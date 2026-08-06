@@ -447,7 +447,18 @@ byte-free tag write above *also* reported `ItemRenamed`, which never happened. T
 - **Self-write suppression:** the stream uses `MarkSelf` and drops `OwnEvent`; there is no `TagWriter` URL
   side channel. Recovery flags override OwnEvent because a unioned batch can also contain external work.
 
-### 4.6 `LibraryIndex` — new (W26.idx), instant warm start
+### 4.6 `LibraryIndex` — new (W26.idx), instant warm start — ✅ SHIPPED 2026-08-05
+
+**Shipped implementation.** `Search/LibraryIndex.swift` is the separate system-SQLite actor at
+`library-index-v1.sqlite3`. It persists every readable regular file, raw tags, label, tracked/verified,
+dataless state and the fresh `(mtime, ctime, size, inode)` tuple under composite byte-exact
+`(root path, marker GUID, file path)` identity. Warm tracked rows publish with cache provenance, then
+`LibraryScan.revalidatedPass` fingerprints the root on a dedicated thread and reads tags only for
+new/changed/unverified paths. Scan provenance makes partial/canceled work non-authoritative; absence applies
+only on a clean pass. SQLite decode/encode/write work polls cancellation every 500 rows. Cache rows are
+freshly re-inspected before any mutation, corpus rename is conditional, dataless rows never reach PDF open,
+and the FSEvents path remains byte-exact through coalescing/containment/inspection. This is clean-slate v1:
+no migration, dual reader or legacy selection-state fallback.
 
 Follows the **existing, proven** `ContentIndex` precedent (`Search/ContentIndex.swift`): an `actor`
 wrapping **system SQLite** (`import SQLite3`, no third-party dependency), living under
@@ -465,7 +476,7 @@ change. Keep them separate; both are disposable caches.
 -- (ArchiveLibrary.swift:110-115, :205-207 both build ArchiveFile through it), so persisting derived
 -- facets (read_state / priority / year) would fork that authority and let the DB disagree with the parser.
 CREATE TABLE entry (
-  path      TEXT PRIMARY KEY,     -- byte-exact as the walk returned it; never NFC/NFD-normalised (§5.3)
+  path      TEXT NOT NULL,        -- byte-exact as the walk returned it; never NFC/NFD-normalised (§5.3)
   root_id   INTEGER NOT NULL,
   name      TEXT NOT NULL,
   ext       TEXT NOT NULL DEFAULT '',
@@ -476,7 +487,9 @@ CREATE TABLE entry (
   tags_raw  TEXT NOT NULL,        -- verbatim array, order preserved
   label     INTEGER,
   tracked   INTEGER NOT NULL,     -- 1 = carries Read/Unread
-  verified  INTEGER NOT NULL      -- 0 = carried over from a scan that did not complete cleanly
+  verified  INTEGER NOT NULL,     -- 0 = carried over from a scan that did not complete cleanly
+  is_dataless INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(root_id, path)
 );
 CREATE INDEX entry_root ON entry(root_id, tracked);
 
@@ -500,10 +513,9 @@ convention is not stylistic: **the write-surface lint bans file-delete APIs app-
 cannot remove a superseded DB** — bumping the name is the only available "migration". No versioned readers,
 no migration code (2026-08-01 no-migration directive).
 
-**Recommend persisting ALL regular files, not just tagged ones** (`tracked` distinguishes them). Measured
-cost on the real corpus: **60 MB and 1.3× the rows** — cheap, and it means an untagged file that *becomes*
-tagged is a one-row update rather than invisible until a full re-walk. Flagged for the owner as a size/benefit
-call.
+**Shipped: persist ALL regular files, not just tagged ones** (`tracked` distinguishes them). Measured cost on
+the real corpus was **60 MB and 1.3× the rows** — cheap, and it means an untagged file that *becomes* tagged
+is a changed-row read rather than absent from the cache universe.
 
 **No back-pressure machinery is needed.** Because the walk is ~10× cheaper than the tag read it feeds, two
 sequential phases are the simplest correct design (proven: two complete 123,028-entry fingerprint
@@ -516,7 +528,8 @@ at 500 rows purely to match `ContentIndex` — measured spread from 500→2000 i
   deleting it loses nothing (same guarantee `ContentIndex` already documents). It is stored **outside
   the corpus**, in app support — never written into an archive folder.
 - **Warm start:** show persisted rows immediately, then revalidate in the background (`stat` each path,
-  re-read tags only where mtime/size moved, plus a full walk to catch additions/removals). The user sees
+  re-read tags only where mtime/**ctime**/size/inode/dataless state moved, plus a full walk to catch
+  additions/removals). The user sees
   rows in milliseconds with a subtle "revalidating…" affordance rather than a 10-second spinner.
 - **Removals** are applied only after the walk **completes successfully** — a cancelled or failed walk
   must never be read as "these files are gone." (`ContentIndexer` already models this hazard with its
@@ -864,7 +877,7 @@ each leaving the app **working**.
 | `W26.walk2` | ✅ **SHIPPED through `6f5d6ad` + completion commit** — Reader Release discovery uses `CorpusWalker`; `PendingWrite` deleted; honest `LibraryPhase`; hostile VM at 0/11 Spotlight-indexed green | L | med | 2 | none | `W26.walk1` |
 | `W26.notsup` | ✅ **SHIPPED in completion commit** — ENOTSUP stays unreadable but gets specific Finder-tag capability guidance; mixed-mount counts preserved | S | low | 1 | none | `W26.walk2` |
 | `W26.fsev` | ✅ **SHIPPED in completion commit** — FSEvents FileEvents/MarkSelf/WatchRoot; exact/subtree/full recovery; SinceNow + catch-up; one active + one queued; real external-xattr test | M | med | 2 | none | `W26.walk2` |
-| `W26.idx` | `LibraryIndex` (SQLite) warm start + background revalidation | L | med | 2 | none | `W26.walk2` |
+| `W26.idx` | ✅ **SHIPPED in completion commit** — SQLite warm start; byte-exact root/path identity; stat/ctime revalidation; honest provenance; cache-write and dataless guards | L | med | 2 | none | `W26.walk2` |
 | `W26.vocab` | Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` | M | low | 1 | none | `W26.walk1` |
 | `W26.oracle` | Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` | S | low | 1 | none | — |
 | `W26.reinfect` | Rewrite the open JPEGS-index item off `NSMetadataQuery` + add its blocking edge | S | low | 1 | none | — |

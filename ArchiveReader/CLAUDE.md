@@ -53,7 +53,8 @@ paths also contain **non-breaking spaces** U+00A0).
 - Color label: `.labelNumberKey` (Red=6 ⇒ box photo, Purple=3 ⇒ folder photo). **Verified:** keeping
   the color-name token (`"Red"`/`"Purple"`) in the tag array and writing `.tagNamesKey` **preserves
   `labelNumber`** without writing it (tested on a Red-labeled scratch copy). Still verify-after-write.
-- Spotlight exposes tags as `kMDItemUserTags`.
+- Reader discovers tags directly from the Finder-tag xattr through `ArchiveCore.TagReading`; it never
+  treats a search index as tag truth.
 
 **Tag facets** (a file's tag array mixes these; classify for display/filter/sort, never lose any):
 - **Year:** 3–4 digits, e.g. `1980` (or `842`). Archive Processor emits 4-digit years; Reader's
@@ -103,10 +104,10 @@ the content index, not a tag.
 > degrades gracefully**: when the classification is missing, fall back to filename-sequence order +
 > manual multi-select. Never build a core behavior that assumes the classification exists.
 
-**Search:** Spotlight (`mdfind`/`NSMetadataQuery`) finds these by tag fast — a compound 3-facet
-query over 6,941 files returned in **0.38s**; `Read OR Unread` in **0.45s**. Scales to 150k (index
-lookups, not scans). Text-content indexing may lag/miss on some locations. **v1 assumes local disk,
-no cloud drives** (cloud support is deferred — long-term; see `POTENTIAL_FEATURES.md`).
+**Search/discovery:** Reader walks the selected archive through `ArchiveCore.CorpusWalker`, restores its
+own disposable SQLite `LibraryIndex` for an instant warm list, revalidates fingerprints/tags in the
+background, and follows external changes with FSEvents. Full-text OCR search uses the separate FTS5 content
+index. Dataless cloud placeholders may be listed but are never materialised for content extraction.
 
 **Chronological sort key:** derived **from the Year/Month/Day tags** into a sortable integer
 (e.g. `year*10000 + month*100 + day`; the arithmetic is BC-capable, though no BC/negative-year token
@@ -141,8 +142,8 @@ add {"1981"}`. All of the following hold for every delta.
    substring (so removing `Unread` never touches a subject `"Read later"`). If the intended target
    is ambiguous, **refuse and surface**, don't guess.
 5. **Compute the new array losslessly:** `new = (fresh − remove) + add`, preserving every untouched
-   token verbatim; append order stable. Never build the write array from Spotlight's
-   `kMDItemUserTags` (lossy/stale). A **no-op delta writes nothing** (no mod-date churn).
+   token verbatim; append order stable. Never build the write array from a persisted discovery row or any
+   external index (both may be stale). A **no-op delta writes nothing** (no mod-date churn).
 6. **Do not request `.documentIdentifierKey`** on read (it can *assign & persist* an identifier —
    a mutation). Use security-scoped bookmarks + re-verify the resolved URL's identity before writing
    (guards against writing to the wrong file after a Finder move). *Mechanism (W14.2):*
@@ -190,10 +191,11 @@ writes against the real corpus — always a copy.
 
 ## Architecture
 
-- **Discovery/filter/sort (tags):** `NSMetadataQuery` scoped to user-granted **archive root(s)**
-  (security-scoped bookmarks). Master universe predicate: `kMDItemUserTags == "Read" ||
-  kMDItemUserTags == "Unread"`. Facet filters combined in-query + in-memory. Live-updating. The
-  filesystem/tags are the **source of truth**.
+- **Discovery/filter/sort (tags):** `ArchiveCore.CorpusWalker` reads the security-scoped archive root;
+  `LibraryIndex` restores byte-exact cached rows and revalidates them against fresh stat/ctime fingerprints;
+  `CorpusWatcher` applies external FSEvents through the same one-path inspection primitive. The UI universe
+  remains files carrying `Read` or `Unread`; facets are parsed and filtered in memory. Filesystem tags are
+  the sole truth, and only a clean completed pass may make absence authoritative.
 - **Content index (full-text + segments):** a background extractor reads each PDF's page-2 text
   **once** and caches: OCR body (for corpus-wide full-text search), the `Classification:` value (for
   document segments + markers), and header metadata (provider/model/OCR-date). Stored in
@@ -308,8 +310,9 @@ writes against the real corpus — always a copy.
 - **Chronological sort key derived from tags** (universal, medieval-safe, no Processor change);
   creation-date native sort is a deferred bonus.
 - **Date Uncertain** sorts by its speculative year, rendered *italic* (never dumped to the end).
-- **Discovery = Spotlight** (`NSMetadataQuery`) over granted archive root(s); universe = files tagged
-  `Read`/`Unread`. No third-party ORM (the content index uses OS SQLite FTS5).
+- **Discovery = owned filesystem truth** over the granted archive root; `LibraryIndex` is an OS-SQLite
+  warm cache, FSEvents supplies live dirtiness, and files tagged `Read`/`Unread` form the visible universe.
+  No third-party ORM.
 - **Subject filters AND by default** (OR/NOT via toggle); read-state is a tri-state filter; "Mark Read"
   never adds a read-state token to a marker/neither file (option, off).
 - **Facet classification is display/sort/filter only** — never drives a write.
@@ -326,7 +329,7 @@ writes against the real corpus — always a copy.
   relaunch. `LibraryFilter.effective(base:user:)` merges for Save/summary.
 - **v1 sandboxed** to a granted root; non-sandboxed whole-Mac search is long-term (behind a `FileAccessProvider` abstraction).
 
-## Implementation map (shipped — v1 + P2 complete, 186 tests, 2026-07-10)
+## Implementation map (shipped)
 
 `macOS/Sources/ArchiveReader/`
 ```
@@ -355,7 +358,12 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               keyboard triage; touches no file — the caller writes via TagWriter.
   AppSettings.swift           UserDefaults-backed option accessors the models read at point of use.
 Search/                       Discovery + disposable caches (never the corpus):
-  ArchiveLibrary.swift        NSMetadataQuery over Read/Unread tags, scoped to the root; live updates.
+  ArchiveLibrary.swift        Warm-cache publication, background revalidation, honest health/absence,
+                              verified-write ordering, and FSEvents merge for one granted root.
+  LibraryIndex.swift          System-SQLite discovery cache: raw tags, stat/ctime fingerprint, dataless
+                              state, byte-exact root/path identity, verified rows + scan provenance.
+  LibraryScan.swift           Dedicated-thread full and fingerprint-diff passes; real monotonic progress.
+  CorpusWatcher.swift         FSEvents exact/subtree/root recovery; byte-exact coalescing + path reads.
   RootFolderStore.swift       Security-scoped bookmark to the archive root.
   ContentIndex.swift          SQLite FTS5 actor (import SQLite3) — full-text + classification; open() is
                               ALL-OR-NOTHING (setup failure ⇒ discardHandle + db = nil) (W23.m9).
@@ -434,7 +442,8 @@ Live sighted loop for the running app: `ops/gui/` (`capture-window.sh` + `clicli
 ## Stack & Build
 
 - Swift 6, SwiftUI (+ AppKit where needed), **XcodeGen** (`project.yml` authoritative; `.xcodeproj`
-  generated & **gitignored**). PDFKit, `NSMetadataQuery`, `NSURL` resource values, `NSFileCoordinator`.
+  generated & **gitignored**). PDFKit, CoreServices/FSEvents, system SQLite3, `NSURL` resource values,
+  `NSFileCoordinator`.
 - Target macOS 14+. Sandbox posture: **v1 sandboxed**, scoped to a user-granted archive root
   (start with the provided test-files folder) via a security-scoped bookmark — OS-enforced
   containment of irreplaceable files. **Non-sandboxed whole-Mac search is planned long-term**, so

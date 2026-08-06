@@ -143,4 +143,19 @@ enum TagWriter {
             return (newTags, label)
         }
     }
+
+    /// Conditional corpus-wide rename. The selection that nominated `url` may have come from a
+    /// persisted cache, so it is not authority that `old` is still present. Re-check inside the same
+    /// coordinated fresh-read transform that writes; if the token disappeared meanwhile, return a
+    /// verified no-op instead of unconditionally adding `new` to the wrong selection set.
+    static func renameToken(from old: String, to new: String, on url: URL,
+                            expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
+        try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+            guard current.contains(where: { shouldRemoveTag($0, matching: old) }) else { return nil }
+            var renamed = current.filter { !shouldRemoveTag($0, matching: old) }
+            if !renamed.contains(where: { isSameTag($0, new) }) { renamed.append(new) }
+            if renamed == current { return nil }
+            return (renamed, label)
+        }
+    }
 }

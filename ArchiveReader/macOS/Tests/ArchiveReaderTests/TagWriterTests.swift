@@ -28,7 +28,7 @@ final class TagWriterTests: XCTestCase {
     }
 
     private func readTags(_ url: URL) throws -> [String] {
-        (try url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
+        (try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
     }
     private func readLabel(_ url: URL) throws -> Int? {
         try url.resourceValues(forKeys: [.labelNumberKey]).labelNumber
@@ -76,6 +76,31 @@ final class TagWriterTests: XCTestCase {
         // Assert the delta applied cleanly and preserved existing tags (defensive check on the primitive).
         XCTAssertTrue(Set(try readTags(url)).isSuperset(of: ["Jerry Brown", "Unread"]))
         _ = r
+    }
+
+    func testConditionalRenameRechecksOldTokenAndDoesNotAddToAStaleSelection() throws {
+        let url = try makeFile("conditional-stale.pdf", tags: ["Unread", "Subject/Current"])
+        let bytesBefore = try Data(contentsOf: url)
+
+        let result = try TagWriter.renameToken(from: "Subject/Old", to: "Subject/New", on: url)
+
+        XCTAssertTrue(result.isNoOp)
+        XCTAssertEqual(try readTags(url), ["Unread", "Subject/Current"])
+        XCTAssertFalse(try readTags(url).contains("Subject/New"),
+                       "a persisted-cache selection is not proof the old tag still exists")
+        XCTAssertEqual(try Data(contentsOf: url), bytesBefore)
+    }
+
+    func testConditionalRenameChangesOnlyAStillPresentOldToken() throws {
+        let url = try makeFile("conditional-present.pdf",
+                               tags: ["Unread", "Subject/Old", "1980", "P8"])
+        let bytesBefore = try Data(contentsOf: url)
+
+        let result = try TagWriter.renameToken(from: "Subject/Old", to: "Subject/New", on: url)
+
+        XCTAssertFalse(result.isNoOp)
+        XCTAssertEqual(Set(try readTags(url)), ["Unread", "Subject/New", "1980", "P8"])
+        XCTAssertEqual(try Data(contentsOf: url), bytesBefore)
     }
 
     func testMarkReadIsNoOpOnFileWithoutReadState() throws {

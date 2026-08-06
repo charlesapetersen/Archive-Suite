@@ -1,6 +1,29 @@
 import Foundation
 import UniformTypeIdentifiers
 
+/// A syscall-fresh identity/freshness tuple for one regular corpus file.
+///
+/// `mtime` is content freshness; `ctime` is metadata freshness and is load-bearing because a Finder
+/// tag-only write changes ctime without changing mtime. `size` and `inode` close same-timestamp rewrite
+/// and path-replacement holes. Values come from one following `stat(2)`, never `URL.resourceValues`,
+/// whose backing `NSURL` caches values and can make a revalidation silently observe its old answer.
+public struct CorpusFileFingerprint: Sendable, Equatable {
+    public let mtime: TimeInterval
+    public let ctime: TimeInterval
+    public let size: Int64
+    public let inode: UInt64
+    public let isDataless: Bool
+
+    public init(mtime: TimeInterval, ctime: TimeInterval, size: Int64, inode: UInt64,
+                isDataless: Bool) {
+        self.mtime = mtime
+        self.ctime = ctime
+        self.size = size
+        self.inode = inode
+        self.isDataless = isDataless
+    }
+}
+
 /// One file the walk found and could fully read.
 ///
 /// Deliberately NOT `ArchiveFile` (the Reader's row model): this is the shared, UI-free shape both apps
@@ -22,15 +45,58 @@ public struct CorpusEntry: Sendable, Equatable {
     /// tags does not materialise it; opening it for text extraction WOULD (plan §7a.10), so this
     /// travels with the entry to let a later indexer skip it rather than download the corpus.
     public let isDataless: Bool
+    /// The fresh `stat(2)` tuple captured by the same inspection that read these tags. Optional only
+    /// for source compatibility with synthetic test rows; real `CorpusWalker` results always set it.
+    public let fingerprint: CorpusFileFingerprint?
 
     public init(url: URL, tagNames: [String], labelNumber: Int?, contentModified: Date?,
-                contentTypeIdentifier: String?, isDataless: Bool) {
+                contentTypeIdentifier: String?, isDataless: Bool,
+                fingerprint: CorpusFileFingerprint? = nil) {
         self.url = url
         self.tagNames = tagNames
         self.labelNumber = labelNumber
         self.contentModified = contentModified
         self.contentTypeIdentifier = contentTypeIdentifier
         self.isDataless = isDataless
+        self.fingerprint = fingerprint
+    }
+}
+
+/// One entry in the cheap, tag-free revalidation walk.
+public struct CorpusFingerprintEntry: Sendable, Equatable {
+    public let url: URL
+    public let fingerprint: CorpusFileFingerprint
+
+    public init(url: URL, fingerprint: CorpusFileFingerprint) {
+        self.url = url
+        self.fingerprint = fingerprint
+    }
+}
+
+/// What a fingerprint-only walk established. It deliberately has the same honest absence gate as
+/// `CorpusScanResult`: a cancelled/denied/partial walk cannot turn missing cache rows into deletions.
+public struct CorpusFingerprintScanResult: Sendable {
+    public let entries: [CorpusFingerprintEntry]
+    public let unreadable: [CorpusReadFailure]
+    public let directoryErrors: [CorpusReadFailure]
+    public let filesSeen: Int
+    public let vanishedMidScan: Int
+    public let rootUnreadable: Bool
+    public let cancelled: Bool
+
+    public var completed: Bool { !rootUnreadable && !cancelled }
+    public var isClean: Bool { completed && unreadable.isEmpty && directoryErrors.isEmpty }
+
+    public init(entries: [CorpusFingerprintEntry], unreadable: [CorpusReadFailure],
+                directoryErrors: [CorpusReadFailure], filesSeen: Int, vanishedMidScan: Int,
+                rootUnreadable: Bool, cancelled: Bool) {
+        self.entries = entries
+        self.unreadable = unreadable
+        self.directoryErrors = directoryErrors
+        self.filesSeen = filesSeen
+        self.vanishedMidScan = vanishedMidScan
+        self.rootUnreadable = rootUnreadable
+        self.cancelled = cancelled
     }
 }
 
@@ -107,6 +173,11 @@ public struct CorpusScanBatch: Sendable {
     public let entries: [CorpusEntry]
     /// Regular files seen so far across the whole pass.
     public let filesSeen: Int
+
+    public init(entries: [CorpusEntry], filesSeen: Int) {
+        self.entries = entries
+        self.filesSeen = filesSeen
+    }
 }
 
 /// The authoritative read-side classification of one path.
@@ -199,13 +270,20 @@ public enum CorpusWalker {
                                predicate: @escaping @Sendable ([String]) -> Bool = tracksReadState)
         -> CorpusPathInspection {
         withDatalessMaterializationDisabled {
-            let url = URL(fileURLWithPath: path.path)
+            // Reconstruct a fresh NSURL (to defeat resource-value caching) from the filesystem
+            // representation, not `path.path`: `URL(fileURLWithPath:)` normalises composed Unicode
+            // and violates the index's byte-exact path contract.
+            let url = path.withUnsafeFileSystemRepresentation { raw in
+                guard let raw else { return path }
+                return URL(fileURLWithFileSystemRepresentation: raw,
+                           isDirectory: false, relativeTo: nil)
+            }
             switch FileStat.capture(url) {
             case .vanished:
                 return .vanished
             case let .failed(reason):
                 return .unreadable(CorpusReadFailure(url: url, reason: reason))
-            case let .ok(isRegularFile, isDirectory, isDirectorySymbolicLink, isDataless):
+            case let .ok(isRegularFile, isDirectory, isDirectorySymbolicLink, fingerprint):
                 if isDirectorySymbolicLink { return .directorySymbolicLink }
                 if isDirectory { return .directory }
                 guard isRegularFile else { return .nonRegular }
@@ -229,7 +307,8 @@ public enum CorpusWalker {
                                                 labelNumber: labelNumber,
                                                 contentModified: values.contentModificationDate,
                                                 contentTypeIdentifier: values.contentType?.identifier,
-                                                isDataless: isDataless))
+                                                isDataless: fingerprint.isDataless,
+                                                fingerprint: fingerprint))
                 }
             }
         }
@@ -315,7 +394,7 @@ public enum CorpusWalker {
                 // We cannot even tell what this is. Honest answer: unknown, so the pass is not clean.
                 unreadable.append(CorpusReadFailure(url: url, reason: reason))
                 continue
-            case let .ok(isRegularFile, _, _, isDataless):
+            case let .ok(isRegularFile, _, _, fingerprint):
                 guard isRegularFile else { continue }   // directories, symlinks to dirs, devices…
                 filesSeen += 1
                 // Progress is about files EXAMINED, not matches found. The old match-sized batching
@@ -352,7 +431,8 @@ public enum CorpusWalker {
                                         labelNumber: labelNumber,
                                         contentModified: values.contentModificationDate,
                                         contentTypeIdentifier: values.contentType?.identifier,
-                                        isDataless: isDataless)
+                                        isDataless: fingerprint.isDataless,
+                                        fingerprint: fingerprint)
                     entries.append(e)
                     batch.append(e)
                 }
@@ -370,6 +450,68 @@ public enum CorpusWalker {
                                 vanishedMidScan: vanished,
                                 rootUnreadable: false,
                                 cancelled: cancelled)
+    }
+
+    /// Walk only regular-file `stat(2)` fingerprints — no tag or content/resource-value reads.
+    ///
+    /// This is the warm-start revalidation first phase: one cheap, fresh syscall per enumerated path,
+    /// then callers compare against a persisted map and run the full trustworthy tag read only for
+    /// new/changed/unverified rows. Byte-exact paths are preserved exactly as enumeration returned.
+    public static func scanFingerprints(
+        root: URL,
+        options: Options = Options(),
+        isCancelled: @Sendable () -> Bool = { false },
+        onProgress: (@Sendable (Int) -> Void)? = nil
+    ) -> CorpusFingerprintScanResult {
+        withDatalessMaterializationDisabled {
+            var entries: [CorpusFingerprintEntry] = []
+            var unreadable: [CorpusReadFailure] = []
+            var filesSeen = 0
+            var vanished = 0
+            var cancelled = false
+            let errorSink = ErrorSink()
+            let fm = FileManager()
+
+            guard let enumerator = fm.enumerator(
+                at: root,
+                includingPropertiesForKeys: nil,
+                options: options.enumerationOptions,
+                errorHandler: { url, error in
+                    errorSink.record(url: url, reason: error.localizedDescription)
+                    return true
+                }
+            ) else {
+                return CorpusFingerprintScanResult(entries: [], unreadable: [], directoryErrors: [],
+                                                   filesSeen: 0, vanishedMidScan: 0,
+                                                   rootUnreadable: true, cancelled: false)
+            }
+
+            while let object = enumerator.nextObject() {
+                if isCancelled() { cancelled = true; break }
+                guard let url = object as? URL else { continue }
+                switch FileStat.capture(url) {
+                case .vanished:
+                    vanished += 1
+                case let .failed(reason):
+                    unreadable.append(CorpusReadFailure(url: url, reason: reason))
+                case let .ok(isRegularFile, _, _, fingerprint):
+                    guard isRegularFile else { continue }
+                    filesSeen += 1
+                    entries.append(CorpusFingerprintEntry(url: url, fingerprint: fingerprint))
+                    if filesSeen.isMultiple(of: options.batchSize) { onProgress?(filesSeen) }
+                }
+            }
+
+            if !filesSeen.isMultiple(of: options.batchSize) { onProgress?(filesSeen) }
+
+            return CorpusFingerprintScanResult(entries: entries,
+                                               unreadable: unreadable,
+                                               directoryErrors: errorSink.drain(),
+                                               filesSeen: filesSeen,
+                                               vanishedMidScan: vanished,
+                                               rootUnreadable: false,
+                                               cancelled: cancelled)
+        }
     }
 
     // MARK: - Off-main execution
@@ -458,7 +600,7 @@ public enum CorpusWalker {
 /// the full `FileManager` enumeration intentionally skips.
 enum FileStat {
     case ok(isRegularFile: Bool, isDirectory: Bool,
-            isDirectorySymbolicLink: Bool, isDataless: Bool)
+            isDirectorySymbolicLink: Bool, fingerprint: CorpusFileFingerprint)
     case vanished
     case failed(String)
 
@@ -487,11 +629,22 @@ enum FileStat {
             let isDirectorySymbolicLink = isDirectory
                 && lstat(rawPath, &linkInfo) == 0
                 && (linkInfo.st_mode & S_IFMT) == S_IFLNK
+            let fingerprint = CorpusFileFingerprint(
+                mtime: timestamp(info.st_mtimespec),
+                ctime: timestamp(info.st_ctimespec),
+                size: info.st_size,
+                inode: UInt64(info.st_ino),
+                isDataless: (info.st_flags & UInt32(SF_DATALESS)) != 0
+            )
             return .ok(isRegularFile: (info.st_mode & S_IFMT) == S_IFREG,
                        isDirectory: isDirectory,
                        isDirectorySymbolicLink: isDirectorySymbolicLink,
-                       isDataless: (info.st_flags & UInt32(SF_DATALESS)) != 0)
+                       fingerprint: fingerprint)
         }
+    }
+
+    private static func timestamp(_ value: timespec) -> TimeInterval {
+        TimeInterval(value.tv_sec) + TimeInterval(value.tv_nsec) / 1_000_000_000
     }
 
     /// Did this path disappear? Used to tell churn from denial when a *later* read fails.

@@ -80,6 +80,12 @@ final class CorpusWalkerTests: XCTestCase {
         url.resolvingSymlinksInPath().standardizedFileURL.pathComponents
     }
 
+    private func fileSystemBytes(_ url: URL) -> [UInt8] {
+        url.withUnsafeFileSystemRepresentation { raw in
+            raw.map { Array(String(cString: $0).utf8) } ?? []
+        }
+    }
+
     // MARK: - 1. The exact membership set
 
     func testScanReturnsExactlyTheReadUnreadTaggedFilesOnAMixedFixture() throws {
@@ -171,6 +177,25 @@ final class CorpusWalkerTests: XCTestCase {
         }
         XCTAssertEqual(entry.tagNames, ["Read", "Subject/New"],
                        "the event read must see disk, not a cached resource-value snapshot")
+    }
+
+    func testInspectRefreshesURLWithoutNormalisingItsFilesystemSpelling() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let path = root.path + "/caf\u{e9}.pdf"
+        let url = path.withCString {
+            URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: nil)
+        }
+        try Data("PDF".utf8).write(to: url)
+        try (url as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+        let spelling = fileSystemBytes(url)
+
+        guard case let .tracked(entry) = CorpusWalker.inspect(url) else {
+            return XCTFail("the exact-spelling fixture must remain tracked")
+        }
+
+        XCTAssertEqual(fileSystemBytes(entry.url), spelling,
+                       "fresh inspection must not round-trip the path through NFC/NFD")
     }
 
     func testInspectDistinguishesADirectorySymlinkFromARealDirectory() throws {
@@ -399,7 +424,83 @@ final class CorpusWalkerTests: XCTestCase {
                        "without this the enumerator stalls ~0.5 s per call on a cloud volume, then lies")
     }
 
-    // MARK: - 6. Off-main execution
+    // MARK: - 6. W26.idx fingerprint-only revalidation
+
+    func testFingerprintScanReturnsEveryRegularFileWithoutReadingTagMembership() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try makeFile("tagged.pdf", tags: ["Unread", "Subject/Z"], in: root)
+        try makeFile("untagged.pdf", in: root)
+        let awkward = "Nested/report\u{2014}final\u{00A0}copy.pdf"
+        try makeFile(awkward, tags: ["Purple"], in: root)
+        try makeFile(".hidden.pdf", tags: ["Read"], in: root)
+
+        let result = CorpusWalker.scanFingerprints(root: root)
+        let rootComponents = normalized(root)
+        let paths = result.entries.map { item -> String in
+            normalized(item.url).dropFirst(rootComponents.count).joined(separator: "/")
+        }.sorted()
+
+        XCTAssertEqual(paths, [awkward, "tagged.pdf", "untagged.pdf"].sorted())
+        XCTAssertEqual(result.filesSeen, 3)
+        XCTAssertTrue(result.isClean)
+        XCTAssertTrue(result.entries.allSatisfy { $0.fingerprint.size > 0 })
+        XCTAssertTrue(result.entries.allSatisfy { !$0.fingerprint.isDataless })
+    }
+
+    func testOrdinaryScanCarriesTheSameFreshFingerprintUsedByTheIndex() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = try makeFile("tracked.pdf", tags: ["Unread"], in: root)
+
+        let ordinary = try XCTUnwrap(CorpusWalker.scan(root: root).entries.first)
+        let cheap = try XCTUnwrap(CorpusWalker.scanFingerprints(root: root).entries.first)
+
+        XCTAssertEqual(normalized(ordinary.url), normalized(url),
+                       "the temp directory may be spelled /var or /private/var")
+        XCTAssertEqual(ordinary.fingerprint, cheap.fingerprint,
+                       "the persisted tuple must describe the same fresh stat as a full tag read")
+    }
+
+    func testTagOnlyChangeInvalidatesFingerprintThroughCtimeNotMtime() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = try makeFile("changed.pdf", tags: ["Unread"], in: root)
+        let before = try XCTUnwrap(CorpusWalker.scanFingerprints(root: root).entries.first?.fingerprint)
+
+        var after = before
+        for i in 0..<20 where after.ctime == before.ctime {
+            try (fresh(url.path) as NSURL).setResourceValue(["Read", "Subject/\(i)"],
+                                                            forKey: .tagNamesKey)
+            after = try XCTUnwrap(CorpusWalker.scanFingerprints(root: root).entries.first?.fingerprint)
+        }
+
+        XCTAssertEqual(after.mtime, before.mtime,
+                       "Finder tags are metadata and must not masquerade as a content change")
+        XCTAssertNotEqual(after.ctime, before.ctime,
+                          "ctime is load-bearing: otherwise a closed-app tag edit reuses stale tags")
+        XCTAssertEqual(after.size, before.size)
+        XCTAssertEqual(after.inode, before.inode)
+    }
+
+    func testCancelledFingerprintScanCannotAuthoriseAbsence() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for i in 0..<20 { try makeFile(String(format: "f%02d.pdf", i), in: root) }
+        let polls = UncheckedBox(0)
+
+        let result = CorpusWalker.scanFingerprints(root: root, isCancelled: {
+            polls.value += 1
+            return polls.value > 5
+        })
+
+        XCTAssertTrue(result.cancelled)
+        XCTAssertFalse(result.completed)
+        XCTAssertFalse(result.isClean)
+        XCTAssertLessThan(result.entries.count, 20)
+    }
+
+    // MARK: - 7. Off-main execution
 
     func testScanDetachedProducesTheSameResultOffTheCallingThread() async throws {
         let root = tempDir.appendingPathComponent("root", isDirectory: true)
@@ -437,7 +538,7 @@ final class CorpusWalkerTests: XCTestCase {
                        "a ~10 s blocking walk must run on our own thread, not a cooperative-pool one")
     }
 
-    // MARK: - 7. Symlinks are classified by their target
+    // MARK: - 8. Symlinks are classified by their target
 
     func testASymlinkIsClassifiedByItsTargetJustAsTheWritePathWouldBe() throws {
         let root = tempDir.appendingPathComponent("root", isDirectory: true)

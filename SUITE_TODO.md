@@ -289,38 +289,18 @@ passes as misses, and proved unreadable subtrees cannot erase prior rows. VM ver
 hostile: Spotlight indexed **0/11** fixture files while Reader still rendered all 11; the full pre-existing
 16-test GUI suite and the new denominator check passed. The accepted one-time content-index re-extraction
 from switching mtime sources remains deliberate; the database version is unchanged.
-- [ ] **W26.idx — `LibraryIndex` (SQLite) warm start + background revalidation [L · med · Tier-2 ·
-  needs: none] (blocked-on: W26.walk2).** Follow the proven `ContentIndex` precedent exactly: an `actor`
-  over **system SQLite** (`import SQLite3`, no third-party dep), in `.applicationSupportDirectory`, schema
-  changes by **bumping the filename** (no migration — nothing to migrate). **Sibling store, not an
-  extension of `ContentIndex`** (discovery must work *before* content extraction, which is populated *from*
-  the library). Warm start renders persisted rows in ms, then revalidates in the background. Removals apply
-  **only after a walk completes successfully** — a cancelled walk must never read as "these files are gone"
-  (reuse `ContentIndexer`'s two-snapshot prune / `rootPrefix` eviction shape, `ContentIndexer.swift:361-420`).
-  ⚠️ **The trap that will get this wrong:** `URL.resourceValues` **caches on the backing `NSURL`** (measured
-  W23.m11-fu — a 100→250-byte rewrite read back unchanged on the same `URL` value), so a revalidation pass
-  that reuses `URL` values is **silently a no-op**. Use `stat(2)` via `withUnsafeFileSystemRepresentation`
-  for every freshness check. Also: store paths byte-exactly (em dash + NBSP filenames) — never round-trip
-  through NFC/NFD, or every launch re-indexes the corpus. **Schema:** an `entry` table storing the **raw**
-  tag array only (`DocumentTags.parse` is the single parse authority — persisting derived facets would fork
-  it) with fingerprint `(mtime, ctime, size, ino)` — **`ctime` is load-bearing, not belt-and-braces, because
-  a tag write bumps ctime ONLY** — plus a `tracked` and a `verified` flag; **and a `scan` provenance table**
-  (`started`, `finished`, `files_seen`, `dir_errors`, `outcome`) which is what lets honest status survive a
-  relaunch at all (`ContentIndexer`'s `Failure` is `@Published` in memory and lost on quit, so a warm start
-  today cannot tell "these rows are correct" from "these are what a half-failed scan saw"). Name it
-  `library-index-v1.sqlite3`; bump the filename for any schema change — **not stylistic: the write-surface
-  lint bans file-delete APIs app-wide, so the app literally cannot remove a superseded DB.** Recommend
-  persisting **all** regular files, not just tagged ones (measured: +60 MB, 1.3× rows) so a newly-tagged file
-  is a one-row update — owner call. **No back-pressure machinery:** the walk is ~10× cheaper than the tag
-  read it feeds, so two sequential phases suffice (walk → one `SELECT` → diff → read tags for the diff only);
-  no `AsyncStream`, no semaphore. Batch at 500 to match `ContentIndex` (500→2000 spread is 15%, not a lever).
-  ⚠️ **The Reader's write-surface lint
-  (`ArchiveReader/scripts/lint-write-surface.sh:20-25`) bans `createFile`, `FileHandle forWriting`,
-  `.write(to:)` and the `FileManager` mutators across the WHOLE app target**, so this cache must persist
-  through the **SQLite3 C API** exactly as `ContentIndex.swift` does — not `Data.write(to:)`, not
-  `FileManager`. Don't discover that at the lint gate. **Test:** cold index → quit → warm start shows
-  rows before any walk finishes, **and** a file whose tags changed while the app was closed is corrected on
-  revalidation (this is the test that catches the caching trap).
+✅ **W26.idx — SHIPPED 2026-08-05 (this commit); full entry in `SUITE_TODO_DONE.md`.** Reader now owns a
+separate system-SQLite `LibraryIndex`: byte-exact `(root path, marker GUID, file path)` identity, raw tags,
+fresh `(mtime, ctime, size, inode, dataless)` fingerprints, every regular file, and honest scan provenance.
+Warm rows render immediately as cache/revalidating, while a dedicated-thread fingerprint pass re-reads tags
+only for changed/new/unverified paths and makes absence authoritative only after a clean pass. Cache rows are
+re-read before any write target/delta is chosen; corpus-wide renames are conditional. Dataless rows never
+reach PDF extraction. Canceled 150k-row SQLite work yields every 500 rows, and NFC/NFD spellings remain
+distinct through persistence, FSEvents coalescing, containment and exact live reads. The store is a new v1
+cache with no migration or legacy-state fallback, as directed. Fixture roots answer NO to the persisted
+index through a single `usesPersistedIndex` predicate — on ⌘⌥R as well as launch, which is where they had
+been escaping onto the real Application Support database from unit tests. **Scale and VM verification were
+not run for this item and are carried into `W26.verify`.**
 - [ ] **W26.vocab — Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` [M · low ·
   Tier-1 · needs: none] (blocked-on: W26.walk1).** Its `NSMetadataQueryUserHomeScope` +
   `kMDItemUserTags LIKE "*"` harvests every tag in the **whole home folder** — a scope no per-root walk
@@ -370,6 +350,21 @@ from switching mtime sources remains deliberate; the database version is unchang
   `grep -rn "NSMetadataQuery\|kMDItem\|mdfind"` over `ArchiveReader/`, `ArchiveProcessor/`, `packages/` and
   `scripts/` returns **nothing but historical comments**. Then flip the wave and delete
   `execution-plans/despotlight.md`.
+  ⚠️ **Carried here from `W26.idx` (2026-08-05).** `W26.idx` shipped its per-item gate — ArchiveCore
+  154+105, Reader 351/351 executed unit tests, Reader Release, Processor Debug, Notes 189+738, lint +
+  self-test 12/12 — but **its scale and VM lanes were never run** (the authoring session lost its tooling
+  mid-item and the checks were completed afterwards from the preserved worktree). Two things W26.idx
+  therefore owes this item, and neither is covered by any test that exists today:
+  **(a) warm-start scale.** The 100k+ run must now time **three** states, not one: cold first walk
+  (fingerprint + full tag read, the ~12 s figure above), **warm start** (cache publish → first paint,
+  which is the number the whole item exists to move), and **steady revalidation** (fingerprint pass with
+  ~0 changed rows). Record the SQLite file size and peak RSS at 150k rows; the cache is disposable, so a
+  ballooning file is a bug, not a cost. Cancel a warm revalidation mid-pass and confirm the next launch
+  reports `asOf == nil` and prunes nothing.
+  **(b) the VM GUI lane.** No host-screen or VM UI check has ever been run against the warm-start UI:
+  confirm cached rows paint as *revalidating* (not settled), that the settled sentence still quotes its
+  examined-file denominator afterwards, and that a warm row selected before revalidation completes is
+  re-verified rather than written blind. `ops/gui/vm-gui-runner.sh` — never the host screen.
 
 ## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN
 

@@ -105,6 +105,36 @@ final class CorpusWatchRequestTests: XCTestCase {
                                                 flags: [0])
         XCTAssertTrue(request.isEmpty)
     }
+
+    func testCanonicalEquivalentEventPathsRemainByteDistinct() {
+        let composed = root.path + "/caf\u{e9}.pdf"
+        let decomposed = root.path + "/cafe\u{301}.pdf"
+        XCTAssertEqual(composed, decomposed, "precondition: ordinary Swift equality collapses them")
+
+        let request = CorpusWatchRequest.reduce(root: root, paths: [composed, decomposed], flags: [0, 0])
+
+        XCTAssertEqual(request.paths.count, 2,
+                       "coalescing must retain both filesystem spellings for independent re-reads")
+        XCTAssertTrue(request.paths.contains(composed))
+        XCTAssertTrue(request.paths.contains(decomposed))
+        XCTAssertFalse(CorpusWatchRequest.contains(
+            root.path + "/cafe\u{301}/child.pdf", under: root.path + "/caf\u{e9}"
+        ), "canonical-equivalent directory names are not the same containment boundary")
+        XCTAssertTrue(CorpusWatchRequest.contains("/tmp/archive/file.pdf", under: "/"),
+                      "selecting the filesystem root must retain every absolute descendant event")
+        // Every component visible: the cursor arithmetic must reconstruct `/Users`, then
+        // `/Users/Shared` — a dropped or doubled first separator resolves neither.
+        XCTAssertTrue(CorpusWatchEligibility.includes(
+            ExactFileURL.make("/Users/Shared/archive-fixture.pdf"),
+            under: ExactFileURL.make("/", isDirectory: true)
+        ), "root eligibility must not drop or double the first path separator")
+        // And the launch walk's `.skipsHiddenFiles` universe still applies to the FIRST component.
+        // macOS marks `/tmp` hidden, so an event under it is not eligible even when the root is `/`.
+        XCTAssertFalse(CorpusWatchEligibility.includes(
+            ExactFileURL.make("/tmp/archive/file.pdf"),
+            under: ExactFileURL.make("/", isDirectory: true)
+        ), "a hidden first component stays outside the walk's universe, root or not")
+    }
 }
 
 @MainActor
@@ -161,6 +191,53 @@ final class CorpusWatcherLibraryTests: XCTestCase {
         }
         XCTAssertEqual(library.rootScanStartsForTesting, scansBefore,
                        "an ordinary file event is one stat/tag read, not a full-corpus walk")
+    }
+
+    func testComposedFilenameEventKeepsItsExactFilesystemSpellingThroughLiveRead() async throws {
+        let root = try makeRoot()
+        // Create with the COMPOSED spelling, then adopt whatever the volume actually stored — this
+        // boot volume writes the decomposed form. Emitting the test's own composed spelling instead
+        // would feed the library an event FSEvents can never deliver (both the walk and the callback
+        // report the same on-disk bytes), and the row it added would be a SECOND row for one file.
+        try Data("fixture".utf8).write(to: ExactFileURL.make(root.path + "/caf\u{e9}.pdf"))
+        let onDisk = try XCTUnwrap(FileManager.default
+            .contentsOfDirectory(at: root, includingPropertiesForKeys: nil).first)
+        let path = fileSystemPath(onDisk)
+        let file = ExactFileURL.make(path)
+        try (file as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+        let capture = MockWatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0, libraryIndexURL: nil) { _, handler in
+            let watcher = MockCorpusWatcher(handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        library.start(scope: root)
+        try await waitUntil { library.phase.isSettled }
+        // BYTES, not `String ==`. Swift string equality is canonical, so comparing the spellings as
+        // strings passes for an NFC/NFD mismatch — the exact failure this test exists to catch.
+        XCTAssertEqual(library.files.first.map { Array(fileSystemPath($0.url).utf8) },
+                       Array(path.utf8),
+                       "precondition: launch discovery retained the on-disk spelling byte-for-byte")
+
+        try (ExactFileURL.make(path) as NSURL).setResourceValue(["Read", "Subject/Exact"],
+                                                                forKey: .tagNamesKey)
+        let request = CorpusWatchRequest.reduce(root: root, paths: [path], flags: [0])
+        XCTAssertTrue(request.paths.contains(path), "the exact callback path survives reduction")
+        capture.latest?.emit(request)
+
+        try await waitUntil {
+            library.files.first?.readState == .read
+                && library.files.first?.subjects == ["Subject/Exact"]
+        }
+        XCTAssertEqual(library.files.count, 1,
+                       "the live read must UPDATE the discovered row, never add a lookalike beside it")
+        XCTAssertEqual(library.files.first.map { Array(fileSystemPath($0.url).utf8) },
+                       Array(path.utf8),
+                       "live inspection must update the exact row, not an NFC/NFD lookalike")
+    }
+
+    private func fileSystemPath(_ url: URL) -> String {
+        url.withUnsafeFileSystemRepresentation { $0.map(String.init(cString:)) ?? url.path }
     }
 
     func testMustScanSubDirsReplacesOnlyThatSubtree() async throws {
@@ -292,7 +369,10 @@ final class CorpusWatcherLibraryTests: XCTestCase {
             return watcher
         }
         var resolutions = 0
-        library.setRootResolver { resolutions += 1; return rootB }
+        library.setRootResolver {
+            resolutions += 1
+            return ResolvedLibraryRoot(url: rootB, markerGUID: nil)
+        }
         library.start(scope: rootA)
         try await waitUntil { library.phase.isSettled }
 

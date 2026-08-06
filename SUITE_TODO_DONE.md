@@ -178,6 +178,81 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   No real corpus write, move, rename, delete, content read, or Spotlight query was used; no host-screen UI
   automation is part of this proof.
 
+- [x] **W26.idx — `LibraryIndex` (SQLite) warm start + background revalidation [L · med · Tier-2].
+  ✅ SHIPPED 2026-08-05** — this commit.
+  **Durable discovery cache.** `LibraryIndex` is a sibling of `ContentIndex`: a system-SQLite actor at
+  `library-index-v1.sqlite3`, outside the corpus, populated only through the SQLite C API. This is a new v1
+  format with no migration, dual reader, or legacy selection-state fallback. Root identity is the conjunction
+  of its byte-exact resolved path and durable marker GUID; parent/nested roots and a replacement mounted at the
+  same pathname remain separate. The entry key is `(root_id, byte-exact path)` and stores every readable
+  regular file, raw tag order, label, `tracked`, `verified`, dataless state, and a fresh
+  `(mtime, ctime, size, inode)` stat fingerprint. `DocumentTags.parse` remains the only facet authority.
+  `started`/`finished` scan provenance, counts, errors and outcome distinguish a clean settled snapshot from
+  an interrupted/partial rewrite after relaunch. Only a clean pass verifies rows and applies absence.
+  **Warm and revalidate.** A current snapshot publishes tracked rows immediately with explicit
+  `.cache(asOf:)` provenance and `.revalidating` phase. A dedicated thread then scans cheap fingerprints for
+  all regular paths and reuses raw tags only when a previously verified tuple matches exactly; ctime forces a
+  read after Finder tag-only edits. New, changed and unverified paths use the same fresh
+  `CorpusWalker.inspect` primitive as full/live discovery. Fingerprint batches report real cold progress;
+  tag-phase batches keep the denominator monotonic. The SQLite snapshot, tag encoding and writes poll
+  cancellation every 500 rows, leaving a canceled scan unfinished/unverified so a root switch is not queued
+  behind 150k stale operations. Rows publish only after the durable commit, while verified Reader writes that
+  land during that commit still outrank the older scan.
+  **Byte and trust boundaries.** URLs are reconstructed from filesystem representations, never
+  `URL(fileURLWithPath:)`. `LibraryIndexPath` hashes UTF-8 bytes and enforces absolute component containment;
+  canonically equivalent NFC/NFD names remain independent. Adversarial review extended that guarantee through
+  the live path: FSEvent exact/subtree sets now use byte keys, root comparisons and containment are byte-level
+  (including `/`), and each live read/eligibility probe reconstructs the exact reported pathname. Corrupt
+  out-of-root database rows may be loaded for diagnosis/eviction but never rendered or used as write targets.
+  **Writes and cloud placeholders.** Cached rows are useful for display, never authority for a mutation.
+  `NavigationModel` freshly re-inspects the cache-provenance subset before mark/group/inline/rename actions;
+  missing, unreadable, untracked or out-of-root rows are rejected while valid neighbours proceed. Corpus-wide
+  rename uses `TagWriter.renameToken`, which re-reads under coordination and writes only if the old token still
+  exists. `ArchiveFile` carries dataless state; `ContentIndexer` deletes stale disposable FTS rows for
+  placeholders, filters them before scheduling, and wraps the actual PDF-open boundary in the thread-scoped
+  no-materialisation policy to close the discovery→open race.
+  **Adversarial completion.** Review findings fixed before ship include old-root publication during the new
+  root's async prepare gap; verified writes overwritten while SQLite committed; canceled actor work running to
+  completion; cold fingerprint progress stuck at zero; partial SQLite steps presented as EOF; stale cached
+  selections becoming write targets; normalized composed filenames missing live updates; corrupt outside-root
+  cache rows; and weak dataless tests that observed only an intermediate deletion. Regression coverage includes
+  cold→quit→warm→changed-while-closed, partial/crashed provenance, nested and replaced roots, byte-distinct
+  canonical names, a forced SQLite step error, deterministic batch cancellation, root-switch and commit/write
+  races, mixed cache/disk bulk writes, zero PDF-open calls for dataless rows, and the policy at the race-path
+  open boundary. All fixtures and databases are disposable scratch data; no real corpus was read or written.
+  🔺 **The gate ran AFTER the implementation session ended, and it was not green on arrival.** That session
+  lost its tooling before the suite-wide lanes, so the work sat uncommitted in a preserved worktree with
+  only focused Reader tests and ArchiveCore behind it. Completing the gate failed **three** Reader tests,
+  and one of them was a real defect in this item:
+  **(1) `ArchiveLibrary` — fixture roots escaped onto the persisted index via ⌘⌥R.** `start(scope:)`
+  checked `ARUITestRootPath` and stayed synchronous, but `rescan()` → `requestRootRescan` →
+  `drainWatchWork` did not, so a rescan on a fixture root took the **async** indexed path and opened the
+  **real Application Support database from a unit test** — breaking the synchrony every fixture test is
+  calibrated against (`DeepLinkTests.testDegradedDiscoveryNeverCountsAsDocumentNotFound` asserted a
+  post-`rescan()` failure state that could no longer exist yet, and took 122 s to fail). Both sites now go
+  through one `usesPersistedIndex` predicate, so the fixture answer cannot diverge by call path again.
+  **(2) A byte-exactness test that could not fail.**
+  `testComposedFilenameEventKeepsItsExactFilesystemSpellingThroughLiveRead` compared spellings with
+  `XCTAssertEqual` on `String` — and Swift string equality is **canonical**, so an NFC/NFD mismatch
+  compares EQUAL. Under that vacuous precondition the test was wrong in the other direction too: it emitted
+  its own composed spelling for a file this volume stores **decomposed** (measured: `readdir`,
+  `contentsOfDirectory` and `FileManager.enumerator` all return NFD for a name created as NFC), i.e. an
+  event FSEvents can never deliver — and the library correctly answered with a **second row**. It now
+  adopts the on-disk spelling, compares UTF-8 bytes, and asserts the row count stays 1, which is the
+  invariant its name always claimed.
+  **(3) A `/`-rooted eligibility assertion that contradicted `.skipsHiddenFiles`.** It asserted
+  `/tmp/archive/file.pdf` is eligible under root `/`; macOS marks `/tmp` **hidden**, so the launch walk
+  skips it and the live path must agree. Split into a positive case over an all-visible chain
+  (`/Users/Shared/…`, which is what actually pins the first-separator arithmetic) and a negative case
+  documenting the hidden first component.
+  **Gate (2026-08-05, post-handoff).** ArchiveCore 154 XCTest + 105 Swift Testing; Reader **351/351**
+  executed unit tests (the separately tracked `DeepLinkTests.testRevealAndSelectNoRoot` isolation artifact
+  excluded, W20.deeplink-isolation) + Release **BUILD SUCCEEDED, 0 source warnings**; Processor Debug
+  **BUILD SUCCEEDED**; Notes 189 XCTest + 738 Swift Testing; write-surface lint clean + self-test 12/12.
+  **The scale and VM lanes were NOT run and are carried into `W26.verify`** — see the ⚠️ block on that item
+  for the three warm-start timings, the SQLite size/RSS ceiling and the VM GUI checks it now owes. No
+  host-screen UI automation, and no real corpus read or written at any point.
+
 - [x] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2].
   ✅ FIXED 2026-08-05** — `2956f3c` (read primitive) → `ad86cce` (write path + trackers).
   **The bug:** `TagWrite.swift:252-261` carried the comment *"a read FAILURE aborts (never treated as

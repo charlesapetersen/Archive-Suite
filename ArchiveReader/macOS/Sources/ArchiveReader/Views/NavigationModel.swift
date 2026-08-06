@@ -103,7 +103,10 @@ final class NavigationModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        library.setRootResolver { [weak self] in self?.rootStore.reResolveSavedRoot() }
+        library.setRootResolver { [weak self] in
+            guard let self, let url = self.rootStore.reResolveSavedRoot() else { return nil }
+            return ResolvedLibraryRoot(url: url, markerGUID: self.rootStore.rootMarker?.guid)
+        }
         filter.read = AppSettings.defaultReadFilter
         filter.subjectCombine = AppSettings.defaultSubjectCombine
         restoreViewState()   // last session's filter + sort override the defaults (C2)
@@ -180,14 +183,18 @@ final class NavigationModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.publishLinkTarget() } }
             .store(in: &cancellables)
-        if let root = rootStore.root { library.start(scope: root) }
+        if let root = rootStore.root {
+            library.start(scope: root, markerGUID: rootStore.rootMarker?.guid)
+        }
     }
 
     /// Retry a root bookmark after an ejection/mount event, then apply the no-timer fallback for a
     /// volume that cannot provide FSEvents. Called from the navigation window's activation notice.
     func applicationDidBecomeActive(now: Date = Date()) {
         if rootStore.root == nil, rootStore.hasSavedBookmark {
-            if let restored = rootStore.reResolveSavedRoot() { library.start(scope: restored) }
+            if let restored = rootStore.reResolveSavedRoot() {
+                library.start(scope: restored, markerGUID: rootStore.rootMarker?.guid)
+            }
             return
         }
         library.revalidateOnActivation(now: now)
@@ -383,7 +390,8 @@ final class NavigationModel: ObservableObject {
     private func restoreSelectionIfNeeded() {
         guard !didRestoreSelection, !library.files.isEmpty else { return }
         didRestoreSelection = true
-        let saved = Set(UserDefaults.standard.stringArray(forKey: "lastSelectionPaths") ?? [])
+        let saved = Set((UserDefaults.standard.stringArray(forKey: "lastSelectionFileURLs") ?? [])
+            .compactMap(URL.init(string:)))
         guard !saved.isEmpty else { return }
         let present = Set(library.files.map(\.id)).intersection(saved)
         if !present.isEmpty { selection = present }
@@ -391,11 +399,11 @@ final class NavigationModel: ObservableObject {
     private func persistSelection() {
         // Cap persistence so a huge multi-select (e.g. Select All over 150k) never serializes a giant
         // array on the main actor or bloats the defaults plist; such selections aren't worth restoring.
-        let paths = Array(selection)
+        let paths = selection.map(\.absoluteString)
         if paths.count <= 500 {
-            UserDefaults.standard.set(paths, forKey: "lastSelectionPaths")
+            UserDefaults.standard.set(paths, forKey: "lastSelectionFileURLs")
         } else {
-            UserDefaults.standard.removeObject(forKey: "lastSelectionPaths")
+            UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
         }
     }
 
@@ -825,7 +833,7 @@ final class NavigationModel: ObservableObject {
             ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
                                  // (which passes the `generation == ftsGeneration` guard) can't repopulate
                                  // ftsPaths with stale old-root paths after the new library loads.
-            library.start(scope: url)
+            library.start(scope: url, markerGUID: rootStore.rootMarker?.guid)
         }
     }
 
@@ -854,12 +862,54 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Tag actions (all via TagWriter)
 
+    /// Cache rows are useful for instant display, never for choosing write targets. Re-read only the
+    /// cache-provenance subset before a bulk operation derives its selection/deltas; disk rows from
+    /// this process can proceed directly. A now-untracked/unreadable/missing path is omitted, never
+    /// coerced into an empty tag array and never written merely because an old cache row named it.
+    private func reverifyCacheRows(_ files: [ArchiveFile]) -> (files: [ArchiveFile], rejected: Int) {
+        var verified: [ArchiveFile] = []
+        var rejected = 0
+        for file in files {
+            guard file.provenance.isCache else { verified.append(file); continue }
+            guard let root = rootStore.root,
+                  LibraryIndexPath(file.url).isContained(in: LibraryIndexPath(root)) else {
+                rejected += 1
+                continue
+            }
+            guard case let .tracked(entry) = CorpusWalker.inspect(file.url) else {
+                rejected += 1
+                continue
+            }
+            verified.append(ArchiveLibrary.row(entry, tagNames: entry.tagNames,
+                                               labelNumber: entry.labelNumber))
+        }
+        return (verified, rejected)
+    }
+
+    private func reverifyCacheRow(_ file: ArchiveFile) -> ArchiveFile? {
+        let result = reverifyCacheRows([file])
+        guard let verified = result.files.first else {
+            statusMessage = "Could not verify \(file.name)."
+            announce(statusMessage)
+            return nil
+        }
+        return verified
+    }
+
     func mark(_ target: ReadState) {
-        let files = selectedFiles
-        guard !files.isEmpty else { return }
+        let reverified = reverifyCacheRows(selectedFiles)
+        let files = reverified.files
+        guard !files.isEmpty else {
+            if reverified.rejected > 0 {
+                statusMessage = "Could not verify \(reverified.rejected) selected file"
+                    + (reverified.rejected == 1 ? "." : "s.")
+                announce(statusMessage)
+            }
+            return
+        }
         var batch: [UndoEntry] = []
         var verified: [TagWriteResult] = []
-        var failures = 0
+        var failures = reverified.rejected
         for f in files {
             let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
             do {
@@ -968,11 +1018,19 @@ final class NavigationModel: ObservableObject {
 
     /// Apply one edit operation to every selected file (per-file delta), with grouped undo.
     func applyEdit(_ op: TagEditOp) {
-        let files = selectedFiles
-        guard !files.isEmpty else { return }
+        let reverified = reverifyCacheRows(selectedFiles)
+        let files = reverified.files
+        guard !files.isEmpty else {
+            if reverified.rejected > 0 {
+                statusMessage = "Could not verify \(reverified.rejected) selected file"
+                    + (reverified.rejected == 1 ? "." : "s.")
+                announce(statusMessage)
+            }
+            return
+        }
         var batch: [UndoEntry] = []
         var verified: [TagWriteResult] = []
-        var failures = 0
+        var failures = reverified.rejected
         for f in files {
             let delta = TagEditing.delta(for: op, given: f.tags)
             if delta.isEmpty { continue }
@@ -1011,17 +1069,28 @@ final class NavigationModel: ObservableObject {
         let old = oldTag                                    // verbatim token identity — must match the
         let new = newTag.trimmingCharacters(in: .whitespaces)  // sheet's affectedFileCount(forTag: oldTag)
         guard !old.isEmpty, !new.isEmpty, new != old else { return }
-        let affected = library.files.filter { $0.subjects.contains(old) }
-        guard !affected.isEmpty else { statusMessage = "No files carry the tag “\(old)”."; announce(statusMessage); return }
+        let reverified = reverifyCacheRows(library.files.filter { $0.subjects.contains(old) })
+        let affected = reverified.files
+        guard !affected.isEmpty else {
+            statusMessage = reverified.rejected > 0
+                ? "Could not verify \(reverified.rejected) matching file"
+                    + (reverified.rejected == 1 ? "." : "s.")
+                : "No files carry the tag “\(old)”."
+            announce(statusMessage)
+            return
+        }
         var batch: [UndoEntry] = []
         var verified: [TagWriteResult] = []
-        var failures = 0
-        // Group/batch path: capture each affected file's identity lazily (§6), then apply through the
-        // identity-carrying batch overload — a file replaced under its path since capture aborts as a
-        // per-file failure while the rest of the rename still applies. Results are 1:1/in-order with `items`.
+        var failures = reverified.rejected
+        // Capture each affected file's identity lazily (§6), then run the conditional fresh-read rename
+        // independently. A file replaced under its path or no longer carrying `old` is never retagged;
+        // one failure does not stop its neighbours.
         let items = affected.map { (url: $0.url, identity: $0.liveIdentity()) }
-        for (i, outcome) in TagWriter.apply(TagDelta(add: [new], remove: [old]), to: items).enumerated() {
-            switch outcome.result {
+        for (i, item) in items.enumerated() {
+            switch Result(catching: {
+                try TagWriter.renameToken(from: old, to: new, on: item.url,
+                                          expecting: item.identity)
+            }) {
             case .success(let r):
                 verified.append(r)
                 if !r.isNoOp { batch.append(UndoEntry(result: r, identity: items[i].identity)) }
@@ -1041,6 +1110,7 @@ final class NavigationModel: ObservableObject {
     // group editor; these act on exactly one file, still via the audited TagWriter + grouped undo.
 
     func applyEdit(_ op: TagEditOp, to file: ArchiveFile) {
+        guard let file = reverifyCacheRow(file) else { return }
         applyDelta(TagEditing.delta(for: op, given: file.tags), to: file)
     }
 
@@ -1051,10 +1121,12 @@ final class NavigationModel: ObservableObject {
     /// read preserves any concurrent third-party tag (never dropping an untouched token). Applied as ONE
     /// delta = one write + one undo step; a no-op edit writes nothing. Subjects only — other facets stay.
     func commitSubjectEdit(from base: [String], to edited: [String], for file: ArchiveFile) {
+        guard let file = reverifyCacheRow(file) else { return }
         applyDelta(TagEditing.subjectDelta(from: base, to: edited), to: file)
     }
 
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
+        guard let file = reverifyCacheRow(file) else { return }
         let identity = file.liveIdentity()   // §6: capture lazily at edit time
         do { reflect(try TagWriter.setReadState(target, on: file.url, addIfMissing: true, expecting: identity), identity: identity) }
         catch { statusMessage = "Could not update \(file.name)."; announce(statusMessage) }
@@ -1062,10 +1134,12 @@ final class NavigationModel: ObservableObject {
 
     /// Single-click toggle for the Read cell: Read → Unread; Unread/none → Read.
     func toggleReadState(for file: ArchiveFile) {
+        guard let file = reverifyCacheRow(file) else { return }
         setReadStateInline(file.readState == .read ? .unread : .read, for: file)
     }
 
     func clearReadState(for file: ArchiveFile) {
+        guard let file = reverifyCacheRow(file) else { return }
         let toks = file.tags.raw.filter { t in
             ReadState.allCases.contains { $0.rawValue.caseInsensitiveCompare(t) == .orderedSame }
         }
@@ -1074,6 +1148,7 @@ final class NavigationModel: ObservableObject {
 
     private func applyDelta(_ delta: TagDelta, to file: ArchiveFile) {
         guard !delta.isEmpty else { return }
+        guard let file = reverifyCacheRow(file) else { return }
         let identity = file.liveIdentity()   // §6: capture lazily at edit time
         do { reflect(try TagWriter.apply(delta, to: file.url, expecting: identity), identity: identity) }
         catch { statusMessage = "Could not edit \(file.name)."; announce(statusMessage) }

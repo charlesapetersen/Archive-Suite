@@ -2,13 +2,48 @@ import Foundation
 import CoreServices
 import ArchiveCore
 
+/// A tiny set whose identity is filesystem UTF-8 bytes, not Swift's canonical-Unicode equality.
+/// FSEvents can name both NFC and NFD spellings in one coalesced batch; collapsing them would leave
+/// one live row stale until the next full scan.
+struct CorpusWatchPathSet: Sendable, Equatable, ExpressibleByArrayLiteral, Sequence {
+    private var storage: [LibraryIndexPath: String] = [:]
+
+    init(arrayLiteral elements: String...) { self.init(elements) }
+    init(_ elements: some Sequence<String>) {
+        for element in elements { storage[LibraryIndexPath(element)] = element }
+    }
+
+    var isEmpty: Bool { storage.isEmpty }
+    var count: Int { storage.count }
+    mutating func insert(_ path: String) { storage[LibraryIndexPath(path)] = path }
+    mutating func removeAll() { storage.removeAll() }
+    mutating func formUnion(_ other: Self) {
+        for path in other { insert(path) }
+    }
+    func contains(_ path: String) -> Bool { storage[LibraryIndexPath(path)] != nil }
+    func filter(_ included: (String) throws -> Bool) rethrows -> Self {
+        try Self(storage.values.filter(included))
+    }
+    func makeIterator() -> Array<String>.Iterator { Array(storage.values).makeIterator() }
+}
+
+/// Construct a URL from the bytes FSEvents/FileManager supplied. `URL(fileURLWithPath:)` performs a
+/// canonical Unicode round-trip and can silently turn an NFC event into a nonexistent NFD pathname.
+enum ExactFileURL {
+    static func make(_ path: String, isDirectory: Bool = false) -> URL {
+        path.withCString {
+            URL(fileURLWithFileSystemRepresentation: $0, isDirectory: isDirectory, relativeTo: nil)
+        }
+    }
+}
+
 /// The two recovery primitives an FSEvents batch can request.
 ///
 /// Paths stay byte-for-byte filesystem paths. No Unicode normalisation or symlink resolution belongs
 /// here: the watcher is reporting the namespace that changed, and the corpus contains decomposed names.
 struct CorpusWatchRequest: Sendable, Equatable {
-    var paths: Set<String> = []
-    var subtrees: Set<String> = []
+    var paths: CorpusWatchPathSet = []
+    var subtrees: CorpusWatchPathSet = []
     var fullRescan = false
     var reResolveRoot = false
 
@@ -71,14 +106,14 @@ struct CorpusWatchRequest: Sendable, Equatable {
 
             if has(eventFlags, FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs)) {
                 guard !isAtomicWriteTemporarySibling(path) else { continue }
-                if path == rootPath { request.fullRescan = true }
+                if same(path, rootPath) { request.fullRescan = true }
                 else { request.subtrees.insert(path) }
                 continue
             }
 
             if has(eventFlags, FSEventStreamEventFlags(kFSEventStreamEventFlagOwnEvent)) { continue }
             guard !isAtomicWriteTemporarySibling(path) else { continue }
-            if path == rootPath { request.fullRescan = true }
+            if same(path, rootPath) { request.fullRescan = true }
             else { request.paths.insert(path) }
         }
 
@@ -98,7 +133,8 @@ struct CorpusWatchRequest: Sendable, Equatable {
     /// Foundation atomic saves observed in the corpus use `a.txt.sb-858602c2-RXb79N`. Ignore that
     /// exact temporary-sibling shape; an ordinary user file merely containing `.sb-` must still be read.
     static func isAtomicWriteTemporarySibling(_ path: String) -> Bool {
-        URL(fileURLWithPath: path).lastPathComponent.range(
+        let name = path.split(separator: "/", omittingEmptySubsequences: false).last.map(String.init) ?? path
+        return name.range(
             of: #"\.sb-[0-9A-Fa-f]{8}-[A-Za-z0-9]{6}$"#,
             options: .regularExpression
         ) != nil
@@ -111,11 +147,20 @@ struct CorpusWatchRequest: Sendable, Equatable {
                 kept.append(candidate)
             }
         }
-        subtrees = Set(kept)
+        subtrees = CorpusWatchPathSet(kept)
     }
 
     static func contains(_ path: String, under root: String) -> Bool {
-        path == root || path.hasPrefix(canonicalRootPath(root) + "/")
+        let pathBytes = Array(path.utf8)
+        let rootBytes = Array(canonicalRootPath(root).utf8)
+        guard pathBytes.starts(with: rootBytes) else { return false }
+        if rootBytes == [UInt8(ascii: "/")] { return pathBytes.first == UInt8(ascii: "/") }
+        return pathBytes.count == rootBytes.count
+            || (pathBytes.count > rootBytes.count && pathBytes[rootBytes.count] == UInt8(ascii: "/"))
+    }
+
+    private static func same(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.utf8.elementsEqual(rhs.utf8)
     }
 
     private static func canonicalRootPath(_ path: String) -> String {
@@ -333,7 +378,7 @@ enum CorpusWatchWork {
 
             for path in request.paths.sorted() {
                 guard !cancellation.isCancelled else { break }
-                let url = URL(fileURLWithPath: path)
+                let url = ExactFileURL.make(path)
                 let inspection = CorpusWalker.inspect(url)
                 switch inspection {
                 case .directory where CorpusWatchEligibility.includes(url, under: root):
@@ -363,7 +408,7 @@ enum CorpusWatchWork {
             var subtreeChanges: [CorpusSubtreeChange] = []
             for path in compacted.sorted() {
                 guard !cancellation.isCancelled else { break }
-                let url = URL(fileURLWithPath: path)
+                let url = ExactFileURL.make(path, isDirectory: true)
                 switch CorpusWalker.inspect(url) {
                 case .directory where CorpusWatchEligibility.includes(url, under: root):
                     subtreeChanges.append(CorpusSubtreeChange(
@@ -391,33 +436,38 @@ enum CorpusWatchWork {
         thread.start()
     }
 
-    private static func compact(_ paths: Set<String>) -> Set<String> {
+    private static func compact(_ paths: CorpusWatchPathSet) -> CorpusWatchPathSet {
         var kept: [String] = []
         for candidate in paths.sorted(by: { $0.count < $1.count }) {
             if !kept.contains(where: { CorpusWatchRequest.contains(candidate, under: $0) }) {
                 kept.append(candidate)
             }
         }
-        return Set(kept)
+        return CorpusWatchPathSet(kept)
     }
 }
 
 /// Preserve the full walk's `.skipsHiddenFiles` / `.skipsPackageDescendants` universe for direct
 /// events. Without this, touching `.hidden.pdf` (or a PDF inside an rtfd/app package) would make the
 /// live library disagree with the next launch scan.
-private enum CorpusWatchEligibility {
+enum CorpusWatchEligibility {
     static func includes(_ url: URL, under root: URL) -> Bool {
         let rootPath = root.path.hasSuffix("/") && root.path.count > 1
             ? String(root.path.dropLast()) : root.path
         guard CorpusWatchRequest.contains(url.path, under: rootPath) else { return false }
-        guard url.path != rootPath else { return true }
+        let pathBytes = Array(url.path.utf8)
+        let rootBytes = Array(rootPath.utf8)
+        guard pathBytes.count != rootBytes.count else { return true }
 
-        let relative = String(url.path.dropFirst(rootPath.count + 1))
-        var cursor = URL(fileURLWithPath: rootPath, isDirectory: true)
-        for component in relative.split(separator: "/", omittingEmptySubsequences: false) {
-            cursor.appendPathComponent(String(component))
-            guard let values = try? URL(fileURLWithPath: cursor.path)
-                .resourceValues(forKeys: [.isHiddenKey, .isPackageKey]) else {
+        var cursorBytes = rootBytes
+        let rootIsSlash = rootBytes == [UInt8(ascii: "/")]
+        let relative = pathBytes.dropFirst(rootBytes.count + (rootIsSlash ? 0 : 1))
+        for component in relative.split(separator: UInt8(ascii: "/"),
+                                        omittingEmptySubsequences: false) {
+            if cursorBytes != [UInt8(ascii: "/")] { cursorBytes.append(UInt8(ascii: "/")) }
+            cursorBytes.append(contentsOf: component)
+            let cursor = ExactFileURL.make(String(decoding: cursorBytes, as: UTF8.self))
+            guard let values = try? cursor.resourceValues(forKeys: [.isHiddenKey, .isPackageKey]) else {
                 // A concurrent disappearance is classified by `CorpusWalker.inspect`; inability to
                 // fetch optional eligibility metadata must not turn into a silent skip.
                 return true

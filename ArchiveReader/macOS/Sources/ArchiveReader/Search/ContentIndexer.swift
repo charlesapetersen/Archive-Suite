@@ -19,7 +19,7 @@ final class ContentIndexer: ObservableObject {
     enum Failure: Equatable, Sendable {
         /// The index could not be opened — nothing is searchable until it can be.
         case unavailable(detail: String)
-        /// The pass ran, but `rows` extracted rows could not be written — results are incomplete.
+        /// The pass ran, but `rows` cache rows could not be updated or removed — results are incomplete.
         case incomplete(rows: Int)
 
         /// One line for the status bar.
@@ -37,7 +37,7 @@ final class ContentIndexer: ObservableObject {
                 return "Full-text search and format health can't be read from the index (\(d)). "
                      + "The index is a rebuildable cache — tags and files are unaffected."
             case .incomplete(let n):
-                return "\(n) file\(n == 1 ? "" : "s") couldn't be written to the index, so search may "
+                return "\(n) file\(n == 1 ? "" : "s") couldn't be updated in the index, so search may "
                      + "miss \(n == 1 ? "it" : "them"). The next indexing pass retries."
             }
         }
@@ -56,10 +56,26 @@ final class ContentIndexer: ObservableObject {
     /// Epoch token: each launch/cancel bumps it so a superseded pass's async progress/finish callbacks
     /// can't clobber the current pass's state (same pattern as NavigationModel.ftsGeneration).
     private var generation = 0
+    /// Kept below the dataless policy wrapper so tests can spy on the exact would-open-PDF boundary.
+    private let extractPDF: @Sendable (URL) -> ExtractedContent?
+#if DEBUG
+    /// Deterministic completion seam for async driver tests; not part of user-visible state.
+    private(set) var completedPassesForTesting = 0
+#endif
 
     /// Point the driver at a specific index file. The app path uses `init()`; tests pass a scratch
     /// (or deliberately corrupt) URL so the `Failure` paths are exercisable headlessly.
-    init(url: URL) { index = ContentIndex(url: url) }
+    init(url: URL) {
+        index = ContentIndex(url: url)
+        extractPDF = PDFTextExtractor.extract
+    }
+
+    /// Test-only shape: inject at the PDF-open boundary while retaining the production dataless
+    /// filter and thread-scoped no-materialisation policy around every invocation.
+    init(url: URL, extractPDFForTesting: @escaping @Sendable (URL) -> ExtractedContent?) {
+        index = ContentIndex(url: url)
+        extractPDF = extractPDFForTesting
+    }
 
     convenience init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -95,6 +111,7 @@ final class ContentIndexer: ObservableObject {
         generation += 1
         let gen = generation
         let idx = index
+        let extractPDF = extractPDF
         // Reserve cores for the main thread + system: at least 1 worker, leave 2 cores free.
         let workers = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
         task = Task.detached(priority: .utility) { [weak self] in
@@ -108,7 +125,17 @@ final class ContentIndexer: ObservableObject {
             }
             // Pull all stored mtimes in one query to partition work without per-file actor round-trips.
             let existing = await idx.existingMTimes()
+            let datalessPaths = files.filter(\.isDataless).map(\.url.path)
+            var cacheRowsDropped = 0
+            if !datalessPaths.isEmpty {
+                // Never let PDFDocument materialise a cloud placeholder. If a previously-local file
+                // became dataless, remove only its disposable content row so stale OCR text cannot
+                // masquerade as a current searchable result.
+                do { try await idx.deletePaths(datalessPaths) }
+                catch { cacheRowsDropped = datalessPaths.count }
+            }
             let work = files.filter { f in
+                guard !f.isDataless else { return false }
                 let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
                 guard let stored = existing[f.url.path] else { return true }
                 return stored != mtime
@@ -117,7 +144,7 @@ final class ContentIndexer: ObservableObject {
             let skipped = total - work.count
             await self?.report((skipped, total), gen)
             if work.isEmpty {
-                await self?.finish(gen)
+                await self?.finish(gen, cacheRowsDropped > 0 ? .rowsDropped(cacheRowsDropped) : .ok)
                 return
             }
 
@@ -130,7 +157,7 @@ final class ContentIndexer: ObservableObject {
             var done = skipped
             var rowsIndexed = 0
             /// Extracted rows a failed batch write dropped — surfaced as `.incomplete`, not swallowed.
-            var droppedRows = 0
+            var droppedRows = cacheRowsDropped
 
             await withTaskGroup(of: IndexRow?.self) { group in
                 var queued = 0
@@ -138,22 +165,9 @@ final class ContentIndexer: ObservableObject {
 
                 // Seed the group with `workers` tasks.
                 while queued < workers, let f = workIter.next() {
-                    let url = f.url
-                    let path = f.url.path
-                    let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
-                    let name = f.name
                     group.addTask(priority: .utility) {
                         guard !Task.isCancelled else { return nil }
-                        if let content = PDFTextExtractor.extract(url) {
-                            return IndexRow(path: path, mtime: mtime, name: name,
-                                            classification: content.classification, body: content.fullBody,
-                                            pageCount: content.pageCount,
-                                            hasText: !content.fullBody.isEmpty, readable: true)
-                        } else {
-                            return IndexRow(path: path, mtime: mtime, name: name,
-                                            classification: nil, body: "",
-                                            pageCount: 0, hasText: false, readable: false)
-                        }
+                        return Self.extractRow(f, extractPDF: extractPDF)
                     }
                     queued += 1
                 }
@@ -180,22 +194,9 @@ final class ContentIndexer: ObservableObject {
 
                     // Feed the next file into the group.
                     if let f = workIter.next() {
-                        let url = f.url
-                        let path = f.url.path
-                        let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
-                        let name = f.name
                         group.addTask(priority: .utility) {
                             guard !Task.isCancelled else { return nil }
-                            if let content = PDFTextExtractor.extract(url) {
-                                return IndexRow(path: path, mtime: mtime, name: name,
-                                                classification: content.classification, body: content.fullBody,
-                                                pageCount: content.pageCount,
-                                                hasText: !content.fullBody.isEmpty, readable: true)
-                            } else {
-                                return IndexRow(path: path, mtime: mtime, name: name,
-                                                classification: nil, body: "",
-                                                pageCount: 0, hasText: false, readable: false)
-                            }
+                            return Self.extractRow(f, extractPDF: extractPDF)
                         }
                     }
                 }
@@ -210,6 +211,28 @@ final class ContentIndexer: ObservableObject {
             await idx.performMaintenance(rowsIndexed: rowsIndexed)
 
             await self?.finish(gen, droppedRows > 0 ? .rowsDropped(droppedRows) : .ok)
+        }
+    }
+
+    /// Each extraction worker owns the thread-scoped dataless policy for exactly its synchronous
+    /// PDF open. The outer `isDataless` filter is the ordinary path; this guard closes the race where
+    /// a local file becomes a placeholder after discovery but before `PDFDocument(url:)`.
+    private nonisolated static func extractRow(
+        _ file: ArchiveFile,
+        extractPDF: @Sendable (URL) -> ExtractedContent?
+    ) -> IndexRow {
+        CorpusWalker.withDatalessMaterializationDisabled {
+            let path = file.url.path
+            let mtime = file.contentModified?.timeIntervalSince1970 ?? 0
+            if let content = extractPDF(file.url) {
+                return IndexRow(path: path, mtime: mtime, name: file.name,
+                                classification: content.classification, body: content.fullBody,
+                                pageCount: content.pageCount,
+                                hasText: !content.fullBody.isEmpty, readable: true)
+            }
+            return IndexRow(path: path, mtime: mtime, name: file.name,
+                            classification: nil, body: "",
+                            pageCount: 0, hasText: false, readable: false)
         }
     }
 
@@ -464,7 +487,7 @@ final class ContentIndexer: ObservableObject {
     enum Outcome: Equatable, Sendable {
         /// Every extracted row was written (or there was no work).
         case ok
-        /// The pass ran but `Int` extracted rows couldn't be written.
+        /// The pass ran but `Int` cache rows couldn't be updated or removed.
         case rowsDropped(Int)
         /// The index never opened, so nothing was attempted.
         case couldNotOpen(String)
@@ -485,6 +508,9 @@ final class ContentIndexer: ObservableObject {
     /// it can't clobber newer state.
     private func finish(_ gen: Int, _ outcome: Outcome = .ok) {
         guard gen == generation else { return }
+#if DEBUG
+        completedPassesForTesting += 1
+#endif
         // A completed pass is the authority on health: it either wrote everything it extracted
         // (so any earlier failure is stale) or it says what it couldn't write.
         setFailure(outcome.failure)

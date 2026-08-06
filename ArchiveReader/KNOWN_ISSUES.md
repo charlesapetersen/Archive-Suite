@@ -63,9 +63,27 @@ Spotlight. Final self-review also made a newer serialized live read retire conve
 guards, so a long-running healthy library cannot retain every Reader edit forever. All filesystem fixtures are
 temporary scratch trees; the real corpus was neither read nor written.
 
+## ✅ FIXED (`W26.idx`) — launch blocked on a full walk, and persisted rows could amplify stale writes
+
+The owned filesystem walk made discovery truthful, but a large root still showed no rows until the pass
+finished. `W26.idx` adds a separate disposable system-SQLite discovery cache keyed by byte-exact root path +
+marker GUID + file path. It restores tracked rows immediately as visibly revalidating, then compares fresh
+`stat(2)` fingerprints and re-reads tags for every new, changed or unverified path. The tuple includes ctime,
+because a Finder tag edit need not change mtime. Scan provenance prevents an interrupted/denied pass from
+claiming currency or deleting unseen rows after relaunch; canceled corpus-scale DB work yields every 500 rows.
+
+The cache does not gain write authority. Every cache-provenance row is re-inspected before a bulk or inline
+mutation derives a target/delta, and the corpus rename primitive re-reads under coordination and requires the
+old token still to exist. Out-of-root/canonical-lookalike paths are rejected byte-exactly. Dataless rows never
+reach the PDF-open boundary; stale content-index rows are removed without materialising the file. Regression
+tests cover warm correction after an app-closed tag change, mixed valid/stale selections, conditional rename,
+root/commit races, partial SQLite state, canonical Unicode spellings and no-download extraction policy. The
+index and saved-selection shape are new v1 state: there is deliberately no migration or compatibility path.
+
 ## ✅ FIXED (W26.deny) — `TagWriter` could DESTROY tags on a file whose xattrs are unreadable-but-writable
 
 **Found 2026-08-04** while auditing Spotlight removal; **independent of Spotlight** and of that wave.
+
 **Fixed 2026-08-05** — `2956f3c` (the read primitive) → `ad86cce` (the write path). Affects
 `packages/ArchiveCore` — filed here because Reader tag safety is documented here. The finding is kept below
 in full, followed by *what shipped*, because two of the prescriptions written into it were measured wrong.

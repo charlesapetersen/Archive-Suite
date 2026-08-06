@@ -2,6 +2,22 @@ import Foundation
 import Combine
 import ArchiveCore
 
+struct ResolvedLibraryRoot: Sendable {
+    let url: URL
+    let markerGUID: UUID?
+}
+
+/// Injectable only so the warm-start contract can be tested without a timing race. Production uses
+/// the same dedicated thread as before; a test can hold this request after cache rows are published,
+/// inspect that intermediate state, then run and deliver the real revalidation pass.
+struct IndexedLibraryScanRequest: Sendable {
+    let root: URL
+    let cached: [LibraryIndexPath: LibraryIndexEntry]
+    let isCancelled: @Sendable () -> Bool
+    let onBatch: (@Sendable (CorpusScanBatch) -> Void)?
+    let completion: @Sendable (DiscoveryPass) -> Void
+}
+
 /// Discovers the tagged-PDF universe by **walking the filesystem** (`ArchiveCore.CorpusWalker`).
 ///
 /// The master predicate is unchanged — a file belongs to the library iff it carries a `Read` or
@@ -45,9 +61,11 @@ final class ArchiveLibrary: ObservableObject {
 
     typealias WatcherFactory = (URL, @escaping CorpusWatcher.Handler) -> any CorpusWatching
     private let watcherFactory: WatcherFactory
+    private let indexedScanStarter: @MainActor (IndexedLibraryScanRequest) -> Void
     private let minimumRootRescanInterval: TimeInterval
+    private let libraryIndex: LibraryIndex?
     private var watcher: (any CorpusWatching)?
-    private var rootResolver: (@MainActor () -> URL?)?
+    private var rootResolver: (@MainActor () -> ResolvedLibraryRoot?)?
     private var rootGeneration: UInt64 = 0
     private var watchWorkInFlight = false
     private var watchCancellation: CorpusWatchCancellation?
@@ -56,16 +74,36 @@ final class ArchiveLibrary: ObservableObject {
     private var queuedRootRescanIsUrgent = false
     private var lastRootScanStartedAt: Date?
     private var scheduledRootRescan: DispatchWorkItem?
+    private var indexRoot: LibraryIndexRoot?
+    private var cachedIndexEntries: [LibraryIndexPath: LibraryIndexEntry] = [:]
+    private var indexPreparation: Task<Void, Never>?
+    private var indexCommit: Task<Void, Never>?
 #if DEBUG
     private(set) var rootScanStartsForTesting = 0
 #endif
 
     init(minimumRootRescanInterval: TimeInterval = 1.0,
+         libraryIndexURL: URL? = ArchiveLibrary.defaultLibraryIndexURL,
          watcherFactory: @escaping WatcherFactory = { root, handler in
              CorpusWatcher(root: root, handler: handler)
+         },
+         indexedScanStarter: @escaping @MainActor (IndexedLibraryScanRequest) -> Void = { request in
+             LibraryScan.revalidateOnDedicatedThread(
+                root: request.root, cached: request.cached,
+                isCancelled: request.isCancelled, onBatch: request.onBatch,
+                completion: request.completion
+             )
          }) {
         self.minimumRootRescanInterval = max(0, minimumRootRescanInterval)
+        self.libraryIndex = libraryIndexURL.map { LibraryIndex(url: $0) }
         self.watcherFactory = watcherFactory
+        self.indexedScanStarter = indexedScanStarter
+    }
+
+    static var defaultLibraryIndexURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("ArchiveReader", isDirectory: true)
+            .appendingPathComponent("library-index-v1.sqlite3")
     }
 
     // MARK: - The write-vs-walk ordering guard (replaced ~80 lines of TTL/convergence overlay)
@@ -108,9 +146,11 @@ final class ArchiveLibrary: ObservableObject {
     /// branch set `NSMetadataQueryLocalComputerScope` and was documented "future use" — dead code that
     /// only a Spotlight index could have served, and walking the whole Mac is not something this app
     /// should ever do.
-    func start(scope: URL?) {
+    func start(scope: URL?, markerGUID: UUID? = nil) {
         watchCancellation?.cancel()
         watchCancellation = nil
+        indexPreparation?.cancel(); indexPreparation = nil
+        indexCommit?.cancel(); indexCommit = nil
         stopWatcher()
         inFlight?.cancel()
         inFlight = nil
@@ -121,11 +161,20 @@ final class ArchiveLibrary: ObservableObject {
         queuedRootRescanIsUrgent = false
         watchWorkInFlight = false       // any old completion is rejected by `rootGeneration`
         rootGeneration &+= 1
+        // Invalidate a completion from the preceding root immediately. An indexed start does async
+        // cache preparation before its own `beginScan`; without this bump the old pass still matched
+        // `currentScan` during that gap and could publish old-root rows into the new root.
+        clock &+= 1
+        currentScan = clock
         files = []
         verifiedWrites.removeAll()      // no override may leak across roots
         lastSettled = nil
         lastRootScanStartedAt = nil
         liveUpdateFailure = nil
+        cachedIndexEntries = [:]
+        indexRoot = scope.flatMap { url in
+            markerGUID.map { LibraryIndexRoot(path: LibraryIndexPath(url).value, markerGUID: $0) }
+        }
         root = scope
         guard let scope else {
             phase = .noRoot
@@ -135,12 +184,32 @@ final class ArchiveLibrary: ObservableObject {
         scopeDescription = scope.lastPathComponent
         phase = .firstScan(done: 0, seen: 0)
         startWatcher(root: scope)
-        beginScan(root: scope)
+        if usesPersistedIndex, let indexRoot, let libraryIndex {
+            prepareInitialIndexedScan(root: scope, indexRoot: indexRoot, index: libraryIndex,
+                                      rootGeneration: rootGeneration)
+        } else {
+            beginScan(root: scope)
+        }
+    }
+
+    /// Whether this root may use the persisted warm-start cache at all.
+    ///
+    /// Fixture roots must answer NO on **every** path that starts a pass, not just the first one:
+    /// they stay synchronous (`beginScan`'s fixture branch finishes before the caller returns, which
+    /// is the contract the deep-link/UI fixture tests are calibrated against) and they never open the
+    /// real Application Support database. Gating only `start(scope:)` left ⌘⌥R — `rescan()` →
+    /// `requestRootRescan` → `drainWatchWork` — going through the async indexed path, which both
+    /// broke that synchrony and let a unit test write the owner's live cache.
+    private var usesPersistedIndex: Bool {
+#if DEBUG
+        if UserDefaults.standard.string(forKey: Self.fixtureRootKey) != nil { return false }
+#endif
+        return indexRoot != nil && libraryIndex != nil
     }
 
     /// RootChanged/Mount/Unmount must go back through the bookmark owner rather than assuming the old
     /// path still names the granted directory. `NavigationModel` installs this before starting a root.
-    func setRootResolver(_ resolver: @escaping @MainActor () -> URL?) {
+    func setRootResolver(_ resolver: @escaping @MainActor () -> ResolvedLibraryRoot?) {
         rootResolver = resolver
     }
 
@@ -171,12 +240,91 @@ final class ArchiveLibrary: ObservableObject {
         requestRootRescan(urgent: true)
     }
 
-    private func beginScan(root: URL) {
+    private func prepareInitialIndexedScan(root: URL, indexRoot: LibraryIndexRoot,
+                                           index: LibraryIndex, rootGeneration: UInt64) {
+        indexPreparation = Task { [weak self] in
+            guard !Task.isCancelled else { return }
+            let snapshot: LibraryIndexSnapshot
+            do {
+                snapshot = try await index.snapshot(for: indexRoot)
+            } catch is CancellationError {
+                return
+            } catch {
+                NSLog("LibraryIndex: warm start unavailable: \(error)")
+                guard let self, !Task.isCancelled, rootGeneration == self.rootGeneration else { return }
+                self.indexPreparation = nil
+                self.beginScan(root: root)
+                return
+            }
+            guard let self, !Task.isCancelled, rootGeneration == self.rootGeneration else { return }
+            self.cachedIndexEntries = snapshot.entries
+            self.publishWarmSnapshot(snapshot)
+
+            do {
+                let scan = try await index.beginScan(root: indexRoot)
+                guard !Task.isCancelled, rootGeneration == self.rootGeneration else { return }
+                self.indexPreparation = nil
+                self.beginScan(root: root, cached: snapshot.entries, indexScan: scan)
+            } catch is CancellationError {
+                return
+            } catch {
+                NSLog("LibraryIndex: scan provenance unavailable: \(error)")
+                guard !Task.isCancelled, rootGeneration == self.rootGeneration else { return }
+                self.indexPreparation = nil
+                // Revalidate against the loaded map even when persistence is unavailable; stat/ctime
+                // still proves which raw-tag rows are reusable, and disk remains the sole truth.
+                self.beginScan(root: root, cached: snapshot.entries)
+            }
+        }
+    }
+
+    private func prepareSubsequentIndexedScan(root: URL) {
+        guard indexPreparation == nil, let indexRoot, let index = libraryIndex else {
+            if indexRoot == nil || libraryIndex == nil { beginScan(root: root) }
+            return
+        }
+        let rootGeneration = self.rootGeneration
+        let cached = cachedIndexEntries
+        indexPreparation = Task { [weak self] in
+            guard !Task.isCancelled else { return }
+            do {
+                let scan = try await index.beginScan(root: indexRoot)
+                guard let self, !Task.isCancelled, rootGeneration == self.rootGeneration else { return }
+                self.indexPreparation = nil
+                self.beginScan(root: root, cached: cached, indexScan: scan)
+            } catch is CancellationError {
+                return
+            } catch {
+                NSLog("LibraryIndex: could not start persisted revalidation: \(error)")
+                guard let self, !Task.isCancelled, rootGeneration == self.rootGeneration else { return }
+                self.indexPreparation = nil
+                self.beginScan(root: root, cached: cached)
+            }
+        }
+    }
+
+    private func publishWarmSnapshot(_ snapshot: LibraryIndexSnapshot) {
+        guard let root else { return }
+        let rootPath = LibraryIndexPath(root)
+        let warm = snapshot.entries.values
+            .filter { LibraryIndexPath($0.path).isContained(in: rootPath) }
+            .filter(\.tracked)
+            .map { Self.row($0, provenance: .cache(asOf: snapshot.asOf)) }
+            .sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }
+        guard !warm.isEmpty || snapshot.asOf != nil else { return } // truly cold root
+        files = warm
+        lastSettled = snapshot.asOf
+        phase = .revalidating(asOf: snapshot.asOf)
+    }
+
+    private func beginScan(root: URL, cached: [LibraryIndexPath: LibraryIndexEntry] = [:],
+                           indexScan: LibraryIndexScan? = nil) {
 #if DEBUG
         rootScanStartsForTesting += 1
 #endif
         clock += 1
         let generation = clock
+        let rootGeneration = self.rootGeneration
         currentScan = generation
         let token = ScanCancellation()
         inFlight = token
@@ -192,23 +340,34 @@ final class ArchiveLibrary: ObservableObject {
         // calibrated against a synchronous load.
         if UserDefaults.standard.string(forKey: Self.fixtureRootKey) != nil {
             finish(LibraryScan.pass(root: root, isCancelled: { token.isCancelled }),
-                   generation: generation)
+                   generation: generation, rootGeneration: rootGeneration, indexScan: nil)
             return
         }
 #endif
         // Progress only — NOT rows. See `finish`: rows are published once per pass, atomically.
         let onBatch: @Sendable (CorpusScanBatch) -> Void = { batch in
-            let found = batch.entries.count
+            let found = batch.entries.filter { CorpusWalker.tracksReadState($0.tagNames) }.count
             let seen = batch.filesSeen
             DispatchQueue.main.async { [weak self] in
                 MainActor.assumeIsolated { self?.reportProgress(generation: generation,
                                                                 found: found, seen: seen) }
             }
         }
-        LibraryScan.onDedicatedThread(root: root,
-                                     isCancelled: { token.isCancelled },
-                                     onBatch: onBatch) { [weak self] pass in
-            MainActor.assumeIsolated { self?.finish(pass, generation: generation) }
+        let completion: @Sendable (DiscoveryPass) -> Void = { [weak self] pass in
+            MainActor.assumeIsolated {
+                self?.finish(pass, generation: generation, rootGeneration: rootGeneration,
+                             indexScan: indexScan)
+            }
+        }
+        if indexScan != nil || !cached.isEmpty {
+            indexedScanStarter(IndexedLibraryScanRequest(
+                root: root, cached: cached, isCancelled: { token.isCancelled },
+                onBatch: onBatch, completion: completion
+            ))
+        } else {
+            LibraryScan.onDedicatedThread(root: root,
+                                          isCancelled: { token.isCancelled },
+                                          onBatch: onBatch, completion: completion)
         }
     }
 
@@ -228,13 +387,58 @@ final class ArchiveLibrary: ObservableObject {
     /// endanger it; (2) `NavigationModel.libraryDidChange` rebuilds the folder tree, subject cache and
     /// smart-folder counts per emission, so 200 partial emissions at corpus scale would be quadratic
     /// work for a list the user cannot use yet anyway.
-    private func finish(_ pass: DiscoveryPass, generation: UInt64) {
-        guard generation == currentScan else { return }   // superseded pass — publish nothing
-        inFlight = nil
+    private func finish(_ pass: DiscoveryPass, generation: UInt64, rootGeneration: UInt64,
+                        indexScan: LibraryIndexScan?) {
+        guard rootGeneration == self.rootGeneration, generation == currentScan else { return }
         let next = DiscoveryHealth.phase(after: pass.result, root: pass.rootStability,
                                          finishedAt: Date(), lastSettled: lastSettled)
-        files = merged(pass: pass, generation: generation,
-                       absenceIsAuthoritative: next.isSettled)
+
+        guard let indexScan, let index = libraryIndex else {
+            let nextFiles = merged(pass: pass, generation: generation,
+                                   absenceIsAuthoritative: next.isSettled)
+            publishFinishedPass(nextFiles, next: next, generation: generation)
+            return
+        }
+
+        let result = pass.result
+        let verdict = LibraryIndexScanVerdict(
+            finishedAt: Date(),
+            filesSeen: result.filesSeen,
+            directoryErrors: result.directoryErrors.count,
+            outcome: result.rootUnreadable ? "failed" : (next.isSettled ? "complete" : "partial"),
+            absenceIsAuthoritative: next.isSettled
+        )
+        let persistedRoot = indexRoot
+        indexCommit = Task { [weak self] in
+            guard !Task.isCancelled else { return }
+            var refreshed: LibraryIndexSnapshot?
+            do {
+                try await index.completeScan(indexScan, entries: result.entries, verdict: verdict)
+                if let persistedRoot, !Task.isCancelled {
+                    refreshed = try await index.snapshot(for: persistedRoot)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                NSLog("LibraryIndex: scan persistence failed: \(error)")
+            }
+            guard let self, !Task.isCancelled,
+                  rootGeneration == self.rootGeneration, generation == self.currentScan else { return }
+            self.indexCommit = nil
+            if let refreshed { self.cachedIndexEntries = refreshed.entries }
+            // Merge only when the durable commit is ready to publish. A verified TagWriter result may
+            // have landed while SQLite was working; `merged` observes its newer sequence and keeps it.
+            let nextFiles = self.merged(pass: pass, generation: generation,
+                                        absenceIsAuthoritative: next.isSettled)
+            self.publishFinishedPass(nextFiles, next: next, generation: generation)
+        }
+    }
+
+    private func publishFinishedPass(_ nextFiles: [ArchiveFile], next: LibraryPhase,
+                                     generation: UInt64) {
+        guard generation == currentScan else { return }
+        inFlight = nil
+        files = nextFiles
         if case let .settled(asOf, _) = next { lastSettled = asOf }
         // A coalesced recovery request received during this pass means discovery is still in
         // progress. Never publish an authoritative `.settled` window while the queued pass waits for
@@ -288,7 +492,9 @@ final class ArchiveLibrary: ObservableObject {
             stopWatcher()
             inFlight?.cancel()
             let resolved = rootResolver?()
-            if rootResolver != nil { start(scope: resolved) }
+            if rootResolver != nil {
+                start(scope: resolved?.url, markerGUID: resolved?.markerGUID)
+            }
             else { requestRootRescan(urgent: true) }   // standalone/test library: safest fallback
             return
         }
@@ -316,7 +522,7 @@ final class ArchiveLibrary: ObservableObject {
     }
 
     private func drainWatchWork() {
-        guard inFlight == nil, !watchWorkInFlight, let root else { return }
+        guard inFlight == nil, !watchWorkInFlight, indexPreparation == nil, let root else { return }
 
         if queuedRootRescan {
             let urgent = queuedRootRescanIsUrgent
@@ -339,7 +545,8 @@ final class ArchiveLibrary: ObservableObject {
             queuedRootRescan = false
             queuedRootRescanIsUrgent = false
             pendingWatchRequest = CorpusWatchRequest() // the new pass covers every callback received so far
-            beginScan(root: root)
+            if usesPersistedIndex { prepareSubsequentIndexedScan(root: root) }
+            else { beginScan(root: root) }
             return
         }
 
@@ -374,20 +581,20 @@ final class ArchiveLibrary: ObservableObject {
     /// Merge a path/subtree batch once. A clean subtree may authoritatively replace only that prefix;
     /// an unreadable subtree keeps every unseen prior row, the same conservative rule as a full pass.
     private func apply(_ changes: CorpusWatchChangeSet, readGeneration: UInt64) {
-        var rows = Dictionary(uniqueKeysWithValues: files.map { ($0.url.path, $0) })
+        var rows = Dictionary(uniqueKeysWithValues: files.map { (LibraryIndexPath($0.url), $0) })
         let priorRows = rows
         var failures: [CorpusReadFailure] = []
         var folderFailures = 0
 
         for change in changes.paths {
-            let path = change.url.path
+            let path = LibraryIndexPath(change.url)
             // Every non-directory inspection positively proves that the old subtree no longer
             // exists. Clear the whole prefix first; then a tracked replacement may add the exact
             // path back. This covers directory -> regular-file replacement without trusting rename
             // or removal flags.
             switch change.inspection {
             case .tracked, .untracked, .directorySymbolicLink, .nonRegular, .vanished:
-                rows = rows.filter { !CorpusWatchRequest.contains($0.key, under: path) }
+                rows = rows.filter { !CorpusWatchRequest.contains($0.key.value, under: path.value) }
             case .directory, .unreadable:
                 break
             }
@@ -426,7 +633,8 @@ final class ArchiveLibrary: ObservableObject {
         for change in changes.subtrees {
             let outcome = DiscoveryHealth.failure(for: change.pass.result, root: change.pass.rootStability)
             if outcome == nil {
-                rows = rows.filter { !CorpusWatchRequest.contains($0.key, under: change.url.path) }
+                let subtreePath = LibraryIndexPath(change.url).value
+                rows = rows.filter { !CorpusWatchRequest.contains($0.key.value, under: subtreePath) }
             } else {
                 failures.append(contentsOf: change.pass.result.unreadable)
                 folderFailures += change.pass.result.directoryErrors.count
@@ -435,16 +643,17 @@ final class ArchiveLibrary: ObservableObject {
                 }
             }
             for entry in change.pass.result.entries {
+                let path = LibraryIndexPath(entry.url)
                 if let write = verifiedWrites[entry.url], write.seq > readGeneration {
                     if CorpusWalker.tracksReadState(write.after) {
-                        rows[entry.url.path] = Self.row(entry, tagNames: write.after,
-                                                       labelNumber: write.afterLabel)
+                        rows[path] = Self.row(entry, tagNames: write.after,
+                                             labelNumber: write.afterLabel)
                     } else {
-                        rows.removeValue(forKey: entry.url.path)
+                        rows.removeValue(forKey: path)
                     }
                 } else {
-                    rows[entry.url.path] = Self.row(entry, tagNames: entry.tagNames,
-                                                    labelNumber: entry.labelNumber)
+                    rows[path] = Self.row(entry, tagNames: entry.tagNames,
+                                          labelNumber: entry.labelNumber)
                 }
             }
 
@@ -454,11 +663,12 @@ final class ArchiveLibrary: ObservableObject {
             for (url, write) in verifiedWrites
                 where write.seq > readGeneration
                     && CorpusWatchRequest.contains(url.path, under: change.url.path) {
-                if CorpusWalker.tracksReadState(write.after), let base = priorRows[url.path] {
-                    rows[url.path] = Self.rebuilt(base, after: write.after,
-                                                  afterLabel: write.afterLabel)
+                let path = LibraryIndexPath(url)
+                if CorpusWalker.tracksReadState(write.after), let base = priorRows[path] {
+                    rows[path] = Self.rebuilt(base, after: write.after,
+                                              afterLabel: write.afterLabel)
                 } else {
-                    rows.removeValue(forKey: url.path)
+                    rows.removeValue(forKey: path)
                 }
             }
         }
@@ -511,6 +721,11 @@ final class ArchiveLibrary: ObservableObject {
     }
 
     var verifiedWriteCountForTesting: Int { verifiedWrites.count }
+
+    /// Lets a NavigationModel write-safety test model rows already published from a warm cache.
+    func replaceFilesForTesting(_ replacement: [ArchiveFile]) { files = replacement }
+
+    func closeLibraryIndexForTesting() async { await libraryIndex?.close() }
 #endif
 
     /// Build the row list from a completed pass. Two rules, and both are the point of this wave.
@@ -527,21 +742,22 @@ final class ArchiveLibrary: ObservableObject {
         let result = pass.result
         var out: [ArchiveFile] = []
         out.reserveCapacity(result.entries.count)
-        var placed = Set<URL>()
+        var placed = Set<LibraryIndexPath>()
 
         for entry in result.entries {
-            placed.insert(entry.url)
+            placed.insert(LibraryIndexPath(entry.url))
             if let write = verifiedWrites[entry.url], write.seq > generation {
                 // The walk read this file BEFORE the write landed; the write's verified re-read wins.
                 guard CorpusWalker.tracksReadState(write.after) else { continue }
                 out.append(Self.row(entry, tagNames: write.after, labelNumber: write.afterLabel))
             } else {
+                guard CorpusWalker.tracksReadState(entry.tagNames) else { continue }
                 out.append(Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber))
             }
         }
 
         if !absenceIsAuthoritative {
-            for row in files where !placed.contains(row.url) {
+            for row in files where !placed.contains(LibraryIndexPath(row.url)) {
                 out.append(row)
             }
         }
@@ -587,7 +803,7 @@ final class ArchiveLibrary: ObservableObject {
 
     // MARK: - Row construction
 
-    private static func row(_ entry: CorpusEntry, tagNames: [String], labelNumber: Int?) -> ArchiveFile {
+    static func row(_ entry: CorpusEntry, tagNames: [String], labelNumber: Int?) -> ArchiveFile {
         ArchiveFile(url: entry.url,
                     name: entry.url.lastPathComponent,
                     fileType: shortType(uti: entry.contentTypeIdentifier, url: entry.url),
@@ -595,13 +811,30 @@ final class ArchiveLibrary: ObservableObject {
                     // `.contentModificationDateKey`, deliberately: a Finder-tag write changes ctime,
                     // not mtime, so this is the right key for the content-index freshness check and
                     // the wrong one for detecting a tag change (plan §5.12).
-                    contentModified: entry.contentModified)
+                    contentModified: entry.contentModified,
+                    isDataless: entry.isDataless,
+                    provenance: .disk(readAt: Date()))
+    }
+
+    private static func row(_ entry: LibraryIndexEntry,
+                            provenance: ArchiveFileProvenance) -> ArchiveFile {
+        let url = LibraryIndexPath(entry.path).fileURL
+        return ArchiveFile(url: url,
+                           name: entry.name,
+                           fileType: shortType(uti: nil, url: url),
+                           tags: DocumentTags.parse(raw: entry.tagNames,
+                                                    labelNumber: entry.labelNumber),
+                           contentModified: Date(timeIntervalSince1970: entry.fingerprint.mtime),
+                           isDataless: entry.fingerprint.isDataless,
+                           provenance: provenance)
     }
 
     private static func rebuilt(_ f: ArchiveFile, after: [String], afterLabel: Int?) -> ArchiveFile {
         ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
                     tags: DocumentTags.parse(raw: after, labelNumber: afterLabel),
-                    contentModified: f.contentModified)
+                    contentModified: f.contentModified,
+                    isDataless: f.isDataless,
+                    provenance: .disk(readAt: Date()))
     }
 
     private static func shortType(uti: String?, url: URL) -> String {
