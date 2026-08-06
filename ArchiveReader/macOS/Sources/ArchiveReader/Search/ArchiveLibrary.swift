@@ -28,6 +28,11 @@ final class ArchiveLibrary: ObservableObject {
     /// revalidates behind rows that are already on screen.
     @Published private(set) var phase: LibraryPhase = .noRoot
     @Published private(set) var scopeDescription = "No folder selected"
+    /// A clean walk can be authoritative even when this volume cannot supply live events. Keep that
+    /// verdict separate from `phase`, but surface it beside scan failures so the Reader never goes
+    /// quietly stale. The fallback is explicit rescan + stale window-activation revalidation.
+    @Published private(set) var liveUpdateFailure: DiscoveryFailure?
+    var discoveryFailure: DiscoveryFailure? { phase.failure ?? liveUpdateFailure }
 
     /// The root being walked, so `rescan()` needs no argument.
     private var root: URL?
@@ -35,6 +40,33 @@ final class ArchiveLibrary: ObservableObject {
     /// When discovery last completed a clean pass on a root that held still. Dates `.revalidating`
     /// and `.degraded`, so the UI can say what it knew and when instead of an undated wrong claim.
     private var lastSettled: Date?
+
+    // MARK: - Live change scheduling
+
+    typealias WatcherFactory = (URL, @escaping CorpusWatcher.Handler) -> any CorpusWatching
+    private let watcherFactory: WatcherFactory
+    private let minimumRootRescanInterval: TimeInterval
+    private var watcher: (any CorpusWatching)?
+    private var rootResolver: (@MainActor () -> URL?)?
+    private var rootGeneration: UInt64 = 0
+    private var watchWorkInFlight = false
+    private var watchCancellation: CorpusWatchCancellation?
+    private var pendingWatchRequest = CorpusWatchRequest()
+    private var queuedRootRescan = false
+    private var queuedRootRescanIsUrgent = false
+    private var lastRootScanStartedAt: Date?
+    private var scheduledRootRescan: DispatchWorkItem?
+#if DEBUG
+    private(set) var rootScanStartsForTesting = 0
+#endif
+
+    init(minimumRootRescanInterval: TimeInterval = 1.0,
+         watcherFactory: @escaping WatcherFactory = { root, handler in
+             CorpusWatcher(root: root, handler: handler)
+         }) {
+        self.minimumRootRescanInterval = max(0, minimumRootRescanInterval)
+        self.watcherFactory = watcherFactory
+    }
 
     // MARK: - The write-vs-walk ordering guard (replaced ~80 lines of TTL/convergence overlay)
     //
@@ -77,11 +109,23 @@ final class ArchiveLibrary: ObservableObject {
     /// only a Spotlight index could have served, and walking the whole Mac is not something this app
     /// should ever do.
     func start(scope: URL?) {
+        watchCancellation?.cancel()
+        watchCancellation = nil
+        stopWatcher()
         inFlight?.cancel()
         inFlight = nil
+        scheduledRootRescan?.cancel()
+        scheduledRootRescan = nil
+        pendingWatchRequest = CorpusWatchRequest()
+        queuedRootRescan = false
+        queuedRootRescanIsUrgent = false
+        watchWorkInFlight = false       // any old completion is rejected by `rootGeneration`
+        rootGeneration &+= 1
         files = []
         verifiedWrites.removeAll()      // no override may leak across roots
         lastSettled = nil
+        lastRootScanStartedAt = nil
+        liveUpdateFailure = nil
         root = scope
         guard let scope else {
             phase = .noRoot
@@ -90,28 +134,53 @@ final class ArchiveLibrary: ObservableObject {
         }
         scopeDescription = scope.lastPathComponent
         phase = .firstScan(done: 0, seen: 0)
+        startWatcher(root: scope)
         beginScan(root: scope)
+    }
+
+    /// RootChanged/Mount/Unmount must go back through the bookmark owner rather than assuming the old
+    /// path still names the granted directory. `NavigationModel` installs this before starting a root.
+    func setRootResolver(_ resolver: @escaping @MainActor () -> URL?) {
+        rootResolver = resolver
     }
 
     /// Re-walk the current root, keeping the rows already on screen (File ▸ Rescan Archive Folder, ⌘⌥R).
     ///
-    /// This ships **with** the swap, not after it: deleting `NSMetadataQueryDidUpdate` removed the
-    /// app's only refresh mechanism, and `CorpusWatcher` (FSEvents) is the next item — so without a
-    /// manual rescan the Reader would have no way at all to notice an external change.
+    /// `CorpusWatcher` normally applies external changes live. This explicit path remains the immediate
+    /// recovery control for a journal-less volume and the operator's way to demand a full proof now.
     func rescan() {
         guard let root else { return }
-        inFlight?.cancel()
-        // `.firstScan` blanks the list, which is honest only when there is nothing to blank.
-        phase = files.isEmpty ? .firstScan(done: 0, seen: 0) : .revalidating(asOf: lastSettled)
-        beginScan(root: root)
+        _ = retryWatcherIfNeeded(root: root)
+        requestRootRescan(urgent: true)
+    }
+
+    /// The journal-unavailable fallback. There is intentionally no periodic timer competing with the
+    /// content indexer: activation retries the stream, and re-walks only when the last clean settle is
+    /// older than five minutes. Explicit ⌘⌥R remains available at any age.
+    func revalidateOnActivation(now: Date = Date(), staleAfter: TimeInterval = 5 * 60) {
+        guard let root else { return }
+        if retryWatcherIfNeeded(root: root) {
+            // A replacement SinceNow stream cannot replay the interval while live updates were down.
+            // Start it first to close the new gap, then catch up once regardless of snapshot age.
+            requestRootRescan(urgent: true)
+            return
+        }
+        guard watcher == nil,
+              let lastSettled,
+              now.timeIntervalSince(lastSettled) >= staleAfter else { return }
+        requestRootRescan(urgent: true)
     }
 
     private func beginScan(root: URL) {
+#if DEBUG
+        rootScanStartsForTesting += 1
+#endif
         clock += 1
         let generation = clock
         currentScan = generation
         let token = ScanCancellation()
         inFlight = token
+        lastRootScanStartedAt = Date()
 
 #if DEBUG
         // A fixture root scans SYNCHRONOUSLY — same walker, same predicate, same failure accounting;
@@ -167,8 +236,282 @@ final class ArchiveLibrary: ObservableObject {
         files = merged(pass: pass, generation: generation,
                        absenceIsAuthoritative: next.isSettled)
         if case let .settled(asOf, _) = next { lastSettled = asOf }
-        phase = next
+        // A coalesced recovery request received during this pass means discovery is still in
+        // progress. Never publish an authoritative `.settled` window while the queued pass waits for
+        // its minimum interval or runs; content-index pruning keys directly off this state.
+        if queuedRootRescan {
+            phase = files.isEmpty ? .firstScan(done: 0, seen: 0) : .revalidating(asOf: lastSettled)
+        } else {
+            phase = next
+        }
+        drainWatchWork()
     }
+
+    // MARK: - FSEvents delivery and bounded revalidation
+
+    private func startWatcher(root: URL) {
+        let generation = rootGeneration
+        let made = watcherFactory(root) { [weak self] request in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.receiveWatchRequest(request, rootGeneration: generation)
+                }
+            }
+        }
+        switch made.start() {
+        case .started:
+            watcher = made
+            liveUpdateFailure = nil
+        case .journalUnavailable:
+            made.stop()
+            watcher = nil
+            liveUpdateFailure = .liveUpdatesUnavailable
+        }
+    }
+
+    /// Returns true only when this call replaced a missing stream with a running SinceNow stream.
+    @discardableResult
+    private func retryWatcherIfNeeded(root: URL) -> Bool {
+        guard watcher == nil else { return false }
+        startWatcher(root: root)
+        return watcher != nil
+    }
+
+    private func stopWatcher() {
+        watcher?.stop()
+        watcher = nil
+    }
+
+    private func receiveWatchRequest(_ request: CorpusWatchRequest, rootGeneration: UInt64) {
+        guard root != nil, rootGeneration == self.rootGeneration else { return }
+        if request.reResolveRoot {
+            stopWatcher()
+            inFlight?.cancel()
+            let resolved = rootResolver?()
+            if rootResolver != nil { start(scope: resolved) }
+            else { requestRootRescan(urgent: true) }   // standalone/test library: safest fallback
+            return
+        }
+        if request.fullRescan {
+            pendingWatchRequest = CorpusWatchRequest()
+            requestRootRescan(urgent: false)
+            return
+        }
+        pendingWatchRequest.merge(request)
+        drainWatchWork()
+    }
+
+    /// At most one full re-walk is active and at most one is queued. Further callbacks merely keep
+    /// that one bit set. A short minimum interval prevents a fast/small root from spinning if a writer
+    /// produces a sustained stream; this delayed work item is event-triggered, not a periodic timer.
+    private func requestRootRescan(urgent: Bool) {
+        guard root != nil else { return }
+        queuedRootRescan = true
+        queuedRootRescanIsUrgent = queuedRootRescanIsUrgent || urgent
+        pendingWatchRequest = CorpusWatchRequest()
+        if !phase.isScanning {
+            phase = files.isEmpty ? .firstScan(done: 0, seen: 0) : .revalidating(asOf: lastSettled)
+        }
+        drainWatchWork()
+    }
+
+    private func drainWatchWork() {
+        guard inFlight == nil, !watchWorkInFlight, let root else { return }
+
+        if queuedRootRescan {
+            let urgent = queuedRootRescanIsUrgent
+            let elapsed = lastRootScanStartedAt.map { Date().timeIntervalSince($0) } ?? .infinity
+            let delay = urgent ? 0 : max(0, minimumRootRescanInterval - elapsed)
+            if delay > 0 {
+                guard scheduledRootRescan == nil else { return }
+                let work = DispatchWorkItem { [weak self] in
+                    MainActor.assumeIsolated {
+                        self?.scheduledRootRescan = nil
+                        self?.drainWatchWork()
+                    }
+                }
+                scheduledRootRescan = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+                return
+            }
+            scheduledRootRescan?.cancel()
+            scheduledRootRescan = nil
+            queuedRootRescan = false
+            queuedRootRescanIsUrgent = false
+            pendingWatchRequest = CorpusWatchRequest() // the new pass covers every callback received so far
+            beginScan(root: root)
+            return
+        }
+
+        guard !pendingWatchRequest.isEmpty else { return }
+        let request = pendingWatchRequest
+        pendingWatchRequest = CorpusWatchRequest()
+        watchWorkInFlight = true
+        let rootGeneration = self.rootGeneration
+        clock += 1
+        let readGeneration = clock
+        let cancellation = CorpusWatchCancellation()
+        watchCancellation = cancellation
+        CorpusWatchWork.onDedicatedThread(root: root, request: request,
+                                          cancellation: cancellation) { [weak self] changes in
+            MainActor.assumeIsolated {
+                self?.finishWatchWork(changes, rootGeneration: rootGeneration,
+                                      readGeneration: readGeneration)
+            }
+        }
+    }
+
+    private func finishWatchWork(_ changes: CorpusWatchChangeSet,
+                                 rootGeneration: UInt64,
+                                 readGeneration: UInt64) {
+        guard rootGeneration == self.rootGeneration else { return }
+        watchWorkInFlight = false
+        watchCancellation = nil
+        apply(changes, readGeneration: readGeneration)
+        drainWatchWork()
+    }
+
+    /// Merge a path/subtree batch once. A clean subtree may authoritatively replace only that prefix;
+    /// an unreadable subtree keeps every unseen prior row, the same conservative rule as a full pass.
+    private func apply(_ changes: CorpusWatchChangeSet, readGeneration: UInt64) {
+        var rows = Dictionary(uniqueKeysWithValues: files.map { ($0.url.path, $0) })
+        let priorRows = rows
+        var failures: [CorpusReadFailure] = []
+        var folderFailures = 0
+
+        for change in changes.paths {
+            let path = change.url.path
+            // Every non-directory inspection positively proves that the old subtree no longer
+            // exists. Clear the whole prefix first; then a tracked replacement may add the exact
+            // path back. This covers directory -> regular-file replacement without trusting rename
+            // or removal flags.
+            switch change.inspection {
+            case .tracked, .untracked, .directorySymbolicLink, .nonRegular, .vanished:
+                rows = rows.filter { !CorpusWatchRequest.contains($0.key, under: path) }
+            case .directory, .unreadable:
+                break
+            }
+
+            if let write = verifiedWrites[change.url], write.seq > readGeneration {
+                // The user's verified edit happened after this read began. It has the same precedence
+                // as in `merged(pass:)`; an older external revalidation cannot undo its tags. When
+                // this read did produce a tracked entry, retain its fresh content mtime/type so a
+                // concurrent external content edit still invalidates the content index.
+                if CorpusWalker.tracksReadState(write.after) {
+                    if case let .tracked(entry) = change.inspection {
+                        rows[path] = Self.row(entry, tagNames: write.after,
+                                              labelNumber: write.afterLabel)
+                    } else if let base = priorRows[path] {
+                        rows[path] = Self.rebuilt(base, after: write.after,
+                                                 afterLabel: write.afterLabel)
+                    }
+                }
+                continue
+            }
+
+            switch change.inspection {
+            case let .tracked(entry):
+                rows[path] = Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber)
+            case .untracked:
+                break
+            case .directorySymbolicLink, .nonRegular, .vanished:
+                break
+            case let .unreadable(failure):
+                failures.append(failure)       // keep the last-known row; absence is not proven
+            case .directory:
+                folderFailures += 1            // work converts this to a subtree; defensive only
+            }
+        }
+
+        for change in changes.subtrees {
+            let outcome = DiscoveryHealth.failure(for: change.pass.result, root: change.pass.rootStability)
+            if outcome == nil {
+                rows = rows.filter { !CorpusWatchRequest.contains($0.key, under: change.url.path) }
+            } else {
+                failures.append(contentsOf: change.pass.result.unreadable)
+                folderFailures += change.pass.result.directoryErrors.count
+                if change.pass.result.rootUnreadable || change.pass.rootStability != .heldStill {
+                    folderFailures += 1
+                }
+            }
+            for entry in change.pass.result.entries {
+                if let write = verifiedWrites[entry.url], write.seq > readGeneration {
+                    if CorpusWalker.tracksReadState(write.after) {
+                        rows[entry.url.path] = Self.row(entry, tagNames: write.after,
+                                                       labelNumber: write.afterLabel)
+                    } else {
+                        rows.removeValue(forKey: entry.url.path)
+                    }
+                } else {
+                    rows[entry.url.path] = Self.row(entry, tagNames: entry.tagNames,
+                                                    labelNumber: entry.labelNumber)
+                }
+            }
+
+            // A clean subtree replacement removed its prior rows before installing the pass. A file
+            // read as untracked before a newer verified edit will therefore be absent from `entries`;
+            // reinsert that last-known row with the verified value rather than losing the user edit.
+            for (url, write) in verifiedWrites
+                where write.seq > readGeneration
+                    && CorpusWatchRequest.contains(url.path, under: change.url.path) {
+                if CorpusWalker.tracksReadState(write.after), let base = priorRows[url.path] {
+                    rows[url.path] = Self.rebuilt(base, after: write.after,
+                                                  afterLabel: write.afterLabel)
+                } else {
+                    rows.removeValue(forKey: url.path)
+                }
+            }
+        }
+
+        let nextFiles = rows.values.sorted {
+            $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending
+        }
+        if nextFiles != files { files = nextFiles }
+
+        if !failures.isEmpty || folderFailures > 0 {
+            let synthetic = CorpusScanResult(entries: [], unreadable: failures,
+                                             directoryErrors: (0..<folderFailures).map {
+                                                 CorpusReadFailure(url: root ?? URL(fileURLWithPath: "/"),
+                                                                   reason: "live subtree could not be read (\($0))")
+                                             },
+                                             filesSeen: 0, vanishedMidScan: 0,
+                                             rootUnreadable: false, cancelled: false)
+            if let failure = DiscoveryHealth.failure(for: synthetic, root: .heldStill) {
+                phase = .degraded(failure, asOf: lastSettled)
+            }
+        } else if nextFiles.isEmpty, !changes.paths.isEmpty || !changes.subtrees.isEmpty {
+            // A path-local read cannot maintain the full walk's exact `filesSeen` denominator. If a
+            // live edit empties the tracked library, establish it before the empty-state UI says
+            // "folder empty" or "none of N are tagged" (e.g. launch scanned 0, then an untracked file
+            // was created). This rare boundary is one coalesced root pass, never per-event polling.
+            requestRootRescan(urgent: false)
+        }
+
+        // Live reads are serialized with full walks and with one another. Once a live read stamped
+        // after a verified write has merged, no older operation remains that could overwrite that
+        // write, so its ordering guard can be retired. Without this, a healthy watcher plus no manual
+        // rescans would retain one entry for every Reader edit for the process's entire lifetime.
+        verifiedWrites = verifiedWrites.filter { $0.value.seq > readGeneration }
+    }
+
+    @discardableResult
+    func flushWatcherForTesting() -> Bool { watcher?.flushSync() ?? false }
+
+    func receiveWatchRequestForTesting(_ request: CorpusWatchRequest) {
+        receiveWatchRequest(request, rootGeneration: rootGeneration)
+    }
+
+#if DEBUG
+    /// Deterministic race seam: capture a watch-read timestamp, interleave a verified write, then
+    /// deliver the already-read result without racing real threads in a unit test.
+    func beginWatchReadForTesting() -> UInt64 { clock += 1; return clock }
+
+    func finishWatchReadForTesting(_ changes: CorpusWatchChangeSet, readGeneration: UInt64) {
+        apply(changes, readGeneration: readGeneration)
+    }
+
+    var verifiedWriteCountForTesting: Int { verifiedWrites.count }
+#endif
 
     /// Build the row list from a completed pass. Two rules, and both are the point of this wave.
     ///

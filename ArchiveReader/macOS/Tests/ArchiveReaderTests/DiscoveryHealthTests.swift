@@ -190,6 +190,7 @@ final class DiscoveryHealthTests: XCTestCase {
                                     .firstScan(done: 0, seen: 0),
                                     .revalidating(asOf: t0),
                                     .degraded(.rootUnreadable, asOf: t0),
+                                    .degraded(.liveUpdatesUnavailable, asOf: t0),
                                     .degraded(.finderTagsUnsupported(files: 4, otherFiles: 0, folders: 0),
                                               asOf: nil),
                                     .degraded(.partiallyUnreadable(files: 1, folders: 0), asOf: nil)] {
@@ -220,6 +221,7 @@ final class DiscoveryHealthTests: XCTestCase {
     /// empty string is the silent failure this type exists to end.
     func testEveryFailureSaysSomethingSpecific() {
         let all: [DiscoveryFailure] = [.rootUnreadable, .rootChangedMidScan, .incomplete,
+                                       .liveUpdatesUnavailable,
                                        .finderTagsUnsupported(files: 4, otherFiles: 0, folders: 0),
                                        .partiallyUnreadable(files: 1, folders: 0),
                                        .partiallyUnreadable(files: 0, folders: 1),

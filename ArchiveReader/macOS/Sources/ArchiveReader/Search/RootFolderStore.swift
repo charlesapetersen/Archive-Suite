@@ -19,6 +19,7 @@ final class RootFolderStore: ObservableObject {
 
     private var accessing: URL?
     private let key = "archiveRootBookmark"
+    var hasSavedBookmark: Bool { UserDefaults.standard.data(forKey: key) != nil }
 
     init() {
 #if DEBUG
@@ -60,8 +61,19 @@ final class RootFolderStore: ObservableObject {
         markerState = .noRoot
     }
 
-    private func resolveSaved() {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return }
+    /// Re-resolve the persisted bookmark after FSEvents reports RootChanged/Mount/Unmount.
+    ///
+    /// A moved granted directory can resolve to a new path; a removed/ejected one becomes no root
+    /// rather than leaving the library watching a dead pathname. The bookmark remains persisted so a
+    /// later window activation can retry after the volume is mounted again.
+    @discardableResult
+    func reResolveSavedRoot() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: key) else {
+            stopAccessing()
+            root = nil
+            markerState = .noRoot
+            return nil
+        }
         var stale = false
         do {
             let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope,
@@ -70,9 +82,14 @@ final class RootFolderStore: ObservableObject {
             // so leave `root` nil (user re-picks) rather than appearing connected. (Fix)
             guard url.startAccessingSecurityScopedResource() else {
                 NSLog("RootFolderStore: saved root is no longer accessible; user must re-pick.")
-                return
+                stopAccessing()
+                root = nil
+                markerState = .noRoot
+                return nil
             }
+            let previous = accessing
             accessing = url
+            previous?.stopAccessingSecurityScopedResource() // balance the old lifetime after new access is live
             root = url
             loadOrEnsureMarker(at: url)
             // Refresh a stale bookmark WHILE access is still held — never drop the scope first. (Fix)
@@ -80,10 +97,17 @@ final class RootFolderStore: ObservableObject {
                                                         includingResourceValuesForKeys: nil, relativeTo: nil) {
                 UserDefaults.standard.set(fresh, forKey: key)
             }
+            return url
         } catch {
             NSLog("RootFolderStore: could not resolve saved bookmark: \(error)")
+            stopAccessing()
+            root = nil
+            markerState = .noRoot
+            return nil
         }
     }
+
+    private func resolveSaved() { _ = reResolveSavedRoot() }
 
     private func stopAccessing() {
         if let a = accessing { a.stopAccessingSecurityScopedResource(); accessing = nil }

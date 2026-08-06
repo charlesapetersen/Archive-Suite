@@ -103,6 +103,7 @@ final class NavigationModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        library.setRootResolver { [weak self] in self?.rootStore.reResolveSavedRoot() }
         filter.read = AppSettings.defaultReadFilter
         filter.subjectCombine = AppSettings.defaultSubjectCombine
         restoreViewState()   // last session's filter + sort override the defaults (C2)
@@ -180,6 +181,16 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.publishLinkTarget() } }
             .store(in: &cancellables)
         if let root = rootStore.root { library.start(scope: root) }
+    }
+
+    /// Retry a root bookmark after an ejection/mount event, then apply the no-timer fallback for a
+    /// volume that cannot provide FSEvents. Called from the navigation window's activation notice.
+    func applicationDidBecomeActive(now: Date = Date()) {
+        if rootStore.root == nil, rootStore.hasSavedBookmark {
+            if let restored = rootStore.reResolveSavedRoot() { library.start(scope: restored) }
+            return
+        }
+        library.revalidateOnActivation(now: now)
     }
 
     /// Adopt the app-level link context and seed it with the current root (the store resolved its saved
@@ -820,10 +831,8 @@ final class NavigationModel: ObservableObject {
 
     /// Re-walk the granted archive folder (File ▸ Rescan Archive Folder, ⌘⌥R).
     ///
-    /// Ships with the Spotlight removal rather than after it: deleting `NSMetadataQueryDidUpdate` took
-    /// away the app's only refresh mechanism, and the FSEvents watcher (`W26.fsev`) is the next item.
-    /// Until it lands, this is how an external change (the Processor writing a batch, a tag edited in
-    /// Finder) gets picked up. Read-only: a rescan walks, it never writes.
+    /// External changes normally arrive through `CorpusWatcher`. This read-only command remains the
+    /// immediate recovery path when the event channel is unavailable or the operator wants a full proof.
     func rescan() {
         guard rootStore.root != nil else {
             statusMessage = "No archive folder is open. Choose one in File ▸ Choose Archive Folder…"

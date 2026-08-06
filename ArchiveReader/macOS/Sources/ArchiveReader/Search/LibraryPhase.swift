@@ -20,6 +20,10 @@ enum DiscoveryFailure: Equatable, Sendable {
     /// `ENOTSUP`). Keep the other failure counts too: a root may cross mount boundaries, and naming
     /// the unsupported volume must not hide simultaneous permissions or directory failures.
     case finderTagsUnsupported(files: Int, otherFiles: Int, folders: Int)
+    /// The last walk was valid, but this root's volume did not provide a working FSEvents stream.
+    /// Kept out of `LibraryPhase.degraded`: the snapshot is authoritative at its settle time, while
+    /// this warning describes how it will be refreshed (activation after five minutes or ⌘⌥R).
+    case liveUpdatesUnavailable
     /// The pass ran to the end but could not read everything it saw.
     case partiallyUnreadable(files: Int, folders: Int)
 
@@ -31,6 +35,8 @@ enum DiscoveryFailure: Equatable, Sendable {
         case .incomplete:         return "Scan incomplete"
         case let .finderTagsUnsupported(files, _, _):
             return "Finder tags unavailable for \(files) file\(files == 1 ? "" : "s")"
+        case .liveUpdatesUnavailable:
+            return "Live archive updates unavailable"
         case let .partiallyUnreadable(files, folders):
             let parts = [files > 0 ? "\(files) file\(files == 1 ? "" : "s")" : nil,
                          folders > 0 ? "\(folders) folder\(folders == 1 ? "" : "s")" : nil]
@@ -69,6 +75,10 @@ enum DiscoveryFailure: Equatable, Sendable {
                         + "more than one reason."
             }
             return detail
+        case .liveUpdatesUnavailable:
+            return "This volume did not provide a working FSEvents journal, so Archive Reader cannot "
+                 + "follow Finder or Processor changes continuously. It will re-scan when the app becomes "
+                 + "active and its last clean scan is more than five minutes old; use ⌘⌥R to refresh now."
         case let .partiallyUnreadable(files, folders):
             let what = folders > 0
                 ? "Some items could not be read (\(files) file\(files == 1 ? "" : "s"), "

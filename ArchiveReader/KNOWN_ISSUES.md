@@ -24,12 +24,44 @@ are deleted. `LibraryPhase` is the single health gate: only a clean, root-stable
 absence as real, prune content-index rows, or claim that no files carry Read/Unread tags. That last sentence
 must quote how many regular files were examined. A degraded pass keeps every unseen prior row, including
 descendants of a directory the enumerator could not enter, and cannot consume a deep link's not-found retry
-budget. File ▸ Rescan Archive Folder (⌘⌥R) supplies refresh until `W26.fsev` adds live FSEvents.
+budget. `W26.fsev` now supplies live FSEvents; File ▸ Rescan Archive Folder (⌘⌥R) remains the explicit
+recovery control.
 
 **Non-vacuous GUI proof:** the Tart VM's fixture builder timed out with **0/11 files Spotlight-indexed**, yet
 Reader rendered all 11 tagged files and its existing 16 UI tests passed. A separate UI test over one genuinely
 untagged sandbox file verified the rendered denominator. The incident no longer has an app-side workaround
 because it no longer depends on Spotlight discovery.
+
+## ✅ FIXED (`W26.fsev`) — external Finder/Processor changes were invisible until a manual rescan
+
+**Fixed 2026-08-05 (completion commit).** `CorpusWatcher` now starts a FileEvents + MarkSelf + WatchRoot
+FSEvents stream before the launch walk, on a serial dispatch queue, and holds an additional security scope
+for exactly the stream lifetime. Each asynchronous exact/subtree read holds its own balanced operation scope
+and is cancelled on root replacement. Every retained event is re-statted and re-read through
+`ArchiveCore.CorpusWalker.inspect`; semantic item flags are never trusted. Exact paths update in place,
+`MustScanSubDirs` replaces only its subtree, stream/drop sentinels force a root pass, and
+RootChanged/mount/unmount re-resolve the saved bookmark before restarting. Hidden files, package
+descendants, directory symlink targets, and the measured `.sb-XXXXXXXX-XXXXXX` atomic-save sibling stay
+outside the walk's universe.
+
+The app persists no event ID: each launch walks once and watches `SinceNow`. A volume whose stream cannot
+start shows *"Live archive updates unavailable"* instead of going quietly stale; activation retries it and,
+if still unavailable and the last clean settle is over five minutes old, re-walks. Recovering a stream also
+forces one catch-up walk because `SinceNow` cannot replay its outage. There is no periodic timer. Root passes
+are bounded to one active + one queued with a minimum interval, and queued recovery never exposes a false
+settled/pruning window.
+
+**Adversarial corrections before ship (11 across two passes):** dropped/history sentinels are interpreted
+before path containment; RootChanged wins over unioned drop/history flags; an old-root callback is
+generation-rejected; live work cannot outlive its security scope or root generation; a live read has the same
+newer-verified-write precedence as a full walk while still accepting freshly read content metadata;
+directory→file replacement clears phantom descendants; directory symlinks never expand the watched tree; a
+queued root pass never briefly publishes settled; a recovered `SinceNow` stream gets a catch-up walk; and a
+failed `FSEventStreamStart` does not call the start-only `Stop` API. The real APFS test changes Finder tags
+from a separate `/usr/bin/xattr` process and uses `FSEventStreamFlushSync` to prove delivery without
+Spotlight. Final self-review also made a newer serialized live read retire converged verified-write ordering
+guards, so a long-running healthy library cannot retain every Reader edit forever. All filesystem fixtures are
+temporary scratch trees; the real corpus was neither read nor written.
 
 ## ✅ FIXED (W26.deny) — `TagWriter` could DESTROY tags on a file whose xattrs are unreadable-but-writable
 

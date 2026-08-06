@@ -382,7 +382,13 @@ Also: **eight consumer sites** depend on `SystemTagsProvider`'s API surface, and
 persisted vocabulary, suggestions are available instantly on launch, so that state can likely be retired —
 check all eight consumers before removing it.
 
-### 4.5 `CorpusWatcher` — new (W26.fsev), FSEvents live updates
+### 4.5 `CorpusWatcher` — new (W26.fsev), FSEvents live updates — ✅ SHIPPED 2026-08-05
+
+The shipped implementation is `ArchiveReader/.../Search/CorpusWatcher.swift` plus the bounded merge/scheduler
+in `ArchiveLibrary`. It starts the stream before the launch walk (so there is no scan→watch gap), reads every
+retained path through `ArchiveCore.CorpusWalker.inspect`, and preserves the launch walk's hidden/package
+exclusions. Exact paths are one stat/tag read; coalesced directories get subtree passes; recovery sentinels
+get one bounded root pass.
 
 **Verified empirically 2026-08-04** (scratch dir, `kFSEventStreamCreateFlagFileEvents`): a pure Finder
 tag write — `setResourceValue(_:forKey:.tagNamesKey)`, changing **no file bytes** — *does* produce an
@@ -402,7 +408,8 @@ byte-free tag write above *also* reported `ItemRenamed`, which never happened. T
   flags are **hints, not a replayable log**; observed one event coalescing a file's creation *and* its
   subsequent tag write.
 - Recovery flags, all reducible to two primitives — *"re-read these paths"* and *"re-walk this subtree"*:
-  `MustScanSubDirs` (0x1, with `UserDropped` 0x2 / `KernelDropped` 0x4) → re-walk that subtree;
+  `MustScanSubDirs` (0x1) → re-walk that subtree; `UserDropped` (0x2) / `KernelDropped` (0x4) → **full
+  monitored-root pass** (the SDK permits sentinel path `/`, so stream-wide flags are reduced before path containment);
   `RootChanged` → re-resolve the bookmark + re-walk; `EventIdsWrapped`/`HistoryDone` → full re-walk;
   `Unmount`/`Mount` → stop/restart.
 - **Own-write detection has a proper API — use it instead of a side channel.**
@@ -413,28 +420,32 @@ byte-free tag write above *also* reported `ItemRenamed`, which never happened. T
 - **`FSEventStreamSetDispatchQueue` is required — run-loop scheduling is deprecated as of macOS 13.**
   Teardown order is mandated by the header: `Stop`, then **`Invalidate` while the stream is still
   scheduled**, then `Release`. Getting this wrong is a crash, not a warning.
-- **Resume across an app quit:** `sinceWhen` replay works and is the right mechanism — but **event IDs are
-  not delivered in ascending order**, and with `kFSEventStreamCreateFlagFullHistory` some delivered IDs are
-  *lower* than the one requested. Persist a high-water mark conservatively (and treat a replay gap as
-  "re-walk", per the principle in §4a).
+- **No event-ID persistence in v1.** Launch performs a complete walk, then the stream starts at
+  `kFSEventStreamEventIdSinceNow`. Non-ascending IDs and FullHistory values below the request make a naïve
+  persisted high-water mark a silent-loss mechanism. A recovered SinceNow stream is followed by one catch-up
+  walk so the outage interval cannot disappear.
 - **`FSEventStreamFlushSync` gives tests a deterministic synchronisation point** — which is precisely the
   reason the fixture scripts currently poll `mdfind`, so it is what makes `W26.scripts` possible.
 - **`kqueue`/`DispatchSource.makeFileSystemObjectSource` is disqualified at this scale** (`EVFILT_VNODE`
   needs one open file descriptor per watched file — 123k fds), and `NSFilePresenter` is disqualified on
   semantics. FSEvents is the only viable choice; do not re-litigate it.
-- **Verify, don't assume, that the root is on a volume `fseventsd` journals.** The real corpus is on local
-  APFS (so it is covered), but the root is user-chosen and could be on a volume with no journal — in which
-  case the watcher must degrade to periodic re-walks *and say so* rather than going quietly deaf.
+- **Verify, don't assume, that the root has a working event channel.** A successful
+  `FSEventStreamStart` on the chosen path is the direct capability check; device-UUID probes only answer
+  whether *historical* events are available and legitimately return nil on read-only/firmlink arrangements.
+  Start failure surfaces *"Live archive updates unavailable"*. There is no periodic timer: activation retries
+  and, while still unavailable, re-walks once the last clean settle is over five minutes old; ⌘⌥R is immediate.
 - Sandbox: the stream is created on the **security-scoped root**, with
   `start/stopAccessingSecurityScopedResource` balanced across the *stream's whole lifetime*, not per
-  read. Entitlements already present (`app-sandbox`, `files.user-selected.read-only`,
+  read. Because exact/subtree work is asynchronous, each worker also owns a separate balanced operation scope
+  and cancellation token; stream teardown or root replacement cancels that work before its result can merge.
+  Directory symlinks are classified as non-regular and are never traversed, so a watched subtree cannot escape
+  the granted root. Entitlements already present (`app-sandbox`, `files.user-selected.read-only`,
   app-scoped bookmarks) are sufficient — POSIX/FSEvents access to a user-granted root works even where
   Spotlight query visibility does not (the very asymmetry documented at `ArchiveLibrary.swift:62-65`).
-- Atomic writes create temp siblings (measured: `a.txt.sb-858602c2-RXb79N`) — the watcher must ignore
-  paths that fail the predicate rather than treating them as corpus members.
-- **Self-write suppression:** `TagWriter` publishes the URLs it just wrote; the watcher drops the
-  matching event so the app does not re-read its own write. Because the verified `.after` is already
-  applied, a missed suppression is merely redundant work, never incorrect.
+- Atomic writes create temp siblings (measured: `a.txt.sb-858602c2-RXb79N`) — only the exact measured
+  `.sb-[8 hex]-[6 alnum]` suffix is ignored; an ordinary filename containing `.sb-` remains visible.
+- **Self-write suppression:** the stream uses `MarkSelf` and drops `OwnEvent`; there is no `TagWriter` URL
+  side channel. Recovery flags override OwnEvent because a unioned batch can also contain external work.
 
 ### 4.6 `LibraryIndex` — new (W26.idx), instant warm start
 
@@ -852,7 +863,7 @@ each leaving the app **working**.
 | `W26.walk1` | ✅ **SHIPPED `003ca59`** — `CorpusWalker` in ArchiveCore + first-ever discovery test | M | low | 1 | none | `W26.deny`, `W26.lint` |
 | `W26.walk2` | ✅ **SHIPPED through `6f5d6ad` + completion commit** — Reader Release discovery uses `CorpusWalker`; `PendingWrite` deleted; honest `LibraryPhase`; hostile VM at 0/11 Spotlight-indexed green | L | med | 2 | none | `W26.walk1` |
 | `W26.notsup` | ✅ **SHIPPED in completion commit** — ENOTSUP stays unreadable but gets specific Finder-tag capability guidance; mixed-mount counts preserved | S | low | 1 | none | `W26.walk2` |
-| `W26.fsev` | `CorpusWatcher` (FSEvents) replaces `DidUpdate`; self-write suppression | M | med | 2 | none | `W26.walk2` |
+| `W26.fsev` | ✅ **SHIPPED in completion commit** — FSEvents FileEvents/MarkSelf/WatchRoot; exact/subtree/full recovery; SinceNow + catch-up; one active + one queued; real external-xattr test | M | med | 2 | none | `W26.walk2` |
 | `W26.idx` | `LibraryIndex` (SQLite) warm start + background revalidation | L | med | 2 | none | `W26.walk2` |
 | `W26.vocab` | Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` | M | low | 1 | none | `W26.walk1` |
 | `W26.oracle` | Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` | S | low | 1 | none | — |
@@ -1149,9 +1160,10 @@ list that was never complete.
 that: a 2,000-file group edit, or the Processor writing a batch over ten minutes, can start walk N, then have
 events 1 s later start walk N+1, and so on.
 
-**Fix (`W26.fsev`):** state the scheduling contract — **at most one full re-walk in flight and at most one
-queued, coalesced newest-wins**, plus a minimum interval between root-level re-walks. `ContentIndexer`'s own
-`pending` discipline (`:55-58`) is the precedent to copy verbatim.
+**Fixed (`W26.fsev`, completion commit):** **at most one full re-walk in flight and at most one queued,
+coalesced newest-wins**, with a one-second minimum interval between event-driven root passes. A queued pass
+keeps `LibraryPhase` revalidating even while it waits, so absence and content-index pruning are never enabled
+between the two walks. Targeted path/subtree work is likewise serial and coalesced.
 
 ### 7a.15 Cloud-root detection: `MNT_LOCAL` cannot fire, so identify positively
 

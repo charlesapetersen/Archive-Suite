@@ -274,13 +274,15 @@ final class LibraryDiscoverySwapTests: XCTestCase {
         let root = try makeRoot()
         try makeFile("first.pdf", tags: ["Unread"], in: root)
 
-        let library = ArchiveLibrary()
+        // This case pins the explicit rescan control itself. Suppress delivery deliberately so the
+        // real live watcher (covered in CorpusWatcherTests) cannot race the pre-rescan assertion.
+        let library = ArchiveLibrary(watcherFactory: { _, _ in SilentCorpusWatcher() })
         library.start(scope: root)
         try await waitForPass(library)
         XCTAssertEqual(names(library), ["first.pdf"])
 
         try makeFile("second.pdf", tags: ["Read"], in: root)
-        XCTAssertEqual(names(library), ["first.pdf"], "no watcher yet — W26.fsev is the next item")
+        XCTAssertEqual(names(library), ["first.pdf"], "no live event was emitted by this test's stub")
 
         library.rescan()
         // A rescan behind existing rows must NOT blank them: `.firstScan` is the only phase whose
@@ -328,6 +330,12 @@ final class LibraryDiscoverySwapTests: XCTestCase {
         XCTAssertEqual(library.phase, .noRoot)
         XCTAssertEqual(library.scopeDescription, "No folder selected")
     }
+}
+
+private final class SilentCorpusWatcher: CorpusWatching {
+    func start() -> CorpusWatcherStartResult { .started }
+    func stop() {}
+    func flushSync() -> Bool { true }
 }
 
 /// Restore owner access below `path` so a deliberately sealed fixture entry can be deleted.

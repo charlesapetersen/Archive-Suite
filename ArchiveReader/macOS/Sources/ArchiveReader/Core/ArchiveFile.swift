@@ -3,8 +3,8 @@ import ArchiveCore
 
 /// One row in the navigation window: a tagged file discovered by the library.
 ///
-/// `tags` are parsed for display/sort/filter (from the Spotlight-provided tag array — the fast path,
-/// no per-file I/O). `url` is the identity used for opening and for `TagWriter` mutations. UI-free.
+/// `tags` are parsed for display/sort/filter from ArchiveCore's on-disk read. `url` is the identity used
+/// for opening and for `TagWriter` mutations. UI-free.
 struct ArchiveFile: Identifiable, Sendable {
     let url: URL
     let name: String

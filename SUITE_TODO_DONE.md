@@ -140,6 +140,44 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   Release build green; write-surface lint clean and self-test 12/12. No ArchiveCore primitive or write path
   changed, no real corpus was read or written, and no physical xattr-less volume was required.
 
+- [x] **W26.fsev — `CorpusWatcher` (FSEvents) replaces `DidUpdate` [M · med · Tier-2].
+  ✅ SHIPPED 2026-08-05** — this commit.
+  **The live path.** Reader starts a FileEvents + MarkSelf + WatchRoot stream on a serial dispatch queue
+  **before** its launch walk, with a second security-scope access balanced across exactly the stream lifetime.
+  Each asynchronous exact/subtree read owns a separate balanced operation scope and cancellation token, so it
+  cannot outlive a root switch or borrow access that the stream teardown has released.
+  It persists no event ID: launch establishes truth, then watches `SinceNow`. `CorpusWalker.inspect` is the
+  shared one-path authority, so launch and live events agree about stat/tag failures, dataless files,
+  Read/Unread membership, content mtime, and the stale-NSURL-cache trap. Semantic FSEvents flags are never
+  believed: every normal event means re-stat and re-read. Hidden files, package descendants, and directory
+  symlink targets remain outside the same universe as a full walk; only the measured
+  `.sb-[8 hex]-[6 alnum]` atomic-save sibling is ignored.
+  **Recovery and coalescing.** `MustScanSubDirs` performs a clean/degraded subtree merge; dropped/history/
+  wrapped sentinels force a root pass; RootChanged/mount/unmount re-resolve the persisted bookmark and restart.
+  Exact and subtree work runs off the main actor on a dedicated thread. Root passes are bounded to one active +
+  one queued with a one-second minimum interval, and a queued pass keeps discovery revalidating so absence and
+  content-index pruning never see a false settled window. Stream start failure is visible as *"Live archive
+  updates unavailable"*: activation retries it, re-walks after five stale minutes while it remains down, and
+  always performs one catch-up walk if a SinceNow stream recovers. ⌘⌥R remains immediate; there is no timer.
+  **Adversarial completion.** Two independent passes found eleven defects, all fixed with regressions: SDK
+  drop/history sentinels were filtered by their meaningless/outside path; a recovered SinceNow stream lost its
+  outage interval; an older live read could overwrite a newer verified Reader edit; an already-queued old-root
+  callback could enter the replacement root; directory→file replacement left phantom descendants; a queued
+  root pass briefly published settled; and failed Start called the start-only Stop API. The write-vs-read fix
+  initially discarded fresh content metadata; directory symlinks could expand outside the root; background
+  subtree work borrowed the stream scope and outlived root switches; and RootChanged unioned with a drop flag
+  selected the weaker full scan instead of bookmark re-resolution. The final write-vs-read rule extends the
+  full-walk monotonic tag ordering to exact and subtree events, including a verified removal, while using the
+  fresh inspection's mtime and type. A newer serialized live read retires converged guards so long-running
+  healthy sessions do not retain every Reader edit forever.
+  **Verification.** The watcher suite is 26/26, including a real local-APFS stream plus an external
+  `/usr/bin/xattr` Finder-tag write and deterministic `FSEventStreamFlushSync`; the rest use disposable scratch
+  trees and injected streams. ArchiveCore passed 149 XCTest and 105 Swift Testing cases; Reader passed all 331
+  selected unit tests (the separately tracked deep-link isolation case remains excluded) plus its Release build;
+  Processor Debug built; and all 738 Notes tests passed. The write-surface lint and its self-test are clean.
+  No real corpus write, move, rename, delete, content read, or Spotlight query was used; no host-screen UI
+  automation is part of this proof.
+
 - [x] **W26.deny — 🔴 the same coercion is in the AUDITED WRITE PATH and it DESTROYS TAGS [S · med · Tier-2].
   ✅ FIXED 2026-08-05** — `2956f3c` (read primitive) → `ad86cce` (write path + trackers).
   **The bug:** `TagWrite.swift:252-261` carried the comment *"a read FAILURE aborts (never treated as

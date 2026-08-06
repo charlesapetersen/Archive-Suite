@@ -289,37 +289,6 @@ passes as misses, and proved unreadable subtrees cannot erase prior rows. VM ver
 hostile: Spotlight indexed **0/11** fixture files while Reader still rendered all 11; the full pre-existing
 16-test GUI suite and the new denominator check passed. The accepted one-time content-index re-extraction
 from switching mtime sources remains deliberate; the database version is unchanged.
-- [ ] **W26.fsev — `CorpusWatcher` (FSEvents) replaces `DidUpdate` [M · med · Tier-2 · needs: none]
-  (blocked-on: W26.walk2).** `kFSEventStreamCreateFlagFileEvents` on the security-scoped root, with
-  `start/stopAccessingSecurityScopedResource` balanced across the **stream's whole lifetime**. ⚠️ **Flags
-  are unioned across the coalescing window** — measured: a byte-free tag write also reported `ItemRenamed`,
-  which never happened. **Treat every event as "re-`stat` and re-read this path", never as "this happened."**
-  Handle `MustScanSubDirs` (re-walk subtree), `RootChanged` (re-resolve bookmark + re-walk),
-  `EventIdsWrapped`/`HistoryDone` (full re-walk), mount/unmount. Ignore atomic-write temp siblings
-  (measured: `a.txt.sb-858602c2-RXb79N`). **Use `kFSEventStreamCreateFlagMarkSelf` +
-  `kFSEventStreamEventFlagOwnEvent` (0x80000) for self-write suppression** — verified that a *different*
-  process making the byte-identical `setResourceValue` call is not so tagged, which beats a `TagWriter` URL
-  side-channel. ⚠️ **Coalescing is the MAINLINE path at this scale, not an edge case:** 12,060 xattr tag
-  writes in 0.30 s delivered only **1,088 events in 37 batches**, so a bulk Read/Unread operation collapses
-  into subtree re-walks — that path is production code, not an error handler.
-  **`FSEventStreamSetDispatchQueue` is required** (run-loop scheduling deprecated as of macOS 13) and
-  teardown order is header-mandated: Stop → Invalidate **while still scheduled** → Release. `sinceWhen`
-  replay across a quit works, but **event IDs are not delivered in ascending order** (and `FullHistory` can
-  deliver IDs *lower* than requested) — keep the high-water mark conservative and treat any gap as
-  "re-walk". `kqueue` is disqualified (one fd per watched file, 123k files); `NSFilePresenter` on semantics.
-  Verify the root's volume is `fseventsd`-journalled; if not, degrade to periodic re-walks **and say so**
-  rather than going quietly deaf. Note FSEvents needs **no file-access entitlement at all** (the
-  notification channel is not path-gated), so events can arrive for paths the app cannot read — see the
-  silent-empty rule above. **Test:** a third-party `setResourceValue` (simulating Finder) is picked up with
-  no Spotlight involved; `MustScanSubDirs` triggers a subtree re-walk; `FSEventStreamFlushSync` provides the
-  deterministic sync point that makes W26.scripts possible. ⚠️ **Do NOT persist a `sinceWhen` checkpoint in
-  v1** (this supersedes the "conservative high-water mark" note above): because IDs are non-ascending and
-  `FullHistory` can deliver IDs *below* the request, "persist the last ID seen" **silently loses events**. Use
-  `kFSEventStreamEventIdSinceNow` and re-walk on launch (~4 s warm anyway); revisit only on a correctness
-  argument, never a performance one. Also: **no periodic re-walk timer** — prefer window-activation
-  revalidation (only when the last settle is >~5 min old) plus explicit ⌘⌥R, since a timer would contend with
-  `ContentIndexer` for I/O at this corpus size. There is currently **zero** FSEvents/kqueue usage anywhere in
-  the suite, so this is greenfield.
 - [ ] **W26.idx — `LibraryIndex` (SQLite) warm start + background revalidation [L · med · Tier-2 ·
   needs: none] (blocked-on: W26.walk2).** Follow the proven `ContentIndex` precedent exactly: an `actor`
   over **system SQLite** (`import SQLite3`, no third-party dep), in `.applicationSupportDirectory`, schema

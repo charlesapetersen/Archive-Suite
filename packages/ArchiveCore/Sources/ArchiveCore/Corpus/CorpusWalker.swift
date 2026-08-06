@@ -109,6 +109,26 @@ public struct CorpusScanBatch: Sendable {
     public let filesSeen: Int
 }
 
+/// The authoritative read-side classification of one path.
+///
+/// `CorpusWatcher` uses this for file-granular FSEvents. Keeping the primitive beside the full walker
+/// matters: a live event and a launch walk must agree about regular files, symlinks, vanished paths,
+/// cloud placeholders, Finder-tag failures and the Read/Unread membership predicate. In particular,
+/// `.untracked` means "we successfully read the tags and the predicate did not match"; it is never a
+/// coercion of an unreadable tag attribute to an empty array.
+public enum CorpusPathInspection: Sendable, Equatable {
+    case tracked(CorpusEntry)
+    case untracked
+    case directory
+    /// A path whose target is a directory but whose directory entry is a symbolic link. The full
+    /// walker never descends directory symlinks, so a live-event consumer must not turn this into a
+    /// subtree walk (which could otherwise escape the selected root).
+    case directorySymbolicLink
+    case nonRegular
+    case vanished
+    case unreadable(CorpusReadFailure)
+}
+
 /// Read-only, deterministic corpus discovery — the replacement for Spotlight (`NSMetadataQuery`).
 ///
 /// **It never writes, moves, renames or deletes.** Enumeration, `stat`, `resourceValues` and
@@ -168,6 +188,52 @@ public enum CorpusWalker {
     public static let hasAnyTag: @Sendable ([String]) -> Bool = { !$0.isEmpty }
 
     // MARK: - The walk
+
+    /// Re-stat and re-read one path through the same primitives as `scan`.
+    ///
+    /// The URL's resource-value cache is deliberately avoided by constructing a fresh filesystem URL
+    /// before the resource read. FSEvents paths originate as strings, but callers may also pass a URL
+    /// that has previously cached values; a Finder-tag-only change updates ctime, not content mtime,
+    /// and must never be hidden behind an old backing `NSURL` cache.
+    public static func inspect(_ path: URL,
+                               predicate: @escaping @Sendable ([String]) -> Bool = tracksReadState)
+        -> CorpusPathInspection {
+        withDatalessMaterializationDisabled {
+            let url = URL(fileURLWithPath: path.path)
+            switch FileStat.capture(url) {
+            case .vanished:
+                return .vanished
+            case let .failed(reason):
+                return .unreadable(CorpusReadFailure(url: url, reason: reason))
+            case let .ok(isRegularFile, isDirectory, isDirectorySymbolicLink, isDataless):
+                if isDirectorySymbolicLink { return .directorySymbolicLink }
+                if isDirectory { return .directory }
+                guard isRegularFile else { return .nonRegular }
+
+                let values: URLResourceValues
+                do {
+                    values = try url.resourceValues(forKeys: [.contentModificationDateKey, .contentTypeKey])
+                } catch {
+                    if FileStat.isMissing(url) { return .vanished }
+                    return .unreadable(CorpusReadFailure(url: url, reason: error.localizedDescription))
+                }
+
+                switch TagReading.read(url) {
+                case let .failure(reason):
+                    if FileStat.isMissing(url) { return .vanished }
+                    return .unreadable(CorpusReadFailure(url: url, reason: reason))
+                case let .success(tagNames, labelNumber):
+                    guard predicate(tagNames) else { return .untracked }
+                    return .tracked(CorpusEntry(url: url,
+                                                tagNames: tagNames,
+                                                labelNumber: labelNumber,
+                                                contentModified: values.contentModificationDate,
+                                                contentTypeIdentifier: values.contentType?.identifier,
+                                                isDataless: isDataless))
+                }
+            }
+        }
+    }
 
     /// Walk `root` and return everything matching `predicate`, plus an honest account of what could
     /// not be read.
@@ -249,7 +315,7 @@ public enum CorpusWalker {
                 // We cannot even tell what this is. Honest answer: unknown, so the pass is not clean.
                 unreadable.append(CorpusReadFailure(url: url, reason: reason))
                 continue
-            case let .ok(isRegularFile, isDataless):
+            case let .ok(isRegularFile, _, _, isDataless):
                 guard isRegularFile else { continue }   // directories, symlinks to dirs, devices…
                 filesSeen += 1
                 // Progress is about files EXAMINED, not matches found. The old match-sized batching
@@ -384,18 +450,24 @@ public enum CorpusWalker {
     }
 }
 
-// MARK: - stat, once, for three answers
+// MARK: - stat classification
 
-/// A single `stat(2)` answering "is this a regular file", "is it a cloud placeholder", and "did it just
-/// disappear" — the last of which is what keeps normal churn out of the denial counts.
+/// One following `stat(2)` answers "is this a regular file", "is it a cloud placeholder", and "did it
+/// just disappear" — the last of which keeps normal churn out of denial counts. Directory targets get
+/// one additional `lstat(2)` so live discovery cannot accidentally descend a directory symlink that
+/// the full `FileManager` enumeration intentionally skips.
 enum FileStat {
-    case ok(isRegularFile: Bool, isDataless: Bool)
+    case ok(isRegularFile: Bool, isDirectory: Bool,
+            isDirectorySymbolicLink: Bool, isDataless: Bool)
     case vanished
     case failed(String)
 
-    /// Follows symlinks, exactly as `URL.resourceValues` and `TagReading.read` do: a symlink to a
+    /// The primary classification follows symlinks, exactly as `URL.resourceValues` and
+    /// `TagReading.read` do: a symlink to a
     /// tagged PDF must be classified by its target, or the walk and the write path would disagree
-    /// about the same entry (the symlink half of the `W26.deny` correction).
+    /// about the same entry (the symlink half of the `W26.deny` correction). Directory targets are
+    /// the exception: an `lstat` records that the directory entry is a symlink so event-driven code
+    /// can preserve the full walk's no-directory-symlink traversal rule.
     ///
     /// Consequence worth knowing: a **dangling** symlink therefore reports `.vanished` on every pass,
     /// not just the one it broke in. It is excluded from `entries` (as the Spotlight-era loader also
@@ -410,7 +482,14 @@ enum FileStat {
                 let code = errno
                 return code == ENOENT ? .vanished : .failed("stat failed: \(describe(code))")
             }
+            let isDirectory = (info.st_mode & S_IFMT) == S_IFDIR
+            var linkInfo = stat()
+            let isDirectorySymbolicLink = isDirectory
+                && lstat(rawPath, &linkInfo) == 0
+                && (linkInfo.st_mode & S_IFMT) == S_IFLNK
             return .ok(isRegularFile: (info.st_mode & S_IFMT) == S_IFREG,
+                       isDirectory: isDirectory,
+                       isDirectorySymbolicLink: isDirectorySymbolicLink,
                        isDataless: (info.st_flags & UInt32(SF_DATALESS)) != 0)
         }
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ArchiveCore
 
 /// The file-navigation window — a Finder-Smart-Folder-like browser over the tagged corpus.
@@ -90,6 +91,9 @@ struct NavigationWindowView: View {
         // Extracted into one modifier: adding them inline blew this body's type-check budget.
         .archivePageLinkBridge(model: model, target: linkContext.target, openWindow: openWindow)
         .onAppear { deepLinkRouter.nav = model; model.attach(linkContext: linkContext) }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.applicationDidBecomeActive()
+        }
     }
 
     // MARK: Table (AppKit NSTableView for virtualized, high-performance scrolling at scale)
@@ -498,7 +502,7 @@ struct NavigationWindowView: View {
             // Degraded discovery says so here rather than leaving a confident-looking count over a list
             // that is missing whatever the pass could not read (the same treatment as a degraded
             // content index below, W23.m9).
-            if let f = model.library.phase.failure {
+            if let f = model.library.discoveryFailure {
                 Label(f.message, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .lineLimit(1).truncationMode(.tail)

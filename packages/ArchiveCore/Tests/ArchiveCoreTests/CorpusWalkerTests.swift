@@ -138,6 +138,54 @@ final class CorpusWalkerTests: XCTestCase {
         XCTAssertEqual(library.filesSeen, vocabulary.filesSeen, "the predicate filters, it does not walk")
     }
 
+    /// W26.fsev: a file event uses this one-path primitive instead of turning every tag edit into a
+    /// 123k-file walk. Every classification is positive: unreadable is never folded into untracked.
+    func testInspectClassifiesAPathThroughTheWalkersMembershipPrimitive() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let tracked = try makeFile("tracked.pdf", tags: ["Unread", "Subject/Foo"], in: root)
+        let untracked = try makeFile("untracked.pdf", tags: ["Subject/Bar"], in: root)
+        let missing = root.appendingPathComponent("missing.pdf")
+
+        guard case let .tracked(entry) = CorpusWalker.inspect(tracked) else {
+            return XCTFail("Read/Unread must be a tracked entry")
+        }
+        XCTAssertEqual(entry.tagNames, ["Unread", "Subject/Foo"])
+        XCTAssertEqual(CorpusWalker.inspect(untracked), .untracked)
+        XCTAssertEqual(CorpusWalker.inspect(root), .directory)
+        XCTAssertEqual(CorpusWalker.inspect(missing), .vanished)
+    }
+
+    /// `URL.resourceValues` caches on its backing NSURL. A live read must reconstruct from the path,
+    /// or the exact URL already used for a pre-change read can hide a third-party Finder-tag update.
+    func testInspectDoesNotReuseAStaleURLResourceCacheAcrossATagChange() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = try makeFile("changed.pdf", tags: ["Unread"], in: root)
+        _ = try url.resourceValues(forKeys: [.tagNamesKey])       // deliberately seed NSURL's cache
+
+        try (fresh(url.path) as NSURL).setResourceValue(["Read", "Subject/New"], forKey: .tagNamesKey)
+
+        guard case let .tracked(entry) = CorpusWalker.inspect(url) else {
+            return XCTFail("the freshly tagged path must remain tracked")
+        }
+        XCTAssertEqual(entry.tagNames, ["Read", "Subject/New"],
+                       "the event read must see disk, not a cached resource-value snapshot")
+    }
+
+    func testInspectDistinguishesADirectorySymlinkFromARealDirectory() throws {
+        let root = tempDir.appendingPathComponent("root", isDirectory: true)
+        let target = tempDir.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        let link = root.appendingPathComponent("linked-directory")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+        XCTAssertEqual(CorpusWalker.inspect(root), .directory)
+        XCTAssertEqual(CorpusWalker.inspect(link), .directorySymbolicLink,
+                       "live consumers must not turn this path into a subtree walk outside root")
+    }
+
     // MARK: - 2. It must not write to what it reads
 
     func testAScanLeavesTheFixtureByteIdentical() throws {
