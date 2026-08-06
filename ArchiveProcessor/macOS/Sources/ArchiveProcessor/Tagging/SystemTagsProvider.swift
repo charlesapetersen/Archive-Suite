@@ -213,7 +213,7 @@ final class SystemTagsProvider: ObservableObject {
                     // did not exist came back `completed == true`, so stamping recorded a vanished or
                     // unmounted archive folder as harvested and the vocabulary then waited a day
                     // before looking again. `W26.vocab-fu1` moved that distinction into the walker
-                    // (`CorpusWalker.rootIsOpenable`), where every caller gets it, and this item's
+                    // (`CorpusWalker.canonicalRoot`), where every caller gets it, and this item's
                     // local `mayStamp` workaround was deleted rather than left as a second opinion.
                     //
                     // A denied *sub*directory is still stampable, deliberately: an unstamped root is

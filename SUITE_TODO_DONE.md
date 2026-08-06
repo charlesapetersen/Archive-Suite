@@ -110,6 +110,56 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.symroot — an archive root that is ITSELF a symlink is now walked through its target
+  [S · low · Tier-2]. ✅ SHIPPED 2026-08-06** — `1e7044d` (the walker + its tests) → this commit (the
+  trackers, the plan's §4.6 correction, and the follow-up).
+
+  **What it was.** `FileManager.enumerator(at:)` refuses a root that is a symbolic link: it reports the link
+  to `errorHandler:` and yields zero objects, even when the target is a readable directory full of tagged
+  files (re-measured 2026-08-06, including through a trailing-slash spelling — that changes nothing). So such
+  a root discovered **nothing at all** — first as a completed-looking empty pass, then, once `W26.vocab-fu1`
+  taught the probe to `lstat`, as an honest `rootUnreadable` ("Archive folder unreadable"). Pre-existing and
+  predating Wave 26; nothing in the repo produces a symlinked root, so this was about a setup a user could
+  reasonably choose, not a regression.
+
+  **The fix.** `rootIsOpenable(_:) -> Bool` became `public CorpusWalker.canonicalRoot(_:) -> URL?` — *"what
+  must I enumerate for this root, or nil if I cannot open it at all"* — consumed by **both** `scan` and
+  `scanFingerprints`. A symlinked final component resolves through `realpath(3)`; everything else is returned
+  unchanged. `realpath` rather than a hand-rolled `readlink` chase because it settles a link-to-a-link, a
+  relative destination and an `ELOOP` cycle in one call and fails outright on a dangling one. The resolved
+  path is then still `opendir`-probed: `realpath` **succeeds** for a link to a regular file, so that second
+  probe is the only thing rejecting it — and it is the mutant that a "this is redundant" simplification trips.
+
+  🔺 **THE ITEM'S OWN PRESCRIPTION WAS MEASURED WRONG — this is the durable part of the entry.** As filed
+  (and as echoed in the plan's §4.6), the fix was to walk the target but **rewrite every discovered path back
+  under the caller's link prefix**, on the grounds that returning resolved paths *"breaks the byte-exact path
+  contract `LibraryIndex` keys on … `/var` → `/private/var` means that is not a corner case."* Measured
+  2026-08-06: the enumerator **already** hands back fully ancestor-resolved paths — hand it a root spelled
+  `/var/folders/…` and every entry comes back `/private/var/folders/…` — so the caller's spelling was never
+  what the walk emitted, and the contract in question is that the walk's OWN output is stable, which it is.
+  The rewrite would have been actively harmful: it would invent a *third* spelling that neither FileManager
+  nor FSEvents ever produces, so `CorpusWatcher`'s realpath'd live events would match **no row**, and every
+  tag write under such a root would read as a brand-new file. **Identity therefore follows enumeration**, and
+  `testARootThatIsItselfASymlinkIsWalkedThroughItsTarget` asserts that in BYTES against a direct scan of the
+  target — it is the test that fails if someone re-implements the filed design.
+
+  **Why only the FINAL component.** `realpath`-ing every root would re-spell every root in the suite
+  (`/var/folders/…` → `/private/var/…`, and a case-mismatched pick on a case-insensitive volume) and orphan
+  cached rows wholesale — the cost the filed item was right to worry about, just about the wrong mechanism. A
+  non-symlink root is therefore handed to the enumerator byte-for-byte as the caller spelled it, so nothing
+  that exists today can shift; `testANonSymlinkedRootIsUsedEXACTLYAsTheCallerSpelledIt` pins both halves of
+  that asymmetry (root keeps the spelling, entries come back resolved) from a single pass.
+
+  **Gate.** ArchiveCore 201 XCTest (199 before) + 105 swift-testing; Reader unit bundle, Processor Debug
+  build, Notes unit bundle all green; write-surface lint + self-test clean on both trees. Four mutants — the
+  symlink branch removed, the `opendir(resolved)` probe dropped, `realpath` applied to every root, and
+  `scanFingerprints` left on the unresolved root — each caught by a named test. Scratch `mktemp` fixtures
+  only; no corpus access, no host-screen automation.
+
+  **Filed:** `W26.symroot-fu1` — the Reader's own root-relative logic (folder tree, exclusions, link writing,
+  and `CorpusWatcher` containment) still compares against its granted **link** spelling, so live updates stop
+  entirely under such a root; the naive fix there loses the sandbox security scope. Open in `SUITE_TODO.md`.
+
 - [x] **W26.reinfect — the approved JPEGS-index item can no longer re-introduce `NSMetadataQuery`
   [S · low · Tier-1]. ✅ SHIPPED 2026-08-06** — `39d1567` (the rewrite + the tag + the edge) → this commit
   (the tracker move + the plan's Site 7).

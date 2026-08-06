@@ -341,23 +341,40 @@ pruning and no authoritative absence, and it is set directly rather than through
 contract is about FINISHED passes); a late pass supersedes it through the existing generation token, and so
 does the first file seen. `requestRootRescan` had to learn about it too — ⌘⌥R while stalled would otherwise
 have reset the phase to "Scanning…" while `drainWatchWork` refused to start anything.
-- [ ] **W26.symroot — an archive root that is ITSELF a symlink cannot be discovered at all [S · low ·
-  Tier-2 · needs: none].** Filed 2026-08-06 by `W26.vocab-fu1`, measured while writing its openability
-  probe: `FileManager.enumerator(at:)` **refuses a root that is a symbolic link** — it reports the link to
-  `errorHandler:` and yields zero objects, even when the target is a readable directory full of tagged
-  files. This is pre-existing and predates Wave 26; `W26.vocab-fu1` only changed how it *reads*, from a
-  completed-looking empty pass to an honest `rootUnreadable` ("Archive folder unreadable"). **Nothing is
-  known to be broken today** — no fixture, script or bookmark in this repo produces a symlinked root, and
-  one could never have worked, so there is no regression to chase; this is about a setup a user could
-  reasonably choose. ⚠️ **The obvious fix is the trap.** Resolving the root before enumeration
-  (`resolvingSymlinksInPath()`) would make every discovered path come back resolved, which breaks the
-  **byte-exact path contract `LibraryIndex` keys on** (W26.idx) — cache rows would stop matching live rows
-  wholesale, and `/var` → `/private/var` means that is not a corner case. So resolve for *enumeration*
-  while keeping the caller's spelling for *identity*, or decide the root is normalised once at selection
-  and everything downstream agrees. Decide that before writing code. **Test:** a symlinked root discovers
-  its target's tagged files; the discovered `URL`s still compare byte-equal to what the caller's root
-  prefix would produce; `CorpusWalkerTests
-  .testARootThatIsItselfASymlinkIsUnreadableBecauseTheEnumeratorRefusesIt` is rewritten, not deleted.
+✅ **W26.symroot — SHIPPED 2026-08-06 (`1e7044d` → this commit); full entry in `SUITE_TODO_DONE.md`.** A root
+that is itself a symbolic link is walked **through its target**: the probe `rootIsOpenable` became
+`CorpusWalker.canonicalRoot`, which answers *"what must I enumerate for this root?"* and is used by `scan` and
+`scanFingerprints` alike, so the warm-start revalidation walk cannot disagree with the full walk about what the
+root is. **The item's own prescription was measured WRONG, and that correction is the durable part:** it asked
+for the target to be walked but every discovered path rewritten back under the caller's link prefix, to protect
+`LibraryIndex`'s byte-exact `(root, path)` contract. Measured, the enumerator **already** hands back fully
+ancestor-resolved paths — a root spelled `/var/folders/…` yields `/private/var/folders/…` entries — so the
+caller's spelling was never what the walk emitted, and a rewrite would invent a *third* spelling that neither
+FileManager nor FSEvents ever produces, leaving `CorpusWatcher`'s realpath'd live events matching no row. So
+identity follows enumeration. Only a symlinked FINAL component is canonicalised — every other root reaches the
+enumerator byte-for-byte as spelled, so no existing root and no cached row can shift.
+- [ ] **W26.symroot-fu1 — under a symlinked root the Reader's own root-relative logic is still spelled with
+  the LINK, so the folder tree, exclusions and live updates all miss [S · low · Tier-2 · needs: none].** Filed
+  2026-08-06 while shipping `W26.symroot`, and deliberately not fixed there: the walker *cannot* fix it,
+  because the spelling has to change where the root is ADOPTED. `CorpusWalker` now discovers a symlinked
+  root's files, spelled under the **target** (a measured decision — do not re-litigate it, see the entry
+  above). Everything in the Reader that compares a discovered path against the granted root still uses the
+  caller's spelling: `NavigationModel.swift:787` (`path.hasPrefix(root + "/")` — the folder tree would place
+  **no** file while the recursive total counts them all), `NavigationModel.sanitizedPathPrefix:526`,
+  `ExcludedFoldersStore.isExcludedAbsolute:44` (an exclusion silently stops applying),
+  `ArchiveLinkWriter.swift:29`/`:77` (a durable link degrades to `lastPathComponent`),
+  `ContentIndexer.swift:420`, and `CorpusWatcher.canonicalRootPath:166` — which only trims a trailing slash,
+  so FSEvents' realpath'd paths fail containment and **live tag updates stop entirely** under such a root.
+  ⚠️ **The naive fix loses file access.** Do NOT canonicalise `RootFolderStore.root` itself: that URL carries
+  the sandbox security scope from `URL(resolvingBookmarkData:)`, and a URL rebuilt by `realpath` is a
+  different instance without it. Keep the scoped URL for I/O and give the comparisons one separate
+  canonical-path value (`CorpusWalker.canonicalRoot(root)?.path ?? root.path`), computed once at adoption.
+  ⛔ **In-memory only** — never persist it, never write `archiveRootBookmark` (2026-07-11 incident).
+  **Measure this FIRST, it may close the item:** whether a Reader root can be a symlink spelling at all —
+  bookmarks are inode-based, so the only routes may be the DEBUG `-ARUITestRootPath` override and a panel
+  pick. If neither can produce one, close this as latent rather than fixing it. **Test:** a fixture root that
+  is a symlink to a tagged tree both lists its files and places them in the folder tree; an excluded
+  subfolder stays excluded; a tag write arrives through the watcher as an update, not a new row.
 ✅ **W26.oracle — SHIPPED 2026-08-06 (`50ea4a1` → this commit); full entry in `SUITE_TODO_DONE.md`.** The
 item's premise was **too kind to the old oracle** and the correction is the durable part: it said the `mdls`
 read *"would have"* failed during the 2026-08-04 incident. Measured on this machine at the harness's own

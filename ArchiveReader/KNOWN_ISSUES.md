@@ -5,7 +5,8 @@ Running log of quirks, risks, and things verified/unverified. Keep current.
 ## ✅ FIXED (`W26.fsev-fu2`) — a folder that would not open left the list spinning "Scanning…" for ever
 
 **Found 2026-08-06** by `W26.fsev-fu1`, which bounded the *stream*'s `open(2)` and measured that the *walk*'s
-own probe had no bound at all. `CorpusWalker.rootIsOpenable` calls `opendir(3)` on the same root, on its
+own probe had no bound at all. `CorpusWalker.canonicalRoot` (`rootIsOpenable` when this was written; renamed
+by `W26.symroot`, which also made it resolve a symlinked root) calls `opendir(3)` on the same root, on its
 dedicated `Thread`; under an unanswered TCC prompt, a stalled network/cloud mount or a disconnected volume it
 does not return, the pass never reaches `finish`, and `LibraryPhase` stays `.firstScan(done: 0, seen: 0)` —
 which `LibraryEmptyState` reads as `.scanning`. So the status bar was honest about live updates while the

@@ -354,8 +354,18 @@ supersede the DDL sketch that was here; full text in `git log -p -- execution-pl
 that still BIND OPEN items are kept verbatim:
 
 - **Rows are keyed on the BYTE-EXACT `(root path, marker GUID, file path)` — never NFC/NFD-normalised** (§5.3).
-  OPEN `W26.symroot`'s obvious fix (`resolvingSymlinksInPath()` before enumeration) breaks precisely this
-  contract, which is why that item has to settle the identity-vs-enumeration split before writing code.
+  ⚠️ **This bullet's reading of `W26.symroot` was WRONG and is corrected here** (2026-08-06, `W26.symroot`
+  shipped). It said the item's obvious fix (`resolvingSymlinksInPath()` before enumeration) *"breaks precisely
+  this contract"*, so the item had to keep the caller's root spelling for identity. Measured: the enumerator
+  **already** yields fully ancestor-resolved paths — hand it a root spelled `/var/folders/…` and every entry
+  comes back `/private/var/folders/…` — so the caller's spelling was never what the walk emitted, and what
+  this contract actually requires is that the walk's own output be *stable*, not that it echo the caller.
+  Keeping the link spelling for identity would have been the harmful choice: it invents a third spelling that
+  neither FileManager nor FSEvents produces, so `CorpusWatcher`'s realpath'd events would match no row at all.
+  Shipped as `CorpusWalker.canonicalRoot`: identity follows enumeration, and **only a symlinked final
+  component** is canonicalised, so no existing root's spelling — and therefore no cached row — moves. The
+  residual is `W26.symroot-fu1`: a CALLER's root-relative logic (the Reader's folder tree, exclusions, link
+  writing, watcher containment) still compares against its granted spelling.
 - Persisting every regular file measured **~60 MB / 1.3× rows**; OPEN `W26.verify` compares the SQLite file
   size against that baseline (and peak RSS at 150k rows).
 - **Removals apply only after a cleanly COMPLETED walk** — a truncated or cancelled walk must never authorise
