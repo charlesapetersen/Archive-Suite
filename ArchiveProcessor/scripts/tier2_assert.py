@@ -11,7 +11,11 @@ pypdf, applied Finder tags via the raw xattr, sidecar presence, and cross-refere
 Hard checks (exit 1 on any failure) verify the PIPELINE produced correct output for the tagging mode.
 Segmentation accuracy vs the LLM is reported as a metric, not a hard gate.
 """
-import sys, re, os, csv, subprocess, binascii, plistlib, glob, logging
+import sys, re, os, csv, glob, logging
+
+# The Finder-tag xattr read is shared with assert_mac.py — one Spotlight-free reader, one place.
+# (`disk_tags` lived here until W26.oracle; its behaviour is unchanged.)
+from finder_tags import disk_tags
 
 logging.getLogger("pypdf").setLevel(logging.ERROR)   # silence "Ignoring wrong pointing object" noise
 try:
@@ -24,28 +28,6 @@ MONTH = re.compile(r'^\d{2} [A-Z][a-z]+$')          # "03 March"
 DAY = re.compile(r'^Day \d+$')
 GT_MAP = {'box': 'box_label', 'folder': 'folder_label',
           'new': 'document_start', 'cont': 'document_continuation'}
-COLOR_IDX = {'Red': 6, 'Purple': 3, 'Orange': 7, 'Yellow': 5, 'Blue': 4, 'Green': 2, 'Gray': 1, 'Grey': 1}
-
-
-def disk_tags(path):
-    """(tag_names:[str], label_number:int) from the file's Finder-tag xattr; ([],0) if none."""
-    r = subprocess.run(['xattr', '-px', 'com.apple.metadata:_kMDItemUserTags', path],
-                       capture_output=True, text=True)
-    if r.returncode != 0 or not r.stdout.strip():
-        return [], 0
-    try:
-        items = plistlib.loads(binascii.unhexlify(''.join(r.stdout.split())))
-    except Exception:
-        return [], 0
-    names, label = [], 0
-    for t in items:
-        parts = str(t).split('\n')
-        names.append(parts[0])
-        if len(parts) > 1 and parts[1].strip().isdigit():
-            label = max(label, int(parts[1].strip()))
-        elif parts[0] in COLOR_IDX:
-            label = max(label, COLOR_IDX[parts[0]])
-    return names, label
 
 
 def pdf_facts(path):
