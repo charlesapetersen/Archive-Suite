@@ -177,30 +177,51 @@ final class SystemTagsProvider: ObservableObject {
 
         CorpusWalker.scanOnDedicatedThread(
             root: root,
-            // The predicate IS the sink, and it always returns false. A vocabulary harvest wants tag
-            // *strings*, not a library: returning false means `CorpusWalker` accumulates no rows at all, so
-            // a 100k-file corpus costs a bounded set of names instead of 100k `CorpusEntry` values held in
-            // memory to build a suggestion list. Do not "fix" this to return true.
-            predicate: { rawTags in
-                vocabulary.add(rawTags: rawTags)
-                return false
-            },
+            // No rows, ever. A vocabulary harvest wants tag *strings*, not a library: a predicate that
+            // always returns false means `CorpusWalker` accumulates no `CorpusEntry` at all, so a
+            // 100k-file corpus costs a bounded set of names instead of 100k rows held in memory to build
+            // a suggestion list. Do not "fix" this to return true.
+            predicate: { _ in false },
             qualityOfService: .utility,
+            // The ingest, and the only place the file's Finder LABEL is available — `onTagsRead` sees
+            // every successful read, matching or not. The label is what tells the marker colour ("Red" on
+            // a red-labelled box) from a subject genuinely called "Red"; harvesting without it would make
+            // "Red" and "Purple" permanent entries in a field labelled *Subjects*, since this app stamps
+            // one of them on every real-tagging output.
+            onTagsRead: { rawTags, labelNumber in
+                vocabulary.add(rawTags: rawTags, labelNumber: labelNumber)
+            },
             onBatch: { _ in
                 Task { @MainActor in SystemTagsProvider.shared.requestCoalescedRefresh() }
             },
             completion: { result in
                 Task { @MainActor in
-                    // Only a pass that COMPLETED may claim the root is covered. A cancelled or
-                    // root-unreadable walk leaves the stamp alone so the next warm-up retries it; files it
-                    // could not read individually are irrelevant here, since nothing is ever pruned.
-                    if result.completed { vocabulary.markHarvested(root) }
+                    if Self.mayStamp(result, root: root) { vocabulary.markHarvested(root) }
                     vocabulary.flush()
                     SystemTagsProvider.shared.publishSnapshot()
                     SystemTagsProvider.shared.isReady = true
                     SystemTagsProvider.shared.harvest(roots, index: index + 1)
                 }
             })
+    }
+
+    /// May this pass claim the root is covered?
+    ///
+    /// `result.completed` alone is **not** enough, and the difference was measured rather than reasoned
+    /// about: for a root that does not exist (or cannot be opened) `FileManager.enumerator` still hands
+    /// back an enumerator, which reports the root to the error handler and then ends — so the pass comes
+    /// back `completed == true`, `rootUnreadable == false`, `filesSeen == 0`, with the root itself in
+    /// `directoryErrors`. Stamping that records a vanished or unmounted archive folder as harvested, and
+    /// the vocabulary then waits a day before looking again.
+    ///
+    /// A denied *sub*directory is deliberately still stampable. An unstamped root is re-walked on the
+    /// next `warmUp()` — i.e. on every tagging-UI appearance — so one permanently-unreadable subfolder
+    /// must not turn a 12 s corpus walk into a walk per card. Nothing is ever pruned from the vocabulary,
+    /// so the cost of missing a few files is a few absent suggestions, not a wrong answer.
+    private static func mayStamp(_ result: CorpusScanResult, root: URL) -> Bool {
+        guard result.completed, !result.rootUnreadable else { return false }
+        let rootPath = root.standardizedFileURL.path
+        return !result.directoryErrors.contains { $0.url.standardizedFileURL.path == rootPath }
     }
 
     // MARK: - Publishing

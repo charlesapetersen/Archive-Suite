@@ -323,14 +323,23 @@ public enum CorpusWalker {
     ///
     /// - Parameter isCancelled: polled once per entry; a `true` leaves `cancelled == true`, which
     ///   makes the result not `isClean` — a cancelled pass can never authorise treating a file as gone.
+    /// - Parameter onTagsRead: called for **every** regular file whose tags were read — matching or
+    ///   not — with the raw tag names and the file's Finder label, on the walking thread, before the
+    ///   predicate runs. Additive, optional, and never consulted for the result. It exists for callers
+    ///   that want *facts about the tags* rather than a library of rows: such a caller leaves
+    ///   `predicate` returning `false` so the walker accumulates no `CorpusEntry` at all, and observes
+    ///   here instead. The Processor's vocabulary harvest is why it exists — its facet filter needs
+    ///   `labelNumber` to tell a marker colour ("Red" on a red-labelled box) from a subject that
+    ///   happens to be called "Red", and a `([String]) -> Bool` predicate cannot supply it.
     public static func scan(root: URL,
                             predicate: @escaping @Sendable ([String]) -> Bool = tracksReadState,
                             options: Options = Options(),
                             isCancelled: @Sendable () -> Bool = { false },
+                            onTagsRead: (@Sendable ([String], Int?) -> Void)? = nil,
                             onBatch: (@Sendable (CorpusScanBatch) -> Void)? = nil) -> CorpusScanResult {
         withDatalessMaterializationDisabled {
             scanBody(root: root, predicate: predicate, options: options,
-                     isCancelled: isCancelled, onBatch: onBatch)
+                     isCancelled: isCancelled, onTagsRead: onTagsRead, onBatch: onBatch)
         }
     }
 
@@ -338,6 +347,7 @@ public enum CorpusWalker {
                                  predicate: @escaping @Sendable ([String]) -> Bool,
                                  options: Options,
                                  isCancelled: @Sendable () -> Bool,
+                                 onTagsRead: (@Sendable ([String], Int?) -> Void)?,
                                  onBatch: (@Sendable (CorpusScanBatch) -> Void)?) -> CorpusScanResult {
         var entries: [CorpusEntry] = []
         var unreadable: [CorpusReadFailure] = []
@@ -425,6 +435,8 @@ public enum CorpusWalker {
                         unreadable.append(CorpusReadFailure(url: url, reason: why))
                     }
                 case let .success(tagNames, labelNumber):
+                    // Every successful read is observable, matching or not — see `onTagsRead`.
+                    onTagsRead?(tagNames, labelNumber)
                     guard predicate(tagNames) else { continue }
                     let e = CorpusEntry(url: url,
                                         tagNames: tagNames,
@@ -528,11 +540,12 @@ public enum CorpusWalker {
                                              options: Options = Options(),
                                              qualityOfService: QualityOfService = .utility,
                                              isCancelled: @escaping @Sendable () -> Bool = { false },
+                                             onTagsRead: (@Sendable ([String], Int?) -> Void)? = nil,
                                              onBatch: (@Sendable (CorpusScanBatch) -> Void)? = nil,
                                              completion: @escaping @Sendable (CorpusScanResult) -> Void) -> Thread {
         let thread = Thread {
             completion(scan(root: root, predicate: predicate, options: options,
-                            isCancelled: isCancelled, onBatch: onBatch))
+                            isCancelled: isCancelled, onTagsRead: onTagsRead, onBatch: onBatch))
         }
         thread.name = "ArchiveCore.CorpusWalker"
         thread.qualityOfService = qualityOfService
