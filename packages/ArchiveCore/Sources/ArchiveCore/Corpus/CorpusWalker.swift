@@ -268,18 +268,18 @@ public enum CorpusWalker {
 
     // MARK: - The walk
 
-    /// Can the walk actually open `root`? Measured, not assumed — and the answer is why every walk
-    /// below starts here rather than trusting the enumerator to refuse.
+    /// The path the walk must actually enumerate for `root` — or `nil` when this root cannot be opened
+    /// at all, which is what every walk below reports as `rootUnreadable`.
     ///
-    /// `FileManager.enumerator(at:)` **returns a live enumerator for a root it cannot open.** Measured
-    /// 2026-08-06 across all three ways a root goes bad — a path that does not exist (`ENOENT`), a
-    /// `0o000` directory (`EACCES`), and a regular file passed as a root (`ENOTDIR`): in every case the
-    /// enumerator is non-nil, reports the root once to `errorHandler:`, and immediately ends. The pass
-    /// therefore came back `completed == true`, `rootUnreadable == false`, `filesSeen == 0`, making a
-    /// walk that read **nothing** indistinguishable from a walk that **found** nothing to any caller
-    /// gating on `completed` — the shape of the 2026-08-04 incident, one layer down. The
-    /// `guard let enumerator … else` branches below are kept as a defensive floor, but they are not the
-    /// branch that fires.
+    /// **Why a probe at all.** `FileManager.enumerator(at:)` **returns a live enumerator for a root it
+    /// cannot open.** Measured 2026-08-06 across all three ways a root goes bad — a path that does not
+    /// exist (`ENOENT`), a `0o000` directory (`EACCES`), and a regular file passed as a root
+    /// (`ENOTDIR`): in every case the enumerator is non-nil, reports the root once to `errorHandler:`,
+    /// and immediately ends. The pass therefore came back `completed == true`,
+    /// `rootUnreadable == false`, `filesSeen == 0`, making a walk that read **nothing**
+    /// indistinguishable from a walk that **found** nothing to any caller gating on `completed` — the
+    /// shape of the 2026-08-04 incident, one layer down. The `guard let enumerator … else` branches
+    /// below are kept as a defensive floor, but they are not the branch that fires.
     ///
     /// `opendir(3)` is the discriminator, deliberately *not* "did the error handler report the root":
     /// for the `0o000` case FileManager hands back `/private/var/…` while the caller passed `/var/…`,
@@ -287,25 +287,54 @@ public enum CorpusWalker {
     /// (the `/private` alias trap). `opendir` is also the exact operation enumeration needs and costs
     /// one syscall per pass.
     ///
-    /// The `lstat` in front of it is the one place this probe must **disagree** with how the rest of
-    /// the walk treats symlinks, and it too was measured: `FileManager.enumerator(at:)` will not
-    /// enumerate a root that is itself a symbolic link — it reports the link to `errorHandler:` and
-    /// yields nothing, even when the target is a perfectly readable directory. `opendir` follows the
-    /// link and would say "openable", leaving that root in exactly the completed-but-read-nothing state
-    /// this function exists to abolish. Only the FINAL component is checked, so an aliased *ancestor*
-    /// (`/var` → `/private/var`, which every temp fixture and much of the corpus path sits under) is
-    /// unaffected. Making a symlinked root actually work would mean resolving it before enumeration,
-    /// which would break the byte-exact path contract `LibraryIndex` keys on — tracked as `W26.symroot`
-    /// rather than smuggled in here.
-    private static func rootIsOpenable(_ root: URL) -> Bool {
-        root.withUnsafeFileSystemRepresentation { rawPath in
-            guard let rawPath else { return false }
+    /// **A root that is ITSELF a symbolic link (`W26.symroot`).** `FileManager.enumerator(at:)` will
+    /// not enumerate one: it reports the link to `errorHandler:` and yields nothing, even when the
+    /// target is a perfectly readable directory full of tagged files (measured 2026-08-06; still
+    /// measured through a trailing-slash spelling, which changes nothing). So such a root is walked
+    /// **through its `realpath(3)`**, and the caller's link spelling never reaches the enumerator.
+    ///
+    /// Two decisions that a maintainer will otherwise re-litigate, both settled by measurement:
+    ///
+    /// 1. **Identity follows enumeration, not the other way round.** Entries under a symlinked root
+    ///    come back spelled under the *target*. `W26.symroot` was filed expecting the opposite — walk
+    ///    the target but rewrite every discovered path back under the caller's link prefix, to protect
+    ///    the byte-exact `(root, path)` contract `LibraryIndex` keys on. Measured, that premise does
+    ///    not hold: the enumerator **already** hands back fully ancestor-resolved paths — a root
+    ///    spelled `/var/folders/…` yields entries spelled `/private/var/folders/…` — so the caller's
+    ///    spelling was never what the walk emitted. Rewriting would invent a third spelling that
+    ///    neither FileManager nor FSEvents ever produces, and `CorpusWatcher`'s live events (which
+    ///    arrive realpath'd) would then match no row: every tag write under such a root would look
+    ///    like a brand-new file.
+    /// 2. **Only a symlinked FINAL component is canonicalised.** For every other root this returns the
+    ///    caller's URL *unchanged*, byte for byte, so no existing root's spelling — and therefore no
+    ///    cached row — can shift underneath the index. An aliased *ancestor* (`/var` → `/private/var`,
+    ///    which every temp fixture and much of the corpus path sits under) is deliberately left alone
+    ///    here; the enumerator resolves it either way, and calling `realpath` on every root would also
+    ///    silently rewrite a case-mismatched spelling on a case-insensitive volume.
+    ///
+    /// Aligning a *caller's* own root-relative logic (the Reader's folder tree, exclusions and
+    /// relative-path link writing all compare against its granted root spelling) is `W26.symroot-fu1`
+    /// — it cannot be done here, and the naive version there loses the sandbox security scope.
+    public static func canonicalRoot(_ root: URL) -> URL? {
+        root.withUnsafeFileSystemRepresentation { rawPath -> URL? in
+            guard let rawPath else { return nil }
             var linkInfo = stat()
-            guard lstat(rawPath, &linkInfo) == 0,
-                  (linkInfo.st_mode & S_IFMT) != S_IFLNK else { return false }
-            guard let dir = opendir(rawPath) else { return false }
+            guard lstat(rawPath, &linkInfo) == 0 else { return nil }
+            guard (linkInfo.st_mode & S_IFMT) == S_IFLNK else {
+                guard let dir = opendir(rawPath) else { return nil }
+                closedir(dir)
+                return root
+            }
+            // `realpath` and not a manual `readlink` chase: it resolves a link-to-a-link, a relative
+            // destination and an `ELOOP` cycle in one syscall, and fails outright on a dangling one.
+            var resolved = [CChar](repeating: 0, count: Int(PATH_MAX))
+            guard realpath(rawPath, &resolved) != nil else { return nil }
+            // The target still has to be an openable DIRECTORY: `realpath` succeeds for a link to a
+            // regular file, and for a link into a directory we are denied.
+            guard let dir = opendir(resolved) else { return nil }
             closedir(dir)
-            return true
+            return URL(fileURLWithFileSystemRepresentation: resolved,
+                       isDirectory: true, relativeTo: nil)
         }
     }
 
@@ -398,10 +427,10 @@ public enum CorpusWalker {
                                  isCancelled: @Sendable () -> Bool,
                                  onTagsRead: (@Sendable ([String], Int?) -> Void)?,
                                  onBatch: (@Sendable (CorpusScanBatch) -> Void)?) -> CorpusScanResult {
-        // Ask before walking: the enumerator will not tell us (see `rootIsOpenable`). Reported with
+        // Ask before walking: the enumerator will not tell us (see `canonicalRoot`). Reported with
         // empty failure lists, matching the nil-enumerator branch below, so a caller counting
         // "folders I could not read" is not handed the root twice for one failure.
-        guard rootIsOpenable(root) else {
+        guard let enumerationRoot = canonicalRoot(root) else {
             return CorpusScanResult(entries: [], unreadable: [], directoryErrors: [],
                                     filesSeen: 0, vanishedMidScan: 0,
                                     rootUnreadable: true, cancelled: false)
@@ -430,7 +459,7 @@ public enum CorpusWalker {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .contentTypeKey]
 
         guard let enumerator = fm.enumerator(
-            at: root,
+            at: enumerationRoot,
             includingPropertiesForKeys: keys,
             options: options.enumerationOptions,
             // WITHOUT this handler the enumerator silently skips a directory it cannot descend into —
@@ -536,8 +565,10 @@ public enum CorpusWalker {
         withDatalessMaterializationDisabled {
             // Same root probe as `scanBody`, for the same measured reason: the warm-start revalidation
             // walk must not report a vanished or unmounted root as "completed, zero files", because the
-            // caller then treats every cached row as gone.
-            guard rootIsOpenable(root) else {
+            // caller then treats every cached row as gone. It must also resolve a symlinked root the
+            // SAME way `scan` does, or a warm root would revalidate as zero files against rows the full
+            // walk had just written — every one of them "deleted".
+            guard let enumerationRoot = canonicalRoot(root) else {
                 return CorpusFingerprintScanResult(entries: [], unreadable: [], directoryErrors: [],
                                                    filesSeen: 0, vanishedMidScan: 0,
                                                    rootUnreadable: true, cancelled: false)
@@ -552,7 +583,7 @@ public enum CorpusWalker {
             let fm = FileManager()
 
             guard let enumerator = fm.enumerator(
-                at: root,
+                at: enumerationRoot,
                 includingPropertiesForKeys: nil,
                 options: options.enumerationOptions,
                 errorHandler: { url, error in

@@ -351,6 +351,10 @@ final class CorpusWalkerTests: XCTestCase {
         let notADirectory = try makeFile("a-plain-file.pdf", tags: ["Unread"])
 
         for (label, root) in [("missing", missing), ("0o000", sealed), ("regular file", notADirectory)] {
+            // The public seam every walk routes through, asserted directly: a caller aligning its own
+            // root spelling (`W26.symroot`) must get the same verdict the walk acts on.
+            XCTAssertNil(CorpusWalker.canonicalRoot(root), "\(label): there is nothing to enumerate")
+
             let result = CorpusWalker.scan(root: root)
 
             XCTAssertTrue(result.rootUnreadable, "\(label): the root could not be opened")
@@ -394,26 +398,37 @@ final class CorpusWalkerTests: XCTestCase {
         XCTAssertEqual(relativePaths(result, root: root), ["readable.pdf"])
     }
 
-    /// A root that is ITSELF a symbolic link is unreadable — and this is the one assertion here whose
-    /// answer I got wrong before measuring it.
+    // MARK: - 3c. A root that is ITSELF a symlink (W26.symroot)
+
+    /// A symlinked root is walked **through its target**, and the entries come back spelled under the
+    /// target — the identity decision this item had to settle before any code was written.
     ///
-    /// `opendir(3)` follows the link, so the first version of the probe called such a root openable, and
-    /// this test failed asserting the walk would then find the target's files. It does not:
-    /// `FileManager.enumerator(at:)` **refuses a symlinked root**, reporting the link itself to
-    /// `errorHandler:` and yielding nothing, even though the target is a readable directory with files
-    /// in it (measured 2026-08-06). So a symlinked root was the last surviving instance of the exact
-    /// defect this item closes — a pass that read nothing and called itself complete — and the probe
-    /// now `lstat`s ahead of `opendir` specifically to catch it. Making such a root *work* is
-    /// `W26.symroot`, deliberately not folded in here.
-    func testARootThatIsItselfASymlinkIsUnreadableBecauseTheEnumeratorRefusesIt() throws {
+    /// `FileManager.enumerator(at:)` refuses a symlinked root outright: it reports the link to
+    /// `errorHandler:` and yields nothing, even when the target is a readable directory full of tagged
+    /// files (measured 2026-08-06, including through a trailing-slash spelling). So before this change
+    /// such a root discovered *nothing at all* — first as a completed-looking empty pass, then, once
+    /// `W26.vocab-fu1` taught the probe to `lstat`, as an honest `rootUnreadable`.
+    ///
+    /// **`W26.symroot` was filed expecting the opposite spelling** — walk the target but rewrite every
+    /// discovered path back under the caller's `link/` prefix, to protect the byte-exact `(root, path)`
+    /// contract `LibraryIndex` keys on. Measured, that premise does not hold: the enumerator **already**
+    /// hands back ancestor-resolved paths (a root spelled `/var/folders/…` yields `/private/var/…`
+    /// entries — see `testANonSymlinkedRootIsUsedEXACTLYAsTheCallerSpelledIt`), so the caller's spelling
+    /// was never what the walk emitted. A rewrite would invent a third spelling that neither FileManager
+    /// nor FSEvents ever produces, and `CorpusWatcher`'s realpath'd live events would then match no row:
+    /// every tag write under such a root would look like a brand-new file. Hence the byte-exact
+    /// assertion below, which is the one that would fail if someone re-implemented the filed design.
+    func testARootThatIsItselfASymlinkIsWalkedThroughItsTarget() throws {
         let real = tempDir.appendingPathComponent("real", isDirectory: true)
         try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
         try makeFile("doc.pdf", tags: ["Read"], in: real)
+        try makeFile("Nested/deep.pdf", tags: ["Unread"], in: real)
+        try makeFile("untagged.pdf", in: real)
         let link = tempDir.appendingPathComponent("link", isDirectory: true)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
 
-        // The premise, pinned so a future Foundation that DOES follow a symlinked root fails here as
-        // itself rather than as a confusing `rootUnreadable` assertion.
+        // The premise, pinned: Foundation still refuses the link itself. If a future Foundation follows
+        // it, this fails as ITSELF — telling us the symlink branch is now redundant, rather than wrong.
         let raw = FileManager().enumerator(at: link, includingPropertiesForKeys: nil,
                                            options: [.skipsHiddenFiles, .skipsPackageDescendants],
                                            errorHandler: { _, _ in true })
@@ -421,15 +436,100 @@ final class CorpusWalkerTests: XCTestCase {
 
         let result = CorpusWalker.scan(root: link)
 
-        XCTAssertTrue(result.rootUnreadable, "so the walk must say it could not look, not that it looked")
-        XCTAssertFalse(result.completed)
-        XCTAssertTrue(result.entries.isEmpty)
+        XCTAssertFalse(result.rootUnreadable, "the target is a readable directory, so this root IS readable")
+        XCTAssertTrue(result.completed)
+        XCTAssertTrue(result.isClean, "and a fully readable tree reached through a link is authoritative")
+        XCTAssertEqual(result.filesSeen, 3)
+        XCTAssertEqual(relativePaths(result, root: real), ["Nested/deep.pdf", "doc.pdf"])
 
-        // The target itself is a perfectly good root — the link is the only thing that is not.
+        // Identity follows enumeration: through the link or straight at the target, ONE byte-exact
+        // spelling. Asserted in bytes, not on `URL`, because `String ==` is canonical equivalence.
         let direct = CorpusWalker.scan(root: real)
-        XCTAssertFalse(direct.rootUnreadable)
-        XCTAssertTrue(direct.isClean)
-        XCTAssertEqual(direct.entries.count, 1)
+        XCTAssertEqual(direct.entries.count, 2, "premise: the target is a good root in its own right")
+        XCTAssertEqual(result.entries.map { fileSystemBytes($0.url) },
+                       direct.entries.map { fileSystemBytes($0.url) },
+                       "a symlinked root must not be a SECOND byte-spelling of the same archive")
+
+        // The cheap revalidation walk has to resolve the root the same way. If it did not, a warm root
+        // would revalidate to zero files against rows the full walk had just written — and every one of
+        // them would read as deleted.
+        let fingerprints = CorpusWalker.scanFingerprints(root: link)
+        XCTAssertFalse(fingerprints.rootUnreadable)
+        XCTAssertEqual(Set(fingerprints.entries.map { fileSystemBytes($0.url) }),
+                       Set(CorpusWalker.scanFingerprints(root: real).entries.map { fileSystemBytes($0.url) }),
+                       "scan and scanFingerprints must agree about what the root IS")
+    }
+
+    /// The four ways a symlinked root is still unusable. None of them may look like an empty archive,
+    /// and none may hang.
+    ///
+    /// The link-to-a-regular-file case is the load-bearing one: `realpath` *succeeds* for it, so only
+    /// the `opendir` of the resolved path rejects it. Drop that second probe as redundant and this is
+    /// the assertion that catches you.
+    func testASymlinkedRootWhoseTargetIsUnusableIsStillRootUnreadable() throws {
+        try XCTSkipIf(getuid() == 0, "root can open a 0o000 directory; the denial case is meaningless")
+
+        let dangling = tempDir.appendingPathComponent("dangling", isDirectory: true)
+        try FileManager.default.createSymbolicLink(
+            at: dangling,
+            withDestinationURL: tempDir.appendingPathComponent("never-created", isDirectory: true))
+
+        let toFile = tempDir.appendingPathComponent("to-file", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: toFile,
+                                                   withDestinationURL: try makeFile("target.pdf", tags: ["Read"]))
+
+        let sealed = tempDir.appendingPathComponent("sealed-target", isDirectory: true)
+        try FileManager.default.createDirectory(at: sealed, withIntermediateDirectories: true)
+        try makeFile("inside.pdf", tags: ["Unread"], in: sealed)
+        chmod(sealed, 0o000)
+        let toSealed = tempDir.appendingPathComponent("to-sealed", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: toSealed, withDestinationURL: sealed)
+
+        // A cycle. `realpath` answers `ELOOP` in one call — the reason it is used instead of chasing
+        // `readlink` by hand, which would need its own loop bound.
+        let cycleA = tempDir.appendingPathComponent("cycle-a", isDirectory: true)
+        let cycleB = tempDir.appendingPathComponent("cycle-b", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: cycleA, withDestinationURL: cycleB)
+        try FileManager.default.createSymbolicLink(at: cycleB, withDestinationURL: cycleA)
+
+        for (label, root) in [("dangling", dangling), ("to a regular file", toFile),
+                              ("to a denied directory", toSealed), ("cycle", cycleA)] {
+            XCTAssertNil(CorpusWalker.canonicalRoot(root), "\(label): there is nothing to enumerate")
+
+            let result = CorpusWalker.scan(root: root)
+            XCTAssertTrue(result.rootUnreadable, "\(label): the walk must say it could not look")
+            XCTAssertFalse(result.completed, "\(label)")
+            XCTAssertFalse(result.isClean, "\(label): absence here is never actionable")
+            XCTAssertTrue(result.entries.isEmpty, "\(label)")
+
+            XCTAssertTrue(CorpusWalker.scanFingerprints(root: root).rootUnreadable,
+                          "\(label): the fingerprint walk agrees, so no cache row is pruned")
+        }
+    }
+
+    /// The narrow half of the decision: a root that is NOT a symlink reaches the enumerator **exactly**
+    /// as the caller spelled it.
+    ///
+    /// `LibraryIndex` keys rows on byte-exact paths, so a probe that "helpfully" `realpath`'d every root
+    /// would re-spell every root in the suite (`/var/folders/…` → `/private/var/folders/…`, and a
+    /// case-mismatched pick on a case-insensitive volume) and orphan every cached row wholesale. That is
+    /// the cost the filed item was worried about, and this is what keeps it at zero. It also pins the
+    /// measured asymmetry the identity decision rests on: the ROOT keeps the caller's spelling while the
+    /// ENTRIES come back ancestor-resolved, from the same pass.
+    func testANonSymlinkedRootIsUsedEXACTLYAsTheCallerSpelledIt() throws {
+        let root = tempDir.appendingPathComponent("under-var", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try makeFile("doc.pdf", tags: ["Read"], in: root)
+        XCTAssertTrue(root.path.hasPrefix("/var/"),
+                      "premise: this fixture really is reached through the /var alias — \(root.path)")
+
+        let canonical = try XCTUnwrap(CorpusWalker.canonicalRoot(root))
+
+        XCTAssertEqual(fileSystemBytes(canonical), fileSystemBytes(root),
+                       "an aliased ANCESTOR must not be resolved — that re-spells every root in the suite")
+        let entry = try XCTUnwrap(CorpusWalker.scan(root: root).entries.first)
+        XCTAssertTrue(entry.url.path.hasPrefix("/private/var/"),
+                      "…while the enumerator resolves it in the ENTRIES regardless — \(entry.url.path)")
     }
 
     /// An aliased *ancestor* is not an aliased root. Every fixture in this file lives under
