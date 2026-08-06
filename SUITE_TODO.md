@@ -353,54 +353,19 @@ caller's spelling was never what the walk emitted, and a rewrite would invent a 
 FileManager nor FSEvents ever produces, leaving `CorpusWatcher`'s realpath'd live events matching no row. So
 identity follows enumeration. Only a symlinked FINAL component is canonicalised — every other root reaches the
 enumerator byte-for-byte as spelled, so no existing root and no cached row can shift.
-- [ ] **W26.symroot-fu1 — under a symlinked root the Reader's own root-relative logic is still spelled with
-  the LINK, so the folder tree, exclusions and live updates all miss [S · low · Tier-2 · needs: none].** Filed
-  2026-08-06 while shipping `W26.symroot`; **rewritten the same day, because its own first question got
-  measured.** `CorpusWalker` now discovers a symlinked root's files, spelled under the **target** (a measured
-  decision — do not re-litigate it, see the entry above). The walker cannot fix the rest: the spelling has to
-  change where the root is ADOPTED.
-  🔺 **THE MEASUREMENT THIS ITEM ASKED FOR, DONE — and it inverts the item.** The question was whether a
-  Reader root can even *be* a symlink spelling. Measured twice, independently:
-  `url.bookmarkData(options: .withSecurityScope, …)` **throws for a symbolic link** — `NSCocoaErrorDomain 256
-  "Could not open() the item"` — while the identical call on a real directory succeeds. `RootFolderStore
-  .setRoot:39-54` bookmarks first, so a symlinked pick lands in the `catch` at `:52`, which only `NSLog`s:
-  **`root` is never set, no marker, no scan, and the UI says nothing at all.** A *plain* (unscoped) bookmark
-  of the same link works and round-trips the **link** spelling — so "bookmarks are inode-based, therefore the
-  Reader only ever sees resolved paths", the guess this item was filed on, is **wrong on both halves**.
-  So this is not polish after a working feature; it is what makes the walker fix reachable in the Reader at
-  all, and the first fix is at adoption: bookmark the **resolved target** (`CorpusWalker.canonicalRoot`), or
-  refuse the pick with a visible message instead of an `NSLog`. Today the only Reader route to a symlinked
-  root is the DEBUG `-ARUITestRootPath` override (`adoptTestRoot:129`), which skips bookmarks — i.e. a UITest
-  could "prove" the fix on a path the shipping app cannot reach.
-  **Then the spelling, which is the larger half.** Everything comparing a discovered path against the granted
-  root still uses the caller's spelling. Confirmed by reading; the first two must move **together**:
-  - `ArchiveLibrary.publishWarmSnapshot:359` — byte containment of target-spelled cache rows against a
-    link-spelled root ⇒ `warm == []` on **every** launch, so a fully warm root shows **zero files** until the
-    whole revalidation walk finishes (`asOf` is non-nil, so the guard at `:361` passes).
-  - `NavigationModel.reverifyCacheRows:875` — rejects any row not contained in the root, so a bulk tag write
-    over cache-provenance rows drops all of them. ⚠️ **Currently MASKED by the bullet above** (no `.cache` row
-    ever reaches `files`) — fixing the warm start alone *unmasks a write-path failure*.
-  - `CorpusWatcher.canonicalRootPath:166` only trims a trailing slash. Measured: FSEvents realpath's the
-    watch root itself and delivers target-spelled paths **whichever spelling the writer used**, so the
-    containment guard at `:99` drops every event — a healthy-looking watcher with **no live updates at all**,
-    and `CorpusWatchEligibility.includes:466` suppresses subtree rescans the same way.
-  - `NavigationModel:787` (the folder tree places **no** file while the recursive total counts them all),
-    `sanitizedPathPrefix:523-527` (a restored folder scope / saved search is silently discarded),
-    `NavigationModel:715`+`:731` (deep-link reveal reports "Document not found in the current archive" for a
-    file visible on screen), `ExcludedFoldersStore.isExcludedAbsolute:44`, `ArchiveLinkWriter:29`/`:77` (a
-    durable link degrades to `lastPathComponent`), `ContentIndexer:420-423` (content-index eviction becomes a
-    permanent no-op — fail-safe, but unboundedly stale) and `:459-462` (excluded folders keep appearing in
-    full-text results).
-  ⚠️ **The naive fix loses file access.** Do NOT canonicalise `RootFolderStore.root` itself: that URL carries
-  the sandbox security scope, and a URL rebuilt by `realpath` is a different instance without it. Keep the
-  scoped URL for I/O and give the comparisons one separate canonical-path value, computed once at adoption.
-  ⛔ **In-memory only** — never persist it, never write `archiveRootBookmark` (2026-07-11 incident).
-  ✅ **Do NOT "fix" `CorpusRootFingerprint.capture` to `lstat` or to the canonical root** — `stat`/`statfs`/
-  `access` all follow the link, so a symlinked root already fingerprints the target directory that was
-  actually enumerated. It agrees with the walker by construction.
-  **Test:** the open panel (or a seeded bookmark) accepts a symlinked folder and the library lists its files;
-  a warm relaunch paints cached rows instead of zero; an external tag change arrives as an update to an
-  existing row, not a new one; a deep link reveals a listed file; an excluded subfolder stays excluded.
+✅ **W26.symroot-fu1 — SHIPPED 2026-08-06 (`bd01025` → `bcfaa18` → `766f59c` → this commit); full
+entry in `SUITE_TODO_DONE.md`.** A symlinked archive folder can now be **chosen** — `bookmarkData(options:
+.withSecurityScope)` cannot `open()` a link, so `setRoot` used to land in a `catch` that only `NSLog`ed: no
+root, no scan, nothing said. It adopts `CorpusWalker.canonicalRoot(url)` instead, and both refusal cases now
+return a message the window shows. **And the larger half — the spelling.** Every place that compared a
+DISCOVERED path against the caller's spelling of the root now uses `RootFolderStore.discoveredPathPrefix`
+(or, in discovery's own objects, one derived from the root they were handed): warm-start containment, cache
+re-verification before a write, FSEvents containment and subtree eligibility, the sidebar folder tree,
+exclusions, the restored folder scope, deep-link reveal, durable-link relative paths, content-index prune.
+Two of these were **paired on purpose** — `publishWarmSnapshot` filtering out every warm row was masking
+`reverifyCacheRows` rejecting every cache row, so fixing the warm start alone would have unmasked a
+write-path failure. Not touched, deliberately: `CorpusRootFingerprint.capture` and `LibraryIndexRoot.path`.
+
 - [ ] **W26.notesabsence — Notes' `ReaderLinkResolver` establishes ABSENCE from a walk that read nothing
   [S · MED · Tier-2 · needs: none].** Filed 2026-08-06 by `W26.symroot`'s adversarial pass; **pre-existing**,
   and it is this wave's core defect surviving one app over.

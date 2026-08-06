@@ -110,6 +110,95 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.symroot-fu1 — a symlinked archive folder can be CHOSEN, and every root-relative
+  comparison is spelled the way the walker reports [M · Tier-2]. ✅ SHIPPED 2026-08-06** — `bd01025` (the
+  ArchiveCore primitive) → `bcfaa18` (adoption) → `766f59c` (the warm start, the write path behind it, and
+  the watcher) → this commit (the rest of the sweep + the trackers).
+
+  **What it was, in two halves.**
+
+  *Adoption.* `url.bookmarkData(options: .withSecurityScope, …)` **throws for a symbolic link** —
+  `NSCocoaErrorDomain 256` "Could not open() the item" — while the identical call on the same real directory
+  succeeds. `RootFolderStore.setRoot` bookmarks FIRST, so a symlinked pick landed in a `catch` that only
+  `NSLog`ed: `root` never set, no marker, no scan, and a window that looked exactly as it had before the
+  panel opened. `chooseRoot` compounded it by starting the library on the **panel** URL rather than on
+  whatever was adopted, and by tearing down the previous root's scope/filters even when nothing was adopted.
+
+  *Spelling.* The enumerator hands back fully `realpath`-resolved paths, so under any root whose spelling
+  differs from its resolved one — a symlinked component, or merely an aliased ancestor like `/var/folders` →
+  `/private/var/folders` — a comparison against `root.path` rejects every path the walk just produced. That
+  is not a corner case: every fixture root is that shape, which is why the sidebar folder tree had never
+  placed a file under one.
+
+  **What shipped.**
+  - `CorpusWalker.discoveredPathPrefix(for:)` (ArchiveCore, `bd01025`) — *the prefix every path a pass
+    reports under this root is spelled with*. Deliberately NOT `canonicalRoot`, which resolves only a
+    symlinked FINAL component: a root spelled `…/link/sub` comes back byte-unchanged from `canonicalRoot`
+    while its entries arrive under `…/real/sub`. A `String`, not a `URL`, because it carries no security
+    scope and must never be opened or persisted.
+  - `setRoot` adopts `CorpusWalker.canonicalRoot(url)` and returns a `RootPickRefusal` — `.unreadable` or
+    `.couldNotBookmark` — which `chooseRoot` shows and announces. It differs from the pick only for a
+    symlinked final component, so no root that works today can shift, and the bookmark is minted for the
+    same URL that is adopted, so the scope belongs to the root we keep.
+  - `RootFolderStore.discoveredPathPrefix`, set through one private `adopt(_:)` shared by all three adoption
+    sites (panel pick, bookmark re-resolve, DEBUG fixture) so a fourth cannot forget it. In-memory only.
+  - The sweep: `ArchiveLibrary.publishWarmSnapshot`, `NavigationModel.reverifyCacheRows`,
+    `CorpusWatchRequest.reduce` + `CorpusWatchEligibility.includes` (via a new `watchedPathPrefix`, applied
+    to the root only and never to an already-resolved event path), `buildFolderTree`, the three
+    `sanitizedPathPrefix` callers, `revealAndSelect`, `isExcludedAbsolute`/`absolutePrefixes` callers,
+    `pruneIfSettled`, `ArchiveLinkTarget.rootPath` (was `root: URL`) + `ArchiveLinkWriter`, and
+    `OptionsView.addExcludedFolder`, which resolves **both** sides because the panel and the root need not
+    agree on spelling.
+
+  🔺 **The two that had to move together, and why one was invisible.** `publishWarmSnapshot` emptied `warm`
+  on every launch under such a root — and `asOf` being non-nil meant the "truly cold root" guard let the
+  publish through anyway, so a fully warm root showed **zero files** until the entire revalidation walk
+  finished, which is the whole delay `W26.idx` exists to remove. `reverifyCacheRows` rejected every cache row
+  the same way, dropping all of them from a bulk tag write — and that could not be observed while the first
+  bullet guaranteed no `.cache` row ever reached `files`. Fixing the warm start alone would have **unmasked a
+  write-path failure**.
+
+  🔺 **Discovery's objects derive their own prefix rather than reading the store's.** During a root switch
+  `ArchiveLibrary` is still finishing the previous root's pass; borrowing `RootFolderStore`'s current answer
+  would judge one root's rows against another's.
+
+  🔺 **`RootFolderStore` now takes an injected `UserDefaults`, and that is what made the adoption path
+  testable at all.** `setRoot` WRITES `archiveRootBookmark`, so before this no test could touch it without
+  risking the owner's real root (the 2026-07-11 incident) — which is why the store's only two existing tests
+  both stopped at `adoptTestRoot`. Production passes `.standard`;
+  `testSetRootNeverTouchesTheStandardBookmarkKey` is the guard that the injection holds.
+
+  🔺 **My own adversarial pass caught a regression I had just written.** The reveal target was rebuilt with
+  `URL(fileURLWithPath: rootPath).appendingPathComponent(…)`, and that initialiser **normalises composed
+  Unicode** — on a volume storing a decomposed name it would emit a spelling the walk never produced, trading
+  this item's bug for `W26.idx`'s. Joined as strings now, the same way `ExcludedFoldersStore` does it.
+
+  **Deliberately NOT touched.** `CorpusRootFingerprint.capture` (the item protects it: `stat`/`statfs`/
+  `access` all follow the link, so it already fingerprints the enumerated directory) and `LibraryIndexRoot
+  .path` — an opaque cache identity that is never compared against file paths, so re-spelling it would orphan
+  rows for no gain.
+
+  **Tests.** 12 new (Reader 354 → 366), every fixture built on a **mid-path** symlink so nothing upstream can
+  hide the divergence, and the write test asserts the tag actually landed on disk. **7 mutants, each caught
+  by a named test:** adopting the pick rather than the target; `discoveredPathPrefix = url.path`; an
+  unopenable pick failing silently; and each of the warm-start, re-verify, watcher and display-filter
+  comparisons reverted to the old spelling. One test was rewritten after it proved vacuous — the prefix
+  assertion passes against `url.path` unless there is a link in the path, because the unit bundle's
+  `NSTemporaryDirectory()` is the app container's tmp and not `/var/folders` (memory
+  `app-hosted-tests-sandboxed-tmp`).
+
+  **Gate.** Reader 366/366 executed unit tests TEST SUCCEEDED (known `DeepLinkTests` env artifact excluded),
+  Release BUILD SUCCEEDED, 0 source warnings; ArchiveCore 204 XCTest + 105 swift-testing; write-surface lint
+  clean on both trees + self-test 14/14; **VM XCUITests 17/17** (`ops/gui/vm-gui-runner.sh xcuitest`). Scratch
+  `mktemp` fixtures and a throwaway defaults suite only; no corpus access and no host-screen UI automation.
+
+  **Not asserted, on purpose.** The sidebar's own exclusion branch is reachable only through an async sink,
+  and with an exclusion live that sink queues a content-index prune that took ~12 s to yield the main actor —
+  a slower whole suite in exchange for re-testing the one shared value the display-filter assertion pins. The
+  real `NSOpenPanel` route cannot be driven headlessly either; the refusal *values* are tested, its wiring in
+  `chooseRoot` is by inspection. **One visible consequence worth knowing:** a symlinked pick is adopted as its
+  target, so the toolbar shows the TARGET's folder name rather than the link's.
+
 - [x] **W26.symroot — an archive root that is ITSELF a symlink is now walked through its target
   [S · low · Tier-2]. ✅ SHIPPED 2026-08-06** — `1e7044d` (the walker + its tests) → this commit (the
   trackers, the plan's §4.6 correction, and the follow-up).

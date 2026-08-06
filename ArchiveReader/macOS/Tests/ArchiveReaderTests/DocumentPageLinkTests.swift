@@ -65,7 +65,7 @@ final class DocumentPageLinkTests: XCTestCase {
     }
 
     private func target(root: URL) -> ArchiveLinkTarget {
-        ArchiveLinkTarget(root: root,
+        ArchiveLinkTarget(rootPath: root.path,
                           marker: RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date()))
     }
 
@@ -296,18 +296,18 @@ final class DocumentPageLinkTests: XCTestCase {
 
         let root = URL(fileURLWithPath: "/tmp/W23m4-context", isDirectory: true)
         let marker = RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date())
-        context.update(root: root, marker: marker)
-        XCTAssertEqual(context.target, ArchiveLinkTarget(root: root, marker: marker))
+        context.update(rootPath: root.path, marker: marker)
+        XCTAssertEqual(context.target, ArchiveLinkTarget(rootPath: root.path, marker: marker))
 
         // A root whose marker could not be read is not linkable — clear rather than go stale.
-        context.update(root: root, marker: nil)
+        context.update(rootPath: root.path, marker: nil)
         XCTAssertNil(context.target)
 
         // A root switch replaces the target (never leaves a document window citing the old archive).
         let other = URL(fileURLWithPath: "/tmp/W23m4-other", isDirectory: true)
         let otherMarker = RootMarker(guid: UUID(), name: "other", kind: .reader, createdAt: Date())
-        context.update(root: other, marker: otherMarker)
-        XCTAssertEqual(context.target?.root, other)
+        context.update(rootPath: other.path, marker: otherMarker)
+        XCTAssertEqual(context.target?.rootPath, other.path)
         XCTAssertEqual(context.target?.marker.guid, otherMarker.guid)
     }
 
@@ -316,8 +316,12 @@ final class DocumentPageLinkTests: XCTestCase {
         let model = navModel(root: root)
         let context = ArchiveLinkContext()
         model.attach(linkContext: context)
-        XCTAssertEqual(context.target?.root.path, root.path,
+        // The store's DISCOVERED spelling, not `root.path`: the target exists to be stripped off
+        // discovered file paths, so publishing the caller's spelling made every link under an aliased
+        // or symlinked root degrade to a bare filename. (`W26.symroot-fu1`.)
+        XCTAssertEqual(context.target?.rootPath, model.rootStore.discoveredPathPrefix,
                        "the document window's target comes from the navigation window's root store")
+        XCTAssertNotNil(context.target?.rootPath)
         XCTAssertEqual(context.target?.marker.guid, guid)
     }
 }

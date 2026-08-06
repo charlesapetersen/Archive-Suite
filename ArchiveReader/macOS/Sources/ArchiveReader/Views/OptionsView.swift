@@ -96,8 +96,12 @@ struct OptionsView: View {
         panel.prompt = "Exclude"
         panel.message = "Choose a subfolder to exclude from the library."
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let rootPath = rootURL.path.hasSuffix("/") ? String(rootURL.path.dropLast()) : rootURL.path
-        let chosen = url.path
+        // BOTH sides resolved, because the relative path stored here is later re-joined to the root
+        // and tested against DISCOVERED paths (`ExcludedFoldersStore.isExcludedAbsolute`). The panel
+        // and the root need not agree on spelling, and the difference would either discard the
+        // exclusion silently or store one that matches nothing. (`W26.symroot-fu1`.)
+        let rootPath = CorpusWalker.discoveredPathPrefix(for: rootURL) ?? rootURL.path
+        let chosen = CorpusWalker.discoveredPathPrefix(for: url) ?? url.path
         // Must be a descendant of root.
         guard chosen.hasPrefix(rootPath + "/") else { return }
         let relative = String(chosen.dropFirst(rootPath.count + 1))

@@ -13,7 +13,13 @@ import ArchiveCore
 /// they want to cite. Publishing this small value as a focused value instead means the command needs
 /// only the focused viewer, and works in every window that reads a document.
 struct ArchiveLinkTarget: Equatable, Sendable {
-    let root: URL
+    /// The root as a **path prefix**, spelled the way discovery reports the files it will be stripped
+    /// from (`RootFolderStore.discoveredPathPrefix`). Deliberately not the root URL: the only use is
+    /// prefix arithmetic against a discovered path, and under a root whose spelling differs from its
+    /// resolved one the URL's own spelling matches nothing the walk produced — every link silently
+    /// degraded to a bare `lastPathComponent`, which resolves in no other archive. It carries no
+    /// security scope and must never be opened. (`W26.symroot-fu1`.)
+    let rootPath: String
     let marker: RootMarker
 }
 
@@ -28,8 +34,9 @@ final class ArchiveLinkContext: ObservableObject {
 
     /// Mirror the navigation window's root store. A missing root or unreadable marker clears the
     /// target (the command then disables) rather than leaving a stale one behind.
-    func update(root: URL?, marker: RootMarker?) {
-        let new = (root != nil && marker != nil) ? ArchiveLinkTarget(root: root!, marker: marker!) : nil
+    func update(rootPath: String?, marker: RootMarker?) {
+        let new = (rootPath != nil && marker != nil)
+            ? ArchiveLinkTarget(rootPath: rootPath!, marker: marker!) : nil
         if new != target { target = new }   // guard the publish: called from view updates
     }
 }

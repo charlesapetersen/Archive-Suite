@@ -210,7 +210,7 @@ final class NavigationModel: ObservableObject {
     /// Mirror the granted root + marker into the app-level context, so any window can build a durable
     /// link. Clears it when either is missing — a link with no marker GUID isn't portable.
     private func publishLinkTarget() {
-        linkContext?.update(root: rootStore.root, marker: rootStore.rootMarker)
+        linkContext?.update(rootPath: rootStore.discoveredPathPrefix, marker: rootStore.rootMarker)
     }
 
     // MARK: Saved searches / scope
@@ -286,7 +286,7 @@ final class NavigationModel: ObservableObject {
     /// Enter a smart-folder scope: the saved search becomes the visible universe; user filters reset.
     func applyScope(_ search: SavedSearch) {
         var f = search.filter
-        let sanitized = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.root?.path)
+        let sanitized = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.discoveredPathPrefix)
         if sanitized != f.pathPrefix {
             f.pathPrefix = sanitized
             statusMessage = "Smart folder's folder scope isn't under the current archive root — showing the whole root."
@@ -412,7 +412,7 @@ final class NavigationModel: ObservableObject {
     func recompute() {
         var base = library.files
         // Exclude user-designated folders before any other filtering.
-        if let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty {
+        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
             base = base.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
         }
         // Base scope = the visible universe (smart folder). User filter layers on top.
@@ -498,14 +498,14 @@ final class NavigationModel: ObservableObject {
         guard let d = UserDefaults.standard.data(forKey: viewStateKey),
               let s = try? JSONDecoder().decode(ViewState.self, from: d) else { return }
         var f = s.filter
-        f.pathPrefix = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.root?.path)
+        f.pathPrefix = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.discoveredPathPrefix)
         filter = f
         // Coerce a persisted .relevance (stale from an older build) to the default sort.
         if !s.sort.isEmpty { sort = s.sort.first?.field == .relevance ? LibrarySort.default : s.sort }
         // Restore the active scope (if its saved search still exists).
         if let sid = s.scopeID, let search = savedSearches.searches.first(where: { $0.id == sid }) {
             var sf = search.filter
-            sf.pathPrefix = Self.sanitizedPathPrefix(sf.pathPrefix, against: rootStore.root?.path)
+            sf.pathPrefix = Self.sanitizedPathPrefix(sf.pathPrefix, against: rootStore.discoveredPathPrefix)
             var restored = search; restored.filter = sf
             scope = restored
             clearUserFilters(recompute: false)
@@ -653,7 +653,7 @@ final class NavigationModel: ObservableObject {
         recompute()                                     // always — a row's read-state/tags may have moved it
         // Filter excluded folders before indexing so excluded files are never added to the content index.
         let filesToIndex: [ArchiveFile]
-        if let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty {
+        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
             filesToIndex = files.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
         } else {
             filesToIndex = files
@@ -670,7 +670,7 @@ final class NavigationModel: ObservableObject {
         // revalidating OR degraded pass now blocks pruning too, because both hand over a snapshot that
         // omits files they merely failed to reach — and `pruneIfSettled` treats every omission as a
         // deletion candidate.
-        if library.phase.isSettled, !filesToIndex.isEmpty, let rootPath = rootStore.root?.path {
+        if library.phase.isSettled, !filesToIndex.isEmpty, let rootPath = rootStore.discoveredPathPrefix {
             indexer.pruneIfSettled(currentPaths: Set(filesToIndex.map(\.url.path)), rootPrefix: rootPath)
         }
     }
@@ -697,7 +697,7 @@ final class NavigationModel: ObservableObject {
     /// target is visible, then selects and scrolls to it. If the library is still gathering, the
     /// reveal is deferred until the target appears (or settled-absence gives up).
     func revealAndSelect(rootGUID: UUID, relativePath: String, page: Int?) {
-        guard let root = rootStore.root else {
+        guard let rootPath = rootStore.discoveredPathPrefix else {
             statusMessage = "No archive folder is open. Choose one in File ▸ Choose Archive Folder…"
             return
         }
@@ -712,7 +712,15 @@ final class NavigationModel: ObservableObject {
             statusMessage = "This link points at a different archive. Choose it in File ▸ Choose Archive Folder…"
             return
         }
-        let targetPath = root.appendingPathComponent(relativePath).path
+        // Built from the spelling the LIBRARY holds, because that is what `applyPendingRevealIfPossible`
+        // matches `$0.url.path` against. Composed from the root URL, this reported "Document not found
+        // in the current archive" for a file visible on screen under any root whose spelling differs
+        // from its resolved one. (`W26.symroot-fu1`.)
+        // Joined as STRINGS, not through `URL(fileURLWithPath:)`: that initialiser normalises composed
+        // Unicode, so on a volume storing a decomposed name it would produce a spelling the walk never
+        // emitted and the match below would miss — trading this item's bug for `W26.idx`'s. The same
+        // joiner `ExcludedFoldersStore` uses.
+        let targetPath = rootPath + "/" + relativePath
         pendingReveal = targetPath
         pendingRevealPage = page
         pendingRevealSettledMisses = 0
@@ -764,7 +772,7 @@ final class NavigationModel: ObservableObject {
     /// on library or saved-search changes, so the sidebar isn't O(searches·N) per render).
     private func refreshSmartFolderCounts() {
         var files = library.files
-        if let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty {
+        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
             files = files.filter { !excludedFolders.isExcludedAbsolute($0.url.path, rootPath: rootPath) }
         }
         var counts: [UUID: Int] = [:]
@@ -775,7 +783,7 @@ final class NavigationModel: ObservableObject {
     /// Build the sidebar folder tree from the discovered file paths under the archive root — no extra
     /// disk scan (stays within the tagged universe). Each node's `fileCount` is its recursive total.
     private func buildFolderTree() -> FolderNode? {
-        guard let rootPath = rootStore.root?.path, !library.files.isEmpty else { return nil }
+        guard let rootPath = rootStore.discoveredPathPrefix, !library.files.isEmpty else { return nil }
         let root = rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath
         final class Mut { var count = 0; var children: [String: Mut] = [:] }
         let top = Mut()
@@ -866,7 +874,7 @@ final class NavigationModel: ObservableObject {
     /// Immediately prune content-index rows under any excluded folder prefix.
     /// Called when the exclusion list changes so search results don't lag the display filter.
     private func pruneExcludedFromIndex() {
-        guard let rootPath = rootStore.root?.path, !excludedFolders.excludedRelativePaths.isEmpty else { return }
+        guard let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty else { return }
         let prefixes = excludedFolders.absolutePrefixes(rootPath: rootPath)
         indexer.pruneExcluded(prefixes: prefixes)
     }
@@ -1224,7 +1232,7 @@ final class NavigationModel: ObservableObject {
 
     func copyArchiveLinks() {
         let files = selectedFiles
-        guard !files.isEmpty, let root = rootStore.root else {
+        guard !files.isEmpty, let rootPath = rootStore.discoveredPathPrefix else {
             statusMessage = "Choose an archive folder first."
             return
         }
@@ -1237,7 +1245,7 @@ final class NavigationModel: ObservableObject {
         }
         Task {
             let item = await ArchiveLinkWriter.pasteboardItem(
-                for: files, root: root, marker: marker, thumbnailer: nil
+                for: files, rootPath: rootPath, marker: marker, thumbnailer: nil
             )
             NSPasteboard.general.clearContents()
             NSPasteboard.general.writeObjects([item])

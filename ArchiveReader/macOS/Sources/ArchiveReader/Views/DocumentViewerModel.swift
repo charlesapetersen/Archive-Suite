@@ -305,7 +305,7 @@ final class DocumentViewerModel: ObservableObject {
         guard urls.indices.contains(index) else { return nil }
         return await ArchiveLinkWriter.pageLink(
             fileURL: urls[index], page: focusedPageNumber,
-            root: target.root, marker: target.marker, thumbnailer: nil
+            rootPath: target.rootPath, marker: target.marker, thumbnailer: nil
         )
     }
 

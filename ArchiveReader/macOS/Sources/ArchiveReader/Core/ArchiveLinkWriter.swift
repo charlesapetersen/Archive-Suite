@@ -7,16 +7,18 @@ import ArchiveCore
 
 enum ArchiveLinkWriter {
     /// Build an `NSPasteboardItem` carrying both plain-text URLs and the rich JSON payload.
-    /// `files` are the selected archive files; `root` is the granted archive-root URL;
-    /// `marker` provides the stable root GUID for durable links.
+    /// `files` are the selected archive files; `rootPath` is the granted root spelled the way
+    /// discovery reports paths under it (`RootFolderStore.discoveredPathPrefix`) — NOT the root URL's
+    /// own `path`, which under an aliased or symlinked root matches nothing the walk produced, so
+    /// every link degraded to a bare `lastPathComponent` (`W26.symroot-fu1`); `marker` provides the
+    /// stable root GUID for durable links.
     /// Thumbnail rendering is async (via the PDFThumbnailer actor) so this method is async.
     static func pasteboardItem(
         for files: [ArchiveFile],
-        root: URL,
+        rootPath: String,
         marker: RootMarker,
         thumbnailer: PDFThumbnailer?
     ) async -> NSPasteboardItem {
-        let rootPath = root.path
         let rootGUID = marker.guid
 
         var entries: [ArchiveLinkPayload.Entry] = []
@@ -67,11 +69,10 @@ enum ArchiveLinkWriter {
     static func pageLink(
         fileURL: URL,
         page: Int,
-        root: URL,
+        rootPath: String,
         marker: RootMarker,
         thumbnailer: PDFThumbnailer?
     ) async -> NSPasteboardItem {
-        let rootPath = root.path
         let filePath = fileURL.path
         let relativePath: String
         if filePath.hasPrefix(rootPath + "/") {

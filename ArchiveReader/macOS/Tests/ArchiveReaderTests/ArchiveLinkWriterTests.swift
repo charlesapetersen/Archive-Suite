@@ -33,7 +33,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
             makeFile("/tmp/TestArchive/Box2/letter.pdf"),
         ]
         let item = await ArchiveLinkWriter.pasteboardItem(
-            for: files, root: root, marker: testMarker, thumbnailer: nil
+            for: files, rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         // Rep 1: plain text — two archivereader:// URLs
@@ -61,7 +61,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
             makeFile("/tmp/TestArchive/Sub Dir/file.pdf"),
         ]
         let item = await ArchiveLinkWriter.pasteboardItem(
-            for: files, root: root, marker: testMarker, thumbnailer: nil
+            for: files, rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         let customType = NSPasteboard.PasteboardType(ArchiveLinkUTI.type)
@@ -89,7 +89,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
             makeFile("/tmp/TestArchive/MEMO-1962.pdf"),
         ]
         let item = await ArchiveLinkWriter.pasteboardItem(
-            for: files, root: root, marker: testMarker, thumbnailer: nil
+            for: files, rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         let customType = NSPasteboard.PasteboardType(ArchiveLinkUTI.type)
@@ -104,7 +104,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
             makeFile("/tmp/TestArchive/doc.pdf"),
         ]
         let item = await ArchiveLinkWriter.pasteboardItem(
-            for: files, root: root, marker: testMarker, thumbnailer: nil
+            for: files, rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         let customType = NSPasteboard.PasteboardType(ArchiveLinkUTI.type)
@@ -121,7 +121,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
         let fileURL = URL(fileURLWithPath: "/tmp/TestArchive/letter.pdf")
         let item = await ArchiveLinkWriter.pageLink(
             fileURL: fileURL, page: 1,
-            root: root, marker: testMarker, thumbnailer: nil
+            rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         let text = item.string(forType: .string)
@@ -145,7 +145,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
         let fileURL = URL(fileURLWithPath: "/tmp/TestArchive/Box/doc.pdf")
         let item = await ArchiveLinkWriter.pageLink(
             fileURL: fileURL, page: 3,
-            root: root, marker: testMarker, thumbnailer: nil
+            rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         let text = item.string(forType: .string)!
@@ -167,7 +167,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
             makeFile("/tmp/TestArchive/Box \u{2014} Special/file name.pdf"),
         ]
         let item = await ArchiveLinkWriter.pasteboardItem(
-            for: files, root: root, marker: testMarker, thumbnailer: nil
+            for: files, rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         let text = item.string(forType: .string)!
@@ -183,7 +183,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
     func testEmptySelectionReturnsEmptyPayload() async throws {
         let root = URL(fileURLWithPath: "/tmp/TestArchive")
         let item = await ArchiveLinkWriter.pasteboardItem(
-            for: [], root: root, marker: testMarker, thumbnailer: nil
+            for: [], rootPath: root.path, marker: testMarker, thumbnailer: nil
         )
 
         let customType = NSPasteboard.PasteboardType(ArchiveLinkUTI.type)
