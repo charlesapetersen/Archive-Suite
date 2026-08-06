@@ -151,13 +151,13 @@ security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<
   add_need "Keychain not set up — it may interrupt you with a password box. Run once: ./ops/autonomous/fix-keychain-access.sh"
 [ "$hold" -gt 0 ] 2>/dev/null && \
   add_need "$hold task(s) are held back for you to decide (they touch things with no undo)"
-# Morning Review: count OPEN checkboxes, then quote the first. Handles both shapes — the `- [ ]` checklist
+# Daemon Report: count OPEN checkboxes, then quote the first. Handles both shapes — the `- [ ]` checklist
 # rows and the older `- **[YYYY-MM-DD] …` prose entries. Sub-headings inside the section must stay ###; a
 # `## ` there correctly ends the scan (and would silently empty this list, so it is worth knowing).
-mr_open="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- \[ \]/{c++} END{print c+0}' "$PLAN" 2>/dev/null)"
+mr_open="$(awk '/^## (Daemon Report|Morning Review)/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- \[ \]/{c++} END{print c+0}' "$PLAN" 2>/dev/null)"
 mr_open="$(num "$mr_open")"
 # Real newlines via add_need, printed with %s not %b — plan text can contain backslashes that %b would eat.
-mr="$(awk '/^## Morning Review/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- (\[ \]|\*\*\[)/{print; exit}' "$PLAN" 2>/dev/null | tr -d '\\\r' | sed 's/^[[:space:]]*//' | cut -c1-64)"
+mr="$(awk '/^## (Daemon Report|Morning Review)/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- (\[ \]|\*\*\[)/{print; exit}' "$PLAN" 2>/dev/null | tr -d '\\\r' | sed 's/^[[:space:]]*//' | cut -c1-64)"
 if [ "$mr_open" -gt 0 ] 2>/dev/null; then
   add_need "$mr_open thing(s) waiting on your decision — first: ${mr}…"
 elif [ -n "$mr" ]; then

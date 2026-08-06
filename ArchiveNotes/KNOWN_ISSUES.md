@@ -625,7 +625,7 @@ Infra masquerading as a product bug is the thing to watch for here — an advers
 gate.
 
 **What the green lane was FOR — three owner-eye checks discharged with it (suite 12/12 → 15/15).** These had
-shipped with unit proof and a "live GUI drive → Morning Review" tail, i.e. behaviour never once driven through
+shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour never once driven through
 the real UI:
 - **G12** — W14.4 (d) per-window Sources column. Asserts the *same* cell identifier present in the Extracts
   window and absent in the Note window, so the negative half cannot pass on a mistyped id.
@@ -892,7 +892,7 @@ SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean 
   Read-only navigation (no write-back, no store/corpus write).
 - **Future (low-pri, owner-eye today):** making the chip buttons (`an.chip.{jump,reveal,preview,zoteroOpen}`)
   XCUITest-hittable would also help VoiceOver — may not be possible for TextKit-2 attachment subviews; not
-  attempted this pass. Logged to Morning Review.
+  attempted this pass. Logged to Daemon Report.
 - **REMAINING (W8-S8 still open — oversized, recommend re-split):** G6 (reveal → Reader) + G11 (Zotero chip
   open), both needing a DEBUG `NSWorkspace.open` spy (assert the dispatched URL; real external launch owner-eye);
   the `an.status.indexReady` probe queryability fix; G2/G6/G11 owner-eye docs in the harness README. Only then
@@ -992,7 +992,7 @@ override; readiness gates on a seeded row.
   XCUITest** (1×1 clear-color a11y element; value stayed empty across a 30 s poll). Non-blocking (the tests
   gate on a concrete seeded row) but the probe's queryability — flagged UNVERIFIED at W8-S7 — needs a fix
   (bump the frame / adjust the a11y wrapping) before any FTS/relevance check relies on it.
-- **REMAINING (W8-S8 is oversized — recommend re-split; see plan Session Log / Morning Review):** G5 (paste →
+- **REMAINING (W8-S8 is oversized — recommend re-split; see plan Session Log / Daemon Report):** G5 (paste →
   source block), G7 (replicate), G8 (delete-last-instance, Tier-2) under XCUITest;
   G4/G6/G10/G11 in cliclick; G2/G6/G11 owner-eye docs. G5/G6 exercise the reader-page **source-block chip** —
   confirm its durable-link/thumbnail render (against the ungranted scratch corpus root) idles under the drive
@@ -1094,7 +1094,7 @@ W8-S4 added the plan §1.5/§1.6/§1.7 parity suites and, in doing so, pinned a 
   `ArchiveCoreTests/DateSortParityTests` (7, §1.7 — the shared SPEC §7 `DocumentTags.sortDate` key), plus a
   `/`-in-multi-segment-rel-path round-trip added to `ArchiveCoreTests/DurableLinkTests` (§1.6) and a
   cross-implementation parity guard added to `ItemSortDateTests`.
-- **FINDING (flagged to Morning Review) — Notes `Item.sortDate` RE-IMPLEMENTS the shared sort formula
+- **FINDING (flagged to Daemon Report) — Notes `Item.sortDate` RE-IMPLEMENTS the shared sort formula
   rather than reusing it.** §1.7's `testReuseNotReimplemented` wanted a "routes through the shared
   `DocumentTags.sortDate`" guard, but `Item.sortDate` (`Store/Item.swift`) duplicates the `*10_000/*100`
   arithmetic inline over `date:String?`+`datePrecision`, whereas Reader reuses
@@ -1104,7 +1104,7 @@ W8-S4 added the plan §1.5/§1.6/§1.7 parity suites and, in doing so, pinned a 
   for a shared table of dates, `Item.sortDate` MUST equal `DocumentTags.sortDate`, so any future drift
   fails a test. Sort order is a display/ordering concern (never written to a corpus → low file-safety
   stakes); the hardening follow-up — extract a shared numeric combiner in ArchiveCore and route both sides
-  through it — is a Morning-Review item, out of scope for this testing sub-task.
+  through it — is a Daemon-Report item, out of scope for this testing sub-task.
 - **RECONCILED — §1.6 resolve / re-grant / fallback live at the Notes layer, not ArchiveCore.** The plan
   placed the durable-link *resolver* cases in `ArchiveCoreTests/DurableLinkTests`, but the resolver
   (`ReaderLinkResolver` + `LinkResolution`, W4-S5) is a `@MainActor` type in the Notes app (it needs
@@ -1222,7 +1222,7 @@ one real bug plus two benign edge-normalizations:
   trailing **tab** or **NBSP** on e.g. a title is normalized away (`"\tTabbed"` → `"Tabbed"`). Edge
   regular-spaces DO survive (they're quoted); interior whitespace is unaffected. Pinned by
   `leadingTrailingEdgeWhitespaceInScalarIsNormalized` so a future `needsQuoting` tightening is intentional.
-  Marginal (who titles a note with an edge tab?) → flagged to Morning Review, not fixed this session.
+  Marginal (who titles a note with an edge tab?) → flagged to Daemon Report, not fixed this session.
 - **NOTED (marginal) — `\r\r\n` in body text leaves a residual `\r\n` after one decode.** `decode`'s
   `replacingOccurrences("\r\n" → "\n")` is a single left-to-right pass, so `CR CR LF` collapses to a
   *residual* `\r\n` that then normalizes on a second decode → a body containing raw CR-soup isn't
@@ -1282,7 +1282,7 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   bytes via `ItemAssetStore.addAsset` (reserve→write, no-overwrite guard) and rewrites the `](assets/…)` refs
   when a name collision disambiguates, so a copy→paste into an extract is self-contained. Verified on scratch
   stores (`ExtractBuilderTests`: byte-on-disk, no-clobber disambiguation, nil-import resilience). **Residual
-  (→ Morning Review, minor, not data loss):** (1) because `ItemAssetStore` writes bytes on a background task,
+  (→ Daemon Report, minor, not data loss):** (1) because `ItemAssetStore` writes bytes on a background task,
   the just-pasted images can render as missing-asset placeholders until the extract is reloaded (identical to
   the single-image paste path); (2) two selected blocks referencing the *same* source image import as two
   copies (consistent with the audited Create/Append `persist`); (3) the end-to-end **GUI copy→paste drive**
@@ -1315,13 +1315,13 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   `.selectAndScroll` branch — which runs only in the window featuring the target's kind — calls
   `openWindow(id:)` (fronts the singleton Notes/Extracts `Window` scene, never duplicates) + `NSApp.activate`,
   so a jump-to-source brings the source note's window forward + focuses it. **Live raise/focus GUI drive →
-  Morning Review.**
+  Daemon Report.**
 - ✅ **FIXED (W14.4c, 2026-07-17 `d615589`):** the chip live title now refreshes reactively. `NotesModel`
   gained an `itemsGeneration` counter (bumped on every `replaceItems`); `MarkdownEditorView.updateNSView`
   re-styles a chip-bearing extract when that generation changes even if THIS note's markdown didn't, so a
   rename in the *other* window recolors the chip while the extract sits idle. Gated to docs that carry a
   note-passage chip (plain notes never re-style on unrelated changes); scroll offset preserved across the
-  refresh so a reader isn't yanked. **Live cross-window recolor GUI drive → Morning Review.**
+  refresh so a reader isn't yanked. **Live cross-window recolor GUI drive → Daemon Report.**
 - **Same-window active-editing edge.** If the jump target note is being actively edited *in the same
   window* (its text view is first responder), freeze-during-edit skips the content re-apply, so the
   scroll maps against possibly-stale content (falls back to top if out of range — non-crashing). The
@@ -1347,14 +1347,14 @@ per-window kind round-trip; `NotesNavigationModelTests` window defaults). Consci
   driving the live app to *create a segmented extract* would write into the owner's real Notes store
   (the file-safety analog of the Reader "never mutate the live root" incident). So the live checks —
   Extract window opens featuring extracts / Note window features notes / toggling to `both` unions /
-  the Sources column shows the right count for a segmented extract — are deferred to Morning Review and
+  the Sources column shows the right count for a segmented extract — are deferred to Daemon Report and
   are the natural payload for the **W8-S7** fixture-rooted XCUITest (which builds the scratch store).
 - ✅ **FIXED (W14.4d, 2026-07-17 `7ef833d`):** the "Sources" column is now per-window. `NotesAppSettings`
   gained `windowHiddenColumns(for:)`/`setWindowHiddenColumns(_:for:)` (keyed per window like
   `windowKindFilter`), defaulting the Note window to hide the always-blank Sources column while the Extracts
   window shows it; the header picker's toggle now persists per window. A first open seeds the default from the
   legacy global `hiddenColumns` (upgrade-safe); an explicit empty set means "show all". +4 settings tests.
-  **Live two-window visibility GUI drive → Morning Review.**
+  **Live two-window visibility GUI drive → Daemon Report.**
 - **`source_count` back-fills on re-index, not instantly, for a pre-`source_count` DB.** The additive
   `ALTER TABLE` defaults existing rows to 0; a stale row shows a blank Sources cell until its mtime
   changes (or the disposable index is deleted + rebuilt). Only affects a dev DB created before this

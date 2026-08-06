@@ -153,7 +153,7 @@ struct NotesFrontMatterTests {
     /// quotes a leading/trailing regular space, so such an edge char is not round-tripped.
     /// Interior whitespace and edge regular-spaces (which DO get quoted) are unaffected.
     /// Pinned so a future tightening of `needsQuoting` is an intentional, reviewed change.
-    /// (Flagged to Morning Review 2026-07-14 — W8-S1.)
+    /// (Flagged to Daemon Report 2026-07-14 — W8-S1.)
     @Test
     func leadingTrailingEdgeWhitespaceInScalarIsNormalized() throws {
         let uuid = "22222222-3333-4444-5555-666666666666"
@@ -251,7 +251,7 @@ struct NotesFrontMatterTests {
     /// A fuzzy string over a palette of tricky characters (quotes, colons, brackets, emoji, em-dash,
     /// NBSP, control chars). `allowNewlines` adds `\n`; `allowCR` additionally adds a lone `\r`
     /// (only for pure-garbage blobs — a body with CR-soup exercises `\r\r\n` residual normalization,
-    /// which is orthogonal to front-matter idempotency; see Morning Review 2026-07-14 W8-S1).
+    /// which is orthogonal to front-matter idempotency; see Daemon Report 2026-07-14 W8-S1).
     private func fuzzyString(maxLen: Int, using rng: inout SeededGenerator,
                              allowNewlines: Bool, allowCR: Bool = false) -> String {
         var palette: [Character] = Array("abcXYZ 0123:,-[]{}\"'#*_`é—\u{00A0}😀\u{01}\t!?&|")

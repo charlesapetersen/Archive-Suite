@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# prove-compact.sh — regression harness for compact-plan.sh (Session Log + Morning Review rotation).
+# prove-compact.sh — regression harness for compact-plan.sh (Session Log + Daemon Report rotation).
 #
 # Builds synthetic AUTONOMOUS_PLAN.md fixtures in a sandbox and runs the REAL compact-plan.sh against
 # them, asserting: old entries archived / recent kept, every OTHER section byte-identical, live anchors
-# survive, idempotency, under-trigger no-ops, and — the WS8 subshell contract — that Morning Review
+# survive, idempotency, under-trigger no-ops, and — the WS8 subshell contract — that Daemon Report
 # rotates even when the Session Log pass no-ops. No network, no real plan, no daemon.
 set -u
 
@@ -18,7 +18,7 @@ ok(){ PASS=$((PASS+1)); printf '  ok  %s\n' "$1"; }
 no(){ FAIL=$((FAIL+1)); printf 'FAIL  %s\n' "$1"; }
 chk(){ if eval "$2"; then ok "$1"; else no "$1"; fi; }
 
-# ---- fixture builder: $1=#sessionlog entries  $2=#morning-review entries  -> writes $SANDBOX/plan.md ----
+# ---- fixture builder: $1=#sessionlog entries  $2=#daemon-report entries  -> writes $SANDBOX/plan.md ----
 make_plan(){
   local nlog="$1" nmr="$2" f="$SANDBOX/plan.md" i
   rm -f "$f" "$f.bak"   # fresh fixture — the path is reused across cases
@@ -34,14 +34,14 @@ make_plan(){
     echo "1. read this plan"
     echo ""
     echo "## WORK QUEUE"
-    echo "- [ ] WS8 rotate morning review"
+    echo "- [ ] WS8 rotate daemon report"
     echo "- [x] WS5 status digest"
     echo ""
     echo "## Session Log"
     # chronological: oldest first, newest last (matches real plan). (`seq 1 0` emits "1 0" on BSD — guard it.)
     [ "$nlog" -ge 1 ] && for i in $(seq 1 "$nlog"); do echo "- SLOG entry $i"; done
     echo ""
-    echo "## Morning Review"
+    echo "## Daemon Report"
     echo ""
     echo "(section preamble that must survive)"
     echo ""
@@ -52,7 +52,7 @@ make_plan(){
       echo "sub-line for entry $i"
       echo ""
     done
-    # optional 3rd arg: append a section AFTER Morning Review (exercises the after-region tail splice)
+    # optional 3rd arg: append a section AFTER Daemon Report (exercises the after-region tail splice)
     if [ -n "${3:-}" ]; then
       echo "## E2E findings"
       echo "- trailing section line A"
@@ -63,8 +63,8 @@ make_plan(){
 }
 
 run(){ AUTONOMOUS_PLAN="$1" AUTONOMOUS_SESSION_ARCHIVE="$SANDBOX/slog-arch.md" \
-       AUTONOMOUS_MR_ARCHIVE="${MRARCH:-$SANDBOX/mr-arch.md}" \
-       KEEP="${KEEP:-12}" TRIGGER="${TRIGGER:-40}" MR_KEEP="${MR_KEEP:-15}" MR_TRIGGER="${MR_TRIGGER:-25}" \
+       AUTONOMOUS_DR_ARCHIVE="${MRARCH:-$SANDBOX/mr-arch.md}" \
+       KEEP="${KEEP:-12}" TRIGGER="${TRIGGER:-40}" DR_KEEP="${DR_KEEP:-15}" DR_TRIGGER="${DR_TRIGGER:-25}" \
        bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/out.txt" 2>&1; }
 
 section(){ # print lines of a '## X' section (exclusive of next '## ') from file $1, header $2
@@ -81,7 +81,7 @@ chk "A slog archived down to KEEP=12"        "[ \"\$(grep -c '^- SLOG entry ' '$
 chk "A slog kept the NEWEST (entry 60)"       "grep -q '^- SLOG entry 60$' '$PLAN'"
 chk "A slog dropped the OLDEST (entry 1)"     "! grep -q '^- SLOG entry 1$' '$PLAN'"
 chk "A slog oldest went to archive"           "grep -q '^- SLOG entry 1$' '$SANDBOX/slog-arch.md'"
-chk "A MR archived down to MR_KEEP=15"         "[ \"\$(grep -c '^\\*\\*\\[' '$PLAN')\" = 15 ]"
+chk "A MR archived down to DR_KEEP=15"         "[ \"\$(grep -c '^\\*\\*\\[' '$PLAN')\" = 15 ]"
 chk "A MR kept the NEWEST (entry 1, top)"      "grep -q 'MR entry 1 —' '$PLAN'"
 chk "A MR dropped an OLD entry (entry 40)"     "! grep -q 'MR entry 40 —' '$PLAN'"
 chk "A MR old entry+sublines went to archive"  "grep -q 'MR entry 40 —' '$SANDBOX/mr-arch.md' && grep -q 'sub-line for entry 40' '$SANDBOX/mr-arch.md'"
@@ -98,7 +98,7 @@ cp "$PLAN" "$SANDBOX/after1.md"
 run "$PLAN"
 chk "A idempotent (plan unchanged on 2nd run)" "diff -q '$SANDBOX/after1.md' '$PLAN' >/dev/null"
 
-# ---------- Case B: Session Log UNDER trigger, Morning Review OVER — MR must still rotate ----------
+# ---------- Case B: Session Log UNDER trigger, Daemon Report OVER — MR must still rotate ----------
 PLAN="$(make_plan 5 40)"
 run "$PLAN"
 chk "B slog untouched (under trigger)"         "[ \"\$(grep -c '^- SLOG entry ' '$PLAN')\" = 5 ]"
@@ -112,13 +112,24 @@ run "$PLAN"
 chk "C total no-op (plan unchanged)"           "diff -q '$SANDBOX/preC.md' '$PLAN' >/dev/null"
 chk "C no MR .bak created"                      "[ ! -f '$PLAN.bak' ]"
 
-# ---------- Case D: no Morning Review header at all — Pass 2 skips cleanly ----------
+# ---------- Case D: no Daemon Report header at all — Pass 2 skips cleanly ----------
 PLAN="$(make_plan 60 0)"
-# make_plan still emits the '## Morning Review' header; strip it to simulate an old plan
-grep -v '^## Morning Review' "$PLAN" > "$PLAN.tmp" && mv "$PLAN.tmp" "$PLAN"
+# make_plan still emits the '## Daemon Report' header; strip it to simulate an old plan
+grep -v '^## Daemon Report' "$PLAN" > "$PLAN.tmp" && mv "$PLAN.tmp" "$PLAN"
 run "$PLAN"
 chk "D slog still compacted without MR header"  "[ \"\$(grep -c '^- SLOG entry ' '$PLAN')\" = 12 ]"
-chk "D MR skip logged"                          "grep -q 'no .## Morning Review. header' '$SANDBOX/out.txt'"
+chk "D MR skip logged"                          "grep -q 'no .## Daemon Report. header' '$SANDBOX/out.txt'"
+
+# ---------- Case D2: the LEGACY '## Morning Review' header still rotates (renamed 2026-08-05) ----------
+# arm.sh installs the compactor from the primary checkout while the plan lives on disk, so a new script
+# meeting an old plan is an ordinary skew — and a compactor that cannot find its own section silently
+# stops bounding the file. The header match is an alternation; this proves it stays one.
+PLAN="$(make_plan 5 40)"
+perl -pi -e 's/^## Daemon Report$/## Morning Review/' "$PLAN"
+run "$PLAN"
+chk "D2 legacy header rotated to DR_KEEP=15"    "[ \"\$(grep -c '^\\*\\*\\[' '$PLAN')\" = 15 ]"
+chk "D2 legacy header itself survives"          "grep -q '^## Morning Review' '$PLAN'"
+chk "D2 legacy rotation was not a skip"         "! grep -q 'header — skip DR' '$SANDBOX/out.txt'"
 
 # ---------- Case E: plan with NO trailing newline — the last line must NOT be lost (HIGH-1 regression) ----------
 # slog UNDER trigger so Pass 1 no-ops (its awk mv would otherwise re-terminate the file and mask the bug);
@@ -134,7 +145,7 @@ chk "E last line removed from the plan"          "! grep -q '^sub-line for entry
 chk "E no conservation failure"                 "! grep -qi 'conservation FAIL' '$SANDBOX/out.txt'"
 chk "E plan re-terminated (trailing newline)"    "[ \"\$(tail -c1 '$PLAN' | wc -l | tr -d ' ')\" = 1 ]"
 
-# ---------- Case F: a section AFTER Morning Review must survive byte-identical (tail-splice) ----------
+# ---------- Case F: a section AFTER Daemon Report must survive byte-identical (tail-splice) ----------
 PLAN="$(make_plan 5 40 trailing)"
 section "$PLAN" "E2E findings" > "$SANDBOX/preF-e2e.txt"
 run "$PLAN"
@@ -154,7 +165,7 @@ chk "F trailing section still present"           "grep -q 'trailing section line
 gplan="$SANDBOX/plan.md"; rm -f "$gplan" "$gplan.bak"
 {
   printf '# P\n\nRUN STATUS: IN_PROGRESS\n\n## PRIME DIRECTIVES\n- x\n\n## RESUME PROTOCOL\n1. y\n\n'
-  printf '## WORK QUEUE\n- [ ] z\n\n## Session Log\n- SLOG entry 1\n\n## Morning Review\n\n(preamble)\n\n'
+  printf '## WORK QUEUE\n- [ ] z\n\n## Session Log\n- SLOG entry 1\n\n## Daemon Report\n\n(preamble)\n\n'
   printf '**[2026-09-01] NEWEST real entry.**\n- normal bullet\n'
   printf '**[note] mid-body not-a-header**\n**[2026-05-09] mid-body date-shaped not-a-header**\nsub A of newest\n\n'
   printf '**[2026-08-31, GUI-ON session] qualifier header entry.**\n- bullet\n\n'

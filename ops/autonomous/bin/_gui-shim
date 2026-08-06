@@ -51,7 +51,7 @@ This is an unattended session; it may not draw on the owner's physical display.
 Do this instead: $2
 
 Do not work around this shim. If a check genuinely cannot run off-screen, leave it for the owner in the
-Morning Review list and pick another item.
+Daemon Report list and pick another item.
 EOF
   exit 74
 }

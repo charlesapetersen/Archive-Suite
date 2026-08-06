@@ -147,7 +147,7 @@ if [ -n "$real_cli" ] && [ -z "${CLAUDECODE:-}" ]; then
 elif [ -n "$real_cli" ]; then
   say "    real CLI detected ($real_cli) but running inside a Claude Code session (CLAUDECODE set) — live smoke skipped (nested-session guard)"
 else
-  say "    no real CLI on the standard paths — fake-CLI path only; real-CLI live smoke deferred (owner/Morning Review)"
+  say "    no real CLI on the standard paths — fake-CLI path only; real-CLI live smoke deferred (owner/Daemon Report)"
 fi
 
 # ---------- 4. REPORT ----------

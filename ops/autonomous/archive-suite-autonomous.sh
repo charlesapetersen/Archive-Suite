@@ -254,7 +254,7 @@ disk_ok() {
 # deliberately NOT part of this).
 #
 # The fingerprint hashes the DECISION SURFACE a fresh session reads to choose work: the repo tip, the plan's
-# RUN STATUS + WORK QUEUE, and the GUI gate. Session Log / Morning Review / E2E findings are EXCLUDED ON
+# RUN STATUS + WORK QUEUE, and the GUI gate. Session Log / Daemon Report / E2E findings are EXCLUDED ON
 # PURPOSE: a no-op session still appends its reasoning there, and hashing that churn would reset the backoff
 # every single cycle and silently restore the old spin.
 work_fingerprint() {
@@ -836,7 +836,7 @@ tick() {
   wait "$cpid"; local rc=$?
   kill "$wpid" "$cwpid" 2>/dev/null; wait "$wpid" "$cwpid" 2>/dev/null
   log "resume session exited rc=$rc"
-  # Best-effort readable mirror of the final result for Morning Review (jq present -> extract; else skip).
+  # Best-effort readable mirror of the final result for Daemon Report (jq present -> extract; else skip).
   if command -v jq >/dev/null 2>&1; then
     jq -rc 'select(.type=="result") | (.result // .error // empty)' "$SLOG" 2>/dev/null \
       | tail -1 > "$STATE/last-session.txt" 2>/dev/null || true
@@ -872,7 +872,7 @@ tick() {
   kill "$hb" 2>/dev/null || true
   rm -f "$LOCK" 2>/dev/null || true
   housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
-  # Keep the durable plan small: archive old Session Log entries AND rotate the Morning Review tail (WS8) so
+  # Keep the durable plan small: archive old Session Log entries AND rotate the Daemon Report tail (WS8) so
   # the plan a fresh session reads doesn't inflate startup cost unbounded. Runs HERE — between cycles, lock
   # released, NO session active — so it can never race a session's plan append. Both passes are self-gating
   # (no-op under their triggers) and excluded from the work fingerprint (captured above), so a rotation is

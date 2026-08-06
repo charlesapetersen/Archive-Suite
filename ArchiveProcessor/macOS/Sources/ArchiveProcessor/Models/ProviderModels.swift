@@ -303,7 +303,7 @@ struct LLMModel: Identifiable, Hashable, Codable {
 
     // ⚠️ W13.oai-1 PLACEHOLDERS — model IDs AND per-1M pricing are NOT yet verified against OpenAI's
     // live pricing. A wrong price is a silent cost-estimator bug, so these are re-verified in the
-    // keyed/owner tail (Morning Review) before the live OCR test; do not treat as authoritative.
+    // keyed/owner tail (Daemon Report) before the live OCR test; do not treat as authoritative.
     // `supportsThinking: true` marks the reasoning families (o-series / GPT-5) that require
     // `max_completion_tokens` — see `OpenAICompatibleClient.openAI(model:apiKey:)`. First entry is the
     // default OCR model (cheapest capable vision model, analogous to Gemini Flash-Lite).
@@ -312,7 +312,7 @@ struct LLMModel: Identifiable, Hashable, Codable {
     // cheapest→flagship. `supportsThinking` follows that benchmark's reasoning column: the models it ran WITH
     // reasoning are reasoning-capable; the "no reason." variants are marked false so the adapter never sends
     // `reasoning_effort` to a model that would reject it. IDs follow OpenAI's lowercase-hyphen convention;
-    // live model-ID + param confirmation remains the keyed OCR smoke (Morning Review) — a wrong ID surfaces
+    // live model-ID + param confirmation remains the keyed OCR smoke (Daemon Report) — a wrong ID surfaces
     // there, not silently in the estimator.
     static let openaiModels: [LLMModel] = [
         LLMModel(

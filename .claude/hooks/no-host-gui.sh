@@ -46,7 +46,7 @@ physical display; that is the owner's screen and they are using it.
 Do this instead: $2
 
 If the check genuinely cannot run off-screen, DO NOT work around this hook. Leave the item for
-the owner: note it in the plan's Morning Review with what you'd need, and pick another item.
+the owner: note it in the plan's Daemon Report with what you'd need, and pick another item.
 EOF
   exit 2
 }

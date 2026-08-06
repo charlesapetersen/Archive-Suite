@@ -5,7 +5,7 @@ import SwiftUI
 /// with a kind glyph) and offers New / Duplicate / Rename / Delete via `NotesModel`'s template actions.
 ///
 /// Editing a template's *body* in the detail editor rides the same note-editor load/save path that is
-/// itself not yet wired (deferred to Morning Review with the note editor); the name + assignment +
+/// itself not yet wired (deferred to Daemon Report with the note editor); the name + assignment +
 /// new-from-template flows are complete now.
 struct TemplatesManagerView: View {
     @ObservedObject var model: NotesModel

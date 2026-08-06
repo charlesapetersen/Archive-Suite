@@ -7,7 +7,7 @@
 # the "sighted loop": launch in a known state → capture → Read the shot → decide next click → repeat.
 #
 # Requires the GUI-on grants (Accessibility + Screen Recording), seeded on this machine
-# (see AGENTS.md → "GUI verification"). This is the live-session / Morning-Review path — the
+# (see AGENTS.md → "GUI verification"). This is the live-session / Daemon-Report path — the
 # headless, permission-free counterpart is the RenderProbe pixel guards in the unit test bundle.
 #
 # SAFETY: point the app at a SCRATCH copy, never the real corpus (choosing a folder clobbers the

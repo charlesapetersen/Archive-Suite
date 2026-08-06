@@ -10,6 +10,46 @@ working inside a subdirectory:
 - [`ArchiveReader/CLAUDE.md`](ArchiveReader/CLAUDE.md) — the Reader (incl. its bulletproof file‑safety Core Directive).
 - [`ArchiveNotes/CLAUDE.md`](ArchiveNotes/CLAUDE.md) — Notes (provenance‑first notes + extracts from archival PDFs).
 
+## 🛑 THE DAEMON REPORT IS A WALKTHROUGH, NOT A DOCUMENT — read this before answering any request for it
+
+**Trigger phrases:** "daemon report", "the report", "morning review" (the old name), "anything for me?",
+"anything I need to decide?", "what needs my eye?", "walk me through it". Any of these means **run the
+walkthrough below.** This section exists because sessions kept getting it wrong in the same two ways, and
+the owner had to correct it every time.
+
+**What the owner wants, exactly:** to be **walked through each open decision, ONE AT A TIME, waiting for his
+answer before moving to the next.** It is a conversation he steers. That is the whole deliverable.
+
+**❌ Do NOT do any of these — each one has actually happened and is a failure, not a variation:**
+- ❌ **Do not write a new entry into the plan.** Being asked for the report is not a cue to author one.
+  Nothing is added to any doc *during* the walkthrough.
+- ❌ **Do not dump a summary** of everything that happened, however well organised. A recap is not a report.
+- ❌ **Do not batch the decisions** into one message with a numbered list and a single "what do you think?".
+  One decision per message. Stop. Wait.
+- ❌ **Do not re-raise settled items.** Anything under a `### ✅ … walkthrough` heading, or in
+  `SUITE_TODO.md` → *"⛔ DECLINED — settled, do NOT re-raise"*, is closed. Reopening it wastes his time.
+- ❌ **Do not present non-decisions as decisions.** "Worth your eye, nothing blocking" is a *mention*, not a
+  step. Fold those into one short block at the end, after the real decisions are done.
+
+**The procedure:**
+1. Read `## Daemon Report` in `.maintenance/AUTONOMOUS_PLAN.md` (newest-first). It is the **input** to the
+   walkthrough, never the output. Stop at the newest `### ✅ … walkthrough` heading — everything below it is
+   already settled.
+2. Add anything from the current session that genuinely needs his call.
+3. Say up front how many open decisions there are ("three, walking them one at a time").
+4. For **each**, in its own message: what was decided/asked before, what changed since, what is actually at
+   stake, then the question with concrete options — and a recommendation when you have one. **Then stop and
+   wait.** Use `AskUserQuestion` so the options are pickable.
+5. After the last one: a compact table of his calls, plus the "worth knowing, no decision" leftovers.
+6. **Only then** ask whether to record the outcomes in the plan. Recording is a separate, opt-in step.
+
+**Naming:** the section was `## Morning Review` until 2026-08-05, renamed because it happens at any hour.
+Scripts still match both spellings; new writing says **Daemon Report**.
+
+**The daemon side is the opposite and stays unchanged:** an unattended session that hits something needing a
+human **appends** to that section and moves on (`ops/autonomous/resume-prompt.txt`). Appending is what the
+daemon does *between* walkthroughs. It is never what you do *during* one.
+
 ## How we work — the loop for every change
 
 The whole per-change checklist in one place, so no rule hides inside a longer section. Every change, in order:

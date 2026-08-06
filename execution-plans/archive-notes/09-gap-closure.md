@@ -141,7 +141,7 @@ tags" but **omits author** and doesn't cite the original-spec rationale, so a fu
   `ArchiveNotes/CLAUDE.md` (the file-safety projection bullet) and `00-overview.md` (§13 future-list + the
   run-1 out-of-scope list) since this plan is deleted on ship. No code change. The additional
   cross-app-parity mirror — incl. a possible SPEC `Author:` facet (a HOLD-QUEUE shared-contract change) — is
-  a **deferred owner decision** (→ Morning Review 2026-07-18).
+  a **deferred owner decision** (→ Daemon Report 2026-07-18).
 
 ---
 
@@ -383,7 +383,7 @@ in the note's `.md` **YAML front-matter** (authoritative, durable plain text) an
 subjects + marker; "no author/date/quality pollution of the global tag namespace"), **D4** ("no `Author:`
 facet"), **D9** (quality = front-matter `1..5` + priority-style UI, "not a Finder tag this run").
 **Functionally sound, no work required:** front-matter YAML still satisfies the original "durable against
-this program no longer being developed" intent. **Open owner decision (→ Morning Review):** whether to
+this program no longer being developed" intent. **Open owner decision (→ Daemon Report):** whether to
 *additionally* mirror author/date/quality to Finder tags for cross-app (Reader/Processor) parity — if
 adopted, a **Tier-2** projection change through `NotesTagProjector` (five tag-safety invariants) plus, for
 author, a **HOLD-QUEUE** SPEC `Author:` facet. Until then it stays deferred (out-of-scope list above, now

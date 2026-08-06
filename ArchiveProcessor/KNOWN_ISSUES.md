@@ -1553,7 +1553,7 @@ because we must never delete regenerable output we can no longer rebuild; the ra
 visible backup folder, so a dropped-but-not-yet-reprocessed segment is fully recoverable. **Tier-2 gate met
 unattended:** build clean (0 new warnings) + `LiveCaptureRecoveryTestDriver` ($0, no OCR) asserts the drop /
 keep / delete-stale / preserve-unrecoverable behavior (ALL PASS) + adversarial self-review. **Deferred to owner
-(Morning Review):** the full end-to-end verify — stage a session with a real legacy build, recover, Process,
+(Daemon Report):** the full end-to-end verify — stage a session with a real legacy build, recover, Process,
 Finish with "Review rotation" on, and confirm every page (incl. the former legacy segments) appears — needs a
 legacy manifest + an OCR key to actually reprocess. The "Related, milder" `resolvedGroupIds` sub-issue below is
 already independently resolved (it IS persisted + restored now — `CaptureSession.swift`), which is what lets the

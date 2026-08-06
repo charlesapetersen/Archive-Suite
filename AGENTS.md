@@ -4,6 +4,11 @@ Umbrella conventions for working in this monorepo (solo or with multiple agents 
 also has its own `AGENTS.md` with app‑specific lanes — read it before working inside a subdir:
 [`ArchiveProcessor/AGENTS.md`](ArchiveProcessor/AGENTS.md) · [`ArchiveReader/AGENTS.md`](ArchiveReader/AGENTS.md) · [`ArchiveNotes/AGENTS.md`](ArchiveNotes/AGENTS.md).
 
+> 🛑 **If the owner asks for the "daemon report" (or "the report", or the old name "morning review"), that
+> is a WALKTHROUGH — one decision at a time, waiting for each answer, writing nothing.** It is not a summary
+> and not a plan entry. Read [`CLAUDE.md`](CLAUDE.md) → *"THE DAEMON REPORT IS A WALKTHROUGH, NOT A
+> DOCUMENT"* before replying. Appending to that section is the *unattended* daemon's job, never yours.
+
 ## Ground rules
 
 - **Worktree-first — mandatory, not optional.** Before *any* edit/build/commit, be in your own git

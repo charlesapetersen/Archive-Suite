@@ -81,13 +81,13 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   routed through the reused `OpenAICompatibleClient`) and (2) a one-click **OpenAI gateway preset**. All
   daemon-buildable sub-tasks landed (build-verified, additive + opt-in, default provider unchanged); the
   live-key OCR smoke + OpenAI Batch API (Phase 4) remain the **keyed/owner tail** (see the keyed-tail note in
-  Wave 13 + Morning Review). **Plan deleted on ship** (git history keeps it).
+  Wave 13 + Daemon Report). **Plan deleted on ship** (git history keeps it).
 - ~~`local-agent-cli-provider.md`~~ — **SHIPPED (Processor, W13.cli-1…4)**: drive OCR/tagging through a locally
   installed, subscription-authenticated CLI (**Claude Code + Gemini CLI + OpenAI Codex CLI**, first-class) with no
   API key — additive `localAgent` config sibling to the gateway (`localAgent > gateway > direct` selection),
   validator + guided wizard + subscription cost pane + full pipeline wiring, all gated unattended at $0 via a
   committed fake-CLI harness. **Plan deleted on ship** (git history keeps it); the real-CLI live smoke +
-  gemini/codex install remain the keyed/owner tail (see **Provider expansion (Wave 13)** + Morning Review).
+  gemini/codex install remain the keyed/owner tail (see **Provider expansion (Wave 13)** + Daemon Report).
 - ~~`archive-notes/` (00a, 01–08)~~ — **SHIPPED** (NEW APP: Archive Notes, W0–W8). The per-wave plans were
   **deleted on ship** (git history keeps them). `execution-plans/archive-notes/00-overview.md` is **RETAINED** as
   the authoritative interface contract (§2 locked decisions, §5 front-matter schema, **§16 Interface Contract**
@@ -461,7 +461,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 ### Follow-ups discovered while fixing Wave 23
 
 - [ ] **W23.m9-fu3 — the index-failure UI in Reader and Notes has never been rendered; give the GUI fixture
-  a corrupt index so it can be [S].** Owner decision, 2026-07-31 Morning Review. W23.m9 shipped two warning
+  a corrupt index so it can be [S].** Owner decision, 2026-07-31 Daemon Report. W23.m9 shipped two warning
   surfaces — Reader's amber status-bar line (`ar.status.indexFailure`) and Notes' reused sidebar banner —
   each shown only when the search index cannot be opened or was not fully written. **Neither has ever been
   drawn by anything.** This is NOT a skipped VM run: no fixture produces a corrupt index, so there is no path
@@ -476,7 +476,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   | files: ops/gui/*, ArchiveReader UITests, ArchiveNotes UITests | Tier-1 | S
 
 - [ ] **W23.m4-fu — a page-specific reveal opens a NEW window per page instead of navigating an open one
-  [S · LOW · UX].** Residual of W23.m4, filed 2026-07-31 from the Morning Review. Since m4, the cited page is
+  [S · LOW · UX].** Residual of W23.m4, filed 2026-07-31 from the Daemon Report. Since m4, the cited page is
   part of the document window's `openWindow(id:value:)` value, so SwiftUI value identity gives two links to
   *different* pages of the same document two windows (same page → one). **Owner reviewed and chose to keep
   the current behaviour** — one view per citation is what you want when comparing two passages — so this is
@@ -488,7 +488,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   | files: ArchiveReader/macOS/Sources/ArchiveReader/ (document window open path) | Tier-1 | S | LOW
 
 - [ ] **W23.l4-fu — no UITest drives the Notes metadata strip, so the date warning row is unverified
-  pixels [XS–S].** Owner decision, 2026-07-31 Morning Review: close this with a **test**, not a recurring
+  pixels [XS–S].** Owner decision, 2026-07-31 Daemon Report: close this with a **test**, not a recurring
   manual check. W23.l4's logic is fully pinned by `DateFieldEntryTests`, but nothing in any UITest touches
   the Date row, so the inline warning (`an.detail.date.dayWarning`) and the dead Set button have never been
   seen by a harness — the standing ask was a 10-second owner eyeball, which does not scale to the next
@@ -534,7 +534,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 The two proposed provider plans, now **elaborated with a "Daemon build plan"** each so a fresh autonomous session
 can build them: each sub-task below is **unattended, $0, no key, no GUI** (build clean + fake-CLI/unit tests +
 self-review), with the live-key verification split out to a **keyed/owner tail** (below) that is flagged to
-Morning Review, NOT skipped. Do top-to-bottom, one bounded sub-task per session. **OpenAI first (Tier-1, smaller,
+Daemon Report, NOT skipped. Do top-to-bottom, one bounded sub-task per session. **OpenAI first (Tier-1, smaller,
 reuses the existing OpenAI-format client), then CLI (Tier-2).** New provider changes stay **additive + opt-in** —
 never flip the default provider until the keyed live test passes. Legend as above.
 
@@ -545,7 +545,7 @@ Tier-2; fake-CLI harness made the whole gate unattended-satisfiable at $0 — th
 W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
 **Keyed / owner tail (NOT daemon-buildable — do not attempt unattended):**
 > The *visual* half of these (does the wizard / Settings row / cost pane look right) is now dischargeable in a
-> GUI-on / Morning-Review session via the live sighted loop (`ops/gui/capture-window.sh` + `cliclick` → read the
+> GUI-on / Daemon-Report session via the live sighted loop (`ops/gui/capture-window.sh` + `cliclick` → read the
 > shot); only the *live-key / account* halves stay genuinely owner-gated. Don't park a pure visual check on the
 > owner as "GUI blocked."
 - **⏸️ ON HOLD (owner 2026-07-16) — OpenAI live 2-image OCR smoke** through gateway + native `.openai` (needs an
@@ -850,7 +850,7 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
-From the 2026-07-28 Morning Review walkthrough. The VM lane (`ops/gui/vm-gui-runner.sh`, built 2026-07-28,
+From the 2026-07-28 Daemon Report walkthrough. The VM lane (`ops/gui/vm-gui-runner.sh`, built 2026-07-28,
 Reader UITests **15/15** in-VM) is the only way GUI verification runs unattended on this machine — but it is
 **hardcoded to the Reader**, so a 10-day-old Processor + Notes backlog still reads "GUI blocked → Morning
 Review": the Anthropic key-wizard visual, the multi-page-PDF auto-re-OCR visuals, the three Notes **W14.4
@@ -1118,7 +1118,7 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   🔺 **A SECOND, INDEPENDENT WAY IT BLOWS — measured 2026-08-04 by `W3.cap-r3-fu9`: parasitic CPU load.** The
   same green suite (170 checks) ran **73 s → timeout** and then **19 s → ALL PASS** on the same commit, minutes
   apart; the only difference was 8 orphaned busy-loop shells from an earlier session's load test eating ~1.3
-  cores (killed in between — see that session's Morning Review note). So the wait is calibrated not just against
+  cores (killed in between — see that session's Daemon Report note). So the wait is calibrated not just against
   the wrong RUN but against the wrong MACHINE STATE, and an iteration-counted `Task.sleep` settle stretches ~6×
   under load, which no amount of check-level care fixes (that item's own new section had to switch its negative
   wait to a wall-clock DEADLINE for the same reason). It also cost a debugging round: the first failing run
@@ -1137,7 +1137,7 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   clean build FIRST** and only then choose the fix. `Net/` is a Tier-2 no-undo path, so treat any behavioural
   change as Tier-2 even though this is nominally a warning cleanup. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift | S | low | none
 - [ ] **W21.status-idle — `arm.sh status` reports "nothing it can do" while a session is actively mid-item,
-  and blames the HOLD QUEUE for it [S · LOW · ops].** Filed 2026-08-02 from the morning-review walkthrough,
+  and blames the HOLD QUEUE for it [S · LOW · ops].** Filed 2026-08-02 from the daemon-report walkthrough,
   where the headline read *"◐ Running, but not finding anything it can do (2 hours)"* and *"Needs you: 2
   task(s) are held back for you to decide"* — while a session launched at 08:18 had already committed
   `d67b9cb` (`W3.cap-r5` checkpoint 1/2) in its worktree and was mid-`Edit` on the trackers. It shipped
@@ -1228,7 +1228,7 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
   | files: ArchiveReader/macOS/Sources/ArchiveReader/Views/, Core/ArchiveFile.swift, Search/ContentIndex.swift | S–M | low | none
 
 - [ ] **W22.notes-rename — Archive Notes cannot rename a note from the UI at all [M].** Owner decision
-  2026-08-02 (morning-review walkthrough): **this is a GAP, not a design choice.** He was offered the
+  2026-08-02 (daemon-report walkthrough): **this is a GAP, not a design choice.** He was offered the
   "titles are derived from the archival source, so renaming is intentionally not offered" reading and
   rejected it. Verified 2026-08-01 (by `W21.vmgui-c`) and re-verified 2026-08-02: `NotesModel` has
   `renameTemplate` (`:519`) and `renameFolder` (`:872`), and `OrganizationStore` has another `renameFolder`
@@ -1347,7 +1347,7 @@ it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now correct
 ## Suite doc hygiene (owner / small) — 2026-07-16
 ## Owner GUI-pass follow-ups — 2026-07-16 (from the interactive Reader + Processor GUI review)
 Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unless flagged owner-decision/Tier-2. Legend as above.
-### Owner dispositions — Morning-Review sweep, 2026-07-16
+### Owner dispositions — Daemon-Report sweep, 2026-07-16
 Owner went through the owner-only queue. Recorded here so none of it gets re-surfaced as an open ask:
 - **Environment: TCC grants (Accessibility / Screen Recording / Automation) are SET, verified live.** Sessions can
   drive + screenshot the GUI themselves — see `AGENTS.md` → *GUI verification*. The Processor's Keychain
@@ -1460,7 +1460,7 @@ at implementation). Not yet scoped into execution plans — the **decades** item
   `6d9a877`; call sites wired in the flip commit) — ALL PASS. **⏸️ 1 REMAINING is OWNER/KEYED — Wave-12 SKIP
   (do NOT attempt unattended):** (6) **`ThinkingLevel.budgetTokens`** — request-body-affecting (512/2000 vs
   1024/4000 differ by call type) → keyed/owner session per the VERIFICATION CONSTRAINT above (Processor has no
-  unit target + its only functional test needs the deleted OCR key). See Morning Review.
+  unit target + its only functional test needs the deleted OCR key). See Daemon Report.
 ### Capture companions (Android + iOS) — owner decisions 2026-07-15
 ### Archive Reader — layout & panels
 ### Archive Reader — tag cloud & filters
@@ -1659,18 +1659,18 @@ the Capture re-pass); this unit was verified **INLINE** by the main-loop model. 
 Design-level ideas the owner wants recorded but explicitly de-prioritised. An autonomous session must
 **skip** these: they need the owner's scoping before any code is written.
 
-### ⛔ DECLINED — settled, do NOT re-raise in Morning Review
+### ⛔ DECLINED — settled, do NOT re-raise in Daemon Report
 - **An `androidTest` source set + Compose UI-test lane for ArchiveCapture — DECLINED by the owner
   2026-07-31.** ArchiveCapture has no instrumented-test lane, so every Compose line ships visually
   unverified, and a session has now written this up **three times** (W23.h4's `AlertDialog`, W23.m1, and
   W23.m8's two status rows) as "if you ever want this closed…". The owner considered it in the Morning
   Review walkthrough and chose not to spend the build-config change on it. **So: ship Compose changes with
   headless JVM coverage of the logic — which is what `./gradlew --offline testDebugUnitTest` already gives —
-  state plainly in the commit that the pixels are unverified, and do NOT open a new Morning Review entry
+  state plainly in the commit that the pixels are unverified, and do NOT open a new Daemon Report entry
   about the missing lane.** One line in the Session Log is enough. Revisit only if the owner asks.
 
 - [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.**
-  Owner direction (2026-07-31 Morning Review, in response to the W23.l4 `Calendar` deviation). Two halves:
+  Owner direction (2026-07-31 Daemon Report, in response to the W23.l4 `Calendar` deviation). Two halves:
   (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
   does, and it must stay the canonical on-disk form, so this item does not change storage; (b) the
   **rendering** calendar becomes a user choice **per note and per document**, defaulting **off** in

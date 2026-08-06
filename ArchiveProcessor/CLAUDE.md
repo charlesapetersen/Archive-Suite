@@ -64,7 +64,7 @@ Dropdown menus for provider and model. The **built-in** models are those listed 
 - gpt-5.4-mini
 - gpt-5.4
 - gpt-5.5
-  - Note: model IDs + per-1M pricing are the current GPT-5 generation from the owner-provided SoCOCRbench source (2026-07-16), ordered cheapest→flagship; a **live-key OCR smoke** is the final ID confirmation (Morning Review). Reasoning models (nano/mini/5.4/5.5) accept `reasoning_effort` (from the Thinking level); gpt-5.4-mini does not. No batch or LLM-rotation path in v1 (like Mistral) — local Vision handles rotation; OpenAI Batch API is a later phase.
+  - Note: model IDs + per-1M pricing are the current GPT-5 generation from the owner-provided SoCOCRbench source (2026-07-16), ordered cheapest→flagship; a **live-key OCR smoke** is the final ID confirmation (Daemon Report). Reasoning models (nano/mini/5.4/5.5) accept `reasoning_effort` (from the Thinking level); gpt-5.4-mini does not. No batch or LLM-rotation path in v1 (like Mistral) — local Vision handles rotation; OpenAI Batch API is a later phase.
 
 ### Custom models, OpenAI-compatible gateway & Local Agent CLI (shipped)
 - **Custom models:** users can add extra Anthropic/Gemini model IDs via **Manage custom models…** in Settings (`Views/ManageModelsView.swift`, persisted by `Models/ModelSelectionStore.swift`) — so the dropdowns are not limited to the built-in lists above.

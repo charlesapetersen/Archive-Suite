@@ -15,7 +15,7 @@ gitignored section on a single laptop, with no record of who granted what, when,
   A category is never authorized wholesale.
 - **An entry is a licence plus its limits.** The ⛔ constraints inside a grant are part of the grant, not
   advice. Read the entry before starting the item and obey it verbatim. If you cannot satisfy a constraint,
-  STOP and flag it to Morning Review — do not proceed on a narrower reading of it.
+  STOP and flag it to Daemon Report — do not proceed on a narrower reading of it.
 - **Entries are a permanent record.** When an authorized item ships, mark the entry discharged (with the
   commit) rather than deleting it: the constraint history is why a later change is or isn't allowed to
   revisit that code. This file is not a to-do list — `SUITE_TODO.md` is.
@@ -28,7 +28,7 @@ gitignored section on a single laptop, with no record of who granted what, when,
 
 ## Grants
 
-*(Granted across the 2026-07-28, 2026-07-29 and 2026-08-01 Morning Review walkthroughs — each entry states
+*(Granted across the 2026-07-28, 2026-07-29 and 2026-08-01 Daemon Report walkthroughs — each entry states
 its own date. Verbatim as recorded when granted.)*
 
 - **`W15.tu0` — AUTHORIZED to edit `SPEC/tag-format.md` (doc-only).** Add the paragraph recording that a
@@ -49,7 +49,7 @@ its own date. Verbatim as recorded when granted.)*
     note `.md` files are left **INERT** — present, unmanaged, never touched again.
   - **NEVER** add the marker to any strip/cleanup list, and never run a projection whose effect is to delete
     `ArchiveSuite` from existing files. Stripping is a real tag WRITE across the owner's notes and is NOT
-    authorized. If you believe stripping is required for correctness, STOP and flag to Morning Review instead.
+    authorized. If you believe stripping is required for correctness, STOP and flag to Daemon Report instead.
   - Required functional proof (Tier-2, scratch copies only, never the real store): project over a note that
     ALREADY carries `ArchiveSuite` and assert the tag is still present and byte-identical afterwards, and that
     no other managed subject was lost. A test that only proves "new notes get no marker" is INSUFFICIENT.
@@ -101,7 +101,7 @@ its own date. Verbatim as recorded when granted.)*
   overtaken — it is redirectable, and `test-batch-resume.sh` redirects it. Their ⛔ SCRATCH-ONLY rule is
   unchanged and still absolute; what has changed is that satisfying it is no longer at odds with driving the
   real code.
-  **AUTHORIZED (granted 2026-08-01, morning-review walkthrough), AND SEQUENCED FIRST of the
+  **AUTHORIZED (granted 2026-08-01, daemon-report walkthrough), AND SEQUENCED FIRST of the
   three W16 money-path items.** Give `pendingBatchURL`/`pendingRunURL` (`+Pipeline.swift:536`, `:571`) a test-only
   base-dir override on the existing `ARCHIVEPROC_TEST_BACKUP_ROOT` pattern, so the DEFAULT
   `makeBatchJournalDeleter` body can be run against a temp directory instead of being grep-verified. Authorized
@@ -140,7 +140,7 @@ its own date. Verbatim as recorded when granted.)*
   tightening (restore the run-tail delete) and declined: it would put a delete back on a path this grant just
   removed one from. **Do not "fix" this later as if it were an oversight** — it is the keep-on-doubt trade,
   decided twice. The grant is retained verbatim below as the record.
-  **AUTHORIZED (granted 2026-08-01, morning-review walkthrough).** Set `batchPollInterrupted` in
+  **AUTHORIZED (granted 2026-08-01, daemon-report walkthrough).** Set `batchPollInterrupted` in
   both `guard !Task.isCancelled` early-returns (`OCRProcessor+OCR.swift:689`, `:701`) so `performBatchOCR:661-664`
   stops deleting the paid-batch recovery journal on a cancelled poll. Authorized because today the operator is
   told *"the paid-batch journal was kept for recovery"* while the journal is deleted anyway — the message and the
@@ -184,7 +184,7 @@ its own date. Verbatim as recorded when granted.)*
   deleted journal costs a paid batch. **Do not narrow it later as if it were an oversight** — and do not
   introduce a second in-flight flag alongside `submissionComplete`; avoiding that drift is why it was reused.
   The grant is retained verbatim below as the record.
-  **AUTHORIZED (granted 2026-08-01, morning-review walkthrough), WITH THE FIX DIRECTION CHOSEN BY
+  **AUTHORIZED (granted 2026-08-01, daemon-report walkthrough), WITH THE FIX DIRECTION CHOSEN BY
   THE OWNER: the in-flight guard.** Stop mid-submit can delete the paid-batch journal while a later Gemini chunk
   is already billed: `cancel()` snapshots `chunkIds` once (`+Pipeline.swift:1639-1640`) while the submit loop may
   still be creating server-side chunks, so if every chunk in that stale snapshot confirms, the journal is deleted
@@ -196,7 +196,7 @@ its own date. Verbatim as recorded when granted.)*
     TOCTOU race. Implement the invariant instead — a flag set before the submit loop and cleared after it, with
     "a submit is in flight ⇒ the journal survives" as the property. **Do not ship the re-read as a substitute.**
     If on reading the code the in-flight guard turns out to be unimplementable as stated, STOP and flag to
-    Morning Review with your evidence; do not silently fall back to the rejected direction.
+    Daemon Report with your evidence; do not silently fall back to the rejected direction.
   - ⛔ **KEEP-ON-DOUBT governs, as with `W16.bat3`.** Retaining a stale journal is cheap; deleting a live one is
     not. Any uncertainty resolves to keeping it.
   - ⛔ **SCRATCH ONLY** — never the owner's real `pending_batch.json`. The journal path is still not redirectable
@@ -213,7 +213,7 @@ its own date. Verbatim as recorded when granted.)*
   saying the failing branch was reachable "only in a state that could not be constructed from the current call
   graph", the adversarial pass proved otherwise, and both the withdrawn claim and the separate money bug
   behind it (**`W16.bat8`, needs the owner**) are recorded rather than quietly dropped.
-  Original grant, for the record — **AUTHORIZED (granted 2026-08-02, morning-review walkthrough), ALL FOUR
+  Original grant, for the record — **AUTHORIZED (granted 2026-08-02, daemon-report walkthrough), ALL FOUR
   EXITS.**
   `pollBatchUntilComplete` assigns `batchPollInterrupted = false` on entry (`+OCR.swift:711`) and four exits
   then return without touching it again — `processBatchResults` in the Anthropic (`:766`) and Mistral (`:789`)
@@ -233,7 +233,7 @@ its own date. Verbatim as recorded when granted.)*
     silently omitting it.
   - ⛔ **DELETION-REDUCING ONLY.** Setting `batchPollInterrupted = true` before returning must only ever cause
     a journal to be KEPT. If any reader of that flag would be made to delete something it does not delete
-    today, STOP and flag to Morning Review. Keep-on-doubt governs, as with `W16.bat3` and `W16.bat5`.
+    today, STOP and flag to Daemon Report. Keep-on-doubt governs, as with `W16.bat3` and `W16.bat5`.
   - ⛔ **SCRATCH ONLY** — never the owner's real `pending_batch.json`. ⚠️ Unlike the 2026-08-01 grants, the
     journal path **is** redirectable under test now (`W16.bat2-fu2`, `5424054`, and `test-batch-resume.sh`
     redirects it), so the regression must drive the **REAL** deleter against a temp fixture rather than a stub.
@@ -243,7 +243,7 @@ its own date. Verbatim as recorded when granted.)*
     that does not exist yet. Tier-2 in full, premise re-confirmed **by symbol, not line number**, first.
   - **Does NOT authorize** `W16.bat5-fu` or any other change to `cancel()` semantics — that is the separate
     grant immediately below. Do not fold the two together; different sites, different trigger.
-- **`W16.bat5-fu` — AUTHORIZED (granted 2026-08-02, morning-review walkthrough), WITH THE FIX DIRECTION
+- **`W16.bat5-fu` — AUTHORIZED (granted 2026-08-02, daemon-report walkthrough), WITH THE FIX DIRECTION
   CHOSEN BY THE OWNER: let a post-Stop chunk ID still reach the journal.**
   ✅ **DISCHARGED 2026-08-03 — shipped in the required direction, every ⛔ met.** `cancel()` keeps the journal
   addressable by IDENTITY (`ClosedPaidBatchJournalAddress`: `submittedAt` + `runFingerprint`, never a
@@ -267,7 +267,7 @@ its own date. Verbatim as recorded when granted.)*
     considered and **rejected** the alternative of not nilling `activePendingBatch` until in-flight submits
     quiesce: it makes Stop non-instant and a hung provider request would stall the teardown. **Do not ship
     the quiesce variant as a substitute.** If the required direction turns out to be unimplementable as
-    stated, STOP and flag to Morning Review with your evidence — do not silently fall back.
+    stated, STOP and flag to Daemon Report with your evidence — do not silently fall back.
   - ⛔ **STOP MUST STAY INSTANT.** The whole point of rejecting the quiesce variant is that pressing Stop
     keeps returning immediately. Any design that makes `cancel()` await a provider request violates this
     grant even if it records the ID correctly.
@@ -287,7 +287,7 @@ its own date. Verbatim as recorded when granted.)*
   - ⛔ **SCRATCH ONLY, always.** All five touch delete/trash/overwrite paths. Never point a test at the real
     corpus, the owner's real `~/Pictures/Archive Processor Live Capture`, or the real Notes store — use
     `ARCHIVEPROC_TEST_BACKUP_ROOT` / `mktemp` fixtures. This overrides finishing the item: if you cannot test
-    it on a scratch copy, STOP and flag to Morning Review.
+    it on a scratch copy, STOP and flag to Daemon Report.
   - ⛔ **Tier-2 in full, per item** — adversarial self-review **plus** a scratch functional test. A clean build
     is not sufficient. **Re-confirm the premise first:** the review is static and 5 commits stale, so verify
     the defect still exists (by symbol, not line) before changing anything. If a premise does not hold, mark
@@ -310,7 +310,7 @@ its own date. Verbatim as recorded when granted.)*
     `NotesModel` refactor is the right answer, the cost of getting it wrong is now low, and structural change
     in Notes is *actively cheap right now* (see the DEVONthink hold above). Still prefer the
     serialization/verification seam plus its test as the smaller first move.
-- **`W16.bat8` — AUTHORIZED (granted 2026-08-04, morning-review walkthrough), WITH THE FIX DIRECTION CHOSEN BY
+- **`W16.bat8` — AUTHORIZED (granted 2026-08-04, daemon-report walkthrough), WITH THE FIX DIRECTION CHOSEN BY
   THE OWNER: (a) the smallest root cause.** `dismissPendingRun()` must clear the **in-memory** interrupted-run
   manifest, not only the banner and the file. Today it clears the banner while the state the banner described
   lives on, and everything downstream is that lie propagating: `startProcessing`'s recovery guard reads DISK so

@@ -11,7 +11,7 @@
 #
 # SAFE BY CONSTRUCTION:
 #   * operates ONLY inside the "## Session Log" region (bounded below by the next '## ' header, i.e.
-#     "## Morning Review"); the DIRECTIVES / RESUME PROTOCOL / WORK QUEUE / E2E / Morning Review are
+#     "## Daemon Report"); the DIRECTIVES / RESUME PROTOCOL / WORK QUEUE / E2E / Daemon Report are
 #     never touched;
 #   * builds the result in a temp file and VALIDATES every live anchor survives (and that the entire
 #     pre-log region is byte-identical) BEFORE replacing the plan;
@@ -47,17 +47,21 @@ TRIGGER="${TRIGGER:-10}"    # only compact when the log exceeds this many entrie
 # again silently un-bound the file: entry COUNT is a proxy for cost, bytes are the cost.
 SL_MAX_BYTES="${SL_MAX_BYTES:-30000}"   # Session Log region byte budget (~7.5k tokens); 0 disables
 # An entry header in the Session Log is a COLUMN-0 line that is either a "- " bullet or date-led
-# (20YY-MM-DD…). Continuations are indented or blank, so — unlike Morning Review — a preceding blank line is
+# (20YY-MM-DD…). Continuations are indented or blank, so — unlike Daemon Report — a preceding blank line is
 # NOT required (entries here are not reliably blank-separated; requiring it would under-count). Heuristic
 # LIMIT (LOW, conservation-safe): a continuation line starting at column 0 with a date would read as a new
 # entry, shifting a boundary; no byte is lost (conservation holds, the archive is the recovery point).
-# Morning Review rotation (WS8) — the '## Morning Review' section is newest-first, one '**[date]' entry
+# Daemon Report rotation (WS8) — the '## Daemon Report' section is newest-first, one '**[date]' entry
 # per session; it grows unbounded (~1.8k lines observed) and every session reads it. Keep the newest
-# $MR_KEEP entries inline, archive the older tail (recoverable — never deleted).
-MR_ARCHIVE="${AUTONOMOUS_MR_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_MORNING_REVIEW_ARCHIVE.md}"
-MR_KEEP="${MR_KEEP:-8}"         # recent Morning Review entries to retain inline
-MR_TRIGGER="${MR_TRIGGER:-12}" # only rotate when the section exceeds this many entries (else no-op)
-MR_MAX_BYTES="${MR_MAX_BYTES:-30000}"   # Morning Review region byte budget (~7.5k tokens); 0 disables
+# $DR_KEEP entries inline, archive the older tail (recoverable — never deleted).
+# The section was called "Morning Review" until 2026-08-05. Every match below accepts BOTH spellings:
+# arm.sh installs this script from the primary checkout, so a script/plan version skew is normal, and a
+# compactor that cannot find its own header aborts the pass (or, worse, would drop the region).
+DR_HEADER_RE='^## (Daemon Report|Morning Review)'
+DR_ARCHIVE="${AUTONOMOUS_DR_ARCHIVE:-${AUTONOMOUS_MR_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_DAEMON_REPORT_ARCHIVE.md}}"
+DR_KEEP="${DR_KEEP:-${MR_KEEP:-8}}"         # recent Daemon Report entries to retain inline
+DR_TRIGGER="${DR_TRIGGER:-${MR_TRIGGER:-12}}" # only rotate when the section exceeds this many entries (else no-op)
+DR_MAX_BYTES="${DR_MAX_BYTES:-${MR_MAX_BYTES:-30000}}"   # Daemon Report region byte budget (~7.5k tokens); 0 disables
 
 [ -f "$PLAN" ] || { echo "compact-plan: no plan at $PLAN — skip"; exit 0; }
 
@@ -154,8 +158,8 @@ if [ "$((L_KEPT + L_DROP))" != "$L_ORIG" ]; then
   echo "compact-plan: line conservation FAIL (kept $L_KEPT + dropped $L_DROP != orig $L_ORIG) — abort, plan untouched"; rm -f "$TMP" "$DROP"; exit 1
 fi
 [ "$L_DROP" -gt 0 ] || { echo "compact-plan: nothing dropped — abort, plan untouched"; rm -f "$TMP" "$DROP"; exit 1; }
-if grep -qE '^## Morning Review' "$PLAN"; then
-  grep -qE '^## Morning Review' "$TMP" || { echo "compact-plan: Morning Review lost — abort, plan untouched"; rm -f "$TMP" "$DROP"; exit 1; }
+if grep -qE "$DR_HEADER_RE" "$PLAN"; then
+  grep -qE "$DR_HEADER_RE" "$TMP" || { echo "compact-plan: Daemon Report lost — abort, plan untouched"; rm -f "$TMP" "$DROP"; exit 1; }
 fi
 # The entire pre-log region (everything through the Session Log header) must be byte-identical.
 if ! diff -q <(sed -n "1,${H}p" "$PLAN") <(sed -n "1,${H}p" "$TMP") >/dev/null 2>&1; then
@@ -176,8 +180,8 @@ rm -f "$DROP"
 echo "compact-plan: archived $CUT Session Log entries (newest $EKEEP kept of $N); plan $L_ORIG -> $L_KEPT lines; archive=$ARCHIVE"
 ) || echo "compact-plan: Pass 1 (Session Log) exited nonzero — plan left untouched by Pass 1 (see message above)"
 
-# ===== Pass 2: Morning Review rotation (WS8) =====
-# '## Morning Review' is newest-first — each session PREPENDS an entry at the top — so keep the newest $MR_KEEP
+# ===== Pass 2: Daemon Report rotation (WS8) =====
+# '## Daemon Report' is newest-first — each session PREPENDS an entry at the top — so keep the newest $DR_KEEP
 # entries inline and archive the older tail. Same safety contract as Pass 1 (region-bounded, validate-before-
 # replace, .bak, archive-not-delete, idempotent, trigger-gated), with these hardenings from the WS8 adversarial
 # reviews:
@@ -193,7 +197,7 @@ echo "compact-plan: archived $CUT Session Log entries (newest $EKEEP kept of $N)
 #     into the entry above (safe: content stays together). Heuristic LIMIT (LOW, conservation-safe): a body that
 #     itself contains a blank line immediately followed by a column-0 '**[' paragraph WOULD be mis-split as a new
 #     entry → that logical entry can be torn across plan/archive. No byte is ever lost (conservation holds; the
-#     archive is the recovery point). Authoring contract: keep a Morning Review entry body contiguous (no blank
+#     archive is the recovery point). Authoring contract: keep a Daemon Report entry body contiguous (no blank
 #     line directly before a column-0 '**[' inside one entry).
 #   * ALL regexes are awk-PROGRAM literals, never passed via `-v` — BSD awk strips backslashes from `-v` values
 #     (it turned an earlier `-v re='^\*\*\['` into an unanchored pattern that matched dates mid-line), so `-v`
@@ -205,10 +209,10 @@ echo "compact-plan: archived $CUT Session Log entries (newest $EKEEP kept of $N)
 # early. A blank-preceded '## ' inside a body (rare) could still end it → under-rotation, never data loss
 # (conservation guarantees every line lands in plan or archive). Same rule mirrored in the count and the split.
 (   # subshell: Pass 2's internal `exit`s must not skip Pass 3 (they silently did when Pass 3 landed)
-MH=$(grep -nE '^## Morning Review' "$PLAN" | head -1 | cut -d: -f1)
-[ -n "$MH" ] || { echo "compact-plan: no '## Morning Review' header — skip MR"; exit 0; }
+MH=$(grep -nE "$DR_HEADER_RE" "$PLAN" | head -1 | cut -d: -f1)
+[ -n "$MH" ] || { echo "compact-plan: no '## Daemon Report' header — skip DR"; exit 0; }
 
-# count entries in the Morning Review region (region = header .. first '## ' after it, else EOF). A header =
+# count entries in the Daemon Report region (region = header .. first '## ' after it, else EOF). A header =
 # a column-0 '**[' line preceded by a blank line (see the structural rationale above).
 MN=$(awk -v h="$MH" '
   {
@@ -227,25 +231,25 @@ MREGB=$(awk -v h="$MH" '
     prevblank = ($0 ~ /^[[:space:]]*$/)
   }
   END { print bytes+0 }' "$PLAN")
-MR_OVER=0
-[ "$MR_MAX_BYTES" -gt 0 ] && [ "$MREGB" -gt "$MR_MAX_BYTES" ] && MR_OVER=1
-if [ "$MN" -le "$MR_TRIGGER" ] && [ "$MR_OVER" = 0 ]; then
-  echo "compact-plan: $MN Morning Review entries <= trigger $MR_TRIGGER and ${MREGB}B <= budget ${MR_MAX_BYTES}B — no-op"; exit 0
+DR_OVER=0
+[ "$DR_MAX_BYTES" -gt 0 ] && [ "$MREGB" -gt "$DR_MAX_BYTES" ] && DR_OVER=1
+if [ "$MN" -le "$DR_TRIGGER" ] && [ "$DR_OVER" = 0 ]; then
+  echo "compact-plan: $MN Daemon Report entries <= trigger $DR_TRIGGER and ${MREGB}B <= budget ${DR_MAX_BYTES}B — no-op"; exit 0
 fi
 
 # ⚠ ANTI-SILENT-FAILURE ALARM (same rationale as Pass 1 — Pass 2 had this exact failure: it wanted a bare
 # column-0 '**[' while the real section uses '### <date>' H3 headers and '- **[' bullets, so it saw MN=0
 # entries in an 81 KB section and reported a clean no-op).
-if [ "$MR_OVER" = 1 ] && [ "$MN" -lt 2 ]; then
-  echo "compact-plan: ⚠⚠ ALARM — Morning Review is ${MREGB}B (budget ${MR_MAX_BYTES}B) but only $MN entries were DETECTED."
+if [ "$DR_OVER" = 1 ] && [ "$MN" -lt 2 ]; then
+  echo "compact-plan: ⚠⚠ ALARM — Daemon Report is ${MREGB}B (budget ${DR_MAX_BYTES}B) but only $MN entries were DETECTED."
   echo "compact-plan:    The entry-header rule no longer matches the authored format. FIX THE DETECTOR in this script."
 fi
 
 # Effective keep from the byte budget, newest-first (this section is already prepend-ordered), clamped to
-# [1, MR_KEEP] — so one enormous entry cannot hold the section over budget indefinitely.
-MR_EKEEP="$MR_KEEP"
-if [ "$MR_MAX_BYTES" -gt 0 ]; then
-  MR_EKEEP=$(awk -v h="$MH" -v keep="$MR_KEEP" -v budget="$MR_MAX_BYTES" '
+# [1, DR_KEEP] — so one enormous entry cannot hold the section over budget indefinitely.
+DR_EKEEP="$DR_KEEP"
+if [ "$DR_MAX_BYTES" -gt 0 ]; then
+  DR_EKEEP=$(awk -v h="$MH" -v keep="$DR_KEEP" -v budget="$DR_MAX_BYTES" '
     {
       if (NR == h) { inreg=1; prevblank=0; next }
       if (inreg && /^## / && prevblank) inreg=0
@@ -262,57 +266,57 @@ if [ "$MR_MAX_BYTES" -gt 0 ]; then
       print fit
     }' "$PLAN")
 fi
-[ -n "$MR_EKEEP" ] && [ "$MR_EKEEP" -ge 1 ] || MR_EKEEP="$MR_KEEP"
+[ -n "$DR_EKEEP" ] && [ "$DR_EKEEP" -ge 1 ] || DR_EKEEP="$DR_KEEP"
 
-MR_CUT=$((MN - MR_EKEEP))
-[ "$MR_CUT" -gt 0 ] || { echo "compact-plan: MR nothing to cut (MN=$MN effective MR_KEEP=$MR_EKEEP) — no-op"; exit 0; }
+DR_CUT=$((MN - DR_EKEEP))
+[ "$DR_CUT" -gt 0 ] || { echo "compact-plan: DR nothing to cut (MN=$MN effective DR_KEEP=$DR_EKEEP) — no-op"; exit 0; }
 
 MTMP=$(mktemp) || exit 1
 MDROP=$(mktemp) || { rm -f "$MTMP"; exit 1; }
 
-# Split in ONE awk pass: within the region, the preamble + entries 1..MR_KEEP + everything OUTSIDE the region
-# (including any section AFTER Morning Review) -> kept ($MTMP); entries MR_KEEP+1..end -> dropped ($MDROP).
+# Split in ONE awk pass: within the region, the preamble + entries 1..DR_KEEP + everything OUTSIDE the region
+# (including any section AFTER Daemon Report) -> kept ($MTMP); entries DR_KEEP+1..end -> dropped ($MDROP).
 # Keyed on the running entry ordinal (same blank-preceded '**[' header rule as the count) — no line-range
 # arithmetic, no lost final line.
-awk -v h="$MH" -v keep="$MR_EKEEP" -v drop="$MDROP" '
+awk -v h="$MH" -v keep="$DR_EKEEP" -v drop="$MDROP" '
   {
     if (NR == h) { inreg=1; prevblank=0; print; next }   # the header itself is always kept
     if (inreg && /^## / && prevblank) inreg=0             # first BLANK-PRECEDED "## " after the header ends it
     if (inreg && (/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) entry++          # crossing a real entry header advances the ordinal
-    if (inreg && entry > keep) print >> drop              # entries MR_KEEP+1..end -> archived
+    if (inreg && entry > keep) print >> drop              # entries DR_KEEP+1..end -> archived
     else print                                            # preamble, kept entries, all after-region lines
     prevblank = ($0 ~ /^[[:space:]]*$/)
   }
 ' "$PLAN" > "$MTMP" || { rm -f "$MTMP" "$MDROP"; exit 1; }
 
-# VALIDATE — anchors survive, pre-Morning-Review region byte-identical, real reduction, and LINE CONSERVATION
+# VALIDATE — anchors survive, pre-Daemon-Report region byte-identical, real reduction, and LINE CONSERVATION
 # (kept + dropped == original), or abort with the plan untouched. Counts via awk END{NR} so a missing final
 # newline can't skew them.
-for a in '^## PRIME DIRECTIVES' '^## RESUME PROTOCOL' '^## WORK QUEUE' '^## Session Log' '^## Morning Review' '^RUN STATUS:'; do
-  grep -qE "$a" "$MTMP" || { echo "compact-plan: MR VALIDATION FAIL ($a missing) — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
+for a in '^## PRIME DIRECTIVES' '^## RESUME PROTOCOL' '^## WORK QUEUE' '^## Session Log' "$DR_HEADER_RE" '^RUN STATUS:'; do
+  grep -qE "$a" "$MTMP" || { echo "compact-plan: DR VALIDATION FAIL ($a missing) — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
 done
 if ! diff -q <(sed -n "1,${MH}p" "$PLAN") <(sed -n "1,${MH}p" "$MTMP") >/dev/null 2>&1; then
-  echo "compact-plan: MR pre-region changed — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1
+  echo "compact-plan: DR pre-region changed — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1
 fi
 L_ORIG=$(awk 'END{print NR}' "$PLAN"); L_KEPT=$(awk 'END{print NR}' "$MTMP"); L_DROP=$(awk 'END{print NR}' "$MDROP")
 if [ "$((L_KEPT + L_DROP))" != "$L_ORIG" ]; then
-  echo "compact-plan: MR line conservation FAIL (kept $L_KEPT + dropped $L_DROP != orig $L_ORIG) — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1
+  echo "compact-plan: DR line conservation FAIL (kept $L_KEPT + dropped $L_DROP != orig $L_ORIG) — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1
 fi
-[ "$L_KEPT" -lt "$L_ORIG" ] || { echo "compact-plan: MR no line reduction — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
-[ "$L_DROP" -gt 0 ] || { echo "compact-plan: MR nothing dropped — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
+[ "$L_KEPT" -lt "$L_ORIG" ] || { echo "compact-plan: DR no line reduction — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
+[ "$L_DROP" -gt 0 ] || { echo "compact-plan: DR nothing dropped — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
 
 # Commit: back up, append the dropped tail to the archive (GUARDED — abort BEFORE the mv if the archive write
 # fails, so entries are never removed from the plan without a copy landing in the archive), then atomically mv.
 cp "$PLAN" "$PLAN.bak" || { rm -f "$MTMP" "$MDROP"; exit 1; }
 {
   echo ""
-  echo "<!-- $(date -u +%Y-%m-%dT%H:%MZ) archived $MR_CUT Morning Review entries from AUTONOMOUS_PLAN.md (kept newest $MR_EKEEP inline; ${MREGB}B region vs ${MR_MAX_BYTES}B budget) -->"
+  echo "<!-- $(date -u +%Y-%m-%dT%H:%MZ) archived $DR_CUT Daemon Report entries from AUTONOMOUS_PLAN.md (kept newest $DR_EKEEP inline; ${MREGB}B region vs ${DR_MAX_BYTES}B budget) -->"
   cat "$MDROP"
-} >> "$MR_ARCHIVE" || { echo "compact-plan: MR archive write failed — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
+} >> "$DR_ARCHIVE" || { echo "compact-plan: DR archive write failed — abort, plan untouched"; rm -f "$MTMP" "$MDROP"; exit 1; }
 mv "$MTMP" "$PLAN"
 rm -f "$MDROP"
-echo "compact-plan: archived $MR_CUT Morning Review entries (newest $MR_EKEEP kept of $MN); plan $L_ORIG -> $L_KEPT lines; archive=$MR_ARCHIVE"
-) || echo "compact-plan: Pass 2 (Morning Review) exited nonzero — plan left untouched by Pass 2 (see message above)"
+echo "compact-plan: archived $DR_CUT Daemon Report entries (newest $DR_EKEEP kept of $MN); plan $L_ORIG -> $L_KEPT lines; archive=$DR_ARCHIVE"
+) || echo "compact-plan: Pass 2 (Daemon Report) exited nonzero — plan left untouched by Pass 2 (see message above)"
 
 # ===== Pass 3: WORK QUEUE done-item archival (2026-08-04) =====
 # WHY: the queue's job is the ORDER and the checkbox, and a `[x]` item contributes nothing to order — but

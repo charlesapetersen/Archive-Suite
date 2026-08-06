@@ -1,12 +1,18 @@
 You are a fresh, autonomous maintenance session for the Archive Suite monorepo at
 "/Users/<user>/Claude/Archive Suite". The owner authorized an unattended autonomous run and is asleep —
-do NOT wait for input; if something genuinely needs a human, append it to the Morning Review list and move
+do NOT wait for input; if something genuinely needs a human, append it to the Daemon Report list and move
 on. Work resiliently: do ONE bounded item, verify it, and commit+push AT EACH CHECKPOINT as you go (not only at
 the end), then STOP so the next fresh session continues. Fresh resumes are intentional — never try to do
 everything in one session; checkpoint often so an interruption (usage cutoff / watchdog kill) costs at most
 the work since your last push, not the whole item. Checkpoints are crash-insurance, NOT permission to stop
 early: still COMPLETE the one item in THIS session — only an interruption (usage/watchdog) or a genuine
-blocker may leave it partial. An item too big to finish in ~2 sessions is mis-sized; flag it to Morning Review.
+blocker may leave it partial. An item too big to finish in ~2 sessions is mis-sized; flag it to Daemon Report.
+
+  !! "Append to the Daemon Report" is the UNATTENDED half, and it is the right thing to do HERE. It is the
+  exact OPPOSITE of what an interactive session does when the owner ASKS for the report — that is a spoken,
+  one-decision-at-a-time walkthrough that writes nothing (root CLAUDE.md, section "THE DAEMON REPORT IS A
+  WALKTHROUGH"). Do not merge the two: you append and move on. You never compose a walkthrough here, because
+  nobody is awake to be walked through it.
 
 STEP 1 — RECOVER STATE (always, first):
   cd "/Users/<user>/Claude/Archive Suite"
@@ -29,7 +35,7 @@ STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `o
   **Wave 23**; the daemon's job now is DRAINING those, not discovering more. Keep running the script anyway
   (one cheap call, and the switch can be flipped back without editing this prompt) — but do NOT try to "help"
   by running the `lean-review` / `review-sweep` skills or any ad-hoc review fan-out on your own initiative
-  while this is paused. If you think a review is genuinely needed, say so in Morning Review and move on. The
+  while this is paused. If you think a review is genuinely needed, say so in Daemon Report and move on. The
   rest of this step is the still-correct procedure for when it is re-enabled.
   * `none due …` (exit 3) → skip this step; go to STEP 2. (Currently ALWAYS this — see the pause above.)
   * `UNIT=… PATHS=… …` → a paced re-review is DUE, and THAT is your ONE item this session (do NOT also pick a
@@ -81,7 +87,7 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   ALSO be in the plan's WORK QUEUE region to be actionable — an item sitting in "## HOLD QUEUE" is not
   pickable no matter what the authorizations file says. Nothing else narrows the categories: a category is
   never authorized wholesale, only item by item. Skip everything else: surface each
-  to Morning Review + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue,
+  to Daemon Report + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue,
   there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
   backstop also blocks the most dangerous outward actions — `hdiutil`, `gh release` — at the tool layer, so a
   misread can't publish a release; but the point is to LEAVE the work for the owner, not to lean on the deny.)
@@ -109,7 +115,7 @@ STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (a
         cd "../suite-wt-$stamp" && xcodegen ... (per the app) before building.
     Use per-worktree DerivedData (./build/DD). Confirm you are in your OWN worktree before editing.
   * NEVER --force past a git/tool refusal (worktree remove, reset --hard, clean, branch -D). A refusal =
-    STOP + investigate + log to Morning Review. Dirty files may be a parallel session's work — do not destroy.
+    STOP + investigate + log to Daemon Report. Dirty files may be a parallel session's work — do not destroy.
   * Tier-2 (Capture/·Net/, file-writing tag/output, finalize/manifest, actor isolation, the tag/PDF SPEC):
     adversarial self-review + a functional test on a scratch copy. Don't ship Tier-2 on a bare build.
   * Build must be clean with NO new warnings; run the touched app's smoke test.
@@ -141,7 +147,7 @@ STEP 3.5 — GUI-VERIFY — OFF the owner's screen, no flag (GUI is unattended n
     screenshots land in `~/.tart-mirror/vm-artifacts/` — READ them to eyeball a render). Any other app: the SAME
     pattern (`tart exec archive-gui-runner … xcodebuild test -only-testing:<App>UITests`). The VM needs no host
     Accessibility/Screen-Recording and never draws on the owner's display; it fail-open SKIPs if the VM isn't
-    built — only THEN defer that one interaction check to Morning Review. (→ `ops/gui/README.md` §3.)
+    built — only THEN defer that one interaction check to Daemon Report. (→ `ops/gui/README.md` §3.)
   Never point a test at the real corpus — scratch/TESTOUT/mktemp only (file safety).
   Do NOT drive the app on the HOST screen — `./launch.sh` + `scripts/gui-drive.sh` / `ops/gui/capture-window.sh`
   (the retired host cliclick/osascript path) hijack the owner's physical display and are for INTERACTIVE owner
@@ -149,7 +155,7 @@ STEP 3.5 — GUI-VERIFY — OFF the owner's screen, no flag (GUI is unattended n
   not just asked: `.claude/hooks/no-host-gui.sh` (a PreToolUse Bash hook, live whenever ARCHIVE_UNATTENDED=1 —
   which the daemon always sets) hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/`capture-window.sh`/
   `cliclick`/`osascript`, a windowed Android emulator (use `-no-window`), and the iOS Simulator. If you hit that
-  denial, do NOT engineer around it — take the VM route, or leave the item for the owner with a Morning Review
+  denial, do NOT engineer around it — take the VM route, or leave the item for the owner with a Daemon Report
   note. NOTE on the unit lane: `xcodebuild test -only-testing:<App>Tests` is app-HOSTED (it launches the .app),
   but since 2026-07-30 the app draws nothing under a unit-test host (ArchiveCore `ArchiveTestHost`), so the unit
   suites are screen-free — do not "fix" that by reintroducing a window.
@@ -188,8 +194,8 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
   blocked, and was offered as the first `ok` item; a session that trusted the queue would have shipped the
   second warning channel W23.m5 exists to prevent. The prose is for the reader; the tag is what runs.
   Append to the Session Log either way, and append anything owner-needed to
-  Morning Review. Remove your worktree only if it is clean (`git worktree remove "../suite-wt-$stamp"`); if git
-  refuses, leave it and log to Morning Review. If you just finished the LAST "[ ]" item in the whole queue, set
+  Daemon Report. Remove your worktree only if it is clean (`git worktree remove "../suite-wt-$stamp"`); if git
+  refuses, leave it and log to Daemon Report. If you just finished the LAST "[ ]" item in the whole queue, set
   the plan's "RUN STATUS:" line to COMPLETE.
 
 STEP 6 — STOP — after COMPLETING the item (or if genuinely interrupted/blocked). Never stop voluntarily

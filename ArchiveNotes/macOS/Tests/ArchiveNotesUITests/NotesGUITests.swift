@@ -488,7 +488,7 @@ class NotesFixtureUITestCase: XCTestCase {
 }
 
 /// Per-wave GUI checks (08-testing §3.7). Landed incrementally (W8-S8 is oversized — see the plan
-/// Session Log + Morning Review): pass 1 = G1 (create) + G3 (raw toggle); pass 2 = G9 (create extract
+/// Session Log + Daemon Report): pass 1 = G1 (create) + G3 (raw toggle); pass 2 = G9 (create extract
 /// from a note selection, first use of the DEBUG selection seam `an.editor.test.select`); pass 3 = G5
 /// (paste archive links as a source block via ⌘⇧V); this pass = G7 (folder replicate) + G8
 /// (delete-last-instance, Tier-2). G7/G8 needed the org-graph folders loaded, which had been blocked by
@@ -598,7 +598,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         // after an ATX heading and drops the trailing newline, both semantically identical (no content
         // lost). So assert the meaningful content survives (whitespace-normalized equality) and nothing
         // was dropped, rather than byte-for-byte. (The whitespace canonicalization on a view-only toggle
-        // is noted as a minor finding — see the plan Session Log / Morning Review.)
+        // is noted as a minor finding — see the plan Session Log / Daemon Report.)
         _ = pollUntil(timeout: 2) { false }
         let bodyAfter = noteBody(uuid: uuid)
         func normalized(_ s: String?) -> String? {
@@ -1053,7 +1053,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
     // MARK: - G12 / G13 / G14 — the W14.4 (b/d) + W14.3 checks that sat on the owner's manual list
     //
-    // Each of these shipped with unit proof and a "live GUI drive → Morning Review" tail, i.e. behaviour
+    // Each of these shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour
     // never once driven through the real UI. They run here, off-screen in the Tart VM, which is what
     // W21.vmgui-c exists for. W14.4's third tail — (c) the cross-window chip recolour — is deliberately
     // NOT here; the reason is in `testG14`'s comment.

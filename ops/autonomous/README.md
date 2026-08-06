@@ -4,11 +4,27 @@ A reusable way to run **unattended, multi-hour maintenance** on this repo that s
 context compaction, and session restarts. Standing principles: memory `autonomous-plan-cron-resume`,
 `autonomous-jobs-queue`, `no-force-override-destructive-git`; root `CLAUDE.md` §"How we work".
 
+## ⚠️ The Daemon Report has two halves, and they are opposites
+
+The `## Daemon Report` section of the plan (called **Morning Review** until 2026-08-05 — renamed because it
+happens at any hour; the scripts still match both spellings) is **written by the daemon and spoken to the
+owner.** Confusing the two halves is the single most repeated mistake against this system:
+
+| | Who | What they do |
+|---|---|---|
+| **Write half** | An unattended session that hits something needing a human | **Appends** an entry and moves on. Never waits. |
+| **Read half** | An interactive session, when the owner **asks** for the report | **Walks him through each open decision, one at a time, waiting for each answer.** Writes nothing. |
+
+The read half is specified in root [`CLAUDE.md`](../../CLAUDE.md) → *"THE DAEMON REPORT IS A WALKTHROUGH,
+NOT A DOCUMENT"*. If you are about to answer a request for the report by writing a plan entry or by posting
+a tidy summary of everything that happened, **you are doing the write half at the wrong moment** — stop and
+read that section.
+
 ## The three layers
 
 - **L0 — durable plan (the foundation).** `.maintenance/AUTONOMOUS_PLAN.md` (gitignored, on-disk) is the
   single source of truth: PRIME DIRECTIVES + RESUME PROTOCOL + a checkboxed WORK QUEUE + Session Log +
-  Morning Review. Every increment is committed+pushed, so any fresh session recovers full state from the
+  Daemon Report. Every increment is committed+pushed, so any fresh session recovers full state from the
   plan + `git log` + `SUITE_TODO.md`. **This is what makes the run resilient to losing context/usage.**
 - **L1 — self-resume daemon (`archive-suite-autonomous.sh`).** A loop that every ~90 s fires ONE fresh
   headless `claude -p` to advance the plan by one bounded item, then the session commits+pushes+stops. A
@@ -101,7 +117,7 @@ consecutive run of usage fast-fails all count as unbroken no-progress, and a *we
 can't forget to set a flag, and a session that *believes* it worked can't lie past an unchanged fingerprint.
 Exit code does **not** gate it: a session that ships a commit then gets killed (budget/watchdog) still moved
 the fingerprint and resets the backoff; a usage fast-fail can't move it and falls through to no-progress.
-- **Excluded on purpose:** the plan's `## Session Log` / `## Morning Review` / `## E2E findings`. A no-op
+- **Excluded on purpose:** the plan's `## Session Log` / `## Daemon Report` / `## E2E findings`. A no-op
   session still appends its reasoning there, so hashing that churn would reset the backoff every cycle and
   silently restore the old spin. `SUITE_TODO.md` is tracked, so it rides in `git HEAD`.
 - **Accelerator, not gate.** It is tempting to *skip* firing while the fingerprint is unchanged. That was
@@ -435,7 +451,7 @@ from `$REPO`'s working tree, not `origin/main`) and re-arm.
 blast-radius work: **Tier-3 releases** (DMG / `gh release` / version tags), **SPEC / `tag-format` changes**
 (the cross-app data contract), anything that **writes the real corpus**, and any **HIGH review finding on an
 irreversible path** (routed here by WS11). The resume prompt (STEP 2) skips the plan's `## HOLD QUEUE` /
-`[hold]` / `needs: owner` items and surfaces them to Morning Review + `STATUS.md`. A defense-in-depth backstop
+`[hold]` / `needs: owner` items and surfaces them to Daemon Report + `STATUS.md`. A defense-in-depth backstop
 reinforces the soft rule: the daemon's `--disallowedTools` blocks the **direct** invocation of `hdiutil` and
 `gh release` (the two release steps) — catching a casual/accidental attempt. It's not a hard boundary (a child
 process like `bash release/build-suite-dmg.sh` could still reach `hdiutil`), so the prompt rule — *leave
@@ -484,7 +500,7 @@ autonomous run for a different repo:
    it names the state dir + the launchd job `com.<LABEL>.autonomous`), `REPO`, `PLAN`, `STATE`, `CLAUDE`.
    Keep the script + the `claude` binary **outside `~/Desktop`/`~/Documents`/`~/Downloads`** (TCC).
 2. **Write the L0 plan** (`$PLAN`, gitignored) from the template shape: PRIME DIRECTIVES → RESUME PROTOCOL →
-   a checkboxed WORK QUEUE → Session Log → Morning Review, and a **plain** status line
+   a checkboxed WORK QUEUE → Session Log → Daemon Report, and a **plain** status line
    `RUN STATUS: IN_PROGRESS`.
 3. **Write the L2 resume prompt** (`$STATE/resume-prompt.txt`) — recover state → pick first `[ ]` → own
    worktree → verify → commit+push+tick → stop. Reuse this repo's `resume-prompt.txt` as the skeleton;
@@ -602,9 +618,9 @@ files (the plan is gitignored, so `.bak` + the archives are the recovery points,
 
 - **Pass 1 — `## Session Log`** (**newest-first** — sessions prepend): keep the newest `KEEP=6`, archive the
   older tail to `AUTONOMOUS_SESSION_LOG_ARCHIVE.md` (trigger: >`TRIGGER=10` entries **or** region >`SL_MAX_BYTES=30000`).
-- **Pass 2 — `## Morning Review`** (WS8, 2026-07-17; **newest-first**): keep the newest `MR_KEEP=8` inline,
-  archive the older tail to `AUTONOMOUS_MORNING_REVIEW_ARCHIVE.md` (trigger: >`MR_TRIGGER=12` **or**
-  >`MR_MAX_BYTES=30000`).
+- **Pass 2 — `## Daemon Report`** (WS8, 2026-07-17; **newest-first**): keep the newest `DR_KEEP=8` inline,
+  archive the older tail to `AUTONOMOUS_DAEMON_REPORT_ARCHIVE.md` (trigger: >`DR_TRIGGER=12` **or**
+  >`DR_MAX_BYTES=30000`).
 - **Pass 3 — `## WORK QUEUE`** (2026-08-04): archive **completed `[x]`** items (the queue's job is the ORDER;
   a done item adds nothing to it) to `AUTONOMOUS_WORK_QUEUE_ARCHIVE.md` once the region exceeds
   `WQ_MAX_BYTES=120000`. ⚠️ **Only items whose tag is independently recorded `[x]` in `SUITE_TODO.md` or
@@ -640,7 +656,7 @@ Both passes are **safe by construction**: region-bounded (never touch DIRECTIVES
 STATUS), they build the result in a temp file and **validate every live anchor survives + the pre-region is
 byte-identical before replacing**, keep a `.bak`, bail leaving the plan untouched on any anomaly, and are
 idempotent (no-op under trigger). Pass 1 is wrapped in a subshell so its no-op `exit` can't skip Pass 2. Both
-run *after* the work fingerprint is sampled and the Morning Review / Session Log sections are excluded from it,
+run *after* the work fingerprint is sampled and the Daemon Report / Session Log sections are excluded from it,
 so a rotation is **never** miscounted as the run advancing. Proven by `tests/prove-compact.sh`.
 
 ## Dependency gating — `(blocked-on: …)` (`next-queue-item.sh`, WS9)

@@ -34,7 +34,7 @@ git -C "$R" init -q; git -C "$R" config user.email t@t; git -C "$R" config user.
 printf -- '- [ ] one\n- [ ] two\n- [x] three\n' > "$R/SUITE_TODO.md"
 git -C "$R" add -A; git -C "$R" commit -qm "seed: the first change"
 P="$R/plan.md"; S="$T/state"; mkdir -p "$S"
-write_plan() { printf 'RUN STATUS: IN_PROGRESS — test\n\n## HOLD QUEUE\n%s\n\n## Morning Review\n%s\n\n## Next\n' "${1:-}" "${2:-}" > "$P"; }
+write_plan() { printf 'RUN STATUS: IN_PROGRESS — test\n\n## HOLD QUEUE\n%s\n\n## Daemon Report\n%s\n\n## Next\n' "${1:-}" "${2:-}" > "$P"; }
 write_plan "" ""
 : > "$S/daemon.log"
 
@@ -109,13 +109,13 @@ printf '%s' "$OUT" | grep -q 'Nothing right now' && ok "quiet when there is noth
 write_plan "- [ ] held thing" "- [ ] decide this thing"
 OUT="$(RUNNING=1 run)"
 printf '%s' "$OUT" | grep -q 'held back for you' && ok "hold queue surfaced" || bad "hold queue missed" "$OUT"
-printf '%s' "$OUT" | grep -q 'waiting on your decision' && ok "morning-review count surfaced" || bad "morning review missed" "$OUT"
+printf '%s' "$OUT" | grep -q 'waiting on your decision' && ok "daemon-report count surfaced" || bad "daemon report missed" "$OUT"
 OUT="$(RUNNING=1 TASKPORT=1 run)"
 printf '%s' "$OUT" | grep -q 'security setting is still relaxed' && ok "taskport surfaced" || bad "taskport missed" "$OUT"
 write_plan "" ""
 
-echo "[9] a '## ' heading inside Morning Review ends the scan (documented trap — must not silently empty)"
-printf 'RUN STATUS: x\n\n## Morning Review\n## Oops\n- [ ] hidden\n' > "$P"
+echo "[9] a '## ' heading inside Daemon Report ends the scan (documented trap — must not silently empty)"
+printf 'RUN STATUS: x\n\n## Daemon Report\n## Oops\n- [ ] hidden\n' > "$P"
 OUT="$(RUNNING=1 run)"
 # Deterministic, so assert it rather than accepting either outcome: the awk ends the section at the first
 # `## `, so the item below it is invisible here. That is by design (it bounds the section) but it is also a

@@ -6,7 +6,7 @@ Reach for this whenever you'd otherwise "do a full code review" — do NOT fire 
 > **⏸ STATUS: paced reviews are PAUSED for the autonomous daemon (owner directive, 2026-07-29 — RE-CONFIRMED
 > 2026-08-01).** ⚠️ **The original condition has been met and the pause was deliberately kept.** This pause was
 > written as "while it drains the Wave 23 bug queue"; as of 2026-08-01 Wave 23 is **34 done / 8 open, and all 8
-> remaining are `-fu` follow-ups**, not original findings. The owner was shown that in the morning-review
+> remaining are `-fu` follow-ups**, not original findings. The owner was shown that in the daemon-report
 > walkthrough, together with the fact that Notes units 12–16 have never been reviewed and that he wants Notes'
 > structure settled before the DEVONthink import — and he **chose "keep everything paused"**, declining even a
 > narrowly-scoped, inline, two-unit Notes review. **Do not re-propose lifting this because Wave 23 is drained.**
