@@ -440,6 +440,10 @@ final class CorpusWalkerTests: XCTestCase {
         XCTAssertTrue(result.completed)
         XCTAssertTrue(result.isClean, "and a fully readable tree reached through a link is authoritative")
         XCTAssertEqual(result.filesSeen, 3)
+        // MEMBERSHIP only. `relativePaths` normalises BOTH sides through `resolvingSymlinksInPath()`, so
+        // this line would pass unchanged even if the entries came back spelled under `link/` — it is not
+        // the spelling assertion it can be mistaken for. The byte comparison below is the only thing
+        // holding the identity decision; do not "simplify" it away on the strength of this line.
         XCTAssertEqual(relativePaths(result, root: real), ["Nested/deep.pdf", "doc.pdf"])
 
         // Identity follows enumeration: through the link or straight at the target, ONE byte-exact
@@ -465,10 +469,11 @@ final class CorpusWalkerTests: XCTestCase {
     ///
     /// The link-to-a-regular-file case is the load-bearing one: `realpath` *succeeds* for it, so only
     /// the `opendir` of the resolved path rejects it. Drop that second probe as redundant and this is
-    /// the assertion that catches you.
+    /// the assertion that catches you — which is exactly why the uid check below is scoped to the ONE
+    /// case that needs it instead of skipping the whole function. A function-wide `XCTSkipIf` here (how
+    /// this was first written, and what the adversarial pass caught) would silently retire the strongest
+    /// assertion in the file on any machine that runs the suite as root.
     func testASymlinkedRootWhoseTargetIsUnusableIsStillRootUnreadable() throws {
-        try XCTSkipIf(getuid() == 0, "root can open a 0o000 directory; the denial case is meaningless")
-
         let dangling = tempDir.appendingPathComponent("dangling", isDirectory: true)
         try FileManager.default.createSymbolicLink(
             at: dangling,
@@ -492,8 +497,12 @@ final class CorpusWalkerTests: XCTestCase {
         try FileManager.default.createSymbolicLink(at: cycleA, withDestinationURL: cycleB)
         try FileManager.default.createSymbolicLink(at: cycleB, withDestinationURL: cycleA)
 
-        for (label, root) in [("dangling", dangling), ("to a regular file", toFile),
-                              ("to a denied directory", toSealed), ("cycle", cycleA)] {
+        var cases: [(String, URL)] = [("dangling", dangling), ("to a regular file", toFile),
+                                      ("cycle", cycleA)]
+        // Only THIS case is meaningless as root, which can open a 0o000 directory.
+        if getuid() != 0 { cases.append(("to a denied directory", toSealed)) }
+
+        for (label, root) in cases {
             XCTAssertNil(CorpusWalker.canonicalRoot(root), "\(label): there is nothing to enumerate")
 
             let result = CorpusWalker.scan(root: root)
