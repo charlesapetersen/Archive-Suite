@@ -7,22 +7,50 @@
 # text layer) PDF and one non-PDF image for format-degrade tests.
 #
 # The fixture lands at ~/Library/Application Support/ArchiveReader/AR-GUI-Fixture
-# (Route B — proven Spotlight-indexed, outside the sandbox container). The path is
-# emitted on stdout so callers (XCUITest setUp) can pass it as -ARUITestRootPath.
+# (Route B — outside the sandbox container, which the UITest runner cannot see past;
+# FixtureUITestCase resolves the same path via getpwuid). The path is emitted on
+# stdout so callers (XCUITest setUp) can pass it as -ARUITestRootPath.
+#
+# NO SPOTLIGHT (W26.scripts). Reader discovery is a filesystem walk (ArchiveCore
+# `CorpusWalker`) — an indexed fixture is neither required nor sufficient — so this
+# script neither force-indexes nor waits for an index. It verifies the tags it wrote
+# by READING THEM BACK off disk, which is deterministic and works on a volume with
+# indexing disabled (a `mktemp` dir, or the guest VM's cold index).
 #
 # Idempotent: rm -rf + rebuild on every run. NEVER touches the real corpus.
 #
 # Usage:  ./scripts/make-gui-fixture.sh
-# Deps:   /opt/homebrew/bin/tag, mdimport, mdfind, sips
+# Env:    AR_FIXTURE_SRC — source corpus dir (default: the repo's Test files/Brown Gemini)
+#         AR_FIXTURE_DST — where to build (default: the Application Support path above).
+#                          Overriding it is how the test harness builds a throwaway
+#                          fixture on an unindexed volume without clobbering the real one.
+# Deps:   /opt/homebrew/bin/tag, sips
 set -euo pipefail
 
 TAG=/opt/homebrew/bin/tag
 SRC="${AR_FIXTURE_SRC:-$HOME/Claude/Archive Suite/Test files/Brown Gemini}"
-DST="$HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture"
+DST="${AR_FIXTURE_DST:-$HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture}"
 
 # --- preflight ---
 [ -d "$SRC" ] || { echo "error: source corpus not found: $SRC" >&2; exit 1; }
 command -v "$TAG" >/dev/null || { echo "error: tag CLI not found ($TAG); brew install tag" >&2; exit 1; }
+
+# The next step is `rm -rf "$DST"`, and DST is now settable from the environment (AR_FIXTURE_DST),
+# so sanity-check it before deleting anything: absolute, at least two components deep, not $HOME,
+# and not inside the source corpus. Prime Directive #1 — a fixture builder must never be one typo
+# away from erasing something that matters.
+# Strip trailing slashes FIRST: "$HOME/" is the same directory as "$HOME" but compares unequal, so
+# without this the one path the guard most needs to refuse walks straight through it. "/" collapses
+# to the empty string and is then refused by the depth check.
+while [ "${DST%/}" != "$DST" ]; do DST="${DST%/}"; done
+case "$DST" in
+  /*/*) : ;;
+  *) echo "error: AR_FIXTURE_DST must be an absolute path at least two components deep: $DST" >&2; exit 1 ;;
+esac
+[ "$DST" != "$HOME" ] || { echo "error: refusing to rebuild the fixture at \$HOME" >&2; exit 1; }
+case "$DST" in
+  "$SRC"|"$SRC"/*) echo "error: refusing to write the fixture inside the source corpus: $DST" >&2; exit 1 ;;
+esac
 
 # --- idempotent rebuild ---
 rm -rf "$DST"
@@ -175,25 +203,62 @@ cat > "$DST/.archive-suite-root.json" <<'JSON'
 {"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}
 JSON
 
-# --- force Spotlight indexing ---
-mdimport "$DST" >/dev/null 2>&1
+# --- verify the tags are ON DISK (W26.scripts: no mdimport, no mdfind poll) ---
+# `tag -s` writes com.apple.metadata:_kMDItemUserTags with setxattr(2) and returns only once the
+# xattr is set, so there is nothing to wait for — read it straight back. The old code force-indexed
+# with `mdimport` and then polled `mdfind` for up to 60 s, which (a) could not be satisfied at all on
+# an unindexed volume (a mktemp dir, or a guest VM with a cold index — exactly where the GUI lane
+# runs) and (b) only ever WARNED, so a genuinely untagged fixture shipped silently and its UITests
+# failed later for a reason the log did not name.
+#
+# Exact-token comparison: "Read" is a SUBSTRING of "Unread", so grep/case would over-match. Split the
+# comma-separated list `tag -lN` prints (it sorts, and no fixture tag contains a comma) and compare
+# each token whole.
+has_read_state() {
+  local tags token rc=1
+  tags=$("$TAG" -lN "$1" 2>/dev/null || true)
+  local saved_ifs=$IFS
+  IFS=,
+  set -o noglob
+  for token in $tags; do
+    if [ "$token" = "Read" ] || [ "$token" = "Unread" ]; then rc=0; break; fi
+  done
+  IFS=$saved_ifs
+  set +o noglob
+  return $rc
+}
 
-# --- wait until Spotlight sees the tagged files (Read OR Unread) ---
-# The fixture has 11 files with Read or Unread (file 9 has neither → 11 of 12 tagged).
+# The fixture is 12 files, 11 of them carrying Read or Unread. File 9 deliberately has NEITHER — it
+# IS the tri-state "neither" bucket a UITest asserts on — so 11/12 is the exact truth, not a floor,
+# and file 9's *absence* of a read state is itself an invariant worth pinning (a future edit that
+# "helpfully" tags it would silently retire that test).
+EXPECTED_TOTAL=12
 EXPECTED_TAGGED=11
-seen=0
-for i in $(seq 1 30); do
-  seen=$(mdfind -onlyin "$DST" 'kMDItemUserTags == "Unread" || kMDItemUserTags == "Read"' 2>/dev/null | wc -l | tr -d ' ')
-  [ "$seen" -ge "$EXPECTED_TAGGED" ] && break
-  sleep 2
+NEITHER="00009 IMG — Brown.pdf"
+total=0
+tagged=0
+problems=""
+for f in "$DST"/*; do
+  [ -f "$f" ] || continue
+  total=$((total + 1))
+  base=$(basename "$f")
+  if has_read_state "$f"; then
+    tagged=$((tagged + 1))
+    if [ "$base" = "$NEITHER" ]; then
+      problems="$problems
+  has a read state but must have NEITHER: $base"
+    fi
+  elif [ "$base" != "$NEITHER" ]; then
+    problems="$problems
+  no Read/Unread on disk: $base"
+  fi
 done
 
-if [ "$seen" -lt "$EXPECTED_TAGGED" ]; then
-  echo "warning: only $seen/$EXPECTED_TAGGED files indexed after 60s" >&2
+if [ "$total" -ne "$EXPECTED_TOTAL" ] || [ "$tagged" -ne "$EXPECTED_TAGGED" ] || [ -n "$problems" ]; then
+  echo "error: fixture is wrong — $total files (want $EXPECTED_TOTAL), $tagged carry Read/Unread on disk (want $EXPECTED_TAGGED) in $DST${problems}" >&2
+  exit 1
 fi
-
-total=$(ls "$DST" | wc -l | tr -d ' ')
-echo "GUI fixture ready: $total files ($seen indexed) in $DST" >&2
+echo "GUI fixture ready: $total files ($tagged tagged Read/Unread, verified on disk) in $DST" >&2
 
 # Emit the fixture path on stdout (for -ARUITestRootPath)
 echo "$DST"
