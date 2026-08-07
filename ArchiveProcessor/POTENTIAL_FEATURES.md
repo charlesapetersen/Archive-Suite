@@ -39,7 +39,7 @@
 - **Memory-efficient streaming** — stream batch results instead of loading all into memory
 
 ### API & Extensibility
-- **Offline local model support** — integrate with Ollama or llama.cpp for fully offline, on-device processing. _(The subscription-authed **Local Agent CLI** backend — Claude Code / Gemini / Codex, no API key — shipped in W13.cli-1…4; this line now covers only the distinct **offline/on-device** case.)_
+- **Offline local model support** — integrate with Ollama or llama.cpp for fully offline, on-device processing. _(The subscription-authed **Local Agent CLI** backend — Claude Code / Gemini / Codex, no API key — shipped in W13.cli-1…4; this line now covers only the distinct **offline/on-device** case.)_ ⚠️ **Apple Vision is a separate, already-queued item, not this one** — `SUITE_TODO.md` **W13.vision-1/-2** (owner, 2026-08-07). Vision is a pure OCR engine, so it transcribes but cannot classify/segment/tag; an offline **VLM** would do both. Don't close either line by shipping the other.
 - **Plugin system** — allow custom classification and tagging plugins
 - **REST API server mode** — run Archive Processor as a headless service for automation
 - **Apple Shortcuts integration** — expose processing actions via Shortcuts app

@@ -749,6 +749,8 @@ self-review), with the live-key verification split out to a **keyed/owner tail**
 Daemon Report, NOT skipped. Do top-to-bottom, one bounded sub-task per session. **OpenAI first (Tier-1, smaller,
 reuses the existing OpenAI-format client), then CLI (Tier-2).** New provider changes stay **additive + opt-in** —
 never flip the default provider until the keyed live test passes. Legend as above.
+*(Both of those plans have since shipped; a third group — **Apple Vision**, owner-queued 2026-08-07 — was
+appended at the end of this wave and is the only one with no keyed tail at all.)*
 
 **OpenAI / ChatGPT provider** (plan `openai-chatgpt-provider.md` shipped + deleted W13.oai-1/2/3; Tier-1;
 SHARED HOTSPOT = the persisted `LLMProvider` enum, append-only):
@@ -773,6 +775,58 @@ W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
   "shipped". | S | low | owner
 - Later phases (not now): OpenAI Batch API (Phase 4) + CLI persistent-`stream-json` perf (Phase 4). Land the
   build-verified code first; these gate final "shipped".
+
+**Apple Vision (on-device) OCR backend** — owner-queued 2026-08-07. The FOURTH backend beside direct API /
+gateway / Local Agent CLI, and the only one that is **free, offline, key-free and unmetered**: macOS's own
+Vision text recognition, either in-process (`VNRecognizeTextRequest`) or via the installed **`mac-ocr`** CLI
+(`/opt/homebrew/bin/mac-ocr`). ⚠️ **Prior art to read FIRST: `~/Claude/vision-reader-gui`** — a shipped
+SwiftUI front end for exactly this CLI. Take its *recognition* plumbing (`Sources/Runner.swift`: binary
+discovery for a Finder-launched app with a bare `PATH`, memoised `locateTool`, per-file invocation for real
+progress, the argument list Vision actually accepts; `README.md`: measured throughput ≈3× at the
+performance-core count, `--fast` ≈2.6× faster for ~1.7% CER, `--pdf-dpi` barely matters on clean scans).
+**Do NOT take its output half** — that app writes a searchable-PDF text layer (`SearchableWriter`/`JBIG2`);
+this app's output format is unchanged, the 2-page image+text PDF of `SPEC/tag-format.md`.
+- [ ] **W13.vision-1 — Apple Vision as a first-class OCR backend [M · low · Tier-1 · daemon-buildable, $0,
+  no key, no GUI].** Vision transcribes only — it cannot classify, segment, date or tag — so this is a
+  **transcription backend, not a provider swap**, and the pieces it doesn't cover already exist:
+  `OCRPrompt.buildClassificationOnly(text:…)` (the text-only classification path built for
+  already-OCR'd PDFs) and `Tagging/TagGenerator.swift` (tags from OCR text, no image). Rotation is
+  already local — `RotationDetector.detectCorrection` is Vision, and `performOCRCall` runs it concurrently
+  with the transcription regardless of backend, so `RotationMode.localVision` needs nothing new.
+  **Wiring:** a `VisionClient` beside `LocalAgentClient` with the same `ocr(imageURL:previousText:…)
+  -> OCRResult` shape, returning `text` + `rotationDegrees` and a **nil `classification`** (which the
+  format already tolerates — SPEC: *"Classification may be ABSENT"*). Then one arm in
+  `OCRProcessor+OCR.swift:1487-1511`'s backend precedence (currently `localAgent > gateway > direct`) and
+  one case in the Settings **OCR backend** picker (`Views/SettingsView.swift:321-340`, the XOR Binding over
+  `useGateway`/`useLocalAgent` — add the third flag there, not downstream). Like the gateway and the CLI it
+  **skips batch and LLM-rotation**. Concurrency is CPU-bound, not rate-limited: size it off the
+  performance-core count per vision-reader-gui's measurements, and keep it OUT of `NetworkSession`'s
+  in-flight limiter.
+  **Decide in the item, don't pre-empt here — in-process Vision vs shelling to `mac-ocr`.** In-process wins
+  on no external dependency, no PATH discovery, no subprocess, and `Vision` is already linked
+  (`RotationDetector.swift`). The CLI wins on already being written and measured, on PDF page rendering +
+  `--format jsonl` streaming, and on per-observation confidence/bbox JSON. Whichever is chosen, the
+  **language / `--fast` / min-confidence / custom-vocabulary knobs are the user-visible surface** —
+  the app already has a custom tag vocabulary that could seed `--custom-words`.
+  **Cost + labelling (small but don't skip them):** `Models/CostEstimator.swift` must report **$0**, and
+  the pinned cost pane needs its third case beside the CLI's *"Included in your subscription"* (say
+  *"Free — runs on this Mac"*). The page-2 header writes `<Provider> · <Model> · <date>` from
+  `model.provider.rawValue` (`OCR/PDFGenerator.swift:233-241`) — `<Provider>` is **free-form** to the
+  Reader, so `Apple Vision · macOS Vision · …` needs no Reader parse change, only the parenthetical
+  example list in `SPEC/tag-format.md:145`. ⚠️ `LLMProvider` is a **persisted, String-backed SHARED
+  HOTSPOT** — appending a case is safe, renaming/reordering is not; and if Vision is modelled as a
+  backend flag rather than an `LLMProvider` case, the header still needs a real string.
+  **Gate:** build clean + `./test-smoke.sh processor` + a $0 headless driver over 2 synthetic PNGs
+  (the Vision path needs no key, so unlike every other backend its functional test is fully unattended —
+  no fake-CLI harness required). | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{VisionClient(new),OCRProcessor+OCR}.swift, Models/{CostEstimator,DefaultsKeys,ProviderModels}.swift, Views/SettingsView.swift, SPEC/tag-format.md | M | low | none
+- [ ] **W13.vision-2 — the hybrid: Vision transcribes, an LLM only classifies/tags [S–M · low · Tier-1]
+  (blocked-on: W13.vision-1).** The point of the backend: pay for judgement, not for transcription. Route
+  Vision's text into the existing text-only paths (`OCRPrompt.buildClassificationOnly`, `TagGenerator`,
+  `LLMTextClient`) so a run does N free image calls + N cheap **text** calls instead of N image calls —
+  and make "no LLM at all" (transcribe-only, `TaggingMode.none`/`.copySource`) a supported combination,
+  which is the fully-offline, fully-free mode. Worth an accuracy note in the same item: Vision is strong on
+  clean typescript and weak on handwriting and heavy skew, where the VLMs are the opposite — so this is an
+  **added backend, never a new default**. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+OCR,OCRProcessor+Pipeline}.swift, Tagging/TagGenerator.swift | S–M | low | none
 
 ## Known-issues work — Wave 14 (cross-app; owner-requested 2026-07-16)
 Actionable open items pulled from the three `KNOWN_ISSUES.md` + the Processor streaming-residuals review, ordered
