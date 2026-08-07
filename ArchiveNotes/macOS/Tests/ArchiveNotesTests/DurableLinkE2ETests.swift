@@ -136,7 +136,7 @@ struct DurableLinkE2ETests {
         }
     }
 
-    @Test("Re-granting the WRONG folder is rejected (GUID mismatch, never a wrong file)")
+    @Test("Re-granting the WRONG folder names the mismatch, never a wrong file — and keeps the grant")
     func regrantWrongFolderRejected() async throws {
         try await withHermeticBookmarks {
             // The folder carries some other GUID; the link wants `wanted`.
@@ -147,8 +147,13 @@ struct DurableLinkE2ETests {
             let resolver = ReaderLinkResolver(rootStore: store)
             let wanted = UUID()
             #expect(wanted != marker.guid)
+            // W26.notesabsence-fu2: a real, grantable archive that just isn't THIS link's is no
+            // longer reported with the same case as "nothing chosen yet" (`.needsRootGrant`) — that
+            // told a user who had just picked a folder to go pick one. `.wrongArchive` names both
+            // GUIDs, and the pick is still honoured: `marker.guid` is usable in Notes from here on.
             #expect(await resolver.grantAndResolve(url: corpus, rootGUID: wanted, relativePath: "sample.pdf")
-                    == .needsRootGrant(guid: wanted))
+                    == .wrongArchive(picked: corpus, granted: marker.guid, wanted: wanted))
+            #expect(store.knownRoots[marker.guid] != nil)
         }
     }
 

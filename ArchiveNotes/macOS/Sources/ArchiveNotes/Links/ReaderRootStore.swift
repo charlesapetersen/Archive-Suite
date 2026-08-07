@@ -24,6 +24,13 @@ enum ReaderRootGrantRefusal: Equatable, Sendable {
     case unreadable(URL)
     /// It opens, but carries no `.archive-suite-root.json` — it is not an Archive root at all.
     case notAnArchiveRoot(URL)
+    /// It is an Archive root, but of the wrong kind — the likely pick being Archive Notes' own
+    /// notes folder, which carries a `.notes` marker (`RootFolderStore` writes one).
+    ///
+    /// Newly reachable as of `W26.notesabsence-fu2`: until Notes had a folder chooser, the only
+    /// folders ever handed to `grantRoot` came from tests. Adopting one would "succeed" and then
+    /// satisfy no link ever, because a Reader link's GUID is a *Reader* root's GUID.
+    case wrongRootKind(URL, RootKind)
     /// A marker file is there and could not be read or decoded. Distinct from `notAnArchiveRoot` on
     /// purpose (W23.m6): the repair for absence is to mint a fresh GUID, which would orphan every
     /// link already written from this root, so "unreadable identity" must never read as "no identity".
@@ -40,6 +47,16 @@ enum ReaderRootGrantRefusal: Equatable, Sendable {
         case let .notAnArchiveRoot(url):
             return "“\(url.lastPathComponent)” is not an Archive Reader folder. "
                 + "Choose the archive folder Reader itself opens."
+        case let .wrongRootKind(url, kind):
+            switch kind {
+            case .notes:
+                return "“\(url.lastPathComponent)” is your Archive Notes folder, not an archive of "
+                    + "scanned documents. Choose the folder Archive Reader opens."
+            case .reader:
+                // Unreachable while `.reader` is what this store wants; kept exhaustive so adding a
+                // third kind is a compile error here rather than a wrong sentence at runtime.
+                return "“\(url.lastPathComponent)” is not the right kind of archive folder."
+            }
         case let .markerUnreadable(url, _):
             return "Could not read the archive identity in “\(url.lastPathComponent)”, "
                 + "so it was not opened."
@@ -195,6 +212,14 @@ final class ReaderRootStore: ObservableObject {
             return .refused(.markerUnreadable(url, "\(error)"))
         }
         guard let marker = found else { return .refused(.notAnArchiveRoot(url)) }
+        // A `.notes` marker is a real Archive root — Notes writes one at its own store — so it gets
+        // past `notAnArchiveRoot` and would be adopted, keyed by a GUID no Reader link can ever
+        // name. Refusing it is only worth saying now that a user can pick a folder at all
+        // (`W26.notesabsence-fu2`); the notes folder is the plausible mis-pick, being the one
+        // folder Notes already talks about.
+        guard marker.kind == .reader else {
+            return .refused(.wrongRootKind(url, marker.kind))
+        }
 
         do {
             let data = try mintBookmark(target)

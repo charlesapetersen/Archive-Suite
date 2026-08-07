@@ -30,6 +30,14 @@ enum LinkResolution: Sendable, Equatable {
     /// the same folder without saying anything is the defect this case exists to stop
     /// (W26.notesabsence-fu1).
     case grantRefused(ReaderRootGrantRefusal)
+    /// The folder the user chose is a perfectly good Reader archive — just **not this link's**.
+    ///
+    /// Distinct from `.needsRootGrant` for the same reason `.grantRefused` is (`W26.notesabsence-fu1`):
+    /// `needsRootGrant` means *ask the user to choose a folder*, and answering a deliberate pick with
+    /// it tells them to do the thing they just did. Reachable only from `grantAndResolve`, which
+    /// before `W26.notesabsence-fu2` had no caller outside the tests — so this branch has always
+    /// existed and has never been seen by a user.
+    case wrongArchive(picked: URL, granted: UUID, wanted: UUID)
 }
 
 /// The outcome of the walk-free stage of resolution.
@@ -281,8 +289,11 @@ final class ReaderLinkResolver {
             return .grantRefused(refusal)
         case .granted(let marker):
             guard marker.guid == rootGUID else {
-                // Wrong folder — the user chose a root with a different GUID.
-                return .needsRootGrant(guid: rootGUID)
+                // Wrong folder — the user chose a root with a different GUID. The grant itself
+                // stands (that archive is now usable in Notes); it just cannot answer THIS link,
+                // and saying "choose a folder" to someone who has just chosen one is the defect
+                // `W26.notesabsence-fu1` fixed one case of.
+                return .wrongArchive(picked: url, granted: marker.guid, wanted: rootGUID)
             }
             return await resolve(rootGUID: rootGUID, relativePath: relativePath, progress: progress)
         }

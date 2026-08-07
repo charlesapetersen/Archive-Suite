@@ -211,16 +211,21 @@ struct ReaderLinkResolverTests {
         }
     }
 
-    @Test("grantAndResolve rejects wrong GUID")
+    @Test("grantAndResolve rejects wrong GUID, but the grant itself stands")
     func grantAndResolveWrongGUID() async throws {
-        let (root, _) = try makeScratchRoot()
+        let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = ReaderRootStore(defaults: scratchDefaults())
         let resolver = ReaderLinkResolver(rootStore: store)
         let wrongGUID = UUID()
         let result = await resolver.grantAndResolve(url: root, rootGUID: wrongGUID, relativePath: "test.pdf")
-        #expect(result == .needsRootGrant(guid: wrongGUID))
+        // W26.notesabsence-fu2: this used to answer `.needsRootGrant(guid: wrongGUID)` — the same
+        // sentence as "you haven't chosen anything yet" — to someone who had just chosen a real,
+        // grantable archive. `.wrongArchive` says which folder was picked and which archive it
+        // actually is, and the grant is kept: `root`'s own GUID is now usable in Notes.
+        #expect(result == .wrongArchive(picked: root, granted: marker.guid, wanted: wrongGUID))
+        #expect(store.knownRoots[marker.guid] != nil, "a grant for the RIGHT guid must not be discarded")
     }
 
     @Test("Resolves file with special characters (em-dash, NBSP, spaces)")
@@ -574,6 +579,32 @@ struct ReaderRootStoreTests {
                 // spelling to report it under.
                 #expect(store.grantRoot(pick).refusal == .unreadable(pick))
             }
+            #expect(store.knownRoots.isEmpty)
+            #expect(defaults.dictionary(forKey: bookmarksKey) == nil,
+                    "a refused grant must not persist a bookmark")
+        }
+    }
+
+    /// Newly reachable now that a real chooser exists (`W26.notesabsence-fu2`): the plausible mis-pick
+    /// is Notes' OWN store root, which carries a genuine, decodable marker — so without this guard it
+    /// would sail past `notAnArchiveRoot` and be adopted under a GUID no Reader link can ever name.
+    @Test("grantRoot refuses a NOTES root, and says which one was picked")
+    func wrongKindIsRefused() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveNotes-rootstore-wrongkind-\(UUID().uuidString)",
+                                    isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let notesMarker = RootMarker(guid: UUID(), name: "My Notes", kind: .notes, createdAt: Date())
+        try JSONEncoder().encode(notesMarker)
+            .write(to: tmp.appendingPathComponent(RootMarker.filename), options: .atomic)
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let result = store.grantRoot(tmp)
+            #expect(result.marker == nil, "a Notes root is not a grantable Reader root")
+            #expect(result.refusal == .wrongRootKind(tmp, .notes))
+            #expect(ReaderRootGrantRefusal.wrongRootKind(tmp, .notes).message.contains("Notes"))
             #expect(store.knownRoots.isEmpty)
             #expect(defaults.dictionary(forKey: bookmarksKey) == nil,
                     "a refused grant must not persist a bookmark")

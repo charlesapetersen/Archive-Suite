@@ -403,7 +403,7 @@ because Notes has no folder chooser at all (`fu2` below). The adversarial pass f
 is NAMED for had no test and a mutation restoring the bug stayed green, which is why `mintBookmark` is an
 injectable seam; it also filed **`fu3`** (a `persistAll` that deletes bookmarks it merely failed to re-mint).
 `fu3` shipped first, as intended — it was harmless only while nothing could grant a root, and `fu2` is the
-item that hands the user one to lose. **`fu2` is the only one of the two still open.**
+item that hands the user one to lose. **Both have since shipped — see `fu2` and `fu3` below.**
 
 ✅ **W26.notesabsence-fu3 — SHIPPED 2026-08-07 (`af01cb7` → this commit); full entry in
 `SUITE_TODO_DONE.md`.** One mechanism behind all three defects: `ReaderRootStore` conflated *"I have a URL
@@ -425,21 +425,16 @@ A third imbalance, found in the same lines and fixed there: re-granting a GUID a
 second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 new source warnings, lint 14/14,
 **10 mutants each caught by a named test**.
 
-- [ ] **W26.notesabsence-fu2 — Notes can never grant a Reader root, so the Reader-link preview is
-  unreachable on every machine — and the popover's advice cannot help [S–M · MED · behaviour].** Filed
-  2026-08-07 while shipping `W26.notesabsence-fu1`; **pre-existing**, older than Wave 26. Measured by
-  construction, not inferred: `grantRoot`'s only caller is `ReaderLinkResolver.grantAndResolve`, whose only
-  callers are **tests** (`grep -rn grantAndResolve ArchiveNotes/macOS/Sources` → one hit, its own
-  declaration), and `grep -rn NSOpenPanel ArchiveNotes/macOS/Sources` returns **nothing** — Notes has no
-  archive-folder chooser at all. So `knownRoots` starts and stays empty, `root(for:)` answers `nil`, and every
-  source-block preview ends at `.needsRootGrant`, whose popover says *"Use File ▸ Choose Archive Folder… in
-  Reader first"* — which cannot work: Notes is **sandboxed** (`ArchiveNotes.entitlements`: `app-sandbox` +
-  `files.user-selected.read-write` + `bookmarks.app-scope`), so a grant the user makes in *Reader* conveys no
-  access to *Notes*. Fix: a File-menu chooser in Notes that calls `grantAndResolve` (the plumbing, refusal
-  messages included, is in place as of `fu1`), and re-word that popover. ⚠️ Only a real `NSOpenPanel` pick can
-  settle the one question `fu1` left open — whether the sandbox honours a security-scoped bookmark minted for
-  a symlink's **target** when the panel granted the **link**. That needs the VM GUI lane, which is Reader-only
-  until `W21.vmgui` lands; say so explicitly when deferring it.
+✅ **W26.notesabsence-fu2 — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.** New
+`ReaderRootChooser` is the panel Notes was missing — `grantRoot`'s only caller used to be a test, and
+`NSOpenPanel` appeared nowhere in Notes' sources, so `knownRoots` started and stayed empty on every real
+machine. Two entry points (File ▸ Choose Archive Folder…, and an in-popover variant that grants and
+re-resolves the waiting link in one step), plus two refusal cases the missing chooser had made unreachable
+in practice: `ReaderRootGrantRefusal.wrongRootKind` (picking Notes' own `.notes`-marked folder) and
+`LinkResolution.wrongArchive` (granting a real, different archive — no longer conflated with "nothing chosen
+yet"). All three popover messages now carry a working "choose a folder" button. My own adversarial pass
+caught a cancel-leaves-a-permanent-spinner bug in that button before it shipped. The sandbox-symlink question
+`fu1` left open is still open — needs a real `NSOpenPanel` pick, VM lane, Reader-only until `W21.vmgui`.
 ✅ **W26.oracle — SHIPPED 2026-08-06 (`50ea4a1` → this commit); full entry in `SUITE_TODO_DONE.md`.** The
 item's premise was **too kind to the old oracle** and the correction is the durable part: it said the `mdls`
 read *"would have"* failed during the 2026-08-04 incident. Measured on this machine at the harness's own

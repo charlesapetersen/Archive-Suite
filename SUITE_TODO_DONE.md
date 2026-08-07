@@ -110,6 +110,70 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.notesabsence-fu2 — Notes can never grant a Reader root, so the Reader-link preview is
+  unreachable on every machine, and the popover's advice ("choose the folder in Reader") cannot help a
+  sandboxed app [S–M · MED · behaviour]. ✅ SHIPPED 2026-08-07** — this commit. Filed 2026-08-07 by
+  `W26.notesabsence-fu1`; pre-existing, older than Wave 26.
+
+  **The gap, measured by construction.** `ReaderRootStore.grantRoot`'s only caller was
+  `ReaderLinkResolver.grantAndResolve`, whose only callers were tests (`grep -rn grantAndResolve
+  ArchiveNotes/macOS/Sources` → one hit, its own declaration), and `grep -rn NSOpenPanel
+  ArchiveNotes/macOS/Sources` returned nothing — Notes had no archive-folder chooser at all. `knownRoots`
+  started and stayed empty on every real machine, and every source-block preview ended at
+  `.needsRootGrant`, whose popover said *"Use File ▸ Choose Archive Folder… in Reader first"* — which cannot
+  work, because Notes is sandboxed (`app-sandbox` + `files.user-selected.read-write` +
+  `bookmarks.app-scope`): a grant the user makes in *Reader* conveys no access to *Notes*.
+
+  **The fix.** New `ReaderRootChooser` (`Links/ReaderRootChooser.swift`) is the panel Notes was missing,
+  behind two seams (`pickFolder`, `report`) so a unit-test host never opens a real `NSOpenPanel`/`NSAlert` —
+  either would block the whole bundle with nobody there to dismiss it. Two entry points: `chooseRoot()` for
+  File ▸ Choose Archive Folder… (new `ReaderRootCommands`, wired into `ArchiveNotesApp`'s `.commands`, passed
+  `previewState` directly rather than via `@FocusedValue` — `.commands` does not inherit a window's
+  `@EnvironmentObject`s), and `chooseRootAndResolve` for the in-popover variant, which grants *and*
+  re-resolves the waiting link in one step. `SourceBlockPreviewState` owns one `ReaderRootChooser` alongside
+  its resolver and exposes `chooseArchiveFolder()` to the menu.
+
+  **Two refusal cases that were reachable in principle but had never been reachable in practice, because
+  nothing could grant anything before this:**
+  - `ReaderRootGrantRefusal.wrongRootKind` — a genuine, decodable Archive root whose marker says `.notes`,
+    not `.reader`. The plausible mis-pick is Notes' own store root, which `RootFolderStore` marks the same
+    way; without this guard it would sail past `notAnArchiveRoot` and be adopted under a GUID no Reader link
+    can ever name.
+  - `LinkResolution.wrongArchive(picked:granted:wanted:)` — `grantAndResolve` picking up a real, grantable
+    root whose GUID is not the one the link wants. Previously answered `.needsRootGrant(guid: wanted)`, the
+    same case as "nothing chosen yet" — telling a user who had just picked a folder to go pick one. The grant
+    now **stands** (that archive is usable in Notes from here on); only the specific link is unresolved.
+    Updated two pre-existing tests whose expectations this changes (`ReaderLinkResolverTests
+    .grantAndResolveWrongGUID`, `DurableLinkE2ETests.regrantWrongFolderRejected`) to assert both the new case
+    and that the grant survives.
+
+  **Popover wording**, all three now carry a "choose a folder" button that drives the chooser without
+  leaving the popover: `.needsRootGrant`'s message no longer sends the user to Reader; `.grantRefused`
+  offers "Choose Another Folder…"; `.wrongArchive` says which archive was picked and that it is a different
+  one, not "not found" and not "choose a folder" (repeating the instruction to someone who just followed it).
+
+  🔺 **Caught in my own adversarial pass, not by a test:** the button's action showed an "Opening the
+  archive…" spinner before the modal panel ran (so the panel looks like it opens something rather than
+  freezing the popover), but on a **cancelled** panel nothing ever replaced that spinner — a cancel would
+  have left it spinning forever, since the panel's dismissal leaves no popover to fall back to except the
+  one code has to rebuild. Fixed by threading the resolution that was on screen *before* the button was
+  pressed through as a fallback (`grantAction(fallbackTo:relativeTo:)`); a cancelled panel now restores
+  exactly what the user was looking at. Not unit-tested: it lives in `ReaderPreviewPopover`, which needs a
+  real `NSPopover`/window to exercise (the resolver-level bookkeeping is deliberately factored out so *that*
+  half stays testable without one — see `fu3`'s note on `releaseRootScope`) — the VM GUI lane is Reader-only
+  until `W21.vmgui`. Verified by reading the control flow instead.
+
+  **What is proven and what is not.** Every assertion is at the store/resolver/chooser level in the Notes
+  test host — the real `NSOpenPanel` pick is not covered, and cannot be from a unit-test host. That leaves
+  one question `fu1` raised open: whether the sandbox honours a security-scoped bookmark minted for a
+  symlink's **target** when the panel granted the **link**. Needs a real pick — VM lane, Reader-only until
+  `W21.vmgui`.
+
+  **Verification.** Notes **771** swift-testing (763 → 771; 8 new: 1 `wrongRootKind` refusal test in
+  `ReaderRootStoreTests`, 7 in the new `ReaderRootChooserTests`) **+ 189** XCTest green; Release BUILD
+  SUCCEEDED with **0 source warnings**; build-for-testing (UITest bundle) succeeds. No ArchiveCore, Reader or
+  Processor source touched, so those lanes were not re-run.
+
 - [x] **W26.notesabsence-fu3 — `ReaderRootStore` DELETES bookmarks it merely failed to re-mint, so one root
   that has moved takes every other granted root with it [S · MED · Tier-2]. ✅ SHIPPED 2026-08-07** —
   `af01cb7` (the three fixes) → this commit (the tests, the mutation pass, the trackers). Filed 2026-08-07 by

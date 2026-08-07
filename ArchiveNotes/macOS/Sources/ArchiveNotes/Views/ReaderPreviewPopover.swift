@@ -11,6 +11,7 @@ final class ReaderPreviewPopover {
 
     private var popover: NSPopover?
     private let resolver: ReaderLinkResolver
+    private let chooser: ReaderRootChooser
 
     /// The in-flight basename search, if any. Cancelled on dismiss / re-show (W23.m14).
     private var searchTask: Task<Void, Never>?
@@ -19,8 +20,21 @@ final class ReaderPreviewPopover {
     private weak var anchorView: NSView?
     private let searchModel = PreviewSearchModel()
 
-    init(resolver: ReaderLinkResolver) {
+    /// What the popover currently on screen is a preview *of*.
+    ///
+    /// Kept because the answer to a missing root — "choose the folder" — has to grant and then
+    /// resolve *this* link, and the button that does it is built after `show` has finished parsing
+    /// (W26.notesabsence-fu2).
+    private struct LinkContext {
+        let guid: UUID
+        let relativePath: String
+        let page: Int?
+    }
+    private var currentLink: LinkContext?
+
+    init(resolver: ReaderLinkResolver, chooser: ReaderRootChooser) {
         self.resolver = resolver
+        self.chooser = chooser
     }
 
     /// Show a preview popover for the given source anchor, anchored to `view`.
@@ -35,16 +49,19 @@ final class ReaderPreviewPopover {
         guard let linkStr = anchor.link,
               let url = URL(string: linkStr),
               case .readerReveal(let guid, let rel, let page) = DurableLink(url: url) else {
+            currentLink = nil
             showMessage("No valid archive link.", relativeTo: view)
             return
         }
+        currentLink = LinkContext(guid: guid, relativePath: rel, page: page)
 
         switch resolver.resolveExact(rootGUID: guid, relativePath: rel) {
         case .decided(let resolution):
             present(resolution, page: page, relativeTo: view)
         case .needsBasenameSearch:
             let search = searchModel.beginSearch()
-            showSearching(relativeTo: view)
+            showSearching("Original file not found at its recorded path.\nSearching the archive\u{2026}",
+                          relativeTo: view)
             searchTask = Task { [weak self] in
                 guard let self else { return }
                 let resolution = await self.resolver.resolve(
@@ -85,9 +102,18 @@ final class ReaderPreviewPopover {
         case .resolved(let fileURL):
             showPDF(fileURL: fileURL, page: page, relativeTo: view)
         case .needsRootGrant:
+            // The old wording — "Use File ▸ Choose Archive Folder… in Reader first" — asked for
+            // something that cannot work and could not be done anyway (W26.notesabsence-fu2).
+            // Notes is sandboxed, so a folder the user grants to *Reader* conveys no access to
+            // *Notes*; and until this item, Notes had no chooser of its own to send them to. Both
+            // halves are fixed here: the sentence names Notes' own menu item, and the button does
+            // it without leaving the popover.
             showMessage(
-                "This link points to an archive not set up on this Mac.\nUse File \u{25b8} Choose Archive Folder\u{2026} in Reader first.",
-                relativeTo: view
+                "Archive Notes has not been given access to this archive folder.\n"
+                    + "Granting it in Reader is not enough \u{2014} choose the same folder here.",
+                relativeTo: view,
+                actionTitle: "Choose Archive Folder\u{2026}",
+                action: grantAction(fallbackTo: resolution, relativeTo: view)
             )
         case .renamedCandidate(let candidate):
             showMessage(
@@ -107,19 +133,78 @@ final class ReaderPreviewPopover {
             // to stop an app saying. The count still earns its place — it is what the user watched
             // tick up — but as an amount examined, not as the point where the search gave up.
             showMessage(
-                "Original file not found at its recorded path.\nThe search of the archive did not finish (\(scanned) items examined), so the file may still be there.",
+                "Original file not found at its recorded path.\n"
+                    + "The search of the archive did not finish (\(scanned) items examined), "
+                    + "so the file may still be there.",
                 relativeTo: view
             )
         case .grantRefused(let refusal):
             // The chosen folder was not adopted. Saying so is the whole point of the case: the
             // silent version of this asked for the same folder again (W26.notesabsence-fu1).
-            showMessage(refusal.message, relativeTo: view)
+            showMessage(refusal.message, relativeTo: view,
+                        actionTitle: "Choose Another Folder\u{2026}",
+                        action: grantAction(fallbackTo: resolution, relativeTo: view))
+        case .wrongArchive(let picked, _, _):
+            // The grant STOOD — that archive is usable in Notes now — it just is not this link's.
+            // Repeating "choose the folder" here would be telling them to do what they just did.
+            showMessage(
+                "“\(picked.lastPathComponent)” is a different archive.\n"
+                    + "This source came from another archive folder \u{2014} choose that one to preview it.",
+                relativeTo: view,
+                actionTitle: "Choose Another Folder\u{2026}",
+                action: grantAction(fallbackTo: resolution, relativeTo: view)
+            )
         }
     }
 
-    private func showSearching(relativeTo anchor: NSView) {
+    /// The action behind every "choose a folder" button: ask, grant, and re-resolve **this** link.
+    ///
+    /// `nil` when there is no link in hand (a malformed chip), so the button is simply absent
+    /// rather than present and inert.
+    ///
+    /// - Parameter fallback: what to re-present if the panel is cancelled. A cancel is not a new
+    ///   answer — the "Opening the archive…" spinner this puts up while the panel is open has
+    ///   nothing to settle into otherwise, and would sit there forever: the panel dismisses the
+    ///   popover on its way up (it is `.transient`), so once it closes there is no popover left to
+    ///   fall back to except the one this rebuilds.
+    ///
+    /// The success path puts the answer back on the same anchor, exactly as the basename search
+    /// does, and skips it if the chip has gone away in the meantime.
+    private func grantAction(fallbackTo fallback: LinkResolution, relativeTo view: NSView) -> (() -> Void)? {
+        guard let link = currentLink else { return nil }
+        return { [weak self, weak view] in
+            guard let self, let view else { return }
+            self.searchTask?.cancel()
+            let search = self.searchModel.beginSearch()
+            // Put up *before* the task starts, so it is what the user finds when the modal panel
+            // closes rather than a blank screen for however long a basename walk takes. Truthful in
+            // the fast case too — it is opening either way.
+            self.showSearching("Opening the archive\u{2026}", relativeTo: view)
+            self.searchTask = Task { [weak self] in
+                guard let self else { return }
+                let outcome = await self.chooser.chooseRootAndResolve(
+                    rootGUID: link.guid,
+                    relativePath: link.relativePath,
+                    progress: { [weak self] scanned in
+                        self?.searchModel.advance(to: scanned, generation: search)
+                    }
+                )
+                guard !Task.isCancelled else { return }
+                guard let target = self.anchorView, target === view, target.window != nil else {
+                    self.closePopover()
+                    return
+                }
+                // A cancelled panel is not silence: the user is still looking at "Opening the
+                // archive…" and needs it replaced with what they were looking at before they
+                // pressed the button, not left spinning.
+                self.present(outcome ?? fallback, page: link.page, relativeTo: target)
+            }
+        }
+    }
+
+    private func showSearching(_ headline: String, relativeTo anchor: NSView) {
         closePopover()
-        let content = PreviewSearchingView(model: searchModel)
+        let content = PreviewSearchingView(headline: headline, model: searchModel)
         let pop = NSPopover()
         pop.contentSize = NSSize(width: 300, height: 120)
         pop.behavior = .transient
@@ -155,10 +240,19 @@ final class ReaderPreviewPopover {
         popover = pop
     }
 
-    private func showMessage(_ text: String, relativeTo anchorView: NSView) {
-        let content = PreviewMessageView(message: text)
+    private func showMessage(
+        _ text: String,
+        relativeTo anchorView: NSView,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        let button: PreviewMessageView.Action? = {
+            guard let actionTitle, let action else { return nil }
+            return PreviewMessageView.Action(title: actionTitle, perform: action)
+        }()
+        let content = PreviewMessageView(message: text, action: button)
         let pop = NSPopover()
-        pop.contentSize = NSSize(width: 300, height: 100)
+        pop.contentSize = NSSize(width: 300, height: button == nil ? 100 : 140)
         pop.behavior = .transient
         pop.contentViewController = NSHostingController(rootView: content)
         pop.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .maxY)
@@ -221,13 +315,14 @@ final class PreviewSearchModel: ObservableObject {
 }
 
 private struct PreviewSearchingView: View {
+    let headline: String
     @ObservedObject var model: PreviewSearchModel
 
     var body: some View {
         VStack(spacing: 8) {
             Spacer(minLength: 0)
             ProgressView().controlSize(.small)
-            Text("Original file not found at its recorded path.\nSearching the archive\u{2026}")
+            Text(headline)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -242,18 +337,29 @@ private struct PreviewSearchingView: View {
 }
 
 private struct PreviewMessageView: View {
+    struct Action {
+        let title: String
+        let perform: () -> Void
+    }
+
     let message: String
+    var action: Action?
 
     var body: some View {
-        VStack {
-            Spacer()
+        VStack(spacing: 12) {
+            Spacer(minLength: 0)
             Text(message)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding()
-            Spacer()
+                .padding(.horizontal)
+            if let action {
+                Button(action.title, action: action.perform)
+                    .buttonStyle(.bordered)
+            }
+            Spacer(minLength: 0)
         }
+        .padding(.vertical)
     }
 }
 
@@ -265,12 +371,17 @@ private struct PreviewMessageView: View {
 final class SourceBlockPreviewState: ObservableObject {
     private let rootStore: ReaderRootStore
     private let preview: ReaderPreviewPopover
+    /// Also driven from the File menu (`ArchiveNotesCommands.swift`), with no anchor and no link in
+    /// hand — the other of the two entry points `ReaderRootChooser` exists for (W26.notesabsence-fu2).
+    private let chooser: ReaderRootChooser
 
     init() {
         let store = ReaderRootStore()
         self.rootStore = store
         let resolver = ReaderLinkResolver(rootStore: store)
-        self.preview = ReaderPreviewPopover(resolver: resolver)
+        let chooser = ReaderRootChooser(rootStore: store, resolver: resolver)
+        self.chooser = chooser
+        self.preview = ReaderPreviewPopover(resolver: resolver, chooser: chooser)
     }
 
     func show(for anchor: SourceAnchor, relativeTo view: NSView) {
@@ -279,5 +390,10 @@ final class SourceBlockPreviewState: ObservableObject {
 
     func dismiss() {
         preview.dismiss()
+    }
+
+    /// File ▸ Choose Archive Folder… — grant a Reader root with no link in hand.
+    func chooseArchiveFolder() {
+        chooser.chooseRoot()
     }
 }

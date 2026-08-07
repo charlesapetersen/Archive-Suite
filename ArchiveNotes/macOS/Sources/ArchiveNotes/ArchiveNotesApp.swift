@@ -43,6 +43,7 @@ struct ArchiveNotesApp: App {
             }
         }
         .commands {
+            ReaderRootCommands(previewState: previewState)
             FormatCommands()
             SourceBlockCommands()
             ZoteroCommands()
