@@ -110,6 +110,75 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.notesabsence-fu1 — a symlinked Reader root cannot be GRANTED in Notes, and the failure is
+  silent [S · MED · Tier-2]. ✅ SHIPPED 2026-08-07** — `6226e7d` (the fix + its tests) → this commit (the
+  mutation pass, the follow-up, the trackers). Filed 2026-08-07 by `W26.notesabsence`; **pre-existing**, and
+  `W26.symroot-fu1`'s adoption half surviving one app over.
+
+  **The defect.** `ReaderRootStore.grantRoot` read the `RootMarker` *before* it attempted the bookmark, and
+  returned that marker on the way out of a `catch` that only `NSLog`ed. So a failed grant came back **non-nil**
+  while `knownRoots[guid]` was never set: the caller believed it had succeeded, `root(for: guid)` answered
+  `nil`, and `resolve` reported `.needsRootGrant` — the user is asked to choose the archive folder, chooses it,
+  and is asked again, with nothing said. A root that IS a symlink took that path **every** time, because
+  `bookmarkData(options: .withSecurityScope)` cannot `open()` a link. That premise is now asserted rather than
+  trusted (`securityScopedBookmarkRefusesASymlink`): minting for the link throws while the same directory
+  succeeds, so if a future macOS lifts the restriction the suite says the canonicalisation stopped being
+  load-bearing instead of passing while guarding nothing.
+
+  **The fix.** The folder is adopted as `CorpusWalker.canonicalRoot(url)`, so the bookmark is minted for — and
+  `knownRoots` holds — the openable target. Only a symlinked FINAL component differs from the pick
+  (`canonicalRoot` returns every other root byte-unchanged), which `grantAndRetrieve` now asserts directly, so
+  no root that works today shifts and no saved bookmark is invalidated. `grantRoot` returns
+  `ReaderRootGrant` — `.granted(marker)` or `.refused(_)` — and the refusals are four distinct things, each
+  with the `message` the popover shows: `.unreadable` (missing, denied, dangling link, `ELOOP`, not a
+  directory, or a link to a regular file — `realpath` succeeds for that one, the `opendir` probe is what
+  refuses it), `.notAnArchiveRoot`, `.markerUnreadable` and `.couldNotBookmark`. The last two used to be the
+  same bare `nil`: `RootMarker.read` already distinguishes an unreadable identity from an absent one for
+  W23.m6's reason — the repair for absence is a fresh GUID, which orphans every link already written from that
+  root — and the store was throwing that away with `try?`. `LinkResolution.grantRefused` carries the refusal
+  through `grantAndResolve` into `ReaderPreviewPopover`; a marker-less pick used to be reported as
+  `.notFound`, a claim the archive had been searched about a folder that was never opened.
+
+  **`ReaderRootStore` now takes an injected `UserDefaults`** (the Reader's precedent from `W26.symroot-fu1`).
+  `grantRoot` WRITES `readerRootBookmarks`, and in `.standard` that key is the app's real set of granted Reader
+  roots — the `ReaderRootStoreTests` suite that exercised it had **no snapshot at all**, unlike its three
+  sibling suites. `grantRootNeverTouchesStandardDefaults` asserts `.standard` is byte-unchanged across a grant.
+
+  **The adversarial pass changed four things, and the first is the one worth remembering.** 🔺 *The branch this
+  item is NAMED for had no test, and a mutation putting the original bug back stayed green.* With the
+  canonicalisation in place, nothing reachable from a test can make minting fail — every fixture is in the app
+  container, where `bookmarkData` always succeeds, and the symlink that used to fail is precisely what the fix
+  removes. So `mintBookmark` is now an injectable seam and `couldNotBookmarkIsRefused` drives it; mutant M7
+  (`catch` → `return .granted(marker)`, i.e. the exact pre-fix bug) is caught by that test and by nothing else.
+  🔺 Re-granting the same GUID at a new path overwrote `activeScopes[guid]` without stopping the scope it
+  replaced — `RootFolderStore.setRoot`'s release-the-previous step, in the same order (new access live first).
+  🔺 Refusals named the *canonicalised target*, so for a symlinked pick the message named a folder the user had
+  never seen; every case now carries the pick. 🔺 The eight tests in `@Suite("ReaderLinkResolver")` granted
+  roots against `.standard` with **no snapshot at all** (its three sibling suites at least restore the key),
+  leaving a junk entry per run keyed by a random GUID; they take injected scratch domains now. That also made
+  the new hermeticity guard assert on **this grant's GUID key** rather than on the whole dictionary — a
+  whole-dictionary comparison would have flaked against those sibling suites' restore window while proving
+  nothing extra.
+
+  8 new tests (Notes 746 → **754** swift-testing, 189 XCTest, `TEST SUCCEEDED`), Release build clean, 0 source
+  warnings; write-surface lint + self-test 14/14. No ArchiveCore change, so no cross-app rebuild was owed.
+  **7 mutants, each caught by a named test** (bookmark the pick not the target; store the pick not the target;
+  collapse `.markerUnreadable` into `.notAnArchiveRoot`; drop the canonicalisation entirely; ignore the
+  injected defaults; report a refusal as `.notFound`; return `.granted` from the bookmark `catch`).
+
+  Two findings went to the queue rather than into this change: **`W26.notesabsence-fu3`** (`persistAll`
+  re-mints without a scope, so one moved root deletes every other root's bookmark — pre-existing, and the
+  Reader refuses to do it) and **`W26.notesabsence-fu2`**. No GUI check was run or is possible: the popover
+  branch this adds is unreachable in the shipping app (fu2), Notes has no VM GUI lane until `W21.vmgui`, and an
+  unattended session may not drive the host screen. The refusal string is asserted in a unit test instead.
+
+  ⚠️ **What is NOT proven, and it is the reason `W26.notesabsence-fu2` exists.** Every assertion is at the
+  store/resolver level in the Notes test host. In the real app the URL would come from an `NSOpenPanel` grant,
+  and whether the sandbox honours a bookmark minted for a symlink's **target** when the panel granted the
+  **link** cannot be seen from a unit test. It is also not reachable today: Notes has no folder chooser, so
+  nothing in the shipping app calls `grantRoot` at all (see `fu2`). The Reader carries the same residual
+  question and shipped on the same footing.
+
 - [x] **W26.notesabsence — Notes' `ReaderLinkResolver` established ABSENCE from a walk that read
   nothing [S · MED · Tier-2]. ✅ SHIPPED 2026-08-07** — `5c46d2a` (the fix + its tests) → this commit (the
   popover wording, the follow-up, the trackers). Filed 2026-08-06 by `W26.symroot`'s adversarial pass;

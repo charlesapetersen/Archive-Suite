@@ -96,6 +96,19 @@ struct ReaderLinkResolverTests {
         return (tmp, marker)
     }
 
+    /// A throwaway defaults domain, one per test, wiped before use.
+    ///
+    /// These tests called `grantRoot` against `UserDefaults.standard` — the app's REAL set of granted
+    /// Reader roots — with no snapshot of any kind, unlike the three sibling suites that at least
+    /// restore the key. Every run left a permanent junk entry there, keyed by a random GUID and
+    /// pointing at a deleted temp directory. Injection (W26.notesabsence-fu1) is what makes that
+    /// avoidable rather than merely tidied up afterwards.
+    private func scratchDefaults(_ name: String = #function) -> UserDefaults {
+        let suite = "ArchiveNotesTests.ReaderLinkResolver.\(name)"
+        UserDefaults.standard.removePersistentDomain(forName: suite)
+        return UserDefaults(suiteName: suite)!
+    }
+
     private func createFile(at root: URL, relativePath: String) throws {
         let fileURL = root.appendingPathComponent(relativePath)
         try FileManager.default.createDirectory(
@@ -112,7 +125,7 @@ struct ReaderLinkResolverTests {
 
         try createFile(at: root, relativePath: "folder/doc.pdf")
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
@@ -126,7 +139,7 @@ struct ReaderLinkResolverTests {
 
     @Test("Returns needsRootGrant for unknown GUID")
     func unknownGUIDNeedsGrant() async {
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         let resolver = ReaderLinkResolver(rootStore: store)
         let unknownGUID = UUID()
         let result = await resolver.resolve(rootGUID: unknownGUID, relativePath: "test.pdf")
@@ -138,7 +151,7 @@ struct ReaderLinkResolverTests {
         let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
@@ -154,7 +167,7 @@ struct ReaderLinkResolverTests {
         // File exists at a different path than what the link says
         try createFile(at: root, relativePath: "new-folder/doc.pdf")
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
@@ -172,7 +185,7 @@ struct ReaderLinkResolverTests {
         let (root, marker) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
@@ -188,7 +201,7 @@ struct ReaderLinkResolverTests {
 
         try createFile(at: root, relativePath: "test.pdf")
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         let resolver = ReaderLinkResolver(rootStore: store)
         let result = await resolver.grantAndResolve(url: root, rootGUID: guid, relativePath: "test.pdf")
         if case .resolved(let url) = result {
@@ -203,7 +216,7 @@ struct ReaderLinkResolverTests {
         let (root, _) = try makeScratchRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         let resolver = ReaderLinkResolver(rootStore: store)
         let wrongGUID = UUID()
         let result = await resolver.grantAndResolve(url: root, rootGUID: wrongGUID, relativePath: "test.pdf")
@@ -218,7 +231,7 @@ struct ReaderLinkResolverTests {
         let relPath = "Folder\u{2014}Name/Doc\u{00A0}File.pdf"
         try createFile(at: root, relativePath: relPath)
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: scratchDefaults())
         store.grantRoot(root)
 
         let resolver = ReaderLinkResolver(rootStore: store)
@@ -384,7 +397,9 @@ struct ReaderRootStoreTests {
 
             #expect(grant.refusal == nil)
             #expect(grant.marker?.guid == marker.guid)
-            #expect(store.root(for: marker.guid) != nil, "a granted root must be USABLE")
+            // The value a caller actually gets back — pre-fix `knownRoots` was empty here and
+            // `root(for:)` answered nil while the marker above came back non-nil.
+            #expect(samePath(store.root(for: marker.guid), real))
             // Stored as the TARGET, because that is the URL a security-scoped bookmark can open.
             #expect(samePath(store.knownRoots[marker.guid], real))
             #expect(store.knownRoots[marker.guid]?.path != link.path)
@@ -494,19 +509,64 @@ struct ReaderRootStoreTests {
         }
     }
 
+    /// The branch this item is NAMED for: `bookmarkData` fails for a folder that opens and carries a
+    /// marker. Pre-fix it returned `.granted`-in-effect — the marker had been read before the attempt —
+    /// so the caller believed a grant had happened that `knownRoots` knew nothing about.
+    ///
+    /// It needs the `mintBookmark` seam, and that is a finding rather than a convenience: with the
+    /// canonicalisation in place, nothing reachable from a test in the app container can make minting
+    /// fail (the symlink that used to is precisely what the fix removes), so without the seam a
+    /// mutation putting the original bug back passes the whole suite.
+    @Test("A folder that cannot be bookmarked is REFUSED — never reported as granted")
+    func couldNotBookmarkIsRefused() async throws {
+        let (real, marker) = try makeMarkedRoot("mint-fails")
+        defer { try? FileManager.default.removeItem(at: real) }
+        // Picked through a symlink, so the refusal's naming is checked on the case where the pick and
+        // the target differ: the user is told about the folder THEY chose.
+        let link = real.deletingLastPathComponent()
+            .appendingPathComponent("ArchiveNotes-mintfail-link-\(UUID().uuidString)",
+                                    isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        defer { try? FileManager.default.removeItem(at: link) }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            store.mintBookmark = { _ in throw CocoaError(.fileReadNoPermission) }
+            let grant = store.grantRoot(link)
+
+            #expect(grant.marker == nil, "a grant that could not be kept is not a grant")
+            guard case .couldNotBookmark(let named, _)? = grant.refusal else {
+                Issue.record("expected .couldNotBookmark, got \(String(describing: grant.refusal))")
+                return
+            }
+            #expect(named == link, "the refusal must name the folder the user picked")
+            #expect(store.knownRoots.isEmpty)
+            #expect(store.root(for: marker.guid) == nil)
+            #expect(defaults.dictionary(forKey: bookmarksKey) == nil,
+                    "nothing may be persisted for a root we could not keep access to")
+        }
+    }
+
     /// The safety guard, mirroring the Reader's: with defaults injected, nothing in a grant may reach
     /// `UserDefaults.standard` — where `readerRootBookmarks` is the app's real set of granted roots.
+    ///
+    /// Asserted on THIS grant's GUID key rather than on the whole dictionary: three sibling suites in
+    /// this bundle still snapshot-and-restore that key around their own `.standard` writes, and they
+    /// run in parallel with this test, so a whole-dictionary comparison would flake against their
+    /// restore window while proving nothing extra. A GUID minted in this test can only get there one way.
     @Test("grantRoot writes ONLY the injected defaults, never the app's real bookmarks")
     func grantRootNeverTouchesStandardDefaults() async throws {
         let (tmp, marker) = try makeMarkedRoot("hermetic")
         defer { try? FileManager.default.removeItem(at: tmp) }
+        let ourKey = marker.guid.uuidString.lowercased()
+        #expect(UserDefaults.standard.dictionary(forKey: bookmarksKey)?.keys.contains(ourKey) != true)
 
-        let before = UserDefaults.standard.dictionary(forKey: bookmarksKey) as NSDictionary?
         try await ScratchDefaults.with { defaults in
             let store = ReaderRootStore(defaults: defaults)
             #expect(store.grantRoot(tmp).marker?.guid == marker.guid)
-            #expect(defaults.dictionary(forKey: bookmarksKey)?.isEmpty == false)
+            #expect(defaults.dictionary(forKey: bookmarksKey)?.keys.contains(ourKey) == true)
         }
-        #expect(UserDefaults.standard.dictionary(forKey: bookmarksKey) as NSDictionary? == before)
+        #expect(UserDefaults.standard.dictionary(forKey: bookmarksKey)?.keys.contains(ourKey) != true,
+                "the grant's bookmark must not appear in the app's real defaults")
     }
 }

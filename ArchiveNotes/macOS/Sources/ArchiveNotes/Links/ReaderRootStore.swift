@@ -13,6 +13,8 @@ import ArchiveCore
 /// caller: two were a bare `nil` (indistinguishable from each other), and the third — the bookmark
 /// failure, which is what a symlinked root hit every time — returned the `RootMarker` that had
 /// already been read, so the caller believed the grant had worked while `knownRoots` stayed empty.
+///
+/// Every case carries the folder **as picked**, never the canonicalised target — see `grantRoot`.
 enum ReaderRootGrantRefusal: Equatable, Sendable {
     /// The folder cannot be opened at all: missing, permission-denied, a dangling symlink, an
     /// `ELOOP` cycle, or not a directory.
@@ -81,6 +83,18 @@ final class ReaderRootStore: ObservableObject {
     private let defaultsKey = "readerRootBookmarks"
     private let defaults: UserDefaults
 
+    /// How `grantRoot` mints its security-scoped bookmark.
+    ///
+    /// A test seam, not a policy knob. The one branch this store exists to get right — `bookmarkData`
+    /// failing for a folder that opens and carries a marker — cannot be provoked otherwise: every
+    /// fixture lives in the app container, where minting always succeeds, so the `catch` that used to
+    /// return a success-implying marker would sit unexercised and a mutation restoring the bug would
+    /// pass. (A symlink is no longer a way in, because that is exactly what the fix stops.)
+    var mintBookmark: (URL) throws -> Data = { url in
+        try url.bookmarkData(options: .withSecurityScope,
+                             includingResourceValuesForKeys: nil, relativeTo: nil)
+    }
+
     /// - Parameter defaults: where the bookmarks are persisted. Injected so a test can hand over a
     ///   throwaway suite: `grantRoot` WRITES, and `readerRootBookmarks` in `.standard` is the app's
     ///   real set of granted Reader roots.
@@ -117,6 +131,9 @@ final class ReaderRootStore: ObservableObject {
     /// every other root byte-unchanged), so no root that works today can shift — and the bookmark is
     /// minted for the same URL that is stored, so the scope belongs to the root we keep.
     ///
+    /// Every refusal names the folder **as picked**, not the canonicalised target: that is the name the
+    /// user chose, and for a symlinked pick the target's last component is a folder they never saw.
+    ///
     /// - Returns: `.granted(marker)`, or `.refused(_)` carrying a reason the caller can show.
     @discardableResult
     func grantRoot(_ url: URL) -> ReaderRootGrant {
@@ -126,28 +143,30 @@ final class ReaderRootStore: ObservableObject {
         do {
             found = try RootMarker.read(at: target)
         } catch {
-            return .refused(.markerUnreadable(target, "\(error)"))
+            return .refused(.markerUnreadable(url, "\(error)"))
         }
-        guard let marker = found else { return .refused(.notAnArchiveRoot(target)) }
+        guard let marker = found else { return .refused(.notAnArchiveRoot(url)) }
 
         do {
-            let data = try target.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
+            let data = try mintBookmark(target)
             // Store the raw bookmark data keyed by lowercased GUID string.
             var stored = savedBookmarks()
             stored[marker.guid.uuidString.lowercased()] = data
             defaults.set(stored, forKey: defaultsKey)
 
-            _ = target.startAccessingSecurityScopedResource()
+            // Re-granting the same GUID at a different path must release the scope it replaces —
+            // `activeScopes` holds one URL per GUID, so overwriting it would drop the only reference
+            // that could ever balance the old `start`. (`RootFolderStore.setRoot` does the same, in
+            // the same order: new access live before the old one is let go.)
+            let previous = activeScopes[marker.guid]
+            _ = target.startAccessingSecurityScopedResource() // false for a panel URL; it is already accessible
             activeScopes[marker.guid] = target
             knownRoots[marker.guid] = target
+            if let previous, previous != target { previous.stopAccessingSecurityScopedResource() }
             return .granted(marker)
         } catch {
             NSLog("ReaderRootStore: could not bookmark \(target.path): \(error)")
-            return .refused(.couldNotBookmark(target, "\(error)"))
+            return .refused(.couldNotBookmark(url, "\(error)"))
         }
     }
 
