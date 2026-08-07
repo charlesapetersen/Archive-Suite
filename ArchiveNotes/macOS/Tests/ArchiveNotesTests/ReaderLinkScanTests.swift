@@ -495,6 +495,26 @@ struct ReaderLinkScanTests {
                 "a stale root reports the file missing (shipped W8-S9), it does not stall")
     }
 
+    @Test("A root behind a denied ANCESTOR is unreachable, not absent")
+    func rootBehindDeniedAncestorIsNotAbsence() async throws {
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveNotes-notesabsence-ancestor-\(UUID().uuidString)",
+                                    isDirectory: true)
+        let root = parent.appendingPathComponent("archive", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("%PDF-1.4\n".utf8).write(to: root.appendingPathComponent("doc.pdf"), options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: parent.path)
+        defer { removeFixture(parent, unlocking: [parent]) }
+
+        // The reason the absence probe is `lstat`-and-errno rather than `fileExists`: `fileExists`
+        // answers `false` here, indistinguishably from a path that was never there, and the old
+        // code read that as the W8-S9 "root is gone" case. `lstat` fails with EACCES, which is a
+        // denial and not an absence.
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: root)
+        #expect(scan.stop == .unreadableRoot,
+                "a root we are not permitted to reach is not a root that is missing")
+    }
+
     @Test("A dangling symlink root is unreachable, not empty")
     func danglingSymlinkRootIsNotAbsence() async throws {
         let container = FileManager.default.temporaryDirectory

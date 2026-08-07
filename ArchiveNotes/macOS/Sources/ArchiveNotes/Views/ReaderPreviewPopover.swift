@@ -94,8 +94,16 @@ final class ReaderPreviewPopover {
             showMessage("Source file not found in the archive.", relativeTo: view)
         case .searchIncomplete(let scanned):
             // Never report "not found" for a search that did not finish.
+            //
+            // Says *that* it did not finish, not *how* it stopped (W26.notesabsence). This read
+            // "stopped after N items", which was true of the only two ways a search could end
+            // early then — cancelled, or hitting its entry bound. It is now also reached by a walk
+            // that ran all the way to the end and was DENIED part of the tree, where "stopped
+            // after 3,412 items" is exactly the confident-sounding wrong sentence this wave exists
+            // to stop an app saying. The count still earns its place — it is what the user watched
+            // tick up — but as an amount examined, not as the point where the search gave up.
             showMessage(
-                "Original file not found at its recorded path.\nThe search of the archive stopped after \(scanned) items, so the file may still be there.",
+                "Original file not found at its recorded path.\nThe search of the archive did not finish (\(scanned) items examined), so the file may still be there.",
                 relativeTo: view
             )
         }

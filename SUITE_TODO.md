@@ -256,6 +256,16 @@ exit 0, "✓ clean".
   `ArchiveProcessor/scripts/test-finder-tags.sh` (shipped by `W26.oracle`) — it is the differential proof that
   the E2E oracle reads Finder tags from the xattr and not Spotlight, and it is the cheapest thing on this
   list: **~2 s**, no key, no network, no GUI, no app build, `mktemp` only. Wire it in with the other three.
+  ➕ **Also fold in the SRCS question, with the cost measured (2026-08-07, from `W26.notesabsence`).** That
+  item asked whether to extend the lint's `SRCS` to the Notes tree in the same change; measured against
+  `ArchiveNotes/macOS/Sources/ArchiveNotes`, appending it to `SRCS` as-is means: **rule 1 (tag write) 0 hits**,
+  **rule 3 (`errorHandler:`-less enumerator) 1 hit** — the very call `W26.notesabsence` fixed, so it would be
+  green on arrival — but **rule 2 (destructive/content write) 11 hits**, every one of which needs an audited
+  `(file, exact source line)` allowance before the tree can be added. That is a write-surface audit of an app
+  whose *whole job* is writing `.md` files, not a one-line append, which is why it was not done inside
+  `W26.notesabsence`. Two shapes to choose between when it is done: audit the 11, or give the rules
+  **per-rule source lists** so rule 3 can cover Notes without rule 2 doing so. Prefer the second if the audit
+  looks like it is mostly re-stating "NoteStore writes notes".
   Green on this commit.
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
@@ -366,23 +376,36 @@ Two of these were **paired on purpose** — `publishWarmSnapshot` filtering out 
 `reverifyCacheRows` rejecting every cache row, so fixing the warm start alone would have unmasked a
 write-path failure. Not touched, deliberately: `CorpusRootFingerprint.capture` and `LibraryIndexRoot.path`.
 
-- [ ] **W26.notesabsence — Notes' `ReaderLinkResolver` establishes ABSENCE from a walk that read nothing
-  [S · MED · Tier-2 · needs: none].** Filed 2026-08-06 by `W26.symroot`'s adversarial pass; **pre-existing**,
-  and it is this wave's core defect surviving one app over.
-  `ArchiveNotes/…/Links/ReaderLinkResolver.swift:250-256` calls `fm.enumerator(at: root, …)` with **no
-  `errorHandler:` and no openability probe** — the exact overload `lint-write-surface.sh` rule 3 bans, on a
-  tree the lint does not cover (its `SRCS` is Reader + ArchiveCore only). The `isDirectory` precheck at `:239`
-  uses `fileExists(atPath:isDirectory:)`, which **follows** symlinks, so a symlinked (or otherwise
-  statable-but-unopenable) root passes it as a directory; the enumerator is then non-nil, yields nothing, and
-  control falls through to `:302` `BasenameScan(match: nil, scanned: 0, stop: .exhausted)` — `.exhausted`
-  meaning *absence established* ⇒ `.notFound` for a note's source file that is sitting right there. A denied
-  subdirectory is the same story without the symlink: skipped in silence, and the scan still calls itself
-  exhausted. **This is what `CorpusWalker.canonicalRoot` was made public for.** Fix: probe the root through it
-  (else `.unreadableRoot`), add the `errorHandler:`, and let any recorded directory error demote `.exhausted`
-  to `.unreadableRoot` — absence must require a clean pass, which `CorpusScanResult.isClean` already encodes.
-  Consider extending the lint's `SRCS` to the Notes tree in the same change, or fold that into `W26.lint-fu`.
-  **Test:** a granted root that is a symlink to a tree containing the target resolves it (not `.notFound`); a
-  root with one `0o000` subdirectory returns `.unreadableRoot`, never `.exhausted`.
+✅ **W26.notesabsence — SHIPPED 2026-08-07 (`5c46d2a` → this commit); full entry in `SUITE_TODO_DONE.md`.**
+Notes' basename fallback no longer establishes absence from a walk it was never allowed to make. The root is
+probed with `CorpusWalker.canonicalRoot` (`opendir(3)`, plus `realpath(3)` for a symlinked final component so
+the *target* is walked) and the enumerator finally has an `errorHandler:`, so one skipped subdirectory demotes
+`.exhausted` to `.unreadableRoot`. The one branch that still establishes absence — the root is GONE, the
+shipped W8-S9 computer-move contract — is kept and **narrowed**: `lstat(2)`/`ENOENT|ENOTDIR` rather than
+`fileExists`, which cannot tell "never there" from "denied by an ancestor" and read a permission error as an
+empty archive. 8 new tests (suite 10 → 18); 5 fail against the pre-fix source and 5 mutants are each caught by
+a named test. **Two findings came out of it:** the popover sentence for an unfinished search said *"stopped
+after N items"*, which this change makes false for a walk that ran to the end and was denied part of the tree
+(reworded here, in the same commit that made it wrong); and `ReaderRootStore.grantRoot` cannot adopt a
+symlinked root at all — filed as `W26.notesabsence-fu1` below.
+
+- [ ] **W26.notesabsence-fu1 — a symlinked Reader root cannot be GRANTED in Notes, and the failure is
+  silent [S · MED · Tier-2 · needs: none].** Filed 2026-08-07 while shipping `W26.notesabsence`;
+  **pre-existing**, and it is the adoption half of `W26.symroot-fu1` surviving in the other app.
+  **Measured, not inferred** (probe run in the Notes test host, 2026-08-07): `link.bookmarkData(options:
+  .withSecurityScope, …)` on a symlinked root throws `NSCocoaErrorDomain 256 "Could not open() the item"`,
+  exactly as it does in the Reader. `ReaderRootStore.grantRoot:49-66` bookmarks first and lands in a `catch`
+  that only `NSLog`s — so `knownRoots[guid]` is never set — **yet it still returns a non-nil `RootMarker`**,
+  because the marker was read before the bookmark was attempted. The caller therefore believes the grant
+  succeeded, `root(for: guid)` answers `nil`, and `resolve` reports `.needsRootGrant`: the user is asked to
+  choose the archive folder, chooses it, and is asked again, with nothing said. Fix along the lines the Reader
+  took: adopt `CorpusWalker.canonicalRoot(url)` (so the bookmark is minted for the openable target) and return
+  a refusal the UI can show, rather than a marker that implies success. ⚠️ This is what currently makes the
+  symlink half of `W26.notesabsence` unreachable from the UI — that fix is tested at `scanForBasename`, which
+  is where it lives, but no granted root can be a symlink until this lands. Touches a *persisted bookmark*
+  path, so: hermetic `readerRootBookmarks` in every test (the existing suites snapshot and restore it) and
+  never the owner's real defaults. **Test:** `grantRoot` on a symlink to a marked root yields a usable
+  `root(for:)`; a genuinely unreadable pick returns a refusal, not a marker.
 ✅ **W26.oracle — SHIPPED 2026-08-06 (`50ea4a1` → this commit); full entry in `SUITE_TODO_DONE.md`.** The
 item's premise was **too kind to the old oracle** and the correction is the durable part: it said the `mdls`
 read *"would have"* failed during the 2026-08-04 incident. Measured on this machine at the harness's own

@@ -110,6 +110,71 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.notesabsence — Notes' `ReaderLinkResolver` established ABSENCE from a walk that read
+  nothing [S · MED · Tier-2]. ✅ SHIPPED 2026-08-07** — `5c46d2a` (the fix + its tests) → this commit (the
+  popover wording, the follow-up, the trackers). Filed 2026-08-06 by `W26.symroot`'s adversarial pass;
+  pre-existing, and this wave's core defect surviving one app over.
+
+  **The defect.** `scanForBasename` prechecked its root with `fileExists(atPath:isDirectory:)`, which
+  **follows** symlinks and reports "yes, a directory" for roots the enumerator then reads nothing from — and
+  `FileManager.enumerator(at:)` is **non-nil** for all of them: it reports the root once to `errorHandler:`
+  (which this call did not pass) and immediately ends. So the `guard let enumerator … else` floor never fired,
+  control fell through to `stop: .exhausted` — *absence established* — and `resolve` turned that into
+  `.notFound` for a source file that was sitting right there. Re-measured 2026-08-07 with this call site's own
+  enumeration options, each root holding a matching `doc.pdf`:
+
+  | root | `fileExists` / `isDirectory` | entries yielded | dir errors | old verdict |
+  | --- | --- | --- | --- | --- |
+  | a symlink to the archive folder | true / true | 0 | 1 | `.exhausted` ⇒ **`.notFound`** |
+  | a `0o000` directory | true / true | 0 | 1 | `.exhausted` ⇒ **`.notFound`** |
+  | one `0o000` SUBdirectory | true / true | the rest | 1 | `.exhausted` ⇒ **`.notFound`** |
+  | a root behind a denied ANCESTOR | false / — | — | — | `.exhausted` ⇒ **`.notFound`** |
+
+  **What shipped.**
+  - The root is probed with `CorpusWalker.canonicalRoot` — `opendir(3)` rather than a stat, plus `realpath(3)`
+    for a symlinked final component so the **target** is enumerated. That is what `W26.symroot` made the
+    function public for, and this is its first cross-app use.
+  - The enumerator gets the `errorHandler:` whose absence `lint-write-surface.sh` rule 3 bans outright, and
+    any recorded directory error demotes `.exhausted` to `.unreadableRoot`. One skipped directory is enough:
+    the file may be in it. Same rule `CorpusScanResult.isClean` encodes for the Reader's discovery walk.
+  - Containment is derived from the **walked** root rather than the caller's spelling. Measured: this is
+    drift-proofing, not a live fix — a mutant reverting it to the caller's spelling passes every test, because
+    `ReaderRootContainment.canonical` resolves symlinks on both sides today. It is `W26.symroot-fu1`'s lesson
+    applied before it can bite, and it is documented in the source as exactly that rather than as a fix.
+
+  **The absence branch was kept and narrowed, not removed.** A root that is GONE still reports absence — the
+  shipped W8-S9 computer-move contract, *a stale root reports the file missing, never a wrong file*. But the
+  test for "gone" is now `lstat(2)` failing with `ENOENT`/`ENOTDIR`, not `fileExists`: `fileExists` answers
+  `false` for a root denied by a `0o000` **ancestor** exactly as readily as for one that was never there, so
+  the old code read a permission error as an empty archive — this wave's defect in miniature, inside the
+  branch meant to be the safe one. Two deliberate behaviour changes fall out, both toward "I could not look":
+  a **dangling symlink** root (the target may be an unmounted volume) and a root behind a **denied ancestor**
+  now report `.searchIncomplete` where they previously reported the file missing.
+
+  **The popover sentence was reworded in the same commit that made it wrong.** `.searchIncomplete` used to
+  mean only *cancelled* or *hit the entry bound*, so "The search of the archive stopped after N items" was
+  accurate. It is now also reached by a walk that ran all the way to the end and was denied part of the tree,
+  where that sentence is precisely the confident-sounding falsehood this wave exists to stop — it reads as
+  "we gave up early" when what happened is "we finished and still could not see everything". Now: "The search
+  of the archive did not finish (N items examined), so the file may still be there." No enum change, so no
+  reason payload and no churn in the tests that compare `.searchIncomplete(scanned:)` by value.
+
+  **Verification.** 8 new tests, suite 10 → 18, whole Notes bundle 189 XCTest + 745 Swift Testing green,
+  Debug build clean with 0 new warnings, write-surface lint + its 14/14 self-test green. Anti-vacuity, because
+  a green new test proves nothing on its own: **5 of the 8 fail against the pre-fix source** (the other 3 are
+  regression guards on behaviour that must NOT change — a clean walk still exhausts, a missing root still
+  establishes absence), and **5 mutants are each caught by a named test** — demote unconditionally →
+  *clean walk still establishes absence*; drop the absence branch → *a root that is GONE*; `stat` instead of
+  `lstat` → *a dangling symlink root*; revert the probe to `fileExists` → *denied ANCESTOR* **and** *dangling
+  symlink*; containment from the caller's spelling → **uncaught**, which is why that one is described above as
+  drift-proofing rather than claimed as a fix. Scratch temp trees only; no corpus path was read.
+
+  **Filed:** `W26.notesabsence-fu1` — `ReaderRootStore.grantRoot` cannot adopt a symlinked root at all
+  (`bookmarkData(.withSecurityScope)` throws `NSCocoaErrorDomain 256`, the `catch` only `NSLog`s, and it
+  returns a non-nil marker anyway), so the symlink half of this fix is currently unreachable from the UI. Also
+  extended `W26.lint-fu` with the measured cost of adding the Notes tree to the lint's `SRCS`: rule 1 → 0 hits,
+  rule 3 → 1 hit (the call fixed here), rule 2 → **11** hits needing individual audited allowances.
+
 - [x] **W26.symroot-fu1 — a symlinked archive folder can be CHOSEN, and every root-relative
   comparison is spelled the way the walker reports [M · Tier-2]. ✅ SHIPPED 2026-08-06** — `bd01025` (the
   ArchiveCore primitive) → `bcfaa18` (adoption) → `766f59c` (the warm start, the write path behind it, and
