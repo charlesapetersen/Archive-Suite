@@ -7,10 +7,12 @@
 #   2) NO file in either tree may call a move / rename / delete / trash / content-write API,
 #      except at the individually audited sites in the ALLOW list below.
 #
-# Run before every commit; exit non-zero on violation. ⚠️ NOTHING invokes this automatically —
-# the header used to claim "also invoked by the autonomous build" and that was measured false on
-# 2026-08-05 (no caller anywhere in `ops/`, `.claude/hooks/`, or any script). Wiring it into the
-# health gate is filed as `W26.lint-fu`; until then it is a manual gate.
+# Run before every commit; exit non-zero on violation. It is ALSO run by the daemon's health gate
+# (`ops/autonomous/health-gate.sh`, step `write-surface-lint`, with its self-test alongside as step
+# `write-surface-lint-proof`) — wired there by `W26.lint-fu` on 2026-08-07. ⚠️ That sentence is only
+# worth having because the previous one like it was FALSE: the header claimed "also invoked by the
+# autonomous build" and on 2026-08-05 that was measured to have no caller anywhere in `ops/`,
+# `.claude/hooks/`, or any script. If you move or rename the gate step, fix this line with it.
 #
 # ── SCOPE (W26.lint, 2026-08-05) ─────────────────────────────────────────────────────────────
 # `SRC` used to be just `macOS/Sources/ArchiveReader`, which left `packages/ArchiveCore`
@@ -62,10 +64,37 @@ set -uo pipefail
 REPO_ROOT="${LINT_WRITE_SURFACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$REPO_ROOT" || { echo "✗ cannot cd to $REPO_ROOT"; exit 1; }
 
-SRCS=(
-  "ArchiveReader/macOS/Sources/ArchiveReader"
-  "packages/ArchiveCore/Sources/ArchiveCore"
-)
+# ── SOURCE LISTS ARE PER-RULE (W26.lint-fu, 2026-08-07) ───────────────────────────────────────
+# One list shared by all three rules forced an all-or-nothing choice about Archive Notes, an app
+# whose whole job is writing `.md` files. Measured against `ArchiveNotes/macOS/Sources/ArchiveNotes`
+# on 2026-08-07: rule 1 → **0 hits**, rule 3 → **0 hits**, rule 2 → **11 hits** (six in `NoteStore`,
+# the rest its Zotero cache, organization file, inline-image attachments and root marker). Auditing
+# those eleven would mostly amount to writing "NoteStore writes notes" eleven times, and an allowance
+# list that says nothing is how an allowlist stops being read. `W26.lint-fu` posed exactly this
+# choice — audit the eleven, or split the lists — and preferred this shape.
+#
+# So rules 1 and 3 cover Notes and rule 2 does not. That is a DECISION, not an oversight:
+#   * rule 1 (tag write) — Notes projects Finder tags too, and it has no business writing one outside
+#     ArchiveCore's choke-point. Zero hits today, so this is a live tripwire, not inherited debt.
+#   * rule 3 (silent enumerator) — `W26.notesabsence` fixed the single hit Notes had; the rule is what
+#     stops it coming back. This is the coverage `W26.lint-fu` asked for by name.
+#   * rule 2 (destructive / content write) — deliberately NOT extended. Adding the tree without first
+#     auditing those eleven writes would simply turn this lint RED, and a RED lint nobody can fix in
+#     one sitting is a lint that gets skipped.
+# The Processor tree is in no list, also deliberately: its `MacOSTagger` is the suite's *fresh-write*
+# tag adapter, so rule 1 there needs its own audit before the tree can be added.
+SRC_READER="ArchiveReader/macOS/Sources/ArchiveReader"
+SRC_CORE="packages/ArchiveCore/Sources/ArchiveCore"
+SRC_NOTES="ArchiveNotes/macOS/Sources/ArchiveNotes"
+
+SRC_TAGWRITE=(    "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
+SRC_DESTRUCTIVE=( "$SRC_READER" "$SRC_CORE" )
+SRC_ENUMERATOR=(  "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
+
+# The UNION — every tree any rule reads. Guard (a) below existence-checks exactly these, so a tree
+# that appears in a rule list but not here would never be checked, and a rename would put that rule
+# back to being silently skipped by grep. Guard (a2) checks for precisely that drift.
+SRCS=( "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
 
 SEP=$'\x1f'   # unit separator — cannot occur in Swift source, so a code line can't forge a key
 
@@ -131,6 +160,18 @@ for src in "${SRCS[@]}"; do
   fi
 done
 
+# (a2) With per-rule source lists, guard (a) only protects what the UNION names. A tree added to one
+#      rule but not to `SRCS` would go unchecked, so a later rename of it would silently narrow that
+#      rule back to nothing — the same vacuous pass, one indirection further away.
+for src in "${SRC_TAGWRITE[@]}" "${SRC_DESTRUCTIVE[@]}" "${SRC_ENUMERATOR[@]}"; do
+  in_union=0
+  for u in "${SRCS[@]}"; do [ "$u" = "$src" ] && in_union=1; done
+  if [ "$in_union" -eq 0 ]; then
+    echo "✗ a rule reads a source root missing from the union SRCS, so it is never existence-checked: $src"
+    fail=1
+  fi
+done
+
 # (b) An allowance whose line no longer exists is an unreviewed hole waiting to be re-filled —
 #     the write was moved, reworded or deleted and nobody re-audited it. Say so.
 for a in ${ALLOW[@]+"${ALLOW[@]}"}; do
@@ -166,8 +207,9 @@ scan_stream() {   # <rule> <message>
   fi
 }
 
-scan() {   # <rule> <message> <extended regex>
-  scan_stream "$1" "$2" < <(grep -rnE "$3" "${SRCS[@]}" --include='*.swift' 2>/dev/null || true)
+scan() {   # <rule> <message> <extended regex> <source root…>
+  local rule="$1" message="$2" re="$3"; shift 3
+  scan_stream "$rule" "$message" < <(grep -rnE "$re" "$@" --include='*.swift' 2>/dev/null || true)
 }
 
 # Every `.enumerator(` call whose OWN argument list — balanced parens, however many lines it spans —
@@ -181,8 +223,8 @@ scan() {   # <rule> <message> <extended regex>
 # reports, and only to a line whose first non-space characters open a comment; a real call sharing a
 # line with a trailing comment is still caught. The only thing this can now miss is commented-out
 # code, which does not compile and cannot walk anything.
-enumerators_without_error_handler() {
-  find "${SRCS[@]}" -name '*.swift' -type f -print0 2>/dev/null \
+enumerators_without_error_handler() {   # <source root…>
+  find "$@" -name '*.swift' -type f -print0 2>/dev/null \
     | xargs -0 /usr/bin/perl -0777 -ne '
         while (/\.enumerator\s*(\((?:[^()]++|(?1))*\))/gs) {
           next if $1 =~ /errorHandler\s*:/;
@@ -198,17 +240,23 @@ enumerators_without_error_handler() {
 # 1) tag-write APIs — only the audited choke-point, only the exact allowed lines.
 scan tagwrite \
   "tag-write API outside ArchiveCore's audited CoordinatedTagWriter (or an allowed line that changed):" \
-  'setResourceValue|setResourceValues|setxattr'
+  'setResourceValue|setResourceValues|setxattr' \
+  "${SRC_TAGWRITE[@]}"
 
 # 2) destructive / content-write APIs — nowhere, except the allowed lines above.
 scan destructive \
   "destructive / content-write API in the linted trees (or an allowed line that changed):" \
-  '\.(removeItem|moveItem|trashItem|replaceItem|replaceItemAt|createFile)\(|FileHandle[^)]*forWriting|PDFDocument[^)]*\.write\(|\.write\(to:'
+  '\.(removeItem|moveItem|trashItem|replaceItem|replaceItemAt|createFile)\(|FileHandle[^)]*forWriting|PDFDocument[^)]*\.write\(|\.write\(to:' \
+  "${SRC_DESTRUCTIVE[@]}"
 
 # 3) FileManager.enumerator without an errorHandler: — a silent skip of what it cannot read.
 scan_stream enumerator \
   "FileManager.enumerator without errorHandler: — it SILENTLY skips directories it cannot read:" \
-  < <(enumerators_without_error_handler)
+  < <(enumerators_without_error_handler "${SRC_ENUMERATOR[@]}")
 
-if [ "$fail" -eq 0 ]; then echo "✓ write-surface lint clean (${SRCS[*]})"; fi
+# The scopes are not uniform, so neither is the claim: naming only the union would report the
+# destructive-write rule as covering a tree it deliberately does not read.
+if [ "$fail" -eq 0 ]; then
+  echo "✓ write-surface lint clean (${SRCS[*]}; destructive-write rule covers ${SRC_DESTRUCTIVE[*]})"
+fi
 exit $fail

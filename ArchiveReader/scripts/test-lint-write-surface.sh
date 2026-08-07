@@ -22,19 +22,24 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LINT="$REPO/ArchiveReader/scripts/lint-write-surface.sh"
 READER_SRC="ArchiveReader/macOS/Sources/ArchiveReader"
 CORE_SRC="packages/ArchiveCore/Sources/ArchiveCore"
+# W26.lint-fu (2026-08-07): the lint's source lists are PER-RULE, and Notes is in two of the three.
+# The fixture must therefore carry the Notes tree as well, or the missing-root guard fires on every
+# case and the control stops meaning anything.
+NOTES_SRC="ArchiveNotes/macOS/Sources/ArchiveNotes"
 
 pass=0; failed=0
 SCRATCH=""
 cleanup() { [ -n "$SCRATCH" ] && [ -d "$SCRATCH" ] && rm -rf "$SCRATCH"; }
 trap cleanup EXIT
 
-# Fresh copy of both linted trees, at the same relative paths the lint (and its ALLOW list) expect.
+# Fresh copy of every linted tree, at the same relative paths the lint (and its ALLOW list) expect.
 fresh_tree() {
   cleanup
   SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/lint-write-surface-test.XXXXXX")"
-  mkdir -p "$SCRATCH/$(dirname "$READER_SRC")" "$SCRATCH/$(dirname "$CORE_SRC")"
-  cp -R "$REPO/$READER_SRC" "$SCRATCH/$(dirname "$READER_SRC")/"
-  cp -R "$REPO/$CORE_SRC" "$SCRATCH/$(dirname "$CORE_SRC")/"
+  for s in "$READER_SRC" "$CORE_SRC" "$NOTES_SRC"; do
+    mkdir -p "$SCRATCH/$(dirname "$s")"
+    cp -R "$REPO/$s" "$SCRATCH/$(dirname "$s")/"
+  done
 }
 
 # expect <expected-rc> <name> [substring the output must contain]
@@ -212,6 +217,78 @@ func plantedProseAndCode(_ root: URL) -> Bool {
 SWIFT
 expect 1 "a real call is caught even when an identical line appears in a comment" \
   "Corpus/PlantedProseAndCode.swift"
+
+echo "── per-rule lists: rule 3 now reaches Archive Notes (W26.lint-fu) ──────────"
+fresh_tree
+mkdir -p "$SCRATCH/$NOTES_SRC/Index"
+cat > "$SCRATCH/$NOTES_SRC/Index/PlantedNotesWalk.swift" <<'SWIFT'
+// The exact shape W26.notesabsence fixed in this tree — a walk that reports nothing and cannot say
+// it was denied. Rule 3 exists to stop it coming back.
+import Foundation
+func plantedNotesWalk(_ root: URL) -> Int {
+    var n = 0
+    let en = FileManager.default.enumerator(
+        at: root,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+    )
+    while en?.nextObject() != nil { n += 1 }
+    return n
+}
+SWIFT
+expect 1 "an errorHandler-less enumerator in the NOTES tree FAILS" "Index/PlantedNotesWalk.swift"
+
+echo "── per-rule lists: rule 1 reaches Notes too ────────────────────────────────"
+fresh_tree
+mkdir -p "$SCRATCH/$NOTES_SRC/Store"
+cat > "$SCRATCH/$NOTES_SRC/Store/PlantedNotesTagWrite.swift" <<'SWIFT'
+import Foundation
+func plantedNotesTagWrite(_ url: URL, _ tags: [String]) throws {
+    try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
+}
+SWIFT
+expect 1 "a tag write in the NOTES tree FAILS (the choke-point rule is suite-wide)" \
+  "Store/PlantedNotesTagWrite.swift"
+
+echo "── …and rule 2 deliberately does NOT: Notes writes .md files for a living ──"
+fresh_tree
+mkdir -p "$SCRATCH/$NOTES_SRC/Store"
+# Pins the W26.lint-fu decision as a behaviour rather than a header paragraph. If someone later adds
+# the Notes tree to SRC_DESTRUCTIVE, this case fails and points them at the audit it requires — the
+# real lint would also go RED on eleven pre-existing writes the same moment.
+cat > "$SCRATCH/$NOTES_SRC/Store/PlantedNotesContentWrite.swift" <<'SWIFT'
+import Foundation
+func plantedNotesContentWrite(_ text: String, _ url: URL) throws {
+    try Data(text.utf8).write(to: url, options: [.atomic])
+    try FileManager.default.removeItem(at: url)
+}
+SWIFT
+expect 0 "a content write in the NOTES tree still passes (rule 2 excludes it by decision)" "lint clean"
+
+echo "── the union guard: a rule list may not name a tree SRCS omits ─────────────"
+fresh_tree
+# Guard (a2) has no reachable trigger from a fixture alone — it is about the lint's own configuration
+# — so mutate the lint instead. Dropping Notes from the union while two rules still read it is the
+# drift it exists to catch: without the guard, renaming the Notes tree would silently narrow rules 1
+# and 3 back to nothing and the lint would print "✓ clean".
+MUT="$SCRATCH/mutant-lint.sh"
+/usr/bin/sed 's|^SRCS=( "\$SRC_READER" "\$SRC_CORE" "\$SRC_NOTES" )$|SRCS=( "$SRC_READER" "$SRC_CORE" )|' \
+  "$LINT" > "$MUT"
+if cmp -s "$MUT" "$LINT"; then
+  echo "✗ union-guard mutant changed NOTHING — the sed no longer matches, so this case is vacuous"
+  failed=$((failed+1))
+else
+  out="$(LINT_WRITE_SURFACE_ROOT="$SCRATCH" bash "$MUT" 2>&1)"; rc=$?
+  if [ "$rc" -ne 1 ]; then
+    echo "✗ a rule root missing from the union PASSED — guard (a2) is decorative"; echo "$out" | sed 's/^/    /'
+    failed=$((failed+1))
+  elif ! printf '%s' "$out" | grep -qF "missing from the union SRCS"; then
+    echo "✗ the union mutant failed, but not for the union reason"; echo "$out" | sed 's/^/    /'
+    failed=$((failed+1))
+  else
+    echo "✓ a rule root missing from the union SRCS FAILS (guard a2)"; pass=$((pass+1))
+  fi
+fi
 
 # RETIRED by `W26.walk2` (2026-08-05): this case simulated walk2 deleting the allowed
 # `ArchiveLibrary.swift` enumerator call, and asserted the allowance then went STALE. walk2 has
