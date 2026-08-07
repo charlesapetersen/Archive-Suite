@@ -5,8 +5,9 @@
 # LLM) — that's why the daemon runs it directly rather than spending a session on it.
 #
 # FREE by default: Reader + Notes smoke (build + unit suites, via the existing ./test-smoke.sh) + a Processor
-# BUILD (compile-break check — NOT the paid OCR smoke) + a light coherence check. Set AUTONOMOUS_GATE_OCR=1
-# to also run the paid Processor OCR smoke (a few cents). Exit 0 = GREEN, nonzero = RED.
+# BUILD (compile-break check — NOT the paid OCR smoke) + the write-surface lint and the four other hermetic
+# script gates (W26.lint-fu) + a light coherence check. Set AUTONOMOUS_GATE_OCR=1 to also run the paid
+# Processor OCR smoke (a few cents). Exit 0 = GREEN, nonzero = RED.
 #
 # Run from anywhere (cd's to the repo root). Builds into gitignored build dirs; makes NO commits, no edits.
 set -uo pipefail
@@ -87,6 +88,41 @@ step processor-build bash -c 'cd ArchiveProcessor/macOS && xcodegen generate >/d
 # kills it) or fails to read the key (→ RED, but the daemon retries once before parking). It's also a paid
 # network round-trip, so leave it OFF unless you specifically want OCR-pipeline coverage in the gate.
 [ "${AUTONOMOUS_GATE_OCR:-0}" = 1 ] && step processor-ocr bash ./test-smoke.sh processor   # paid, opt-in (OCR only; no UITest)
+
+# ── Tier-2 script gates that nothing was running (W26.lint-fu, 2026-08-07) ────────────────────────
+# Five harnesses shipped across Wave 26, each the mechanism proof for a Core-Directive or
+# de-Spotlight guarantee — and every one of them had NO CALLER anywhere in the repo. The
+# write-surface lint's own header claimed it was "also invoked by the autonomous build"; measured
+# false on 2026-08-05. So the automated half of the Core Directive ran only when a human remembered
+# it, which is the same failure as a lint that passes vacuously, moved up one level: the guarantee
+# reads as enforced and is not.
+#
+# All five are free and hermetic — no key, no network, no GUI, no app build, mktemp scratch only,
+# and no real-corpus path anywhere. Measured here on 2026-08-07: 0 s / 16 s / 65 s / 3 s / 20 s
+# ≈ 105 s, against GATE_MAXRUN=50 min. They sit ahead of the ~15-20 min VM lane deliberately, so a
+# RED lands in the gate's first few minutes.
+#
+# The four below are REAL steps: each was run green on a clean tree before being wired (the item's
+# "the gate must not start RED"), and each failure mode is a fact about the source, never
+# inconclusive.
+step write-surface-lint       bash "$ROOT/ArchiveReader/scripts/lint-write-surface.sh"
+step write-surface-lint-proof bash "$ROOT/ArchiveReader/scripts/test-lint-write-surface.sh"
+step tag-vocabulary           bash "$ROOT/ArchiveProcessor/scripts/test-tag-vocabulary.sh"
+# PYTHONDONTWRITEBYTECODE: this one imports `finder_tags.py` from the source tree, so CPython would
+# leave a `__pycache__` dir in ArchiveProcessor/scripts on every gate run. The repo ignores that path
+# now as well, but the gate should not be dirtying the checkout it is judging in the first place.
+step finder-tags              env PYTHONDONTWRITEBYTECODE=1 bash "$ROOT/ArchiveProcessor/scripts/test-finder-tags.sh"
+# The odd one out: it needs `/opt/homebrew/bin/tag` and the `Test files/Brown Gemini` corpus, and it
+# PREFLIGHTS both. W26.lint-fu asked which way that should go here — RED, or a WARN-skip like the VM
+# lane — and the answer is a skip, for the VM lane's reason: an absent prerequisite is not a
+# regression, and a gate that parks the run over one teaches its reader to ignore parks. The script
+# was changed to exit 3 with a `SKIPPED:` line for exactly (and only) those two cases, so the lane is
+# named in the "NOT VERIFIED:" tail of the summary instead of passing silently.
+# This is not hypothetical: `Test files/` is GITIGNORED, so the corpus exists only in whichever
+# checkout the owner put it in. The gate runs from the primary checkout, where it is present — but
+# any other clone, and every git worktree, has no such directory. RED there would be a lie.
+step_skippable fixture-scripts bash "$ROOT/ArchiveReader/scripts/test-fixture-scripts.sh"
+
 # Coherence: WARN-ONLY (never REDs the gate). A dirty TRACKED tree hints at a half-committed/aborted state,
 # but it's fragile as a park trigger — the gate must not false-park a healthy run over it (and a build can
 # leave transient tracked churn on some setups). The builds + unit suites above are the real RED signal.
@@ -158,10 +194,13 @@ fi
 # line is what lands in last-gate.log and what the owner reads. "GREEN" alone would claim coverage the
 # run does not have.
 if [ -n "$skips" ] || [ -n "$warns" ]; then
-  echo "HEALTH GATE: GREEN (builds + Reader/Notes unit suites + coherence)${skips:+ — NOT VERIFIED:$skips}${warns:+ — KNOWN FAILURES:$warns}"
-  [ -n "$skips" ] && echo "  ↳ the skipped lane(s) ran ZERO tests. Reason above; artifacts in ~/.tart-mirror/vm-artifacts/."
+  echo "HEALTH GATE: GREEN (builds + Reader/Notes unit suites + write-surface lint + script gates + coherence)${skips:+ — NOT VERIFIED:$skips}${warns:+ — KNOWN FAILURES:$warns}"
+  # The artifact directory belongs to gui-vm alone. Since W26.lint-fu, `fixture-scripts` can skip too and
+  # leaves nothing there, so the pointer is attributed rather than stated as if it covered every skip —
+  # sending the reader to an empty directory is how a summary line starts lying about what it knows.
+  [ -n "$skips" ] && echo "  ↳ the skipped lane(s) ran ZERO tests — the reason is printed above (gui-vm additionally leaves artifacts in ~/.tart-mirror/vm-artifacts/)."
   [ -n "$warns" ] && echo "  ↳ the warned lane(s) RAN and FAILED; they are tracked, so they don't park the run. Detail above + ~/.tart-mirror/vm-artifacts/gui-vm-<app>-LAST-FAILURE.log."
   exit 0
 fi
-echo "HEALTH GATE: GREEN (all builds + Reader/Notes suites + coherence + GUI-VM UITests)"
+echo "HEALTH GATE: GREEN (all builds + Reader/Notes suites + write-surface lint + script gates + coherence + GUI-VM UITests)"
 exit 0

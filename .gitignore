@@ -36,3 +36,9 @@ Test Outputs/
 
 # Archived/irrelevant untracked scratch docs (completed-run review reports, etc.) — see old/README.md.
 old/
+
+# Python bytecode. `ArchiveProcessor/scripts/*.py` are imported as modules by the test oracles
+# (finder_tags.py by tier2_assert.py / test-finder-tags.sh), so CPython writes it into the source
+# tree. The health gate also sets PYTHONDONTWRITEBYTECODE=1 for that step — belt and braces, since
+# a gate run must not dirty the checkout it is judging (W26.lint-fu, 2026-08-07).
+__pycache__/

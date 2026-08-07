@@ -27,6 +27,9 @@
 # source corpus is only ever read.
 #
 # Usage: ArchiveReader/scripts/test-fixture-scripts.sh
+#   exit 0 = every check passed · 1 = a check FAILED · 3 = a prerequisite is missing, nothing ran.
+# Also run unattended by the daemon health gate, as the skippable step `fixture-scripts`
+# (`ops/autonomous/health-gate.sh`) — wired there by `W26.lint-fu` on 2026-08-07.
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -44,6 +47,15 @@ trap cleanup EXIT
 
 ok()   { echo "✓ $1"; pass=$((pass+1)); }
 bad()  { echo "✗ $1"; [ -n "${2:-}" ] && printf '%s\n' "$2" | sed 's/^/    /'; failed=$((failed+1)); }
+# An absent PREREQUISITE is not a failed check. Exit 3 is the health gate's "ran nothing,
+# inconclusive" code (`step_skippable` in `ops/autonomous/health-gate.sh`; wired by `W26.lint-fu`,
+# 2026-08-07, which asked whether a missing `tag` CLI or corpus should RED the gate and answered
+# no — for the same reason the VM lane skips, an absent prerequisite is not a regression, and a
+# gate that parks over one teaches its reader to ignore parks). It is still NON-ZERO, so a human
+# `if ./test-fixture-scripts.sh` reads it as "not proven" exactly as before; the `SKIPPED:` prefix
+# is the line the gate quotes back in the "NOT VERIFIED:" tail of its summary. Only the two
+# preflight cases may use this — a real check that fails is always exit 1.
+skip() { echo "SKIPPED: $1"; echo "⊘ nothing was proven — prerequisite missing"; exit 3; }
 
 # --- the Spotlight tripwire ------------------------------------------------------------------
 # Not just a failing stub: a stub that RECORDS being called. The old code piped both tools to
@@ -68,9 +80,9 @@ run_shimmed() {
 
 echo "── preflight ───────────────────────────────────────────────────────────────"
 if [ -d "$CORPUS" ]; then ok "source corpus present: $CORPUS"
-else bad "source corpus missing: $CORPUS (set AR_FIXTURE_SRC)"; echo; echo "✗ aborting"; exit 1; fi
+else skip "source corpus missing: $CORPUS (set AR_FIXTURE_SRC)"; fi
 if [ -x /opt/homebrew/bin/tag ]; then ok "tag CLI present"
-else bad "tag CLI missing — brew install tag"; echo; echo "✗ aborting"; exit 1; fi
+else skip "tag CLI missing — brew install tag"; fi
 
 echo "── 1. static: no Spotlight query left in either script ─────────────────────"
 for s in "$GUI_FIXTURE" "$SMOKE"; do

@@ -151,8 +151,8 @@ lists the recent commits so you can see which item is stuck.
 regression can still hide across dozens of unreviewed commits. So every `AUTONOMOUS_GATE_EVERY` commits
 (default 30) the daemon runs `ops/autonomous/health-gate.sh` and **parks + alerts on RED**. It's deterministic
 (build/test), so the **daemon runs it directly** — no session, no LLM. Default checks are **free**: build all
-three apps + Reader/Notes **unit** suites + a coherence check (clean tree); `AUTONOMOUS_GATE_OCR=1` adds the
-paid Processor OCR smoke.
+three apps + Reader/Notes **unit** suites + the write-surface lint and four other hermetic script gates + a
+coherence check (clean tree); `AUTONOMOUS_GATE_OCR=1` adds the paid Processor OCR smoke.
 - **Unit tests via `-only-testing:<UnitBundle>`, not the whole scheme** — load-bearing: the schemes also hold
   UITest bundles, and running a UITest pops the macOS "Enable UI Automation" prompt, which would **hang the
   gate** (it runs synchronously in the daemon loop) and wake you. (`./test-smoke.sh reader|notes` run the full
@@ -161,6 +161,20 @@ paid Processor OCR smoke.
   plain unit test inside `ArchiveReaderTests`: it renders a PDF page / view to a bitmap and asserts non-blank,
   with no "Enable UI Automation" prompt. So render regressions (blank PDF pane, blank thumbnail) are caught
   headlessly; only *interaction / whole-window* checks still need GUI-on. → `ops/gui/README.md`.
+- **Five Tier-2 script gates that nothing was running** (`W26.lint-fu`, 2026-08-07). Wave 26 shipped a
+  harness for each of its guarantees and wired **none** of them to a caller — the write-surface lint's own
+  header even claimed "also invoked by the autonomous build", measured false on 2026-08-05. A guarantee that
+  reads as enforced and isn't is the vacuous-pass failure one level up, so all five run here now:
+  `write-surface-lint` + `write-surface-lint-proof` (the Core Directive's automated half, and the proof it
+  can still fail), `tag-vocabulary` (the Processor's tag-write hook + `$HOME`-walk prohibition),
+  `finder-tags` (the E2E oracle reads xattrs, not Spotlight) and `fixture-scripts` (the Reader fixture
+  builders need no Spotlight, plus the `rm -rf` guard on their new destination overrides). Together ~105 s,
+  no key/network/GUI/app build, `mktemp` scratch only, and placed **before** the ~15–20 min VM lane so a RED
+  surfaces early. All five were run green on a clean tree before wiring — a gate must not start RED.
+  - `fixture-scripts` is the one **skippable** member: it needs `/opt/homebrew/bin/tag` and the
+    **gitignored** `Test files/Brown Gemini` corpus, which exists only in the checkout the owner put it in.
+    It exits **3 + `SKIPPED:`** for a missing prerequisite (never for a failed check), so a machine without
+    them gets `⊘ … NOT VERIFIED: fixture-scripts` rather than a false park. Same contract as `gui-vm`.
 - **GUI UITests in a headless VM (`AUTONOMOUS_GUI_VM`, ON by default since 2026-07-28; `=0` to disable).** That
   last gap — real *interaction / whole-window* UITests — now runs in the gate WITHOUT a screen:
   `ops/autonomous/gui-vm-gate.sh` runs **every app's** UITest bundle inside the Tart VM (`ops/gui/README.md` §3)

@@ -110,6 +110,84 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.lint-fu — nothing actually RUNS the write-surface lint [S · low · Tier-2 · ops].
+  ✅ SHIPPED 2026-08-07** — `5210c12` -> this commit. Filed 2026-08-05 by `W26.lint`, then extended four
+  times as later items shipped harnesses with the same defect.
+
+  **The gap.** Wave 26 shipped a mechanism proof for each of its guarantees and wired **none** of them to a
+  caller. `lint-write-surface.sh`'s own header claimed it was *"also invoked by the autonomous build"* —
+  measured false on 2026-08-05: no caller in `ops/`, in `.claude/hooks/`, or in any script. So the Core
+  Directive's automated half ran only when a human remembered it, which is the same failure as a lint that
+  passes vacuously, one level further up: the guarantee reads as enforced and is not.
+
+  **All five are health-gate steps now** (`ops/autonomous/health-gate.sh`): `write-surface-lint`,
+  `write-surface-lint-proof`, `tag-vocabulary`, `finder-tags`, and the skippable `fixture-scripts`. Measured
+  here before wiring, on a clean tree: **0 s / 16 s / 65 s / 3 s / 20 s ≈ 105 s**, against `GATE_MAXRUN` of
+  50 min. Placed **before** the ~15–20 min VM lane so a RED lands in the gate's first minutes, and every one
+  of them was run green first — the item's "the gate must not start RED".
+
+  **The `fixture-scripts` question the item left open, answered: SKIP, not RED.** It needs
+  `/opt/homebrew/bin/tag` and the `Test files/Brown Gemini` corpus, and it PREFLIGHTS both. 🔺 The deciding
+  fact is one the item did not have: **`Test files/` is GITIGNORED**, so that corpus exists only in whichever
+  checkout the owner put it in — absent from every other clone and from **every git worktree**, i.e. from the
+  isolation each session is required to work in. RED there would be a lie about the source. The script now
+  exits **3 with a `SKIPPED:` line** for exactly (and only) its two preflight cases — a failed *check* is
+  still exit 1 — and the gate runs it through `step_skippable`, the same contract as `gui-vm`, so the lane
+  appears as `⊘ … NOT VERIFIED: fixture-scripts` rather than as a silent ✓ or a false park.
+
+  **The SRCS question, resolved by measurement.** Re-measured against
+  `ArchiveNotes/macOS/Sources/ArchiveNotes` on 2026-08-07: rule 1 (tag write) **0 hits**; rule 3
+  (`errorHandler:`-less enumerator) **0 hits** — the item recorded 1, and `W26.notesabsence` has since fixed
+  it; rule 2 (destructive / content write) **11 hits**, six of them in `NoteStore`. Auditing those eleven is
+  writing "NoteStore writes notes" eleven times, so the item's own preferred shape wins: **the rules get
+  their own source lists.** Rules 1 and 3 cover Notes, rule 2 does not, and the Processor tree is in none —
+  its `MacOSTagger` is the suite's *fresh-write* tag adapter and needs its own audit first. Each exclusion is
+  a stated decision in the script rather than an omission, and the rule-2 one is pinned by a self-test case
+  that fails if someone quietly adds the tree.
+
+  🔺 **What splitting the list cost, which is the part worth keeping.** Guard (a) existence-checks the source
+  roots so a rename cannot silently narrow a rule to nothing — but it only ever saw one list. A tree named by
+  a rule and omitted from the union would have slipped straight past it: the same vacuous pass, one
+  indirection further away. New **guard (a2)** catches exactly that, and the self-test proves it by
+  **mutating the lint itself** (dropping Notes from the union while two rules still read it), because a
+  configuration bug is not reachable from a source fixture. The mutant carries the usual `cmp -s` vacuity
+  check. `✓ clean` also stopped over-claiming: the scopes are no longer uniform, so the line names the
+  destructive rule's narrower one instead of implying the union.
+
+  **Verification.** Self-test **14 → 18 checks**, green under both bash 5 and bash 3.2 (the script is
+  bash-3.2-safe by design and `/usr/bin/env bash` does not always find 5). Both preflight branches proven to
+  exit 3 with `SKIPPED:` — the corpus one directly, the `tag`-CLI one via a mutant, since the CLI is
+  installed here. `prove-vm-lane.sh` 48/48 corroborates the exit-3 → `⊘` rendering by extracting and driving
+  the gate's real `step_skippable`. The full gate was then run end-to-end, twice: **GREEN** on a clean tree
+  with all five new lanes ✓, and **RED naming `write-surface-lint`** with a violation planted in ArchiveCore
+  — the mechanism proof the autonomous-setup discipline asks for, rather than an argument that the wiring
+  looks right.
+
+  **Also:** `__pycache__/` is gitignored and the `finder-tags` step sets `PYTHONDONTWRITEBYTECODE=1` — that
+  script imports `finder_tags.py` from the source tree, so CPython was leaving bytecode in
+  `ArchiveProcessor/scripts` on every run, and a gate should not dirty the checkout it is judging.
+
+  🔺 **The full-gate proof could not run as a full gate, and finding out why is the bigger result.** The
+  `reader` step **hangs** — 0 % CPU, test host alive, indefinitely. `sample` put the main thread in
+  `FSEventStreamCreate → watch_all_parents → open(2)`, reached through the DEBUG fixture lane's *inline*
+  watcher start: the exact bug `W26.fsev-fu1` fixed, resurfacing through the carve-out it deliberately left,
+  whose stated premise ("a scratch dir's `open(2)` cannot block") is false because FSEvents opens every
+  ANCESTOR, not the root. A second hang earlier in the bundle came from a leaked `ARUITestRootPath` in the
+  owner's real defaults. Both are filed as **`W26.fixturehang`** (HIGH) with the full stacks; it hangs rather
+  than REDs, so the daemon would burn `GATE_MAXRUN` and park blaming build time. The two proof runs above
+  therefore used a `sed` copy of the gate with **only** the three app build/test steps removed — verified
+  non-vacuous (exactly 3 lines, 12 steps → 9) and with the five new lanes byte-identical — so `step()`,
+  `step_skippable()` and the real RED/GREEN tail were all exercised for the lanes this item adds.
+
+  **One thing observed and deliberately not fixed:** with `AUTONOMOUS_GUI_VM=0` the final line still says
+  "+ GUI-VM UITests". It is the gate's own over-claiming failure mode, but it fires only when an operator
+  has explicitly disabled that lane and therefore knows; folding it in here would have widened a `[S]` ops
+  item into the summary-line rewrite it is not.
+
+  ⚠️ **Not live yet, and this is inherent, not an oversight:** `daemon.sh` installs from the PRIMARY
+  checkout's working tree, so the new gate steps do nothing until the primary is fast-forwarded and the owner
+  restarts the daemon. Flagged in Daemon Report.
+
 - [x] **W26.scripts — fixture scripts drop `mdimport`/`mdfind` polling [S · low · Tier-1 · needs: none].
   ✅ SHIPPED 2026-08-07** — `18824bb` -> this commit. `ArchiveReader/scripts/make-gui-fixture.sh` and
   `smoke-setup.sh` force-indexed their output and then polled `mdfind` for up to 60 s / 40 s.

@@ -232,51 +232,27 @@ later items in this wave need from it. **(1)** `ArchiveReader/scripts/lint-write
 **`(file, exact source line)` pairs — never whole files**, so a new ArchiveCore file that calls
 `setResourceValue`/`setxattr`/a `FileManager` mutator/`.write(to:)` fails the lint. **Run it before committing
 any ArchiveCore work** (`./ArchiveReader/scripts/lint-write-surface.sh`; self-test:
-`./ArchiveReader/scripts/test-lint-write-surface.sh`) — nothing invokes it for you, see `W26.lint-fu`.
+`./ArchiveReader/scripts/test-lint-write-surface.sh`) — and since `W26.lint-fu` (2026-08-07) the daemon's
+health gate runs both, so a violation you forget to check is caught within `AUTONOMOUS_GATE_EVERY` commits
+instead of never.
 **(2)** It was not merely scoped too narrowly, it was passing **vacuously**: the Reader app target has **zero**
 tag-write hits of its own (its `TagWriter` is a delta adapter over `ArchiveCore.CoordinatedTagWriter`), so
 rule 1 had nothing left to catch. Verified by running the OLD script against planted ArchiveCore violations —
 exit 0, "✓ clean".
 
-- [ ] **W26.lint-fu — nothing actually RUNS the write-surface lint [S · low · Tier-2 · ops].** Filed 2026-08-05
-  while shipping `W26.lint`. The script's header claimed it was *"also invoked by the autonomous build"*;
-  measured false — there is no caller anywhere in `ops/`, `.claude/hooks/`, or any script, so the Core
-  Directive's automated half only runs when a human remembers it. (The header now says so honestly.) Wire
-  `./ArchiveReader/scripts/lint-write-surface.sh` into the daemon's health gate — and its self-test
-  `test-lint-write-surface.sh` alongside, since a lint that cannot fail is the failure mode `W26.lint` was
-  about. ⚠️ **Tier-2 per the autonomous-setup change discipline** (adversarial review + prove-the-mechanism
-  before install), and `daemon.sh` installs from the PRIMARY checkout's working tree — a fix landed via
-  worktree+push is not live until the primary is fast-forwarded and the owner restarts it. Do NOT make the gate
-  fail on a pre-existing violation without checking a clean tree passes first: both scripts are green on
-  `1460125`. ➕ **Same gap, same fix, added 2026-08-06:** `ArchiveProcessor/scripts/test-tag-vocabulary.sh`
-  (shipped by `W26.vocab`) also has no caller — it is the Tier-2 gate on the tag-write vocabulary hook and
-  the `$HOME`-walk prohibition, and it takes ~1 min, so wire it in with the other two. It needs no key, no
-  network and no GUI, and it is self-contained (`mktemp -d`, `-outputDirectory` in the volatile argument
-  domain), so it is safe on the gate. Green on `a25ee02`. ➕ **Third script, same gap, added 2026-08-06:**
-  `ArchiveProcessor/scripts/test-finder-tags.sh` (shipped by `W26.oracle`) — it is the differential proof that
-  the E2E oracle reads Finder tags from the xattr and not Spotlight, and it is the cheapest thing on this
-  list: **~2 s**, no key, no network, no GUI, no app build, `mktemp` only. Wire it in with the other three.
-  ➕ **Also fold in the SRCS question, with the cost measured (2026-08-07, from `W26.notesabsence`).** That
-  item asked whether to extend the lint's `SRCS` to the Notes tree in the same change; measured against
-  `ArchiveNotes/macOS/Sources/ArchiveNotes`, appending it to `SRCS` as-is means: **rule 1 (tag write) 0 hits**,
-  **rule 3 (`errorHandler:`-less enumerator) 1 hit** — the very call `W26.notesabsence` fixed, so it would be
-  green on arrival — but **rule 2 (destructive/content write) 11 hits**, every one of which needs an audited
-  `(file, exact source line)` allowance before the tree can be added. That is a write-surface audit of an app
-  whose *whole job* is writing `.md` files, not a one-line append, which is why it was not done inside
-  `W26.notesabsence`. Two shapes to choose between when it is done: audit the 11, or give the rules
-  **per-rule source lists** so rule 3 can cover Notes without rule 2 doing so. Prefer the second if the audit
-  looks like it is mostly re-stating "NoteStore writes notes".
-  ➕ **Fifth script, same gap, added 2026-08-07 (from `W26.scripts`):**
-  `ArchiveReader/scripts/test-fixture-scripts.sh` — it proves the two Reader fixture builders need no
-  Spotlight and that their replacement on-disk verification can actually fail (4 mutants). It also carries
-  the `rm -rf` guard on the new `AR_FIXTURE_DST`/`AR_SMOKE_DST` overrides, so it is a file-safety test, not
-  only a de-Spotlight one. **~35 s** (it builds the fixture four times over — once clean plus three
-  mutants), no key, no network, no GUI, no app build; `mktemp` only, and it never touches the real fixture
-  or the real corpus. Green on this commit. ⚠️ It needs `/opt/homebrew/bin/tag` and the `Test files/Brown
-  Gemini` corpus, both of which it PREFLIGHTS and aborts on — so on a machine lacking either it exits 1
-  rather than skipping. Decide on the gate whether that should be a WARN-skip like the VM step, or a RED;
-  the other four have no such external dependency.
-  Green on this commit.
+✅ **W26.lint-fu — SHIPPED 2026-08-07 (`5210c12` → this commit); full entry in `SUITE_TODO_DONE.md`.** All
+five of Wave 26's un-run harnesses are steps in `ops/autonomous/health-gate.sh` now — `write-surface-lint`,
+`write-surface-lint-proof`, `tag-vocabulary`, `finder-tags` and the skippable `fixture-scripts` (~105 s
+together, ahead of the VM lane). Two things later items need from it. **(1) The lint's source lists are
+PER-RULE**: rules 1 (tag write) and 3 (errorHandler-less enumerator) now cover
+`ArchiveNotes/macOS/Sources/ArchiveNotes`, rule 2 (destructive / content write) deliberately does not — that
+tree has 11 pre-existing content writes, six in `NoteStore`, and adding it without auditing them first would
+simply turn the lint RED. A new guard (a2) fails if any rule names a tree the union `SRCS` omits. **(2) A
+missing PREREQUISITE is exit 3, not exit 1**: `test-fixture-scripts.sh` needs `/opt/homebrew/bin/tag` and the
+**gitignored** `Test files/Brown Gemini` corpus, so on any other clone — and in every worktree — the lane
+reports `⊘ … NOT VERIFIED: fixture-scripts` instead of parking the run. ⚠️ **`daemon.sh` installs from the
+PRIMARY checkout's working tree, so the new gate steps are not live until the primary is fast-forwarded and
+the owner restarts the daemon** (Daemon Report).
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
 (Drive.app installed, not signed in): same silent-empty from the no-`errorHandler` enumerator, and
@@ -319,8 +295,8 @@ closed inside it.
 (rule 3, multi-line aware — plan §7a.8, reassigned here by `W26.lint`), with an allowance pinned to
 `ArchiveLibrary.swift:97`. ⚠️ **`W26.walk2` MUST delete that allowance when it deletes the call** — the
 lint's STALE-allowance guard hard-fails otherwise, and there is a self-test case that simulates exactly
-that deletion. Run `./ArchiveReader/scripts/lint-write-surface.sh` before committing (nothing invokes it —
-`W26.lint-fu`).
+that deletion. Run `./ArchiveReader/scripts/lint-write-surface.sh` before committing — the health gate runs
+it too since `W26.lint-fu` (2026-08-07), but that is a backstop every 30 commits, not a substitute.
 **(4) Reader discovery has tests for the first time ever** — `ArchiveReaderTests/LibraryDiscoveryTests.swift`
 (the `grep 'ArchiveLibrary('` → zero-hits gap is closed). Two of its three cases COMPARE the walker against
 the shipped DEBUG fixture loader, so they **stop compiling when `W26.walk2` deletes
@@ -479,6 +455,53 @@ explain why not.
   by tag fast"*) + its *Verified Facts* Spotlight line + Implementation Map; `ArchiveProcessor/CLAUDE.md`
   (vocabulary narrowing); `SPEC/tag-format.md` (how tags are **read** — the tag vocabulary itself is
   unchanged, so this is *not* a contract change); `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`.
+- [ ] **W26.fixturehang — the DEBUG fixture lane starts FSEvents on the MAIN THREAD, and it HANGS the whole
+  Reader unit bundle — and with it the daemon's health gate [M · HIGH · Tier-2 · ops+reader].** Filed
+  2026-08-07 while wiring `W26.lint-fu`'s gate steps; **pre-existing**, introduced with the carve-out in
+  `W26.fsev-fu1` (`ab80c12`, 2026-08-06). Measured with `sample`, not read.
+
+  **Symptom.** `ops/autonomous/health-gate.sh`'s `reader` step sits at **0 % CPU with the test host alive**,
+  indefinitely. It does not fail — it hangs, so the daemon (which runs the gate synchronously) waits until
+  `GATE_MAXRUN` = 50 min kills it, and **two consecutive gate timeouts PARK the run** with a note blaming
+  build time. Reproduced on two separate runs.
+
+  **Root cause — the stack, bottom-up.** `SymlinkedRootTests.spin` →
+  `RunLoop.run(until:)` → main-queue drain → `ArchiveLibrary.makeWatcher`'s handler →
+  `receiveWatchRequest` (`ArchiveLibrary.swift:764`) → `start(scope:markerGUID:)` (`:243`) →
+  `startWatcher(root:holdingDiscovery:)` (`:624`) → **`startWatcherInline(root:)` (`:667`)** →
+  `CorpusWatcher.start()` (`CorpusWatcher.swift:284`) → **`FSEventStreamCreate` → `watch_all_parents` →
+  `open(2)`**, parked on `com.apple.main-thread`. This is *precisely the bug `W26.fsev-fu1` exists to
+  prevent*, reached through the DEBUG fixture lane that item deliberately left inline.
+
+  🔺 **The carve-out's stated premise is FALSE, and that is the finding.** `startWatcherInline`'s comment
+  argues the hazard cannot arise because *"a fixture root is a scratch directory the test itself just
+  created on local disk, so its `open(2)` cannot block"*. But FSEvents does not open the root — it opens
+  **every ANCESTOR** (`watch_all_parents`). A container fixture root
+  (`~/Library/Containers/com.archivereader.app/Data/tmp/…`) has ancestors under `~/Library`, and one of
+  those is what parks. The reasoning was about the wrong file. FSEvents offers no cancel, so the thread —
+  here the *main* thread — is unrecoverable.
+
+  **A second, independent defect in the same lines.** `ArchiveLibrary.isFixtureRoot` is
+  `UserDefaults.standard.string(forKey: fixtureRootKey) != nil` — a **process-wide** read of the shared
+  `com.archivereader.app` domain. `SymlinkedRootTests.navModel` writes that key and removes it in
+  `addTeardownBlock`, but **a killed test host runs no teardown**, so the key persists into the owner's real
+  defaults and every LATER run starts in fixture mode. Found exactly that on 2026-08-07:
+  `ARUITestRootPath = …/tmp/SymlinkedRootTests-9ED68E63-…/link/corpus`. Consequence:
+  `CorpusWatcherLibraryTests.testAnAbandonedStartIsRefusedEvenThoughTheRootGenerationNeverMoved` installs a
+  `BlockingCorpusWatcher` whose `start()` waits on an **untimed** semaphore precisely to prove the start is
+  off-thread — so under the leaked key the inline path deadlocks the main thread forever, a *different* hang
+  earlier in the same bundle. I deleted the key to get past it (`archiveRootBookmark` untouched); that is a
+  repair, not the fix.
+
+  **Fix (do both; (a) first, then re-measure).** (a) `isFixtureRoot` must not be a process-wide default —
+  inject `UserDefaults`, as `W26.symroot-fu1` did for `RootFolderStore` and `W26.notesabsence-fu1` did for
+  `ReaderRootStore`; `ArchiveLibrary` is the third instance of one pattern. (b) Delete the inline lane, or
+  bound it: the walk-synchrony the carve-out protects does not require the *stream start* to be inline, and
+  a main-thread `open(2)` with no deadline is the thing `W26.fsev-fu1` and `W26.fsev-fu2` both ruled out
+  everywhere else. Related, same defaults domain: `W20.deeplink-isolation` — consider doing them together.
+  ⚠️ Until this lands, **`ops/autonomous/health-gate.sh` cannot complete on this machine**, which is why
+  `W26.lint-fu`'s own end-to-end gate proof had to run against a copy with the three app steps removed.
+
 - [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
   (blocked-on: W26.fsev, W26.idx, W26.vocab, W26.deny, W26.lint).** Full-scale run against a **scratch copy** (never the real
   corpus — Core Directive) of 100k+ files: timings vs the 10.15 s baseline — ⚠️ **`CorpusWalker` adds one
