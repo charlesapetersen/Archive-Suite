@@ -2,6 +2,10 @@
 // Part of Archive Notes (W4-S5). W23.m14: the basename fallback moved off the
 // main actor into a cancellable, bounded, progress-reporting search.
 // W23.l1: containment is canonical (symlink-resolving), not merely lexical.
+// W26.notesabsence: absence requires a walk that could actually READ the tree —
+// the root is probed with `CorpusWalker.canonicalRoot` and the enumerator has an
+// `errorHandler:`, so a symlinked, denied or partly-denied root reports
+// `.searchIncomplete` instead of insisting the file is not there.
 
 import Foundation
 import ArchiveCore
@@ -45,7 +49,12 @@ struct BasenameScan: Sendable, Equatable {
         case hitLimit
         /// The enclosing task was cancelled — absence is NOT established.
         case cancelled
-        /// The root could not be enumerated at all — absence is NOT established.
+        /// **Some part of the tree could not be read, so absence is NOT established.**
+        ///
+        /// Named for the case that used to be the only one it covered. Since `W26.notesabsence`
+        /// it also covers a walk that started fine and then met a directory it could not descend
+        /// into: an unreadable *subtree* is every bit as fatal to a claim of absence as an
+        /// unreadable root, because the file being looked for may be sitting in it.
         case unreadableRoot
     }
 
@@ -102,6 +111,44 @@ enum ReaderRootContainment {
         guard urlComponents.count >= rootComponents.count else { return false }
         return Array(urlComponents.prefix(rootComponents.count)) == rootComponents
     }
+}
+
+/// Is there *nothing* at `url` — as distinct from something we are not allowed to look at?
+///
+/// This is the sole gate on the one branch of the basename search that still establishes absence,
+/// so it must be far pickier than the `FileManager.fileExists` it replaced. `fileExists` answers
+/// `false` for a path denied by a `0o000` ancestor exactly as readily as for one that was never
+/// there, which is this wave's defect in miniature: a permission error read as an empty archive.
+///
+/// `lstat(2)` and not `stat(2)`: a **dangling** symlink root is a root we cannot reach — the target
+/// may be an unmounted volume — not a root that is provably empty, so it must fall through to
+/// `.unreadableRoot`. This is the one behaviour the fix deliberately changes for a path that
+/// previously reported `.exhausted`.
+///
+/// `ENOTDIR` counts as absent alongside `ENOENT`: it means a component of the path is a plain file,
+/// so nothing can exist at the path either.
+private func rootIsWhollyAbsent(_ url: URL) -> Bool {
+    url.withUnsafeFileSystemRepresentation { rawPath -> Bool in
+        guard let rawPath else { return false }
+        var linkInfo = stat()
+        guard lstat(rawPath, &linkInfo) != 0 else { return false }
+        return errno == ENOENT || errno == ENOTDIR
+    }
+}
+
+/// Records that the enumerator hit a directory it could not descend into.
+///
+/// A reference type because FileManager stores the handler and calls it synchronously from inside
+/// `nextObject()` — a captured `var` would not satisfy Swift 6. Only the *fact* is kept: the caller
+/// reports one `.unreadableRoot`, it does not enumerate the failures. (`ArchiveCore`'s equivalent,
+/// `CorpusWalker`'s `ErrorSink`, keeps the list because its result type exposes one; it is `private`
+/// to that file, which is why this is not it.)
+private final class ScanErrorSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _sawError = false
+
+    func record() { lock.lock(); _sawError = true; lock.unlock() }
+    var sawError: Bool { lock.lock(); defer { lock.unlock() }; return _sawError }
 }
 
 /// Each a multiple of the one before, so a single modulo gates the rest.
@@ -235,22 +282,46 @@ final class ReaderLinkResolver {
         // A private FileManager: the enumerator is driven off-actor and must not share
         // state with whatever the main actor is doing to `FileManager.default`.
         let fm = FileManager()
-        var isDirectory: ObjCBool = false
-        if fm.fileExists(atPath: root.path, isDirectory: &isDirectory) {
-            guard isDirectory.boolValue else {
-                // The root exists but cannot be walked, so absence is NOT established.
+
+        // **Openability is a syscall, not a stat (`W26.notesabsence`).** This used to ask
+        // `fileExists(atPath:isDirectory:)`, which follows symlinks and says "yes, a directory"
+        // for roots the enumerator then reads *nothing* from. Measured 2026-08-07 with this
+        // call's own options, each root holding a matching `doc.pdf`:
+        //
+        // | root | fileExists / isDirectory | entries yielded | old verdict |
+        // | --- | --- | --- | --- |
+        // | a symlink to the archive folder | true / true | 0 | `.exhausted` ⇒ **`.notFound`** |
+        // | a `0o000` directory | true / true | 0 | `.exhausted` ⇒ **`.notFound`** |
+        //
+        // `FileManager.enumerator(at:)` is non-nil in both cases — it reports the root once to
+        // `errorHandler:` and immediately ends — so the `guard let enumerator` below never fired
+        // and the walk fell through to "every entry examined". `CorpusWalker.canonicalRoot` is
+        // the shared probe for exactly this (`opendir(3)`, plus `realpath(3)` for a symlinked
+        // final component so the target is walked); it is what that function was made public for.
+        guard let walkRoot = CorpusWalker.canonicalRoot(root) else {
+            guard rootIsWhollyAbsent(root) else {
+                // The root is *there* and we cannot read it — a denial, an unmounted volume, a
+                // plain file, a dangling link. Absence is NOT established.
                 return BasenameScan(match: nil, scanned: 0, stop: .unreadableRoot)
             }
-        } else {
             // The root itself is gone: nothing can be under a directory that isn't there,
             // so absence IS established. (This is the shipped W8-S9 computer-move
             // contract — a stale root reports the file missing, never a wrong file.)
             return BasenameScan(match: nil, scanned: 0, stop: .exhausted)
         }
+
+        // WITHOUT this handler the enumerator silently skips a directory it cannot descend into
+        // and the walk still calls itself exhausted — the same bug one level down, and the reason
+        // `lint-write-surface.sh` rule 3 bans the handler-less overload outright.
+        let errorSink = ScanErrorSink()
         guard let enumerator = fm.enumerator(
-            at: root,
+            at: walkRoot,
             includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: [.skipsHiddenFiles, .skipsPackageDescendants],
+            errorHandler: { _, _ in
+                errorSink.record()
+                return true    // keep walking; the recorded error is what forbids claiming absence
+            }
         ) else {
             return BasenameScan(match: nil, scanned: 0, stop: .unreadableRoot)
         }
@@ -258,7 +329,14 @@ final class ReaderLinkResolver {
         // Canonicalized ONCE, outside the loop: containment is only asked about an entry whose
         // name already matched, so the walk pays one `realpath` per candidate (rare) rather
         // than one per entry (100k–150k).
-        let canonicalRoot = ReaderRootContainment.canonical(root)
+        //
+        // Derived from `walkRoot`, not from `root`: containment must be asked in the spelling the
+        // enumerator actually reports, which for a symlinked root is the target's. The two agree
+        // today — `canonical(_:)` resolves symlinks on both sides — but deriving it from what the
+        // walk was handed is what keeps them from drifting apart (`W26.symroot-fu1`, where a root
+        // spelled one way and paths discovered another rejected every row). `walkRoot` is the same
+        // directory as the granted root either way, so the granted-root contract is unchanged.
+        let canonicalRoot = ReaderRootContainment.canonical(walkRoot)
 
         var scanned = 0
         // `nextObject()` rather than `for … in enumerator`: NSEnumerator's Sequence
@@ -299,6 +377,10 @@ final class ReaderLinkResolver {
             return BasenameScan(match: nil, scanned: scanned, stop: .cancelled)
         }
         onProgress?(scanned)
-        return BasenameScan(match: nil, scanned: scanned, stop: .exhausted)
+        // The walk reached the end — but "the end of what it was allowed to see" is not absence.
+        // One skipped directory is enough: the file may be in it. `CorpusScanResult.isClean`
+        // encodes the same rule for the Reader's discovery walk.
+        return BasenameScan(match: nil, scanned: scanned,
+                            stop: errorSink.sawError ? .unreadableRoot : .exhausted)
     }
 }

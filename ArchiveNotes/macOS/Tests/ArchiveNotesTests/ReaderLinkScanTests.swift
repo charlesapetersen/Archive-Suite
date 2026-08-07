@@ -376,4 +376,163 @@ struct ReaderLinkScanTests {
         model.advance(to: 128, generation: second)
         #expect(model.scanned == 128)
     }
+
+    // MARK: - 6. Absence requires a walk that could READ the tree (W26.notesabsence)
+
+    /// A root reachable only through a symlink, holding `doc.pdf` at `matchRelPath`.
+    ///
+    /// The link's FINAL component is the root — the shape a user creates by aliasing an archive
+    /// folder onto another volume, and the one `FileManager.enumerator(at:)` refuses outright.
+    /// Returns `(linkURL, realRootURL, guid)`; delete `container` to clean up both.
+    private func makeSymlinkedRoot(matchRelPath: String) throws -> (link: URL, real: URL,
+                                                                    guid: UUID, container: URL) {
+        let container = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveNotes-notesabsence-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+
+        let real = container.appendingPathComponent("real", isDirectory: true)
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+
+        let guid = UUID()
+        let marker = RootMarker(guid: guid, name: "real", kind: .reader, createdAt: Date())
+        try JSONEncoder().encode(marker)
+            .write(to: real.appendingPathComponent(RootMarker.filename), options: .atomic)
+
+        let fileURL = real.appendingPathComponent(matchRelPath)
+        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try Data("%PDF-1.4 scratch\n".utf8).write(to: fileURL, options: .atomic)
+
+        let link = container.appendingPathComponent("link", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        return (link, real, guid, container)
+    }
+
+    /// Chmod a directory back before deleting it — a `0o000` fixture that is merely
+    /// `removeItem`-ed silently survives the test run.
+    private func removeFixture(_ url: URL, unlocking: [URL] = []) {
+        for dir in unlocking {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755],
+                                                   ofItemAtPath: dir.path)
+        }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    @Test("A symlinked root is walked THROUGH the link, so the file is found rather than denied")
+    func symlinkedRootIsWalkedThroughItsTarget() async throws {
+        let fixture = try makeSymlinkedRoot(matchRelPath: "new/place/doc.pdf")
+        defer { removeFixture(fixture.container) }
+
+        // Pre-fix: `fileExists(atPath:isDirectory:)` follows the link and reports a directory,
+        // the enumerator is non-nil and yields NOTHING, and the walk called that exhausted —
+        // `.notFound` for a file sitting right there. Measured 2026-08-07.
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: fixture.link)
+        #expect(scan.stop != .unreadableRoot, "a readable target must not read as unreadable")
+        guard let match = scan.match else {
+            Issue.record("the walk did not find doc.pdf under the symlinked root (stop: \(scan.stop))")
+            return
+        }
+        #expect(match.lastPathComponent == "doc.pdf")
+        // Containment accepted it: entries come back spelled under the TARGET, and the walk's
+        // canonical root has to be spelled the same way or every match is discarded.
+        #expect(match.path.hasSuffix("new/place/doc.pdf"))
+    }
+
+    @Test("A root we cannot open at all is never absence — it is an incomplete search")
+    func deniedRootIsNotAbsence() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveNotes-notesabsence-denied-\(UUID().uuidString)",
+                                    isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("%PDF-1.4\n".utf8).write(to: root.appendingPathComponent("doc.pdf"), options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: root.path)
+        defer { removeFixture(root, unlocking: [root]) }
+
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: root)
+        #expect(scan.match == nil)
+        #expect(scan.stop == .unreadableRoot,
+                "a 0o000 root yields a live enumerator and zero entries — that is not absence")
+    }
+
+    @Test("One unreadable SUBDIRECTORY demotes the whole walk: the file may be inside it")
+    func deniedSubdirectoryDemotesExhausted() async throws {
+        let (root, _) = try makeRoot(fillerFiles: 20, perDirectory: 10)
+        let denied = root.appendingPathComponent("denied", isDirectory: true)
+        try FileManager.default.createDirectory(at: denied, withIntermediateDirectories: true)
+        try Data("%PDF-1.4\n".utf8).write(to: denied.appendingPathComponent("doc.pdf"), options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: denied.path)
+        defer { removeFixture(root, unlocking: [denied]) }
+
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: root)
+        #expect(scan.match == nil, "the file is behind the denial; it must not be findable")
+        #expect(scan.scanned > 0, "the readable part of the tree was still walked")
+        #expect(scan.stop == .unreadableRoot,
+                "the enumerator skipped `denied/` in silence and the walk claimed to be exhausted")
+    }
+
+    @Test("A clean walk over a readable tree still establishes absence")
+    func cleanWalkStillEstablishesAbsence() async throws {
+        let (root, _) = try makeRoot(fillerFiles: 20, perDirectory: 10)
+        defer { removeFixture(root) }
+
+        // The other half of the fix: it must not make every search incomplete. Without this,
+        // demoting on any error passes vacuously by never reporting `.exhausted` again.
+        let scan = await ReaderLinkResolver.scanForBasename("ghost.pdf", under: root)
+        #expect(scan.match == nil)
+        #expect(scan.stop == .exhausted)
+    }
+
+    @Test("A root that is GONE still establishes absence — the W8-S9 computer-move contract")
+    func missingRootStillEstablishesAbsence() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveNotes-notesabsence-gone-\(UUID().uuidString)",
+                                    isDirectory: true)
+        // Never created. `canonicalRoot` returns nil here exactly as it does for a denial, so
+        // this is the assertion that keeps the two apart.
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: root)
+        #expect(scan.match == nil)
+        #expect(scan.stop == .exhausted,
+                "a stale root reports the file missing (shipped W8-S9), it does not stall")
+    }
+
+    @Test("A dangling symlink root is unreachable, not empty")
+    func danglingSymlinkRootIsNotAbsence() async throws {
+        let container = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveNotes-notesabsence-dangling-\(UUID().uuidString)",
+                                    isDirectory: true)
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+        defer { removeFixture(container) }
+        let link = container.appendingPathComponent("link", isDirectory: true)
+        try FileManager.default.createSymbolicLink(
+            at: link, withDestinationURL: container.appendingPathComponent("nowhere"))
+
+        // The deliberate behaviour CHANGE: `fileExists` follows the link, finds nothing and used
+        // to report absence. The target may be an unmounted volume, so we cannot say that.
+        let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: link)
+        #expect(scan.stop == .unreadableRoot)
+    }
+
+    @Test("End to end: a denied subtree reaches the user as searchIncomplete, not notFound")
+    func deniedSubtreeSurfacesAsSearchIncomplete() async throws {
+        try await withHermeticBookmarks {
+            let (root, guid) = try makeRoot(fillerFiles: 20, perDirectory: 10)
+            let denied = root.appendingPathComponent("denied", isDirectory: true)
+            try FileManager.default.createDirectory(at: denied, withIntermediateDirectories: true)
+            try Data("%PDF-1.4\n".utf8).write(to: denied.appendingPathComponent("doc.pdf"),
+                                              options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o000],
+                                                  ofItemAtPath: denied.path)
+            defer { removeFixture(root, unlocking: [denied]) }
+
+            let store = ReaderRootStore()
+            store.grantRoot(root)
+            let resolver = ReaderLinkResolver(rootStore: store)
+
+            let result = await resolver.resolve(rootGUID: guid, relativePath: "old/doc.pdf")
+            guard case .searchIncomplete = result else {
+                Issue.record("expected .searchIncomplete, got \(result)")
+                return
+            }
+        }
+    }
 }
