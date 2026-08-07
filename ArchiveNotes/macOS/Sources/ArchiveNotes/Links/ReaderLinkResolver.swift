@@ -24,6 +24,12 @@ enum LinkResolution: Sendable, Equatable {
     /// cancelled, or it hit its entry bound. Absence was never established, so this must
     /// never be reported as `.notFound` (W23.m14).
     case searchIncomplete(scanned: Int)
+    /// The folder the user chose could not be granted at all — `refusal.message` says why.
+    ///
+    /// Never `.notFound` and never `.needsRootGrant`: nothing was searched, and asking again for
+    /// the same folder without saying anything is the defect this case exists to stop
+    /// (W26.notesabsence-fu1).
+    case grantRefused(ReaderRootGrantRefusal)
 }
 
 /// The outcome of the walk-free stage of resolution.
@@ -250,14 +256,18 @@ final class ReaderLinkResolver {
         relativePath: String,
         progress: (@MainActor @Sendable (Int) -> Void)? = nil
     ) async -> LinkResolution {
-        guard let marker = rootStore.grantRoot(url) else {
-            return .notFound
+        switch rootStore.grantRoot(url) {
+        case .refused(let refusal):
+            // The folder could not be adopted, so no search happened. Reporting `.notFound` here
+            // (what a marker-less pick used to get) claims the archive was looked through.
+            return .grantRefused(refusal)
+        case .granted(let marker):
+            guard marker.guid == rootGUID else {
+                // Wrong folder — the user chose a root with a different GUID.
+                return .needsRootGrant(guid: rootGUID)
+            }
+            return await resolve(rootGUID: rootGUID, relativePath: relativePath, progress: progress)
         }
-        guard marker.guid == rootGUID else {
-            // Wrong folder — the user chose a root with a different GUID.
-            return .needsRootGrant(guid: rootGUID)
-        }
-        return await resolve(rootGUID: rootGUID, relativePath: relativePath, progress: progress)
     }
 
     /// Stop the security scope for a given root (e.g. after a popover closes).

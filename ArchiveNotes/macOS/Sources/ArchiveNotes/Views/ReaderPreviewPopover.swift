@@ -106,6 +106,10 @@ final class ReaderPreviewPopover {
                 "Original file not found at its recorded path.\nThe search of the archive did not finish (\(scanned) items examined), so the file may still be there.",
                 relativeTo: view
             )
+        case .grantRefused(let refusal):
+            // The chosen folder was not adopted. Saying so is the whole point of the case: the
+            // silent version of this asked for the same folder again (W26.notesabsence-fu1).
+            showMessage(refusal.message, relativeTo: view)
         }
     }
 

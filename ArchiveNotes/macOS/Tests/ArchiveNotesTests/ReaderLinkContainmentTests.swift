@@ -181,7 +181,7 @@ struct ReaderLinkContainmentTests {
 
         await withHermeticBookmarks {
             let store = ReaderRootStore()
-            #expect(store.grantRoot(aliasedRoot)?.guid == guid)
+            #expect(store.grantRoot(aliasedRoot).marker?.guid == guid)
             let resolver = ReaderLinkResolver(rootStore: store)
 
             let result = await resolver.resolve(rootGUID: guid, relativePath: "collection/doc.pdf")
@@ -195,9 +195,12 @@ struct ReaderLinkContainmentTests {
 
     @Test("A root that is itself a symlink contains its files under either spelling")
     func symlinkedRootContainsItsFiles() throws {
-        // The predicate directly: `ReaderRootStore` cannot register a root that IS a symlink
-        // (security-scoped `bookmarkData` refuses one), so this is the level the guarantee is
-        // provable at — and it is the guarantee the resolver leans on.
+        // The containment predicate directly, on both spellings of the same root. Since
+        // `W26.notesabsence-fu1` such a root can also be GRANTED — as its target, which is the
+        // spelling `root(for:)` then hands the resolver — so this case is no longer the only level
+        // the guarantee is provable at; it stays because it is the predicate the resolver leans on,
+        // and it holds for the link spelling too (a link the store no longer stores, but a
+        // *saved* bookmark minted before the fix still resolves to one).
         let tree = try makeTree()
         defer { try? FileManager.default.removeItem(at: tree.base) }
 
