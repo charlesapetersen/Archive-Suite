@@ -450,11 +450,61 @@ explain why not.
   not defer this waiting for `test-tier2.sh` (which costs money and, on this machine, cannot run at all —
   see the pypdf note in the Daemon Report). **Test:** a run dir whose output PDF is `0o000` must FAIL with a
   message naming the unreadable read, in `none` and `automatic` alike.
-- [ ] **W26.docs — docs/SPEC stop claiming Spotlight [S · low · Tier-1 · needs: none] (blocked-on:
+- [ ] **W26.docs — docs stop claiming Spotlight [S · low · Tier-1 · needs: none] (blocked-on:
   W26.walk2).** `ArchiveReader/CLAUDE.md:106` (*"Search: Spotlight (`mdfind`/`NSMetadataQuery`) finds these
   by tag fast"*) + its *Verified Facts* Spotlight line + Implementation Map; `ArchiveProcessor/CLAUDE.md`
-  (vocabulary narrowing); `SPEC/tag-format.md` (how tags are **read** — the tag vocabulary itself is
-  unchanged, so this is *not* a contract change); `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`.
+  (vocabulary narrowing); `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, `POTENTIAL_FEATURES.md`, and
+  `REVIEW.md` — which still assigns *"Spotlight consistency"* as a standing review concern for a subsystem
+  that no longer exists, and which the daemon reads to pick review units. Audited checklist:
+  `execution-plans/despotlight.md` §10.
+  ⛔ **`SPEC/tag-format.md` is CARVED OUT of this item — do not touch it here.** Owner call, 2026-08-07
+  daemon-report walkthrough: he was offered a doc-only SPEC grant on the `W15.tu0` precedent and chose the
+  split instead, so the two SPEC bullets are now **`W26.docs-spec`**, parked in the plan's HOLD QUEUE. What
+  remains here is non-contract docs only, so this item is **ungated and the daemon may take it** — it had
+  been sitting at the head of the queue getting skipped by every session (`W26.lint-fu`, 2026-08-07).
+- [ ] **W26.docs-spec — ⛔ OWNER-GATED: the two `SPEC/tag-format.md` bullets split out of `W26.docs`
+  [XS · low · doc-only · shared contract].** Split 2026-08-07 (daemon-report walkthrough) so `W26.docs`
+  could stop being skipped at the head of the queue. **Parked in the plan's HOLD QUEUE — the daemon must
+  NOT execute this.** The park is the structural gate: `next-queue-item.sh` only walks the `## WORK QUEUE`
+  region, so an item outside it is never offered, no matter what its tags say. The `⛔` marker alone would
+  not do it.
+
+  **The two bullets, verbatim from `execution-plans/despotlight.md` §10:**
+  1. `SPEC/tag-format.md` — how tags are **read**. The tag vocabulary itself is unchanged, so this is *not*
+     a shared-contract change and does not trip the both-apps-together rule.
+  2. ⚠️ `SPEC/tag-format.md` names **`ArchiveLibrary` as the Spotlight consumer in its API table.** That row
+     *is* the contract both apps must interpret identically, so this one edit **does** touch the shared
+     contract and must land with both apps together (`CLAUDE.md` §*"The shared contract is the risk"*). The
+     tag *vocabulary* is still unchanged — it is the reader-side API row that moves.
+
+  ⚠️ **Those two bullets contradict each other** on whether this trips the both-apps-together rule. Bullet 2
+  is the later, more specific reading and is the one to act on; resolving the contradiction in the plan is
+  part of the item. **To unblock:** add a `W26.docs-spec` grant to `OWNER_AUTHORIZATIONS.md` (the `W15.tu0`
+  entry is the exact precedent — *"AUTHORIZED to edit `SPEC/tag-format.md` (doc-only)"*) and move this item
+  out of the HOLD QUEUE into the WORK QUEUE. Ticking a gate alone never makes an item actionable.
+- [ ] **W26.tagvocab-salvage — two claims in an UNCOMMITTED `tagvocab-proof.swift` may have no shipped
+  equivalent, and the only copy is in a stray worktree [XS · low · verification-gap].** Filed 2026-08-07
+  (daemon-report walkthrough). `W26.vocab` shipped `ArchiveProcessor/scripts/test-tag-vocabulary.sh` in one
+  design; an **earlier, abandoned design of the same gate** survives only in
+  `../suite-wt-vocab-20260805-220156-2908` — a `swift build`-based script plus a 212-line
+  `scripts/tagvocab-proof.swift` harness that `git log --all --diff-filter=A` finds **in no commit on any
+  branch**. 🔴 **That worktree is deliberately being KEPT until this item closes: do not
+  `git worktree remove` it and do not `git worktree prune`.** The file exists nowhere else.
+
+  **What to check.** The harness asserts **8** claims; the shipped script's header lists **6**. Six line up
+  (write-is-byte-identical, subjects-only, refused-write-contributes-nothing, survives-relaunch, real
+  `CorpusWalker` harvest, `$HOME`-not-harvestable). **Two have no counterpart in that list:**
+  - **claim 3** — a colour token is judged by the label that actually **LANDED**: an app-assigned Red is the
+    marker; a subject "Red" on a file with no red label is a subject. Not a nicety — `W26.vocab`'s own entry
+    records exactly this as one of the three defects testing rather than reading caught (*"the harvest could
+    not see a Finder label, so 'Red'/'Purple' were becoming permanent **Subjects**"*).
+  - **claim 5** — copy-source pass-through (`stampUnread: false`) contributes the source file's real subjects.
+
+  ⚠️ **This compared the two files' STATED claim lists, not their executed assertions** — the shipped driver
+  may cover both without listing them. Read the code before concluding anything. **If covered:** say so in
+  the commit, close this, and the worktree is free. **If not:** port the two assertions into the shipped
+  `test-tag-vocabulary.sh` — it is a health-gate step as of `W26.lint-fu` (`f64649b`), so they start being
+  enforced the moment they land — then free the worktree.
 - [ ] **W26.fixturehang — the DEBUG fixture lane starts FSEvents on the MAIN THREAD, and it HANGS the whole
   Reader unit bundle — and with it the daemon's health gate [M · HIGH · Tier-2 · ops+reader].** Filed
   2026-08-07 while wiring `W26.lint-fu`'s gate steps; **pre-existing**, introduced with the carve-out in

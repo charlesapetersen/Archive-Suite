@@ -1143,8 +1143,12 @@ The audited list, so `W26.docs` is a checklist rather than a hunt:
 - `Tests/ArchiveReaderUITests/FixtureUITestCase.swift:62-64` and `NavigationUITests.swift:46-48` (§5.9/5.10).
 - `ArchiveProcessor/CLAUDE.md` — vocabulary narrowing (§4.4.3); `ArchiveProcessor/TESTING.md:72` — flag the
   dubious Spotlight-contention premise (§ Site 8) without acting on it.
-- `SPEC/tag-format.md` — how tags are *read*. The tag vocabulary itself is unchanged, so **this is not a
-  shared-contract change** and does not trip the both-apps-together rule.
+- ⛔ **CARVED OUT of `W26.docs` → `W26.docs-spec` (HOLD QUEUE, owner-gated). Do not edit `SPEC/tag-format.md`
+  under `W26.docs`.** Owner call, 2026-08-07 daemon-report walkthrough. *Original bullet, retained as the
+  record:* `SPEC/tag-format.md` — how tags are *read*. The tag vocabulary itself is unchanged, so **this is
+  not a shared-contract change** and does not trip the both-apps-together rule. (⚠️ This contradicts the
+  second SPEC bullet below; bullet 2 is the later, more specific reading. Resolving that is part of
+  `W26.docs-spec`.)
 - `ArchiveReader/CLAUDE.md` carries **eight** statements that become false — including a **§Decisions
   entry** (which the owner ships as settled) plus the architecture and stack sections. Treat the §Decisions
   one carefully: it is a record of an owner decision, so **supersede it with a dated new decision** rather
@@ -1152,10 +1156,12 @@ The audited list, so `W26.docs` is a checklist rather than a hunt:
 - `ArchiveReader/KNOWN_ISSUES.md` — **five** affected passages, including a *"Verified facts to rely on"*
   entry **that the incident itself falsified**, and a whole section documenting the Spotlight-lag mechanism
   being deleted.
-- ⚠️ **`SPEC/tag-format.md` names `ArchiveLibrary` as the Spotlight consumer in its API table.** That row
-  *is* the contract both apps must interpret identically, so this one edit **does** touch the shared
-  contract and must land with both apps together (CLAUDE.md §"The shared contract is the risk"). The tag
-  *vocabulary* is still unchanged — it is the reader-side API row that moves.
+- ⛔ **ALSO CARVED OUT → `W26.docs-spec`.** ⚠️ **`SPEC/tag-format.md` names `ArchiveLibrary` as the Spotlight
+  consumer in its API table.** That row *is* the contract both apps must interpret identically, so this one
+  edit **does** touch the shared contract and must land with both apps together (CLAUDE.md §"The shared
+  contract is the risk"). The tag *vocabulary* is still unchanged — it is the reader-side API row that
+  moves. **This is the bullet that makes the item owner-gated** — it is why `W26.docs` was skipped by every
+  session until the split.
 - ⚠️ **`REVIEW.md` assigns "Spotlight consistency" as a standing review concern for Reader/Search — and the
   autonomous daemon reads that file to pick review units.** Leaving it stale sends future review sessions
   hunting a subsystem that no longer exists.
