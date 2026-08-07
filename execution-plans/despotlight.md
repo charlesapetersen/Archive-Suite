@@ -53,14 +53,25 @@ user's home** — a scope no per-root walk reproduces. Needs a real decision, no
 
 References `NSMetadataQueryDidUpdate` in prose about tag-write lag. Update the comment; no code change.
 
-### Site 4 — test/fixture infrastructure (decide, don't just delete)
+### Site 4 — test/fixture infrastructure — ✅ SHIPPED 2026-08-07 (`W26.scripts` `18824bb` + completion commit)
 
-- `ArchiveReader/scripts/make-gui-fixture.sh` — lines 16, 179 (`mdimport`), 186 (poll `mdfind`)
-- `ArchiveReader/scripts/smoke-setup.sh` — lines 22 (`mdimport`), 26 (poll `mdfind`)
+`make-gui-fixture.sh` and `smoke-setup.sh` no longer `mdimport` or poll `mdfind`. Kept here because two
+of this section's own claims were measured, and one of them was too mild:
 
-Both force-index fixture copies and then **poll `mdfind` until the tags appear** — a wait that becomes
-both unnecessary and impossible once discovery is ours. Removing these polls also removes a real source
-of fixture-setup flake.
+- ⚠️ **"Unnecessary, and a source of flake" UNDERSTATES it.** The poll is **unsatisfiable** wherever
+  these fixtures are actually built — a `mktemp` dir is never indexed (the same fact §Site 6 measured
+  about `/tmp`, which had made the E2E tag oracle blind in every run) and the Tart guest boots with a
+  cold index. Both scripts only WARNED on timeout, so the real failure mode was a fixture that shipped
+  looking fine and made its UITests fail later for a reason the log never named. Anywhere else in this
+  plan that reasons about a *slow* index in a scratch location should read *absent*, not slow.
+- ✅ **§4.5's "`FSEventStreamFlushSync` replaces `mdfind` polling in the fixture scripts" turned out not
+  to be needed in the scripts at all.** `tag -s` and `ditto` are synchronous — the xattr is on disk when
+  they return — so the scripts read the tags straight back and assert on them. The flush belongs to the
+  app-side watcher, not here. Nothing waits.
+- The replacement verification is fail-closed and mutation-tested by
+  `ArchiveReader/scripts/test-fixture-scripts.sh` (26 checks; the gate is asserted rather than argued —
+  the real `mdfind` sees **0 of 12** files in a complete, correct fixture). Nothing runs it yet —
+  `W26.lint-fu`.
 
 ### Site 5 — docs that become false
 
@@ -714,7 +725,7 @@ each leaving the app **working**.
 | `W26.vocab` | Processor `SystemTagsProvider` off Spotlight → persisted `TagVocabulary` | M | low | 1 | none | `W26.walk1` |
 | `W26.oracle` | Processor test oracle `assert_mac.py` off `mdls` → `disk_tags()` | S | low | 1 | none | — |
 | `W26.reinfect` | ✅ **SHIPPED in completion commit** — JPEGS §2 is a walk-built stem index; item tagged `W24.jpeg1`; edge `(blocked-on: W26.walk2, W26.verify)`, not `walk1` (§Site 7) | S | low | 1 | none | — |
-| `W26.scripts` | Fixture scripts drop `mdimport`/`mdfind` polling | S | low | 1 | none | `W26.walk2` |
+| `W26.scripts` | ✅ **SHIPPED in completion commit** — fixture builders read the tags back instead of waiting for an index; the poll was unsatisfiable, not slow (§Site 4); new `test-fixture-scripts.sh` + an `rm -rf` guard on the new DST overrides | S | low | 1 | none | `W26.walk2` |
 | `W26.docs` | Docs/SPEC stop claiming Spotlight (incl. `ArchiveReader/CLAUDE.md:106`) | S | low | 1 | none | `W26.walk2` |
 | `W26.verify` | Scale + safety verification on a scratch copy; gates deleting this plan | M | med | 2 | none | `W26.fsev`, `W26.idx`, `W26.vocab`, `W26.oracle`, `W26.reinfect`, `W26.deny`, `W26.lint` |
 

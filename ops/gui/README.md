@@ -95,7 +95,11 @@ Reader on `AR-GUI-Fixture` (11 documents, tags, parsed dates, OCR-fail badges).
 
 **GUI fixture:** fixtured Reader UITests need `ArchiveReader/scripts/make-gui-fixture.sh` (a tagged scratch
 corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). It honors `AR_FIXTURE_SRC` (point it
-at a mounted corpus) and takes the first 10 real PDFs — robust to a slimmed/strided corpus.
+at a mounted corpus) and `AR_FIXTURE_DST` (build somewhere throwaway), and takes the first 10 real PDFs —
+robust to a slimmed/strided corpus. Since `W26.scripts` (2026-08-07) it neither `mdimport`s nor waits on
+`mdfind`: it reads the tags back off disk and **exits non-zero** if the fixture is wrong. That matters most
+here — the guest boots with a cold Spotlight index, so the old poll could only ever time out and warn.
+Its own gate is `ArchiveReader/scripts/test-fixture-scripts.sh` (26 checks, run it by hand — `W26.lint-fu`).
 
 **THE GUEST'S SCREEN SIZE IS NOT THE VM'S CONFIGURED ONE (W21.vmgui-c, measured 2026-08-01).** `tart run
 --no-graphics` attaches no display, so the guest's WindowServer boots at its headless default **1024×768** —

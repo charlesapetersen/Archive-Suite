@@ -110,6 +110,51 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.scripts — fixture scripts drop `mdimport`/`mdfind` polling [S · low · Tier-1 · needs: none].
+  ✅ SHIPPED 2026-08-07** — `18824bb` -> this commit. `ArchiveReader/scripts/make-gui-fixture.sh` and
+  `smoke-setup.sh` force-indexed their output and then polled `mdfind` for up to 60 s / 40 s.
+
+  **The item called the poll "unnecessary and a source of flake". Measured, it is worse than that: it is
+  UNSATISFIABLE wherever these fixtures are actually built.** A `mktemp` dir is never indexed (the same
+  fact `W26.oracle` measured about `/tmp`, which had made the E2E tag oracle blind in every run), and the
+  Tart guest boots with a cold index. Both scripts only **warned** on timeout, so the shape of the bug was
+  a fixture that shipped looking fine and made its UITests fail later for a reason the log never named.
+
+  **What replaced the wait.** `tag -s` and `ditto` are synchronous — the xattr is on disk when they
+  return — so there is nothing to wait for and the tags are simply read back:
+  - make-gui-fixture: 12 files, exactly **11** carrying Read or Unread, and file 9 carrying **NEITHER**.
+    File 9 *is* the tri-state bucket a UITest asserts on, so its absence of a read state is an invariant
+    worth pinning, not an omission — a later edit that "helpfully" tags it would silently retire that
+    test. Exact-token comparison, because **"Read" is a substring of "Unread"** and a grep would
+    over-match. **Fail-closed** now, where the poll only ever warned. (This does not preempt
+    `W21.vmgui-a`, which is about the *runner* noticing a failed fixture build; it is what gives that
+    item a non-zero exit to notice.)
+  - smoke-setup: the raw `com.apple.metadata:_kMDItemUserTags` must be **byte-identical on both sides of
+    the copy** — the ditto-preserves-tags claim its own comment makes, which the old poll never checked.
+    Raw `xattr` (base macOS) rather than the `tag` CLI, so the smoke setup gains no brew dependency.
+
+  **New `AR_FIXTURE_DST` / `AR_SMOKE_DST`** make the item's own gate runnable on a genuinely unindexed
+  volume without clobbering the real fixture. They also feed a `rm -rf`, so they arrive with a guard
+  (absolute, ≥2 components, not `$HOME`, not inside the source corpus). 🔺 **My adversarial pass caught
+  that guard letting through the one path it exists for:** `$HOME/` is the same directory as `$HOME` but
+  a different string, so the equality check missed it while the depth check was happy. Trailing slashes
+  are stripped first now (`/` collapses to empty and is refused by the depth check), and a named test
+  pins it.
+
+  **New `ArchiveReader/scripts/test-fixture-scripts.sh` — 26 checks, three layers**, because any one
+  alone passes vacuously: *static* (no `mdimport`/`mdfind`/`kMDItem… ==` survives in either script — the
+  xattr NAME is not a query and must survive); *dynamic* (both run with `mdimport`/`mdfind` shimmed to a
+  tripwire that **records** the call, since a non-zero exit alone proves nothing against code that piped
+  both to `/dev/null` and `|| true`-ed the poll); *mutation* (4 mutants, each caught by name, and a
+  mutant whose `sed` matches nothing is itself a failure so a stale case cannot go quiet). The gate is
+  asserted directly rather than argued: the fixture is complete and correct while the **real** `mdfind`
+  sees **0 of its 12 files**.
+
+  End-to-end: the fixture built by the changed script **inside the Tart guest** (cold index, the
+  environment the poll could never satisfy) drove **ArchiveReaderUITests 17/17 green**. Host default-DST
+  build green, both scripts `bash -n` clean. No Swift source touched. Filed nothing new; extended
+  `W26.lint-fu` with the new self-test, which — like the other four — nothing yet runs.
+
 - [x] **W26.notesabsence-fu2 — Notes can never grant a Reader root, so the Reader-link preview is
   unreachable on every machine, and the popover's advice ("choose the folder in Reader") cannot help a
   sandboxed app [S–M · MED · behaviour]. ✅ SHIPPED 2026-08-07** — this commit. Filed 2026-08-07 by

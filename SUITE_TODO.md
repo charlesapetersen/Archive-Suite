@@ -266,6 +266,16 @@ exit 0, "✓ clean".
   `W26.notesabsence`. Two shapes to choose between when it is done: audit the 11, or give the rules
   **per-rule source lists** so rule 3 can cover Notes without rule 2 doing so. Prefer the second if the audit
   looks like it is mostly re-stating "NoteStore writes notes".
+  ➕ **Fifth script, same gap, added 2026-08-07 (from `W26.scripts`):**
+  `ArchiveReader/scripts/test-fixture-scripts.sh` — it proves the two Reader fixture builders need no
+  Spotlight and that their replacement on-disk verification can actually fail (4 mutants). It also carries
+  the `rm -rf` guard on the new `AR_FIXTURE_DST`/`AR_SMOKE_DST` overrides, so it is a file-safety test, not
+  only a de-Spotlight one. **~35 s** (it builds the fixture four times over — once clean plus three
+  mutants), no key, no network, no GUI, no app build; `mktemp` only, and it never touches the real fixture
+  or the real corpus. Green on this commit. ⚠️ It needs `/opt/homebrew/bin/tag` and the `Test files/Brown
+  Gemini` corpus, both of which it PREFLIGHTS and aborts on — so on a machine lacking either it exits 1
+  rather than skipping. Decide on the gate whether that should be a WARN-skip like the VM step, or a RED;
+  the other four have no such external dependency.
   Green on this commit.
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
@@ -464,11 +474,6 @@ explain why not.
   not defer this waiting for `test-tier2.sh` (which costs money and, on this machine, cannot run at all —
   see the pypdf note in the Daemon Report). **Test:** a run dir whose output PDF is `0o000` must FAIL with a
   message naming the unreadable read, in `none` and `automatic` alike.
-- [ ] **W26.scripts — fixture scripts drop `mdimport`/`mdfind` polling [S · low · Tier-1 · needs: none]
-  (blocked-on: W26.walk2).** `ArchiveReader/scripts/make-gui-fixture.sh` (lines 16, 179, 186) and
-  `smoke-setup.sh` (lines 22, 26) force-index fixture copies then **poll `mdfind` until tags appear** — a
-  wait that becomes both unnecessary and impossible once discovery is ours, and a real source of
-  fixture-setup flake. **Test:** both scripts produce a usable fixture on a volume with indexing disabled.
 - [ ] **W26.docs — docs/SPEC stop claiming Spotlight [S · low · Tier-1 · needs: none] (blocked-on:
   W26.walk2).** `ArchiveReader/CLAUDE.md:106` (*"Search: Spotlight (`mdfind`/`NSMetadataQuery`) finds these
   by tag fast"*) + its *Verified Facts* Spotlight line + Implementation Map; `ArchiveProcessor/CLAUDE.md`
