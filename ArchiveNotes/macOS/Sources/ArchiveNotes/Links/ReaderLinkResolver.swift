@@ -173,6 +173,15 @@ final class ReaderLinkResolver {
     private let rootStore: ReaderRootStore
     private let scanLimit: Int
 
+    /// The root whose security scope the most recent resolution left running, if any.
+    ///
+    /// Resolution starts a scope as a side effect (`ReaderRootStore.root(for:)`) and nothing ever
+    /// gave one back: `stopAccessing(guid:)` had **no caller in the whole app**, so every root a
+    /// session previewed stayed scoped until quit (`W26.notesabsence-fu3`). Remembering it here
+    /// rather than in the popover is what makes "which root, and when" testable without a window —
+    /// the popover's part is one call in `dismiss()`.
+    private(set) var scopedRootGUID: UUID?
+
     init(rootStore: ReaderRootStore, scanLimit: Int = BasenameScan.defaultLimit) {
         self.rootStore = rootStore
         self.scanLimit = scanLimit
@@ -186,6 +195,15 @@ final class ReaderLinkResolver {
         guard let rootURL = rootStore.root(for: rootGUID) else {
             return .decided(.needsRootGrant(guid: rootGUID))
         }
+        // A scope is live from here on. Recorded, not released — the caller may be about to read a
+        // PDF out of this root, or to walk it. `releaseRootScope()` is the other half.
+        //
+        // A root replacing a *different* one is released now: only one preview is up at a time, so
+        // the outgoing root has no reader left.
+        if let outgoing = scopedRootGUID, outgoing != rootGUID {
+            rootStore.stopAccessing(guid: outgoing)
+        }
+        scopedRootGUID = rootGUID
 
         let targetURL = rootURL.appendingPathComponent(relativePath)
 
@@ -270,8 +288,19 @@ final class ReaderLinkResolver {
         }
     }
 
-    /// Stop the security scope for a given root (e.g. after a popover closes).
-    func stopAccessing(guid: UUID) {
+    /// Give back the security scope the last resolution started (e.g. after a popover closes).
+    ///
+    /// Replaces `stopAccessing(guid:)`, which had no caller anywhere in the app — the popover
+    /// dismissed and the scope stayed. Taking no GUID is deliberate: the caller that knows a preview
+    /// is over does not know which root it was for, and asking it to remember is how the old API
+    /// came to be dead.
+    ///
+    /// Safe to call while a basename search is still unwinding: the walk holds no reference to the
+    /// scope beyond the open enumerator, so at worst a cancelled search records a few directory
+    /// errors on its way out — and a cancelled search's answer is discarded by construction.
+    func releaseRootScope() {
+        guard let guid = scopedRootGUID else { return }
+        scopedRootGUID = nil
         rootStore.stopAccessing(guid: guid)
     }
 

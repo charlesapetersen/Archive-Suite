@@ -3,6 +3,9 @@
 // W26.notesabsence-fu1: a root that IS a symbolic link can now be granted — it is adopted as its
 // target, because a security-scoped bookmark cannot open a link — and every way a grant can fail
 // returns a refusal the caller can SAY, instead of a marker that implies success.
+// W26.notesabsence-fu3: READING a root can no longer WRITE the bookmark dictionary, so one root
+// whose scope will not start can no longer take every other granted root down with it; and a scope
+// that was never started is never stopped.
 
 import Foundation
 import ArchiveCore
@@ -78,8 +81,21 @@ enum ReaderRootGrant: Equatable, Sendable {
 final class ReaderRootStore: ObservableObject {
     @Published private(set) var knownRoots: [UUID: URL] = [:]
 
-    /// Active security scopes keyed by GUID, so we can stop them on removal.
-    private var activeScopes: [UUID: URL] = [:]
+    /// One root's live access, as this store understands it.
+    ///
+    /// `started` is the half that used to be missing. `startAccessingSecurityScopedResource()`
+    /// returns **false** for a URL that is already accessible without a scope — the panel URL a
+    /// fresh grant hands over, and every URL in a test running from the app container — and Apple
+    /// is explicit that a `false` start must not be balanced by a stop. Recording the URL without
+    /// recording *that* made `stopAccessing(guid:)` stop a scope it had never started.
+    private struct Scope {
+        let url: URL
+        /// `true` only if *this store* started the scope and therefore owes it a stop.
+        let started: Bool
+    }
+
+    /// Live access keyed by GUID, so we can stop what we started — and only that.
+    private var activeScopes: [UUID: Scope] = [:]
     private let defaultsKey = "readerRootBookmarks"
     private let defaults: UserDefaults
 
@@ -95,6 +111,18 @@ final class ReaderRootStore: ObservableObject {
                              includingResourceValuesForKeys: nil, relativeTo: nil)
     }
 
+    /// How a security scope is started, and how it is given back.
+    ///
+    /// Test seams for the same reason `mintBookmark` is one, and the reason is the whole of
+    /// `W26.notesabsence-fu3`: the branch that matters — a bookmark that resolves at launch but
+    /// whose scope will not start, because the volume is not mounted — cannot be provoked from a
+    /// test. Every fixture lives in the app container, where a start is *always* refused for the
+    /// opposite reason (the URL needs no scope), so without a seam the failure branch would run
+    /// only in the wrong sense and a mutation putting the whole-dictionary rewrite back would pass.
+    /// `stopScope` is separate so a test can prove a stop that must NOT happen did not happen.
+    var startScope: (URL) -> Bool = { $0.startAccessingSecurityScopedResource() }
+    var stopScope: (URL) -> Void = { $0.stopAccessingSecurityScopedResource() }
+
     /// - Parameter defaults: where the bookmarks are persisted. Injected so a test can hand over a
     ///   throwaway suite: `grantRoot` WRITES, and `readerRootBookmarks` in `.standard` is the app's
     ///   real set of granted Reader roots.
@@ -105,19 +133,40 @@ final class ReaderRootStore: ObservableObject {
 
     /// Look up a Reader root by its marker GUID.
     /// Starts the security scope if not already active; returns `nil` on miss.
+    ///
+    /// **This is a read. It writes nothing to `UserDefaults` (`W26.notesabsence-fu3`).** It used to:
+    /// a scope that would not start was treated as proof the bookmark was dead, the GUID was dropped
+    /// and `persistAll()` rebuilt the *whole* `readerRootBookmarks` dictionary by re-minting every
+    /// surviving root — with no scope started, which is exactly the condition under which minting
+    /// fails. So one click into a root whose volume was not mounted silently deleted the persisted
+    /// bookmark of every *other* root as collateral.
+    ///
+    /// Two separate corrections, and the second is the one that outlives this function:
+    ///
+    /// 1. **The failed root's own bookmark also stays.** A refused start is not proof of staleness —
+    ///    an unmounted volume refuses one and remounts later — and Notes has no folder chooser at all
+    ///    (`W26.notesabsence-fu2`), so forgetting a grant here is unrecoverable by the user. The
+    ///    Reader reached the same conclusion on the same question and says so in
+    ///    `RootFolderStore.reResolveSavedRoot`: *"The bookmark remains persisted so a later window
+    ///    activation can retry after the volume is mounted again."* This deviates from the filed
+    ///    item, which asked only that the *other* roots be spared.
+    /// 2. **`persistAll` is gone entirely**, so no code path re-mints during a read. Narrowing it to
+    ///    delete one key would have left the shape of the bug — a lookup that rewrites the store —
+    ///    in place for the next edit to widen again.
+    ///
+    /// The GUID is still dropped from `knownRoots`, in memory: this session cannot open that root, so
+    /// handing its URL back would only produce failures further downstream. The next launch retries.
     func root(for guid: UUID) -> URL? {
-        if let url = activeScopes[guid] {
-            return url
+        if let scope = activeScopes[guid] {
+            return scope.url
         }
         guard let url = knownRoots[guid] else { return nil }
-        if url.startAccessingSecurityScopedResource() {
-            activeScopes[guid] = url
-            return url
+        guard startScope(url) else {
+            knownRoots.removeValue(forKey: guid)
+            return nil
         }
-        // Bookmark is stale / no longer accessible — remove it.
-        knownRoots.removeValue(forKey: guid)
-        persistAll()
-        return nil
+        activeScopes[guid] = Scope(url: url, started: true)
+        return url
     }
 
     /// Register a newly-granted Reader root: read its `RootMarker` for the GUID, persist a
@@ -159,10 +208,22 @@ final class ReaderRootStore: ObservableObject {
             // that could ever balance the old `start`. (`RootFolderStore.setRoot` does the same, in
             // the same order: new access live before the old one is let go.)
             let previous = activeScopes[marker.guid]
-            _ = target.startAccessingSecurityScopedResource() // false for a panel URL; it is already accessible
-            activeScopes[marker.guid] = target
+            let started: Bool
+            if let previous, previous.url == target, previous.started {
+                // Already inside a scope for this exact URL. start/stop are balanced per call and
+                // nothing here counts them, so a second start would leave one that can never be
+                // given back — the old code's re-grant-at-the-same-path case.
+                started = true
+            } else {
+                // `false` here is normal, not a failure: a panel URL is already accessible, so there
+                // is no scope to start and — Apple is explicit — none to stop later either.
+                started = startScope(target)
+            }
+            activeScopes[marker.guid] = Scope(url: target, started: started)
             knownRoots[marker.guid] = target
-            if let previous, previous != target { previous.stopAccessingSecurityScopedResource() }
+            if let previous, previous.url != target, previous.started {
+                stopScope(previous.url)
+            }
             return .granted(marker)
         } catch {
             NSLog("ReaderRootStore: could not bookmark \(target.path): \(error)")
@@ -171,10 +232,22 @@ final class ReaderRootStore: ObservableObject {
     }
 
     /// Stop the security scope for the given root. Does not remove the bookmark.
+    ///
+    /// Stops **only a scope this store started** (`W26.notesabsence-fu3`). Apple's rule is that a
+    /// `startAccessingSecurityScopedResource()` returning `false` must not be paired with a stop, and
+    /// this used to pair it with one for every root granted in the current session — a grant's URL
+    /// comes from the open panel, which is accessible without a scope, so its start always returns
+    /// `false`.
+    ///
+    /// A never-started entry is also **kept**, not dropped: the panel's grant lasts as long as the
+    /// process, so the URL is still the right answer for `root(for:)`. Dropping it sent the next
+    /// lookup down the `knownRoots` path, where the start refused again — and, before the fix above,
+    /// that refusal wiped every persisted bookmark in the store. Losing a whole session's roots by
+    /// closing a popover was two lines apart.
     func stopAccessing(guid: UUID) {
-        if let url = activeScopes.removeValue(forKey: guid) {
-            url.stopAccessingSecurityScopedResource()
-        }
+        guard let scope = activeScopes[guid], scope.started else { return }
+        activeScopes.removeValue(forKey: guid)
+        stopScope(scope.url)
     }
 
     // MARK: - Private
@@ -205,31 +278,19 @@ final class ReaderRootStore: ObservableObject {
         }
     }
 
+    /// Re-mint one stale bookmark, touching **only that GUID's entry**.
+    ///
+    /// This was already the right shape when `persistAll()` was the wrong one, and the difference is
+    /// instructive: minting needs a live scope, which is why this starts one first. `persistAll()`
+    /// re-minted without ever starting a scope, so its `try?` swallowed a failure that was more or
+    /// less guaranteed — and wrote the resulting gap back over the store.
     private func refreshBookmark(guid: UUID, url: URL) {
-        guard url.startAccessingSecurityScopedResource() else { return }
-        defer { url.stopAccessingSecurityScopedResource() }
-        if let fresh = try? url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ) {
+        guard startScope(url) else { return }
+        defer { stopScope(url) }
+        if let fresh = try? mintBookmark(url) {
             var stored = savedBookmarks()
             stored[guid.uuidString.lowercased()] = fresh
             defaults.set(stored, forKey: defaultsKey)
         }
-    }
-
-    private func persistAll() {
-        var stored: [String: Data] = [:]
-        for (guid, url) in knownRoots {
-            if let data = try? url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            ) {
-                stored[guid.uuidString.lowercased()] = data
-            }
-        }
-        defaults.set(stored, forKey: defaultsKey)
     }
 }

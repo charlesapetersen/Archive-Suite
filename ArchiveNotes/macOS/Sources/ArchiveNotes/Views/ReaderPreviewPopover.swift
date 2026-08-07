@@ -72,6 +72,10 @@ final class ReaderPreviewPopover {
         searchTask?.cancel()
         searchTask = nil
         closePopover()
+        // The preview is what held the Reader root open, so the preview is what gives it back
+        // (W26.notesabsence-fu3). `show` calls `dismiss` first, so a second preview of the SAME
+        // root re-enters its scope a moment later — cheap, and it keeps this the only release site.
+        resolver.releaseRootScope()
     }
 
     // MARK: - Private
