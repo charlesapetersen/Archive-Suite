@@ -110,6 +110,80 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.notesabsence-fu3 — `ReaderRootStore` DELETES bookmarks it merely failed to re-mint, so one root
+  that has moved takes every other granted root with it [S · MED · Tier-2]. ✅ SHIPPED 2026-08-07** —
+  `af01cb7` (the three fixes) → this commit (the tests, the mutation pass, the trackers). Filed 2026-08-07 by
+  `W26.notesabsence-fu1`'s adversarial pass; **pre-existing**.
+
+  **One mechanism, three defects.** The store conflated *"I have a URL for this root"* with *"I hold a scope
+  for it"*, and settled the confusion in persisted state.
+
+  1. **`root(for:)` — a READ — wrote `UserDefaults`.** A scope that would not start was treated as proof the
+     bookmark was dead, so the GUID was dropped and `persistAll()` rebuilt the **whole**
+     `readerRootBookmarks` dictionary by re-minting every surviving root — **with no scope started**, which
+     is the one condition under which minting reliably fails (it is exactly why `refreshBookmark` starts one).
+     `loadSaved` deliberately starts no scopes, so with roots A and B restored at launch, one click into A
+     after A's volume went away dropped A *and silently dropped B's persisted bookmark as collateral*.
+     `persistAll()` is **deleted outright rather than narrowed**: the shape of the bug is a lookup that
+     rewrites the store, and a narrowed version leaves that shape for the next edit to widen again.
+
+     🔺 **The item's own prescription was improved on, and that is the durable part.** It asked only that the
+     *other* roots be spared — "remove the one failed GUID's entry and leave the rest byte-untouched". The
+     failed root's bookmark now **stays too**. A refused `startAccessingSecurityScopedResource()` is not
+     proof of staleness (an unmounted volume refuses one and remounts later), and Notes has **no folder
+     chooser at all** (`fu2`), so forgetting a grant here is unrecoverable *by the user*. The Reader, facing
+     the identical question, documented the same answer: *"The bookmark remains persisted so a later window
+     activation can retry after the volume is mounted again"* (`RootFolderStore.reResolveSavedRoot`) — the
+     very comparison the item cited while prescribing the opposite. Mutant **M2 IS the item's literal fix**,
+     and a named test kills it, so the deviation is asserted rather than merely argued. The GUID is still
+     dropped from `knownRoots` **in memory** — this session cannot open that root — and the next launch
+     retries; a test builds a third store on the same defaults to prove the grant survived.
+
+  2. **`grantRoot` recorded a scope whose start returned `false`.** It always does return false there: a
+     panel URL is already accessible, so there is no scope to start — and Apple is explicit that such a start
+     must not be balanced by a stop. `activeScopes` now holds a `Scope { url, started }`, and
+     `stopAccessing(guid:)` stops only what this store started. It also **keeps** the never-started entry
+     rather than dropping it: dropping it sent the next lookup down the `knownRoots` path, where the start
+     refused again — and that refusal is branch (1), which wiped the whole store. **Losing a session's roots
+     by closing a popover was two lines apart.**
+
+     A third imbalance was found in the same lines and closed there rather than filed: re-granting a GUID at
+     the **same** path started a second scope that nothing could ever stop, because `activeScopes` holds one
+     entry per GUID and the first start lost its only reference.
+
+  3. **`ReaderLinkResolver.stopAccessing(guid:)` had no caller anywhere in the app**, so every root a session
+     previewed stayed scoped until quit. Replaced by **`releaseRootScope()`**, which takes no GUID — the
+     caller that knows a preview is over does not know which root it was for, and asking it to remember is
+     how the old API came to be dead. The resolver remembers instead (`scopedRootGUID`, set by `resolveExact`
+     only when a root was really opened, and released when a *different* root is resolved), which is also
+     what makes "which root, and when" testable **without a window**. `ReaderPreviewPopover.dismiss()` is the
+     one production call site.
+
+  **New `startScope`/`stopScope` seams**, for the same reason `mintBookmark` became one in `fu1`: the branch
+  that matters — a bookmark that resolves at launch but whose scope will not start — cannot be provoked from
+  a test, because every fixture lives in the app container where a start is *always* refused for the opposite
+  reason (the URL needs no scope). Without the seam the failure branch would only ever run in the wrong sense
+  and a mutation restoring the whole-dictionary rewrite would pass. `stopScope` is separate so a test can
+  prove a stop that must **not** happen did not happen — the absence is the assertion.
+
+  **Verification.** Notes **763** swift-testing (754 → 763; 9 new tests, one of them from the adversarial
+  pass) **+ 189** XCTest green; Release BUILD SUCCEEDED with **0 source warnings** (the 22 `NotesGUITests`
+  actor-isolation warnings are pre-existing — `W23.notes-uitest-warn`); write-surface lint clean and its
+  self-test 14/14. **10 mutants, each caught by a NAMED test** (M1 `persistAll` restored, M2 the item's
+  literal prescription, M3/M4 the two halves of the `started` guard, M5 double-start on re-grant, M6 the
+  guard dropped from the *replacement* path alone, M7 `releaseRootScope` emptied, M8 the outgoing root
+  leaked, M9 an unknown root claiming the scope slot, M10 `stopAccessing` forgetting the bookmark). No
+  ArchiveCore, Reader or Processor source is touched, so those lanes were not re-run.
+
+  **My own adversarial pass added the ninth test**: nothing yet proved that a *second* preview works after
+  the release — the actual regression the wiring risks (click one source chip, close it, click another).
+  M10 is that test's mutant.
+
+  **The one thing verified by READING, not by a test:** that `ReaderPreviewPopover.dismiss()` calls
+  `releaseRootScope()`. Showing an `NSPopover` needs a real window, an unattended run may not draw on the
+  owner's screen, and the VM GUI lane is Reader-only until `W21.vmgui`. Everything the line *does* is under
+  test at the resolver level; only the call itself is not. Say so if it is ever re-examined.
+
 - [x] **W26.notesabsence-fu1 — a symlinked Reader root cannot be GRANTED in Notes, and the failure is
   silent [S · MED · Tier-2]. ✅ SHIPPED 2026-08-07** — `6226e7d` (the fix + its tests) → this commit (the
   mutation pass, the follow-up, the trackers). Filed 2026-08-07 by `W26.notesabsence`; **pre-existing**, and

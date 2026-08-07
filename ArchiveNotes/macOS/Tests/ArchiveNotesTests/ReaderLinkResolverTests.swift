@@ -295,6 +295,118 @@ struct ReaderLinkResolverTests {
                         .contains(plain.lastPathComponent))
         }
     }
+
+    // MARK: - W26.notesabsence-fu3: the scope a resolution starts is given back
+
+    /// Resolving starts a security scope as a side effect and, until this item, nothing ever gave one
+    /// back: `stopAccessing(guid:)` had no caller anywhere in the app, so every root a session
+    /// previewed stayed scoped until quit.
+    ///
+    /// The bookkeeping lives on the resolver rather than in `ReaderPreviewPopover` precisely so it can
+    /// be asserted here — showing a popover needs a real window, which an unattended run may not open.
+    @Test("releaseRootScope gives back the scope the last resolution started, once")
+    func releaseRootScopeReturnsTheScope() async throws {
+        let (root, marker) = try makeScratchRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try createFile(at: root, relativePath: "doc.pdf")
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let stops = ScopeCallLog()
+            let starts = ScopeCallLog()
+            store.startScope = { starts.record($0); return true }
+            store.stopScope = { stops.record($0) }
+            #expect(store.grantRoot(root).refusal == nil)
+
+            let resolver = ReaderLinkResolver(rootStore: store)
+            #expect(resolver.scopedRootGUID == nil)
+            _ = resolver.resolveExact(rootGUID: marker.guid, relativePath: "doc.pdf")
+
+            #expect(resolver.scopedRootGUID == marker.guid)
+            #expect(stops.urls.isEmpty, "the preview is still up — the scope must stay")
+
+            resolver.releaseRootScope()
+            #expect(resolver.scopedRootGUID == nil)
+            #expect(stops.urls.count == 1)
+
+            // Dismissing twice, or dismissing a preview that never opened one, is a no-op.
+            resolver.releaseRootScope()
+            #expect(stops.urls.count == 1)
+
+            // …and the root is not stranded by having been released. This is the regression the
+            // wiring itself risks — clicking a second source chip after closing the first — and it
+            // is why `stopAccessing` gives back the scope without forgetting the bookmark: the next
+            // lookup has to be able to start a fresh one.
+            let second = resolver.resolveExact(rootGUID: marker.guid, relativePath: "doc.pdf")
+            #expect(second == .decided(.resolved(root.appendingPathComponent("doc.pdf"))))
+            #expect(resolver.scopedRootGUID == marker.guid)
+            #expect(starts.urls.count == 2, "the released scope must be re-startable, not gone")
+        }
+    }
+
+    /// Only one preview is up at a time, so a resolution against a *different* root means the
+    /// outgoing one has no reader left. Without this, jumping between two archives leaked the first
+    /// scope for the life of the app — `releaseRootScope` would only ever reach the newest root.
+    @Test("Resolving against a different root releases the outgoing one")
+    func switchingRootsReleasesTheOutgoingScope() async throws {
+        let (rootA, markerA) = try makeScratchRoot()
+        defer { try? FileManager.default.removeItem(at: rootA) }
+        try createFile(at: rootA, relativePath: "a.pdf")
+        let (rootB, markerB) = try makeScratchRoot()
+        defer { try? FileManager.default.removeItem(at: rootB) }
+        try createFile(at: rootB, relativePath: "b.pdf")
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let stops = ScopeCallLog()
+            store.startScope = { _ in true }
+            store.stopScope = { stops.record($0) }
+            #expect(store.grantRoot(rootA).refusal == nil)
+            #expect(store.grantRoot(rootB).refusal == nil)
+
+            let resolver = ReaderLinkResolver(rootStore: store)
+            _ = resolver.resolveExact(rootGUID: markerA.guid, relativePath: "a.pdf")
+            _ = resolver.resolveExact(rootGUID: markerB.guid, relativePath: "b.pdf")
+
+            #expect(resolver.scopedRootGUID == markerB.guid)
+            #expect(stops.urls.count == 1, "A had no reader left the moment B was resolved")
+            #expect(stops.urls.first?.lastPathComponent == rootA.lastPathComponent)
+
+            // Resolving the SAME root again must not churn its scope.
+            _ = resolver.resolveExact(rootGUID: markerB.guid, relativePath: "b.pdf")
+            #expect(stops.urls.count == 1)
+        }
+    }
+
+    /// A link whose root is unknown opens no scope, so there is nothing to release — and, in
+    /// particular, it must not silently discard the scope a *previous* preview is still using.
+    @Test("An unknown root claims no scope and disturbs no live one")
+    func unknownRootClaimsNoScope() async throws {
+        let (root, marker) = try makeScratchRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try createFile(at: root, relativePath: "doc.pdf")
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let stops = ScopeCallLog()
+            store.startScope = { _ in true }
+            store.stopScope = { stops.record($0) }
+
+            let fresh = ReaderLinkResolver(rootStore: store)
+            let stranger = UUID()
+            #expect(fresh.resolveExact(rootGUID: stranger, relativePath: "doc.pdf")
+                        == .decided(.needsRootGrant(guid: stranger)))
+            #expect(fresh.scopedRootGUID == nil)
+
+            #expect(store.grantRoot(root).refusal == nil)
+            _ = fresh.resolveExact(rootGUID: marker.guid, relativePath: "doc.pdf")
+            #expect(fresh.scopedRootGUID == marker.guid)
+
+            _ = fresh.resolveExact(rootGUID: UUID(), relativePath: "doc.pdf")
+            #expect(fresh.scopedRootGUID == marker.guid, "the live preview's root is untouched")
+            #expect(stops.urls.isEmpty)
+        }
+    }
 }
 
 /// A throwaway `UserDefaults` suite for the tests that make `ReaderRootStore` PERSIST something.
@@ -329,12 +441,15 @@ struct ReaderRootStoreTests {
     private let bookmarksKey = "readerRootBookmarks"
 
     /// A scratch directory carrying a Reader `RootMarker`. Removed by the caller.
-    private func makeMarkedRoot(_ label: String) throws -> (URL, RootMarker) {
+    ///
+    /// `guid` is for the one case that needs two *different directories* claiming the *same* root
+    /// identity: re-granting a GUID at a new path (W26.notesabsence-fu3).
+    private func makeMarkedRoot(_ label: String, guid: UUID = UUID()) throws -> (URL, RootMarker) {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ArchiveNotes-rootstore-\(label)-\(UUID().uuidString)",
                                     isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let marker = RootMarker(guid: UUID(), name: "test", kind: .reader, createdAt: Date())
+        let marker = RootMarker(guid: guid, name: "test", kind: .reader, createdAt: Date())
         try JSONEncoder().encode(marker)
             .write(to: dir.appendingPathComponent(RootMarker.filename), options: .atomic)
         return (dir, marker)
@@ -569,4 +684,196 @@ struct ReaderRootStoreTests {
         #expect(UserDefaults.standard.dictionary(forKey: bookmarksKey)?.keys.contains(ourKey) != true,
                 "the grant's bookmark must not appear in the app's real defaults")
     }
+
+    // MARK: - W26.notesabsence-fu3: a READ never rewrites the store, and only a started scope stops
+
+    /// The headline defect, end to end and byte-exact.
+    ///
+    /// Two roots are granted, then a *fresh store* (a relaunch: `loadSaved` fills `knownRoots` and
+    /// deliberately starts no scopes) meets a root whose scope will not start. Pre-fix that dropped
+    /// the GUID and called `persistAll()`, which rebuilt the whole `readerRootBookmarks` dictionary
+    /// from what was left — so the OTHER root's bookmark disappeared as collateral, and the failed
+    /// root's did too. Nothing about the second root was wrong; nothing about it was even consulted.
+    ///
+    /// The comparison is on the raw dictionary rather than on key presence, because a `persistAll`
+    /// restored by mutation would re-mint surviving roots and hand back *different bytes* for a
+    /// bookmark that was never asked to change. Both are asserted: one names the collateral, the
+    /// other refuses the rewrite outright.
+    @Test("A root whose scope will not start leaves the bookmark dictionary byte-untouched")
+    func failedScopeStartPersistsNothing() async throws {
+        let (rootA, markerA) = try makeMarkedRoot("nostart-A")
+        defer { try? FileManager.default.removeItem(at: rootA) }
+        let (rootB, markerB) = try makeMarkedRoot("nostart-B")
+        defer { try? FileManager.default.removeItem(at: rootB) }
+        let keyA = markerA.guid.uuidString.lowercased()
+        let keyB = markerB.guid.uuidString.lowercased()
+
+        try await ScratchDefaults.with { defaults in
+            let granting = ReaderRootStore(defaults: defaults)
+            #expect(granting.grantRoot(rootA).refusal == nil)
+            #expect(granting.grantRoot(rootB).refusal == nil)
+
+            // A relaunch. Snapshot AFTER construction: `loadSaved` may legitimately re-mint a stale
+            // bookmark on the way in, and that write is not the one under test.
+            let relaunched = ReaderRootStore(defaults: defaults)
+            let before = defaults.dictionary(forKey: bookmarksKey) as? [String: Data]
+            #expect(before?.count == 2)
+            #expect(relaunched.knownRoots.count == 2)
+
+            // A's volume is not mounted. (The seam is the only way here: in the app container a
+            // start is refused for the opposite reason — the URL needs no scope — and the failure
+            // branch would never be reached with a real one.)
+            relaunched.startScope = { _ in false }
+            #expect(relaunched.root(for: markerA.guid) == nil)
+
+            let after = defaults.dictionary(forKey: bookmarksKey) as? [String: Data]
+            #expect(after?[keyB] == before?[keyB],
+                    "the OTHER root's bookmark must survive a failed lookup of this one")
+            #expect(after?[keyA] == before?[keyA],
+                    "a refused start is not proof of staleness — the grant must survive it too")
+            #expect(after == before, "a lookup must not write UserDefaults at all")
+
+            // In memory, this session gives up on A and keeps B: handing back a URL we cannot open
+            // would only fail further downstream.
+            #expect(relaunched.knownRoots[markerA.guid] == nil)
+            #expect(relaunched.knownRoots[markerB.guid] != nil)
+
+            // …and because nothing was persisted away, the NEXT launch still has both. This is the
+            // whole reason the failed root's entry is kept: Notes has no folder chooser
+            // (W26.notesabsence-fu2), so a forgotten grant cannot be re-made by the user.
+            let nextLaunch = ReaderRootStore(defaults: defaults)
+            #expect(nextLaunch.knownRoots[markerA.guid] != nil)
+            #expect(nextLaunch.knownRoots[markerB.guid] != nil)
+        }
+    }
+
+    /// Apple's rule, as a test: a `startAccessingSecurityScopedResource()` that returned `false` must
+    /// not be balanced by a stop. Every root granted in the current session is in that state — the
+    /// URL comes from the open panel and is already accessible — so pre-fix *every* `stopAccessing`
+    /// was an unbalanced stop.
+    ///
+    /// The second assertion is the one with teeth. Pre-fix the entry was also removed, which sent the
+    /// next lookup down the `knownRoots` path, where the start refused again — and that refusal is
+    /// the branch that used to wipe the whole store. Closing a popover could cost a session's roots.
+    @Test("A scope that was never started is never stopped — and the root stays usable")
+    func neverStartedScopeIsNeverStopped() async throws {
+        let (root, marker) = try makeMarkedRoot("unstarted")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let stops = ScopeCallLog()
+            store.stopScope = { stops.record($0) }
+            // Not forced: a container URL genuinely refuses a start, which is exactly the panel case.
+            #expect(store.grantRoot(root).refusal == nil)
+
+            store.stopAccessing(guid: marker.guid)
+
+            #expect(stops.urls.isEmpty, "nothing started, so nothing may be stopped")
+            #expect(store.root(for: marker.guid) != nil,
+                    "the panel's grant outlives the popover — the URL is still the right answer")
+            #expect(defaults.dictionary(forKey: bookmarksKey)?.keys.contains(
+                marker.guid.uuidString.lowercased()) == true)
+        }
+    }
+
+    /// The other side of the same rule: a scope this store *did* start is given back exactly once.
+    @Test("A started scope is stopped once, and a second stop is a no-op")
+    func startedScopeIsStoppedExactlyOnce() async throws {
+        let (root, marker) = try makeMarkedRoot("started")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let stops = ScopeCallLog()
+            store.startScope = { _ in true }
+            store.stopScope = { stops.record($0) }
+            #expect(store.grantRoot(root).refusal == nil)
+
+            store.stopAccessing(guid: marker.guid)
+            store.stopAccessing(guid: marker.guid)
+
+            #expect(stops.urls.count == 1)
+            #expect(samePath(stops.urls.first, root))
+        }
+    }
+
+    /// Re-granting the same GUID at the *same* path started a second scope that nothing could ever
+    /// stop — `activeScopes` holds one entry per GUID, so the first start lost its only reference.
+    /// Same imbalance as the nits above, one line away, so it is closed here rather than filed.
+    @Test("Re-granting the same root does not start a second scope")
+    func regrantingSamePathDoesNotDoubleStart() async throws {
+        let (root, _) = try makeMarkedRoot("regrant-same")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let starts = ScopeCallLog()
+            store.startScope = { starts.record($0); return true }
+            store.stopScope = { _ in }
+            #expect(store.grantRoot(root).refusal == nil)
+            #expect(store.grantRoot(root).refusal == nil)
+
+            #expect(starts.urls.count == 1, "the scope was already held; a second start cannot be balanced")
+        }
+    }
+
+    /// …while re-granting the same GUID at a DIFFERENT path must still release the scope it replaces.
+    /// Shipped behaviour, kept: the `started` flag narrows *which* stops happen, not whether this one does.
+    @Test("Re-granting a root at a new path releases the scope it replaces")
+    func regrantingNewPathReleasesTheOldScope() async throws {
+        let guid = UUID()
+        let (first, _) = try makeMarkedRoot("regrant-old", guid: guid)
+        defer { try? FileManager.default.removeItem(at: first) }
+        let (second, _) = try makeMarkedRoot("regrant-new", guid: guid)
+        defer { try? FileManager.default.removeItem(at: second) }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let stops = ScopeCallLog()
+            store.startScope = { _ in true }
+            store.stopScope = { stops.record($0) }
+            #expect(store.grantRoot(first).refusal == nil)
+            #expect(store.grantRoot(second).refusal == nil)
+
+            #expect(stops.urls.count == 1)
+            #expect(samePath(stops.urls.first, first))
+            #expect(samePath(store.knownRoots[guid], second))
+        }
+    }
+
+    /// …and the release above is still governed by `started`. Same scenario, except the first grant
+    /// never got a scope — the ordinary case for a panel URL — so replacing it must stop nothing.
+    /// Without this the `started` guard could be dropped from the replacement path alone and every
+    /// other test here would stay green.
+    @Test("Replacing a root whose scope was never started stops nothing")
+    func regrantAtANewPathDoesNotStopAnUnstartedScope() async throws {
+        let guid = UUID()
+        let (first, _) = try makeMarkedRoot("unstarted-old", guid: guid)
+        defer { try? FileManager.default.removeItem(at: first) }
+        let (second, _) = try makeMarkedRoot("unstarted-new", guid: guid)
+        defer { try? FileManager.default.removeItem(at: second) }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            let stops = ScopeCallLog()
+            store.stopScope = { stops.record($0) }
+            // The real seam: a container URL refuses a start, exactly as a panel URL does.
+            #expect(store.grantRoot(first).refusal == nil)
+            #expect(store.grantRoot(second).refusal == nil)
+
+            #expect(stops.urls.isEmpty, "the replaced scope was never started, so it is not ours to stop")
+            #expect(samePath(store.knownRoots[guid], second))
+        }
+    }
+}
+
+/// Records the URLs a `ReaderRootStore` scope seam was called with.
+///
+/// A class because the seams are stored properties: a captured `var` would be copied, and the point
+/// of these tests is a call that must NOT happen — which is only observable if the absence is real.
+@MainActor
+final class ScopeCallLog {
+    private(set) var urls: [URL] = []
+    func record(_ url: URL) { urls.append(url) }
 }

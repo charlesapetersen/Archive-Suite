@@ -402,24 +402,28 @@ every assertion is at the store/resolver level in the Notes test host — the pa
 because Notes has no folder chooser at all (`fu2` below). The adversarial pass found that the branch the item
 is NAMED for had no test and a mutation restoring the bug stayed green, which is why `mintBookmark` is an
 injectable seam; it also filed **`fu3`** (a `persistAll` that deletes bookmarks it merely failed to re-mint).
-Both follow-ups are below, `fu3` first on purpose.
+`fu3` shipped first, as intended — it was harmless only while nothing could grant a root, and `fu2` is the
+item that hands the user one to lose. **`fu2` is the only one of the two still open.**
 
-- [ ] **W26.notesabsence-fu3 — `ReaderRootStore` DELETES bookmarks it merely failed to re-mint, so one
-  root that has moved takes every other granted root with it [S · MED · Tier-2].** Filed 2026-08-07 by
-  `W26.notesabsence-fu1`'s adversarial pass; **pre-existing**, and the Reader explicitly refuses to do this.
-  Traced, not guessed: `root(for:)` reads `startAccessingSecurityScopedResource() == false` as *stale*,
-  removes that GUID and calls `persistAll()`, which rebuilds the **whole** `readerRootBookmarks` dictionary
-  with `try? url.bookmarkData(options: .withSecurityScope)` and **starts no scope first** — minting needs an
-  active scope, which is exactly why `refreshBookmark` starts one. `loadSaved` deliberately starts no scopes,
-  so with roots A and B restored at launch, one click into A after A's folder moved drops A *and silently
-  drops B's persisted bookmark too*. Compare `RootFolderStore.reResolveSavedRoot`: *"The bookmark remains
-  persisted so a later window activation can retry after the volume is mounted again."* Fix: never re-mint
-  inside a persist — remove the one failed GUID's entry and leave the rest byte-untouched. Two related nits
-  to close in the same change: `grantRoot` records `activeScopes[guid]` even when the start returned `false`,
-  so `stopAccessing(guid:)` can stop a scope that was never started (Apple: don't call it if start returned
-  `false`); and `ReaderLinkResolver.stopAccessing` has **no caller at all** — the popover's `dismiss()` never
-  releases a scope. ⚠️ **Do this before `W26.notesabsence-fu2`**, which is why it is listed first: fu3 is
-  harmless only for as long as nothing can grant a root, and fu2 is the item that hands the user one to lose.
+✅ **W26.notesabsence-fu3 — SHIPPED 2026-08-07 (`af01cb7` → this commit); full entry in
+`SUITE_TODO_DONE.md`.** One mechanism behind all three defects: `ReaderRootStore` conflated *"I have a URL
+for this root"* with *"I hold a scope for it"*, and paid for it in persisted state. `root(for:)` — a **read**
+— wrote `UserDefaults`: a scope that would not start was read as a dead bookmark, and `persistAll()` then
+rebuilt the *whole* `readerRootBookmarks` dictionary by re-minting every surviving root **with no scope
+started**, the one condition under which minting reliably fails. `persistAll` is **deleted**, not narrowed —
+the shape of the bug is a lookup that rewrites the store. 🔺 **The item's own prescription was improved on and
+that is the durable part:** it asked that the *other* roots be spared and the failed one's entry removed; the
+failed one's bookmark now stays **too**, because a refused start is not proof of staleness (an unmounted
+volume refuses one and remounts later) and Notes has no folder chooser at all (`fu2`), so forgetting a grant
+here is unrecoverable by the user — the same answer the Reader documented in
+`RootFolderStore.reResolveSavedRoot`. Mutant **M2 is the item's literal fix**, and a named test kills it.
+Both nits closed: `activeScopes` now records `started`, so `stopAccessing` stops only what this store started
+and **keeps** the never-started entry (dropping it sent the next lookup down the path that wiped the store —
+losing a session's roots by closing a popover was two lines apart); and the dead
+`ReaderLinkResolver.stopAccessing` is replaced by `releaseRootScope()`, wired to the popover's `dismiss()`.
+A third imbalance, found in the same lines and fixed there: re-granting a GUID at the *same* path started a
+second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 new source warnings, lint 14/14,
+**10 mutants each caught by a named test**.
 
 - [ ] **W26.notesabsence-fu2 — Notes can never grant a Reader root, so the Reader-link preview is
   unreachable on every machine — and the popover's advice cannot help [S–M · MED · behaviour].** Filed
