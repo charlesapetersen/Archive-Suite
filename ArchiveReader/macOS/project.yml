@@ -11,6 +11,16 @@ settings:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
+    # Certificate-based signing, NOT ad-hoc ("-"). An ad-hoc signature's designated requirement is
+    # pinned to the CDHASH, which changes on every rebuild — so macOS forgets every TCC grant
+    # (Desktop/Documents/…) and re-prompts forever; with the daemon rebuilding all day that is a
+    # prompt per build. A certificate pins the requirement to the CERT instead, which is stable, so
+    # one "Allow" survives every rebuild. Set at base so the app AND both test bundles share one
+    # identity — the UITest runner (com.archivereader.uitests.xctrunner) is a separate TCC client and
+    # would otherwise keep prompting on its own account.
+    # Self-signed, local-only, never notarized. Create it with ops/setup-signing-cert.sh.
+    CODE_SIGN_IDENTITY: "Archive Suite Dev"
+    CODE_SIGN_STYLE: Manual
 
 packages:
   ArchiveCore:
@@ -33,8 +43,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.app
         INFOPLIST_FILE: Sources/ArchiveReader/Info.plist
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: NO
         SWIFT_VERSION: "6.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
@@ -75,8 +83,11 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.uitests
         TEST_TARGET_NAME: ArchiveReader
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: NO
+        # ENABLE_HARDENED_RUNTIME: NO is RETAINED deliberately. It was found necessary under ad-hoc
+        # signing (W7.1) — the Runner couldn't load the xctest plugin because library validation
+        # rejected mismatched CDHashes. Certificate signing plausibly makes it unnecessary (runner and
+        # plugin now share one cert, which is what library validation wants), but that was NOT
+        # re-tested when signing changed, so the working setting stays. Don't flip it casually.
         ENABLE_HARDENED_RUNTIME: NO
 
 schemes:

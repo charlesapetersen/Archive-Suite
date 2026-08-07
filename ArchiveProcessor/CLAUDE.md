@@ -360,7 +360,13 @@ example script lives at `.maintenance/` during active maintenance sessions.
 
 ## Releasing (macOS DMG + GitHub release)
 
-Versioning is by **git tag** (`vMAJOR.MINOR.PATCH`, e.g. `v3.8.1`) — the tag is the source of truth; `Info.plist` `CFBundleShortVersionString` is left at "1.0". Patch bump for internal-only changes (refactors), minor for user-facing features. Distribution is **owner-only** (ad-hoc signed `CODE_SIGN_IDENTITY "-"`, not notarized) — a fresh macOS may need right-click→Open the first time.
+Versioning is by **git tag** (`vMAJOR.MINOR.PATCH`, e.g. `v3.8.1`) — the tag is the source of truth; `Info.plist` `CFBundleShortVersionString` is left at "1.0". Patch bump for internal-only changes (refactors), minor for user-facing features. Distribution is **owner-only** — signed with the suite's local **self-signed** cert
+(`CODE_SIGN_IDENTITY: "Archive Suite Dev"`, not ad-hoc since 2026-08-07), still not notarized, so a fresh
+macOS may need right-click→Open the first time. Rationale + setup: root [`CLAUDE.md`](../CLAUDE.md)
+§*Conventions* and [`../ops/setup-signing-cert.sh`](../ops/setup-signing-cert.sh). Unlike Reader/Notes this
+target gets **no** `get-task-allow` / `disable-library-validation`: its entitlements are xcodegen-generated
+from `project.yml`'s `entitlements.properties`, which is not config-scoped, so adding them would ship
+debugger-attach in Release too — and Processor has no test target that needs them.
 
 **GitHub CLI gotcha:** the real CLI is **`/opt/homebrew/bin/gh`** — call it by full path, because a shadowing Python tool named `gh` is first on `PATH` (bare `gh` fails with an argparse error). It is authenticated as `charlesapetersen` (`repo` scope), so `gh release create` can publish and upload assets.
 

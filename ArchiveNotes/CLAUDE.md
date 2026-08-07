@@ -53,7 +53,12 @@ this file is authoritative for Notes‑specific work.
   that a `reader-page` link survives a computer move (same GUID, new absolute path → still resolves;
   guarded teardown); `DurableLinkE2ETests` proves the resolver logic in the unit gate. Both are GUI-free.
   [`GUI_SAFETY.md`](GUI_SAFETY.md) is the authoritative test file-safety protocol.
-- **Bundle ID:** `com.archivenotes.app`. Ad‑hoc signed (`CODE_SIGN_IDENTITY "-"`), not notarized.
+- **Bundle ID:** `com.archivenotes.app`. Signed with the suite's local self‑signed cert
+  (`CODE_SIGN_IDENTITY: "Archive Suite Dev"`), not ad‑hoc and not notarized — rationale, the
+  `ops/setup-signing-cert.sh` setup, and the library‑validation caveat are in the root
+  [`CLAUDE.md`](../CLAUDE.md) §*Conventions*. Notes' **Debug** entitlements
+  (`ArchiveNotes.uitest.entitlements`) therefore carry `disable-library-validation` +
+  `get-task-allow`; the Release file must never gain either.
 
 ## Implementation Map
 

@@ -30,8 +30,9 @@ documented once, authoritatively, in [`SPEC/tag-format.md`](SPEC/tag-format.md).
 1. Download the latest **Archive Suite** DMG from the [Releases page](https://github.com/charlesapetersen/Archive-Suite/releases).
 2. Open the DMG and **drag the apps onto the Applications folder** (the DMG window shows the apps and
    an Applications shortcut side by side).
-3. **First launch:** the apps are ad‑hoc signed (not notarized), so the first time you open each one,
-   right‑click it in Applications → **Open** → **Open**. After that they launch normally.
+3. **First launch:** the apps are signed with a self‑signed certificate and are not notarized, so the
+   first time you open each one, right‑click it in Applications → **Open** → **Open**. After that they
+   launch normally.
 
 You can install just the apps you need, but the Suite is designed to be used together.
 

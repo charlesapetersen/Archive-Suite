@@ -2,6 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- DEBUG-ONLY entitlements (project.yml maps this file to the Debug config; Release uses
+	     ArchiveNotes.entitlements, which must NEVER gain get-task-allow).
+	     get-task-allow is required since signing moved from ad-hoc to a certificate (2026-08-07):
+	     XCTest injects into the app under test, and a real signature + hardened runtime refuses that
+	     without it ("test host is not debuggable"). The unit bundle is app-HOSTED, so this gates the
+	     whole unit suite, not just the UITests.
+
+	     disable-library-validation is required for the same reason. Xcode 16 splits a Debug build's
+	     code into ArchiveNotes.debug.dylib inside the bundle, and ENABLE_HARDENED_RUNTIME: YES turns
+	     ON library validation, which only loads code sharing the main binary's TEAM ID. Our cert is
+	     self-signed, so TeamIdentifier is "not set" — and "no team" does NOT satisfy "same team", so
+	     dyld refuses the dylib and the app dies at launch with SIGABRT, taking every app-hosted test
+	     with it. This is the W7.1 finding generalised: ad-hoc signing sidestepped library validation;
+	     a real cert with no team does not. Release keeps hardened runtime AND strict validation. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.get-task-allow</key>
+	<true/>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.files.bookmarks.app-scope</key>

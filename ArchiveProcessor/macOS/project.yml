@@ -11,6 +11,17 @@ settings:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
+    # Certificate-based signing, NOT ad-hoc ("-") — see the long note in
+    # ArchiveReader/macOS/project.yml. Short version: an ad-hoc designated requirement is pinned to the
+    # CDHASH, so every rebuild invalidates every TCC grant and macOS re-prompts forever; a cert pins it
+    # to the CERT, which is stable.
+    # NOTE: unlike Reader/Notes, this target gets NO com.apple.security.get-task-allow. Its entitlements
+    # are xcodegen-GENERATED from the `entitlements.properties` map below, which is not config-scoped —
+    # adding it there would ship a debugger-attach entitlement in RELEASE builds too. Processor has no
+    # test target, so nothing needs it.
+    # Self-signed, local-only, never notarized. Create it with ops/setup-signing-cert.sh.
+    CODE_SIGN_IDENTITY: "Archive Suite Dev"
+    CODE_SIGN_STYLE: Manual
 
 packages:
   ArchiveCore:
@@ -28,8 +39,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.archiveprocessor.app
         INFOPLIST_FILE: Sources/ArchiveProcessor/Info.plist
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: NO
         SWIFT_VERSION: "6.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     entitlements:

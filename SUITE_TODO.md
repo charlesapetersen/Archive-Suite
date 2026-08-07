@@ -102,6 +102,41 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
   viewer, preview, filter, sort, degrade). Plan deleted.
 
+## Signing + TCC consent (owner, 2026-08-07)
+
+Filed while switching the suite off ad-hoc signing (shipped entry in `SUITE_TODO_DONE.md`). The item below was
+**found by** that work but is **not caused by** it — proven by A/B, see the entry.
+
+- [ ] **W28.fsevhang — `CorpusWatcherLibraryTests` DEADLOCKS — at least two tests hang forever, on `main`
+  [M · **HIGH** · Tier-2 · reader].** Confirmed hanging: `testAnAbandonedStartIsRefusedEvenThoughTheRoot
+  GenerationNeverMoved` and `testARootSwitchAbandonsAStreamWhoseOpenIsStillStuck` (the second surfaced only
+  after `-skip-testing` on the first, so **assume the whole class is affected, not two tests**). Neither
+  completes: the host app sits in state `S` with ~1.7 s CPU — blocked, not spinning — so `xcodebuild test`
+  never returns and **the health gate can never go GREEN**. The daemon's watchdog would eventually park on it,
+  and because a hang is not a failure the park note will not say which test.
+  **It is NOT a signing regression, and it is NOT a regression from any single commit** — it is
+  **nondeterministic**. Evidence, all gathered 2026-08-07:
+  | where | signing | result |
+  |---|---|---|
+  | `08d7f05` (this branch's base) | cert | hangs (killed at 300 s) |
+  | `08d7f05`, separate worktree, no other change | **ad-hoc** | hangs (killed after ~4.5 min silent) |
+  | `766f59c^` | ad-hoc | hangs (killed after ~2 min silent) |
+  | health gate 2026-08-06 08:35, at a commit **containing** the test | ad-hoc | **PASSED** |
+
+  The test arrived in `ab80c12` (`W26.fsev-fu1`, 08-06 03:02) and the gate went GREEN at 08:35 *with it
+  present* — so it passed once and now hangs reliably. `766f59c` (`W26.symroot-fu1` 3/N) was the first
+  suspect, being the only post-GREEN commit touching `CorpusWatcherTests.swift`, and **was ruled out** by
+  building its parent, which hangs too.
+  **Therefore: a race, not a bad commit.** The test drives blocking primitives
+  (`BlockingCorpusWatcher`, `waitUntilStarting()`, `waitUntil { … }`) against `ArchiveLibrary`'s start /
+  abandon path, so a missed wake-up **deadlocks instead of failing** — which is why the gate hangs rather
+  than going RED. Start at `BlockingWatcherLog.releaseAll()` and the `waitUntilStarting()` handshake around
+  the second `library.rescan()`. A hang is worse than a failure here: `step()` never returns, so the gate
+  produces no verdict and the park note cannot name the test.
+  ⚠️ Until this is fixed, `health-gate.sh` must not be treated as a usable gate, and **do not re-arm the daemon**
+  — it will park. The signing change was verified against the rest of the suite with this one test
+  `-skip-testing`'d; that skip is a diagnostic crutch and **must not** be committed into the gate.
+
 ## Autonomous diagnostics (from the 2026-08-06 health-gate RED)
 
 Filed 2026-08-06 while fixing the compactor abort + park misdiagnosis (full entry in `SUITE_TODO_DONE.md`).

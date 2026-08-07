@@ -16,6 +16,52 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Signing + TCC consent (owner, 2026-08-07)
+
+- [x] **W28.cert — the suite signs with a real certificate, so a TCC grant survives a rebuild. ✅ DONE** —
+  this commit. **The symptom the owner reported:** "Archivereader.app would like to access files in your
+  Desktop folder" over and over. **The cause was not the Desktop** — it was `CODE_SIGN_IDENTITY "-"`. An
+  ad-hoc signature's designated requirement is pinned to the **cdhash**, which changes on every rebuild, so
+  macOS saw each build as a different program and discarded every TCC grant. With the daemon rebuilding all
+  day that is a consent dialog per build, forever; clicking Allow could never stick. Measured on the three
+  stale copies then on disk: three different cdhashes, hence three separate TCC clients.
+  **Fix:** a local **self-signed** code-signing cert (`"Archive Suite Dev"`, `ops/setup-signing-cert.sh`,
+  10-year, user trust store only, key at `~/.local/share/archive-suite-signing/`). The requirement becomes
+  `identifier "com.archivereader.app" and certificate leaf = H"e34232a4…"` — **proven byte-identical across
+  two builds with different cdhashes**, which is the whole point and the acceptance test to re-run if this is
+  ever touched (`codesign -d -r-`, twice, diff).
+  Applied at `settings.base` in all three macOS `project.yml` files so the app **and both test bundles** share
+  one identity — `com.archivereader.uitests.xctrunner` is its own TCC client and would otherwise keep
+  prompting on its own account. `CODE_SIGNING_REQUIRED: NO` removed (a signing failure should be loud).
+  **The iOS companion deliberately stays ad-hoc** — a macOS self-signed cert is not valid for iOS, and it is
+  PARKED.
+  ⚠️ **The trap, which cost a full debugging round: a self-signed cert has NO Team ID.**
+  `ENABLE_HARDENED_RUNTIME: YES` enables **library validation**, which loads only code sharing the main
+  binary's Team ID — and *no team does not satisfy same team*. Xcode 16 puts a Debug build's code in
+  `<App>.debug.dylib` inside the bundle, so the app died at launch with `SIGABRT`
+  (`DYLD … Library not loaded: @rpath/ArchiveReader.debug.dylib … (code signature…)`) and took **every
+  app-hosted test** with it. This is the **W7.1 UITest finding generalised**: ad-hoc sidestepped library
+  validation; a cert without a team walks into it. Hence the **Debug-only** entitlements now carry
+  `com.apple.security.cs.disable-library-validation` + `com.apple.security.get-task-allow` (XCTest
+  injection). **Release keeps hardened runtime AND strict validation** — never add either key to a Release
+  entitlements file. Processor gets neither: its entitlements are xcodegen-generated from
+  `entitlements.properties`, which is **not** config-scoped, so adding them would ship debugger-attach in
+  Release; it has no test target that needs them. The UITest targets keep `ENABLE_HARDENED_RUNTIME: NO`
+  (W7.1) — plausibly now unnecessary, but not re-tested, so the known-good setting stays.
+  **Two process lessons worth keeping, both learned by getting them wrong first:**
+  (i) `security import` of an **empty-password** PKCS#12 fails with "The user name or passphrase you entered
+  is not correct" — PKCS#12 MACs "no password" and "empty string" differently. Worse, it imports the key and
+  cert *anyway* before erroring, so a failed run leaves a usable-looking untrusted identity behind; two such
+  orphans accumulated and made `codesign -s` fail with `ambiguous (matches … and …)`. The script now
+  **refuses to create a second cert with the same CN** and prints delete-by-hash instructions.
+  (ii) The p12's **filename becomes the imported key's label** when the key bag has no friendlyName, so
+  `id.p12` produced a key called `id` whose cert was called `Archive Suite Dev`; scoping
+  `set-key-partition-list -l "Archive Suite Dev"` then silently configured the *wrong* key and `codesign`
+  kept raising "wants to use key" on every invocation. It is now unscoped (`-s -t private`) so it cannot
+  miss, and the p12 is named after the CN. **Verify non-interactivity by TIMING, never by exit status** — a
+  keychain dialog needs a human, so three signs at ~70 ms each prove no prompt; `rc=0` cannot distinguish
+  "never prompted" from "the operator clicked Allow", which is exactly the false pass that hid this bug.
+
 ## Autonomous compactor + park diagnosis (from the 2026-08-06 health-gate RED)
 
 - [x] **`arm.sh` → `daemon.sh`, and the verb `arm` → `start` (owner, 2026-08-06). ✅ DONE** — this commit.
