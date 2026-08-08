@@ -478,9 +478,13 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
     log "health gate timed out on retry — SKIPPING (inconclusive, not parking)."; return 0
   fi
   # WHICH step failed decides what the owner should go and DO — and the gate already says so, in a line this
-  # note never read. health-gate.sh publishes "HEALTH GATE: RED —<steps>" (its $fails list) and THEN prints up
-  # to 40 more lines of step output, so the `tail -25` below can never contain that verdict: it is structurally
-  # impossible for the tail alone to name the step.
+  # note never read. health-gate.sh publishes "HEALTH GATE: RED —<steps>" (its $fails list) and THEN prints
+  # each FAILING step's own tail (up to 40 lines apiece, under a "===== <step> (rc=N) =====" banner), so the
+  # `tail -25` below generally cannot contain that verdict: it is structurally unreliable for naming the step.
+  # ⚠️ Until 2026-08-08 that trailing text was the tail of a SHARED transcript — i.e. of whichever step ran
+  # LAST, typically a passing one — so the 00:44 park on `tag-vocabulary` quoted "36 passed, 0 failed" here
+  # under the heading "failing output". Fixed in health-gate.sh (`W26.gatepath`); the $diag line below, which
+  # names the steps, was already correct and is still the part to trust.
   # On 2026-08-06 that is exactly how a park whose ONLY failing step was `context-budget` — one execution plan
   # 110% over its size budget, with reader/notes/processor-build/coherence/tracker-sync/gui-vm ALL GREEN —
   # reached the owner as "a reproducible build/test regression" on "a broken tree", and cost him a hunt for a
@@ -654,6 +658,16 @@ for _v in $(env | sed -n 's/^\(CLAUDE[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$_v"; 
 caffeinate -di -w "$$" &
 
 log "=== daemon up (pid $$, interval ${INTERVAL}s, budget \$$BUDGET) ==="
+
+# W27.parkstick — retire the previous park's Desktop note. `park_run` writes
+# ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt and, until now, a repo-wide grep found ONE writer and NO remover, so
+# `status-digest.sh` kept printing "It parked and left you a note … then restart it" for as long as the file
+# existed — i.e. `daemon.sh status` went on asking the owner to restart a daemon that was already running, and
+# the ask outlived its cause by however long it took him to notice and delete the file by hand. A run reaching
+# this line IS the event that retires the note: the restart it asks for has happened. Deleted rather than
+# archived because `daemon.log` already holds every park message durably, and park_run rewrites the file the
+# moment we park again — so nothing is lost and the bullet becomes true-by-construction.
+rm -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true
 
 # ---- Health watchdog (Layers 1+2) — see the HB_* config block above for the full rationale. ----
 # Print pid $1 and every descendant pid. macOS `ps` has no recursive ppid filter, so snapshot the whole

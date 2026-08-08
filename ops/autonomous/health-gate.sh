@@ -23,8 +23,29 @@ export PATH="$ROOT/ops/autonomous/bin:$PATH"
 LOG="$(mktemp)"; fails=""
 trap 'rm -f "$LOG"' EXIT
 
-# Run a named check; capture its output to $LOG; record a failure without aborting (no set -e).
-step() { local name="$1"; shift; printf '── %s ──\n' "$name"; if "$@" >>"$LOG" 2>&1; then echo "  ✓ $name"; else echo "  ✗ $name (rc=$?)"; fails="$fails $name"; fi; }
+# Run a named check; record a failure without aborting (no set -e); on failure, append THAT STEP'S OWN tail
+# to $LOG.
+#
+# WHY per-step and not one shared transcript (2026-08-08): $LOG used to accumulate every step's output and
+# the RED branch printed `tail -40 "$LOG"` — i.e. the tail of whichever step ran LAST, which on a green-tailed
+# run is a passing one. The 2026-08-08 park on `tag-vocabulary` reported "36 passed, 0 failed" under the
+# heading "failing output", because `status-proof` and `dispatch-proof` run after it and overwrote the tail.
+# The owner-facing park note and ARCHIVE-SUITE-RUN-PARKED.txt are built from this text, so the one artifact
+# naming the failure showed a step that had passed. Same family as the `step_skippable` bug below: a gate
+# that misreports what it did is worse than a gate that says less.
+step() {
+  local name="$1"; shift
+  printf '── %s ──\n' "$name"
+  local out; out="$(mktemp)"
+  if "$@" >"$out" 2>&1; then
+    echo "  ✓ $name"
+  else
+    local rc=$?
+    echo "  ✗ $name (rc=$rc)"; fails="$fails $name"
+    { printf '\n===== %s (rc=%s) =====\n' "$name" "$rc"; tail -40 "$out"; } >>"$LOG"
+  fi
+  rm -f "$out"
+}
 
 # Like step(), but for a check that can legitimately be INCONCLUSIVE (exit 3 = skipped). A skip is not
 # a pass: it prints ⊘ with the reason and is named in the final summary line.
@@ -38,11 +59,12 @@ skips=""; warns=""
 step_skippable() {
   local name="$1"; shift
   printf '── %s ──\n' "$name"
-  # Capture THIS step's output separately. Reading the shared $LOG would report the first 'SKIPPED:'
-  # anywhere in the file — including one left by an earlier step — as this step's reason.
+  # Capture THIS step's output separately. Reading a shared transcript would report the first 'SKIPPED:'
+  # anywhere in the file — including one left by an earlier step — as this step's reason. ($LOG is now
+  # failures-only for the same class of reason; see step() above. Only the `*)` arm contributes to it —
+  # a skip and a known-failure are both reported inline, and neither is what RED is asking about.)
   local out; out="$(mktemp)"
   "$@" >"$out" 2>&1; local rc=$?
-  cat "$out" >>"$LOG"
   case "$rc" in
     0) echo "  ✓ $name" ;;
     3) local why; why="$(grep 'SKIPPED:' "$out" | tail -1)"
@@ -54,7 +76,8 @@ step_skippable() {
     4) echo "  ⚠ $name — KNOWN FAILURES (ran, did not pass; not parking):"
        grep -E 'GUI-VM gate: (WARN|passed)|Test Case .*failed|error:' "$out" | sed 's/^/      /' | head -20
        warns="$warns $name" ;;
-    *) echo "  ✗ $name (rc=$rc)"; fails="$fails $name" ;;
+    *) echo "  ✗ $name (rc=$rc)"; fails="$fails $name"
+       { printf '\n===== %s (rc=%s) =====\n' "$name" "$rc"; tail -40 "$out"; } >>"$LOG" ;;
   esac
   rm -f "$out"
 }
@@ -171,23 +194,33 @@ step context-budget bash "$ROOT/ops/autonomous/context-budget.sh" "$ROOT"
 # compactor is broken and the plan WILL drift back over budget — fix the compactor, don't skip this.
 step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 
-# Same argument, for the two OTHER hermetic ops harnesses. Both are seconds long, sandbox-only (mktemp fixtures
-# + an isolated $HOME) and deterministic, so there is no reason to leave them unwatched:
+# Same argument, for the three OTHER hermetic ops harnesses. All are seconds long, sandbox-only (mktemp
+# fixtures + an isolated $HOME) and deterministic, so there is no reason to leave them unwatched:
 #   * prove-status.sh — the ONE status renderer the owner reads. It sat silently at 34/2 until 2026-08-06, and
 #     the cause was the harness itself reading the owner's REAL ~/Desktop park note: 34/2 with that file
 #     present, 36/0 without. Its verdict depended on state outside its own sandbox. Now isolated.
 #   * prove-daemon-dispatch.sh — daemon.sh's command dispatch, driven through `--dry-run` so it never installs
 #     or launches anything. Guards the 2026-08-06 rename (arm.sh -> daemon.sh, verb `arm` -> `start`),
 #     including that the retired `arm` verb is REJECTED rather than quietly still working as an alias.
+#   * prove-gate-report.sh — THIS script's own RED report (W27.gatetail, owner-approved 2026-08-08). It
+#     extracts the real step()/step_skippable()/verdict text from this file and drives it against synthetic
+#     steps, so the block the daemon quotes into the park note cannot silently go back to reporting the LAST
+#     step instead of the FAILING one — a regression that is only ever observed during an incident, and that
+#     misreported three of the owner's parks before it was fixed. Self-referential on purpose: nothing else
+#     watches the gate's own honesty.
 # prove-daemon.sh is deliberately NOT here: ~10 min of real daemon loops does not belong in a gate that already
-# runs ~22 min against GATE_MAXRUN=50min. Run that one by hand for daemon-behaviour changes.
+# runs ~22 min against GATE_MAXRUN=50min. Run that one by hand for daemon-behaviour changes. (That exclusion is
+# about RUNTIME, not principle — which is why the sub-second prove-gate-report.sh above is in.)
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
+step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
 
 echo
 if [ -n "$fails" ]; then
   echo "HEALTH GATE: RED —$fails"
-  echo "--- failing output (tail) ---"; tail -40 "$LOG"
+  # Every FAILING step's own tail, each under its own banner — not the tail of a shared transcript, which
+  # is the tail of whatever ran last. This text is what the daemon quotes into the park note.
+  echo "--- failing output (tail, per failing step) ---"; cat "$LOG"
   exit 1
 fi
 # A skip never REDs the gate (infra must not park a healthy run) but it MUST be visible here — this

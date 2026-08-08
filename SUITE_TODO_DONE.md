@@ -75,6 +75,11 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   self-contradictory; and the per-step output goes to a `mktemp` that is gone by the time you read the
   summary, so the real error only appears by re-running the step directly. Evidence for a VM failure is kept
   at `~/.tart-mirror/vm-artifacts/gui-vm-<app>-attempt{1,2}.log`.
+  ✅ **`W27.gatetail` CLOSED 2026-08-08** (entry in §*Autonomous compactor + park diagnosis*) — this was its
+  **second** recorded misdiagnosis, and it went on to cost a third on 2026-08-08, when it printed the same
+  `status-proof` "36 passed, 0 failed" as `tag-vocabulary`'s failing output. The fix also softens the second
+  trap for the case that matters: a **failing** step's last 40 lines now survive its `mktemp` into the
+  verdict, so the RED usually explains itself without a re-run.
 
 - [x] **W28.trackerbudget — the shipped-rollup prose moved OUT of the open tracker, because DONE was not a
   superset of it. ✅ DONE** — this commit. `SUITE_TODO.md` had reached **98 % of its 200 KB budget (3.2 KB of
@@ -242,15 +247,80 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
     Step names now also ride in the park *reason*, which upgrades `daemon.log`, the ntfy title, the macOS
     banner and `STATUS.md` for free. The split is IFS-independent: under an inherited `IFS=$'\n'` the loop saw
     one word `" context-budget"` and would have misclassified every document failure as a code regression.
-  - ⚠️ **Not fixed here, deliberately** (each is a separate, smaller change): `health-gate.sh`'s
+  - ⚠️ **Not fixed here, deliberately** (each was a separate, smaller change): `health-gate.sh`'s
     `--- failing output (tail) ---` is `tail -40` of the **shared** step accumulator, so it shows the last
     step's output rather than the failing step's — it only looked right because `context-budget` runs last. And
     nothing ever deletes `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt`, so the "Needs you" bullet stays after the
-    cause is fixed.
+    cause is fixed. ✅ **Both filed as `W27.gatetail` / `W27.parkstick` and both CLOSED 2026-08-08** — see the
+    two entries directly below. The first one cost exactly what this entry predicted it would.
+
+- [x] **W27.gatetail — the gate's "failing output" was the tail of the LAST step, not the failing one.
+  ✅ CLOSED 2026-08-08** this commit. Predicted here on 2026-08-06 and **collected on 2026-08-08**, in the
+  precise shape forecast: `tag-vocabulary` failed, `status-proof` and `dispatch-proof` ran after it, and so
+  `last-gate.log`, the daemon's park note and `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt` all printed
+  **"36 passed, 0 failed"** directly beneath the heading *"failing output"*. The owner's one artifact naming
+  the failure showed a step that had passed. `step()` now captures each step's output separately and
+  contributes only a **failing** step's tail to `$LOG`, each under its own `===== <step> (rc=N) =====`
+  banner; `step_skippable` does the same from its `*)` arm only, since a skip and a known-failure are both
+  reported inline and neither is what RED is asking about. The RED branch `cat`s that instead of tailing a
+  shared transcript. The daemon's `$diag` line, which parses `HEALTH GATE: RED —<steps>` and names the steps,
+  was already correct and was already right on the night — its neighbouring comment, which described the
+  gate's old output shape, is corrected in `archive-suite-autonomous.sh`.
+  **Tier-2 functional test — `ops/autonomous/tests/prove-gate-report.sh`, and it is a gate step**
+  (`gate-report`; owner call, 2026-08-08 walkthrough). It extracts the real `step()` / `step_skippable()` /
+  RED-verdict text **out of `health-gate.sh` itself** and drives it against synthetic steps, so it tests the
+  shipped text rather than a copy that can drift; 18 assertions, well under a second. The headline case is the
+  exact 2026-08-08 shape — an early **failing** step and a later **passing** one whose `36 passed, 0 failed`
+  tail used to be quoted — plus: every failing step is reported (not just the first or last), each rc is
+  preserved, a `step_skippable` SKIP (3) or KNOWN-FAILURE (4) contributes nothing while a hard failure does,
+  and an all-green run prints no verdict at all. ⚠️ **The extraction is asserted, not assumed** — an empty or
+  unrecognisable match is a FATAL, because a harness whose `sed` quietly matched nothing would pass forever,
+  which is the `W26.lint-fu` failure mode exactly. **Mutation-proved:** against a `health-gate.sh` with the
+  pre-fix pooled-`$LOG` `step()` planted back, **8 of the 18 go red**, including *"a later PASSING step's
+  output leaked into the report"* and *"the report quotes a passing step's summary"*.
+  The counter-argument — that adding a gate step is how `W26.gatepath` parked the run — was considered and is
+  answered by the discipline that failure taught: it was verified at a space-bearing path before going live.
+  `prove-daemon.sh` stays out of the gate on **runtime** grounds (~10 min), not principle, so a sub-second
+  proof does not inherit that exclusion.
+
+- [x] **W27.parkstick — the Desktop park note is retired when a run starts, so "Needs you" stops being
+  sticky. ✅ CLOSED 2026-08-08** this commit. `park_run` writes `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt` and a
+  repo-wide grep still found **one writer and no remover**, so `status-digest.sh`'s *"It parked and left you a
+  note … then restart it"* bullet outlived its cause by however long it took the owner to notice and delete
+  the file by hand — `daemon.sh status` asking him to restart a daemon that was already running.
+  `archive-suite-autonomous.sh` now `rm -f`s it immediately after the `=== daemon up ===` log: a run reaching
+  that line **is** the restart the note asks for. Deleted rather than archived because `daemon.log` holds every
+  park message durably and `park_run` rewrites the file the moment we park again — so the bullet becomes
+  true-by-construction ("there is an unhandled park") rather than "a park happened once". Caught independently
+  while restoring the run from this same park, then matched to the existing item rather than re-filed.
 
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.gatepath — the health-gate step that could only ever fail, because a worktree path has no space
+  and the primary checkout's does. ✅ CLOSED 2026-08-08** this commit. The 2026-08-08 00:44 park was **not a
+  code regression**: the `tag-vocabulary` gate step had **never passed once**.
+  `ArchiveProcessor/scripts/test-tag-vocabulary.sh` built ArchiveCore from an **unquoted**
+  `$(find "$SUITE/packages/ArchiveCore/Sources" -name '*.swift')`. The primary checkout is
+  `/Users/<user>/Claude/Archive Suite` — **the path contains a space** — so word-splitting handed `swiftc` 34
+  half-paths instead of 17 files (`/Users/<user>/Claude/Archive` + `Suite/packages/…/CorpusWalker.swift`), and
+  the step exited 1 on `[FAIL] ArchiveCore build`. Now collected into an array via `-print0` / `read -d ''`,
+  plus an empty-list guard — which is also what keeps `set -u` from aborting on an empty array expansion, and
+  turns a moved source tree into a sentence instead of a compiler error about nothing.
+
+  **Why it hid for two days, and the general trap.** `W26.vocab` wrote and verified the script inside a
+  daemon worktree (`suite-wt-<stamp>` — no space), where the unquoted form works by luck. `W26.lint-fu`
+  (`f64649b`, 2026-08-07 07:37) then wired it in as a gate step — and **the gate only ever runs in the
+  primary checkout** (`health-gate.sh` derives `ROOT` from its own location; the daemon invokes it there). So
+  it passed everywhere it was developed and failed *100% of the time* in the one place that runs it. The
+  first gate run after wiring, 2026-08-08 00:11, went RED, retried RED, and parked at 00:44; last GREEN was
+  `e2d7bcc` (2026-08-06 08:35), 31 commits earlier. ⚠️ **Generalised: any shell quoting bug in a gate script
+  is invisible in every worktree it is developed in and certain in the gate.** Recorded in `AGENTS.md`
+  §*Verification*; to test a gate script the way the gate runs it, give your worktree a path with a space.
+
+  **Verified** in a worktree deliberately named with a space (`suite-wt-gatefix 20260808-…`), the only way to
+  reproduce it: the step exits **0** there under `/bin/bash` 3.2, and the full `health-gate.sh` was re-run
+  end-to-end at that same space-bearing path and came back GREEN before this was committed.
 - [x] **W26.docs — docs stop claiming Spotlight. ✅ CLOSED** `98469f9` -> `aef9823` -> this commit
   (2026-08-07). Worked from the audited checklist in `execution-plans/despotlight.md` §10 rather than by
   searching, then re-derived the inventory anyway (339 matches / 52 files) because most of §10's line

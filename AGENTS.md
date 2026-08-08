@@ -134,8 +134,18 @@ Processor has `scripts/test-smoke.sh` / `test-tier2.sh`, plus `scripts/e2e-phone
 phone↔Mac round-trip E2E on the emulator, the functional test for `Capture/`/`Net/` changes). Tag‑write
 changes are Tier‑2 (adversarial review + tests on scratch copies).
 ⚠️ **`ArchiveReader/scripts/lint-write-surface.sh` also covers `packages/ArchiveCore` now** (W26.lint), so run
-it for **any** ArchiveCore change, not just a Reader one — and you must run it *yourself*: nothing invokes it
-automatically, which is filed as `W26.lint-fu`.
+it for **any** ArchiveCore change, not just a Reader one. Run it *yourself* rather than waiting for the gate:
+`W26.lint-fu` (`f64649b`) made it a `health-gate.sh` step, but that is a backstop every
+`AUTONOMOUS_GATE_EVERY` commits, not a per-change check.
+
+⚠️ **Quote every path expansion in a gate script — a worktree hides the bug the gate will hit.** A worktree
+is `…/suite-wt-<stamp>` (no space); the primary checkout is `…/Archive Suite` (**a space**), and
+`health-gate.sh` derives its `ROOT` from its own location, so **the gate only ever runs at the spaced path**.
+An unquoted `$(find …)` or `$VAR` therefore passes every worktree it was developed in and fails *100% of the
+time* in the gate. Collect file lists into arrays (`find -print0` + `while read -r -d ''`), quote everything
+else. This is not hypothetical: it is exactly how the `tag-vocabulary` step parked the run on 2026-08-08
+having never once passed — `W26.gatepath` in `SUITE_TODO_DONE.md`. To verify a gate script the way the gate
+will run it, make your worktree path contain a space.
 
 ### GUI verification — you can drive it yourself; don't punt it to the owner
 

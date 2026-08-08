@@ -45,11 +45,26 @@ echo "work: $WORK"
 # one compiler invocation.
 echo "── building ArchiveCore…"
 mkdir -p "$WORK/core"
+# The source list goes into an ARRAY, never an unquoted `$(find …)` spliced into the argv. The suite's
+# primary checkout is "…/Archive Suite" — the path contains a SPACE — so an unquoted command substitution
+# word-splits every absolute path into two broken halves ("/Users/…/Archive" + "Suite/packages/…") and
+# swiftc reports 17 missing input files. This was invisible for two days because a daemon worktree
+# (`suite-wt-<stamp>`) has no space in its name, so the step passed everywhere it was developed and failed
+# 100% of the time in the primary checkout — which is the only place the health gate runs it. `-print0` +
+# `read -d ''` so a newline in a path cannot split one either.
+CORE_SRC=()
+while IFS= read -r -d '' f; do CORE_SRC+=("$f"); done \
+  < <(find "$SUITE/packages/ArchiveCore/Sources" -name '*.swift' -print0)
+# Also the guard for `set -u`: expanding an empty array under it aborts with a bare "unbound variable".
+# A moved/renamed source tree should say so, not surface as a compiler error about nothing.
+if [ "${#CORE_SRC[@]}" -eq 0 ]; then
+  echo "  [FAIL] no ArchiveCore sources found under $SUITE/packages/ArchiveCore/Sources"; exit 1
+fi
 if ! xcrun swiftc -swift-version 6 -O -emit-module -emit-library -static \
       -module-name ArchiveCore \
       -emit-module-path "$WORK/core/ArchiveCore.swiftmodule" \
       -o "$WORK/core/libArchiveCore.a" \
-      $(find "$SUITE/packages/ArchiveCore/Sources" -name '*.swift') 2>"$WORK/core.err"; then
+      "${CORE_SRC[@]}" 2>"$WORK/core.err"; then
   echo "  [FAIL] ArchiveCore build:"; head -25 "$WORK/core.err"; exit 1
 fi
 
