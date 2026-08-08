@@ -323,18 +323,21 @@ second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 ne
   not defer this waiting for `test-tier2.sh` (which costs money and, on this machine, cannot run at all —
   see the pypdf note in the Daemon Report). **Test:** a run dir whose output PDF is `0o000` must FAIL with a
   message naming the unreadable read, in `none` and `automatic` alike.
-- [ ] **W26.docs — docs stop claiming Spotlight [S · low · Tier-1 · needs: none] (blocked-on:
-  W26.walk2).** `ArchiveReader/CLAUDE.md:106` (*"Search: Spotlight (`mdfind`/`NSMetadataQuery`) finds these
-  by tag fast"*) + its *Verified Facts* Spotlight line + Implementation Map; `ArchiveProcessor/CLAUDE.md`
-  (vocabulary narrowing); `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, `POTENTIAL_FEATURES.md`, and
-  `REVIEW.md` — which still assigns *"Spotlight consistency"* as a standing review concern for a subsystem
-  that no longer exists, and which the daemon reads to pick review units. Audited checklist:
-  `execution-plans/despotlight.md` §10.
-  ⛔ **`SPEC/tag-format.md` is CARVED OUT of this item — do not touch it here.** Owner call, 2026-08-07
-  daemon-report walkthrough: he was offered a doc-only SPEC grant on the `W15.tu0` precedent and chose the
-  split instead, so the two SPEC bullets are now **`W26.docs-spec`**, parked in the plan's HOLD QUEUE. What
-  remains here is non-contract docs only, so this item is **ungated and the daemon may take it** — it had
-  been sitting at the head of the queue getting skipped by every session (`W26.lint-fu`, 2026-08-07).
+✅ **W26.docs — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.**
+
+- [ ] **W26.docs-fu1 — two GUI checks whose ONLY stated blocker was the Spotlight index are now runnable
+  [XS · low · GUI · VM lane].** Filed 2026-08-07 while closing `W26.docs` — the plan's "second dividend"
+  (`execution-plans/despotlight.md` §10), collected rather than dropped. `SUITE_TODO_DONE.md` records two
+  shipped Reader items whose GUI verification was deferred *"(scratch corpus not Spotlight-indexed)"*:
+  **⌘0 = fit-full-page in the preview sheet** (the Document-menu path was confirmed; the preview-specific
+  one was not) and **non-PDF images (JPG/PNG/TIFF/HEIC/BMP/GIF) opening in viewer + preview**. Since
+  `W26.walk2` a scratch corpus needs no index to be discovered, so the blocker is void and both are
+  ordinary VM-lane checks. ⚠️ **Do not discharge these by reading the code** — both were deferred precisely
+  because the code was already believed correct; the point is pixels. Run on the Reader lane
+  (`ops/gui/vm-gui-runner.sh xcuitest`), never the host screen, and note that a `PDFView`'s content pane is
+  not XCUITest-queryable (the W7.6 finding) — assert via observable chrome plus a screenshot from
+  `~/.tart-mirror/vm-artifacts/`, and READ the screenshot. Closing this means annotating both
+  `SUITE_TODO_DONE.md` entries with what was actually seen.
 - [ ] **W26.docs-spec — ⛔ OWNER-GATED: the two `SPEC/tag-format.md` bullets split out of `W26.docs`
   [XS · low · doc-only · shared contract].** Split 2026-08-07 (daemon-report walkthrough) so `W26.docs`
   could stop being skipped at the head of the queue. **Parked in the plan's HOLD QUEUE — the daemon must

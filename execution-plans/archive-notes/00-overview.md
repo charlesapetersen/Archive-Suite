@@ -299,7 +299,12 @@ On first grant of a Reader archive root **or** the Notes store, drop `.archive-s
 ### 8.4 Reader-side additions (see `04`)
 Reader gains: `CFBundleURLTypes` (`archivereader`), an app-level deep-link **router** + `.onOpenURL`, a
 public `NavigationModel.revealAndSelect(paths:)` built on the *existing* in-process select+scroll primitive
-(clears filters/scope, defers until the Spotlight gather completes), and a **"Copy Archive Link(s)"** command
+(clears filters/scope, then defers the reveal until the target appears in the library — or until *settled
+absence* gives up; re-worded 2026-08-07 by `W26.docs`, it used to say "until the Spotlight gather completes",
+and since `W26.walk2` the wait is on the `CorpusWalker` pass, not a Spotlight gather. **The contract Notes
+depends on is unchanged**: a link handed over before discovery finishes still resolves once the file shows
+up, and a link to a file that genuinely isn't there still fails honestly rather than hanging), and a
+**"Copy Archive Link(s)"** command
 that writes a multi-representation pasteboard item: the `archivereader://reveal…` URL(s) as plain text **plus**
 a custom-UTI JSON payload `[{link, display, page, thumbnailPNGbase64?}]` that Notes reads on paste to build
 source blocks in one step. These are **read-only w.r.t. the corpus** (Tier-1/2, no `TagWriter` change).

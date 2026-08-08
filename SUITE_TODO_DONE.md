@@ -251,6 +251,61 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.docs — docs stop claiming Spotlight. ✅ CLOSED** `98469f9` -> `aef9823` -> this commit
+  (2026-08-07). Worked from the audited checklist in `execution-plans/despotlight.md` §10 rather than by
+  searching, then re-derived the inventory anyway (339 matches / 52 files) because most of §10's line
+  numbers were stale — much of what it lists had already been corrected in passing by `W26.walk2`,
+  `W26.vocab`, `W26.oracle` and `W26.scripts`. What was left had a shape: **the sentences that read as
+  settled rather than as description survived the code they described.**
+  - `ArchiveReader/KNOWN_ISSUES.md` §*Verified facts to rely on* still asserted *"Spotlight tag queries
+    are fast (compound 3-facet over 6,941 files ≈ 0.38s) and scale"* — the exact entry the 2026-08-04
+    incident falsified, in the one section written to be trusted without re-checking. **Retracted in
+    place** (struck, not deleted) with the reason: 0.38 s was measured on a *healthy* index and is silent
+    about the failure that happened — a dead index answers just as fast, with zero rows and no error.
+    Replaced by the measured walk (123,028 files / 102,478 PDFs / depth 7 → **10.15 s**), which cannot be
+    silently empty.
+  - `ArchiveReader/CLAUDE.md` §Decisions claimed whole-Mac search was an entitlement flip "behind a
+    `FileAccessProvider` abstraction". **Superseded with a dated entry rather than edited**, per the
+    convention for owner-settled decisions. Two independent reasons, one of which nobody had noticed:
+    `W26.walk2` deleted the `nil`-scope branch that made it free, **and `FileAccessProvider` was never
+    written** (0 references in the tree). The same promise in §Stack & Build, `POTENTIAL_FEATURES.md:17`
+    and both READMEs is re-costed as new code (walk N roots, merge, and define what "the whole Mac"
+    excludes).
+  - **Five source comments justified live code by a dead subsystem** — the failure mode is the inverse of
+    a stale comment: each names "the Spotlight echo" as *why* a guard exists, so a reader who knows
+    Spotlight is gone deletes the guard. Every mechanism is still load-bearing (a re-walk republishes an
+    identically-valued snapshot too), so they are retargeted to "a repeat emission from a re-walk", not
+    dropped: `LibraryChangeSignature.swift`, `NavigationModel.swift:675`/`:1180`, `SubjectTokenField.swift`,
+    `ContentIndexer.swift:54`. Two further comments were wrong on fact, not rationale —
+    `NavigationModel.swift:983` ("a failed write keeps the Spotlight value") and `NavigationUITests.swift`,
+    which documented the visible universe as the predicate `kMDItemUserTags == Read || Unread` when it is
+    now a filter over the walk (same rule, so no expectation changed).
+  - `REVIEW.md` unit 9 assigned *"Spotlight consistency"* as a standing review concern for a subsystem
+    that no longer exists — and the daemon reads that file to pick review units, so it would have sent a
+    future session hunting it. Now: honest absence, warm-cache staleness, FSEvents/walk ordering.
+  - Suite `README.md` (product claim + the ASCII architecture diagram), `ArchiveProcessor/CLAUDE.md` +
+    `README.md` (`SystemTagsProvider` described as Spotlight-sourced — false since `W26.vocab`),
+    `LiveCaptureView.swift:881`, `ArchiveReader/README.md`/`AGENTS.md`, `SMOKE_TEST.md`, and the
+    cross-app `execution-plans/archive-notes/00-overview.md:302` deep-link reveal contract **Notes
+    depends on** (re-worded, with the contract itself explicitly stated as unchanged).
+  - **Site 8 flagged, not acted on**, per the plan: `ProcessFilesTestDriver.swift` states as fact that
+    reading `.tagNamesKey` "contends with Spotlight". Nobody measured it, and `W26.oracle` already showed
+    the adjacent claim about this lane was flatly wrong. The external-asserter split stays — it is
+    justified by the `JSONSerialization` wedge alone — so the unverified half is now marked unverified
+    instead of being quietly relied on.
+  - **Deliberately left alone**, and said so in the commits so the next session doesn't "finish the job":
+    `NavigationWindowView.swift:165`/`:212`, `LibraryPhase.swift`, `ArchiveReaderUITests.swift`,
+    `CorpusWatcherTests.swift`, `LibraryDiscoverySwapTests.swift`, `ContentIndexer.swift:307`,
+    `ops/gui/README.md`, `ops/autonomous/README.md`, `ArchiveProcessor/TESTING.md` — accurate history,
+    assertions of absence, or already re-argued in place. Plus the plan's three xattr/Finder-comment
+    matches (incl. `devonthink-import.md:353`), which must survive a find-and-replace.
+  - ⛔ **`SPEC/tag-format.md` untouched** — carved out to `W26.docs-spec` (HOLD QUEUE) by the owner's
+    2026-08-07 call. Collected the plan's "second dividend": the two GUI verifications in this file that
+    were deferred *because the scratch corpus was not Spotlight-indexed* have had that blocker discharged
+    and are now `W26.docs-fu1` rather than re-deferred.
+  Tier-1. Reader `build` + `build-for-testing` and Processor Debug all succeed with no new warnings; the
+  only Swift changes are comments. Filed `W26.docs-fu1`.
+
 - [x] **W26.fixturehang — the fixture pin no longer lives in the owner's defaults domain, so a killed test
   host can no longer put their Reader into fixture mode. ✅ CLOSED** `eef85d5` -> `d58c058` -> this commit
   (2026-08-07). Half **(b)** — the main-thread `FSEventStreamCreate`, i.e. the HANG — shipped separately as
@@ -4864,9 +4919,14 @@ explain why not.
   publishes the viewer model so the existing Document menu ⌘0 (Fit Page) + zoom shortcuts reach the
   preview. Build clean, 191 tests green. GUI-verify: Document menu confirmed; preview-specific test
   deferred (scratch corpus not Spotlight-indexed). | done
+  ↳ **That deferral reason is void as of `W26.walk2` (noted 2026-08-07, `W26.docs`).** A scratch corpus
+  needs no index to be discovered now, so this check is runnable on the Reader VM lane — tracked as
+  `W26.docs-fu1` rather than re-deferred.
 - [x] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images (JPG/PNG/TIFF/HEIC/BMP/GIF)
   now open in viewer + preview via PDFPage(image:) wrapping in DocumentViewerModel.loadCurrent().
   Build clean, 191 tests green. GUI-verify deferred (scratch corpus not Spotlight-indexed). | done
+  ↳ **Same discharge as above (2026-08-07, `W26.docs`)** — the index was the only blocker; now
+  `W26.docs-fu1`.
 
 
 ## Owner-requested (2026-07-10) — Reader

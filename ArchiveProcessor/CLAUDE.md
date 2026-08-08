@@ -453,7 +453,9 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   TagGenerator.swift           LLM tag generation (subjects + date) from OCR text.
   DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification.
   CollectionSegmenter.swift    Group files into box/folder collections.
-  SystemTagsProvider.swift     Spotlight-sourced existing-tag autocomplete for tagging UIs.
+  SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
+                               `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
+                               operator types + every verified write). No Spotlight since W26.vocab.
 Capture/                       Live Capture core (Tier-2):
   CaptureSession.swift         Owns a live session: incoming folder, token, received photos, receiver
                                lifecycle, ingest(...) (durable-manifest-before-ack, idempotent (group,seq)),

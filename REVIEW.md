@@ -63,7 +63,7 @@ Highest-risk first. Paths are repo-root-relative.
 | 6 | Android companion | `ArchiveProcessor/ArchiveCapture/` | capture path, wire protocol, lifecycle |
 | ~~7~~ | ~~iOS companion~~ | **ON HOLD — skip** (maintain-only; see SUITE_TODO "Project focus") | — |
 | 8 | Reader/Core | `ArchiveReader/macOS/Sources/ArchiveReader/Core/` | **TagWriter / file-safety (PRIME)**, content index |
-| 9 | Reader/Search | `ArchiveReader/macOS/Sources/ArchiveReader/Search/` | index correctness, Spotlight consistency |
+| 9 | Reader/Search | `ArchiveReader/macOS/Sources/ArchiveReader/Search/` | index correctness, **honest absence** (a partial or denied walk must never read as "nothing is tagged" — the 2026-08-04 incident), warm-cache staleness vs revalidation, FSEvents/walk ordering against verified writes |
 | 10 | Reader/Views | `ArchiveReader/macOS/Sources/ArchiveReader/Views/` | resource/perf (large tables), inline-edit safety, **render (blank/wrong pixels)** |
 | 11 | Notes/Store+Tags | `ArchiveNotes/macOS/Sources/ArchiveNotes/Store/ ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagProjector.swift ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesTagVocabulary.swift` | **PRIME file-safety:** the shared `CoordinatedTagWriter` tag-write choke-point (+ the latent concurrent-write race, W15.tu3), atomic store writes / Trash-delete / asset name-reservation, front-matter + block codec integrity, **never writes the corpus** |
 | 12 | Notes/Index+Org | `ArchiveNotes/macOS/Sources/ArchiveNotes/Index/` | FTS5 correctness, prune-gate never-wipes (empty snapshot), OrganizationStore replication / delete-last-instance invariants, org-graph persistence, DB-vs-fixture shadowing |

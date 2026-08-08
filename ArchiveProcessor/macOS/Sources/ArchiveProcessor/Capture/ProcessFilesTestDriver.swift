@@ -10,10 +10,17 @@ import PDFKit
 /// the LLM's proposals verbatim). On completion it writes a `TEST_DONE.txt` marker + a small
 /// `manifest.tsv` (per-file classification + status) and returns (no `exit()`, mirroring
 /// `LiveCaptureTestDriver`); the external harness detects the marker and tears the app down. The
-/// driver deliberately does NOT read Finder tags or build JSON in-process — reading `.tagNamesKey`
-/// contends with Spotlight, and an in-process `JSONSerialization` of the result set wedges in this
-/// post-pipeline main-actor context — so all PDF/tag/sidecar verification is done by the external
-/// asserter (`scripts/tier2_assert.py`) reading the run dir after the app exits.
+/// driver deliberately does NOT read Finder tags or build JSON in-process — an in-process
+/// `JSONSerialization` of the result set wedges in this post-pipeline main-actor context — so all
+/// PDF/tag/sidecar verification is done by the external asserter (`scripts/tier2_assert.py`) reading
+/// the run dir after the app exits.
+///
+/// ⚠️ **The tag half of that rationale is UNVERIFIED and is not a reason to keep this shape.** It used
+/// to read "reading `.tagNamesKey` contends with Spotlight". Nobody measured that, and `W26.oracle`
+/// showed the adjacent Spotlight claim about this lane was simply wrong (TESTOUT lives under `/tmp`,
+/// which Spotlight never indexes). Recorded as `execution-plans/despotlight.md` §"Site 8" and
+/// `ArchiveProcessor/TESTING.md` — flagged, **not acted on**: the external-asserter split is right for
+/// the `JSONSerialization` reason alone, so nothing here changes on the strength of the tag claim.
 ///
 /// Test-only scaffolding. It never mutates UserDefaults/Keychain (the API key is threaded straight
 /// through as a parameter), never touches Live Capture, and refuses to write into `Test Files/`.
@@ -175,7 +182,8 @@ enum ProcessFilesTestDriver {
         // writes just proved works on this actor), so the harness always sees completion. Then a
         // tiny TSV manifest of per-file classification + status from in-memory job state. All PDF /
         // Finder-tag / sidecar verification is done by the EXTERNAL asserter reading the run dir —
-        // the driver deliberately does NOT read tags (contends with Spotlight) or build JSON here.
+        // the driver deliberately does NOT read tags or build JSON here (see the type doc — the
+        // JSON reason is measured; the "contends with Spotlight" one was never verified).
         let succeeded = processor.jobs.filter { "\($0.status)" == "succeeded" }.count
         let failed = processor.jobs.filter { "\($0.status)" == "failed" }.count
         writeMarker(donePath, processor.statusMessage.isEmpty ? "DONE" : processor.statusMessage)

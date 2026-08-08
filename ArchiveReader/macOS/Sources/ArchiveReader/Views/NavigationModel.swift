@@ -1178,7 +1178,8 @@ final class NavigationModel: ObservableObject {
 
     /// Commit an inline subject-token edit. `base` is the token set the user STARTED editing from
     /// (snapshotted by the field at edit-begin) — NOT the file's current `subjects`, which may have moved
-    /// under an active edit (a Spotlight echo / group edit / undo to the same file). Diffing against the
+    /// under an active edit (a repeat emission from a re-walk / group edit / undo to the same file).
+    /// Diffing against the
     /// edit-start base means the delta names ONLY what the user actually changed, so `TagWriter`'s fresh
     /// read preserves any concurrent third-party tag (never dropping an untouched token). Applied as ONE
     /// delta = one write + one undo step; a no-op edit writes nothing. Subjects only — other facets stay.

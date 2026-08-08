@@ -1121,6 +1121,15 @@ audited writer it must agree with, collapses all three.
 
 ## 10. Docs that move with the code (same commit, per convention)
 
+> ✅ **SHIPPED as `W26.docs` (2026-08-07, `98469f9` → `aef9823` → the completing commit)**, except the two
+> ⛔ SPEC bullets, which are `W26.docs-spec` in the plan's HOLD QUEUE and remain open. Two notes for anyone
+> re-reading this list. **(a) Most of its line numbers were already stale** — much of what it names had been
+> corrected in passing by `W26.walk2`, `W26.vocab`, `W26.oracle` and `W26.scripts`, so the item was worked by
+> re-deriving the inventory (339 matches / 52 files) and using this section as the *judgement* record rather
+> than as coordinates. **(b) `ArchiveFile.swift` needed nothing** — its "no per-file I/O" invariant was
+> already gone and `liveIdentity()` already states the surviving reason to stay lazy. The "second dividend"
+> at the foot of this section was collected as **`W26.docs-fu1`**, not dropped.
+
 The audited list, so `W26.docs` is a checklist rather than a hunt:
 
 - `ArchiveReader/CLAUDE.md:106` (*"Search: Spotlight (`mdfind`/`NSMetadataQuery`)…"*), its §Verified Facts

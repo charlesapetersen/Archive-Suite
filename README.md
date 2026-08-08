@@ -7,7 +7,7 @@ of thousands of scanned pages.
 | App | Role | Does |
 |-----|------|------|
 | **Archive Processor** | *Capture · OCR · Tag* | Photograph or import document images, OCR them, and write a tagged 2‑page PDF (original image + selectable OCR text) with subject / date / priority / color / read‑state Finder tags. Includes iPhone + Android capture companions (Live Capture) and guided bring‑your‑own free Gemini/Mistral OCR keys. |
-| **Archive Reader** | *Find · Read · Triage* | Read and triage the tagged PDFs the Processor produces: Spotlight‑fast discovery at 150k+ files, chronological navigation, filter by subject/priority/read‑state, full‑text search, a two‑up image+OCR viewer, safe tag editing, and one‑keystroke Read/Unread triage. |
+| **Archive Reader** | *Find · Read · Triage* | Read and triage the tagged PDFs the Processor produces: discovery walks your archive folder directly — **no Spotlight**, so a stale or dead index can never hide your files (~100k PDFs in ~10 s, instant warm start from a local cache, kept live by FSEvents) — chronological navigation, filter by subject/priority/read‑state, full‑text search, a two‑up image+OCR viewer, safe tag editing, and one‑keystroke Read/Unread triage. |
 | **Archive Notes** | *Note · Extract · Cite* | Provenance‑first note‑taking from the documents you read: notes and extracts that keep a **durable link** back to the exact source page (survives a computer move), Zotero references, folders / smart folders / replication, and full‑text search — designed for 100k notes / 2M words. |
 
 They are **three separate apps by design** — you can run any one alone — but they share one contract
@@ -18,7 +18,7 @@ documented once, authoritatively, in [`SPEC/tag-format.md`](SPEC/tag-format.md).
 ```
    Archive Processor                         Archive Reader
    ┌───────────────────┐   tagged 2-page    ┌───────────────────┐
-   │ capture / import  │   PDFs on disk     │ find (Spotlight)  │
+   │ capture / import  │   PDFs on disk     │ find (folder walk)│
    │ OCR (Gemini/      │  ───────────────▶  │ read (image+OCR)  │
    │ Mistral)          │   (Finder tags +   │ triage / filter   │
    │ tag & classify    │    OCR text)       │ edit tags safely  │

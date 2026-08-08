@@ -878,7 +878,9 @@ private struct LiveProcessingBox: View {
 private struct SegmentTagCard: View {
     let group: CaptureGroup
     @ObservedObject var session: CaptureSession
-    /// Observed so the "building suggestions…" note clears the moment the Spotlight gather finishes.
+    /// Observed so the "building suggestions…" note clears the moment the vocabulary harvest finishes.
+    /// Since `W26.vocab` that note only appears on a genuinely cold first run — the vocabulary is
+    /// persisted, so there is normally nothing to wait for (see `SystemTagsProvider.isReady`).
     @ObservedObject private var tagsProvider = SystemTagsProvider.shared
 
     @State private var subjects: [String] = []

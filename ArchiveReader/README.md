@@ -69,8 +69,11 @@ never hand-edit the `.pbxproj`.
 
 ## Architecture (short)
 
-Swift 6 · SwiftUI (+ AppKit where needed) · PDFKit · `NSMetadataQuery` (Spotlight) · `NSURL`
-resource values for tags · `NSFileCoordinator` for safe metadata-only writes · system SQLite FTS5
-(no third-party deps) for the disposable content/full-text index. XcodeGen build. v1 sandboxed to a
-user-granted archive root; non-sandboxed whole-Mac search planned. Domain logic lives UI-free in
-`Core/` so it can become the shared `ArchiveCore` package when the suite converges.
+Swift 6 · SwiftUI (+ AppKit where needed) · PDFKit · `ArchiveCore.CorpusWalker` for discovery (a direct
+filesystem walk — **no Spotlight**), `CorpusWatcher` (FSEvents) for live updates and a SQLite
+`LibraryIndex` for warm start · `NSURL` resource values for tags · `NSFileCoordinator` for safe
+metadata-only writes · system SQLite FTS5 (no third-party deps) for the disposable content/full-text
+index. XcodeGen build. v1 sandboxed to a user-granted archive root; non-sandboxed whole-Mac search is a
+long-term maybe and is **not** the mere entitlement flip this file used to claim (see
+`POTENTIAL_FEATURES.md`). Domain logic lives UI-free in `Core/` so it can become the shared `ArchiveCore`
+package when the suite converges.
