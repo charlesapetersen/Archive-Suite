@@ -205,12 +205,15 @@ run_xcuitest() {
   log "building + running $ONLY_TESTING for $APP in the VM…"
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
   # before executing a single test. Remove it first.
+  # CODE_SIGN_IDENTITY=- : the guest has no keychain, so it cannot use the host's "Archive Suite Dev"
+  # cert (W28.cert). Same rationale as ops/autonomous/gui-vm-gate.sh — see the long note there.
   tart exec "$VM" bash -lc "
     rm -rf '$GUEST_DD/uitest.xcresult'
     xcodebuild test \
       -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
       -only-testing:'$ONLY_TESTING' -destination 'platform=macOS' \
-      -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/uitest.xcresult'
+      -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/uitest.xcresult' \
+      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " 2>&1 | tee "$ART/xcuitest-$APP.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
   log "XCUITest log: $ART/xcuitest-$APP.log"
   grep -q '\*\* TEST SUCCEEDED \*\*' "$ART/xcuitest-$APP.log" 2>/dev/null \
@@ -219,7 +222,8 @@ run_xcuitest() {
 
 build_for_sighted() {
   log "building $SCHEME in the VM (for the sighted lane)…"
-  tart exec "$VM" bash -lc "xcodebuild build-for-testing -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' -destination 'platform=macOS' -derivedDataPath '$GUEST_DD'" >/dev/null
+  # CODE_SIGN_IDENTITY=- : guest has no keychain for the host's cert (W28.cert; see gui-vm-gate.sh).
+  tart exec "$VM" bash -lc "xcodebuild build-for-testing -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' -destination 'platform=macOS' -derivedDataPath '$GUEST_DD' CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" >/dev/null
 }
 
 # --- LANE: sighted (real pixels over VNC) ---

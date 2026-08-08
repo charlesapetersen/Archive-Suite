@@ -18,6 +18,64 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Signing + TCC consent (owner, 2026-08-07)
 
+- [x] **W28.cert-fu1 — the GUI-VM lane builds in a guest with no keychain, so certificate signing RED'd it.
+  ✅ DONE** — this commit. **A regression `W28.cert` shipped and this session missed**, because host builds
+  were verified and the VM lane was not considered: the guest runs its own `xcodebuild`, and the
+  `"Archive Suite Dev"` cert lives only in the HOST login keychain. Every target failed with
+  *"No certificate matching 'Archive Suite Dev' found"* — for `reader` **and** `notes`, both attempts. Worse
+  than a plain break: `gui-vm-gate.sh` classifies that as a **reproducible UITest failure → RED → park**, so
+  a *build-configuration* error was being reported as a product test failure. It was invisible from the host
+  (host `reader`/`notes`/`processor-build` steps all pass), which is exactly why it slipped.
+  **Fix:** the three guest `xcodebuild` invocations (one in `ops/autonomous/gui-vm-gate.sh`, two in
+  `ops/gui/vm-gui-runner.sh`) now pass `CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO`, so **the guest stays
+  ad-hoc while the host keeps the cert** — restoring precisely the configuration this lane was green on.
+  That is the right split, not a workaround: the cert exists *only* to make a TCC grant survive a rebuild,
+  and a disposable off-screen VM has no durable grants to keep. ⛔ **Do NOT "fix" this by installing the
+  cert into the VM** — that couples a throwaway image to host keychain secrets and breaks again on every VM
+  rebuild.
+  ⚠️ **Two diagnosis traps hit on the way, both already filed:** `W27.gatetail` — the gate's
+  *"failing output (tail)"* showed `status-proof`'s 36-passed output, not `gui-vm`'s, so the RED looked
+  self-contradictory; and the per-step output goes to a `mktemp` that is gone by the time you read the
+  summary, so the real error only appears by re-running the step directly. Evidence for a VM failure is kept
+  at `~/.tart-mirror/vm-artifacts/gui-vm-<app>-attempt{1,2}.log`.
+
+- [x] **W28.trackerbudget — the shipped-rollup prose moved OUT of the open tracker, because DONE was not a
+  superset of it. ✅ DONE** — this commit. `SUITE_TODO.md` had reached **98 % of its 200 KB budget (3.2 KB of
+  headroom)**, so the next entry of any size would have turned `context-budget.sh` RED and parked the daemon —
+  a gate failure caused by *writing a tracker entry*. There were **zero `[x]` items** to drain (63 genuinely
+  open, convention already followed), so the usual remedy did not apply. The drainable material was the six
+  `✅ **W26.x — SHIPPED …; full entry in SUITE_TODO_DONE.md**` rollups.
+  ⚠️ **They could NOT simply be deleted, and checking that was the whole job:** five of six distinctive
+  phrases in them appeared **zero** times in `SUITE_TODO_DONE.md` — "full entry in DONE" was **false**, and
+  the durable engineering corrections (`W26.symroot`'s *"the item's own prescription was measured WRONG, and
+  that correction is the durable part"*, `W26.symroot-fu1`'s *"Not touched, deliberately"*, `W26.walk2`'s
+  0/11-Spotlight VM measurement) existed **only** in the open tracker. So they were **moved verbatim**, not
+  compressed — `SUITE_TODO_DONE.md` is not in the budget list, which is exactly where shipped prose belongs.
+  Result **196,741 → 183,699 bytes (98 % → 91 %)**, headroom 3.2 KB → 16.3 KB, nothing reworded or dropped.
+  Verified: every phrase still present, `check-tracker-sync.sh` ✓ *"agree on all 64 shared items"*, and
+  `next-queue-item.sh` still resolves all seven affected tags as DONE (one `[x]` line each in DONE, zero
+  conflicting `[ ]` lines) — the resolver reads **checkbox** lines, and the `✅` rollups were never checkbox
+  lines, so pointer text was never load-bearing for dependency gating.
+  ⚠️ **Note for whoever repeats this:** the `✅` blocks are **consecutive with no blank line between them**,
+  so "block ends at the next blank line" silently merges five of them into one. That is how this pass moved
+  `W26.idx`/`fsev-fu2`/`symroot`/`symroot-fu1` along with `walk2` and left them without a pointer line. Their
+  prose is intact in DONE and all four still resolve as DONE, so nothing broke — but split on the `✅` marker,
+  not on blank lines.
+
+- [x] **W28.fsevhang-bound — the untimed harness semaphore behind the gate hang is now bounded. ✅ DONE** —
+  this commit. Defence-in-depth for **`W26.fixturehang`** (still open, still HIGH — see its UPDATE block for
+  the confirmed leaked-`ARUITestRootPath` trigger, the 3/3-hang vs 12/12-pass measurement, and the ruled-out
+  suspects). `BlockingCorpusWatcher.start()`'s `gate.wait()` was **unbounded**, which is what turned the
+  fixture lane's main-thread `open(2)` into an *unrecoverable* stall: no failure, no test name, `xcodebuild
+  test` never returns, `step()` never reports, and the daemon burns `GATE_MAXRUN` then parks blaming build
+  time. It is now bounded (30 s, injectable) and records `timedOutWaitingForGate`; `BlockingWatcherLog`
+  additionally releases a watcher appended **after** `releaseAll()` snapshotted, closing the late-arrival
+  race. Both are proved by `BlockingWatcherHarnessTests` in ~0.26 s using the injectable bound — a guard
+  nothing exercises being the failure mode this repo already learned from the write-surface lint.
+  ⚠️ **This does not fix the root cause** and must not be read as closing `W26.fixturehang`: the main-thread
+  `FSEventStreamCreate` and the process-wide `isFixtureRoot` default are untouched. It only guarantees the
+  pathology can no longer hang the gate silently. Reader suite 376 tests / 0 failures.
+
 - [x] **W28.cert — the suite signs with a real certificate, so a TCC grant survives a rebuild. ✅ DONE** —
   this commit. **The symptom the owner reported:** "Archivereader.app would like to access files in your
   Desktop folder" over and over. **The cause was not the Desktop** — it was `CODE_SIGN_IDENTITY "-"`. An
@@ -155,6 +213,150 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
+
+### Shipped-rollup detail moved out of `SUITE_TODO.md` (2026-08-07, W28.trackerbudget)
+
+Verbatim from the open tracker, where it was the ONLY copy — `SUITE_TODO_DONE.md` was not a
+superset, so these were moved rather than compressed. Nothing was reworded or dropped.
+
+✅ **W26.deny — SHIPPED 2026-08-05 (`2956f3c` → `ad86cce`); full entry in `SUITE_TODO_DONE.md`.** Three things
+later items in this wave need from it. **(1)** `TagXattr.inspect` (ArchiveCore) is now the shared primitive
+for *"no tags"* vs *"couldn't read the tags"* — call it, don't re-derive it. **(2) Two of this plan's written
+prescriptions were measured WRONG while shipping it** — `XATTR_NOFOLLOW` (must FOLLOW: `resourceValues`
+reports the *target's* tags through a symlink) and *"a returned size of 0"* (a removed-tags file keeps a
+42-byte empty-array plist; 51 of the owner's files are in that state) — both now corrected in plan §4a.1 and
+§7a.3. **(3)** The corpus census is refreshed: 123,302 regular files · 21,311 ENOATTR · 101,940 tagged · 51
+empty-array residue · **0 denied** · 0 undecodable.
+
+✅ **W26.notsup — SHIPPED 2026-08-05 (this commit); full entry in `SUITE_TODO_DONE.md`.** An xattr-less
+SMB/NFS volume remains safely unreadable—never coerced to untagged—but Reader now says *"Finder tags
+unavailable for N files"* and explains that it cannot list or edit them, with APFS-copy + rescan guidance.
+Mixed-mount permission/file/folder counts remain visible. The mapper recognizes only ArchiveCore's exact
+ENOTSUP suffix; an ordinary error path containing `(ENOTSUP)` cannot be misdiagnosed as a volume capability.
+Exposure remains zero on the owner's APFS corpus.
+✅ **W26.lint — SHIPPED 2026-08-05 (`1460125` → this commit); full entry in `SUITE_TODO_DONE.md`.** Two things
+later items in this wave need from it. **(1)** `ArchiveReader/scripts/lint-write-surface.sh` now lints
+`packages/ArchiveCore/Sources/ArchiveCore` as well as the Reader app target, and allowances are
+**`(file, exact source line)` pairs — never whole files**, so a new ArchiveCore file that calls
+`setResourceValue`/`setxattr`/a `FileManager` mutator/`.write(to:)` fails the lint. **Run it before committing
+any ArchiveCore work** (`./ArchiveReader/scripts/lint-write-surface.sh`; self-test:
+`./ArchiveReader/scripts/test-lint-write-surface.sh`) — and since `W26.lint-fu` (2026-08-07) the daemon's
+health gate runs both, so a violation you forget to check is caught within `AUTONOMOUS_GATE_EVERY` commits
+instead of never.
+**(2)** It was not merely scoped too narrowly, it was passing **vacuously**: the Reader app target has **zero**
+tag-write hits of its own (its `TagWriter` is a delta adapter over `ArchiveCore.CoordinatedTagWriter`), so
+rule 1 had nothing left to catch. Verified by running the OLD script against planted ArchiveCore violations —
+exit 0, "✓ clean".
+
+✅ **W26.lint-fu — SHIPPED 2026-08-07 (`5210c12` → this commit); full entry in `SUITE_TODO_DONE.md`.** All
+five of Wave 26's un-run harnesses are steps in `ops/autonomous/health-gate.sh` now — `write-surface-lint`,
+`write-surface-lint-proof`, `tag-vocabulary`, `finder-tags` and the skippable `fixture-scripts` (~105 s
+together, ahead of the VM lane). Two things later items need from it. **(1) The lint's source lists are
+PER-RULE**: rules 1 (tag write) and 3 (errorHandler-less enumerator) now cover
+`ArchiveNotes/macOS/Sources/ArchiveNotes`, rule 2 (destructive / content write) deliberately does not — that
+tree has 11 pre-existing content writes, six in `NoteStore`, and adding it without auditing them first would
+simply turn the lint RED. A new guard (a2) fails if any rule names a tree the union `SRCS` omits. **(2) A
+missing PREREQUISITE is exit 3, not exit 1**: `test-fixture-scripts.sh` needs `/opt/homebrew/bin/tag` and the
+**gitignored** `Test files/Brown Gemini` corpus, so on any other clone — and in every worktree — the lane
+reports `⊘ … NOT VERIFIED: fixture-scripts` instead of parking the run. ⚠️ **`daemon.sh` installs from the
+PRIMARY checkout's working tree, so the new gate steps are not live until the primary is fast-forwarded and
+the owner restarts the daemon** (Daemon Report).
+
+✅ **W26.walk2 — SHIPPED 2026-08-05 (`f1c0d2f` → `b88d20a` → `6f5d6ad` → this commit); full entry in
+`SUITE_TODO_DONE.md`.** Reader Release discovery now uses `ArchiveCore.CorpusWalker`; every
+`NSMetadataQuery`/`NSMetadataItem` path and the Spotlight-lag `PendingWrite` subsystem are gone.
+`LibraryPhase` is the single health/absence/pruning gate, incomplete passes keep every unseen prior row,
+and verified writes use a monotonic ordering guard instead of a timer. The incident's old claim is
+unrepresentable: only a settled scan may say no files carry Read/Unread, and it quotes the examined-file
+denominator. Manual File ▸ Rescan Archive Folder (⌘⌥R) covers the interval before `W26.fsev` ships.
+Adversarial completion added progress for wholly untagged trees, protected deep links from treating degraded
+passes as misses, and proved unreadable subtrees cannot erase prior rows. VM verification was deliberately
+hostile: Spotlight indexed **0/11** fixture files while Reader still rendered all 11; the full pre-existing
+16-test GUI suite and the new denominator check passed. The accepted one-time content-index re-extraction
+from switching mtime sources remains deliberate; the database version is unchanged.
+✅ **W26.idx — SHIPPED 2026-08-05 (this commit); full entry in `SUITE_TODO_DONE.md`.** Reader now owns a
+separate system-SQLite `LibraryIndex`: byte-exact `(root path, marker GUID, file path)` identity, raw tags,
+fresh `(mtime, ctime, size, inode, dataless)` fingerprints, every regular file, and honest scan provenance.
+Warm rows render immediately as cache/revalidating, while a dedicated-thread fingerprint pass re-reads tags
+only for changed/new/unverified paths and makes absence authoritative only after a clean pass. Cache rows are
+re-read before any write target/delta is chosen; corpus-wide renames are conditional. Dataless rows never
+reach PDF extraction. Canceled 150k-row SQLite work yields every 500 rows, and NFC/NFD spellings remain
+distinct through persistence, FSEvents coalescing, containment and exact live reads. The store is a new v1
+cache with no migration or legacy-state fallback, as directed. Fixture roots answer NO to the persisted
+index through a single `usesPersistedIndex` predicate — on ⌘⌥R as well as launch, which is where they had
+been escaping onto the real Application Support database from unit tests. **Scale and VM verification were
+not run for this item and are carried into `W26.verify`.**
+✅ **W26.fsev-fu2 — SHIPPED 2026-08-06 (this commit); full entry in `SUITE_TODO_DONE.md`.** The walk now has
+the deadline the stream got in `W26.fsev-fu1`. A pass that has examined **zero** files after
+`scanStallTimeout` (5 s) publishes `.degraded(.scanStalled)` — *"Archive folder has not answered"* — instead
+of leaving the list in `.firstScan(done: 0, seen: 0)` behind a spinner for ever. Reported, never cancelled: a
+thread blocked in `opendir` cannot be interrupted. It grants nothing (`.degraded` is not settled, so no
+pruning and no authoritative absence, and it is set directly rather than through `DiscoveryHealth`, whose
+contract is about FINISHED passes); a late pass supersedes it through the existing generation token, and so
+does the first file seen. `requestRootRescan` had to learn about it too — ⌘⌥R while stalled would otherwise
+have reset the phase to "Scanning…" while `drainWatchWork` refused to start anything.
+✅ **W26.symroot — SHIPPED 2026-08-06 (`1e7044d` → this commit); full entry in `SUITE_TODO_DONE.md`.** A root
+that is itself a symbolic link is walked **through its target**: the probe `rootIsOpenable` became
+`CorpusWalker.canonicalRoot`, which answers *"what must I enumerate for this root?"* and is used by `scan` and
+`scanFingerprints` alike, so the warm-start revalidation walk cannot disagree with the full walk about what the
+root is. **The item's own prescription was measured WRONG, and that correction is the durable part:** it asked
+for the target to be walked but every discovered path rewritten back under the caller's link prefix, to protect
+`LibraryIndex`'s byte-exact `(root, path)` contract. Measured, the enumerator **already** hands back fully
+ancestor-resolved paths — a root spelled `/var/folders/…` yields `/private/var/folders/…` entries — so the
+caller's spelling was never what the walk emitted, and a rewrite would invent a *third* spelling that neither
+FileManager nor FSEvents ever produces, leaving `CorpusWatcher`'s realpath'd live events matching no row. So
+identity follows enumeration. Only a symlinked FINAL component is canonicalised — every other root reaches the
+enumerator byte-for-byte as spelled, so no existing root and no cached row can shift.
+✅ **W26.symroot-fu1 — SHIPPED 2026-08-06 (`bd01025` → `bcfaa18` → `766f59c` → this commit); full
+entry in `SUITE_TODO_DONE.md`.** A symlinked archive folder can now be **chosen** — `bookmarkData(options:
+.withSecurityScope)` cannot `open()` a link, so `setRoot` used to land in a `catch` that only `NSLog`ed: no
+root, no scan, nothing said. It adopts `CorpusWalker.canonicalRoot(url)` instead, and both refusal cases now
+return a message the window shows. **And the larger half — the spelling.** Every place that compared a
+DISCOVERED path against the caller's spelling of the root now uses `RootFolderStore.discoveredPathPrefix`
+(or, in discovery's own objects, one derived from the root they were handed): warm-start containment, cache
+re-verification before a write, FSEvents containment and subtree eligibility, the sidebar folder tree,
+exclusions, the restored folder scope, deep-link reveal, durable-link relative paths, content-index prune.
+Two of these were **paired on purpose** — `publishWarmSnapshot` filtering out every warm row was masking
+`reverifyCacheRows` rejecting every cache row, so fixing the warm start alone would have unmasked a
+write-path failure. Not touched, deliberately: `CorpusRootFingerprint.capture` and `LibraryIndexRoot.path`.
+
+✅ **W26.notesabsence — SHIPPED 2026-08-07 (`5c46d2a` → this commit); full entry in `SUITE_TODO_DONE.md`.**
+Notes' basename fallback no longer establishes absence from a walk it was never allowed to make. The root is
+probed with `CorpusWalker.canonicalRoot` (`opendir(3)`, plus `realpath(3)` for a symlinked final component so
+the *target* is walked) and the enumerator finally has an `errorHandler:`, so one skipped subdirectory demotes
+`.exhausted` to `.unreadableRoot`. The one branch that still establishes absence — the root is GONE, the
+shipped W8-S9 computer-move contract — is kept and **narrowed**: `lstat(2)`/`ENOENT|ENOTDIR` rather than
+`fileExists`, which cannot tell "never there" from "denied by an ancestor" and read a permission error as an
+empty archive. 8 new tests (suite 10 → 18); 5 fail against the pre-fix source and 5 mutants are each caught by
+a named test. **Two findings came out of it:** the popover sentence for an unfinished search said *"stopped
+after N items"*, which this change makes false for a walk that ran to the end and was denied part of the tree
+(reworded here, in the same commit that made it wrong); and `ReaderRootStore.grantRoot` cannot adopt a
+symlinked root at all — filed as `W26.notesabsence-fu1` below.
+
+✅ **W26.notesabsence-fu2 — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.** New
+`ReaderRootChooser` is the panel Notes was missing — `grantRoot`'s only caller used to be a test, and
+`NSOpenPanel` appeared nowhere in Notes' sources, so `knownRoots` started and stayed empty on every real
+machine. Two entry points (File ▸ Choose Archive Folder…, and an in-popover variant that grants and
+re-resolves the waiting link in one step), plus two refusal cases the missing chooser had made unreachable
+in practice: `ReaderRootGrantRefusal.wrongRootKind` (picking Notes' own `.notes`-marked folder) and
+`LinkResolution.wrongArchive` (granting a real, different archive — no longer conflated with "nothing chosen
+yet"). All three popover messages now carry a working "choose a folder" button. My own adversarial pass
+caught a cancel-leaves-a-permanent-spinner bug in that button before it shipped. The sandbox-symlink question
+`fu1` left open is still open — needs a real `NSOpenPanel` pick, VM lane, Reader-only until `W21.vmgui`.
+✅ **W26.oracle — SHIPPED 2026-08-06 (`50ea4a1` → this commit); full entry in `SUITE_TODO_DONE.md`.** The
+item's premise was **too kind to the old oracle** and the correction is the durable part: it said the `mdls`
+read *"would have"* failed during the 2026-08-04 incident. Measured on this machine at the harness's own
+output location (`/tmp/ap-e2e-$$/out`, `e2e-phone-mac.sh:34-35`), `mdls -name kMDItemUserTags` answers
+`(null)` — **exit 0** — for a file whose tags are provably on disk, because `/tmp` and `/var/folders` are
+never indexed. So the tag half of the E2E year check was not fragile, it was **dead in every run that has
+ever happened**; `year` has only ever been satisfiable from the output filename or the extracted text. The
+risk was never a false FAIL, it was silent loss of assertion coverage. New shared reader
+`ArchiveProcessor/scripts/finder_tags.py` (`read_tags` → `ok`/`absent`/`unreadable`, W26.deny's distinction
+in Python); `tier2_assert.py`'s `disk_tags` moved into it with **byte-identical** old-vs-new output proven on
+a synthetic run dir; new gate `./ArchiveProcessor/scripts/test-finder-tags.sh` (26 checks, 6/6 mutants
+caught). **Nothing under `ArchiveProcessor/scripts/` reads Spotlight any more** — `grep -rn
+"mdls\|mdfind\|mdimport\|kMDItem\|NSMetadataQuery"` over that tree returns only the two docstring lines that
+explain why not.
 
 - [x] **W26.lint-fu — nothing actually RUNS the write-surface lint [S · low · Tier-2 · ops].
   ✅ SHIPPED 2026-08-07** — `5210c12` -> this commit. Filed 2026-08-05 by `W26.lint`, then extended four

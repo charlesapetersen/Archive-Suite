@@ -1048,16 +1048,39 @@ private final class BlockingCorpusWatcher: CorpusWatching, @unchecked Sendable {
     private let lock = NSLock()
     private var mainThread: Bool?
     private var stopCount = 0
+    private let gateTimeout: TimeInterval
+    /// Set when `start()`'s gate wait hit its bound instead of being released — i.e. the pathology in
+    /// W28.fsevhang occurred. Surfaced so a hang shows up as an assertable fact, not as a silent stall.
+    private var gateTimedOut = false
 
-    init(result: CorpusWatcherStartResult = .started, handler: @escaping CorpusWatcher.Handler) {
+    /// `gateTimeout` is injectable ONLY so the bound itself is testable in milliseconds instead of on
+    /// faith — a guard nothing exercises is the failure mode this repo already learned about the write
+    /// lint. Production callers take the default.
+    init(result: CorpusWatcherStartResult = .started,
+         gateTimeout: TimeInterval = 30,
+         handler: @escaping CorpusWatcher.Handler) {
         self.result = result
+        self.gateTimeout = gateTimeout
         self.handler = handler
     }
 
     func start() -> CorpusWatcherStartResult {
         lock.lock(); mainThread = Thread.isMainThread; lock.unlock()
         entered.signal()
-        gate.wait()
+        // BOUNDED ON PURPOSE (W28.fsevhang). An unbounded `gate.wait()` here could hang the whole
+        // `xcodebuild test` run forever — not fail it, HANG it: no verdict, no failing test name, and
+        // the health gate's `step()` never returns. Two ways it happened:
+        //   * a watcher the library creates *after* the test body's `defer { releaseAll() }` snapshot
+        //     is never signalled by anyone, so its start blocks for good;
+        //   * whatever thread blocks here can starve the MainActor, and EVERY other timeout in this
+        //     file is downstream of that — `waitUntil`'s predicate is @MainActor and its deadline loop
+        //     needs the main actor to resume, so a starved MainActor means even its 10s XCTFail cannot
+        //     fire. This wait is therefore the ONE place a bound actually breaks the cycle.
+        // The bound is far above any healthy run (a released gate returns in microseconds), so it only
+        // ever fires on the pathology, converting an infinite hang into a normal test failure.
+        if gate.wait(timeout: .now() + gateTimeout) == .timedOut {
+            lock.lock(); gateTimedOut = true; lock.unlock()
+        }
         return result
     }
     func stop() { lock.lock(); stopCount += 1; lock.unlock() }
@@ -1066,6 +1089,7 @@ private final class BlockingCorpusWatcher: CorpusWatching, @unchecked Sendable {
 
     var startedOnMainThread: Bool? { lock.lock(); defer { lock.unlock() }; return mainThread }
     var stops: Int { lock.lock(); defer { lock.unlock() }; return stopCount }
+    var timedOutWaitingForGate: Bool { lock.lock(); defer { lock.unlock() }; return gateTimedOut }
 
     /// Block until `start()` has actually been entered, so a test's "the walk has not begun" assertion
     /// cannot pass merely because the start had not been dispatched yet.
@@ -1083,11 +1107,20 @@ private final class BlockingWatcherCapture: @unchecked Sendable { var latest: Bl
 private final class BlockingWatcherLog: @unchecked Sendable {
     private let lock = NSLock()
     private var watchers: [BlockingCorpusWatcher] = []
+    /// Latched by `releaseAll`. The library may create a watcher AFTER the test body's
+    /// `defer { releaseAll() }` has already taken its snapshot — a plain `forEach` over that snapshot
+    /// signals a set the late arrival is not in, so its `start()` blocks with no remaining releaser
+    /// (W28.fsevhang). Once released, the log stays released and lets late arrivals straight through.
+    private var releasedEverything = false
     var all: [BlockingCorpusWatcher] { lock.lock(); defer { lock.unlock() }; return watchers }
     func append(_ watcher: BlockingCorpusWatcher) {
-        lock.lock(); watchers.append(watcher); lock.unlock()
+        lock.lock(); watchers.append(watcher); let alreadyReleased = releasedEverything; lock.unlock()
+        if alreadyReleased { watcher.release() }   // never let one appear behind the release
     }
-    func releaseAll() { all.forEach { $0.release() } }
+    func releaseAll() {
+        lock.lock(); releasedEverything = true; let snapshot = watchers; lock.unlock()
+        snapshot.forEach { $0.release() }
+    }
 }
 
 private final class CounterBox: @unchecked Sendable {
@@ -1109,5 +1142,45 @@ private final class FlagBox: @unchecked Sendable {
         guard !value else { return false }
         value = true
         return true
+    }
+}
+
+/// W28.fsevhang — the harness's own anti-hang guards. These exist because the pathology they guard
+/// cannot hang the gate loudly: an unbounded wait produces NO failure and NO test name, just an
+/// `xcodebuild test` that never returns and a `step()` that never reports. A guard nothing exercises is
+/// exactly what this repo already learned about with the write-surface lint, so both are proved here,
+/// in milliseconds, using the injectable bound rather than the 30s production default.
+final class BlockingWatcherHarnessTests: XCTestCase {
+
+    /// The bound itself: a start nobody releases must RETURN, not block forever, and must say it timed out.
+    func testAnUnreleasedStartReturnsAtItsBoundInsteadOfBlockingForever() {
+        let watcher = BlockingCorpusWatcher(gateTimeout: 0.25) { _ in }
+        let began = Date()
+        let result = watcher.start()               // nobody ever calls release()
+        let elapsed = Date().timeIntervalSince(began)
+
+        XCTAssertEqual(result, .started, "the bound must not change what start reports")
+        XCTAssertTrue(watcher.timedOutWaitingForGate,
+                      "hitting the bound must be recorded, so a hang is an assertable fact")
+        XCTAssertLessThan(elapsed, 5, "start returned only after \(elapsed)s — the bound did not hold")
+    }
+
+    /// The race the bound is a net for: a watcher created AFTER `releaseAll()` took its snapshot. Before
+    /// the fix it was in nobody's release set and blocked until the bound; now the log lets it through.
+    func testAWatcherAppendedAfterReleaseAllIsReleasedImmediately() {
+        let log = BlockingWatcherLog()
+        log.releaseAll()                            // the test body's `defer` has already run
+
+        let late = BlockingCorpusWatcher(gateTimeout: 30) { _ in }   // production bound on purpose
+        log.append(late)                            // must not leave it waiting behind the release
+
+        let began = Date()
+        _ = late.start()
+        let elapsed = Date().timeIntervalSince(began)
+
+        XCTAssertFalse(late.timedOutWaitingForGate,
+                       "the late arrival waited out its bound — append did not release it")
+        XCTAssertLessThan(elapsed, 5,
+                          "start took \(elapsed)s; a released gate should return ~instantly")
     }
 }

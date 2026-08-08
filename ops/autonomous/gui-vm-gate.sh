@@ -170,11 +170,21 @@ run_app_once() {   # $1 = app, $2 = attempt number
   # makes every retry fail before it runs a single test — which reads as "inconclusive" and silently
   # downgrades a real RED to a skip. Per-attempt path, and remove it first in case a prior run was killed.
   bundle="$dd/uitest-attempt$attempt.xcresult"
+  # CODE_SIGN_IDENTITY=- OVERRIDES project.yml's "Archive Suite Dev" FOR THE GUEST ONLY.
+  # The repo moved to certificate signing on 2026-08-07 (W28.cert) so TCC grants survive a rebuild on
+  # the HOST. That cert lives in the host's login keychain; the guest builds the app itself and has no
+  # keychain material, so every target failed with "No certificate matching 'Archive Suite Dev' found"
+  # — a build error the lane reported as a reproducible UITest failure, i.e. a RED that would park the
+  # daemon. The VM is a disposable off-screen test environment: nothing there needs a durable TCC grant,
+  # which is the ONLY reason the cert exists. So the guest stays ad-hoc — exactly the configuration this
+  # lane was green on before — and the host keeps the cert. Do NOT "fix" this by provisioning the cert
+  # into the VM: that couples a throwaway image to host secrets and breaks again on every VM rebuild.
   "${TO[@]}" tart exec "$VM" bash -lc "
     rm -rf '$bundle'
     xcodebuild test -project '$GUEST_REPO/$proj' -scheme '$scheme' \
       -only-testing:$tests -destination 'platform=macOS' \
-      -derivedDataPath '$dd' -resultBundlePath '$bundle'
+      -derivedDataPath '$dd' -resultBundlePath '$bundle' \
+      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " >>"$log" 2>&1
 }
 

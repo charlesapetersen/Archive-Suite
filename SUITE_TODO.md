@@ -102,41 +102,6 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   DEBUG-gated fixture-root override, `make-gui-fixture.sh`, initial test suite (navigation, tag cloud,
   viewer, preview, filter, sort, degrade). Plan deleted.
 
-## Signing + TCC consent (owner, 2026-08-07)
-
-Filed while switching the suite off ad-hoc signing (shipped entry in `SUITE_TODO_DONE.md`). The item below was
-**found by** that work but is **not caused by** it — proven by A/B, see the entry.
-
-- [ ] **W28.fsevhang — `CorpusWatcherLibraryTests` DEADLOCKS — at least two tests hang forever, on `main`
-  [M · **HIGH** · Tier-2 · reader].** Confirmed hanging: `testAnAbandonedStartIsRefusedEvenThoughTheRoot
-  GenerationNeverMoved` and `testARootSwitchAbandonsAStreamWhoseOpenIsStillStuck` (the second surfaced only
-  after `-skip-testing` on the first, so **assume the whole class is affected, not two tests**). Neither
-  completes: the host app sits in state `S` with ~1.7 s CPU — blocked, not spinning — so `xcodebuild test`
-  never returns and **the health gate can never go GREEN**. The daemon's watchdog would eventually park on it,
-  and because a hang is not a failure the park note will not say which test.
-  **It is NOT a signing regression, and it is NOT a regression from any single commit** — it is
-  **nondeterministic**. Evidence, all gathered 2026-08-07:
-  | where | signing | result |
-  |---|---|---|
-  | `08d7f05` (this branch's base) | cert | hangs (killed at 300 s) |
-  | `08d7f05`, separate worktree, no other change | **ad-hoc** | hangs (killed after ~4.5 min silent) |
-  | `766f59c^` | ad-hoc | hangs (killed after ~2 min silent) |
-  | health gate 2026-08-06 08:35, at a commit **containing** the test | ad-hoc | **PASSED** |
-
-  The test arrived in `ab80c12` (`W26.fsev-fu1`, 08-06 03:02) and the gate went GREEN at 08:35 *with it
-  present* — so it passed once and now hangs reliably. `766f59c` (`W26.symroot-fu1` 3/N) was the first
-  suspect, being the only post-GREEN commit touching `CorpusWatcherTests.swift`, and **was ruled out** by
-  building its parent, which hangs too.
-  **Therefore: a race, not a bad commit.** The test drives blocking primitives
-  (`BlockingCorpusWatcher`, `waitUntilStarting()`, `waitUntil { … }`) against `ArchiveLibrary`'s start /
-  abandon path, so a missed wake-up **deadlocks instead of failing** — which is why the gate hangs rather
-  than going RED. Start at `BlockingWatcherLog.releaseAll()` and the `waitUntilStarting()` handshake around
-  the second `library.rescan()`. A hang is worse than a failure here: `step()` never returns, so the gate
-  produces no verdict and the park note cannot name the test.
-  ⚠️ Until this is fixed, `health-gate.sh` must not be treated as a usable gate, and **do not re-arm the daemon**
-  — it will park. The signing change was verified against the rest of the suite with this one test
-  `-skip-testing`'d; that skip is a diagnostic crutch and **must not** be committed into the gate.
-
 ## Autonomous diagnostics (from the 2026-08-06 health-gate RED)
 
 Filed 2026-08-06 while fixing the compactor abort + park misdiagnosis (full entry in `SUITE_TODO_DONE.md`).
@@ -246,48 +211,11 @@ per file (*has tags* / *verified none* / *could not read*), the `errorHandler:` 
 of everything skipped. **Every layer must be able to say "I don't know" separately from "there is nothing" —
 Spotlight could not, which is why the app lied.**
 
-✅ **W26.deny — SHIPPED 2026-08-05 (`2956f3c` → `ad86cce`); full entry in `SUITE_TODO_DONE.md`.** Three things
-later items in this wave need from it. **(1)** `TagXattr.inspect` (ArchiveCore) is now the shared primitive
-for *"no tags"* vs *"couldn't read the tags"* — call it, don't re-derive it. **(2) Two of this plan's written
-prescriptions were measured WRONG while shipping it** — `XATTR_NOFOLLOW` (must FOLLOW: `resourceValues`
-reports the *target's* tags through a symlink) and *"a returned size of 0"* (a removed-tags file keeps a
-42-byte empty-array plist; 51 of the owner's files are in that state) — both now corrected in plan §4a.1 and
-§7a.3. **(3)** The corpus census is refreshed: 123,302 regular files · 21,311 ENOATTR · 101,940 tagged · 51
-empty-array residue · **0 denied** · 0 undecodable.
+✅ **W26.deny — SHIPPED 2026-08-05 (`2956f3c` → `ad86cce`); full entry in `SUITE_TODO_DONE.md`.**
 
-✅ **W26.notsup — SHIPPED 2026-08-05 (this commit); full entry in `SUITE_TODO_DONE.md`.** An xattr-less
-SMB/NFS volume remains safely unreadable—never coerced to untagged—but Reader now says *"Finder tags
-unavailable for N files"* and explains that it cannot list or edit them, with APFS-copy + rescan guidance.
-Mixed-mount permission/file/folder counts remain visible. The mapper recognizes only ArchiveCore's exact
-ENOTSUP suffix; an ordinary error path containing `(ENOTSUP)` cannot be misdiagnosed as a volume capability.
-Exposure remains zero on the owner's APFS corpus.
-✅ **W26.lint — SHIPPED 2026-08-05 (`1460125` → this commit); full entry in `SUITE_TODO_DONE.md`.** Two things
-later items in this wave need from it. **(1)** `ArchiveReader/scripts/lint-write-surface.sh` now lints
-`packages/ArchiveCore/Sources/ArchiveCore` as well as the Reader app target, and allowances are
-**`(file, exact source line)` pairs — never whole files**, so a new ArchiveCore file that calls
-`setResourceValue`/`setxattr`/a `FileManager` mutator/`.write(to:)` fails the lint. **Run it before committing
-any ArchiveCore work** (`./ArchiveReader/scripts/lint-write-surface.sh`; self-test:
-`./ArchiveReader/scripts/test-lint-write-surface.sh`) — and since `W26.lint-fu` (2026-08-07) the daemon's
-health gate runs both, so a violation you forget to check is caught within `AUTONOMOUS_GATE_EVERY` commits
-instead of never.
-**(2)** It was not merely scoped too narrowly, it was passing **vacuously**: the Reader app target has **zero**
-tag-write hits of its own (its `TagWriter` is a delta adapter over `ArchiveCore.CoordinatedTagWriter`), so
-rule 1 had nothing left to catch. Verified by running the OLD script against planted ArchiveCore violations —
-exit 0, "✓ clean".
+✅ **W26.notsup — SHIPPED 2026-08-05 (this commit); full entry in `SUITE_TODO_DONE.md`.**
 
-✅ **W26.lint-fu — SHIPPED 2026-08-07 (`5210c12` → this commit); full entry in `SUITE_TODO_DONE.md`.** All
-five of Wave 26's un-run harnesses are steps in `ops/autonomous/health-gate.sh` now — `write-surface-lint`,
-`write-surface-lint-proof`, `tag-vocabulary`, `finder-tags` and the skippable `fixture-scripts` (~105 s
-together, ahead of the VM lane). Two things later items need from it. **(1) The lint's source lists are
-PER-RULE**: rules 1 (tag write) and 3 (errorHandler-less enumerator) now cover
-`ArchiveNotes/macOS/Sources/ArchiveNotes`, rule 2 (destructive / content write) deliberately does not — that
-tree has 11 pre-existing content writes, six in `NoteStore`, and adding it without auditing them first would
-simply turn the lint RED. A new guard (a2) fails if any rule names a tree the union `SRCS` omits. **(2) A
-missing PREREQUISITE is exit 3, not exit 1**: `test-fixture-scripts.sh` needs `/opt/homebrew/bin/tag` and the
-**gitignored** `Test files/Brown Gemini` corpus, so on any other clone — and in every worktree — the lane
-reports `⊘ … NOT VERIFIED: fixture-scripts` instead of parking the run. ⚠️ **`daemon.sh` installs from the
-PRIMARY checkout's working tree, so the new gate steps are not live until the primary is fast-forwarded and
-the owner restarts the daemon** (Daemon Report).
+✅ **W26.lint-fu — SHIPPED 2026-08-07 (`5210c12` → this commit); full entry in `SUITE_TODO_DONE.md`.**
 
 🔴 **AND IT HANGS ON CLOUD STORAGE.** Reproduced against a real `~/Library/CloudStorage/GoogleDrive-…` dir
 (Drive.app installed, not signed in): same silent-empty from the no-`errorHandler` enumerator, and
@@ -339,76 +267,9 @@ the shipped DEBUG fixture loader, so they **stop compiling when `W26.walk2` dele
 `-ARUITestRootPath` because the loader is the baseline being compared; `W26.walk2`'s headline regression test
 must do the OPPOSITE and assert the key is ABSENT (plan §7a.9). Do not copy their setup.
 
-✅ **W26.walk2 — SHIPPED 2026-08-05 (`f1c0d2f` → `b88d20a` → `6f5d6ad` → this commit); full entry in
-`SUITE_TODO_DONE.md`.** Reader Release discovery now uses `ArchiveCore.CorpusWalker`; every
-`NSMetadataQuery`/`NSMetadataItem` path and the Spotlight-lag `PendingWrite` subsystem are gone.
-`LibraryPhase` is the single health/absence/pruning gate, incomplete passes keep every unseen prior row,
-and verified writes use a monotonic ordering guard instead of a timer. The incident's old claim is
-unrepresentable: only a settled scan may say no files carry Read/Unread, and it quotes the examined-file
-denominator. Manual File ▸ Rescan Archive Folder (⌘⌥R) covers the interval before `W26.fsev` ships.
-Adversarial completion added progress for wholly untagged trees, protected deep links from treating degraded
-passes as misses, and proved unreadable subtrees cannot erase prior rows. VM verification was deliberately
-hostile: Spotlight indexed **0/11** fixture files while Reader still rendered all 11; the full pre-existing
-16-test GUI suite and the new denominator check passed. The accepted one-time content-index re-extraction
-from switching mtime sources remains deliberate; the database version is unchanged.
-✅ **W26.idx — SHIPPED 2026-08-05 (this commit); full entry in `SUITE_TODO_DONE.md`.** Reader now owns a
-separate system-SQLite `LibraryIndex`: byte-exact `(root path, marker GUID, file path)` identity, raw tags,
-fresh `(mtime, ctime, size, inode, dataless)` fingerprints, every regular file, and honest scan provenance.
-Warm rows render immediately as cache/revalidating, while a dedicated-thread fingerprint pass re-reads tags
-only for changed/new/unverified paths and makes absence authoritative only after a clean pass. Cache rows are
-re-read before any write target/delta is chosen; corpus-wide renames are conditional. Dataless rows never
-reach PDF extraction. Canceled 150k-row SQLite work yields every 500 rows, and NFC/NFD spellings remain
-distinct through persistence, FSEvents coalescing, containment and exact live reads. The store is a new v1
-cache with no migration or legacy-state fallback, as directed. Fixture roots answer NO to the persisted
-index through a single `usesPersistedIndex` predicate — on ⌘⌥R as well as launch, which is where they had
-been escaping onto the real Application Support database from unit tests. **Scale and VM verification were
-not run for this item and are carried into `W26.verify`.**
-✅ **W26.fsev-fu2 — SHIPPED 2026-08-06 (this commit); full entry in `SUITE_TODO_DONE.md`.** The walk now has
-the deadline the stream got in `W26.fsev-fu1`. A pass that has examined **zero** files after
-`scanStallTimeout` (5 s) publishes `.degraded(.scanStalled)` — *"Archive folder has not answered"* — instead
-of leaving the list in `.firstScan(done: 0, seen: 0)` behind a spinner for ever. Reported, never cancelled: a
-thread blocked in `opendir` cannot be interrupted. It grants nothing (`.degraded` is not settled, so no
-pruning and no authoritative absence, and it is set directly rather than through `DiscoveryHealth`, whose
-contract is about FINISHED passes); a late pass supersedes it through the existing generation token, and so
-does the first file seen. `requestRootRescan` had to learn about it too — ⌘⌥R while stalled would otherwise
-have reset the phase to "Scanning…" while `drainWatchWork` refused to start anything.
-✅ **W26.symroot — SHIPPED 2026-08-06 (`1e7044d` → this commit); full entry in `SUITE_TODO_DONE.md`.** A root
-that is itself a symbolic link is walked **through its target**: the probe `rootIsOpenable` became
-`CorpusWalker.canonicalRoot`, which answers *"what must I enumerate for this root?"* and is used by `scan` and
-`scanFingerprints` alike, so the warm-start revalidation walk cannot disagree with the full walk about what the
-root is. **The item's own prescription was measured WRONG, and that correction is the durable part:** it asked
-for the target to be walked but every discovered path rewritten back under the caller's link prefix, to protect
-`LibraryIndex`'s byte-exact `(root, path)` contract. Measured, the enumerator **already** hands back fully
-ancestor-resolved paths — a root spelled `/var/folders/…` yields `/private/var/folders/…` entries — so the
-caller's spelling was never what the walk emitted, and a rewrite would invent a *third* spelling that neither
-FileManager nor FSEvents ever produces, leaving `CorpusWatcher`'s realpath'd live events matching no row. So
-identity follows enumeration. Only a symlinked FINAL component is canonicalised — every other root reaches the
-enumerator byte-for-byte as spelled, so no existing root and no cached row can shift.
-✅ **W26.symroot-fu1 — SHIPPED 2026-08-06 (`bd01025` → `bcfaa18` → `766f59c` → this commit); full
-entry in `SUITE_TODO_DONE.md`.** A symlinked archive folder can now be **chosen** — `bookmarkData(options:
-.withSecurityScope)` cannot `open()` a link, so `setRoot` used to land in a `catch` that only `NSLog`ed: no
-root, no scan, nothing said. It adopts `CorpusWalker.canonicalRoot(url)` instead, and both refusal cases now
-return a message the window shows. **And the larger half — the spelling.** Every place that compared a
-DISCOVERED path against the caller's spelling of the root now uses `RootFolderStore.discoveredPathPrefix`
-(or, in discovery's own objects, one derived from the root they were handed): warm-start containment, cache
-re-verification before a write, FSEvents containment and subtree eligibility, the sidebar folder tree,
-exclusions, the restored folder scope, deep-link reveal, durable-link relative paths, content-index prune.
-Two of these were **paired on purpose** — `publishWarmSnapshot` filtering out every warm row was masking
-`reverifyCacheRows` rejecting every cache row, so fixing the warm start alone would have unmasked a
-write-path failure. Not touched, deliberately: `CorpusRootFingerprint.capture` and `LibraryIndexRoot.path`.
+✅ **W26.walk2 — SHIPPED; full entry in `SUITE_TODO_DONE.md`.**
 
 ✅ **W26.notesabsence — SHIPPED 2026-08-07 (`5c46d2a` → this commit); full entry in `SUITE_TODO_DONE.md`.**
-Notes' basename fallback no longer establishes absence from a walk it was never allowed to make. The root is
-probed with `CorpusWalker.canonicalRoot` (`opendir(3)`, plus `realpath(3)` for a symlinked final component so
-the *target* is walked) and the enumerator finally has an `errorHandler:`, so one skipped subdirectory demotes
-`.exhausted` to `.unreadableRoot`. The one branch that still establishes absence — the root is GONE, the
-shipped W8-S9 computer-move contract — is kept and **narrowed**: `lstat(2)`/`ENOENT|ENOTDIR` rather than
-`fileExists`, which cannot tell "never there" from "denied by an ancestor" and read a permission error as an
-empty archive. 8 new tests (suite 10 → 18); 5 fail against the pre-fix source and 5 mutants are each caught by
-a named test. **Two findings came out of it:** the popover sentence for an unfinished search said *"stopped
-after N items"*, which this change makes false for a walk that ran to the end and was denied part of the tree
-(reworded here, in the same commit that made it wrong); and `ReaderRootStore.grantRoot` cannot adopt a
-symlinked root at all — filed as `W26.notesabsence-fu1` below.
 
 ✅ **W26.notesabsence-fu1 — SHIPPED 2026-08-07 (`6226e7d` → this commit); full entry in
 `SUITE_TODO_DONE.md`.** A symlinked Reader root can be granted in Notes, and a refused grant is no longer a
@@ -446,30 +307,7 @@ A third imbalance, found in the same lines and fixed there: re-granting a GUID a
 second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 new source warnings, lint 14/14,
 **10 mutants each caught by a named test**.
 
-✅ **W26.notesabsence-fu2 — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.** New
-`ReaderRootChooser` is the panel Notes was missing — `grantRoot`'s only caller used to be a test, and
-`NSOpenPanel` appeared nowhere in Notes' sources, so `knownRoots` started and stayed empty on every real
-machine. Two entry points (File ▸ Choose Archive Folder…, and an in-popover variant that grants and
-re-resolves the waiting link in one step), plus two refusal cases the missing chooser had made unreachable
-in practice: `ReaderRootGrantRefusal.wrongRootKind` (picking Notes' own `.notes`-marked folder) and
-`LinkResolution.wrongArchive` (granting a real, different archive — no longer conflated with "nothing chosen
-yet"). All three popover messages now carry a working "choose a folder" button. My own adversarial pass
-caught a cancel-leaves-a-permanent-spinner bug in that button before it shipped. The sandbox-symlink question
-`fu1` left open is still open — needs a real `NSOpenPanel` pick, VM lane, Reader-only until `W21.vmgui`.
-✅ **W26.oracle — SHIPPED 2026-08-06 (`50ea4a1` → this commit); full entry in `SUITE_TODO_DONE.md`.** The
-item's premise was **too kind to the old oracle** and the correction is the durable part: it said the `mdls`
-read *"would have"* failed during the 2026-08-04 incident. Measured on this machine at the harness's own
-output location (`/tmp/ap-e2e-$$/out`, `e2e-phone-mac.sh:34-35`), `mdls -name kMDItemUserTags` answers
-`(null)` — **exit 0** — for a file whose tags are provably on disk, because `/tmp` and `/var/folders` are
-never indexed. So the tag half of the E2E year check was not fragile, it was **dead in every run that has
-ever happened**; `year` has only ever been satisfiable from the output filename or the extracted text. The
-risk was never a false FAIL, it was silent loss of assertion coverage. New shared reader
-`ArchiveProcessor/scripts/finder_tags.py` (`read_tags` → `ok`/`absent`/`unreadable`, W26.deny's distinction
-in Python); `tier2_assert.py`'s `disk_tags` moved into it with **byte-identical** old-vs-new output proven on
-a synthetic run dir; new gate `./ArchiveProcessor/scripts/test-finder-tags.sh` (26 checks, 6/6 mutants
-caught). **Nothing under `ArchiveProcessor/scripts/` reads Spotlight any more** — `grep -rn
-"mdls\|mdfind\|mdimport\|kMDItem\|NSMetadataQuery"` over that tree returns only the two docstring lines that
-explain why not.
+✅ **W26.notesabsence-fu2 — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.**
 
 - [ ] **W26.oracle-fu1 — `tier2_assert.py` reports a PASS for tags it could not read [S · low · Tier-2 ·
   money-lane oracle].** Filed 2026-08-06 while shipping `W26.oracle`; **pre-existing**, and deliberately not
@@ -586,6 +424,30 @@ explain why not.
   everywhere else. Related, same defaults domain: `W20.deeplink-isolation` — consider doing them together.
   ⚠️ Until this lands, **`ops/autonomous/health-gate.sh` cannot complete on this machine**, which is why
   `W26.lint-fu`'s own end-to-end gate proof had to run against a copy with the three app steps removed.
+
+  **UPDATE 2026-08-07 (W28.cert session) — this entry's second defect is now confirmed FROM THE OUTSIDE, and
+  half a mitigation has SHIPPED.** The hang was hit independently while verifying the signing switch and
+  chased from scratch before this entry was found; the two accounts agree, which is worth more than either.
+  - **The leaked-key mechanism is measurably the trigger.** Read at 07:16, the owner's real defaults held a
+    stale `ARUITestRootPath = …/tmp/SymlinkedRootTests-2F56A414-…/link/corpus` — a *different* leak from the
+    `9ED68E63` one deleted above, so this re-leaks routinely, not once. With it set the class hung **3/3**;
+    once it was gone the FULL suite passed **12/12** consecutively and the class alone **4/4**. Same commit,
+    same machine, no code change between. So the gate's ability to finish currently depends on whether a
+    previous run happened to be killed — which is why "it hung all afternoon, then stopped" is expected
+    behaviour and not evidence anyone fixed it.
+  - **Ruled out, so nobody re-walks it:** not the signing change (an A/B worktree at the same commit with
+    **ad-hoc** signing and no other diff hung identically), and not `766f59c` (its parent hangs too — that
+    was this session's first, wrong, suspect).
+  - **SHIPPED here, defence-in-depth only:** the `BlockingCorpusWatcher` semaphore this entry correctly calls
+    **untimed** is now **bounded** (30 s, injectable), and `BlockingWatcherLog` releases a watcher appended
+    after `releaseAll()` has already snapshotted. Two harness self-tests prove both in ~0.26 s
+    (`BlockingWatcherHarnessTests`). This does NOT fix the root cause — it converts an unrecoverable
+    main-thread deadlock that burns `GATE_MAXRUN` and parks the daemon into an ordinary bounded test failure
+    that names itself. **Fix (a) + (b) below are still required and still HIGH.**
+  - **One more defect in the same lines, free to fix with (a):** `ArchiveLibrary.swift:418` reads
+    `fixtureRootKey` **directly** rather than through `isFixtureRoot`, so the "one spelling, so the several
+    behaviours cannot drift apart" invariant asserted at `:268` is already broken — three call sites, two
+    spellings. Route it through the property when injecting `UserDefaults`.
 
 - [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
   (blocked-on: W26.fsev, W26.idx, W26.vocab, W26.deny, W26.lint).** Full-scale run against a **scratch copy** (never the real
