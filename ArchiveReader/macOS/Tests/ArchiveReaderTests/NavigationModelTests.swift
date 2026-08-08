@@ -45,11 +45,19 @@ final class NavigationModelTests: XCTestCase {
 /// A killed host runs neither, which is how a fixture pin outlived its run and put the owner's real app
 /// into fixture mode against a deleted `mktemp` directory (observed twice on 2026-08-07).
 ///
-/// Non-vacuity: reverting any single hunk of the source change turns one of these RED. Put
-/// `persistSelection` back on `.standard` → the first case sees the key change. Put `persistViewState` or
-/// `isUITestMode` back → the second (that pairing is the trap: with `isUITestMode` reading `.standard`
-/// and the tests no longer writing the pin there, the guard reads nil, every test stops counting as a UI
-/// test, and the view-state write it was suppressing lands on the owner's saved filter and sort).
+/// Non-vacuity — measured per hunk, not asserted in general, because the first version of this comment
+/// claimed more than it could deliver:
+///   - `persistSelection` back on `.standard` → `testAPinnedModel…` RED (the real key changes).
+///   - `persistViewState` back on `.standard` → `testAnUnpinnedModel…` RED (same).
+///   - `isUITestMode` back on `.standard` → `testAPinnedModelIsStillRecognised…` RED, and ONLY that one.
+///     It needs its own case: with the pin no longer in `.standard`, that read returns nil, every pinned
+///     test stops counting as a UI test, and the view-state suppression silently stops applying. The two
+///     cases above cannot see it, because the write it un-suppresses goes to the injected domain — which
+///     is exactly the trap this half of the item had to avoid, one indirection along.
+///
+/// Note the XCUITest lane is unaffected by all of this: there the pin arrives as a launch argument, i.e.
+/// in `.standard`'s volatile argument domain, and production passes `.standard`. The "volatile argument
+/// domain" the old comments described was real — for the UITest lane, and never for these unit tests.
 @MainActor
 final class NavigationModelDefaultsIsolationTests: XCTestCase {
 
@@ -80,6 +88,20 @@ final class NavigationModelDefaultsIsolationTests: XCTestCase {
         try Data("scratch PDF".utf8).write(to: pdf)
         try (pdf as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
         return root
+    }
+
+    /// A real persisted `ar.viewState` blob carrying `searchText`, written by the production path from an
+    /// unpinned model on its own throwaway suite. Proven non-empty before it is handed back, so a seed
+    /// that silently failed to persist cannot make a "was not restored" assertion vacuous.
+    private func produceViewState(searchText: String) throws -> Data {
+        let producer = fixtureDefaults(pinnedTo: nil, "\(#function)-viewStateProducer")
+        let model = NavigationModel(defaults: producer)
+        model.filter.searchText = searchText
+        model.recompute()
+        let data = try XCTUnwrap(producer.data(forKey: "ar.viewState"), "the seed must actually exist")
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains(searchText),
+                      "and must carry the value the pinned model is required to ignore")
+        return data
     }
 
     /// A PINNED model: the resumed selection is written, and it is written to the injected suite.
@@ -122,5 +144,37 @@ final class NavigationModelDefaultsIsolationTests: XCTestCase {
                       "and what it persisted is this test's filter")
         XCTAssertEqual(realDomainSnapshot(), before,
                        "the owner's saved filter and sort must be exactly as they were")
+    }
+
+    /// A pinned model is still recognised AS pinned once the pin lives in the injected domain — so it
+    /// neither restores nor persists view state.
+    ///
+    /// This is the contract that made moving `isUITestMode` a requirement rather than a tidy-up: it is
+    /// what keeps a fixture run from inheriting a filter (a saved `read=unread` hides the whole fixture →
+    /// 0 rows) or writing one back. Nothing else here can observe it, because with the write itself moved
+    /// the failure is silent in the real domain.
+    func testAPinnedModelIsStillRecognisedAsPinnedAndSoLeavesViewStateAlone() throws {
+        let root = try scratchRoot()
+        let defaults = fixtureDefaults(pinnedTo: root)
+
+        // A view state present in the model's OWN domain must still be ignored: fixture mode is about
+        // determinism, not merely about staying off `.standard`.
+        //
+        // The seed is produced by an UNPINNED model on a second throwaway suite rather than encoded here,
+        // so it is a real `ViewState` written by the real code path — a hand-rolled JSON blob that failed
+        // to decode would make the "not restored" assertion pass for the wrong reason.
+        let seeded = try produceViewState(searchText: "seeded-must-not-be-restored")
+        defaults.set(seeded, forKey: "ar.viewState")
+
+        let model = NavigationModel(defaults: defaults)
+        XCTAssertEqual(model.filter.searchText, "",
+                       "a pinned run must not inherit a saved filter — that is how a fixture shows 0 rows")
+
+        model.filter.searchText = "written-by-a-pinned-run"
+        model.recompute()
+
+        let after = try XCTUnwrap(defaults.data(forKey: "ar.viewState"))
+        XCTAssertEqual(after, seeded,
+                       "a pinned run must not persist view state either — the seeded value is untouched")
     }
 }

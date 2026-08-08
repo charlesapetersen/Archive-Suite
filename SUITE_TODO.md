@@ -378,99 +378,13 @@ second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 ne
   the commit, close this, and the worktree is free. **If not:** port the two assertions into the shipped
   `test-tag-vocabulary.sh` — it is a health-gate step as of `W26.lint-fu` (`f64649b`), so they start being
   enforced the moment they land — then free the worktree.
-- [ ] **W26.fixturehang — the DEBUG fixture lane starts FSEvents on the MAIN THREAD, and it HANGS the whole
-  Reader unit bundle — and with it the daemon's health gate [M · HIGH · Tier-2 · ops+reader].** Filed
-  2026-08-07 while wiring `W26.lint-fu`'s gate steps; **pre-existing**, introduced with the carve-out in
-  `W26.fsev-fu1` (`ab80c12`, 2026-08-06). Measured with `sample`, not read.
-
-  **Symptom.** `ops/autonomous/health-gate.sh`'s `reader` step sits at **0 % CPU with the test host alive**,
-  indefinitely. It does not fail — it hangs, so the daemon (which runs the gate synchronously) waits until
-  `GATE_MAXRUN` = 50 min kills it, and **two consecutive gate timeouts PARK the run** with a note blaming
-  build time. Reproduced on two separate runs.
-
-  **Root cause — the stack, bottom-up.** `SymlinkedRootTests.spin` →
-  `RunLoop.run(until:)` → main-queue drain → `ArchiveLibrary.makeWatcher`'s handler →
-  `receiveWatchRequest` (`ArchiveLibrary.swift:764`) → `start(scope:markerGUID:)` (`:243`) →
-  `startWatcher(root:holdingDiscovery:)` (`:624`) → **`startWatcherInline(root:)` (`:667`)** →
-  `CorpusWatcher.start()` (`CorpusWatcher.swift:284`) → **`FSEventStreamCreate` → `watch_all_parents` →
-  `open(2)`**, parked on `com.apple.main-thread`. This is *precisely the bug `W26.fsev-fu1` exists to
-  prevent*, reached through the DEBUG fixture lane that item deliberately left inline.
-
-  🔺 **The carve-out's stated premise is FALSE, and that is the finding.** `startWatcherInline`'s comment
-  argues the hazard cannot arise because *"a fixture root is a scratch directory the test itself just
-  created on local disk, so its `open(2)` cannot block"*. But FSEvents does not open the root — it opens
-  **every ANCESTOR** (`watch_all_parents`). A container fixture root
-  (`~/Library/Containers/com.archivereader.app/Data/tmp/…`) has ancestors under `~/Library`, and one of
-  those is what parks. The reasoning was about the wrong file. FSEvents offers no cancel, so the thread —
-  here the *main* thread — is unrecoverable.
-
-  **A second, independent defect in the same lines.** `ArchiveLibrary.isFixtureRoot` is
-  `UserDefaults.standard.string(forKey: fixtureRootKey) != nil` — a **process-wide** read of the shared
-  `com.archivereader.app` domain. `SymlinkedRootTests.navModel` writes that key and removes it in
-  `addTeardownBlock`, but **a killed test host runs no teardown**, so the key persists into the owner's real
-  defaults and every LATER run starts in fixture mode. Found exactly that on 2026-08-07:
-  `ARUITestRootPath = …/tmp/SymlinkedRootTests-9ED68E63-…/link/corpus`. Consequence:
-  `CorpusWatcherLibraryTests.testAnAbandonedStartIsRefusedEvenThoughTheRootGenerationNeverMoved` installs a
-  `BlockingCorpusWatcher` whose `start()` waits on an **untimed** semaphore precisely to prove the start is
-  off-thread — so under the leaked key the inline path deadlocks the main thread forever, a *different* hang
-  earlier in the same bundle. I deleted the key to get past it (`archiveRootBookmark` untouched); that is a
-  repair, not the fix.
-
-  **Fix (do both; (a) first, then re-measure).** (a) `isFixtureRoot` must not be a process-wide default —
-  inject `UserDefaults`, as `W26.symroot-fu1` did for `RootFolderStore` and `W26.notesabsence-fu1` did for
-  `ReaderRootStore`; `ArchiveLibrary` is the third instance of one pattern. (b) Delete the inline lane, or
-  bound it: the walk-synchrony the carve-out protects does not require the *stream start* to be inline, and
-  a main-thread `open(2)` with no deadline is the thing `W26.fsev-fu1` and `W26.fsev-fu2` both ruled out
-  everywhere else. Related, same defaults domain: `W20.deeplink-isolation` — consider doing them together.
-  ⚠️ Until this lands, **`ops/autonomous/health-gate.sh` cannot complete on this machine**, which is why
-  `W26.lint-fu`'s own end-to-end gate proof had to run against a copy with the three app steps removed.
-
-  **UPDATE 2026-08-07 (W28.cert session) — this entry's second defect is now confirmed FROM THE OUTSIDE, and
-  half a mitigation has SHIPPED.** The hang was hit independently while verifying the signing switch and
-  chased from scratch before this entry was found; the two accounts agree, which is worth more than either.
-  - **The leaked-key mechanism is measurably the trigger.** Read at 07:16, the owner's real defaults held a
-    stale `ARUITestRootPath = …/tmp/SymlinkedRootTests-2F56A414-…/link/corpus` — a *different* leak from the
-    `9ED68E63` one deleted above, so this re-leaks routinely, not once. With it set the class hung **3/3**;
-    once it was gone the FULL suite passed **12/12** consecutively and the class alone **4/4**. Same commit,
-    same machine, no code change between. So the gate's ability to finish currently depends on whether a
-    previous run happened to be killed — which is why "it hung all afternoon, then stopped" is expected
-    behaviour and not evidence anyone fixed it.
-  - **Ruled out, so nobody re-walks it:** not the signing change (an A/B worktree at the same commit with
-    **ad-hoc** signing and no other diff hung identically), and not `766f59c` (its parent hangs too — that
-    was this session's first, wrong, suspect).
-  - **SHIPPED here, defence-in-depth only:** the `BlockingCorpusWatcher` semaphore this entry correctly calls
-    **untimed** is now **bounded** (30 s, injectable), and `BlockingWatcherLog` releases a watcher appended
-    after `releaseAll()` has already snapshotted. Two harness self-tests prove both in ~0.26 s
-    (`BlockingWatcherHarnessTests`). This does NOT fix the root cause — it converts an unrecoverable
-    main-thread deadlock that burns `GATE_MAXRUN` and parks the daemon into an ordinary bounded test failure
-    that names itself. **Fix (a) + (b) below are still required and still HIGH.**
-  - **One more defect in the same lines, free to fix with (a):** `ArchiveLibrary.swift:418` reads
-    `fixtureRootKey` **directly** rather than through `isFixtureRoot`, so the "one spelling, so the several
-    behaviours cannot drift apart" invariant asserted at `:268` is already broken — three call sites, two
-    spellings. Route it through the property when injecting `UserDefaults`. ✅ **Done** (below).
-
-  ### 🔻 STATUS 2026-08-07: **(b) is SHIPPED — the HANG is gone. (a) is HALF shipped, so the LEAK remains.**
-  What changed (see `SUITE_TODO_DONE.md` → `W26.fixturehang-b`): the fixture lane now starts its stream on a
-  dedicated thread (`startWatcherOffMainThread`), keeping `owesCatchUpPass: false` and arming no stall
-  deadline, so fixture pass-counts are unchanged; `isFixtureRoot` reads an **injected** `UserDefaults`; and
-  `:418`'s duplicate direct read now goes through the property (three call sites, one spelling). Two
-  functional tests pin fixture mode in a **throwaway suite** and assert the fixture start is off-thread and
-  that the pin is honoured from the injected domain only. 378 tests / 0 failures, no new warnings.
-  **Therefore `health-gate.sh` can no longer HANG on this** — even with a leaked pin, the `open(2)` is off the
-  main thread, so the pathology is at worst a bounded failure that names itself.
-  ⚠️ **What is deliberately NOT done, and why this item stays open:** the *leak itself*.
-  `NavigationModel` still constructs `ArchiveLibrary()` (i.e. `.standard`), and **11 writes across 6 test
-  files** still do `UserDefaults.standard.set(…, forKey: "ARUITestRootPath")`. So a killed test host still
-  leaves the pin in the owner's real domain, and the owner's real app can still start in fixture mode pinned
-  to a deleted `mktemp` directory — no longer a hang, but still wrong, and still silent.
-  **Remaining work:** give `NavigationModel` a defaults seam and migrate those 6 files (and
-  `RootFolderStore()`/`ExcludedFoldersStore.shared` alongside, same domain) onto a throwaway suite. Note
-  `SymlinkedRootTests.swift:14`'s own doc comment already **claims** it uses "the volatile `ARUITestRootPath`
-  argument" while `:44` writes persistent `.standard` — fix the comment or the code, they disagree.
-  A tempting shortcut to weigh: read the pin only from
-  `UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)`, which a persisted write
-  cannot reach — it kills the leak's *effect* in one line, but it still forces those 6 files onto injection,
-  so it does not avoid the sweep. Related, same domain: `W20.deeplink-isolation`.
+- [x] **W26.fixturehang — the fixture pin no longer lives in the owner's defaults domain, so a killed
+  test host can no longer put their Reader into fixture mode. ✅ CLOSED 2026-08-07** `eef85d5` ->
+  `d58c058` -> this commit. Half (b) — the main-thread `FSEventStreamCreate`, the HANG — shipped as
+  `W26.fixturehang-b` (`a0c7170`); this closed half (a), the LEAK: eleven pin writes across six files moved
+  onto per-test throwaway suites behind one `fixtureDefaults` helper, enabled by `NavigationModel(defaults:)`.
+  Full entry, the five mutation proofs, the two same-shape leaks it also closed, and the self-inflicted
+  defaults incident it repaired: `SUITE_TODO_DONE.md` §Wave 26.
 
 - [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
   (blocked-on: W26.fsev, W26.idx, W26.vocab, W26.deny, W26.lint).** Full-scale run against a **scratch copy** (never the real
@@ -1043,6 +957,17 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
   no business reading the corpus at all, and any future lane that runs the suite WITHOUT the
   `-skip-testing` line now stalls rather than reporting a failure. This makes the item's priority
   higher than "restore coverage": it is now also a real-corpus-contact and a wall-clock problem.
+  🔻 **UPDATE 2026-08-07 — the prescribed seam ALREADY EXISTS; do not re-derive it.** `W26.fixturehang`
+  made `RootFolderStore`, `ArchiveLibrary` **and** `NavigationModel` take an injected `UserDefaults`, and
+  added `fixtureDefaults(pinnedTo:)` in `ArchiveReaderTests` as the one way to mint a throwaway domain. So
+  the fix here is now `NavigationModel(defaults: fixtureDefaults())` — one line — plus this item's OWN
+  remaining deliverable, which is the part `W26.fixturehang` deliberately left: **drop the
+  `-skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot` from
+  `ops/autonomous/health-gate.sh:80` and prove the case now runs green in the gate.** The four *other*
+  pin-writing cases in that file were migrated by the sweep; this one writes no pin, which is why it was
+  left. ⚠️ Also re-measure the escalation before repeating it: read 2026-08-07, the owner's granted root is
+  `~/Archive/Glazer Gemini 2.5 LLM`, **not** the corpus — so "walks ~123k real corpus files" is not what
+  happens on this machine today. The hazard is real but root-dependent; say which you measured.
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)

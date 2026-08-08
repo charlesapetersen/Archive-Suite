@@ -17,19 +17,34 @@ final class ExcludedFoldersStoreTests: XCTestCase {
 
     /// The guard on the above: a store on a throwaway suite must leave the real key exactly as it found
     /// it, including when the owner has exclusions set. Fails if `scratchStore` is ever "simplified"
-    /// back to `.shared`.
+    /// back to `.shared`, or if `ExcludedFoldersStore.persist` loses its injected domain.
+    ///
+    /// ⚠️ The excluded path is a **UUID sentinel**, and the load-bearing assertion is that the real key
+    /// does not CONTAIN it — not that the key is unchanged. The first version of this test used the
+    /// literal `"Unsorted"` and a before/after comparison, and it passed against a planted mutation:
+    /// XCTest runs the class alphabetically, four `add()` cases run before this one, and under the
+    /// mutation they had already left `["Unsorted"]` in the real domain — so before and after matched and
+    /// the guard reported clean while the owner's list was being overwritten. Order-dependent, and
+    /// therefore vacuous exactly when it mattered. A value only this run could have produced cannot
+    /// coincide with a leftover.
+    ///
+    /// It does not repair what it finds, deliberately: putting the owner's value back would itself be a
+    /// write to their domain, and it would hide the breakage from the next run.
     func testAScratchStoreNeverTouchesTheRealExcludedFoldersKey() {
         let realKey = "ar.excludedFolders"
+        let sentinel = "W26-fixturehang-sentinel-\(UUID().uuidString)"
         let before = UserDefaults.standard.stringArray(forKey: realKey)
 
         let store = scratchStore()
-        store.add("Unsorted")
+        store.add(sentinel)
         store.add("Beta")
         store.remove("Beta")
 
-        XCTAssertEqual(store.excludedRelativePaths, ["Unsorted"], "the scratch store did do the work")
-        XCTAssertEqual(UserDefaults.standard.stringArray(forKey: realKey), before,
-                       "and none of it reached the owner's exclusion list")
+        XCTAssertEqual(store.excludedRelativePaths, [sentinel], "the scratch store did do the work")
+        let real = UserDefaults.standard.stringArray(forKey: realKey)
+        XCTAssertFalse(real?.contains(sentinel) ?? false,
+                       "a value only this test could have written reached the owner's exclusion list")
+        XCTAssertEqual(real, before, "and nothing else about that list changed either")
     }
 
     // MARK: - isExcludedAbsolute

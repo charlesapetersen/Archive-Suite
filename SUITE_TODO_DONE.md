@@ -251,6 +251,71 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.fixturehang — the fixture pin no longer lives in the owner's defaults domain, so a killed test
+  host can no longer put their Reader into fixture mode. ✅ CLOSED** `eef85d5` -> `d58c058` -> this commit
+  (2026-08-07). Half **(b)** — the main-thread `FSEventStreamCreate`, i.e. the HANG — shipped separately as
+  `W26.fixturehang-b` (`a0c7170`); this closes half **(a)**, the LEAK. 382 tests / 0 failures in 7.8 s,
+  Debug + Release clean with no new warnings, write-surface lint clean.
+
+  **What the fix is, and what it is not.** All eleven `UserDefaults.standard.set(…, forKey:
+  "ARUITestRootPath")` writes across six test files now go to a per-test throwaway suite, through one shared
+  `fixtureDefaults` helper. It is **not** a better teardown: `SIGKILL` runs none, which is why `defer` and
+  `addTeardownBlock` never protected anything here. The pin now lives somewhere production never reads, so a
+  killed host leaves an inert plist. The enabling source change is `NavigationModel(defaults:)` —
+  `ArchiveLibrary` and `RootFolderStore` had both already taken an injected domain and both were
+  unreachable from a test, because the only thing that constructs them passed nothing.
+
+  🔺 **The trap, and the reason `isUITestMode` had to move in the same commit.** That DEBUG guard was the
+  only thing keeping unit tests off the owner's real `ar.viewState`, and it worked *because* those tests
+  wrote the pin into `.standard` — the very leak this item closes. Migrating them to a throwaway suite
+  while leaving that read on `.standard` would have made the guard return nil, reclassified every pinned
+  test as "not a UI test", and started clobbering the owner's saved filter and sort. The pin and the state
+  it suppresses have to share one domain. The XCUITest lane is unaffected: there the pin arrives as a
+  launch argument, i.e. in `.standard`'s genuinely volatile argument domain, and production passes
+  `.standard`.
+
+  🔺 **Two leaks of the same shape found in the sweep, both worse than the one filed.**
+  `ExcludedFoldersStoreTests` cleared `ar.excludedFolders` in `setUp` **and** `tearDown`, so running that
+  file DELETED the owner's real exclusion list — on every green run, no kill required — while its own
+  comment claimed "a fresh store backed by an isolated UserDefaults suite per test". It is now true
+  (`ExcludedFoldersStore(defaults:)`). And `RootFolderStoreTests.testNormalInitDoesNotUseTestPath` resolved
+  the OWNER'S saved bookmark and started a security scope on their real archive root, reaching that branch
+  by removing a key from the owner's own defaults; on an empty suite it asserts what it meant to.
+
+  🔺 **Three doc comments disagreed with the code four lines below them,** each claiming the pin lived in
+  "the volatile `ARUITestRootPath` argument domain" while writing persistent `.standard`
+  (`SymlinkedRootTests:14`, named in the item, plus the same sentence in `RootMarkerStateTests` and
+  `DocumentPageLinkTests`). That disagreement is what the item cost.
+
+  **Non-vacuity — five planted mutations, measured, not asserted in general.** `persistSelection` →
+  `.standard`: RED. `persistViewState` → `.standard`: RED. `isUITestMode` → `.standard`: RED, and **only**
+  `testAPinnedModelIsStillRecognisedAsPinnedAndSoLeavesViewStateAlone` — that case exists because neither
+  other test can see it (the write it un-suppresses lands in the injected domain, so the failure is silent
+  where it matters). `fixtureDefaults` returning `.standard`: 10 cases RED. ⚠️ **The fifth mutation exposed
+  a vacuous guard of my own and is the durable lesson:** `testAScratchStoreNeverTouchesTheReal…` first used
+  the literal `"Unsorted"` with a before/after comparison and **PASSED against the planted mutation** —
+  XCTest runs a class alphabetically, four `add()` cases run first, and under the mutation they had already
+  left `["Unsorted"]` in the real domain, so before and after matched while the owner's list was being
+  overwritten. It asserts on a **UUID sentinel** now, and on non-containment rather than on equality, so it
+  cannot be order-dependent.
+
+  ⚠️ **INCIDENT, self-inflicted and repaired in-session.** Those mutation runs necessarily wrote the owner's
+  real domain (that is what they prove). Afterwards `ar.viewState` held `"written-by-a-pinned-run"` and
+  `ar.excludedFolders` held the test fixtures' folder names — a Reader that would have shown zero rows and
+  silently hidden folders. Repaired from **inside the app's sandbox** (a throwaway test, since `defaults
+  read` / `plutil` on that container hang on a TCC prompt an unattended session cannot answer): the four
+  polluted keys removed, `archiveRootBookmark` **never touched** — read 720 bytes before and after, so the
+  granted root is intact. Two readings worth keeping: `ARUITestRootPath` was **absent** before the repair
+  (no leak outstanding), and the granted root is `~/Archive/Glazer Gemini 2.5 LLM`, **not** the corpus — so
+  `W20.deeplink-isolation`'s "walks ~123k real corpus files" escalation does not currently apply on this
+  machine. **The owner's saved filter/sort and exclusion list are now empty rather than restored** — the
+  originals were unrecoverable, and both were already being cleared by the pre-existing tests on every run.
+  → Daemon Report.
+
+  **DELIBERATELY NOT DONE:** `DeepLinkTests.testRevealAndSelectNoRoot`. It writes no pin, so it is not one
+  of the eleven; it is `W20.deeplink-isolation`, whose deliverable includes dropping the `-skip-testing`
+  line in `health-gate.sh`. That item's prescribed seam now exists, so it needs only its own gate.
+
 ### Shipped-rollup detail moved out of `SUITE_TODO.md` (2026-08-07, W28.trackerbudget)
 
 Verbatim from the open tracker, where it was the ONLY copy — `SUITE_TODO_DONE.md` was not a
