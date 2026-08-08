@@ -328,6 +328,13 @@ writes against the real corpus — always a copy.
   set, not the whole root); selecting a folder / All Files exits the scope. Scope persists across
   relaunch. `LibraryFilter.effective(base:user:)` merges for Save/summary.
 - **v1 sandboxed** to a granted root; non-sandboxed whole-Mac search is long-term (behind a `FileAccessProvider` abstraction).
+  - **SUPERSEDED 2026-08-07 (`W26.docs`, following the `W26.walk2` de-Spotlighting) — the sandbox decision
+    stands, its stated *cost* does not.** That reading was cheap only because whole-Mac was Spotlight's
+    `NSMetadataQueryLocalComputerScope`, i.e. free. `W26.walk2` deleted that branch, and the
+    `FileAccessProvider` abstraction it leaned on **was never written** (0 references in the tree). Whole-Mac
+    is now **new code** — walk N granted roots, merge them, and decide what "the whole Mac" excludes — not an
+    entitlement flip. **v1 stays sandboxed to one granted root**; treat whole-Mac as an unbuilt feature with a
+    real cost (`POTENTIAL_FEATURES.md`), not a config toggle.
 
 ## Implementation map (shipped)
 
@@ -446,9 +453,10 @@ Live sighted loop for the running app: `ops/gui/` (`capture-window.sh` + `clicli
   `NSFileCoordinator`.
 - Target macOS 14+. Sandbox posture: **v1 sandboxed**, scoped to a user-granted archive root
   (start with the provided test-files folder) via a security-scoped bookmark — OS-enforced
-  containment of irreplaceable files. **Non-sandboxed whole-Mac search is planned long-term**, so
-  file access + search go behind a `FileAccessProvider` abstraction: switching posture is an
-  entitlement/config change, not a rewrite.
+  containment of irreplaceable files. **Non-sandboxed whole-Mac search remains a long-term maybe, but it is
+  NOT an entitlement/config change** (corrected 2026-08-07, `W26.docs`): the `FileAccessProvider` abstraction
+  this sentence promised was never written, and since `W26.walk2` discovery is a `CorpusWalker` walk of one
+  granted root rather than a Spotlight scope. Changing posture means new code — see §Decisions.
 - Build: `xcodegen generate` then `xcodebuild -scheme ArchiveReader -configuration Debug build`.
   Per-worktree DerivedData (`-derivedDataPath ./build/DD`) for concurrent agents, like the sibling.
 

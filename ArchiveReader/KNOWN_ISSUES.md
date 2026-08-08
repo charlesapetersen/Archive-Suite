@@ -354,7 +354,15 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
 - `FileManager.setAttributes([.creationDate:])` accepts historical dates (1938, 1850) but **clamps
   below ~1677-09-21** (int64-ns-since-1970). → Do NOT use creation date as the chronological sort
   key; sort by a date derived from the tags (no range limit, medieval-safe).
-- Spotlight tag queries are fast (compound 3-facet over 6,941 files ≈ 0.38s) and scale.
+- ~~Spotlight tag queries are fast (compound 3-facet over 6,941 files ≈ 0.38s) and scale.~~
+  ⛔ **RETRACTED 2026-08-07 (`W26.docs`) — this "verified fact" is what the 2026-08-04 incident falsified,
+  and it is exactly the kind of fact this section exists to be trusted on.** The 0.38 s was measured on a
+  *healthy* index and says nothing about the failure mode that matters: a dead Data-volume index answers
+  just as fast, with **zero rows**, and reports no error — 1,849 correctly-tagged PDFs became *"No
+  Read/Unread-tagged PDFs were found in this folder."* Speed was never the risk; **unfalsifiable emptiness**
+  was. Replacement fact, measured read-only 2026-08-04 on the real corpus: a single-threaded
+  `FileManager.enumerator` walk of 123,028 files / 102,478 PDFs at depth 7 takes **10.15 s**, and it cannot
+  be silently empty. Discovery is that walk now (`ArchiveCore.CorpusWalker`, `W26.walk1`/`walk2`).
 
 ## macOS tag/label coupling (verified 2026-07-05)
 - A **`Red`/`Purple` tag token is inseparable from its Finder color label**: setting the token makes
@@ -368,16 +376,18 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
 ## Deferred hardening (from the 2026-07-05 code review)
 - **Write-target identity re-verification (Safety §6, low severity) — FIXED 2026-07-17 (mechanism
   `838b456`+`d393ff3`, W14.2; armed at live call sites `1a7c6cb`+W14.2-fu).** The concern: a tag write
-  applies to whatever file currently occupies the URL, so a Finder move/replace between Spotlight
-  discovery and the write could tag the wrong file. **Mechanism:** `CoordinatedTagWriter.write(_:expectedIdentity:)`
+  applies to whatever file currently occupies the URL, so a Finder move/replace between discovery and the
+  write could tag the wrong file. **Mechanism:** `CoordinatedTagWriter.write(_:expectedIdentity:)`
   + `FileIdentity` (backed by `fileResourceIdentifier`, compared via `isEqual:` — **never**
   `.documentIdentifierKey`, which mutates on read) re-verify the resolved URL's identity **inside the
   `NSFileCoordinator` block** and abort with `.identityMismatch` on a moved/replaced file; the Reader
   `TagWriter.apply`/`setReadState` adapter exposes an opt-in `expecting:` param (fully unit-tested on
   scratch copies). **Armed (W14.2-fu):** every `NavigationModel` write call site — `mark`, group/inline
   edits, corpus-wide rename, and undo — now captures the file's `FileIdentity` **lazily at edit time**
-  (via `ArchiveFile.liveIdentity()`, never at bulk discovery, so the "no per-file I/O" fast path is
-  preserved) and passes it through `expecting:`; undo re-verifies against the identity captured at the
+  (via `ArchiveFile.liveIdentity()`, never at bulk discovery — the original rationale was Spotlight's
+  "no per-file I/O" fast path, which `W26.walk2` retired, but **lazy is still correct**: an identity
+  captured at discovery would already be stale at edit time, and a stale identity is worse than a fresh
+  one) and passes it through `expecting:`; undo re-verifies against the identity captured at the
   ORIGINAL edit, so a file swapped under its path between edit and undo is skipped rather than mis-tagged.
   The group/rename path uses the identity-carrying `TagWriter.apply(_:to:[(url,identity)])` batch overload.
   A `nil` identity (file with no resolvable id) transparently skips the check for that file. Guard active

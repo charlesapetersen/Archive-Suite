@@ -36,7 +36,8 @@ worktree."
 - **Core** — `Sources/ArchiveReader/Core/` — UI-free domain: tag facets, `TagWriter`, PDF/
   classification model, date parsing, file-link formatting. **Package-ready** (becomes `ArchiveCore`
   at suite convergence — keep it free of SwiftUI/AppKit imports).
-- **Search/Index** — Spotlight (`NSMetadataQuery`) discovery + the SQLite FTS content index.
+- **Search/Index** — filesystem discovery (`ArchiveCore.CorpusWalker` + the FSEvents `CorpusWatcher` +
+  the `LibraryIndex` warm-start cache; **no Spotlight**) + the SQLite FTS content index.
 - **Nav UI** — the navigation window: table, filters, tag editor, copy-links, mark-read.
 - **Doc UI** — the document window: two-up PDF viewer, zoom, splitter, intelligent copy, find.
 

@@ -40,8 +40,9 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
 - [x] **M. Copy links (⌘⇧C)** — **PASS**. Clipboard = `file:///Users/<user>/Desktop/AR-Smoke/00015%20IMG%20%E2%80%94%20Brown.pdf`
       (space→%20, em dash→%E2%80%94). Correctly percent-encoded.
 - [x] **N. Mark Read** on a scratch selection — status updates; **the row now displays "Read" and
-      HOLDS it** through the Spotlight-update window. **PASS** (fresh build). This is the fix for the
-      two compounding bugs below.
+      HOLDS it** through the next discovery emission (an FSEvents-driven re-inspection, or a re-walk;
+      re-worded 2026-08-07 — the criterion used to say "the Spotlight-update window", which no longer
+      exists). **PASS** (fresh build). This is the fix for the two compounding bugs below.
 - [x] **O. Undo (Tags→Undo Tag Change)** — 00015 reverts to "Unread" (display + disk), status
       "Undid 1 change"; holds. **PASS**.
 - [~] **P. Mark Unread** — covered by O (undo restored the "Unread" token and the row re-rendered to
@@ -78,6 +79,12 @@ incomplete:
    Fix: `ArchiveLibrary.applyVerifiedWrites` overlays `TagWriter`'s verified `.after` per URL and
    `reload()` keeps it until Spotlight value-converges or a 600s TTL leak-guard (never backslides).
    Display-only (no disk write/read); pure `overrideDecision` unit-tested (8 tests).
+   > **History, not current behaviour (noted 2026-08-07, `W26.docs`).** Both the bug and that fix are
+   > gone: `W26.walk2` removed Spotlight discovery, so nothing re-emits a stale tag array, and the
+   > `PendingWrite` TTL/convergence subsystem was deleted with it. A smaller monotonic ordering guard now
+   > covers the one race that survives — a walk that *started* before a verified write cannot replace the
+   > fresh `.after`. See `KNOWN_ISSUES.md` §"Spotlight tag-index lag clobber". Kept here because the
+   > two-bugs-stacked lesson (#1 hid #2) is the reason this smoke test exists.
 
 Both were needed: #1 hid #2 (we never saw "Read" to watch it revert). Verified live on the fresh
 build: Mark Read → row shows "Read" and holds ≥6 s; Undo → reverts to "Unread" and holds. Disk truth

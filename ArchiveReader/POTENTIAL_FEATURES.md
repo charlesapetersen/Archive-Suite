@@ -14,9 +14,12 @@ All High-priority items are implemented (see `CLAUDE.md` §Implementation map):
 - ✅ **Corpus data-quality dashboard** — the library-health popover (stethoscope in the status bar).
 - ✅ **Quick Look preview** from the nav list (⌘Y — moved off bare Space so it can't block typing).
 - ✅ **Saved searches / smart folders** — `SavedSearch` + the toolbar "Saved" menu.
-- ◑ **Non-sandboxed whole-Mac search** — code-ready: `ArchiveLibrary.start(scope: nil)` uses the
-  local-computer scope, so this is a build-time entitlement flip (drop `com.apple.security.app-sandbox`),
-  not new code. Kept sandboxed for v1 by owner decision.
+- ◑ **Non-sandboxed whole-Mac search** — **no longer code-ready; re-costed 2026-08-07 (`W26.docs`).** This
+  bullet used to say it was a build-time entitlement flip (drop `com.apple.security.app-sandbox`) because
+  `ArchiveLibrary.start(scope: nil)` fell through to Spotlight's local-computer scope. `W26.walk2` deleted
+  that branch: `nil` now *clears* the library, and discovery is a `CorpusWalker` walk of one granted root.
+  Whole-Mac would mean **new code** — walking N roots, merging their results, and a defensible answer for
+  what "the whole Mac" excludes (an unbounded `/` walk is not it). Still kept sandboxed by owner decision.
 
 
 ## P2 — SHIPPED (2026-07-07) ✅

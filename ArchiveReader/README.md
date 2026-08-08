@@ -24,7 +24,9 @@ Protocol.
 > document-viewer flows are owner-verified. `CLAUDE.md` is the authoritative record.
 
 
-- **Find** every PDF tagged `Read`/`Unread` under your archive root, via Spotlight — fast at 150k+.
+- **Find** every PDF tagged `Read`/`Unread` under your archive root by walking the folder itself — no
+  Spotlight, so a stale or dead index can never hide your files. ~102k PDFs walk in ~10 s, a warm start
+  paints from the local index while it revalidates, and FSEvents keeps it live.
 - **Navigation window** (Finder-Smart-Folder-like): columns for Document date · File name · File
   type · File tags · Read/Unread; multi-level sort (chronological by default; medieval-safe);
   separate filters for subject tags, priority (P7–P10), and read-state.
