@@ -10,8 +10,9 @@
 // These tests drive the REAL models over REAL on-disk PDFs synthesized into an `mktemp` scratch
 // directory. FILE SAFETY: every byte written here (PDFs, the root marker, the `Unread` Finder tag that
 // makes a fixture file discoverable) lives inside that scratch directory; nothing touches a corpus, and
-// the archive root is set via the volatile `ARUITestRootPath` argument domain, so the owner's real
-// `archiveRootBookmark` is never read or written.
+// the archive root is pinned with `ARUITestRootPath` in a THROWAWAY defaults suite (`fixtureDefaults`),
+// so the owner's real `archiveRootBookmark` is never read or written. This comment used to call that
+// domain "volatile"; it was `.standard` — see `W26.fixturehang`.
 //
 // Non-vacuity, per defect: with the pre-fix rules these are RED —
 //   (2) `testLinkCitesTextPageWhenTextPaneFocused` expects page 6 where the old
@@ -224,12 +225,10 @@ final class DocumentPageLinkTests: XCTestCase {
         return (root, guid, pdf.path)
     }
 
-    /// A NavigationModel pinned to a scratch root. `ARUITestRootPath` lives in the volatile argument
-    /// domain, so this never reads or writes the owner's real `archiveRootBookmark`.
-    private func navModel(root: URL) -> NavigationModel {
-        UserDefaults.standard.set(root.path, forKey: "ARUITestRootPath")
-        addTeardownBlock { UserDefaults.standard.removeObject(forKey: "ARUITestRootPath") }
-        return NavigationModel()
+    /// A NavigationModel pinned to a scratch root in a throwaway defaults domain (`fixtureDefaults`),
+    /// so nothing it persists — the pin included — can reach the owner's app.
+    private func navModel(root: URL, _ testName: String = #function) -> NavigationModel {
+        fixtureNavigationModel(pinnedTo: root, testName)
     }
 
     func testRevealWithPageRequestsTheViewerOnThatPage() throws {

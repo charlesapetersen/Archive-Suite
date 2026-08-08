@@ -10,37 +10,43 @@ final class RootFolderStoreTests: XCTestCase {
     /// Verify that launching with -ARUITestRootPath sets `root` WITHOUT persisting a bookmark.
     /// The real `archiveRootBookmark` must stay untouched — this is the safety guarantee that
     /// the DEBUG fixture-root override can never shadow or clobber the user's real archive root.
+    ///
+    /// The pin goes into a throwaway suite (`fixtureDefaults`): it used to be written into `.standard`
+    /// and removed in a `defer`, which a killed host never runs — `W26.fixturehang`.
     func testAdoptTestRootDoesNotPersistBookmark() throws {
         // Snapshot any existing bookmark so we can verify it's unchanged afterward.
         let originalBookmark = UserDefaults.standard.data(forKey: bookmarkKey)
 
-        // Inject the launch argument the same way XCUITest would.
         let fixturePath = NSTemporaryDirectory() + "RootFolderStoreTest-fixture"
         try FileManager.default.createDirectory(atPath: fixturePath, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(atPath: fixturePath) }
 
-        UserDefaults.standard.set(fixturePath, forKey: "ARUITestRootPath")
-        defer { UserDefaults.standard.removeObject(forKey: "ARUITestRootPath") }
-
-        let store = RootFolderStore()
+        // Inject the launch argument the same way XCUITest would — into this test's own domain.
+        let defaults = fixtureDefaults(pinnedTo: URL(fileURLWithPath: fixturePath, isDirectory: true))
+        let store = RootFolderStore(defaults: defaults)
 
         // root should be set to the fixture path.
         XCTAssertEqual(store.root?.path, fixturePath, "root should point at the fixture")
 
-        // The real bookmark key must be unchanged.
-        let afterBookmark = UserDefaults.standard.data(forKey: bookmarkKey)
-        XCTAssertEqual(originalBookmark, afterBookmark,
+        // No bookmark anywhere: not in the injected domain (the assertion the fixture lane owes) and
+        // not in the real one (the 2026-07-11 incident's guard).
+        XCTAssertNil(defaults.data(forKey: bookmarkKey),
+                     "adoptTestRoot must persist no bookmark at all, not merely a harmless one")
+        XCTAssertEqual(UserDefaults.standard.data(forKey: bookmarkKey), originalBookmark,
                        "adoptTestRoot must NEVER write archiveRootBookmark")
     }
 
     /// With no -ARUITestRootPath, init falls through to resolveSaved() as usual.
+    ///
+    /// On a throwaway domain rather than `.standard`, which is a safety fix and not just tidiness: with
+    /// `.standard` this test resolved the OWNER'S saved bookmark and started a security scope on their
+    /// real archive root, and it reached that branch by removing a key from the owner's own defaults.
+    /// An empty suite holds no bookmark, so `resolveSaved()` is exercised and finds nothing.
     func testNormalInitDoesNotUseTestPath() {
-        UserDefaults.standard.removeObject(forKey: "ARUITestRootPath")
-        let store = RootFolderStore()
-        // We can't easily assert what resolveSaved does (depends on persisted state),
-        // but we verify no crash and that the test-root code path was NOT taken
-        // when the key is absent.
-        _ = store.root // just exercising the path
+        let defaults = fixtureDefaults()   // no pin
+        let store = RootFolderStore(defaults: defaults)
+        XCTAssertNil(store.root, "no pin and no saved bookmark is no root — not the owner's")
+        XCTAssertFalse(store.hasSavedBookmark)
     }
 
     // MARK: Adoption (W26.symroot-fu1)

@@ -197,12 +197,11 @@ final class LibraryWarmStartTests: XCTestCase {
     func testBulkMarkReverifiesCachedRowsAndStillUpdatesValidDiskNeighbours() throws {
         let scratch = try makeScratch()
         defer { try? FileManager.default.removeItem(at: scratch) }
-        UserDefaults.standard.set(scratch.path, forKey: "ARUITestRootPath")
-        UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
-        defer {
-            UserDefaults.standard.removeObject(forKey: "ARUITestRootPath")
-            UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
-        }
+        // A throwaway domain, not `.standard`: this pin used to be undone in a `defer`, which a killed
+        // host never reaches, so it outlived the run and put the owner's own app into fixture mode
+        // (`W26.fixturehang`). A fresh suite also holds no `lastSelectionFileURLs`, so the reset that
+        // used to sit here has nothing left to reset.
+        let defaults = fixtureDefaults(pinnedTo: scratch)
 
         let staleURL = scratch.appendingPathComponent("stale.pdf")
         let validURL = scratch.appendingPathComponent("valid.pdf")
@@ -211,7 +210,7 @@ final class LibraryWarmStartTests: XCTestCase {
         try setTags(["Unread", "Subject/WasTracked"], on: staleURL)
         try setTags(["Unread", "Subject/Valid"], on: validURL)
 
-        let model = NavigationModel()
+        let model = NavigationModel(defaults: defaults)
         let staleDiskRow = try XCTUnwrap(model.library.files.first { $0.url == staleURL })
         let validDiskRow = try XCTUnwrap(model.library.files.first { $0.url == validURL })
         let staleCacheRow = ArchiveFile(
@@ -317,14 +316,7 @@ final class LibraryWarmStartTests: XCTestCase {
         try Data("valid scratch PDF".utf8).write(to: file)
         try setTags(["Unread", "Subject/Linked"], on: file)
 
-        UserDefaults.standard.set(linked.path, forKey: "ARUITestRootPath")
-        UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
-        defer {
-            UserDefaults.standard.removeObject(forKey: "ARUITestRootPath")
-            UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
-        }
-
-        let model = NavigationModel()
+        let model = NavigationModel(defaults: fixtureDefaults(pinnedTo: linked))
         XCTAssertEqual(model.rootStore.root?.path, linked.path,
                        "precondition: the store holds the LINK spelling, as a real pick would")
         let diskRow = try XCTUnwrap(model.library.files.first { $0.url.path == file.path },

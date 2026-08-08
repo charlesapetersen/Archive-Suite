@@ -11,8 +11,14 @@ import ArchiveCore
 /// upstream papers over the divergence, and it is the same shape as any `/var/folders` root — which
 /// is why the sidebar folder tree had never placed a file under a fixture root.
 ///
-/// Scratch `mktemp` fixtures only; the store is pinned with the volatile `ARUITestRootPath` argument
-/// domain, so no test here reads or writes the owner's `archiveRootBookmark`.
+/// Scratch `mktemp` fixtures only; the store is pinned with `ARUITestRootPath` in a **throwaway defaults
+/// suite** (`fixtureDefaults`), so no test here reads or writes the owner's `archiveRootBookmark` — nor
+/// any other key in a domain the owner's app reads.
+///
+/// This comment used to claim the pin lived in "the volatile `ARUITestRootPath` argument domain" while
+/// the code four lines into `navModel` wrote persistent `.standard`. `W26.fixturehang` is what that
+/// disagreement cost: a killed host runs no teardown, so the pin outlived the run and put the owner's
+/// real Reader into fixture mode against a deleted directory.
 @MainActor
 final class SymlinkedRootTests: XCTestCase {
 
@@ -40,14 +46,12 @@ final class SymlinkedRootTests: XCTestCase {
         return (linked, corpus, file)
     }
 
-    private func navModel(pinnedTo root: URL) -> NavigationModel {
-        UserDefaults.standard.set(root.path, forKey: "ARUITestRootPath")
-        UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
-        addTeardownBlock {
-            UserDefaults.standard.removeObject(forKey: "ARUITestRootPath")
-            UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
-        }
-        return NavigationModel()
+    /// `defaults` is passed in only by the exclusion test, which has to seed a key before the model
+    /// reads it at construction. A throwaway suite starts empty, so the `lastSelectionFileURLs` reset
+    /// this used to perform against `.standard` is no longer a thing that needs doing.
+    private func navModel(pinnedTo root: URL, defaults: UserDefaults? = nil,
+                          _ testName: String = #function) -> NavigationModel {
+        NavigationModel(defaults: defaults ?? fixtureDefaults(pinnedTo: root, testName))
     }
 
     /// `library.files` is populated synchronously for a fixture root, but `displayed` and
@@ -135,21 +139,20 @@ final class SymlinkedRootTests: XCTestCase {
         let fixture = try makeLinkedRoot()
 
         // Seeded BEFORE the model exists, so the exclusion is part of the first pass rather than an
-        // async `objectWillChange` hop the test has to outwait. The store is a singleton over a real
-        // defaults key — snapshot and restore it, never clear it, so a test cannot quietly drop the
-        // owner's own exclusions.
-        let previously = UserDefaults.standard.stringArray(forKey: "ar.excludedFolders")
-        addTeardownBlock {
-            MainActor.assumeIsolated {
-                if let previously { UserDefaults.standard.set(previously, forKey: "ar.excludedFolders") }
-                else { UserDefaults.standard.removeObject(forKey: "ar.excludedFolders") }
-                ExcludedFoldersStore.shared.reload()
-            }
-        }
-        UserDefaults.standard.set(["Box"], forKey: "ar.excludedFolders")
-        ExcludedFoldersStore.shared.reload()
+        // async `objectWillChange` hop the test has to outwait.
+        //
+        // It goes into the model's OWN throwaway domain, which is why the snapshot-and-restore dance
+        // this used to do is gone: it wrote `ar.excludedFolders` in `.standard` and put the owner's
+        // value back in a teardown block, so a killed host left the owner's Reader silently hiding a
+        // folder called `Box`. The same leak as the fixture pin, one key over (`W26.fixturehang`).
+        // `ExcludedFoldersStore.shared.reload()` is likewise gone — the model builds its own store on
+        // this domain and reads the seed at init, so nothing has to poke the singleton.
+        let defaults = fixtureDefaults(pinnedTo: fixture.linked)
+        defaults.set(["Box"], forKey: "ar.excludedFolders")
 
-        let model = navModel(pinnedTo: fixture.linked)
+        let model = navModel(pinnedTo: fixture.linked, defaults: defaults)
+        XCTAssertEqual(model.excludedFolders.excludedRelativePaths, ["Box"],
+                       "precondition: the exclusion was seeded in the domain the model actually reads")
         XCTAssertTrue(model.library.files.contains { $0.url.path == fixture.file.path },
                       "precondition: the exclusion is a DISPLAY filter — discovery still finds the file")
         // Driven directly rather than waited on: `recompute()` is the production filter and it is

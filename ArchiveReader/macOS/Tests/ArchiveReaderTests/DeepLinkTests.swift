@@ -41,11 +41,8 @@ final class DeepLinkTests: XCTestCase {
         let data = try JSONEncoder().encode(marker)
         try data.write(to: dir.appendingPathComponent(RootMarker.filename))
 
-        // Use the test-root path.
-        UserDefaults.standard.set(dir.path, forKey: "ARUITestRootPath")
-        defer { UserDefaults.standard.removeObject(forKey: "ARUITestRootPath") }
-
-        let store = RootFolderStore()
+        // Use the test-root path, pinned in this test's own domain.
+        let store = RootFolderStore(defaults: fixtureDefaults(pinnedTo: dir))
         XCTAssertEqual(store.root?.path, dir.path)
         XCTAssertEqual(store.rootMarker?.guid, marker.guid,
                        "adoptTestRoot should read (not create) the marker")
@@ -57,10 +54,7 @@ final class DeepLinkTests: XCTestCase {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        UserDefaults.standard.set(dir.path, forKey: "ARUITestRootPath")
-        defer { UserDefaults.standard.removeObject(forKey: "ARUITestRootPath") }
-
-        let store = RootFolderStore()
+        let store = RootFolderStore(defaults: fixtureDefaults(pinnedTo: dir))
         XCTAssertEqual(store.root?.path, dir.path)
         XCTAssertNil(store.rootMarker, "No marker file → rootMarker should be nil")
     }
@@ -87,10 +81,7 @@ final class DeepLinkTests: XCTestCase {
         let data = try JSONEncoder().encode(marker)
         try data.write(to: dir.appendingPathComponent(RootMarker.filename))
 
-        UserDefaults.standard.set(dir.path, forKey: "ARUITestRootPath")
-        defer { UserDefaults.standard.removeObject(forKey: "ARUITestRootPath") }
-
-        let model = NavigationModel()
+        let model = NavigationModel(defaults: fixtureDefaults(pinnedTo: dir))
         XCTAssertEqual(model.rootStore.rootMarker?.guid, knownGUID)
 
         // Try to reveal with a different GUID.
@@ -112,10 +103,7 @@ final class DeepLinkTests: XCTestCase {
         let data = try JSONEncoder().encode(marker)
         try data.write(to: dir.appendingPathComponent(RootMarker.filename))
 
-        UserDefaults.standard.set(dir.path, forKey: "ARUITestRootPath")
-        defer { UserDefaults.standard.removeObject(forKey: "ARUITestRootPath") }
-
-        let model = NavigationModel()
+        let model = NavigationModel(defaults: fixtureDefaults(pinnedTo: dir))
         // With the right GUID but no library files, the reveal is deferred (pendingReveal set).
         // The status message should NOT be the mismatch message.
         model.revealAndSelect(rootGUID: knownGUID, relativePath: "sub/test.pdf", page: nil)
@@ -131,14 +119,13 @@ final class DeepLinkTests: XCTestCase {
         let marker = RootMarker(guid: UUID(), name: "test", kind: .reader, createdAt: Date())
         try JSONEncoder().encode(marker).write(to: dir.appendingPathComponent(RootMarker.filename))
 
-        UserDefaults.standard.set(dir.path, forKey: "ARUITestRootPath")
+        let defaults = fixtureDefaults(pinnedTo: dir)
         addTeardownBlock {
             try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
             try? FileManager.default.removeItem(at: dir)
-            UserDefaults.standard.removeObject(forKey: "ARUITestRootPath")
         }
 
-        let model = NavigationModel()
+        let model = NavigationModel(defaults: defaults)
         XCTAssertTrue(model.library.phase.isSettled, "precondition: the initial fixture pass is clean")
         try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: dir.path)
         model.rescan()

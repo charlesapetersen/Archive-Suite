@@ -9,9 +9,11 @@
 // the four reasons applies instead of the old "Choose an archive folder first." (with a folder
 // plainly open) or nothing at all.
 //
-// FILE SAFETY: every byte here lives in an `mktemp` scratch directory; the archive root is set via
-// the volatile `ARUITestRootPath` argument domain, so the owner's real `archiveRootBookmark` is
-// never read or written, and `RootFolderStore` is never constructed against it.
+// FILE SAFETY: every byte here lives in an `mktemp` scratch directory; the archive root is pinned with
+// `ARUITestRootPath` in a THROWAWAY defaults suite (`fixtureDefaults`), so the owner's real
+// `archiveRootBookmark` is never read or written, and no key this file sets is in a domain the owner's
+// app reads. The comment here used to call that domain "volatile" — it was `.standard`, which is
+// neither volatile nor the owner's to write; see `W26.fixturehang`.
 //
 // Non-vacuity: restoring the pre-fix marker layer (a read failure reported as absence, a failed
 // write returning the in-memory marker) turns `readOnlyRoot…`, `unreadableMarker…` and
@@ -129,12 +131,10 @@ final class RootMarkerStateTests: XCTestCase {
         return (root, pdf.path)
     }
 
-    /// A NavigationModel pinned to a scratch root. `ARUITestRootPath` lives in the volatile argument
-    /// domain, so this never reads or writes the owner's real `archiveRootBookmark`.
-    private func navModel(root: URL) -> NavigationModel {
-        UserDefaults.standard.set(root.path, forKey: "ARUITestRootPath")
-        addTeardownBlock { UserDefaults.standard.removeObject(forKey: "ARUITestRootPath") }
-        return NavigationModel()
+    /// A NavigationModel pinned to a scratch root in a throwaway defaults domain (`fixtureDefaults`),
+    /// so nothing it persists — the pin included — can reach the owner's app.
+    private func navModel(root: URL, _ testName: String = #function) -> NavigationModel {
+        fixtureNavigationModel(pinnedTo: root, testName)
     }
 
     func testCopyArchiveLinksRefusesADegradedRootAndSaysWhy() throws {
