@@ -447,7 +447,30 @@ second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 ne
   - **One more defect in the same lines, free to fix with (a):** `ArchiveLibrary.swift:418` reads
     `fixtureRootKey` **directly** rather than through `isFixtureRoot`, so the "one spelling, so the several
     behaviours cannot drift apart" invariant asserted at `:268` is already broken — three call sites, two
-    spellings. Route it through the property when injecting `UserDefaults`.
+    spellings. Route it through the property when injecting `UserDefaults`. ✅ **Done** (below).
+
+  ### 🔻 STATUS 2026-08-07: **(b) is SHIPPED — the HANG is gone. (a) is HALF shipped, so the LEAK remains.**
+  What changed (see `SUITE_TODO_DONE.md` → `W26.fixturehang-b`): the fixture lane now starts its stream on a
+  dedicated thread (`startWatcherOffMainThread`), keeping `owesCatchUpPass: false` and arming no stall
+  deadline, so fixture pass-counts are unchanged; `isFixtureRoot` reads an **injected** `UserDefaults`; and
+  `:418`'s duplicate direct read now goes through the property (three call sites, one spelling). Two
+  functional tests pin fixture mode in a **throwaway suite** and assert the fixture start is off-thread and
+  that the pin is honoured from the injected domain only. 378 tests / 0 failures, no new warnings.
+  **Therefore `health-gate.sh` can no longer HANG on this** — even with a leaked pin, the `open(2)` is off the
+  main thread, so the pathology is at worst a bounded failure that names itself.
+  ⚠️ **What is deliberately NOT done, and why this item stays open:** the *leak itself*.
+  `NavigationModel` still constructs `ArchiveLibrary()` (i.e. `.standard`), and **11 writes across 6 test
+  files** still do `UserDefaults.standard.set(…, forKey: "ARUITestRootPath")`. So a killed test host still
+  leaves the pin in the owner's real domain, and the owner's real app can still start in fixture mode pinned
+  to a deleted `mktemp` directory — no longer a hang, but still wrong, and still silent.
+  **Remaining work:** give `NavigationModel` a defaults seam and migrate those 6 files (and
+  `RootFolderStore()`/`ExcludedFoldersStore.shared` alongside, same domain) onto a throwaway suite. Note
+  `SymlinkedRootTests.swift:14`'s own doc comment already **claims** it uses "the volatile `ARUITestRootPath`
+  argument" while `:44` writes persistent `.standard` — fix the comment or the code, they disagree.
+  A tempting shortcut to weigh: read the pin only from
+  `UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)`, which a persisted write
+  cannot reach — it kills the leak's *effect* in one line, but it still forces those 6 files onto injection,
+  so it does not avoid the sweep. Related, same domain: `W20.deeplink-isolation`.
 
 - [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
   (blocked-on: W26.fsev, W26.idx, W26.vocab, W26.deny, W26.lint).** Full-scale run against a **scratch copy** (never the real

@@ -18,6 +18,43 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Signing + TCC consent (owner, 2026-08-07)
 
+- [x] **W26.fixturehang-b — the fixture lane no longer starts FSEvents on the main thread, so the gate can
+  no longer HANG. ✅ DONE (half of W26.fixturehang; that item STAYS OPEN for the leak)** — this commit.
+  **The carve-out's stated premise was false, and that is the durable finding.** `startWatcherInline`
+  argued the hazard could not arise because *"a fixture root is a scratch directory the test itself just
+  created on local disk, so its `open(2)` cannot block"* — but `FSEventStreamCreate` does not open the root,
+  it opens every **ANCESTOR** (`watch_all_parents`), and a container fixture root
+  (`~/Library/Containers/com.archivereader.app/Data/tmp/…`) has ancestors under `~/Library`. One of those is
+  what parked. The reasoning was about the wrong file. FSEvents offers no cancel, so on the main thread it
+  was unrecoverable: the whole unit bundle sat at 0 % CPU with the test host alive, indefinitely, which the
+  daemon can only end by burning `GATE_MAXRUN` (50 min) — and two consecutive timeouts PARK the run,
+  blaming build time.
+  **What made the fix safe was separating two things the carve-out conflated.** The comment justified being
+  inline by pointing at tests that read `files` the moment `NavigationModel()` returns and XCUITest
+  `waitForRows` timings — but those depend on the **WALK**'s synchrony, which is a *different* branch
+  (`beginScan`'s fixture branch). The **stream start** was never what they rested on. So the walk stays
+  synchronous and only the start moved, onto a dedicated thread — deliberately NOT through the production
+  machinery: no `pendingWatcherStart`, no stall deadline, and `owesCatchUpPass: false` unconditionally,
+  because a catch-up pass would add a rescan that every fixture test counting passes would see. Same
+  identity discipline as `watcherDidStart` (generation + root re-checked, else `stop()`).
+  **Half (a), partially:** `isFixtureRoot` now reads an **injected** `UserDefaults` (`ArchiveLibrary` is the
+  third instance of this pattern — `W26.symroot-fu1` did `RootFolderStore`, `W26.notesabsence-fu1` did
+  `ReaderRootStore`), and `:418`'s **duplicate direct read** now routes through the property, so the "one
+  spelling, so the several behaviours cannot drift apart" invariant the property's own comment asserts is
+  finally true — it had been three call sites and two spellings.
+  **Proved, not asserted:** two functional tests that pin fixture mode in a **throwaway suite** — one that
+  the fixture start is off the main thread (the direct regression test; the pre-existing
+  `testTheStreamsOpenIsNotPerformedOnTheMainThread` only ever covered the production lane), one that the pin
+  is honoured from the injected domain only, using an observable discriminator (the production lane arms a
+  stall deadline and reports `.liveUpdatesStalled`; the fixture lane arms none). Before the injection landed
+  the second test was **unwritable** — both lanes read `.standard`, so nothing could tell them apart.
+  378 tests / 0 failures; zero new warnings (32 pre-existing, none in the touched files).
+  ⚠️ **`W26.fixturehang` REMAINS OPEN and this must not be read as closing it.** The *leak* is untouched:
+  `NavigationModel` still builds `ArchiveLibrary()` on `.standard`, and 11 writes across 6 test files still
+  persist the pin there, so a killed host still puts later launches — including the owner's real app — into
+  fixture mode pinned to a deleted directory. That is no longer a hang, but it is still wrong and still
+  silent. Remaining scope is recorded on the item.
+
 - [x] **W28.cert-fu1 — the GUI-VM lane builds in a guest with no keychain, so certificate signing RED'd it.
   ✅ DONE** — this commit. **A regression `W28.cert` shipped and this session missed**, because host builds
   were verified and the VM lane was not considered: the guest runs its own `xcodebuild`, and the

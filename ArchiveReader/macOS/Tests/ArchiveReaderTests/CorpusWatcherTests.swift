@@ -910,6 +910,82 @@ final class CorpusWatcherLibraryTests: XCTestCase {
         try await waitUntil { library.flushWatcherForTesting() }
         XCTAssertEqual(abandoned.stops, 1)
     }
+
+    // MARK: - W26.fixturehang
+
+    /// A defaults domain that exists only for this test. **Never `.standard`** — a killed test host runs no
+    /// teardown, and a pin left behind in the real `com.archivereader.app` domain is exactly
+    /// `W26.fixturehang`'s trigger: every later launch, including the owner's actual app, then starts in
+    /// fixture mode pinned to a deleted `mktemp` directory.
+    private func throwawayDefaults(pinning root: URL?) -> UserDefaults {
+        let suite = UserDefaults(suiteName: "ar.fixture.\(UUID().uuidString)")!
+        if let root { suite.set(root.path, forKey: "ARUITestRootPath") }
+        return suite
+    }
+
+    /// Half (b): the FIXTURE lane must start its stream off the main thread too.
+    ///
+    /// `testTheStreamsOpenIsNotPerformedOnTheMainThread` proves it for the production lane. The fixture
+    /// lane was deliberately left inline on a premise that was measured FALSE: `FSEventStreamCreate` does
+    /// not open the root, it opens every ANCESTOR, and a container fixture root's ancestors are under
+    /// `~/Library`. FSEvents has no cancel, so on the main thread that `open(2)` is unrecoverable — it hung
+    /// the entire unit bundle at 0 % CPU until the daemon's `GATE_MAXRUN` killed it and parked the run.
+    ///
+    /// This test is only writable *because* half (a) landed: it pins fixture mode in a THROWAWAY suite.
+    func testTheFixtureLanesStreamOpenIsAlsoNotOnTheMainThread() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+        let capture = BlockingWatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0,
+                                     defaults: throwawayDefaults(pinning: root)) { _, handler in
+            let watcher = BlockingCorpusWatcher(handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        defer { capture.latest?.release() }
+
+        library.start(scope: root)
+        try XCTUnwrap(capture.latest).waitUntilStarting()
+
+        XCTAssertEqual(try XCTUnwrap(capture.latest).startedOnMainThread, false,
+                       "the fixture lane open(2)s every ancestor; on the main thread that IS the gate hang")
+    }
+
+    /// Half (a): the pin is read from the INJECTED domain, never the process-wide one.
+    ///
+    /// The discriminator is observable: the production lane arms a stall deadline, so a start that never
+    /// returns reports `.liveUpdatesStalled`; the fixture lane arms none and stays silent. So an EMPTY
+    /// injected suite must take the PRODUCTION lane even though this very process may hold a stale
+    /// `ARUITestRootPath` in `.standard` — which was the leak that silently put real launches into fixture
+    /// mode. Before the fix this test could not distinguish them at all: both read `.standard`.
+    func testTheFixturePinIsReadFromTheInjectedDomainNotTheProcessWideOne() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+
+        // No pin in the injected suite -> production lane -> the stall deadline fires.
+        let unpinned = BlockingWatcherCapture()
+        let production = ArchiveLibrary(minimumRootRescanInterval: 0, watcherStartTimeout: 0.05,
+                                        defaults: throwawayDefaults(pinning: nil)) { _, handler in
+            let w = BlockingCorpusWatcher(handler: handler); unpinned.latest = w; return w
+        }
+        defer { unpinned.latest?.release() }
+        production.start(scope: root)
+        try await waitUntil { production.liveUpdateFailure == .liveUpdatesStalled }
+
+        // Pinned -> fixture lane -> no deadline armed, so nothing is ever reported as stalled.
+        let pinned = BlockingWatcherCapture()
+        let fixture = ArchiveLibrary(minimumRootRescanInterval: 0, watcherStartTimeout: 0.05,
+                                     defaults: throwawayDefaults(pinning: root)) { _, handler in
+            let w = BlockingCorpusWatcher(handler: handler); pinned.latest = w; return w
+        }
+        defer { pinned.latest?.release() }
+        fixture.start(scope: root)
+        try XCTUnwrap(pinned.latest).waitUntilStarting()
+
+        XCTAssertNil(fixture.liveUpdateFailure,
+                     "a stall report here means the PRODUCTION lane ran for a pinned root — i.e. the pin "
+                     + "was not read from the injected domain")
+    }
 }
 
 final class CorpusWatcherStreamTests: XCTestCase {

@@ -125,10 +125,19 @@ final class ArchiveLibrary: ObservableObject {
     /// a healthy walk emits its first 500-file batch in ~40 ms (measured 123,028 files in 10.15 s), so
     /// five seconds with nothing seen means the root probe itself has not returned. Firing early costs
     /// only a sentence that the next progress callback — or the finished pass — withdraws.
+    /// `defaults` is injected for ONE reason: the fixture pin (`ARUITestRootPath`) must not be read from
+    /// the process-wide domain. Reading `.standard` meant a test that wrote the key and was then KILLED
+    /// (no teardown) left it in the owner's real `com.archivereader.app` defaults, so every later launch —
+    /// including the owner's actual app — silently started in fixture mode, pinned to a deleted `mktemp`
+    /// directory. That is `W26.fixturehang`'s second defect, and it was observed twice on 2026-08-07
+    /// (`SymlinkedRootTests-9ED68E63…`, then `-2F56A414…`). `ArchiveLibrary` is the THIRD instance of this
+    /// one pattern — `W26.symroot-fu1` did it for `RootFolderStore`, `W26.notesabsence-fu1` for
+    /// `ReaderRootStore`. Production passes `.standard`; only tests pass a throwaway suite.
     init(minimumRootRescanInterval: TimeInterval = 1.0,
          libraryIndexURL: URL? = ArchiveLibrary.defaultLibraryIndexURL,
          watcherStartTimeout: TimeInterval = 2.0,
          scanStallTimeout: TimeInterval = 5.0,
+         defaults: UserDefaults = .standard,
          watcherFactory: @escaping WatcherFactory = { root, handler in
              CorpusWatcher(root: root, handler: handler)
          },
@@ -143,6 +152,7 @@ final class ArchiveLibrary: ObservableObject {
         self.libraryIndex = libraryIndexURL.map { LibraryIndex(url: $0) }
         self.watcherStartTimeout = max(0, watcherStartTimeout)
         self.scanStallTimeout = max(0, scanStallTimeout)
+        self.defaults = defaults
         self.watcherFactory = watcherFactory
         self.indexedScanStarter = indexedScanStarter
     }
@@ -179,6 +189,10 @@ final class ArchiveLibrary: ObservableObject {
     /// (`ContentIndexer`'s generation-token discipline, same shape).
     private var currentScan: UInt64 = 0
     private var inFlight: ScanCancellation?
+
+    /// The defaults domain the fixture pin is read from — injected, never `.standard` implicitly.
+    /// See `init`'s note: a process-wide read is how a killed test leaked fixture mode into the real app.
+    private let defaults: UserDefaults
 
 #if DEBUG
     /// Launch/defaults key that pins the app to a fixture root (XCUITest + unit tests).
@@ -268,7 +282,7 @@ final class ArchiveLibrary: ObservableObject {
     /// Whether this process is pinned to a fixture root. One spelling, so the several behaviours that
     /// key off it (no persisted index, a synchronous walk, an inline watcher start) cannot drift apart.
     private var isFixtureRoot: Bool {
-        UserDefaults.standard.string(forKey: Self.fixtureRootKey) != nil
+        defaults.string(forKey: Self.fixtureRootKey) != nil
     }
 #endif
 
@@ -415,7 +429,10 @@ final class ArchiveLibrary: ObservableObject {
         // (`DocumentPageLinkTests`, `RootMarkerStateTests`) assert on `files` the moment
         // `NavigationModel()` returns, and the XCUITest fixture lane's `waitForRows` timings were
         // calibrated against a synchronous load.
-        if UserDefaults.standard.string(forKey: Self.fixtureRootKey) != nil {
+        // Through `isFixtureRoot`, NOT a second direct read: the property's own comment promises "one
+        // spelling, so the several behaviours that key off it cannot drift apart", and this line was the
+        // counter-example — three call sites, two spellings, and only two of them injectable.
+        if isFixtureRoot {
             finish(LibraryScan.pass(root: root, isCancelled: { token.isCancelled }),
                    generation: generation, rootGeneration: rootGeneration, indexScan: nil)
             return
@@ -621,7 +638,7 @@ final class ArchiveLibrary: ObservableObject {
         guard pendingWatcherStart == nil else { return }
 #if DEBUG
         if isFixtureRoot {
-            startWatcherInline(root: root)
+            startWatcherOffMainThread(root: root)
             return
         }
 #endif
@@ -654,17 +671,49 @@ final class ArchiveLibrary: ObservableObject {
     }
 
 #if DEBUG
-    /// The fixture lane keeps the pre-`W26.fsev-fu1` inline start, deliberately.
+    /// The fixture lane starts its stream OFF the main thread, like every other lane (`W26.fixturehang`).
     ///
-    /// `beginScan`'s fixture branch is synchronous because two shipped tests read `files` the moment
-    /// `NavigationModel()` returns and the XCUITest lane's `waitForRows` timings were calibrated against
-    /// that; deferring the walk behind an off-thread start would break both, and the catch-up pass a
-    /// late stream owes would perturb every fixture test that counts passes. The hazard cannot arise
-    /// here: a fixture root is a scratch directory the test itself just created on local disk, so its
-    /// `open(2)` cannot block on a permission prompt, a stalled mount or a missing volume.
-    private func startWatcherInline(root: URL) {
-        let made = makeWatcher(root: root, generation: rootGeneration)
-        install(made, result: made.start(), owesCatchUpPass: false)
+    /// It used to call `made.start()` INLINE, and **the carve-out's stated premise was measured false.**
+    /// It argued the hazard could not arise because "a fixture root is a scratch directory the test itself
+    /// just created on local disk, so its `open(2)` cannot block" — but that is about the wrong file:
+    /// `FSEventStreamCreate` does not open the root, it opens every **ANCESTOR** (`watch_all_parents`), and
+    /// a container fixture root (`~/Library/Containers/com.archivereader.app/Data/tmp/…`) has ancestors
+    /// under `~/Library`. One of those is what parks. FSEvents offers no cancel, so on the main thread the
+    /// thread is unrecoverable: `sample` showed the whole unit bundle at 0 % CPU with the test host alive,
+    /// indefinitely — which the daemon can only end by burning `GATE_MAXRUN` and parking, blaming build
+    /// time. This is precisely the bug `W26.fsev-fu1` exists to prevent, reached through the one lane it
+    /// deliberately left inline.
+    ///
+    /// **What the carve-out actually had to protect is the WALK's synchrony, and that is a separate
+    /// branch** — `beginScan`'s fixture branch above. Two shipped tests (`DocumentPageLinkTests`,
+    /// `RootMarkerStateTests`) read `files` the moment `NavigationModel()` returns, and the XCUITest lane's
+    /// `waitForRows` timings were calibrated against a synchronous load. The *stream start* was never what
+    /// either depends on. So the walk stays synchronous and only the start moves.
+    ///
+    /// Deliberately NOT routed through `startWatcher`'s production machinery: no `pendingWatcherStart`, no
+    /// stall deadline, and `owesCatchUpPass: false` unconditionally. A catch-up pass would add a rescan
+    /// that every fixture test counting passes would see — that is the behaviour worth preserving, and it
+    /// is preserved exactly.
+    private func startWatcherOffMainThread(root: URL) {
+        let generation = rootGeneration
+        let made = makeWatcher(root: root, generation: generation)
+        let thread = Thread { [weak self] in
+            let result = made.start()
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    // Same identity discipline as `watcherDidStart`: a start whose root was replaced while
+                    // it was blocked gets stopped, never installed over a newer root's stream.
+                    guard let self, self.rootGeneration == generation, self.root != nil else {
+                        made.stop()
+                        return
+                    }
+                    self.install(made, result: result, owesCatchUpPass: false)
+                }
+            }
+        }
+        thread.name = "ArchiveReader.CorpusWatcherStart.fixture"
+        thread.qualityOfService = .userInitiated
+        thread.start()
     }
 #endif
 
