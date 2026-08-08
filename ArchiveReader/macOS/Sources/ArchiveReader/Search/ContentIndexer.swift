@@ -51,7 +51,8 @@ final class ContentIndexer: ObservableObject {
     /// holds the slot forever — its `Task.isCancelled` check was dead code without this).
     private var task: Task<Void, Never>?
     /// A newer file set requested while a pass was running. Coalesced (newest wins) and launched when
-    /// the current pass finishes, so a live/incremental Spotlight update is never silently dropped.
+    /// the current pass finishes, so a live/incremental discovery update (an FSEvents re-inspection or a
+    /// revalidation pass) is never silently dropped.
     private var pending: [ArchiveFile]?
     /// Epoch token: each launch/cancel bumps it so a superseded pass's async progress/finish callbacks
     /// can't clobber the current pass's state (same pattern as NavigationModel.ftsGeneration).

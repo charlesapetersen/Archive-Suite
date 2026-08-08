@@ -9,8 +9,9 @@ import AppKit
 ///
 /// Safety-critical details (see the adversarial review that drove them):
 /// - **Edit-start base snapshot.** The diff base is captured when editing begins (`editBase`), NOT the
-///   live `subjects`. During an active edit the row can re-render (a Spotlight echo / group edit / undo
-///   to the same file republishes `model.displayed`); diffing against the *edit-start* base means the
+///   live `subjects`. During an active edit the row can re-render (a repeat emission from a re-walk /
+///   group edit / undo to the same file republishes `model.displayed`); diffing against the *edit-start*
+///   base means the
 ///   delta names only what the USER changed, so a concurrently-added third-party tag is never dropped.
 /// - **Frozen during edit.** While this field is first responder, `updateNSView` re-syncs neither the
 ///   displayed tokens nor the commit closure — the edit isn't clobbered and the commit target stays put.

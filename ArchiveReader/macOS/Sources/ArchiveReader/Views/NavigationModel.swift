@@ -672,7 +672,8 @@ final class NavigationModel: ObservableObject {
 
     // Cheap change-signatures (see `LibraryChangeSignature`) so a tag edit — which never moves files and,
     // for read-state/priority, never touches subjects — doesn't rebuild path-/subject-invariant derived
-    // state on every library emission (or re-run it on the Spotlight echo). A false "unchanged" only ever
+    // state on every library emission (or re-run it on a repeat emission from a re-walk). A false
+    // "unchanged" only ever
     // yields a briefly-stale derived cache, self-healing on the next real change; never a data risk.
     private var pathsSig = 0, subjectsSig = 0, matchSig = 0
 
@@ -979,7 +980,7 @@ final class NavigationModel: ObservableObject {
                 if !r.isNoOp { batch.append(UndoEntry(result: r, identity: identity)) }  // real changes → undo
             } catch { failures += 1 }
         }
-        // Only verified (non-throwing) writes move a row — a failed write keeps the Spotlight value and
+        // Only verified (non-throwing) writes move a row — a failed write keeps the last-discovered value and
         // must NOT vanish from a filtered view (Safety §11). The row shows TagWriter's re-read `.after`.
         library.applyVerifiedWrites(verified)
         if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }

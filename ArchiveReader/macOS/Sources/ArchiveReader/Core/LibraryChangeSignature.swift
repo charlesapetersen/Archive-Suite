@@ -2,7 +2,9 @@ import Foundation
 
 /// Cheap, order-independent change-signatures over the library snapshot. `NavigationModel` uses these
 /// to skip rebuilding path-/subject-invariant derived state on every `library.files` emission (and to
-/// avoid re-running it on the Spotlight index echo): if a signature is unchanged, the corresponding
+/// avoid re-running it on a repeat emission — a re-walk or an FSEvents re-inspection that republishes an
+/// identically-valued snapshot; written for the Spotlight index echo, the mechanism carried over unchanged
+/// when `W26.walk2` removed Spotlight): if a signature is unchanged, the corresponding
 /// cache is left as-is. A false "unchanged" only ever yields a briefly-stale *derived* cache (never a
 /// data risk), self-healing on the next real change.
 ///

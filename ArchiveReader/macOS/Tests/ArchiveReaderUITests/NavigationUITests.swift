@@ -44,8 +44,10 @@ final class NavigationUITests: FixtureUITestCase {
         }
 
         // Subject tokens that SHOULD appear. NOTE: "Budget Policy" is deliberately NOT here — it lives
-        // only on fixture file 00009, which has no Read/Unread tag, so the library predicate
-        // (kMDItemUserTags == Read || Unread) never surfaces it (matching production behavior).
+        // only on fixture file 00009, which has no Read/Unread tag, so the library's visible universe
+        // (files whose Finder tags include `Read` or `Unread`) never surfaces it (matching production
+        // behavior). That universe used to be an `NSMetadataQuery` predicate; since `W26.walk2` it is a
+        // filter over the `CorpusWalker` walk — same rule, no Spotlight.
         let expectedSubjects = ["Jerry Brown", "Economics", "Medieval Records",
                                 "DP chapters", "Education Policy"]
         let allLabels = (0..<tagTexts.count).map { tagTexts.element(boundBy: $0).label }
