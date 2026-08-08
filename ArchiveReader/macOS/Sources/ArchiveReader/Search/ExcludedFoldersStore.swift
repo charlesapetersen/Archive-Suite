@@ -13,8 +13,16 @@ final class ExcludedFoldersStore: ObservableObject {
 
     private let key = "ar.excludedFolders"
 
-    private init() {
-        excludedRelativePaths = UserDefaults.standard.stringArray(forKey: key) ?? []
+    /// Injected so a test can exclude a folder without writing the owner's real `ar.excludedFolders`.
+    /// The hazard is the same shape as `W26.fixturehang`'s fixture pin: `SymlinkedRootTests` set
+    /// `["Box"]` in `.standard` and restored it in a teardown block, and a killed test host runs no
+    /// teardown — leaving the owner's Reader silently hiding a folder called `Box`. Production uses
+    /// `.shared` (i.e. `.standard`); only tests pass a throwaway suite.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        excludedRelativePaths = defaults.stringArray(forKey: key) ?? []
     }
 
     /// Add a folder (as a root-relative path). Deduplicates and collapses nested exclusions
@@ -56,13 +64,13 @@ final class ExcludedFoldersStore: ObservableObject {
 
     /// Re-read the persisted list (e.g. after UserDefaults is cleared in tests).
     func reload() {
-        excludedRelativePaths = UserDefaults.standard.stringArray(forKey: key) ?? []
+        excludedRelativePaths = defaults.stringArray(forKey: key) ?? []
     }
 
     // MARK: - Private
 
     private func persist() {
-        UserDefaults.standard.set(excludedRelativePaths, forKey: key)
+        defaults.set(excludedRelativePaths, forKey: key)
     }
 
     private func isExcluded(_ path: String) -> Bool {

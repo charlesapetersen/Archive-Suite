@@ -19,12 +19,26 @@ struct FolderNode: Identifiable, Hashable, Sendable {
 /// state, and the (safe) actions. All tag mutations go through `TagWriter`.
 @MainActor
 final class NavigationModel: ObservableObject {
-    let library = ArchiveLibrary()
-    let rootStore = RootFolderStore()
+    let library: ArchiveLibrary
+    let rootStore: RootFolderStore
     let indexer = ContentIndexer()
     let notes = NotesStore()
     let savedSearches = SavedSearchStore()
-    let excludedFolders = ExcludedFoldersStore.shared
+    let excludedFolders: ExcludedFoldersStore
+
+    /// The defaults domain EVERY key this model touches is read from and written to — the fixture pin
+    /// (`ARUITestRootPath`), the view state (`ar.viewState`), the resumed selection
+    /// (`lastSelectionFileURLs`), and, through the two stores it owns, `archiveRootBookmark` and
+    /// `ar.excludedFolders`.
+    ///
+    /// Injected for the reason `W26.fixturehang` records: a test that writes the pin into the
+    /// process-wide `com.archivereader.app` domain and is then KILLED runs no teardown, so the pin
+    /// persists into the owner's real defaults and every later launch — the owner's actual app included
+    /// — starts in fixture mode pinned to a deleted `mktemp` directory. `ArchiveLibrary` and
+    /// `RootFolderStore` already took an injected domain; they were unreachable from a test because the
+    /// model that constructs them did not. Production passes `.standard`; only tests pass a throwaway
+    /// suite.
+    private let defaults: UserDefaults
 
     @Published var filter = LibraryFilter()
     /// The text field binds to this; a debounce pipeline copies it into `filter.searchText` after
@@ -102,7 +116,17 @@ final class NavigationModel: ObservableObject {
     private var undoStack: [[UndoEntry]] = []
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    /// `excludedFolders` defaults to the process-wide singleton, which is what production wants: the
+    /// Settings scene (`OptionsView`) observes `ExcludedFoldersStore.shared`, so the model must be
+    /// looking at that same object or an exclusion added in Settings would not narrow the list. A test
+    /// passing a throwaway `defaults` gets its own instance on that domain instead — nothing else
+    /// observes it, and nothing it persists reaches the owner's `ar.excludedFolders`.
+    init(defaults: UserDefaults = .standard, excludedFolders: ExcludedFoldersStore? = nil) {
+        self.defaults = defaults
+        self.library = ArchiveLibrary(defaults: defaults)
+        self.rootStore = RootFolderStore(defaults: defaults)
+        self.excludedFolders = excludedFolders
+            ?? (defaults === UserDefaults.standard ? .shared : ExcludedFoldersStore(defaults: defaults))
         library.setRootResolver { [weak self] in
             guard let self, let url = self.rootStore.reResolveSavedRoot() else { return nil }
             return ResolvedLibraryRoot(url: url, markerGUID: self.rootStore.rootMarker?.guid)
@@ -167,7 +191,7 @@ final class NavigationModel: ObservableObject {
                 self.reconcileScopeWithStore()
             } }
             .store(in: &cancellables)
-        excludedFolders.objectWillChange
+        self.excludedFolders.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in MainActor.assumeIsolated {
                 guard let self else { return }
@@ -386,11 +410,15 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Reading-session resume
 
+    /// Spelled once so the read, the write and the removal cannot drift apart — the three-call-sites,
+    /// two-spellings defect `W26.fixturehang` found in `ArchiveLibrary`.
+    private static let selectionKey = "lastSelectionFileURLs"
+
     private var didRestoreSelection = false
     private func restoreSelectionIfNeeded() {
         guard !didRestoreSelection, !library.files.isEmpty else { return }
         didRestoreSelection = true
-        let saved = Set((UserDefaults.standard.stringArray(forKey: "lastSelectionFileURLs") ?? [])
+        let saved = Set((defaults.stringArray(forKey: Self.selectionKey) ?? [])
             .compactMap(URL.init(string:)))
         guard !saved.isEmpty else { return }
         let present = Set(library.files.map(\.id)).intersection(saved)
@@ -401,9 +429,9 @@ final class NavigationModel: ObservableObject {
         // array on the main actor or bloats the defaults plist; such selections aren't worth restoring.
         let paths = selection.map(\.absoluteString)
         if paths.count <= 500 {
-            UserDefaults.standard.set(paths, forKey: "lastSelectionFileURLs")
+            defaults.set(paths, forKey: Self.selectionKey)
         } else {
-            UserDefaults.standard.removeObject(forKey: "lastSelectionFileURLs")
+            defaults.removeObject(forKey: Self.selectionKey)
         }
     }
 
@@ -478,7 +506,15 @@ final class NavigationModel: ObservableObject {
     /// real Archive Reader. So view-state (filter/sort/scope) must NOT be restored (it would inherit
     /// the owner's live filter, e.g. a `read=unread` filter that hides the whole fixture → 0 rows)
     /// nor persisted (it would clobber the owner's saved view-state). Tests start from clean defaults.
-    private var isUITestMode: Bool { UserDefaults.standard.string(forKey: "ARUITestRootPath") != nil }
+    ///
+    /// Read from the INJECTED domain, and that is load-bearing rather than tidiness. This guard used to
+    /// be the only thing keeping unit tests off the owner's real `ar.viewState`, and it worked purely
+    /// because those tests wrote the pin into `.standard` — the very leak `W26.fixturehang` is about.
+    /// Moving them onto a throwaway suite without moving this read would have made the guard read
+    /// `nil`, turned every such test into "not a UI test", and started clobbering the owner's saved
+    /// filter/sort. With both on `defaults`, the pin and the state it suppresses live in one domain.
+    private var isUITestMode: Bool { defaults.string(forKey: fixtureRootKey) != nil }
+    private let fixtureRootKey = "ARUITestRootPath"
 #endif
 
     private func persistViewState() {
@@ -488,14 +524,14 @@ final class NavigationModel: ObservableObject {
         // Never persist .relevance — it's transient (active only while a query is live).
         let persistedSort = sort.first?.field == .relevance ? LibrarySort.default : sort
         if let d = try? JSONEncoder().encode(ViewState(filter: filter, sort: persistedSort, scopeID: scope?.id)) {
-            UserDefaults.standard.set(d, forKey: viewStateKey)
+            defaults.set(d, forKey: viewStateKey)
         }
     }
     private func restoreViewState() {
 #if DEBUG
         if isUITestMode { return }   // clean defaults for deterministic tests; don't inherit owner state
 #endif
-        guard let d = UserDefaults.standard.data(forKey: viewStateKey),
+        guard let d = defaults.data(forKey: viewStateKey),
               let s = try? JSONDecoder().decode(ViewState.self, from: d) else { return }
         var f = s.filter
         f.pathPrefix = Self.sanitizedPathPrefix(f.pathPrefix, against: rootStore.discoveredPathPrefix)
