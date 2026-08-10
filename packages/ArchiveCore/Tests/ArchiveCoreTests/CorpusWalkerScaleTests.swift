@@ -106,6 +106,14 @@ final class CorpusWalkerScaleTests: XCTestCase {
         XCTAssertEqual(warm.entries.count, result.entries.count,
                        "two passes over an unchanged tree must agree; if they do not, one of them is wrong")
 
+        // (4) The YARDSTICK — `W26.verify-fu1`. See `ScaleLaneCalibration`: a per-file absolute measured
+        // here is not the per-file absolute the app pays, so this lane also measures a reference the
+        // other lane measures identically, and the harness compares the two RATIOS rather than the two
+        // absolutes. Equally warm with (3) by construction: it runs immediately after it.
+        let calibration = ScaleLaneCalibration.measure(
+            lane: "core", root: root, warmWalkSeconds: warmSeconds, filesSeen: result.filesSeen)
+        print(calibration.line)
+
         let files = Double(max(result.filesSeen, 1))
         func perFile(_ seconds: TimeInterval) -> String {
             String(format: "%.1f", seconds / files * 1_000_000)
