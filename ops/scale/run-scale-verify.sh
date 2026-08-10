@@ -49,6 +49,7 @@ done
 [ -n "$ROOT" ] || ROOT="$SCRATCH/scale-corpus-$( [ "$SELF_TEST" = 1 ] && echo selftest || echo "$FILES" )"
 [ -n "$MIN_FILES" ] || MIN_FILES="$FILES"
 BIN="$REPO/build/scale/scale-corpus"
+HOSTILE="$ROOT-hostile"
 BEFORE="$SCRATCH/manifest-before.tsv"
 AFTER="$SCRATCH/manifest-after.tsv"
 REPORT="$SCRATCH/report.txt"
@@ -91,6 +92,10 @@ fi
 # ── 2. the before manifest ────────────────────────────────────────────────────────────────────────
 step "fingerprinting the tree BEFORE any walk"
 "$BIN" manifest --root "$ROOT" --out "$BEFORE" || exit 1
+# The hostile sibling is walked too, so it needs the same guard — and it is the more interesting half:
+# these are the files the walker must report as unreadable, and a "fix" that made them readable (or
+# writable) would show up here as a ctime change rather than as a passing test.
+"$BIN" manifest --root "$HOSTILE" --out "$BEFORE.hostile" || exit 1
 
 # ── 3. the ArchiveCore lane ───────────────────────────────────────────────────────────────────────
 step "ArchiveCore lane — walk, fingerprint pass, cancel semantics"
@@ -100,12 +105,48 @@ CORE_LOG="$SCRATCH/core-lane.log"
   # RELEASE, deliberately. A debug ArchiveCore walks at ~350 us/file (measured on the self-test tree),
   # which is an -Onone artefact and would make the headline number a fiction: the app ships optimised,
   # and the ~12 s baseline this lane is measured against was taken with optimised Foundation calls.
-  ARCHIVE_SCALE_ROOT="$ROOT" ARCHIVE_SCALE_MIN_FILES="$MIN_FILES" \
+  ARCHIVE_SCALE_ROOT="$ROOT" ARCHIVE_SCALE_HOSTILE_ROOT="$HOSTILE" \
+  ARCHIVE_SCALE_MIN_FILES="$MIN_FILES" \
     xcrun swift test -c release --build-path .build --filter 'CorpusWalkerScaleTests' 2>&1
 ) | tee "$CORE_LOG"
 grep -q 'with 0 failures' "$CORE_LOG" || fail "ArchiveCore scale lane did not pass (see $CORE_LOG)"
 grep -q 'tests skipped' "$CORE_LOG" && fail "ArchiveCore scale lane SKIPPED — the env gate did not take"
 grep -E '^ *(SCALE|filesSeen|CorpusWalker|old resourceValues|footprint)' "$CORE_LOG" > "$REPORT"
+
+# ── 3b. the Reader warm-start lane ────────────────────────────────────────────────────────────────
+# Cold index build, warm start, steady revalidation, and the cancel semantics `W26.idx` never ran at
+# scale. This is the app-HOSTED unit bundle, which since 2026-07-30 renders nothing under
+# `ArchiveTestHost` — it draws no window and never touches the owner's screen or their granted root.
+# `-only-testing` keeps it to the unit bundle; the UITests belong to the VM lane, never the host.
+#
+# The corpus path is handed over in a FILE, not an env var. A `TEST_RUNNER_`-prefixed build setting is
+# the documented way to forward environment into a test process, and the build tool does accept it — but
+# measured here, the value never reaches an app-HOSTED unit test: every case skipped while the run still
+# reported TEST SUCCEEDED. The path is fixed rather than derived from $SCRATCH, because inside the
+# sandbox the test can only compute an absolute /Users/<name>/… path (its own $HOME is the container).
+step "Reader lane — cold index, warm start, steady revalidation, cancel semantics"
+READER_LOG="$SCRATCH/reader-lane.log"
+HANDSHAKE="$HOME/Library/Caches/ArchiveSuiteScale/scale-lane-root.txt"
+mkdir -p "$(dirname "$HANDSHAKE")"
+printf '%s\n%s\n' "$ROOT" "$MIN_FILES" > "$HANDSHAKE"
+(
+  cd "$REPO/ArchiveReader/macOS" || exit 1
+  export PATH=/opt/homebrew/bin:$PATH
+  xcodegen generate >/dev/null 2>&1
+  xcodebuild test -scheme ArchiveReader -destination "platform=macOS" \
+    -only-testing:ArchiveReaderTests/LibraryIndexScaleTests \
+    -derivedDataPath ./build/scale-DD 2>&1
+) | tee "$READER_LOG" | grep -E '^(SCALE|  |Test Suite .Selected|.*(error|failed|passed|Skipped))' | tail -40
+if grep -q 'TEST SUCCEEDED' "$READER_LOG"; then
+  ok "Reader warm-start lane passed"
+else
+  fail "Reader warm-start lane did not pass (see $READER_LOG)"
+fi
+# A SKIPPED case is a FAILED lane here. This is the check that caught the env-forwarding gap above:
+# without it the run reported TEST SUCCEEDED over two cases that had measured nothing at all.
+grep -qE "Test Case.*' skipped" "$READER_LOG" && \
+  fail "Reader lane SKIPPED — the handshake did not reach the test process ($HANDSHAKE)"
+grep -E '^ *(SCALE|filesSeen|cold|WARM|steady|sqlite|footprint)' "$READER_LOG" >> "$REPORT"
 
 # ── 4. the after manifest, and the no-write assertion ─────────────────────────────────────────────
 step "fingerprinting the tree AFTER, and diffing"
@@ -115,13 +156,19 @@ if "$BIN" compare --before "$BEFORE" --after "$AFTER"; then
 else
   fail "the discovery lane MUTATED the tree — see the diff above"
 fi
+"$BIN" manifest --root "$HOSTILE" --out "$AFTER.hostile" || exit 1
+if "$BIN" compare --before "$BEFORE.hostile" --after "$AFTER.hostile"; then
+  ok "no-write assertion holds across the hostile sibling too"
+else
+  fail "the discovery lane MUTATED the hostile tree — see the diff above"
+fi
 
 # ── 5. self-test: the no-write guard must be able to fail ─────────────────────────────────────────
 # A guard nobody has watched fail is not a guard. This mutates one file's tags the way a real write
 # would and requires `compare` to catch it; then it restores the tree and requires green again.
 if [ "$SELF_TEST" = 1 ]; then
   step "self-test — proving the no-write guard has teeth"
-  VICTIM="$(find "$ROOT" -name '*.pdf' -not -path '*zz-hostile*' | head -1)"
+  VICTIM="$(find "$ROOT" -name '*.pdf' | head -1)"
   if [ -z "$VICTIM" ]; then
     fail "self-test found no file to mutate"
   else
