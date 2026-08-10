@@ -368,12 +368,18 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   [S · LOW · ops/trackers].** Filed 2026-08-10 from the Daemon Report walkthrough — the owner asked why the
   digest went **"237 finished" → "246 finished" overnight when only 8 items closed**, and the 9th turned out
   not to exist.
-  **The arithmetic.** `ops/autonomous/status-digest.sh:125` counts ticked bullets across BOTH
-  `SUITE_TODO.md` and `SUITE_TODO_DONE.md` with no dedup, so an item that ships *and* also leaves a ticked
-  stub behind scores **twice, permanently** — the drift only ever grows. Two do today: `W26.fixturehang` (stub L352, full
-  entry `SUITE_TODO_DONE.md` L856) and `W26.verify-fu1` (stub L360, full entry L300). So the digest reads
-  **246 when the true figure is 244**; last night's "237" was already 1 high on the same account (true 236),
-  making the real overnight delta **+8**, which matches the 8 items that actually closed.
+  **The arithmetic.** The `done_todo=` assignment in `ops/autonomous/status-digest.sh` (line 131 as of
+  `9b6a5d9`; cite the VARIABLE, not a line number — a sibling commit in this same session already shifted the
+  file by +5) counts ticked bullets across BOTH `SUITE_TODO.md` and `SUITE_TODO_DONE.md` with no dedup, so an
+  item that ships *and* also leaves a ticked stub behind scores **twice, permanently** — the drift only ever
+  grows. Two do today: `W26.fixturehang` (stub in `SUITE_TODO.md`, full entry in `SUITE_TODO_DONE.md`) and
+  `W26.verify-fu1` (same shape). Grep the tags rather than trusting any line number in this entry. So the
+  digest reads **246 where 244 is the defensible figure**; last night's "237" was already 1 high on the same
+  account (true 236), making the real overnight delta **+8**, which matches the 8 items that actually closed.
+  ⚠️ **244 is still not a count of finished ITEMS**, and this item does not make it one: it keeps the two
+  indented `- [x]` sub-bullets (`W21.vmgui-c`, `G5`) that are sub-steps of entries which are themselves
+  `[ ]`. So "N finished" remains items + a couple of sub-steps. Deciding whether that is acceptable is part
+  of the work; if it is not, the fix is a tag-based count, not the positional lint below.
   **Why the gate cannot see it.** `check-tracker-sync.sh` compares the plan's `WORK QUEUE` against
   `SUITE_TODO.md`, only for items present in **both**, and deliberately applies first-occurrence-wins so that
   "a live entry wins over a stale archived twin". TODO-vs-DONE duplication is *precisely* the shape it skips,
@@ -383,18 +389,35 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   session will otherwise re-derive). **Fold each stub's prose into its `SUITE_TODO_DONE.md` entry, then
   remove the stub** — `CLAUDE.md` §*Docs & backlog convention* is explicit that `SUITE_TODO.md` carries
   **OPEN items only** and that shipping moves the *whole* entry.
-  **Then guard it.** In `SUITE_TODO.md` a **top-level ticked bullet** is always this bug, and the check has
-  no false positives: the only other ticked lines are *indented* sub-bullets inside still-open entries (L1032
-  `W21.vmgui-c`, L1690 `G5`), which are legitimate prose.
-  The exact pattern to fail on is `- [x]` at **column 0**, no leading whitespace.
-  ⚠️ Note while writing the check: the CURRENT regex is `^\s*[-*].*\[[xX]\]`, which also matches any wrapped
-  prose line that merely *begins* with `**bold**` and happens to contain a ticked bullet later in the line —
-  drafting this very entry inflated the count by 2 that way before it was caught. The column-0 rule avoids
-  that class entirely, which is a second reason to prefer it.
-  Add it as a `health-gate.sh` step and **prove it
-  RED against the two stubs before folding them**, so the guard is demonstrated to bite rather than asserted
-  to. Counting distinct item tags instead would be the alternative, but 95 of the ticked lines carry no
-  parseable tag, so the positional rule is the cheaper and stricter one.
+  **⭐ DO THE CHEAP FIX FIRST — it is a one-line change that kills the whole class.** Both counters use the
+  loose `^\s*[-*].*\[…\]`, which matches any wrapped prose line that merely *begins* with `**bold**` and
+  happens to contain a checkbox later in the line — drafting this very entry tripped it **twice** (inflating
+  the count by 2, then by 1 again while writing the correction), which is about as direct a demonstration of
+  the defect as an entry can carry. **An immune form already exists four lines below**, in the `hold=`
+  assignment — it anchors the checkbox to the bullet with `[[:space:]]+` instead of letting `.*` wander.
+  Retighten `open_todo=` and `done_todo=` to that shape and the bold-prose class is gone from both numbers.
+  ⚠️ **`open_todo` — the owner-facing "N tasks to do" — has the IDENTICAL exposure** and was omitted from the
+  first draft of this entry. It is the same one-line fix. Better still, `next-queue-item.sh` and
+  `check-tracker-sync.sh` already share a fence-and-blockquote-aware item parser (proven by
+  `prove-tracker-sync.sh`), so a `[x]` inside a code fence or a `>` quote is *also* miscounted today by both
+  digest numbers; reusing that parser is the strictly correct end state.
+  **Only then consider the positional lint.** In `SUITE_TODO.md` a ticked bullet at **column 0** is always the
+  stub bug; the indented sub-bullets `W21.vmgui-c` and `G5` are legitimate prose, and are what keeps the rule
+  false-positive-free.
+  The literal pattern is `- [x]` anchored at the start of the line, with no leading whitespace.
+  🛑 **If you add it to `health-gate.sh`, add it WARN-ONLY** — as `coherence` and `tracker-sync` already are,
+  and *unlike* `context-budget`. A hard step here parks the entire overnight run over a docs-hygiene nit: land
+  the lint in a checkpoint commit, run out of budget before folding the stubs, and the next cycle REDs, boots
+  the launchd job and writes a park note to the owner's Desktop. If it is ever made hard, then **the lint and
+  the stub folding MUST be one commit** — and take the RED proof locally against a scratch copy, not by
+  committing a knowingly-red gate.
+  **On the tag-based alternative — reconciling the caveat above, because these are two different asks.**
+  Counting distinct item *tags* would give a true count of finished items (149 today, not 244) and would
+  settle the sub-step question outright — but it **redefines** the metric rather than repairing it, and 95 of
+  the ticked lines carry no parseable tag, so it cannot double as the lint. So: use a tag count if the owner
+  wants "N finished" to mean *items*; use the anchored regex plus the column-0 lint if he wants **today's**
+  metric to stop drifting. Don't silently pick one — the first changes the number he has been reading for
+  weeks, and this entry was filed to make that number trustworthy, not to move it.
 
 - [ ] **W26.vmuitest-blind — EVERY Reader XCUITest is currently RED in the Tart VM because the
   app-under-test comes up with NO WINDOW, and the app itself is fine [M · HIGH · ops/GUI].** Filed

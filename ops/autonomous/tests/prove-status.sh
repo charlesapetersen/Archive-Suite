@@ -75,15 +75,37 @@ printf '%s' "$OUT" | grep -q 'Working now' && ok "working state" || bad "working
 # show the wedged session it was added to reveal. The assertion it replaces passed ONLY because this test
 # hand-backdated the lock 2 hours, which production cannot do. That backdating is kept below on purpose:
 # even a 2-hour-old lock must not resurrect the claim.
+#
+# ⚠️ KEYED ON THE DATA SOURCE, NOT ON THE WORDING — deliberately, and this matters. An earlier draft of this
+# guard asserted the absence of the PHRASE "into its current task". That would have gone RED on the very fix
+# the ⛔ note in status-digest.sh sanctions: a session-start stamp written once at acquire time renders a
+# TRUE "Working now — 3 hours into its current task", and since `status-proof` is a HARD health-gate step
+# (health-gate.sh:220) the gate would have parked the daemon and told the implementer to revert correct work.
+# What is actually forbidden is deriving a duration from the LEASE. So: (a) the renderer must not read
+# engine.lock at all, and (b) a backdated lease must not surface as a duration. A future session-start stamp
+# passes both, because this harness never creates one.
 touch -t "$(date -v-2H '+%Y%m%d%H%M' 2>/dev/null || date -d '2 hours ago' '+%Y%m%d%H%M')" "$S/engine.lock"
+# The backdating is the guard's whole premise, so prove it took effect. If both `date` forms fail (non-BSD,
+# non-GNU, or a PATH stub) the substitution is empty, `touch -t ""` errors, and NO lock is created — and with
+# `set -uo pipefail` and no `-e` this harness would sail on, silently degrading to the no-lock case below and
+# reporting a green that proved nothing about the 2-hour input.
+[ -f "$S/engine.lock" ] && ok "the 2-hour backdated lease exists (guard premise holds)" \
+  || bad "backdating engine.lock FAILED — every assertion below it is now vacuous" "date -v-2H and date -d both unusable?"
 OUT="$(RUNNING=1 run)"
-printf '%s' "$OUT" | grep -q 'into its current task' \
-  && bad "task-age claim is BACK — read the ⛔ note in status-digest.sh STATE 1 before re-adding it" "$OUT" \
-  || ok "no task-age claim, even with a hand-backdated 2-hour-old lock"
+# (a) source: no non-comment line of the renderer may touch the lease. Report the offending line, not a blank.
+OFFENDS="$(grep -vE '^[[:space:]]*#' "$DIGEST" | grep -n 'engine\.lock' || true)"
+[ -n "$OFFENDS" ] \
+  && bad "status-digest.sh reads engine.lock again — it is a heartbeat LEASE; see the ⛔ note in STATE 1" "$OFFENDS" \
+  || ok "renderer never reads engine.lock (only the ⛔ comment mentions it)"
+# (b) behaviour: a 2-hour-old lease must not surface as a duration anywhere in the output.
+printf '%s' "$OUT" | grep -qE '2 hours|119 min|120 min' \
+  && bad "the lease's age is being rendered as a duration again" "$OUT" \
+  || ok "a 2-hour-old lease surfaces no duration"
 printf '%s' "$OUT" | grep -q 'Working now' && ok "still reports the working state" || bad "working state lost" "$OUT"
+# Housekeeping, not an assertion: leave no backdated lease for the sections below. The old
+# "degrades with no lock file" check that used to live here is GONE on purpose — with the renderer no longer
+# opening the file, it re-tested the no-lock state already asserted at the top of [2].
 rm -f "$S/engine.lock"
-OUT="$(RUNNING=1 run)"
-printf '%s' "$OUT" | grep -q 'Working now' && ok "unchanged with no lock file at all" || bad "broke without engine.lock" "$OUT"
 
 echo "[3] running + idle + a 429 in the last session -> THROTTLED, and explicitly not 'out of work'"
 echo "$(( $(date +%s) - 3000 ))" > "$S/idle.since"

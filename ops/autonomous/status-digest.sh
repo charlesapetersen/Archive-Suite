@@ -89,9 +89,14 @@ elif [ "$running" = 1 ]; then
       # therefore NEVER show the wedged-for-three-hours session it was added to reveal; a lock older than
       # $STALE (1500s) is taken over by the next cycle anyway. The old test "proved" it only by backdating
       # the lock 2 hours by hand — an input production cannot produce.
-      # Staleness is already answered honestly two lines down by "latest change <relative>" plus the Health
-      # row, which is what the owner said he actually reads. If a true task age is ever wanted, it needs a
-      # separate session-start stamp written once at acquire time — not this file's mtime.
+      # Staleness is already answered honestly by the RENDER block far below (the "Done" row, printed at the
+      # `printf … 'latest %s'` line, plus the Health row) — which is what the owner said he actually reads.
+      # NB the exact wording differs by branch: "· latest <relative>" when there were commits in the last 24h,
+      # "· latest change <relative>" only in the nothing-in-24h branch. Don't grep for one and conclude the
+      # substitute is missing.
+      # If a true task age is ever wanted it needs a separate session-start stamp written ONCE at acquire time
+      # (next to `touch "$LOCK"`), never this file's mtime. prove-status.sh's guard is keyed on the lease, not
+      # on the wording, precisely so that fix does not trip it.
       ;;
     *)
       idle=$(( $(date +%s) - since ))
