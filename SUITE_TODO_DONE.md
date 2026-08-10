@@ -297,6 +297,103 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.verify-fu1 — the two lanes were never measuring in the same world, and then "unclamped"
+  turned out to be the wrong bar for the number that came out. ✅ CLOSED 2026-08-10** `94e30d8` ->
+  `11e243d` -> `15df472` -> this commit. The item asked for ONE trustworthy per-file cost where the
+  harness offered two — ArchiveCore 248 µs/file against the Reader lane's 56 µs/file on the same
+  150,000-file scratch tree — and said to settle it *"by measuring one path both ways in one process
+  rather than by arguing."*
+
+  🔺 **IT IS THE MEASURING PROCESS, AND NONE OF THE ITEM'S THREE CANDIDATES.** Not the release
+  test-harness build, not the three live 116k-entry arrays, not URL bridging. Decomposing the walk into
+  its primitives and running the identical decomposition in both processes shows **every** filesystem
+  primitive ~5-6× dearer in the `swift test` lane, including bare `FileManager.enumerator` iteration
+  (6.3 vs 1.4 µs/entry) and a bare `stat(2)` (16.6 vs 3.4 µs/entry) — code paths containing no
+  ArchiveCore at all. An unattended daemon session runs at `QOS_CLASS_BACKGROUND`, so everything it
+  spawns is clamped to efficiency cores (`qos_class_self() == 9`, and
+  `pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0)` *fails* while the task clamp is in
+  place). The app-hosted lane escapes only because `testmanagerd`, not the session's shell, launches it.
+  So the item's premise — "Debug being 4.4× faster than release is the wrong direction" — was reasoning
+  about the wrong two variables; **debug vs release is ~5% on this walk** (230.1 vs 218.7 µs/file, same
+  tree), because it is syscall-bound and there is nothing for `-O` to inline away.
+
+  🔺 **AND THEN THE FIX'S OWN HEADLINE WAS WRONG IN THE SAME FAMILY, CAUGHT BEFORE IT SHIPPED.** The
+  first working version declared *"a full walk costs 40.1 µs/file (qos=25, unclamped)"* — but the app
+  does not walk unclamped either: `LibraryScan.onDedicatedThread` runs discovery on a dedicated
+  `.utility` thread. `ScaleLaneCalibration` was wrong twice in the same direction and the two faults hid
+  each other: it classified utility itself as *clamped* (disqualifying the only band anyone wants a
+  number from) while blessing user-initiated as the one to quote. The bar is now `quotable` — sampled at
+  the band `LibraryScan` walks in, **or better** — and the Reader lane takes its sample on a `Thread`
+  configured exactly like the app's, asserting it actually reached utility, because if the host process
+  were itself clamped the thread could not and the number would silently describe some other band. A
+  sample from above the band is still quotable (a faster band cannot overstate a cost) but the harness
+  labels it a floor rather than dressing it up as the exact figure.
+
+  **The shape of the answer:** a per-file *absolute* belongs to the thread that took it; what survives
+  the environment is the *ratio* of the full walk to a reference pass taken moments later at the same
+  warmth. `ScaleLaneCalibration` lives in the product module, not either test bundle — `ArchiveReaderTests`
+  cannot import `ArchiveCoreTests`, and a yardstick each lane implemented for itself would drift, which
+  makes the cross-lane check a green that means nothing. The reference is `CorpusWalker.scanFingerprints`
+  (the shipped stat-only pass), deliberately **not** the walk's own dominant cost — the trustworthy tag
+  read, ~90% of it — because normalising by the thing under test is vacuous.
+
+  **Measured at 150,000 files, one run, both lanes on the same tree:**
+
+  | | ArchiveCore lane | Reader lane |
+  |---|---|---|
+  | QoS reached | 9 (background clamp) — `quotable=no` | **17 (.utility, the app's band)** — `quotable=yes` |
+  | warm full walk | 242.8 µs/file | **40.8 µs/file** |
+  | reference (`scanFingerprints`) | 26.1 µs/file | 4.6 µs/file |
+  | **normalised (walk ÷ reference)** | **9.31** | **8.86** |
+
+  **6.0× apart in the absolutes; 1.05× apart once normalised.** The clamp is the whole of it. Two more
+  scales agree: 30,000 files → 5.5× absolute, 1.22× normalised; 150k on an earlier pass → 6.9× and 1.18×.
+  The residual ~1.2× wanders in *both* directions across runs, so it is spread, not a systematic bias.
+
+  🔺 **THE CORRECTION RUNS BACKWARDS THROUGH `W26.verify`, AND REVERSES ITS HEADLINE.** That item
+  recorded *"cold walk 37.25 s (248 µs/file), ~3× the plan's ~12 s projection — the model was right, its
+  absolute was not."* Every one of those absolutes came from the clamped lane. The real cold walk is
+  **6.1 s (40.8 µs/file)** and `scanFingerprints` is **0.69 s (4.6 µs/file)**, so the plan's ~12 s
+  projection was not 3× optimistic — it was ~2× **pessimistic**. `W26.verify`'s affordability conclusion
+  still holds; it held for a reason weaker than the truth. Corrected in
+  `ArchiveReader/KNOWN_ISSUES.md` (rewritten — it is a "rely on this" surface) and annotated in place in
+  that item's entry above (left legible rather than rewritten).
+
+  📌 **ONE FIGURE IS DELIBERATELY NOT CORRECTED, AND SAYS SO: the 1.19× vs the pre-W26 API pattern.** It
+  is a within-process comparison, so the clamp does not invalidate it — but it has only ever been taken
+  *in* the clamped lane, and the clamp taxes `stat(2)` hardest, which is exactly where `CorpusWalker`'s
+  extra cost sits. Three runs of that lane on the same tree give 1.19× / 1.32× / 1.48×. Recorded as
+  "1.2–1.5×, shape trustworthy, exact factor not", rather than quietly quoting the first run.
+
+  🔺 **A NEW MEASUREMENT SETTLED A QUESTION NOBODY HAD ASKED: the QoS cliff is `.background` alone.**
+  `.utility` 40.8 µs/file vs `.userInitiated` 42.6 µs/file on the same tree in the same process — no
+  difference worth the name (`SCALE qosband`). So the ~6× is not a general "lower QoS costs more"
+  gradient; it is the background clamp specifically. Which matters for the app: discovery sitting at
+  `.utility` costs nothing, and anything that let it fall to `.background` would cost everything.
+
+  🔺 **THE DRAFT'S OWN PROOF WAS RED AGAINST A COMPARATOR THAT WAS CORRECT.** An interrupted session had
+  left `--prove-calibration` reporting 7 of 9; the two failing checks piped the verdict into `grep -q`,
+  which exits on the first match while the function is still writing, so the writing subshell died 141
+  and `pipefail` scored the pipeline as failed. They capture and match a string now. **A proof that fails
+  when the thing it watches is correct is worse than no proof** — and this one would have been read as
+  "the comparator is broken" by whoever ran it next.
+
+  Then the proof got its own mutation pass (throwaway copies in a `mktemp` dir, baseline green first, the
+  real harness never written): headline picks the clamped lane → RED on both headline checks; tolerance
+  widened to infinity → RED on both disagreement cases; a missing calib line treated as a skip → RED on
+  all three `rc=2` cases; the ratio never computed → RED on both disagreement cases. **4/4, each failing
+  only what it should.** The comparator's tolerance is 2.0× and the width is deliberate: repeated runs
+  spread ~20%, and the disagreement it exists to catch was 4.4×. A missing or unparseable calib line
+  FAILS rather than skips — a lane that quietly stopped calibrating would otherwise take the whole check
+  with it, silently, which is the exact failure mode that produced this item.
+
+  **Green:** `--prove-calibration` 11/11; two full 150k runs and one 30k run of `run-scale-verify.sh`, all
+  ✅ GREEN including the no-write assertion over 150,650 paths plus the hostile sibling (taken by a
+  separate process, plan §7a.7); ArchiveCore release build + tests clean; **Reader, Processor and Notes
+  test bundles all built clean with no new warnings** — the cross-app rebuild a shared-ArchiveCore change
+  owes, even though `quotable` has no consumer outside the two scale lanes. Scratch corpora only, wiped
+  after; the real corpus was never touched.
+
 - [x] **W26.verify — the wave's scale and safety verification ran, and the number the item told me to
   expect was wrong in BOTH directions. ✅ CLOSED 2026-08-10** `32ed9d2` -> `08ef598` -> `43a299a` -> this
   commit. Gate: a 100k+ run on a **scratch** corpus (never the real one), timings against the ~12 s
@@ -322,6 +419,14 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
   **Measured at 150,000 files** (release, warm disk, this machine; `unreadable=0 dirErrors=0 vanished=0`,
   so the pass reports itself **clean**, which is the only state that authorises a prune):
+
+  > 🔴 **THE PER-FILE ABSOLUTES IN THIS TABLE ARE ~6× INFLATED — corrected by `W26.verify-fu1` (below), and
+  > left in place rather than rewritten so the correction is legible.** Every row here except the warm-start
+  > and SQLite figures was taken inside a `swift test` process that an unattended daemon session had clamped
+  > to `QOS_CLASS_BACKGROUND`; the app walks at `.utility`. **Cold walk is 6.1 s / 40.8 µs/file, not 37.25 s
+  > / 248 µs/file, and `scanFingerprints` is 0.69 s / 4.6 µs/file, not 4.30 s / 28.7 µs/file.** Which
+  > reverses this entry's own headline: the plan's ~12 s projection was not 3× optimistic, it was ~2×
+  > **pessimistic**. See `ArchiveReader/KNOWN_ISSUES.md` for the corrected set.
 
   | | |
   |---|---|
@@ -353,6 +458,8 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   **Affordability, which is what the item actually needed, holds comfortably.** Worst measured case is one
   ~37 s pass, in the background, off the main actor, once — against Spotlight's answer for the same corpus,
   which was **zero rows**. Warm start is 0.463 s and matches the plan's 0.61 s / 4.3 µs-per-row projection.
+  *(`W26.verify-fu1`: that "~37 s" is the clamped figure — the real one-off cost is **~6 s**. The conclusion
+  was right for a reason weaker than the truth.)*
   The cache is 390 B/row, well inside the 1 KiB/row ceiling a disposable cache deserves.
 
   **The completion grep became a runnable audit** (`ops/despotlight-audit.sh`), split into §7a.7's two

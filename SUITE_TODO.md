@@ -357,20 +357,11 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   Full entry, the five mutation proofs, the two same-shape leaks it also closed, and the self-inflicted
   defaults incident it repaired: `SUITE_TODO_DONE.md` §Wave 26.
 
-- [ ] **W26.verify-fu1 — the scale harness's two lanes disagree by 4.4x on the same tree, and nothing
-  explains it [S · LOW · measurement].** Filed 2026-08-10 by `W26.verify`. **Not a product defect** — no
-  perf claim rests on it, and both lanes are green. Measured on the same 150,000-file scratch corpus in one
-  run: the ArchiveCore lane (release, `swift test`) walks it at **248 us/file cold and 246 us/file warm**,
-  while the Reader lane (Debug, app-hosted, `LibraryScan.pass` → the same `CorpusWalker.scan`) walks it at
-  **56 us/file**. Debug being 4.4x *faster* than release is the wrong direction for every obvious
-  explanation, and cold ≈ warm inside the ArchiveCore lane rules out the page cache (which was the first
-  hypothesis, and it was wrong). Candidates not yet distinguished: SwiftPM's release test-harness build
-  (is the walker actually inlined/optimised under `swift test -c release`?); three 116k-entry `CorpusEntry`
-  arrays alive at once in the ArchiveCore case (733 MiB footprint vs 890 MiB, but very different allocation
-  patterns); and per-process `FileManager`/URL-bridging differences. **Why it matters:** the plan's §2
-  arithmetic — and any future "is a full walk affordable?" question — needs ONE trustworthy per-file
-  number, and right now the harness offers two. Fix by measuring one path both ways in one process rather
-  than by arguing. `ops/scale/run-scale-verify.sh`. | files: packages/ArchiveCore/Tests/ArchiveCoreTests/CorpusWalkerScaleTests.swift | S | low | none
+- [x] **W26.verify-fu1 — the two lanes were never measuring in the same world, and "unclamped" was the
+  wrong bar for the number that came out. ✅ CLOSED 2026-08-10** — full entry in `SUITE_TODO_DONE.md`
+  §Wave 26. The 4.4× was the *measuring process*, not the walker; the corrected per-file cost is
+  **40.8 µs/file (6.1 s at 150k)**, which also corrects `W26.verify`'s headline in the opposite direction
+  from the one it claimed.
 
 - [ ] **W26.verify-fu2 — the warm-start UI has still never been checked in the VM, and two of the three
   checks need infrastructure that does not exist [M · MED · GUI].** Split out of `W26.verify` 2026-08-10;

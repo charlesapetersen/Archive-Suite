@@ -2,31 +2,44 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## 📏 MEASURED (`W26.verify`, 2026-08-10) — what Spotlight-free discovery actually costs at 150k
+## 📏 MEASURED (`W26.verify`, corrected by `W26.verify-fu1`, 2026-08-10) — what Spotlight-free discovery costs at 150k
 
 Recorded because the de-Spotlight plan's projection (~12 s at 150k) is **not** what a measurement says, and
 the plan is being deleted. Synthetic **scratch** corpus, 150,000 files / 124,647 PDFs / 652 dirs / depth 7 /
-115,999 Read-or-Unread-tagged; release; never the real corpus. Harness: `ops/scale/run-scale-verify.sh`.
+115,999 Read-or-Unread-tagged; never the real corpus. Harness: `ops/scale/run-scale-verify.sh`.
 
-- **Cold full walk: 37 s** (248 µs/file) — one pass, in the background, off the main actor. ~3× the plan's
-  projection. Against it: Spotlight's answer for the owner's real corpus on 2026-08-04 was **zero rows**.
-- **Vs the API pattern it replaced: 1.19×** (31.2 s on the same tree, same process, both passes warm) —
-  close to the +15% the plan predicted from `CorpusWalker`'s extra `stat(2)` per entry. ⚠️ Compare only
-  passes that are equally warm: timing the walker first and the old path second reports a spurious 1.36×,
-  because the first pass warms the cache for the second.
-- **Warm start: 0.463 s** for 115,999 cached rows (4.0 µs/row), matching the plan's 4.3 µs/row projection.
+> ⚠️ **Every per-file absolute below is quoted from a sample taken in the QoS band the app actually walks
+> in** — `LibraryScan.onDedicatedThread` runs discovery on a dedicated `.utility` thread. That qualifier is
+> load-bearing and is the whole of `W26.verify-fu1`: this section's first version quoted **248 µs/file**,
+> which was measured inside a `swift test` process an unattended daemon session had clamped to
+> `QOS_CLASS_BACKGROUND`. Under that clamp every filesystem primitive — including a bare `stat(2)`, which
+> contains no code of ours — costs ~6× more. **Do not quote a per-file number from a lane that did not
+> report `quotable=yes`.**
+
+- **Cold full walk: 6.1 s** (40.8 µs/file) — one pass, in the background, off the main actor. That is **half**
+  the plan's ~12 s projection, not 3× it; the earlier "37 s / ~3× worse" reading was the clamp. Against it:
+  Spotlight's answer for the owner's real corpus on 2026-08-04 was **zero rows**.
+- **Warm start: 0.460 s** for 115,999 cached rows (4.0 µs/row), matching the plan's 4.3 µs/row projection.
   This is the number a user experiences on every launch after the first.
-- **Fingerprint-only revalidation: 4.3 s** (28.7 µs/file). **Steady revalidation: 5.2 s.**
-- **Cache size: 43.2 MiB, 390 B/row** including WAL/shm. **Footprint: 355 MiB** for one walk.
+- **Fingerprint-only pass** (warm start's first phase): **0.69 s** (4.6 µs/file). **Steady revalidation: 3.4 s**
+  — the fingerprint pass plus the trustworthy tag reads the cache cannot vouch for.
+- **Cold index persist: 1.58 s** for 115,999 rows (13.7 µs/row). **Cache size: 43.2 MiB, 390 B/row**
+  including WAL/shm. **Footprint: +277 MiB** across the Reader lane's full cold-walk-and-persist sequence.
+- **Vs the API pattern it replaced: 1.2–1.5×** (three runs on the same tree: 1.19×, 1.32×, 1.48×) — the
+  right side of the +15% the plan predicted from `CorpusWalker`'s extra `stat(2)` per entry, but noisier
+  than one run suggests. ⚠️ Two cautions. Compare only passes that are equally *warm*: timing the walker
+  first and the old path second reports a spurious 1.36×, because the first pass warms the cache for the
+  second. And this ratio is the one figure here that has only ever been taken **in the clamped lane** — the
+  clamp taxes `stat(2)` heavily, which is exactly where the walker's extra cost is, so if anything it
+  overstates the penalty. The shape is trustworthy; the exact factor is not.
 - **Discovery writes nothing** — every path's inode, size, mtime, ctime and xattr digest identical before
   and after, measured by a separate process (150,650 paths, and the hostile sibling too).
 - A cancelled pass is `cancelled`, not `completed`, not `isClean`, and prunes nothing; a cancelled warm
   revalidation leaves `asOf == nil` with every row preserved.
-
-⚠️ **Open measurement discrepancy (`W26.verify-fu1`):** the app-hosted Reader lane walks the same tree at
-**56 µs/file** against ArchiveCore's 246 µs/file — 4.4× apart, in the direction optimisation does not
-explain, and not the page cache (cold ≈ warm within one lane). Treat the per-file absolute as unsettled
-until that closes; the 1.19× ratio and the warm-start figure are within-process and unaffected.
+- **The QoS cliff is `.background`, not "any non-default band."** Measured on the same tree in the same
+  process: `.utility` 40.8 µs/file vs `.userInitiated` 42.6 µs/file — no difference worth the name. It is
+  the background clamp alone that costs ~6×, so a shipping change that moved discovery to `.utility` from a
+  higher band would cost nothing, and one that let it fall to `.background` would cost everything.
 
 ## ✅ FIXED (`W26.previewzoom`) — the preview sheet's zoom/fit shortcuts did nothing; `⌘0` never reached it
 

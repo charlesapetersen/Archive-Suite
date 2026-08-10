@@ -179,6 +179,13 @@ choice for the *walk* matters far more than parallelism does:
 | **Whole Spotlight-free discovery** | — | **~4.2 s warm / ~6.7 s cold** |
 | Warm start: load + rebuild 150,000 persisted rows | 0.61–0.64 s | (4.3 µs/row) |
 
+> ✅ **CONFIRMED BY MEASUREMENT, 2026-08-10 (`W26.verify` + `W26.verify-fu1`).** A real 150,000-file scratch
+> run walks at **40.8 µs/file → 6.1 s**, inside this table's **~4.2 s warm / ~6.7 s cold** projection. Note
+> which row that vindicates: `W26.verify` first reported 37 s and called the projection "~3× optimistic",
+> but it had (a) measured inside a background-QoS-clamped process, ~6× inflated (`W26.verify-fu1`), and
+> (b) compared against the coarse `~12.4 s` enumerator-only row above rather than the refined whole-discovery
+> figure on this one. **This table was right.** Corrected numbers: `ArchiveReader/KNOWN_ISSUES.md`.
+
 Two notes on method: parallelism is **not** the main lever, and dropping to raw `getxattr` + binary-plist
 decode does **not** pay off as folklore suggests (2× serially, but it loses to `TaskGroup`-parallelised
 `resourceValues` and forfeits the audited path) — so **use `TagReading.read` as the read primitive** and get
