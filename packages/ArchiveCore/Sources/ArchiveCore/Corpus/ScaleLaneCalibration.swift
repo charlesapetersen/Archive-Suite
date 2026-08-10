@@ -16,12 +16,18 @@ import Foundation
 /// `pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0)` fails with the task clamp in place). The
 /// app-hosted test host escapes the clamp because `testmanagerd`, not the session's shell, launches it.
 ///
-/// **So a per-file absolute is a property of the process that took it, not of the walker.** What survives
-/// the environment is the *ratio* of the full walk to a reference pass measured in the same process,
+/// **So a per-file absolute is a property of the thread that took it, not of the walker.** What survives
+/// the environment is the *ratio* of the full walk to a reference pass measured on the same thread,
 /// moments apart, at the same cache warmth. Both lanes therefore emit a `SCALE calib` line, and the
 /// harness compares the two RATIOS. That is also why this type lives in the product module rather than in
 /// either test bundle: a yardstick each lane implemented for itself could drift, and a drifted yardstick
 /// turns the cross-lane check into a green that means nothing.
+///
+/// **And exactly one band gives the absolute anyone wants: the one the app walks in.** `LibraryScan`
+/// runs discovery on a dedicated `.utility` thread, so the Reader lane takes its calibration sample on a
+/// thread configured the same way and `quotable` is measured against that bar — see the property. Both
+/// halves matter: the ratio says the two lanes agree about the *walker*, and the shipping-band sample
+/// says what the walk *costs*. Neither answers the other's question.
 ///
 /// The reference is `CorpusWalker.scanFingerprints` — the shipped stat-only pass. Deliberately not the
 /// walk's own dominant cost (the trustworthy tag read, which is ~90% of it): normalising by the thing
@@ -30,12 +36,21 @@ public struct ScaleLaneCalibration: Sendable {
 
     /// Which lane took this sample — `core` or `reader`.
     public let lane: String
-    /// `qos_class_self()` in the measuring process. 9 = background, 17 = utility, 21 = default,
+    /// `qos_class_self()` on the measuring thread. 9 = background, 17 = utility, 21 = default,
     /// 25 = user-initiated, 33 = user-interactive, 0 = unspecified/legacy.
     public let qos: UInt32
-    /// True when the measuring process is clamped below the default band, i.e. when its absolute
-    /// per-file numbers are inflated and must not be quoted as a cost the app would pay.
-    public let clamped: Bool
+    /// Whether this sample's per-file **absolute** may be quoted as a cost the app would pay.
+    ///
+    /// The bar is the band the shipping discovery pass actually runs in: `LibraryScan`'s dedicated
+    /// thread is `.utility` (`LibraryScan.onDedicatedThread`, `revalidateOnDedicatedThread`), so a
+    /// sample taken at utility **or better** is quotable and one taken below it is not.
+    ///
+    /// Deliberately NOT "unclamped". The first draft of this type treated utility itself as a clamp,
+    /// which disqualified the only band anybody wants a number from and left the harness quoting a
+    /// user-initiated figure — a band the app never runs discovery in — as though it were the
+    /// shipping cost. Unspecified (0) is not quotable: it means the band could not be read, and a
+    /// measurement that cannot say where it was taken is not one to build arithmetic on.
+    public let quotable: Bool
     public let walkMicrosecondsPerFile: Double
     public let referenceMicrosecondsPerFile: Double
     public let filesSeen: Int
@@ -47,10 +62,14 @@ public struct ScaleLaneCalibration: Sendable {
 
     /// One machine-readable line, parsed by `ops/scale/run-scale-verify.sh`.
     public var line: String {
-        String(format: "SCALE calib lane=%@ qos=%u clamped=%@ files=%d walk=%.1f reference=%.1f normalised=%.2f",
-               lane, qos, clamped ? "yes" : "no", filesSeen,
+        String(format: "SCALE calib lane=%@ qos=%u quotable=%@ files=%d walk=%.1f reference=%.1f normalised=%.2f",
+               lane, qos, quotable ? "yes" : "no", filesSeen,
                walkMicrosecondsPerFile, referenceMicrosecondsPerFile, normalised)
     }
+
+    /// The QoS band the shipping discovery pass runs in — `LibraryScan`'s dedicated thread. A sample
+    /// taken here is the one the arithmetic should use; anything below it is inflated.
+    public static let shippingBand = UInt32(QOS_CLASS_UTILITY.rawValue)
 
     /// Time the reference pass **now**, and pair it with a full-walk timing the caller has just taken.
     ///
@@ -70,8 +89,7 @@ public struct ScaleLaneCalibration: Sendable {
         return ScaleLaneCalibration(
             lane: lane,
             qos: currentQoS,
-            clamped: currentQoS == UInt32(QOS_CLASS_BACKGROUND.rawValue)
-                  || currentQoS == UInt32(QOS_CLASS_UTILITY.rawValue),
+            quotable: currentQoS >= shippingBand,
             walkMicrosecondsPerFile: warmWalkSeconds / files * 1_000_000,
             referenceMicrosecondsPerFile: referenceSeconds / referenceFiles * 1_000_000,
             filesSeen: filesSeen)

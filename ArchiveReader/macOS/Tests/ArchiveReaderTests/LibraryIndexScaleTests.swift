@@ -193,13 +193,39 @@ final class LibraryIndexScaleTests: XCTestCase {
         // and `CorpusWalker.scan` directly rather than `LibraryScan.pass` so it is literally the call the
         // ArchiveCore lane calibrates. Both passes here are warm — the tree has been walked three times —
         // which is the condition `ScaleLaneCalibration.measure` requires to mean anything.
-        let calibrationWalkStart = Date()
-        let calibrationWalk = CorpusWalker.scan(root: root)
-        let calibrationWalkSeconds = Date().timeIntervalSince(calibrationWalkStart)
-        let calibration = ScaleLaneCalibration.measure(
-            lane: "reader", root: root,
-            warmWalkSeconds: calibrationWalkSeconds, filesSeen: calibrationWalk.filesSeen)
+        //
+        // **On a `.utility` thread, because that is where the app walks.** `LibraryScan.onDedicatedThread`
+        // sets `qualityOfService = .utility`, so a sample taken on the ambient test thread (user-initiated)
+        // would come from a band the shipping app never runs discovery in — a subtler version of the very
+        // fault this item exists to fix. The user-initiated sample is taken as well and reported, so the
+        // size of the band's effect is on the record rather than assumed in either direction.
+        let calibration = Self.measuringOnThread(qos: .utility) {
+            let start = Date()
+            let walk = CorpusWalker.scan(root: root)
+            return ScaleLaneCalibration.measure(
+                lane: "reader", root: root,
+                warmWalkSeconds: Date().timeIntervalSince(start), filesSeen: walk.filesSeen)
+        }
+        let ambient = Self.measuringOnThread(qos: .userInitiated) {
+            let start = Date()
+            let walk = CorpusWalker.scan(root: root)
+            return ScaleLaneCalibration.measure(
+                lane: "reader-userInitiated", root: root,
+                warmWalkSeconds: Date().timeIntervalSince(start), filesSeen: walk.filesSeen)
+        }
         print(calibration.line)
+        print(String(format: "SCALE qosband shipping(utility) qos=%u walk=%.1f | userInitiated qos=%u "
+                     + "walk=%.1f | shipping/userInitiated=%.2f",
+                     calibration.qos, calibration.walkMicrosecondsPerFile,
+                     ambient.qos, ambient.walkMicrosecondsPerFile,
+                     calibration.walkMicrosecondsPerFile
+                        / max(ambient.walkMicrosecondsPerFile, 0.000_001)))
+        XCTAssertEqual(calibration.qos, ScaleLaneCalibration.shippingBand,
+                       "the shipping-band sample must actually have been taken at utility — if the host "
+                       + "process is itself QoS-clamped the thread cannot reach it, and the number below "
+                       + "would silently describe some other band")
+        XCTAssertTrue(calibration.quotable,
+                      "a sample from the app's own discovery band is by definition quotable")
 
         await warmIndex.close()
     }
@@ -259,6 +285,34 @@ final class LibraryIndexScaleTests: XCTestCase {
         print("SCALE cancel-semantics rows=\(seeded.entries.count) "
               + "cancelledAfterFilesSeen=\(cancelled.result.filesSeen) asOf=nil ✓ pruned=0 ✓")
         await relaunch.close()
+    }
+
+    /// Run `body` to completion on a **dedicated `Thread` at `qos`**, and hand back what it returned.
+    ///
+    /// A real `Thread`, configured the way `LibraryScan.onDedicatedThread` configures its own, rather
+    /// than a `DispatchQueue` or a `Task` — the point is to reproduce the shipping walk's execution
+    /// context exactly, and the cooperative pool does not let a caller pin a band. Blocking the caller
+    /// on a semaphore is fine here: this is a measurement lane, the walk is the only thing running, and
+    /// nothing it does needs the calling thread.
+    private static func measuringOnThread<T: Sendable>(qos: QualityOfService,
+                                                       _ body: @escaping @Sendable () -> T) -> T {
+        let box = ResultBox<T>()
+        let done = DispatchSemaphore(value: 0)
+        let thread = Thread {
+            box.value = body()
+            done.signal()
+        }
+        thread.name = "W26.verify-fu1.calibration"
+        thread.qualityOfService = qos
+        thread.start()
+        done.wait()
+        // Force-unwrap deliberately: the semaphore is signalled only after the box is filled, so a nil
+        // here would mean the thread never ran, which must fail the lane rather than be papered over.
+        return box.value!
+    }
+
+    private final class ResultBox<T>: @unchecked Sendable {
+        var value: T?
     }
 
     private final class Counter: @unchecked Sendable {

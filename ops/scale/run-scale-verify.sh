@@ -13,10 +13,10 @@
 #      size, mtime, ctime, xattr digest) before and after, and any difference at all fails the run.
 #      `execution-plans/despotlight.md` §7a.7: the subject cannot take this measurement about itself.
 #   5. **The two lanes above agree about the WALK, and the run states ONE per-file cost.** They walk the
-#      same tree in different processes, and a process's QoS moves every filesystem primitive by ~5-6x
-#      (`W26.verify-fu1`), so their raw per-file absolutes are not comparable and only the unclamped one
-#      is a cost the app would pay. Each lane therefore also measures a reference pass, and step 3c
-#      compares the ratios.
+#      same tree in different processes, and QoS moves every filesystem primitive by ~5-6x
+#      (`W26.verify-fu1`), so their raw per-file absolutes are not comparable. Each lane therefore also
+#      measures a reference pass and step 3c compares the ratios; the absolute is quoted only from a lane
+#      that sampled in the band the app's own discovery thread runs in (`.utility`).
 #
 # The corpus is SCRATCH and synthetic — never the owner's archive. `scale-corpus.swift` refuses any root
 # whose leaf is not named `scale-corpus*`, and refuses outright any path mentioning the real corpus.
@@ -83,7 +83,8 @@ calib_field() { printf '%s\n' "$1" | tr ' ' '\n' | awk -F= -v k="$2" '$1 == k { 
 
 # calibration_verdict <core-line> <reader-line> → 0 agree, 1 disagree, 2 a line is missing/unparseable.
 calibration_verdict() {
-  local core="$1" reader="$2" core_n reader_n spread headline taxed line head_lane head_us tax summary
+  local core="$1" reader="$2" core_n reader_n spread headline taxed line \
+        head_lane head_us head_qos head_band tax summary
   # A missing line is a FAILURE, not a skip: a lane that quietly stopped calibrating would take this
   # whole check with it and leave the headline number unguarded again — silently.
   if [ -z "$core" ] || [ -z "$reader" ]; then
@@ -100,29 +101,39 @@ calibration_verdict() {
   spread="$(awk -v a="$core_n" -v b="$reader_n" \
     'BEGIN { if (a+0 <= 0 || b+0 <= 0) print 0; else printf "%.2f", (a > b ? a/b : b/a) }')"
 
-  # The headline: only an UNCLAMPED lane may state what discovery costs. Chosen from the reported qos,
-  # not hardcoded — run this interactively and both lanes are unclamped; run it from the daemon and only
-  # the app-hosted one is.
+  # The headline: only a QUOTABLE lane may state what discovery costs, and quotable means "sampled in
+  # the band the app's own discovery thread runs in (.utility) or better" — NOT merely "not clamped".
+  # The lane says so itself in `quotable=`, computed from the QoS it actually reached; nothing here is
+  # hardcoded, because which lane qualifies depends on how the run was launched.
   headline=""; taxed=""
   for line in "$core" "$reader"; do
-    if [ "$(calib_field "$line" clamped)" = "no" ]; then headline="$line"; else taxed="$line"; fi
+    if [ "$(calib_field "$line" quotable)" = "yes" ]; then headline="$line"; else taxed="$line"; fi
   done
   if [ -n "$headline" ]; then
     head_lane="$(calib_field "$headline" lane)"
     head_us="$(calib_field "$headline" walk)"
-    summary="one number: a full walk costs ${head_us} us/file (lane=${head_lane}, qos=$(calib_field "$headline" qos), unclamped)"
+    head_qos="$(calib_field "$headline" qos)"
+    # 17 is QOS_CLASS_UTILITY — exactly where `LibraryScan` walks. A sample from ABOVE that band is
+    # still quotable, because a faster band cannot overstate the cost, but it must not be dressed up
+    # as the shipping band: it is a floor, and the sentence says so.
+    if [ "$head_qos" = "17" ]; then
+      head_band="qos=$head_qos, the band LibraryScan walks in"
+    else
+      head_band="qos=$head_qos, ABOVE the .utility band LibraryScan walks in — a floor, not the exact cost"
+    fi
+    summary="one number: a full walk costs ${head_us} us/file (lane=${head_lane}, ${head_band})"
     if [ -n "$taxed" ]; then
       tax="$(awk -v a="$(calib_field "$taxed" walk)" -v b="$head_us" \
         'BEGIN { printf "%.1f", (b+0 > 0 ? a/b : 0) }')"
-      summary="$summary; lane=$(calib_field "$taxed" lane) reports $(calib_field "$taxed" walk) us/file, ${tax}x inflated by its QOS_CLASS_BACKGROUND clamp — not a cost the app pays"
+      summary="$summary; lane=$(calib_field "$taxed" lane) reports $(calib_field "$taxed" walk) us/file at qos=$(calib_field "$taxed" qos), ${tax}x inflated by a clamp below that band — not a cost the app pays"
     fi
     printf '✓ %s\n' "$summary"
     [ -n "${REPORT:-}" ] && printf 'SCALE headline %s\n' "$summary" >> "$REPORT"
   else
-    # Not a failure: it means the run had no unclamped lane, so it has no shipping number to quote.
-    printf '⚠️  every lane was QoS-clamped; the per-file absolutes above are inflated and none of them\n'
-    printf '   is a cost the app would pay. Re-run from an unclamped shell for a headline number.\n'
-    [ -n "${REPORT:-}" ] && printf 'SCALE headline UNAVAILABLE — every lane was QoS-clamped\n' >> "$REPORT"
+    # Not a failure: it means no lane reached the shipping band, so the run has no number to quote.
+    printf '⚠️  no lane reached the band the app walks in (.utility); every per-file absolute above is\n'
+    printf '   inflated by a QoS clamp and none of them is a cost the app would pay.\n'
+    [ -n "${REPORT:-}" ] && printf 'SCALE headline UNAVAILABLE — no lane reached the shipping QoS band\n' >> "$REPORT"
   fi
 
   if awk -v s="$spread" -v t="$CALIB_TOLERANCE" 'BEGIN { exit !(s+0 > 0 && s+0 <= t+0) }'; then
@@ -146,8 +157,10 @@ if [ "$PROVE_CALIB" = 1 ]; then
     if [ "$got" = "$want" ]; then ok "$label (rc=$got)"
     else printf '❌ %s: wanted rc=%s, got rc=%s\n' "$label" "$want" "$got"; PROOF_FAILED=1; fi
   }
-  AGREE_CORE='SCALE calib lane=core qos=9 clamped=yes files=150000 walk=218.7 reference=24.5 normalised=8.93'
-  AGREE_READ='SCALE calib lane=reader qos=25 clamped=no files=150000 walk=37.7 reference=5.0 normalised=7.51'
+  # Both fixtures are shaped like a real daemon run: the core lane clamped to background by the session
+  # that spawned it, the Reader lane sampling on a `.utility` thread — the band `LibraryScan` walks in.
+  AGREE_CORE='SCALE calib lane=core qos=9 quotable=no files=150000 walk=218.7 reference=24.5 normalised=8.93'
+  AGREE_READ='SCALE calib lane=reader qos=17 quotable=yes files=150000 walk=37.7 reference=5.0 normalised=7.51'
   step "proving the cross-lane comparator can pass AND fail"
   expect 0 "two lanes whose ratios agree are accepted"            "$AGREE_CORE" "$AGREE_READ"
   expect 1 "a 4.4x disagreement in the RATIO is rejected" \
@@ -158,7 +171,7 @@ if [ "$PROVE_CALIB" = 1 ]; then
   expect 2 "a missing reader line is a failure, not a skip"        "$AGREE_CORE" ""
   expect 2 "a line with no normalised= field is a failure"         "SCALE calib lane=core qos=9" "$AGREE_READ"
   # Inflated ABSOLUTES with matching ratios are exactly the real 2026-08-10 case: accepted, because the
-  # tax is the environment's, and the headline must then quote the unclamped lane.
+  # tax is the environment's, and the headline must then quote the shipping-band lane.
   expect 0 "a 5.8x absolute gap with agreeing ratios is accepted"  "$AGREE_CORE" "$AGREE_READ"
   # The two headline checks CAPTURE the verdict and match the string, rather than piping it into
   # `grep -q`. That pipe is a SIGPIPE race, and it is not theoretical: `grep -q` exits on the first
@@ -174,10 +187,16 @@ if [ "$PROVE_CALIB" = 1 ]; then
       *) printf '❌ %s — no line matched %s\n' "$label" "$want"; PROOF_FAILED=1 ;;
     esac
   }
-  says "the headline quotes the UNCLAMPED lane's number" \
+  says "the headline quotes the SHIPPING-BAND lane's number" \
        'costs 37.7 us/file (lane=reader' "$AGREE_CORE" "$AGREE_READ"
-  says "with no unclamped lane it refuses to quote a number" \
-       'every lane was QoS-clamped' "$AGREE_CORE" "${AGREE_READ/clamped=no/clamped=yes}"
+  says "with no shipping-band lane it refuses to quote a number" \
+       'no lane reached the band the app walks in' "$AGREE_CORE" "${AGREE_READ/quotable=yes/quotable=no}"
+  # A user-initiated sample is quotable — a faster band cannot overstate the cost — but it is a FLOOR,
+  # and must not be dressed up as the band the app actually walks in.
+  says "a sample above the shipping band is labelled a floor, not the exact cost" \
+       'ABOVE the .utility band' "$AGREE_CORE" "${AGREE_READ/qos=17/qos=25}"
+  says "a sample AT the shipping band is not hedged as a floor" \
+       'qos=17, the band LibraryScan walks in' "$AGREE_CORE" "$AGREE_READ"
   if [ "$PROOF_FAILED" = 0 ]; then echo; echo "✅ calibration comparator proof GREEN"; exit 0; fi
   echo; echo "❌ calibration comparator proof RED"; exit 1
 fi
@@ -283,9 +302,14 @@ grep -E '^ *(SCALE|filesSeen|cold|WARM|steady|sqlite|footprint)' "$READER_LOG" >
 #
 # So each lane emits a `SCALE calib` line pairing its walk with a reference pass (the shipped stat-only
 # walk) taken moments later at the same warmth, and this step compares the two RATIOS. The ratio is what
-# survives the environment. The absolute quoted as "what discovery costs" is then the one from the
-# UNCLAMPED lane, chosen from the reported `qos`, not hardcoded — run this interactively and both lanes
-# are unclamped; run it from the daemon and only the app-hosted one is.
+# survives the environment.
+#
+# The ABSOLUTE is a separate question, and "unclamped" is the wrong bar for it: the shipping discovery
+# pass is not unclamped either — `LibraryScan.onDedicatedThread` runs it at `.utility`. So the Reader
+# lane takes its sample on a `.utility` thread configured the same way, each lane reports whether it
+# reached that band in `quotable=`, and the number quoted as "what discovery costs" comes from a lane
+# that did. A sample from ABOVE the band is accepted as a floor and said to be one; a run where no lane
+# reached it quotes nothing at all.
 step "cross-lane calibration (W26.verify-fu1)"
 calibration_verdict "$(calib_line "$CORE_LOG" core)" "$(calib_line "$READER_LOG" reader)" || FAILED=1
 
