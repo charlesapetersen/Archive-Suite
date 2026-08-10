@@ -297,6 +297,58 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.tagvocab-salvage — both salvage claims were already covered, and mutation says the coverage is
+  real rather than nominal. ✅ CLOSED 2026-08-10** (this commit). **No code and no test change** — the item
+  had two outcomes and this is the "covered, close it" one. Filed 2026-08-07 from a comparison of the two
+  files' *stated claim lists*, which the item itself flagged as the weak instrument; reading the executed
+  assertions reverses the conclusion.
+
+  **The two claims, and where the shipped `test-tag-vocabulary.sh` already executes them.**
+  - **Claim 3 (a colour token is judged by the label that LANDED)** — covered in *both* directions on the
+    write path, which is what makes it a discriminating test rather than a one-sided one:
+    `applyTags(["1962","Red","Corr","Tax"], stampUnread: true)` lands label 6 (asserted) and then
+    *"the marker colour this write stamped is not a subject suggestion"*; while
+    `applyTags(["Red","Comm","1955"], appColor: nil, colorIsAuthoritative: true, stampUnread: true)` lands
+    label 0 (asserted) and then *"…so 'Red' IS suggestable when it is a subject rather than a marker"*.
+    The harvest phase covers the same property from the **filesystem** side — a seeded `["Purple", …]` with
+    label 3 → *"the harvest did NOT learn the marker colour off a labelled file"* — which is the direction
+    the incident in `W26.vocab` actually took, and which the salvage harness **never had** (its harvest
+    fixture carries no colour token at all).
+  - **Claim 5 (copy-source pass-through, `stampUnread: false`)** — `applyTags(["Deaver","Blue","Rcpt"], …,
+    stampUnread: false)` asserts verbatim pass-through, *and* that the pre-existing label 3 is untouched
+    (the salvage harness created its copy file with no label, so it could not check that), *and*
+    *"copy-source subjects entered the vocabulary"*. Plus a case the salvage harness lacks entirely: an
+    **empty** copy-source write is a no-op on disk and still teaches the file's real existing subjects.
+
+  **Mutation, because "the assertion exists" is not "the assertion bites."** Baseline: the whole gate green
+  (all phases PASS, rc=0). Then two mutations in a scratch worktree, each reverted immediately:
+  - **A** — `TagVocabulary.add` parses with `labelNumber: nil`. Exactly **two** FAILs, one per claim-3
+    direction: the write-path marker assertion (Red learned off a label-6 write) and the harvest-path one
+    (Purple). The *subject*-direction assertion stayed green, as it must — it does not depend on the label.
+  - **B** — the ingest hook wrapped in `if isStamping`, i.e. a hook that skips copy-source pass-throughs.
+    Exactly **three** FAILs: *"copy-source subjects entered the vocabulary"*, *"a no-op still teaches the
+    vocabulary the file's real subjects"*, and the relaunch superset that carries them into the next process.
+
+  **What was deliberately NOT ported.** (i) The salvage harness's "Red Scare" case — a subject that merely
+  *contains* a colour word — tests no distinct branch: `DocumentTags.parse` compares the landed label's token
+  name **exact, whole-string, case-insensitive**, so a multi-word subject never reaches that branch at all.
+  The shipped case ("Red" itself, with the label cleared) is the strictly harder version. (ii) Its
+  `!learned.contains("1972")` — a date token on the *copy-source* path — is the one sub-assertion with no
+  shipped counterpart, and it is redundant: `MacOSTagger` has **one** ingest hook (`MacOSTagger.swift:110`,
+  after the `try`), the `GeneratedTags` overload delegates to the `[String]` one, and both `stampUnread`
+  modes therefore feed the single filter `DocumentTags.parse(raw:labelNumber:).subjects` — whose date-token
+  exclusion the gate already asserts. ⚠️ The residual that would make it non-redundant is a *future refactor*
+  that split the hook per mode and dropped `labelNumber:` on the copy-source leg; today's fixture would not
+  catch that (label 3 vs tag "Blue" do not collide). Not filed: it is a hypothetical about a shape the code
+  does not have, and the single hook is what keeps it hypothetical.
+
+  **The worktree hold was already discharged, by a different session.** The item's 🔴 protection rested on
+  `../suite-wt-vocab-20260805-220156-2908` holding *the only copy* of the 212-line harness. It did not:
+  both files are **byte-identical** (`md5`, then `diff`) to copies archived at
+  `old/w26-vocab-prior-session-wip-20260806/` on 2026-08-06. So freeing it lost nothing. Removed with **no
+  `--force` anywhere**: the two untracked duplicates were deleted first so `git worktree remove` never had
+  to refuse, and the branch had no unique commits (`git log origin/main..` empty) so it went with `-d`.
+
 - [x] **W26.fixwarn-fu1 — the other seven un-run harnesses, and an assertion so there is never an eighth.
   ✅ CLOSED** `877c695` -> this commit (2026-08-10). Filed by `W26.fixwarn`, whose own fix was wiring the
   *fifth* such harness into the health gate. **11 of the 13 `ops/autonomous/tests/prove-*.sh` are gate steps

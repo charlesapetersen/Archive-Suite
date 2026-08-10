@@ -349,29 +349,6 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   part of the item. **To unblock:** add a `W26.docs-spec` grant to `OWNER_AUTHORIZATIONS.md` (the `W15.tu0`
   entry is the exact precedent — *"AUTHORIZED to edit `SPEC/tag-format.md` (doc-only)"*) and move this item
   out of the HOLD QUEUE into the WORK QUEUE. Ticking a gate alone never makes an item actionable.
-- [ ] **W26.tagvocab-salvage — two claims in an UNCOMMITTED `tagvocab-proof.swift` may have no shipped
-  equivalent, and the only copy is in a stray worktree [XS · low · verification-gap].** Filed 2026-08-07
-  (daemon-report walkthrough). `W26.vocab` shipped `ArchiveProcessor/scripts/test-tag-vocabulary.sh` in one
-  design; an **earlier, abandoned design of the same gate** survives only in
-  `../suite-wt-vocab-20260805-220156-2908` — a `swift build`-based script plus a 212-line
-  `scripts/tagvocab-proof.swift` harness that `git log --all --diff-filter=A` finds **in no commit on any
-  branch**. 🔴 **That worktree is deliberately being KEPT until this item closes: do not
-  `git worktree remove` it and do not `git worktree prune`.** The file exists nowhere else.
-
-  **What to check.** The harness asserts **8** claims; the shipped script's header lists **6**. Six line up
-  (write-is-byte-identical, subjects-only, refused-write-contributes-nothing, survives-relaunch, real
-  `CorpusWalker` harvest, `$HOME`-not-harvestable). **Two have no counterpart in that list:**
-  - **claim 3** — a colour token is judged by the label that actually **LANDED**: an app-assigned Red is the
-    marker; a subject "Red" on a file with no red label is a subject. Not a nicety — `W26.vocab`'s own entry
-    records exactly this as one of the three defects testing rather than reading caught (*"the harvest could
-    not see a Finder label, so 'Red'/'Purple' were becoming permanent **Subjects**"*).
-  - **claim 5** — copy-source pass-through (`stampUnread: false`) contributes the source file's real subjects.
-
-  ⚠️ **This compared the two files' STATED claim lists, not their executed assertions** — the shipped driver
-  may cover both without listing them. Read the code before concluding anything. **If covered:** say so in
-  the commit, close this, and the worktree is free. **If not:** port the two assertions into the shipped
-  `test-tag-vocabulary.sh` — it is a health-gate step as of `W26.lint-fu` (`f64649b`), so they start being
-  enforced the moment they land — then free the worktree.
 - [x] **W26.fixturehang — the fixture pin no longer lives in the owner's defaults domain, so a killed
   test host can no longer put their Reader into fixture mode. ✅ CLOSED 2026-08-07** `eef85d5` ->
   `d58c058` -> this commit. Half (b) — the main-thread `FSEventStreamCreate`, the HANG — shipped as
