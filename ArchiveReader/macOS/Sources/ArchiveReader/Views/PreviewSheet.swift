@@ -26,7 +26,16 @@ struct PreviewSheet: View {
         .onChange(of: nav.selection) { model.load(nav.documentSelection()) }
         // Space toggles the preview closed (Finder-style); Esc also closes via the Done button.
         .onKeyPress(.space) { dismiss(); return .handled }
-        .focusedObject(model)   // expose to the Document menu so ⌘0 (Fit Page) + zoom shortcuts work
+        // Expose to the Document menu so ⌘0 (Fit Page) + the zoom shortcuts work. SCENE-scoped, not
+        // view-scoped: `.focusedObject` publishes only while the modified subtree holds SwiftUI keyboard
+        // focus, and the pane here is an AppKit `PDFView` behind `NSViewRepresentable`, which never gives
+        // it — so every zoom/fit command stayed `.disabled(doc == nil)` with the sheet wide open
+        // (W26.previewzoom, measured in the VM). `NavigationWindowView` and `DocumentWindowView` publish
+        // the same way and their Document-menu commands work. Scoping to the scene is safe because the
+        // sheet's subtree is torn down on dismiss, which un-publishes the model with it — asserted by
+        // `testFitPageCommandReachesThePreviewSheet`'s dismissed-sheet case, because a command left live
+        // over a dead preview model is the obvious way to get this wrong.
+        .focusedSceneObject(model)
     }
 
     private var header: some View {

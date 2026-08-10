@@ -189,24 +189,29 @@ final class ViewerUITests: FixtureUITestCase {
     /// its *Document-menu* path confirmed — the sheet-specific check was deferred, then stayed deferred
     /// on a reason (an unindexed scratch corpus) that `W26.walk2` made void.
     ///
-    /// 🔴 **RAN 2026-08-09, AND THE SHIPPED CLAIM IS FALSE — the feature does not work.** Tracked as
-    /// `W26.previewzoom`; this test is annotated `XCTExpectFailure` so the lane stays green *and* flips
-    /// loudly the moment someone fixes it. Do not delete the annotation without fixing the app: what was
-    /// measured in the VM was
-    ///  - CHROME: `Fit Page` is disabled from the list (correct) and **still disabled while the preview
-    ///    sheet is open** — so `@FocusedObject var doc` is nil and ⌘0 is bound to nothing; and
-    ///  - PIXELS: the sheet's image pane was **byte-identical** before and after ⌘↑×3, and again after
-    ///    ⌘0 (two of the three screenshots deduplicated to one blob in the result bundle). Nothing zoomed
-    ///    and nothing refitted, because the command never arrives.
+    /// 🔴 **This ran on 2026-08-09 and the shipped claim was FALSE** — `Fit Page` stayed disabled with the
+    /// sheet wide open, and the image pane was byte-identical across ⌘↑×3 and ⌘0. Cause and fix were one
+    /// token (`W26.previewzoom`, fixed 2026-08-10): `PreviewSheet` was the app's only `.focusedObject`,
+    /// which publishes solely while the modified subtree holds SwiftUI keyboard focus — and the pane is an
+    /// AppKit `PDFView` behind `NSViewRepresentable`, which never gives it. It now publishes with
+    /// `.focusedSceneObject`, like `NavigationWindowView` and `DocumentWindowView`, whose Document-menu
+    /// commands always worked. The `XCTExpectFailure` that held the bug is deleted with the fix.
     ///
-    /// The cause is one token, and the codebase's own convention names it: `NavigationWindowView` and
-    /// `DocumentWindowView` both publish with `.focusedSceneObject`, and their Document-menu commands
-    /// work. `PreviewSheet.swift:29` is the only `.focusedObject` in the app — and the only one that
-    /// fails. See `W26.previewzoom` for the fix and for the zoom→⌘0 pixel bracket to re-add with it.
+    /// Three things are asserted, because none is sufficient alone:
+    ///  1. CHROME, enabled — `Fit Page` is DISABLED from the list and ENABLED while the sheet is open.
+    ///     The disabled control is what makes the enabled state mean something.
+    ///  2. CHROME, the converse — with the sheet DISMISSED it goes back to DISABLED. Scene-scoped
+    ///     publication outlives *view* focus, so a command left live over a torn-down preview model is
+    ///     the obvious way to get this fix wrong, and nothing else covers it. It is asserted BEFORE the
+    ///     pixels, and the sheet is re-opened afterwards, so the cheap decisive checks cannot end up
+    ///     behind the slow one (see the timing note below).
+    ///  3. PIXELS — a PDFView's content pane is not XCUITest-queryable (W7.6), so *whether the page
+    ///     actually refitted* is only visible in a screenshot. Three shots bracket the sequence:
+    ///     fit → zoomed in → ⌘0. A human reads them; the test does not judge them.
     ///
-    /// The ⌘↑/⌘0 keystrokes are deliberately NOT re-sent here: with the bug present they provably change
-    /// nothing, and ⌘0 in that state left the app **non-idle for 241 s** (measured), which would put a
-    /// 4½-minute dead wait into every health-gate run to re-prove a no-op.
+    /// ⏱ With the bug present, ⌘0 in the sheet left the app **non-idle for 241 s** (measured twice over).
+    /// That stall was never explained, so the bracket prints its own elapsed time: if a future run is slow,
+    /// the log says which keystroke paid for it instead of leaving the next reader to re-measure.
     func testFitPageCommandReachesThePreviewSheet() throws {
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
@@ -218,26 +223,60 @@ final class ViewerUITests: FixtureUITestCase {
                        "precondition: from the list alone, ⌘0 has no viewer to fit")
         closeMenu()
 
-        // Open the preview sheet via the toolbar (more robust than Space, which is focus-scoped).
-        toolbarButton("ar.toolbar.preview").click()
-        let done = app.buttons["ar.preview.done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 5), "the preview sheet should open")
-        settle(1)
-
-        // (2) Pixels: the sheet opens at fit-full-page (PDFPaneController(persists: false)). This shot is
-        // the other half of the item — it is what confirms the *preview default zoom* really is full page.
-        captureScreenshot("w26docsfu1-preview-default-fit")
-
-        // (1b) The assertion the disabled control above earns — and the one that is currently BROKEN.
-        XCTExpectFailure("W26.previewzoom: PreviewSheet uses .focusedObject, which publishes nothing here, "
-                         + "so the Document menu's zoom/fit commands stay disabled and ⌘0 never reaches the sheet",
-                         strict: true) {
-            XCTAssertTrue(documentMenuItem("Fit Page").isEnabled,
-                          "…and ENABLED while the preview sheet is open — the sheet publishes the viewer model")
-        }
+        // (1b) The assertion that control earns: open the sheet and the command comes alive.
+        openPreviewSheet()
+        XCTAssertTrue(documentMenuItem("Fit Page").isEnabled,
+                      "ENABLED while the preview sheet is open — the sheet publishes the viewer model")
         closeMenu()
 
+        // (2) The converse. `.focusedSceneObject` is scoped to the SCENE, not to the focused view, so the
+        // only thing that un-publishes it is the sheet's subtree going away. Prove it does: a Fit Page
+        // that stays enabled here is a live command pointing at a dead preview model.
+        dismissPreviewSheet()
+        XCTAssertFalse(documentMenuItem("Fit Page").isEnabled,
+                       "DISABLED again once the sheet is dismissed — the model must not outlive its sheet")
+        closeMenu()
+
+        // (3) Pixels, on a freshly re-opened sheet (which also re-proves 1b survives a second presentation).
+        openPreviewSheet()
+
+        // The sheet opens at fit-full-page (PDFPaneController(persists: false)), so shot 1 is both the
+        // *preview default zoom* evidence and the reference the third shot has to come back to.
+        captureScreenshot("w26previewzoom-1-default-fit")
+
+        let zoomStart = Date()
+        for _ in 0..<3 { app.typeKey(.upArrow, modifierFlags: .command) }   // ⌘↑ zoom in the image pane
+        print("[timing] ⌘↑×3 took \(String(format: "%.1f", -zoomStart.timeIntervalSinceNow)) s")
+        settle(1)
+        captureScreenshot("w26previewzoom-2-zoomed-in")
+
+        let fitStart = Date()
+        app.typeKey("0", modifierFlags: .command)                          // ⌘0 fit page
+        print("[timing] ⌘0 took \(String(format: "%.1f", -fitStart.timeIntervalSinceNow)) s")
+        settle(1)
+        captureScreenshot("w26previewzoom-3-after-cmd0")
+
+        dismissPreviewSheet()
+    }
+
+    /// Open the preview sheet from the navigation toolbar (more robust than Space, which is focus-scoped)
+    /// and wait for it to be on screen.
+    private func openPreviewSheet() {
+        toolbarButton("ar.toolbar.preview").click()
+        XCTAssertTrue(app.buttons["ar.preview.done"].waitForExistence(timeout: 5),
+                      "the preview sheet should open")
+        settle(1)
+    }
+
+    /// Dismiss the preview sheet and wait for it to be gone — the wait matters, because the assertion that
+    /// follows a dismissal is about what the teardown un-publishes.
+    private func dismissPreviewSheet() {
+        let done = app.buttons["ar.preview.done"]
         if done.exists { done.click() }
+        let deadline = Date().addingTimeInterval(5)
+        while done.exists, Date() < deadline { settle(0.25) }
+        XCTAssertFalse(done.exists, "the preview sheet should close")
+        settle(1)
     }
 
     // MARK: - A tagged non-PDF image really renders, in preview AND viewer (W26.docs-fu1)
