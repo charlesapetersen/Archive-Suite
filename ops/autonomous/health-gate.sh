@@ -162,6 +162,14 @@ fi
 # plan still listed W21.vmgui-path as open after it shipped, so the resolver was offering finished work.
 bash "$ROOT/ops/autonomous/check-tracker-sync.sh" || true
 
+# Ticked stubs in SUITE_TODO: it holds OPEN items only, so a `[x]` left there is counted TWICE in the
+# owner-facing "N finished" (status-digest.sh sums both trackers with no dedup). WARN-ONLY for the same reason
+# as the two above — a docs-hygiene nit must never park a run whose builds and suites are green. Deliberately a
+# SEPARATE script from tracker-sync: that one's job is comparing `[x]` state between the plan and SUITE_TODO, so
+# it must treat a `[x]` there as valid input; asserting the opposite in the same file contradicted it and broke
+# 5 of its fixtures (W26.donecount).
+bash "$ROOT/ops/autonomous/check-todo-stubs.sh" || true
+
 # Run EVERY app's UITests in a headless Tart VM — off the owner's screen, and without the "Enable UI
 # Automation" prompt that makes the steps above avoid UITests on the host. ON by default (2026-07-28;
 # set AUTONOMOUS_GUI_VM=0 to disable). Fail-open: a missing VM / boot failure / guest-agent timeout SKIPs
@@ -253,6 +261,7 @@ step vm-lane-proof  bash "$ROOT/ops/autonomous/tests/prove-vm-lane.sh"
 #     machinery must keep working while the deployment default is off, so this stays watched while it sleeps.
 step dep-gating-proof     bash "$ROOT/ops/autonomous/tests/prove-dep-gating.sh"
 step tracker-sync-proof   bash "$ROOT/ops/autonomous/tests/prove-tracker-sync.sh"
+step todo-stubs-proof     bash "$ROOT/ops/autonomous/tests/prove-todo-stubs.sh"
 step housekeeping-proof   bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
 step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"

@@ -130,10 +130,16 @@ fi
 commits24="$(num "$(g log --since='24 hours ago' --oneline 2>/dev/null | wc -l | tr -d ' ')")"
 lastwhen="$(g log -1 --format='%cr')"; lastwhen="${lastwhen:-—}"
 lastsubj="$(clip "$(g log -1 --format='%s')" 62)"
-open_todo="$(num "$(grep -cE '^\s*[-*].*\[ \]' "$REPO/SUITE_TODO.md" 2>/dev/null)")"
+# ⚠️ ANCHOR THE CHECKBOX TO THE BULLET (`[[:space:]]+` between them), do NOT use `.*` — W26.donecount.
+# The old `^\s*[-*].*\[ \]` matched any WRAPPED PROSE LINE that merely began with `**bold**` and happened to
+# contain a checkbox later in the line, because `[-*]` accepts the `*` of `**`. Writing about W26.donecount
+# tripped it on THREE separate occasions, inflating the count four times in total (+2 filing the item, +1
+# correcting that entry, +1 drafting the backfill header) — each caught only by re-measuring before commit,
+# which is as direct a demonstration as a defect gets. This is the same immune form `hold=` below always used.
+open_todo="$(num "$(grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]' "$REPO/SUITE_TODO.md" 2>/dev/null)")"
 # Completed work lives in SUITE_TODO_DONE.md since 2026-08-01 (finishing an item MOVES its entry rather than
 # ticking it in place), so counting SUITE_TODO alone reported "1 finished" the moment the archive was split out.
-done_todo="$(num "$(cat "$REPO/SUITE_TODO.md" "$REPO/SUITE_TODO_DONE.md" 2>/dev/null | grep -cE '^\s*[-*].*\[[xX]\]')")"
+done_todo="$(num "$(cat "$REPO/SUITE_TODO.md" "$REPO/SUITE_TODO_DONE.md" 2>/dev/null | grep -cE '^[[:space:]]*[-*][[:space:]]+\[[xX]\]')")"
 hold="$(num "$(awk '/^## HOLD QUEUE/{f=1;next} f&&/^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE '^[[:space:]]*[-*][[:space:]]+\[ \]')")"
 
 # $STATE/last-gate only advances on a GREEN gate (the daemon writes HEAD there only on rc=0), so on its own

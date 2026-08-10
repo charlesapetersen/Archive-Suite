@@ -164,6 +164,73 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Autonomous compactor + park diagnosis (from the 2026-08-06 health-gate RED)
 
+- [x] **W26.trackergap — 73 shipped items whose completion was recorded ONLY in the gitignored plan are now in
+  the tracker of record, which nearly doubled what compaction can reclaim. ✅ DONE 2026-08-10** — this commit.
+  Owner: *"Why not close that gap now yourself, along with W26.donecount."* The gap was flagged as a limit on
+  `W26.selfheal`; closing it turned out to matter far more than expected.
+  **What it was.** 74 tags were `[x]` in the plan's `## WORK QUEUE` but recorded nowhere in `SUITE_TODO.md` or
+  `SUITE_TODO_DONE.md` — early-wave work (W1–W10, plus `W2a`–`W2e`). One of the 74, `Wave 11 … COMPLETE`, is a
+  milestone marker and was deliberately left (`check-tracker-sync.sh` ignores non-dotted tags for the same
+  reason); the other 73 were migrated **verbatim** — same titles, same shas, same prose, 65 of them carrying a
+  commit sha. Nothing was rewritten, summarised or invented. Details: §*Waves 1–10 — BACKFILLED*, at the end of
+  this file.
+  **Why it mattered more than bookkeeping.** `compact-plan.sh` Pass 3 may only archive a plan `[x]` whose tag is
+  independently vouched for by the trackers, because `next-queue-item.sh` reads a *missing* tag as NOT done and
+  would block any dependent forever. So the gap was silently halving compaction. Measured on the live plan,
+  same 70,000 B threshold, before → after the backfill: **35 lines archived → 249**, **39,198 B reclaimed →
+  68,157 B**, plan **156,510 B → 127,551 B** (87% → 71% of budget), WORK QUEUE floor **62,792 B → 33,833 B**.
+  🔺 **The durable finding: Pass 3's reach is bounded by what the trackers can vouch for, not by its own
+  threshold.** A tracker gap does not merely lose bookkeeping — it disables the mechanism that keeps the plan
+  inside its context budget, which is what parked the run in the first place. Two guards each behaving
+  correctly, composing into a failure.
+  **Also corrected:** the owner-facing "N finished" had been *understating* the project by 73 items all along
+  (`status-digest.sh` reads only the two trackers, never the plan) — an undercount corrected, not inflation.
+  The full arithmetic for this commit, since the headline moves a long way in one step: **247 → 320 finished,
+  65 → 64 to do.** That is `+73` backfilled, `−2` folded stubs (`W26.donecount` below), `+2` for this entry and
+  that one; and one item closed. Verified no tag is now counted twice (the dotted-tag duplicate check is clean —
+  the earlier `W4.0 x2` was an artifact of a check regex that dropped the second dot, not a real duplicate), and
+  `check-tracker-sync.sh` went from 74 to 147 shared items, all agreeing.
+
+- [x] **W26.donecount — the digest's "finished" count no longer double-counts, and the defect now has a lint
+  that cannot be a code-regression false alarm. ✅ DONE 2026-08-10** — this commit. Filed and closed the same
+  day, from the owner's own question about why the digest read "237 finished" → "246 finished" overnight when 8
+  items closed. Three parts, in the order the item prescribed:
+  1. **The cheap fix, which was the real one.** Both counters used `^\s*[-*].*\[…\]`, where `[-*]` accepts the
+     `*` of `**bold**` and `.*` then reaches a checkbox anywhere later in the line — so an ordinary wrapped
+     prose line counted as an item. Both now anchor the checkbox to the bullet with `[[:space:]]+`, the immune
+     form `hold=` had used all along, four lines below. `open_todo` — the owner-facing "N tasks to do" — had the
+     identical exposure and was missing from the item's first draft. ⚠️ **This defect bit while being written
+     about, four times** (+2 filing it, +1 correcting it, +1 writing the backfill header), each caught only by
+     re-measuring before commit. Proven by `prove-status.sh` [0b], which asserts a bold-prose line containing a
+     checkbox is not counted AND that indented sub-bullets still are (no under-counting); mutation-tested by
+     restoring the loose regex → 2 assertions fail.
+  2. **The two stubs folded.** `W26.fixturehang` and `W26.verify-fu1` sat `[x]` in `SUITE_TODO.md` while their
+     full entries lived here, so each scored twice. Before deleting either, every fact in both stubs was checked
+     against its archived entry — shas, the 40.8 µs/file figure, the `W26.verify` headline reversal, the
+     `fixtureDefaults` detail — and **all were already present**, so the fold was verifiably lossless rather
+     than assumed to be. That step alone is the `−2` in `W26.trackergap`'s arithmetic above; do not read it as
+     the commit's net change.
+  3. **A lint, in its own script, warn-only.** `ops/autonomous/check-todo-stubs.sh` fails on a **column-0**
+     `- [x]` in `SUITE_TODO.md` — exact rather than heuristic, because an *indented* ticked bullet is a
+     legitimate finished sub-step of a still-open parent (there are such lines today). It also skips code fences
+     and blockquotes, mirroring its siblings — `SUITE_TODO.md` is prose as much as data and may legitimately
+     contain a fenced or quoted *example* of a ticked bullet, which must not be reported as the defect it
+     illustrates (covered by `prove-todo-stubs.sh` case 5; no such example exists in the tracker today, so this
+     is prevention rather than a fix). Proven RED against the two real stubs **before** they were folded, per
+     the item's own instruction, then GREEN after.
+     ⚠️ **It was first added to `check-tracker-sync.sh` and that was wrong** — that script's job is comparing
+     `[x]` state *between* the plan and SUITE_TODO, so it must treat a `[x]` there as valid input; asserting the
+     opposite in the same file is self-contradictory and broke 5 of its fixtures, one of whose premise is a
+     deliberately-unmirrored HOLD QUEUE item. The tests caught it; the fix was a separate single-purpose script.
+     Invoked `|| true` from `health-gate.sh` beside `coherence`/`tracker-sync` — ⛔ **never a hard step**, or a
+     docs nit would park an overnight run. Its proof `prove-todo-stubs.sh` (17/0) *is* a hard step, and is
+     enumerated by `prove-gate-report.sh`'s watcher (14 harnesses, all accounted for).
+  **Deliberately NOT done:** switching "N finished" to a distinct-tag count. That would give a true item count
+  (and settle whether sub-steps belong in it) but **redefines** the metric rather than repairing it, and 95 of
+  the ticked lines carry no parseable tag so it cannot double as the lint. The owner's ask was to make the
+  number trustworthy, not to move it — so it stayed a line count, now an accurate one. Raise it as a decision
+  if the *meaning* should change.
+
 - [x] **W26.selfheal — a document-only gate RED now REPAIRS ITSELF instead of parking the run, and the WORK
   QUEUE compaction pass that would have prevented this one was unreachable. ✅ DONE 2026-08-10** — this commit.
   Owner, on being shown that the plan was 108% of budget and would park the run ~2 commits after restart:
@@ -178,6 +245,12 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
      exit 0. Not lower, because the region *settles* at 62,792 B (the remainder are the plan-only `[x]` items
      Pass 3's safety rule deliberately keeps) and a sub-floor threshold would re-fire forever archiving nothing.
      Verified both directions: fires on run 1, clean no-op on run 2.
+     📌 **SUPERSEDED THE SAME DAY, annotated rather than rewritten** (the `W26.verify-fu1` precedent): closing
+     the tracker gap in `W26.trackergap` removed the constraint behind those figures. With 73 previously
+     plan-only items now vouched for by the trackers, the same threshold archives **249 lines / 68,157 B**
+     (plan → 127,551 B, 71% of budget) and the floor drops 62,792 → **33,833 B**. The 70,000 threshold is
+     unchanged and still correct — it simply had far more it was allowed to move. The durable lesson is that
+     **Pass 3's reach is bounded by what the trackers can vouch for, not by its own threshold.**
   2. **The gate could only ever REPORT a document problem, never fix one.** `park_run` fired on a doc RED
      exactly as on a code RED — the doc/code split only changed the note's *wording* — so the daemon stopped a
      healthy run and asked the owner to hand-run the compactor it calls itself every cycle. `health_gate()` now
@@ -6562,3 +6635,99 @@ explain why not.
   confirmed that morning. The guard already makes that class of drift loud, which was the actual goal. The
   reasoning sits at the code site (`next-queue-item.sh` §2b) and in the plan's WORK QUEUE header, so a future
   attempt starts from it — deliberately NOT left as a lingering execution plan.
+
+## Waves 1–10 — BACKFILLED from the daemon plan (2026-08-10)
+
+These 73 items shipped long ago, but their completion was only ever recorded in
+`.maintenance/AUTONOMOUS_PLAN.md` — which is **gitignored**, so the tracker of record never learned they
+were done. Three concrete consequences, all of which were live until this backfill:
+
+- **`compact-plan.sh` Pass 3 could not archive them.** Its safety rule only archives a plan-side ticked item
+  whose tag is independently recorded as done here or in `SUITE_TODO.md`, because `next-queue-item.sh` reads a
+  *missing* tag as NOT done and would block any dependent forever. So the plan sat 15,708 B over its context
+  budget while holding **~29 KB** of already-shipped prose Pass 3 was **not allowed** to move (68,157 B
+  archivable once vouched for, against 39,198 B before), and the WORK QUEUE region could not compact below a
+  62,792 B floor.
+- **The "N finished" count understated the project by 73 items** (`status-digest.sh` reads only the two
+  tracker files, never the plan).
+- **The durable record lived only in a gitignored file.** Archiving the plan lines would have moved this
+  history further *out* of version control, not into it. Hence a migration into the tracker, not an archive.
+
+**Provenance:** each entry below is the plan WORK QUEUE line **verbatim** — same title, same commit sha(s),
+same prose. Nothing was rewritten, summarised or invented; 65 of the 73 carry a sha. One plan `[x]` was
+deliberately NOT migrated: `Wave 11 (Archive Notes) COMPLETE`, a milestone marker rather than an item
+(`check-tracker-sync.sh` likewise ignores non-dotted tags for exactly this reason).
+
+- [x] **W1.0 — Baseline E2E pass** `83fc998` — PASS 3/3 (no flakiness). Two harness bugs found & fixed
+- [x] **W1.x — no app-level fix items needed** — baseline found only harness bugs (fixed in `83fc998`)
+- [x] **W10.1 — Prefix-match as-you-type OCR search.** `bb90bb4` — `ftsMatchExpression` appends `*` to the last
+- [x] **W10.2** `4492de4` — ExcludedFoldersStore (shared singleton, UserDefaults-backed) with component-boundary
+- [x] **W2a — iOS Drive-relay on-device OAuth (implement).** `28262ba` — DriveAuth.swift (ASWebAuthenticationSession + PKCE + thread-safe TokenStore); CaptureViewModel TransportMode auto-select; ConnectScreen Drive sign-in section; project.yml URL scheme. Placeholder client ID (needs real GCP iOS client). iOS build clean, 0 warnings.
+- [x] **W2b — A1 deferred: Process Files pane inline-disclosure per-item action UI.** `d068a99` — Tap-to-expand rows surface retry / retry-with-model / rotate-&-re-run / view-text / reclassify via OCRProcessor.retryOne + ModelChoiceSheet + FileTextViewerSheet. Review-mode keyboard/tap gestures preserved. Build clean, 0 warnings.
+- [x] **W2c — Reader nav Table → AppKit `NSTableView`.** `435b8c4` — `AppKitTableView.swift` (NSViewRepresentable + NSTableViewDiffableDataSource); debounced filterSearchText (150ms); ContextMenuTableView + ContextMenuActions trampoline. Build clean, 161 tests green. Full GUI re-verify → Daemon Report.
+- [x] **W2d — Remove stray `InlineTest` tag on the SCRATCH corpus.** `0a5e56b` — N/A: scratch corpus (`AR-Smoke/Batch-A/00001`) no longer exists on disk (directory empty, file cleaned up). SUITE_TODO checkbox flipped.
+- [x] **W2e — De-nest the `App/App` folders.** `7706368` — Renamed both inner dirs to `macOS/`; updated all path refs (launch.sh, bootstrap.sh, README, DMG script, CLAUDE.md, AGENTS.md, REVIEW.md, SPEC, SUITE_TODO.md). Both apps build (0 warnings), 161 Reader tests green, combined DMG verified (4.7 MB). Execution plan deleted.
+- [x] **W3.f-recheck — merge page-drop** `0658204` — Re-examined: `guard … else { continue }` WAS a latent
+- [x] **W3.f1 [HIGH] relay `replaces` chain divergence** `e5b0ebc` — iOS + Android now append to the chain;
+- [x] **W3.f2 [MED] collection pinned in arrival order** `b0ed943` — `backfillCollections()` re-resolves
+- [x] **W3.f3 [MED] data race on `MacOSTagger.stampUnread`** `5b58da8` — OSAllocatedUnfairLock-backed
+- [x] **W3.f4 [MED] idle-connection leak** `eb91276` — 30s DispatchWorkItem timeout on each NWConnection;
+- [x] **W3.f5 [MED] Reader double recompute per tag write** `f2bdfb5` — Gate `refreshFormatStatuses()`
+- [x] **W3.f6 [LOW] non-localized PDF date** `f5589c8` — pinned DateFormatter locale to en_US_POSIX.
+- [x] **W3.i1 [HIGH] segmentComplete/sessionComplete return true without confirming write** `01b40c9` —
+- [x] **W3.i2 [HIGH] seqs: nil on encodeSegment (SPEC A5 violation)** `4b0a7f1` — iOS + Android: SegTags
+- [x] **W3.i3 [HIGH] AVCaptureSession not stopped on background** `ed7f738` — CameraController +
+- [x] **W3.i4 [HIGH] deleteItem has no upload-state guard** `98d1bc9` — .uploaded items delete immediately;
+- [x] **W3.i5 [HIGH] accessTokenBlocking() deadlock risk** `d9fc414` — dispatchPrecondition(.notOnQueue(.main)) +
+- [x] **W3.i6 [MED] clearSession deletes un-uploaded photos without warning** `ddc96f3` — confirmation dialog
+- [x] **W3.i7 [MED] DriveRelayTransport epoch cached, not re-read** `b38140e` — iOS+Android: re-read
+- [x] **W3.i8 [MED] prefersEphemeralWebBrowserSession = false** `a383166` — set to `true` (ephemeral session
+- [x] **W3.i9 [MED] CameraController @Published without @MainActor** `38cda28` — .authorized branch in
+- [x] **W3.n1 [HIGH] CaptureServer listener data race** `03db95a` — start()+stop() dispatched onto serial
+- [x] **W3.n2 [HIGH] persistProcessed() return ignored** `c585a3e` — Both call sites check return; on failure
+- [x] **W3.n3 [MED] DriveObjectStore lock held during HTTP** `b271e31` — All public methods restructured:
+- [x] **W3.n4 [MED] DriveClient unbounded semaphore wait** `32648dd` — Both macOS + iOS DriveClient:
+- [x] **W3.n5 [LOW] CaptureServer replaces chain silent filter** `2419153` — Reject (400) if any ID in
+- [x] **W3.r1 [MED] topicalTags drops demoted date-facet subjects** `7ce9e65` — exclude only winning facet
+- [x] **W3.r2 [MED] setDay inline editor writes malformed tags** `f21eab9` — Day validated (1...31), year
+- [x] **W3.r3 [MED] subjectsKey recomputes topicalTags O(n log n) during sort** `52f7937` — Schwartzian
+- [x] **W3.sA — Tier A (file-safety / data-loss / SPEC):** `96adfcb` — All 7 findings verified + fixed:
+- [x] **W3.sB — Tier B (crashes):** `738ffaa` — Both verified + fixed: ClosedRange guard (`start <= end`);
+- [x] **W3.sC — Tier C (correctness/concurrency):** `766b990` — 5 of 6 verified + fixed: retryOne re-entrancy
+- [x] **W3.sD — Tier D (perf, batch; don't over-invest):** `b5f4d0e` — Fixed 3 O(n²) hotspots (uniqueOutputURL
+- [x] **W4.0.a — DONE 2026-07-09: deleted the plaintext API keys.** `rm ~/.local/state/archive-overnight/ocr-key.env`
+- [x] **W4.0.b — DONE 2026-07-09: tooling/scratch/worktree cleanup.** Removed the retired monolith
+- [x] **W4.1 — DONE 2026-07-09: documentation harmonized** (audit by a subagent + applied). SUITE_TODO
+- [x] **W4.2 — DONE 2026-07-09: reconciled + closed.** Tree clean, `origin/main == 1bf9e15` (close-out commit).
+- [x] **W5.a1 — Tag cloud: exclude ALL date facets (year/month/day/decade) + logarithmic sizing.** `f606452` —
+- [x] **W5.a2 — Remove date tags (months/years/decades) from the tag FILTER field.** `ac6afbe` —
+- [x] **W5.a3 — Smart folders as a scoped root** `db63fe7` — `scope` (SavedSearch?), `baseFtsPaths`,
+- [x] **W5.a4 — Decade date facet ("1970s")** `95389e9` — SPEC + Reader parse/sort/display/topicalTags +
+- [x] **W5.b1 — Index build: parallel + batched + WAL + end-of-pass maintenance + `existingMTimes`** `571dc97` —
+- [x] **W5.b2 — Ranked (bm25) search + search-during-index refresh** `1f01290` — bm25 ORDER BY (name=10,
+- [x] **W5.b3 — Prune the content index (gated)** `2e830ad` — allPaths()+deletePaths() on ContentIndex;
+- [x] **W5.b4 — Incremental (as-you-type) OCR search, debounced.** `7aa673f` — Combine debounce pipeline
+- [x] **W5.c1 — Restore inline TAG editing in the file list** `1027b68` — TagTokenCellView (NSTokenField
+- [x] **W5.c2 — Add/remove columns in the file list** `b495211` — ColumnPickerHeaderView (right-click
+- [x] **W5.c3 — Drop the top-bar Sort button; header-click = primary sort; right-click header = secondary
+- [x] **W5.c4 — Adjustable + collapsible side panels (folder nav / tag cloud) + toggle shortcuts.** `916819c` —
+- [x] **W5.c5 — Wrap (not clip) file tags in the list cell** `8c55198` — `usesAutomaticRowHeights` + multi-line
+- [x] **W5.d1 — Single-page PDF with a text layer → render its text as plain text in the RIGHT pane** `fcf4d0a` — `embeddedText` computed property on DocumentViewerModel; ScrollView+Text(.textSelection) in both DocumentWindowView and PreviewSheet. Build clean, 191 tests green, 0 warnings. GUI-verify deferred (screen locked).
+- [x] **W5.d2 — Preview gets its OWN default zoom** `627e306` — PDFPaneController(persists: false) in preview mode; focus left pane via async dispatch on appear. Build clean 0 warnings, 191 tests green. GUI-verify deferred (screen locked).
+- [x] **W5.d3 — ⌘0 = fit full page in ALL zoom contexts** `a0ceec9` — `.focusedObject(model)` on PreviewSheet publishes the viewer model so the Document menu ⌘0 + zoom shortcuts reach the preview. Build clean, 191 tests green, 0 warnings. GUI-verify: Document menu confirmed; preview-specific manual test deferred (scratch corpus not Spotlight-indexed on /tmp). |
+- [x] **W5.d4 — View non-PDFs (JPG/PNG/TIFF/HEIC) in the viewer + preview** `4617084` — PDFPage(image:) wrapping in DocumentViewerModel.loadCurrent(); supports jpg/jpeg/png/tiff/tif/heic/heif/bmp/gif. Existing zoom/scroll/pane infrastructure works unchanged. Build clean 0 warnings, 191 tests green. GUI-verify deferred (scratch corpus not Spotlight-indexed on /tmp). | DocumentViewerModel.swift | S
+- [x] **W5.e1 — Multi-column OCR output layout** `76cf3ac` — `textColumns` setting (1/2/3, default 1) in Settings + ProcessingProfiles; body text on page 2 flows into N CoreText columns (header single-column). Threaded through OCRProcessor, SessionProcessingConfig, LiveCaptureProcessor (Codable-safe decodeIfPresent). Build clean 0 new warnings. Tier-2 APPROVE (7/7 vectors). 7 synthetic tests green. GUI-verify deferred: verify on a real multi-column newspaper scan → Daemon Report. | L
+- [x] **W6.1 — lean-review Reader/Search** — 2 confirmed (0H/2M), 0 refuted, both fixed inline: (a) WAL checkpoint no-op after prune — restructured `performMaintenance` guard; (b) prune Task.detached race — serialized via stored handle + cancellation. 191 tests green, 0 warnings. Report: `.maintenance/review/Reader-Search.md`.
+- [x] **W6.2 — lean-review Reader/Views** `f866a0f` — 5 confirmed (0H/5M), 2 refuted, both fixed inline: (a) TagEditorView year accepts 0/negative → guard 100–9999; (b) InlineEditCells year accepts 1-2 digit → same; (c) TagFilterField.Coordinator @MainActor added. 2 perf findings (displayedByID rebuild, tagCloud uncached) queued W6.5. 191 tests green, 0 warnings. Report: `.maintenance/review/Reader-Views.md`.
+- [x] **W6.3 — lean-review Reader/Core delta** — 0 confirmed (0H/0M/0L), 0 refuted. Delta is clean: decade parse/sort/display, smart-folder effective merge, Schwartzian cache, topicalTags set-exclusion, isDateFacetLike, setYear decade removal — all correct, SPEC-compliant, well-tested (191 tests green). Report: `.maintenance/review/Reader-Core-delta.md`.
+- [x] **W6.4 — lean-review Processor OCR/PDF-output** — 12 confirmed (3H/5M/4L), 3 refuted. W5.e1 multi-column delta clean (SPEC-compliant). H1 merged-PDF overwrite (no disk-collision guard), H2-H3 try? swallowed in rotation/manual-seg flows, M1-M2 outputURLMap phantom + resume try?, M3-M5 perf (MainActor PDF gen, serial batch results, Anthropic batch memory). All findings queued W6.5. Report: `.maintenance/review/Processor-OCR-PDF.md`.
+- [x] **W6.5 — Triage + fix HIGH/MED confirmed findings** `14118c0` — Fixed H1-H3 (correctness) + M1-M2 (phantom outputURLMap): H1 merged-PDF disk-collision guard (fileExists + _takenOutputPaths); H2-H3 try? → do/catch + os_log in rotation/manual-seg regen; M1 outputURLMap + passSourceTags moved inside do block; M2 resume regen tracks failures, skips outputURLMap for failed items. M3-M5 (perf: MainActor PDF gen, serial batch, Anthropic batch memory) and W6.2 Reader perf findings (displayedByID rebuild, tagCloud uncached) deferred — correctness-only, perf items noted to Daemon Report. Build clean 0 new warnings.
+- [x] **W7.1** `bbb54bb` — XCUITest target + scheme added to `project.yml`; trivial smoke test (launch → main window exists) GREEN. Key finding: ad-hoc signing (`CODE_SIGN_IDENTITY: "-"`) requires `ENABLE_HARDENED_RUNTIME: NO` on the UITest target — without it, the Runner can't load the xctest plugin (library validation rejects mismatched CDHashes). 191 unit tests + 1 UI test green, 0 new warnings. De-risks (NSMetadataQuery probe, NSTokenField round-trip) deferred to W7.3/W7.5 — need the fixture-root override and accessibility IDs first.
+- [x] **W7.2** `51e90b2` — Added `ar.<area>.<control>` accessibilityIdentifiers across 7 View files (40+ controls): filter bar, tag cloud, toolbar, sidebar, preview, document viewer, PDFPaneView. Per-ROW `ar.cell.tags.<filename>` on virtualized tag token cells. `PanelDivider`/`PDFPaneView` gain `id` params. DEBUG `accessibilityValue` exposes `PDFView.scaleFactor`. Build clean 0 warnings, 191 tests green.
+- [x] **W7.3** `cd0c4c1` — DEBUG-gated `-ARUITestRootPath` fixture-root override in `RootFolderStore`: `#if DEBUG` + launch-arg-gated `adoptTestRoot()` sets `root` without persisting/reading `archiveRootBookmark`, compiled out of Release. Route B implemented: `ArchiveReader.uitest.entitlements` (read-WRITE temporary-exception for `/Users/`) used for Debug builds only; Release uses the original prod entitlements (byte-identical). `project.yml` per-config `CODE_SIGN_ENTITLEMENTS`. New `RootFolderStoreTests` verify bookmark key is untouched. 193 unit tests green, 0 new warnings.
+- [x] **W7.4** `8a8922e` — `scripts/make-gui-fixture.sh`: copies 10 curated PDFs from the test corpus to Route B (`~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`), strips inherited tags, applies a deliberate variety via `tag` CLI (years incl. 3-digit medieval 842 + decade 1970s, months, Day N, subjects incl. facet-colliding "1984", P7–P10, Read/Unread, Box=Red/Folder=Purple, one tri-state "neither"). Generates a no-text-layer PDF (raw PDF 1.4) + a non-PDF JPEG (sips) for format-degrade tests. `mdimport` + `mdfind` poll (≤60s). Idempotent (rm -rf + rebuild). Emits fixture path on stdout for `-ARUITestRootPath`. Verified: 12 files, 11 indexed, all tags correct, build clean 0 warnings, 193 tests green.
+- [x] **W7.5** `46d2671` — Authored 12 fixture-based XCUITests in 3 files: FixtureUITestCase (base class with -ARUITestRootPath + XCTSkipUnless), NavigationUITests (8 tests: table population, tag cloud no-date-tokens regression, sidebar/tag-cloud toggle, column headers, header-click sort, name filter, OCR field), ViewerUITests (4 tests: preview open/dismiss, text pane, document viewer via ⌘O, no-text-layer banner, non-PDF degrade). Build clean 0 warnings, 193 unit tests green, UI tests compile + skip gracefully. Shipped execution plan deleted.
+- [x] **W7.6 — DONE `da382fc`** (fixup; checkpoints `cd1297e` + `6f0bf45`): all **14 Reader GUI XCUITests now EXECUTE and PASS** (were 13/14 skipping). Fixed: (1) sandbox↔Spotlight fixture load — a sandboxed `NSMetadataQuery` returns nothing for a temporary-exception path, so added a DEBUG off-Spotlight directory-enumeration path in `ArchiveLibrary`; (2) UITest↔owner **shared-UserDefaults** isolation — the UITest build shares the bundle ID, so `NavigationModel` was inheriting the owner's live filter (`read=unread` → 0 rows) AND clobbering the owner's view-state; now skipped in UITest mode; (3) tag-cloud element-type + row/header hittability (`clickRow` helper) + tag-cloud state-robustness; (4) PDFView content panes aren't XCUITest-queryable → assert observable chrome; (5) `@MainActor` on the UI-test classes (warnings 171→32). Original problem statement (historical): Confirmed 2026-07-11
+- [x] **W8.1** `404e197` — (a) `displayedByID` rebuild gated by `displayedGeneration` counter — skips O(N) dict rebuild on unrelated `updateNSView` calls (selection, scroll, font size). (b) `tagCloud` cached with `_tagCloudCache`, invalidated in `recompute()`. 193 tests green, 0 warnings. GUI-verify deferred to Daemon Report (perf-only, no visible UI change).
+- [x] **W8.2** `dff252f` — M3 handleOCRResult PDF gen → Task.detached(.utility); M4 processBatchResults rotation → bounded-concurrent withTaskGroup; M5 Anthropic batch → incremental JSON serialization. Tier-2 APPROVE (18 attack vectors). Build clean 0 warnings.
+- [x] **W9.1 — L1–L4 low-severity fixes** `78700d7` — L1 Gemini cancelBatch apiKey → urlComponentEncoded; L2

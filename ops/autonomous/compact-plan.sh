@@ -393,13 +393,17 @@ QUEUE_ARCHIVE="${AUTONOMOUS_QUEUE_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_WORK_QU
 # 180,000 B, and the non-queue sections run ~94 KB, so the plan hits its own gate at a queue size around
 # 86 KB — well under a 120 KB trigger. Net effect: Pass 3 no-op'd every cycle since it landed (the archive
 # file had never been created), the plan drifted to 195,708 B / 108% of budget, and the gate PARKED the run
-# instead — the machinery to fix it existed and was simply unreachable. Measured on the live plan: queue
-# region 101,990 B, Pass 3 at this threshold archives 35 tracker-confirmed lines and reclaims 39,198 B,
-# taking the plan to 156,510 B (context-budget.sh then exits 0).
-# Why 70000 and not lower: the region SETTLES at 62,792 B, because the remaining `[x]` items are the ones
-# whose done-state exists only in the plan and the safety rule above deliberately leaves them. A threshold
-# under that floor would re-fire every cycle archiving nothing, churning the .bak for no gain. 70000 fires
-# now and then cleanly no-ops (verified both runs).
+# instead — the machinery to fix it existed and was simply unreachable.
+# Measured on the live plan, queue region 101,990 B:
+#   * with the tracker gap still open — 35 lines archived, 39,198 B reclaimed, plan -> 156,510 B, floor 62,792 B;
+#   * after the gap was CLOSED in the same session (73 shipped items whose done-state existed only in this
+#     gitignored plan were backfilled into SUITE_TODO_DONE.md) — **249 lines archived, 68,157 B reclaimed,
+#     plan -> 127,551 B (71% of budget), floor 33,833 B**.
+# That second figure is the one that matters, and it is the point of the safety rule above: Pass 3's reach is
+# bounded by what the TRACKERS can vouch for, not by this threshold. A tracker gap silently halves it.
+# Why 70000 and not lower: it must sit above the settled floor or Pass 3 re-fires every cycle archiving
+# nothing and churning the .bak for no gain. 33,833 leaves ample headroom, so 70000 both fires now and then
+# cleanly no-ops (verified in both states).
 WQ_MAX_BYTES="${WQ_MAX_BYTES:-70000}"
 
 (

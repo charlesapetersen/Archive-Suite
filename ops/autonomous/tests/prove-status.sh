@@ -59,6 +59,29 @@ OUT="$(RUNNING=0 SUPERVISED=0 run)"
 printf '%s' "$OUT" | grep -qE '2 tasks to do · 1 finished' \
   && ok "a missing archive is a no-op (works pre-split too)" || bad "missing archive broke the count" "$OUT"
 
+echo "[0b] W26.donecount — a WRAPPED PROSE line that merely starts with **bold** is NOT a checkbox item"
+# The counters used `^\s*[-*].*\[ \]`, where `[-*]` accepts the `*` of `**bold**` and `.*` then reaches a
+# checkbox anywhere later in the line. So an ordinary continuation line inside an entry — "**Then guard it.**
+# In SUITE_TODO.md a column-0 `- [x]` is always the stub bug" — counted as a finished ITEM. This is not
+# hypothetical: writing the W26.donecount entry tripped it three times (+2, +1, +1), each caught only by
+# re-measuring before commit. Both counters now anchor the checkbox to the bullet with `[[:space:]]+`.
+# The two prose lines below are verbatim-shaped versions of the ones that actually inflated the count.
+printf -- '- [ ] one\n- [ ] two\n- [x] three\n' > "$R/SUITE_TODO.md"
+printf -- '**Then guard it.** a column-0 `- [x]` in SUITE_TODO.md is always the stub bug\n' >> "$R/SUITE_TODO.md"
+printf -- '  **The arithmetic.** it counts `[ ]` bullets across BOTH trackers with no dedup\n' >> "$R/SUITE_TODO.md"
+printf -- '- [x] archived-one\n' > "$R/SUITE_TODO_DONE.md"
+OUT="$(RUNNING=0 SUPERVISED=0 run)"
+printf '%s' "$OUT" | grep -qE '2 tasks to do · 2 finished' \
+  && ok "bold prose containing a checkbox is not counted (2 to do · 2 finished)" \
+  || bad "prose line inflated a counter — the loose regex is back" "$OUT"
+# …and the anchored form must not UNDER-count: indented sub-bullets are legitimate items and still count.
+printf -- '  - [x] a legitimate indented sub-item\n' >> "$R/SUITE_TODO_DONE.md"
+OUT="$(RUNNING=0 SUPERVISED=0 run)"
+printf '%s' "$OUT" | grep -qE '2 tasks to do · 3 finished' \
+  && ok "indented sub-bullets still count (no under-counting)" || bad "anchoring dropped a real item" "$OUT"
+printf -- '- [ ] one\n- [ ] two\n- [x] three\n' > "$R/SUITE_TODO.md"
+rm -f "$R/SUITE_TODO_DONE.md"
+
 echo "[1] not running -> says so, and says how to start it"
 OUT="$(RUNNING=0 SUPERVISED=0 run)"
 printf '%s' "$OUT" | grep -q 'Not running' && printf '%s' "$OUT" | grep -q 'daemon.sh' \

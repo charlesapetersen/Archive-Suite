@@ -396,6 +396,9 @@ ops/autonomous/tests/prove-no-host-gui.sh      # the host-GUI firewall (.claude/
 ops/autonomous/tests/prove-tracker-sync.sh     # the tracker-sync guard: drift is loud (both directions, the
                                                # real W21.vmgui-path shape) and legitimate asymmetry is silent
                                                # (one-file-only items, HOLD QUEUE, fences, quotes) ($0, <1s).
+ops/autonomous/tests/prove-todo-stubs.sh       # the ticked-stub lint: a COLUMN-0 `[x]` in SUITE_TODO is loud
+                                               # (with the double-count distinction), an INDENTED ticked
+                                               # sub-step and fenced/quoted examples stay silent ($0, <1s).
 ```
 
 ### Which of these actually run, and the assertion that keeps it that way (W26.fixwarn-fu1, 2026-08-10)
@@ -444,6 +447,29 @@ is that drift is silent**, so `health-gate.sh` now runs `check-tracker-sync.sh` 
   `2` bad input; `TRACKER_SYNC_QUIET=1` silences the success line but never a divergence).
 - It doubles as the **equivalence check for the tracker consolidation** — "do both sources report the same
   item state?" is exactly the assertion a strangler migration needs while both lists still exist.
+
+### Ticked stubs — `check-todo-stubs.sh` (WARN-only in the gate, W26.donecount 2026-08-10)
+
+`SUITE_TODO.md` holds **OPEN items only**; shipping MOVES the whole entry to `SUITE_TODO_DONE.md`. A `[x]` left
+behind reads as done in *both* files, and `status-digest.sh` sums ticked bullets across the two with no dedup —
+so it is counted **twice, permanently**. The owner caught it from the outside: the digest went "237 finished" →
+"246 finished" overnight when 8 items had closed. Two stubs were double-counted; 244 was the true figure.
+
+- **Column 0 only, and that is what makes it usable.** An *indented* `- [x]` is a legitimate finished sub-step
+  inside an entry that is itself still `[ ]` (there are such lines today). A ticked bullet at column 0 in that
+  file is always the defect — exact, not heuristic, so it can be a gate check without becoming noise.
+- **Deliberately a SEPARATE script from `check-tracker-sync.sh`.** It was tried there and reverted the same
+  session: that script's job is comparing `[x]` state *between* the plan and SUITE_TODO, so it must treat a
+  `[x]` there as valid input. Asserting the opposite in the same file is self-contradictory, and it broke 5 of
+  its fixtures — one of which exists to prove a deliberately-unmirrored HOLD QUEUE item is ignored. Two
+  assertions about one file belong in two scripts.
+- Skips code fences and blockquotes like its siblings, or it would report the fenced *example* of the bug that
+  `W26.donecount`'s own entry contains.
+- **WARN-only** (`|| true`), beside `coherence` and `tracker-sync` — ⛔ never a hard step, or a docs-hygiene nit
+  parks an overnight run. Its proof `tests/prove-todo-stubs.sh` (17/0) *is* a hard step.
+- Run it directly: `ops/autonomous/check-todo-stubs.sh` (read-only; `0` clean, `1` stubs found, `2` bad input;
+  `TODO_STUBS_QUIET=1` silences the success line but never a finding). It distinguishes a **confirmed
+  double-count** (the tag is also done in the archive) from a merely misplaced tick — different fixes.
 
 ## Health watchdog (Layers 1+2) — added 2026-07-12
 
@@ -682,10 +708,13 @@ is active:
   the *whole plan* at 180,000 B and the non-queue sections run ~94 KB, so the plan REDs the gate at a queue size
   around 86 KB, far below a 120 KB trigger. Pass 3 therefore no-op'd every cycle from the day it landed (its
   archive file had never been created), the plan drifted to 195,708 B / 108% of budget, and the gate parked the
-  run instead — with the fix sitting one unreachable threshold away. Measured at 70000: 35 tracker-confirmed
-  lines archived, **39,198 B reclaimed**, plan 195,708 → 156,510 B. Not set lower because the region *settles*
-  at 62,792 B (the remaining `[x]` items are the plan-only ones the safety rule below deliberately keeps), so a
-  threshold under that floor would re-fire forever archiving nothing.
+  run instead — with the fix sitting one unreachable threshold away. Measured at 70000, on a queue region of
+  101,990 B: with the tracker gap still open, 35 lines archived / 39,198 B reclaimed / plan → 156,510 B, floor
+  62,792 B. **After the gap was closed the same session** (73 shipped items whose done-state existed only in the
+  gitignored plan were backfilled into `SUITE_TODO_DONE.md`): **249 lines archived, 68,157 B reclaimed, plan
+  195,708 → 127,551 B — 71% of budget — floor 33,833 B.** The lesson is in the gap between those two runs:
+  **Pass 3's reach is bounded by what the trackers can vouch for, not by this threshold**, so a tracker gap
+  silently halves compaction. Not set lower than the settled floor, or it re-fires forever archiving nothing.
   ⚠️ **Only items whose tag is independently recorded `[x]` in `SUITE_TODO.md` or
   `SUITE_TODO_DONE.md` are eligible** — `next-queue-item.sh` reads a *missing* tag as NOT done, so stripping a
   plan-only `[x]` would block any future dependent forever. Resolvability is preserved **by construction**, and
