@@ -11,8 +11,11 @@ DerivedData/
 *.xcodeproj/
 **/xcuserdata/
 *.xcuserstate
-# SwiftPM build dir (ArchiveCore package).
-.build/
+# SwiftPM build dirs (ArchiveCore package). The glob, not just `.build/`: a session comparing build
+# configurations needs a second `--build-path` (`.build-debug`, `.build-release`, …), and an unignored
+# one silently pins the worktree — `git worktree remove` refuses on untracked files, so the cleanup step
+# fails with nothing but a build cache in the way, and `--force` is not an option here.
+.build*/
 
 # Release artifacts — the combined DMG is a build output; NEVER commit it.
 release/*.dmg
