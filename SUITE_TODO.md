@@ -363,8 +363,58 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   **40.8 µs/file (6.1 s at 150k)**, which also corrects `W26.verify`'s headline in the opposite direction
   from the one it claimed.
 
+- [ ] **W26.vmuitest-blind — EVERY Reader XCUITest is currently RED in the Tart VM because the
+  app-under-test comes up with NO WINDOW, and the app itself is fine [M · HIGH · ops/GUI].** Filed
+  2026-08-10 while verifying `W26.verify-fu2`. ⚠️ **This makes the whole unattended GUI lane vacuous** —
+  `resume-prompt.txt` STEP 3.5 sends every GUI check here, and right now every one of them fails for a
+  reason that has nothing to do with the change under test.
+  **Measured today, on pristine `edce83e` main, via `ops/gui/vm-gui-runner.sh reader xcuitest`:**
+  - `ArchiveReaderUITests/testAppLaunchesAndShowsMainWindow` — the simplest UITest in the repo — FAILS:
+    *"The main Archive Reader window should appear within 10 seconds."* So does
+    `testAnUntaggedFolderShowsTheScannedDenominator`. 2 tests, 2 failures.
+  - The app-under-test is **running** (`XCUIApplication.state == 4`, foreground) with **`windows == 0`**,
+    and the a11y snapshot marks the Application element `Disabled`. Its menu bar IS installed and fully
+    enumerable, and it has **no Dock icon** (`vm-artifacts/shots-reader/uitest-warmstart-no-table.png`).
+  - **The same build draws correctly in the same VM**: `vm-gui-runner.sh reader sighted` renders the
+    navigation window with all 11 fixture rows (`vm-artifacts/sighted-reader.png`, 2026-08-10 14:50).
+    So this is the XCUITest LANE, not the app.
+  - Not stale guest state: a `PRERUN` that killed the app and deleted its saved application state and its
+    container preferences changed nothing.
+  - No app-code cause on main: nothing since the lane last passed (`W26.docs-fu1`, 2026-08-09, whose shots
+    were read) touches the app entry point, the window scene, or `ArchiveTestHost`. The guest advertises a
+    pending system update, so a guest-side macOS/Xcode change is the likely trigger.
+  **Leading hypothesis — NOT confirmed; confirm before fixing.** `ArchiveCore.ArchiveTestHost` suppresses
+  the window when `ProcessInfo.environment["XCTestConfigurationFilePath"] != nil`: `.prohibited`
+  activation policy (no Dock icon) plus `HiddenWindowStub`, which `orderOut`s the window (0 windows,
+  process alive, menu bar intact). That is symptom-for-symptom what is on screen. Its own doc comment
+  asserts the opposite — *"A UITest target's app-under-test is launched separately by `XCUIApplication`
+  and does not inherit it"* — so if that variable now reaches the app-under-test, the comment is the bug's
+  alibi. **First step is to OBSERVE the app-under-test's environment**, not to tighten the predicate on a
+  guess: an empty-string value would still be `!= nil`, so "treat empty as absent" is a plausible fix and
+  an equally plausible red herring.
+  ⚠️ Tier-2 and cross-app: `ArchiveTestHost` is shared `ArchiveCore`, and each app's unit suite has a
+  `TestHostWindowSuppressionTests` asserting today's behaviour — a fix must keep the screen-safety
+  property (`xcodebuild test -only-testing:<App>Tests` draws nothing) while letting UITests render, and
+  must build + test all three apps. | files: packages/ArchiveCore/Sources/ArchiveCore/ArchiveTestHost.swift, ops/gui/vm-gui-runner.sh | M | high | none
+
 - [ ] **W26.verify-fu2 — the warm-start UI has still never been checked in the VM, and two of the three
-  checks need infrastructure that does not exist [M · MED · GUI].** Split out of `W26.verify` 2026-08-10;
+  checks need infrastructure that does not exist [M · MED · GUI]** (blocked-on: W26.vmuitest-blind).
+  **Status 2026-08-10 — the infrastructure and all three tests have LANDED (`2d5a754`, `f4d0d11`); only
+  the VM run is outstanding, and it is blocked by `W26.vmuitest-blind`.** What shipped: two DEBUG launch
+  keys, both read from the INJECTED defaults domain — `ARUITestLibraryIndexPath` (substitutes a SCRATCH
+  warm-start database in `ArchiveLibrary.init`, and is the only thing that lets a fixture root use a
+  persisted cache at all, since `usesPersistedIndex` otherwise answers NO) and `ARUITestScanHoldSeconds`
+  (holds the pass once the warm rows are published, applied BEFORE `armScanStallDeadline` so the hook can
+  never be reported as *"Archive folder has not answered"*); `ar.status.scanning` and `ar.status.message`
+  accessibility identifiers; `LibraryFixtureLaneWarmStartTests` (4 tests, green, including a guard that a
+  fixture root with NO index key still scans synchronously — the contract `DocumentPageLinkTests` /
+  `RootMarkerStateTests` / `waitForRows` are calibrated against); and `WarmStartUITests`, which makes all
+  three assertions. **Measured while doing it: revalidating a two-file corpus settles inside 10 ms**, so
+  the item's premise was right — the run that did not hold the pass never observed `revalidating` at all.
+  Also found: check (2)'s COLD half is **already shipped** as
+  `ArchiveReaderUITests.testAnUntaggedFolderShowsTheScannedDenominator`; what this item adds is the WARM
+  variant. Remaining: `ONLY_TESTING=ArchiveReaderUITests/WarmStartUITests ops/gui/vm-gui-runner.sh reader
+  xcuitest`, read the four shots, tick. Original text follows. Split out of `W26.verify` 2026-08-10;
   this is the (b) half that item carried over from `W26.idx`. Three assertions, none of which any test
   makes today: (1) cached rows paint as *revalidating*, not settled; (2) after revalidation the settled
   sentence still quotes its examined-file denominator (`ar.empty.nothingTagged` — *"Scanned N files … none
@@ -378,7 +428,7 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   denominator sentence only renders over an empty list. (3) is already proven headlessly by
   `LibraryWarmStartTests.testBulkMarkReverifiesCachedRowsAndStillUpdatesValidDiskNeighbours` and
   `testCorruptOutOfRootCacheRowIsNeverPublishedAsAWriteTarget`; what is unproven is the same thing through
-  the UI. VM lane only (`ops/gui/vm-gui-runner.sh reader xcuitest`), never the host screen. | files: ArchiveReader/macOS/Tests/ArchiveReaderUITests/NavigationUITests.swift | M | med | none
+  the UI. VM lane only (`ops/gui/vm-gui-runner.sh reader xcuitest`), never the host screen. | files: ArchiveReader/macOS/Tests/ArchiveReaderUITests/WarmStartUITests.swift | M | med | none
 
 - [ ] **W26.plandelete — delete `execution-plans/despotlight.md`** (blocked-on: W26.verify-fu1,
   W26.verify-fu2, W26.docs-spec). The convention is that a shipped plan is deleted, and `W26.verify` was

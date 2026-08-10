@@ -150,7 +150,11 @@ final class WarmStartUITests: XCTestCase {
     /// leave the next launch cold and every warm assertion would fail for the wrong reason.
     private func seedTheWarmStartCache(expectingRows: Int? = nil) throws {
         let cold = launch()
-        XCTAssertTrue(cold.tables["ar.table"].waitForExistence(timeout: 30))
+        if !cold.tables["ar.table"].waitForExistence(timeout: 30) {
+            reportWhatIsOnScreen(cold)
+            XCTFail("the app never drew its file list over \(corpus.path)")
+            return
+        }
         let wanted = expectingRows ?? tagged.count
         if wanted > 0 { waitForRows(cold, minimum: wanted, timeout: 30) }
         XCTAssertTrue(waitForDisappearance(cold.staticTexts["ar.status.scanning"], timeout: 60),
@@ -158,6 +162,19 @@ final class WarmStartUITests: XCTestCase {
         try waitForTheCacheToBeWritten()
         cold.terminate()
         app = nil
+    }
+
+    /// Everything a stranger would need to tell "the app could not read my corpus" from "the app did not
+    /// come up at all" — the two failures that look identical from a missing table.
+    private func reportWhatIsOnScreen(_ app: XCUIApplication) {
+        print("[warmstart] scratch=\(scratch.path)")
+        print("[warmstart] corpus=\(corpus.path) exists=\(FileManager.default.fileExists(atPath: corpus.path))")
+        let listing = (try? FileManager.default.contentsOfDirectory(atPath: corpus.path)) ?? []
+        print("[warmstart] corpus contents=\(listing.sorted())")
+        print("[warmstart] database=\(database.path) exists=\(FileManager.default.fileExists(atPath: database.path))")
+        print("[warmstart] app state=\(app.state.rawValue) windows=\(app.windows.count)")
+        print("[warmstart] hierarchy:\n\(app.debugDescription)")
+        captureScreenshot("warmstart-no-table")
     }
 
     private func waitForTheCacheToBeWritten(timeout: TimeInterval = 30) throws {

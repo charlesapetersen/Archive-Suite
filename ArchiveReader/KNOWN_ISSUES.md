@@ -2,6 +2,24 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## 🔴 OPEN (2026-08-10) — the VM XCUITest lane is BLIND: the app-under-test has no window
+
+**Do not read a green — or a red — Reader XCUITest run as evidence right now.** Measured today on pristine
+`edce83e` main: `ops/gui/vm-gui-runner.sh reader xcuitest` fails even
+`ArchiveReaderUITests/testAppLaunchesAndShowsMainWindow`. The app-under-test is running in the foreground
+with **zero windows**, marked `Disabled` in the accessibility tree, with its menu bar installed and no Dock
+icon. **The app itself is fine**: the same build renders the navigation window and all 11 fixture rows in
+the same VM through the *sighted* lane (`vm-artifacts/sighted-reader.png`). Deleting the guest's saved
+application state and container preferences changes nothing, and no commit since the lane last passed
+(2026-08-09) touches the app entry point, the window scene, or `ArchiveTestHost`.
+
+Leading hypothesis, unconfirmed: `ArchiveCore.ArchiveTestHost`'s unit-test-host suppression (`.prohibited`
+activation policy + `HiddenWindowStub.orderOut`) is firing for the app-under-test, which would match every
+symptom including the missing Dock icon. Full evidence, the confirm-before-fixing instruction and the
+cross-app Tier-2 constraints: `SUITE_TODO.md` → **W26.vmuitest-blind**. Until it closes, GUI verification
+falls back to the sighted lane plus the headless render guards, and `W26.verify-fu2`'s VM run is blocked
+behind it.
+
 ## 📏 MEASURED (`W26.verify`, corrected by `W26.verify-fu1`, 2026-08-10) — what Spotlight-free discovery costs at 150k
 
 Recorded because the de-Spotlight plan's projection (~12 s at 150k) is **not** what a measurement says, and
