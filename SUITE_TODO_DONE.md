@@ -297,6 +297,65 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.fixwarn — the fixture step asks the GUEST for its exit status instead of asking the transport.
+  ✅ CLOSED** `4dc64ff` -> this commit (2026-08-10). `tart exec` fails independently of the command it
+  carries: on 2 of the 4 VM runs of 2026-08-09/10 it returned `Error: StreamClosed(streamID: …
+  HTTP2ErrorCode<0x5 Stream Closed>)` / `Error: internal error (13): transport: SendHeader called multiple
+  times` while the fixture built perfectly — right mtime, `IMG_PHOTO — Fixture.jpg` present, tagged and
+  discovered by the tests — so the lane cried *"fixture build reported a failure"* over a build that had
+  just succeeded. The item's own prescription (capture the guest's real exit status) was correct and is
+  what shipped.
+  🔺 **THE BUG WAS IN BOTH ENTRY POINTS, NOT THE ONE THE ITEM NAMES.** `vm-gui-runner.sh` inferred failure
+  from a `| tail -5` pipeline — which infers it *because* of `set -o pipefail`, so the pipe was never
+  incidental — and `ops/autonomous/gui-vm-gate.sh:162` inferred it from the exec's status directly. The
+  daemon's own gate has therefore been emitting the same false `WARN[app]: GUI fixture rebuild FAILED` into
+  its per-attempt logs, un-filed, for as long as the runner has. Fixing only the named file would have left
+  the copy that runs unattended every cycle — which is the precise failure `tart-lib.sh` was created to end
+  (the guest-agent race got fixed in the gate and not in the runner). So the fix is one shared
+  `tart_build_fixture` there, and `prove-vm-lane.sh` asserts BOTH callers route through it.
+  🔺 **UNKNOWN IS A THIRD TIER, AND THAT IS THE WHOLE DESIGN.** The guest writes its own `$?` to a file; a
+  second, tiny exec reads it back. **0** = the guest build passed · **1** = it failed, carrying the guest's
+  own exit code · **2** = the status could not be read, which is transport trouble and says *nothing* about
+  the build — there the existing fixture-presence probe is the verdict. Collapsing 2 into 1 would just
+  reinstate the cried-wolf warning through a different door; collapsing it into 0 would hide a real failure.
+  ⚠️ **Two details that are load-bearing rather than tidy.** (1) The status file's name carries a
+  **run-unique token**. With a fixed path, a run whose cleanup exec was dropped leaves a status the next run
+  reads as its own — reporting success for a build that never ran. That direction (silently swallowing a
+  real failure) is strictly worse than the warning this item is about, so it is pinned by a test. (2) `( $mk )`
+  is a **subshell, not a brace group**: a builder ending in `exit N` would otherwise take the guest shell
+  down before the status line is written, so a real failure would arrive as "unknown" — the one tier that
+  must stay reserved for transport.
+  🔺 **MUTATION-TESTED, AND THE FIRST PASS CAUGHT A BAD TEST OF MINE.** Restoring the transport inference
+  REDs 3 of the new assertions and collapsing UNKNOWN into FAILED REDs 1 — but the fixed-token mutation
+  stayed **GREEN**, because the stale-file assertion planted a file at a name the helper never looks for. It
+  proved nothing. Rewritten to stage the real hazard — drop a run's cleanup exec so its status file survives,
+  then drop the next run's build exec — and it REDs on that mutation too. Worth recording because the
+  assertion *read* correct in review; only the mutation showed it was inert.
+  📌 **`prove-vm-lane.sh` is now a health-gate step.** It was the fifth hermetic ops harness in the position
+  `f64649b` fixed for the other four — ~4 s, fully stubbed (no VM, no network, no Xcode), watching the one
+  lane whose documented history is "reported green while running zero tests", and wired into nothing. New
+  assertions that nothing runs are exactly this item's own complaint in another form. Checked in the gate's
+  OWN environment before wiring it, because that is where a harness turns a green gate red: 60/0 in 4.2 s
+  with `ops/autonomous/bin` (the host-GUI shims) first on PATH and `ARCHIVE_UNATTENDED=1`, and 60/0 again
+  under a bare `/usr/bin:/bin` — tart-lib.sh resolves Homebrew itself, so the step does not depend on the
+  gate's PATH line. Residual filed, NOT fixed here: **`W26.fixwarn-fu1`** — **seven** of the *other*
+  harnesses are still in this exact position (counted, with the three comment-only near-miss references
+  checked by hand), and nothing notices when the next one lands that way.
+  **Verification:** `prove-vm-lane` 60 passed / 0 failed, twice, byte-identical (48 on main, so §11 is 12
+  new assertions and every pre-existing one still green) + the three mutations above; `bash -n` on all five
+  touched scripts.
+  🔬 **And IN SITU against the real VM and the real transport, which is the half no stub can reach** — the
+  guest-side quoting, the subshell, the token read-back and the cleanup all live. Five cases, one boot:
+  (a) the REAL Reader fixture builder → rc=**0**, guest exit 0, and its genuine output came back
+  (*"GUI fixture ready: 12 files (11 tagged Read/Unread, verified on disk)"*) with **no warning** — the
+  cried-wolf case, gone; (b) a builder ending `exit 7` → rc=**1** carrying **7**, which is the subshell
+  detail proven where it matters (a brace group would have killed the guest shell and mis-reported this as
+  UNKNOWN); (c) an ordinary failure with no explicit exit → rc=**1**, guest exit 1, stderr in the tail;
+  (d) `$GR`/`$GC` resolve **in the guest** to `/Volumes/My Shared Files/{repo,corpus}`, so the unexpanded
+  mkfixture strings survive the host as designed; (e) the guest's status dir is left **empty** afterwards,
+  so the run-unique token does not accumulate litter. Scratch GUI fixture inside the VM only, sourced from
+  `ArchiveProcessor/Test Files/DeaverLLM`; nothing on the host screen and nothing near the real corpus.
+
 - [x] **W26.previewzoom — ⌘0 / ⌘↑ / ⌘↓ reach the preview sheet, and the publisher now outlives what it
   publishes. ✅ CLOSED** `f630b44` -> `e4e74e6` -> this commit (2026-08-10). `PreviewSheet` was the app's
   only `.focusedObject`, and the only publication point whose Document-menu commands did not work:

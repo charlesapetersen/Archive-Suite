@@ -208,12 +208,25 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     step instead of the FAILING one — a regression that is only ever observed during an incident, and that
 #     misreported three of the owner's parks before it was fixed. Self-referential on purpose: nothing else
 #     watches the gate's own honesty.
+#   * prove-vm-lane.sh — the GUI lane's exit-code -> owner-visible-text mapping, the per-app table, the VM
+#     lock, and (W26.fixwarn) that a `tart exec` transport error is never mistaken for a failed fixture
+#     build. Missed by the 2026-08-08 sweep above, so it was the fifth harness in the same position: ~4 s,
+#     fully stubbed — no VM, no network, no Xcode — and watching the one lane whose whole documented history
+#     is "reported green while running zero tests." Added 2026-08-10 with W26.fixwarn's own assertions.
+#     It needs nothing from the PATH line at the top of this file: measured 60/0 both with the shim dir
+#     first AND under a bare /usr/bin:/bin, because tart-lib.sh resolves Homebrew itself. It also cannot
+#     collide with the gui-vm step that drives the REAL lane — it stubs `tart` and points TART_LOCK_DIR at
+#     its own mktemp, so it never touches the shared VM or the shared lock.
+#     ⚠️ SEVEN more harnesses in ops/autonomous/tests/ are still run by nothing — counted, and the three
+#     with a comment-only near-miss reference checked by hand (SUITE_TODO W26.fixwarn-fu1, which also wants
+#     a meta-assertion so #14 cannot land unwatched). Adding one here does not make this list complete.
 # prove-daemon.sh is deliberately NOT here: ~10 min of real daemon loops does not belong in a gate that already
 # runs ~22 min against GATE_MAXRUN=50min. Run that one by hand for daemon-behaviour changes. (That exclusion is
 # about RUNTIME, not principle — which is why the sub-second prove-gate-report.sh above is in.)
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
 step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
+step vm-lane-proof  bash "$ROOT/ops/autonomous/tests/prove-vm-lane.sh"
 
 echo
 if [ -n "$fails" ]; then
