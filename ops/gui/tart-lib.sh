@@ -123,6 +123,59 @@ tart_wait_agent() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# tart_build_fixture VM MKFIXTURE [TAIL_LINES] — rebuild the GUI fixture inside the guest and report the
+# GUEST COMMAND's own exit status, never `tart exec`'s.
+#   returns 0 — the guest build exited 0
+#           1 — the guest build exited non-zero (the code is in $TART_FIXTURE_RC)
+#           2 — UNKNOWN: the status could not be read back. That is tart/agent trouble, and it is NOT
+#               evidence of a failed build — the caller's fixture-presence probe is the real verdict.
+# The tail of the guest's build output is left in $TART_FIXTURE_TAIL in all three cases.
+#
+# THE BUG THIS EXISTS FOR (SUITE_TODO W26.fixwarn; seen on 2 of the 4 VM runs of 2026-08-09/10). Both
+# entry points used to infer the build's fate from `tart exec`'s exit status. tart's control channel fails
+# INDEPENDENTLY of the command it carries — observed as `Error: StreamClosed(streamID: …
+# HTTP2ErrorCode<0x5 Stream Closed>)` and `Error: internal error (13): transport: SendHeader called
+# multiple times` — while the fixture built perfectly both times (right mtime, `IMG_PHOTO — Fixture.jpg`
+# present, tagged, and discovered by the tests). So the lane cried *"fixture build reported a failure"*
+# over a build that had just succeeded. That is worse than silence: `W26.walk1` de-silenced this step
+# precisely so a REAL fixture failure could not hide, and a warning that fires on a healthy run trains the
+# next session to read past the one signal it was added to give. It is INTERMITTENT, so a green run is not
+# evidence that the transport behaved — which is why the fix is structural rather than a retry.
+#
+# The fix is to stop asking the transport a question only the guest can answer: the guest records its own
+# `$?` to a file, and a second, tiny exec reads it back (a few bytes, not a build's worth of output).
+# The RUN-UNIQUE token is load-bearing, not decoration — with a fixed path a previous run's status could
+# be read as this one's, turning a cried-wolf warning into a silently-swallowed real failure, which is the
+# strictly worse direction to fail in.
+TART_FIXTURE_TMP="${TART_FIXTURE_TMP:-/tmp/archive-gui-fixture}"
+
+tart_build_fixture() {
+  local vm="$1" mk="$2" lines="${3:-5}" tok raw glog grc
+  tok="fixrc-$$-$(date +%s)-${RANDOM:-0}"
+  glog="$TART_FIXTURE_TMP/$tok.log"; grc="$TART_FIXTURE_TMP/$tok.rc"
+  TART_FIXTURE_TAIL=""; TART_FIXTURE_RC=""
+  # `|| true` on purpose: THIS exec's status is the exact thing we have learned not to trust.
+  # $GR/$GC are assigned in the guest so the mkfixture strings (which keep them unexpanded) resolve there.
+  # A SUBSHELL around $mk, not a brace group: a builder that ends in `exit N` would otherwise take the
+  # guest shell down with it and the status line below would never be written — i.e. a real failure would
+  # arrive as "unknown", which is the one classification that must stay reserved for transport trouble.
+  tart exec "$vm" bash -lc "
+    mkdir -p '$TART_FIXTURE_TMP'
+    GR='$GUEST_REPO'; GC='$GUEST_CORPUS'
+    ( $mk ) > '$glog' 2>&1
+    echo '$tok' \$? > '$grc'
+  " >/dev/null 2>&1 || true
+  raw="$(tart exec "$vm" bash -lc "cat '$grc' 2>/dev/null" 2>/dev/null || true)"
+  TART_FIXTURE_TAIL="$(tart exec "$vm" bash -lc "tail -n $lines '$glog' 2>/dev/null" 2>/dev/null || true)"
+  tart exec "$vm" bash -lc "rm -f '$glog' '$grc'" >/dev/null 2>&1 || true
+  # Only a line carrying THIS run's token counts; anything else is stale or truncated, i.e. unknown.
+  case "$raw" in "$tok "*) TART_FIXTURE_RC="${raw#"$tok" }" ;; *) TART_FIXTURE_RC="" ;; esac
+  case "$TART_FIXTURE_RC" in ''|*[!0-9]*) TART_FIXTURE_RC=""; return 2 ;; esac
+  if [ "$TART_FIXTURE_RC" = 0 ]; then return 0; fi
+  return 1
+}
+
+# ---------------------------------------------------------------------------------------------------
 # tart_ensure_display VM — raise the guest's screen to $TART_VM_DISPLAY (default 1920x1200). Returns 0
 # when the display now meets the target, 1 when it does not; either way the guest helper's own report is
 # left in $TART_DISPLAY_NOTE so the caller can print what ACTUALLY took effect rather than what it asked

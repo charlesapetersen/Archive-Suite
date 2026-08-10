@@ -205,6 +205,99 @@ grep -q 'ARCHIVE_UNATTENDED' "$ROOT/ArchiveProcessor/scripts/test-smoke.sh" \
   && ok "Processor smoke skips its host launch step when unattended" \
   || no "Processor smoke still runs 'open \$APP' + osascript unattended"
 
+echo "== 11. the fixture build's verdict comes from the GUEST, not from tart's transport (W26.fixwarn) =="
+# `tart exec` fails independently of the command it carries: on 2 of the 4 VM runs of 2026-08-09/10 it
+# returned StreamClosed / "SendHeader called multiple times" while the fixture built perfectly, and both
+# entry points cried "fixture build reported a failure". A warning that fires on a healthy run destroys the
+# de-silencing (W26.walk1) it was added for. Stub `tart` so the exec shapes run on the host, and pin all
+# three classifications — including that a REAL failure still fails.
+STUB_BIN="$TMP/bin"; mkdir -p "$STUB_BIN"
+cat > "$STUB_BIN/tart" <<'STUB'
+#!/usr/bin/env bash
+# `tart exec VM bash -lc BODY` -> run BODY here. STUB_TRANSPORT_MATCH: run it, then fail the way tart does
+# (the W26.fixwarn shape). STUB_SKIP_MATCH: the exec never lands at all.
+[ "${1:-}" = exec ] || exit 0
+body="${5:-}"
+if [ -n "${STUB_SKIP_MATCH:-}" ]; then
+  case "$body" in *"$STUB_SKIP_MATCH"*)
+    echo "Failed to connect to the VM using its control socket" >&2; exit 1 ;;
+  esac
+fi
+bash -c "$body"; rc=$?
+if [ -n "${STUB_TRANSPORT_MATCH:-}" ]; then
+  case "$body" in *"$STUB_TRANSPORT_MATCH"*)
+    echo "Error: internal error (13): transport: SendHeader called multiple times" >&2; exit 1 ;;
+  esac
+fi
+exit "$rc"
+STUB
+chmod +x "$STUB_BIN/tart"
+PATH="$STUB_BIN:$PATH"; export PATH
+TART_FIXTURE_TMP="$TMP/guest-tmp"; mkdir -p "$TART_FIXTURE_TMP"
+
+fixcase() {  # $1 = mkfixture text -> sets $frc + $TART_FIXTURE_RC + $TART_FIXTURE_TAIL
+  frc=0; tart_build_fixture stub-vm "$1" 5 || frc=$?
+}
+
+STUB_TRANSPORT_MATCH=MKFIXOK; export STUB_TRANSPORT_MATCH
+fixcase 'echo MKFIXOK'
+[ "$frc" = 0 ] && ok "a tart transport error over a SUCCEEDING guest build is NOT reported as a failure" \
+               || no "the transport error was reported as a build failure again (rc=$frc) — W26.fixwarn is back"
+case "$TART_FIXTURE_TAIL" in
+  *MKFIXOK*) ok "…and the build's output still comes back (the step stays de-silenced)" ;;
+  *) no "the build output was lost — W26.walk1's de-silencing is undone (tail='$TART_FIXTURE_TAIL')" ;;
+esac
+unset STUB_TRANSPORT_MATCH
+
+fixcase 'echo MKFIXBAD >&2; exit 3'
+{ [ "$frc" = 1 ] && [ "${TART_FIXTURE_RC:-}" = 3 ]; } \
+  && ok "a genuinely failing build still FAILS, carrying the guest's own exit code (3)" \
+  || no "a failing build was not caught (rc=$frc, guest rc='${TART_FIXTURE_RC:-}')"
+case "$TART_FIXTURE_TAIL" in
+  *MKFIXBAD*) ok "…and its stderr is in the tail the caller prints" ;;
+  *) no "the failing build's stderr never reached the caller (tail='$TART_FIXTURE_TAIL')" ;;
+esac
+
+STUB_TRANSPORT_MATCH=MKFIXBAD; export STUB_TRANSPORT_MATCH
+fixcase 'echo MKFIXBAD >&2; exit 3'
+[ "$frc" = 1 ] && ok "a failing build PLUS a transport error is still a failure (the fix cannot mute a real one)" \
+               || no "a real failure was swallowed when the transport also failed (rc=$frc) — strictly worse than crying wolf"
+unset STUB_TRANSPORT_MATCH
+
+# UNKNOWN must be its own tier. It is not "failed" (that is the cried-wolf bug) and it is emphatically not
+# "passed" — the caller's fixture-presence probe is what settles it.
+STUB_SKIP_MATCH=MKFIXOK; export STUB_SKIP_MATCH
+fixcase 'echo MKFIXOK'
+[ "$frc" = 2 ] && ok "an exec that never lands is UNKNOWN (rc=2), not a failure and not a pass" \
+               || no "a non-landing exec classified as $frc — the three tiers have collapsed"
+
+# The run-unique token is load-bearing, not decoration. Stage the real hazard: a run whose CLEANUP exec is
+# dropped (as droppable as any other) leaves its status file on the guest; the NEXT run must not read it.
+# With a fixed path that leftover reports success for a build that never ran — silently swallowing a real
+# failure, which is strictly worse than the cried-wolf warning this item is about.
+STUB_SKIP_MATCH='rm -f '
+fixcase 'echo MKFIXOK'
+[ "$frc" = 0 ] && ok "a run whose cleanup exec is dropped still passes (leaving its .rc behind)" \
+               || no "the dropped-cleanup run misreported itself (rc=$frc)"
+STUB_SKIP_MATCH=MKFIXOK
+fixcase 'echo MKFIXOK'
+[ "$frc" = 2 ] \
+  && ok "…and the NEXT run does not read that leftover as its own status (run-unique token)" \
+  || no "read the PREVIOUS run's status as this run's (rc=$frc) — a real failure could be silently swallowed"
+unset STUB_SKIP_MATCH
+PATH="${PATH#"$STUB_BIN":}"
+
+# Both entry points must go through the helper — the whole point of tart-lib.sh is that a fix cannot land
+# in only one of them, and this bug shipped in BOTH.
+for f in ops/gui/vm-gui-runner.sh ops/autonomous/gui-vm-gate.sh; do
+  grep -q 'tart_build_fixture' "$ROOT/$f" \
+    && ok "$f builds the fixture through tart_build_fixture" \
+    || no "$f still infers the fixture build's fate from tart exec's own status"
+  grep -qE 'tart exec .*(MKFIXTURE|\$mk)' "$ROOT/$f" \
+    && no "$f still has a raw 'tart exec … \$mk' — the transport verdict is back" \
+    || ok "$f has no raw mkfixture exec left"
+done
+
 echo
 echo "prove-vm-lane: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

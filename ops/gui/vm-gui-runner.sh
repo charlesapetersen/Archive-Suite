@@ -193,8 +193,17 @@ ensure_fixture() {
   # Deliberately NOT silenced. The previous version piped this to /dev/null with `|| true`, so when its
   # source path turned out to be unmounted the failure was invisible and the whole suite quietly XCTSkipped
   # while still reporting success.
-  tart exec "$VM" bash -lc "GR='$GUEST_REPO'; GC='$GUEST_CORPUS'; $MKFIXTURE" 2>&1 | tail -5 \
-    || warn "fixture build reported a failure (output above)."
+  # …but the VERDICT comes from the GUEST's own exit status (tart_build_fixture), never from `tart exec`'s,
+  # which fails on its own transport and cried wolf on half the runs — W26.fixwarn.
+  local rc=0
+  tart_build_fixture "$VM" "$MKFIXTURE" 5 || rc=$?
+  if [ -n "$TART_FIXTURE_TAIL" ]; then printf '%s\n' "$TART_FIXTURE_TAIL"; fi
+  case "$rc" in
+    0) : ;;
+    1) warn "fixture build FAILED inside the guest (exit $TART_FIXTURE_RC; output above)." ;;
+    *) warn "could not read the fixture build's exit status back from the guest — that is tart's transport,
+    NOT necessarily the build. The presence check below is the real verdict." ;;
+  esac
   tart exec "$VM" bash -lc "[ -d '$GUEST_FIXTURE' ]" >/dev/null 2>&1 \
     || warn "fixture STILL absent after the build attempt — fixtured UITests will XCTSkip, so a green run would not mean what you think."
 }

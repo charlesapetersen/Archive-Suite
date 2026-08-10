@@ -121,7 +121,7 @@ is_fail()    { grep -q '\*\* TEST FAILED \*\*'    "$(applog "$1" "$2")" 2>/dev/n
 is_success() { grep -q '\*\* TEST SUCCEEDED \*\*' "$(applog "$1" "$2")" 2>/dev/null; }
 
 run_app_once() {   # $1 = app, $2 = attempt number
-  local app="$1" attempt="$2" log fixture mk prerun proj scheme tests dd bundle
+  local app="$1" attempt="$2" log fixture mk prerun proj scheme tests dd bundle frc
   log="$(applog "$app" "$attempt")"; : > "$log"
   proj="$(archive_app_field "$app" proj)";   scheme="$(archive_app_field "$app" scheme)"
   tests="$(archive_app_field "$app" tests)"; dd="$(archive_app_field "$app" dd)"
@@ -159,8 +159,17 @@ run_app_once() {   # $1 = app, $2 = attempt number
       # exactly what happened on 2026-07-30: two of the five "Notes UITest failures" were this bug, not
       # app defects, and they had already been written up as tracked product bugs. Both builders are
       # idempotent and rm -rf only their own scratch dir, so rebuilding is safe and cheap.
-      tart exec "$VM" bash -lc "GR='$GUEST_REPO'; GC='$GUEST_CORPUS'; $mk" >>"$log" 2>&1 \
-        || echo "WARN[$app]: GUI fixture rebuild FAILED (see $log) — fixtured UITests will XCTSkip." | tee -a "$log"
+      # The verdict is the GUEST's own exit status, never `tart exec`'s: tart's control channel fails
+      # independently of the command it carries, and this warn fired over builds that had just succeeded
+      # (W26.fixwarn — the full account is on tart_build_fixture in ops/gui/tart-lib.sh).
+      frc=0
+      tart_build_fixture "$VM" "$mk" 200 || frc=$?
+      printf '%s\n' "$TART_FIXTURE_TAIL" >>"$log"
+      case "$frc" in
+        0) echo "fixture[$app]: rebuilt ok (guest exit 0)" >>"$log" ;;
+        1) echo "WARN[$app]: GUI fixture rebuild FAILED in the guest (exit $TART_FIXTURE_RC; see $log) — fixtured UITests will XCTSkip." | tee -a "$log" ;;
+        *) echo "WARN[$app]: could not read the GUI fixture build's exit status back from the guest — tart's transport, NOT necessarily the build (see $log). The presence check below is the real verdict." | tee -a "$log" ;;
+      esac
     fi
     tart exec "$VM" bash -lc "[ -d '$fixture' ]" >/dev/null 2>&1 \
       || echo "WARN[$app]: GUI fixture absent after the rebuild — fixtured UITests will XCTSkip, so a GREEN run would NOT mean what you think." | tee -a "$log"
