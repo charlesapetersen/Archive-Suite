@@ -305,30 +305,28 @@ second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 ne
 ✅ **W26.docs-fu1 — SHIPPED 2026-08-09 (this commit); full entry in `SUITE_TODO_DONE.md`.** One of the two
 deferred checks PASSED on pixels and the other is BROKEN → `W26.previewzoom` below.
 
-- [ ] **W26.previewzoom — ⌘0 / ⌘↑ / ⌘↓ do NOT reach the preview sheet; `PreviewSheet` is the app's only
-  `.focusedObject` and the only one that fails [XS · MED · shipped-claim-false · GUI].** Filed 2026-08-09 by
-  `W26.docs-fu1`, which ran the deferred check in the VM and found the feature does not work. **Measured, not
-  inferred:** Document ▸ `Fit Page` is correctly disabled from the list and **stays disabled while the preview
-  sheet is open**, so `ArchiveReaderCommands`' `@FocusedObject var doc` is nil and `.disabled(doc == nil)`
-  keeps every zoom/fit command dead; and in pixels the sheet's image pane was **byte-identical** before and
-  after `⌘↑`×3 and again after `⌘0` (two of three screenshots deduplicated to a single blob in the result
-  bundle). So two shipped `SUITE_TODO_DONE.md` claims are false as written — *"⌘0 = fit full page everywhere
-  zoom applies"* and the *"on open, focus the image pane so keyboard zoom works immediately"* half of
-  *"Preview gets its own default zoom"* (both now annotated there).
-  **Fix (one token, named by the codebase's own convention):** `PreviewSheet.swift:29` uses
-  `.focusedObject(model)`, which publishes only while the modified subtree holds SwiftUI keyboard focus — and
-  the pane is an AppKit `PDFView` behind `NSViewRepresentable`, which never gives it. `NavigationWindowView.swift:88`
-  and `DocumentWindowView.swift:34` both use **`.focusedSceneObject`** and their Document-menu commands work.
-  Switch it. ⚠️ **Then check the converse**, because scene-scoped publication outlives view focus: with the
-  sheet DISMISSED, `Fit Page` must go back to disabled — a stale enabled command pointing at a dead preview
-  model is the obvious way to get this wrong, and no test covers it.
-  **Test:** `ViewerUITests.testFitPageCommandReachesThePreviewSheet` already asserts the enabled-state chrome
-  and is wrapped in `XCTExpectFailure(strict: true)` — so **fixing the app makes that test fail** until the
-  annotation is deleted, which is the intended handshake. Re-add the pixel bracket the fix deserves
-  (`⌘↑`×3 → shot → `⌘0` → shot; it is in `bb48b26` if you want the exact code) and add the dismissed-sheet
-  case. ⚠️ Budget for it: with the bug present, `⌘0` in the sheet left the app **non-idle for 241 s** (one
-  keystroke, measured twice-over in a 355 s vs 114 s run difference) — that stall is itself unexplained and
-  may or may not survive the fix. VM lane only (`ops/gui/vm-gui-runner.sh reader xcuitest`), never the host screen.
+✅ **W26.previewzoom — SHIPPED 2026-08-10 (this commit); full entry in `SUITE_TODO_DONE.md`.** The one-token
+fix the item prescribed was only half of it — the converse the item told the next session to check is what
+caught the other half. Filed in passing: `W26.previewzoom-fu1` below.
+
+- [ ] **W26.previewzoom-fu1 — the Document menu's three Find commands are now ENABLED in the preview sheet,
+  which has no find bar [XS · LOW · UX].** Filed 2026-08-10 while shipping `W26.previewzoom`; **not fixed
+  there** (one item per change), and it is a *consequence* of that fix rather than a pre-existing bug.
+  Publishing the preview's `DocumentViewerModel` to the scene necessarily enables **every**
+  `.disabled(doc == nil)` item in the Document menu, and three of them have no preview counterpart:
+  `Find…` (⌘F) only sets `showingFind = true`, and `DocumentWindowView.swift:24` is the app's **only**
+  `if model.showingFind { findBar }` — so the item looks live and nothing appears; `Find Next` (⌘G) and
+  `Find Previous` (⌘⇧G) additionally call `findNext()`/`findPrevious()`, which with an empty `findQuery`
+  fall straight into `performFind()`'s `guard !query.isEmpty` and clear the highlight. Inert, with no way to
+  type a query. **Everything else the fix enables is correct and wanted** and should not be touched: zoom /
+  fit, page stepping, pane focus, `Copy` / `Copy Cleaned for Prose` (which land on the same model as the
+  sheet header's own ⌘C / ⌘⇧C, so behaviour is identical), and *"Copy Archive Link to This Page"*, which now
+  works from the preview exactly as `W23.m4` intended it to everywhere a document is on screen.
+  **Fix — pick one deliberately, don't leave three enabled-but-inert items:** (a) render the find bar in the
+  preview too (a small feature; the sheet is 940×700 and has room), or (b) let the commands know which
+  viewers can find — e.g. a `DocumentViewerModel.supportsFind`, false for the `persists: false` preview
+  model — and gate those three items on it. **Test:** a `ViewerUITests` case asserting `Find…` in the
+  preview sheet is either functional or disabled; VM lane only.
 - [ ] **W26.fixwarn — the VM runner's fixture step reports a failure that did not happen, on a `tart exec`
   transport error [XS · LOW · ops].** Filed 2026-08-09 by `W26.docs-fu1` (seen on both of its runs).
   `ensure_fixture` pipes `tart exec … | tail -5`, and tart returned `Error: StreamClosed(streamID: …

@@ -297,6 +297,52 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.previewzoom — ⌘0 / ⌘↑ / ⌘↓ reach the preview sheet, and the publisher now outlives what it
+  publishes. ✅ CLOSED** `f630b44` -> `e4e74e6` -> this commit (2026-08-10). `PreviewSheet` was the app's
+  only `.focusedObject`, and the only publication point whose Document-menu commands did not work:
+  `.focusedObject` publishes solely while the modified subtree holds SwiftUI keyboard focus, and the
+  preview's image pane is an AppKit `PDFView` behind `NSViewRepresentable`, which never gives it — so
+  `@FocusedObject var doc` stayed nil and every zoom/fit command stayed `.disabled(doc == nil)` with the
+  sheet wide open.
+  🔺 **THE ONE-TOKEN FIX THE ITEM PRESCRIBED WAS HALF OF IT, AND THE CONVERSE THE ITEM TOLD THE NEXT SESSION
+  TO CHECK IS WHAT CAUGHT THE OTHER HALF.** Switching to `.focusedSceneObject` on the sheet (checkpoint
+  `f630b44`) made `Fit Page` correctly ENABLED with the sheet open — and it **stayed enabled after the sheet
+  was dismissed**, the single failure in an otherwise-green 17-test VM run. **A focused-SCENE value is not
+  retracted when the view that set it is torn down.** That is the durable, generalisable fact: a destroyed
+  view cannot publish `nil`, so scene-scoped publication has to be owned by something that OUTLIVES the
+  thing it publishes. Not a timing artifact either — `documentMenuItem` re-opens the Document menu on every
+  call, so each read is a fresh AppKit validation. And the damage is not confined to a dead ⌘0: the Document
+  menu's `Copy` (⌘C) and `Copy Cleaned for Prose` (⌘⇧C) would then be live in the nav window, where they
+  shadow the Selection menu's own bindings.
+  **The shipped shape:** `PreviewSheet` publishes nothing; it takes a `@Binding var published`, set in
+  `onAppear` and cleared in `onDisappear`. `NavigationWindowView` — which outlives every presentation of the
+  sheet — holds that model in `@State` and publishes `publishedPreviewViewer`, `nil` unless
+  `model.showingPreview`. That gate is belt-and-braces over the binding: `onDisappear` is not guaranteed on
+  every teardown path, but the sheet cannot be on screen with its own `isPresented` binding false.
+  ⚠️ **Deliberately NOT hoisted into one long-lived viewer model in the nav window**, which would have been
+  simpler and is the trap on the other side: `PDFPaneController` carries `savedScale` forward by design
+  (DV-2), so a single shared instance would make a re-opened preview restore the last zoom instead of
+  fit-full-page — quietly falsifying the shipped *"Preview gets its own default zoom"* behaviour while
+  fixing this one. A fresh `@StateObject` per presentation keeps it.
+  🔺 **THE PIXELS ARE THE INVERSE OF THE ONES THAT PROVED THE BUG, AND THEY PROVE IT BY THE SAME TRICK.**
+  `W26.docs-fu1` established the bug when three preview screenshots collapsed to **two** blobs. Here the
+  three shots are `fit → ⌘↑×3 → ⌘0`, and by MD5: shot 2 **differs** from shot 1 (`e6012262…` vs
+  `29e26af3…`) and shot 3 is **byte-identical to shot 1** (`29e26af3…`). So the zoom really happened and
+  ⌘0 refit *exactly* back to the default — a round trip, not merely "something changed". Read as images
+  too: the page goes from a small full-page thumbnail to a large scrolled view with the page top pinned
+  (DV-2b), and back. The image pane is the one that moved, which is also the *"on open, focus the image
+  pane so keyboard zoom works immediately"* claim discharged.
+  ⏱ **The 241 s stall is GONE, and it was the bug.** The item flagged that `⌘0` in the sheet had left the
+  app non-idle for 241 s and warned the stall might not survive the fix. The test now prints its own
+  elapsed time per keystroke: **⌘↑×3 = 0.4 s, ⌘0 = 0.1 s.** The app was waiting on a keystroke bound to
+  nothing.
+  **Verification:** VM lane (`ops/gui/vm-gui-runner.sh reader xcuitest`) **19 tests / 0 failures / ** TEST
+  SUCCEEDED**, 213 s. Host TEST BUILD SUCCEEDED, no new warnings (the setUp/tearDown actor-isolation ones
+  and the unused `header` in `NavigationUITests` are pre-existing and untouched). Scratch GUI fixture only,
+  never the corpus; nothing drawn on the host screen. **Filed in passing: `W26.previewzoom-fu1`** — the fix
+  necessarily enables *every* `.disabled(doc == nil)` Document-menu item in the preview, and the three Find
+  commands have no find bar there to drive. Also seen again, on both runs: `W26.fixwarn`'s false *"fixture
+  build reported a failure"* on a `tart exec` transport error, while the fixture built fine.
 - [x] **W26.gatepath — the health-gate step that could only ever fail, because a worktree path has no space
   and the primary checkout's does. ✅ CLOSED 2026-08-08** this commit. The 2026-08-08 00:44 park was **not a
   code regression**: the `tag-vocabulary` gate step had **never passed once**.
@@ -5024,6 +5070,9 @@ explain why not.
   reaches no menu command (→ **`W26.previewzoom`**). Whatever `leftController.focus()` does on appear, it does
   not make the Document menu's zoom commands live. This entry was not one of the two `W26.docs-fu1` names
   (it was deferred for "screen locked", not for the index), but the same run answers it.
+  ↳ ✅ **TRUE AGAIN AS OF 2026-08-10 (`W26.previewzoom`).** The false half is fixed: `⌘↑`×3 now visibly
+  zooms the **image** pane — which is the half of this claim about `leftController.focus()` — and `⌘0`
+  returns it to full page, byte-identically (shots 1 and 3 share an MD5). Both halves of the entry hold.
 - [x] **⌘0 = "fit full page" everywhere zoom applies** — `.focusedObject(model)` on PreviewSheet
   publishes the viewer model so the existing Document menu ⌘0 (Fit Page) + zoom shortcuts reach the
   preview. Build clean, 191 tests green. GUI-verify: Document menu confirmed; preview-specific test
@@ -5039,6 +5088,13 @@ explain why not.
   publishers that *do* work (`NavigationWindowView`, `DocumentWindowView`) both use `.focusedSceneObject`.
   The Document-menu path this entry also claims was confirmed at the time and is not in doubt; only the
   preview-sheet half is. Fix tracked as **`W26.previewzoom`**.
+  ↳ ✅ **TRUE AGAIN AS OF 2026-08-10 (`W26.previewzoom`) — but this entry's stated MECHANISM was wrong, and
+  that is worth keeping.** `⌘0` does now fit the preview to full page (asserted in chrome *and* in pixels:
+  the after-⌘0 shot is byte-identical to the opening fit). The implementation sentence above —
+  *"`.focusedObject(model)` on PreviewSheet publishes the viewer model"* — never worked and has been
+  replaced: the sheet publishes nothing, and the **nav window** publishes the preview's model to the scene
+  and withdraws it on dismissal, because a focused-scene value is not retracted when the view that set it
+  is torn down.
 - [x] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images (JPG/PNG/TIFF/HEIC/BMP/GIF)
   now open in viewer + preview via PDFPage(image:) wrapping in DocumentViewerModel.loadCurrent().
   Build clean, 191 tests green. GUI-verify deferred (scratch corpus not Spotlight-indexed). | done

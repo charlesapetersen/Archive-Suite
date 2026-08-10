@@ -190,28 +190,32 @@ final class ViewerUITests: FixtureUITestCase {
     /// on a reason (an unindexed scratch corpus) that `W26.walk2` made void.
     ///
     /// 🔴 **This ran on 2026-08-09 and the shipped claim was FALSE** — `Fit Page` stayed disabled with the
-    /// sheet wide open, and the image pane was byte-identical across ⌘↑×3 and ⌘0. Cause and fix were one
-    /// token (`W26.previewzoom`, fixed 2026-08-10): `PreviewSheet` was the app's only `.focusedObject`,
-    /// which publishes solely while the modified subtree holds SwiftUI keyboard focus — and the pane is an
-    /// AppKit `PDFView` behind `NSViewRepresentable`, which never gives it. It now publishes with
-    /// `.focusedSceneObject`, like `NavigationWindowView` and `DocumentWindowView`, whose Document-menu
-    /// commands always worked. The `XCTExpectFailure` that held the bug is deleted with the fix.
+    /// sheet wide open, and the image pane was byte-identical across ⌘↑×3 and ⌘0. `PreviewSheet` was the
+    /// app's only `.focusedObject`, which publishes solely while the modified subtree holds SwiftUI keyboard
+    /// focus — and the pane is an AppKit `PDFView` behind `NSViewRepresentable`, which never gives it.
+    /// Fixed 2026-08-10 (`W26.previewzoom`). The `XCTExpectFailure` that held the bug is deleted with it.
+    ///
+    /// ⚠️ **Assertion 2 below is not paperwork — it FAILED, and it is why the fix is not the one-token one
+    /// the issue prescribed.** Swapping the sheet to `.focusedSceneObject` left `Fit Page` enabled *after
+    /// dismissal*, because **a focused-scene value is not retracted when the view that set it is torn
+    /// down**. The publication now belongs to `NavigationWindowView`, which outlives the sheet and can
+    /// withdraw it (`publishedPreviewViewer`). Do not "simplify" this back into the sheet.
     ///
     /// Three things are asserted, because none is sufficient alone:
     ///  1. CHROME, enabled — `Fit Page` is DISABLED from the list and ENABLED while the sheet is open.
     ///     The disabled control is what makes the enabled state mean something.
-    ///  2. CHROME, the converse — with the sheet DISMISSED it goes back to DISABLED. Scene-scoped
-    ///     publication outlives *view* focus, so a command left live over a torn-down preview model is
-    ///     the obvious way to get this fix wrong, and nothing else covers it. It is asserted BEFORE the
-    ///     pixels, and the sheet is re-opened afterwards, so the cheap decisive checks cannot end up
+    ///  2. CHROME, the converse — with the sheet DISMISSED it goes back to DISABLED. It is asserted BEFORE
+    ///     the pixels, and the sheet is re-opened afterwards, so the cheap decisive checks cannot end up
     ///     behind the slow one (see the timing note below).
     ///  3. PIXELS — a PDFView's content pane is not XCUITest-queryable (W7.6), so *whether the page
     ///     actually refitted* is only visible in a screenshot. Three shots bracket the sequence:
-    ///     fit → zoomed in → ⌘0. A human reads them; the test does not judge them.
+    ///     fit → zoomed in → ⌘0. A human reads them; the test does not judge them. What they showed on
+    ///     2026-08-10: shot 2 differs from shot 1, and shot 3 is **byte-identical to shot 1** — a round
+    ///     trip, which is a stronger claim than "something changed".
     ///
     /// ⏱ With the bug present, ⌘0 in the sheet left the app **non-idle for 241 s** (measured twice over).
-    /// That stall was never explained, so the bracket prints its own elapsed time: if a future run is slow,
-    /// the log says which keystroke paid for it instead of leaving the next reader to re-measure.
+    /// The stall WAS the bug — a keystroke bound to nothing — and it is gone: ⌘↑×3 = 0.4 s, ⌘0 = 0.1 s.
+    /// The bracket keeps printing its elapsed time so a future slow run says which keystroke paid for it.
     func testFitPageCommandReachesThePreviewSheet() throws {
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
@@ -226,12 +230,13 @@ final class ViewerUITests: FixtureUITestCase {
         // (1b) The assertion that control earns: open the sheet and the command comes alive.
         openPreviewSheet()
         XCTAssertTrue(documentMenuItem("Fit Page").isEnabled,
-                      "ENABLED while the preview sheet is open — the sheet publishes the viewer model")
+                      "ENABLED while the preview sheet is open — the nav window publishes the viewer model")
         closeMenu()
 
-        // (2) The converse. `.focusedSceneObject` is scoped to the SCENE, not to the focused view, so the
-        // only thing that un-publishes it is the sheet's subtree going away. Prove it does: a Fit Page
-        // that stays enabled here is a live command pointing at a dead preview model.
+        // (2) The converse, and the assertion that actually earned its keep: a focused-SCENE value is NOT
+        // retracted when the view that set it is torn down, so a sheet that publishes itself leaves this
+        // command enabled over a dead preview model. Only a publisher that OUTLIVES the sheet can withdraw
+        // it. This failed against the sheet-publishes-itself version and passes against the nav window's.
         dismissPreviewSheet()
         XCTAssertFalse(documentMenuItem("Fit Page").isEnabled,
                        "DISABLED again once the sheet is dismissed — the model must not outlive its sheet")

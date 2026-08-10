@@ -2,37 +2,57 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## OPEN (`W26.previewzoom`) — the preview sheet's zoom/fit shortcuts do nothing; `⌘0` never reaches it
+## ✅ FIXED (`W26.previewzoom`) — the preview sheet's zoom/fit shortcuts did nothing; `⌘0` never reached it
 
 **Found 2026-08-09** by `W26.docs-fu1`, the item that finally ran a GUI check deferred since the feature
-shipped. It is a *shipped claim that is false*, not a regression: `SUITE_TODO_DONE.md` records **"⌘0 = fit
-full page everywhere zoom applies"** and **"on open, focus the image pane so keyboard zoom works
-immediately"**, and neither holds in the preview sheet (`Space` / `⌘Y`). The full **document window is fine**
-— only the sheet is affected.
+shipped; **fixed 2026-08-10.** It was a *shipped claim that was false*, not a regression: `SUITE_TODO_DONE.md`
+recorded **"⌘0 = fit full page everywhere zoom applies"** and **"on open, focus the image pane so keyboard
+zoom works immediately"**, and neither held in the preview sheet (`Space` / `⌘Y`). The full **document window
+was always fine** — only the sheet was affected.
 
 **What was measured in the VM** (`ArchiveReaderUITests.testFitPageCommandReachesThePreviewSheet`; screenshots
 in `~/.tart-mirror/vm-artifacts/shots-reader/`):
-- Document ▸ `Fit Page` is disabled from the list (correct — nothing to fit) and **stays disabled while the
-  preview sheet is open**, so `ArchiveReaderCommands`' `@FocusedObject var doc` is nil and `.disabled(doc == nil)`
-  kills `Fit Page`, `Zoom In`, `Zoom Out` and the pane-focus commands alike.
+- Document ▸ `Fit Page` was disabled from the list (correct — nothing to fit) and **stayed disabled while the
+  preview sheet was open**, so `ArchiveReaderCommands`' `@FocusedObject var doc` was nil and `.disabled(doc == nil)`
+  killed `Fit Page`, `Zoom In`, `Zoom Out` and the pane-focus commands alike.
 - In pixels the sheet's image pane was **byte-identical** before and after `⌘↑`×3 and again after `⌘0` (three
   screenshots, two blobs — the result bundle deduplicated the identical pair). Nothing zoomed; nothing refit.
 
-**Cause, and why it is a one-token fix:** `PreviewSheet.swift:29` publishes with `.focusedObject(model)`, which
-applies only while the modified subtree holds SwiftUI keyboard focus — and the pane is an AppKit `PDFView`
-behind `NSViewRepresentable`, which never gives SwiftUI that focus. Every publisher in the app that *works*
-uses the scene-scoped variant: `NavigationWindowView.swift:88` and `DocumentWindowView.swift:34` both say
-`.focusedSceneObject`. The sheet is the only `.focusedObject` in the tree, and the only one that fails.
+**Cause:** `PreviewSheet` published with `.focusedObject(model)`, which applies only while the modified
+subtree holds SwiftUI keyboard focus — and the pane is an AppKit `PDFView` behind `NSViewRepresentable`, which
+never gives SwiftUI that focus. It was the app's only `.focusedObject`; `NavigationWindowView` and
+`DocumentWindowView` both use `.focusedSceneObject`, and their Document-menu commands always worked.
 
-⚠️ **Two things to check when fixing it, neither currently covered:** (1) scene-scoped publication outlives
-view focus, so with the sheet **dismissed** `Fit Page` must go back to disabled — a stale enabled command
-pointing at a dead preview model is the natural way to get this wrong; (2) `⌘0` with the sheet open left the
-app **non-idle for 241 s** (measured: the same test class ran 355 s with that keystroke and 114 s without),
-which is unexplained and may not survive the fix.
+🔺 **THE ONE-TOKEN FIX THAT SUGGESTS IS HALF OF IT, AND THE OTHER HALF IS THE PART WORTH REMEMBERING: a
+focused-SCENE value is NOT retracted when the view that set it is torn down.** Switching the sheet to
+`.focusedSceneObject(model)` made `Fit Page` correctly ENABLED with the sheet open, and left it **enabled
+after the sheet was dismissed** — a live command over a dead preview model, and with it the Document menu's
+⌘C / ⌘⇧C shadowing the Selection menu's own bindings in the nav window. Not a test artifact:
+`documentMenuItem` re-opens the Document menu on every call, so every read is a fresh AppKit validation.
+**A destroyed view cannot publish `nil`**, so scene-scoped publication has to be owned by something that
+outlives what it publishes.
 
-**Test handshake:** the assertion is already committed and wrapped in `XCTExpectFailure(strict: true)`, so the
-lane is green today and **fixing the app will fail that test** until the annotation is deleted. Re-add the
-`⌘↑`×3 → `⌘0` pixel bracket with the fix (exact code in `bb48b26`).
+**Shipped shape:** `PreviewSheet` publishes nothing and reports its model up through a `@Binding`
+(`published`, set in `onAppear`, cleared in `onDisappear`); `NavigationWindowView` holds it in `@State` and
+publishes `publishedPreviewViewer`, which is `nil` unless `model.showingPreview` — belt-and-braces, because
+`onDisappear` is not guaranteed on every teardown path but the sheet cannot be on screen with its own
+`isPresented` binding false. The model stays a fresh `@StateObject` **per presentation** on purpose:
+`PDFPaneController` carries `savedScale` forward by design (DV-2), so one shared long-lived instance would
+have made a re-opened preview restore the last zoom instead of fit-full-page — falsifying the *"Preview gets
+its own default zoom"* behaviour while fixing this one.
+
+**The 241 s stall recorded against this issue was the bug**, not a separate mystery: with `⌘0` bound to
+nothing the app never went idle. After the fix, from the test's own timing prints, `⌘↑`×3 = **0.4 s** and
+`⌘0` = **0.1 s**.
+
+**How it is now proven** — the inverse of the deduplication that proved the bug. Three shots bracket
+`fit → ⌘↑×3 → ⌘0`: shot 2 differs from shot 1, and shot 3 is **byte-identical to shot 1** (MD5
+`29e26af3…`), so the zoom happened *and* `⌘0` refit exactly back to the default rather than merely changing
+something. VM lane 19 tests / 0 failures.
+
+**Residual, tracked as `W26.previewzoom-fu1`:** publishing the model necessarily enables *every*
+`.disabled(doc == nil)` item in the Document menu while the preview is up, and `Find…` / `Find Next` /
+`Find Previous` have no find bar there to drive.
 
 ## ✅ FIXED (`W26.fsev-fu2`) — a folder that would not open left the list spinning "Scanning…" for ever
 
