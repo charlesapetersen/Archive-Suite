@@ -67,14 +67,23 @@ printf '%s' "$OUT" | grep -q 'Not running' && printf '%s' "$OUT" | grep -q 'daem
 echo "[2] running with no idle marker -> Working now"
 OUT="$(RUNNING=1 run)"
 printf '%s' "$OUT" | grep -q 'Working now' && ok "working state" || bad "working state wrong" "$OUT"
-# ...and it must say HOW LONG on the current task, or a wedged session reads exactly like a healthy one.
+# ⛔ REGRESSION GUARD, and an INVERTED assertion — it used to require the opposite (2026-08-10).
+# The state line must NOT claim how long it has been on the current task. `engine.lock` is a
+# mutual-exclusion LEASE that the daemon heartbeats every 60s for the child's whole lifetime, so its mtime
+# means "since the last tick", never "since the task began": it printed "1 second into its current task"
+# beside a 12-minute-old commit, and was structurally incapable of ever exceeding 60s — so it could never
+# show the wedged session it was added to reveal. The assertion it replaces passed ONLY because this test
+# hand-backdated the lock 2 hours, which production cannot do. That backdating is kept below on purpose:
+# even a 2-hour-old lock must not resurrect the claim.
 touch -t "$(date -v-2H '+%Y%m%d%H%M' 2>/dev/null || date -d '2 hours ago' '+%Y%m%d%H%M')" "$S/engine.lock"
 OUT="$(RUNNING=1 run)"
-printf '%s' "$OUT" | grep -q 'into its current task' && ok "reports time on the current task" || bad "no task age" "$OUT"
-printf '%s' "$OUT" | grep -qE '2 hours into' && ok "the age is right (2 hours)" || bad "wrong age" "$OUT"
+printf '%s' "$OUT" | grep -q 'into its current task' \
+  && bad "task-age claim is BACK — read the ⛔ note in status-digest.sh STATE 1 before re-adding it" "$OUT" \
+  || ok "no task-age claim, even with a hand-backdated 2-hour-old lock"
+printf '%s' "$OUT" | grep -q 'Working now' && ok "still reports the working state" || bad "working state lost" "$OUT"
 rm -f "$S/engine.lock"
 OUT="$(RUNNING=1 run)"
-printf '%s' "$OUT" | grep -q 'Working now' && ok "degrades to plain 'Working now' with no lock file" || bad "broke without engine.lock" "$OUT"
+printf '%s' "$OUT" | grep -q 'Working now' && ok "unchanged with no lock file at all" || bad "broke without engine.lock" "$OUT"
 
 echo "[3] running + idle + a 429 in the last session -> THROTTLED, and explicitly not 'out of work'"
 echo "$(( $(date +%s) - 3000 ))" > "$S/idle.since"

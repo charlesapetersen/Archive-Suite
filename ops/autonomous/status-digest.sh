@@ -80,14 +80,19 @@ elif [ "$running" = 1 ]; then
   case "$since" in
     ''|*[!0-9]*)
       STATE_ICON="${GRN}●${OFF}"; STATE_LINE="Working now"
-      # How long it has been on the CURRENT task. "Working now" on its own cannot distinguish a healthy
-      # session from one wedged for three hours, and that is the whole reason to look. engine.lock is
-      # created when a session starts and removed when it ends, so its age is the session's age.
-      lock_m="$(stat -f %m "$STATE/engine.lock" 2>/dev/null || stat -c %Y "$STATE/engine.lock" 2>/dev/null)"
-      case "$lock_m" in
-        ''|*[!0-9]*) : ;;
-        *) STATE_LINE="Working now — $(human_secs "$(( $(date +%s) - lock_m ))") into its current task" ;;
-      esac ;;
+      # ⛔ DO NOT re-add a "— N into its current task" suffix here from engine.lock's mtime (removed
+      # 2026-08-10 at the owner's request, after he noticed it saying "1 second into its current task"
+      # beside a 12-minute-old commit). That reading was FALSE, not merely noisy: `engine.lock` is a
+      # mutual-exclusion LEASE, not a session marker, and archive-suite-autonomous.sh heartbeats it —
+      # `( while kill -0 "$ppid"; do touch "$LOCK"; sleep 60; done ) &` — for the child's whole lifetime,
+      # so its age is "seconds since the last heartbeat tick" and is structurally pinned to 0-60s. It could
+      # therefore NEVER show the wedged-for-three-hours session it was added to reveal; a lock older than
+      # $STALE (1500s) is taken over by the next cycle anyway. The old test "proved" it only by backdating
+      # the lock 2 hours by hand — an input production cannot produce.
+      # Staleness is already answered honestly two lines down by "latest change <relative>" plus the Health
+      # row, which is what the owner said he actually reads. If a true task age is ever wanted, it needs a
+      # separate session-start stamp written once at acquire time — not this file's mtime.
+      ;;
     *)
       idle=$(( $(date +%s) - since ))
       if reset="$(ratelimit_reset_epoch)"; then
