@@ -357,31 +357,45 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   Full entry, the five mutation proofs, the two same-shape leaks it also closed, and the self-inflicted
   defaults incident it repaired: `SUITE_TODO_DONE.md` §Wave 26.
 
-- [ ] **W26.verify — scale + safety verification; gates deleting the plan [M · med · Tier-2 · needs: none]
-  (blocked-on: W26.fsev, W26.idx, W26.vocab, W26.deny, W26.lint).** Full-scale run against a **scratch copy** (never the real
-  corpus — Core Directive) of 100k+ files: timings vs the 10.15 s baseline — ⚠️ **`CorpusWalker` adds one
-  `stat(2)` per entry** (~15 µs, ≈+1.9 s at 123k) to get `S_ISREG` + `SF_DATALESS` + ENOENT-vs-denial from a
-  single call, so the baseline it must beat is ~12 s, not 10.15 s; confirm the real number rather than
-  assume it — memory ceiling, a
-  **no-write assertion across the whole tree**, and cancel-mid-walk leaves no partial removals. Confirm
-  `grep -rn "NSMetadataQuery\|kMDItem\|mdfind"` over `ArchiveReader/`, `ArchiveProcessor/`, `packages/` and
-  `scripts/` returns **nothing but historical comments**. Then flip the wave and delete
-  `execution-plans/despotlight.md`.
-  ⚠️ **Carried here from `W26.idx` (2026-08-05).** `W26.idx` shipped its per-item gate — ArchiveCore
-  154+105, Reader 351/351 executed unit tests, Reader Release, Processor Debug, Notes 189+738, lint +
-  self-test 12/12 — but **its scale and VM lanes were never run** (the authoring session lost its tooling
-  mid-item and the checks were completed afterwards from the preserved worktree). Two things W26.idx
-  therefore owes this item, and neither is covered by any test that exists today:
-  **(a) warm-start scale.** The 100k+ run must now time **three** states, not one: cold first walk
-  (fingerprint + full tag read, the ~12 s figure above), **warm start** (cache publish → first paint,
-  which is the number the whole item exists to move), and **steady revalidation** (fingerprint pass with
-  ~0 changed rows). Record the SQLite file size and peak RSS at 150k rows; the cache is disposable, so a
-  ballooning file is a bug, not a cost. Cancel a warm revalidation mid-pass and confirm the next launch
-  reports `asOf == nil` and prunes nothing.
-  **(b) the VM GUI lane.** No host-screen or VM UI check has ever been run against the warm-start UI:
-  confirm cached rows paint as *revalidating* (not settled), that the settled sentence still quotes its
-  examined-file denominator afterwards, and that a warm row selected before revalidation completes is
-  re-verified rather than written blind. `ops/gui/vm-gui-runner.sh` — never the host screen.
+- [ ] **W26.verify-fu1 — the scale harness's two lanes disagree by 4.4x on the same tree, and nothing
+  explains it [S · LOW · measurement].** Filed 2026-08-10 by `W26.verify`. **Not a product defect** — no
+  perf claim rests on it, and both lanes are green. Measured on the same 150,000-file scratch corpus in one
+  run: the ArchiveCore lane (release, `swift test`) walks it at **248 us/file cold and 246 us/file warm**,
+  while the Reader lane (Debug, app-hosted, `LibraryScan.pass` → the same `CorpusWalker.scan`) walks it at
+  **56 us/file**. Debug being 4.4x *faster* than release is the wrong direction for every obvious
+  explanation, and cold ≈ warm inside the ArchiveCore lane rules out the page cache (which was the first
+  hypothesis, and it was wrong). Candidates not yet distinguished: SwiftPM's release test-harness build
+  (is the walker actually inlined/optimised under `swift test -c release`?); three 116k-entry `CorpusEntry`
+  arrays alive at once in the ArchiveCore case (733 MiB footprint vs 890 MiB, but very different allocation
+  patterns); and per-process `FileManager`/URL-bridging differences. **Why it matters:** the plan's §2
+  arithmetic — and any future "is a full walk affordable?" question — needs ONE trustworthy per-file
+  number, and right now the harness offers two. Fix by measuring one path both ways in one process rather
+  than by arguing. `ops/scale/run-scale-verify.sh`. | files: packages/ArchiveCore/Tests/ArchiveCoreTests/CorpusWalkerScaleTests.swift | S | low | none
+
+- [ ] **W26.verify-fu2 — the warm-start UI has still never been checked in the VM, and two of the three
+  checks need infrastructure that does not exist [M · MED · GUI].** Split out of `W26.verify` 2026-08-10;
+  this is the (b) half that item carried over from `W26.idx`. Three assertions, none of which any test
+  makes today: (1) cached rows paint as *revalidating*, not settled; (2) after revalidation the settled
+  sentence still quotes its examined-file denominator (`ar.empty.nothingTagged` — *"Scanned N files … none
+  carry a Read or Unread tag"*); (3) a warm row selected before revalidation completes is re-verified
+  rather than written blind. ⚠️ **Read this before starting: (1) is not observable as the code stands.** On
+  a 12-file GUI fixture revalidation finishes in milliseconds, so there is no window in which XCUITest can
+  see the revalidating paint — a test written against it would pass or fail by luck, which is exactly the
+  flake class `W21.vmgui-c` cost two days. It needs a DEBUG-only stall hook (a launch argument in the
+  `-ARUITestRootPath` family) so the transient becomes a state the test can enter deliberately; that is
+  product-adjacent code, so Tier-2. (2) needs a fixture whose files carry NO Read/Unread tag, since the
+  denominator sentence only renders over an empty list. (3) is already proven headlessly by
+  `LibraryWarmStartTests.testBulkMarkReverifiesCachedRowsAndStillUpdatesValidDiskNeighbours` and
+  `testCorruptOutOfRootCacheRowIsNeverPublishedAsAWriteTarget`; what is unproven is the same thing through
+  the UI. VM lane only (`ops/gui/vm-gui-runner.sh reader xcuitest`), never the host screen. | files: ArchiveReader/macOS/Tests/ArchiveReaderUITests/NavigationUITests.swift | M | med | none
+
+- [ ] **W26.plandelete — delete `execution-plans/despotlight.md`** (blocked-on: W26.verify-fu1,
+  W26.verify-fu2, W26.docs-spec). The convention is that a shipped plan is deleted, and `W26.verify` was
+  the gate on that — but the plan is still the only place two open items' context lives: `-fu1` needs §2's
+  measurement method and §4a.3's fresh-URL rationale, `-fu2` needs §4.3's honest-states design and §4.6's
+  warm-start design, and `W26.docs-spec` (hold queue) quotes §Site 5. Deleting it now would strand all
+  three. When the last of them closes, delete it — git keeps the history.
+
 
 ## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN
 

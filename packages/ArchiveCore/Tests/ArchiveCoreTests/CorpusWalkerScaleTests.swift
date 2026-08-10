@@ -45,10 +45,19 @@ final class CorpusWalkerScaleTests: XCTestCase {
 
     // MARK: - The three numbers
 
-    /// Cold-ish full discovery, the number the wave's ~12 s baseline is about — and, on the same tree in
-    /// the same process, the pre-W26 discovery path for an apples-to-apples ratio. The 10.15 s / 12.4 s
-    /// figures in the plan were measured on the real corpus; comparing a synthetic tree against them
-    /// would compare two different trees, so the baseline is re-measured here rather than assumed.
+    /// Full discovery at scale — timed THREE ways, because two of them would lie on their own.
+    ///
+    /// The plan's 10.15 s / 12.4 s figures were taken on the real corpus, so comparing a synthetic tree
+    /// against them compares two different trees; the pre-W26 API pattern is therefore re-measured here,
+    /// on this tree, in this process.
+    ///
+    /// ⚠️ **And the ORDER of those two measurements is load-bearing.** A first draft timed the walker,
+    /// then the old path, and reported the ratio — which credited the old path with a page cache the
+    /// walker had just warmed for it, and made the walker look 1.36× slower. The same tree walked again
+    /// later in the same run took 8.45 s against the first pass's 36.90 s: a 4.4× cache effect, i.e. far
+    /// larger than the difference being attributed to the code. So: pass 1 is the walker COLD, pass 2 is
+    /// the old path, pass 3 is the walker WARM — and only passes 2 and 3 may be compared to each other.
+    /// A perf claim taken from a cold-vs-warm pair is not a finding, it is an artefact of the order.
     func testFullWalkAtScaleAndAgainstTheOldPathOnTheSameTree() throws {
         let root = try scaleRoot()
 
@@ -89,18 +98,31 @@ final class CorpusWalkerScaleTests: XCTestCase {
         }
         let baselineSeconds = Date().timeIntervalSince(baselineStart)
 
-        let perFileMicroseconds = walkSeconds / Double(max(result.filesSeen, 1)) * 1_000_000
+        // (3) The walker again, now with the same cache warmth the old path just enjoyed. THIS is the
+        // pass that may be compared with (2).
+        let warmStart = Date()
+        let warm = CorpusWalker.scan(root: root)
+        let warmSeconds = Date().timeIntervalSince(warmStart)
+        XCTAssertEqual(warm.entries.count, result.entries.count,
+                       "two passes over an unchanged tree must agree; if they do not, one of them is wrong")
+
+        let files = Double(max(result.filesSeen, 1))
+        func perFile(_ seconds: TimeInterval) -> String {
+            String(format: "%.1f", seconds / files * 1_000_000)
+        }
         let footprint = Double(currentFootprintBytes()) / 1_048_576
         print("""
         SCALE walk root=\(root.path)
           filesSeen=\(result.filesSeen) tracked=\(result.entries.count) \
         unreadable=\(result.unreadable.count) dirErrors=\(result.directoryErrors.count) \
         vanished=\(result.vanishedMidScan)
-          CorpusWalker.scan      \(String(format: "%.2f", walkSeconds)) s  \
-        (\(String(format: "%.1f", perFileMicroseconds)) us/file)
+          CorpusWalker.scan COLD  \(String(format: "%.2f", walkSeconds)) s  (\(perFile(walkSeconds)) us/file)
           old resourceValues path \(String(format: "%.2f", baselineSeconds)) s  \
-        (seen=\(baselineSeen) tracked=\(baselineTracked))
-          footprint after walk \(String(format: "%.1f", footprint)) MiB
+        (\(perFile(baselineSeconds)) us/file, seen=\(baselineSeen) tracked=\(baselineTracked))
+          CorpusWalker.scan WARM  \(String(format: "%.2f", warmSeconds)) s  (\(perFile(warmSeconds)) us/file)
+          ratio WARM vs old path  \(String(format: "%.2f", warmSeconds / max(baselineSeconds, 0.001)))x \
+        (the only comparable pair — both after the tree was walked once)
+          footprint after 3 walks \(String(format: "%.1f", footprint)) MiB
         """)
 
         // Both paths must agree on membership on the readable part of the tree. The walker finds MORE

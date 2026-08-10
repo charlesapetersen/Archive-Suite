@@ -297,6 +297,89 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.verify — the wave's scale and safety verification ran, and the number the item told me to
+  expect was wrong in BOTH directions. ✅ CLOSED 2026-08-10** `32ed9d2` -> `08ef598` -> `43a299a` -> this
+  commit. Gate: a 100k+ run on a **scratch** corpus (never the real one), timings against the ~12 s
+  baseline, a memory ceiling, a no-write assertion over the whole tree, cancel-mid-walk leaving no partial
+  removals, the split completion grep, and the warm-start lanes `W26.idx` never ran.
+
+  **The harness** (`ops/scale/run-scale-verify.sh`, `--self-test` for a cheap 2,000-file proof):
+  - `ops/scale/scale-corpus.swift` builds a synthetic scratch corpus shaped like the owner's real one —
+    652 dirs, ragged to depth 7, 150,000 files, 124,647 PDFs, 115,999 carrying Read/Unread (77.3%, against
+    the corpus's measured 77.4%), an empty-array tag residue, and names with an em dash + non-breaking
+    space. Refuses any root whose leaf is not `scale-corpus*`, and any path naming the real corpus.
+  - **The no-write assertion is taken by a THIRD program**, per plan §7a.7: the same tool fingerprints
+    every path (inode, size, mtime, **ctime**, and an FNV digest over every xattr) before and after. ctime
+    is the load-bearing field — it moves on any metadata write, including every xattr set. atime is
+    deliberately not recorded; reading a tree legitimately updates it.
+  - `--self-test` proves the guard can FAIL, in both shapes: a planted tag write on an existing file, and a
+    planted `.archive-suite-root.json` (§7a.7's exact case — pointing the app at a folder WRITES one).
+    It rebuilds its corpus every run, because a mutation moves ctime irreversibly; reusing one silently
+    absorbed a planted write into the "before" baseline on the first attempt.
+  - **Hostile shapes live in a SIBLING root**, not inside the tree. One unreadable file makes a pass
+    unclean, which makes the verdict "partial" and `asOf` nil — so a warm-start lane pointed at a tree with
+    one planted obstacle could never assert the currency it exists to measure.
+
+  **Measured at 150,000 files** (release, warm disk, this machine; `unreadable=0 dirErrors=0 vanished=0`,
+  so the pass reports itself **clean**, which is the only state that authorises a prune):
+
+  | | |
+  |---|---|
+  | `CorpusWalker.scan` cold | 37.25 s (248.3 µs/file) |
+  | pre-W26 `resourceValues` pattern, same tree, same process | 31.18 s (207.9 µs/file) |
+  | `CorpusWalker.scan` warm (the comparable pass) | 36.98 s (246.5 µs/file) |
+  | **ratio, warm vs the path it replaced** | **1.19×** |
+  | `scanFingerprints` (warm start's first phase) | 4.30 s (28.7 µs/file) |
+  | cold index persist, 115,999 rows | 1.74 s (15.0 µs/row) |
+  | **warm start** (new index object on the same file) | **0.463 s (4.0 µs/row)** |
+  | steady revalidation, ~0 changed rows | 5.16 s |
+  | SQLite total (db+wal+shm) | 43.2 MiB — **390 B/row** |
+  | footprint | 355 MiB (one walk) / 890 MiB (Reader lane at 150k rows) |
+  | cancel mid-walk | stopped at 7,468 files; `cancelled`, **not** `completed`, **not** `isClean` |
+  | cancelled warm revalidation | `asOf == nil`, **0 rows pruned** (115,999 preserved) |
+
+  **⚠️ THE ITEM'S EXPECTED NUMBER WAS WRONG BOTH WAYS, AND THE FIRST CORRECTION I REACHED FOR WAS WRONG
+  TOO.** The item said to beat ~12 s at 150k and to *"confirm the real number rather than assume it"*.
+  (a) The absolute cost is ~3× that on a synthetic tree, so the ~12 s projection does not survive contact
+  with a measurement — but (b) **the ratio to the path it replaced is 1.19×**, which is almost exactly the
+  +15% the plan predicted from the extra `stat(2)` per entry. The model was right; the absolute was not.
+  (c) A first draft timed the walker, then the old path, and reported **1.36×** — crediting the old path
+  with a cache the walker had just warmed. Fixed by timing three passes and comparing only the two that
+  are both warm. **A perf claim taken from a cold-vs-warm pair is an artefact of the order, not a finding**,
+  and it would have been filed as a defect against `CorpusWalker` had the Reader lane's 56 µs/file not
+  contradicted it. That contradiction is unexplained and is now `W26.verify-fu1` — a measurement question,
+  not a product one.
+
+  **Affordability, which is what the item actually needed, holds comfortably.** Worst measured case is one
+  ~37 s pass, in the background, off the main actor, once — against Spotlight's answer for the same corpus,
+  which was **zero rows**. Warm start is 0.463 s and matches the plan's 0.61 s / 4.3 µs-per-row projection.
+  The cache is 390 B/row, well inside the 1 KiB/row ceiling a disposable cache deserves.
+
+  **The completion grep became a runnable audit** (`ops/despotlight-audit.sh`), split into §7a.7's two
+  rules because the single grep was **unsatisfiable as written** — this wave's own work adds Spotlight
+  mentions. Rule 1: no Spotlight API or CLI in executable code. Rule 2: `kMDItemUserTags` only as part of
+  the xattr name `com.apple.metadata:_kMDItemUserTags`, never as a Spotlight attribute, and no other
+  `kMDItem*` at all. **360 files, clean**, with 15 deliberate hits across 3 allowed files (the two
+  `mdls`-blindness measurements and the fixture-script tripwire), each carrying its reason in the source;
+  a stale allowance hard-fails, like `W26.lint`'s. Comment detection is multi-line aware, and had to be: a
+  first cut keyed on "the line starts with `//`" flagged two lines of `assert_mac.py`'s docstring and would
+  have **passed a Spotlight call split across two lines** — §7a.8's "worst kind of green". Self-test 10/10,
+  including the two cases that must still PASS so the rules cannot decay into banning the suite's own
+  record of what it removed.
+
+  **One measured gotcha worth keeping:** `TEST_RUNNER_<VAR>` is the documented way to forward environment
+  into a test process, and the build tool accepts it and echoes it back in the settings — but it does **not**
+  reach an app-HOSTED unit test. Both Reader cases skipped with "unset" while the run reported TEST
+  SUCCEEDED. Only the harness's rule that *a SKIPPED case is a FAILED lane* surfaced it. The corpus path is
+  now handed over in a file at `/Users/<NSUserName()>/…` — not `$HOME`, which inside the sandbox is the app
+  CONTAINER, the same trap that made every Wave-7 fixture UITest skip for a week.
+
+  **Not done here, split out:** the VM warm-start UI check (`W26.verify-fu2`) — two of its three assertions
+  need infrastructure that does not exist (a DEBUG revalidation stall hook, since the revalidating paint is
+  a sub-100 ms transient on a 12-file fixture, and an untagged fixture for the denominator sentence). The
+  plan is retained until the follow-ups close (`W26.plandelete`), because it is still the only place their
+  context lives.
+
 - [x] **W26.tagvocab-salvage — both salvage claims were already covered, and mutation says the coverage is
   real rather than nominal. ✅ CLOSED 2026-08-10** (this commit). **No code and no test change** — the item
   had two outcomes and this is the "covered, close it" one. Filed 2026-08-07 from a comparison of the two

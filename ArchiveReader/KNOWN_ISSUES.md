@@ -2,6 +2,32 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## 📏 MEASURED (`W26.verify`, 2026-08-10) — what Spotlight-free discovery actually costs at 150k
+
+Recorded because the de-Spotlight plan's projection (~12 s at 150k) is **not** what a measurement says, and
+the plan is being deleted. Synthetic **scratch** corpus, 150,000 files / 124,647 PDFs / 652 dirs / depth 7 /
+115,999 Read-or-Unread-tagged; release; never the real corpus. Harness: `ops/scale/run-scale-verify.sh`.
+
+- **Cold full walk: 37 s** (248 µs/file) — one pass, in the background, off the main actor. ~3× the plan's
+  projection. Against it: Spotlight's answer for the owner's real corpus on 2026-08-04 was **zero rows**.
+- **Vs the API pattern it replaced: 1.19×** (31.2 s on the same tree, same process, both passes warm) —
+  close to the +15% the plan predicted from `CorpusWalker`'s extra `stat(2)` per entry. ⚠️ Compare only
+  passes that are equally warm: timing the walker first and the old path second reports a spurious 1.36×,
+  because the first pass warms the cache for the second.
+- **Warm start: 0.463 s** for 115,999 cached rows (4.0 µs/row), matching the plan's 4.3 µs/row projection.
+  This is the number a user experiences on every launch after the first.
+- **Fingerprint-only revalidation: 4.3 s** (28.7 µs/file). **Steady revalidation: 5.2 s.**
+- **Cache size: 43.2 MiB, 390 B/row** including WAL/shm. **Footprint: 355 MiB** for one walk.
+- **Discovery writes nothing** — every path's inode, size, mtime, ctime and xattr digest identical before
+  and after, measured by a separate process (150,650 paths, and the hostile sibling too).
+- A cancelled pass is `cancelled`, not `completed`, not `isClean`, and prunes nothing; a cancelled warm
+  revalidation leaves `asOf == nil` with every row preserved.
+
+⚠️ **Open measurement discrepancy (`W26.verify-fu1`):** the app-hosted Reader lane walks the same tree at
+**56 µs/file** against ArchiveCore's 246 µs/file — 4.4× apart, in the direction optimisation does not
+explain, and not the page cache (cold ≈ warm within one lane). Treat the per-file absolute as unsettled
+until that closes; the 1.19× ratio and the warm-start figure are within-process and unaffected.
+
 ## ✅ FIXED (`W26.previewzoom`) — the preview sheet's zoom/fit shortcuts did nothing; `⌘0` never reached it
 
 **Found 2026-08-09** by `W26.docs-fu1`, the item that finally ran a GUI check deferred since the feature
