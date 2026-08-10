@@ -211,10 +211,13 @@ func build() {
         }
     }
 
-    // ── Hostile entries, in their own directory so a lane can point at either tree.
-    // They are what makes `isClean == false` reachable at scale, and they are the shapes §4a of the plan
-    // proved are misread as "no tags" rather than "could not read".
-    let hostile = root + "/zz-hostile"
+    // ── Hostile entries, in their own SIBLING ROOT rather than inside the main tree.
+    // They are what makes `isClean == false` reachable, and they are the shapes §4a of the plan proved
+    // are misread as "no tags" rather than "could not read". They must not live INSIDE the main tree:
+    // a single unreadable file or sealed directory makes the whole pass unclean, which makes the
+    // Reader's verdict "partial" and `asOf` nil — so a warm-start lane pointed at a tree with one
+    // planted obstacle could never assert the currency it exists to measure. Two roots, two questions.
+    let hostile = root + "-hostile"
     try? fm.createDirectory(atPath: hostile, withIntermediateDirectories: true)
     let denied = hostile + "/tag-read-denied.pdf"
     let fd = denied.withCString { open($0, O_WRONLY | O_CREAT | O_TRUNC, 0o644) }
@@ -235,7 +238,7 @@ func build() {
 
     let elapsed = Date().timeIntervalSince(started)
     let meta: [String: Any] = [
-        "root": root, "files": written, "dirs": allDirs.count + 2, "pdfs": pdfs,
+        "root": root, "files": written, "dirs": allDirs.count, "pdfs": pdfs,
         "trackedByReadState": tracked, "taggedAtAll": taggedAtAll, "seed": Int(seed),
         "buildSeconds": elapsed, "hostileDir": hostile,
     ]
@@ -388,14 +391,18 @@ func wipe() {
     guard FileManager.default.fileExists(atPath: meta) else {
         die("refusing to remove \(root): no sibling \(meta), so this tool did not build it")
     }
-    // The hostile tree contains a 0o000 directory, which defeats removeItem — reopen it first rather
+    // The hostile sibling contains a 0o000 directory, which defeats removeItem — reopen it first rather
     // than reaching for `rm -rf` (a force past a refusal is exactly what the prime directives forbid).
-    _ = (root + "/zz-hostile/sealed-dir").withCString { chmod($0, 0o755) }
-    _ = (root + "/zz-hostile/tag-read-denied.pdf").withCString { chmod($0, 0o644) }
+    let hostile = root + "-hostile"
+    _ = (hostile + "/sealed-dir").withCString { chmod($0, 0o755) }
+    _ = (hostile + "/tag-read-denied.pdf").withCString { chmod($0, 0o644) }
     do {
         try FileManager.default.removeItem(atPath: root)
         try FileManager.default.removeItem(atPath: meta)
-        print("wiped \(root)")
+        if FileManager.default.fileExists(atPath: hostile) {
+            try FileManager.default.removeItem(atPath: hostile)
+        }
+        print("wiped \(root) (+ its hostile sibling)")
     } catch { die("could not wipe \(root): \(error.localizedDescription)") }
 }
 

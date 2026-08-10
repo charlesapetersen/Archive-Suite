@@ -64,11 +64,13 @@ final class CorpusWalkerScaleTests: XCTestCase {
                                     "the lane requires \(requiredFileCount)+ files; got \(result.filesSeen)")
         XCTAssertGreaterThan(result.entries.count, 0, "the corpus is tagged; discovery cannot be empty")
 
-        // The hostile tree is deliberately present, so this pass must NOT be clean — and must say why.
-        XCTAssertFalse(result.isClean,
-                       "the planted unreadable file and sealed directory must make this pass unclean")
-        XCTAssertFalse(result.unreadable.isEmpty, "the tagged 0o000 file must be reported, not coerced")
-        XCTAssertFalse(result.directoryErrors.isEmpty, "the sealed directory must be reported")
+        // The main tree holds no obstacles, so a 150k-file pass must report itself CLEAN — and that is
+        // not a cosmetic assertion: `isClean && completed` is the only state that authorises treating an
+        // absent file as deleted. A walk that cannot reach "clean" at scale can never prune, and the
+        // cache would grow stale rows forever. (The hostile shapes live in a sibling root, checked below.)
+        XCTAssertTrue(result.isClean, "a scale walk of an unobstructed tree must report itself clean; "
+                      + "unreadable=\(result.unreadable.count) dirErrors=\(result.directoryErrors.count)")
+        XCTAssertEqual(result.vanishedMidScan, 0, "nothing is deleting files under this walk")
 
         // (2) The path this wave replaced, on the same tree: FileManager.enumerator + resourceValues,
         // with no error handler and no stat — i.e. what `ArchiveLibrary` used to do per file.
@@ -134,6 +136,31 @@ final class CorpusWalkerScaleTests: XCTestCase {
         rows=\(result.entries.count) unreadable=\(result.unreadable.count)
         """)
         XCTAssertLessThan(seconds, 60, "the stat-only pass is meant to be the cheap phase")
+    }
+
+    /// The negative half, on the sibling root the builder plants: at scale it is easy to write a lane
+    /// that only ever sees a clean tree, and then "clean" means nothing. Each shape here is one §4a
+    /// coercion — a tagged file whose xattrs cannot be read, a sealed directory, a dangling symlink —
+    /// and each must arrive as a REPORTED failure rather than as silence.
+    func testTheHostileSiblingRootReportsEveryPlantedFailureRatherThanCoercingIt() throws {
+        guard let path = ProcessInfo.processInfo.environment["ARCHIVE_SCALE_HOSTILE_ROOT"],
+              !path.isEmpty, FileManager.default.fileExists(atPath: path) else {
+            throw XCTSkip("ARCHIVE_SCALE_HOSTILE_ROOT unset — run ops/scale/run-scale-verify.sh")
+        }
+        let root = URL(fileURLWithPath: path, isDirectory: true)
+        let result = CorpusWalker.scan(root: root, predicate: CorpusWalker.hasAnyTag)
+
+        XCTAssertFalse(result.rootUnreadable, "the hostile root itself is readable")
+        XCTAssertTrue(result.completed, "it completed; it just could not read everything")
+        XCTAssertFalse(result.isClean, "a pass that hit unreadable content is never clean")
+        XCTAssertEqual(result.unreadable.count, 1,
+                       "the tagged 0o000 file must be reported as unreadable, never coerced to untagged")
+        XCTAssertEqual(result.directoryErrors.count, 1, "the sealed directory must be reported")
+        XCTAssertEqual(result.vanishedMidScan, 1, "the dangling symlink resolves to nothing")
+        XCTAssertTrue(result.entries.isEmpty,
+                      "every readable file here is behind the sealed directory, so nothing is discoverable")
+        print("SCALE hostile unreadable=\(result.unreadable.count) "
+              + "dirErrors=\(result.directoryErrors.count) vanished=\(result.vanishedMidScan)")
     }
 
     /// Cancel mid-walk. Two things must hold, and the second is the one with teeth: a cancelled pass is
