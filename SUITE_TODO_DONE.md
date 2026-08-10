@@ -343,6 +343,45 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   necessarily enables *every* `.disabled(doc == nil)` Document-menu item in the preview, and the three Find
   commands have no find bar there to drive. Also seen again, on both runs: `W26.fixwarn`'s false *"fixture
   build reported a failure"* on a `tart exec` transport error, while the fixture built fine.
+- [x] **W26.previewzoom-fu1 — the three Find commands the preview's publication enabled are gated on a
+  viewer that actually HAS a find bar. ✅ CLOSED** `1bd62d9` -> this commit (2026-08-10). The residual
+  `W26.previewzoom` filed against itself: publishing the sheet's `DocumentViewerModel` to the scene enables
+  **every** `.disabled(doc == nil)` item in the Document menu, and `Find…` / `Find Next` / `Find Previous`
+  have no counterpart there — `DocumentWindowView` holds the app's only `if model.showingFind { findBar }`,
+  so ⌘F looked live and did nothing, and ⌘G / ⌘⇧G fell into `performFind`'s empty-query branch and cleared
+  the highlight.
+  **Fix — option (b) of the two the item offered:** a `DocumentViewerModel.supportsFind`, false for the
+  sheet's model, gating those three items (`noFind` in `ArchiveReaderCommands`). Option (a), rendering a find
+  bar in the sheet, was **considered and not taken**: it is a feature rather than a fix, and it would put Esc
+  and focus semantics inside a modal sheet — the exact ground `W26.previewzoom` spent its whole budget on.
+  ⌘O opens the full viewer, which has find. If the owner later wants find in the preview, (a) is still open
+  and `supportsFind` is the one line it flips.
+  ⚠️ **`supportsFind` is deliberately NOT derived from `persists`,** though the two co-vary in the one preview
+  that exists today. "Does not write zoom to defaults" and "has no find bar" are different facts about a
+  viewer, and a future non-persisting viewer that renders a bar would silently inherit the wrong answer —
+  a unit test pins exactly that (`persists: false` alone still supports find).
+  **The guard is in the MODEL, not only in the menu:** `performFind` / `findNext` / `findPrevious` return
+  early when `supportsFind` is false, so a second publisher of the preview model cannot reach around the
+  three `.disabled` modifiers. That is the half a unit test can hold; the menu half only exists in SwiftUI's
+  focus machinery and needs the VM.
+  **Verification.** Unit: `DocumentFindTests` **20/20** (3 new — the default IS find-capable and
+  `persists: false` alone does *not* disable find; the preview model reports false; and driven directly
+  against a scratch PDF the control viewer finds **3** matches in, the preview model finds **0** and
+  next/prev cannot rebuild the list behind it). Full Reader unit bundle **377 tests / 0 failures**
+  (`-skip-testing:DeepLinkTests`, per standing practice), Debug build clean, **no new warnings**.
+  VM lane (`ops/gui/vm-gui-runner.sh reader xcuitest`): `testFindCommandsAreDisabledInThePreviewSheetOnly`
+  **passed, 54.8 s**, asserting three states because no one of them means anything alone — from the list
+  disabled (no viewer at all), in the **document window enabled** (the control that stops a mis-wired gate
+  from killing find in the one place it works), and in the preview sheet the three disabled **while
+  `Fit Page` and `Copy Cleaned for Prose` are enabled**, the pair that proves the model really is published
+  and the disabling is find-specific.
+  ⚠️ **Two VM runs, and the first one is worth keeping:** the whole `ViewerUITests` class ran 9 tests, 8
+  green, and this one failed — not on the product but on its own query. `documentMenuItem` searches the
+  **whole menu bar**, and plain `"Copy"` is ambiguous there (the standard Edit menu has one), so XCUITest
+  raised *"Multiple matching elements found"*. Everything before that line had already passed, including
+  both controls; switching to the unique `"Copy Cleaned for Prose"` made the focused re-run green. Noted in
+  the test, because the next menu-item assertion will reach for a short title too.
+  Scratch GUI fixture only, never the corpus; nothing drawn on the host screen.
 - [x] **W26.gatepath — the health-gate step that could only ever fail, because a worktree path has no space
   and the primary checkout's does. ✅ CLOSED 2026-08-08** this commit. The 2026-08-08 00:44 park was **not a
   code regression**: the `tag-vocabulary` gate step had **never passed once**.

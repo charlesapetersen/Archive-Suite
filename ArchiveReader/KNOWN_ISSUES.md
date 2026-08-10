@@ -50,9 +50,15 @@ nothing the app never went idle. After the fix, from the test's own timing print
 `29e26af3…`), so the zoom happened *and* `⌘0` refit exactly back to the default rather than merely changing
 something. VM lane 19 tests / 0 failures.
 
-**Residual, tracked as `W26.previewzoom-fu1`:** publishing the model necessarily enables *every*
-`.disabled(doc == nil)` item in the Document menu while the preview is up, and `Find…` / `Find Next` /
-`Find Previous` have no find bar there to drive.
+**Residual, tracked as `W26.previewzoom-fu1` — ✅ ALSO FIXED, 2026-08-10:** publishing the model necessarily
+enables *every* `.disabled(doc == nil)` item in the Document menu while the preview is up, and `Find…` /
+`Find Next` / `Find Previous` had no find bar there to drive. They now gate on a
+`DocumentViewerModel.supportsFind` (false for the sheet's model), as do the model's own `performFind` /
+`findNext` / `findPrevious` — the invariant belongs to the viewer, not to three `.disabled` modifiers.
+⚠️ It is **not** derived from `persists`, deliberately: the two co-vary in today's one preview, but a future
+non-persisting viewer that renders a find bar would inherit the wrong answer. Everything else the publication
+enables (zoom / fit, paging, pane focus, ⌘C / ⌘⇧C, *Copy Archive Link to This Page*) is wanted and stays
+enabled — the UITest asserts that pair, because "find disabled" is only meaningful next to "the rest is not".
 
 ## ✅ FIXED (`W26.fsev-fu2`) — a folder that would not open left the list spinning "Scanning…" for ever
 

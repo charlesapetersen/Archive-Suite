@@ -264,6 +264,69 @@ final class ViewerUITests: FixtureUITestCase {
         dismissPreviewSheet()
     }
 
+    // MARK: - Find is DISABLED in the preview sheet, and only there (W26.previewzoom-fu1)
+
+    /// The cost of the fix above: publishing the preview's viewer model to the scene enables **every**
+    /// `.disabled(doc == nil)` item in the Document menu, and three of them — `Find…`, `Find Next`,
+    /// `Find Previous` — have no counterpart in the sheet. `DocumentWindowView` holds the app's only
+    /// `if model.showingFind { findBar }`, so ⌘F there looked live and did nothing.
+    ///
+    /// Only a UITest can see this: the enabled state is SwiftUI's, computed from a focused object that no
+    /// unit test has. `DocumentFindTests` covers the model half (`supportsFind`, and find inert without it).
+    ///
+    /// Three states, because no one of them means anything alone:
+    ///  1. From the LIST — disabled. There is no viewer at all; the floor.
+    ///  2. In the DOCUMENT WINDOW — enabled. The control that matters: a `supportsFind` wired wrong (or a
+    ///     gate that reads false everywhere) would kill find in the one place it works, and every other
+    ///     assertion here would still pass.
+    ///  3. In the PREVIEW SHEET — the three find items disabled *while* `Fit Page` and `Copy` are enabled.
+    ///     That pair is the discriminator: it proves the model IS published (so this is not just case 1
+    ///     again) and that the disabling is find-specific, which is exactly what the item asked for.
+    func testFindCommandsAreDisabledInThePreviewSheetOnly() throws {
+        let findItems = ["Find…", "Find Next", "Find Previous"]
+
+        waitForRows(minimum: 3, timeout: 10)
+        clickRow(0)
+
+        // (1) The floor: no viewer published, nothing to find in.
+        for title in findItems {
+            XCTAssertFalse(documentMenuItem(title).isEnabled,
+                           "precondition: from the list alone, \(title) has no viewer")
+            closeMenu()
+        }
+
+        // (2) The document window — the one viewer that renders a find bar.
+        pressKey("o", modifiers: .command)
+        settle(2)
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window opened")
+        for title in findItems {
+            XCTAssertTrue(documentMenuItem(title).isEnabled,
+                          "\(title) must stay ENABLED in the document window — it has the find bar")
+            closeMenu()
+        }
+        pressKey("w", modifiers: .command)                 // close the viewer
+        settle(1)
+
+        // (3) The preview sheet: published, and find-less.
+        openPreviewSheet()
+        XCTAssertTrue(documentMenuItem("Fit Page").isEnabled,
+                      "precondition: the sheet's viewer model IS published (W26.previewzoom)")
+        closeMenu()
+        // "Copy Cleaned for Prose", not plain "Copy": `documentMenuItem` queries the whole menu bar, and
+        // the standard Edit menu has a "Copy" of its own — the ambiguous query fails the test outright
+        // ("Multiple matching elements found"), which is how this line read on its first VM run.
+        XCTAssertTrue(documentMenuItem("Copy Cleaned for Prose").isEnabled,
+                      "precondition: the other commands the publication enables are wanted and stay enabled")
+        closeMenu()
+        for title in findItems {
+            XCTAssertFalse(documentMenuItem(title).isEnabled,
+                           "\(title) must be DISABLED in the preview — the sheet renders no find bar")
+            closeMenu()
+        }
+
+        dismissPreviewSheet()
+    }
+
     /// Open the preview sheet from the navigation toolbar (more robust than Space, which is focus-scoped)
     /// and wait for it to be on screen.
     private func openPreviewSheet() {

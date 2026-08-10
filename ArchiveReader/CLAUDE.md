@@ -267,6 +267,10 @@ writes against the real corpus — always a copy.
 *Preview sheet* (opened by `Space`/`⌘Y`)
 - `↑/↓` previous/next file in the list (nav selection follows) · `←/→` cycle within a multi-file selection ·
   `⌘C`/`⌘⇧C` copy verbatim/cleaned · `⌘O` open the full viewer · `Space`/`Esc` close
+- `⌘↑`/`⌘↓`/`⌘0` zoom in/out/fit the focused pane — the image pane on open (since `W26.previewzoom`: the
+  sheet's viewer model is published by `NavigationWindowView`, so the Document menu acts on it)
+- **No find bar here:** `⌘F`/`⌘G`/`⌘⇧G` are *disabled* in the preview (`DocumentViewerModel.supportsFind`,
+  `W26.previewzoom-fu1`) — `⌘O` into the full viewer to search
 
 > **Reconciled with the code, 2026-07-07.** The viewer scheme changed after PLAN was written
 > (shipped UI batch #14): `↑/↓` now **scroll the focused page** instead

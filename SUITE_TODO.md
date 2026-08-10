@@ -309,24 +309,12 @@ deferred checks PASSED on pixels and the other is BROKEN → `W26.previewzoom` b
 fix the item prescribed was only half of it — the converse the item told the next session to check is what
 caught the other half. Filed in passing: `W26.previewzoom-fu1` below.
 
-- [ ] **W26.previewzoom-fu1 — the Document menu's three Find commands are now ENABLED in the preview sheet,
-  which has no find bar [XS · LOW · UX].** Filed 2026-08-10 while shipping `W26.previewzoom`; **not fixed
-  there** (one item per change), and it is a *consequence* of that fix rather than a pre-existing bug.
-  Publishing the preview's `DocumentViewerModel` to the scene necessarily enables **every**
-  `.disabled(doc == nil)` item in the Document menu, and three of them have no preview counterpart:
-  `Find…` (⌘F) only sets `showingFind = true`, and `DocumentWindowView.swift:24` is the app's **only**
-  `if model.showingFind { findBar }` — so the item looks live and nothing appears; `Find Next` (⌘G) and
-  `Find Previous` (⌘⇧G) additionally call `findNext()`/`findPrevious()`, which with an empty `findQuery`
-  fall straight into `performFind()`'s `guard !query.isEmpty` and clear the highlight. Inert, with no way to
-  type a query. **Everything else the fix enables is correct and wanted** and should not be touched: zoom /
-  fit, page stepping, pane focus, `Copy` / `Copy Cleaned for Prose` (which land on the same model as the
-  sheet header's own ⌘C / ⌘⇧C, so behaviour is identical), and *"Copy Archive Link to This Page"*, which now
-  works from the preview exactly as `W23.m4` intended it to everywhere a document is on screen.
-  **Fix — pick one deliberately, don't leave three enabled-but-inert items:** (a) render the find bar in the
-  preview too (a small feature; the sheet is 940×700 and has room), or (b) let the commands know which
-  viewers can find — e.g. a `DocumentViewerModel.supportsFind`, false for the `persists: false` preview
-  model — and gate those three items on it. **Test:** a `ViewerUITests` case asserting `Find…` in the
-  preview sheet is either functional or disabled; VM lane only.
+✅ **W26.previewzoom-fu1 — SHIPPED 2026-08-10 (this commit); full entry in `SUITE_TODO_DONE.md`.** Option (b)
+of the two the item offered: a `DocumentViewerModel.supportsFind` the preview model sets false, gating the
+three Find commands (and the model's own find entry points, so a second publisher cannot reach around them).
+Option (a) — render a find bar in the sheet — was considered and **not** taken: a feature, not a fix, and Esc
+/ focus semantics inside a modal sheet is the ground `W26.previewzoom` spent its whole budget on. It stays
+available if the owner wants it; `supportsFind` is the one line it flips.
 - [ ] **W26.fixwarn — the VM runner's fixture step reports a failure that did not happen, on a `tart exec`
   transport error [XS · LOW · ops].** Filed 2026-08-09 by `W26.docs-fu1` (seen on both of its runs).
   `ensure_fixture` pipes `tart exec … | tail -5`, and tart returned `Error: StreamClosed(streamID: …
