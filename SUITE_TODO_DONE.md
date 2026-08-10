@@ -321,6 +321,38 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   **Verified** in a worktree deliberately named with a space (`suite-wt-gatefix 20260808-…`), the only way to
   reproduce it: the step exits **0** there under `/bin/bash` 3.2, and the full `health-gate.sh` was re-run
   end-to-end at that same space-bearing path and came back GREEN before this was committed.
+- [x] **W26.docs-fu1 — the two deferred GUI checks RAN; one passed on pixels, the other found a real bug.
+  ✅ CLOSED** `2cd5b80` -> `bb48b26` -> this commit (2026-08-09). Both were deferred *"(scratch corpus not
+  Spotlight-indexed)"*, a reason `W26.walk2` made void, and the item forbade discharging them by reading the
+  code. Ran on the Reader VM lane; both `SUITE_TODO_DONE.md` entries are annotated below with what was
+  actually seen. **Non-PDF images: CONFIRMED, in both places.** `IMG_PHOTO — Fixture.jpg` was discovered in
+  an unindexed scratch fixture, and the tan JPEG is visibly drawn as a page in the preview sheet ("No OCR
+  text page · This document has a single page") and again in the full viewer, under its
+  image-only banner — an empty `PDFPage(image:)` would have shown as blank in exactly those shots.
+  **⌘0 in the preview sheet: BROKEN** — `Fit Page` stays disabled with the sheet open and the pane was
+  byte-identical after `⌘↑`×3 and after `⌘0`; filed as **`W26.previewzoom`** with the one-token cause.
+  🔺 **THE INSTRUMENTATION WAS THE FIRST THING THAT HAD TO BE FIXED, AND IT FAILED SILENTLY IN THE DIRECTION
+  OF LOOKING FINE.** Checkpoint 1 wrote each shot to the VM's `--dir=out:` share so it would appear on the
+  host; all five shots instead logged *"no writable artifact dir"*, because **the XCUITest runner is
+  sandboxed** — the same trap as the fixture path the test class already documents, re-encountered from the
+  other side. The result bundle was no fallback either: a FAILED run leaves it **unfinalized**, so
+  `xcresulttool export attachments` refuses it ("Info.plist … does not exist"), and these shots were only
+  read at all by classifying `…xcresult/Data` blobs by magic bytes. Fixed properly: the test writes to its
+  own temp dir (always permitted) and prints the path; `vm-gui-runner.sh`'s new `collect_shots` copies them
+  out over the **unsandboxed** `tart exec` into `$ART/shots-<app>/`. STEP 3.5's "READ the screenshot from
+  `~/.tart-mirror/vm-artifacts/`" is now true rather than aspirational — 3 shots collected, read, and used.
+  🔺 **THE DEDUPLICATION IS WHAT PROVED THE BUG, WHICH IS WORTH REMEMBERING.** Three preview screenshots
+  produced only **two** blobs: content-addressed storage collapsed "default fit" and "after ⌘↑×3" into one
+  file. A pane that cannot be queried (W7.6) still cannot be *compared* by XCUITest — but the result bundle
+  compares it for free, and "your before and after are the same bytes" is a stronger statement than any
+  assertion available through the accessibility tree. 🔺 Also measured: `⌘0` with the sheet open left the app
+  **non-idle for 241 s** — the whole class ran 355 s with that keystroke and 114 s without it. Recorded under
+  `W26.previewzoom` rather than chased; the keystroke is not re-sent in the committed test, because with the
+  bug present it provably changes nothing and would put a 4½-minute dead wait in every health-gate run.
+  **Verification:** VM lane `ArchiveReaderUITests/ViewerUITests` **8/8 TEST SUCCEEDED** (the known bug held
+  by `XCTExpectFailure(strict: true)`, so fixing the app will fail that test until the annotation is removed);
+  host TEST BUILD clean, no new warnings. Scratch fixture only, never the corpus; nothing on the host screen.
+  Filed in passing: `W26.previewzoom`, `W26.fixwarn`.
 - [x] **W26.docs — docs stop claiming Spotlight. ✅ CLOSED** `98469f9` -> `aef9823` -> this commit
   (2026-08-07). Worked from the audited checklist in `execution-plans/despotlight.md` §10 rather than by
   searching, then re-derived the inventory anyway (339 matches / 52 files) because most of §10's line
@@ -4985,6 +5017,13 @@ explain why not.
   to **full page** until the user changes it; on open, **focus the image pane** so keyboard zoom works
   immediately. `PDFPaneController(persists: false)` in preview mode; focus via async dispatch on appear.
   Build clean, 191 tests green. GUI-verify deferred (screen locked). | done
+  ↳ **HALF-CONFIRMED, HALF-FALSE — GUI-verified in the VM 2026-08-09 (`W26.docs-fu1`).** The *default zoom*
+  claim is TRUE in pixels: the sheet opens with the whole page visible
+  (`shots-reader/uitest-w26docsfu1-preview-default-fit.png`). The *"keyboard zoom works immediately"* claim is
+  **FALSE** — `⌘↑`×3 left the pane byte-identical, because the model is published with `.focusedObject` and so
+  reaches no menu command (→ **`W26.previewzoom`**). Whatever `leftController.focus()` does on appear, it does
+  not make the Document menu's zoom commands live. This entry was not one of the two `W26.docs-fu1` names
+  (it was deferred for "screen locked", not for the index), but the same run answers it.
 - [x] **⌘0 = "fit full page" everywhere zoom applies** — `.focusedObject(model)` on PreviewSheet
   publishes the viewer model so the existing Document menu ⌘0 (Fit Page) + zoom shortcuts reach the
   preview. Build clean, 191 tests green. GUI-verify: Document menu confirmed; preview-specific test
@@ -4992,11 +5031,30 @@ explain why not.
   ↳ **That deferral reason is void as of `W26.walk2` (noted 2026-08-07, `W26.docs`).** A scratch corpus
   needs no index to be discovered now, so this check is runnable on the Reader VM lane — tracked as
   `W26.docs-fu1` rather than re-deferred.
+  ↳ 🔴 **RAN 2026-08-09 (`W26.docs-fu1`) — THE CLAIM IS FALSE FOR THE PREVIEW SHEET.** What was seen in the
+  VM: Document ▸ `Fit Page` is disabled from the list (correct) and **still disabled while the preview sheet
+  is open**, so `@FocusedObject var doc` is nil and every zoom/fit command stays dead; in pixels the image
+  pane was **byte-identical** before and after `⌘↑`×3 and again after `⌘0`. `.focusedObject(model)` publishes
+  only while the modified subtree holds SwiftUI keyboard focus, and the pane is an AppKit `PDFView` — the two
+  publishers that *do* work (`NavigationWindowView`, `DocumentWindowView`) both use `.focusedSceneObject`.
+  The Document-menu path this entry also claims was confirmed at the time and is not in doubt; only the
+  preview-sheet half is. Fix tracked as **`W26.previewzoom`**.
 - [x] **View non-PDFs (e.g. JPG) in the viewer** — tagged non-PDF images (JPG/PNG/TIFF/HEIC/BMP/GIF)
   now open in viewer + preview via PDFPage(image:) wrapping in DocumentViewerModel.loadCurrent().
   Build clean, 191 tests green. GUI-verify deferred (scratch corpus not Spotlight-indexed). | done
   ↳ **Same discharge as above (2026-08-07, `W26.docs`)** — the index was the only blocker; now
   `W26.docs-fu1`.
+  ↳ ✅ **CONFIRMED IN PIXELS 2026-08-09 (`W26.docs-fu1`), in both places.** The tagged JPEG
+  (`IMG_PHOTO — Fixture.jpg`, a solid tan image) was discovered in an unindexed scratch fixture, and it is
+  visibly **drawn as a page**: in the preview sheet beside "No OCR text page · This document has a single
+  page" (`shots-reader/uitest-w26docsfu1-jpeg-1-preview.png`), and in the full document window reached with
+  ⌘O, titled `IMG_PHOTO — Fixture.jpg`, "1 of 1", under the amber *"No OCR text layer — this document is
+  image-only"* banner (`…-jpeg-2-viewer.png`). This is the check the pre-existing
+  `testNonPDFImageDegrades` could not make: it proves only that nothing crashed, and an empty
+  `PDFPage(image:)` would have satisfied it. Now also asserted structurally — `ar.preview.noText` exists
+  only on the `model.current != nil` branch, so it is queryable proof the image was wrapped into a document
+  rather than the sheet falling back to its (identifier-less) load-error view. Only the JPEG path was
+  exercised; PNG/TIFF/HEIC/BMP/GIF share the same `PDFPage(image:)` wrap and remain untested in pixels.
 
 
 ## Owner-requested (2026-07-10) — Reader

@@ -302,19 +302,45 @@ second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 ne
   message naming the unreadable read, in `none` and `automatic` alike.
 ✅ **W26.docs — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.**
 
-- [ ] **W26.docs-fu1 — two GUI checks whose ONLY stated blocker was the Spotlight index are now runnable
-  [XS · low · GUI · VM lane].** Filed 2026-08-07 while closing `W26.docs` — the plan's "second dividend"
-  (`execution-plans/despotlight.md` §10), collected rather than dropped. `SUITE_TODO_DONE.md` records two
-  shipped Reader items whose GUI verification was deferred *"(scratch corpus not Spotlight-indexed)"*:
-  **⌘0 = fit-full-page in the preview sheet** (the Document-menu path was confirmed; the preview-specific
-  one was not) and **non-PDF images (JPG/PNG/TIFF/HEIC/BMP/GIF) opening in viewer + preview**. Since
-  `W26.walk2` a scratch corpus needs no index to be discovered, so the blocker is void and both are
-  ordinary VM-lane checks. ⚠️ **Do not discharge these by reading the code** — both were deferred precisely
-  because the code was already believed correct; the point is pixels. Run on the Reader lane
-  (`ops/gui/vm-gui-runner.sh xcuitest`), never the host screen, and note that a `PDFView`'s content pane is
-  not XCUITest-queryable (the W7.6 finding) — assert via observable chrome plus a screenshot from
-  `~/.tart-mirror/vm-artifacts/`, and READ the screenshot. Closing this means annotating both
-  `SUITE_TODO_DONE.md` entries with what was actually seen.
+✅ **W26.docs-fu1 — SHIPPED 2026-08-09 (this commit); full entry in `SUITE_TODO_DONE.md`.** One of the two
+deferred checks PASSED on pixels and the other is BROKEN → `W26.previewzoom` below.
+
+- [ ] **W26.previewzoom — ⌘0 / ⌘↑ / ⌘↓ do NOT reach the preview sheet; `PreviewSheet` is the app's only
+  `.focusedObject` and the only one that fails [XS · MED · shipped-claim-false · GUI].** Filed 2026-08-09 by
+  `W26.docs-fu1`, which ran the deferred check in the VM and found the feature does not work. **Measured, not
+  inferred:** Document ▸ `Fit Page` is correctly disabled from the list and **stays disabled while the preview
+  sheet is open**, so `ArchiveReaderCommands`' `@FocusedObject var doc` is nil and `.disabled(doc == nil)`
+  keeps every zoom/fit command dead; and in pixels the sheet's image pane was **byte-identical** before and
+  after `⌘↑`×3 and again after `⌘0` (two of three screenshots deduplicated to a single blob in the result
+  bundle). So two shipped `SUITE_TODO_DONE.md` claims are false as written — *"⌘0 = fit full page everywhere
+  zoom applies"* and the *"on open, focus the image pane so keyboard zoom works immediately"* half of
+  *"Preview gets its own default zoom"* (both now annotated there).
+  **Fix (one token, named by the codebase's own convention):** `PreviewSheet.swift:29` uses
+  `.focusedObject(model)`, which publishes only while the modified subtree holds SwiftUI keyboard focus — and
+  the pane is an AppKit `PDFView` behind `NSViewRepresentable`, which never gives it. `NavigationWindowView.swift:88`
+  and `DocumentWindowView.swift:34` both use **`.focusedSceneObject`** and their Document-menu commands work.
+  Switch it. ⚠️ **Then check the converse**, because scene-scoped publication outlives view focus: with the
+  sheet DISMISSED, `Fit Page` must go back to disabled — a stale enabled command pointing at a dead preview
+  model is the obvious way to get this wrong, and no test covers it.
+  **Test:** `ViewerUITests.testFitPageCommandReachesThePreviewSheet` already asserts the enabled-state chrome
+  and is wrapped in `XCTExpectFailure(strict: true)` — so **fixing the app makes that test fail** until the
+  annotation is deleted, which is the intended handshake. Re-add the pixel bracket the fix deserves
+  (`⌘↑`×3 → shot → `⌘0` → shot; it is in `bb48b26` if you want the exact code) and add the dismissed-sheet
+  case. ⚠️ Budget for it: with the bug present, `⌘0` in the sheet left the app **non-idle for 241 s** (one
+  keystroke, measured twice-over in a 355 s vs 114 s run difference) — that stall is itself unexplained and
+  may or may not survive the fix. VM lane only (`ops/gui/vm-gui-runner.sh reader xcuitest`), never the host screen.
+- [ ] **W26.fixwarn — the VM runner's fixture step reports a failure that did not happen, on a `tart exec`
+  transport error [XS · LOW · ops].** Filed 2026-08-09 by `W26.docs-fu1` (seen on both of its runs).
+  `ensure_fixture` pipes `tart exec … | tail -5`, and tart returned `Error: StreamClosed(streamID: …
+  HTTP2ErrorCode<0x5 Stream Closed>)` on the first run and `Error: internal error (13): transport: SendHeader
+  called multiple times` on the second → *"WARN: fixture build reported a failure"* both times. **The fixture
+  was built correctly both times** (its mtime matched the run, and `IMG_PHOTO — Fixture.jpg` was present,
+  tagged, and discovered by the tests). This matters because `W26.walk1`-era work deliberately **de-silenced**
+  that step so a real fixture failure could not hide — a warning that cries wolf every run trains sessions to
+  ignore exactly the signal it was added to give. Likely a tart/HTTP2 artifact of the pipe closing, not of the
+  guest command: distinguish them by capturing the guest's real exit status (e.g. run the fixture build with
+  its output to a guest file, then `tail` that file in a second `tart exec`) rather than by inferring failure
+  from tart's transport error.
 - [ ] **W26.docs-spec — ⛔ OWNER-GATED: the two `SPEC/tag-format.md` bullets split out of `W26.docs`
   [XS · low · doc-only · shared contract].** Split 2026-08-07 (daemon-report walkthrough) so `W26.docs`
   could stop being skipped at the head of the queue. **Parked in the plan's HOLD QUEUE — the daemon must

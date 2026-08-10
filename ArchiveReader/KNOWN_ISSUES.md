@@ -2,6 +2,38 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## OPEN (`W26.previewzoom`) — the preview sheet's zoom/fit shortcuts do nothing; `⌘0` never reaches it
+
+**Found 2026-08-09** by `W26.docs-fu1`, the item that finally ran a GUI check deferred since the feature
+shipped. It is a *shipped claim that is false*, not a regression: `SUITE_TODO_DONE.md` records **"⌘0 = fit
+full page everywhere zoom applies"** and **"on open, focus the image pane so keyboard zoom works
+immediately"**, and neither holds in the preview sheet (`Space` / `⌘Y`). The full **document window is fine**
+— only the sheet is affected.
+
+**What was measured in the VM** (`ArchiveReaderUITests.testFitPageCommandReachesThePreviewSheet`; screenshots
+in `~/.tart-mirror/vm-artifacts/shots-reader/`):
+- Document ▸ `Fit Page` is disabled from the list (correct — nothing to fit) and **stays disabled while the
+  preview sheet is open**, so `ArchiveReaderCommands`' `@FocusedObject var doc` is nil and `.disabled(doc == nil)`
+  kills `Fit Page`, `Zoom In`, `Zoom Out` and the pane-focus commands alike.
+- In pixels the sheet's image pane was **byte-identical** before and after `⌘↑`×3 and again after `⌘0` (three
+  screenshots, two blobs — the result bundle deduplicated the identical pair). Nothing zoomed; nothing refit.
+
+**Cause, and why it is a one-token fix:** `PreviewSheet.swift:29` publishes with `.focusedObject(model)`, which
+applies only while the modified subtree holds SwiftUI keyboard focus — and the pane is an AppKit `PDFView`
+behind `NSViewRepresentable`, which never gives SwiftUI that focus. Every publisher in the app that *works*
+uses the scene-scoped variant: `NavigationWindowView.swift:88` and `DocumentWindowView.swift:34` both say
+`.focusedSceneObject`. The sheet is the only `.focusedObject` in the tree, and the only one that fails.
+
+⚠️ **Two things to check when fixing it, neither currently covered:** (1) scene-scoped publication outlives
+view focus, so with the sheet **dismissed** `Fit Page` must go back to disabled — a stale enabled command
+pointing at a dead preview model is the natural way to get this wrong; (2) `⌘0` with the sheet open left the
+app **non-idle for 241 s** (measured: the same test class ran 355 s with that keystroke and 114 s without),
+which is unexplained and may not survive the fix.
+
+**Test handshake:** the assertion is already committed and wrapped in `XCTExpectFailure(strict: true)`, so the
+lane is green today and **fixing the app will fail that test** until the annotation is deleted. Re-add the
+`⌘↑`×3 → `⌘0` pixel bracket with the fix (exact code in `bb48b26`).
+
 ## ✅ FIXED (`W26.fsev-fu2`) — a folder that would not open left the list spinning "Scanning…" for ever
 
 **Found 2026-08-06** by `W26.fsev-fu1`, which bounded the *stream*'s `open(2)` and measured that the *walk*'s

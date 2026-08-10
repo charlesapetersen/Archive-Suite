@@ -53,6 +53,13 @@ argument is optional, so the old `vm-gui-runner.sh xcuitest` form still means "r
 `~/.tart-mirror/vm-artifacts/` — `Read` the PNGs to eyeball renders. Drive the VM with `tart exec <vm> …`
 (no SSH — Cirrus images ship the guest agent).
 
+**Screenshots a UITest takes** land in `vm-artifacts/shots-<app>/` as `uitest-<name>.png`. A test **cannot**
+write there itself — the XCUITest runner is **sandboxed**, so the `--dir=out:` share is not writable from
+inside it (measured 2026-08-09, `W26.docs-fu1`). `FixtureUITestCase.captureScreenshot` therefore writes to the
+runner's own temp dir and prints `[shot] <name>: wrote <path>`; `collect_shots` copies those out afterwards
+over the *unsandboxed* `tart exec`. Don't route this through the result bundle instead: a failed or killed run
+leaves the `.xcresult` **unfinalized**, and `xcresulttool` refuses one with no `Info.plist`.
+
 **One-time setup** (`brew install cirruslabs/cli/tart crane`; `vncdotool` in a venv at `~/.tart-mirror/vncenv`):
 build the VM from Cirrus's `macos-tahoe-xcode:26.3` (macOS 26 + Xcode 26.3 — matches host). The image is
 ~63 GB; pull it **resumably** by mirroring into a local registry then cloning (a network drop costs ≤512 MB,

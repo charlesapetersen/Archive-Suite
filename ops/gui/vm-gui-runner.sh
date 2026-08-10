@@ -232,9 +232,15 @@ run_xcuitest() {
 # then means classifying `…xcresult/Data` blobs by magic bytes.
 collect_shots() {
   local dest="$ART/shots-$APP" n=0 p paths
-  paths="$(sed -nE 's/^\[shot\] [^:]*: wrote (.+)$/\1/p' "$ART/xcuitest-$APP.log" 2>/dev/null | sort -u)"
+  # Clear the directory FIRST, unconditionally. If this run took no shots, an absent dir has to mean
+  # "no shots this run" — leaving the previous run's PNGs there is worse than having none, because the
+  # next session reads them as evidence about a run that never produced them.
+  rm -rf "$dest"
+  # Greedy `.*` so a shot name containing a colon still resolves (the last ": wrote " wins), and `|| true`
+  # because a missing log is not a reason to abort the run under `set -e`.
+  paths="$(sed -nE 's/^\[shot\] .*: wrote (.+)$/\1/p' "$ART/xcuitest-$APP.log" 2>/dev/null | sort -u || true)"
   [ -n "$paths" ] || return 0
-  rm -rf "$dest"; mkdir -p "$dest"
+  mkdir -p "$dest"
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     # The guest paths contain spaces but no quotes, so double-quoting inside the -lc string is enough.

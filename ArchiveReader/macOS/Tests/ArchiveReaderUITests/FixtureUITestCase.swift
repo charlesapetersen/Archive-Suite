@@ -133,8 +133,9 @@ class FixtureUITestCase: XCTestCase {
     /// path. `run_xcuitest` in `vm-gui-runner.sh` greps those `[shot] …: wrote <path>` lines out of the
     /// log afterwards and copies each file to the host over the *unsandboxed* `tart exec` — which is what
     /// makes STEP 3.5's "READ the screenshot from `~/.tart-mirror/vm-artifacts/`" true. The share is still
-    /// tried first (it costs one `isWritableFile` call and works if a future runner is unsandboxed);
-    /// `AR_UITEST_SHOT_DIR` overrides both, verbatim.
+    /// tried first (it costs one `isWritableFile` call and works if a future runner is unsandboxed), and
+    /// `AR_UITEST_SHOT_DIR` is tried ahead of it. Each candidate must be *writable* to be chosen, so an
+    /// override that the sandbox refuses falls through here rather than losing the shot.
     ///
     /// This is a *diagnostic* channel, never an assertion: no test may pass or fail on where a shot went.
     static let screenshotDirectory: URL = {
