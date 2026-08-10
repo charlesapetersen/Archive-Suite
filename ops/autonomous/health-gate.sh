@@ -217,16 +217,70 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     first AND under a bare /usr/bin:/bin, because tart-lib.sh resolves Homebrew itself. It also cannot
 #     collide with the gui-vm step that drives the REAL lane — it stubs `tart` and points TART_LOCK_DIR at
 #     its own mktemp, so it never touches the shared VM or the shared lock.
-#     ⚠️ SEVEN more harnesses in ops/autonomous/tests/ are still run by nothing — counted, and the three
-#     with a comment-only near-miss reference checked by hand (SUITE_TODO W26.fixwarn-fu1, which also wants
-#     a meta-assertion so #14 cannot land unwatched). Adding one here does not make this list complete.
-# prove-daemon.sh is deliberately NOT here: ~10 min of real daemon loops does not belong in a gate that already
-# runs ~22 min against GATE_MAXRUN=50min. Run that one by hand for daemon-behaviour changes. (That exclusion is
-# about RUNTIME, not principle — which is why the sub-second prove-gate-report.sh above is in.)
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
 step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
 step vm-lane-proof  bash "$ROOT/ops/autonomous/tests/prove-vm-lane.sh"
+
+# W26.fixwarn-fu1 (2026-08-10) — the SIX remaining hermetic harnesses. Wiring them one at a time is how this
+# list came to be wrong five times: `f64649b` swept four in, W26.fixwarn found a fifth, and counting them to
+# justify the word "fifth" turned up SEVEN more that nothing ran. Each was baselined against pristine main
+# first (memory `ops-harnesses-red-on-main`: inheriting someone else's RED would park the daemon on it) and
+# then re-run in THIS gate's own env — shim dir first on PATH, ARCHIVE_UNATTENDED=1 — because that env is
+# where a harness turns a green gate red. All six: green on main, seconds long, mktemp-sandboxed.
+#   * prove-dep-gating.sh (5 s, 42/0) — next-queue-item.sh's `blocked-on` resolver, i.e. the code that
+#     decides what the daemon works on next. A wrong verdict there ships work out of order — `W23.h5-fu`
+#     carried its dependency in prose only and was offered as actionable, which is the near-miss this guards.
+#   * prove-tracker-sync.sh (6 s, 25/0) — check-tracker-sync.sh, which the `tracker sync` line above already
+#     runs warn-only. The guard was in the gate; the proof that the guard still fires was not.
+#   * prove-housekeeping.sh (7 s) — the daemon's worktree/branch GC. This one deletes things: its whole
+#     contract is which worktrees are reclaimed and which are KEPT, and a `W26.tagvocab-salvage` worktree is
+#     being kept RIGHT NOW for a file that exists in no commit.
+#   * prove-no-host-gui.sh (7 s, 28/0) — the host-GUI firewall hook. A pattern that silently stopped matching
+#     would hand the owner's display back to the daemon with no symptom until they were interrupted. Note it
+#     passes with ARCHIVE_UNATTENDED=1 already exported (it sets the axis per case), which is the gate's env.
+#   * prove-exit-logging.sh (7 s, 12/0) — why the daemon exited. Flagged in the item as
+#     "plausibly too invasive": it does run the REAL daemon and SIGTERM it, but measured, it is hermetic —
+#     throwaway $HOME/$STATE/repo, a fake `claude`, and its own stub dir FIRST on PATH (so its launchctl and
+#     osascript stubs win over this gate's shims). It never touches the real state dir or the real launchd job,
+#     and its VERDICT depends on nothing outside its own mktemp. It is not leak-proof under SIGKILL — each
+#     case kills its own daemon, so at most one orphaned sandbox loop survives a killed gate — but that
+#     orphan is unsupervised, private to a temp dir, and stays dead once killed. Contrast prove-keepalive
+#     below, where both halves of that sentence go the other way.
+#   * prove-review-cadence.sh (43 s, 17/0) — the slowest of the six, and the only one worth a second thought
+#     for runtime; 43 s against a ~22 min gate is not the exclusion prove-daemon.sh earns. It forces
+#     AUTONOMOUS_REVIEW_ENABLED=1 on purpose: paced reviews are OFF by owner directive, and the picker
+#     machinery must keep working while the deployment default is off, so this stays watched while it sleeps.
+step dep-gating-proof     bash "$ROOT/ops/autonomous/tests/prove-dep-gating.sh"
+step tracker-sync-proof   bash "$ROOT/ops/autonomous/tests/prove-tracker-sync.sh"
+step housekeeping-proof   bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
+step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
+step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
+step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"
+
+# ── The two harnesses that are NOT gate steps, and why ────────────────────────────────────────────────────
+# The line below is MACHINE-READ: `prove-gate-report.sh` asserts that every ops/autonomous/tests/prove-*.sh
+# is either a `step` above or named here (W26.fixwarn-fu1 part 2), so harness #14 cannot land unwatched the
+# way seven of them did. Adding a name here SILENCES that assertion for it — so a name belongs here only
+# with its reason written out, and only because the harness genuinely does not belong in the gate. It is not
+# a snooze button. (The assertion also fails if a name here is stale or is in fact wired, so the list cannot
+# quietly rot into a blanket exemption.)
+#
+#   * prove-daemon.sh — RUNTIME. ~10 min of real daemon loops does not belong in a gate that already runs
+#     ~22 min against GATE_MAXRUN=50 min. Run it by hand for daemon-behaviour changes. (Runtime, not
+#     principle — which is why the sub-second prove-gate-report.sh above IS in.)
+#   * prove-keepalive.sh — SIDE EFFECTS OUTSIDE ITS OWN SANDBOX. It is fast (7 s) and green on main, so
+#     runtime is not the objection: it drives the owner's REAL launchd, bootstrapping a throwaway
+#     `com.archivesuite.ws1probe.<pid>` job into gui/$UID, `kill -9`ing it and booting it out. Two problems
+#     for a gate. (1) Its verdict depends on state outside its own sandbox — real launchd's behaviour — which
+#     is exactly how prove-status.sh sat at 34/2 for weeks: it was reading the owner's real ~/Desktop park
+#     note. A harness whose RED can be the environment's is how a real park becomes a false one, and the gate
+#     is a park trigger. (2) Cleanup is `trap cleanup EXIT`, and the daemon's watchdog backstop is a detached
+#     `kill -KILL` (archive-suite-autonomous.sh ~line 701) — SIGKILL runs no EXIT trap, so a gate killed
+#     mid-step leaves a job LOADED in gui/$UID, and it is `KeepAlive=true`: it RELAUNCHES itself forever. The
+#     label is `$$`-unique, so that accumulates one phantom supervised `com.archivesuite.ws1probe.*` per
+#     killed gate, in the same domain and under the same prefix the owner reads while diagnosing the daemon.
+# GATE-UNWATCHED-BY-DESIGN: prove-daemon.sh prove-keepalive.sh
 
 echo
 if [ -n "$fails" ]; then
