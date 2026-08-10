@@ -189,6 +189,18 @@ final class LibraryIndexScaleTests: XCTestCase {
         XCTAssertLessThan(peakFootprintMiB, 4_096,
                           "a discovery pass that needs gigabytes at 150k files is a design fault")
 
+        // ── The cross-lane yardstick (`W26.verify-fu1`). Last, so it disturbs none of the numbers above,
+        // and `CorpusWalker.scan` directly rather than `LibraryScan.pass` so it is literally the call the
+        // ArchiveCore lane calibrates. Both passes here are warm — the tree has been walked three times —
+        // which is the condition `ScaleLaneCalibration.measure` requires to mean anything.
+        let calibrationWalkStart = Date()
+        let calibrationWalk = CorpusWalker.scan(root: root)
+        let calibrationWalkSeconds = Date().timeIntervalSince(calibrationWalkStart)
+        let calibration = ScaleLaneCalibration.measure(
+            lane: "reader", root: root,
+            warmWalkSeconds: calibrationWalkSeconds, filesSeen: calibrationWalk.filesSeen)
+        print(calibration.line)
+
         await warmIndex.close()
     }
 

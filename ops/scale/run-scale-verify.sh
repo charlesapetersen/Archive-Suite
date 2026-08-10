@@ -12,6 +12,11 @@
 #   4. **Discovery writes nothing.** A separate program fingerprints every path in the tree (inode,
 #      size, mtime, ctime, xattr digest) before and after, and any difference at all fails the run.
 #      `execution-plans/despotlight.md` §7a.7: the subject cannot take this measurement about itself.
+#   5. **The two lanes above agree about the WALK, and the run states ONE per-file cost.** They walk the
+#      same tree in different processes, and a process's QoS moves every filesystem primitive by ~5-6x
+#      (`W26.verify-fu1`), so their raw per-file absolutes are not comparable and only the unclamped one
+#      is a cost the app would pay. Each lane therefore also measures a reference pass, and step 3c
+#      compares the ratios.
 #
 # The corpus is SCRATCH and synthetic — never the owner's archive. `scale-corpus.swift` refuses any root
 # whose leaf is not named `scale-corpus*`, and refuses outright any path mentioning the real corpus.
@@ -20,6 +25,7 @@
 #   ./ops/scale/run-scale-verify.sh --files 120000
 #   ./ops/scale/run-scale-verify.sh --self-test     # cheap: proves the no-write guard can FAIL
 #   ./ops/scale/run-scale-verify.sh --keep          # leave the corpus for a follow-up lane
+#   ./ops/scale/run-scale-verify.sh --prove-calibration   # seconds, no corpus: proves step 3c can FAIL
 #
 # Exit 0 = every lane green. Non-zero = a real failure; the corpus is left in place for inspection.
 
@@ -33,15 +39,25 @@ SELF_TEST=0
 KEEP=0
 MIN_FILES=""
 ROOT=""
+PROVE_CALIB=0
+# How far the two lanes' NORMALISED walk costs may sit apart before step 3c calls it a disagreement about
+# the code rather than about the environment. 2.0x, and the width is deliberate: repeated runs of one lane
+# spread ~20%, while the disagreement this exists to catch was 4.4x. A tight bound flakes; the absent
+# bound is what filed `W26.verify-fu1`.
+CALIB_TOLERANCE=2.0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --files)     FILES="$2"; shift 2 ;;
     --dirs)      DIRS="$2"; shift 2 ;;
     --root)      ROOT="$2"; shift 2 ;;
-    --self-test) SELF_TEST=1; FILES=2000; DIRS=40; MIN_FILES=1000; shift ;;
+    # On a 2,000-file tree the reference pass is ~30 ms, so the ratio is timer-dominated: measured
+    # spreads of 1.7x are ordinary there and mean nothing. The self-test proves the guard's teeth via
+    # --prove-calibration, not by running a real measurement on a tree too small to measure.
+    --self-test) SELF_TEST=1; FILES=2000; DIRS=40; MIN_FILES=1000; CALIB_TOLERANCE=3.0; shift ;;
     --keep)      KEEP=1; shift ;;
-    -h|--help)   sed -n '2,30p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --prove-calibration) PROVE_CALIB=1; shift ;;
+    -h|--help)   sed -n '2,31p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *)           echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -58,6 +74,113 @@ FAILED=0
 step()   { printf '\n=== %s\n' "$*"; }
 fail()   { printf '❌ %s\n' "$*"; FAILED=1; }
 ok()     { printf '✓ %s\n' "$*"; }
+
+# ── the cross-lane calibration comparator (step 3c) ───────────────────────────────────────────────
+# Kept up here, as a pure function of two `SCALE calib` lines, so `--prove-calibration` can watch it
+# FAIL without a corpus. It reports; the CALLER decides what a non-zero return does to the run.
+calib_line()  { grep -o "SCALE calib lane=$2 .*" "$1" | tail -1; }
+calib_field() { printf '%s\n' "$1" | tr ' ' '\n' | awk -F= -v k="$2" '$1 == k { print $2 }'; }
+
+# calibration_verdict <core-line> <reader-line> → 0 agree, 1 disagree, 2 a line is missing/unparseable.
+calibration_verdict() {
+  local core="$1" reader="$2" core_n reader_n spread headline taxed line head_lane head_us tax summary
+  # A missing line is a FAILURE, not a skip: a lane that quietly stopped calibrating would take this
+  # whole check with it and leave the headline number unguarded again — silently.
+  if [ -z "$core" ] || [ -z "$reader" ]; then
+    printf '❌ a lane emitted no SCALE calib line (core=%s reader=%s)\n' "${core:-<none>}" "${reader:-<none>}"
+    return 2
+  fi
+  printf '%s\n%s\n' "$core" "$reader"
+  core_n="$(calib_field "$core" normalised)"
+  reader_n="$(calib_field "$reader" normalised)"
+  if [ -z "$core_n" ] || [ -z "$reader_n" ]; then
+    printf '❌ a SCALE calib line carries no normalised= field (core=%s reader=%s)\n' "$core" "$reader"
+    return 2
+  fi
+  spread="$(awk -v a="$core_n" -v b="$reader_n" \
+    'BEGIN { if (a+0 <= 0 || b+0 <= 0) print 0; else printf "%.2f", (a > b ? a/b : b/a) }')"
+
+  # The headline: only an UNCLAMPED lane may state what discovery costs. Chosen from the reported qos,
+  # not hardcoded — run this interactively and both lanes are unclamped; run it from the daemon and only
+  # the app-hosted one is.
+  headline=""; taxed=""
+  for line in "$core" "$reader"; do
+    if [ "$(calib_field "$line" clamped)" = "no" ]; then headline="$line"; else taxed="$line"; fi
+  done
+  if [ -n "$headline" ]; then
+    head_lane="$(calib_field "$headline" lane)"
+    head_us="$(calib_field "$headline" walk)"
+    summary="one number: a full walk costs ${head_us} us/file (lane=${head_lane}, qos=$(calib_field "$headline" qos), unclamped)"
+    if [ -n "$taxed" ]; then
+      tax="$(awk -v a="$(calib_field "$taxed" walk)" -v b="$head_us" \
+        'BEGIN { printf "%.1f", (b+0 > 0 ? a/b : 0) }')"
+      summary="$summary; lane=$(calib_field "$taxed" lane) reports $(calib_field "$taxed" walk) us/file, ${tax}x inflated by its QOS_CLASS_BACKGROUND clamp — not a cost the app pays"
+    fi
+    printf '✓ %s\n' "$summary"
+    [ -n "${REPORT:-}" ] && printf 'SCALE headline %s\n' "$summary" >> "$REPORT"
+  else
+    # Not a failure: it means the run had no unclamped lane, so it has no shipping number to quote.
+    printf '⚠️  every lane was QoS-clamped; the per-file absolutes above are inflated and none of them\n'
+    printf '   is a cost the app would pay. Re-run from an unclamped shell for a headline number.\n'
+    [ -n "${REPORT:-}" ] && printf 'SCALE headline UNAVAILABLE — every lane was QoS-clamped\n' >> "$REPORT"
+  fi
+
+  if awk -v s="$spread" -v t="$CALIB_TOLERANCE" 'BEGIN { exit !(s+0 > 0 && s+0 <= t+0) }'; then
+    printf '✓ the lanes agree on the WALK once the process is normalised out (%s vs %s, %sx apart, tolerance %sx)\n' \
+      "$core_n" "$reader_n" "$spread" "$CALIB_TOLERANCE"
+    return 0
+  fi
+  printf '❌ the lanes disagree about the walk itself, not just their environments: normalised %s vs %s (%sx > %sx)\n' \
+    "$core_n" "$reader_n" "$spread" "$CALIB_TOLERANCE"
+  return 1
+}
+
+# ── --prove-calibration: a guard nobody has watched fail is not a guard ───────────────────────────
+if [ "$PROVE_CALIB" = 1 ]; then
+  REPORT=""    # nothing is appended to a real report by a proof run
+  PROOF_FAILED=0
+  expect() {   # expect <want-rc> <label> <core-line> <reader-line>
+    local want="$1" label="$2"; shift 2
+    calibration_verdict "$@" > /dev/null 2>&1
+    local got=$?
+    if [ "$got" = "$want" ]; then ok "$label (rc=$got)"
+    else printf '❌ %s: wanted rc=%s, got rc=%s\n' "$label" "$want" "$got"; PROOF_FAILED=1; fi
+  }
+  AGREE_CORE='SCALE calib lane=core qos=9 clamped=yes files=150000 walk=218.7 reference=24.5 normalised=8.93'
+  AGREE_READ='SCALE calib lane=reader qos=25 clamped=no files=150000 walk=37.7 reference=5.0 normalised=7.51'
+  step "proving the cross-lane comparator can pass AND fail"
+  expect 0 "two lanes whose ratios agree are accepted"            "$AGREE_CORE" "$AGREE_READ"
+  expect 1 "a 4.4x disagreement in the RATIO is rejected" \
+    "${AGREE_CORE/normalised=8.93/normalised=33.0}" "$AGREE_READ"
+  expect 1 "the same rejection in the other direction" \
+    "$AGREE_CORE" "${AGREE_READ/normalised=7.51/normalised=1.7}"
+  expect 2 "a missing core line is a failure, not a skip"          ""            "$AGREE_READ"
+  expect 2 "a missing reader line is a failure, not a skip"        "$AGREE_CORE" ""
+  expect 2 "a line with no normalised= field is a failure"         "SCALE calib lane=core qos=9" "$AGREE_READ"
+  # Inflated ABSOLUTES with matching ratios are exactly the real 2026-08-10 case: accepted, because the
+  # tax is the environment's, and the headline must then quote the unclamped lane.
+  expect 0 "a 5.8x absolute gap with agreeing ratios is accepted"  "$AGREE_CORE" "$AGREE_READ"
+  # The two headline checks CAPTURE the verdict and match the string, rather than piping it into
+  # `grep -q`. That pipe is a SIGPIPE race, and it is not theoretical: `grep -q` exits on the first
+  # match while `calibration_verdict` is still writing, the writing subshell dies 141, and `pipefail`
+  # reports the whole pipeline as failed — so both of these checks read RED against a comparator that
+  # had in fact printed exactly the right sentence. A proof that fails when the thing it watches is
+  # correct is worse than no proof.
+  says() {     # says <label> <expected-substring> <core-line> <reader-line>
+    local label="$1" want="$2"; shift 2
+    local out; out="$(calibration_verdict "$@")"
+    case "$out" in
+      *"$want"*) ok "$label" ;;
+      *) printf '❌ %s — no line matched %s\n' "$label" "$want"; PROOF_FAILED=1 ;;
+    esac
+  }
+  says "the headline quotes the UNCLAMPED lane's number" \
+       'costs 37.7 us/file (lane=reader' "$AGREE_CORE" "$AGREE_READ"
+  says "with no unclamped lane it refuses to quote a number" \
+       'every lane was QoS-clamped' "$AGREE_CORE" "${AGREE_READ/clamped=no/clamped=yes}"
+  if [ "$PROOF_FAILED" = 0 ]; then echo; echo "✅ calibration comparator proof GREEN"; exit 0; fi
+  echo; echo "❌ calibration comparator proof RED"; exit 1
+fi
 
 mkdir -p "$SCRATCH" "$REPO/build/scale"
 
@@ -102,9 +225,11 @@ step "ArchiveCore lane — walk, fingerprint pass, cancel semantics"
 CORE_LOG="$SCRATCH/core-lane.log"
 (
   cd "$REPO/packages/ArchiveCore" || exit 1
-  # RELEASE, deliberately. A debug ArchiveCore walks at ~350 us/file (measured on the self-test tree),
-  # which is an -Onone artefact and would make the headline number a fiction: the app ships optimised,
-  # and the ~12 s baseline this lane is measured against was taken with optimised Foundation calls.
+  # RELEASE, because that is what ships. It is NOT what makes this lane's number what it is, though:
+  # measured on the same 30k tree, 2026-08-10, debug walks it at 230.1 us/file and release at 218.7 —
+  # a 5% difference, i.e. noise, because the walk is syscall-bound and there is nothing for -O to
+  # inline away. (An earlier comment here blamed a ~350 us/file debug figure on -Onone; the real term
+  # is the process's QoS clamp, which moves this lane ~5-6x on its own — step 3c and `W26.verify-fu1`.)
   ARCHIVE_SCALE_ROOT="$ROOT" ARCHIVE_SCALE_HOSTILE_ROOT="$HOSTILE" \
   ARCHIVE_SCALE_MIN_FILES="$MIN_FILES" \
     xcrun swift test -c release --build-path .build --filter 'CorpusWalkerScaleTests' 2>&1
@@ -147,6 +272,22 @@ fi
 grep -qE "Test Case.*' skipped" "$READER_LOG" && \
   fail "Reader lane SKIPPED — the handshake did not reach the test process ($HANDSHAKE)"
 grep -E '^ *(SCALE|filesSeen|cold|WARM|steady|sqlite|footprint)' "$READER_LOG" >> "$REPORT"
+
+# ── 3c. cross-lane calibration — ONE per-file number, not two ─────────────────────────────────────
+# `W26.verify-fu1`. The two lanes above walk the SAME tree and disagreed by 4.4x on the per-file cost,
+# with nothing to say which was real. The answer is that neither absolute is a property of the walker:
+# an unattended daemon session runs at QOS_CLASS_BACKGROUND, so `swift test` — spawned by that session —
+# is clamped to efficiency cores, while the app-hosted lane escapes because `testmanagerd` launches its
+# host. Measured by decomposing the walk, EVERY filesystem primitive is ~5-6x dearer under the clamp,
+# including bare enumeration and a bare stat(2), neither of which contains a line of our code.
+#
+# So each lane emits a `SCALE calib` line pairing its walk with a reference pass (the shipped stat-only
+# walk) taken moments later at the same warmth, and this step compares the two RATIOS. The ratio is what
+# survives the environment. The absolute quoted as "what discovery costs" is then the one from the
+# UNCLAMPED lane, chosen from the reported `qos`, not hardcoded — run this interactively and both lanes
+# are unclamped; run it from the daemon and only the app-hosted one is.
+step "cross-lane calibration (W26.verify-fu1)"
+calibration_verdict "$(calib_line "$CORE_LOG" core)" "$(calib_line "$READER_LOG" reader)" || FAILED=1
 
 # ── 4. the after manifest, and the no-write assertion ─────────────────────────────────────────────
 step "fingerprinting the tree AFTER, and diffing"
