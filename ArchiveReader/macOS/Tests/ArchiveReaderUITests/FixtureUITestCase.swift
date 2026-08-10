@@ -118,6 +118,60 @@ class FixtureUITestCase: XCTestCase {
         app.typeKey(key, modifierFlags: modifiers)
     }
 
+    // MARK: - Pixels
+
+    /// Where a screenshot can be written so a human can READ it after the run, or `nil` if nowhere is
+    /// writable (in which case `captureScreenshot` still attaches it to the result bundle).
+    ///
+    /// The VM GUI lane mounts the host's `~/.tart-mirror/vm-artifacts` into the guest at
+    /// `/Volumes/My Shared Files/out` (`--dir=out:` in `ops/gui/vm-gui-runner.sh`), so a PNG written
+    /// there appears on the host with no extraction step — which is what STEP 3.5 of the resume prompt
+    /// means by "READ the screenshot from `~/.tart-mirror/vm-artifacts/`". Outside the VM that share does
+    /// not exist and nothing is written. `AR_UITEST_SHOT_DIR` overrides it (verbatim).
+    ///
+    /// This is a *diagnostic* channel, never an assertion: no test may pass or fail on whether a
+    /// directory happened to be writable.
+    static let screenshotDirectory: URL? = {
+        let candidates: [String]
+        if let override = ProcessInfo.processInfo.environment["AR_UITEST_SHOT_DIR"], !override.isEmpty {
+            candidates = [override]
+        } else {
+            candidates = ["/Volumes/My Shared Files/out"]
+        }
+        for path in candidates where FileManager.default.isWritableFile(atPath: path) {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+        return nil
+    }()
+
+    /// Capture the whole screen, attach it to the result bundle, and — when the VM's artifact share is
+    /// mounted — also drop it beside the run's logs as `uitest-<name>.png` for a human to look at.
+    ///
+    /// The whole screen rather than one window on purpose: these shots are read to answer "did it
+    /// actually DRAW", and a window-scoped capture of a pane that rendered nothing looks much like one
+    /// that rendered. Returns the written path (nil if it was only attached).
+    @discardableResult
+    func captureScreenshot(_ name: String) -> URL? {
+        let shot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: shot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let dir = Self.screenshotDirectory else {
+            print("[shot] \(name): no writable artifact dir — attached to the result bundle only")
+            return nil
+        }
+        let url = dir.appendingPathComponent("uitest-\(name).png")
+        do {
+            try shot.pngRepresentation.write(to: url, options: .atomic)
+            print("[shot] \(name): wrote \(url.path)")
+            return url
+        } catch {
+            print("[shot] \(name): could not write \(url.path) — \(error)")
+            return nil
+        }
+    }
+
     /// A navigation-window toolbar button, resolved robustly.
     ///
     /// On macOS 26 the SwiftUI toolbar can surface one `accessibilityIdentifier` on more than one

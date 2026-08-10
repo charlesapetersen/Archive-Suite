@@ -183,6 +183,123 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
+    // MARK: - ⌘0 (Fit Page) reaches the PREVIEW sheet (W26.docs-fu1)
+
+    /// The preview-sheet half of "⌘0 = fit full page everywhere zoom applies", which shipped with only
+    /// its *Document-menu* path confirmed — the sheet-specific check was deferred, then stayed deferred
+    /// on a reason (an unindexed scratch corpus) that `W26.walk2` made void.
+    ///
+    /// Two things are asserted, because neither is sufficient alone:
+    ///  1. CHROME — `Fit Page` is DISABLED with only the navigation window up and ENABLED while the
+    ///     preview sheet is open. That is exactly the mechanism the shipped change added
+    ///     (`PreviewSheet.focusedObject(model)` publishing a `DocumentViewerModel` the command binds to),
+    ///     and the disabled control is what makes the enabled state mean something.
+    ///  2. PIXELS — a PDFView's content pane is not XCUITest-queryable (W7.6), so *whether the page
+    ///     actually refitted* is only visible in a screenshot. Three shots bracket the sequence:
+    ///     fit → zoomed in → ⌘0. A human reads them; the test does not judge them.
+    func testFitPageCommandReachesThePreviewSheet() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        clickRow(0)
+
+        // (1a) The control. Without a published DocumentViewerModel the command has nothing to act on.
+        let fitFromList = documentMenuItem("Fit Page")
+        XCTAssertTrue(fitFromList.exists, "Fit Page should be in the Document menu")
+        XCTAssertFalse(fitFromList.isEnabled,
+                       "precondition: from the list alone, ⌘0 has no viewer to fit")
+        closeMenu()
+
+        // Open the preview sheet via the toolbar (more robust than Space, which is focus-scoped).
+        toolbarButton("ar.toolbar.preview").click()
+        let done = app.buttons["ar.preview.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5), "the preview sheet should open")
+        settle(1)
+
+        // (2) Pixels: the sheet opens at fit-full-page (PDFPaneController(persists: false)), so shot 1
+        // is the reference the third shot has to come back to.
+        captureScreenshot("w26docsfu1-preview-1-default-fit")
+
+        for _ in 0..<3 { app.typeKey(.upArrow, modifierFlags: .command) }   // ⌘↑ zoom in the image pane
+        settle(1)
+        captureScreenshot("w26docsfu1-preview-2-zoomed-in")
+
+        app.typeKey("0", modifierFlags: .command)                          // ⌘0 fit page
+        settle(1)
+        captureScreenshot("w26docsfu1-preview-3-after-cmd0")
+
+        // (1b) The assertion the control above earns: the sheet publishes the model, so ⌘0 is live.
+        let fitFromSheet = documentMenuItem("Fit Page")
+        XCTAssertTrue(fitFromSheet.isEnabled,
+                      "…and ENABLED while the preview sheet is open — the sheet publishes the viewer model")
+        closeMenu()
+
+        if done.exists { done.click() }
+    }
+
+    // MARK: - A tagged non-PDF image really renders, in preview AND viewer (W26.docs-fu1)
+
+    /// The other check deferred for "scratch corpus not Spotlight-indexed": tagged non-PDF images open
+    /// in the viewer and the preview. `testNonPDFImageDegrades` already proves the app does not crash
+    /// and a window appears; what was never checked is whether the image is *shown*, which lives in
+    /// pixels — `PDFPage(image:)` returning an empty page would pass every query above.
+    ///
+    /// The fixture's `IMG_PHOTO — Fixture.jpg` is a solid tan JPEG, so a rendered page is unmistakable
+    /// in the shots, and its absence equally so.
+    func testNonPDFImageRendersInPreviewAndViewer() throws {
+        waitForRows(minimum: 5, timeout: 10)
+
+        let filterField = app.textFields["ar.filter.name"]
+        XCTAssertTrue(filterField.waitForExistence(timeout: 5))
+        filterField.click()
+        filterField.typeText("PHOTO")
+        settle(1)
+        XCTAssertGreaterThanOrEqual(rowCount, 1, "the tagged JPEG should be discoverable in the list")
+
+        clickRow(0)
+        toolbarButton("ar.toolbar.preview").click()
+        XCTAssertTrue(app.buttons["ar.preview.done"].waitForExistence(timeout: 5),
+                      "the preview sheet should open for a non-PDF image")
+
+        // Chrome: a JPEG has no OCR text page, so the right pane must be the "No OCR text page" view.
+        // That element only exists on the `model.current != nil` branch — i.e. it is queryable proof the
+        // image was wrapped into a document rather than the sheet falling back to its load-error view
+        // (which carries no identifier at all).
+        XCTAssertTrue(elementExists("ar.preview.noText"),
+                      "a non-PDF image should load and show the no-OCR-text pane, not a load error")
+        settle(1)
+        captureScreenshot("w26docsfu1-jpeg-1-preview")
+
+        // …and in the full viewer, reached the way a reader would from the preview.
+        app.buttons["ar.preview.open"].click()
+        settle(2)
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "Open should bring up the document window")
+        captureScreenshot("w26docsfu1-jpeg-2-viewer")
+
+        pressKey("w", modifiers: .command)
+        settle(1)
+    }
+
+    // MARK: - Helpers
+
+    /// Let the UI settle for `seconds` without blocking the main actor's runloop callbacks.
+    private func settle(_ seconds: TimeInterval) {
+        RunLoop.current.run(until: Date().addingTimeInterval(seconds))
+    }
+
+    /// True if any element — of any type — carries this identifier. SwiftUI decides for itself whether a
+    /// given view lands in the tree as a static text, a group or something else, so a type-specific query
+    /// can report "absent" for something plainly on screen.
+    private func elementExists(_ identifier: String, timeout: TimeInterval = 5) -> Bool {
+        let match = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+        return match.waitForExistence(timeout: timeout)
+    }
+
+    /// Dismiss an open menu without invoking anything. Escape is also the preview sheet's cancel action,
+    /// so this is only ever called while a menu is up (the menu takes the key first).
+    private func closeMenu() {
+        app.typeKey(.escape, modifierFlags: [])
+        settle(0.3)
+    }
+
     /// Open the Document menu and return one of its items. Menu items only join the accessibility tree
     /// while their menu is open, so the click is part of the query.
     private func documentMenuItem(_ title: String) -> XCUIElement {
