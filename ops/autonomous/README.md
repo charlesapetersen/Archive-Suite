@@ -391,6 +391,32 @@ ops/autonomous/tests/prove-tracker-sync.sh     # the tracker-sync guard: drift i
                                                # (one-file-only items, HOLD QUEUE, fences, quotes) ($0, <1s).
 ```
 
+### Which of these actually run, and the assertion that keeps it that way (W26.fixwarn-fu1, 2026-08-10)
+
+**11 of the 13 `tests/prove-*.sh` harnesses are `health-gate.sh` steps**, so they run on every gate rather
+than when someone remembers. That took five hand-sweeps, and each one found the previous had missed some:
+`f64649b` wired four, `W26.fixwarn` a fifth, and counting them to justify the word "fifth" turned up **seven**
+more that nothing ran — `prove-compact.sh` had been RED *and* unwatched for weeks, `prove-status.sh` sat at
+34/2. Three of the seven even had a reference that a `grep -l` would have scored as wired, and all three were
+prose. **An unrun test is worse than no test:** it reads as coverage in review and asserts nothing at runtime.
+
+**Two are deliberately NOT gate steps**, named on health-gate.sh's machine-read `# GATE-UNWATCHED-BY-DESIGN:`
+line with the reasons in the prose above it:
+- `prove-daemon.sh` — **runtime.** ~10 min of real daemon loops, in a gate that already runs ~22 min against
+  `GATE_MAXRUN=50 min`. Run it by hand for daemon-behaviour changes.
+- `prove-keepalive.sh` — **side effects outside its own sandbox.** It is fast (7 s) and green, so runtime is
+  not the objection: it drives real launchd, so its verdict depends on state outside its sandbox (the exact
+  way `prove-status.sh` sat at 34/2 — it was reading the owner's real `~/Desktop` park note), and its cleanup
+  is an `EXIT` trap while the watchdog backstop is a detached `kill -KILL`, so a killed gate would leave a
+  `KeepAlive=true` job loaded in `gui/$UID` relaunching itself forever, one `$$`-unique phantom per killed run.
+
+**`prove-gate-report.sh` asserts the property** (§5): every `tests/prove-*.sh` is either invoked by a
+`step`/`step_skippable` in `health-gate.sh` **or** named on that line — and the list may not lie, so an entry
+that is stale, or that is in fact wired, REDs too. A comment mentioning a harness does not count as wiring.
+It lives there because it must live in a step that is *independently* wired: an assertion inside the harness
+it is asserting about stops running the moment that step is dropped, which is the failure being closed.
+So **harness #14 cannot land unwatched** — and adding a name to the exclusion line is not a snooze button.
+
 ### Tracker sync — `check-tracker-sync.sh` (WARN-only in the gate)
 
 The same item is tracked twice: the plan's WORK QUEUE (gitignored, what `next-queue-item.sh` offers) and

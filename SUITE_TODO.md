@@ -321,38 +321,14 @@ item's own prescription (capture the guest's real exit status) was the right one
 `tart_build_fixture` in `tart-lib.sh`. UNKNOWN is a third tier on purpose. `prove-vm-lane.sh` §11 pins all
 three classifications against a stubbed `tart`, and that harness is now a health-gate step, so it is
 watched rather than merely present. Filed in passing: `W26.fixwarn-fu1` below.
-- [ ] **W26.fixwarn-fu1 — SEVEN more `prove-*.sh` harnesses are run by nothing, and nothing notices when
-  the next one lands that way [S · MED · ops · verification-gap].** Filed 2026-08-10 by `W26.fixwarn`, whose
-  own fix was to wire the *fifth* such harness into the health gate. Enumerated that day: 13 harnesses in
-  `ops/autonomous/tests/`, **5** wired as gate steps (`prove-compact`, `prove-status`,
-  `prove-daemon-dispatch`, `prove-gate-report`, `prove-vm-lane`), **1** excluded on a stated,
-  still-correct ground (`prove-daemon.sh` — ~10 min of real daemon loops), and **7** referenced by nothing
-  that executes: `prove-dep-gating`, `prove-exit-logging`, `prove-housekeeping`, `prove-keepalive`,
-  `prove-no-host-gui`, `prove-review-cadence`, `prove-tracker-sync`. ⚠️ **Three of those have a
-  near-miss reference that is comment-only — checked, not assumed**: `prove-exit-logging` in
-  `archive-suite-autonomous.sh:875`, `prove-keepalive` in `prove-daemon-dispatch.sh:5`,
-  `prove-review-cadence` in `next-review-unit.sh:45`. A `grep -l` alone would have scored those three as
-  wired; they are prose.
-
-  This is the exact shape of the bug `f64649b` fixed for four harnesses and `W26.fixwarn` for a fifth —
-  each time by hand, each time finding the previous sweep had missed some. `prove-compact.sh` had been RED
-  *and* unwatched for weeks; `prove-status.sh` sat at 34/2. **An unrun test is worse than no test**: it
-  reads as coverage in review and asserts nothing at runtime.
-
-  **Two parts, and the second is the one that matters.** (1) **Triage the seven** — wire the hermetic,
-  seconds-long ones as gate steps; for any that genuinely do not belong (⚠️ `prove-keepalive` drives
-  **real launchd** and `prove-exit-logging` SIGTERMs a session mid-launch — plausibly too invasive or too
-  slow for a ~22 min gate), record the exclusion **with its reason**, the way `prove-daemon.sh`'s is
-  recorded. Do NOT blanket-wire: a slow or environment-dependent harness in the gate turns a real park
-  into a false one. Baseline each against pristine `main` BEFORE wiring it — several have been RED on main
-  for unrelated reasons (memory `ops-harnesses-red-on-main`), and inheriting that RED would park the daemon
-  on someone else's bug. (2) **Close the class**: assert in a harness that IS a gate step (
-  `prove-gate-report.sh` is the natural home — it already parses `health-gate.sh`'s own step text) that
-  **every** `ops/autonomous/tests/prove-*.sh` is either a `step` in the gate or named in an explicit
-  exclusion list. Then harness #14 cannot land unwatched, and this item never needs a sixth manual sweep.
-  ⚠️ Putting that meta-assertion in `prove-vm-lane.sh` (or in any harness it is asserting about) would be
-  circular and inert — if the step is dropped, the assertion stops running too. That is precisely the
-  failure being closed, so the guard has to live in a step that is independently wired.
+✅ **W26.fixwarn-fu1 — SHIPPED 2026-08-10 (`877c695` → this commit); full entry in `SUITE_TODO_DONE.md`.**
+Part 1 was triage, not blanket wiring: six of the seven became gate steps (+58 s), each baselined green on
+pristine main first and re-run in the gate's own env, and `prove-exit-logging` — one of the two the item
+guessed was too invasive — turned out hermetic. `prove-keepalive` is the one exclusion, and not for runtime:
+it drives real launchd, so its verdict depends on state outside its sandbox and a SIGKILLed gate would leave
+a self-relaunching phantom job in `gui/$UID`. Part 2 closes the class: `prove-gate-report.sh` §5 asserts every
+`prove-*.sh` is a gate step or on health-gate.sh's machine-read `# GATE-UNWATCHED-BY-DESIGN:` line, mutation-
+proven 8/8 (including that the list cannot lie by going stale or naming a harness that IS wired).
 - [ ] **W26.docs-spec — ⛔ OWNER-GATED: the two `SPEC/tag-format.md` bullets split out of `W26.docs`
   [XS · low · doc-only · shared contract].** Split 2026-08-07 (daemon-report walkthrough) so `W26.docs`
   could stop being skipped at the head of the queue. **Parked in the plan's HOLD QUEUE — the daemon must

@@ -108,6 +108,89 @@ case "$out" in *"HEALTH GATE: RED"*)   no "an all-green run printed a RED verdic
 case "$out" in *"failing output"*)     no "an all-green run printed a failing-output block" ;;    *) ok "an all-green run prints no failing-output block" ;; esac
 case "$out" in *"GREENDECOY"*)         no "a passing step's output leaked to the gate's stdout" ;; *) ok "passing steps stay quiet on stdout" ;; esac
 
+# --- 5. EVERY prove-*.sh is either a gate step or an explicit, honest exclusion (W26.fixwarn-fu1) ---------
+#
+# WHY THIS LIVES HERE. Five separate hand-sweeps wired harnesses into the gate and each one found the
+# previous sweep had missed some: `f64649b` took four, W26.fixwarn a fifth, and counting them to justify the
+# word "fifth" found SEVEN more that nothing ran (prove-compact.sh had been RED *and* unwatched for weeks).
+# An unrun test is worse than none: it reads as coverage in review and asserts nothing at runtime. The class
+# only closes if something ASSERTS the property, so harness #14 cannot land unwatched.
+#
+# It has to live in a step that is independently wired. Putting it in the harness it is asserting about is
+# circular and inert — unwire that step and the assertion stops running too, which is precisely the failure
+# being closed. This file is wired for its own unrelated reason (W27.gatetail), so it is the natural home.
+echo
+echo "== every prove-*.sh is watched or explicitly excluded =="
+
+TESTS_DIR="$HERE"
+
+# wired <gate-file> <harness-basename> — true iff the gate INVOKES it via step/step_skippable.
+# A COMMENT mentioning it does not count. That is not hypothetical: on 2026-08-10 three of the seven
+# unwatched harnesses had a reference a `grep -l` would have scored as wired, and all three were prose
+# (archive-suite-autonomous.sh:875, prove-daemon-dispatch.sh:5, next-review-unit.sh:45).
+# Conservative by construction: a step whose path is assembled from a variable reads as UNWIRED and REDs.
+# That is the right direction — the RED lands on whoever just edited the gate, loudly, not on an incident.
+wired() {
+  local esc; esc="$(printf '%s' "$2" | sed 's/[].[^$*\\]/\\&/g')"
+  grep -Eq "^[^#]*[[:space:]]*step(_skippable)?[[:space:]]+.*tests/$esc" "$1"
+}
+
+# --- 5a. the predicate has teeth: prove it before trusting its verdict on the real files ---
+cat > "$T/gate-pos.sh" <<'EOG'
+step synth-proof bash "$ROOT/ops/autonomous/tests/prove-synthetic.sh"
+EOG
+cat > "$T/gate-pos2.sh" <<'EOG'
+[ "${SOME_FLAG:-1}" = 1 ] && step_skippable synth bash "$ROOT/ops/autonomous/tests/prove-synthetic.sh"
+EOG
+cat > "$T/gate-neg.sh" <<'EOG'
+#   * prove-synthetic.sh — a real harness, described here in prose and run by nothing.
+# step synth-proof bash "$ROOT/ops/autonomous/tests/prove-synthetic.sh"   <- commented out, i.e. not wired
+EOG
+cat > "$T/gate-neighbour.sh" <<'EOG'
+step other-proof bash "$ROOT/ops/autonomous/tests/prove-synthetic-extra.sh"
+EOG
+if wired "$T/gate-pos.sh"  prove-synthetic.sh; then ok "predicate: a real \`step\` invocation counts as wired"; else no "predicate: missed a plain step invocation"; fi
+if wired "$T/gate-pos2.sh" prove-synthetic.sh; then ok "predicate: a conditional \`step_skippable\` counts as wired"; else no "predicate: missed a conditional step_skippable"; fi
+if wired "$T/gate-neg.sh"  prove-synthetic.sh; then no "predicate: a COMMENT-ONLY mention was counted as wired — the exact 2026-08-10 near-miss"; else ok "predicate: a comment-only mention does NOT count as wired"; fi
+if wired "$T/gate-neighbour.sh" prove-synthetic.sh; then no "predicate: prove-synthetic-extra.sh was mistaken for prove-synthetic.sh"; else ok "predicate: a longer neighbour name is not mistaken for a shorter one"; fi
+
+# --- 5b. the exclusion list must exist, be unique, and be machine-readable ---
+MARK='# GATE-UNWATCHED-BY-DESIGN:'
+n_mark="$(grep -cF "$MARK" "$GATE")"
+[ "$n_mark" -ge 1 ] || { echo "FATAL: no '$MARK' line in health-gate.sh — the exclusion list is the other half of this assertion; without it every unwired harness would look like an error and the gate could not express a legitimate exclusion at all"; exit 1; }
+if [ "$n_mark" = 1 ]; then ok "exactly one '$MARK' line in health-gate.sh"; else no "$n_mark '$MARK' lines — only the first is read, so the others silently exempt nothing"; fi
+EXCLUDED="$(grep -F "$MARK" "$GATE" | head -1 | sed "s|^.*$MARK||")"
+[ -n "$(printf '%s' "$EXCLUDED" | tr -d '[:space:]')" ] || { echo "FATAL: the '$MARK' line is empty — prove-daemon.sh at minimum belongs there"; exit 1; }
+
+# --- 5c. the list may not lie: every name on it must exist and must NOT be wired ---
+for h in $EXCLUDED; do
+  if [ -f "$TESTS_DIR/$h" ]; then ok "excluded harness exists on disk: $h"
+  else no "the exclusion list names $h, which is not in ops/autonomous/tests/ — a stale entry silently exempts nothing, and would hide a renamed harness"; fi
+  if wired "$GATE" "$h"; then no "$h is BOTH a gate step and on the exclusion list — one of the two is wrong, and the list is what reviewers read"; else ok "excluded harness is genuinely not a step: $h"; fi
+done
+
+# --- 5d. the real property ---
+# Vacuity guard first: a glob that matched nothing would pass every assertion below and prove nothing —
+# the failure mode this whole harness family exists to catch. This file must be in its own enumeration.
+SELF="$(basename "$0")"
+n_h=0; saw_self=0; unwatched=""
+for f in "$TESTS_DIR"/prove-*.sh; do
+  [ -f "$f" ] || continue
+  n_h=$((n_h+1)); b="$(basename "$f")"
+  [ "$b" = "$SELF" ] && saw_self=1
+  wired "$GATE" "$b" && continue
+  case " $EXCLUDED " in *" $b "*) continue ;; esac
+  unwatched="$unwatched $b"
+done
+[ "$n_h" -gt 0 ] || { echo "FATAL: found no prove-*.sh in $TESTS_DIR — the enumeration is broken, so section 5 proved nothing"; exit 1; }
+if [ "$saw_self" = 1 ]; then ok "the enumeration reached the right directory ($n_h harnesses, including this one)"
+else no "the enumeration ($n_h files) does not contain $SELF — it is looking at the wrong directory, so its verdict is meaningless"; fi
+if [ -z "$unwatched" ]; then
+  ok "all $n_h prove-*.sh harnesses are either a gate step or an explicitly-listed exclusion"
+else
+  no "harness(es) run by NOTHING and not on the exclusion list:$unwatched — wire each as a \`step\` in health-gate.sh, or add it to the '$MARK' line WITH its reason in the prose above that line. An unrun test reads as coverage and asserts nothing."
+fi
+
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="
 [ "$FAIL" -eq 0 ]

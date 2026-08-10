@@ -297,6 +297,65 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.fixwarn-fu1 — the other seven un-run harnesses, and an assertion so there is never an eighth.
+  ✅ CLOSED** `877c695` -> this commit (2026-08-10). Filed by `W26.fixwarn`, whose own fix was wiring the
+  *fifth* such harness into the health gate. **11 of the 13 `ops/autonomous/tests/prove-*.sh` are gate steps
+  now, the other 2 are named on a machine-read exclusion line, and `prove-gate-report.sh` §5 asserts that
+  partition** — so harness #14 cannot land unwatched and this never needs a sixth manual sweep.
+
+  **Part 1 — triage, not blanket wiring.** Each of the seven was baselined GREEN against pristine `main`
+  first (memory `ops-harnesses-red-on-main`: inheriting someone else's RED would park the daemon on their
+  bug) and then re-run in the gate's OWN env — `ops/autonomous/bin` shims first on PATH, `ARCHIVE_UNATTENDED=1`
+  — because that env is where a harness turns a green gate red. Wired: `prove-dep-gating` 42/0 (4 s),
+  `prove-tracker-sync` 25/0 (6 s), `prove-housekeeping` ALL PASSED (4 s), `prove-no-host-gui` 28/0 (6 s),
+  `prove-exit-logging` 12/0 (6 s), `prove-review-cadence` 17/0 (31 s). **+58 s** on a ~22 min gate against
+  `GATE_MAXRUN=50 min`. Then all six run VERBATIM as shipped under the gate's real extracted `step()`: six
+  ✓, and `$LOG` empty afterwards, so no passing step leaks output into the block the daemon quotes into a
+  park note.
+
+  🔺 **ONE OF THE ITEM'S TWO "too invasive" CANDIDATES WASN'T.** `prove-exit-logging` does run the real daemon
+  and SIGTERM it, but measured it is hermetic: throwaway `$HOME`/`$STATE`/repo, a fake `claude`, and its own
+  stub dir FIRST on PATH — so its `launchctl`/AppleScript stubs win over the gate's shims — and its verdict
+  depends on nothing outside its mktemp. It is also the only new step with timing-sensitive waits (its header
+  records ~4-in-6 false failures from a race that was later fixed), so it was run **4×: green in 5–7 s every
+  time**, and `prove-review-cadence` 3× at 30–31 s.
+
+  🔺 **`prove-keepalive` IS excluded, and NOT for the reason the item guessed.** At 7 s and 4/0 green, runtime
+  is not the objection. It drives the owner's REAL launchd, which fails a gate two ways. (a) Its verdict
+  depends on state outside its own sandbox — precisely how `prove-status.sh` sat at 34/2 for weeks (it was
+  reading the owner's real `~/Desktop` park note), and a gate is a *park trigger*, so a harness whose RED can
+  be the environment's turns a real park into a false one. (b) Its cleanup is `trap cleanup EXIT` while the
+  daemon's watchdog backstop is a detached `kill -KILL` (`archive-suite-autonomous.sh` ~L701) — SIGKILL runs
+  no EXIT trap, so a killed gate leaves a `KeepAlive=true` job LOADED in `gui/$UID` that relaunches itself
+  forever, and the label is `$$`-unique, so that accumulates one phantom supervised
+  `com.archivesuite.ws1probe.*` per killed run, in the domain and under the prefix the owner reads while
+  diagnosing the daemon. `prove-exit-logging`'s worst SIGKILL residue is one *unsupervised* sandbox loop in a
+  temp dir that stays dead once killed — the comment says so rather than claiming it leaks nothing.
+
+  **Part 2 — the class is closed, in the one place it can be.** `health-gate.sh` carries
+  `# GATE-UNWATCHED-BY-DESIGN: prove-daemon.sh prove-keepalive.sh` with both reasons in prose above it, and
+  `prove-gate-report.sh` §5 machine-reads that line. It is there because it must live in a step that is
+  *independently* wired: an assertion inside a harness it is asserting about stops running the moment that
+  step is dropped, which is the exact failure being closed. **The list may not lie** — an entry that is stale
+  (no such file) or that is in fact ALSO wired REDs the gate, so it cannot rot into a blanket exemption; and
+  a comment mentioning a harness does not count as wiring, which is not hypothetical (three of the seven had
+  a reference `grep -l` would have scored as wired, and all three were prose).
+
+  🔺 **MUTATION-PROVEN, because an assertion nothing has ever seen fail is the same bug one level up.** A
+  driver ran `prove-gate-report.sh` against 8 mutated COPIES of `ops/autonomous` (never the real tree): a
+  brand-new unwired harness → RED naming it; an existing `step` commented out → RED naming
+  `prove-vm-lane.sh`; an exclusion dropped → RED; a stale entry added → RED; a harness both wired and
+  excluded → RED for that reason; the marker line deleted → **FATAL**, not a silent skip; a duplicate marker
+  line → RED (only the first is read, so the rest exempt nothing); a comment-only reference → still RED.
+  **8/8 caught, 16/16 assertions, with an unmutated baseline green first** so the mutations mean something.
+  The predicate has its own four positive/negative controls in-harness, including that
+  `prove-synthetic-extra.sh` is not mistaken for `prove-synthetic.sh`. `prove-gate-report.sh` 18/0 → **29/0**,
+  byte-identical across two runs and green under a bare `/usr/bin:/bin` as well as the gate's PATH.
+
+  📌 **Deliberately conservative:** a step whose path came from a variable would read as UNWIRED and RED. That
+  is the right direction — the RED lands loudly on whoever just edited the gate, not on an incident. The
+  README's "run these by hand" block now says which 11 run themselves and why the 2 don't.
+
 - [x] **W26.fixwarn — the fixture step asks the GUEST for its exit status instead of asking the transport.
   ✅ CLOSED** `4dc64ff` -> this commit (2026-08-10). `tart exec` fails independently of the command it
   carries: on 2 of the 4 VM runs of 2026-08-09/10 it returned `Error: StreamClosed(streamID: …
