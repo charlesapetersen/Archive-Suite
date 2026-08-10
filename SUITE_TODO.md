@@ -363,6 +363,39 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   **40.8 µs/file (6.1 s at 150k)**, which also corrects `W26.verify`'s headline in the opposite direction
   from the one it claimed.
 
+- [ ] **W26.donecount — the digest's "finished" count double-counts every item that leaves a ticked
+  pointer stub in `SUITE_TODO.md`, and `check-tracker-sync.sh` is structurally blind to it
+  [S · LOW · ops/trackers].** Filed 2026-08-10 from the Daemon Report walkthrough — the owner asked why the
+  digest went **"237 finished" → "246 finished" overnight when only 8 items closed**, and the 9th turned out
+  not to exist.
+  **The arithmetic.** `ops/autonomous/status-digest.sh:125` counts ticked bullets across BOTH
+  `SUITE_TODO.md` and `SUITE_TODO_DONE.md` with no dedup, so an item that ships *and* also leaves a ticked
+  stub behind scores **twice, permanently** — the drift only ever grows. Two do today: `W26.fixturehang` (stub L352, full
+  entry `SUITE_TODO_DONE.md` L856) and `W26.verify-fu1` (stub L360, full entry L300). So the digest reads
+  **246 when the true figure is 244**; last night's "237" was already 1 high on the same account (true 236),
+  making the real overnight delta **+8**, which matches the 8 items that actually closed.
+  **Why the gate cannot see it.** `check-tracker-sync.sh` compares the plan's `WORK QUEUE` against
+  `SUITE_TODO.md`, only for items present in **both**, and deliberately applies first-occurrence-wins so that
+  "a live entry wins over a stale archived twin". TODO-vs-DONE duplication is *precisely* the shape it skips,
+  so this drift is silent — the exact failure mode its own header says it exists to prevent.
+  **⚠️ The two stubs are DELIBERATE — do not simply delete them.** Each carries a correction worth keeping
+  (`W26.verify-fu1`'s reverses `W26.verify`'s *published* headline, which is the kind of thing a future
+  session will otherwise re-derive). **Fold each stub's prose into its `SUITE_TODO_DONE.md` entry, then
+  remove the stub** — `CLAUDE.md` §*Docs & backlog convention* is explicit that `SUITE_TODO.md` carries
+  **OPEN items only** and that shipping moves the *whole* entry.
+  **Then guard it.** In `SUITE_TODO.md` a **top-level ticked bullet** is always this bug, and the check has
+  no false positives: the only other ticked lines are *indented* sub-bullets inside still-open entries (L1032
+  `W21.vmgui-c`, L1690 `G5`), which are legitimate prose.
+  The exact pattern to fail on is `- [x]` at **column 0**, no leading whitespace.
+  ⚠️ Note while writing the check: the CURRENT regex is `^\s*[-*].*\[[xX]\]`, which also matches any wrapped
+  prose line that merely *begins* with `**bold**` and happens to contain a ticked bullet later in the line —
+  drafting this very entry inflated the count by 2 that way before it was caught. The column-0 rule avoids
+  that class entirely, which is a second reason to prefer it.
+  Add it as a `health-gate.sh` step and **prove it
+  RED against the two stubs before folding them**, so the guard is demonstrated to bite rather than asserted
+  to. Counting distinct item tags instead would be the alternative, but 95 of the ticked lines carry no
+  parseable tag, so the positional rule is the cheaper and stricter one.
+
 - [ ] **W26.vmuitest-blind — EVERY Reader XCUITest is currently RED in the Tart VM because the
   app-under-test comes up with NO WINDOW, and the app itself is fine [M · HIGH · ops/GUI].** Filed
   2026-08-10 while verifying `W26.verify-fu2`. ⚠️ **This makes the whole unattended GUI lane vacuous** —
@@ -1853,6 +1886,20 @@ Design-level ideas the owner wants recorded but explicitly de-prioritised. An au
 **skip** these: they need the owner's scoping before any code is written.
 
 ### ⛔ DECLINED — settled, do NOT re-raise in Daemon Report
+- **Changing the Tier-2 mutation-proof discipline so a proof can't touch the owner's real defaults domain —
+  DECLINED by the owner 2026-08-10.** Context: closing `W26.fixturehang` required planting each hunk's old
+  behaviour back to prove a test went red, and those runs by construction write the real
+  `com.archivereader.app` domain — which left his `ar.viewState` and `ar.excludedFolders` polluted, and the
+  session then *deleted* the four keys because the originals were unrecoverable. He was walked through three
+  alternatives and **turned all three down**: a throwaway defaults domain even when the mutation is *about*
+  the real one (weakens the proof), snapshot-and-restore around such a run (itself a write, and the read path
+  hangs under TCC), and park-and-ask-first (stalls the daemon). **So: keep the discipline exactly as it is
+  and accept the occasional settings reset.** His reasoning, which is the part worth not relitigating: the
+  *shipped* code no longer touches his domain at all, so this can only recur when a proof deliberately
+  re-plants the old bug, and every alternative dilutes the one gate that caught a vacuous guard. ⛔ Do not
+  re-open this as a Daemon Report entry, and do not "improve" it in passing while working a nearby item.
+  Full incident record: `SUITE_TODO_DONE.md` §Wave 26 (`W26.fixturehang`).
+
 - **An `androidTest` source set + Compose UI-test lane for ArchiveCapture — DECLINED by the owner
   2026-07-31.** ArchiveCapture has no instrumented-test lane, so every Compose line ships visually
   unverified, and a session has now written this up **three times** (W23.h4's `AlertDialog`, W23.m1, and
