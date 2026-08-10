@@ -18,6 +18,8 @@ struct NavigationWindowView: View {
     @State private var renameText = ""
     @FocusState private var searchFocused: Bool     // C5: ⌥⌘F focuses OCR search
     @State private var tagFilterFocusToken = 0       // C5: ⌘L focuses the tag filter
+    /// The preview sheet's viewer model while that sheet is up — see `publishedPreviewViewer`.
+    @State private var previewViewer: DocumentViewerModel?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -79,13 +81,14 @@ struct NavigationWindowView: View {
         .onChange(of: model.focusSearchRequest) { searchFocused = true }              // C5 ⌥⌘F
         .onChange(of: model.focusTagFilterRequest) { tagFilterFocusToken &+= 1 }       // C5 ⌘L
         .sheet(isPresented: $model.showingPreview) {
-            PreviewSheet(selection: model.documentSelection(), nav: model) {
+            PreviewSheet(selection: model.documentSelection(), nav: model, published: $previewViewer) {
                 model.showingPreview = false
                 openSelection()   // "Open" → jump to the full document window
             }
         }
         .navigationTitle("Archive Reader")
         .focusedSceneObject(model)
+        .focusedSceneObject(publishedPreviewViewer)   // W26.previewzoom — the preview sheet's viewer
         .focusedSceneValue(\.openSelection) { openSelection() }
         // W23.m4 — page-link publication + the deep-link "open the viewer ON the cited page" bridge.
         // Extracted into one modifier: adding them inline blew this body's type-check budget.
@@ -94,6 +97,26 @@ struct NavigationWindowView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.applicationDidBecomeActive()
         }
+    }
+
+    /// The preview sheet's `DocumentViewerModel`, published to the SCENE so `ArchiveReaderCommands`'
+    /// `@FocusedObject var doc` sees it and the Document menu's zoom/fit commands (⌘0, ⌘↑, ⌘↓) act on the
+    /// preview — and `nil` the instant that sheet is gone (W26.previewzoom).
+    ///
+    /// 🔺 **Why the nav window publishes a model it does not own.** The obvious fix was to change the
+    /// sheet's own `.focusedObject(model)` to `.focusedSceneObject(model)`. That half works and is a trap:
+    /// **a focused-scene value is NOT retracted when the view that set it is torn down.** Measured in the
+    /// VM, 2026-08-10 — with the sheet publishing itself, `Fit Page` was correctly enabled while the sheet
+    /// was open and *stayed enabled after it was dismissed*, a live command pointing at a dead preview
+    /// model (and ⌘C / ⌘⇧C in the Document menu then shadow the Selection menu's own bindings in the nav
+    /// window). A view that has been destroyed cannot publish `nil`, so the publisher has to be something
+    /// that outlives the sheet. This view does; `PreviewSheet.published` is the binding it reports through.
+    ///
+    /// The `showingPreview` gate is deliberately belt-and-braces over that binding: `onDisappear` is not
+    /// guaranteed on every teardown path, but the sheet cannot be on screen with its own `isPresented`
+    /// binding false, so gating on it cannot leave a stale publication behind.
+    private var publishedPreviewViewer: DocumentViewerModel? {
+        model.showingPreview ? previewViewer : nil
     }
 
     // MARK: Table (AppKit NSTableView for virtualized, high-performance scrolling at scale)
