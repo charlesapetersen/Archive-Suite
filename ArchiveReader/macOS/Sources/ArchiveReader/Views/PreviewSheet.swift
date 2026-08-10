@@ -17,7 +17,11 @@ struct PreviewSheet: View {
     var onOpenFull: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var model = DocumentViewerModel(persists: false)
+    /// `supportsFind: false` — this sheet renders no find bar (the app's only one is in
+    /// `DocumentWindowView`), and publishing the model to the scene enables every `.disabled(doc == nil)`
+    /// item in the Document menu. Without the flag, `Find…`/`Find Next`/`Find Previous` look live here and
+    /// do nothing (`W26.previewzoom-fu1`). ⌘O opens the full viewer, which does have find.
+    @StateObject private var model = DocumentViewerModel(persists: false, supportsFind: false)
 
     var body: some View {
         VStack(spacing: 0) {

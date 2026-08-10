@@ -29,10 +29,26 @@ final class DocumentViewerModel: ObservableObject {
     let leftController: PDFPaneController     // the current pair's image page (PDF page 2·pair)
     let rightController: PDFPaneController   // the current pair's OCR text page (PDF page 2·pair + 1)
 
+    /// Whether the view driven by this model renders a find bar — i.e. whether the user can type a query
+    /// at all. The Document menu's `Find…` / `Find Next` / `Find Previous` gate on it, and so do the find
+    /// entry points below, so the invariant lives in ONE place rather than in three menu modifiers.
+    ///
+    /// It exists because of `W26.previewzoom-fu1`: the preview sheet's model is published to the scene (so
+    /// zoom / paging / copy / page-link commands reach the sheet — `W26.previewzoom`), which necessarily
+    /// enables **every** `.disabled(doc == nil)` item in that menu; but `DocumentWindowView` holds the app's
+    /// only `if model.showingFind { findBar }`, so in the preview those three were live-looking and inert.
+    ///
+    /// Deliberately NOT derived from `persists`. The two co-vary in the one preview we have today, but
+    /// "does not write zoom to defaults" and "has no find bar" are different facts about a viewer; a future
+    /// non-persisting viewer that DOES render a find bar would silently inherit the wrong answer.
+    let supportsFind: Bool
+
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
-    init(persists: Bool = true) {
+    /// `supportsFind: false` → the view renders no find bar, so the find commands stay disabled.
+    init(persists: Bool = true, supportsFind: Bool = true) {
         leftController = PDFPaneController(key: "left", persists: persists)
         rightController = PDFPaneController(key: "right", persists: persists)
+        self.supportsFind = supportsFind
     }
 
     /// Which pane keyboard focus / zoom acts on. ⌘↑/⌘↓ zoom this pane; ⌘⌥←/→ switch it.
@@ -176,6 +192,7 @@ final class DocumentViewerModel: ObservableObject {
     /// (A very large multi-document selection therefore pauses briefly on the first search; acceptable
     /// because the viewer opens one document at a time and selections are bounded in practice.)
     func performFind() {
+        guard supportsFind else { return }      // no find bar → no query, and no highlight to clear
         let query = findQuery
         lastFoundQuery = query
         guard !query.isEmpty else {
@@ -201,6 +218,7 @@ final class DocumentViewerModel: ObservableObject {
 
     /// Move to the next match (wrapping past the last), rebuilding first if the query changed. ⌘G.
     func findNext() {
+        guard supportsFind else { return }
         if findQuery != lastFoundQuery { performFind(); return }
         findNavigator.next()
         refreshFindPublished()
@@ -209,6 +227,7 @@ final class DocumentViewerModel: ObservableObject {
 
     /// Step to the previous match (wrapping before the first), rebuilding first if the query changed. ⌘⇧G.
     func findPrevious() {
+        guard supportsFind else { return }
         if findQuery != lastFoundQuery { performFind(); return }
         findNavigator.previous()
         refreshFindPublished()

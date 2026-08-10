@@ -167,6 +167,56 @@ final class DocumentFindTests: XCTestCase {
         XCTAssertTrue(DocumentFindScanner.pairMatchCounts(in: PDFDocument(), query: "alpha").isEmpty)
     }
 
+    // MARK: supportsFind — a viewer with no find bar cannot find (W26.previewzoom-fu1)
+
+    /// The DEFAULT is find-capable: the document window renders the app's only find bar, and gating the
+    /// menu on `supportsFind` would silently kill find everywhere if this flipped.
+    func testDocumentWindowViewerSupportsFind() {
+        XCTAssertTrue(DocumentViewerModel().supportsFind)
+        XCTAssertTrue(DocumentViewerModel(persists: false).supportsFind,
+                      "not derived from `persists` — a non-persisting viewer may still render a find bar")
+    }
+
+    /// The preview sheet's model. Since `W26.previewzoom` the sheet publishes its model to the scene, which
+    /// enables every `.disabled(doc == nil)` item in the Document menu — and the sheet has no find bar, so
+    /// `Find…`/`Find Next`/`Find Previous` were enabled with no way to type a query.
+    func testPreviewViewerDoesNotSupportFind() {
+        XCTAssertFalse(DocumentViewerModel(persists: false, supportsFind: false).supportsFind)
+    }
+
+    /// The invariant belongs to the MODEL, not to three menu modifiers: even driven directly — as a second
+    /// publisher of the preview model could — find does nothing on a viewer that has no bar. A query can
+    /// only have been set programmatically there, which is exactly the case the guard exists for.
+    func testFindIsInertOnAViewerThatDoesNotSupportFind() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("W26previewzoomfu1-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("finds.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["Alpha alpha image", "Alpha OCR text"], to: url),
+                      "precondition: scratch PDF written")
+
+        // Control: the same document and query in a find-capable viewer — 3 matches.
+        let window = DocumentViewerModel(persists: false)
+        window.load(DocumentSelection(filePaths: [url.path]))
+        window.findQuery = "alpha"
+        window.performFind()
+        XCTAssertEqual(window.findTotal, 3, "precondition: the query really does match this document")
+        XCTAssertEqual(window.findOrdinal, 1)
+
+        let preview = DocumentViewerModel(persists: false, supportsFind: false)
+        preview.load(DocumentSelection(filePaths: [url.path]))
+        preview.findQuery = "alpha"
+        preview.performFind()
+        XCTAssertEqual(preview.findTotal, 0, "no find bar → no search")
+        XCTAssertNil(preview.findOrdinal)
+        preview.findNext()
+        preview.findPrevious()
+        XCTAssertEqual(preview.findTotal, 0, "…and next/prev cannot rebuild the match list behind it")
+        XCTAssertNil(preview.findOrdinal)
+        XCTAssertEqual(preview.findStatusText, "", "nothing to report — the bar it would report in is absent")
+    }
+
     // MARK: helper — render selectable text into a real multi-page PDFDocument
 
     private func makeTextPDF(pages: [String]) -> PDFDocument { TestPDFBuilder.textPDF(pages: pages) }

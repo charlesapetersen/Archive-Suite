@@ -25,6 +25,8 @@ struct ArchiveReaderCommands: Commands {
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
 
     private var noSelection: Bool { nav?.selection.isEmpty ?? true }
+    /// No viewer, or a viewer with no find bar (the preview sheet) — see the Find items below.
+    private var noFind: Bool { !(doc?.supportsFind ?? false) }
 
     var body: some Commands {
         // View — panel toggles (placed in the system View menu)
@@ -151,12 +153,16 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("c", modifiers: .command).disabled(doc == nil)
             Button("Copy Cleaned for Prose") { doc?.copySelection() }
                 .keyboardShortcut("c", modifiers: [.command, .shift]).disabled(doc == nil)
+            // These three need MORE than a published viewer: they need one whose view renders a find bar.
+            // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
+            // which enables every `doc == nil` item here — but it has no find bar and no way to type a
+            // query, so ⌘F looked live and did nothing there (W26.previewzoom-fu1).
             Button("Find…") { doc?.showingFind = true }
-                .keyboardShortcut("f", modifiers: .command).disabled(doc == nil)
+                .keyboardShortcut("f", modifiers: .command).disabled(noFind)
             Button("Find Next") { doc?.showingFind = true; doc?.findNext() }
-                .keyboardShortcut("g", modifiers: .command).disabled(doc == nil)
+                .keyboardShortcut("g", modifiers: .command).disabled(noFind)
             Button("Find Previous") { doc?.showingFind = true; doc?.findPrevious() }
-                .keyboardShortcut("g", modifiers: [.command, .shift]).disabled(doc == nil)
+                .keyboardShortcut("g", modifiers: [.command, .shift]).disabled(noFind)
             Divider()
             Button("Zoom In (Image)") { doc?.leftController.zoomIn() }.disabled(doc == nil)
             Button("Zoom Out (Image)") { doc?.leftController.zoomOut() }.disabled(doc == nil)
