@@ -216,8 +216,35 @@ run_xcuitest() {
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " 2>&1 | tee "$ART/xcuitest-$APP.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
   log "XCUITest log: $ART/xcuitest-$APP.log"
+  collect_shots
   grep -q '\*\* TEST SUCCEEDED \*\*' "$ART/xcuitest-$APP.log" 2>/dev/null \
     || warn "no '** TEST SUCCEEDED **' marker for $APP — read the log before believing this run passed."
+}
+
+# --- bring the tests' screenshots back to the host (STEP 3.5's "READ the screenshot") ---------------
+# A test CANNOT write to the artifact share itself: the XCUITest runner is sandboxed, so
+# /Volumes/My Shared Files/out is not writable from inside it (measured 2026-08-09 — all five shots of a
+# run reported "no writable artifact dir"). The test writes to its own temporary directory and prints
+# `[shot] <name>: wrote <path>`; `tart exec` is NOT sandboxed, so the copy happens out here.
+#
+# The result bundle is deliberately not the channel: `xcresulttool` refuses a bundle that was never
+# finalized, and that is exactly the state a failed or killed run leaves behind — recovering the shots
+# then means classifying `…xcresult/Data` blobs by magic bytes.
+collect_shots() {
+  local dest="$ART/shots-$APP" n=0 p paths
+  paths="$(sed -nE 's/^\[shot\] [^:]*: wrote (.+)$/\1/p' "$ART/xcuitest-$APP.log" 2>/dev/null | sort -u)"
+  [ -n "$paths" ] || return 0
+  rm -rf "$dest"; mkdir -p "$dest"
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    # The guest paths contain spaces but no quotes, so double-quoting inside the -lc string is enough.
+    if tart exec "$VM" bash -lc "cp \"$p\" '/Volumes/My Shared Files/out/shots-$APP/'" >/dev/null 2>&1; then
+      n=$(( n + 1 ))
+    else
+      warn "a test wrote a screenshot at $p but it could not be collected"
+    fi
+  done <<< "$paths"
+  log "$n screenshot(s) collected into $dest — READ them; pixels are the point of a GUI check."
 }
 
 build_for_sighted() {

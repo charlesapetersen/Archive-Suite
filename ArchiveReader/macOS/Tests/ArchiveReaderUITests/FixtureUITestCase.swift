@@ -120,36 +120,46 @@ class FixtureUITestCase: XCTestCase {
 
     // MARK: - Pixels
 
-    /// Where a screenshot can be written so a human can READ it after the run, or `nil` if nowhere is
-    /// writable (in which case `captureScreenshot` still attaches it to the result bundle).
+    /// Where a screenshot is written so a human can READ it after the run.
     ///
-    /// The VM GUI lane mounts the host's `~/.tart-mirror/vm-artifacts` into the guest at
-    /// `/Volumes/My Shared Files/out` (`--dir=out:` in `ops/gui/vm-gui-runner.sh`), so a PNG written
-    /// there appears on the host with no extraction step — which is what STEP 3.5 of the resume prompt
-    /// means by "READ the screenshot from `~/.tart-mirror/vm-artifacts/`". Outside the VM that share does
-    /// not exist and nothing is written. `AR_UITEST_SHOT_DIR` overrides it (verbatim).
+    /// ⚠️ **The VM's artifact share is NOT reachable from here, and that was measured, not assumed.**
+    /// `ops/gui/vm-gui-runner.sh` mounts the host's `~/.tart-mirror/vm-artifacts` into the guest at
+    /// `/Volumes/My Shared Files/out`, so writing a PNG there *would* land it on the host with no
+    /// extraction step. But the XCUITest **runner is sandboxed** — the same trap as the GUI fixture path
+    /// (see the class header) — so that share is not writable from inside a test, and the first version
+    /// of this helper reported "no writable artifact dir" for all five shots of a run (2026-08-09).
     ///
-    /// This is a *diagnostic* channel, never an assertion: no test may pass or fail on whether a
-    /// directory happened to be writable.
-    static let screenshotDirectory: URL? = {
-        let candidates: [String]
+    /// So write to the runner's own temporary directory, which the sandbox always permits, and print the
+    /// path. `run_xcuitest` in `vm-gui-runner.sh` greps those `[shot] …: wrote <path>` lines out of the
+    /// log afterwards and copies each file to the host over the *unsandboxed* `tart exec` — which is what
+    /// makes STEP 3.5's "READ the screenshot from `~/.tart-mirror/vm-artifacts/`" true. The share is still
+    /// tried first (it costs one `isWritableFile` call and works if a future runner is unsandboxed);
+    /// `AR_UITEST_SHOT_DIR` overrides both, verbatim.
+    ///
+    /// This is a *diagnostic* channel, never an assertion: no test may pass or fail on where a shot went.
+    static let screenshotDirectory: URL = {
+        var candidates: [String] = []
         if let override = ProcessInfo.processInfo.environment["AR_UITEST_SHOT_DIR"], !override.isEmpty {
-            candidates = [override]
-        } else {
-            candidates = ["/Volumes/My Shared Files/out"]
+            candidates.append(override)
         }
+        candidates.append("/Volumes/My Shared Files/out")
         for path in candidates where FileManager.default.isWritableFile(atPath: path) {
             return URL(fileURLWithPath: path, isDirectory: true)
         }
-        return nil
+        return FileManager.default.temporaryDirectory
     }()
 
-    /// Capture the whole screen, attach it to the result bundle, and — when the VM's artifact share is
-    /// mounted — also drop it beside the run's logs as `uitest-<name>.png` for a human to look at.
+    /// Capture the whole screen, attach it to the result bundle, and write it as `uitest-<name>.png`
+    /// where the VM lane can collect it (see `screenshotDirectory`).
     ///
     /// The whole screen rather than one window on purpose: these shots are read to answer "did it
     /// actually DRAW", and a window-scoped capture of a pane that rendered nothing looks much like one
-    /// that rendered. Returns the written path (nil if it was only attached).
+    /// that rendered. Returns the written path (nil only if the write itself failed).
+    ///
+    /// Both the attachment and the file are kept. The attachment alone is not enough: `xcresulttool`
+    /// refuses a result bundle that was never finalized (a killed or failed run leaves one with no
+    /// `Info.plist`), and recovering shots from `…xcresult/Data` then means classifying blobs by magic
+    /// bytes — which is how the shots for this test were read the first time.
     @discardableResult
     func captureScreenshot(_ name: String) -> URL? {
         let shot = XCUIScreen.main.screenshot()
@@ -157,11 +167,7 @@ class FixtureUITestCase: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
-        guard let dir = Self.screenshotDirectory else {
-            print("[shot] \(name): no writable artifact dir — attached to the result bundle only")
-            return nil
-        }
-        let url = dir.appendingPathComponent("uitest-\(name).png")
+        let url = Self.screenshotDirectory.appendingPathComponent("uitest-\(name).png")
         do {
             try shot.pngRepresentation.write(to: url, options: .atomic)
             print("[shot] \(name): wrote \(url.path)")
