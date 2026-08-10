@@ -149,8 +149,15 @@ lists the recent commits so you can see which item is stuck.
 
 **Periodic health gate (WS7, 2026-07-17).** Per-change review catches per-change bugs; a *compounding*
 regression can still hide across dozens of unreviewed commits. So every `AUTONOMOUS_GATE_EVERY` commits
-(default 30) the daemon runs `ops/autonomous/health-gate.sh` and **parks + alerts on RED**. It's deterministic
-(build/test), so the **daemon runs it directly** — no session, no LLM. Default checks are **free**: build all
+(default 30) the daemon runs `ops/autonomous/health-gate.sh` and **parks + alerts on a CODE RED — but
+SELF-REPAIRS a DOCUMENT-only RED** (2026-08-10, owner: *"We don't want it to park when it hits the budget cap.
+We want it to fix itself"*). A document RED (`context-budget`/`tracker-sync`/`coherence`) means a file grew, not
+that anything broke, and the daemon already runs the compactor every cycle — so on a doc-only RED it runs
+`compact-plan.sh`, re-runs the gate once, and parks **only if it is still red** (the park note then says repair
+was already attempted, so you are not sent to hand-run a tool the daemon just ran). ⛔ A **code** RED, or any
+**mixed** RED, is never self-repaired — that is exactly what parking is for. `AUTONOMOUS_GATE_SELFHEAL=0` disables it.
+
+The gate is deterministic (build/test), so the **daemon runs it directly** — no session, no LLM. Default checks are **free**: build all
 three apps + Reader/Notes **unit** suites + the write-surface lint and four other hermetic script gates + a
 coherence check (clean tree); `AUTONOMOUS_GATE_OCR=1` adds the paid Processor OCR smoke.
 - **Unit tests via `-only-testing:<UnitBundle>`, not the whole scheme** — load-bearing: the schemes also hold
@@ -657,8 +664,11 @@ shared `origin/main` ref) so it can't hang the loop; never touches the primary c
 
 Every fresh session reads the whole plan to orient, so any section that grows unbounded silently inflates the
 per-session startup cost. `compact-plan.sh` runs **between cycles** (lock released, no session active — it can
-never race a session's append) and trims two growing sections back, archiving the overflow to recoverable
-files (the plan is gitignored, so `.bak` + the archives are the recovery points, not git):
+never race a session's append) and trims **three** growing sections back, archiving the overflow to recoverable
+files (the plan is gitignored, so `.bak` + the archives are the recovery points, not git). It is also invoked a
+second way since 2026-08-10: `health_gate()` runs it to **self-repair a document-only gate RED** before parking
+(→ *Periodic health gate*, above), which is safe for the same reason — the gate too runs only when no engine
+is active:
 
 - **Pass 1 — `## Session Log`** (**newest-first** — sessions prepend): keep the newest `KEEP=6`, archive the
   older tail to `AUTONOMOUS_SESSION_LOG_ARCHIVE.md` (trigger: >`TRIGGER=10` entries **or** region >`SL_MAX_BYTES=30000`).
@@ -667,7 +677,16 @@ files (the plan is gitignored, so `.bak` + the archives are the recovery points,
   >`DR_MAX_BYTES=30000`).
 - **Pass 3 — `## WORK QUEUE`** (2026-08-04): archive **completed `[x]`** items (the queue's job is the ORDER;
   a done item adds nothing to it) to `AUTONOMOUS_WORK_QUEUE_ARCHIVE.md` once the region exceeds
-  `WQ_MAX_BYTES=120000`. ⚠️ **Only items whose tag is independently recorded `[x]` in `SUITE_TODO.md` or
+  `WQ_MAX_BYTES=70000`.
+  ⚠️ **That trigger was 120000 until 2026-08-10, which this pass could never reach** — `context-budget.sh` caps
+  the *whole plan* at 180,000 B and the non-queue sections run ~94 KB, so the plan REDs the gate at a queue size
+  around 86 KB, far below a 120 KB trigger. Pass 3 therefore no-op'd every cycle from the day it landed (its
+  archive file had never been created), the plan drifted to 195,708 B / 108% of budget, and the gate parked the
+  run instead — with the fix sitting one unreachable threshold away. Measured at 70000: 35 tracker-confirmed
+  lines archived, **39,198 B reclaimed**, plan 195,708 → 156,510 B. Not set lower because the region *settles*
+  at 62,792 B (the remaining `[x]` items are the plan-only ones the safety rule below deliberately keeps), so a
+  threshold under that floor would re-fire forever archiving nothing.
+  ⚠️ **Only items whose tag is independently recorded `[x]` in `SUITE_TODO.md` or
   `SUITE_TODO_DONE.md` are eligible** — `next-queue-item.sh` reads a *missing* tag as NOT done, so stripping a
   plan-only `[x]` would block any future dependent forever. Resolvability is preserved **by construction**, and
   Pass 3 deliberately leaves plan-only entries behind (those are a tracker gap to fix, not a compaction target).
@@ -695,13 +714,22 @@ alarm into a quiet no-op**, and if you change an entry-header rule, re-check it 
 **Enforcement lives outside this script too:** `context-budget.sh` (run by the health gate, free) fails the
 gate when any orientation document exceeds its budget — so if a detector ever breaks again, the resulting
 growth REDs the gate instead of quietly costing tokens. When it fails, **fix the document, not the budget.**
+Since 2026-08-10 the daemon attempts that fix *itself* first (compact → re-gate → park only if still red), so a
+budget RED reaching the owner now means compaction ran and was **insufficient** — a real document edit is owed,
+not a re-run of the compactor. ⚠️ 2026-08-10 also showed the limit of that enforcement: it can only RED the
+gate, and REDing the gate merely *stops* the run — for however long the document stays over — while the pass
+that would have fixed it sat behind an unreachable trigger. **Enforcement is not repair.**
 
-Both passes are **safe by construction**: region-bounded (never touch DIRECTIVES / RESUME / WORK QUEUE / RUN
-STATUS), they build the result in a temp file and **validate every live anchor survives + the pre-region is
+All three passes are **safe by construction**: region-bounded (Pass 3 owns the WORK QUEUE's completed items;
+DIRECTIVES / RESUME / HOLD QUEUE / RUN STATUS are never touched by any pass), they build the result in a temp
+file and **validate every live anchor survives + the pre-region is
 byte-identical before replacing**, keep a `.bak`, bail leaving the plan untouched on any anomaly, and are
-idempotent (no-op under trigger). Pass 1 is wrapped in a subshell so its no-op `exit` can't skip Pass 2. Both
-run *after* the work fingerprint is sampled and the Daemon Report / Session Log sections are excluded from it,
-so a rotation is **never** miscounted as the run advancing. Proven by `tests/prove-compact.sh`.
+idempotent (no-op under trigger). Each pass is wrapped in a subshell so an early no-op `exit` cannot skip the
+passes after it. All three run *after* the work fingerprint is sampled, and the Daemon Report / Session Log
+sections are excluded from it, so a rotation is **never** miscounted as the run advancing. Proven by
+`tests/prove-compact.sh` (72/0). ⚠️ The self-repair path calls this script at a DIFFERENT point in the cycle —
+from `health_gate()` — so if you add a pass, check it is safe there too: the gate runs with no engine active
+(same guarantee), but it does **not** re-sample the fingerprint afterwards.
 
 ## Dependency gating — `(blocked-on: …)` (`next-queue-item.sh`, WS9)
 

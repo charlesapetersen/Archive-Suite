@@ -29,6 +29,9 @@ STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"  # runtime st
 CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
 # =======================================================================================================
 LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
+# The plan compactor, used in TWO places: the between-cycles housekeeping call, and health_gate()'s
+# self-repair of a document-only RED. One definition so those can never drift onto different binaries.
+COMPACTOR="${AUTONOMOUS_COMPACTOR:-$HOME/.local/bin/compact-plan.sh}"
 JOB="com.${LABEL}.autonomous"    # launchd label (matches the .plist)
 
 INTERVAL="${AUTONOMOUS_INTERVAL:-90}"     # idle gap between cycles (90 s — near back-to-back; sessions run
@@ -95,6 +98,9 @@ GATE_MAXRUN="${AUTONOMOUS_GATE_MAXRUN:-3000}"      # wall-clock cap on the gate 
                                                    # cold run could blow the cap and false-park via GATE_MAX_TIMEOUTS.
                                                    # Set it back to 1800 if you run with AUTONOMOUS_GUI_VM=0.
 GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts before PARK (a persistent hang)
+# 1 = a DOCUMENT-only RED (context-budget/tracker-sync/coherence) runs $COMPACTOR and re-gates once before
+# parking; 0 = park immediately as before. CODE and MIXED reds are never self-repaired regardless.
+GATE_SELFHEAL="${AUTONOMOUS_GATE_SELFHEAL:-1}"
 
 # STATUS — the daemon rewrites $STATE/STATUS.md each cycle + on park so a check-in is a few seconds of
 # reading: is it running, what has it done, how much is left, is the code healthy, does it need the owner.
@@ -423,6 +429,33 @@ _run_gate_once() {
   [ "$GATE_RC" -eq 0 ] || GATE_RC=1     # normalize any nonzero exit to RED
 }
 
+# Classify the gate's RED verdict in $glog into DOCUMENT vs CODE steps.
+# Assigns — deliberately NOT `local` — the caller's vline/steps/has_code/doc_list. health_gate() declares
+# those and calls this UP TO TWICE (once on the verdict, again after a self-repair attempt), so it MUST reset
+# has_code/doc_list on every call: otherwise a second, document-only verdict would inherit has_code=1 from the
+# first and be parked as a code regression, which is the precise misreport this classification exists to stop.
+# Split on spaces EXPLICITLY. Do not rely on the ambient IFS: this can run under an inherited environment
+# (launchd, a sourced profile) where IFS is not the default, and with IFS=$'\n' the loop sees one word
+# " context-budget" WITH its leading space, no `case` pattern matches, and every document failure silently
+# misclassifies as a code regression.
+_classify_red() {
+  vline="$(grep -m1 '^HEALTH GATE: RED' "$glog" 2>/dev/null)"
+  # Strip the "HEALTH GATE: RED" prefix plus any separator bytes (the em dash is multi-byte, so a byte-based
+  # cut could split it), collapse runs of spaces, and TRIM — `steps` is a clean "a b c" with no edge spaces.
+  steps="$(printf '%s' "$vline" | sed 's/^HEALTH GATE: RED[^A-Za-z0-9]*//' | tr -s ' ' | sed 's/^ *//; s/ *$//')"
+  has_code=0; doc_list=""
+  local s IFS=' '
+  for s in $steps; do
+    # A DOCUMENT step failing means a file is oversized or the trackers disagree — the CODE is fine. Every
+    # other step in health-gate.sh builds or tests code. (coherence/tracker-sync are warn-only by construction
+    # so they cannot actually reach $fails; they are listed defensively, not because they can RED today.)
+    case "$s" in
+      context-budget|tracker-sync|coherence) doc_list="${doc_list:+$doc_list }$s" ;;
+      *)                                     has_code=1 ;;
+    esac
+  done
+}
+
 # Health gate (WS7). Returns: 9 = RED/park (caller stops the loop); 10 = ran GREEN (this cycle's work);
 # 0 = not due OR inconclusive-timeout-skip (caller continues to a normal session). last-gate persists across
 # restarts; a missing/invalid sha fails OPEN (due now). Must be called only when no other engine is active.
@@ -489,25 +522,43 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   # 110% over its size budget, with reader/notes/processor-build/coherence/tracker-sync/gui-vm ALL GREEN —
   # reached the owner as "a reproducible build/test regression" on "a broken tree", and cost him a hunt for a
   # bug that did not exist. Name the step, and do not assert a cause the gate did not report.
-  local vline steps s has_code=0 doc_list="" diag over
-  vline="$(grep -m1 '^HEALTH GATE: RED' "$glog" 2>/dev/null)"
-  # Strip the "HEALTH GATE: RED" prefix plus any separator bytes (the em dash is multi-byte, so a byte-based
-  # cut could split it), collapse runs of spaces, and TRIM — `steps` is a clean "a b c" with no edge spaces.
-  steps="$(printf '%s' "$vline" | sed 's/^HEALTH GATE: RED[^A-Za-z0-9]*//' | tr -s ' ' | sed 's/^ *//; s/ *$//')"
-  # Split on spaces EXPLICITLY. Do not rely on the ambient IFS: this function can run under an inherited
-  # environment (launchd, a sourced profile) where IFS is not the default, and with IFS=$'\n' the loop below
-  # sees one word " context-budget" WITH its leading space, no `case` pattern matches, and every document
-  # failure silently misclassifies as a code regression — the exact bug this block exists to fix.
-  local IFS=' '
-  for s in $steps; do
-    # A DOCUMENT step failing means a file is oversized or the trackers disagree — the CODE is fine. Every
-    # other step in health-gate.sh builds or tests code. (coherence/tracker-sync are warn-only by construction
-    # so they cannot actually reach $fails; they are listed defensively, not because they can RED today.)
-    case "$s" in
-      context-budget|tracker-sync|coherence) doc_list="${doc_list:+$doc_list }$s" ;;
-      *)                                     has_code=1 ;;
-    esac
-  done
+  local vline steps has_code=0 doc_list="" diag over healed=""
+  _classify_red        # sets vline/steps/has_code/doc_list from $glog (declared here, assigned there)
+
+  # SELF-HEAL a DOCUMENT-ONLY red before parking (owner, 2026-08-10: "We don't want it to park when it hits
+  # the budget cap. We want it to fix itself"). A document RED is not a regression — it is a file that grew,
+  # and the daemon already owns the tool that shrinks it. Parking asked the owner to hand-run a compactor the
+  # daemon calls every cycle anyway, and on 2026-08-06 that park cost him a hunt for a bug that did not exist.
+  # ⛔ CODE reds are NOT self-healed, ever: a build/test failure is exactly what parking is for.
+  # Safe here for the same reason the between-cycles call is: health_gate() runs only when no engine is
+  # active (see this function's contract above), so this cannot race a session's Session Log append.
+  if [ "$has_code" = 0 ] && [ -n "$doc_list" ] && [ "$GATE_SELFHEAL" = 1 ]; then
+    # Guard the WHOLE attempt on an executable compactor: with none, a third gate run could not possibly
+    # differ from the two that just failed, so spending GATE_MAXRUN on it would be pure waste.
+    if [ -x "$COMPACTOR" ]; then
+      log "health gate RED on DOCUMENT step(s) only ($doc_list) — attempting SELF-REPAIR (compact-plan) before parking…"
+      "$COMPACTOR" "$REPO" >>"$LOG" 2>&1 \
+        || log "self-repair: compact-plan aborted a pass (rc=$?) — detail just above in this log."
+      _run_gate_once
+      if [ "$GATE_RC" -eq 0 ]; then
+        git -C "$REPO" rev-parse HEAD > "$GATE_STATE" 2>/dev/null || true
+        log "health gate GREEN after SELF-REPAIR — a document was over budget and the daemon fixed it itself (not parking)."
+        return 10
+      fi
+      if [ "$GATE_RC" -eq 2 ]; then
+        log "self-repair gate run TIMED OUT — SKIPPING (inconclusive, not parking)."; return 0
+      fi
+      # Still RED. Re-classify from the NEW $glog: the failing set can differ now (compaction may have fixed
+      # the plan while a DIFFERENT document is over), and parking on the stale verdict would name the wrong
+      # file — the same misreport class as the 2026-08-06 incident.
+      healed=" (self-repair attempted: compact-plan ran, the gate was still RED afterwards)"
+      _classify_red
+      log "health gate STILL RED after self-repair ($steps) — parking."
+    else
+      log "health gate RED on DOCUMENT step(s) only ($doc_list), but no compactor at $COMPACTOR — cannot self-repair; parking."
+    fi
+  fi
+
   if [ "$has_code" = 1 ]; then
     # Mixed RED counts as CODE (the conservative reading), but still say the doc step failed too.
     diag="FAILED STEP(S): $steps — a reproducible build/test regression the per-change reviews missed. The daemon stopped so it doesn't pile more commits on a broken tree.${doc_list:+
@@ -522,8 +573,8 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   else
     diag="the gate exited nonzero but printed no 'HEALTH GATE: RED' verdict line, so the failing step is UNKNOWN — read $glog in full before assuming a code regression."
   fi
-  park_run "health gate RED (x2)${steps:+ — $steps}" \
-    "Archive Suite autonomous run PARKED — the periodic HEALTH GATE failed TWICE in a row.
+  park_run "health gate RED (x2)${steps:+ — $steps}${healed:+ — self-repair failed}" \
+    "Archive Suite autonomous run PARKED — the periodic HEALTH GATE failed TWICE in a row.$healed
 $diag
 Reproduce: ./ops/autonomous/health-gate.sh   ·   full gate output: $glog
 Then restart it: ./ops/autonomous/daemon.sh start
@@ -946,8 +997,8 @@ tick() {
   # a different file. compact-plan.sh now exits nonzero ONLY when a pass truly aborted (a legitimate no-op is
   # still 0), so this logs a loud, greppable line instead of discarding it. health-gate's `compact-proof` step
   # is the standing mechanism proof; this line is the run-time symptom.
-  if [ -x "$HOME/.local/bin/compact-plan.sh" ]; then
-    if "$HOME/.local/bin/compact-plan.sh" "$REPO" >> "$LOG" 2>&1; then :; else
+  if [ -x "$COMPACTOR" ]; then
+    if "$COMPACTOR" "$REPO" >> "$LOG" 2>&1; then :; else
       log "⚠⚠ compact-plan ABORTED a pass (rc=$?) — the plan is NOT being kept within its context budget. Detail just above in this log; mechanism proof: ops/autonomous/tests/prove-compact.sh"
     fi
   fi

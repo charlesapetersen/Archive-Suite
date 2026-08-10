@@ -130,6 +130,7 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_GATE_EVERY="${GATE_EVERY:-0}" AUTONOMOUS_GATE_CMD="${GATE_CMD:-/bin/false}" AUTONOMOUS_GATE_MAXRUN="${GATE_MAXRUN:-60}" \
   AUTONOMOUS_GATE_MAX_TIMEOUTS="${GATE_MAX_TIMEOUTS:-2}" \
   AUTONOMOUS_STATUS_CMD="${STATUS_CMD:-$T/status-stub.sh}" \
+  AUTONOMOUS_COMPACTOR="${COMPACTOR:-$T/no-such-compactor}" \
   AUTONOMOUS_HB_POLL=1 \
     bash "$DAEMON" >/dev/null 2>&1 &
   local pid=$!; echo "$pid" >> "$T/daemon.pids"; echo "$pid"   # record for the leak-proof EXIT reaper
@@ -389,6 +390,68 @@ L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-code.sh" run_daemon 0 8)
 grep -q 'build/test regression' "$L" && ok "a real code RED still says regression" || bad "lost the code-regression wording on a real build failure"
 grep -q 'PARKED (health gate RED (x2) — reader' "$L" && ok "code RED names its step too" || bad "code RED is still anonymous"
 grep -q 'NOTHING IS WRONG WITH THE CODE' "$L" && bad "called a broken build a document problem" || ok "code RED not misfiled as a document problem"
+
+echo "[23d] WS7 — a DOCUMENT-only RED must SELF-REPAIR (compact) and NOT park (owner, 2026-08-10)"
+# "We don't want it to park when it hits the budget cap. We want it to fix itself." A document RED is a file
+# that grew, not a regression — and the daemon already calls compact-plan.sh every cycle. Until now it parked
+# and asked the owner to hand-run that same compactor. Root cause of the 2026-08-10 case: compact-plan's WQ
+# pass had a 120 KB trigger the plan's own 180 KB budget could never let it reach, so the plan drifted to
+# 108% and the gate parked with the fix sitting one unreachable threshold away.
+# Gate stub: RED, RED, then GREEN — i.e. green only on the run that FOLLOWS the compaction.
+# Count file baked in at write time (as gate-flaky.sh does) rather than passed through the environment —
+# launch() rebuilds the daemon's env explicitly, so an inline VAR= on run_daemon is a fragile channel.
+cat > "$T/gate-doc-then-green.sh" <<GDG
+#!/bin/sh
+c="$T/gdg.count"; n=\$(cat "\$c" 2>/dev/null || echo 0); n=\$((n+1)); echo "\$n" > "\$c"
+if [ "\$n" -ge 3 ]; then echo "gate ok after compaction"; exit 0; fi
+echo "HEALTH GATE: RED — context-budget"
+echo "✗ context-budget: OVER budget: .maintenance/AUTONOMOUS_PLAN.md"
+exit 1
+GDG
+chmod +x "$T/gate-doc-then-green.sh"
+# Compactor stub: records that it ran, so "self-repaired" can never be inferred from the log text alone.
+printf '#!/bin/sh\necho "compact-plan: archived N lines"\necho ran >> "%s"\nexit 0\n' "$T/compacted.marker" > "$T/compactor.sh"
+chmod +x "$T/compactor.sh"
+rm -f "$T/gdg.count" "$T/compacted.marker"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-doc-then-green.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+grep -q 'attempting SELF-REPAIR' "$L" && ok "a document-only RED triggers self-repair" || bad "no self-repair attempted on a document RED"
+[ -f "$T/compacted.marker" ] && ok "the compactor actually RAN (marker written, not just logged)" || bad "compactor never executed"
+grep -q 'GREEN after SELF-REPAIR' "$L" && ok "gate went green after the repair" || bad "did not recover after repair"
+grep -q 'PARKED' "$L" && bad "PARKED despite repairing itself — the whole point was not to" || ok "did NOT park (fixed itself)"
+[ -s "$STATE/last-gate" ] && ok "recorded last-gate after the self-repaired green" || bad "last-gate not recorded on a repaired green"
+
+echo "[23e] WS7 — if self-repair does NOT clear it, still park, and SAY repair was tried"
+# The note must not imply the owner has an unrun remedy available when the daemon already ran it.
+rm -f "$T/compacted.marker"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+grep -q 'attempting SELF-REPAIR' "$L" && ok "tried to repair first" || bad "parked without trying"
+grep -q 'STILL RED after self-repair' "$L" && ok "logged that the repair did not clear it" || bad "silent about the failed repair"
+grep -q 'PARKED (health gate RED (x2) — context-budget' "$L" && ok "parks, still naming the failing step" || bad "park reason lost the step name"
+grep -q 'self-repair attempted' "$L" && ok "the park note says repair was already attempted" || bad "note implies an unrun remedy"
+grep -q 'NOTHING IS WRONG WITH THE CODE' "$L" && ok "still not sold as a code regression" || bad "document park implies a code bug again"
+
+echo "[23f] WS7 — a CODE red must NEVER be self-repaired (compaction cannot fix a broken build)"
+# Laundering a build failure through a compactor would be strictly worse than the bug this replaced.
+rm -f "$T/compacted.marker"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-code.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+grep -q 'SELF-REPAIR' "$L" && bad "attempted to compact away a BUILD failure" || ok "no self-repair on a code RED"
+[ -f "$T/compacted.marker" ] && bad "ran the compactor for a broken build" || ok "compactor never invoked for code"
+grep -q 'build/test regression' "$L" && ok "still reported as a regression" || bad "lost the regression wording"
+grep -q 'PARKED (health gate RED (x2) — reader' "$L" && ok "parked on the code RED as before" || bad "code RED no longer parks"
+
+echo "[23g] WS7 — a MIXED red (document + code) is treated as CODE: no repair, parks as a regression"
+{ printf '#!/bin/sh\n'
+  printf 'echo "HEALTH GATE: RED \xe2\x80\x94 context-budget reader"\n'
+  printf 'echo "BUILD FAILED: boom"\nexit 1\n'; } > "$T/gate-red-mixed.sh"; chmod +x "$T/gate-red-mixed.sh"
+rm -f "$T/compacted.marker"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-mixed.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+grep -q 'SELF-REPAIR' "$L" && bad "self-repaired a mixed RED that includes a code failure" || ok "mixed RED is not self-repaired"
+[ -f "$T/compacted.marker" ] && bad "compactor ran on a mixed RED" || ok "compactor not invoked on a mixed RED"
+grep -q 'build/test regression' "$L" && ok "mixed RED keeps the conservative code wording" || bad "mixed RED misfiled as a document problem"
 
 echo "[23b] WS7 — a FLAKY failure (red once, then green) must NOT park (F1 retry-once)"
 rm -f "$T/flaky.count"; echo "0:no" > "$CTRL"; write_plan; dfset 999999

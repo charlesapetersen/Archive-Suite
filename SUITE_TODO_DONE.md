@@ -164,6 +164,45 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Autonomous compactor + park diagnosis (from the 2026-08-06 health-gate RED)
 
+- [x] **W26.selfheal — a document-only gate RED now REPAIRS ITSELF instead of parking the run, and the WORK
+  QUEUE compaction pass that would have prevented this one was unreachable. ✅ DONE 2026-08-10** — this commit.
+  Owner, on being shown that the plan was 108% of budget and would park the run ~2 commits after restart:
+  *"Is the daemon currently set up to self-compact? We don't want it to park when it hits the budget cap. We
+  want it to fix itself."* It was set up, and it was running every cycle, and it still could not have helped.
+  **Two independent faults, and the second is the one worth remembering.**
+  1. **`compact-plan.sh` Pass 3 (WORK QUEUE) had a trigger it could never reach.** `WQ_MAX_BYTES` defaulted to
+     120,000 B, but `context-budget.sh` caps the whole plan at 180,000 B and the non-queue sections run ~94 KB
+     — so the plan REDs the gate at a queue size near 86 KB, far below the trigger. Pass 3 no-op'd every cycle
+     from the day it landed; its archive file had **never been created**. Now 70,000 B: measured 35
+     tracker-confirmed lines archived, **39,198 B reclaimed**, plan 195,708 → 156,510 B, `context-budget.sh`
+     exit 0. Not lower, because the region *settles* at 62,792 B (the remainder are the plan-only `[x]` items
+     Pass 3's safety rule deliberately keeps) and a sub-floor threshold would re-fire forever archiving nothing.
+     Verified both directions: fires on run 1, clean no-op on run 2.
+  2. **The gate could only ever REPORT a document problem, never fix one.** `park_run` fired on a doc RED
+     exactly as on a code RED — the doc/code split only changed the note's *wording* — so the daemon stopped a
+     healthy run and asked the owner to hand-run the compactor it calls itself every cycle. `health_gate()` now
+     compacts, re-runs the gate once, and parks only if still red; the note then says repair was attempted, so
+     the owner is never sent after an already-run remedy. ⛔ **CODE reds and MIXED reds are never self-repaired**
+     — laundering a build failure through a compactor would be worse than the bug this replaced.
+     `AUTONOMOUS_GATE_SELFHEAL=0` disables it.
+  **The generalisable finding:** *enforcement is not repair.* `context-budget.sh` did its job perfectly — it
+  detected the drift and REDed the gate — and the only consequence was that the run STOPPED, for however long
+  the document stayed over, while the machinery that could have fixed it sat behind an unreachable number. A
+  guard that can only halt the line is half a mechanism when the repair is already automatable.
+  **Also fixed here:** `compact-plan.sh`'s header and the README both still claimed the WORK QUEUE (and the
+  Daemon Report) were "never touched" by compaction — the Daemon Report got its own pass on 2026-07-17 and the
+  WORK QUEUE on 2026-08-04, so both statements were false when written and stayed that way. That wording is what
+  would send the next session hunting for new machinery instead of the broken threshold; it is the reason this
+  item exists as a *threshold* fix rather than a rewrite. And the classification was factored
+  into `_classify_red()` because it must now run **twice** (before and after a repair attempt); it resets
+  `has_code`/`doc_list` on every call, or a second document-only verdict would inherit `has_code=1` from the
+  first and be parked as a code regression — the exact misreport the split exists to prevent. Re-classifying
+  after the repair also means a park names the document that is *still* over, not the one compaction just fixed.
+  Proofs: `prove-daemon.sh` [23d] self-repair recovers and does not park (asserted via a marker file, so
+  "repaired" cannot be inferred from log text alone), [23e] failed repair still parks and says so, [23f] a code
+  RED never invokes the compactor, [23g] a mixed RED is treated as code. **`prove-daemon.sh` 97/0** (80/0
+  before: +17 assertions, none changed), `prove-compact.sh` 72/0 unchanged.
+
 - [x] **`arm.sh` → `daemon.sh`, and the verb `arm` → `start` (owner, 2026-08-06). ✅ DONE** — this commit.
   "Arm"/"re-arm" was jargon that had to be explained every time it surfaced in a park note or a status hint.
   The owner chose the conventional shape, so it is now `daemon.sh start | stop | status | nohup` (`keepalive`

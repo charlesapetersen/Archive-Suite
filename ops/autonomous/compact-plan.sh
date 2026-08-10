@@ -9,10 +9,16 @@
 # WHEN: the daemon calls this BETWEEN cycles (after a session exits + the lock is released, before the
 # next launch) — so NO claude session is active and this can never race a session's Session Log append.
 #
+# ⚠️ THIS LIST WAS STALE AND SAID THE OPPOSITE OF THE CODE (corrected 2026-08-10). It claimed the Daemon
+# Report and WORK QUEUE "are never touched"; both have had their own pass for some time — Pass 2 rotates the
+# Daemon Report (DR_KEEP/DR_TRIGGER) and Pass 3 archives completed WORK QUEUE items (WQ_MAX_BYTES). Reading
+# the old wording, a session would have concluded the queue bloat was out of scope and gone looking for new
+# machinery instead of the unreachable threshold that was actually the bug.
+#
+# THREE PASSES, each region-bounded: 1 = Session Log, 2 = Daemon Report, 3 = WORK QUEUE completed items.
 # SAFE BY CONSTRUCTION:
-#   * operates ONLY inside the "## Session Log" region (bounded below by the next '## ' header, i.e.
-#     "## Daemon Report"); the DIRECTIVES / RESUME PROTOCOL / WORK QUEUE / E2E / Daemon Report are
-#     never touched;
+#   * each pass operates ONLY inside its own region (bounded below by the next '## ' header); the
+#     DIRECTIVES / RESUME PROTOCOL / E2E / HOLD QUEUE regions are never touched by any pass;
 #   * builds the result in a temp file and VALIDATES every live anchor survives (and that the entire
 #     pre-log region is byte-identical) BEFORE replacing the plan;
 #   * keeps a .bak of the pre-compaction plan; BAILS (leaving the plan untouched) on any anomaly;
@@ -382,7 +388,19 @@ echo "compact-plan: archived $DR_CUT Daemon Report entries (newest $DR_EKEEP kep
 # Same contract as Passes 1-2: region-bounded, whole-span moves, validate-before-replace, .bak, archive-not-
 # delete, line conservation, idempotent.
 QUEUE_ARCHIVE="${AUTONOMOUS_QUEUE_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_WORK_QUEUE_ARCHIVE.md}"
-WQ_MAX_BYTES="${WQ_MAX_BYTES:-120000}"   # WORK QUEUE region byte budget; 0 disables Pass 3
+# WORK QUEUE region byte budget; 0 disables Pass 3.
+# ⚠️ 2026-08-10 — WAS 120000, WHICH THIS PASS COULD NEVER REACH. context-budget.sh caps the WHOLE plan at
+# 180,000 B, and the non-queue sections run ~94 KB, so the plan hits its own gate at a queue size around
+# 86 KB — well under a 120 KB trigger. Net effect: Pass 3 no-op'd every cycle since it landed (the archive
+# file had never been created), the plan drifted to 195,708 B / 108% of budget, and the gate PARKED the run
+# instead — the machinery to fix it existed and was simply unreachable. Measured on the live plan: queue
+# region 101,990 B, Pass 3 at this threshold archives 35 tracker-confirmed lines and reclaims 39,198 B,
+# taking the plan to 156,510 B (context-budget.sh then exits 0).
+# Why 70000 and not lower: the region SETTLES at 62,792 B, because the remaining `[x]` items are the ones
+# whose done-state exists only in the plan and the safety rule above deliberately leaves them. A threshold
+# under that floor would re-fire every cycle archiving nothing, churning the .bak for no gain. 70000 fires
+# now and then cleanly no-ops (verified both runs).
+WQ_MAX_BYTES="${WQ_MAX_BYTES:-70000}"
 
 (
 [ "$WQ_MAX_BYTES" -gt 0 ] || { echo "compact-plan: WQ pass disabled (WQ_MAX_BYTES=0)"; exit 0; }
