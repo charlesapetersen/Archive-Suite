@@ -149,7 +149,19 @@ final class ArchiveLibrary: ObservableObject {
              )
          }) {
         self.minimumRootRescanInterval = max(0, minimumRootRescanInterval)
+#if DEBUG
+        // A fixture root normally has NO warm-start cache at all (`usesPersistedIndex`). The one lane
+        // that needs one names its own scratch database, and this is where that redirection happens —
+        // once, in the initialiser — so no later code path can reach the real Application Support file
+        // while a fixture is pinned (`W26.verify-fu2`).
+        let scratchIndexPath = defaults.string(forKey: Self.fixtureLibraryIndexKey)
+            .flatMap { $0.isEmpty ? nil : $0 }
+        self.fixtureIndexOverride = scratchIndexPath != nil
+        let resolvedIndexURL = scratchIndexPath.map { URL(fileURLWithPath: $0) } ?? libraryIndexURL
+        self.libraryIndex = resolvedIndexURL.map { LibraryIndex(url: $0) }
+#else
         self.libraryIndex = libraryIndexURL.map { LibraryIndex(url: $0) }
+#endif
         self.watcherStartTimeout = max(0, watcherStartTimeout)
         self.scanStallTimeout = max(0, scanStallTimeout)
         self.defaults = defaults
@@ -197,6 +209,19 @@ final class ArchiveLibrary: ObservableObject {
 #if DEBUG
     /// Launch/defaults key that pins the app to a fixture root (XCUITest + unit tests).
     private static let fixtureRootKey = "ARUITestRootPath"
+    /// Launch/defaults key naming a **scratch** warm-start database for the fixture lane
+    /// (`W26.verify-fu2`). Its presence is the whole opt-in: without it a fixture root keeps the
+    /// cold, synchronous behaviour every other fixture test is calibrated against, and — the part that
+    /// matters for safety — never opens the owner's real `library-index-v1.sqlite3`.
+    private static let fixtureLibraryIndexKey = "ARUITestLibraryIndexPath"
+    /// Launch/defaults key (seconds) that HOLDS a fixture root's revalidation pass after its warm rows
+    /// are published, so `.revalidating` becomes a state a UI test can enter deliberately instead of a
+    /// sub-100 ms transient it has to catch by luck — the flake class `W21.vmgui-c` cost two days.
+    private static let fixtureScanHoldKey = "ARUITestScanHoldSeconds"
+    /// Set once, in `init`, from `fixtureLibraryIndexKey`. A stored flag rather than a second read of
+    /// the key for the reason `isFixtureRoot` documents: one spelling, so the behaviours that key off
+    /// it cannot drift apart.
+    private let fixtureIndexOverride: Bool
 #endif
 
     // MARK: - Starting and re-running discovery
@@ -271,9 +296,12 @@ final class ArchiveLibrary: ObservableObject {
     /// real Application Support database. Gating only `start(scope:)` left ⌘⌥R — `rescan()` →
     /// `requestRootRescan` → `drainWatchWork` — going through the async indexed path, which both
     /// broke that synchrony and let a unit test write the owner's live cache.
+    /// ⚠️ The exception below is what makes the fixture lane's warm start possible **and** is the only
+    /// way a fixture root can reach a persisted cache: `fixtureIndexOverride` is true only when the
+    /// launch named a scratch database, which the initialiser has already substituted for the real one.
     private var usesPersistedIndex: Bool {
 #if DEBUG
-        if isFixtureRoot { return false }
+        if isFixtureRoot, !fixtureIndexOverride { return false }
 #endif
         return indexRoot != nil && libraryIndex != nil
     }
@@ -283,6 +311,16 @@ final class ArchiveLibrary: ObservableObject {
     /// key off it (no persisted index, a synchronous walk, an inline watcher start) cannot drift apart.
     private var isFixtureRoot: Bool {
         defaults.string(forKey: Self.fixtureRootKey) != nil
+    }
+
+    /// How long to hold a fixture root's asynchronous pass once its warm rows are on screen.
+    ///
+    /// Zero — no hold — unless the launch asked for one AND pinned a scratch cache, because a hold is
+    /// meaningless without warm rows to hold it over. See `beginScan` for where it is applied and why
+    /// it must precede the stall deadline.
+    private var fixtureScanHold: TimeInterval {
+        guard isFixtureRoot, fixtureIndexOverride else { return 0 }
+        return max(0, defaults.double(forKey: Self.fixtureScanHoldKey))
     }
 #endif
 
@@ -432,16 +470,48 @@ final class ArchiveLibrary: ObservableObject {
         // Through `isFixtureRoot`, NOT a second direct read: the property's own comment promises "one
         // spelling, so the several behaviours that key off it cannot drift apart", and this line was the
         // counter-example — three call sites, two spellings, and only two of them injectable.
-        if isFixtureRoot {
+        //
+        // `fixtureIndexOverride` is the ONE fixture root that must not take this branch: a synchronous
+        // `LibraryScan.pass` neither consults `cached` nor leaves a `.revalidating` window, so a lane
+        // pinned to a scratch warm-start database would have had its warm start compiled away
+        // (`W26.verify-fu2`). Every other fixture test sets no index key and keeps this path exactly.
+        if isFixtureRoot, !fixtureIndexOverride {
             finish(LibraryScan.pass(root: root, isCancelled: { token.isCancelled }),
                    generation: generation, rootGeneration: rootGeneration, indexScan: nil)
             return
         }
+        // The warm-start UI check's stall hook. Deliberately BEFORE `armScanStallDeadline`: this delay
+        // is the test's own, so reporting it as "the archive folder has not answered" would be a lie
+        // the app tells about itself. `inFlight` is already set, so `drainWatchWork` correctly refuses
+        // to start a competing pass while this one is waiting, and a root switch or a newer pass drops
+        // it through the same generation guards every other deferred completion goes through.
+        if fixtureScanHold > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + fixtureScanHold) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, !token.isCancelled,
+                          generation == self.currentScan,
+                          rootGeneration == self.rootGeneration else { return }
+                    self.startAsyncPass(root: root, cached: cached, indexScan: indexScan,
+                                        generation: generation, rootGeneration: rootGeneration,
+                                        token: token)
+                }
+            }
+            return
+        }
 #endif
+        startAsyncPass(root: root, cached: cached, indexScan: indexScan,
+                       generation: generation, rootGeneration: rootGeneration, token: token)
+    }
+
+    /// Hand a pass to another thread. Split out of `beginScan` so the DEBUG stall hook above can defer
+    /// exactly this — arming included — and nothing else.
+    private func startAsyncPass(root: URL, cached: [LibraryIndexPath: LibraryIndexEntry],
+                                indexScan: LibraryIndexScan?, generation: UInt64,
+                                rootGeneration: UInt64, token: ScanCancellation) {
         // Everything below here hands the walk to another thread and cannot be waited on. Arm the
-        // stall deadline first, and only here: the fixture branch above has already finished, and the
-        // `watcherStartHoldsDiscovery` branch at the top of this function has not started anything
-        // yet (the stream's own deadline covers that interval).
+        // stall deadline first, and only here: the fixture branch in `beginScan` has already finished,
+        // and its `watcherStartHoldsDiscovery` branch has not started anything yet (the stream's own
+        // deadline covers that interval).
         armScanStallDeadline(generation: generation)
         // Progress only — NOT rows. See `finish`: rows are published once per pass, atomically.
         let onBatch: @Sendable (CorpusScanBatch) -> Void = { batch in

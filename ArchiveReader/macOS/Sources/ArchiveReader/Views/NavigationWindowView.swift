@@ -519,7 +519,13 @@ struct NavigationWindowView: View {
 
     private var statusBar: some View {
         HStack {
-            if model.library.phase.isScanning { ProgressView().controlSize(.small); Text("Scanning…") }
+            if model.library.phase.isScanning {
+                ProgressView().controlSize(.small)
+                // Identified so a UI test can tell "cached rows, still revalidating" from "settled":
+                // rows on screen WITH this label is the revalidating paint, rows on screen WITHOUT it
+                // is settled, and a first scan has no rows at all (`W26.verify-fu2`).
+                Text("Scanning…").accessibilityIdentifier("ar.status.scanning")
+            }
             Text("\(model.displayed.count) shown · \(model.library.files.count) total in \(model.library.scopeDescription)")
                 .foregroundStyle(.secondary)
             // Degraded discovery says so here rather than leaving a confident-looking count over a list
@@ -555,7 +561,13 @@ struct NavigationWindowView: View {
                 .accessibilityIdentifier("ar.status.health")
                 .popover(isPresented: $showingHealth) { DataQualityView(q: model.dataQuality, needsAttention: model.needsAttentionCount) }
             Spacer()
-            if !model.statusMessage.isEmpty { Text(model.statusMessage).foregroundStyle(.secondary) }
+            // Identified because this is where a REFUSED write reports itself ("Could not verify …"),
+            // which is the only on-screen evidence that a cache row was re-verified rather than
+            // written blind (`W26.verify-fu2`).
+            if !model.statusMessage.isEmpty {
+                Text(model.statusMessage).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ar.status.message")
+            }
             if !model.selection.isEmpty { Text("\(model.selection.count) selected").foregroundStyle(.secondary) }
         }
         .font(.callout)
