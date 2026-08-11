@@ -111,6 +111,51 @@ struct NoteStoreTests {
         #expect(again.trailingBodyRaw == loaded.trailingBodyRaw)
     }
 
+    /// W3.notes-cr-line-start through the real `create` → `.md` on disk → `load` path.
+    ///
+    /// A body whose lines end in a lone `\r` (classic-Mac text, pasted into the editor) already ends
+    /// its line, so the serializer must write the header straight after it. The old
+    /// `hasSuffix("\n")` test said otherwise and appended a `\n`, which Swift merges into the
+    /// preceding `\r` as ONE `"\r\n"` grapheme — so the operator's line endings were silently
+    /// rewritten, and on the next decode `FrontMatterCodec`'s `\r\n` → `\n` normalization finished the
+    /// job. Provenance happens to survive that particular laundering; the operator's text does not,
+    /// which is what the raw-file and `trailingBodyRaw` expectations below pin down.
+    @Test("a CR-delimited body keeps its line endings and its block through disk")
+    func carriageReturnDelimitedBodySurvivesDiskRoundTrip() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        var item = makeItem(title: "Classic Mac Line Endings")
+        item.trailingBodyRaw = "Prose ending in a classic-Mac line break.\r"
+        item.blocks = [
+            Block(kind: .readerPage,
+                  source: SourceAnchor(link: "archivereader://open?doc=cr", display: "Doc p.7", page: 7),
+                  markdown: "Quoted passage.\r", unknownHeaderFields: []),
+        ]
+
+        let ref = try await store.create(item)
+        let raw = try String(contentsOf: ref.url, encoding: .utf8)
+        #expect(raw.contains("\r<!-- block: reader-page"))
+        #expect(!raw.contains("\r\n<!-- block:"))
+
+        let loaded = try await store.load(item.id)
+        #expect(loaded.trailingBodyRaw == "Prose ending in a classic-Mac line break.\r")
+        #expect(loaded.blocks.count == 1)
+        #expect(loaded.blocks.first?.source?.page == 7)
+        #expect(loaded.blocks.first?.source?.link == "archivereader://open?doc=cr")
+        #expect(loaded.blocks.first?.markdown == "Quoted passage.\r")
+
+        // Fixed point: an autosaving editor must not grow or re-punctuate the body on every save.
+        _ = try await store.save(loaded)
+        let again = try await store.load(item.id)
+        #expect(again.trailingBodyRaw == loaded.trailingBodyRaw)
+        #expect(again.blocks.first?.markdown == loaded.blocks.first?.markdown)
+        // Front matter carries a `modified` stamp, so compare the shape that matters, not the bytes.
+        let rawAgain = try String(contentsOf: ref.url, encoding: .utf8)
+        #expect(rawAgain.contains("\r<!-- block: reader-page"))
+        #expect(!rawAgain.contains("\r\n<!-- block:"))
+    }
+
     // MARK: - Save (retitle -> rename)
 
     @Test("save retitles the file when title changes")

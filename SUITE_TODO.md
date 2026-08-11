@@ -1228,20 +1228,17 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-cr-line-start — a lone `\r` defeats both the new header guard and `BlockParser`'s line-start test, because Swift compares GRAPHEMES [S · LOW].**
-  Filed 2026-08-11 from the same pass; the one residual gap *in* the
-  `W3.notes-chip-header-needs-a-line-break` fix, left rather than widened into a second defect's territory.
-  `BlockParser.swift:56-58` decides "is this a line start?" with `body[body.index(before:)] == "\n"` — a
-  `Character` comparison. Swift merges `CR LF` into a single `"\r\n"` grapheme, so `"\r\n" == "\n"` is
-  **false**: a header preceded by CRLF is not recognised *at all*, independent of the new guard. Worse for the
-  guard specifically — if a body ends in a LONE `\r`, `hasSuffix("\n")` is false, so it appends `\n`, the two
-  merge into one `"\r\n"` grapheme, and the header is still not a header. Verified by compiled repro:
-  lone-CR → recognised **false**; CRLF → recognised true but with a spurious blank line. **Narrow
-  reachability** — `FrontMatterCodec.swift:17` normalises `\r\n` read from disk but NOT a lone `\r`, so it
-  needs CR-delimited text pasted into the editor. **Not a regression:** pre-fix that input was broken too.
-  Fix at the root, not at the guard: make `BlockParser.parse`'s line-start test accept `\r\n` and `\r`, or
-  compare the last unicode SCALAR instead of the last `Character`. Patching only `MarkdownBridge` cannot work
-  — any `\n` it appends after a `\r` is swallowed into the same grapheme. | ArchiveNotes/Store | Tier-2
+- [ ] **W3.notes-cr-line-start-fu1 — `FrontMatterCodec.decode` still rewrites the operator's CRLF line endings to LF, but leaves a lone `\r` alone [XS · LOW · cosmetic, may well be WONTFIX].**
+  Filed 2026-08-11 by the `W3.notes-cr-line-start` fix. `FrontMatterCodec.swift:17`
+  `replacingOccurrences(of: "\r\n", with: "\n")` runs over the WHOLE file text, so a CRLF-delimited body is
+  silently normalised on every read while a CR-delimited one is now preserved verbatim (that preservation is
+  pinned by `NoteStoreTests.carriageReturnDelimitedBodySurvivesDiskRoundTrip`). **No data loss** — only line
+  endings change, and the parser handles all three forms now, which is exactly why this is no longer
+  load-bearing for the BODY. ⚠️ It IS still load-bearing for the FRONT MATTER: that half splits on `"\n"`, so
+  do not simply delete the call — narrow it to the front-matter region, or leave it. Given the owner's
+  no-production-material premise and that most editors normalise anyway, **deciding this is not worth doing is
+  a perfectly good outcome**; it is filed so the asymmetry is a recorded choice rather than an oversight.
+  | ArchiveNotes/Store | Tier-1
 - [ ] **W3.notes-thumb-line-duplicates — a `thumb:` block grows one extra `![display](thumb)` line on EVERY save, without bound [M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` fix, which added the first
   parse→serialize→parse idempotence test this class has ever had; the `thumb:` shape is the one shape that

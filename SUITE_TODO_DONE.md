@@ -5281,6 +5281,46 @@ explain why not.
   (`ArchiveNotes/Store`) — nothing in ArchiveCore, so no cross-app rebuild was owed; every store is `mktemp`
   (Prime Directive #1), no corpus touched, nothing on the host screen. | ArchiveNotes/Store | Tier-2 | done
 
+- [x] **W3.notes-cr-line-start — a lone `\r` defeats both the new header guard and `BlockParser`'s
+  line-start test, because Swift compares GRAPHEMES [S · LOW].** ✅ **SHIPPED 2026-08-11** — code `f2e455d`,
+  tracker flip in the commit whose subject begins `fix(notes,trackers): W3.notes-cr-line-start`. Filed
+  2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` pass as its one residual; pre-existing.
+  **The fix had to be wider than the filing, and that is the finding.** The filing named one symptom — a
+  header after a lone `\r` is not recognised at a line start. Fixing only that would have left CR-delimited
+  notes WORSE than before: the header becomes a real block, and then two further `Character`-level tests in
+  the same file mangle it. `parseSegment` skips the terminator after `-->` with `text[mdStart] == "\n"`, so a
+  CRLF header line leaves `"\r\nBody"` at the head of the block body; and `parseHeader` splits fields with
+  `split(separator: "\n")`, so a CR-separated multi-line header collapses to ONE line — the kind falls back
+  to `.freeform` and the entire source anchor is dropped. Recognising a header you then cannot parse is a
+  worse failure than not recognising it, so all four tests moved together.
+  **What landed.** One predicate family in `BlockParser`, comparing unicode SCALARS instead of `Character`s:
+  `isLineTerminator` (scalar) → `isLineBreak` (the `"\n"`/`"\r"`/`"\r\n"` characters) → `endsWithLineTerminator`
+  + `isAtLineStart`. `parse`'s line-start test, `serialize`'s two separator guards, `parseSegment`'s
+  terminator skip and `parseHeader`'s field split all route through it. The two callers that had **duplicated
+  the `hasSuffix("\n")` idiom** now ask `BlockParser` instead of guessing: `MarkdownBridge.serialize`'s chip
+  guard (whose doc comment carried this item as an open residual — now closed at the root, as the filing
+  required) and `ExtractBuilder.flattenedNestedHeaders`. Side effect worth naming: the guard no longer appends
+  a SECOND newline after CRLF text, which was putting a blank line into the operator's note on the next save.
+  **Gate was mutation, not a green suite** — same lesson as the sibling item. 7 new `BlockParserTests` were
+  run against pristine `2e9bc94` first and **all 7 failed**; they cover each of the four mechanisms plus a
+  parse→serialize→parse fixed point for a CR-delimited note. The Tier-2 functional test is
+  `NoteStoreTests.carriageReturnDelimitedBodySurvivesDiskRoundTrip` — a real `create` → `.md` on a `mktemp`
+  store → `load`, then a second save to prove a fixed point. Mutating just the `serialize` guard back to
+  `hasSuffix("\n")` fails exactly 4 of its expectations, so it demonstrably bites.
+  **One thing the disk test taught, recorded so nobody re-derives it:** provenance actually SURVIVES the disk
+  round-trip even unfixed, because `FrontMatterCodec.decode` normalises `\r\n` → `\n` and thereby launders the
+  `\n` the buggy guard had just appended. What did not survive was the operator's text — the lone `\r` came
+  back as `\n`. That laundering is why the reachable damage is the in-editor path, and why the disk test
+  asserts on line endings rather than on block count. The leftover asymmetry (CRLF normalised, lone CR
+  preserved) is filed as `W3.notes-cr-line-start-fu1`, explicitly flagged as a fine thing to decline.
+  Verified: Notes unit bundle **Swift Testing 780 tests / 84 suites, 0 failures** plus the XCTest half (205),
+  `** TEST SUCCEEDED **`, **no new warnings** — **plus the headless Tart VM GUI lane, `ArchiveNotesUITests`
+  20/20 green** (`ops/gui/vm-gui-runner.sh notes xcuitest`, 364 s, off the owner's screen). The VM run is a
+  regression check and is labelled as one: it exercises the editor round-trip this change sits under, it does
+  not reach a CR paste. Notes-local (`ArchiveNotes/Store`, `Editor`, `Core`) — nothing in ArchiveCore, so no
+  cross-app rebuild was owed; every store is `mktemp` (Prime Directive #1), no corpus touched, nothing on the
+  host screen. | ArchiveNotes/Store | Tier-2 | done
+
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
   command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine
