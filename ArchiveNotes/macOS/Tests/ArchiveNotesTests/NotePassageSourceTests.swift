@@ -165,6 +165,44 @@ final class NotePassageSourceTests: XCTestCase {
         XCTAssertTrue(assets.isEmpty)
     }
 
+    // MARK: W3.notes-extract-smuggles-a-source-header — a snapshot never re-emits the source's chip
+
+    /// A selection that covers a whole block starts AT that block's chip (`blockRanges` is
+    /// chip-delimited), so the snapshot must NOT serialize the chip back into the passage body: the
+    /// whole snapshot becomes ONE `note-passage` block's markdown, and a `<!-- block: reader-page -->`
+    /// nested inside it re-parses as a second, non-note block *inside the extract* (00-overview §D7).
+    func testSnapshotMarkdown_leadingChip_isNotSerializedIntoTheBody() {
+        let r = renderedProsePlusChip()
+        let chip = chipLocation(in: r)
+        XCTAssertNotEqual(chip, NSNotFound)
+        let whole = NSRange(location: chip, length: r.length - chip)
+        let (md, _) = source(r, ranges: []).snapshotMarkdown(in: whole)
+        // Exact, not `contains`: the chip's own trailing newline goes with it, so the passage body
+        // does not open on a blank line.
+        XCTAssertEqual(md, "Quoted body.")
+    }
+
+    /// A range spanning prose + a chip: both bodies survive, on their own lines, with no header
+    /// between them. (`passageBlocks` never asks for a multi-segment range — it intersects the
+    /// selection with one block at a time — but the stripper is not allowed to fuse two lines.)
+    func testSnapshotMarkdown_interiorChip_isNotSerializedIntoTheBody() {
+        let r = renderedProsePlusChip()
+        let (md, _) = source(r, ranges: []).snapshotMarkdown(in: NSRange(location: 0, length: r.length))
+        XCTAssertEqual(md, "Intro prose.\nQuoted body.")
+    }
+
+    /// End to end through the shipped builder: the passage block a whole-block selection produces
+    /// carries no nested header at all.
+    func testPassageBlocks_wholeBlockSelection_carriesNoNestedHeader() {
+        let r = renderedProsePlusChip()
+        let chip = chipLocation(in: r)
+        let passages = ExtractBuilder.passageBlocks(fromSelectionIn:
+            source(r, ranges: [NSRange(location: chip, length: r.length - chip)]))
+        XCTAssertEqual(passages.count, 1)
+        XCTAssertFalse(passages[0].block.markdown.contains("<!-- block:"),
+                       "got: \(passages[0].block.markdown)")
+    }
+
     // MARK: live-view snapshot independence (D7 value copy)
 
     func testLiveInit_snapshotsByValue_independentOfLaterEdits() {

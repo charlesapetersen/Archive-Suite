@@ -1228,21 +1228,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-extract-smuggles-a-source-header — a chip-inclusive selection puts a raw `reader-page`/`zotero-*` header INSIDE an extract, straight past the coercion that exists to forbid it [M · MED · invariant].**
-  Filed 2026-08-11 from the `W3.notes-chip-header-needs-a-line-break` adversarial pass; **pre-existing, and
-  NOT touched by that change** (at the point its new guard could fire, `result` is still `""`, so it never
-  does). `NotePassageBlockMap.blockRanges` starts each segment AT the chip (`NotePassageSource.swift:39-44`),
-  so a selection covering a whole block hands `MarkdownBridge.serialize` a `sub` whose first character is the
-  chip — and `snapshotMarkdown:93` therefore returns `<!-- block: reader-page … -->\n…` as *body text*. That
-  string becomes the `markdown` of a new `note-passage` block (`ExtractBuilder.swift:82-83`), so
-  `coercedToNotesOnly` (`:178-186`) — whose whole job is the extracts-reference-NOTES-only invariant of
-  00-overview §D7 — never sees it: the offending header is nested one level down, inside a block it considers
-  clean. On reload the extract has an extra block of the original kind. The shape is already constructed by
-  `NotePassageSourceTests.swift:139` (`NSRange(location: chip, length: 2)`), which asserts other things about
-  it. Fix direction: have `snapshotMarkdown` drop a leading chip from the sub-range (the chip's provenance is
-  already captured in the segment's own anchor, so re-emitting it is pure duplication), or coerce recursively.
-  Whichever is chosen, the acceptance test is a round-trip asserting no `block: reader-page` /
-  `block: zotero-` survives anywhere in a saved extract. | ArchiveNotes/Core | Tier-2
 - [ ] **W3.notes-frontmatter-codec-bypasses-the-leading-text-guard — the ONLY path that writes a note `.md` hand-rolls the join and makes `BlockParser.serialize`'s guard dead code [S · LOW-MED · latent].**
   Filed 2026-08-11 from the same pass; pre-existing. `FrontMatterCodec.swift:126-131` does
   `result += leading` and then `BlockParser.serialize(leadingText: nil, blocks: item.blocks)` — passing `nil`

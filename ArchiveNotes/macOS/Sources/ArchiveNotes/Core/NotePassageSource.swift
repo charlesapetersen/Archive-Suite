@@ -85,11 +85,14 @@ struct EditorPassageSource: PassageSelectionSource {
     /// Snapshot a covered sub-range into CommonMark plus the inline-image bytes it references (keyed
     /// by bare filename, matching `NotesPassagePayload.Segment.assetPNGs` / `ExtractBuilder.persist`).
     /// A value copy — the source note is never mutated.
+    ///
+    /// The whole result becomes the markdown of ONE `note-passage` block, so it must contain **no
+    /// block header at all** — see `strippingBlockChips`.
     func snapshotMarkdown(in range: NSRange) -> (markdown: String, assets: [String: Data]) {
         let clamped = NSIntersectionRange(range, NSRange(location: 0, length: rendered.length))
         guard clamped.length > 0 else { return ("", [:]) }
 
-        let sub = rendered.attributedSubstring(from: clamped)
+        let sub = Self.strippingBlockChips(rendered.attributedSubstring(from: clamped))
         let markdown = MarkdownBridge.serialize(sub)
 
         var assets: [String: Data] = [:]
@@ -101,6 +104,42 @@ struct EditorPassageSource: PassageSelectionSource {
             assets[bare] = bytes
         }
         return (markdown, assets)
+    }
+
+    /// Drop every source-block chip from a snapshot sub-range (W3.notes-extract-smuggles-a-source-header).
+    ///
+    /// `NotePassageBlockMap.blockRanges` starts each segment **at** its chip, so a selection covering a
+    /// whole block hands us a sub-range whose first character is that chip — and `MarkdownBridge
+    /// .serialize` faithfully turns a chip back into a `<!-- block: reader-page … -->` header. That
+    /// header would land as the *body* of the new `note-passage` block, one level below where
+    /// `ExtractBuilder.coercedToNotesOnly` looks, and re-parse on reload as a foreign block sitting
+    /// inside the extract — precisely the extracts-reference-NOTES-only invariant (00-overview §D7) the
+    /// coercion exists to hold. Re-emitting it is pure duplication anyway: the passage's own
+    /// `note-passage` anchor already records which note and which block ordinal it came from.
+    ///
+    /// A chip that OPENS the snapshot also owns the `\n` `MarkdownBridge.parse` put after it, so both go
+    /// (otherwise the passage body starts with a blank line). An interior chip's newline is the boundary
+    /// with the body before it, so that one stays. Text is never dropped — only provenance markup is.
+    private static func strippingBlockChips(_ sub: NSAttributedString) -> NSAttributedString {
+        var chips: [NSRange] = []
+        sub.enumerateAttribute(.noteBlockSource,
+                               in: NSRange(location: 0, length: sub.length)) { value, range, _ in
+            guard value != nil else { return }
+            chips.append(range)
+        }
+        guard !chips.isEmpty else { return sub }
+
+        let stripped = NSMutableAttributedString(attributedString: sub)
+        let original = sub.string as NSString          // immutable snapshot: chip ranges index THIS
+        for chip in chips.reversed() {                 // back-to-front: earlier ranges stay valid
+            var cut = chip
+            if chip.location == 0, NSMaxRange(chip) < original.length,
+               original.character(at: NSMaxRange(chip)) == 0x0A {   // '\n'
+                cut.length += 1
+            }
+            stripped.deleteCharacters(in: cut)
+        }
+        return stripped
     }
 }
 

@@ -172,17 +172,43 @@ struct ExtractBuilder {
     // MARK: - Extract-references-notes-only invariant (the single choke-point, §Risks)
 
     /// Coerce any block that is NOT a resolvable note-passage (a reader-page/-doc, a zotero-*, or a
-    /// note-passage with a malformed target) into a plain `freeform` block with no source. The S2
-    /// paste path routes pasted blocks through here so an outside-document source can never silently
-    /// attach to an extract (extracts reference NOTES only — §D7).
+    /// note-passage with a malformed target) into a plain `freeform` block with no source, and strip
+    /// any block header nested *inside* a block's markdown. Both the paste path and `persist` (i.e.
+    /// every durable extract write) route through here, so an outside-document source cannot attach to
+    /// an extract at either level (extracts reference NOTES only — §D7).
     nonisolated static func coercedToNotesOnly(_ blocks: [Block]) -> [Block] {
         blocks.map { block in
+            let markdown = flattenedNestedHeaders(block.markdown)
             if block.kind == .notePassage, block.source?.notePassageTarget != nil {
-                return block
+                var kept = block
+                kept.markdown = markdown
+                return kept
             }
             return Block(kind: .freeform, source: nil,
-                         markdown: block.markdown, unknownHeaderFields: [])
+                         markdown: markdown, unknownHeaderFields: [])
         }
+    }
+
+    /// Drop `<!-- block: … -->` headers nested inside ONE block's markdown, keeping every scrap of
+    /// text (W3.notes-extract-smuggles-a-source-header).
+    ///
+    /// Kind coercion above inspects the block list, so it is blind one level down — and a header at a
+    /// line start inside a block's markdown is not inert text: `BlockParser.parse` splits on it, so on
+    /// reload it becomes a *real* foreign block inside the extract. The root cause was
+    /// `EditorPassageSource.snapshotMarkdown` re-serializing the source note's own chip (fixed there,
+    /// where the chip is still an attribute rather than text); this is the choke-point half, so the
+    /// invariant does not rest on every future producer of a passage markdown being careful.
+    /// `BlockParser` is the authority on what counts as a header, so the split is delegated to it and
+    /// cannot drift from the reader.
+    nonisolated private static func flattenedNestedHeaders(_ markdown: String) -> String {
+        let (leading, nested) = BlockParser.parse(markdown)
+        guard !nested.isEmpty else { return markdown }   // the common path: no header, byte-identical
+        var out = leading ?? ""
+        for block in nested where !block.markdown.isEmpty {
+            if !out.isEmpty, !out.hasSuffix("\n") { out += "\n" }
+            out += block.markdown
+        }
+        return out
     }
 
     // MARK: - Default title
@@ -190,8 +216,13 @@ struct ExtractBuilder {
     /// First non-empty snapshot line, stripped of Markdown markers (`#`, `*`, `_`, `>`, list
     /// bullets), whitespace-trimmed, truncated to 80 chars on a word boundary; falls back to
     /// `"Extract <yyyy-MM-dd>"` when the snapshot is image-/whitespace-only.
-    nonisolated static func defaultTitle(fromFirstLineOf passages: [ExtractPassageBlock], fallbackDate: Date) -> String {
-        let combined = passages.map { $0.block.markdown }.joined(separator: "\n")
+    ///
+    /// Takes the blocks as **persisted** (i.e. post-`coercedToNotesOnly`), not the raw passages: a
+    /// `<!-- block: …` line nested in the markdown is not title material, and reading it as one put
+    /// the smuggled header back into the front matter even once the body was clean
+    /// (W3.notes-extract-smuggles-a-source-header).
+    nonisolated static func defaultTitle(fromFirstLineOf blocks: [Block], fallbackDate: Date) -> String {
+        let combined = blocks.map { $0.markdown }.joined(separator: "\n")
         for rawLine in combined.split(separator: "\n", omittingEmptySubsequences: false) {
             let cleaned = strippedTitleLine(String(rawLine))
             if !cleaned.isEmpty { return truncateOnWordBoundary(cleaned, max: 80) }
@@ -211,7 +242,7 @@ struct ExtractBuilder {
         let (date, precision) = Item.normalizedDate(Self.isoDay(when), precision: .day)
         let item = Item(id: id,
                         kind: .extract,
-                        title: Self.defaultTitle(fromFirstLineOf: passages, fallbackDate: when),
+                        title: Self.defaultTitle(fromFirstLineOf: blocks, fallbackDate: when),
                         authors: [],
                         date: date,
                         datePrecision: precision,
@@ -270,7 +301,11 @@ struct ExtractBuilder {
 
     /// Copy each passage's inline-image bytes into the target item's `assets/` (via the audited
     /// `NoteStore.importAsset`), rewriting the block markdown when the store disambiguated the
-    /// stored filename. Returns the blocks with resolved asset paths.
+    /// stored filename. Returns the blocks with resolved asset paths, run through
+    /// `coercedToNotesOnly` — this is the one path `createExtract` and `append` share, so putting the
+    /// §D7 invariant here means no durable extract write can bypass it (W3.notes-extract-smuggles-a-
+    /// source-header). For blocks built by `passageBlocks` the coercion is the identity; it bites only
+    /// when a caller hands over a block that is not a resolvable note passage.
     private func persist(_ passages: [ExtractPassageBlock], into id: UUID) async throws -> [Block] {
         var result: [Block] = []
         result.reserveCapacity(passages.count)
@@ -287,7 +322,7 @@ struct ExtractBuilder {
             }
             result.append(block)
         }
-        return result
+        return Self.coercedToNotesOnly(result)
     }
 
     // MARK: - Pure text helpers

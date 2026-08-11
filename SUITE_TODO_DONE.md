@@ -5139,6 +5139,45 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **W3.notes-extract-smuggles-a-source-header — a chip-inclusive selection put a raw
+  `reader-page`/`zotero-*` header INSIDE an extract, straight past the coercion that exists to forbid it
+  [M · MED · invariant].** ✅ **SHIPPED 2026-08-11** (the commit whose subject begins
+  `fix(notes,trackers): W3.notes-extract-smuggles-a-source-header`; a self-referential sha cannot be written
+  into its own commit). Filed 2026-08-11 from the `W3.notes-chip-header-needs-a-line-break` adversarial pass;
+  pre-existing.
+  **Reproduced before fixing, on the bytes a scratch store actually received.** A select-all over a note with a
+  `reader-page` block and a `zotero-item` block produced an extract whose `.md` held, nested inside each
+  `note-passage` block, the source note's own header — and the item reloaded with **5** blocks where it should
+  have 3. Mechanism exactly as filed: `NotePassageBlockMap.blockRanges` starts each segment AT its chip, so
+  `snapshotMarkdown` handed `MarkdownBridge.serialize` a sub-range whose first character is the chip, and
+  `serialize` faithfully turned it back into `<!-- block: reader-page … -->` *body text*.
+  **Fixed at BOTH ends, because they fail for different reasons.**
+  (1) *Root cause* — `EditorPassageSource.strippingBlockChips` drops every chip from a snapshot sub-range
+  before serializing. A chip that OPENS the snapshot takes the `\n` `MarkdownBridge.parse` put after it (so the
+  body does not start blank); an interior chip's newline stays (it is the boundary with the body before it, and
+  fusing two lines would be a new defect). Text is never dropped, only provenance markup — which is not lost:
+  the passage's own `note-passage` anchor already records the source note + block ordinal, and §D7 says an
+  extract may reference NOTES only, so carrying the reader-page anchor was the violation, not the loss.
+  (2) *Choke point* — `coercedToNotesOnly` now also strips headers nested one level down, delegating "what is a
+  header" to `BlockParser.parse` so it cannot drift from the reader, and `persist` runs it. `persist` is the one
+  path `createExtract` and `append` share, so **no durable extract write can bypass the invariant** — previously
+  the coercion was on the paste path only, and the two persistence paths never called it at all. For blocks built
+  by `passageBlocks` the coercion is the identity.
+  (3) Found by the acceptance test, not by the filing: `defaultTitle` read the RAW passages, so a smuggled
+  header became the extract's *title* even once its body was clean. It now reads the persisted (coerced) blocks.
+  **Tests — the filing's acceptance bar was "a round-trip asserting no `block: reader-page` / `block: zotero-`
+  survives anywhere in a saved extract", so the assertions are on the file on disk.** New:
+  `ExtractNestedSourceHeaderTests` (select-all → `createExtract`; `append` to an existing extract; a hand-built
+  passage that bypasses the snapshot entirely — all three read the `.md` back and also assert the reloaded block
+  count + kinds), three `coercedToNotesOnly` flattening cases (nested header stripped with text preserved
+  verbatim, leading text kept on its own line, clean markdown returned byte-identical), and three in
+  `NotePassageSourceTests` asserting the snapshot markdown EXACTLY (`"Quoted body."`,
+  `"Intro prose.\nQuoted body."`) rather than by `contains`, which cannot see a header's position. All confirmed
+  RED before the fix and green after; full Notes bundle 196 XCTest + 778 swift-testing green, no new warnings.
+  **Scope:** Notes-local (`ArchiveNotes/Core`) — nothing in `ArchiveCore`, so no cross-app rebuild was owed.
+  Every store is `mktemp` (Prime Directive #1); no corpus touched. **Not GUI-verified:** the VM lane is still
+  Reader-only (`W21.vmgui`), and the visible effect (an extract renders one chip, not two) is fully determined
+  by the block list the tests assert on disk. | ArchiveNotes/Core | Tier-2 | done
 - [x] **W3.notes-chip-header-needs-a-line-break — `MarkdownBridge.serialize` emitted a block header with no
   preceding newline, so a pasted passage's provenance chip degraded to LITERAL TEXT on the next load
   [M · MED · data-shaped].** ✅ **SHIPPED 2026-08-11** (the commit whose subject begins `fix(notes,trackers): W3.notes-chip-header-needs-a-line-break`; a self-referential sha cannot be written into its own commit). Filed 2026-08-05 while fixing
