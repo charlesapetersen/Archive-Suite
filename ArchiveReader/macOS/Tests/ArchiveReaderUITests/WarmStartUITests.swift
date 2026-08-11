@@ -90,7 +90,10 @@ final class WarmStartUITests: XCTestCase {
                       "an untagged tree that was read completely may say so — and only then")
         captureScreenshot("warmstart-nothing-tagged")
 
-        let sentence = empty.label
+        // `.accessibilityText`, never `.label`: a SwiftUI Text puts its string in the accessibility
+        // VALUE and leaves the label empty (→ UITestText.swift). Reading `.label` here is what made
+        // this check fail with an empty actual the first time it was ever able to run.
+        let sentence = empty.accessibilityText
         XCTAssertTrue(sentence.contains("Scanned \(tagged.count + 1) files"),
                       "the denominator must be quoted, and be the real examined count: \(sentence)")
         XCTAssertTrue(sentence.contains("none carry a Read or Unread tag"),
@@ -121,7 +124,7 @@ final class WarmStartUITests: XCTestCase {
         let status = warm.staticTexts["ar.status.message"]
         XCTAssertTrue(status.waitForExistence(timeout: 20), "the write must report what it did")
         captureScreenshot("warmstart-refused-blind-write")
-        let message = status.label
+        let message = status.accessibilityText   // the string is in the VALUE — see UITestText.swift
         XCTAssertTrue(message.contains("could not update"),
                       "the vanished cache row must be refused, not written: \(message)")
         XCTAssertTrue(message.contains("Marked \(tagged.count - 1)"),

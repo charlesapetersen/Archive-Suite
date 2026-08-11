@@ -409,6 +409,121 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.vmuitest-blind — the GUI VM stopped serving the accessibility tree, so XCUITest saw no
+  windows in EITHER app; the apps were drawing correctly the whole time [M · HIGH · ops/GUI].** Filed
+  2026-08-10 while verifying `W26.verify-fu2`; **root cause found and repaired 2026-08-10 (see below) —
+  this entry stays open only until the gate has run green twice unattended.**
+  ⚠️ **It made the whole unattended GUI lane vacuous** — `resume-prompt.txt` STEP 3.5 sends every GUI
+  check here — and then it **parked the daemon**: the health gate read 37 failing UITests across both
+  apps as *"a reproducible build/test regression the per-change reviews missed"*.
+  **CONFIRMED ROOT CAUSE (measured in the guest, 2026-08-10).** Not the app, not the tests, not any of
+  the 30 commits since the last green gate:
+  - `AXIsProcessTrusted()` was **false** in the guest and `AXUIElementCopyAttributeValue(app, kAXWindows)`
+    returned **-25211 `kAXErrorAPIDisabled`**. XCUITest reads the accessibility tree and nothing else, so
+    every window assertion in every bundle failed as *"Main window should appear"*.
+  - The apps were **fine**: `CGWindowList` showed the Reader's navigation window at its usual 900×612
+    while the same run's UITests reported zero windows.
+  - Everything `tart exec` starts is attributed to the **guest agent** as its responsible process, so the
+    lane borrows the agent's Accessibility grant. That row still existed and still read `auth_value = 2`
+    — and tccd ignored it: *"Failed to match existing code requirement for subject …/tart-guest-agent"*,
+    `authReason=5`. **A grant that is present, reads as allowed, and is silently not honoured** is why
+    this was invisible from the outside and cost a day.
+  - Two things were wrong with it, and the first repair attempt failed because only the second was
+    obvious: (1) the installed agent is **linker-signed** ad-hoc, which `codesign --verify` calls *"not
+    signed at all"* — such a binary satisfies **no** requirement, so any csreq stored against it is dead
+    on arrival; (2) the agent is a **fat** binary, and a single-slice `cdhash` requirement does not match
+    it — the requirement has to be its **designated requirement**, the `or` of both slices.
+  **THERE WERE TWO INDEPENDENT FAULTS, and either one alone still produces "Main window should appear"
+  for every test** — which is why fixing one and re-running looked like no progress and nearly got the
+  second one dismissed:
+  - **(a) the guest could not SEE** — the stale grant above; and
+  - **(b) there was nothing to see** — AppKit **state restoration** on the app-under-test. XCUITest
+    launches it WITHOUT `-ApplePersistenceIgnoreState`, though Xcode passes that very flag to its own
+    test RUNNER. Both read off `ps` in the guest: runner `…-Runner -NSTreatUnknownArgumentsAsOpen NO
+    -ApplePersistenceIgnoreState YES`, app `…/ArchiveReader -ARUITestRootPath …`. The app then logs
+    `hasPersistentStateToRestore=1` → `No windows open yet` and SwiftUI never opens the `Window` scene.
+    Self-perpetuating: a launch that restores "no windows" re-saves "no windows" on terminate.
+  **(b) is the 2026-08-10 08:00 session's diagnosis, and it was RIGHT.** Its abandoned branch
+  `wt/autonomous-vmuitest-20260810-080001-27534` is **merged here**, not discarded. ⚠️ It was briefly
+  dismissed during this repair on the strength of a bad experiment — the flag was tested against a plain
+  `open`, which opens a window anyway, so it could not have shown a difference. **The only valid test of
+  a UITest-launch fix is a UITest run.** Notes needed the same seam, which that session never reached.
+  **`ArchiveTestHost` is NOT involved** (the one hypothesis that is genuinely dead): the app-under-test
+  carries **no `XCTest*` environment variable at all**, so `isUnitTestHost` is false, and `lsappinfo`
+  reports an ordinary `Foreground` process, not `.prohibited`.
+  **Repaired + guarded (this change):** `ops/gui/vm-seed-accessibility.sh` (+ its guest half) re-signs the
+  agent properly ad-hoc and stores its designated requirement, idempotently and with a backup;
+  `ops/gui/vm-check-accessibility.swift` asks the AX API whether it can actually enumerate a window, and
+  **both** the interactive lane and the health gate now run it as a preflight. A lane that cannot see is
+  now an explicit **SKIP** ("NOT VERIFIED: gui-vm"), never a RED — an environment fault must not be able
+  to park the daemon on a phantom regression again. | files: ops/gui/vm-seed-accessibility.sh, ops/gui/vm-seed-accessibility-guest.sh, ops/gui/vm-check-accessibility.swift, ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh | M | high | none
+
+- [x] **W26.verify-fu2 — the warm-start UI has still never been checked in the VM, and two of the three
+  checks need infrastructure that does not exist [M · MED · GUI]** ~~(blocked-on: W26.vmuitest-blind)~~.
+  ✅ **SHIPPED 2026-08-10 — all three checks pass in the VM.** `W26.vmuitest-blind` unblocked the lane;
+  the three tests then ran for the first time ever and came back 1 pass / 2 fail, and **both failures
+  were in the TEST, not the product**. They read the sentence from `XCUIElement.label`, but a SwiftUI
+  `Text` puts its string in the accessibility **value** and leaves the label empty — measured across
+  every static text in the window:
+      id=<ar.status.message>  label=<>  value=<Marked 2; 1 could not update.>
+  So each failure quoted an EMPTY actual and read as "the app printed nothing", when the app had printed
+  exactly the right sentence. Fixed by `XCUIElement.accessibilityText` (label + value joined —
+  `Tests/ArchiveReaderUITests/UITestText.swift`), which is the idiom the passing COLD sibling
+  `testAnUntaggedFolderShowsTheScannedDenominator` was already using inline; that inline copy now goes
+  through the helper too, so the next test cannot pick the wrong half by accident.
+  **The refusal this item exists to prove was working the whole time** — confirmed in pixels as well as
+  the tree: `vm-artifacts/shots-reader/uitest-warmstart-refused-blind-write.png` shows the status bar
+  reading *"Marked 2; 1 could not update. 3 selected"* over the three warm rows, one of whose files was
+  deleted while the app was closed. Four shots read (`warmstart-revalidating`, `-settled`,
+  `-nothing-tagged`, `-refused-blind-write`), which was the item's own remaining step.
+  Historical detail from the first run follows:
+  - ✅ `testWarmRowsPaintAsRevalidatingBeforeTheyPaintAsSettled` — passed (28.6 s).
+  - ❌ `testASettledPassOverAnUntaggedFolderQuotesTheFilesItExamined` — *"the denominator must be quoted,
+    and be the real examined count:"* (`WarmStartUITests.swift:94`) — the quoted actual is **empty**.
+  - ❌ `testAWarmRowWhoseFileVanishedIsRefusedRatherThanWrittenBlind` — *"the vanished cache row must be
+    refused, not written:"* (`WarmStartUITests.swift:125`) — likewise empty.
+  ⚠️ **These two were the FIRST honest signal this lane had produced in a day, not a new regression**:
+  they were authored in `f4d0d11` ("the three warm-start UI checks exist as tests; the VM run is next")
+  and have never once executed, because the lane was blind from the moment they landed. Both messages
+  quote an empty actual value, so **suspect the assertion's own plumbing (an accessibility identifier
+  that never resolves) before the product** — and note the sibling COLD test
+  `testAnUntaggedFolderShowsTheScannedDenominator` passes, which makes an empty WARM reading the more
+  interesting half. Evidence: `vm-artifacts/gui-vm-reader-attempt1.log`.
+  (That RED was the lane working, and a different thing from the environment fault that parked the
+  daemon. It is now GREEN: **reader 28 passed / 0 failed, notes 20 passed / 0 failed**, both on the
+  first attempt.)
+  **Earlier status (2026-08-10) — the infrastructure and all three tests have LANDED (`2d5a754`,
+  `f4d0d11`); only the VM run was outstanding.** What shipped: two DEBUG launch
+  keys, both read from the INJECTED defaults domain — `ARUITestLibraryIndexPath` (substitutes a SCRATCH
+  warm-start database in `ArchiveLibrary.init`, and is the only thing that lets a fixture root use a
+  persisted cache at all, since `usesPersistedIndex` otherwise answers NO) and `ARUITestScanHoldSeconds`
+  (holds the pass once the warm rows are published, applied BEFORE `armScanStallDeadline` so the hook can
+  never be reported as *"Archive folder has not answered"*); `ar.status.scanning` and `ar.status.message`
+  accessibility identifiers; `LibraryFixtureLaneWarmStartTests` (4 tests, green, including a guard that a
+  fixture root with NO index key still scans synchronously — the contract `DocumentPageLinkTests` /
+  `RootMarkerStateTests` / `waitForRows` are calibrated against); and `WarmStartUITests`, which makes all
+  three assertions. **Measured while doing it: revalidating a two-file corpus settles inside 10 ms**, so
+  the item's premise was right — the run that did not hold the pass never observed `revalidating` at all.
+  Also found: check (2)'s COLD half is **already shipped** as
+  `ArchiveReaderUITests.testAnUntaggedFolderShowsTheScannedDenominator`; what this item adds is the WARM
+  variant. Remaining: `ONLY_TESTING=ArchiveReaderUITests/WarmStartUITests ops/gui/vm-gui-runner.sh reader
+  xcuitest`, read the four shots, tick. Original text follows. Split out of `W26.verify` 2026-08-10;
+  this is the (b) half that item carried over from `W26.idx`. Three assertions, none of which any test
+  makes today: (1) cached rows paint as *revalidating*, not settled; (2) after revalidation the settled
+  sentence still quotes its examined-file denominator (`ar.empty.nothingTagged` — *"Scanned N files … none
+  carry a Read or Unread tag"*); (3) a warm row selected before revalidation completes is re-verified
+  rather than written blind. ⚠️ **Read this before starting: (1) is not observable as the code stands.** On
+  a 12-file GUI fixture revalidation finishes in milliseconds, so there is no window in which XCUITest can
+  see the revalidating paint — a test written against it would pass or fail by luck, which is exactly the
+  flake class `W21.vmgui-c` cost two days. It needs a DEBUG-only stall hook (a launch argument in the
+  `-ARUITestRootPath` family) so the transient becomes a state the test can enter deliberately; that is
+  product-adjacent code, so Tier-2. (2) needs a fixture whose files carry NO Read/Unread tag, since the
+  denominator sentence only renders over an empty list. (3) is already proven headlessly by
+  `LibraryWarmStartTests.testBulkMarkReverifiesCachedRowsAndStillUpdatesValidDiskNeighbours` and
+  `testCorruptOutOfRootCacheRowIsNeverPublishedAsAWriteTarget`; what is unproven is the same thing through
+  the UI. VM lane only (`ops/gui/vm-gui-runner.sh reader xcuitest`), never the host screen. | files: ArchiveReader/macOS/Tests/ArchiveReaderUITests/WarmStartUITests.swift | M | med | none
+
+
 - [x] **W26.verify-fu1 — the two lanes were never measuring in the same world, and then "unclamped"
   turned out to be the wrong bar for the number that came out. ✅ CLOSED 2026-08-10** `94e30d8` ->
   `11e243d` -> `15df472` -> this commit. The item asked for ONE trustworthy per-file cost where the

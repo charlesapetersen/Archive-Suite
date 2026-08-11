@@ -1228,6 +1228,15 @@ final class NotesGUITests: NotesFixtureUITestCase {
         // --- Phase 1: ⌘⌥E in the Note window must raise the EXTRACTS window. ---
         // Focus the Note window first (opening the Extracts window took it), so a raise is a real
         // transition rather than the state we started in.
+        // Front the Note window through the WINDOW MENU, not by clicking inside it. The two windows open
+        // stacked with a one-pixel cascade offset — measured in the VM 2026-08-10:
+        //     note    (417, 265, 1121, 612)
+        //     extract (417, 266, 1121, 612)   ← on top, and key
+        // so every element in the Note window sits under the Extracts window, and a coordinate click
+        // aimed at one of its cells lands on the Extracts window instead. `selectItem` alone therefore
+        // left the Note window NOT key and this check failed for a reason that looks like the product
+        // refusing to take focus. (It also means the row was never actually selected.)
+        frontWindow(named: "Archive Notes")
         selectItem(uuid: Self.idPlain)
         XCTAssertTrue(pollUntil(timeout: 10) { isKey(noteWin) },
                       "selecting in the Note window should make it key before the trigger")
@@ -1277,6 +1286,24 @@ final class NotesGUITests: NotesFixtureUITestCase {
         guard probe.exists else { return false }
         if let v = probe.value as? String, !v.isEmpty { return v == "key" }
         return probe.label.hasPrefix("key:")
+    }
+
+    /// Bring a `Window(title:id:)` scene to the front by NAME, through the same automatic Window menu
+    /// `openExtractsWindow` uses. Coordinate-free on purpose.
+    ///
+    /// Clicking inside a window does not reliably front it in this app: the Note and Extracts windows
+    /// open stacked with a one-pixel cascade offset, so any click aimed at an element of the lower
+    /// window lands on the upper one. Anything that needs a specific window to be KEY must say so by
+    /// name — a click can only ever confirm what was already on top.
+    private func frontWindow(named title: String) {
+        app.activate()
+        let windowMenu = app.menuBars.menuBarItems["Window"]
+        XCTAssertTrue(windowMenu.waitForExistence(timeout: 10), "the Window menu should exist")
+        windowMenu.click()
+        let item = app.menuItems[title]
+        XCTAssertTrue(item.waitForExistence(timeout: 5),
+                      "Window ▸ \(title) should be offered for that Window scene")
+        item.click()
     }
 
     /// The Extracts window, opened if it is not already up. SwiftUI's automatic Window menu carries one

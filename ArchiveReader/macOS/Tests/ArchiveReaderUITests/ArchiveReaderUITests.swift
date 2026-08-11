@@ -48,7 +48,7 @@ final class ArchiveReaderUITests: XCTestCase {
         let emptyState = app.descendants(matching: .any)["ar.empty.nothingTagged"]
         XCTAssertTrue(emptyState.waitForExistence(timeout: 10),
                       "the empty state must quote what discovery actually examined")
-        let accessibilityText = [emptyState.label, emptyState.value as? String ?? ""].joined(separator: " ")
+        let accessibilityText = emptyState.accessibilityText   // label + value — see UITestText.swift
         XCTAssertTrue(accessibilityText.contains("No tagged documents"),
                       "a complete scan of an untagged scratch folder should reach the honest empty state")
         XCTAssertTrue(accessibilityText.contains("Scanned 1 file in this folder"),
