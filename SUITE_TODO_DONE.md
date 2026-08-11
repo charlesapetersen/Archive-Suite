@@ -5174,10 +5174,17 @@ explain why not.
   `NotePassageSourceTests` asserting the snapshot markdown EXACTLY (`"Quoted body."`,
   `"Intro prose.\nQuoted body."`) rather than by `contains`, which cannot see a header's position. All confirmed
   RED before the fix and green after; full Notes bundle 196 XCTest + 778 swift-testing green, no new warnings.
+  **GUI-verified in the headless Tart VM** (`ops/gui/vm-gui-runner.sh notes xcuitest`): `ArchiveNotesUITests`
+  **20/20 in 359 s**, which includes the two tests that drive this exact path end to end through the real app —
+  `testG9_CreateExtractFromSelectionWritesExtractItem` (⌘⌥E over a live selection, asserting the extract's `.md`
+  on disk) and `testG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract` (copy a whole note body as a
+  passage, paste into an extract). ⚠️ **The autonomous plan's "`vm-gui-runner.sh` is currently Reader-only, so
+  defer Notes GUI checks to Daemon Report" note is STALE** — it is dated 2026-07-28 and `W21.vmgui-c` landed the
+  Notes lane on 2026-08-01 (`de43be3`). `vm-gui-runner.sh notes xcuitest` works; what `W21.vmgui`/`-d` still owes
+  is the **Processor** lane. Do not defer a Notes GUI check on that basis. (Corrected in the plan preamble too.)
   **Scope:** Notes-local (`ArchiveNotes/Core`) — nothing in `ArchiveCore`, so no cross-app rebuild was owed.
-  Every store is `mktemp` (Prime Directive #1); no corpus touched. **Not GUI-verified:** the VM lane is still
-  Reader-only (`W21.vmgui`), and the visible effect (an extract renders one chip, not two) is fully determined
-  by the block list the tests assert on disk. | ArchiveNotes/Core | Tier-2 | done
+  Every store is `mktemp` (Prime Directive #1); no corpus touched, nothing on the host screen.
+  | ArchiveNotes/Core | Tier-2 | done
 - [x] **W3.notes-chip-header-needs-a-line-break — `MarkdownBridge.serialize` emitted a block header with no
   preceding newline, so a pasted passage's provenance chip degraded to LITERAL TEXT on the next load
   [M · MED · data-shaped].** ✅ **SHIPPED 2026-08-11** (the commit whose subject begins `fix(notes,trackers): W3.notes-chip-header-needs-a-line-break`; a self-referential sha cannot be written into its own commit). Filed 2026-08-05 while fixing
