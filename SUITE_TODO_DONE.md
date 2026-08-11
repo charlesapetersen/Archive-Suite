@@ -5139,6 +5139,44 @@ explain why not.
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 
+- [x] **W3.notes-editor-blankline-collapse — CONFIRM FIRST, then decide: `MarkdownBridge.parse` → `serialize` collapses a blank line between two paragraphs, and a single line break into a space, for EVERY line-ending form [S · investigate-first · possibly intended].**
+  ✅ **CONFIRMED data-shaped, then FIXED — 2026-08-11.** The premise this item demanded be checked first
+  was right: the real editor path loses it too. `NotesModel.setBody` write-back was measured end to end, not
+  just the bare bridge call, and a two-paragraph note came back off DISK with its blank line gone.
+  **Root cause:** Apple's Markdown parser models block boundaries as `presentationIntent` IDENTITY only —
+  the parsed characters of `"A\n\nB"` are literally `"AB"`, with no separator character at all — so
+  concatenating the runs glued every note's paragraphs together, in the editor's display AND in what it
+  serialized back. (The filed guess, that `collectParagraphs` enumerates attribute RUNS rather than
+  paragraph ranges, was in the right area but not the mechanism.)
+  **Fix:** the Styler re-materialises the boundary as real text, tagged `.noteBlockSeparator`
+  (`MarkdownAttributes`), and `serializeParagraph` reads that tag to tell a block separator from a newline
+  the operator typed — emitting it AFTER the decorated construct so a code fence stays closed and a
+  heading's `#` keeps its own line. Both faces are fixed by the one change.
+  **Tests (5, all green):** `blockBoundariesSurviveTheRoundTrip`, `parsedDisplayTextKeepsTheParagraphBreak`,
+  `softBreakInsideAParagraphStaysASpace`, and the two that make it data-shaped rather than cosmetic —
+  *"a two-paragraph body keeps its blank line through the editor write-back to disk"* and *"a mixed-block
+  body keeps every block boundary through the write-back to disk"*. Full Notes unit run: 215 XCTest + 790
+  swift-testing, 0 failures, no new warnings.
+  ⚠️ **Provenance:** this work was written by the daemon session that was stopped mid-flight on 2026-08-11
+  and survived only as uncommitted files in `../suite-wt-20260811-081102-79869`. It was reviewed, rebased
+  onto current main, rebuilt and re-run before landing — the third time in this family that the substance
+  of a session was in a killed predecessor's WIP (`006e756`, `deba3a9`, this).
+  Measured 2026-08-11 while adversarially reviewing `W3.notes-cr-line-start-fu1` — **not caused by it, and
+  not CR-specific: that is the point of filing it.** Straight `MarkdownBridge.serialize(MarkdownBridge
+  .parse(markdown:))`, three forms, identical outcome, and a fixed point from the first pass onward:
+  `"Para one.\n\nPara two.\n"` → `"Para one.Para two."` (21 → 18 scalars), and the `\r` and `\r\n` spellings
+  of the same input give byte-identical output; `"Line one.\nLine two.\n"` → `"Line one. Line two."`. The LF
+  control is why nothing was filed against the CR family here — the bridge treats all three the same, so
+  `fu1` neither introduced nor widened this.
+  ⚠️ **The premise to check before writing any code:** the probe called the bridge DIRECTLY with default
+  arguments. The real editor path goes through `NotesModel.getBody`/`setBody` (and passes an asset store), so
+  the first job is to establish whether an operator's two-paragraph note actually loses its blank line on
+  save. If it does, it is data-shaped and belongs with `W3.notes-thumb-line-duplicates`. If the real path
+  keeps the break, close this as an artefact of calling the bridge bare — and say so, because the raw
+  measurement above will otherwise get re-derived. A plausible mechanism to test first: `collectParagraphs`
+  enumerates `.noteBlockKind` attribute RUNS, not paragraph ranges, so plain text may arrive as one run.
+  | ArchiveNotes/Editor | Tier-1 (investigation)
+
 - [x] **W23.flake1 — de-flake `NoteBodyEditorModelTests.supersededLoadIgnored` (it RED'd the health gate).**
   The 2026-07-29 19:10 periodic gate went **RED on Notes** (708 passed / **1 failed**) and then **GREEN on the
   daemon's retry against the identical commit `baa970a` with a clean tree** — same code, different result, i.e.

@@ -188,4 +188,47 @@ struct NotesModelBodyTests {
         await env.model.setBody(writtenBack2, for: item.id)
         #expect(await env.model.loadBody(for: item.id) == md1)
     }
+
+    // W3.notes-editor-blankline-collapse — the Tier-2 functional half, on a scratch `mktemp` store.
+    // The item was filed as "possibly intended", with one instruction: establish whether the REAL
+    // path loses the break, because the raw measurement had called the bridge bare. It does. Measured
+    // on `deba3a9` through exactly this path, the two paragraphs reached disk as `Para one.Para two.`
+    // — the blank line AND the word boundary gone, on the first autosave of any two-paragraph note.
+    //
+    // Two save cycles deliberately: this defect's neighbour in the same family
+    // (`W3.notes-cr-line-start-fu1`) decayed PROGRESSIVELY, so one cycle is not evidence of a fixed
+    // point.
+
+    @Test("a two-paragraph body keeps its blank line through the editor write-back to disk")
+    func twoParagraphBodySurvivesWriteBackToDisk() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try await makeNote(env, body: "Para one.\n\nPara two.\n")
+
+        // What the editor renders on load and hands back to `setBody` on the first autosave.
+        let loaded = await env.model.loadBody(for: id) ?? ""
+        await env.model.setBody(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: loaded)), for: id)
+
+        let afterOne = try await env.store.load(id).trailingBodyRaw ?? ""
+        #expect(afterOne == "Para one.\n\nPara two.",
+                "the paragraph break did not survive one save: \(afterOne.debugDescription)")
+
+        // A second cycle: no decay, and no growth either.
+        let reloaded = await env.model.loadBody(for: id) ?? ""
+        await env.model.setBody(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: reloaded)), for: id)
+        let afterTwo = try await env.store.load(id).trailingBodyRaw ?? ""
+        #expect(afterTwo == afterOne, "the body decayed on the second save: \(afterTwo.debugDescription)")
+    }
+
+    @Test("a mixed-block body keeps every block boundary through the write-back to disk")
+    func mixedBlockBodySurvivesWriteBackToDisk() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let body = "Opening prose.\n\n- first\n- second\n\n> A quote.\n\nClosing prose."
+        let id = try await makeNote(env, body: body)
+
+        let loaded = await env.model.loadBody(for: id) ?? ""
+        await env.model.setBody(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: loaded)), for: id)
+
+        let onDisk = try await env.store.load(id).trailingBodyRaw ?? ""
+        #expect(onDisk == body, "block boundaries changed on save: \(onDisk.debugDescription)")
+    }
 }

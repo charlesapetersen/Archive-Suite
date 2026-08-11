@@ -1228,22 +1228,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-editor-blankline-collapse — CONFIRM FIRST, then decide: `MarkdownBridge.parse` → `serialize` collapses a blank line between two paragraphs, and a single line break into a space, for EVERY line-ending form [S · investigate-first · possibly intended].**
-  Measured 2026-08-11 while adversarially reviewing `W3.notes-cr-line-start-fu1` — **not caused by it, and
-  not CR-specific: that is the point of filing it.** Straight `MarkdownBridge.serialize(MarkdownBridge
-  .parse(markdown:))`, three forms, identical outcome, and a fixed point from the first pass onward:
-  `"Para one.\n\nPara two.\n"` → `"Para one.Para two."` (21 → 18 scalars), and the `\r` and `\r\n` spellings
-  of the same input give byte-identical output; `"Line one.\nLine two.\n"` → `"Line one. Line two."`. The LF
-  control is why nothing was filed against the CR family here — the bridge treats all three the same, so
-  `fu1` neither introduced nor widened this.
-  ⚠️ **The premise to check before writing any code:** the probe called the bridge DIRECTLY with default
-  arguments. The real editor path goes through `NotesModel.getBody`/`setBody` (and passes an asset store), so
-  the first job is to establish whether an operator's two-paragraph note actually loses its blank line on
-  save. If it does, it is data-shaped and belongs with `W3.notes-thumb-line-duplicates`. If the real path
-  keeps the break, close this as an artefact of calling the bridge bare — and say so, because the raw
-  measurement above will otherwise get re-derived. A plausible mechanism to test first: `collectParagraphs`
-  enumerates `.noteBlockKind` attribute RUNS, not paragraph ranges, so plain text may arrive as one run.
-  | ArchiveNotes/Editor | Tier-1 (investigation)
 - [ ] **W3.notes-thumb-line-duplicates — a `thumb:` block grows one extra `![display](thumb)` line on EVERY save, without bound [M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` fix, which added the first
   parse→serialize→parse idempotence test this class has ever had; the `thumb:` shape is the one shape that

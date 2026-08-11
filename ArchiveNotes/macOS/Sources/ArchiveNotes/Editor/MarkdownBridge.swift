@@ -401,8 +401,23 @@ enum MarkdownBridge {
     private static func serializeParagraph(_ storage: NSAttributedString,
                                            range: NSRange,
                                            kind: BlockKind) -> String {
+        // W3.notes-editor-blankline-collapse — a block separator at the END of this paragraph is
+        // not part of its text: it separates this block from the next, and `serializeBodySegment`'s
+        // join already writes one of its newlines. Emitting the rest AFTER the decorated construct
+        // is what keeps a code fence closed (inside `trimmed` it would land between the last code
+        // line and the closing ```) and a heading's `#` on a line of its own.
+        // A separator in the MIDDLE of a paragraph is a different thing — two same-kind blocks that
+        // `collectParagraphs` merged, which is the common two-plain-paragraphs case — and it
+        // serializes verbatim through `serializeInlineRuns`. That IS the blank line.
+        var contentRange = range
+        var separatorSuffix = ""
+        if let separator = trailingSeparatorRange(storage, in: range) {
+            contentRange = NSRange(location: range.location, length: separator.location - range.location)
+            separatorSuffix = String((storage.string as NSString).substring(with: separator).dropFirst())
+        }
+
         // Get the inline-serialized content for this paragraph
-        let inlineContent = serializeInlineRuns(storage, range: range)
+        let inlineContent = serializeInlineRuns(storage, range: contentRange)
         // Strip trailing newline if present
         let trimmed = inlineContent.hasSuffix("\n")
             ? String(inlineContent.dropLast())
@@ -411,24 +426,39 @@ enum MarkdownBridge {
         switch kind {
         case .heading(let level):
             let prefix = String(repeating: "#", count: min(level, 6))
-            return "\(prefix) \(trimmed)"
+            return "\(prefix) \(trimmed)\(separatorSuffix)"
 
         case .blockquote:
-            return "> \(trimmed)"
+            return "> \(trimmed)\(separatorSuffix)"
 
         case .codeBlock(let hint):
             let fence = "```"
             let lang = hint ?? ""
-            return "\(fence)\(lang)\n\(trimmed)\n\(fence)"
+            return "\(fence)\(lang)\n\(trimmed)\n\(fence)\(separatorSuffix)"
 
         case .listItem(let ordered, let depth, let ordinal):
             let indent = String(repeating: "    ", count: depth)
             let bullet = ordered ? "\(ordinal). " : "- "
-            return "\(indent)\(bullet)\(trimmed)"
+            return "\(indent)\(bullet)\(trimmed)\(separatorSuffix)"
 
         case .plain:
-            return trimmed
+            return trimmed + separatorSuffix
         }
+    }
+
+    /// The run of block-separator whitespace at the very end of `range`, if the paragraph ends in
+    /// one. `longestEffectiveRange` is bounded by `range`, so this can never reach into the next
+    /// paragraph's separator.
+    private static func trailingSeparatorRange(_ storage: NSAttributedString,
+                                               in range: NSRange) -> NSRange? {
+        guard range.length > 0 else { return nil }
+        var effective = NSRange(location: 0, length: 0)
+        let last = range.location + range.length - 1
+        guard storage.attribute(.noteBlockSeparator, at: last,
+                                longestEffectiveRange: &effective, in: range) as? Bool == true else {
+            return nil
+        }
+        return effective
     }
 
     // MARK: - Inline run serialization

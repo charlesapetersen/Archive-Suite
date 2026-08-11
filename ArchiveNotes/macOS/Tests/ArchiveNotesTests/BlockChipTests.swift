@@ -348,6 +348,16 @@ final class BlockChipTests: XCTestCase {
                 <!-- block: freeform -->
                 Last.
                 """),
+            // W3.notes-editor-blankline-collapse — a block BODY is ordinary prose, so it can hold
+            // more than one paragraph. Before the fix the two paragraphs came back glued
+            // ("…one.Body two."), which this table could not see: it compared block kinds and
+            // provenance, and one glued block still has both.
+            ("multi-paragraph block body", """
+                <!-- block: freeform -->
+                Body one.
+
+                Body two.
+                """),
         ]
 
         for (name, md) in cases {

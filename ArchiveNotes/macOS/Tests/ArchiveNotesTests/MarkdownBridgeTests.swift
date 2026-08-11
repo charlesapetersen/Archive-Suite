@@ -397,6 +397,65 @@ struct MarkdownBridgeTests {
         return out
     }
 
+    // MARK: - W3.notes-editor-blankline-collapse — block boundaries are TEXT, not just intent
+
+    /// The defect this table exists for: Apple's Markdown parser represents a block boundary as
+    /// `presentationIntent` identity and emits **no separator characters**, so the styler's
+    /// run-concatenation glued every block together. Measured on `deba3a9`, through
+    /// `NotesModel.loadBody` → bridge → `setBody`: `"Para one.\n\nPara two.\n"` reached disk as
+    /// `"Para one.Para two."` — not a lost blank line but a lost WORD boundary, on the first autosave
+    /// of any note with two paragraphs, and shown that way in the editor too.
+    ///
+    /// Each row is asserted as an exact fixed point rather than by `contains`, because the failure
+    /// mode was a *missing separator* — a `contains` assertion sees nothing wrong with glued text.
+    @Test @MainActor
+    func blockBoundariesSurviveTheRoundTrip() {
+        let cases: [(name: String, md: String, want: String)] = [
+            ("two paragraphs", "Para one.\n\nPara two.", "Para one.\n\nPara two."),
+            ("three paragraphs", "One.\n\nTwo.\n\nThree.", "One.\n\nTwo.\n\nThree."),
+            ("heading then two paragraphs", "# Head\n\nBody one.\n\nBody two.",
+             "# Head\n\nBody one.\n\nBody two."),
+            ("paragraph, list, paragraph", "Body.\n\n- a\n- b\n\nAfter.", "Body.\n\n- a\n- b\n\nAfter."),
+            ("ordered list then paragraph", "1. one\n2. two\n\nAfter list.", "1. one\n2. two\n\nAfter list."),
+            ("nested list stays tight", "- a\n    - nested\n- b", "- a\n    - nested\n- b"),
+            ("blockquote then paragraph", "> Quoted.\n\nAfter quote.", "> Quoted.\n\nAfter quote."),
+            ("code block then paragraph", "```swift\nlet x = 1\n```\n\nAfter code.",
+             "```swift\nlet x = 1\n```\n\nAfter code."),
+            ("paragraph then code block", "Before.\n\n```\ncode\n```", "Before.\n\n```\ncode\n```"),
+            ("image on its own line", "Para.\n\n![Doc](assets/p1.png)\n\nAfter image.",
+             "Para.\n\n![Doc](assets/p1.png)\n\nAfter image."),
+            // The separator is inserted at a block boundary, so it must not be swept into the
+            // preceding INLINE construct — a `\n\n` that inherited `.link` or a bold font would
+            // serialize as `**bold\n\n**` and corrupt the markup, not just the whitespace.
+            ("paragraph ending in bold", "Ends in **bold**\n\nNext para.", "Ends in **bold**\n\nNext para."),
+            ("paragraph ending in a link", "Ends in a [link](https://e.com)\n\nNext para.",
+             "Ends in a [link](https://e.com)\n\nNext para.")
+        ]
+
+        for (name, md, want) in cases {
+            let once = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md))
+            #expect(once == want, "\(name): got \(once.debugDescription), want \(want.debugDescription)")
+            let twice = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: once))
+            #expect(twice == once, "\(name): not a fixed point — \(twice.debugDescription)")
+        }
+    }
+
+    /// The editor's own face of the same defect: the styled string the text view DISPLAYS carried no
+    /// separator either, so a two-paragraph note rendered as one run-on line. Asserted on the parse
+    /// output directly, because `serialize` could be made to re-invent a boundary the user never sees.
+    @Test @MainActor
+    func parsedDisplayTextKeepsTheParagraphBreak() {
+        #expect(MarkdownBridge.parse(markdown: "Para one.\n\nPara two.").string == "Para one.\n\nPara two.")
+        #expect(MarkdownBridge.parse(markdown: "- a\n- b").string == "a\nb")
+    }
+
+    /// A single line break inside one paragraph is a CommonMark *soft* break, and rendering it as a
+    /// space is correct — pinned so the block-separator work above is not "fixed" into breaking it.
+    @Test @MainActor
+    func softBreakInsideAParagraphStaysASpace() {
+        assertNormalized("Line one.\nLine two.", expected: "Line one. Line two.")
+    }
+
     /// Assert that parse→serialize produces the expected normalized form,
     /// and that a second round-trip is identical (fixed-point after one pass).
     @MainActor

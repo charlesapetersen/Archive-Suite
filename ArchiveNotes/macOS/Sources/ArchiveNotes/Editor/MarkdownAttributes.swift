@@ -11,6 +11,10 @@ extension NSAttributedString.Key {
     static let noteImageRelPath = NSAttributedString.Key("an.imageRelPath")
     /// Source anchor on a block-header chip char (SourceAnchorBox).
     static let noteBlockSource = NSAttributedString.Key("an.blockSource")
+    /// The whitespace the Styler inserts BETWEEN two blocks (Bool). Not the operator's text: the
+    /// serializer reads it to tell a paragraph break from a newline someone typed
+    /// (`W3.notes-editor-blankline-collapse`).
+    static let noteBlockSeparator = NSAttributedString.Key("an.blockSeparator")
 }
 
 // MARK: - BlockKind (paragraph-level semantic)
@@ -33,18 +37,66 @@ enum MarkdownStyler {
 
     /// Parse an `AttributedString` with Apple's semantic attributes into an
     /// `NSMutableAttributedString` with visual styles + our custom keys.
+    ///
+    /// **Block boundaries are re-materialised here as text** (`W3.notes-editor-blankline-collapse`).
+    /// Apple's Markdown parser models them as `presentationIntent` identity ONLY — the parsed
+    /// characters of `"A\n\nB"` are `"AB"`, with no separator at all — so concatenating the runs
+    /// glued every note's paragraphs together, in the editor's own display AND in what the editor
+    /// then serialized back to disk (measured end-to-end through `NotesModel.setBody`). Restoring
+    /// the separator here fixes both faces at once, and is why the serializer can keep emitting a
+    /// paragraph's text verbatim.
     @MainActor
     static func style(_ source: AttributedString, fontSize: CGFloat = 14) -> NSMutableAttributedString {
         let result = NSMutableAttributedString()
         let bodyFont = NSFont.systemFont(ofSize: fontSize)
+        var previous: (intent: PresentationIntent?, attrs: [NSAttributedString.Key: Any])?
 
         for run in source.runs {
             let runText = String(source[run.range].characters)
             let attrs = buildAttributes(run: run, fontSize: fontSize, bodyFont: bodyFont)
+
+            if let previous, previous.intent != run.presentationIntent {
+                let separator = blockSeparator(from: previous.intent, to: run.presentationIntent)
+                result.append(NSAttributedString(string: separator,
+                                                 attributes: separatorAttributes(after: previous.attrs,
+                                                                                 bodyFont: bodyFont)))
+            }
+
             result.append(NSAttributedString(string: runText, attributes: attrs))
+            previous = (run.presentationIntent, attrs)
         }
 
         return result
+    }
+
+    /// The text that separates two adjacent blocks: a blank line, except between list items, which
+    /// stay tight. (Any two list items count as "the same list" — a nested sublist or an
+    /// immediately-following list of the other marker type both round-trip correctly without the
+    /// blank line, and both would render wrong with one.)
+    private static func blockSeparator(from previous: PresentationIntent?,
+                                       to next: PresentationIntent?) -> String {
+        isListItem(previous) && isListItem(next) ? "\n" : "\n\n"
+    }
+
+    private static func isListItem(_ intent: PresentationIntent?) -> Bool {
+        guard let intent else { return false }
+        return intent.components.contains { if case .listItem = $0.kind { return true } else { return false } }
+    }
+
+    /// Block-level attributes only. The separator belongs to the block it FOLLOWS (so it serializes
+    /// as that paragraph's trailing newline), but it must not inherit that block's last INLINE run:
+    /// a `\n\n` carrying `.link`, `.noteInlineCode` or a bold font would be serialized inside the
+    /// construct — `"…**bold**"` would come back as `"**bold\n\n**"`.
+    private static func separatorAttributes(after attrs: [NSAttributedString.Key: Any],
+                                            bodyFont: NSFont) -> [NSAttributedString.Key: Any] {
+        var separatorAttrs: [NSAttributedString.Key: Any] = [
+            .font: bodyFont,
+            .foregroundColor: NSColor.textColor,
+            .noteBlockSeparator: true
+        ]
+        separatorAttrs[.noteBlockKind] = attrs[.noteBlockKind]
+        if let paragraphStyle = attrs[.paragraphStyle] { separatorAttrs[.paragraphStyle] = paragraphStyle }
+        return separatorAttrs
     }
 
     private static func buildAttributes(
