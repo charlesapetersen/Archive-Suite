@@ -75,6 +75,31 @@ tart set archive-gui-runner --display 1920x1200
 `xcodegen` must be on the **host** — the runner generates the `.xcodeproj` into the mounted worktree; the
 guest image has no xcodegen.
 
+⚠️ **Keep the guest booting to an EMPTY desktop.** macOS's *reopen at login* resume list survives
+`tart stop`, so anything left running when the VM goes down is relaunched by `launchd` ~7 s into the next
+boot — indefinitely, and invisibly. Measured on a fresh boot 2026-08-10, before any test had run:
+
+```
+358  application.com.archivenotes.app…      <- a stale APP-UNDER-TEST
+360  VisionReaderGUI   364  VisionOCR   362  TextEdit   359  Terminal
+```
+
+Two of those cost real debugging time. The stale `ArchiveNotes` meant `notes:prerun` was deleting a
+container out from under a live instance (now prevented by `tart_kill_app`, called before every prerun in
+both lanes). The others arrived on 2026-08-08 from an unrelated project that used this VM for its own GUI
+testing, and one of them held a 900×552 window in the middle of the screen during Archive Suite runs — it
+is visible behind the app in `vm-artifacts/sighted-reader.png`. Disabled in the guest with:
+
+```bash
+defaults write com.apple.loginwindow TALLogoutSavesState -bool false
+defaults write com.apple.loginwindow LoginwindowLaunchesRelaunchApps -bool false
+```
+
+Verified by rebooting: no `application.*` jobs in `launchctl list`, no stray GUI processes. If the guest
+ever starts booting into apps again, that pair of defaults is the first thing to check — and note the
+tests are only *partly* protected by `tart_kill_app`, which knows the apps in the per-app table and
+nothing else.
+
 **Why VNC for the sighted lane** (not in-VM `screencapture`/`cliclick`): a headless VM has **no capturable
 display** until a viewer attaches (in-VM `screencapture` → "could not create image from display"), and in-VM
 `cliclick` needs Accessibility TCC that's awkward to grant. So the sighted lane boots with

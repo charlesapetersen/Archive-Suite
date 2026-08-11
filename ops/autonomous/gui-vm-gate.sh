@@ -147,6 +147,11 @@ run_app_once() {   # $1 = app, $2 = attempt number
   # worth doing — but it must SAY so, because "which state did we start from" is now known to change the
   # result. (The suite no longer depends on it: `closeExtractsWindowIfOpen()` in setUp makes one window a
   # precondition either way. This warning exists so a silent change of premise can't happen again unseen.)
+  # Kill any stale instance BEFORE the prerun wipes its container — the guest boots with whatever was
+  # running when it was last stopped, app-under-test included (→ tart_kill_app, which carries the
+  # measurement). Ordering: kill, wipe, build the fixture, test.
+  tart_kill_app "$VM" "$app"
+  echo "pre-kill[$app]: any stale instance terminated" >>"$log"
   if [ -n "$prerun" ]; then
     if tart exec "$VM" bash -lc "$prerun" >>"$log" 2>&1; then
       echo "prerun[$app]: ok" >>"$log"

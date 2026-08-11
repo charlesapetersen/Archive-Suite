@@ -409,6 +409,35 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.lanehygiene — the GUI VM never boots to an empty desktop, and the xcuitest lane never killed
+  the app it was about to wipe [S · MED · ops/GUI].** Found while chasing the two Notes flakes left over
+  from `W26.vmuitest-blind`. Three separate defects, all in the lane rather than any app:
+  - **A stale app-under-test at every boot.** macOS's *reopen at login* resume list survives `tart stop`,
+    so `launchd` relaunches whatever was running ~7 s into the next boot. Measured on a FRESH boot before
+    any test ran: `application.com.archivenotes.app…` plus `VisionReaderGUI`, `VisionOCR`, `TextEdit`,
+    `Terminal`. `notes:prerun` (`rm -rf …/Containers/com.archivenotes.app`) was therefore deleting a
+    container out from under a LIVE instance — and this suite's own notes record that container state
+    decides outcomes here (the 2026-08-04 two-window cascade). **Fixed:** `tart_kill_app` in
+    `ops/gui/tart-lib.sh`, called BEFORE the prerun by the gate and the runner; the sighted lane's inline
+    `pkill` — the only one that ever did this — now goes through it. Ordering: kill → wipe → fixture → test.
+  - **The desktop itself.** Disabled the resume list in the guest (`TALLogoutSavesState`,
+    `LoginwindowLaunchesRelaunchApps` → false) and quit the strays. Verified by rebooting: no
+    `application.*` jobs, no stray GUI processes. Nothing deleted. The non-Archive apps arrived
+    2026-08-08 from an unrelated project that used this VM for its own GUI testing; one held a 900×552
+    window mid-screen during Archive Suite runs (visible in `vm-artifacts/sighted-reader.png`).
+  - **The runner regenerated the project under a live mount.** `vm-gui-runner.sh` called `ensure_vm`
+    and *then* `gen_project`, so xcodegen rewrote the `.xcodeproj` on the host while the guest had it
+    shared — the guest then saw *"missing its project.pbxproj"* and the run died before a single test.
+    Reproduced 2026-08-10: three back-to-back `notes xcuitest` runs, 1st green, 2nd and 3rd both dead on
+    that error with the file present and correct on the host throughout. The gate has always generated
+    before booting; **fixed** by putting `gen_project` ahead of `ensure_vm`. Third instance in two days of
+    the one-entry-point-fixed asymmetry `tart-lib.sh`'s header exists to prevent — hence the kill living
+    in the shared library rather than in either script.
+  **Verified:** `AUTONOMOUS_GUI_VM_APPS=notes` gate run GREEN — 20 passed / 0 failed, `pre-kill[notes]`
+  in the log. The two flakes (`testG5`, `testG13`) have now passed four consecutive Notes runs along with
+  `testG14`; they are not *proven* gone — absence of a flake is not evidence — but nothing has reproduced
+  since, and the gate's retry still covers a single-attempt blip. | files: ops/gui/tart-lib.sh, ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/gui/README.md | S | med | none
+
 - [x] **W26.vmuitest-blind — the GUI VM stopped serving the accessibility tree, so XCUITest saw no
   windows in EITHER app; the apps were drawing correctly the whole time [M · HIGH · ops/GUI].** Filed
   2026-08-10 while verifying `W26.verify-fu2`; **root cause found and repaired 2026-08-10 (see below) —

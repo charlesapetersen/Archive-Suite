@@ -198,6 +198,33 @@ tart_ensure_display() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# tart_kill_app VM APP — terminate any running instance of an app in the guest. Always returns 0: a run
+# that had nothing to kill is the normal case, not a failure.
+#
+# CALL IT BEFORE THE PRERUN, NOT AFTER. The prerun is a container wipe, and wiping a container out from
+# under a LIVE app is a different test than starting from a fresh one — this suite's own notes record
+# that container state decides outcomes here (the 2026-08-04 two-window cascade in ArchiveNotesUITests).
+#
+# THE BUG THIS EXISTS FOR (measured 2026-08-10). The guest does NOT boot to an empty desktop. macOS
+# LaunchServices keeps a "reopen at login" resume list that survives `tart stop`, so whatever was running
+# when the VM last went down comes back ~7 s after boot. On a FRESH boot, before any test had run:
+#     358  application.com.archivenotes.app…      <- a stale APP-UNDER-TEST, already running
+#     360  VisionReaderGUI   364  VisionOCR   362  TextEdit   359  Terminal
+# `notes:prerun` was therefore deleting `~/Library/Containers/com.archivenotes.app` while an instance of
+# ArchiveNotes held it open. The sighted lane has always killed first (`run_sighted`); the xcuitest lane
+# never did, in either entry point — which is precisely the one-copy-fixed asymmetry this file exists to
+# prevent, so the kill lives here and both lanes call it.
+tart_kill_app() {
+  local vm="$1" app="$2" procname
+  procname="$(archive_app_field "$app" procname)"
+  [ -n "$procname" ] || return 0
+  # `sleep 1` so the port/container is actually released before the caller wipes or relaunches; `true`
+  # keeps the exit status clean for the gate's `set -uo pipefail` (pkill exits 1 when nothing matched).
+  tart exec "$vm" bash -lc "pkill -x '$procname' 2>/dev/null; sleep 1; true" >/dev/null 2>&1
+  return 0
+}
+
+# ---------------------------------------------------------------------------------------------------
 # tart_lock_acquire [WAIT_SECONDS] / tart_lock_release — one writer at a time for the shared VM.
 #
 # There is ONE VM name and ONE artifact dir, and both entry points (the health gate and the interactive

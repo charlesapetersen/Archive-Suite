@@ -63,7 +63,7 @@ tart_lock_acquire "${LOCK_WAIT:-120}" \
 
 SPEC_REL="$(archive_app_field "$APP" spec)";        PROJ_REL="$(archive_app_field "$APP" proj)"
 SCHEME="$(archive_app_field "$APP" scheme)";        GUEST_DD="$(archive_app_field "$APP" dd)"
-GUEST_APP="$(archive_app_field "$APP" appbundle)";  PROCNAME="$(archive_app_field "$APP" procname)"
+GUEST_APP="$(archive_app_field "$APP" appbundle)"   # procname is read by tart_kill_app, not needed here
 GUEST_FIXTURE="$(archive_app_field "$APP" fixture)"; MKFIXTURE="$(archive_app_field "$APP" mkfixture)"
 LAUNCHARG="$(archive_app_field "$APP" launcharg)";  PRERUN="$(archive_app_field "$APP" prerun)"
 ONLY_TESTING="${ONLY_TESTING:-$(archive_app_field "$APP" tests)}"
@@ -230,6 +230,9 @@ assert_accessibility() {
 # --- LANE: XCUITest (accessibility) ---
 run_xcuitest() {
   assert_accessibility
+  # Before the prerun, which is a container wipe: the guest boots with whatever was running when it was
+  # last stopped, the app-under-test included (→ tart_kill_app).
+  tart_kill_app "$VM" "$APP"
   [ -n "$PRERUN" ] && tart exec "$VM" bash -lc "$PRERUN" >/dev/null 2>&1
   log "building + running $ONLY_TESTING for $APP in the VM…"
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
@@ -293,10 +296,12 @@ run_sighted() {
   [ -x "$VNCDOTOOL" ] || die "vncdotool not found at $VNCDOTOOL — recreate it:
     python3 -m venv ~/.tart-mirror/vncenv && ~/.tart-mirror/vncenv/bin/pip install vncdotool"
   [ -n "$VNC_PORT" ] || die "no VNC endpoint — this script must have started the VM for the sighted lane"
+  # Same kill-then-wipe order as the xcuitest lane, through the shared helper rather than an inline
+  # `pkill` (this lane's inline copy was the only one that ever did it — → tart_kill_app).
+  tart_kill_app "$VM" "$APP"
   [ -n "$PRERUN" ] && tart exec "$VM" bash -lc "$PRERUN" >/dev/null 2>&1
   log "launching $APP in the VM against its scratch fixture…"
   tart exec "$VM" bash -lc "
-    pkill -x '$PROCNAME' 2>/dev/null || true
     open '$GUEST_APP' --args $LAUNCHARG '$GUEST_FIXTURE'
     sleep 9
   "
@@ -309,8 +314,17 @@ run_sighted() {
 }
 
 log "app=$APP  lane=$LANE  vm=$VM"
-ensure_vm
+# GENERATE BEFORE BOOTING — never the other way round. `gen_project` rewrites the `.xcodeproj` bundle on
+# the HOST, and the guest builds it through the `--dir=repo:` share. Regenerating it while that share is
+# already mounted lets the guest observe the directory mid-rewrite:
+#     xcodebuild: error: Unable to read project 'ArchiveNotes.xcodeproj' … Reason: … cannot be opened
+#     because it is missing its project.pbxproj file.
+# Measured 2026-08-10: three back-to-back `notes xcuitest` runs, the 1st green and the 2nd and 3rd both
+# dead on that error, with the pbxproj present and correct on the host the whole time. The health gate
+# has always generated every app's project before `boot_vm`, which is why this only ever bit the
+# interactive lane — the same one-entry-point-fixed asymmetry `tart-lib.sh`'s header exists to prevent.
 gen_project
+ensure_vm
 ensure_fixture
 case "$LANE" in
   xcuitest) run_xcuitest ;;
