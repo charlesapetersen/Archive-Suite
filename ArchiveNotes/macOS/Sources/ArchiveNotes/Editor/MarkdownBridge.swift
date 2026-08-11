@@ -279,7 +279,11 @@ enum MarkdownBridge {
     /// Text is never dropped; only unmodeled visual styling is lost.
     ///
     /// Block-header chip characters (`noteBlockSource` attr) are serialized as
-    /// `<!-- block: kind ... -->` headers with optional `![display](thumb)` lines.
+    /// `<!-- block: kind ... -->` headers with optional `![display](thumb)` lines — each emitted at the
+    /// start of a line, the only form `BlockParser.parse` will read back as a header. One residual, so
+    /// this is not read as an absolute guarantee: a body ending in a LONE `\r` still defeats it, because
+    /// Swift merges the appended `\n` into a single `"\r\n"` grapheme and `BlockParser`'s line-start test
+    /// compares `Character`s (`W3.notes-cr-line-start`).
     @MainActor
     static func serialize(_ attributed: NSAttributedString) -> String {
         if attributed.length == 0 { return "" }
@@ -293,6 +297,15 @@ enum MarkdownBridge {
             // Check for a block-header chip at this position
             if let box = attributed.attribute(.noteBlockSource, at: i,
                                               effectiveRange: nil) as? SourceAnchorBox {
+                // W3.notes-chip-header-needs-a-line-break — a header must BEGIN A LINE. `BlockParser
+                // .parse` only recognises `<!-- block:` at a line start (`BlockParser.swift:56-58`),
+                // and `serializeBodySegment` joins paragraphs with `\n` without a trailing one — so
+                // every body butts straight up against the next header, and on reload the two blocks
+                // merge into one with the second chip degraded to literal text. That silently strips
+                // a pasted passage's provenance anchor. `BlockParser.serialize:90-101` guards exactly
+                // this on the storage side; this is the editor side of the same rule.
+                if !result.isEmpty, !result.hasSuffix("\n") { result += "\n" }
+
                 // Emit the block header
                 result += serializeBlockHeader(box)
                 i += 1 // skip the chip attachment character

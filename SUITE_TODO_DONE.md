@@ -5139,6 +5139,64 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **W3.notes-chip-header-needs-a-line-break — `MarkdownBridge.serialize` emitted a block header with no
+  preceding newline, so a pasted passage's provenance chip degraded to LITERAL TEXT on the next load
+  [M · MED · data-shaped].** ✅ **SHIPPED 2026-08-11** (the commit whose subject begins `fix(notes,trackers): W3.notes-chip-header-needs-a-line-break`; a self-referential sha cannot be written into its own commit). Filed 2026-08-05 while fixing
+  `W3.notes-passage-paste-at-caret`, deliberately not fixed in that change.
+  **The mechanism, confirmed rather than assumed.** `BlockParser.parse:56-58` only recognises `<!-- block:` as
+  a header at a LINE START. `MarkdownBridge.serializeBodySegment:361` joins paragraphs with `\n` and never
+  appends a trailing one, so *every* body butted straight up against the next header. Not an edge case: the
+  filing said "a body that does not end in a newline", but there is no other kind — the trailing newline is
+  eaten on the way in (Apple's Markdown parser) and never re-added on the way out. `BlockParser.serialize:90-101`
+  guards exactly this on the storage side; the editor side did not.
+  **Measured on pristine `5512df3`, from the bytes actually written to a scratch `.md`:**
+  `…an early egalitarian culture.<!-- block: freeform -->` — one line, and the item reloads with **1** block
+  where it should be 2. The second block's chip is now body text of the first, and its `note:` anchor is gone.
+  **Fix** — one guard in `MarkdownBridge.serialize`, mirroring the storage side: emit `\n` before a header when
+  `result` is non-empty and does not already end in one. Chosen there rather than in `serializeBodySegment`
+  because `serialize` is the single choke point every editor write reaches disk through (`MarkdownEditorView
+  .writeBack:346` and `NotePassageSource.snapshotMarkdown:93` are its only two production callers), so a chip
+  inserted mid-line by ANY route — caret paste, `buildInsertableBlock`, a future one — is corrected on the way
+  out instead of at each insertion site.
+  **Tests (the item asked for the idempotence test "regardless" — it did not exist for this class at all):**
+  `BlockChipTests` gains `testEmittedHeaderAfterABodyStartsOnItsOwnLine`,
+  `testEmittedHeaderAfterLeadingProseStartsOnItsOwnLine` and
+  `testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint` (5 document shapes × block count + kind +
+  provenance preserved + byte-identical second pass); `NotesModelBodyTests
+  .editorWriteBackKeepsBothBlocksOnDisk` drives the whole loop on an `mktemp` store (Prime Directive #1) —
+  editor storage → serialize → `setBody` → `BlockParser.parse` → atomic `.md` → reload — and asserts the
+  on-disk bytes, which is where the loss actually landed. All four were confirmed **RED before the fix**
+  (4 issues in the store test alone, including the `.md` quoted above) and green after.
+  ⚠️ **Why the existing suite missed it, worth keeping:** every prior multi-block test asserts with
+  `contains`, which cannot see WHERE on the line a header sits, and `testSecondRoundTripIsNoOp` uses a single
+  block. A suite that round-trips blocks constantly was structurally blind to it.
+  **The adversarial pass found four things; one changed this commit, three were filed.** In scope and fixed
+  here: `testChipInsertedMidLineStillSerializesOntoItsOwnLine`, covering the `buildInsertableBlock` shape
+  (a chip dropped wherever the caret sits) — the guard handles it, and the deliberate visible consequence is
+  that `Foo[chip] bar` reflows to `Foo[chip]⏎bar` on the next load, since `parse` adds a newline AFTER a chip
+  but never before one. That is what the format requires and strictly better than destroying the chip. Two
+  comments were also corrected rather than left overclaiming: the `serialize` doc no longer promises an
+  absolute line-start guarantee, and the store test no longer says it drives `MarkdownEditorView.writeBack`
+  (it drives the same pure functions plus the real store; the raw-mode branch stays untested).
+  **Filed not fixed, one item per change** — all four reproduced against pristine `5512df3`:
+  `W3.notes-thumb-line-duplicates` (a `thumb:` block gains a duplicate `![display](thumb)` line every pass,
+  1 → 2 → 3 measured — the one shape excluded from the new fixed-point table, with a pointer);
+  `W3.notes-extract-smuggles-a-source-header` (MED — a chip-inclusive selection nests a raw `reader-page`
+  header inside an extract one level below where `coercedToNotesOnly` looks, defeating the
+  extracts-reference-notes-only invariant); `W3.notes-frontmatter-codec-bypasses-the-leading-text-guard`
+  (the only disk-write path passes `leadingText: nil`, making `BlockParser.serialize:92`'s guard dead code —
+  latent only because every current producer of `trailingBodyRaw` is `BlockParser.parse`);
+  `W3.notes-cr-line-start` (LOW — the one residual gap in THIS fix: `BlockParser`'s line-start test compares
+  `Character`s, and Swift merges CR+LF into one `"\r\n"` grapheme, so a lone `\r` defeats both it and the new
+  guard. Unfixable from `MarkdownBridge` alone — any `\n` appended after a `\r` is swallowed into the same
+  grapheme — so it belongs at the parser, and the doc comment now says so instead of overclaiming).
+  Verified: Notes unit bundle **772 swift-testing / 83 suites + 193 XCTest, 0 failures**, fresh DerivedData, no
+  new warnings (the 55 emitted are the known `ArchiveNotesUITests` actor-isolation backdrop,
+  `W23.notes-uitest-warn`) — **plus the headless Tart VM GUI lane, `ArchiveNotesUITests` 20/20 green**
+  (`ops/gui/vm-gui-runner.sh notes xcuitest`, 358 s, off the owner's screen). The VM run is the one that
+  matters here beyond habit: this change alters the BYTES written to `.md`, and G13/G6 assert on those bytes
+  from disk. Notes-local change — `MarkdownBridge` is not in ArchiveCore, so no cross-app rebuild was owed.
+
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
   command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine

@@ -1228,20 +1228,64 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-chip-header-needs-a-line-break — `MarkdownBridge.serialize` emits a block header with no preceding newline, so a pasted passage's provenance chip degrades to LITERAL TEXT on the next load [M · MED · data-shaped].**
-  Filed 2026-08-05, found while fixing `W3.notes-passage-paste-at-caret` and deliberately NOT fixed in the same
-  change. `MarkdownBridge.serialize` concatenates a body segment and the next header with no separator, so a
-  correct round-trip produces `…early egalitarian culture.<!-- block: note-passage` — the header starts
-  mid-line. `BlockParser.parse` only recognises a header at LINE START (`BlockParser.swift:56-58`), and
-  `BlockParser.serialize` guards exactly this case (`:90-101`); `MarkdownBridge.serialize` does not.
-  ⚠️ **This fires on the path that PASSES.** Round-tripped by hand: `BlockParser.parse` of a healthy pasted
-  extract yields `blocks=1` where it should be 2, and re-serializing gives a different string (the header's
-  field indentation is eaten). So the passage silently loses its provenance anchor on reload, and `testG13`
-  going green does NOT cover it — G13 asserts the `.md` the paste writes, never what a reload makes of it.
-  Fix is small (emit a newline before a header when the preceding character is not one, mirroring
-  `BlockParser.serialize`) but it is the shared write-back path for every note and extract, so it wants its own
-  Tier-2 plus a parse→serialize→parse idempotence test. **Add that test regardless** — the class is untested
-  today, which is why two defects in it have now been found by accident. | ArchiveNotes/Editor + Store | Tier-2
+- [ ] **W3.notes-extract-smuggles-a-source-header — a chip-inclusive selection puts a raw `reader-page`/`zotero-*` header INSIDE an extract, straight past the coercion that exists to forbid it [M · MED · invariant].**
+  Filed 2026-08-11 from the `W3.notes-chip-header-needs-a-line-break` adversarial pass; **pre-existing, and
+  NOT touched by that change** (at the point its new guard could fire, `result` is still `""`, so it never
+  does). `NotePassageBlockMap.blockRanges` starts each segment AT the chip (`NotePassageSource.swift:39-44`),
+  so a selection covering a whole block hands `MarkdownBridge.serialize` a `sub` whose first character is the
+  chip — and `snapshotMarkdown:93` therefore returns `<!-- block: reader-page … -->\n…` as *body text*. That
+  string becomes the `markdown` of a new `note-passage` block (`ExtractBuilder.swift:82-83`), so
+  `coercedToNotesOnly` (`:178-186`) — whose whole job is the extracts-reference-NOTES-only invariant of
+  00-overview §D7 — never sees it: the offending header is nested one level down, inside a block it considers
+  clean. On reload the extract has an extra block of the original kind. The shape is already constructed by
+  `NotePassageSourceTests.swift:139` (`NSRange(location: chip, length: 2)`), which asserts other things about
+  it. Fix direction: have `snapshotMarkdown` drop a leading chip from the sub-range (the chip's provenance is
+  already captured in the segment's own anchor, so re-emitting it is pure duplication), or coerce recursively.
+  Whichever is chosen, the acceptance test is a round-trip asserting no `block: reader-page` /
+  `block: zotero-` survives anywhere in a saved extract. | ArchiveNotes/Core | Tier-2
+- [ ] **W3.notes-frontmatter-codec-bypasses-the-leading-text-guard — the ONLY path that writes a note `.md` hand-rolls the join and makes `BlockParser.serialize`'s guard dead code [S · LOW-MED · latent].**
+  Filed 2026-08-11 from the same pass; pre-existing. `FrontMatterCodec.swift:126-131` does
+  `result += leading` and then `BlockParser.serialize(leadingText: nil, blocks: item.blocks)` — passing `nil`
+  for the very argument whose guard (`BlockParser.swift:92`) inserts the separating newline between leading
+  prose and the first header. Since `NoteStore.swift:210-211`/`:258` is the only encode→write site, that
+  guard is dead on the only path that reaches disk. **Latent today, not firing:** every producer of
+  `trailingBodyRaw` is `BlockParser.parse` (`FrontMatterCodec.swift:63`, `NotesModel.swift:744`), whose
+  `leadingText` always ends in `\n` by construction. The day anything else sets `trailingBodyRaw` — a
+  template, an importer, a migration — the `…culture.<!-- block:` corruption that
+  `W3.notes-chip-header-needs-a-line-break` just fixed on the editor side reappears on the storage side, with
+  no test to catch it. Fix is one line (pass `leadingText: item.trailingBodyRaw` and drop the manual
+  `+=`); add a test that sets `trailingBodyRaw` to a string with NO trailing newline and asserts the reload
+  still finds the block. | ArchiveNotes/Store | Tier-2
+- [ ] **W3.notes-cr-line-start — a lone `\r` defeats both the new header guard and `BlockParser`'s line-start test, because Swift compares GRAPHEMES [S · LOW].**
+  Filed 2026-08-11 from the same pass; the one residual gap *in* the
+  `W3.notes-chip-header-needs-a-line-break` fix, left rather than widened into a second defect's territory.
+  `BlockParser.swift:56-58` decides "is this a line start?" with `body[body.index(before:)] == "\n"` — a
+  `Character` comparison. Swift merges `CR LF` into a single `"\r\n"` grapheme, so `"\r\n" == "\n"` is
+  **false**: a header preceded by CRLF is not recognised *at all*, independent of the new guard. Worse for the
+  guard specifically — if a body ends in a LONE `\r`, `hasSuffix("\n")` is false, so it appends `\n`, the two
+  merge into one `"\r\n"` grapheme, and the header is still not a header. Verified by compiled repro:
+  lone-CR → recognised **false**; CRLF → recognised true but with a spurious blank line. **Narrow
+  reachability** — `FrontMatterCodec.swift:17` normalises `\r\n` read from disk but NOT a lone `\r`, so it
+  needs CR-delimited text pasted into the editor. **Not a regression:** pre-fix that input was broken too.
+  Fix at the root, not at the guard: make `BlockParser.parse`'s line-start test accept `\r\n` and `\r`, or
+  compare the last unicode SCALAR instead of the last `Character`. Patching only `MarkdownBridge` cannot work
+  — any `\n` it appends after a `\r` is swallowed into the same grapheme. | ArchiveNotes/Store | Tier-2
+- [ ] **W3.notes-thumb-line-duplicates — a `thumb:` block grows one extra `![display](thumb)` line on EVERY save, without bound [M · MED · data-shaped].**
+  Filed 2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` fix, which added the first
+  parse→serialize→parse idempotence test this class has ever had; the `thumb:` shape is the one shape that
+  still fails it, so it is excluded from that test's table with a pointer here. **Not caused by that change —
+  measured on pristine `5512df3` too.** `MarkdownBridge.parse` renders a `thumb:` block as chip + the block
+  body, and the body ALREADY contains the `![display](thumb)` line (`BlockParser.parseSegment` leaves it
+  there); `MarkdownBridge.serializeBlockHeader:340-343` then emits that line again from `box.thumbRef`. So the
+  line is written twice, read back as body, and written twice again. Measured, one input with a single
+  `![Doc](assets/p1.png)`: pass 1 → **2** copies, pass 2 → **3** (the third collapsing onto the body line as
+  ` ![Doc](assets/p1.png) Body text.`). The editor autosaves, so this is unbounded growth in the operator's
+  own note plus a visibly duplicated thumbnail. Two candidate fixes — have `parse` CONSUME the thumb line into
+  the chip (which is what `testThumbLineConsumedIntoChip`'s name already claims happens, and does not), or
+  stop re-emitting it in `serializeBlockHeader` and let the body carry it. Pick ONE; emitting from both places
+  is the bug. Then delete the exclusion note in `BlockChipTests
+  .testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint` and add the `thumb:` shape to its table —
+  that is the acceptance test. | ArchiveNotes/Editor | Tier-2
 - [ ] **W21.vmgui-winsize-writeback — closing the Extracts window in `setUp` fires `.onDisappear`, which writes the SHARED window-size prefs both windows restore from [S · LOW · latent].**
   Filed 2026-08-04. `NotesBrowserView.swift:70` `.onDisappear { … NotesAppSettings.setWindowSize(w.frame.size) }`
   writes the single shared `windowW`/`windowH` keys, and `configureWindow` restores BOTH windows from them.

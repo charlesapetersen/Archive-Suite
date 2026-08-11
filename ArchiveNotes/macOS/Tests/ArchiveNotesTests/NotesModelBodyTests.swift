@@ -134,4 +134,58 @@ struct NotesModelBodyTests {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         #expect(await env.model.loadBody(for: UUID()) == nil)
     }
+
+    // W3.notes-chip-header-needs-a-line-break — the functional half of the fix, on a scratch store.
+    // The unit tests in `BlockChipTests` stop at the string `MarkdownBridge.serialize` produces; this
+    // one carries it the rest of the way to disk — serialize → `setBody` → `BlockParser.parse` →
+    // atomic `.md` → reload — because that is where the loss actually landed. A header glued to the
+    // previous body line is not a header to `BlockParser.parse`, so the second block was absorbed into
+    // the first as literal text and its provenance anchor was gone for good.
+    //
+    // Scope, stated so it is not over-read: this drives the same two pure functions plus the real
+    // store, NOT `MarkdownEditorView.writeBack` (an AppKit coordinator, out of reach of a unit test).
+    // The raw-mode branch of `writeBack`, which commits `textView.string` verbatim, stays untested.
+
+    @Test("editor write-back of a two-block body keeps BOTH blocks' provenance on disk")
+    func editorWriteBackKeepsBothBlocksOnDisk() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let src = UUID()
+        let item = Item(id: UUID(), kind: .note, title: "WriteBack", authors: [], date: nil,
+                        datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
+                        roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
+                        unknownFrontMatter: [], trailingBodyRaw: nil)
+        let ref = try await env.store.create(item)
+
+        // A pasted passage whose body does not end in a newline, followed by the operator's own
+        // freeform block — the exact shape `W3.notes-passage-paste-at-caret` produces.
+        let editorMarkdown = """
+        <!-- block: note-passage
+             note: archivenotes://open?id=\(src.uuidString)#block-0
+             display: "Src — 1968" -->
+        …an early egalitarian culture.
+        <!-- block: freeform -->
+        My own commentary.
+        """
+        // What the editor hands `setBody` after rendering that body and serializing it back.
+        let writtenBack = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: editorMarkdown))
+        await env.model.setBody(writtenBack, for: item.id)
+
+        let reloaded = try await env.store.load(item.id)
+        #expect(reloaded.blocks.count == 2)
+        #expect(reloaded.blocks.first?.kind == .notePassage)
+        #expect(reloaded.blocks.first?.source?.noteRef?.contains(src.uuidString) == true)
+        #expect(reloaded.blocks.first?.markdown.contains("egalitarian culture") == true)
+        #expect(reloaded.blocks.last?.kind == .freeform)
+        #expect(reloaded.blocks.last?.markdown.contains("My own commentary") == true)
+
+        // The literal-text failure mode, asserted against the bytes actually written.
+        let onDisk = try String(contentsOf: ref.url, encoding: .utf8)
+        #expect(!onDisk.contains("culture.<!-- block:"))
+
+        // And the loop is stable: a second write-back of what the editor renders changes nothing.
+        let md1 = await env.model.loadBody(for: item.id) ?? ""
+        let writtenBack2 = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md1))
+        await env.model.setBody(writtenBack2, for: item.id)
+        #expect(await env.model.loadBody(for: item.id) == md1)
+    }
 }
