@@ -329,27 +329,6 @@ it drives real launchd, so its verdict depends on state outside its sandbox and 
 a self-relaunching phantom job in `gui/$UID`. Part 2 closes the class: `prove-gate-report.sh` §5 asserts every
 `prove-*.sh` is a gate step or on health-gate.sh's machine-read `# GATE-UNWATCHED-BY-DESIGN:` line, mutation-
 proven 8/8 (including that the list cannot lie by going stale or naming a harness that IS wired).
-- [ ] **W26.docs-spec — ⛔ OWNER-GATED: the two `SPEC/tag-format.md` bullets split out of `W26.docs`
-  [XS · low · doc-only · shared contract].** Split 2026-08-07 (daemon-report walkthrough) so `W26.docs`
-  could stop being skipped at the head of the queue. **Parked in the plan's HOLD QUEUE — the daemon must
-  NOT execute this.** The park is the structural gate: `next-queue-item.sh` only walks the `## WORK QUEUE`
-  region, so an item outside it is never offered, no matter what its tags say. The `⛔` marker alone would
-  not do it.
-
-  **The two bullets, verbatim from `execution-plans/despotlight.md` §10:**
-  1. `SPEC/tag-format.md` — how tags are **read**. The tag vocabulary itself is unchanged, so this is *not*
-     a shared-contract change and does not trip the both-apps-together rule.
-  2. ⚠️ `SPEC/tag-format.md` names **`ArchiveLibrary` as the Spotlight consumer in its API table.** That row
-     *is* the contract both apps must interpret identically, so this one edit **does** touch the shared
-     contract and must land with both apps together (`CLAUDE.md` §*"The shared contract is the risk"*). The
-     tag *vocabulary* is still unchanged — it is the reader-side API row that moves.
-
-  ⚠️ **Those two bullets contradict each other** on whether this trips the both-apps-together rule. Bullet 2
-  is the later, more specific reading and is the one to act on; resolving the contradiction in the plan is
-  part of the item. **To unblock:** add a `W26.docs-spec` grant to `OWNER_AUTHORIZATIONS.md` (the `W15.tu0`
-  entry is the exact precedent — *"AUTHORIZED to edit `SPEC/tag-format.md` (doc-only)"*) and move this item
-  out of the HOLD QUEUE into the WORK QUEUE. Ticking a gate alone never makes an item actionable.
-
 - [ ] **W26.plandelete — delete `execution-plans/despotlight.md`** (blocked-on: W26.docs-spec).
   The convention is that a shipped plan is deleted, and `W26.verify` was the gate on that — but the plan
   is still the only place an open item's context lives. **Two of the three blockers have now closed**:

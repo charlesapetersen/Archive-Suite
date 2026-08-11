@@ -31,6 +31,23 @@ gitignored section on a single laptop, with no record of who granted what, when,
 *(Granted across the 2026-07-28, 2026-07-29 and 2026-08-01 Daemon Report walkthroughs — each entry states
 its own date. Verbatim as recorded when granted.)*
 
+- **`W26.docs-spec` — AUTHORIZED to edit `SPEC/tag-format.md` (doc-only), 2026-08-11.** Correct the three
+  places the shared contract still describes **Spotlight** as the Reader's tag-discovery mechanism, which
+  `W26.walk2` removed: the API table's *"Spotlight view … Reader `ArchiveLibrary`"* row, the
+  *"`kMDItemUserTags` is lossy/stale … used only to find files"* bullet, and the *"never build the write
+  array from Spotlight"* clause in the write rules. **The tag VOCABULARY is untouched** — no token, facet,
+  date rule, priority, colour or PDF-format change — so nothing either app *writes* or *parses* moves; only
+  the reader-side API row, which is why this is doc-only.
+  ⛔ **CONSTRAINT: this grant is exactly those three sites and their surrounding sentences.** It is not a
+  standing licence over `SPEC/tag-format.md`; a further SPEC edit needs its own grant, as `W15.tu0` and
+  `R13d` each did.
+  **Why it was gated at all:** the API-table row is a line both apps must read identically, so under
+  `CLAUDE.md` §*"The shared contract is the risk"* it lands with both apps together and Tier-2 applies.
+  The item's own two bullets contradicted each other on that point (bullet 1 said it was not a
+  shared-contract change, bullet 2 said it was); **bullet 2 is the binding reading**, and resolving the
+  contradiction was part of the item. Offered to the owner as the `W15.tu0` shape on 2026-08-07 and
+  **deferred in favour of splitting** `W26.docs` so it would stop being skipped at the head of the queue;
+  granted on 2026-08-11 when he asked for the hold queue to be resolved. Normal Tier-2 gate still applies.
 - **`W15.tu0` — AUTHORIZED to edit `SPEC/tag-format.md` (doc-only).** Add the paragraph recording that a
   `["A","A","B"]` tag array survives a `.tagNamesKey` write→read round-trip (i.e. macOS persists duplicate tag
   strings), beside the existing multiset rule. **No behaviour change, no code path altered** — the fact is

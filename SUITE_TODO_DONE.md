@@ -409,6 +409,45 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
 
+- [x] **W26.docs-spec — the two `SPEC/tag-format.md` bullets split out of `W26.docs`
+  ✅ **SHIPPED 2026-08-11 — granted and done in one sitting**, at the owner's direction when he asked for
+  the hold queue to be resolved. Grant added to `OWNER_AUTHORIZATIONS.md` (scoped to these three sites, NOT
+  a standing licence over the SPEC), item moved out of the plan's HOLD QUEUE, three sites corrected:
+  - the API table row — was *"Spotlight view | tags surface as `kMDItemUserTags` (query only) | Reader
+    `ArchiveLibrary`"*, now *"Discover tagged files | walk the granted root; read `.tagNamesKey` per file |
+    Reader `ArchiveCore.CorpusWalker` (+ `ArchiveLibrary` cache)"*. This row was simply **false** after
+    `W26.walk2`: the canonical shared contract described a subsystem the Reader no longer has.
+  - the *"Spotlight `kMDItemUserTags` is lossy/stale"* bullet, and write-rule 5's *"never build the write
+    array from Spotlight"* — both **generalised rather than deleted**, to *no index or cache is ever tag
+    truth*. Retiring the safety rule along with the mechanism would have quietly dropped it just as
+    `LibraryIndex` arrived to inherit exactly the same hazard.
+  **CONTRADICTION RESOLVED — bullet 2 was right, bullet 1 was wrong**, and both are annotated in place in
+  `execution-plans/despotlight.md` §10 with the reason: "the vocabulary is unchanged" is necessary but not
+  sufficient for "not a shared-contract change". The contract is also the API table saying *how* each app
+  reaches those tokens. Vocabulary-unchanged ⇒ doc-only; it does **not** ⇒ not-shared-contract.
+  **Verified:** all three apps build clean, no new warnings; tag vocabulary untouched, so nothing either app
+  writes or parses moved.
+  [XS · low · doc-only · shared contract].** Split 2026-08-07 (daemon-report walkthrough) so `W26.docs`
+  could stop being skipped at the head of the queue. **Parked in the plan's HOLD QUEUE — the daemon must
+  NOT execute this.** The park is the structural gate: `next-queue-item.sh` only walks the `## WORK QUEUE`
+  region, so an item outside it is never offered, no matter what its tags say. The `⛔` marker alone would
+  not do it.
+
+  **The two bullets, verbatim from `execution-plans/despotlight.md` §10:**
+  1. `SPEC/tag-format.md` — how tags are **read**. The tag vocabulary itself is unchanged, so this is *not*
+     a shared-contract change and does not trip the both-apps-together rule.
+  2. ⚠️ `SPEC/tag-format.md` names **`ArchiveLibrary` as the Spotlight consumer in its API table.** That row
+     *is* the contract both apps must interpret identically, so this one edit **does** touch the shared
+     contract and must land with both apps together (`CLAUDE.md` §*"The shared contract is the risk"*). The
+     tag *vocabulary* is still unchanged — it is the reader-side API row that moves.
+
+  ⚠️ **Those two bullets contradict each other** on whether this trips the both-apps-together rule. Bullet 2
+  is the later, more specific reading and is the one to act on; resolving the contradiction in the plan is
+  part of the item. **To unblock:** add a `W26.docs-spec` grant to `OWNER_AUTHORIZATIONS.md` (the `W15.tu0`
+  entry is the exact precedent — *"AUTHORIZED to edit `SPEC/tag-format.md` (doc-only)"*) and move this item
+  out of the HOLD QUEUE into the WORK QUEUE. Ticking a gate alone never makes an item actionable.
+
+
 - [x] **W26.lanehygiene — the GUI VM never boots to an empty desktop, and the xcuitest lane never killed
   the app it was about to wipe [S · MED · ops/GUI].** Found while chasing the two Notes flakes left over
   from `W26.vmuitest-blind`. Three separate defects, all in the lane rather than any app:

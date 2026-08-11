@@ -30,7 +30,7 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
 | Read tag names | `url.resourceValues(forKeys: [.tagNamesKey]).tagNames` → `[String]` | `MacOSTagger.readTags`, `TagWriter.mutate` |
 | Write tag names | `(url as NSURL).setResourceValue([String], forKey: .tagNamesKey)` | `MacOSTagger.applyTags`, `TagWriter.mutate` |
 | Read/write color label | `.labelNumberKey` (Int) | both (`finderLabelIndex` / `ArchiveColor`) |
-| Spotlight view | tags surface as `kMDItemUserTags` (query only) | Reader `ArchiveLibrary` |
+| Discover tagged files | walk the granted root; read `.tagNamesKey` per file | Reader `ArchiveCore.CorpusWalker` (+ `ArchiveLibrary` cache) |
 
 - The tag array is an **ordered `[String]`**; macOS may reorder on write, so consumers compare as a
   **multiset**, never by position.
@@ -47,8 +47,11 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
   `labelNumber`** without writing it. Processor still writes `.labelNumberKey` explicitly
   (`MacOSTagger.applyTags`, lines 72–76: set to 6/3, or `0` when no color); Reader writes it **only**
   when a delta changes color (`TagWriter` §7), otherwise restores drift.
-- **Spotlight `kMDItemUserTags` is lossy/stale** and is used only to _find_ files. Never build a
-  write array from it (Reader `TagWriter`/CLAUDE §Safety-5).
+- **No search index is ever tag truth.** The filesystem xattr read through `.tagNamesKey` is the only
+  authority. Spotlight's `kMDItemUserTags` was the Reader's discovery mechanism until `W26.walk2` replaced
+  it with a direct walk (`ArchiveCore.CorpusWalker`) plus a disposable `LibraryIndex` cache and FSEvents;
+  it is lossy and stale, and the same rule binds the cache that replaced it. Never build a write array
+  from a cache or an index — only from a fresh per-file read (Reader `TagWriter`/CLAUDE §Safety-5).
 
 ---
 
@@ -180,8 +183,9 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    never touches a subject `"Read later"`; Read/Unread compare case-insensitively, all other tokens
    exactly (`TagWriter.shouldRemove`/`isSameTag`; `DocumentTags.parse`).
 5. **Lossless writes.** `new = (fresh − remove) + add`, every untouched token preserved verbatim; a
-   no-op delta writes nothing (no mod-date churn). **Never** build the write array from Spotlight
-   `kMDItemUserTags`.
+   no-op delta writes nothing (no mod-date churn). **Never** build the write array from any index or
+   cache — not Spotlight's `kMDItemUserTags` (the Reader's discovery mechanism until `W26.walk2`), and
+   not the `LibraryIndex` rows that replaced it. Only a fresh per-file `.tagNamesKey` read.
 6. **`Unread` stamped last, once.** In real-tagging modes only (`.automatic`/`.autoDate`/
    `.autoDateManualSeg`/`.human`), Processor drops any incoming `Unread`, writes all other tags,
    then appends exactly one `Unread` as the final element (`MacOSTagger.applyTags`, lines 42–66).

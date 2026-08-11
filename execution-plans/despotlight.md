@@ -1159,12 +1159,16 @@ The audited list, so `W26.docs` is a checklist rather than a hunt:
 - `Tests/ArchiveReaderUITests/FixtureUITestCase.swift:62-64` and `NavigationUITests.swift:46-48` (§5.9/5.10).
 - `ArchiveProcessor/CLAUDE.md` — vocabulary narrowing (§4.4.3); `ArchiveProcessor/TESTING.md:72` — flag the
   dubious Spotlight-contention premise (§ Site 8) without acting on it.
-- ⛔ **CARVED OUT of `W26.docs` → `W26.docs-spec` (HOLD QUEUE, owner-gated). Do not edit `SPEC/tag-format.md`
-  under `W26.docs`.** Owner call, 2026-08-07 daemon-report walkthrough. *Original bullet, retained as the
-  record:* `SPEC/tag-format.md` — how tags are *read*. The tag vocabulary itself is unchanged, so **this is
-  not a shared-contract change** and does not trip the both-apps-together rule. (⚠️ This contradicts the
-  second SPEC bullet below; bullet 2 is the later, more specific reading. Resolving that is part of
-  `W26.docs-spec`.)
+- ✅ **DONE 2026-08-11 under `W26.docs-spec`** (granted in `OWNER_AUTHORIZATIONS.md`; the carve-out from
+  `W26.docs` was the owner's call on 2026-08-07). **CONTRADICTION RESOLVED — bullet 2 below wins, and this
+  bullet was wrong.** *Original bullet, retained as the record:* `SPEC/tag-format.md` — how tags are *read*.
+  The tag vocabulary itself is unchanged, so **this is not a shared-contract change** and does not trip the
+  both-apps-together rule.
+  **Why it was wrong:** "the vocabulary is unchanged" is necessary but not sufficient. The contract is not
+  only the token set — it is also the API table saying *how* each app reaches those tokens, and both apps
+  must read that identically. An edit can leave every token alone and still move the shared contract, which
+  is exactly what the `ArchiveLibrary` row did. Vocabulary-unchanged ⇒ doc-only; it does **not** ⇒
+  not-shared-contract.
 - `ArchiveReader/CLAUDE.md` carries **eight** statements that become false — including a **§Decisions
   entry** (which the owner ships as settled) plus the architecture and stack sections. Treat the §Decisions
   one carefully: it is a record of an owner decision, so **supersede it with a dated new decision** rather
@@ -1172,12 +1176,17 @@ The audited list, so `W26.docs` is a checklist rather than a hunt:
 - `ArchiveReader/KNOWN_ISSUES.md` — **five** affected passages, including a *"Verified facts to rely on"*
   entry **that the incident itself falsified**, and a whole section documenting the Spotlight-lag mechanism
   being deleted.
-- ⛔ **ALSO CARVED OUT → `W26.docs-spec`.** ⚠️ **`SPEC/tag-format.md` names `ArchiveLibrary` as the Spotlight
-  consumer in its API table.** That row *is* the contract both apps must interpret identically, so this one
-  edit **does** touch the shared contract and must land with both apps together (CLAUDE.md §"The shared
-  contract is the risk"). The tag *vocabulary* is still unchanged — it is the reader-side API row that
-  moves. **This is the bullet that makes the item owner-gated** — it is why `W26.docs` was skipped by every
-  session until the split.
+- ✅ **DONE 2026-08-11 under `W26.docs-spec` — and this is the bullet that was right.** ⚠️
+  **`SPEC/tag-format.md` names `ArchiveLibrary` as the Spotlight consumer in its API table.** That row *is*
+  the contract both apps must interpret identically, so this one edit **does** touch the shared contract and
+  must land with both apps together (CLAUDE.md §"The shared contract is the risk"). The tag *vocabulary* is
+  still unchanged — it is the reader-side API row that moves. **This is the bullet that made the item
+  owner-gated** — it is why `W26.docs` was skipped by every session until the split.
+  **What landed:** the API row now reads *"Discover tagged files | walk the granted root; read
+  `.tagNamesKey` per file | Reader `ArchiveCore.CorpusWalker` (+ `ArchiveLibrary` cache)"*, and the two
+  other Spotlight sites (§"lossy/stale … only to find files", and write-rule 5's "never build the write
+  array from Spotlight") were generalised to *no index or cache is ever tag truth* — which keeps the safety
+  rule pointed at the `LibraryIndex` that replaced Spotlight instead of retiring it with the mechanism.
 - ⚠️ **`REVIEW.md` assigns "Spotlight consistency" as a standing review concern for Reader/Search — and the
   autonomous daemon reads that file to pick review units.** Leaving it stale sends future review sessions
   hunting a subsystem that no longer exists.
