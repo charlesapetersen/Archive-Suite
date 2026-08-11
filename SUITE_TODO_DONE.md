@@ -5242,6 +5242,44 @@ explain why not.
   (`ops/gui/vm-gui-runner.sh notes xcuitest`, 358 s, off the owner's screen). The VM run is the one that
   matters here beyond habit: this change alters the BYTES written to `.md`, and G13/G6 assert on those bytes
   from disk. Notes-local change — `MarkdownBridge` is not in ArchiveCore, so no cross-app rebuild was owed.
+- [x] **W3.notes-frontmatter-codec-bypasses-the-leading-text-guard — the ONLY path that writes a note `.md`
+  hand-rolled the join and made `BlockParser.serialize`'s guard dead code [S · LOW-MED · latent].**
+  ✅ **SHIPPED 2026-08-11** — code `79ed44e`, tracker flip in the commit whose subject begins
+  `fix(notes,trackers): W3.notes-frontmatter-codec-bypasses-the-leading-text-guard`. Filed 2026-08-11 by the
+  `W3.notes-chip-header-needs-a-line-break` pass; pre-existing.
+  **Fix, exactly as the filing predicted — one line.** `FrontMatterCodec.encode` appended
+  `item.trailingBodyRaw` itself and then called `BlockParser.serialize(leadingText: nil, blocks:)`, passing
+  `nil` for the argument whose guard (`BlockParser.swift:92`) inserts the newline separating leading prose
+  from the first `<!-- block:` header. Hand the leading text to the serializer, drop the manual `+=`.
+  **Confirmed latent rather than assumed latent:** every producer of `trailingBodyRaw` in the app is
+  `BlockParser.parse` (`FrontMatterCodec.swift:63`, `NotesModel.swift:744`), whose leading text ends in `\n`
+  by construction — grepped, not inferred. So no note now on disk changes shape, and the byte-stable
+  `encode(decode(text)) == text` round-trips stayed green *before* the fix too.
+  ⚠️ **Which is exactly why a green suite proved nothing here, and a MUTATION check was the real gate.**
+  Reverted the one line, re-ran the new tests, and the corruption came out named:
+  `trailingBodyRaw → "Prose with no trailing newline.<!-- block: reader-page…"` — the header read back as
+  prose, the block and its `link`/`page` provenance gone. Same `…culture.<!-- block:` shape
+  `W3.notes-chip-header-needs-a-line-break` fixed on the editor side, on the storage side.
+  **Three tests, at the two levels that can break** — `FrontMatterCodecTests
+  .testLeadingBodyWithoutTrailingNewlineKeepsItsFirstBlockOnReload` (sets `trailingBodyRaw` directly, which is
+  the thing no current producer does and therefore the point); `…AndNoBlocksIsNotPadded` (the **over-fix
+  guard** — with no header to separate, no newline may be added; it passes against both versions deliberately,
+  it constrains the fix rather than proving it); and `NoteStoreTests
+  .leadingBodyWithoutNewlineSurvivesDiskRoundTrip`, the Tier-2 functional test on an `mktemp` scratch store —
+  real `create` → `.md` on disk → `load`, reading the raw bytes, plus a second save/load showing the inserted
+  newline is a **fixed point**, not the unbounded growth `W3.notes-thumb-line-duplicates` describes.
+  The XCTest case asserts via `blocks.first`, not `blocks[0]`: pre-fix the array is empty, and a subscript
+  trap takes the whole app-hosted bundle down instead of reporting one red test (observed during the mutation
+  run — `ContiguousArrayBuffer.swift:692: Fatal error: Index out of range`).
+  **Side effect worth keeping:** `NotesModel.getBody:733` already passed `leadingText:`, so the editor and the
+  encoder were serializing the same item two different ways. They now agree.
+  Verified: Notes unit bundle **Swift Testing 779 tests / 84 suites, 0 failures** plus the XCTest half,
+  `** TEST SUCCEEDED **`; the three changed files force-recompiled with **no new warnings** — **plus the
+  headless Tart VM GUI lane, `ArchiveNotesUITests` 20/20 green** (`ops/gui/vm-gui-runner.sh notes xcuitest`,
+  360 s, off the owner's screen). The VM run is a regression check, stated plainly: no UI path can *reach* the
+  changed branch today, so it proves the editor round-trip still works, not the fix. Notes-local
+  (`ArchiveNotes/Store`) — nothing in ArchiveCore, so no cross-app rebuild was owed; every store is `mktemp`
+  (Prime Directive #1), no corpus touched, nothing on the host screen. | ArchiveNotes/Store | Tier-2 | done
 
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI

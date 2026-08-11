@@ -1228,19 +1228,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-frontmatter-codec-bypasses-the-leading-text-guard — the ONLY path that writes a note `.md` hand-rolls the join and makes `BlockParser.serialize`'s guard dead code [S · LOW-MED · latent].**
-  Filed 2026-08-11 from the same pass; pre-existing. `FrontMatterCodec.swift:126-131` does
-  `result += leading` and then `BlockParser.serialize(leadingText: nil, blocks: item.blocks)` — passing `nil`
-  for the very argument whose guard (`BlockParser.swift:92`) inserts the separating newline between leading
-  prose and the first header. Since `NoteStore.swift:210-211`/`:258` is the only encode→write site, that
-  guard is dead on the only path that reaches disk. **Latent today, not firing:** every producer of
-  `trailingBodyRaw` is `BlockParser.parse` (`FrontMatterCodec.swift:63`, `NotesModel.swift:744`), whose
-  `leadingText` always ends in `\n` by construction. The day anything else sets `trailingBodyRaw` — a
-  template, an importer, a migration — the `…culture.<!-- block:` corruption that
-  `W3.notes-chip-header-needs-a-line-break` just fixed on the editor side reappears on the storage side, with
-  no test to catch it. Fix is one line (pass `leadingText: item.trailingBodyRaw` and drop the manual
-  `+=`); add a test that sets `trailingBodyRaw` to a string with NO trailing newline and asserts the reload
-  still finds the block. | ArchiveNotes/Store | Tier-2
 - [ ] **W3.notes-cr-line-start — a lone `\r` defeats both the new header guard and `BlockParser`'s line-start test, because Swift compares GRAPHEMES [S · LOW].**
   Filed 2026-08-11 from the same pass; the one residual gap *in* the
   `W3.notes-chip-header-needs-a-line-break` fix, left rather than widened into a second defect's territory.
