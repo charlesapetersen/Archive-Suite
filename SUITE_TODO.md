@@ -1228,17 +1228,35 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-cr-line-start-fu1 — `FrontMatterCodec.decode` still rewrites the operator's CRLF line endings to LF, but leaves a lone `\r` alone [XS · LOW · cosmetic, may well be WONTFIX].**
-  Filed 2026-08-11 by the `W3.notes-cr-line-start` fix. `FrontMatterCodec.swift:17`
-  `replacingOccurrences(of: "\r\n", with: "\n")` runs over the WHOLE file text, so a CRLF-delimited body is
-  silently normalised on every read while a CR-delimited one is now preserved verbatim (that preservation is
-  pinned by `NoteStoreTests.carriageReturnDelimitedBodySurvivesDiskRoundTrip`). **No data loss** — only line
-  endings change, and the parser handles all three forms now, which is exactly why this is no longer
-  load-bearing for the BODY. ⚠️ It IS still load-bearing for the FRONT MATTER: that half splits on `"\n"`, so
-  do not simply delete the call — narrow it to the front-matter region, or leave it. Given the owner's
-  no-production-material premise and that most editors normalise anyway, **deciding this is not worth doing is
-  a perfectly good outcome**; it is filed so the asymmetry is a recorded choice rather than an oversight.
-  | ArchiveNotes/Store | Tier-1
+- [ ] **W3.notes-editor-blankline-collapse — CONFIRM FIRST, then decide: `MarkdownBridge.parse` → `serialize` collapses a blank line between two paragraphs, and a single line break into a space, for EVERY line-ending form [S · investigate-first · possibly intended].**
+  Measured 2026-08-11 while adversarially reviewing `W3.notes-cr-line-start-fu1` — **not caused by it, and
+  not CR-specific: that is the point of filing it.** Straight `MarkdownBridge.serialize(MarkdownBridge
+  .parse(markdown:))`, three forms, identical outcome, and a fixed point from the first pass onward:
+  `"Para one.\n\nPara two.\n"` → `"Para one.Para two."` (21 → 18 scalars), and the `\r` and `\r\n` spellings
+  of the same input give byte-identical output; `"Line one.\nLine two.\n"` → `"Line one. Line two."`. The LF
+  control is why nothing was filed against the CR family here — the bridge treats all three the same, so
+  `fu1` neither introduced nor widened this.
+  ⚠️ **The premise to check before writing any code:** the probe called the bridge DIRECTLY with default
+  arguments. The real editor path goes through `NotesModel.getBody`/`setBody` (and passes an asset store), so
+  the first job is to establish whether an operator's two-paragraph note actually loses its blank line on
+  save. If it does, it is data-shaped and belongs with `W3.notes-thumb-line-duplicates`. If the real path
+  keeps the break, close this as an artefact of calling the bridge bare — and say so, because the raw
+  measurement above will otherwise get re-derived. A plausible mechanism to test first: `collectParagraphs`
+  enumerates `.noteBlockKind` attribute RUNS, not paragraph ranges, so plain text may arrive as one run.
+  | ArchiveNotes/Editor | Tier-1 (investigation)
+- [ ] **W3.notes-extract-title-line-split — an extract's default title is the WHOLE snapshot when the passage is CR- or CRLF-delimited, because "first line" is computed with `split(separator: "\n")` [XS · LOW].**
+  Filed 2026-08-11 by the `W3.notes-cr-line-start-fu1` adversarial pass; **pre-existing** (a lone `\r` was
+  never normalised, so this never needed a CRLF note to bite). `ExtractBuilder.defaultTitle:227-228` joins
+  the block markdowns and iterates `combined.split(separator: "\n", omittingEmptySubsequences: false)`.
+  Swift compares GRAPHEMES, so `"\r\n" != "\n"` and a lone `"\r"` is not `"\n"` either — a CR/CRLF-delimited
+  snapshot does not split at all, the loop sees ONE line, and the extract is titled with the first 80
+  characters of the entire passage instead of its first line. Reachable: PDF text extraction commonly hands
+  back `\r`/`\r\n`, and extracts are built from Reader selections. **The fix is now one call**: ask
+  `BlockParser.splitLines` (added by `W3.notes-cr-line-start-fu1`) instead of splitting on `"\n"` — same
+  authority the rest of the family already routes through, so it cannot drift from the parser again. Same
+  shape as the four mechanisms in `W3.notes-cr-line-start`; this is the fifth, one file over. Acceptance:
+  a test asserting a CR-, a CRLF- and an LF-delimited two-line snapshot all title from the FIRST line
+  (all three fail today for two of the three forms). | ArchiveNotes/Core | Tier-1
 - [ ] **W3.notes-thumb-line-duplicates — a `thumb:` block grows one extra `![display](thumb)` line on EVERY save, without bound [M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` fix, which added the first
   parse→serialize→parse idempotence test this class has ever had; the `thumb:` shape is the one shape that

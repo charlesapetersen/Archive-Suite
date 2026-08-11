@@ -5321,6 +5321,62 @@ explain why not.
   cross-app rebuild was owed; every store is `mktemp` (Prime Directive #1), no corpus touched, nothing on the
   host screen. | ArchiveNotes/Store | Tier-2 | done
 
+- [x] **W3.notes-cr-line-start-fu1 — `FrontMatterCodec.decode` rewrote the operator's CRLF line endings
+  to LF while leaving a lone `\r` alone [XS · filed LOW "cosmetic, may well be WONTFIX"].**
+  ✅ **SHIPPED 2026-08-11** — code `b50245b`, tracker flip in the commit whose subject begins
+  `fix(notes,trackers): W3.notes-cr-line-start-fu1`. Filed 2026-08-11 by the `W3.notes-cr-line-start` fix
+  as a recorded asymmetry, with declining it named as a fine outcome. **Not declined — measuring it moved
+  it out of "cosmetic".**
+  **The filing's own framing was the thing to check first.** A one-off normalisation would indeed have
+  been cosmetic. It is not one-off: `replacingOccurrences(of: "\r\n", with: "\n")` over a `"\r\r\n"`
+  leaves `\r` and `\n` adjacent, Swift merges them into ONE `"\r\n"` grapheme, and the NEXT read
+  normalises that too — measured `"A\r\r\nB"` → `"A\r\nB"` → `"A\nB"`. So the blank line between two
+  paragraphs of mixed-ending prose is gone after two saves of an autosaving editor, and the loss is
+  progressive rather than a single laundering. (The `\r\r\n` residual was already a known oddity: the
+  fuzz suite's `allowCR` comment waves at it as "orthogonal to front-matter idempotency". It was the
+  whole bug.)
+  **What landed.** `FrontMatterCodec.splitFrontMatter` replaces the whole-document normalisation: it
+  finds the fence via a new `BlockParser.splitLines` (LF / CR LF / lone CR each ONE terminator, reusing
+  the `W3.notes-cr-line-start` predicate family rather than re-deriving a fourth copy of it), hands
+  `parseFrontMatter` the region's LINES instead of a normalised blob, and slices the body out of the
+  ORIGINAL text. Net effect: **nothing normalises note text any more.** Two side effects, both wanted —
+  a CR-delimited file now decodes (it was rejected outright as `.missingFrontMatter`, because the
+  normalisation never touched a lone `\r` and so `hasPrefix("---\n")` failed), and a pre-existing TRAP
+  is gone: a file that is just `"---"` passed the opener guard *on purpose* (`norm == "---"`) and then
+  hit `index(startIndex, offsetBy: 4)` on a 3-character string — verified a precondition failure, not a
+  thrown error. It reports `.unterminatedFrontMatter` now.
+  **Rejected alternative, recorded in the doc comment because it looks right:** normalise as before, then
+  map the body's offset back into the original text. Character counts usually DO match (Swift merges
+  CR LF into one `Character`) — but at `"\r\r\n"` the normalised string shrinks by one (measured 18 → 17),
+  so the mapping skews silently on exactly the input this fix is about.
+  **Gate was mutation, not a green suite** — third item in this family where that mattered. The 4 runnable
+  new tests were run against pristine `772b22c` first and **all 4 failed** (9 failing expectations), and
+  the failure text spells out the decay: `"Para one.\r\nPara two.\n"` after one cycle,
+  `"Para one.\nPara two.\n"` after two, 23 scalars → 20. The Tier-2 functional test is
+  `NoteStoreTests.crlfDelimitedBodySurvivesDiskRoundTrip` — a real `create` → `.md` on a `mktemp` store →
+  `load` → `save` → `load`, **two** cycles because one cycle still looks stable. The 5th test (bare `---`
+  → typed error) is deliberately NOT in that baseline: against pristine code it takes the test process
+  down rather than failing, which is the finding.
+  Verified: Notes unit bundle **781 Swift Testing tests / 84 suites + the XCTest half (209)**,
+  `** TEST SUCCEEDED **`, and a force-recompile of all four touched files (`touch` + build-for-testing, so
+  an incremental no-op could not hide anything) with **zero warnings** — **plus the headless Tart VM GUI
+  lane, `ArchiveNotesUITests` 20/20 green** (`ops/gui/vm-gui-runner.sh notes xcuitest`, 358 s, off the
+  owner's screen), as a regression check on the editor round-trip this sits under; it does not itself paste
+  CR text.
+  **What the adversarial pass measured, and what it did NOT file.** Two candidate downstream consumers now
+  see CRLF where they used to see laundered LF. `MarkdownBridge` parse→serialize was probed at three line
+  endings: a **fixed point** in every form from the first pass, so the parent item's "considered and left
+  alone" verdict on `serializeParagraph`'s `hasSuffix("\n")` still holds. The blank-line collapse the same
+  probe exposed is **uniform across LF too** (the control is what settled it), so it is neither caused nor
+  widened here — filed separately, caveated, as `W3.notes-editor-blankline-collapse`. The one real defect
+  found is `W3.notes-extract-title-line-split`: `ExtractBuilder.defaultTitle` still finds its "first line"
+  with `split(separator: "\n")`, so a CR/CRLF snapshot titles the extract with its whole first 80
+  characters. Pre-existing, one file over, and the fix is now a single call to the `splitLines` this item
+  added. Notes-local (`ArchiveNotes/Store`) — nothing in ArchiveCore, so no
+  cross-app rebuild was owed; every store is `mktemp` (Prime Directive #1), no corpus touched, nothing on
+  the host screen. Filed as Tier-1; gated as Tier-2 anyway, since it decides the bytes of the operator's
+  own notes. | ArchiveNotes/Store | Tier-1 (gated Tier-2) | done
+
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
   command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine
