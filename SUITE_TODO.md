@@ -350,44 +350,75 @@ proven 8/8 (including that the list cannot lie by going stale or naming a harnes
   entry is the exact precedent — *"AUTHORIZED to edit `SPEC/tag-format.md` (doc-only)"*) and move this item
   out of the HOLD QUEUE into the WORK QUEUE. Ticking a gate alone never makes an item actionable.
 
-- [ ] **W26.vmuitest-blind — EVERY Reader XCUITest is currently RED in the Tart VM because the
-  app-under-test comes up with NO WINDOW, and the app itself is fine [M · HIGH · ops/GUI].** Filed
-  2026-08-10 while verifying `W26.verify-fu2`. ⚠️ **This makes the whole unattended GUI lane vacuous** —
-  `resume-prompt.txt` STEP 3.5 sends every GUI check here, and right now every one of them fails for a
-  reason that has nothing to do with the change under test.
-  **Measured today, on pristine `edce83e` main, via `ops/gui/vm-gui-runner.sh reader xcuitest`:**
-  - `ArchiveReaderUITests/testAppLaunchesAndShowsMainWindow` — the simplest UITest in the repo — FAILS:
-    *"The main Archive Reader window should appear within 10 seconds."* So does
-    `testAnUntaggedFolderShowsTheScannedDenominator`. 2 tests, 2 failures.
-  - The app-under-test is **running** (`XCUIApplication.state == 4`, foreground) with **`windows == 0`**,
-    and the a11y snapshot marks the Application element `Disabled`. Its menu bar IS installed and fully
-    enumerable, and it has **no Dock icon** (`vm-artifacts/shots-reader/uitest-warmstart-no-table.png`).
-  - **The same build draws correctly in the same VM**: `vm-gui-runner.sh reader sighted` renders the
-    navigation window with all 11 fixture rows (`vm-artifacts/sighted-reader.png`, 2026-08-10 14:50).
-    So this is the XCUITest LANE, not the app.
-  - Not stale guest state: a `PRERUN` that killed the app and deleted its saved application state and its
-    container preferences changed nothing.
-  - No app-code cause on main: nothing since the lane last passed (`W26.docs-fu1`, 2026-08-09, whose shots
-    were read) touches the app entry point, the window scene, or `ArchiveTestHost`. The guest advertises a
-    pending system update, so a guest-side macOS/Xcode change is the likely trigger.
-  **Leading hypothesis — NOT confirmed; confirm before fixing.** `ArchiveCore.ArchiveTestHost` suppresses
-  the window when `ProcessInfo.environment["XCTestConfigurationFilePath"] != nil`: `.prohibited`
-  activation policy (no Dock icon) plus `HiddenWindowStub`, which `orderOut`s the window (0 windows,
-  process alive, menu bar intact). That is symptom-for-symptom what is on screen. Its own doc comment
-  asserts the opposite — *"A UITest target's app-under-test is launched separately by `XCUIApplication`
-  and does not inherit it"* — so if that variable now reaches the app-under-test, the comment is the bug's
-  alibi. **First step is to OBSERVE the app-under-test's environment**, not to tighten the predicate on a
-  guess: an empty-string value would still be `!= nil`, so "treat empty as absent" is a plausible fix and
-  an equally plausible red herring.
-  ⚠️ Tier-2 and cross-app: `ArchiveTestHost` is shared `ArchiveCore`, and each app's unit suite has a
-  `TestHostWindowSuppressionTests` asserting today's behaviour — a fix must keep the screen-safety
-  property (`xcodebuild test -only-testing:<App>Tests` draws nothing) while letting UITests render, and
-  must build + test all three apps. | files: packages/ArchiveCore/Sources/ArchiveCore/ArchiveTestHost.swift, ops/gui/vm-gui-runner.sh | M | high | none
+- [ ] **W26.vmuitest-blind — the GUI VM stopped serving the accessibility tree, so XCUITest saw no
+  windows in EITHER app; the apps were drawing correctly the whole time [M · HIGH · ops/GUI].** Filed
+  2026-08-10 while verifying `W26.verify-fu2`; **root cause found and repaired 2026-08-10 (see below) —
+  this entry stays open only until the gate has run green twice unattended.**
+  ⚠️ **It made the whole unattended GUI lane vacuous** — `resume-prompt.txt` STEP 3.5 sends every GUI
+  check here — and then it **parked the daemon**: the health gate read 37 failing UITests across both
+  apps as *"a reproducible build/test regression the per-change reviews missed"*.
+  **CONFIRMED ROOT CAUSE (measured in the guest, 2026-08-10).** Not the app, not the tests, not any of
+  the 30 commits since the last green gate:
+  - `AXIsProcessTrusted()` was **false** in the guest and `AXUIElementCopyAttributeValue(app, kAXWindows)`
+    returned **-25211 `kAXErrorAPIDisabled`**. XCUITest reads the accessibility tree and nothing else, so
+    every window assertion in every bundle failed as *"Main window should appear"*.
+  - The apps were **fine**: `CGWindowList` showed the Reader's navigation window at its usual 900×612
+    while the same run's UITests reported zero windows.
+  - Everything `tart exec` starts is attributed to the **guest agent** as its responsible process, so the
+    lane borrows the agent's Accessibility grant. That row still existed and still read `auth_value = 2`
+    — and tccd ignored it: *"Failed to match existing code requirement for subject …/tart-guest-agent"*,
+    `authReason=5`. **A grant that is present, reads as allowed, and is silently not honoured** is why
+    this was invisible from the outside and cost a day.
+  - Two things were wrong with it, and the first repair attempt failed because only the second was
+    obvious: (1) the installed agent is **linker-signed** ad-hoc, which `codesign --verify` calls *"not
+    signed at all"* — such a binary satisfies **no** requirement, so any csreq stored against it is dead
+    on arrival; (2) the agent is a **fat** binary, and a single-slice `cdhash` requirement does not match
+    it — the requirement has to be its **designated requirement**, the `or` of both slices.
+  **THERE WERE TWO INDEPENDENT FAULTS, and either one alone still produces "Main window should appear"
+  for every test** — which is why fixing one and re-running looked like no progress and nearly got the
+  second one dismissed:
+  - **(a) the guest could not SEE** — the stale grant above; and
+  - **(b) there was nothing to see** — AppKit **state restoration** on the app-under-test. XCUITest
+    launches it WITHOUT `-ApplePersistenceIgnoreState`, though Xcode passes that very flag to its own
+    test RUNNER. Both read off `ps` in the guest: runner `…-Runner -NSTreatUnknownArgumentsAsOpen NO
+    -ApplePersistenceIgnoreState YES`, app `…/ArchiveReader -ARUITestRootPath …`. The app then logs
+    `hasPersistentStateToRestore=1` → `No windows open yet` and SwiftUI never opens the `Window` scene.
+    Self-perpetuating: a launch that restores "no windows" re-saves "no windows" on terminate.
+  **(b) is the 2026-08-10 08:00 session's diagnosis, and it was RIGHT.** Its abandoned branch
+  `wt/autonomous-vmuitest-20260810-080001-27534` is **merged here**, not discarded. ⚠️ It was briefly
+  dismissed during this repair on the strength of a bad experiment — the flag was tested against a plain
+  `open`, which opens a window anyway, so it could not have shown a difference. **The only valid test of
+  a UITest-launch fix is a UITest run.** Notes needed the same seam, which that session never reached.
+  **`ArchiveTestHost` is NOT involved** (the one hypothesis that is genuinely dead): the app-under-test
+  carries **no `XCTest*` environment variable at all**, so `isUnitTestHost` is false, and `lsappinfo`
+  reports an ordinary `Foreground` process, not `.prohibited`.
+  **Repaired + guarded (this change):** `ops/gui/vm-seed-accessibility.sh` (+ its guest half) re-signs the
+  agent properly ad-hoc and stores its designated requirement, idempotently and with a backup;
+  `ops/gui/vm-check-accessibility.swift` asks the AX API whether it can actually enumerate a window, and
+  **both** the interactive lane and the health gate now run it as a preflight. A lane that cannot see is
+  now an explicit **SKIP** ("NOT VERIFIED: gui-vm"), never a RED — an environment fault must not be able
+  to park the daemon on a phantom regression again. | files: ops/gui/vm-seed-accessibility.sh, ops/gui/vm-seed-accessibility-guest.sh, ops/gui/vm-check-accessibility.swift, ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh | M | high | none
 
 - [ ] **W26.verify-fu2 — the warm-start UI has still never been checked in the VM, and two of the three
-  checks need infrastructure that does not exist [M · MED · GUI]** (blocked-on: W26.vmuitest-blind).
-  **Status 2026-08-10 — the infrastructure and all three tests have LANDED (`2d5a754`, `f4d0d11`); only
-  the VM run is outstanding, and it is blocked by `W26.vmuitest-blind`.** What shipped: two DEBUG launch
+  checks need infrastructure that does not exist [M · MED · GUI]** ~~(blocked-on: W26.vmuitest-blind)~~.
+  🔓 **UNBLOCKED 2026-08-10** — `W26.vmuitest-blind` is repaired, so these three tests RAN in the VM for
+  the first time, and the result is **1 pass / 2 fail**:
+  - ✅ `testWarmRowsPaintAsRevalidatingBeforeTheyPaintAsSettled` — passed (28.6 s).
+  - ❌ `testASettledPassOverAnUntaggedFolderQuotesTheFilesItExamined` — *"the denominator must be quoted,
+    and be the real examined count:"* (`WarmStartUITests.swift:94`) — the quoted actual is **empty**.
+  - ❌ `testAWarmRowWhoseFileVanishedIsRefusedRatherThanWrittenBlind` — *"the vanished cache row must be
+    refused, not written:"* (`WarmStartUITests.swift:125`) — likewise empty.
+  ⚠️ **These two are the FIRST honest signal this lane has produced in a day, not a new regression**:
+  they were authored in `f4d0d11` ("the three warm-start UI checks exist as tests; the VM run is next")
+  and have never once executed, because the lane was blind from the moment they landed. Both messages
+  quote an empty actual value, so **suspect the assertion's own plumbing (an accessibility identifier
+  that never resolves) before the product** — and note the sibling COLD test
+  `testAnUntaggedFolderShowsTheScannedDenominator` passes, which makes an empty WARM reading the more
+  interesting half. Evidence: `vm-artifacts/gui-vm-reader-attempt1.log`.
+  **Until this is resolved the gui-vm gate is legitimately RED on Reader** — that is the lane working, and
+  it is a different thing from the environment fault that parked the daemon.
+  **Earlier status (2026-08-10) — the infrastructure and all three tests have LANDED (`2d5a754`,
+  `f4d0d11`); only the VM run was outstanding.** What shipped: two DEBUG launch
   keys, both read from the INJECTED defaults domain — `ARUITestLibraryIndexPath` (substitutes a SCRATCH
   warm-start database in `ArchiveLibrary.init`, and is the only thing that lets a fixture root use a
   persisted cache at all, since `usesPersistedIndex` otherwise answers NO) and `ARUITestScanHoldSeconds`

@@ -7,7 +7,7 @@ final class ArchiveReaderUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
+        app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launch()
     }
 
@@ -39,7 +39,9 @@ final class ArchiveReaderUITests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
 
         app.terminate()
-        app.launchArguments = ["-ARUITestRootPath", root.path]
+        // ASSIGNS rather than appends (a deliberately fresh argument list for the relaunch), so the
+        // state-ignoring flag has to be put back explicitly — `+=` elsewhere keeps it for free.
+        app.launchArguments = UITestLaunch.arguments(["-ARUITestRootPath", root.path])
         app.launch()
         app.activate()
 

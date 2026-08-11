@@ -208,8 +208,28 @@ ensure_fixture() {
     || warn "fixture STILL absent after the build attempt — fixtured UITests will XCTSkip, so a green run would not mean what you think."
 }
 
+# --- PREFLIGHT: is the guest's accessibility tree actually being served? -----------------------------
+# XCUITest reads the accessibility tree, so if the guest's Accessibility grant is not honoured EVERY window
+# assertion fails — with a message ("Main window should appear") that reads exactly like a product bug. On
+# 2026-08-10 that cost a day of hunting a phantom regression in both apps and then parked the daemon: the
+# apps were drawing correctly the whole time, and the real fault was a TCC row whose stored code
+# requirement no longer matched the guest agent. Ask first, so the lane can name its own broken
+# environment instead of blaming the change under test. → ops/gui/vm-check-accessibility.swift
+assert_accessibility() {
+  local out
+  out="$(tart exec "$VM" bash -lc \
+    "swift '$GUEST_REPO/ops/gui/vm-check-accessibility.swift'" 2>&1)" || {
+    printf '%s\n' "$out" >&2
+    die "the GUI VM is not serving the accessibility tree, so XCUITest cannot see any window and every
+     test in this bundle would fail for a reason that has nothing to do with your change.
+     Repair it:  ops/gui/vm-seed-accessibility.sh    (then re-run this lane)"
+  }
+  printf '%s\n' "$out" | sed 's/^/  /'
+}
+
 # --- LANE: XCUITest (accessibility) ---
 run_xcuitest() {
+  assert_accessibility
   [ -n "$PRERUN" ] && tart exec "$VM" bash -lc "$PRERUN" >/dev/null 2>&1
   log "building + running $ONLY_TESTING for $APP in the VM…"
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail

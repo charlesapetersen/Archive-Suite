@@ -2,23 +2,38 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## 🔴 OPEN (2026-08-10) — the VM XCUITest lane is BLIND: the app-under-test has no window
+## ✅ CLOSED (2026-08-10) — the VM XCUITest lane went BLIND for a day: TWO faults, neither in the app
 
-**Do not read a green — or a red — Reader XCUITest run as evidence right now.** Measured today on pristine
-`edce83e` main: `ops/gui/vm-gui-runner.sh reader xcuitest` fails even
-`ArchiveReaderUITests/testAppLaunchesAndShowsMainWindow`. The app-under-test is running in the foreground
-with **zero windows**, marked `Disabled` in the accessibility tree, with its menu bar installed and no Dock
-icon. **The app itself is fine**: the same build renders the navigation window and all 11 fixture rows in
-the same VM through the *sighted* lane (`vm-artifacts/sighted-reader.png`). Deleting the guest's saved
-application state and container preferences changes nothing, and no commit since the lane last passed
-(2026-08-09) touches the app entry point, the window scene, or `ArchiveTestHost`.
+**Both apps' entire UITest bundles failed as *"Main window should appear"*, and the apps were drawing
+correctly throughout.** The health gate read the 37 failures as "a reproducible build/test regression the
+per-change reviews missed" and **parked the daemon**. Nothing in the 30 commits since the last green gate
+was involved. Kept here because the symptom is maximally misleading — it names a window, so it reads as a
+product bug — and because it took two rounds to fix, each of which looked like a total failure until the
+other landed:
 
-Leading hypothesis, unconfirmed: `ArchiveCore.ArchiveTestHost`'s unit-test-host suppression (`.prohibited`
-activation policy + `HiddenWindowStub.orderOut`) is firing for the app-under-test, which would match every
-symptom including the missing Dock icon. Full evidence, the confirm-before-fixing instruction and the
-cross-app Tier-2 constraints: `SUITE_TODO.md` → **W26.vmuitest-blind**. Until it closes, GUI verification
-falls back to the sighted lane plus the headless render guards, and `W26.verify-fu2`'s VM run is blocked
-behind it.
+1. **The guest could not SEE.** `AXIsProcessTrusted()` was false and `kAXWindows` returned **-25211**
+   (`kAXErrorAPIDisabled`). Everything `tart exec` starts is attributed to the tart guest agent, so the
+   lane borrows *its* Accessibility grant — and that grant, while present and reading `auth_value = 2`,
+   was silently not honoured: *"Failed to match existing code requirement …"*, `authReason=5`. Two causes,
+   both needed: the agent binary is **linker-signed** ad-hoc (`codesign --verify` → "not signed at all"),
+   which can satisfy **no** requirement; and it is a **fat** binary, so the requirement must be its
+   designated requirement (`cdhash <arm64> or cdhash <x86_64>`), not one slice's hash.
+2. **There was nothing to see.** XCUITest launches the app-under-test **without**
+   `-ApplePersistenceIgnoreState`, though Xcode passes it to its own test runner. AppKit then restores
+   saved state whose window set is empty (`hasPersistentStateToRestore=1` → `No windows open yet`) and
+   SwiftUI never opens the `Window` scene. Self-perpetuating: that launch re-saves "no windows".
+
+**Fixed:** `ops/gui/vm-seed-accessibility.sh` (idempotent, backs up, verifies) for (1); a
+`UITestLaunch.archiveUITestApp()` seam in **both** UITest bundles for (2). **Guarded:**
+`ops/gui/vm-check-accessibility.swift` runs as a preflight in the interactive lane *and* the health gate,
+and a lane that cannot see is now a **SKIP** ("NOT VERIFIED"), never a RED — an environment fault must not
+be able to park the daemon on a phantom regression again.
+
+⚠️ **The lesson worth keeping:** *a UITest-launch fix can only be tested by a UITest run.* Fix (2) was
+briefly dismissed during the repair because the flag was tried against a plain `open`, which opens a
+window anyway and therefore could not show a difference. Equally, `CGWindowList` and the *sighted* lane
+see real pixels while XCUITest sees only the accessibility tree — when they disagree, the lane is blind,
+not the app. Full record: `SUITE_TODO.md` → **W26.vmuitest-blind**.
 
 ## 📏 MEASURED (`W26.verify`, corrected by `W26.verify-fu1`, 2026-08-10) — what Spotlight-free discovery costs at 150k
 

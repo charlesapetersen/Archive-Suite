@@ -49,7 +49,7 @@ class FixtureUITestCase: XCTestCase {
             "GUI fixture not found — run scripts/make-gui-fixture.sh first"
         )
 
-        app = XCUIApplication()
+        app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launchArguments += ["-ARUITestRootPath", Self.fixturePath]
         app.launch()
         app.activate()   // bring to front so row/header clicks are hittable even if another app had focus

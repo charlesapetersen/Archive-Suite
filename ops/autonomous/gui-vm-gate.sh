@@ -109,6 +109,17 @@ boot_vm() {
   else
     echo "WARN: could not raise the guest display to ${TART_VM_DISPLAY:-1920x1200} — Notes UITests will likely fail as 'not hittable'. Guest said: ${TART_DISPLAY_NOTE:-(no output)}" >>"$GLOG"
   fi
+  # Can the guest still SERVE the accessibility tree? XCUITest reads nothing else, so when the answer is
+  # no, every window assertion in every bundle fails as "Main window should appear" — a sentence that
+  # reads like a product regression and is not one. That is not a hypothetical: on 2026-08-10 the guest
+  # agent's Accessibility grant stopped matching its own code requirement, all 37 UITests across BOTH apps
+  # went red twice, and this gate parked the daemon citing "a reproducible build/test regression the
+  # per-change reviews missed" while the apps were drawing their windows perfectly the whole time.
+  # A lane that cannot see is INCONCLUSIVE, never RED — hence a skip (exit 3), like every other
+  # infrastructure failure here. → ops/gui/vm-check-accessibility.swift, repaired by vm-seed-accessibility.sh
+  if ! tart exec "$VM" bash -lc "swift '$GUEST_REPO/ops/gui/vm-check-accessibility.swift'" >>"$GLOG" 2>&1; then
+    return 3
+  fi
   return 0
 }
 
@@ -210,6 +221,9 @@ echo "GUI-VM gate: running [$APPS] UITests in VM '$VM' (headless, off-screen)…
 boot_vm; case $? in
   1) skip "VM never got an IP (see $GLOG)" ;;
   2) skip "Tart Guest Agent never answered within ${AGENTWAIT}s (see $GLOG)" ;;
+  3) skip "the guest is not serving the accessibility tree, so XCUITest can see no windows and every
+     UITest would fail for a reason unrelated to the code. Repair: ops/gui/vm-seed-accessibility.sh
+     (see $GLOG)" ;;
 esac
 
 is_warn_only() { case " $WARN_APPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }

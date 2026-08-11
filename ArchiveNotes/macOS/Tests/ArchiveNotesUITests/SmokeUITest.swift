@@ -52,7 +52,7 @@ final class SmokeUITest: XCTestCase {
             "GUI fixture not found — run scripts/make-notes-fixture.sh first"
         )
 
-        let app = XCUIApplication()
+        let app = XCUIApplication.archiveUITestApp()   // never a bare init — see UITestLaunch
         // Open the SCRATCH fixture store (in-memory override — never persists / touches the real store).
         app.launchArguments += ["-ANUITestStorePath", Self.fixturePath]
         app.launch()

@@ -56,7 +56,7 @@ class NotesFixtureUITestCase: XCTestCase {
             "GUI fixture not found — run scripts/make-notes-fixture.sh first"
         )
 
-        app = XCUIApplication()
+        app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launchArguments += ["-ANUITestStorePath", Self.fixturePath]
         app.launch()
         app.activate()

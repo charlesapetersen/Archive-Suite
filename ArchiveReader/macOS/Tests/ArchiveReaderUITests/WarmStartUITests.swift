@@ -133,7 +133,7 @@ final class WarmStartUITests: XCTestCase {
     // MARK: - Launching
 
     private func launch(hold: TimeInterval? = nil) -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = XCUIApplication.archiveUITestApp()   // never a bare init — see UITestLaunch
         app.launchArguments += ["-ARUITestRootPath", corpus.path,
                                "-ARUITestLibraryIndexPath", database.path]
         if let hold { app.launchArguments += ["-ARUITestScanHoldSeconds", String(Int(hold))] }
