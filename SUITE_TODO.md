@@ -1244,32 +1244,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   measurement above will otherwise get re-derived. A plausible mechanism to test first: `collectParagraphs`
   enumerates `.noteBlockKind` attribute RUNS, not paragraph ranges, so plain text may arrive as one run.
   | ArchiveNotes/Editor | Tier-1 (investigation)
-- [ ] **W3.notes-paste-url-line-split — pasting CR/CRLF-delimited text that contains Reader links either drops every link but one, or files a source block whose durable link points at a path that cannot exist [S · MED · provenance].**
-  Filed 2026-08-11 by the `W3.notes-extract-title-line-split` adversarial pass; **pre-existing**, and the
-  SIXTH instance of the `W3.notes-cr-line-start` mechanism. `SourceBlockPaster.scanURLs:85` splits with
-  `text.split(separator: "\n", omittingEmptySubsequences: true)` and trims each line with
-  `trimmingCharacters(in: .whitespaces)` — **which is space + tab only, not `\r`**. This is the plain-text
-  pasteboard FALLBACK (`readPasteboard` step 2), i.e. exactly the "operator copied this out of an email, a
-  chat or a Word doc" path, which is where CRLF comes from; the rich Reader-UTI path is unaffected.
-  **Measured 2026-08-11, and the failure is silent rather than loud** — `URL(string:)` does not reject a
-  control character, it percent-encodes it:
-  - one link on its own terminated line → `URL(string:)` SUCCEEDS, percent-encoding the terminator it should
-    have rejected (`…rel=A.pdf%0D` for a lone CR, `…rel=A.pdf%0D%0A` for CRLF — the split does not split a
-    CRLF at all, so the trailing terminator survives into the URL too), and `DurableLink.init(url:)` takes
-    `rel` verbatim from the query item, so a block is CREATED with `relativePath == "A.pdf\r"` (resp.
-    `"A.pdf\r\n"`) — a source anchor that can never resolve, with nothing to tell the operator why. (If that
-    link instead ends in `&page=<n>`, `Int("3\r")` is nil and the whole link is rejected, so the same paste
-    silently yields no block at all. Which of the two you get depends on query-item order.)
-  - N links separated by CRLF → the split sees ONE line and the first URL swallows the rest
-    (`…rel=A.pdf%0D%0Aarchivereader://reveal?rel=B.pdf`), so N links become at most one, and that one broken.
-  **The fix is the same one call as the fifth instance**, plus a trim that actually removes the terminator:
-  `BlockParser.splitLines` for the split AND `.whitespacesAndNewlines` for the trim — do BOTH; either alone
-  leaves one of the two shapes above. Acceptance: paste a two-link snippet in LF, CRLF and lone-CR form and
-  assert two entries with clean `relativePath`s in all three (the LF row passes today, which is what proves
-  the assertion rather than the split). ⚠️ Decide deliberately, in the same pass, whether a trailing-`\r`
-  `rel` should instead be REJECTED in `DurableLink` — that is an ArchiveCore change and would make the item
-  Tier-2 across all three apps, so it is a choice to make rather than drift into.
-  | ArchiveNotes/Sources | Tier-1 (Tier-2 if it reaches ArchiveCore)
 - [ ] **W3.notes-thumb-line-duplicates — a `thumb:` block grows one extra `![display](thumb)` line on EVERY save, without bound [M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` fix, which added the first
   parse→serialize→parse idempotence test this class has ever had; the `thumb:` shape is the one shape that
@@ -1286,6 +1260,53 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   is the bug. Then delete the exclusion note in `BlockChipTests
   .testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint` and add the `thumb:` shape to its table —
   that is the acceptance test. | ArchiveNotes/Editor | Tier-2
+- [ ] **W3.notes-header-field-terminator — `serializeHeader` writes every field value RAW into a line-based, comment-delimited header, so a terminator or a `-->` inside `link`/`display` truncates the durable link, leaks pasted text into the note body, or splits one block into two and destroys the first one's provenance [S–M · MED · data-shaped].**
+  Filed 2026-08-11 by the `W3.notes-paste-url-line-split` adversarial pass; **pre-existing**, and NOT the
+  same bug — that item fixed the *scanner* (`SourceBlockPaster`), which is where a malformed value is
+  CREATED; this is the *serializer*, which is where any malformed value does its damage, whoever produced it.
+  `BlockParser.serializeHeader:231-250` interpolates every value unescaped — `link: \(v)`,
+  `display: "\(v)"`, and the same for `thumb`/`zotero`/`note` and `unknownHeaderFields` (`page` is an `Int`,
+  so it is the one field that cannot carry this) — while
+  `parse`/`parseHeader` read that header as *lines* inside an HTML comment. So a value containing a line
+  terminator, or the string `-->`, breaks the grammar it is written into.
+  **Measured 2026-08-11 on `adbe271`, in the app-hosted bundle (probe since deleted). Reachability first —
+  the new `containsLineTerminator(rel)` guard does not cover this**, because the terminator need not be in
+  `rel`: `entriesFromPayload` accepted all six of `&x=<LF|CRLF|CR>junk` and `#<LF|CRLF|CR>x` (an IGNORED
+  query item, and the fragment — `DurableLink` reads only `root`/`rel`/`page`, so `rel` comes back clean),
+  and each time `anchor.link` kept the raw terminator verbatim. `display` is not validated at all
+  (`"Line1\r\nLine2"` accepted as-is).
+  **Then serialize → parse, five shapes, and NONE of them is a fixed point:**
+  - `link` + `"\njunk"` → reloads TRUNCATED at the terminator (`…&rel=a.pdf&x=`); the tail line is silently
+    dropped. A durable link that no longer names what it named.
+  - `link` + `"\nnote: smuggled"` → same truncation, and the injected line is consumed as the KNOWN `note:`
+    field (it did not appear in `unknownHeaderFields`) — i.e. a pasted payload can plant a note-passage
+    reference the operator never made.
+  - `display` + CRLF → reloads as `"Line1` — with the leading quote, since `unquote` only strips a matched
+    pair — and `Line2"` is dropped.
+  - `display` containing `-->` → **the header closes EARLY**: display reloads as `"A` and the remainder
+    (`LEAK" -->\nBody.\n`) becomes the block's MARKDOWN. ⚠️ This one needs no terminator at all, which is
+    why the fix cannot be "another line-terminator guard".
+  - `display` containing `"\n<!-- block: freeform -->\n"` → `parse` sees a second header at line start:
+    **2 blocks, and the FIRST loses its provenance entirely** (kind `freeform`, link/display nil), its real
+    header text demoted to body. Same destruction as `W3.notes-extract-smuggles-a-source-header`, reached
+    through a header FIELD instead of a passage.
+  **Reachable WITHOUT the pasteboard (read from the code, not measured end-to-end — confirm first):**
+  `SourceAnchor.notePassage` sets `display` to `"\(sourceTitle) — \(date)"`, so a note whose TITLE contains
+  `-->` would corrupt every extract taken from it; `EditorFormatting.insertZoteroBlock` sets
+  `display: ref.citation ?? ref.itemKey` from Zotero metadata. The custom-UTI path is the *measured* entry
+  point but the narrowest one (only Reader writes that UTI today).
+  **Fix at the serializer, not at the producers.** One guard in `serializeHeader` covers all four producers
+  (paste · extract/`notePassage` · Zotero · the debug insert) and keeps the rule in ONE place — putting it in
+  the paster instead would be a second copy of the invariant, which is precisely how this family of six bugs
+  began; `BlockParser.containsLineTerminator` already exists as the single authority for the terminator half.
+  The invariant to enforce: **a header field value is exactly one line and contains no `-->`.** Sanitizing is
+  the likely shape (`serialize` returns `String` and cannot fail, and dropping provenance would be worse than
+  folding a terminator to a space) — but pick deliberately, and mind the boundary
+  `W3.notes-cr-line-start-fu1` drew: this may only touch header FIELD values, which are metadata; nothing may
+  normalise the operator's body prose. Acceptance: add all five shapes to `BlockChipTests
+  .testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint`'s table (all five are RED today — that is
+  the measurement above) plus one `mktemp`-store disk round-trip, two save/load cycles.
+  | ArchiveNotes/Store | Tier-2 (it decides the bytes of the operator's `.md`)
 - [ ] **W21.vmgui-winsize-writeback — closing the Extracts window in `setUp` fires `.onDisappear`, which writes the SHARED window-size prefs both windows restore from [S · LOW · latent].**
   Filed 2026-08-04. `NotesBrowserView.swift:70` `.onDisappear { … NotesAppSettings.setWindowSize(w.frame.size) }`
   writes the single shared `windowW`/`windowH` keys, and `configureWindow` restores BOTH windows from them.

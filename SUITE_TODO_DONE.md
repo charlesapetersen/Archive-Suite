@@ -5419,6 +5419,55 @@ explain why not.
   written at all (the new tests are pure-function), no corpus touched, nothing on the host screen.
   | ArchiveNotes/Core | Tier-1 | done
 
+- [x] **W3.notes-paste-url-line-split — pasting CR/CRLF-delimited text that contains Reader links either
+  dropped every link but one, or filed a source block whose durable link pointed at a path that cannot exist
+  [S · MED · provenance].** ✅ **SHIPPED 2026-08-11** — code `adbe271`, tracker flip in the commit whose
+  subject begins `fix(notes,trackers): W3.notes-paste-url-line-split`. Filed 2026-08-11 by the
+  `W3.notes-extract-title-line-split` pass; **pre-existing**, the SIXTH instance of the
+  `W3.notes-cr-line-start` mechanism, and the first one in the *paste* path rather than the parser.
+  **The measurement changed the item's headline, and in the worse direction.** The filing predicted "one
+  broken block". Measured before the fix — two links, first one page-bearing, CRLF or lone CR: **ZERO
+  blocks**. The unsplit text lands on the trailing `page=` query item, `Int("1\r\n…")` is nil, and
+  `DurableLink` rejects the whole link. Reader's own formatter always puts `page` last, so for the common
+  Copy-Archive-Link(s) shape the real outcome is **total silent loss**, not a broken block. The LF control
+  gave 2 clean entries throughout, which is what proves the assertions rather than the split. Two doc-level
+  links gave 1 entry whose `rel` had swallowed the next link; a single doc-level link plus a terminator gave
+  `rel == "a.pdf\r"` / `"a.pdf\r\n"`.
+  **What landed:** both halves the filing required — `BlockParser.splitLines` for the split (LF · CR LF ·
+  lone CR each ONE terminator, asking the family's existing authority instead of making a seventh copy of the
+  idiom) and `.whitespacesAndNewlines` for the trim. Either alone leaves one of the two shapes above. Plus
+  the route neither half can reach: a terminator can arrive **already percent-encoded** (`rel=A.pdf%0D`),
+  which `URL(string:)` decodes back to `"\r"` — new `BlockParser.containsLineTerminator` rejects such a link
+  in `scanURLs` **and** in `entriesFromPayload`, the custom-UTI path, which takes `rel` verbatim from
+  untrusted pasteboard JSON and had the same hole.
+  **DECIDED, not drifted into (the filing demanded the decision): `DurableLink` does NOT reject a
+  terminator-bearing `rel`.** That would be an ArchiveCore change, Tier-2 across three apps, making a parse
+  stricter than its own formatter — `rel` is a filename, a CR is legal in one on APFS, so a rejecting parse
+  would make `DurableLink`'s format→parse round-trip lossy. The malformation is created by the scanner and is
+  fixed at the scanner; the guard lives in the consumer holding the untrusted input.
+  5 new tests, each parameterized over LF · CRLF · lone CR with the LF row kept as a permanent control.
+  Verified on the exact shipping tree, re-run in the completing session rather than carried over from the
+  checkpoint: Notes unit bundle **785 Swift Testing tests / 84 suites + the XCTest half — 999 passing test
+  cases in the `.xcresult`, 0 failures, `** TEST SUCCEEDED **`** (the XCTest half is 214, was 209 — the five
+  new cases), plus a force-recompile of all three touched files with **zero compiler warnings** (the only two
+  `warning:` lines in the build log are the benign `appintentsmetadataprocessor` ones), and
+  `ArchiveNotesUITests` **20/20, 0 failures, 356.9 s** in the headless Tart VM
+  (`ops/gui/vm-gui-runner.sh notes xcuitest`, off the owner's screen) — which for this item is more than the
+  usual regression check: `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` drives this exact code
+  through the real app, and it passed first try in 21.4 s (no sign of `W21.vmgui-g5-flake` this run).
+  **One residual filed, not fixed: `W3.notes-header-field-terminator`** — and it is a different level, which
+  is why it was filed rather than folded in. This item fixed the *scanner*, where a malformed value is
+  created; `BlockParser.serializeHeader` writes every field value RAW into a line-based, comment-delimited
+  header, where any malformed value — whoever produced it — truncates the link, leaks text into the note
+  body, or splits one block into two and destroys the first one's provenance. Measured in five shapes, none
+  of them a fixed point; one of them needs no line terminator at all (a `-->` inside `display`), so it cannot
+  be another terminator guard, and `display` reaches that header from note TITLES via
+  `SourceAnchor.notePassage`, not just from the pasteboard.
+  Notes-local (`ArchiveNotes/Sources` + `Store`) — nothing in ArchiveCore, so no cross-app rebuild was owed;
+  the new tests are pure-function, so no store was written, no corpus touched, nothing on the host screen.
+  | ArchiveNotes/Sources | Tier-1 (gated Tier-2 anyway — it decides what provenance the operator's note
+  keeps) | done
+
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
   command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine
