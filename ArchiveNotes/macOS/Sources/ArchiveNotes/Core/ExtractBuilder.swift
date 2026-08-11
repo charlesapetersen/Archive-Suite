@@ -205,7 +205,9 @@ struct ExtractBuilder {
         guard !nested.isEmpty else { return markdown }   // the common path: no header, byte-identical
         var out = leading ?? ""
         for block in nested where !block.markdown.isEmpty {
-            if !out.isEmpty, !out.hasSuffix("\n") { out += "\n" }
+            // Same authority on what ends a line as everywhere else — `hasSuffix("\n")` is false for
+            // CR/CRLF-terminated text and would insert a blank line (`W3.notes-cr-line-start`).
+            if !out.isEmpty, !BlockParser.endsWithLineTerminator(out) { out += "\n" }
             out += block.markdown
         }
         return out

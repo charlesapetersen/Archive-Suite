@@ -224,4 +224,95 @@ final class BlockParserTests: XCTestCase {
         XCTAssertEqual(reparsed.count, 1)
         XCTAssertEqual(reparsed[0].source?.notePassageTarget?.block, 3)
     }
+
+    // MARK: - CR line terminators (W3.notes-cr-line-start)
+    //
+    // Swift merges `CR LF` into ONE `"\r\n"` grapheme, so every `Character`-level comparison against
+    // `"\n"` in this file was false for CR-terminated text. Four consequences, all covered below: a
+    // header after CR or CRLF was not recognized at all; the terminator closing a header line leaked
+    // into the block body; CR-separated header fields did not split; and `serialize`'s separator guard
+    // appended a second newline. Those tests compare unicode SCALARS now.
+    //
+    // Reachable by pasting CR-delimited text into the editor — `FrontMatterCodec.decode` normalizes
+    // `\r\n` read from disk, but never a lone `\r`.
+
+    func testHeaderAfterLoneCarriageReturnIsRecognized() {
+        let (leading, blocks) = BlockParser.parse("Intro prose.\r<!-- block: freeform -->\nBody text.\n")
+        XCTAssertEqual(leading, "Intro prose.\r")
+        XCTAssertEqual(blocks.count, 1)
+        XCTAssertEqual(blocks[0].kind, .freeform)
+        XCTAssertEqual(blocks[0].markdown, "Body text.\n")
+    }
+
+    func testHeaderAfterCRLFIsRecognized() {
+        let (leading, blocks) = BlockParser.parse("Intro prose.\r\n<!-- block: freeform -->\nBody text.\n")
+        XCTAssertEqual(leading, "Intro prose.\r\n")
+        XCTAssertEqual(blocks.count, 1)
+        XCTAssertEqual(blocks[0].markdown, "Body text.\n")
+    }
+
+    /// The terminator closing the header line may be CR or CRLF; exactly one is consumed, and none of
+    /// it may survive at the head of the block body.
+    func testCarriageReturnAfterHeaderCloseIsConsumed() {
+        let (_, crlf) = BlockParser.parse("<!-- block: freeform -->\r\nBody text.\n")
+        XCTAssertEqual(crlf.first?.markdown, "Body text.\n")
+        let (_, cr) = BlockParser.parse("<!-- block: freeform -->\rBody text.\n")
+        XCTAssertEqual(cr.first?.markdown, "Body text.\n")
+    }
+
+    /// A multi-line header whose field lines are CR-separated must still split into fields. Without
+    /// this the header is recognized (above) but parses WORSE than before the fix: every field after
+    /// the first is swallowed into the value of the one before it, so the kind falls back to
+    /// `.freeform` and the whole source anchor is lost.
+    func testCarriageReturnSeparatedHeaderFieldsParse() {
+        let body = "<!-- block: reader-page\r     link: archivereader://x\r     page: 7 -->\rBody.\n"
+        let (_, blocks) = BlockParser.parse(body)
+        XCTAssertEqual(blocks.count, 1)
+        XCTAssertEqual(blocks[0].kind, .readerPage)
+        XCTAssertEqual(blocks[0].source?.link, "archivereader://x")
+        XCTAssertEqual(blocks[0].source?.page, 7)
+    }
+
+    /// `serialize`'s separator guard must not append a SECOND newline after CRLF-terminated text:
+    /// `"…\r\n".hasSuffix("\n")` is FALSE (the last `Character` is the merged grapheme), so the guard
+    /// inserted a blank line into the note on the first save after any CRLF paste.
+    func testSerializeDoesNotDoubleTerminateCRLFText() {
+        let blocks = [Block(kind: .freeform, source: nil, markdown: "Body\n", unknownHeaderFields: [])]
+        XCTAssertEqual(BlockParser.serialize(leadingText: "Intro.\r\n", blocks: blocks),
+                       "Intro.\r\n<!-- block: freeform -->\nBody\n")
+    }
+
+    /// A lone `\r` already ends the line, so nothing is appended — and appending was worse than
+    /// useless: the `\n` merged into the preceding `\r` into one grapheme, leaving the header exactly
+    /// as unrecognized as before. That merge is why this could not be fixed at `MarkdownBridge`.
+    func testSerializeLeavesLoneCarriageReturnAlone() {
+        let blocks = [Block(kind: .freeform, source: nil, markdown: "Body\n", unknownHeaderFields: [])]
+        let out = BlockParser.serialize(leadingText: "Intro.\r", blocks: blocks)
+        XCTAssertEqual(out, "Intro.\r<!-- block: freeform -->\nBody\n")
+        let (leading, reparsed) = BlockParser.parse(out)
+        XCTAssertEqual(leading, "Intro.\r")
+        XCTAssertEqual(reparsed.count, 1)
+    }
+
+    /// The end state: a CR-delimited note keeps both blocks' provenance and is a fixed point under
+    /// parse → serialize → parse, so an autosaving editor cannot grow or degrade it.
+    func testCRDelimitedNoteRoundTripsAsAFixedPoint() {
+        let body = "Intro.\r"
+            + "<!-- block: reader-page\r     link: archivereader://a\r     page: 1 -->\rFirst body.\r"
+            + "<!-- block: reader-doc\r     link: archivereader://b -->\rSecond body.\r"
+        let (leading, blocks) = BlockParser.parse(body)
+        XCTAssertEqual(leading, "Intro.\r")
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertEqual(blocks[0].kind, .readerPage)
+        XCTAssertEqual(blocks[0].source?.page, 1)
+        XCTAssertEqual(blocks[1].kind, .readerDoc)
+        XCTAssertEqual(blocks[1].source?.link, "archivereader://b")
+
+        let once = BlockParser.serialize(leadingText: leading, blocks: blocks)
+        let (leading2, blocks2) = BlockParser.parse(once)
+        XCTAssertEqual(blocks2.count, 2)
+        XCTAssertEqual(blocks2[0].source?.page, 1)
+        XCTAssertEqual(BlockParser.serialize(leadingText: leading2, blocks: blocks2), once,
+                       "parse → serialize → parse must be a fixed point for CR-delimited text")
+    }
 }

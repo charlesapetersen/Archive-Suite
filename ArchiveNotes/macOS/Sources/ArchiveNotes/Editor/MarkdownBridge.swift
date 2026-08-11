@@ -280,10 +280,10 @@ enum MarkdownBridge {
     ///
     /// Block-header chip characters (`noteBlockSource` attr) are serialized as
     /// `<!-- block: kind ... -->` headers with optional `![display](thumb)` lines — each emitted at the
-    /// start of a line, the only form `BlockParser.parse` will read back as a header. One residual, so
-    /// this is not read as an absolute guarantee: a body ending in a LONE `\r` still defeats it, because
-    /// Swift merges the appended `\n` into a single `"\r\n"` grapheme and `BlockParser`'s line-start test
-    /// compares `Character`s (`W3.notes-cr-line-start`).
+    /// start of a line, the only form `BlockParser.parse` will read back as a header. The CR residual
+    /// this used to carry is CLOSED: `BlockParser`'s line-start test compares unicode SCALARS now, so a
+    /// body ending in CR or CRLF already begins a line and nothing is appended to it
+    /// (`W3.notes-cr-line-start`).
     @MainActor
     static func serialize(_ attributed: NSAttributedString) -> String {
         if attributed.length == 0 { return "" }
@@ -302,9 +302,11 @@ enum MarkdownBridge {
                 // and `serializeBodySegment` joins paragraphs with `\n` without a trailing one — so
                 // every body butts straight up against the next header, and on reload the two blocks
                 // merge into one with the second chip degraded to literal text. That silently strips
-                // a pasted passage's provenance anchor. `BlockParser.serialize:90-101` guards exactly
-                // this on the storage side; this is the editor side of the same rule.
-                if !result.isEmpty, !result.hasSuffix("\n") { result += "\n" }
+                // a pasted passage's provenance anchor. `BlockParser.serialize` guards exactly this on
+                // the storage side; this is the editor side of the same rule — so it asks the same
+                // authority what ends a line (`hasSuffix("\n")` is false for a CRLF-terminated body,
+                // which appended a blank line on every save: `W3.notes-cr-line-start`).
+                if !result.isEmpty, !BlockParser.endsWithLineTerminator(result) { result += "\n" }
 
                 // Emit the block header
                 result += serializeBlockHeader(box)

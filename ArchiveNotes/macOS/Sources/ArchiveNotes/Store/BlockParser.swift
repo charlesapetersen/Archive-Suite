@@ -53,9 +53,7 @@ enum BlockParser {
 
         while search < body.endIndex,
               let range = body.range(of: marker, range: search..<body.endIndex) {
-            let atLineStart = range.lowerBound == body.startIndex ||
-                body[body.index(before: range.lowerBound)] == "\n"
-            if atLineStart { positions.append(range.lowerBound) }
+            if isAtLineStart(range.lowerBound, in: body) { positions.append(range.lowerBound) }
             search = range.upperBound
         }
 
@@ -87,17 +85,58 @@ enum BlockParser {
     /// insert a single separating newline before a header whenever the preceding text lacks one. The
     /// final block is left untouched (no spurious trailing newline), so a single-block or already
     /// newline-terminated body round-trips byte-for-byte.
+    ///
+    /// "Lacks one" is decided by `endsWithLineTerminator`, not `hasSuffix("\n")` — see the line-
+    /// terminator section below (`W3.notes-cr-line-start`).
     static func serialize(leadingText: String?, blocks: [Block]) -> String {
         var out = leadingText ?? ""
-        if !blocks.isEmpty, !out.isEmpty, !out.hasSuffix("\n") { out += "\n" }
+        if !blocks.isEmpty, !out.isEmpty, !endsWithLineTerminator(out) { out += "\n" }
         for (i, block) in blocks.enumerated() {
             out += serializeHeader(block)
             out += block.markdown
-            if i + 1 < blocks.count, !block.markdown.isEmpty, !block.markdown.hasSuffix("\n") {
+            if i + 1 < blocks.count, !block.markdown.isEmpty, !endsWithLineTerminator(block.markdown) {
                 out += "\n"
             }
         }
         return out
+    }
+
+    // MARK: - Line terminators (W3.notes-cr-line-start)
+
+    /// A line here may be terminated by LF, CR LF or a lone CR, and the tests below compare unicode
+    /// SCALARS rather than `Character`s on purpose.
+    ///
+    /// Swift merges `CR LF` into a SINGLE `"\r\n"` grapheme, so `"\r\n" == "\n"` is **false** and
+    /// `"…\r\n".hasSuffix("\n")` is **false**. Every `Character`-level test in this file was therefore
+    /// blind to CR-terminated text in four separate ways: a header after CR or CRLF was not recognized
+    /// as a header at all, the terminator closing a header line leaked into the block body,
+    /// CR-separated header fields did not split, and `serialize`'s separator guard appended a second
+    /// newline (a blank line inserted into the operator's note on the next save).
+    ///
+    /// The lone-CR case is also why this could not be patched at the caller: any `\n` appended after a
+    /// `\r` merges into that same grapheme, so the header stays unrecognized however careful the
+    /// producer is. Reachable by pasting CR-delimited text into the editor —
+    /// `FrontMatterCodec.decode` normalizes `\r\n` read from disk, but never a lone `\r`.
+    private static func isLineTerminator(_ scalar: Unicode.Scalar) -> Bool {
+        scalar == "\n" || scalar == "\r"
+    }
+
+    /// True for the `Character`s that are exactly one line break: `"\n"`, `"\r"`, and the merged
+    /// `"\r\n"` grapheme.
+    private static func isLineBreak(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy(isLineTerminator)
+    }
+
+    /// True if `text` already ends a line, so a header written straight after it begins one.
+    static func endsWithLineTerminator(_ text: String) -> Bool {
+        guard let last = text.unicodeScalars.last else { return false }
+        return isLineTerminator(last)
+    }
+
+    /// True if `index` begins a line within `body` (the start of `body` counts).
+    private static func isAtLineStart(_ index: String.Index, in body: String) -> Bool {
+        guard let previous = body[..<index].unicodeScalars.last else { return true }
+        return isLineTerminator(previous)
     }
 
     // MARK: - Internal
@@ -109,7 +148,9 @@ enum BlockParser {
 
         let headerRaw = String(text[text.startIndex..<closeRange.upperBound])
         var mdStart = closeRange.upperBound
-        if mdStart < text.endIndex && text[mdStart] == "\n" {
+        // Consume exactly ONE terminator, whichever form it takes — `index(after:)` steps over the
+        // whole `"\r\n"` grapheme, which is one line break, not two.
+        if mdStart < text.endIndex, isLineBreak(text[mdStart]) {
             mdStart = text.index(after: mdStart)
         }
         let markdown = mdStart < text.endIndex ? String(text[mdStart...]) : ""
@@ -123,7 +164,7 @@ enum BlockParser {
         if let r = text.range(of: "<!--") { text = String(text[r.upperBound...]) }
         if let r = text.range(of: "-->", options: .backwards) { text = String(text[..<r.lowerBound]) }
 
-        let fieldLines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        let fieldLines = text.split(omittingEmptySubsequences: false, whereSeparator: { isLineBreak($0) })
             .map { $0.trimmingCharacters(in: .whitespaces) }
 
         var kind: Block.Kind = .freeform
