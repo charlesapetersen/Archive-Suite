@@ -5377,6 +5377,48 @@ explain why not.
   the host screen. Filed as Tier-1; gated as Tier-2 anyway, since it decides the bytes of the operator's
   own notes. | ArchiveNotes/Store | Tier-1 (gated Tier-2) | done
 
+- [x] **W3.notes-extract-title-line-split — an extract's default title was the WHOLE snapshot whenever the
+  passage was CR- or CRLF-delimited, because "first line" was computed with `split(separator: "\n")`
+  [XS · LOW].** ✅ **SHIPPED 2026-08-11** — code `c2e4827`, tracker flip in the commit whose subject begins
+  `fix(notes,trackers): W3.notes-extract-title-line-split`. Filed 2026-08-11 by the
+  `W3.notes-cr-line-start-fu1` adversarial pass; **pre-existing** — a lone `\r` was never normalised
+  anywhere, so this never needed a CRLF note to bite. The FIFTH instance of the `W3.notes-cr-line-start`
+  mechanism, one file over from the other four.
+  **The mechanism, unchanged from the filing.** Swift compares GRAPHEMES: `"\r\n"` is not `"\n"`, and a lone
+  `"\r"` is not either. So `ExtractBuilder.defaultTitle`'s split did not split a CR/CRLF snapshot **at all**
+  — the loop saw ONE line and the extract was titled with the first 80 characters of the entire passage.
+  Reachable because PDF text extraction hands back both forms and extracts are built from Reader selections.
+  **What landed** is the one call the filing promised: `BlockParser.splitLines` instead of
+  `split(separator: "\n")`, the same authority the rest of the family routes through, so it cannot drift
+  from the parser again.
+  **The block seam turned out to be the same bug, and is now covered.** `defaultTitle` joins the block
+  markdowns with `"\n"`, so a block whose text ends in a lone `"\r"` produced a `"\r\n"` grapheme *at the
+  join* — one line break the old split could not see, welding the next block's first line onto the title.
+  That case was not in the filing; it is now its own test.
+  **Gate was mutation, the fourth item in this family to be gated that way.** The 4 new tests were run
+  against pristine `f6ee0d6` FIRST: **7 failing expectations** — the CR and CRLF rows of each of the three
+  parameterized cases, plus the block-seam case. The LF rows passed there, which is exactly what proves the
+  assertions themselves are right rather than the split. Each case is parameterized over all three
+  terminators for that reason, and the LF row stays in as a permanent control.
+  Verified: Notes unit bundle **785 Swift Testing tests / 84 suites + the XCTest half (209)**,
+  `** TEST SUCCEEDED **`, and a force-recompile of both touched files (`touch` + `build-for-testing`, so an
+  incremental no-op could not hide anything) with **zero warnings** — plus the headless Tart VM GUI lane,
+  **`ArchiveNotesUITests` 20/20** (`ops/gui/vm-gui-runner.sh notes xcuitest`, off the owner's screen), as a
+  regression check on the app this sits under; it does not itself build a CR-delimited extract.
+  **What the adversarial pass found, and filed rather than fixed.** Sweeping the rest of Notes for the same
+  idiom turned up one more live site, and it is worse than this one: `SourceBlockPaster.scanURLs` splits the
+  plain-text pasteboard on `"\n"` and trims with `.whitespaces` (space + tab, **not** `\r`). Measured —
+  `URL(string:)` percent-encodes the control character instead of rejecting it, so a CR-terminated Reader
+  link is ACCEPTED with `relativePath == "A.pdf\r"` (`"A.pdf\r\n"` for CRLF, which does not split at all),
+  i.e. a source block whose provenance can never resolve — and CRLF-separated links collapse into one URL
+  that swallows the rest. Filed as `W3.notes-paste-url-line-split` (S · MED) with the measurements, **each
+  one re-measured independently in the completing session** rather than carried over on trust, not fixed
+  here: different file, different failure, and it raises an ArchiveCore question this XS item has no
+  business answering.
+  Notes-local (`ArchiveNotes/Core`) — nothing in ArchiveCore, so no cross-app rebuild was owed; no store was
+  written at all (the new tests are pure-function), no corpus touched, nothing on the host screen.
+  | ArchiveNotes/Core | Tier-1 | done
+
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
   command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine

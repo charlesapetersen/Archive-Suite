@@ -1244,19 +1244,32 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   measurement above will otherwise get re-derived. A plausible mechanism to test first: `collectParagraphs`
   enumerates `.noteBlockKind` attribute RUNS, not paragraph ranges, so plain text may arrive as one run.
   | ArchiveNotes/Editor | Tier-1 (investigation)
-- [ ] **W3.notes-extract-title-line-split — an extract's default title is the WHOLE snapshot when the passage is CR- or CRLF-delimited, because "first line" is computed with `split(separator: "\n")` [XS · LOW].**
-  Filed 2026-08-11 by the `W3.notes-cr-line-start-fu1` adversarial pass; **pre-existing** (a lone `\r` was
-  never normalised, so this never needed a CRLF note to bite). `ExtractBuilder.defaultTitle:227-228` joins
-  the block markdowns and iterates `combined.split(separator: "\n", omittingEmptySubsequences: false)`.
-  Swift compares GRAPHEMES, so `"\r\n" != "\n"` and a lone `"\r"` is not `"\n"` either — a CR/CRLF-delimited
-  snapshot does not split at all, the loop sees ONE line, and the extract is titled with the first 80
-  characters of the entire passage instead of its first line. Reachable: PDF text extraction commonly hands
-  back `\r`/`\r\n`, and extracts are built from Reader selections. **The fix is now one call**: ask
-  `BlockParser.splitLines` (added by `W3.notes-cr-line-start-fu1`) instead of splitting on `"\n"` — same
-  authority the rest of the family already routes through, so it cannot drift from the parser again. Same
-  shape as the four mechanisms in `W3.notes-cr-line-start`; this is the fifth, one file over. Acceptance:
-  a test asserting a CR-, a CRLF- and an LF-delimited two-line snapshot all title from the FIRST line
-  (all three fail today for two of the three forms). | ArchiveNotes/Core | Tier-1
+- [ ] **W3.notes-paste-url-line-split — pasting CR/CRLF-delimited text that contains Reader links either drops every link but one, or files a source block whose durable link points at a path that cannot exist [S · MED · provenance].**
+  Filed 2026-08-11 by the `W3.notes-extract-title-line-split` adversarial pass; **pre-existing**, and the
+  SIXTH instance of the `W3.notes-cr-line-start` mechanism. `SourceBlockPaster.scanURLs:85` splits with
+  `text.split(separator: "\n", omittingEmptySubsequences: true)` and trims each line with
+  `trimmingCharacters(in: .whitespaces)` — **which is space + tab only, not `\r`**. This is the plain-text
+  pasteboard FALLBACK (`readPasteboard` step 2), i.e. exactly the "operator copied this out of an email, a
+  chat or a Word doc" path, which is where CRLF comes from; the rich Reader-UTI path is unaffected.
+  **Measured 2026-08-11, and the failure is silent rather than loud** — `URL(string:)` does not reject a
+  control character, it percent-encodes it:
+  - one link on its own terminated line → `URL(string:)` SUCCEEDS, percent-encoding the terminator it should
+    have rejected (`…rel=A.pdf%0D` for a lone CR, `…rel=A.pdf%0D%0A` for CRLF — the split does not split a
+    CRLF at all, so the trailing terminator survives into the URL too), and `DurableLink.init(url:)` takes
+    `rel` verbatim from the query item, so a block is CREATED with `relativePath == "A.pdf\r"` (resp.
+    `"A.pdf\r\n"`) — a source anchor that can never resolve, with nothing to tell the operator why. (If that
+    link instead ends in `&page=<n>`, `Int("3\r")` is nil and the whole link is rejected, so the same paste
+    silently yields no block at all. Which of the two you get depends on query-item order.)
+  - N links separated by CRLF → the split sees ONE line and the first URL swallows the rest
+    (`…rel=A.pdf%0D%0Aarchivereader://reveal?rel=B.pdf`), so N links become at most one, and that one broken.
+  **The fix is the same one call as the fifth instance**, plus a trim that actually removes the terminator:
+  `BlockParser.splitLines` for the split AND `.whitespacesAndNewlines` for the trim — do BOTH; either alone
+  leaves one of the two shapes above. Acceptance: paste a two-link snippet in LF, CRLF and lone-CR form and
+  assert two entries with clean `relativePath`s in all three (the LF row passes today, which is what proves
+  the assertion rather than the split). ⚠️ Decide deliberately, in the same pass, whether a trailing-`\r`
+  `rel` should instead be REJECTED in `DurableLink` — that is an ArchiveCore change and would make the item
+  Tier-2 across all three apps, so it is a choice to make rather than drift into.
+  | ArchiveNotes/Sources | Tier-1 (Tier-2 if it reaches ArchiveCore)
 - [ ] **W3.notes-thumb-line-duplicates — a `thumb:` block grows one extra `![display](thumb)` line on EVERY save, without bound [M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` fix, which added the first
   parse→serialize→parse idempotence test this class has ever had; the `thumb:` shape is the one shape that
