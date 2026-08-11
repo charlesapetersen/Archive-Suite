@@ -210,6 +210,23 @@ final class SourceBlockPasterTests: XCTestCase {
         XCTAssertEqual(entries.compactMap(relativePath(of:)), ["a.pdf", "b.pdf"])
     }
 
+    /// The trim half of the fix, isolated. `BlockParser.splitLines` CONSUMES a CR/LF terminator, so for
+    /// those the trim has nothing left to remove — mutating it back to `.whitespaces` keeps every row
+    /// above green, which is why this test exists. What `.whitespacesAndNewlines` still reaches is the
+    /// separators `splitLines` does not treat as line breaks and a rich-text paste really produces:
+    /// VERTICAL TAB (Word's soft break) and LINE/PARAGRAPH SEPARATOR (what an `NSTextView` copies).
+    /// Measured with `.whitespaces`: VT survives into the rel verbatim, and U+2028/U+2029 arrive as a
+    /// TRAILING SPACE — both anchors that cannot resolve.
+    func testScanURLsTrimsTrailingNonCRLFSeparators() {
+        for (name, sep) in [("VERTICAL TAB", "\u{000B}"), ("FORM FEED", "\u{000C}"),
+                            ("LINE SEPARATOR", "\u{2028}"), ("PARAGRAPH SEPARATOR", "\u{2029}")] {
+            let entries = SourceBlockPaster.scanURLs(in: scanLink("a.pdf") + sep)
+            XCTAssertEqual(entries.count, 1, "\(name): link should still be recognized")
+            XCTAssertEqual(entries.first.flatMap(relativePath(of:)), "a.pdf",
+                           "\(name): separator must not survive into the rel")
+        }
+    }
+
     /// A terminator can also arrive already percent-encoded, where splitting and trimming the pasted TEXT
     /// cannot reach it: `URL(string:)` decodes `%0D` back into `"\r"`. Such a `rel` names a path that
     /// cannot exist, so the link is rejected rather than filed as an anchor that never resolves.

@@ -5445,18 +5445,28 @@ explain why not.
   stricter than its own formatter — `rel` is a filename, a CR is legal in one on APFS, so a rejecting parse
   would make `DurableLink`'s format→parse round-trip lossy. The malformation is created by the scanner and is
   fixed at the scanner; the guard lives in the consumer holding the untrusted input.
-  5 new tests, each parameterized over LF · CRLF · lone CR with the LF row kept as a permanent control.
+  6 new tests, each parameterized over LF · CRLF · lone CR with the LF row kept as a permanent control —
+  the sixth being `testScanURLsTrimsTrailingNonCRLFSeparators`, which is the **only mutation-proof for the
+  trim half**: `splitLines` consumes CR/LF, so on those rows the trim has nothing left to remove and
+  reverting it to `.whitespaces` keeps every other row green. It asserts on the separators `splitLines` does
+  not treat as breaks (VT · FF · `U+2028` · `U+2029`), where the trim is doing the work alone.
   Verified on the exact shipping tree, re-run in the completing session rather than carried over from the
-  checkpoint: Notes unit bundle **785 Swift Testing tests / 84 suites + the XCTest half — 999 passing test
-  cases in the `.xcresult`, 0 failures, `** TEST SUCCEEDED **`** (the XCTest half is 214, was 209 — the five
-  new cases), plus a force-recompile of all three touched files with **zero compiler warnings** (the only two
+  checkpoint: Notes unit bundle **785 Swift Testing tests / 84 suites + XCTest 215 (was 209 — the six new
+  cases), 0 failures, `** TEST SUCCEEDED **`**, plus a force-recompile of all three touched files with
+  **zero compiler warnings** (the only two
   `warning:` lines in the build log are the benign `appintentsmetadataprocessor` ones), and
   `ArchiveNotesUITests` **20/20, 0 failures, 356.9 s** in the headless Tart VM
   (`ops/gui/vm-gui-runner.sh notes xcuitest`, off the owner's screen) — which for this item is more than the
   usual regression check: `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` drives this exact code
   through the real app, and it passed first try in 21.4 s (no sign of `W21.vmgui-g5-flake` this run).
-  **One residual filed, not fixed: `W3.notes-header-field-terminator`** — and it is a different level, which
-  is why it was filed rather than folded in. This item fixed the *scanner*, where a malformed value is
+  **TWO residuals filed, not fixed.** (1) **`W3.notes-paste-url-line-split-fu1`** — `splitLines` treats only
+  LF · CR LF · lone CR as line breaks, so two links separated by VERTICAL TAB `U+000B`, FORM FEED, `U+2028`
+  or `U+2029` still arrive as ONE line: re-measured against the shipped fix, page links give **0 entries**
+  and doc-level links **1 entry with the next link swallowed into `rel`**, for all four separators. Only the
+  TRAILING case is fixed, by the trim. Where to split is a genuine decision — widening `splitLines` reaches
+  front-matter parsing and every block body (Tier-2) versus a paster-local pre-split of the pasted text —
+  which is why it is an item and not a patch. (2) **`W3.notes-header-field-terminator`**, a different level,
+  which is why it too was filed rather than folded in. This item fixed the *scanner*, where a malformed value is
   created; `BlockParser.serializeHeader` writes every field value RAW into a line-based, comment-delimited
   header, where any malformed value — whoever produced it — truncates the link, leaks text into the note
   body, or splits one block into two and destroys the first one's provenance. Measured in five shapes, none
