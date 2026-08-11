@@ -313,6 +313,56 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertEqual(item.title, "CRLF")
     }
 
+    // MARK: - Line endings are the operator's, not ours (W3.notes-cr-line-start-fu1)
+
+    /// `decode` used to normalize `\r\n` → `\n` across the WHOLE file, so a Windows-delimited body came
+    /// back rewritten — while a CR-delimited one was preserved verbatim
+    /// (`NoteStoreTests.carriageReturnDelimitedBodySurvivesDiskRoundTrip` pins that half). The body is
+    /// sliced out of the original text untouched now; only the front matter is split.
+    func testCRLFBodyPreservedVerbatim() throws {
+        let text = "---\r\nschema: 1\r\nid: 00000000-0000-0000-0000-000000000009\r\nkind: note\r\ntitle: CRLF Body\r\nroundup: false\r\ncreated: 2026-01-01T00:00:00Z\r\nmodified: 2026-01-01T00:00:00Z\r\n---\r\nLine one.\r\nLine two.\r\n"
+        let item = try FrontMatterCodec.decode(text)
+        XCTAssertEqual(item.title, "CRLF Body")
+        XCTAssertEqual(item.trailingBodyRaw, "Line one.\r\nLine two.\r\n")
+    }
+
+    /// The reachable damage, and why this outlived "cosmetic": on MIXED endings the old whole-document
+    /// rewrite lost one line break per read and kept going — `"A\r\r\nB"` → `"A\r\nB"` → `"A\nB"` — so
+    /// the blank line between two paragraphs vanished over an autosaving editor's saves. Two
+    /// decode→encode cycles are the smallest test that shows the progression.
+    func testMixedLineEndingBodyDoesNotDecayAcrossSaves() throws {
+        let front = "---\nschema: 1\nid: 00000000-0000-0000-0000-00000000000a\nkind: note\ntitle: Mixed\nroundup: false\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\n---\n"
+        let body = "Para one.\r\r\nPara two.\r\n"
+
+        let once = try FrontMatterCodec.decode(front + body)
+        XCTAssertEqual(once.trailingBodyRaw, body)
+
+        let twice = try FrontMatterCodec.decode(FrontMatterCodec.encode(once))
+        XCTAssertEqual(twice.trailingBodyRaw, body)
+        // Scalar-level, because the two line breaks decay into ONE `"\r\n"` grapheme first: a
+        // `Character` count would already have looked stable at the halfway point.
+        XCTAssertEqual(twice.trailingBodyRaw?.unicodeScalars.count, body.unicodeScalars.count)
+    }
+
+    /// A CR-delimited file used not to decode at all: the normalization did not touch a lone `\r`, so
+    /// `hasPrefix("---\n")` failed and the whole note was rejected as `.missingFrontMatter`.
+    func testCarriageReturnDelimitedFrontMatterDecodes() throws {
+        let text = "---\rschema: 1\rid: 00000000-0000-0000-0000-00000000000b\rkind: note\rtitle: Classic Mac\rroundup: false\rcreated: 2026-01-01T00:00:00Z\rmodified: 2026-01-01T00:00:00Z\r---\rBody.\r"
+        let item = try FrontMatterCodec.decode(text)
+        XCTAssertEqual(item.title, "Classic Mac")
+        XCTAssertEqual(item.trailingBodyRaw, "Body.\r")
+    }
+
+    /// A file that is just the opening fence used to **trap**, not throw: `norm == "---"` was accepted
+    /// on purpose by the opener guard, and the next line computed `index(startIndex, offsetBy: 4)` on a
+    /// 3-character string (an out-of-bounds String index is a precondition failure — verified against
+    /// the old code before changing it). Pre-existing; the structural split removed the arithmetic.
+    func testBareOpeningFenceThrowsTypedErrorRatherThanTrapping() {
+        XCTAssertThrowsError(try FrontMatterCodec.decode("---")) { error in
+            XCTAssertEqual(error as? FrontMatterCodec.CodecError, .unterminatedFrontMatter)
+        }
+    }
+
     // MARK: - Scalar quoting edge cases
 
     func testTitleWithColonQuoted() throws {

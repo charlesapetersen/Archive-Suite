@@ -156,6 +156,45 @@ struct NoteStoreTests {
         #expect(!rawAgain.contains("\r\n<!-- block:"))
     }
 
+    /// W3.notes-cr-line-start-fu1 — the other half of the asymmetry the test above pins, through the
+    /// real `create` → `.md` on disk → `load` → `save` path.
+    ///
+    /// `FrontMatterCodec.decode` used to normalize `\r\n` → `\n` over the whole file, so a
+    /// Windows-delimited body was rewritten on every read even though nothing downstream needs LF any
+    /// more. On MIXED endings that was progressive rather than one-off: `"\r\r\n"` normalizes to
+    /// `"\r\n"`, which the NEXT read normalizes to `"\n"`, so the blank line between two paragraphs is
+    /// gone after two saves. Hence two save cycles here — one cycle looks stable.
+    @Test("a CRLF-delimited body keeps its line endings and its blank line across repeated saves")
+    func crlfDelimitedBodySurvivesDiskRoundTrip() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        var item = makeItem(title: "Windows Line Endings")
+        item.trailingBodyRaw = "Para one.\r\r\nPara two.\r\n"
+        item.blocks = [
+            Block(kind: .readerPage,
+                  source: SourceAnchor(link: "archivereader://open?doc=crlf", display: "Doc p.3", page: 3),
+                  markdown: "Quoted passage.\r\n", unknownHeaderFields: []),
+        ]
+
+        let ref = try await store.create(item)
+        let loaded = try await store.load(item.id)
+        #expect(loaded.trailingBodyRaw == "Para one.\r\r\nPara two.\r\n")
+        #expect(loaded.blocks.count == 1)
+        #expect(loaded.blocks.first?.markdown == "Quoted passage.\r\n")
+        #expect(loaded.blocks.first?.source?.page == 3)
+
+        _ = try await store.save(loaded)
+        let again = try await store.load(item.id)
+        #expect(again.trailingBodyRaw == loaded.trailingBodyRaw)
+        #expect(again.blocks.first?.markdown == loaded.blocks.first?.markdown)
+        #expect(again.blocks.first?.source?.link == "archivereader://open?doc=crlf")
+
+        // And the bytes on disk are the operator's, not a laundered copy of them.
+        let raw = try String(contentsOf: ref.url, encoding: .utf8)
+        #expect(raw.contains("Para one.\r\r\nPara two.\r\n"))
+    }
+
     // MARK: - Save (retitle -> rename)
 
     @Test("save retitles the file when title changes")

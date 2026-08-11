@@ -14,29 +14,9 @@ enum FrontMatterCodec {
     // MARK: - Decode
 
     static func decode(_ text: String) throws -> Item {
-        let norm = text.replacingOccurrences(of: "\r\n", with: "\n")
+        let (frontMatterLines, body) = try splitFrontMatter(text)
 
-        guard norm.hasPrefix("---\n") || norm == "---" else {
-            throw CodecError.missingFrontMatter
-        }
-
-        let afterOpener = norm[norm.index(norm.startIndex, offsetBy: 4)...]
-        guard let closeRange = afterOpener.range(of: "\n---\n") ??
-              afterOpener.range(of: "\n---", options: [], range: afterOpener.startIndex..<afterOpener.endIndex) else {
-            throw CodecError.unterminatedFrontMatter
-        }
-
-        let fmText = String(afterOpener[afterOpener.startIndex..<closeRange.lowerBound])
-
-        let bodyStartIdx: String.Index
-        if let full = afterOpener.range(of: "\n---\n") {
-            bodyStartIdx = full.upperBound
-        } else {
-            bodyStartIdx = closeRange.upperBound
-        }
-        let body = bodyStartIdx < afterOpener.endIndex ? String(afterOpener[bodyStartIdx...]) : ""
-
-        let fields = parseFrontMatter(fmText)
+        let fields = parseFrontMatter(frontMatterLines)
         let (leadingText, blocks) = BlockParser.parse(body)
 
         guard let idStr = fields.id, let id = UUID(uuidString: idStr) else {
@@ -137,6 +117,57 @@ enum FrontMatterCodec {
         return result
     }
 
+    // MARK: - Document split
+
+    /// Split the document into its front-matter LINES and its body, rewriting neither.
+    ///
+    /// The fence is located with LF, CR LF and a lone CR all counting as one terminator
+    /// (`BlockParser.splitLines`), the front matter is handed on already split into lines (that half is
+    /// line-oriented — see `parseFrontMatter`), and the body is a **verbatim slice of the original
+    /// text**.
+    ///
+    /// This replaced `text.replacingOccurrences(of: "\r\n", with: "\n")` over the WHOLE document
+    /// (W3.notes-cr-line-start-fu1). That call was load-bearing only for the front matter, which is
+    /// split structurally now; over the body it was destructive in two ways. It rewrote a CRLF body to
+    /// LF on every read — while leaving a CR-delimited one verbatim, since `BlockParser` handles all
+    /// three terminators (`W3.notes-cr-line-start`) — so the same prose came back punctuated one way
+    /// or the other depending on which key the operator's other editor had written. And on MIXED
+    /// endings it lost a line break per read and kept going: measured, `"A\r\r\nB"` → `"A\r\nB"` →
+    /// `"A\nB"`, i.e. a blank line between two paragraphs disappearing across an autosaving editor's
+    /// saves. That is the part that made this more than cosmetic.
+    ///
+    /// Rejected alternative, recorded because it is the tempting one: normalize as before, then map the
+    /// body's offset back into the original text. Swift merges `CR LF` into ONE `Character`, so the
+    /// normalized string usually has the same `count` and the offsets do line up — except at `"\r\r\n"`,
+    /// where the replacement leaves `\r` and `\n` adjacent and they merge into a single grapheme,
+    /// shrinking the string by one (measured: 18 characters → 17). The mapping skews silently on
+    /// exactly the input this fix is about.
+    ///
+    /// One pre-existing crash went with the old arithmetic: a file that is just `"---"` passed the
+    /// opener guard (`norm == "---"` was accepted on purpose) and then hit
+    /// `index(startIndex, offsetBy: 4)` on a 3-character string, which is a precondition failure, not a
+    /// thrown error — verified before this change. It has an opener and no closer, so it now reports
+    /// `.unterminatedFrontMatter` like every other unclosed front matter.
+    private static func splitFrontMatter(_ text: String) throws -> (frontMatter: [String], body: String) {
+        let lines = BlockParser.splitLines(text)
+
+        guard let opener = lines.first, opener == "---" else {
+            throw CodecError.missingFrontMatter
+        }
+        guard let closerIdx = lines.dropFirst().firstIndex(of: "---") else {
+            throw CodecError.unterminatedFrontMatter
+        }
+
+        let frontMatter = lines[1..<closerIdx].map(String.init)
+
+        // The closer's `endIndex` is its terminator; stepping over it with `index(after:)` consumes
+        // the whole `"\r\n"` grapheme — one line break, not two. A closer at EOF has no terminator.
+        let closerEnd = lines[closerIdx].endIndex
+        let body = closerEnd < text.endIndex ? String(text[text.index(after: closerEnd)...]) : ""
+
+        return (frontMatter, body)
+    }
+
     // MARK: - Front-matter parser
 
     private struct ParsedFields {
@@ -163,9 +194,12 @@ enum FrontMatterCodec {
         "roundup", "zotero", "created", "modified"
     ]
 
-    private static func parseFrontMatter(_ text: String) -> ParsedFields {
+    /// Takes the region's lines rather than its text: `splitFrontMatter` has already split them on any
+    /// of the three line terminators, so this half no longer needs the document normalized to LF first
+    /// (W3.notes-cr-line-start-fu1 — and a CR-delimited file, which used to be rejected outright as
+    /// `.missingFrontMatter`, parses as a result).
+    private static func parseFrontMatter(_ lines: [String]) -> ParsedFields {
         var fields = ParsedFields()
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         var i = 0
 
         while i < lines.count {

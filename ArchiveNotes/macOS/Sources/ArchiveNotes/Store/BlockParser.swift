@@ -115,8 +115,10 @@ enum BlockParser {
     ///
     /// The lone-CR case is also why this could not be patched at the caller: any `\n` appended after a
     /// `\r` merges into that same grapheme, so the header stays unrecognized however careful the
-    /// producer is. Reachable by pasting CR-delimited text into the editor —
-    /// `FrontMatterCodec.decode` normalizes `\r\n` read from disk, but never a lone `\r`.
+    /// producer is. Reachable by pasting CR-delimited text into the editor, and now by reading one off
+    /// disk too: `FrontMatterCodec.decode` used to normalize `\r\n` (never a lone `\r`) over the whole
+    /// file, and since `W3.notes-cr-line-start-fu1` it normalizes nothing — every terminator reaching
+    /// this parser is whatever the operator actually typed.
     private static func isLineTerminator(_ scalar: Unicode.Scalar) -> Bool {
         scalar == "\n" || scalar == "\r"
     }
@@ -131,6 +133,16 @@ enum BlockParser {
     static func endsWithLineTerminator(_ text: String) -> Bool {
         guard let last = text.unicodeScalars.last else { return false }
         return isLineTerminator(last)
+    }
+
+    /// Split `text` into lines, treating LF, CR LF and a lone CR as ONE terminator each. Empty lines
+    /// are kept, and the elements are `Substring`s of `text`, so a caller can slice the ORIGINAL bytes
+    /// back out: a line's `endIndex` is its terminator, and `text.index(after:)` steps over the whole
+    /// `"\r\n"` grapheme. `FrontMatterCodec.splitFrontMatter` uses that to find the front-matter fence
+    /// without rewriting the body (W3.notes-cr-line-start-fu1) — it asks here rather than re-deriving
+    /// the terminator test, which is how the four bugs above came to exist in the first place.
+    static func splitLines(_ text: String) -> [Substring] {
+        text.split(omittingEmptySubsequences: false, whereSeparator: { isLineBreak($0) })
     }
 
     /// True if `index` begins a line within `body` (the start of `body` counts).
