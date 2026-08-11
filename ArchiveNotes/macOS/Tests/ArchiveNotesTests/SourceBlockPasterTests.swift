@@ -143,6 +143,98 @@ final class SourceBlockPasterTests: XCTestCase {
         XCTAssertEqual(entries[0].anchor.display, "scan.jpg")
     }
 
+    // MARK: - scanURLs line terminators (W3.notes-paste-url-line-split)
+
+    /// The `rel` an entry's anchor actually resolves against — read back out of the stored link string,
+    /// because that string is what lands in the note and what a click later re-parses.
+    private func relativePath(of entry: SourceBlockPaster.PasteEntry) -> String? {
+        guard let link = entry.anchor.link,
+              let url = URL(string: link),
+              case .readerReveal(_, let rel, _) = DurableLink(url: url) else { return nil }
+        return rel
+    }
+
+    private static let scanRoot = "7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567"
+
+    private func scanLink(_ rel: String, page: Int? = nil) -> String {
+        var s = "archivereader://reveal?root=\(Self.scanRoot)&rel=\(rel)"
+        if let page { s += "&page=\(page)" }
+        return s
+    }
+
+    /// LF · CR LF · lone CR — every terminator an operator can paste. The LF row passes before the fix,
+    /// which is what makes the other two rows the assertion rather than the split.
+    private static let lineTerminators: [(name: String, sep: String)] = [
+        ("LF", "\n"), ("CRLF", "\r\n"), ("lone CR", "\r")
+    ]
+
+    func testScanURLsTwoLinksSplitOnEveryLineTerminator() {
+        for (name, sep) in Self.lineTerminators {
+            let text = scanLink("a.pdf", page: 1) + sep + scanLink("Letters/b.pdf") + sep
+            let entries = SourceBlockPaster.scanURLs(in: text)
+
+            XCTAssertEqual(entries.count, 2, "\(name): both links should be recognized")
+            guard entries.count == 2 else { continue }
+            XCTAssertEqual(relativePath(of: entries[0]), "a.pdf", "\(name): first rel must be clean")
+            XCTAssertEqual(relativePath(of: entries[1]), "Letters/b.pdf", "\(name): second rel must be clean")
+            XCTAssertEqual(entries[0].kind, .readerPage, "\(name)")
+            XCTAssertEqual(entries[0].anchor.page, 1, "\(name)")
+            XCTAssertEqual(entries[1].kind, .readerDoc, "\(name)")
+            XCTAssertEqual(entries[1].anchor.display, "b", "\(name)")
+        }
+    }
+
+    /// A single link on its own terminated line. Before the fix: a doc-level link kept the terminator in
+    /// `rel` (`"a.pdf\r"`), and a PAGE link — the shape Reader's own formatter emits, `page=` last — was
+    /// dropped entirely because `Int("7\r")` is nil.
+    func testScanURLsSingleTerminatedLineKeepsRelAndPageClean() {
+        for (name, sep) in Self.lineTerminators {
+            let doc = SourceBlockPaster.scanURLs(in: scanLink("a.pdf") + sep)
+            XCTAssertEqual(doc.count, 1, "\(name): doc-level link")
+            XCTAssertEqual(doc.first.flatMap(relativePath(of:)), "a.pdf", "\(name): doc-level rel")
+
+            let page = SourceBlockPaster.scanURLs(in: scanLink("a.pdf", page: 7) + sep)
+            XCTAssertEqual(page.count, 1, "\(name): page link must not be dropped")
+            XCTAssertEqual(page.first.flatMap(relativePath(of:)), "a.pdf", "\(name): page-link rel")
+            XCTAssertEqual(page.first?.anchor.page, 7, "\(name): page number")
+        }
+    }
+
+    /// Blank lines survive the switch to `splitLines`, which keeps empty subsequences — the old split
+    /// omitted them, so this guards the regression the change could have introduced.
+    func testScanURLsSkipsBlankAndJunkLinesAroundLinks() {
+        let text = "\r\n  \t\(scanLink("a.pdf"))\t \nhttps://example.com\r\n\r\n\(scanLink("b.pdf", page: 2))  \n"
+        let entries = SourceBlockPaster.scanURLs(in: text)
+
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(entries.compactMap(relativePath(of:)), ["a.pdf", "b.pdf"])
+    }
+
+    /// A terminator can also arrive already percent-encoded, where splitting and trimming the pasted TEXT
+    /// cannot reach it: `URL(string:)` decodes `%0D` back into `"\r"`. Such a `rel` names a path that
+    /// cannot exist, so the link is rejected rather than filed as an anchor that never resolves.
+    func testScanURLsRejectsPercentEncodedTerminatorInRel() {
+        XCTAssertTrue(SourceBlockPaster.scanURLs(in: scanLink("a.pdf%0D") + "\n").isEmpty,
+                      "CR-bearing rel should be rejected")
+        XCTAssertTrue(SourceBlockPaster.scanURLs(in: scanLink("a.pdf%0D%0A") + "\n").isEmpty,
+                      "CRLF-bearing rel should be rejected")
+        XCTAssertTrue(SourceBlockPaster.scanURLs(in: scanLink("a%0Ab.pdf") + "\n").isEmpty,
+                      "LF INSIDE a rel should be rejected too, not just a trailing one")
+    }
+
+    /// The custom-UTI path treats its payload as untrusted and takes `rel` verbatim, so it needs the same
+    /// rule — a terminator-bearing `rel` there would file the same unresolvable anchor.
+    func testPayloadRejectsTerminatorBearingRel() {
+        let payload = ArchiveLinkPayload(entries: [
+            .init(link: scanLink("a.pdf%0D"), display: "Broken"),
+            .init(link: scanLink("b.pdf"), display: "Valid")
+        ])
+
+        let entries = SourceBlockPaster.entriesFromPayload(payload)
+        XCTAssertEqual(entries.count, 1, "Terminator-bearing rel should be filtered out")
+        XCTAssertEqual(entries[0].anchor.display, "Valid")
+    }
+
     // MARK: - importThumbnail (asset import)
 
     @MainActor

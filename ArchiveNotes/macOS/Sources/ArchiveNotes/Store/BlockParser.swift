@@ -145,6 +145,16 @@ enum BlockParser {
         text.split(omittingEmptySubsequences: false, whereSeparator: { isLineBreak($0) })
     }
 
+    /// True if `text` carries a line terminator ANYWHERE — the test for a value that is supposed to be a
+    /// single line and is not. Scalar-level, so it catches a lone `"\r"` and the merged `"\r\n"` grapheme
+    /// alike. `SourceBlockPaster` uses it on a pasted link's `rel` (W3.notes-paste-url-line-split): a
+    /// terminator can also arrive percent-encoded (`rel=A.pdf%0D`), where no amount of splitting or
+    /// trimming the pasted TEXT will remove it, and the result is a source anchor naming a path that
+    /// cannot exist. Asked here rather than re-derived there, for the reason in `splitLines`.
+    static func containsLineTerminator(_ text: String) -> Bool {
+        text.unicodeScalars.contains(where: isLineTerminator)
+    }
+
     /// True if `index` begins a line within `body` (the start of `body` counts).
     private static func isAtLineStart(_ index: String.Index, in body: String) -> Bool {
         guard let previous = body[..<index].unicodeScalars.last else { return true }

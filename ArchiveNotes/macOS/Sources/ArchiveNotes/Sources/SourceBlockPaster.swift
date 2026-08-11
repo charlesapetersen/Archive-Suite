@@ -55,9 +55,13 @@ struct SourceBlockPaster {
     /// Build entries from a decoded custom-UTI payload.
     static func entriesFromPayload(_ payload: ArchiveLinkPayload) -> [PasteEntry] {
         payload.entries.compactMap { entry in
-            // Validate each link via DurableLink (treat payload as untrusted)
+            // Validate each link via DurableLink (treat payload as untrusted). A `rel` carrying a line
+            // terminator can only name a path that does not exist, so the entry is dropped rather than
+            // filed as provenance that never resolves — the same rule `scanURLs` applies, because a
+            // percent-encoded terminator reaches this path too (W3.notes-paste-url-line-split).
             guard let url = URL(string: entry.link),
-                  case .readerReveal = DurableLink(url: url) else { return nil }
+                  case .readerReveal(_, let rel, _) = DurableLink(url: url),
+                  !BlockParser.containsLineTerminator(rel) else { return nil }
 
             let kind: Block.Kind = entry.page != nil ? .readerPage : .readerDoc
 
@@ -80,12 +84,25 @@ struct SourceBlockPaster {
     }
 
     /// Scan text for `archivereader://` URLs and produce paste entries (no thumbnails).
+    ///
+    /// The line split goes through `BlockParser.splitLines` and the trim through
+    /// `.whitespacesAndNewlines` — both halves are required (W3.notes-paste-url-line-split, the sixth
+    /// instance of the `W3.notes-cr-line-start` family). This is the plain-text pasteboard FALLBACK, i.e.
+    /// the "operator copied this out of an email, a chat or a Word doc" path, which is exactly where CRLF
+    /// comes from; `split(separator: "\n")` did not split a CRLF or lone-CR paste at all, and
+    /// `.whitespaces` is space + tab, so the terminator survived into the URL. `URL(string:)` does not
+    /// reject a control character — it percent-encodes it — so the failure was silent either way:
+    /// measured, a CRLF-separated pair of PAGE links yielded ZERO blocks (the terminator lands on the
+    /// trailing `page=` item, `Int("1\r\n")` is nil, the whole link is rejected), and a pair of
+    /// doc-level links yielded ONE block whose `relativePath` had swallowed the next link
+    /// (`"A.pdf\r\narchivereader://reveal?root=…"`).
     static func scanURLs(in text: String) -> [PasteEntry] {
         var entries: [PasteEntry] = []
-        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+        for line in BlockParser.splitLines(text) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let url = URL(string: trimmed),
-                  case .readerReveal(_, let rel, let page) = DurableLink(url: url) else {
+                  case .readerReveal(_, let rel, let page) = DurableLink(url: url),
+                  !BlockParser.containsLineTerminator(rel) else {
                 continue
             }
             let basename = URL(fileURLWithPath: rel).lastPathComponent
