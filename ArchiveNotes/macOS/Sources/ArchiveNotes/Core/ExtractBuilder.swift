@@ -223,9 +223,16 @@ struct ExtractBuilder {
     /// `<!-- block: …` line nested in the markdown is not title material, and reading it as one put
     /// the smuggled header back into the front matter even once the body was clean
     /// (W3.notes-extract-smuggles-a-source-header).
+    ///
+    /// The line split goes through `BlockParser.splitLines` — the same authority the rest of this family
+    /// routes through — because Swift compares GRAPHEMES: `"\r\n"` is not `"\n"` and a lone `"\r"` is not
+    /// either, so `split(separator: "\n")` did not split a CR/CRLF snapshot at all and titled the extract
+    /// with the first 80 characters of the WHOLE passage (`W3.notes-extract-title-line-split`). PDF text
+    /// extraction hands back both forms. Note the block seam is the same bug: the markdowns are joined
+    /// with `"\n"`, so a block ending in a lone `"\r"` makes a `"\r\n"` grapheme at the join.
     nonisolated static func defaultTitle(fromFirstLineOf blocks: [Block], fallbackDate: Date) -> String {
         let combined = blocks.map { $0.markdown }.joined(separator: "\n")
-        for rawLine in combined.split(separator: "\n", omittingEmptySubsequences: false) {
+        for rawLine in BlockParser.splitLines(combined) {
             let cleaned = strippedTitleLine(String(rawLine))
             if !cleaned.isEmpty { return truncateOnWordBoundary(cleaned, max: 80) }
         }

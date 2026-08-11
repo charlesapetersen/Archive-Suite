@@ -153,6 +153,49 @@ struct ExtractTitleTests {
                                             fallbackDate: epoch)
         #expect(t.hasPrefix("Extract "))
     }
+
+    // MARK: - W3.notes-extract-title-line-split
+    //
+    // "First line" was computed with `split(separator: "\n")`, and Swift compares GRAPHEMES: `"\r\n"` is
+    // not `"\n"`, and a lone `"\r"` is not one either. A CR/CRLF-delimited snapshot therefore did not
+    // split at ALL — the loop saw one line and the extract was titled with the first 80 characters of the
+    // whole passage. Reachable because PDF text extraction hands back both forms and extracts are built
+    // from Reader selections. Each case below is run for all three terminators so the LF control proves
+    // the assertion itself is right; only the CR and CRLF rows were red.
+
+    @Test("titles from the FIRST line, whatever the line terminator",
+          arguments: ["\n", "\r\n", "\r"])
+    func firstLineForEveryTerminator(terminator: String) {
+        let md = "First line\(terminator)Second line\(terminator)Third line"
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(md)],
+                                            fallbackDate: epoch) == "First line")
+    }
+
+    @Test("skips leading blank + image-only lines, whatever the line terminator",
+          arguments: ["\n", "\r\n", "\r"])
+    func skipsImageOnlyForEveryTerminator(terminator: String) {
+        let md = "\(terminator)![pic](assets/x.png)\(terminator)Real Title"
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(md)],
+                                            fallbackDate: epoch) == "Real Title")
+    }
+
+    @Test("falls back to Extract <date> for a whitespace/image-only snapshot, whatever the terminator",
+          arguments: ["\n", "\r\n", "\r"])
+    func fallbackForEveryTerminator(terminator: String) {
+        let md = "   \(terminator)![only](assets/a.png)\(terminator)   "
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(md)],
+                                            fallbackDate: epoch).hasPrefix("Extract "))
+    }
+
+    /// The block seam is its own case: the markdowns are joined with `"\n"`, so a block whose text ends
+    /// in a lone `"\r"` produced a `"\r\n"` grapheme at the join — one line break that the old
+    /// `"\n"` split could not see, welding the next block's first line onto the title.
+    @Test("a block ending in a lone CR does not weld onto the next block's first line")
+    func crTerminatedBlockJoinDoesNotWeld() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("First line\r"),
+                                                              passage("Second line")],
+                                            fallbackDate: epoch) == "First line")
+    }
 }
 
 // MARK: - Passage building + persistence
