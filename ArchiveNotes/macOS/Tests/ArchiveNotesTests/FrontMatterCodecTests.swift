@@ -389,6 +389,71 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertEqual(reencoded, text)
     }
 
+    /// W3.notes-frontmatter-codec-bypasses-the-leading-text-guard. `encode` used to append
+    /// `trailingBodyRaw` itself and then call `BlockParser.serialize(leadingText: nil, …)`, so the
+    /// guard that inserts the separating newline before a header (`BlockParser.swift:92`) never ran on
+    /// the only path that reaches disk. A leading body with NO trailing newline therefore butted
+    /// straight up against `<!-- block:`, which `BlockParser.parse` only recognizes at a line start —
+    /// so on reload the header was plain prose and the block (with its provenance) was gone.
+    /// Every producer of `trailingBodyRaw` in the app today is `BlockParser.parse`, whose leading text
+    /// always ends in `\n`, so this was latent; a template/importer/migration setting it directly is
+    /// all it would have taken. This test writes that value directly, which is the point.
+    func testLeadingBodyWithoutTrailingNewlineKeepsItsFirstBlockOnReload() throws {
+        let ref = Date(timeIntervalSinceReferenceDate: 804_070_200)
+        let item = Item(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000c1")!,
+            kind: .note, title: "No trailing newline", authors: [],
+            date: nil, datePrecision: nil, dateUncertain: false, quality: nil,
+            tags: [], zotero: [], roundup: false, created: ref, modified: ref, schema: 1,
+            blocks: [
+                Block(kind: .readerPage,
+                      source: SourceAnchor(link: "archivereader://open?doc=abc", display: "Doc p.7", page: 7),
+                      markdown: "Quoted passage.\n", unknownHeaderFields: []),
+            ],
+            unknownFrontMatter: [],
+            trailingBodyRaw: "Intro prose with no trailing newline."
+        )
+
+        let encoded = FrontMatterCodec.encode(item)
+        // The corruption shape: prose and header fused into one line.
+        XCTAssertFalse(encoded.contains("newline.<!-- block:"),
+                       "leading prose must not butt up against the block header")
+        XCTAssertTrue(encoded.contains("\n<!-- block: reader-page"),
+                      "the header must begin its own line")
+
+        let decoded = try FrontMatterCodec.decode(encoded)
+        // `first`, not `[0]`: on the pre-fix code `blocks` is EMPTY, and subscripting it would trap and
+        // take the whole app-hosted bundle down with it instead of reporting one red test.
+        XCTAssertEqual(decoded.blocks.count, 1, "the block must survive the reload")
+        XCTAssertEqual(decoded.blocks.first?.kind, .readerPage)
+        XCTAssertEqual(decoded.blocks.first?.source?.page, 7)
+        XCTAssertEqual(decoded.blocks.first?.source?.link, "archivereader://open?doc=abc")
+        // The separating newline is the only difference the fix introduces.
+        XCTAssertEqual(decoded.trailingBodyRaw, "Intro prose with no trailing newline.\n")
+    }
+
+    /// The other half of the fix: with NO blocks there is no header to separate, so the newline must
+    /// NOT be added — a body that is pure prose still round-trips byte-for-byte.
+    func testLeadingBodyWithoutTrailingNewlineAndNoBlocksIsNotPadded() throws {
+        let ref = Date(timeIntervalSinceReferenceDate: 804_070_200)
+        let item = Item(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000c2")!,
+            kind: .note, title: "Prose only", authors: [],
+            date: nil, datePrecision: nil, dateUncertain: false, quality: nil,
+            tags: [], zotero: [], roundup: false, created: ref, modified: ref, schema: 1,
+            blocks: [], unknownFrontMatter: [],
+            trailingBodyRaw: "Prose with no trailing newline."
+        )
+
+        let encoded = FrontMatterCodec.encode(item)
+        XCTAssertTrue(encoded.hasSuffix("---\nProse with no trailing newline."),
+                      "no spurious trailing newline; got: \(String(encoded.suffix(60)).debugDescription)")
+
+        let decoded = try FrontMatterCodec.decode(encoded)
+        XCTAssertEqual(decoded.trailingBodyRaw, "Prose with no trailing newline.")
+        XCTAssertEqual(FrontMatterCodec.encode(decoded), encoded)
+    }
+
     // MARK: - Zotero fetchedAt date
 
     func testZoteroFetchedAt() throws {

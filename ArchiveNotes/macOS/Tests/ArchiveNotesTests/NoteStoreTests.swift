@@ -75,6 +75,42 @@ struct NoteStoreTests {
         #expect(loaded.tags == ["test"])
     }
 
+    /// W3.notes-frontmatter-codec-bypasses-the-leading-text-guard, proven at the level that matters:
+    /// through the real `create` → `.md` on disk → `load` path, not just through the codec. Leading
+    /// prose with no trailing newline used to be written flush against the first `<!-- block:` header,
+    /// which `BlockParser.parse` only recognizes at a line start — so the block, and its provenance,
+    /// was silently absorbed into the prose the next time the note was opened.
+    @Test("a leading body with no trailing newline keeps its block through disk")
+    func leadingBodyWithoutNewlineSurvivesDiskRoundTrip() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        var item = makeItem(title: "Fused Header")
+        item.trailingBodyRaw = "Prose with no trailing newline."
+        item.blocks = [
+            Block(kind: .readerPage,
+                  source: SourceAnchor(link: "archivereader://open?doc=abc", display: "Doc p.7", page: 7),
+                  markdown: "Quoted passage.\n", unknownHeaderFields: []),
+        ]
+
+        let ref = try await store.create(item)
+        let raw = try String(contentsOf: ref.url, encoding: .utf8)
+        #expect(!raw.contains("newline.<!-- block:"))
+        #expect(raw.contains("\n<!-- block: reader-page"))
+
+        let loaded = try await store.load(item.id)
+        #expect(loaded.blocks.count == 1)
+        #expect(loaded.blocks.first?.source?.page == 7)
+        #expect(loaded.blocks.first?.source?.link == "archivereader://open?doc=abc")
+        #expect(loaded.trailingBodyRaw == "Prose with no trailing newline.\n")
+
+        // And it is a fixed point: saving what we loaded does not keep growing the body.
+        _ = try await store.save(loaded)
+        let again = try await store.load(item.id)
+        #expect(again.blocks.count == 1)
+        #expect(again.trailingBodyRaw == loaded.trailingBodyRaw)
+    }
+
     // MARK: - Save (retitle -> rename)
 
     @Test("save retitles the file when title changes")

@@ -125,10 +125,14 @@ enum FrontMatterCodec {
 
         var result = lines.joined(separator: "\n") + "\n"
 
-        if let leading = item.trailingBodyRaw {
-            result += leading
-        }
-        result += BlockParser.serialize(leadingText: nil, blocks: item.blocks)
+        // Joining leading prose to the first block header is `BlockParser.serialize`'s job, not ours:
+        // it inserts the separating newline a header needs when the prose does not end in one
+        // (`BlockParser.swift:92` — a header is only recognized at the start of a line). Appending
+        // `trailingBodyRaw` here by hand and then passing `leadingText: nil` made that guard dead code
+        // on the ONLY path that reaches disk (`NoteStore.saveEntry`), so a leading body with no trailing
+        // newline butted straight up against `<!-- block:` and the first block was swallowed into the
+        // prose on reload — provenance and all. (W3.notes-frontmatter-codec-bypasses-the-leading-text-guard.)
+        result += BlockParser.serialize(leadingText: item.trailingBodyRaw, blocks: item.blocks)
 
         return result
     }
