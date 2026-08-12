@@ -1,5 +1,5 @@
 You are a fresh, autonomous maintenance session for the Archive Suite monorepo at
-"/Users/<user>/Claude/Archive Suite". The owner authorized an unattended autonomous run and is asleep —
+"__REPO__". The owner authorized an unattended autonomous run and is asleep —
 do NOT wait for input; if something genuinely needs a human, append it to the Daemon Report list and move
 on. Work resiliently: do ONE bounded item, verify it, and commit+push AT EACH CHECKPOINT as you go (not only at
 the end), then STOP so the next fresh session continues. Fresh resumes are intentional — never try to do
@@ -15,7 +15,7 @@ blocker may leave it partial. An item too big to finish in ~2 sessions is mis-si
   nobody is awake to be walked through it.
 
 STEP 1 — RECOVER STATE (always, first):
-  cd "/Users/<user>/Claude/Archive Suite"
+  cd "__REPO__"
   git fetch origin && git pull --rebase origin main
   Read, in full, ".maintenance/AUTONOMOUS_PLAN.md". It is authoritative for the WORK QUEUE and the safety
   PRIME DIRECTIVES (file safety, no-force, Tier-2, worktree-first). Where its RESUME PROTOCOL or commit/
@@ -165,9 +165,9 @@ STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --
   and/or update the relevant KNOWN_ISSUES.md IN THE SAME COMMIT (a Stop hook blocks the turn otherwise).
   Edge cases (the ack file is read from the PRIMARY checkout — use its absolute path, NOT a worktree-relative
   one): a change that ships no tracked item at all (infra) →
-  `touch "/Users/<user>/Claude/Archive Suite/.docsync-ok"`. If you must stop with the item only PARTIALLY
+  `touch "__REPO__/.docsync-ok"`. If you must stop with the item only PARTIALLY
   done (a real blocker — rare; prefer finishing it), your checkpoints are already pushed, so just
-  `touch "/Users/<user>/Claude/Archive Suite/.docsync-ok"`, do NOT tick the checkbox, and record the
+  `touch "__REPO__/.docsync-ok"`, do NOT tick the checkbox, and record the
   remaining sub-steps (STEP 5). End the commit message with a co-author trailer naming THE MODEL YOU ARE
   ACTUALLY RUNNING AS — not a version copied from this file or from the last commit:
       Co-Authored-By: Claude <your model, e.g. Opus 5> (1M context) <noreply@anthropic.com>
@@ -202,7 +202,7 @@ STEP 6 — STOP — after COMPLETING the item (or if genuinely interrupted/block
   mid-item, and never pick up a second item.
 
 ITEM-SPECIFIC NOTES:
-  * Wave 1 E2E: run `caffeinate -di "/Users/<user>/Claude/Archive Suite/ArchiveProcessor/scripts/e2e-phone-mac.sh"`.
+  * Wave 1 E2E: run `caffeinate -di "__REPO__/ArchiveProcessor/scripts/e2e-phone-mac.sh"`.
     The OCR key is exported as $OCR_KEY (from ~/.local/state/archive-autonomous/ocr-key.env); if that's empty,
     the harness falls back to the Keychain. Artifacts land in /tmp/ap-e2e-*. Copy REPORT.txt + the tail of
     mac.log into the plan's "E2E findings" section and turn each failure into a W1.x fix item. Fixing E2E bugs

@@ -3,6 +3,7 @@ package com.archiveprocessor.capture.net
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.archiveprocessor.capture.BuildConfig
 import android.os.Handler
 import android.os.Looper
 import net.openid.appauth.AuthState
@@ -35,8 +36,13 @@ class DriveAuth(context: Context) {
 
     val isSignedIn: Boolean get() = authState.isAuthorized
 
+    /** True once this build has an OAuth client configured — see [CLIENT_ID]. The other transports (LAN,
+     *  USB) are unaffected, so an unconfigured build is usable; only Drive sign-in is not. */
+    val isConfigured: Boolean get() = CLIENT_ID.isNotEmpty()
+
     /** Intent to launch from an Activity's ActivityResultLauncher — opens the Google consent in a Custom Tab. */
     fun authorizeIntent(loginHint: String?): Intent {
+        check(isConfigured) { UNCONFIGURED_MESSAGE }
         val req = AuthorizationRequest.Builder(SERVICE_CONFIG, CLIENT_ID, ResponseTypeValues.CODE, Uri.parse(REDIRECT_URI))
             .setScope(SCOPE)
             .also { if (!loginHint.isNullOrBlank()) it.setLoginHint(loginHint) }
@@ -92,10 +98,18 @@ class DriveAuth(context: Context) {
     }
 
     companion object {
-        // Android OAuth client in GCP project YOUR_GCP_PROJECT (package com.archiveprocessor.capture + debug SHA-1).
-        const val CLIENT_ID = "YOUR_ANDROID_OAUTH_CLIENT_ID.apps.googleusercontent.com"
-        // Reversed-client-ID custom scheme (implicit redirect for Android/iOS installed-app clients).
-        const val REDIRECT_URI = "com.googleusercontent.apps.YOUR_ANDROID_OAUTH_CLIENT_ID:/oauth2redirect"
+        // The Android OAuth client is bound to this app's package name + signing SHA-1, so it cannot be
+        // shared between installations — every build needs its own. It is supplied at build time from the
+        // gitignored `local.properties` (`driveOAuthClientId=…`) and reaches here through BuildConfig;
+        // empty means "not configured", which disables only Drive sign-in. Setup: ../../README-oauth.md.
+        val CLIENT_ID: String = BuildConfig.DRIVE_OAUTH_CLIENT_ID
+        // Reversed-client-ID custom scheme (implicit redirect for Android/iOS installed-app clients),
+        // derived from CLIENT_ID in build.gradle.kts so the two can never disagree.
+        val REDIRECT_URI: String = BuildConfig.DRIVE_OAUTH_REDIRECT_URI
+
+        const val UNCONFIGURED_MESSAGE =
+            "No Google OAuth client is configured for this build. Add driveOAuthClientId to " +
+            "ArchiveCapture/local.properties — see README-oauth.md. LAN and USB capture are unaffected."
         const val SCOPE = "https://www.googleapis.com/auth/drive.file"
         private val SERVICE_CONFIG = AuthorizationServiceConfiguration(
             Uri.parse("https://accounts.google.com/o/oauth2/v2/auth"),

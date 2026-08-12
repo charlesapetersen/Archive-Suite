@@ -21,8 +21,42 @@ final class SnapshotTests: XCTestCase {
     /// `.missing` records only when no reference exists yet, otherwise compares.
     private let recordMode: SnapshotTestingConfiguration.Record = .missing
 
+    /// True inside the Tart GUI VM (an Apple-Virtualization guest reports `hw.model` as `VirtualMac*`).
+    ///
+    /// **Why this test skips in the VM, when everything else runs there.** A pixel reference is only
+    /// meaningful against one renderer, and the same view rasterises differently on the host and in the
+    /// guest — so one of the two must be the reference machine and the other must not compare. That
+    /// choice is forced, not preferred: **the reference cannot be recorded in the VM.** The repo is a
+    /// read-only shared mount there and the test host is sandboxed, so recording fails with *"You don't
+    /// have permission to save the file … in the folder SnapshotTests"* (measured 2026-08-12). Since the
+    /// reference can only ever be produced on the host, the host is where it must be compared.
+    ///
+    /// The visual coverage automation *does* get is `RenderProbe` / `DocumentRenderGuardTests`, which
+    /// assert on rendered pixels without needing a committed reference and so run fine in the guest.
+    ///
+    /// Making this run in the VM means teaching the test to write its recording to the guest's own tmp
+    /// and having `vm-gui-runner.sh` copy it back — the same trick `collect_shots` already does for
+    /// screenshots. That is unbuilt; see `SUITE_TODO.md`.
+    private var isVirtualMachine: Bool {
+        var size = 0
+        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else { return false }
+        var chars = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("hw.model", &chars, &size, nil, 0) == 0 else { return false }
+        return String(decoding: chars.prefix(while: { $0 != 0 }).map(UInt8.init(bitPattern:)),
+                      as: UTF8.self).hasPrefix("VirtualMac")
+    }
+
     @MainActor
-    func testDeterministicViewMatchesReference() {
+    func testDeterministicViewMatchesReference() throws {
+        try XCTSkipIf(
+            isVirtualMachine,
+            """
+            Skipped in the GUI VM: the committed reference is host-rendered and the guest rasterises \
+            differently, so comparing here reports a renderer difference rather than a change to the \
+            view. It cannot be re-recorded here either — the repo is a read-only shared mount and this \
+            test host is sandboxed. Run the Reader's tests on the host for this one assertion.
+            """
+        )
         // Pure geometry + colour (no text) → stable across runs on this machine.
         let view = ZStack {
             LinearGradient(colors: [Color(red: 0.12, green: 0.28, blue: 0.6),

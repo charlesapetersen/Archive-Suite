@@ -27,14 +27,17 @@ documented once, authoritatively, in [`SPEC/tag-format.md`](SPEC/tag-format.md).
 
 ## Install
 
-1. Download the latest **Archive Suite** DMG from the [Releases page](https://github.com/charlesapetersen/Archive-Suite/releases).
-2. Open the DMG and **drag the apps onto the Applications folder** (the DMG window shows the apps and
-   an Applications shortcut side by side).
-3. **First launch:** the apps are signed with a self‑signed certificate and are not notarized, so the
-   first time you open each one, right‑click it in Applications → **Open** → **Open**. After that they
-   launch normally.
+**Build from source** — see [Build from source](#build-from-source) below. That is currently the only
+route: the earlier DMGs were built for private use and have been withdrawn, and no public release is
+posted yet. When one is, it will appear on the
+[Releases page](https://github.com/charlesapetersen/Archive-Suite/releases) as a single DMG holding
+all three apps.
 
-You can install just the apps you need, but the Suite is designed to be used together.
+A note for whenever that lands: the apps are signed with a **self‑signed certificate and are not
+notarized**, so the first time you open each one you'll need to right‑click it in Applications →
+**Open** → **Open**. After that they launch normally.
+
+You can build just the apps you need, but the Suite is designed to be used together.
 
 ## The irreplaceable-files guarantee
 
@@ -80,3 +83,22 @@ root:
 
 or per app: `cd ArchiveReader && ./bootstrap.sh && ./launch.sh`. Requires macOS 14+, Xcode 16,
 `brew install xcodegen`. See [CLAUDE.md](CLAUDE.md) for conventions and the release process.
+
+**Optional — the Drive cloud relay.** Live Capture's LAN and USB transports need no setup at all. The
+Google Drive relay, for reading rooms whose Wi‑Fi blocks device‑to‑device traffic, needs an OAuth
+client you create yourself: it is bound to your app's package name and signing key, so no shared one
+can exist. Steps: [`ArchiveProcessor/ArchiveCapture/README-oauth.md`](ArchiveProcessor/ArchiveCapture/README-oauth.md).
+Builds without it work fine — only Drive sign-in is disabled.
+
+## Status and expectations
+
+This is a working tool built for one historian's own archive, published because it may be useful to
+others doing the same work — not a supported product. It is maintained by an AI agent under the
+conventions in [CLAUDE.md](CLAUDE.md), with no CI. Known limitations are recorded honestly in each
+app's `KNOWN_ISSUES.md`, including an
+[accepted, unfixed weakness](ArchiveProcessor/KNOWN_ISSUES.md) in the Live Capture LAN transport —
+read that before using Live Capture over untrusted Wi‑Fi.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).

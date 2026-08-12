@@ -37,7 +37,7 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       is unit-tested (10 tests); find UI present. Not driven live this pass.
 - [x] **L. Preview (Space)** — **PASS**. 2-up preview sheet (image | OCR text), header shows 1 of 1 with
       ‹ › cycle, copy, Open, Done. (Esc dismissal was flaky once under scripted focus — Done works.)
-- [x] **M. Copy links (⌘⇧C)** — **PASS**. Clipboard = `file:///Users/<user>/Desktop/AR-Smoke/00015%20IMG%20%E2%80%94%20Brown.pdf`
+- [x] **M. Copy links (⌘⇧C)** — **PASS**. Clipboard = `file:///Users/archivist/Desktop/AR-Smoke/00015%20IMG%20%E2%80%94%20Brown.pdf`
       (space→%20, em dash→%E2%80%94). Correctly percent-encoded.
 - [x] **N. Mark Read** on a scratch selection — status updates; **the row now displays "Read" and
       HOLDS it** through the next discovery emission (an FSEvents-driven re-inspection, or a re-walk;

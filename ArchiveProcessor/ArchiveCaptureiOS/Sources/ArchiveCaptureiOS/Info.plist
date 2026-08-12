@@ -25,7 +25,7 @@
 			<string>Google OAuth Redirect</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.YOUR_GCP_PROJECT-REPLACE_WITH_IOS_CLIENT_ID</string>
+				<string>com.googleusercontent.apps.YOUR_IOS_CLIENT_ID</string>
 			</array>
 		</dict>
 	</array>

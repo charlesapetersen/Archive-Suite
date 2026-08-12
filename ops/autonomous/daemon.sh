@@ -25,6 +25,12 @@
 # unchecked [ ] work-queue items. See README.md for the design (L0 plan / L1 daemon / L2 prompt).
 set -uo pipefail
 
+# Escape a string for use as the REPLACEMENT half of `sed s|…|…|`. Only `&` and `\` are special there
+# (`|` cannot appear in an absolute path we'd render). Without this a clone under a directory containing
+# `&` — legal on macOS — renders the placeholder back into itself: `/Users/x/R&D/…` becomes
+# `/Users/x/R__REPO__D/…` in the resume prompt and the plist, and `plutil -lint` cannot see it.
+sed_repl() { printf '%s' "$1" | sed -e 's/[\\&]/\\&/g'; }
+
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"          # this script's checkout = where the daemon works
 STATE="$HOME/.local/state/archive-autonomous"
 BIN="$HOME/.local/bin"
@@ -125,7 +131,9 @@ mkdir -p "$BIN" "$STATE"
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
 install -m 755 "$DAEMON_SRC" "$DAEMON_DST"
 install -m 755 "$COMPACT_SRC" "$COMPACT_DST"   # plan compactor: Session Log + Daemon Report (daemon calls it between cycles)
-cp "$PROMPT_SRC" "$STATE/resume-prompt.txt"
+# The committed prompt carries a __REPO__ placeholder rather than one machine's absolute path; the
+# daemon renders the real checkout in here, since the session that reads it needs a literal path.
+sed "s|__REPO__|$(sed_repl "$REPO")|g" "$PROMPT_SRC" >"$STATE/resume-prompt.txt"
 echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prompt -> $STATE/"
 
 # 2b. ensure a stable local code-signing identity exists so Debug builds re-sign stably and the macOS
@@ -168,9 +176,15 @@ if [ "$MODE" = keepalive ]; then
   # so intentional stops still stick. NOTE: a LaunchAgent loads in your GUI login session — it survives a
   # daemon CRASH, not a logout/reboot (reboot-survival is deliberately out of scope). (GUI verification now
   # runs off-screen in the Tart VM regardless of supervisor — ops/gui/README §3 — so no host TCC grant matters.)
-  plutil -lint "$PLIST_SRC" >/dev/null || fail "plist is malformed: $PLIST_SRC"
+  # launchd expands neither `~` nor `$HOME` in a path, so the committed template carries a __HOME__
+  # placeholder and the real home is rendered in here. Lint the RENDERED file — that is what launchd loads.
   mkdir -p "$HOME/Library/LaunchAgents"
-  install -m 644 "$PLIST_SRC" "$PLIST_DST"
+  rendered="$(mktemp)"
+  sed -e "s|__HOME__|$(sed_repl "$HOME")|g" -e "s|__REPO__|$(sed_repl "$REPO")|g" "$PLIST_SRC" >"$rendered" \
+    || { rm -f "$rendered"; fail "could not render plist: $PLIST_SRC"; }
+  plutil -lint "$rendered" >/dev/null || { rm -f "$rendered"; fail "plist is malformed after rendering: $PLIST_SRC"; }
+  install -m 644 "$rendered" "$PLIST_DST"
+  rm -f "$rendered"
   launchctl bootout "$GUI_DOMAIN/$JOB" 2>/dev/null || true   # clear any stale registration first
   if launchctl bootstrap "$GUI_DOMAIN" "$PLIST_DST"; then
     echo "launched (launchd KeepAlive [default]; plist -> $PLIST_DST) — a crash/kill auto-restarts."
@@ -179,7 +193,9 @@ if [ "$MODE" = keepalive ]; then
   fi
 else
   # macOS has no setsid; subshell + nohup survives this shell returning (reparented to init).
-  ( nohup "$DAEMON_DST" >"$STATE/nohup.out" 2>&1 & )
+  # AUTONOMOUS_REPO must be passed the same way the launchd lane passes it (plist EnvironmentVariables):
+  # the installed daemon sits outside any checkout and refuses to start without it.
+  ( AUTONOMOUS_REPO="$REPO" nohup "$DAEMON_DST" >"$STATE/nohup.out" 2>&1 & )
   echo "launched (detached nohup — NO crash-restart; the default '$0' uses launchd KeepAlive instead)."
 fi
 

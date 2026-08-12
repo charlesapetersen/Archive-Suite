@@ -5,7 +5,7 @@ import XCTest
 final class FileLinkTests: XCTestCase {
 
     func testFileURLPercentEncodesEmDashAndSpaces() {
-        let url = URL(fileURLWithPath: "/Users/<user>/Archive/00001 — Brown.pdf")
+        let url = URL(fileURLWithPath: "/Users/archivist/Archive/00001 — Brown.pdf")
         let f = FileLinkFormatter(format: .fileURL)
         let s = f.line(for: url)
         XCTAssertTrue(s.hasPrefix("file:///"))
@@ -15,13 +15,13 @@ final class FileLinkTests: XCTestCase {
     }
 
     func testPosixPathIsUnencoded() {
-        let url = URL(fileURLWithPath: "/Users/<user>/Archive/00001 — Brown.pdf")
+        let url = URL(fileURLWithPath: "/Users/archivist/Archive/00001 — Brown.pdf")
         let f = FileLinkFormatter(format: .posixPath)
-        XCTAssertEqual(f.line(for: url), "/Users/<user>/Archive/00001 — Brown.pdf")
+        XCTAssertEqual(f.line(for: url), "/Users/archivist/Archive/00001 — Brown.pdf")
     }
 
     func testMarkdownUsesNameAndEncodedURL() {
-        let url = URL(fileURLWithPath: "/Users/<user>/Archive/00001 — Brown.pdf")
+        let url = URL(fileURLWithPath: "/Users/archivist/Archive/00001 — Brown.pdf")
         let f = FileLinkFormatter(format: .markdown)
         let s = f.line(for: url)
         XCTAssertTrue(s.hasPrefix("[00001 — Brown]("))

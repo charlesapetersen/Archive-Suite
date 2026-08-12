@@ -23,7 +23,21 @@ set -uo pipefail
 
 # ===== PROJECT CONFIG — to reuse elsewhere, edit these 5 (or set the matching AUTONOMOUS_* env vars) =====
 LABEL="${AUTONOMOUS_LABEL:-archivesuite}"                            # unique slug: names the state dir + launchd job
-REPO="${AUTONOMOUS_REPO:-/Users/<user>/Claude/Archive Suite}"  # the checkout to work in (worktrees branch off it)
+# The checkout to work in (worktrees branch off it). This script is INSTALLED to ~/.local/bin, outside any
+# checkout, so it cannot derive the path from its own location — `daemon.sh` passes it in, via the plist's
+# EnvironmentVariables under launchd and via the exported var on the nohup lane. There is deliberately no
+# hardcoded fallback: guessing wrong means the daemon works in a directory that does not exist and every
+# cycle fails obscurely, which is worse than refusing to start.
+REPO="${AUTONOMOUS_REPO:-}"
+if [ -z "$REPO" ]; then
+  echo "archive-suite-autonomous: AUTONOMOUS_REPO is unset. Start via ops/autonomous/daemon.sh, which sets" >&2
+  echo "it from its own checkout, or export it yourself: AUTONOMOUS_REPO=/path/to/Archive\\ Suite $0" >&2
+  exit 2
+fi
+if [ ! -d "$REPO/.git" ] && [ ! -f "$REPO/.git" ]; then
+  echo "archive-suite-autonomous: AUTONOMOUS_REPO='$REPO' is not a git checkout — refusing to start." >&2
+  exit 2
+fi
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"     # L0 durable plan (keep it gitignored)
 STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"  # runtime state (logs, lock, resume prompt)
 CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)

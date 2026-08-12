@@ -49,7 +49,11 @@ You will be working in your own worktree (correctly). But the daemon reads `.mai
 **from the primary checkout** and measures code-review deltas against **the primary checkout's `HEAD`**. Pushing
 leaves `origin/main` ahead of it. So after your final push:
 ```bash
-cd "/Users/<user>/Claude/Archive Suite" && git merge --ff-only origin/main
+# Resolve the PRIMARY checkout from wherever you are — a worktree's common dir points at it. Do NOT write
+# a bare `cd "$REPO"`: with REPO unset that is `cd ""`, which bash and zsh treat as a silent no-op (rc 0),
+# so the merge would "succeed" in your worktree and leave the primary checkout exactly as stale as before.
+primary="$(dirname "$(git rev-parse --git-common-dir)")"
+git -C "$primary" merge --ff-only origin/main
 ```
 *(2026-07-29: `origin/main` was at `62a10d1` while the primary checkout still sat at `cb948c6`. Also note
 `ops/autonomous/daemon.sh` installs the daemon scripts from **that working tree**, not from `origin/main` — so a

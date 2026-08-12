@@ -58,9 +58,17 @@ mode without touching anything. The manual steps below are what it automates.
 The committed copies here are the source of truth; install to the runtime location:
 
 ```bash
+REPO="$(pwd)"     # this checkout — the daemon and the prompt both need it as a literal path
 cp ops/autonomous/archive-suite-autonomous.sh ~/.local/bin/ && chmod +x ~/.local/bin/archive-suite-autonomous.sh
-cp ops/autonomous/resume-prompt.txt ~/.local/state/archive-autonomous/
+# The committed prompt carries a __REPO__ placeholder instead of one machine's absolute path, so it is
+# RENDERED rather than copied. `daemon.sh` does this for you; by hand it is a sed.
+sed "s|__REPO__|$REPO|g" ops/autonomous/resume-prompt.txt > ~/.local/state/archive-autonomous/resume-prompt.txt
 ```
+
+Running the daemon by hand needs `AUTONOMOUS_REPO` set too — it is installed outside any checkout, so it
+cannot find the repo itself and **refuses to start** rather than guessing:
+`AUTONOMOUS_REPO="$REPO" ~/.local/bin/archive-suite-autonomous.sh`. Under launchd, `daemon.sh` renders it
+into the plist's `EnvironmentVariables`.
 
 **Default — crash-restart under launchd (`./ops/autonomous/daemon.sh start`; WS1, default since 2026-07-17).** The
 daemon runs under a launchd LaunchAgent with **`KeepAlive=true`**, so a **crash / OOM / stray kill

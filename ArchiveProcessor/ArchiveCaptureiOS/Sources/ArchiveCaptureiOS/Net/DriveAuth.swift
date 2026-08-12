@@ -60,7 +60,7 @@ private final class TokenStore: @unchecked Sendable {
 /// The phone must sign in to the **same Google account** as the Mac — `drive.file` is per-project, so
 /// an OAuth client in the same GCP project can see/write the folder the Mac created.
 ///
-/// **Setup (one-time, GCP console):** create an **iOS** OAuth client in project `YOUR_GCP_PROJECT` with
+/// **Setup (one-time, GCP console):** create an **iOS** OAuth client in your own project with
 /// bundle ID `com.archiveprocessor.capture.ios`. Copy the client ID here. Enable **"Custom URI scheme"**
 /// in the client's Advanced Settings (off by default; Google blocks it otherwise — same gotcha as Android).
 @MainActor
@@ -68,9 +68,9 @@ final class DriveAuth: ObservableObject {
 
     // MARK: - GCP iOS OAuth client
 
-    /// iOS OAuth client in GCP project YOUR_GCP_PROJECT (bundle ID com.archiveprocessor.capture.ios).
+    /// iOS OAuth client in your own GCP project (bundle ID com.archiveprocessor.capture.ios).
     /// **Replace this** with the real client ID after creating the iOS client in the Google Cloud console.
-    static let clientID = "YOUR_GCP_PROJECT-REPLACE_WITH_IOS_CLIENT_ID.apps.googleusercontent.com"
+    static let clientID = "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com"
 
     /// Reversed-client-ID custom scheme — the redirect URI for iOS installed-app clients (no secret needed).
     static var redirectURI: String {

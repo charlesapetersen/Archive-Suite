@@ -16,6 +16,47 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Open-sourcing the repo (owner, 2026-08-11)
+
+- [x] **`W29.pub1` — de-personalise the tree for a public repo.** Owner decided to make `Archive-Suite`
+  public. Removed every hardcoded home-directory path from tracked files (15 files): the launchd plist and
+  `resume-prompt.txt` now carry `__HOME__`/`__REPO__` placeholders that `daemon.sh` **renders** at install
+  time (launchd expands neither `~` nor `$HOME` in a path, and the prompt is read by a session that needs a
+  literal), the `ops/autonomous/*.sh` repo defaults moved to `$HOME`, and doc/test paths became neutral
+  fixtures. Added `LICENSE` (MIT) and a `.vscode/` ignore. **No API keys were ever in the tree or in any of
+  the 1,017 commits** — the Keychain-only rule held. | suite | M
+- [x] **`W29.pub2` — the Android Drive OAuth client left git.** `DriveAuth.CLIENT_ID` was a literal tied to
+  the owner's GCP project. It is bound to package name + signing SHA-1, so it can never be shared with a
+  fork *anyway* — a forker's build with it would simply be rejected by Google. Now read from the gitignored
+  `local.properties` via `buildConfigField`, with the reversed-client-ID redirect **derived** from it in
+  `build.gradle.kts` so the two cannot disagree. An unconfigured build compiles and LAN/USB capture is
+  unaffected; only Drive sign-in is refused, and `ConnectScreen` reports that instead of throwing (the first
+  draft `check()`-crashed a Compose handler — caught by the pre-commit review). Setup:
+  `ArchiveCapture/README-oauth.md`. | ArchiveCapture | M
+- [x] **`W29.pub3` — `daemon.sh` passes `AUTONOMOUS_REPO` explicitly.** The installed daemon lives outside
+  any checkout and so cannot derive the repo path. It previously fell back to one hardcoded absolute path;
+  it now **refuses to start** without the variable rather than looping in a directory that does not exist,
+  and `daemon.sh` supplies it on both lanes (plist `EnvironmentVariables` under launchd, exported for
+  nohup). | ops | S
+
+## Reader test hardening (owner-reviewed 2026-07-18)
+
+- [x] **`W29.t1` — `DeepLinkTests.testRevealAndSelectNoRoot` read the owner's real preferences.** It built a
+  bare `NavigationModel()`, which defaults to `UserDefaults.standard` — and inside the app-hosted test
+  bundle that IS the shipping Reader's domain. On any machine where the owner has ever chosen an archive
+  folder, `archiveRootBookmark` is set there, the model finds a root, and the test fails for a reason
+  unrelated to the code — while passing on a fresh machine and in the VM. Now uses the file's own
+  `fixtureDefaults()` helper (unpinned), whose whole purpose is this. Host and VM now agree. | Reader | S
+- [x] **`W29.t2` — `SnapshotTests` skips in the GUI VM, with the reason recorded.** It passed on the host
+  and failed in the VM: the committed reference is host-rendered and the guest rasterises differently. The
+  reference **cannot** be re-recorded in the guest — the repo is a read-only shared mount and the test host
+  is sandboxed, so recording dies with *"You don't have permission to save the file…"* (measured). Since the
+  reference can only be produced on the host, the host is where it is compared; the VM skips loudly. Detected
+  via `hw.model` (`VirtualMac*`) — note an env var does **not** work here: `xcodebuild`'s environment is not
+  inherited by an app-hosted test process (measured, and now commented at both ends). Automation keeps its
+  pixel coverage through `RenderProbe`/`DocumentRenderGuardTests`, which need no committed reference.
+  Follow-up `W29.t2-fu1` below. | Reader | M
+
 ## Signing + TCC consent (owner, 2026-08-07)
 
 - [x] **W26.fixturehang-b — the fixture lane no longer starts FSEvents on the main thread, so the gate can
@@ -1042,8 +1083,8 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   code regression**: the `tag-vocabulary` gate step had **never passed once**.
   `ArchiveProcessor/scripts/test-tag-vocabulary.sh` built ArchiveCore from an **unquoted**
   `$(find "$SUITE/packages/ArchiveCore/Sources" -name '*.swift')`. The primary checkout is
-  `/Users/<user>/Claude/Archive Suite` — **the path contains a space** — so word-splitting handed `swiftc` 34
-  half-paths instead of 17 files (`/Users/<user>/Claude/Archive` + `Suite/packages/…/CorpusWalker.swift`), and
+  the repo path — **the path contains a space** — so word-splitting handed `swiftc` 34
+  half-paths instead of 17 files (`<parent>/Archive` + `Suite/packages/…/CorpusWalker.swift`), and
   the step exited 1 on `[FAIL] ArchiveCore build`. Now collected into an array via `-print0` / `read -d ''`,
   plus an empty-list guard — which is also what keeps `set -u` from aborting on an empty array expansion, and
   turns a moved source tree into a sentence instead of a compiler error about nothing.
@@ -6241,7 +6282,7 @@ explain why not.
 - [x] **shipped `6ea268a`, suite-v1.2.0 (B5; residual `resolvedGroupIds` resurface tracked as B9 in KNOWN_ISSUES)** — Streaming residuals (mostly shipped in the cloud-transport work — Finish drain-gate + phone queue-depth + "End segment = the only done action" landed): finish/verify any remainder — `needsResend` for P10/reclassify in-flight, `completedDocGroups` persistence across Mac restart. | Capture/LiveCaptureProcessor.swift, companions | M
 - [x] **shipped `7aace39` + audit fix, suite-v1.2.0 (see KNOWN_ISSUES ✅ FIXED)** — KNOWN_ISSUES #2: merged multi-page docs leave exported originals loose — thread per-page image URLs into `organizeOutput`. **Tier-2 file-move**; needs a live pipeline run. | OCR/CollectionSegmenter.swift, Capture/LiveCaptureProcessor.swift | M
 - [x] **Owner-gated: live Google Drive end-to-end test — DONE 2026-07-07.** Android phone→Drive→Mac verified end-to-end (sign-in, single photo, multi-page segment + Mac tag card, Box/Folder markers, Finish; photo durable in the Mac session + backup folder). Fixes landed: `DriveError` legibility + `DriveAuth.init` whitespace-trim; console setup (Desktop client for Mac, Android client + SHA-1 + **Custom URI scheme enabled** for the phone) captured in the Processor CLAUDE.md Live Capture section. ✅
-- [x] **iOS Drive-relay on-device OAuth — implemented.** `DriveAuth.swift` (`ASWebAuthenticationSession` + PKCE, `drive.file` scope, thread-safe `TokenStore` for `DriveClient`'s blocking token provider); `CaptureViewModel` gains `TransportMode` (.lan/.drive) + auto-selects Drive when QR has a relay token and user is signed in (falls back on LAN-unreachable too); `ConnectScreen` gains a "Sign in to Google Drive" section. `project.yml` registers the reversed-client-ID URL scheme. **Placeholder client ID** — needs a real iOS OAuth client in GCP project YOUR_GCP_PROJECT (bundle ID `com.archiveprocessor.capture.ios`, "Custom URI scheme" enabled). iOS build clean, no new warnings. On-device testing deferred → `ArchiveProcessor/POTENTIAL_FEATURES.md`. | ArchiveCaptureiOS | M
+- [x] **iOS Drive-relay on-device OAuth — implemented.** `DriveAuth.swift` (`ASWebAuthenticationSession` + PKCE, `drive.file` scope, thread-safe `TokenStore` for `DriveClient`'s blocking token provider); `CaptureViewModel` gains `TransportMode` (.lan/.drive) + auto-selects Drive when QR has a relay token and user is signed in (falls back on LAN-unreachable too); `ConnectScreen` gains a "Sign in to Google Drive" section. `project.yml` registers the reversed-client-ID URL scheme. **Placeholder client ID** — needs a real iOS OAuth client in the builder's own GCP project (bundle ID `com.archiveprocessor.capture.ios`, "Custom URI scheme" enabled). iOS build clean, no new warnings. On-device testing deferred → `ArchiveProcessor/POTENTIAL_FEATURES.md`. | ArchiveCaptureiOS | M
 
 
 ## P3 — Suite structural

@@ -37,6 +37,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.archiveprocessor.capture.capture.CaptureViewModel
+import com.archiveprocessor.capture.net.DriveAuth
 import com.archiveprocessor.capture.net.MacEndpoint
 import com.archiveprocessor.capture.net.QrAnalyzer
 
@@ -207,6 +208,13 @@ private fun CloudPairing(vm: CaptureViewModel, onBack: () -> Unit, onConnected: 
 
     fun proceed(ep: MacEndpoint) {
         if (busy) return
+        // A build with no OAuth client configured cannot sign in at all (see DriveAuth.CLIENT_ID). Say so
+        // and stay on this screen: LAN and USB are unaffected, so the operator has somewhere to go.
+        if (!vm.driveAuth.isConfigured) {
+            status = DriveAuth.UNCONFIGURED_MESSAGE
+            analyzerRef[0]?.rearm()
+            return
+        }
         busy = true
         pending = ep
         // Already signed in (same Google account persists) → straight to the relay; else consent first.

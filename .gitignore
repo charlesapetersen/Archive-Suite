@@ -45,3 +45,6 @@ old/
 # tree. The health gate also sets PYTHONDONTWRITEBYTECODE=1 for that step — belt and braces, since
 # a gate run must not dirty the checkout it is judging (W26.lint-fu, 2026-08-07).
 __pycache__/
+
+# Editor state (local, per-machine).
+.vscode/

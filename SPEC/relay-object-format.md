@@ -275,5 +275,5 @@ contract. Severity in brackets.
   3. The fingerprint field set is `{type,priority,year,month,replaces}` (5 fields, per A1) — the v1 §5
      `scanOnce` parenthetical says `{type,priority,year,month}` (drops `replaces`). **Shipped includes
      `replaces`** (verified against the golden `fp` values).
-  4. Old paths were pre-merge (`/Users/<user>/Desktop/Claude/Archive Processor/…`, `…/Claude/SPEC/…`);
+  4. Old paths were pre-merge (`~/Desktop/Claude/Archive Processor/…`, `…/Claude/SPEC/…`);
      corrected throughout to the monorepo layout above.

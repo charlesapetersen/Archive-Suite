@@ -1,8 +1,31 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// The Google OAuth client for the Drive cloud relay is per-installation, not per-project: it is bound to
+// this app's package name + signing SHA-1, so a fork's build MUST use its own. It therefore lives in the
+// gitignored `local.properties` rather than in git. Absent it, the app builds and every non-Drive
+// transport (LAN, USB) works normally; only Drive sign-in fails, with a message pointing here.
+// Setup: ArchiveProcessor/ArchiveCapture/README-oauth.md
+// Trimmed on read: java.util.Properties preserves a trailing space (verified), and an untrimmed value
+// yields both a broken redirect scheme (removeSuffix misses) and an `invalid_client` from Google, while
+// still looking configured. The Mac side trims its pasted id/secret for exactly this reason.
+val driveOAuthClientId: String =
+    (Properties().apply {
+        rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+    }.getProperty("driveOAuthClientId")
+        ?: (project.findProperty("driveOAuthClientId") as String?)
+        ?: "").trim()
+
+// AppAuth binds its RedirectUriReceiverActivity to the reversed-client-ID scheme, which is just the client
+// ID with the domain reversed and the `.apps.googleusercontent.com` suffix dropped.
+val driveOAuthRedirectScheme: String =
+    if (driveOAuthClientId.isEmpty()) "com.googleusercontent.apps.invalid-unconfigured"
+    else "com.googleusercontent.apps." + driveOAuthClientId.removeSuffix(".apps.googleusercontent.com")
 
 android {
     namespace = "com.archiveprocessor.capture"
@@ -17,8 +40,10 @@ android {
 
         // AppAuth redirect: the reversed-client-ID custom scheme for the Android OAuth client. AppAuth's
         // library manifest binds its RedirectUriReceiverActivity to this scheme via the placeholder.
-        manifestPlaceholders["appAuthRedirectScheme"] =
-            "com.googleusercontent.apps.YOUR_ANDROID_OAUTH_CLIENT_ID"
+        manifestPlaceholders["appAuthRedirectScheme"] = driveOAuthRedirectScheme
+
+        buildConfigField("String", "DRIVE_OAUTH_CLIENT_ID", "\"$driveOAuthClientId\"")
+        buildConfigField("String", "DRIVE_OAUTH_REDIRECT_URI", "\"$driveOAuthRedirectScheme:/oauth2redirect\"")
     }
 
     buildTypes {

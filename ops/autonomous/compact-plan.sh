@@ -26,7 +26,7 @@
 # The plan file is gitignored, so .bak + the archive file are the recovery points (not git).
 set -u
 
-REPO="${1:-/Users/<user>/Claude/Archive Suite}"
+REPO="${1:-$HOME/Claude/Archive Suite}"
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
 ARCHIVE="${AUTONOMOUS_SESSION_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_SESSION_LOG_ARCHIVE.md}"
 KEEP="${KEEP:-6}"           # recent Session Log entries to retain inline

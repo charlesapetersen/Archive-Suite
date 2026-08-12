@@ -7,10 +7,20 @@
 
   <!-- Runs the SAME daemon script (a long-lived loop). Script lives OUTSIDE ~/Desktop so launchd's
        TCC context can exec it (the prior under-Desktop attempt died: "Operation not permitted"). -->
+  <!-- Paths below are rendered from a placeholder to the real $HOME by `daemon.sh` at install time; the
+       committed template is deliberately user-agnostic. launchd expands neither ~ nor $HOME in a path. -->
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/<user>/.local/bin/archive-suite-autonomous.sh</string>
+    <string>__HOME__/.local/bin/archive-suite-autonomous.sh</string>
   </array>
+
+  <!-- The daemon script lives outside any checkout, so it cannot find the repo by itself; pass it in.
+       Rendered from a placeholder by `daemon.sh` at install time, same as the paths below. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>AUTONOMOUS_REPO</key>
+    <string>__REPO__</string>
+  </dict>
 
   <key>RunAtLoad</key>
   <true/>
@@ -29,9 +39,9 @@
   <integer>60</integer>
 
   <key>StandardOutPath</key>
-  <string>/Users/<user>/.local/state/archive-autonomous/launchd.out.log</string>
+  <string>__HOME__/.local/state/archive-autonomous/launchd.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/<user>/.local/state/archive-autonomous/launchd.err.log</string>
+  <string>__HOME__/.local/state/archive-autonomous/launchd.err.log</string>
 
   <key>ProcessType</key>
   <string>Background</string>

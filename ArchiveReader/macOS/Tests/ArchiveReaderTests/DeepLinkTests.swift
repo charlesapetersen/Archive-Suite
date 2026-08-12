@@ -62,7 +62,12 @@ final class DeepLinkTests: XCTestCase {
     // MARK: - NavigationModel.revealAndSelect
 
     func testRevealAndSelectNoRoot() {
-        let model = NavigationModel()
+        // `fixtureDefaults()` with no pin, NOT a bare `NavigationModel()`: the bare initialiser defaults to
+        // `UserDefaults.standard`, which inside the app-hosted test bundle IS the real Reader's domain. On a
+        // machine where the owner has ever chosen an archive folder, `archiveRootBookmark` is set there, the
+        // model finds a root, and this test fails for a reason that has nothing to do with the code — while
+        // passing on a fresh machine or in the VM. An unpinned throwaway domain is genuinely rootless.
+        let model = NavigationModel(defaults: fixtureDefaults())
         // No root set — should set a status message, not crash.
         model.revealAndSelect(rootGUID: UUID(), relativePath: "test.pdf", page: nil)
         XCTAssertTrue(model.statusMessage.contains("No archive folder"),

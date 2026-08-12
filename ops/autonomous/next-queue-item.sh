@@ -23,7 +23,7 @@
 # rule keeps that safe.)
 set -u
 
-REPO="${1:-/Users/<user>/Claude/Archive Suite}"
+REPO="${1:-$HOME/Claude/Archive Suite}"
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
 TODO="${AUTONOMOUS_SUITE_TODO:-$REPO/SUITE_TODO.md}"
 # Completed items are archived out of the live queue into SUITE_TODO_DONE.md, but they MUST still count as

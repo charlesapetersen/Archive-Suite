@@ -19,7 +19,7 @@
 #   next-review-unit.sh --record U # stamp unit U as reviewed at the current $REPO HEAD (call after review)
 set -uo pipefail
 
-REPO="${AUTONOMOUS_REPO:-/Users/<user>/Claude/Archive Suite}"
+REPO="${AUTONOMOUS_REPO:-$HOME/Claude/Archive Suite}"
 STATE_DIR="$REPO/.maintenance/review"
 TSV="$STATE_DIR/last-reviewed.tsv"                 # rows: <unit>\t<sha>\t<iso-date>  (+ a __any__ cadence row)
 REVIEW_EVERY="${AUTONOMOUS_REVIEW_EVERY:-20}"      # global cooldown: ≥ this many commits since the LAST review

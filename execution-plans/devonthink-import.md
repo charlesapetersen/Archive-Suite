@@ -81,11 +81,14 @@ Key patterns confirmed by sampling (drive the transform rules in §5):
   so archival links resolve by **name, not path** (§4a).
 - **Broken DEVONthink links** have a single space inside the UUID at a hyphen boundary, e.g.
   `x-devonthink-item://EF7851F5-6F3C-4373-90C5- BE14C6B8AAD5`. UUID is fixed `8-4-4-4-12` → deterministic repair.
-- **`file://` prefix variants before `Archival%20Photos`** seen: `/Users/olduser/Google Drive/…`,
+- **`file://` prefix variants before `Archival%20Photos`** seen (home-directory names elided **uniformly**
+  as `<olduser>`/`<user>` — the two macOS accounts these links were made under; the transform rules in §5
+  key on the prefix *shape*, not on the name): `/Users/<olduser>/Google Drive/…`,
   `/Users/<user>/Desktop/Google Drive/…` (current canonical), `/Users/<user>/Google Drive/…`,
   `/Volumes/Archival Storage/…` (540 links — incl. a "Microelectronic News" journal run that **does** live in
   the root under `Complete Journals/Microelectronics News/`, so it resolves by name), and a corrupted
-  `/Userolduseren/…`. Non-archival `file://` also exists (Zotero storage PDFs;
+  `/User<olduser>en/…` (note the shape: `/Users/` and the trailing path component have been chewed together —
+  the repair keys on that, not on the account name). Non-archival `file://` also exists (Zotero storage PDFs;
   a Desktop "D's revision" PDF). ~1,100 links point into **numbered processing folders** (`01`–`06`).
 - **Dates live in DEVONthink's `Alias` field** (per-record metadata, NOT in the file body) → readable only
   via scripting. Some **titles are month-prefixed** ("Nov: …") — but on-disk filenames are sanitized, so
@@ -276,8 +279,8 @@ only genuine internet URLs remain as `://`.** Every conversion is deterministic 
 | `applewebdata://` | 4 | drop (transient WebKit artifact), log each | logged |
 | `mailto:` | 2 | keep as `mailto:` link | — |
 
-**Corrupt links** (e.g. the observed `olduser/olduser/…Archival%20Photos/…pdf%22` — doubled segment, missing
-`file:///Users/` prefix, stray `%22`): a repair pass strips the trailing `%22`, de-dupes the doubled
+**Corrupt links** (e.g. the observed `<olduser>/<olduser>/…Archival%20Photos/…pdf%22`, with the home-directory
+name elided as above — doubled segment, missing `file:///Users/` prefix, stray `%22`): a repair pass strips the trailing `%22`, de-dupes the doubled
 segment, and re-anchors on `Archival%20Photos`, then routes through §4a. Anything the repair can't
 confidently fix is flagged, never guessed.
 

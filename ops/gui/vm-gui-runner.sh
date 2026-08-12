@@ -239,6 +239,9 @@ run_xcuitest() {
   # before executing a single test. Remove it first.
   # CODE_SIGN_IDENTITY=- : the guest has no keychain, so it cannot use the host's "Archive Suite Dev"
   # cert (W28.cert). Same rationale as ops/autonomous/gui-vm-gate.sh — see the long note there.
+  # Note for anyone adding a flag here: xcodebuild's environment is NOT inherited by an app-hosted test
+  # process (measured — an env var set on this line reads as unset inside the test). SnapshotTests
+  # therefore detects this VM from `hw.model` rather than from anything passed in here.
   tart exec "$VM" bash -lc "
     rm -rf '$GUEST_DD/uitest.xcresult'
     xcodebuild test \

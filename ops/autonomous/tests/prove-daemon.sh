@@ -75,7 +75,7 @@ chmod +x "$BIN/df"
 dfset() { : > "$DFCTL.count"; printf '%s\n' "$@" > "$DFCTL"; }
 export PATH="$BIN:$PATH"
 
-REPO="$T/repo with space"; mkdir -p "$REPO"          # space in path: mirrors "/Users/<user>/Claude/Archive Suite"
+REPO="$T/repo with space"; mkdir -p "$REPO"          # space in path: mirrors "<repo with a space in its path>"
 git -C "$REPO" init -q 2>/dev/null
 git -C "$REPO" config user.email t@t; git -C "$REPO" config user.name t
 echo seed > "$REPO/f"

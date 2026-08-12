@@ -18,7 +18,7 @@
 # this is the thing you run WHEN something is already wrong.
 set -uo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
-REPO="${AUTONOMOUS_REPO:-/Users/<user>/Claude/Archive Suite}"
+REPO="${AUTONOMOUS_REPO:-$HOME/Claude/Archive Suite}"
 STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
 JOB="com.archivesuite.autonomous"; GUI_DOMAIN="gui/$(id -u)"
