@@ -20,6 +20,23 @@ Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
+## Open-sourcing the repo (owner, 2026-08-11)
+
+- [ ] **`W29.drive-secret` — the Drive cloud relay has NO usable client secret; mint a new one and enter it.**
+  The Desktop OAuth client secret was found in a since-deleted execution plan during the publication scrub
+  (`W29.pub1`) and the owner **deactivated** it on 2026-08-12. Deactivated, **not replaced** — so this is the
+  current, expected state, and a session that finds Drive sign-in failing should **not** treat it as a
+  regression, chase it through `DriveAuth`/`DriveClient`, or "fix" it in code. There is nothing wrong with
+  the code. Two steps, both owner-only: (1) in the Google Cloud console, add a new secret on the Desktop
+  OAuth client; (2) paste it into the Processor's **Settings → Live Capture**, which stores it in the
+  Keychain as `DriveClientSecret` — the value is trimmed on use (`DriveAuth.init`), since a pasted trailing
+  space reads back as `invalid_client`. Step 2 needs no build work first: Processor was **Debug-built clean
+  on 2026-08-12, zero warnings**, so the Settings pane is reachable as soon as you want it. Expect to re-authorise Drive on the Mac afterwards: a refresh token is redeemed *with*
+  the client secret, so the old grant died with it. **Unaffected:** the LAN and USB transports (no accounts,
+  no keys) and both phone companions (installed-app clients carry no secret — they are bound by package name
+  + signing SHA-1). Setup steps: [`ArchiveProcessor/ArchiveCapture/README-oauth.md`](ArchiveProcessor/ArchiveCapture/README-oauth.md).
+  | ArchiveProcessor | S | risk low | **needs:** owner (Google Cloud console + a GUI paste)
+
 ## Reader test hardening (owner-reviewed 2026-07-18)
 
 - [ ] **`W29.t2-fu1` — let `SnapshotTests` run in the GUI VM.** It skips there today because the reference

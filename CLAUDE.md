@@ -303,11 +303,13 @@ The original history is kept as a git bundle **outside the repo, untracked and u
 
 **⛔ Never push it, commit it, or merge from it.** It is the *un‑scrubbed* history, so it still carries the
 personal email addresses, home‑directory paths, the old account name, the GCP project number, and — the
-reason this warning is emphatic — an **OAuth client secret** in a since‑deleted execution plan. That
-credential has been **rotated** and is dead, but the bundle is the reason this file says "treat it as
-credential‑bearing" rather than "it's just old commits": the next thing to land in a planning doc might not
-be dead. `.gitignore` refuses `*.bundle` so a stray copy inside the checkout cannot be committed by
-accident, but that guard only covers this directory — the file's real protection is living outside it.
+reason this warning is emphatic — an **OAuth client secret** in a since‑deleted execution plan. The owner
+**deactivated** that credential on 2026‑08‑12, so it is dead (see `W29.drive-secret` in
+[`SUITE_TODO.md`](SUITE_TODO.md) — deactivated, *not* yet replaced, which is why cloud relay currently has no
+usable secret at all). The bundle is nonetheless why this file says "treat it as credential‑bearing" rather
+than "it's just old commits": the next thing to land in a planning doc might not be dead. `.gitignore`
+refuses `*.bundle` so a stray copy inside the checkout cannot be committed by accident, but that guard only
+covers this directory — the file's real protection is living outside it.
 
 Use it to answer "what did this look like before?" — resolving an old SHA a doc cites, or recovering a
 removed `.dmg`. It is a read‑only archive, not a remote.
