@@ -85,16 +85,19 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   core = replicants (shared `uuid` → memberships) vs near-duplicates (different `uuid` → date consolidation),
   and the link-conversion contract (nothing survives as `file://`/`zotero://`/`x-devonthink-item://`; only
   internet URLs stay `://`). See §9 open decisions + §8 owner prerequisites (a Reader root over Archival Photos).
-- `despotlight.md` — **QUEUED (Reader + Processor; Wave 26; mixed Tier-1/Tier-2)**: remove **all** reliance on
-  Spotlight (`NSMetadataQuery`/`kMDItem*`/`mdfind`) per the owner directive 2026-08-04 (*"Spotlight is
-  fundamentally unreliable on macOS"*), after a live incident where a dead Data-volume Spotlight index made the
-  Reader report *"No Read/Unread-tagged PDFs were found"* over 1,849 correctly-tagged files. Three stages:
-  (A) an owned read-only `CorpusWalker` in ArchiveCore becomes the Reader's Release discovery path — deleting
-  ~80 lines of `PendingWrite` Spotlight-lag masking and adding honest `.failed` vs `.emptyButReadable` states;
-  (B) `CorpusWatcher` (FSEvents — **verified** to report xattr-only tag writes) + a `LibraryIndex` SQLite warm
-  start following the `ContentIndex` precedent; (C) the Processor's home-wide tag vocabulary, the fixture
-  scripts' `mdimport`/`mdfind` polling, and the docs. Measured read-only on the real corpus: **123,028 files /
-  102,478 PDFs walked in 10.15 s single-threaded**, which is why this is safe. See **Wave 26** below.
+- ~~`despotlight.md`~~ — **SHIPPED (Reader + Processor, Wave 26); plan deleted 2026-08-12 (`W26.plandelete`)**
+  per the "delete a shipped plan" convention — `git log -p -- execution-plans/despotlight.md` for the text.
+  Removed **all** reliance on Spotlight (`NSMetadataQuery`/`kMDItem*`/`mdfind`) per the owner directive
+  2026-08-04 (*"Spotlight is fundamentally unreliable on macOS"*), after a live incident where a dead
+  Data-volume Spotlight index made the Reader report *"No Read/Unread-tagged PDFs were found"* over 1,849
+  correctly-tagged files. What shipped: an owned read-only `CorpusWalker` in ArchiveCore as the Reader's
+  Release discovery path (replacing ~80 lines of `PendingWrite` Spotlight-lag masking, with honest `.failed`
+  vs `.emptyButReadable` states); `CorpusWatcher` (FSEvents — **verified** to report xattr-only tag writes) +
+  a `LibraryIndex` SQLite warm start; and the Processor's tag vocabulary, the fixture scripts' `mdimport`/
+  `mdfind` polling, and the docs. Measured read-only on the real corpus: **123,028 files / 102,478 PDFs walked
+  in 10.15 s single-threaded**, which is why it was safe. The plan's **declined designs** survive in
+  `SUITE_TODO_DONE.md` §"Wave 26 — DECLINED DESIGNS"; the completion audit is `./ops/despotlight-audit.sh`.
+  One item remains open — `W26.oracle-fu1`, self-contained under **Wave 26** below.
 - `archive-notes/09-gap-closure.md` — **IN PROGRESS (Archive Notes post-ship reconciliation; W9; mixed Tier-1/Tier-2)**:
   closes the plan-vs-build + spec-vs-build deltas found after W0–W8 shipped (docs/tracker sync, wire built-but-dead
   features, re-arm safety-net lint/smoke tooling, secondary UI polish), then a **Phase-E verification review** that
@@ -153,12 +156,14 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   makes extra paid calls per file that the quoted figure does not include. Pass the run's values from
   `activeRunConfig` (now the retry sheets' seed anyway).
 
-## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
+## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan DELETED (`W26.plandelete`)
 
 **Owner directive, 2026-08-04:** *"Spotlight is fundamentally unreliable on macOS."* Remove **all** reliance
-on Spotlight (`NSMetadataQuery` / `kMDItem*` / `mdfind`) across the suite. **Read
-`execution-plans/despotlight.md` first** — it carries the full inventory, the measured evidence, the
-verified traps and the per-item test gates; these one-liners are not enough to work from.
+on Spotlight (`NSMetadataQuery` / `kMDItem*` / `mdfind`) across the suite. **The plan
+`execution-plans/despotlight.md` was deleted 2026-08-12** now that the wave has shipped — recover it with
+`git log -p -- execution-plans/despotlight.md`. Its still-live content was folded out first: the **declined
+designs** (its §9) are in `SUITE_TODO_DONE.md` §"Wave 26 — DECLINED DESIGNS", and the one open item below
+carries its own full spec. The completion audit it prescribed is runnable: `./ops/despotlight-audit.sh`.
 
 **The incident.** The owner pointed the Reader at `~/Desktop/Glazer Gemini 2.5 LLM` — 1,849 PDFs, **every
 one correctly tagged** — and got *"No Read/Unread-tagged PDFs were found in this folder."* The macOS
@@ -195,7 +200,8 @@ unreadable with a traversable parent: the call does NOT throw and yields `tagNam
 `TagReading.swift:34`'s `values.tagNames ?? []` reports as *"confirmed no tags"* about a file carrying
 `["Unread", …]`. **Probe ONLY on the `tagNames == nil` branch** — a blanket pre-check is wasted work at 150k
 (this plan's earlier, wrong prescription), and a new `TagReadResult.denied` case has the largest blast radius
-(all three designs declined it; see plan §9). 🔴 **AND THE PROBE MUST BE `getxattr`, NOT `access(R_OK)` —
+(all three designs declined it; the reasoning is now in `SUITE_TODO_DONE.md` §"Wave 26 — DECLINED DESIGNS",
+folded out of the deleted plan's §9). 🔴 **AND THE PROBE MUST BE `getxattr`, NOT `access(R_OK)` —
 verified 2026-08-04.** An ACE denying **only** `readextattr` (narrower than the ACL case above, which also
 denies `read`/`readattr` and therefore throws) gives: `resourceValues` no-throw with `tagNames=nil`,
 **`access(R_OK) == 0`** — so `access` **fails to detect it** and would coerce a tagged file to "no tags"
@@ -357,14 +363,12 @@ it drives real launchd, so its verdict depends on state outside its sandbox and 
 a self-relaunching phantom job in `gui/$UID`. Part 2 closes the class: `prove-gate-report.sh` §5 asserts every
 `prove-*.sh` is a gate step or on health-gate.sh's machine-read `# GATE-UNWATCHED-BY-DESIGN:` line, mutation-
 proven 8/8 (including that the list cannot lie by going stale or naming a harness that IS wired).
-- [ ] **W26.plandelete — delete `execution-plans/despotlight.md`** (blocked-on: W26.docs-spec).
-  The convention is that a shipped plan is deleted, and `W26.verify` was the gate on that — but the plan
-  is still the only place an open item's context lives. **Two of the three blockers have now closed**:
-  `W26.verify-fu1` shipped in `2946781`, and `W26.verify-fu2` shipped 2026-08-10 (its VM run finally
-  possible once `W26.vmuitest-blind` was repaired), so §2's measurement method, §4a.3's fresh-URL
-  rationale, §4.3's honest-states design and §4.6's warm-start design are no longer load-bearing.
-  **Only `W26.docs-spec` (hold queue) still quotes the plan — §Site 5.** When that closes, delete it —
-  git keeps the history.
+✅ **W26.plandelete — SHIPPED 2026-08-12 (this commit); full entry in `SUITE_TODO_DONE.md`.** The last
+blocker (`W26.docs-spec`) closed 2026-08-11. The `git rm` was the trivial half: the item's real content was
+proving the plan's own gate — *"the plan is still the only place an open item's context lives"* — was clear.
+It was not clear by default. §9's **declined designs** were forward-looking, not a record of shipped work, and
+this file cited them live; they are folded into `SUITE_TODO_DONE.md` §"Wave 26 — DECLINED DESIGNS". All 9
+surviving code/doc citations were confirmed self-sufficient before deleting.
 
 
 ## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN

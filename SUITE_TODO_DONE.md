@@ -504,7 +504,85 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   while restoring the run from this same park, then matched to the existing item rather than re-filed.
 
 
-## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan `execution-plans/despotlight.md`
+## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan DELETED by `W26.plandelete`
+
+> 🗑️ **`execution-plans/despotlight.md` was deleted on 2026-08-12 (`W26.plandelete`), per the repo convention
+> that a shipped plan goes once its feature ships.** Recover any of it with
+> `git log -p -- execution-plans/despotlight.md`. All **9 design citations** of it that survive in live code
+> and docs (`CorpusWalkerScaleTests.swift` §7a.7, `lint-write-surface.sh` §7a.8, `run-scale-verify.sh` §7a.7,
+> `scale-corpus.swift` §7a.7, `LibraryIndexScaleTests.swift` §7a.7, `despotlight-audit.sh` §7a.7,
+> `ProcessFilesTestDriver.swift` + `ArchiveProcessor/TESTING.md` §"Site 8", `ArchiveReader/KNOWN_ISSUES.md`
+> §4a.1/§7a.3) **state their fact inline and cite the plan only as provenance** — that was checked
+> site-by-site before deleting, and is why they were left alone rather than rewritten. Separately, four ops
+> files (`context-budget.sh`, `ops/autonomous/README.md`, `archive-suite-autonomous.sh`, `prove-daemon.sh`)
+> name this file as the worked example of the 2026-08-06 over-budget park; those are historical records of an
+> incident, and one of them is a fabricated string inside a test stub, so none reads the file. Three earlier plans
+> (`local-agent-cli-provider.md`, `android-ui-test-harness.md`, `tracker-consolidation.md`) are cited the same
+> way; a dangling plan citation is the established shape here, not rot.
+
+### Wave 26 — DECLINED DESIGNS (folded out of the deleted plan's §9, 2026-08-12)
+
+**Kept verbatim in substance because the plan said why they were worth keeping:** each *"is a plausible-sounding
+idea that a later reviewer will propose, and the reasoning against it is not obvious."* Three independent
+designs converged on all of them. This block is the durable home — `SUITE_TODO.md`'s `TagReading` entry cites
+it, and it is the answer when one of these is re-proposed.
+
+- **Do NOT add a `.denied` case to `TagReadResult`.** The theoretically honest fix for the "reports *no tags*
+  when it means *couldn't read*" defect, and it has the **largest blast radius**: every `TagReading` caller in
+  **all three apps**, plus `CoordinatedTagWriter`'s §3 refusal logic in `TagWrite.swift`. All three designs
+  declined it, preferring the walker probe the parent directory's readability instead. ⚠️ The plan flagged this
+  as a **genuine open decision** (it contradicted its own §4a.3, which argued the fix belongs in `TagReading`
+  because the Safety §3 write guard is bypassable through that path) and told `W26.walk1` to resolve it
+  explicitly. **Resolved as the narrow reading:** fix the walker, leave the enum alone. The `getxattr`-on-`nil`
+  probe that shipped is the record of that choice — see the `TagReading` entry in `SUITE_TODO.md`.
+- **Do NOT share one database between the apps, and do NOT add an App Group.** The Reader is sandboxed (its
+  Application Support lives inside `~/Library/Containers/com.archivereader.app/Data/`) and the Processor is
+  not, so a shared store means a new entitlement *and* a new cross-app coupling. **Share the walker CODE in
+  ArchiveCore; keep STORAGE per-app.** The `SELECT tags_raw` vocabulary query is only 0.295 s at 150k rows, so
+  the Processor can simply do its own root-scoped read.
+- **Do NOT build a shadow/dual-run mode** comparing the walk against Spotlight before the flip. It sounds like
+  the responsible move and is worthless here: the Data volume's Spotlight index is **dead on this machine**, so
+  the comparison baseline is an empty set. There is nothing to validate against.
+- **Do NOT add a periodic re-walk timer.** Prefer window-activation-triggered revalidation (only when the last
+  settle is older than ~5 minutes) plus an explicit ⌘⌥R. A timer would contend with `ContentIndexer` for I/O on
+  a corpus this size, for no correctness gain over FSEvents plus a launch walk.
+- **Do NOT refuse cloud-backed roots at selection time.** Detecting FileProvider/CloudStorage paths is
+  imperfect and refusal is a UX cliff; the thread-policy guard plus honest `.degraded` reporting is the right
+  shape — fail fast and explain, don't pre-emptively forbid.
+- **Do NOT adopt the shared walker in Archive Notes.** Notes has zero Spotlight references and its own working
+  walk; adding the dependency bought nothing this wave.
+- **Do NOT emulate Spotlight's home-wide tag vocabulary** in the Processor — explicitly declined.
+- **Do NOT create a `W26.retire` item, and do not delete any W26 tracker entry.** A review lens raised a
+  CRITICAL "the wave's tags collide with an existing W26 set" — an artifact of that review comparing a
+  *parallel, independently invented* item set against the one actually committed. There is exactly one W26 set
+  and `next-queue-item.sh` resolves all of it.
+
+**Also out of scope, and still true:** rebuilding the owner's Spotlight index is a system-level fix independent
+of this wave (`sudo killall mdbulkimport; sudo mdutil -E /System/Volumes/Data`; the Data volume was **90% full**,
+98 GB free of 926 GB, which plausibly contributed to the wedge) — *the whole point of the wave is that the app
+must not care*. Full-text search was untouched: `ContentIndex`/`ContentIndexer` never needed Spotlight, only a
+re-sourced input list. And no migration/back-compat was written for any on-disk format, per the
+no-production-material directive.
+
+**One argument worth keeping for the ArchiveCore placement:** the membership predicate was **already duplicated**
+before the wave — the `NSMetadataQuery` predicate and the DEBUG walk's case-insensitive check were two
+independent expressions of the same rule. A Reader-local fix would have left that duplication and let the
+Processor grow a third; one component in ArchiveCore, next to the audited writer it must agree with, collapses
+all three.
+
+- [x] **W26.plandelete — delete `execution-plans/despotlight.md`** ✅ **SHIPPED 2026-08-12 (this commit).**
+  The last blocker (`W26.docs-spec`) closed 2026-08-11, so the plan's own gate — *"the plan is still the only
+  place an open item's context lives"* — was finally clear. **It was not clear by default, and the check is the
+  item:** before deleting, all 9 surviving code/doc citations were read and confirmed self-sufficient (each
+  quotes its fact and cites the plan only as provenance), the one remaining open Wave 26 item
+  (`W26.oracle-fu1`) was confirmed to carry its full spec in `SUITE_TODO.md` rather than in the plan, and §9's
+  **declined designs** — the one part of the plan that was *forward*-looking rather than a record of shipped
+  work, and which `SUITE_TODO.md` cites live as "see plan §9" — were folded into the block above rather than
+  dropped. That fold is the substance of this item; the `git rm` is the trivial half. 92,317 B off the tree —
+  the largest of the `execution-plans/` documents sharing `context-budget.sh`'s `PLAN_BUDGET`, and the file
+  whose 2026-08-06 over-budget breach is the worked example in that script's own remedy list. It was **not**
+  the largest guarded document overall (`SUITE_TODO.md` and the plan are both bigger), and deleting it does
+  not move `PER-SESSION ORIENTATION`, which counts neither.
 
 - [x] **W26.docs-spec — the two `SPEC/tag-format.md` bullets split out of `W26.docs`
   ✅ **SHIPPED 2026-08-11 — granted and done in one sitting**, at the owner's direction when he asked for
