@@ -262,3 +262,51 @@ this repo:
 The two repos were merged into this monorepo and Archive Suite v1.0.0 shipped (see `git log` for the
 record). De‑nesting shipped (`7706368`); `packages/ArchiveCore` shipped in the W0 refactor
 (`49c0162`–`b90800f`); Archive Notes scaffolding is in progress.
+
+## ⚠️ The history was rewritten when this repo went public (2026‑08‑12) — every SHA before then changed
+
+**Nothing in `git log` older than the publication commit has the hash it originally had.** The repo was
+private until 2026‑08‑12; making it public meant rewriting all 1,017 commits with `git-filter-repo`
+(`W29.pub1`–`pub3` in [`SUITE_TODO_DONE.md`](SUITE_TODO_DONE.md)). Four things changed across the whole
+history: author/committer identity → a GitHub noreply address; hardcoded home paths, the old account name
+and the GCP project number → placeholders; five committed `.dmg` build artifacts → removed; and two
+superseded planning docs deleted outright. Two commits that held nothing but a `.dmg` disappeared with it.
+
+**Consequences to expect, none of them bugs:**
+
+- **A commit hash cited in an older doc will not resolve.** `SUITE_TODO_DONE.md`, `KNOWN_ISSUES.md` and the
+  per‑app guides quote pre‑rewrite SHAs in their hundreds — `7706368`, `49c0162`–`b90800f` in the paragraph
+  directly above, and so on. They are *historically accurate* and deliberately left alone; they simply name
+  objects that no longer exist under those names. Don't "fix" them, and don't treat a failed
+  `git show <old-sha>` as repo corruption. Find the commit by its message or by `git log -S` instead.
+- **`git log` blames one identity for everything.** The rewrite collapsed two spellings of the same author
+  into one; it does not mean the history was squashed.
+- **Any old clone or worktree is on an unrelated history.** `git pull` into one will not fast‑forward.
+  Re‑clone rather than trying to merge.
+
+### The pre‑rewrite history is preserved — as a local bundle, never in this repo
+
+The original history is kept as a git bundle **outside the repo, untracked and unpublished**:
+
+```
+~/Claude/archive-suite-full-backup-2026-08-11.bundle
+```
+
+| | |
+|---|---|
+| SHA‑256 | `491776575b3305551cae6b422256bb723ea89ba80d6dbf0f8df8f20d3d030048` |
+| Size | 28,428,854 bytes (27 MB) |
+| Contents | 42 refs, 1,017 commits, complete history; original `HEAD` = `3ea86c4` |
+| Verify | `git bundle verify ~/Claude/archive-suite-full-backup-2026-08-11.bundle` (run from inside a repo) |
+| Read it | `git clone --bare ~/Claude/archive-suite-full-backup-2026-08-11.bundle /tmp/as-original` |
+
+**⛔ Never push it, commit it, or merge from it.** It is the *un‑scrubbed* history, so it still carries the
+personal email addresses, home‑directory paths, the old account name, the GCP project number, and — the
+reason this warning is emphatic — an **OAuth client secret** in a since‑deleted execution plan. That
+credential has been **rotated** and is dead, but the bundle is the reason this file says "treat it as
+credential‑bearing" rather than "it's just old commits": the next thing to land in a planning doc might not
+be dead. `.gitignore` refuses `*.bundle` so a stray copy inside the checkout cannot be committed by
+accident, but that guard only covers this directory — the file's real protection is living outside it.
+
+Use it to answer "what did this look like before?" — resolving an old SHA a doc cites, or recovering a
+removed `.dmg`. It is a read‑only archive, not a remote.

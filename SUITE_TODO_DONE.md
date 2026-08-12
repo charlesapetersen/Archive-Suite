@@ -18,6 +18,12 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Open-sourcing the repo (owner, 2026-08-11)
 
+> **Every commit hash quoted below, and everywhere else in this file, predates the 2026-08-12 history
+> rewrite and no longer resolves.** They are kept because they are the accurate record of what shipped
+> when. The pre-rewrite history — the only place those SHAs exist — is preserved as a local, untracked,
+> credential-bearing bundle. Both the rewrite's consequences and the bundle's location, checksum and
+> handling rules are in [`CLAUDE.md`](CLAUDE.md) → *"The history was rewritten when this repo went public"*.
+
 - [x] **`W29.pub1` — de-personalise the tree for a public repo.** Owner decided to make `Archive-Suite`
   public. Removed every hardcoded home-directory path from tracked files (15 files): the launchd plist and
   `resume-prompt.txt` now carry `__HOME__`/`__REPO__` placeholders that `daemon.sh` **renders** at install

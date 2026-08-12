@@ -48,3 +48,7 @@ __pycache__/
 
 # Editor state (local, per-machine).
 .vscode/
+
+# Git bundles. The pre-publication history backup is one (kept OUTSIDE the repo, see CLAUDE.md);
+# it carries un-scrubbed credentials, so a stray copy in here must never become a commit.
+*.bundle
