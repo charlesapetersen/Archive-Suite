@@ -346,8 +346,13 @@ struct ExtractBuilder {
 
     nonisolated private static func strippedTitleLine(_ line: String) -> String {
         var s = line
-        // Drop inline images entirely so an image-only line reads as empty and is skipped.
-        s = s.replacingOccurrences(of: #"!\[[^\]]*\]\([^)]*\)"#, with: "", options: .regularExpression)
+        // Drop inline images entirely so an image-only line reads as empty and is skipped. The
+        // grammar comes from `InlineImageMarkdown` so that an ESCAPED alt text
+        // (`![Moore \[draft\]](assets/p1.png)`) is still recognised as an image — against the old
+        // local pattern it survived stripping and became the extract's title
+        // (W3.notes-thumb-line-duplicates-fu1).
+        s = s.replacingOccurrences(of: InlineImageMarkdown.strippingPatternSource,
+                                   with: "", options: .regularExpression)
         s = s.trimmingCharacters(in: .whitespaces)
         // Strip leading block markers: ATX headings, blockquotes, unordered + ordered list bullets.
         s = s.replacingOccurrences(of: #"^\s*(#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)+"#,

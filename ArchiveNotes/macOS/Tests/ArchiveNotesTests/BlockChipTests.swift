@@ -269,6 +269,38 @@ final class BlockChipTests: XCTestCase {
         XCTAssertEqual(parsed.first?.source?.page, 41)
     }
 
+    /// W3.notes-thumb-line-duplicates-fu1 — the same authoring path, with a bracketed document title.
+    /// `Moore [draft]` used to emit `![Moore [draft]](…)`, which the image pattern cannot match, so the
+    /// first save→reload turned the thumbnail into escaped prose and orphaned the imported asset while
+    /// `thumb:` went on claiming a thumbnail existed. The reference must survive, and what insertion
+    /// produces must be a fixed point.
+    func testInsertedBlockWithABracketedDisplayKeepsItsThumbnail() {
+        let chip = MarkdownBridge.buildInsertableBlock(
+            kind: .readerPage,
+            anchor: SourceAnchor(link: "archivereader://x", display: "Moore [draft]", page: 41,
+                                 thumbRef: "assets/p41-thumb.png"))
+        let serialized = MarkdownBridge.serialize(chip)
+
+        XCTAssertEqual(occurrences(of: "![Moore \\[draft\\]](assets/p41-thumb.png)", in: serialized), 1,
+                       "The bracketed thumbnail line is missing or doubled:\n\(serialized)")
+
+        let reloaded = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: serialized))
+        XCTAssertEqual(reloaded, serialized,
+                       "A bracketed display is not a fixed point:\n\(reloaded)")
+
+        // The reference itself — not just the text — has to come back as an image.
+        let reparsed = MarkdownBridge.parse(markdown: serialized)
+        var relPath: String?
+        reparsed.enumerateAttribute(.noteImageRelPath,
+                                    in: NSRange(location: 0, length: reparsed.length)) { val, _, _ in
+            if let p = val as? String { relPath = p }
+        }
+        XCTAssertEqual(relPath, "assets/p41-thumb.png",
+                       "The thumbnail reloaded as prose, not as an image:\n\(serialized)")
+        XCTAssertEqual(BlockParser.parse(serialized).blocks.first?.source?.thumbRef,
+                       "assets/p41-thumb.png")
+    }
+
     /// The over-fix guard: a block with NO thumb ref gains nothing from the same code path. Passes
     /// against both versions on purpose — it constrains the fix rather than proving it.
     func testInsertedBlockWithoutAThumbAddsNoImageLine() {

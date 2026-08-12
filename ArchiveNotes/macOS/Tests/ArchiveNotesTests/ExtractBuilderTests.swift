@@ -138,6 +138,17 @@ struct ExtractTitleTests {
                                             fallbackDate: epoch) == "Real Title")
     }
 
+    /// W3.notes-thumb-line-duplicates-fu1 — a thumbnail line whose alt text carries an ESCAPED
+    /// bracket (`![Moore \[draft\]](…)`, which is what a bracketed document title now writes) is
+    /// still an image, so an image-only line is still empty. Against the pattern this file's other
+    /// cases were written for, the escaped form survived stripping and became the extract's title.
+    @Test("skips an image-only line whose alt text is escaped")
+    func skipsEscapedAltImageOnly() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("![Moore \\[draft\\]](assets/p1.png)\nReal Title")],
+            fallbackDate: epoch) == "Real Title")
+    }
+
     @Test("truncates on a word boundary at 80 chars")
     func truncates() {
         let long = String(repeating: "word ", count: 40) // 200 chars

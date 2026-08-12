@@ -15,10 +15,10 @@ enum MarkdownBridge {
 
     // MARK: - Image regex
 
-    /// Matches `![alt](path)` inline image references in Markdown text.
-    private static let imagePattern = try! NSRegularExpression(
-        pattern: #"!\[([^\]]*)\]\(([^)]+)\)"#
-    )
+    /// Matches `![alt](path)` inline image references in Markdown text. The grammar — pattern,
+    /// emitter and label escaping together — belongs to `InlineImageMarkdown`
+    /// (W3.notes-thumb-line-duplicates-fu1).
+    private static var imagePattern: NSRegularExpression { InlineImageMarkdown.pattern }
 
     /// Placeholder prefix used to protect image refs from Apple's Markdown parser.
     private static let imageTokenPrefix = "\u{FFFC}IMG:"
@@ -207,7 +207,8 @@ enum MarkdownBridge {
 
         let combined = NSMutableAttributedString(attributedString: chip)
         combined.append(parseSingleBody(
-            "![\(anchor.display ?? "")](\(thumb))", fontSize: fontSize, assetStore: assetStore
+            InlineImageMarkdown.emit(alt: anchor.display ?? "", path: thumb),
+            fontSize: fontSize, assetStore: assetStore
         ))
         return combined
     }
@@ -228,7 +229,7 @@ enum MarkdownBridge {
 
         for match in matches {
             let fullRange = match.range
-            let alt = nsString.substring(with: match.range(at: 1))
+            let alt = InlineImageMarkdown.unescapeAlt(nsString.substring(with: match.range(at: 1)))
             let path = nsString.substring(with: match.range(at: 2))
             let token = "\(imageTokenPrefix)\(refs.count)\u{FFFC}"
             refs.append(ImageRef(alt: alt, path: path, token: token))
@@ -501,7 +502,7 @@ enum MarkdownBridge {
                 } else {
                     alt = ""
                 }
-                result += "![\(alt)](\(relPath))"
+                result += InlineImageMarkdown.emit(alt: alt, path: relPath)
                 return
             }
 
