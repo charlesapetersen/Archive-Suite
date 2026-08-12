@@ -5353,6 +5353,59 @@ explain why not.
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 
+- [x] **W3.notes-thumb-line-duplicates — a `thumb:` block grew one extra `![display](thumb)` line on EVERY
+  save, without bound [M · MED · data-shaped].** ✅ **SHIPPED 2026-08-12** — `99870c8` (code + tests) and the
+  commit whose subject begins `fix(notes,trackers): W3.notes-thumb-line-duplicates`, which carries this move
+  (a self-referential sha cannot be written into its own commit). Filed 2026-08-11 by the
+  `W3.notes-chip-header-needs-a-line-break` fix; pre-existing, and the one shape excluded from that item's
+  new idempotence table.
+  **The defect was two emitters, not one bad one.** `BlockParser.parseSegment` leaves the
+  `![display](thumb)` line in the block BODY — which is *also* what renders it, as an ordinary inline image —
+  and `MarkdownBridge.serializeBlockHeader` ALSO wrote it out of `box.thumbRef` on every save. So each save
+  wrote it twice, the extra copy came back as body on the next load, and an autosaving editor grew the
+  operator's own note one line per save.
+  **Of the item's two candidate fixes, the BODY keeps the line and the serializer stops re-emitting it.** The
+  other candidate — have `parse` consume the line into the chip, which `testThumbLineConsumedIntoChip`'s name
+  claimed already happened — was rejected on evidence, not taste: `BlockHeaderChipView.setupSubviews` builds a
+  label and buttons and **never draws the image**, and `thumb:` is a header field nothing renders, so
+  consuming the line would have made every thumbnail INVISIBLE. It would also have cost the bytes on passage
+  copy, since `NotePassageSource` collects images by their `noteImageRelPath` attachments *in the body*.
+  **That decision moved the authoring point rather than deleting it.** `MarkdownBridge.buildInsertableBlock`
+  now writes the line into the body once, when a pasted Reader link becomes a block, and takes an
+  `assetStore` so it builds that attachment through `parseSingleBody` — the same containment check and cache
+  key the reload path uses, not a second construction that could drift. Both `MarkdownEditorView` callers
+  pass the store that just imported the thumbnail bytes. `SourceAnchorBox.thumbRef` was **removed**: it only
+  ever mirrored `anchor.thumbRef`, and that duplicate field is what made re-emitting easy to write.
+  📌 **Side effect worth keeping:** deleting the thumbnail in the editor now STICKS. The old serializer
+  re-created it from `thumbRef` on the next save, so the operator could not remove even a duplicate the app
+  had itself produced.
+  🔺 **A GREEN SUITE PROVED LITTLE, SO THE GATE WAS MUTATION.** With the pre-fix re-emission restored, the new
+  through-disk test reports `occurrences → 2` then `→ 3` on the raw `.md` — the item's own measured numbers —
+  and **4 of the 5** new/changed tests go red. The fifth, `testInsertedBlockWithoutAThumbAddsNoImageLine`,
+  passes against both versions **on purpose**: it is the over-fix guard (a thumb-less block must gain
+  nothing), and that is written in the test.
+  **Tests.** `NoteStoreTests.thumbLineDoesNotMultiplyAcrossEditorSaveCycles` is the Tier-2 functional test on
+  an `mktemp` scratch store: the whole autosave cycle the app runs (disk → `loadBody`'s
+  `BlockParser.serialize` → the EDITOR's `MarkdownBridge` parse/serialize → `setBody`'s parse → atomic save),
+  asserting the RAW bytes over **two** cycles, because unbounded growth is the claim and one cycle cannot see
+  it. At the editor level `testThumbLineConsumedIntoChip` is replaced by
+  `testThumbLineIsWrittenOnceAndDoesNotGrowAcrossSaves` — the old test asserted the line appears SOMEWHERE,
+  which is true whether it appears once or ten times — plus deletion-sticks and insertion-authoring tests; and
+  the `thumb:` shape is now IN
+  `testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint`'s table in two variants, which is the
+  acceptance test the item named.
+  **No cleanup pass was written for notes that already hold duplicates** — they stop growing and keep the
+  copies they have. Nothing to migrate (standing premise, owner 2026-08-01: Notes holds only test material).
+  **Verified:** Notes unit bundle **791 tests / 84 suites**, `** TEST SUCCEEDED **`, all five touched files
+  force-recompiled (`touch` + full run) with **no new warnings**; **`ArchiveNotesUITests` 20/20 in the
+  headless Tart VM** (`ops/gui/vm-gui-runner.sh notes xcuitest`, 353 s, off the owner's screen) — including
+  `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock`, which is the paste path
+  `buildInsertableBlock` sits on, so that is a real check and not only a regression sweep.
+  **Scope:** Notes-local (`ArchiveNotes/Editor`) — nothing in `ArchiveCore`, so no cross-app rebuild was owed.
+  Scratch `mktemp` stores only (Prime Directive #1); no corpus touched, nothing drawn on the host screen.
+  Residual filed as `W3.notes-thumb-line-duplicates-fu1` (a `[` in `display` destroys the reference outright —
+  pre-existing, measured).
+  | ArchiveNotes/Editor | Tier-2 | done
 - [x] **W3.notes-editor-blankline-collapse — CONFIRM FIRST, then decide: `MarkdownBridge.parse` → `serialize` collapses a blank line between two paragraphs, and a single line break into a space, for EVERY line-ending form [S · investigate-first · possibly intended].**
   ✅ **CONFIRMED data-shaped, then FIXED — 2026-08-11.** The premise this item demanded be checked first
   was right: the real editor path loses it too. `NotesModel.setBody` write-back was measured end to end, not

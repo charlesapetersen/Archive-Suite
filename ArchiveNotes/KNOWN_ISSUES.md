@@ -631,8 +631,12 @@ the real UI:
   window and absent in the Note window, so the negative half cannot pass on a mistyped id.
 - **G13** — W14.3 live copy→paste. Asserts the imported file is **byte-identical** to the source note's asset,
   not merely referenced — a reference without the bytes is precisely the bug W14.3 fixed. Self-contained: the
-  fixture's only `![](assets/…)` line is a reader-page thumbnail the chip consumes, so the test pastes its own
-  image in first (and XCTest's alphabetical order runs it before G4 anyway).
+  fixture's only `![](assets/…)` line belongs to a reader-page block (it is that block's thumbnail line), so
+  the test pastes its own image in first rather than borrow one it does not own (and XCTest's alphabetical
+  order runs it before G4 anyway). ⚠️ This said "a reader-page thumbnail **the chip consumes**" until
+  2026-08-12: the chip has never consumed that line — `BlockHeaderChipView` draws a label and buttons, never
+  the image — and `W3.notes-thumb-line-duplicates` settled the body as its one home. The test's own reasoning
+  is unaffected either way.
 - **G14** — W14.4 (b) raise **and** focus, for both triggers: ⌘⌥E raises the Extracts window, then
   Jump-to-Source raises the Note window back. Via a new DEBUG `an.status.keyWindow` probe, since XCUITest
   exposes no `isKeyWindow`/`isMainWindow` on a window element; without it the check could only assert the

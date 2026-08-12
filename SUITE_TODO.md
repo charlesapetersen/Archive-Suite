@@ -1239,22 +1239,26 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-thumb-line-duplicates — a `thumb:` block grows one extra `![display](thumb)` line on EVERY save, without bound [M · MED · data-shaped].**
-  Filed 2026-08-11 by the `W3.notes-chip-header-needs-a-line-break` fix, which added the first
-  parse→serialize→parse idempotence test this class has ever had; the `thumb:` shape is the one shape that
-  still fails it, so it is excluded from that test's table with a pointer here. **Not caused by that change —
-  measured on pristine `5512df3` too.** `MarkdownBridge.parse` renders a `thumb:` block as chip + the block
-  body, and the body ALREADY contains the `![display](thumb)` line (`BlockParser.parseSegment` leaves it
-  there); `MarkdownBridge.serializeBlockHeader:340-343` then emits that line again from `box.thumbRef`. So the
-  line is written twice, read back as body, and written twice again. Measured, one input with a single
-  `![Doc](assets/p1.png)`: pass 1 → **2** copies, pass 2 → **3** (the third collapsing onto the body line as
-  ` ![Doc](assets/p1.png) Body text.`). The editor autosaves, so this is unbounded growth in the operator's
-  own note plus a visibly duplicated thumbnail. Two candidate fixes — have `parse` CONSUME the thumb line into
-  the chip (which is what `testThumbLineConsumedIntoChip`'s name already claims happens, and does not), or
-  stop re-emitting it in `serializeBlockHeader` and let the body carry it. Pick ONE; emitting from both places
-  is the bug. Then delete the exclusion note in `BlockChipTests
-  .testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint` and add the `thumb:` shape to its table —
-  that is the acceptance test. | ArchiveNotes/Editor | Tier-2
+- [ ] **W3.notes-thumb-line-duplicates-fu1 — a `[` in a block's `display` DESTROYS its thumbnail reference on the first save: the emitted `![Doc [1]](assets/p1.png)` is not an image ref, so it reloads as the escaped prose `Doc \[1\]` while `thumb:` still claims a thumbnail [S · MED · data-shaped].**
+  Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates` fix; **PRE-EXISTING** — that item moved which
+  code writes the line, not how the alt text is escaped, and the old serializer interpolated `display` just
+  as rawly.
+  **Measured 2026-08-12** in the app-hosted bundle (probe since deleted), three displays through
+  `buildInsertableBlock` → `serialize` → `BlockParser.parse`:
+  - `Doc [1]` → body reloads as `Doc \[1\]`. `MarkdownBridge.imagePattern` is
+    `!\[([^\]]*)\]\(([^)]+)\)`, and `[^\]]*` cannot cross the inner `]`, so the line never matches;
+    `parseSingleBody` treats it as prose and `escapeMarkdown` escapes the brackets on the way out. The
+    reference is gone, so nothing renders and the imported asset is orphaned — while the header's
+    `thumb: assets/p1.png` still asserts a thumbnail exists. It IS a fixed point (loses it once, does not
+    grow).
+  - `Doc (draft)` → `![Doc (draft)](assets/p1.png)`, intact. Parens are fine; the greedy `[^\]]*` handles them.
+  - `Plain Doc` → intact.
+  **Reachable in one paste:** `display` is the Reader document's title, and a bracketed title is ordinary
+  (`Moore [draft]`, `Report [1of2]`). ⚠️ Fix in the ONE emitter, `MarkdownBridge.serializeInlineRuns:485`
+  (`![\(alt)](\(relPath))`), not at `buildInsertableBlock` — the alt reaches that line from every inline
+  image, not just a thumbnail. Same FAMILY as `W3.notes-header-field-terminator` (a raw value interpolated
+  into a grammar that cannot carry it) but a different grammar and a different emitter, so the two fixes are
+  independent and neither blocks the other. | ArchiveNotes/Editor | Tier-2
 - [ ] **W3.notes-header-field-terminator — `serializeHeader` writes every field value RAW into a line-based, comment-delimited header, so a terminator or a `-->` inside `link`/`display` truncates the durable link, leaks pasted text into the note body, or splits one block into two and destroys the first one's provenance [S–M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-paste-url-line-split` adversarial pass; **pre-existing**, and NOT the
   same bug — that item fixed the *scanner* (`SourceBlockPaster`), which is where a malformed value is
