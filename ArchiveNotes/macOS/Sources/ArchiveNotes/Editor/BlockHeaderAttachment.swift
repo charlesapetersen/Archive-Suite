@@ -9,18 +9,22 @@ final class PreviewCallbackBox: @unchecked Sendable {
 
 /// Reference wrapper so a `SourceAnchor` (value type) can ride on an `NSAttributedString.Key`.
 /// Immutable + `@unchecked Sendable` — all fields are `let`.
+///
+/// W3.notes-thumb-line-duplicates — there is deliberately no `thumbRef` here. It duplicated
+/// `anchor.thumbRef` (its only initializer read exactly that), and the duplicate is what made it easy
+/// for `MarkdownBridge.serializeBlockHeader` to re-emit the thumbnail line the block BODY already
+/// carried, once per save, forever. The anchor is the single source for it; the body is the single home
+/// for the rendered `![display](thumb)` line.
 final class SourceAnchorBox: @unchecked Sendable {
     let anchor: SourceAnchor
     let kind: Block.Kind
     let unknownHeaderFields: [(String, String)]
-    let thumbRef: String?
 
     init(anchor: SourceAnchor, kind: Block.Kind = .freeform,
-         unknownHeaderFields: [(String, String)] = [], thumbRef: String? = nil) {
+         unknownHeaderFields: [(String, String)] = []) {
         self.anchor = anchor
         self.kind = kind
         self.unknownHeaderFields = unknownHeaderFields
-        self.thumbRef = thumbRef
     }
 }
 

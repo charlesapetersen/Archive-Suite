@@ -195,6 +195,69 @@ struct NoteStoreTests {
         #expect(raw.contains("Para one.\r\r\nPara two.\r\n"))
     }
 
+    /// W3.notes-thumb-line-duplicates through the WHOLE autosave cycle the app actually runs:
+    /// `.md` on disk → `NotesModel.loadBody`'s `BlockParser.serialize` → the EDITOR's
+    /// `MarkdownBridge.parse`/`serialize` → `setBody`'s `BlockParser.parse` → atomic save. The defect
+    /// lived in the editor half, so no storage test could see it; what it damaged was the file, so this
+    /// asserts the RAW bytes — and does it twice, because unbounded growth is the claim.
+    ///
+    /// Scratch `mktemp` store only (Prime Directive #1). The two cycles are deliberate: the pre-fix
+    /// count went 1 → 2 → 3, and a single cycle proves nothing about whether it settles.
+    @MainActor
+    @Test("a thumb block's image line does not multiply across editor autosave cycles")
+    func thumbLineDoesNotMultiplyAcrossEditorSaveCycles() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        let thumbLine = "![Doc p.41](assets/p41-thumb.png)"
+        var item = makeItem(title: "Moore Oral History")
+        item.blocks = [
+            Block(kind: .readerPage,
+                  source: SourceAnchor(link: "archivereader://reveal?root=G&rel=Moore.pdf&page=41",
+                                       display: "Doc p.41", page: 41,
+                                       thumbRef: "assets/p41-thumb.png"),
+                  markdown: "\(thumbLine)\n\nAnnotation.\n", unknownHeaderFields: []),
+        ]
+        let ref = try await store.create(item)
+
+        let created = try String(contentsOf: ref.url, encoding: .utf8)
+        #expect(occurrences(of: thumbLine, in: created) == 1,
+                "fixture precondition: one thumb line on disk to begin with")
+
+        for cycle in 1...2 {
+            // Exactly what an autosave does, in the same order.
+            let loaded = try await store.load(item.id)
+            let editorMarkdown = BlockParser.serialize(leadingText: loaded.trailingBodyRaw,
+                                                       blocks: loaded.blocks)
+            let edited = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: editorMarkdown))
+            let parsed = BlockParser.parse(edited)
+            var next = loaded
+            next.trailingBodyRaw = parsed.leadingText
+            next.blocks = parsed.blocks
+            _ = try await store.save(next)
+
+            let raw = try String(contentsOf: ref.url, encoding: .utf8)
+            #expect(occurrences(of: thumbLine, in: raw) == 1,
+                    "cycle \(cycle): the note gained a duplicate thumbnail line:\n\(raw)")
+            #expect(occurrences(of: "Annotation.", in: raw) == 1,
+                    "cycle \(cycle): the block body text was duplicated:\n\(raw)")
+            #expect(raw.contains("thumb: assets/p41-thumb.png"),
+                    "cycle \(cycle): the durable thumb ref left the header:\n\(raw)")
+            #expect(raw.contains("\n<!-- block: reader-page"),
+                    "cycle \(cycle): the header no longer begins a line:\n\(raw)")
+            let reloaded = try await store.load(item.id)
+            #expect(reloaded.blocks.count == 1,
+                    "cycle \(cycle): the block was lost or split:\n\(raw)")
+            #expect(reloaded.blocks.first?.source?.thumbRef == "assets/p41-thumb.png")
+            #expect(reloaded.blocks.first?.source?.page == 41)
+        }
+    }
+
+    /// Counting, not `contains` — a line written twice contains itself.
+    private func occurrences(of needle: String, in haystack: String) -> Int {
+        haystack.components(separatedBy: needle).count - 1
+    }
+
     // MARK: - Save (retitle -> rename)
 
     @Test("save retitles the file when title changes")

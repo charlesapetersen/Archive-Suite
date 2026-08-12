@@ -99,8 +99,7 @@ enum MarkdownBridge {
         let box = SourceAnchorBox(
             anchor: anchor,
             kind: block.kind,
-            unknownHeaderFields: block.unknownHeaderFields,
-            thumbRef: block.source?.thumbRef
+            unknownHeaderFields: block.unknownHeaderFields
         )
         let attachment = BlockHeaderAttachment(sourceBox: box)
         attachment.onReveal = onReveal
@@ -173,13 +172,24 @@ enum MarkdownBridge {
     // MARK: - Insert block (seam for W4)
 
     /// Insert a source block at the given location in the text storage.
-    /// Returns the attributed string to insert (chip + newline).
+    /// Returns the attributed string to insert (chip + newline, plus the thumbnail line when the
+    /// anchor carries one).
+    ///
+    /// W3.notes-thumb-line-duplicates — this is the ONE place a block's `![display](thumb)` line is
+    /// authored. `serializeBlockHeader` no longer emits it (it did so on every save, over a body that
+    /// already held the same line), so a pasted thumbnail that is not written into the body here would
+    /// have no rendered form at all: the chip draws the label and its buttons, never the image
+    /// (`BlockHeaderChipView.setupSubviews`), and `thumb:` is a header field nothing renders. Built
+    /// through `parseSingleBody` on purpose, so an inserted thumbnail is the same attachment the reload
+    /// path produces — same containment check, same cache key — rather than a second construction of
+    /// one that could drift.
     @MainActor
     static func buildInsertableBlock(
         kind: Block.Kind = .readerPage,
         anchor: SourceAnchor,
         unknownHeaderFields: [(String, String)] = [],
         fontSize: CGFloat = 14,
+        assetStore: EditorAssetStore? = nil,
         onReveal: (@Sendable (SourceAnchor) -> Void)? = nil,
         onPreview: ((SourceAnchor, NSView) -> Void)? = nil,
         onJump: (@Sendable (SourceAnchor) -> Void)? = nil,
@@ -189,10 +199,17 @@ enum MarkdownBridge {
             kind: kind, source: anchor, markdown: "",
             unknownHeaderFields: unknownHeaderFields
         )
-        return buildChipAttributedString(
+        let chip = buildChipAttributedString(
             block: block, fontSize: fontSize, onReveal: onReveal,
             onPreview: onPreview, onJump: onJump, passageSummaries: passageSummaries
         )
+        guard let thumb = anchor.thumbRef, !thumb.isEmpty else { return chip }
+
+        let combined = NSMutableAttributedString(attributedString: chip)
+        combined.append(parseSingleBody(
+            "![\(anchor.display ?? "")](\(thumb))", fontSize: fontSize, assetStore: assetStore
+        ))
+        return combined
     }
 
     // MARK: - Image extraction (pre-parse)
@@ -279,7 +296,7 @@ enum MarkdownBridge {
     /// Text is never dropped; only unmodeled visual styling is lost.
     ///
     /// Block-header chip characters (`noteBlockSource` attr) are serialized as
-    /// `<!-- block: kind ... -->` headers with optional `![display](thumb)` lines — each emitted at the
+    /// `<!-- block: kind ... -->` headers — each emitted at the
     /// start of a line, the only form `BlockParser.parse` will read back as a header. The CR residual
     /// this used to carry is CLOSED: `BlockParser`'s line-start test compares unicode SCALARS now, so a
     /// body ending in CR or CRLF already begins a line and nothing is appended to it
@@ -340,6 +357,15 @@ enum MarkdownBridge {
     }
 
     /// Serialize a `SourceAnchorBox` back to the `<!-- block: ... -->` header format.
+    ///
+    /// W3.notes-thumb-line-duplicates — the thumbnail leaves here as the `thumb:` FIELD only. This used
+    /// to *also* emit `![display](thumb)` from `box.thumbRef`, while the same line was already sitting
+    /// in the block BODY: `BlockParser.parseSegment` leaves it there and `parse` renders it as the
+    /// inline image the operator actually sees. So every save wrote it twice, the extra copy came back
+    /// as body on the next load, and the note grew one line per autosave without bound. The line now
+    /// has exactly one home — the body — authored once by `buildInsertableBlock` and carried from then
+    /// on by `serializeBodySegment`. Deleting the image in the editor now sticks, too; it used to
+    /// reappear on the next save.
     private static func serializeBlockHeader(_ box: SourceAnchorBox) -> String {
         let block = Block(
             kind: box.kind,
@@ -347,16 +373,9 @@ enum MarkdownBridge {
             markdown: "",
             unknownHeaderFields: box.unknownHeaderFields
         )
-        // Reuse BlockParser.serialize for the header, then extract just the header
-        // (it appends the empty markdown, which is fine).
-        var header = BlockParser.serialize(leadingText: nil, blocks: [block])
-        // BlockParser.serialize emits the header only (markdown is ""), no trailing content.
-        // If there's a thumbRef, emit the thumb line after the header.
-        if let thumb = box.thumbRef {
-            let display = box.anchor.display ?? ""
-            header += "![\(display)](\(thumb))\n"
-        }
-        return header
+        // Reuse BlockParser.serialize for the header — markdown is "", so it emits the header alone
+        // with no trailing content.
+        return BlockParser.serialize(leadingText: nil, blocks: [block])
     }
 
     /// Serialize a body segment (no chips) using the existing paragraph/inline logic.

@@ -180,9 +180,19 @@ final class BlockChipTests: XCTestCase {
                        "Second round-trip should produce identical output")
     }
 
-    // MARK: - Thumb line consumed into chip
+    // MARK: - W3.notes-thumb-line-duplicates — the thumb line has exactly ONE home
 
-    func testThumbLineConsumedIntoChip() {
+    /// A `thumb:` block's `![display](thumb)` line lives in the block BODY, and a save must not add a
+    /// second copy. `serializeBlockHeader` used to emit it from `box.thumbRef` while the body already
+    /// held the same line — `BlockParser.parseSegment` leaves it there, which is also what renders it
+    /// as the inline image the operator sees — so every save wrote it twice and the extra copy came
+    /// back as body on the next load: 1 → 2 → 3 → …, one line per autosave, in the operator's own note.
+    ///
+    /// This replaces `testThumbLineConsumedIntoChip`, which could not fail on any of that: it asserted
+    /// the line appears SOMEWHERE in the output, which is true whether it appears once or ten times.
+    /// Its name also claimed a consumption into the chip that has never happened — `BlockHeaderChipView`
+    /// draws a label and buttons, never the image — which is exactly why the body must keep the line.
+    func testThumbLineIsWrittenOnceAndDoesNotGrowAcrossSaves() {
         let md = """
             <!-- block: reader-page
                  link: archivereader://x
@@ -193,14 +203,82 @@ final class BlockChipTests: XCTestCase {
             Body text.
 
             """
-        let parsed = MarkdownBridge.parse(markdown: md)
-        let serialized = MarkdownBridge.serialize(parsed)
+        XCTAssertEqual(occurrences(of: "![Doc](assets/p1.png)", in: md), 1,
+                       "fixture precondition: the input holds exactly one thumb line")
 
-        // The thumb line should be in the serialized output (emitted by chip serialization)
-        XCTAssertTrue(serialized.contains("![Doc](assets/p1.png)"),
-                       "Thumb line should be preserved in serialized output")
+        let first = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: md))
+        XCTAssertEqual(occurrences(of: "![Doc](assets/p1.png)", in: first), 1,
+                       "The thumb line was emitted twice on the first save:\n\(first)")
+        XCTAssertTrue(first.contains("thumb: assets/p1.png"),
+                      "The durable thumb REF must stay in the header:\n\(first)")
+
+        let second = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: first))
+        XCTAssertEqual(occurrences(of: "![Doc](assets/p1.png)", in: second), 1,
+                       "The thumb line grew on the second save:\n\(second)")
+        XCTAssertEqual(second, first, "The thumb shape is not a fixed point:\n\(second)")
+        XCTAssertEqual(occurrences(of: "Body text.", in: second), 1,
+                       "The block body text was duplicated:\n\(second)")
+    }
+
+    /// Deleting the thumbnail image in the editor now STICKS. Re-emitting it from `thumbRef` meant the
+    /// next save re-created it, so the operator could not remove even a duplicate the app had itself
+    /// produced. The `thumb:` ref stays in the header either way — that is the durable provenance, and
+    /// deleting a rendered image is not a statement about where the page came from.
+    func testDeletingTheThumbImageIsNotUndoneByTheNextSave() {
+        let withoutTheImageLine = """
+            <!-- block: reader-page
+                 link: archivereader://x
+                 display: "Doc"
+                 thumb: assets/p1.png -->
+            Body text.
+            """
+        let serialized = MarkdownBridge.serialize(
+            MarkdownBridge.parse(markdown: withoutTheImageLine))
+
+        XCTAssertFalse(serialized.contains("![Doc](assets/p1.png)"),
+                       "A deleted thumbnail image came back on save:\n\(serialized)")
         XCTAssertTrue(serialized.contains("thumb: assets/p1.png"),
-                       "Thumb ref should be in the header")
+                      "The durable thumb REF must survive the deletion:\n\(serialized)")
+    }
+
+    /// The pasted-thumbnail path. `buildInsertableBlock` is now the ONE place that authors the
+    /// `![display](thumb)` line, so a block inserted with a `thumbRef` must carry it into the body —
+    /// otherwise dropping the serializer's copy would have silently left every pasted thumbnail with no
+    /// rendered form at all (the chip never draws the image, and `thumb:` is a header field nothing
+    /// renders). What it inserts must already be a fixed point, so the first save→reload does not
+    /// reshape the note.
+    func testInsertedBlockWithAThumbCarriesItsImageLineIntoTheBody() {
+        let chip = MarkdownBridge.buildInsertableBlock(
+            kind: .readerPage,
+            anchor: SourceAnchor(link: "archivereader://x", display: "Doc p.41", page: 41,
+                                 thumbRef: "assets/p41-thumb.png"))
+        let serialized = MarkdownBridge.serialize(chip)
+
+        XCTAssertEqual(occurrences(of: "![Doc p.41](assets/p41-thumb.png)", in: serialized), 1,
+                       "The inserted block lost or doubled its thumbnail line:\n\(serialized)")
+        XCTAssertTrue(serialized.contains("thumb: assets/p41-thumb.png"),
+                      "The inserted block lost its thumb ref:\n\(serialized)")
+
+        let reloaded = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: serialized))
+        XCTAssertEqual(reloaded, serialized,
+                       "What insertion produces is not a fixed point:\n\(reloaded)")
+
+        let parsed = BlockParser.parse(serialized).blocks
+        XCTAssertEqual(parsed.count, 1, "Inserted block lost on reload:\n\(serialized)")
+        XCTAssertEqual(parsed.first?.source?.thumbRef, "assets/p41-thumb.png")
+        XCTAssertEqual(parsed.first?.source?.page, 41)
+    }
+
+    /// The over-fix guard: a block with NO thumb ref gains nothing from the same code path. Passes
+    /// against both versions on purpose — it constrains the fix rather than proving it.
+    func testInsertedBlockWithoutAThumbAddsNoImageLine() {
+        let chip = MarkdownBridge.buildInsertableBlock(
+            kind: .readerPage,
+            anchor: SourceAnchor(link: "archivereader://x", display: "Doc", page: 2))
+        let serialized = MarkdownBridge.serialize(chip)
+
+        XCTAssertFalse(serialized.contains("!["),
+                       "A thumb-less block invented an image line:\n\(serialized)")
     }
 
     // MARK: - Insert block seam
@@ -303,9 +381,10 @@ final class BlockChipTests: XCTestCase {
     /// `W3.notes-chip-header-needs-a-line-break`, which is why two defects in it were found by
     /// accident rather than by the suite.
     ///
-    /// The `thumb:` shape is deliberately absent: `serializeBlockHeader` re-emits the thumb line that
-    /// is ALSO still in the block body, so that shape grows a duplicate `![…](…)` on every pass. That
-    /// is a separate pre-existing defect (`W3.notes-thumb-line-duplicates`), not this one.
+    /// The `thumb:` shape was excluded here until `W3.notes-thumb-line-duplicates` was fixed: the
+    /// serializer re-emitted the thumb line the body already carried, so that one shape grew a
+    /// duplicate `![…](…)` on every pass. It is in the table now, and that is this table's job — the
+    /// growth was invisible to every other assertion in the class, all of which use `contains`.
     func testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint() {
         let cases: [(name: String, md: String)] = [
             ("body without a trailing newline", """
@@ -358,6 +437,29 @@ final class BlockChipTests: XCTestCase {
 
                 Body two.
                 """),
+            // W3.notes-thumb-line-duplicates — the shape this table used to exclude. The body opens
+            // with the block's own `![display](thumb)` line, which the serializer also emitted from
+            // `thumbRef`: two copies on the first pass, three on the second, unbounded.
+            ("thumb block, image line in the body", """
+                <!-- block: reader-page
+                     link: archivereader://reveal?root=ABC&rel=doc.pdf&page=1
+                     display: "Doc p.1"
+                     page: 1
+                     thumb: assets/p1.png -->
+                ![Doc p.1](assets/p1.png)
+
+                Annotation.
+                """),
+            // …and the same block with nothing but the thumb line, which is what a freshly pasted
+            // Reader link becomes once it has been saved.
+            ("thumb block, no other body", """
+                <!-- block: reader-page
+                     link: archivereader://reveal?root=ABC&rel=doc.pdf&page=2
+                     display: "Doc p.2"
+                     page: 2
+                     thumb: assets/p2.png -->
+                ![Doc p.2](assets/p2.png)
+                """),
         ]
 
         for (name, md) in cases {
@@ -407,6 +509,14 @@ final class BlockChipTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// How many times `needle` appears in `haystack`. Counting is the point for
+    /// `W3.notes-thumb-line-duplicates`: `contains` is blind to a line written twice, which is how a
+    /// defect that doubled a note's thumbnail on every save survived a suite that round-trips blocks
+    /// constantly.
+    private func occurrences(of needle: String, in haystack: String) -> Int {
+        haystack.components(separatedBy: needle).count - 1
+    }
 
     /// True when every `<!-- block:` in `md` begins a line — the precondition `BlockParser.parse`
     /// applies before it will treat one as a header at all.

@@ -393,7 +393,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         func insertBlock(kind: Block.Kind = .readerPage, anchor: SourceAnchor) {
             guard let textView, !currentIsRaw else { return }
             let chipStr = MarkdownBridge.buildInsertableBlock(
-                kind: kind, anchor: anchor, fontSize: currentFontSize,
+                kind: kind, anchor: anchor, fontSize: currentFontSize, assetStore: assetStore,
                 onReveal: onRevealBlock, onPreview: onPreviewBlock
             )
             textView.undoManager?.beginUndoGrouping()
@@ -420,9 +420,12 @@ struct MarkdownEditorView: NSViewRepresentable {
                         entry.anchor.thumbRef = ref
                     }
                 }
+                // W3.notes-thumb-line-duplicates — the imported thumbnail's `![…](…)` line is written
+                // into the body HERE (the only place that authors it), so pass the store that just
+                // took the bytes: it resolves the ref to the very image it wrote.
                 let chipStr = MarkdownBridge.buildInsertableBlock(
                     kind: entry.kind, anchor: entry.anchor, fontSize: currentFontSize,
-                    onReveal: onRevealBlock, onPreview: onPreviewBlock
+                    assetStore: assetStore, onReveal: onRevealBlock, onPreview: onPreviewBlock
                 )
                 textView.insertText(chipStr, replacementRange: textView.selectedRange())
             }
