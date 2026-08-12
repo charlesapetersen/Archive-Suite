@@ -16,6 +16,56 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Autonomous daemon — document budgets (owner, 2026-08-12)
+
+- [x] **`W30.docheal` — the daemon self-heals a document overage instead of parking, and the budgets stop being
+  arbitrary.** Owner: *"This keeps happening and I really want to fix it… if it could self heal that would be
+  great."* Two separate defects, one symptom.
+  **(1) The self-heal was file-blind.** `health_gate()`'s document self-repair (added 2026-08-10 on the owner's
+  *"we want it to fix itself"*) was gated on `-x "$COMPACTOR"` — *a compactor exists* — never on *the compactor
+  owns the failing file*. `compact-plan.sh` rewrites `.maintenance/AUTONOMOUS_PLAN.md` and nothing else, so for
+  the other eight budgeted documents the outcome was fixed in advance: run a compactor that cannot touch the
+  file, re-gate, still RED, park. It fired twice for real — 2026-08-06 (`execution-plans/despotlight.md` at
+  110%) and 2026-08-12 01:25 (the umbrella `CLAUDE.md`, 1,682 B over) — and the second burned **61 m 33 s across
+  three full build+test gate runs**, VM UITest lane included, to rediscover a `wc -c` result. Contributing: the
+  publication rewrite (`W29.pub*`) destroyed the last-green SHA in `$STATE/last-gate`, so the gate read its
+  fail-open sentinel and was DUE every cycle — with a document over budget it could never go green again.
+  **Fix:** `doc_pregate()` runs the pure-shell budget check *before* the gate is launched and dispatches on the
+  FILE — the compactor for the one file it owns; a bounded **session** (via `$STATE/doc-budget-fix`, read at
+  STEP 1.5 of `resume-prompt.txt`) for the prose guides, `SUITE_TODO.md`, an execution plan or the prompt
+  itself. The gate is deferred for that cycle, not skipped. A file at ≥`ACT_PCT` (93%) gets the same trim
+  pre-emptively so OVER is never reached. Park remains the backstop after `AUTONOMOUS_DOCFIX_MAX` (3) failed
+  attempts, with a note saying both remedies were already tried — and **an attempt is counted by HEAD moving,
+  not per cycle** (owner: *"this is a laptop and I'm moving around throughout the day opening and closing the
+  machine"*). Cycle-counting would have let three lid-closes park the run over a trim no session ever attempted;
+  a killed session commits nothing, so it costs nothing. Growth projections taken the same day also caught a
+  live gap on the total-overage path: a total can exceed its budget with *no* file over (that is rule 1), so the
+  OVER list is empty there and the request would have named no file at all — now it names the trackers the
+  report itself prescribes. At `SUITE_TODO.md`'s measured +2.8 KB/day the total reaches its budget in ~3 weeks,
+  so that path was weeks away, not hypothetical. The request goes to a state file, **not** the
+  WORK QUEUE, because queue entries are compared to `SUITE_TODO.md` by `check-tracker-sync.sh` every gate and an
+  auto-appended one would manufacture exactly the drift that guard exists to catch.
+  **(2) The budgets were arbitrary, and that decided which file failed first.** The 2026-08-04 set was
+  "today's size, rounded up": the headroom that fell out ranged from **+13%** (`ArchiveProcessor/CLAUDE.md`) to
+  **+66%** (`ArchiveReader/CLAUDE.md`), and all three app guides got the same `64000` despite measuring 38K /
+  56K / 54K. So the file that parked the run was the one that drew the thinnest arbitrary slack, not the one
+  that cost anything — `CLAUDE.md` is 5.9% of a session's orientation read, while `SUITE_TODO.md` sat at 91% of
+  a budget ten times larger, free to add ten times as many tokens in silence. Re-derived on two stated rules:
+  the **per-session orientation TOTAL** is the cost control (`ORIENT_TOTAL`, 500000 B ≈ 125k tokens, deliberately
+  tighter than the 518000 sum of its parts so aggregate creep still fails), and a file's budget reflects **how
+  expensive it is to get back under it** — tight where a script can fix it (`AUTONOMOUS_PLAN.md` 150000),
+  middling where a convention can (`SUITE_TODO.md` 205000), roomy where only editorial judgement can (the
+  guides; one number for all three app guides, derived from the largest rather than a round figure).
+  **`CLAUDE.md` 24000 → 34000 is evidence-based, and the evidence is the argument against cosmetic trimming:** a
+  trim was attempted first, on the fattest target in the file (the signing bullet, whose full narrative already
+  lives in this file under *Signing + TCC consent* by its own pointer). Removing every line that was narrative
+  rather than an imperative or a ⛔ constraint recovered **89 bytes**. The document is not bloated; the number
+  was wrong, and the "fix" it demanded would have been 93 bytes of theatre to dodge a warn.
+  Proofs: `ops/autonomous/tests/prove-context-budget.sh` (new, wired as the gate's `budget-contract` step — it
+  also statically asserts the total stays tighter than the sum of its parts, which nothing else enforced) and
+  `tests/prove-daemon.sh` §28a–g. Shipped 2026-08-12.
+
+
 ## Open-sourcing the repo (owner, 2026-08-11)
 
 > **Every commit hash quoted below, and everywhere else in this file, predates the 2026-08-12 history

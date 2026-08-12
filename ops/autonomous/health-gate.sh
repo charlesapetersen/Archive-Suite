@@ -189,6 +189,14 @@ bash "$ROOT/ops/autonomous/check-todo-stubs.sh" || true
 # When it REDs, fix the DOCUMENT, not the budget — per-file remedies are in context-budget.sh's header.
 step context-budget bash "$ROOT/ops/autonomous/context-budget.sh" "$ROOT"
 
+# …and prove the guard still speaks the language the daemon parses. Since 2026-08-12 the doc pre-gate
+# (doc_pregate() in archive-suite-autonomous.sh) reads context-budget.sh's `context-budget: OVER|NEAR|TOTAL …`
+# lines to decide WHICH remedy to run — so a renamed field no longer just looks different to a human, it means
+# the pre-gate finds no over-budget file, queues no trim, and the run parks for the exact problem the pre-gate
+# exists to absorb. This also statically asserts rule 1 (ORIENT_TOTAL stays tighter than the sum of the
+# per-file budgets); raise a budget without re-checking that and aggregate creep silently stops being guarded.
+step budget-contract bash "$ROOT/ops/autonomous/tests/prove-context-budget.sh"
+
 # compact-plan.sh is the ONLY thing keeping the plan's orientation cost bounded, so its correctness is a gate
 # concern, not a nicety. On 2026-08-06 it was found to have been ABORTING Pass 1 on EVERY cycle for weeks: the
 # live plan's '## Daemon Report' header had no blank line before it, so the Session Log region ran to EOF and

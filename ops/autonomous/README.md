@@ -165,6 +165,36 @@ that anything broke, and the daemon already runs the compactor every cycle — s
 was already attempted, so you are not sent to hand-run a tool the daemon just ran). ⛔ A **code** RED, or any
 **mixed** RED, is never self-repaired — that is exactly what parking is for. `AUTONOMOUS_GATE_SELFHEAL=0` disables it.
 
+**⚠️ That self-repair only ever covered ONE of the nine budgeted documents — fixed 2026-08-12 by the DOC
+PRE-GATE (WS13).** Its precondition was *"a compactor exists"*, not *"the compactor owns the failing file"*, and
+`compact-plan.sh` rewrites `.maintenance/AUTONOMOUS_PLAN.md` and nothing else. So for the other eight documents
+the sequence was fixed in advance: run a compactor that cannot touch the file → re-gate → still RED → park. It
+fired twice for real — 2026-08-06 (`execution-plans/despotlight.md` at 110%) and **2026-08-12 01:25** (the
+umbrella `CLAUDE.md`, 1,682 B over) — and the second burned **61 minutes across three full build+test gate
+runs**, VM UITest lane included, to rediscover a `wc -c` result. `doc_pregate()` now runs the pure-shell budget
+check **before the gate is ever launched** (milliseconds) and dispatches on the FILE:
+
+| over-budget document | remedy | cost |
+|---|---|---|
+| `.maintenance/AUTONOMOUS_PLAN.md` | `compact-plan.sh`, in-cycle | free, no session, genuinely self-healing |
+| anything else (prose guides, `SUITE_TODO.md`, an execution plan, this prompt) | hand it to the next **session** as its one bounded item, via `$STATE/doc-budget-fix` (STEP 1.5 of `resume-prompt.txt`) | one session; **no park** |
+
+It writes that request file rather than appending to the WORK QUEUE deliberately: queue entries are compared
+against `SUITE_TODO.md` by `check-tracker-sync.sh` on every gate, so auto-appending one would manufacture the
+exact drift that guard exists to catch. When a document is over, the gate is **deferred** for that cycle (it
+would RED on the very file being fixed, and the older self-heal above would then park for it); the cadence is
+commit-based, so the gate is still due next cycle. **Park is still the backstop, just not the first move:**
+after `AUTONOMOUS_DOCFIX_MAX` (default 3) attempts fail to bring the docs under, it parks with a
+note saying both remedies were already tried — which, after three sessions, usually means the *budget* is wrong
+rather than the document. **An attempt is counted by HEAD MOVING, not per cycle** (owner, 2026-08-12: *"this is
+a laptop and I'm moving around throughout the day opening and closing the machine"*). A lid close kills the
+in-flight session; counting cycles would let three such interruptions park the run over a trim no session ever
+got a fair run at — the false-park class `GATE_MAX_TIMEOUTS` and `MAX_NOCOMPLETE` are both shaped to avoid. A
+session that commits nothing costs nothing; and if HEAD never moves there is no new code to gate either, so
+deferring the gate indefinitely is harmless. A `NEAR` file (≥`ACT_PCT`, default 93%) gets the same trim **pre-emptively**, so the
+OVER state is not reached at all. `AUTONOMOUS_DOC_PREGATE=0` disables the whole layer.
+Contract proof: `tests/prove-context-budget.sh` (a gate step) + `tests/prove-daemon.sh` §28a–g.
+
 The gate is deterministic (build/test), so the **daemon runs it directly** — no session, no LLM. Default checks are **free**: build all
 three apps + Reader/Notes **unit** suites + the write-surface lint and four other hermetic script gates + a
 coherence check (clean tree); `AUTONOMOUS_GATE_OCR=1` adds the paid Processor OCR smoke.

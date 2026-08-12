@@ -28,6 +28,33 @@ STEP 1 — RECOVER STATE (always, first):
   releases / SPEC / real-corpus / HIGH-risk findings) and `(blocked-on:)`-dependent items — both below.
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
+STEP 1.5 — DOC BUDGET FIX (only when the daemon has asked for one — it PREEMPTS the work queue):
+  Look for `~/.local/state/archive-autonomous/doc-budget-fix`. Absent is the normal case: skip to STEP 2.0.
+  If it EXISTS, a guarded document is at or over its size budget, and bringing it back under is your ONE item
+  this session — do NOT also pick a queue item. Line 1 is REQUIRED (something is OVER; the health gate stays
+  RED until it is under) or ADVISORY (nothing is over yet, but it is close enough that trimming now is what
+  prevents a park). `FILES:` names them; the rest is the `context-budget.sh` report with every size and budget.
+  ⛔ THE ANSWER IS ALMOST NEVER "RAISE THE BUDGET". The header of `ops/autonomous/context-budget.sh` states how
+  every number was derived and gives the per-file remedy. In short:
+    * `.maintenance/AUTONOMOUS_PLAN.md` — the daemon ran `compact-plan.sh` BEFORE asking you, so if this is
+      still listed the compactor no-op'd. Find out why; that has been the bug twice (see its header).
+    * `SUITE_TODO.md` — move shipped `[x]` entries into `SUITE_TODO_DONE.md`, whole entry, per the convention.
+    * `execution-plans/*.md` — a SHIPPED plan is DELETED (git keeps the history). One still in flight gets its
+      shipped sections tombstoned: a few lines naming the commit, keeping only the facts other sections or
+      live code still cite by number.
+    * a prose guide (`CLAUDE.md`, `AGENTS.md`, an app guide, this prompt) — fold reference detail into that
+      app's `KNOWN_ISSUES.md` / `README.md` and keep the map tight. ⛔ Do NOT delete a live directive, an owner
+      decision or a warning to save bytes: move DETAIL, never MEANING. A guide that has been trimmed into
+      uselessness costs far more than the tokens it saved.
+  Raising a budget IS legitimate when the document is genuinely doing its job and the number is simply wrong —
+  the 2026-08-04 numbers were "today's size, rounded up", and one of them parked a run. If you raise one, say
+  why in the commit message and check the PER-SESSION ORIENTATION total still holds.
+  Then, in the SAME commit-and-push turn, `rm ~/.local/state/archive-autonomous/doc-budget-fix` and STOP
+  (STEP 6). Leaving it re-asks the next session, and the daemon parks after 3 attempts that COMMITTED work
+  without clearing it (an attempt is counted by HEAD moving, so a session killed mid-run — a closed laptop lid,
+  a usage cutoff, a watchdog — costs nothing and does not push the run toward a park).
+  Verify before you delete it (instant, pure shell):  ./ops/autonomous/context-budget.sh
+
 STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `ops/autonomous/next-review-unit.sh`.
   ⏸ PAUSED (owner directive 2026-07-29): paced code reviews are DISABLED at the source — the script's master
   switch makes it ALWAYS report `none due` / exit 3, so in practice this step is a no-op and you go straight to

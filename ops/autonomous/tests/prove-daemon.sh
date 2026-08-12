@@ -131,11 +131,14 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_GATE_MAX_TIMEOUTS="${GATE_MAX_TIMEOUTS:-2}" \
   AUTONOMOUS_STATUS_CMD="${STATUS_CMD:-$T/status-stub.sh}" \
   AUTONOMOUS_COMPACTOR="${COMPACTOR:-$T/no-such-compactor}" \
+  AUTONOMOUS_DOC_PREGATE="${DOC_PREGATE:-0}" \
+  AUTONOMOUS_BUDGET_CMD="${BUDGET_CMD:-$T/no-such-budget}" \
+  AUTONOMOUS_DOCFIX_MAX="${DOCFIX_MAX:-3}" \
   AUTONOMOUS_HB_POLL=1 \
     bash "$DAEMON" >/dev/null 2>&1 &
   local pid=$!; echo "$pid" >> "$T/daemon.pids"; echo "$pid"   # record for the leak-proof EXIT reaper
 }
-reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md"; }
+reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md" "$STATE/doc-budget-fix" "$STATE/doc-budget-tries" "$STATE/doc-budget-head"; }
 stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; }   # (dropped no-op `pkill -f provetest`; label is env, not argv)
 run_daemon() { reset_state; local p; p=$(launch "$1"); sleep "$2"; stop "$p"; echo "$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
@@ -500,6 +503,160 @@ echo "1:no" > "$CTRL"; write_plan; dfset 999999; rm -f "$STATE/STATUS.md"
 L=$(run_daemon 5 22)
 grep -q 'PARKED' "$L" && [ -s "$STATE/STATUS.md" ] && ok "STATUS.md refreshed at park" || bad "STATUS.md not refreshed on park"
 grep -qE 'parked=.*(progress|blocked)' "$STATE/STATUS.md" 2>/dev/null && ok "park flag passed to the digest" || bad "park flag not passed ($(cat "$STATE/STATUS.md" 2>/dev/null | tr -d '\n'))"
+
+
+# ================= WS13 — the DOC PRE-GATE (2026-08-12) =================
+# WHY THESE EXIST. Until 2026-08-12 a document over budget went: gate RED -> retry the WHOLE gate -> run a
+# compactor that could only ever fix ONE of the nine budgeted files -> gate a THIRD time -> PARK. It fired
+# twice for real (2026-08-06 despotlight.md at 110%, 2026-08-12 CLAUDE.md at 107%) and the 2026-08-12 instance
+# burned 61 minutes on three full build+test runs to rediscover a `wc -c` result. The pre-gate checks the
+# budgets BEFORE the gate is launched and dispatches per FILE: the compactor for the one file it owns, and a
+# bounded SESSION for everything else. It must never park on the first failure, and must still park eventually.
+BUDGET_STUB="$T/budget-stub.sh"
+# Stub protocol: reads $T/budget.state for the machine lines to emit, exits 1 if any OVER/TOTAL OVER is present.
+cat > "$BUDGET_STUB" <<'BSTUB'
+#!/bin/sh
+s="$(cat "$BSTATE" 2>/dev/null)"
+echo "  (stub context-budget report)"
+printf '%s\n' "$s"
+printf '%s' "$s" | grep -qE '^context-budget: (OVER|TOTAL OVER)' && exit 1
+exit 0
+BSTUB
+chmod +x "$BUDGET_STUB"
+bstate() { printf '%s\n' "$1" > "$T/budget.state"; }
+# The stub needs $BSTATE in its env; launch() rebuilds the env explicitly, so bake the path in via a wrapper.
+cat > "$T/budget-cmd.sh" <<WCMD
+#!/bin/sh
+BSTATE="$T/budget.state" exec "$BUDGET_STUB" "\$@"
+WCMD
+chmod +x "$T/budget-cmd.sh"
+DOCFIX="$STATE/doc-budget-fix"
+
+echo "[28a] WS13 — a doc OVER budget must NOT park on the first failure; it hands a trim to a session"
+# The single most important assertion here: the old code parked. This must not.
+# ⚠️ DOCFIX_MAX is raised out of the way ON PURPOSE. The stub budget script reports the same overage forever
+# (nothing in this harness ever trims a file), and AUTONOMOUS_INTERVAL is 1s, so a 10-second run makes ~4-8
+# attempts — with the default cap of 3 the daemon reaches its park BACKSTOP legitimately, and then clears
+# $DOCFIX on the way out. The first cut of this case asserted "did not park" against that and failed itself:
+# it was measuring the backstop, which is [28f]'s job. Keep the two separate — this case is about the FIRST
+# overage, so the cap must not be reachable within the window.
+bstate "context-budget: OVER CLAUDE.md 25682 24000
+context-budget: TOTAL OK 434506 500000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" DOC_PREGATE=1 DOCFIX_MAX=99 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 10)
+grep -q 'doc pre-gate: OVER budget' "$L" && ok "pre-gate noticed the over-budget document" || bad "pre-gate did not report the overage"
+grep -q 'PARKED' "$L" && bad "PARKED on the first document overage — the whole point of WS13 is that it does not" || ok "did NOT park on the first overage"
+[ -f "$DOCFIX" ] && ok "wrote the fix request a session reads ($DOCFIX)" || bad "no fix request written"
+head -1 "$DOCFIX" 2>/dev/null | grep -q '^REQUIRED' && ok "the request is marked REQUIRED (something is over)" || bad "request not marked REQUIRED"
+grep -q '^FILES: CLAUDE.md' "$DOCFIX" 2>/dev/null && ok "the request NAMES the over-budget file" || bad "request does not name the file ($(cat "$DOCFIX" 2>/dev/null | tr '\n' '|'))"
+grep -q 'health gate DEFERRED' "$L" && ok "DEFERRED the expensive gate (it would RED on the doc being fixed)" || bad "ran the gate anyway — it will RED and park for the document"
+grep -q 'launching fresh' "$L" && ok "still launched a session (the trim is the session's work)" || bad "no session launched, so nothing will do the trim"
+# …and the claim it must NOT make: this check runs before any build, so it cannot speak to code health.
+grep -q 'NOTHING IS WRONG WITH THE CODE' "$L" && bad "the pre-gate asserted the code is fine, having run no build at all" || ok "makes no unearned claim about the code"
+
+echo "[28b] WS13 — the one file a SCRIPT can fix is fixed in-cycle, with no session and no park"
+# AUTONOMOUS_PLAN.md is the compactor's file. Stub: over, then clean once the compactor has run.
+printf '#!/bin/sh\nprintf "context-budget: TOTAL OK 1 2\\n" > "%s"\necho ran >> "%s"\nexit 0\n' \
+  "$T/budget.state" "$T/compacted2.marker" > "$T/compactor2.sh"; chmod +x "$T/compactor2.sh"
+rm -f "$T/compacted2.marker"
+bstate "context-budget: OVER .maintenance/AUTONOMOUS_PLAN.md 190000 150000
+context-budget: TOTAL OK 434506 500000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" COMPACTOR="$T/compactor2.sh" run_daemon 0 8)
+# Assert the DISPATCH DECISION from the log, for the same reason as [28c]: the between-cycles housekeeping
+# compaction (archive-suite-autonomous.sh:1169) runs $COMPACTOR every cycle regardless, so a bare marker check
+# would pass here even if the pre-gate had done nothing at all — a vacuously green assertion.
+grep -q 'AUTONOMOUS_PLAN.md is over — running the compactor' "$L" && ok "dispatched the compactor for the file it actually owns" || bad "pre-gate never dispatched the compactor for an AUTONOMOUS_PLAN.md overage"
+[ -f "$T/compacted2.marker" ] && ok "…and the compactor really executed (marker written, not just logged)" || bad "compactor never executed"
+grep -q 'fixed it itself' "$L" && ok "reported a genuine in-cycle self-heal" || bad "did not report self-healing"
+[ -f "$DOCFIX" ] && bad "asked a session to fix what the compactor already fixed" || ok "no session hand-off needed"
+grep -q 'PARKED' "$L" && bad "parked after successfully self-healing" || ok "did not park"
+
+echo "[28c] WS13 — the compactor is NOT run AS A REPAIR for a file it cannot fix (the 2026-08-12 bug, directly)"
+# This is the defect the park exposed: the old precondition was "a compactor exists", not "the compactor owns
+# the failing file", so compact-plan ran against a CLAUDE.md overage and a third full gate run was wasted.
+# ⚠️ ASSERT ON THE LOG, NOT ON A MARKER FILE. The daemon calls $COMPACTOR in THREE places, and one of them
+# (archive-suite-autonomous.sh:1169) is the routine between-cycles housekeeping compaction that runs every
+# cycle no matter what is over budget. So a "did the compactor execute?" marker is TRUE every cycle and cannot
+# distinguish a wrong repair from normal housekeeping — the first cut of this case asserted exactly that and
+# failed itself. What must not happen is the pre-gate DISPATCHING it as the remedy for a file it cannot touch,
+# and that decision is what the log line records.
+rm -f "$T/compacted2.marker"
+bstate "context-budget: OVER CLAUDE.md 25682 24000
+context-budget: TOTAL OK 434506 500000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=99 BUDGET_CMD="$T/budget-cmd.sh" COMPACTOR="$T/compactor2.sh" run_daemon 0 8)
+grep -q 'running the compactor' "$L" && bad "dispatched compact-plan as the repair for a CLAUDE.md overage — it can only rewrite AUTONOMOUS_PLAN.md, so this is the wasted-gate-run bug" || ok "did not dispatch the compactor for a file it cannot fix"
+grep -q 'handed the trim to the next session' "$L" && ok "chose the remedy that CAN fix a prose guide (a session)" || bad "did not hand the trim to a session either — the overage has no remedy at all"
+
+echo "[28d] WS13 — NEAR budget (nothing over) queues a PRE-EMPTIVE trim and does NOT defer the gate"
+bstate "context-budget: NEAR SUITE_TODO.md 195000 205000
+context-budget: TOTAL OK 434506 500000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 8)
+[ -f "$DOCFIX" ] && ok "queued a pre-emptive trim before anything went over" || bad "no advisory request written"
+head -1 "$DOCFIX" 2>/dev/null | grep -q '^ADVISORY' && ok "marked ADVISORY (nothing is over yet)" || bad "not marked ADVISORY ($(head -1 "$DOCFIX" 2>/dev/null))"
+grep -q 'health gate DEFERRED' "$L" && bad "deferred the gate for a file that is merely NEAR its budget" || ok "did not defer the gate on a NEAR"
+grep -q 'PARKED' "$L" && bad "parked on a NEAR" || ok "did not park on a NEAR"
+
+echo "[28e] WS13 — all clear CLEARS a satisfied request, so a fixed document cannot re-ask forever"
+bstate "context-budget: TOTAL OK 100 500000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+reset_state; printf 'REQUIRED\nFILES: CLAUDE.md\n' > "$DOCFIX"; echo 2 > "$STATE/doc-budget-tries"
+P=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" launch 0); sleep 7; stop "$P"; L="$STATE/daemon.log"
+[ -f "$DOCFIX" ] && bad "left a satisfied fix request in place — every future session would burn itself on it" || ok "cleared the satisfied request"
+[ -f "$STATE/doc-budget-tries" ] && bad "left the attempt counter, so an unrelated later overage starts pre-charged toward a park" || ok "cleared the attempt counter"
+
+echo "[28f] WS13 — PARK IS STILL THE BACKSTOP: after DOCFIX_MAX failed attempts it parks, and says both remedies were tried"
+# Without this the daemon would queue a trim forever for a document no session can fix (usually a wrong budget).
+bstate "context-budget: OVER CLAUDE.md 25682 24000
+context-budget: TOTAL OK 434506 500000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" DOCFIX_MAX=1 run_daemon 0 14)
+grep -q 'PARKED (documents over budget after 1 trim attempts' "$L" && ok "parks once the attempt cap is hit" || bad "never parked despite exceeding DOCFIX_MAX ($(grep -c 'handed the trim' "$L") hand-offs)"
+grep -q 'compact-plan.sh ran (it can only shrink' "$L" && ok "the note says WHY the mechanical remedy could not help" || bad "note does not explain the compactor's scope"
+grep -q 'BUDGET is wrong rather than the document' "$L" && ok "the note names the likeliest real cause after repeated failures" || bad "note offers no diagnosis"
+grep -q 'context-budget.sh' "$L" && ok "points at the remedy + the derivation of the numbers" || bad "no pointer to context-budget.sh"
+
+echo "[28h] WS13 — a TOTAL overage with NO per-file OVER still names something actionable"
+# Rule 1 means the sum can exceed its budget while every individual file is inside its own — so the OVER list
+# is legitimately EMPTY here and a naive "FILES: $over" hands a session a request naming nothing. Not
+# hypothetical: growth projections on 2026-08-12 put the total at its budget in ~3 weeks (SUITE_TODO.md alone
+# grows ~2.8 KB/day), so this is a path the daemon WILL take.
+bstate "context-budget: WARN SUITE_TODO.md 200000 205000
+context-budget: TOTAL OVER 520000 500000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=99 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 8)
+[ -f "$DOCFIX" ] && ok "a total-only overage still produces a fix request" || bad "no request written for a total overage"
+head -1 "$DOCFIX" 2>/dev/null | grep -q '^REQUIRED' && ok "marked REQUIRED (the gate will stay RED)" || bad "total overage not marked REQUIRED"
+# The assertion that matters: the FILES line must never be empty.
+grep -qE '^FILES: *$' "$DOCFIX" 2>/dev/null && bad "FILES: is EMPTY — the session is told to fix nothing in particular" || ok "FILES: names a target rather than being blank"
+grep -q 'ORIENTATION TOTAL' "$DOCFIX" 2>/dev/null && ok "says it is the TOTAL, not one file" || bad "does not explain that the total is what is over"
+grep -q 'SUITE_TODO.md' "$DOCFIX" 2>/dev/null && ok "points at a tracker, which is the report's own remedy" || bad "no tracker named as the target"
+grep -q 'PARKED' "$L" && bad "parked on a total overage instead of queueing the trim" || ok "did not park"
+
+echo "[28i] WS13 — THE LAPTOP CASE: sessions that commit nothing must NEVER push the run toward a park"
+# Owner, 2026-08-12: "this is a laptop and I'm moving around throughout the day opening and closing the
+# machine." A lid close kills the in-flight session. If an attempt were counted per CYCLE, $DOCFIX_MAX such
+# cycles would park the run over a trim no session ever got a fair run at — a false park. An attempt is
+# therefore counted only when HEAD MOVES. Here the stub commits NOTHING ("0:no"), which is what a killed
+# session looks like from the outside, and DOCFIX_MAX is 1 — the most hostile setting available. It must
+# still not park, however many cycles run.
+bstate "context-budget: OVER CLAUDE.md 25682 24000
+context-budget: TOTAL OK 434506 500000"
+echo "0:no" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 16)
+grep -q 'PARKED' "$L" && bad "PARKED after cycles that committed nothing — a laptop lid close would now stop the run over an unattempted trim" || ok "does not park when no session ever committed"
+grep -q 'not counting it' "$L" && ok "logged that an empty/killed session was NOT counted as an attempt" || bad "silently counted (or never re-checked) a session that did nothing"
+[ "$(cat "$STATE/doc-budget-tries" 2>/dev/null)" = "1" ] && ok "the attempt counter stayed at 1 across several cycles" || bad "counter drifted to '$(cat "$STATE/doc-budget-tries" 2>/dev/null)' without any commit"
+# …and the contrast is [28f], where sessions DO commit: there HEAD moves, attempts count, and it parks.
+
+echo "[28g] WS13 — the pre-gate can be turned OFF, and then the old gate path is untouched"
+bstate "context-budget: OVER CLAUDE.md 25682 24000"
+echo "0:yes" > "$CTRL"; write_plan; dfset 999999
+L=$(GATE_EVERY=0 DOC_PREGATE=0 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 6)
+grep -q 'doc pre-gate' "$L" && bad "the pre-gate ran with AUTONOMOUS_DOC_PREGATE=0" || ok "AUTONOMOUS_DOC_PREGATE=0 disables it completely"
+[ -f "$DOCFIX" ] && bad "wrote a fix request while disabled" || ok "writes nothing while disabled"
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="

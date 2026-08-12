@@ -116,6 +116,27 @@ GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts 
 # parking; 0 = park immediately as before. CODE and MIXED reds are never self-repaired regardless.
 GATE_SELFHEAL="${AUTONOMOUS_GATE_SELFHEAL:-1}"
 
+# DOC PRE-GATE (WS13, 2026-08-12) — the document budgets are checked BEFORE the expensive gate, and repaired
+# per-file. 1 = on. See doc_pregate() for the full rationale; the short version is that the gate's own
+# self-heal above could only ever fix ONE of the nine budgeted documents, so for the other eight it parked.
+DOC_PREGATE="${AUTONOMOUS_DOC_PREGATE:-1}"
+BUDGET_CMD="${AUTONOMOUS_BUDGET_CMD:-$REPO/ops/autonomous/context-budget.sh}"   # overridable (harness stubs it)
+DOCFIX="$STATE/doc-budget-fix"          # the fix request a session reads as its one bounded item
+DOCFIX_TRIES="$STATE/doc-budget-tries"  # failed trim attempts; park at $DOCFIX_MAX
+DOCFIX_HEAD="$STATE/doc-budget-head"    # HEAD at the last COUNTED attempt — see the laptop note below
+# How many sessions may fail to bring the docs under budget before this parks. 3 not 1: a trim is judgement
+# work and the first attempt can legitimately under-cut. 0 disables the park backstop entirely (don't — a
+# document no session can fix, e.g. one whose budget is simply wrong, would then loop forever).
+DOCFIX_MAX="${AUTONOMOUS_DOCFIX_MAX:-3}"
+# ⚠️ AN ATTEMPT IS COUNTED BY COMMIT, NOT BY CYCLE (owner, 2026-08-12: "this is a laptop and I'm moving around
+# throughout the day opening and closing the machine"). Counting cycles was wrong for exactly that reason: a lid
+# close kills the in-flight session, the next cycle finds the document still over, and after $DOCFIX_MAX such
+# cycles the daemon would park over a trim NO SESSION EVER GOT A FAIR RUN AT — a false park, which is the
+# failure class GATE_MAX_TIMEOUTS and MAX_NOCOMPLETE are both shaped to avoid. So an attempt only counts when
+# HEAD has MOVED since the last counted one: a session that actually ran and committed something, yet left the
+# document over budget, has had its chance. A sleep-killed session commits nothing, so it costs nothing. If HEAD
+# never moves there is no new code to gate either, so deferring the gate indefinitely is harmless.
+
 # STATUS — the daemon rewrites $STATE/STATUS.md each cycle + on park so a check-in is a few seconds of
 # reading: is it running, what has it done, how much is left, is the code healthy, does it need the owner.
 # ONE renderer (ops/autonomous/status-digest.sh), shared with `daemon.sh status`; it suppresses colour when
@@ -468,6 +489,159 @@ _classify_red() {
       *)                                     has_code=1 ;;
     esac
   done
+}
+
+# ---- DOC PRE-GATE (WS13, 2026-08-12) -------------------------------------------------------------------
+# WHY THIS EXISTS. The gate's document self-heal above (GATE_SELFHEAL, added 2026-08-10 on the owner's
+# "we don't want it to park when it hits the budget cap, we want it to fix itself") could only ever fix ONE of
+# the nine budgeted documents. Its only tool is $COMPACTOR — compact-plan.sh — which shrinks
+# .maintenance/AUTONOMOUS_PLAN.md and nothing else, and the dispatch never read WHICH file was over. So for the
+# other eight the sequence was: run a compactor that cannot touch the file, re-gate, still RED, park. That is
+# not a fallback, it is a guaranteed outcome, and it happened twice: 2026-08-06 (execution-plans/despotlight.md
+# at 110%) and 2026-08-12 01:25 (the umbrella CLAUDE.md, 1,682 bytes over — 5.9% of a session's orientation
+# read, while SUITE_TODO.md sat at 91% of a budget ten times larger). Each park cost the owner a morning, and
+# each burned up to THREE full 50-minute gate runs (initial + flake-retry + post-repair) to rediscover a fact
+# `wc -c` produces in milliseconds.
+#
+# WHAT IT DOES. Runs the pure-shell budget check BEFORE the gate is ever launched, and dispatches the remedy
+# the failing FILE actually needs:
+#   * .maintenance/AUTONOMOUS_PLAN.md -> $COMPACTOR. Mechanical, in-cycle, free. Genuinely self-healing.
+#   * every other document (the prose guides, SUITE_TODO.md, an execution plan, the resume prompt) -> NOT
+#     shell-fixable. Folding detail into KNOWN_ISSUES/README, or tombstoning a shipped plan section, is
+#     editorial judgement. So it hands the trim to the next SESSION as its one bounded item, via $DOCFIX.
+#     The daemon is a session runner; a doc trim is the same shape as every other item it works. NO PARK.
+#
+# WHY $DOCFIX AND NOT THE WORK QUEUE. WORK QUEUE entries are compared against SUITE_TODO.md by
+# check-tracker-sync.sh on every gate. Auto-appending one would manufacture precisely the tracker drift that
+# guard exists to catch, and the fix would trip a different document step on its way in.
+#
+# PARK IS STILL THE BACKSTOP — just no longer the first move. $DOCFIX_MAX consecutive failed attempts parks
+# with a note saying both remedies were already tried. Without that counter, a document no session can bring
+# under budget (most likely a budget that is simply wrong) would queue a trim forever.
+#
+# RETURNS: 0 = nothing to do, carry on to the gate · 11 = a trim is queued, SKIP the gate this cycle (it would
+# RED on a document problem already being fixed, and the gate's own self-heal would then park for it) ·
+# 9 = parked (caller stops the loop).
+_docfix_write() {   # $1 = REQUIRED|ADVISORY   $2 = space-separated file list   $3 = the budget report
+  # A TOTAL overage has NO per-file OVER by definition — every file can be inside its own budget while their
+  # sum is not (that is the whole point of rule 1 in context-budget.sh). So $2 is legitimately EMPTY on that
+  # path, and a bare "FILES:" would hand a session a request naming nothing to fix. Found 2026-08-12 by
+  # projecting growth: at ~+2.8 KB/day from SUITE_TODO.md the total reaches its budget in ~3 weeks, i.e. this
+  # is a path the daemon WILL take, not a hypothetical. Name the target the report itself prescribes.
+  local files="$2"
+  [ -n "$(printf '%s' "$files" | tr -d '[:space:]')" ] || \
+    files="(no single file is over — the PER-SESSION ORIENTATION TOTAL is. Shrink a TRACKER: .maintenance/AUTONOMOUS_PLAN.md or SUITE_TODO.md; together they are ~72% of it. Sizes are in the report below.)"
+  { echo "$1"
+    echo "# doc-budget fix request — written by the daemon's doc pre-gate at $(date '+%F %T')."
+    echo "# REQUIRED: a document is OVER budget. The health gate stays RED until it is back under."
+    echo "# ADVISORY: nothing is over YET; these are close enough that trimming now avoids a park later."
+    echo "FILES: $files"
+    echo "---- context-budget report ----"
+    printf '%s\n' "$3"
+  } > "$DOCFIX.tmp" 2>/dev/null && mv -f "$DOCFIX.tmp" "$DOCFIX" 2>/dev/null || rm -f "$DOCFIX.tmp" 2>/dev/null
+}
+# Parse one state out of the machine-readable block. $1 = report, $2 = OVER|NEAR|WARN.
+_budget_files() { printf '%s\n' "$1" | awk -v k="$2" '$1=="context-budget:" && $2==k {print $3}' | tr '\n' ' '; }
+_budget_total() { printf '%s\n' "$1" | awk '$1=="context-budget:" && $2=="TOTAL" {print $3; exit}'; }
+
+doc_pregate() {
+  [ "$DOC_PREGATE" = 1 ] || return 0
+  [ -x "$BUDGET_CMD" ] || { log "doc pre-gate: no budget script at $BUDGET_CMD — skipping (fail-open)."; return 0; }
+
+  local out over near tstate n
+  out="$("$BUDGET_CMD" "$REPO" 2>&1)"
+  over="$(_budget_files "$out" OVER)"; over="${over% }"
+  near="$(_budget_files "$out" NEAR)"; near="${near% }"
+  tstate="$(_budget_total "$out")"
+
+  # 1. Everything comfortably within budget — clear any stale request so a satisfied one can't loop.
+  if [ -z "$over" ] && [ -z "$near" ] && [ "$tstate" != "OVER" ]; then
+    if [ -f "$DOCFIX" ] || [ -f "$DOCFIX_TRIES" ]; then
+      log "doc pre-gate: every guarded document is within budget — clearing the pending fix request."
+      rm -f "$DOCFIX" "$DOCFIX_TRIES" "$DOCFIX_HEAD"
+    fi
+    return 0
+  fi
+
+  # 2. Nothing OVER, but something is NEAR its limit -> trim it PRE-EMPTIVELY, so OVER is never reached.
+  #    Rate-limited by the presence of a pending request: without that this would re-ask every cycle for a
+  #    file that is legitimately allowed to sit at 93% while a session gets to it.
+  if [ -z "$over" ] && [ "$tstate" != "OVER" ]; then
+    rm -f "$DOCFIX_TRIES" "$DOCFIX_HEAD"
+    [ -f "$DOCFIX" ] && return 0
+    _docfix_write ADVISORY "$near" "$out"
+    log "doc pre-gate: NEAR budget ($near) — queued a PRE-EMPTIVE trim; nothing is over, so the gate still runs."
+    return 0
+  fi
+
+  # 3. Something IS over.
+  # ⚠️ Word this CAREFULLY. The gate's park note says "NOTHING IS WRONG WITH THE CODE: every build and test
+  # suite in this gate PASSED", and an adversarial review on 2026-08-12 showed that sentence is a hardcoded
+  # consequence of the failing-set classification, NOT a measurement — it prints whenever the failing set is a
+  # subset of the document steps, so it would also print on a run where a test lane SKIPPED (rc=3, zero tests
+  # run) or KNOWN-FAILED (rc=4), since neither enters $fails. This pre-gate has even less standing to say it:
+  # it runs BEFORE any build, so it has measured exactly nothing about the code. State only what is true here —
+  # which document is over, and that the document guard is not a build or a test.
+  log "doc pre-gate: OVER budget (${over:-per-session orientation total}) — this is the document-SIZE guard, not a build or a test. Repairing before the gate runs."
+
+  # 3a. The mechanical remedy, where it applies. This is the one document a script can fix.
+  case " $over " in
+    *" .maintenance/AUTONOMOUS_PLAN.md "*)
+      if [ -x "$COMPACTOR" ]; then
+        log "doc pre-gate: AUTONOMOUS_PLAN.md is over — running the compactor (mechanical, in-cycle, no session)."
+        "$COMPACTOR" "$REPO" >>"$LOG" 2>&1 || log "doc pre-gate: compactor rc=$? — detail just above in this log."
+        out="$("$BUDGET_CMD" "$REPO" 2>&1)"
+        over="$(_budget_files "$out" OVER)"; over="${over% }"
+        tstate="$(_budget_total "$out")"
+      else
+        log "doc pre-gate: AUTONOMOUS_PLAN.md is over but no compactor at $COMPACTOR — falling through to a session."
+      fi ;;
+  esac
+  if [ -z "$over" ] && [ "$tstate" != "OVER" ]; then
+    log "doc pre-gate: back within budget after compaction — the daemon fixed it itself, no session needed."
+    rm -f "$DOCFIX" "$DOCFIX_TRIES" "$DOCFIX_HEAD"
+    return 0
+  fi
+
+  # 3b. What is left needs judgement. Hand it to the next session — and count the attempt ONLY if a session has
+  #     actually had a fair run since the last count, measured by HEAD moving (see the DOCFIX_HEAD note above:
+  #     on a laptop that sleeps, cycle-counting false-parks over trims nobody ever attempted).
+  local head_now head_last
+  head_now="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown)"
+  head_last="$(cat "$DOCFIX_HEAD" 2>/dev/null || true)"
+  n="$(cat "$DOCFIX_TRIES" 2>/dev/null)"; case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  if [ -z "$head_last" ]; then
+    # First time we have seen this overage: count it, and remember where HEAD was.
+    n=$(( n + 1 )); echo "$head_now" > "$DOCFIX_HEAD" 2>/dev/null || true
+    echo "$n" > "$DOCFIX_TRIES" 2>/dev/null || true
+  elif [ "$head_last" = "$head_now" ]; then
+    # No commit since the last counted attempt — the session was killed (lid close, usage cutoff, watchdog) or
+    # did nothing. It has not had its chance, so it does not burn one.
+    log "doc pre-gate: no commit since the last trim attempt — not counting it (a killed or empty session must not push this toward a park). Still at $n/$DOCFIX_MAX."
+  else
+    n=$(( n + 1 )); echo "$head_now" > "$DOCFIX_HEAD" 2>/dev/null || true
+    echo "$n" > "$DOCFIX_TRIES" 2>/dev/null || true
+  fi
+  if [ "$DOCFIX_MAX" -gt 0 ] && [ "$n" -gt "$DOCFIX_MAX" ]; then
+    rm -f "$DOCFIX_TRIES" "$DOCFIX" "$DOCFIX_HEAD"
+    park_run "documents over budget after $DOCFIX_MAX trim attempts" \
+      "Archive Suite autonomous run PARKED — a document has been OVER its size budget for $DOCFIX_MAX
+consecutive sessions and the trims did not bring it under. This is the document-SIZE guard: it measures bytes,
+so it is not a build or a test failure. (It also says nothing either way about the code — this check runs
+BEFORE the gate, so no build or suite has run at this point.)
+OVER BUDGET: ${over:-per-session orientation total}
+Both remedies have ALREADY been tried, so there is nothing left to hand-run:
+  * compact-plan.sh ran (it can only shrink .maintenance/AUTONOMOUS_PLAN.md);
+  * $DOCFIX_MAX sessions were given the trim as their one item and did not finish it.
+That pattern usually means the BUDGET is wrong rather than the document — see the header of
+ops/autonomous/context-budget.sh, which explains how each number was derived and what justifies raising one.
+Reproduce (instant, pure shell):  ./ops/autonomous/context-budget.sh
+Then restart it:  ./ops/autonomous/daemon.sh start"
+    return 9
+  fi
+  _docfix_write REQUIRED "$over" "$out"
+  log "doc pre-gate: handed the trim to the next session as its ONE item (attempt $n/$DOCFIX_MAX): ${over:-per-session orientation total}. Deferring the gate."
+  return 11
 }
 
 # Health gate (WS7). Returns: 9 = RED/park (caller stops the loop); 10 = ran GREEN (this cycle's work);
@@ -873,9 +1047,22 @@ tick() {
   #      the primary checkout. That's safe because only ONE daemon runs (launchd single-instance + daemon.sh's
   #      double-launch guard) and interactive sessions don't consult engine.lock; a concurrent second daemon
   #      is the only overlap risk, which those guards already preclude.
-  health_gate; local hg=$?
-  [ "$hg" = 9 ] && return 9
-  if [ "$hg" = 10 ]; then note_progress; return 0; fi
+  # 3b''. DOC PRE-GATE (WS13) — must run BEFORE health_gate, and that order is the whole point: the document
+  #       budgets are pure `wc -c` (milliseconds), so checking them here means a document problem is repaired,
+  #       or handed to a session, WITHOUT first spending up to 3 x GATE_MAXRUN of xcodebuild proving the code
+  #       is fine. It also means the gate never REDs on a document at all, which is what used to park the run.
+  doc_pregate; local dp=$?
+  [ "$dp" = 9 ] && return 9
+  if [ "$dp" = 11 ]; then
+    # A trim is queued. DEFER the gate rather than run it: it would RED on the very document being fixed, and
+    # health_gate()'s own self-heal would then park for it — the exact loop this pre-gate exists to break.
+    # The gate is not skipped, only postponed: its cadence is commit-based, so it is still due next cycle.
+    log "doc pre-gate: health gate DEFERRED this cycle — a document trim is queued for the session below."
+  else
+    health_gate; local hg=$?
+    [ "$hg" = 9 ] && return 9
+    if [ "$hg" = 10 ]; then note_progress; return 0; fi
+  fi
 
   # 3c. Snapshot the decision surface BEFORE the session so we can tell afterwards whether the session
   #     actually advanced the run (see the idle-backoff block above). Cheap: one rev-parse + one hash.
