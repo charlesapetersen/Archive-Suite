@@ -216,6 +216,13 @@ macOS/Sources/ArchiveNotes/
                                    the S3 jump-to-source side) + EditorPassageSource (the live
                                    PassageSelectionSource over a value snapshot of the editor text —
                                    D7 independence; snapshotMarkdown → CommonMark + inline-image bytes) (W7-S2)
+    InlineImageMarkdown.swift      The ONE owner of the `![alt](path)` grammar — escape-aware pattern
+                                   (possessive: backtracking here is waste), emit(alt:path:), and the
+                                   label escape/unescape pair (CommonMark ASCII-punctuation rule). Used by
+                                   MarkdownBridge's two emit sites + its parse pattern and by
+                                   ExtractBuilder.strippedTitleLine, which needs the SAME grammar or an
+                                   escaped alt survives stripping and becomes an extract's title
+                                   (W3.notes-thumb-line-duplicates-fu1)
     NotePassageResolve.swift       Pure jump-to-source + provenance-chip logic over the in-memory
                                    [ItemSummary]: resolve(anchor:)→PassageResolution taxonomy, chipLabel
                                    (live title, snapshot fallback), isSourceMissing, scrollRange

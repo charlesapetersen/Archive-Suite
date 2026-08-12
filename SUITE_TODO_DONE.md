@@ -5353,6 +5353,69 @@ explain why not.
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 
+- [x] **W3.notes-thumb-line-duplicates-fu1 — a `[` in a block's `display` DESTROYED its thumbnail reference on
+  the first save: the emitted `![Doc [1]](assets/p1.png)` is not an image ref, so it reloaded as the escaped
+  prose `Doc \[1\]` while `thumb:` still claimed a thumbnail [S · MED · data-shaped].** ✅ **SHIPPED
+  2026-08-12** — `1603875` (code + tests) and the commit whose subject begins
+  `fix(notes,trackers): W3.notes-thumb-line-duplicates-fu1`, which carries this move (a self-referential sha
+  cannot be written into its own commit). Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates` fix;
+  pre-existing — that item moved which code wrote the line, not how the alt text was escaped.
+  **The filing named the wrong site, and that is the substance of the fix.** It said to fix
+  `serializeInlineRuns:485`, "the ONE emitter every inline image passes through". But the measured break is
+  one step EARLIER: `buildInsertableBlock` builds the same `![display](thumb)` grammar at INSERT time and
+  hands it to `parseSingleBody`, so a bracketed display never became an attachment at all and the serializer
+  never saw one. Fixing only the serializer would have left the filed bug exactly as it was.
+  **What shipped:** a new `InlineImageMarkdown` (`Core/`) owns the grammar — the escape-aware pattern, the
+  emitter, and the label escaping — because the failure mode is that changing one half without the other is
+  invisible until a note reloads. Both emit sites (`MarkdownBridge:210` insert, `:504` serialize) go through
+  `InlineImageMarkdown.emit`, and `extractImageReferences` decodes the label so an attachment's `altText`
+  holds the operator's text rather than the escaped form. Escaping `[`/`]`/`\` is also what CommonMark
+  requires — an unbalanced bracket inside a link label means it is not a label — so the `.md` stays readable
+  in other viewers.
+  **`ExtractBuilder.strippedTitleLine` had to widen with it, and this is the part worth remembering.** It
+  carried its own copy of the pattern to drop image-only lines; against that copy an ESCAPED alt is not an
+  image, so the reference would have survived stripping and become the extract's TITLE. One shared source
+  string now. A second constant (`strippingPatternSource`) keeps that caller's tolerance of an empty `()`
+  destination, which the reading pattern rightly rejects.
+  **Mutation-verified** (source reverted, tests kept — 4 red → 4 green): the round-trip reloaded as the prose
+  `Moore \[draft\]` with `noteImageRelPath` nil; the inserted-block line was found 0 times instead of 1; the
+  attachment's `altText` was nil; and the extract title came back as the escaped brackets instead of
+  `Real Title`. Two further tests pass against BOTH versions on purpose — an ordinary alt gains no escaping,
+  and a literal backslash does not grow across three round-trips (the escaper escapes the backslash itself,
+  so a decoder that is not a true inverse would add one per save; that is why `unescapeAlt` follows
+  CommonMark's ASCII-punctuation rule rather than stripping brackets).
+  **Tier-2 functional test** is `NoteStoreTests.bracketedDisplayKeepsItsThumbnailAcrossEditorSaveCycles` on an
+  `mktemp` scratch store — the whole real autosave cycle (disk → `BlockParser.serialize` → the EDITOR's
+  parse/serialize → `BlockParser.parse` → atomic save), asserting the RAW bytes over two cycles, because the
+  in-memory bridge tests cannot see what landed in the file. Pre-fix it is red in both cycles: **0**
+  occurrences of the reference on disk and `noteImageRelPath` nil on reload.
+  **The adversarial pass changed the code, which is the point of having one.** It measured the new
+  escape-aware label as **4x–1400x slower** than the old bracket-free one on input with *non-matching* `![`
+  starts (a pasted code fence, a hand edit): each failing start now re-scans much further. The quantifiers are
+  therefore **possessive** (`((?:[^\]\\]++|\\.)*+)`) — semantically identical here, because a `\` can only be
+  consumed by `\\.`, so the label cannot reinterpret an escaped `\]` and the greedy run always halts at the
+  first bare `]`, the only thing that may follow it. No shorter label can succeed, so refusing to backtrack is
+  free: byte-identical captures, 6–8x faster. It also confirmed what did NOT break — `escapeAlt`/`unescapeAlt`
+  is a true inverse over 17 pathological inputs with no growth; `ExtractBuilder:156,329` re-keys assets on the
+  alt-independent `](path)` substring; `NotePassageSource.snapshotMarkdown` reads paths from the
+  `.noteImageRelPath` attribute, not the text; and `altText` has exactly one reader, so no durable field
+  carries the escaped form.
+  Notes suite 797 tests / 84 suites green, no new warnings; `ArchiveNotesUITests` 20/20 in the Tart VM.
+  **No cleanup pass** for notes that already lost a reference: the bug was a fixed point, so those notes hold
+  orphaned assets and a `thumb:` that over-claims, and nothing here re-derives them. No migration written
+  because there is nothing to migrate (standing premise, owner 2026-08-01 — Notes holds only test material).
+  **Residuals filed — three, and one of them is a cost of this fix rather than a survivor of it:**
+  `W3.notes-image-dest-paren` (the destination half of the same grammar — a `)` in the path truncates it AND
+  spills the tail into the body as prose; measured, but no in-app producer can write such a name, so it is a
+  hand-edit entry point and LOW); `W3.notes-image-label-trailing-backslash` (**introduced here and knowingly
+  kept** — a label ending in a lone `\` now merges two references and eats the prose between them, which is
+  CommonMark's own reading of that input where the old pattern's two-reference reading was the non-conforming
+  one; unreachable from the emitter, which doubles a backslash, and it carries the pre-existing
+  "`strippedTitleLine` never unescapes" gap with it since that is the same function); and two extra measured
+  shapes added to **`W3.notes-header-field-terminator`** — `display` reaches the body as this line's alt text
+  too, so a terminator in it breaks two grammars at once and that item's chosen fix location
+  (`serializeHeader`) does not reach the second one; plus its `display: "…"` quoting being asymmetric with
+  `unquote`, which needs no terminator at all.
 - [x] **W3.notes-thumb-line-duplicates — a `thumb:` block grew one extra `![display](thumb)` line on EVERY
   save, without bound [M · MED · data-shaped].** ✅ **SHIPPED 2026-08-12** — `99870c8` (code + tests) and the
   commit whose subject begins `fix(notes,trackers): W3.notes-thumb-line-duplicates`, which carries this move

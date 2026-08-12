@@ -253,6 +253,69 @@ struct NoteStoreTests {
         }
     }
 
+    /// W3.notes-thumb-line-duplicates-fu1 — the Tier-2 functional check, on the same real autosave cycle
+    /// as the test above, because the damage is measured in the FILE. A bracketed document title
+    /// (`Moore [draft]`) used to leave the first save with no image reference at all: the line reloaded as
+    /// escaped prose, so the imported asset was orphaned while the header's `thumb:` went on claiming a
+    /// thumbnail. Two cycles, and the bytes asserted directly — an in-memory bridge test cannot see what
+    /// landed on disk.
+    ///
+    /// Scratch `mktemp` store only (Prime Directive #1).
+    @MainActor
+    @Test("a bracketed display keeps its thumbnail reference across editor autosave cycles")
+    func bracketedDisplayKeepsItsThumbnailAcrossEditorSaveCycles() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        // What `buildInsertableBlock` writes for this display — escaped, and an image reference.
+        let thumbLine = "![Moore \\[draft\\]](assets/p41-thumb.png)"
+        var item = makeItem(title: "Moore Oral History")
+        item.blocks = [
+            Block(kind: .readerPage,
+                  source: SourceAnchor(link: "archivereader://reveal?root=G&rel=Moore.pdf&page=41",
+                                       display: "Moore [draft]", page: 41,
+                                       thumbRef: "assets/p41-thumb.png"),
+                  markdown: "\(thumbLine)\n\nAnnotation.\n", unknownHeaderFields: []),
+        ]
+        let ref = try await store.create(item)
+
+        for cycle in 1...2 {
+            let loaded = try await store.load(item.id)
+            let editorMarkdown = BlockParser.serialize(leadingText: loaded.trailingBodyRaw,
+                                                       blocks: loaded.blocks)
+            let edited = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: editorMarkdown))
+            let parsed = BlockParser.parse(edited)
+            var next = loaded
+            next.trailingBodyRaw = parsed.leadingText
+            next.blocks = parsed.blocks
+            _ = try await store.save(next)
+
+            let raw = try String(contentsOf: ref.url, encoding: .utf8)
+            #expect(occurrences(of: thumbLine, in: raw) == 1,
+                    "cycle \(cycle): the thumbnail reference is gone or doubled on disk:\n\(raw)")
+            #expect(!raw.contains("![Moore [draft]]"),
+                    "cycle \(cycle): an UNESCAPED label reached the file, which cannot be parsed:\n\(raw)")
+            #expect(raw.contains("display: \"Moore [draft]\""),
+                    "cycle \(cycle): the header's display must stay the operator's own text:\n\(raw)")
+            #expect(occurrences(of: "Annotation.", in: raw) == 1,
+                    "cycle \(cycle): the block body text was duplicated:\n\(raw)")
+
+            // The reference has to come back as an IMAGE, not as prose that merely looks like one.
+            let reloaded = try await store.load(item.id)
+            #expect(reloaded.blocks.count == 1, "cycle \(cycle): the block was lost or split:\n\(raw)")
+            #expect(reloaded.blocks.first?.source?.thumbRef == "assets/p41-thumb.png")
+            #expect(reloaded.blocks.first?.source?.display == "Moore [draft]")
+            let styled = MarkdownBridge.parse(markdown: reloaded.blocks[0].markdown)
+            var relPath: String?
+            styled.enumerateAttribute(.noteImageRelPath,
+                                      in: NSRange(location: 0, length: styled.length)) { v, _, _ in
+                if let p = v as? String { relPath = p }
+            }
+            #expect(relPath == "assets/p41-thumb.png",
+                    "cycle \(cycle): the thumbnail reloaded as prose, not as an image:\n\(raw)")
+        }
+    }
+
     /// Counting, not `contains` — a line written twice contains itself.
     private func occurrences(of needle: String, in haystack: String) -> Int {
         haystack.components(separatedBy: needle).count - 1

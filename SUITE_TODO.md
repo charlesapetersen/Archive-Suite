@@ -1239,26 +1239,54 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-thumb-line-duplicates-fu1 — a `[` in a block's `display` DESTROYS its thumbnail reference on the first save: the emitted `![Doc [1]](assets/p1.png)` is not an image ref, so it reloads as the escaped prose `Doc \[1\]` while `thumb:` still claims a thumbnail [S · MED · data-shaped].**
-  Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates` fix; **PRE-EXISTING** — that item moved which
-  code writes the line, not how the alt text is escaped, and the old serializer interpolated `display` just
-  as rawly.
-  **Measured 2026-08-12** in the app-hosted bundle (probe since deleted), three displays through
-  `buildInsertableBlock` → `serialize` → `BlockParser.parse`:
-  - `Doc [1]` → body reloads as `Doc \[1\]`. `MarkdownBridge.imagePattern` is
-    `!\[([^\]]*)\]\(([^)]+)\)`, and `[^\]]*` cannot cross the inner `]`, so the line never matches;
-    `parseSingleBody` treats it as prose and `escapeMarkdown` escapes the brackets on the way out. The
-    reference is gone, so nothing renders and the imported asset is orphaned — while the header's
-    `thumb: assets/p1.png` still asserts a thumbnail exists. It IS a fixed point (loses it once, does not
-    grow).
-  - `Doc (draft)` → `![Doc (draft)](assets/p1.png)`, intact. Parens are fine; the greedy `[^\]]*` handles them.
-  - `Plain Doc` → intact.
-  **Reachable in one paste:** `display` is the Reader document's title, and a bracketed title is ordinary
-  (`Moore [draft]`, `Report [1of2]`). ⚠️ Fix in the ONE emitter, `MarkdownBridge.serializeInlineRuns:485`
-  (`![\(alt)](\(relPath))`), not at `buildInsertableBlock` — the alt reaches that line from every inline
-  image, not just a thumbnail. Same FAMILY as `W3.notes-header-field-terminator` (a raw value interpolated
-  into a grammar that cannot carry it) but a different grammar and a different emitter, so the two fixes are
-  independent and neither blocks the other. | ArchiveNotes/Editor | Tier-2
+- [ ] **W3.notes-image-dest-paren — a `)` in an inline image's PATH truncates the reference AND spills the rest of the path into the note body as prose [XS · LOW · data-shaped · hand-edit entry only].**
+  Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates-fu1` fix, which fixed the alt-text half of the same
+  grammar and measured this half in the same throwaway probe. **PRE-EXISTING** and untouched by that fix —
+  it escaped the label, not the destination.
+  **Measured 2026-08-12** in the app-hosted bundle (probe since deleted), `![p](assets/photo (1).png)` through
+  `MarkdownBridge.parse` → `serialize`: `noteImageRelPath` comes back as **`assets/photo (1`** (the
+  destination group is `[^)]+`, so it stops at the first `)`), and the tail re-serializes as a **new body
+  line** — `![p](assets/photo (1)\n.png)`. So it is not merely a lost reference: it is prose the operator
+  never typed, and it is **not a fixed point**.
+  **Reachability is the reason this is LOW, and it should be re-checked before any fix.** Every in-app
+  producer supplies its own name — `pasted-<date>.png` (`EditorTextView:283`), `p<N>-thumb.png` /
+  `doc-thumb.png` (`SourceBlockPaster.importThumbnail`), or a `bare` name copied from another note's asset
+  (`ExtractBuilder:152,325`, `MarkdownEditorView:465`) — and both disambiguators (`NoteStore
+  .disambiguateAsset`, `ItemAssetStore.uniqueName`) only ever append `-N`. So the entry point is a
+  **hand-edited note**, or an asset name that came from outside the app. Nothing in the app writes one today.
+  ⚠️ Fix in `InlineImageMarkdown` — the grammar now has ONE owner, so emitter, pattern and stripping pattern
+  are one file. The CommonMark answer is the angle-bracket destination (`![alt](<assets/photo (1).png>)`),
+  which also fixes a second latent divergence worth confirming while you are there: our `[^)]+` accepts a
+  **space** in a destination and CommonMark does not, so a path with a space is readable in Notes and broken
+  in every other Markdown viewer. Tier-2. | ArchiveNotes/Editor | Tier-2
+- [ ] **W3.notes-image-label-trailing-backslash — a label ending in a LONE `\` swallows the rest of the line: two image references merge into one, the prose between them disappears and one asset is orphaned — and the same input defeats the title stripper, so it lands in an extract's title AND its filename [S · LOW · data-shaped · hand-edit / legacy entry only].**
+  Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates-fu1` adversarial pass, which found it in the fix it
+  was reviewing. **Introduced by that fix, and knowingly kept** — read the trade before "fixing" it.
+  `![a\](x) and ![b](y)`: the escape-aware label may cross an escaped `\]`, so it consumes
+  `a\](x) and ![b` and the match ends at the SECOND `]` — **one** reference (alt `a\](x) and ![b`, path `y`)
+  where the old bracket-free pattern found two. The visible prose ` and ` is absorbed into an alt text, the
+  `x` asset is orphaned, and re-saving writes `![a\](x) and !\[b](y)`, a **stable fixed point**, so it does
+  not self-heal. Alone, `![a\](x)` simply stops matching and reloads as prose — the very failure fu1 fixed,
+  relocated to a rarer input.
+  ⚠️ **This is CommonMark's own reading** (`\]` inside a label is an escaped bracket, so the label continues),
+  which is why it was not "corrected" back: the old two-reference reading was the non-conforming one, and any
+  other Markdown viewer would agree with the new behaviour. It is also **unreachable from any in-app
+  producer** — `InlineImageMarkdown.escapeAlt` doubles a backslash, so the emitter can only ever write
+  `![a\\](x)`, which round-trips correctly (verified). The entry points are a raw-mode hand edit, or a note
+  written by the pre-fu1 raw emitter from a `display` ending in `\`.
+  **Second surface, same input, and this one reaches a durable record:** `ExtractBuilder.strippedTitleLine`
+  no longer strips `![a\](x)`, so `defaultTitle` returns the raw markdown as the extract's `title:` front
+  matter *and* its `.md` filename (`NoteStore.sanitizedTitle` maps only `/` and `:`, so brackets and
+  backslashes pass straight through).
+  **A THIRD, purely PRE-EXISTING gap belongs with it**, because it is the same function and the same fix:
+  `strippedTitleLine` strips `*`/`_`/backtick but never *unescapes*, so a first line of ordinary prose reading
+  `Real [Title]` — which `MarkdownBridge.escapeMarkdown` writes as `Real \[Title\]` — becomes the title and
+  the filename with literal backslashes in it. fu1 introduced a CommonMark unescaper
+  (`InlineImageMarkdown.unescapeAlt`) and deliberately did not reach into the title path with it; this is
+  where that would go.
+  Decide the shape deliberately: requiring the label's escapes to be *balanced*, or refusing a lone trailing
+  backslash, is one line in `InlineImageMarkdown` — but either diverges from CommonMark, which is a real cost
+  now that the emitter conforms. Tier-2. | ArchiveNotes/Editor | Tier-2
 - [ ] **W3.notes-header-field-terminator — `serializeHeader` writes every field value RAW into a line-based, comment-delimited header, so a terminator or a `-->` inside `link`/`display` truncates the durable link, leaks pasted text into the note body, or splits one block into two and destroys the first one's provenance [S–M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-paste-url-line-split` adversarial pass; **pre-existing**, and NOT the
   same bug — that item fixed the *scanner* (`SourceBlockPaster`), which is where a malformed value is
@@ -1305,6 +1333,21 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   normalise the operator's body prose. Acceptance: add all five shapes to `BlockChipTests
   .testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint`'s table (all five are RED today — that is
   the measurement above) plus one `mktemp`-store disk round-trip, two save/load cycles.
+  ⚠️ **A SIXTH shape, measured 2026-08-12 by `W3.notes-thumb-line-duplicates-fu1`, and it is the one the
+  stated fix location does NOT reach.** `display` also reaches the *body* — `buildInsertableBlock` writes it
+  as the alt text of the block's `![display](thumb)` line — so a terminator in `display` lands in TWO
+  grammars at once. Through the authoring path with `thumbRef` set, all three of LF / CRLF / CR: the header
+  truncates as this item already says (`display` reloads as `"Line1`, `Line2"` dropped) **and** the body line
+  comes back as `![Line1<LF>Line2](assets/p3.png)` — spanning two lines, `fixedPoint=false`. The `thumbRef`
+  itself survives and the block count stays 1. So a guard in `serializeHeader` alone will leave the body line
+  broken: either sanitize `display` where it is *produced* (which reaches both grammars at once, at the cost
+  of the four producers this item deliberately avoided touching) or add a terminator rule to
+  `InlineImageMarkdown` as well — decide that explicitly, since choosing the serializer was this item's whole
+  design.
+  ⚠️ **A SEVENTH shape, from the same 2026-08-12 pass, needs no terminator either and is the cheapest of the
+  lot:** `serializeHeader:236` writes `display: "\(v)"` unescaped while `unquote:252-258` decodes `\"` and
+  `\\` — the pair is asymmetric, so a `display` containing a double quote or a backslash is not a fixed point.
+  Whatever guard this item lands, make the quoting symmetric in the same pass; it is the same two functions.
   | ArchiveNotes/Store | Tier-2 (it decides the bytes of the operator's `.md`)
 - [ ] **W3.notes-paste-url-line-split-fu1 — two Reader links separated by a VERTICAL TAB or U+2028 still collapse into one line: page links then yield NOTHING, and doc-level links yield ONE block whose `relativePath` has swallowed the next link [XS · LOW · provenance].**
   Filed 2026-08-11 by the `W3.notes-paste-url-line-split` fix, which measured it while closing the CR/CRLF
