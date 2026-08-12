@@ -149,6 +149,21 @@ struct ExtractTitleTests {
             fallbackDate: epoch) == "Real Title")
     }
 
+    /// W3.notes-image-dest-paren — the stripping pattern is the same grammar, so it has to widen with
+    /// the reader or the two disagree about what an image is. Both spellings, because a note can hold
+    /// either: the healed angle form the emitter writes, and the bare one a hand edit leaves. Against
+    /// the old `[^)]*` the tail of the path (`.png)`) survived stripping and became the extract's
+    /// TITLE — and, through `sanitizedTitle`, its filename.
+    @Test("skips an image-only line whose path contains a parenthesis, in both spellings")
+    func skipsParenthesisedPathImageOnly() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("![p](<assets/photo (1).png>)\nReal Title")],
+            fallbackDate: epoch) == "Real Title")
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("![p](assets/photo (1).png)\nReal Title")],
+            fallbackDate: epoch) == "Real Title")
+    }
+
     @Test("truncates on a word boundary at 80 chars")
     func truncates() {
         let long = String(repeating: "word ", count: 40) // 200 chars

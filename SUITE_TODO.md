@@ -1239,26 +1239,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-image-dest-paren — a `)` in an inline image's PATH truncates the reference AND spills the rest of the path into the note body as prose [XS · LOW · data-shaped · hand-edit entry only].**
-  Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates-fu1` fix, which fixed the alt-text half of the same
-  grammar and measured this half in the same throwaway probe. **PRE-EXISTING** and untouched by that fix —
-  it escaped the label, not the destination.
-  **Measured 2026-08-12** in the app-hosted bundle (probe since deleted), `![p](assets/photo (1).png)` through
-  `MarkdownBridge.parse` → `serialize`: `noteImageRelPath` comes back as **`assets/photo (1`** (the
-  destination group is `[^)]+`, so it stops at the first `)`), and the tail re-serializes as a **new body
-  line** — `![p](assets/photo (1)\n.png)`. So it is not merely a lost reference: it is prose the operator
-  never typed, and it is **not a fixed point**.
-  **Reachability is the reason this is LOW, and it should be re-checked before any fix.** Every in-app
-  producer supplies its own name — `pasted-<date>.png` (`EditorTextView:283`), `p<N>-thumb.png` /
-  `doc-thumb.png` (`SourceBlockPaster.importThumbnail`), or a `bare` name copied from another note's asset
-  (`ExtractBuilder:152,325`, `MarkdownEditorView:465`) — and both disambiguators (`NoteStore
-  .disambiguateAsset`, `ItemAssetStore.uniqueName`) only ever append `-N`. So the entry point is a
-  **hand-edited note**, or an asset name that came from outside the app. Nothing in the app writes one today.
-  ⚠️ Fix in `InlineImageMarkdown` — the grammar now has ONE owner, so emitter, pattern and stripping pattern
-  are one file. The CommonMark answer is the angle-bracket destination (`![alt](<assets/photo (1).png>)`),
-  which also fixes a second latent divergence worth confirming while you are there: our `[^)]+` accepts a
-  **space** in a destination and CommonMark does not, so a path with a space is readable in Notes and broken
-  in every other Markdown viewer. Tier-2. | ArchiveNotes/Editor | Tier-2
 - [ ] **W3.notes-image-label-trailing-backslash — a label ending in a LONE `\` swallows the rest of the line: two image references merge into one, the prose between them disappears and one asset is orphaned — and the same input defeats the title stripper, so it lands in an extract's title AND its filename [S · LOW · data-shaped · hand-edit / legacy entry only].**
   Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates-fu1` adversarial pass, which found it in the fix it
   was reviewing. **Introduced by that fix, and knowingly kept** — read the trade before "fixing" it.

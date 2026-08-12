@@ -5353,6 +5353,56 @@ explain why not.
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 
+- [x] **W3.notes-image-dest-paren — a `)` in an inline image's PATH truncated the reference AND spilled the
+  rest of the path into the note body as prose [XS · LOW · data-shaped · hand-edit entry only].** ✅ **SHIPPED
+  2026-08-12** — `8946e55` (code + 9 tests) and the commit whose subject begins
+  `fix(notes,trackers): W3.notes-image-dest-paren`, which carries this move (a self-referential sha cannot be
+  written into its own commit). Filed 2026-08-12 by `W3.notes-thumb-line-duplicates-fu1`, which fixed the
+  alt-text half of the same grammar and measured this half in the same probe; pre-existing.
+  **Reachability re-checked before spending, as the filing demanded, and it is unchanged:** every in-app
+  producer names its own asset (`pasted-<date>.png`, `p<N>-thumb.png`, `doc-thumb.png`) and both
+  disambiguators only append `-N`, so the entry point is a hand-edited note or a name from outside the app.
+  It was still worth fixing, because the failure is not a lost reference but a CHANGED FILE: the tail
+  re-serialized as a body line the operator never typed, and a second save produced a third version.
+  **The fix is lenient read, strict write.** `InlineImageMarkdown` now carries both of CommonMark's
+  destination spellings: bare with **balanced** parentheses (so the destination stops at the reference's own
+  `)`, not the first one) and `<…>`, which `destination(_:)` reaches for whenever a path holds `( ) < > \`,
+  whitespace or a control character. Reading the bare form is deliberate — it is what lets a hand-edited path
+  heal into the conformant spelling on its next save instead of degrading into prose — and writing the angle
+  form closes the latent divergence the filing named: a path with a SPACE was readable here and broken in
+  every other Markdown viewer. Line terminators are now excluded from both spellings; the old `[^)]` admitted
+  them, so a reference broken across two lines matched and the emitter silently deleted the line break.
+  **The coupled consumer was `ExtractBuilder`'s asset re-key**, which finds a destination by plain string
+  match: it now asks the grammar owner (`destinationLiteral`) instead of interpolating `](ref)`, which would
+  have missed an angle-bracketed name and left the copied bytes referenced at the original one. Its
+  `strippedTitleLine` widened with the same grammar, or the tail `.png)` survives stripping and becomes an
+  extract's title AND filename.
+  **Two deliberate behaviour changes, both CommonMark's reading:** an UNBALANCED `(` in a path is no longer a
+  reference at all (it stays the operator's text rather than matching a truncated path — a later well-formed
+  reference on the same line is still found; verified), and a bare destination is no longer written for a
+  path with a space.
+  **Gate was MUTATION** (destination group + emitter reverted to the pre-fix behaviour, tests kept): 8 of the
+  10 new tests go red, with the exact values the filing recorded — `relPath` = `assets/photo (1`, the tail on
+  a new body line, 0 occurrences of the healed line on disk. The 2 that pass against both versions are the
+  over-fix guard (an ordinary path gains no brackets) and the stripping test's bare-spelling half.
+  **Tier-2 functional test** is `NoteStoreTests.parenthesisedAssetNameHealsOnSaveAndConverges` on an `mktemp`
+  scratch store: it starts from the hand-edited spelling, runs the real autosave cycle twice, asserts the RAW
+  bytes, and compares cycle 2 to cycle 1 — convergence is the half in-memory equality cannot show.
+  **Measured cost, all three patterns on the same inputs in one process** (the fu1 review's lesson — do not
+  name a cost you have not measured): a 13.6 KB body with 200 images, old `0.314 ms` → new `0.256 ms`
+  (**0.82x — faster**); a 4.3 KB body with one image, `0.036` → `0.037 ms`; a pathological 4 KB single path,
+  `0.015` → `0.092 ms` (6.0x, and no real path is 4,000 characters). The alternatives are RUNS (`[^…]++`),
+  not single characters, and that is what buys it: the per-character form of the same grammar measures
+  `0.490 ms` (1.56x) and `0.167 ms` (10.8x) on those two, i.e. ~1.9x worse than the shipped form in both.
+  **Also cleared by the adversarial pass:** a malformed reference does not hide a well-formed one later on
+  the same line (the scanner resumes — measured on four shapes); no other `[^)]` destination pattern exists
+  in the app; `AssetPathResolver`'s W23.m3 containment now sees the DECODED path, which is the string that
+  has to be gate-checked, and its `..`/absolute/`~` gate refuses a traversal spelled with backslash escapes.
+  Notes-local, nothing in `ArchiveCore` → no cross-app rebuild owed. Verified: Notes unit bundle **807 tests
+  / 84 suites**, `** TEST SUCCEEDED **`, **no new warnings**; **`ArchiveNotesUITests` 20/20 in the headless
+  Tart VM** (372 s, off the owner's screen). Scratch `mktemp` only; no corpus touched.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/InlineImageMarkdown.swift, Core/ExtractBuilder.swift, Editor/MarkdownBridge.swift | XS | low | none
+
 - [x] **W3.notes-thumb-line-duplicates-fu1 — a `[` in a block's `display` DESTROYED its thumbnail reference on
   the first save: the emitted `![Doc [1]](assets/p1.png)` is not an image ref, so it reloaded as the escaped
   prose `Doc \[1\]` while `thumb:` still claimed a thumbnail [S · MED · data-shaped].** ✅ **SHIPPED
@@ -5407,7 +5457,8 @@ explain why not.
   **Residuals filed — three, and one of them is a cost of this fix rather than a survivor of it:**
   `W3.notes-image-dest-paren` (the destination half of the same grammar — a `)` in the path truncates it AND
   spills the tail into the body as prose; measured, but no in-app producer can write such a name, so it is a
-  hand-edit entry point and LOW); `W3.notes-image-label-trailing-backslash` (**introduced here and knowingly
+  hand-edit entry point and LOW — ✅ **since SHIPPED 2026-08-12**, entry above);
+  `W3.notes-image-label-trailing-backslash` (**introduced here and knowingly
   kept** — a label ending in a lone `\` now merges two references and eats the prose between them, which is
   CommonMark's own reading of that input where the old pattern's two-reference reading was the non-conforming
   one; unreachable from the emitter, which doubles a backslash, and it carries the pre-existing

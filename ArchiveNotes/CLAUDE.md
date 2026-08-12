@@ -217,11 +217,18 @@ macOS/Sources/ArchiveNotes/
                                    PassageSelectionSource over a value snapshot of the editor text —
                                    D7 independence; snapshotMarkdown → CommonMark + inline-image bytes) (W7-S2)
     InlineImageMarkdown.swift      The ONE owner of the `![alt](path)` grammar — escape-aware pattern
-                                   (possessive: backtracking here is waste), emit(alt:path:), and the
-                                   label escape/unescape pair (CommonMark ASCII-punctuation rule). Used by
-                                   MarkdownBridge's two emit sites + its parse pattern and by
-                                   ExtractBuilder.strippedTitleLine, which needs the SAME grammar or an
-                                   escaped alt survives stripping and becomes an extract's title
+                                   (possessive: backtracking here is waste), emit(alt:path:), the
+                                   label escape/unescape pair (CommonMark ASCII-punctuation rule), and
+                                   the destination pair destination(_:)/decodeDestination(_:): both of
+                                   CommonMark's spellings, bare-with-balanced-parens for reading and
+                                   `<…>` for writing anything with `( ) < > \`, whitespace or a control
+                                   char (W3.notes-image-dest-paren — lenient read, strict write, so a
+                                   hand-edited path heals on its next save). Used by MarkdownBridge's two
+                                   emit sites + its parse pattern, and by ExtractBuilder — both
+                                   strippedTitleLine (the SAME grammar or an escaped alt / a
+                                   parenthesised path survives stripping and becomes an extract's title)
+                                   and the asset re-key, which spells its string match with
+                                   destinationLiteral rather than interpolating `](ref)`
                                    (W3.notes-thumb-line-duplicates-fu1)
     NotePassageResolve.swift       Pure jump-to-source + provenance-chip logic over the in-memory
                                    [ItemSummary]: resolve(anchor:)→PassageResolution taxonomy, chipLabel
