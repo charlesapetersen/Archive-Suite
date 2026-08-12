@@ -421,6 +421,27 @@ struct ExtractBuilderTests {
         #expect(!markdown.contains("](assets/a.png)"))
         #expect(markdown.contains("](assets/b.png)"))    // failed import → original ref left dangling, not dropped
     }
+
+    /// W3.notes-image-dest-paren — the coupled consumer. This re-key is a plain string match, so it
+    /// has to spell the destination the way the emitter does: an asset whose name needs the
+    /// angle-bracket form is written `](<assets/photo (1).png>)`, and a hand-rolled `](ref)` would
+    /// silently find nothing — leaving the copied bytes referenced at the ORIGINAL name, i.e. a
+    /// missing-asset placeholder in the new extract.
+    @Test("A parenthesised asset name is re-keyed too — the destination is spelled by the grammar owner")
+    func pasteRewritesAParenthesisedRef() {
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1970",
+            segments: [.init(sourceBlockIndex: 0,
+                             markdown: "![a](<assets/photo (1).png>)\n",
+                             assetPNGs: ["photo (1).png": Data([1])])])
+        let markdown = ExtractBuilder.pastedExtractMarkdown(from: payload) { _, _ in
+            "assets/photo (1)-1.png"
+        }
+        #expect(markdown.contains("](<assets/photo (1)-1.png>)"),
+                "the collided ref was not rewritten: \(markdown.debugDescription)")
+        #expect(!markdown.contains("](<assets/photo (1).png>)"),
+                "the original ref survived, so the copy dangles: \(markdown.debugDescription)")
+    }
 }
 
 // MARK: - Extract-references-notes-only invariant

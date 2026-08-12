@@ -152,8 +152,13 @@ struct ExtractBuilder {
                 guard let stored = importAsset(bytes, bare) else { continue }
                 let originalRef = "assets/\(bare)"
                 if stored != originalRef {
-                    block.markdown = block.markdown
-                        .replacingOccurrences(of: "](\(originalRef))", with: "](\(stored))")
+                    // Spelled by the grammar owner, not interpolated: a name needing the
+                    // angle-bracket destination (`assets/photo (1).png`) is written `](<…>)`, and a
+                    // hand-rolled `](\(ref))` would silently fail to find it — leaving the copy
+                    // referenced at the ORIGINAL name, i.e. a missing asset (W3.notes-image-dest-paren).
+                    block.markdown = block.markdown.replacingOccurrences(
+                        of: InlineImageMarkdown.destinationLiteral(originalRef),
+                        with: InlineImageMarkdown.destinationLiteral(stored))
                 }
             }
             return block
@@ -325,8 +330,11 @@ struct ExtractBuilder {
                 let stored = try await store.importAsset(bytes, preferredName: bare, into: id)
                 let originalRef = "assets/\(bare)"
                 if stored != originalRef {
-                    block.markdown = block.markdown
-                        .replacingOccurrences(of: "](\(originalRef))", with: "](\(stored))")
+                    // Same re-key, same reason as `pastedExtractMarkdown` — through the grammar owner
+                    // so an angle-bracketed destination is found too (W3.notes-image-dest-paren).
+                    block.markdown = block.markdown.replacingOccurrences(
+                        of: InlineImageMarkdown.destinationLiteral(originalRef),
+                        with: InlineImageMarkdown.destinationLiteral(stored))
                 }
             }
             result.append(block)

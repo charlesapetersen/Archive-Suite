@@ -230,7 +230,7 @@ enum MarkdownBridge {
         for match in matches {
             let fullRange = match.range
             let alt = InlineImageMarkdown.unescapeAlt(nsString.substring(with: match.range(at: 1)))
-            let path = nsString.substring(with: match.range(at: 2))
+            let path = InlineImageMarkdown.decodeDestination(nsString.substring(with: match.range(at: 2)))
             let token = "\(imageTokenPrefix)\(refs.count)\u{FFFC}"
             refs.append(ImageRef(alt: alt, path: path, token: token))
 

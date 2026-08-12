@@ -316,6 +316,69 @@ struct NoteStoreTests {
         }
     }
 
+    /// W3.notes-image-dest-paren — the Tier-2 functional check, on the same real autosave cycle, and
+    /// starting from the entry point the filing names: a note **hand-edited** to reference an asset
+    /// whose name contains a `)`. Pre-fix the first save split the line — `![p](assets/photo (1)` and
+    /// a new body line `.png)` — so the operator's file gained prose they never typed, and the second
+    /// save produced yet another file. Two cycles, bytes asserted directly, and cycle 2 compared to
+    /// cycle 1 because convergence is the half that in-memory equality cannot show.
+    ///
+    /// Scratch `mktemp` store only (Prime Directive #1).
+    @MainActor
+    @Test("a parenthesised asset name heals to the angle form and then stops changing")
+    func parenthesisedAssetNameHealsOnSaveAndConverges() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        let path = "assets/photo (1).png"
+        let handEdited = "![p](\(path))"          // what a hand edit (or a foreign asset name) leaves
+        let healed = "![p](<\(path)>)"            // CommonMark's spelling, what the emitter now writes
+        var item = makeItem(title: "Photo Note")
+        item.blocks = [
+            Block(kind: .readerPage,
+                  source: SourceAnchor(link: "archivereader://reveal?root=G&rel=Photo.pdf&page=1",
+                                       display: "Photo", page: 1, thumbRef: path),
+                  markdown: "\(handEdited)\n\nAnnotation.\n", unknownHeaderFields: []),
+        ]
+        let ref = try await store.create(item)
+
+        var previousRaw: String?
+        for cycle in 1...2 {
+            let loaded = try await store.load(item.id)
+            let editorMarkdown = BlockParser.serialize(leadingText: loaded.trailingBodyRaw,
+                                                       blocks: loaded.blocks)
+            let edited = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: editorMarkdown))
+            let parsed = BlockParser.parse(edited)
+            var next = loaded
+            next.trailingBodyRaw = parsed.leadingText
+            next.blocks = parsed.blocks
+            _ = try await store.save(next)
+
+            let raw = try String(contentsOf: ref.url, encoding: .utf8)
+            #expect(occurrences(of: healed, in: raw) == 1,
+                    "cycle \(cycle): the reference is missing or doubled on disk:\n\(raw)")
+            #expect(!raw.contains("\n.png)"),
+                    "cycle \(cycle): the tail of the path became a body line:\n\(raw)")
+            #expect(occurrences(of: "Annotation.", in: raw) == 1,
+                    "cycle \(cycle): the block body text was duplicated:\n\(raw)")
+            if let previousRaw { #expect(raw == previousRaw, "cycle \(cycle) rewrote the file again:\n\(raw)") }
+            previousRaw = raw
+
+            // And it has to come back as an IMAGE with the WHOLE path, not a truncated one.
+            let reloaded = try await store.load(item.id)
+            #expect(reloaded.blocks.count == 1, "cycle \(cycle): the block was lost or split:\n\(raw)")
+            #expect(reloaded.blocks.first?.source?.thumbRef == path)
+            let styled = MarkdownBridge.parse(markdown: reloaded.blocks[0].markdown)
+            var relPath: String?
+            styled.enumerateAttribute(.noteImageRelPath,
+                                      in: NSRange(location: 0, length: styled.length)) { v, _, _ in
+                if let p = v as? String { relPath = p }
+            }
+            #expect(relPath == path,
+                    "cycle \(cycle): the path came back as \(relPath ?? "nil"):\n\(raw)")
+        }
+    }
+
     /// Counting, not `contains` — a line written twice contains itself.
     private func occurrences(of needle: String, in haystack: String) -> Int {
         haystack.components(separatedBy: needle).count - 1

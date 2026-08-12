@@ -217,6 +217,113 @@ struct ImageSerializationTests {
         #expect(!serialized.contains("\\"))
     }
 
+    // MARK: - W3.notes-image-dest-paren — the destination half of the same grammar
+
+    /// The filed bug, measured. The destination group was `[^)]+`, so it stopped at the first `)`:
+    /// the path came back truncated to `assets/photo (1` **and** the tail `.png)` re-serialized as a
+    /// new body line — prose the operator never typed.
+    @Test("A parenthesis in the path keeps the whole reference and spills no prose")
+    func parenthesisedPathKeepsItsWholeReference() {
+        let parsed = MarkdownBridge.parse(markdown: "![p](assets/photo (1).png)", fontSize: 14)
+
+        var relPath: String?
+        parsed.enumerateAttribute(.noteImageRelPath,
+                                  in: NSRange(location: 0, length: parsed.length)) { val, _, _ in
+            if let p = val as? String { relPath = p }
+        }
+        #expect(relPath == "assets/photo (1).png",
+                "the destination was truncated at the first ')': \(relPath ?? "nil")")
+
+        let serialized = MarkdownBridge.serialize(parsed)
+        #expect(serialized.contains("![p](<assets/photo (1).png>)"),
+                "the reference was not re-emitted in the angle form: \(serialized.debugDescription)")
+        #expect(!serialized.trimmingCharacters(in: .whitespacesAndNewlines).contains("\n"),
+                "the tail of the path became a body line: \(serialized.debugDescription)")
+    }
+
+    /// Self-healing has to CONVERGE. The lenient bare reading is re-emitted in CommonMark's angle
+    /// form, and that form has to survive unchanged — otherwise every save rewrites the note again.
+    /// Pre-fix, two saves produced two different files, which is what made the truncation corrupting
+    /// rather than merely lossy. Three round-trips, because a one-shot comparison cannot see drift.
+    @Test("A parenthesised path is a fixed point after the first save")
+    func parenthesisedPathIsAFixedPoint() {
+        let first = MarkdownBridge.serialize(
+            MarkdownBridge.parse(markdown: "![p](assets/photo (1).png)", fontSize: 14))
+        let second = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: first, fontSize: 14))
+        let third = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: second, fontSize: 14))
+
+        #expect(first == second,
+                "save 2 changed the line: \(first.debugDescription) → \(second.debugDescription)")
+        #expect(second == third,
+                "save 3 changed the line: \(second.debugDescription) → \(third.debugDescription)")
+    }
+
+    /// The latent divergence the same fix closes: CommonMark forbids a space in a bare destination,
+    /// so a path with one was readable here and broken in every other Markdown viewer. We still READ
+    /// the bare form — that is what lets a hand-edited note heal — but we no longer WRITE it.
+    @Test("A path with a space is written in CommonMark's angle-bracket form")
+    func spacedPathIsWrittenInAngleBrackets() {
+        let serialized = MarkdownBridge.serialize(
+            MarkdownBridge.parse(markdown: "![a](assets/two words.png)", fontSize: 14))
+        #expect(serialized.contains("![a](<assets/two words.png>)"),
+                "a space still went out bare: \(serialized.debugDescription)")
+    }
+
+    /// The balanced-parenthesis rule has to stop at the reference's OWN closing paren. If it ran to
+    /// the last `)` on the line instead, this pair would merge into one reference, the prose between
+    /// them would be absorbed and one asset orphaned — the failure shape of
+    /// `W3.notes-image-label-trailing-backslash`, relocated to the destination.
+    @Test("Two references on one line stay two when the first path has parentheses")
+    func balancedDestinationDoesNotSwallowTheNextReference() {
+        let serialized = MarkdownBridge.serialize(
+            MarkdownBridge.parse(markdown: "![a](assets/x (1).png) and ![b](assets/y.png)",
+                                 fontSize: 14))
+        #expect(serialized.contains("![a](<assets/x (1).png>)"), "\(serialized)")
+        #expect(serialized.contains("![b](assets/y.png)"), "\(serialized)")
+        #expect(serialized.contains(" and "),
+                "the prose between the two references was absorbed: \(serialized.debugDescription)")
+    }
+
+    /// The over-fix guard: an ordinary path is written exactly as before, no angle brackets. Passes
+    /// against both versions on purpose — it constrains the fix rather than proving it.
+    @Test("An ordinary path is not angle-bracketed")
+    func ordinaryPathIsNotAngleBracketed() {
+        let serialized = MarkdownBridge.serialize(
+            MarkdownBridge.parse(markdown: "![a](assets/p1-thumb.png)", fontSize: 14))
+        #expect(serialized.contains("![a](assets/p1-thumb.png)"))
+        #expect(!serialized.contains("<"))
+    }
+
+    /// `decodeDestination` must be a true inverse of `destination` — the same requirement the alt
+    /// text's escape pair carries, and for the same reason: a decoder that is not an inverse changes
+    /// the path on every save. Pathological inputs, so the angle branch and its escapes are covered.
+    @Test("Every destination spelling round-trips through decode")
+    func destinationSpellingsRoundTrip() {
+        for path in ["assets/p1.png", "assets/photo (1).png", "assets/two words.png",
+                     "assets/a<b>.png", #"assets/back\slash.png"#, #"assets/a\.png"#,
+                     "assets/unbalanced(.png", "assets/)leading.png", "assets/tab\there.png",
+                     "assets/(all)(balanced).png", ""] {
+            let written = InlineImageMarkdown.destination(path)
+            let back = InlineImageMarkdown.decodeDestination(written)
+            #expect(back == path,
+                    "\(path.debugDescription) → \(written.debugDescription) → \(back.debugDescription)")
+        }
+    }
+
+    /// An unbalanced `(` in the path is not a reference at all — CommonMark's reading, and the safe
+    /// one: it stays the operator's own text instead of matching a truncated path and re-emitting a
+    /// line they never wrote.
+    @Test("An unterminated parenthesis in the path reads as prose, not as a truncated reference")
+    func unterminatedParenthesisIsNotAReference() {
+        let parsed = MarkdownBridge.parse(markdown: "![a](assets/x (1.png)", fontSize: 14)
+        var relPath: String?
+        parsed.enumerateAttribute(.noteImageRelPath,
+                                  in: NSRange(location: 0, length: parsed.length)) { val, _, _ in
+            if let p = val as? String { relPath = p }
+        }
+        #expect(relPath == nil, "it matched a truncated destination: \(relPath ?? "nil")")
+    }
+
     // MARK: - Helpers
 
     /// Create a minimal valid 1x1 white PNG.
