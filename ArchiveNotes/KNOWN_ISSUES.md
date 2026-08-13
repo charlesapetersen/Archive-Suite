@@ -3,6 +3,21 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W21.vmgui-g5-flake) — the source-block UI check could retry against the wrong note
+
+**2026-08-12.** G5 first synthesized ⌘⇧V, waited up to ten seconds for disk, selected another note to flush,
+then retried through the Edit menu. The shortcut could miss while XCUITest was moving first responder; worse,
+the retry accepted any nonempty editor value, so it could treat the still-loaded fallback note as the Zotero
+target and paste into the wrong item. That explains both the 46-second failed first attempt and why adding a
+second long path did not make the check reliable. No product defect was found.
+
+The check now waits for body text unique to the Zotero fixture, requires the DEBUG selection seam to confirm
+the caret placement, and clicks the real `Edit ▸ Paste as Source Block(s)` item once. That menu item and ⌘⇧V
+are the same SwiftUI `Button`, so the production command remains end-to-end while XCUITest no longer depends
+on synthesized shortcut delivery. The `.md` oracle was also tightened to require the complete durable URL,
+including its relative path and page. Three independently rebuilt fixture runs passed off-screen in the Tart
+VM (27.880 s, 27.074 s, and 28.324 s); the final full suite passed 20/20 in 368.011 s, with G5 at 26.799 s.
+
 ## ✅ FIXED (W21.vmgui-winsize-writeback) — fixture setup could overwrite the shared browser-window size
 
 **2026-08-12.** The GUI harness deliberately closes the auto-opened Extracts scene before every test so its

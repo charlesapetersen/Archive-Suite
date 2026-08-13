@@ -44,7 +44,7 @@ path. Each test subtracts a pre-test `itemDirs()` snapshot, because the runner h
 | G2  | Typing into the styled editor persists to the note's `.md` | **owner-eye** (typing gesture) |
 | G3  | Raw-Markdown toggle shows literal source + is lossless round-trip | **Auto** |
 | G4  | Paste image → the item's `assets/…png` + an inline `![](…)` reference (Tier-2 write) | **Auto** (via DEBUG paste seam); ⌘V gesture is owner-eye |
-| G5  | Paste archive link as a source block (⌘⇧V) → a `reader-page` block in the `.md` | **Auto** |
+| G5  | Paste archive link through Edit ▸ Paste as Source Block(s) → a `reader-page` block in the `.md` | **Auto** (⌘⇧V is the same Button's code-inspected binding) |
 | G6  | Reveal a reader-page source block → dispatches `archivereader://reveal?…` | **Auto** (URL dispatch); Reader launch is owner-eye |
 | G7  | Replicate an item into a folder → a new membership in `organization.json` | **Auto** |
 | G8  | Delete-last-instance guard: Cancel keeps, Delete trashes (Tier-2) | **Auto** |

@@ -1263,13 +1263,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W21.vmgui-g5-flake — `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` is FLAKY in the VM [S · LOW].**
-  Filed 2026-08-04. It failed attempt 1 at **46.250 s** and PASSED attempt 2 at **18.154 s** in the same gate
-  run — a 2.5× spread, so something on that path has a long poll that occasionally loses. Not a regression
-  (see `W21.vmgui-g13` (a) — same empty diff). ⚠️ It is NOT the cause of the gate RED; it was only reported as
-  one because `gui-vm-gate.sh` printed the union of both attempts' failures under "reproducible" (fixed
-  2026-08-04, see `SUITE_TODO_DONE.md` §W21.vmgui-flakereport). Worth finding the slow poll before it starts
-  failing twice. | ArchiveNotes/Tests | Tier-2
 - [ ] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
   Filed 2026-07-31 from the W23.m9-fu2 session. A **clean** build of the Notes scheme emits 22 Swift 6
   warnings from `Tests/ArchiveNotesUITests/NotesGUITests.swift:55-77` — "main actor-isolated property `app`

@@ -7014,6 +7014,23 @@ explain why not.
   host GUI.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesBrowserView.swift, Core/NotesAppSettings.swift, ArchiveNotes/macOS/Tests/ArchiveNotesTests/NotesAppSettingsTests.swift | S | low | Tier-2
 
+- [x] **W21.vmgui-g5-flake — G5's shortcut retry could paste into the wrong note [S · LOW].** ✅ **SHIPPED 2026-08-12** — commit whose subject begins `fix(notes,trackers): W21.vmgui-g5-flake`.
+  No product defect was found. The first path synthesized ⌘⇧V while XCUITest was still moving first responder;
+  if delivery missed, it spent the long disk poll, selected the plain note to flush, then reselected Zotero.
+  The retry waited only for a nonempty editor, so the still-loaded plain body satisfied it immediately and the
+  Edit-menu fallback could paste into the wrong item. That two-hazard path accounts for the observed 46.250 s
+  failure followed by an 18.154 s retry pass.
+  G5 now waits for body text unique to the Zotero fixture, asserts that the DEBUG selection seam really placed
+  the caret (the old return value was discarded), and invokes the real `Edit ▸ Paste as Source Block(s)` item
+  once. The menu item and ⌘⇧V are declared on the same production `Button`, so this keeps the command's
+  end-to-end coverage without testing synthesized shortcut routing. Independent Tier-2 refutation found and
+  closed one oracle gap: the target `.md` must contain the complete durable URL (root, relative path and page),
+  not just its root prefix, while retaining the Zotero block.
+  Three focused clean-fixture repetitions passed off-screen in the Tart VM: **27.880 s, 27.074 s, 28.324 s**.
+  After the oracle hardening, the full suite passed **20/20 in 368.011 s** (G5: 26.799 s). Full Notes smoke:
+  **841 Swift Testing tests / 84 suites + XCTest 221**. No real store, corpus, or host GUI was touched.
+  | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift, ArchiveNotes/scripts/GUI-HARNESS.md | S | low | Tier-2
+
 - [x] **W21.vmgui-flakereport — the flake guard retried, learned the answer, and then threw it away — ✅ DONE 2026-08-04** (this commit).
   `gui-vm-gate.sh`'s `show_failures()` looped BOTH attempts and `sort -u`'d them, printing the union directly
   beneath "RED — reproducible UITest failure in: <app>". The APP-level guard was always right (it clears an app

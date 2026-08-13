@@ -673,7 +673,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         // (Left on disk — the runner can't delete under /Users/; wiped by the next pre-run fixture rebuild.)
     }
 
-    /// G5 — Paste archive links as a source block (Edit ▸ Paste as Source Block(s), ⌘⇧V). Seeds the
+    /// G5 — Paste archive links as a source block (Edit ▸ Paste as Source Block(s)). Seeds the
     /// general pasteboard with a plain-text `archivereader://reveal?…` URL (the paster's plain-text
     /// fallback — no custom UTI needed, and `NSPasteboard.general` is settable cross-process from the
     /// test runner) and pastes it into a note editor, asserting the note's on-disk `.md` gains a
@@ -698,55 +698,61 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         func blockOnDisk() -> Bool { (rawMarkdown(inItemDir: uuid) ?? "").contains("block: reader-page") }
 
-        // One paste attempt: (re)select the target, ensure STYLED mode, seed the pasteboard, place a
-        // caret, fire the trigger, then flush the editor write-back to disk by selecting another item
-        // (select() flushes the outgoing editor inline — W7-S6) and poll disk.
-        func attempt(_ trigger: () -> Void) -> Bool {
-            selectItem(uuid: uuid)
-            XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
-            _ = pollUntil(timeout: 10) { !((editor.value as? String) ?? "").isEmpty }
+        selectItem(uuid: uuid)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
+        // Target-specific, not merely "nonempty": the old shortcut→select-away→menu retry accepted the
+        // previously loaded plain note here and could paste into the wrong item. This exact phrase is in
+        // both the raw and styled renderings of idZotero, and in no other fixture note.
+        XCTAssertTrue(
+            pollUntil(timeout: 10) {
+                ((editor.value as? String) ?? "").contains("Notes on the Lovelace paper.")
+            },
+            "the Zotero target body must finish loading before the paste command runs"
+        )
 
-            // Ensure styled: in RAW mode the editor shows the literal `zotero://select…` header source;
-            // that never appears in styled mode (it renders as a chip). Toggle back to styled if raw.
-            if ((editor.value as? String) ?? "").contains("zotero://select") {
-                rawToggle.click()
-                _ = pollUntil(timeout: 5) { !(((editor.value as? String) ?? "").contains("zotero://select")) }
-            }
-
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            XCTAssertTrue(pb.setString(link, forType: .string), "should seed the pasteboard with the link")
-
-            _ = setEditorSelection(location: 0, length: 0)   // defined caret at the start
-            trigger()
-
-            var ok = pollUntil(timeout: 4) { blockOnDisk() }
-            if !ok {
-                selectItem(uuid: Self.idPlain)               // flush idZotero's pending write-back
-                ok = pollUntil(timeout: 6) { blockOnDisk() }
-            }
-            return ok
+        // Ensure styled: in RAW mode the editor shows the literal `zotero://select…` header source;
+        // that never appears in styled mode (it renders as a chip). Toggle back to styled if raw.
+        if ((editor.value as? String) ?? "").contains("zotero://select") {
+            XCTAssertTrue(rawToggle.waitForExistence(timeout: 5), "raw toggle should exist")
+            rawToggle.click()
+            XCTAssertTrue(
+                pollUntil(timeout: 5) {
+                    !(((editor.value as? String) ?? "").contains("zotero://select"))
+                },
+                "the target editor must reach styled mode before source-block paste"
+            )
         }
 
-        // Primary: ⌘⇧V. Fallback: the Edit-menu item (title-located, Reader-harness parity).
-        var wrote = attempt { app.activate(); app.typeKey("v", modifierFlags: [.command, .shift]) }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        XCTAssertTrue(pb.setString(link, forType: .string), "should seed the pasteboard with the link")
+        XCTAssertTrue(setEditorSelection(location: 0, length: 0),
+                      "the DEBUG selection seam must place a defined caret before paste")
+
+        // Drive the real command through its deterministic menu item. The ⌘⇧V binding is declared on
+        // this same Button in SourceBlockCommands and needs no first-responder timing test; intermittently
+        // missing that synthesized keystroke was what made this check spend its long retry path.
+        app.activate()
+        let editMenu = app.menuBars.menuBarItems["Edit"]
+        XCTAssertTrue(editMenu.waitForExistence(timeout: 5), "the Edit menu should exist")
+        editMenu.click()
+        let pasteItem = app.menuItems["Paste as Source Block(s)"]
+        XCTAssertTrue(pasteItem.waitForExistence(timeout: 3),
+                      "Edit ▸ Paste as Source Block(s) should be present")
+        pasteItem.click()
+
+        var wrote = pollUntil(timeout: 4) { blockOnDisk() }
         if !wrote {
-            wrote = attempt {
-                let editMenu = app.menuBars.menuBarItems["Edit"]
-                if editMenu.waitForExistence(timeout: 5) {
-                    editMenu.click()
-                    let item = app.menuItems["Paste as Source Block(s)"]
-                    if item.waitForExistence(timeout: 3) { item.click() }
-                }
-            }
+            selectItem(uuid: Self.idPlain)   // flush idZotero's pending write-back (W7-S6)
+            wrote = pollUntil(timeout: 6) { blockOnDisk() }
         }
 
-        XCTAssertTrue(wrote, "⌘⇧V / Edit ▸ Paste as Source Block(s) should insert a reader-page block")
+        XCTAssertTrue(wrote, "Edit ▸ Paste as Source Block(s) should insert a reader-page block")
         let bodyAfter = rawMarkdown(inItemDir: uuid) ?? ""
         XCTAssertTrue(bodyAfter.contains("block: reader-page"),
                       "the note should carry a reader-page provenance block after the paste")
-        XCTAssertTrue(bodyAfter.contains("archivereader://reveal?root=\(Self.corpusRootGUID)"),
-                      "the pasted block should preserve the durable reader link")
+        XCTAssertTrue(bodyAfter.contains("link: \(link)"),
+                      "the pasted block should preserve the complete durable reader link")
         // The pre-existing zotero-item block must survive (paste is additive, not a replace).
         XCTAssertTrue(bodyAfter.contains("block: zotero-item"),
                       "the paste must be additive — the note's original zotero-item block should remain")
