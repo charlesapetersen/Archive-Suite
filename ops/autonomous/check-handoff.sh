@@ -26,7 +26,11 @@ set -uo pipefail
 # Resolve the PRIMARY checkout from wherever we are — a worktree's common dir points at it. Never write a
 # bare `cd "$REPO"`: with REPO unset that is `cd ""`, which bash and zsh treat as a silent no-op (rc 0).
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "check-handoff: not inside a git repo" >&2; exit 2; }
-ROOT="$(dirname "$(git rev-parse --git-common-dir)")"
+# `--git-common-dir` answers RELATIVELY (`.git`) when you are standing in the primary checkout and
+# absolutely when you are in a worktree, so `dirname` alone yields `.` in the primary case. `git worktree
+# list` always answers absolutely, and step 1 identifies the primary by comparing against this value — so
+# a relative ROOT made the primary checkout fail to match and get reported as a stray worktree. Resolve it.
+ROOT="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" 2>/dev/null && pwd)"
 [ -d "$ROOT" ] || { echo "check-handoff: cannot resolve the primary checkout" >&2; exit 2; }
 PLAN="${AUTONOMOUS_PLAN:-$ROOT/.maintenance/AUTONOMOUS_PLAN.md}"
 TODO="$ROOT/SUITE_TODO.md"
