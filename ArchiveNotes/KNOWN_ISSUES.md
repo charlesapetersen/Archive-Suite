@@ -3,6 +3,15 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W3.notes-extract-title-code-span-references) — code typed into an inline span became parsed filename markup
+
+**2026-08-12.** Extract titles are durable: `createExtract` writes them to front matter and uses the same
+value for the note's filename. The title pass ran its image and link regexes across the whole line before the
+code-span-aware scanner, so `` `[a](b)` `` became `a` and `` `![a](b)` `` disappeared. Matched code spans are
+now protected before the shared `InlineImageMarkdown` patterns run, then restored verbatim. The Tier-2
+scratch-store test reads back the filename, front matter, and body after the real create → write → reload
+cycle; it never touches a real Notes store or archive corpus.
+
 ## ✅ FIXED (W23.h3-fu) — a replicate could slip a live membership onto a note already bound for the Trash
 
 **2026-07-31.** W23.h3 closed the delete-last-instance *decision*: `removeConfirmedLastMembership` reads its

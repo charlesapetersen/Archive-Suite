@@ -487,17 +487,14 @@ struct ExtractTitleTests {
                                             fallbackDate: epoch) == "https://example.com")
     }
 
-    /// **Known divergence, pinned rather than fixed** — `W3.notes-extract-title-code-span-references`.
-    /// The image and link passes are line-wide regexes, so a reference inside a code span is reduced
-    /// even though CommonMark renders it literally. Pre-existing in shape (the image strip has always
-    /// done this) and widened here to links; fixing it means teaching the code-span scanner the
-    /// reference grammar, which is a bigger change than this item. This test flips when that lands.
-    @Test("a reference inside a code span is reduced anyway (known divergence)")
-    func referenceInsideACodeSpanIsReducedAnyway() {
+    /// A reference inside code is typed content, not an image or link. It is important that this is
+    /// true for both spellings, because the resulting title is also the extract's filename.
+    @Test("references inside a code span stay literal in the extract title")
+    func referencesInsideACodeSpanStayLiteral() {
         #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`[a](b)`")],
-                                            fallbackDate: epoch) == "a")
+                                            fallbackDate: epoch) == "[a](b)")
         #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`![a](b)` tail")],
-                                            fallbackDate: epoch) == "tail")
+                                            fallbackDate: epoch) == "![a](b) tail")
     }
 
     /// A fenced block is exempt for real — `defaultTitle` takes those lines verbatim, so a code line
@@ -956,6 +953,32 @@ struct ExtractNestedSourceHeaderTests {
         // Survives the round trip, so the next save is not a rename.
         let reloaded = try await store.load(created.id)
         #expect(reloaded.title == "Example Doc")
+    }
+
+    /// **W3.notes-extract-title-code-span-references — Tier-2 disk check.** `wrapInlineCode`
+    /// deliberately writes its content raw, so a code-span reference must reach both title surfaces
+    /// literally rather than being treated as a link or image. This drives the real write on a scratch
+    /// store and reads back the filename and durable front-matter bytes.
+    @Test("a code-span reference lands literal in the front matter AND the filename")
+    func codeSpanReferenceIsLiteralOnDisk() async throws {
+        let (store, tmp) = try scratch(); defer { cleanup(tmp) }
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1968",
+            segments: [.init(sourceBlockIndex: 0, markdown: "`[a](b)`\nbody\n")])
+        let builder = ExtractBuilder(store: store, now: { Date(timeIntervalSince1970: 1_000_000_000) })
+        let created = try await builder.createExtract(from: ExtractBuilder.passageBlocks(from: payload))
+
+        let url = try await store.mdURL(for: created.id)
+        #expect(url.lastPathComponent == "[a](b).md",
+                "a code reference was reduced in the filename: \(url.lastPathComponent)")
+
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        #expect(raw.contains("title: \"[a](b)\"\n"),
+                "a code reference was reduced in the front matter:\n\(raw)")
+        #expect(raw.contains("`[a](b)`"), "the extract body must remain verbatim:\n\(raw)")
+
+        let reloaded = try await store.load(created.id)
+        #expect(reloaded.title == "[a](b)")
     }
 
     /// The choke-point half: even a passage handed straight to `createExtract` — bypassing the

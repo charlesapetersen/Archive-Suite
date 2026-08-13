@@ -5491,6 +5491,28 @@ explain why not.
   regexes, so a reference inside a CODE SPAN is stripped/reduced even though CommonMark renders it literally.
   Pre-existing in shape (the image strip has always done this) and widened here to links; pinned by a
   characterization test that flips when it is fixed.
+- [x] **W3.notes-extract-title-code-span-references — a markdown reference inside a CODE SPAN was stripped
+  from the extract title, so a first line of `` `[a](b)` `` named the file `a.md` instead of `[a](b).md`
+  [XS · LOW · data-shaped].** ✅ **SHIPPED 2026-08-12** — commit whose subject begins
+  `fix(notes,trackers): W3.notes-extract-title-code-span-references`.
+  Filed 2026-08-12 by the `W3.notes-extract-title-link-markdown` adversarial pass. **Pre-existing in shape and
+  widened by it:** `ExtractBuilder.strippedTitleLine` ran the image strip and link reduction as line-wide
+  regexes before the character scanner that alone knew about code spans. CommonMark processes no reference
+  inside one — `` `![a](b)` `` and `` `[a](b)` `` render literally — and
+  `MarkdownBridge.wrapInlineCode` writes the operator's text into backticks **raw**, so this deleted code the
+  operator actually typed in a string that becomes the extract's `title:` front matter and `.md` filename.
+  **The cheap fix was wrong:** skipping every line containing a backtick would discard ordinary titles, and a
+  fourth regex cannot decide a span (a backtick run opens one only if a run of exactly the same length closes
+  it; fenced-block state is similarly carried by `defaultTitle`).
+  **The fix keeps the grammar singular.** `strippedInlineMarkers` now protects matched code spans with a
+  per-line collision-free sentinel, applies `InlineImageMarkdown`'s existing image-then-link patterns only to
+  non-code text, resolves ordinary inline markers, then restores the raw code. This keeps image-before-link
+  ordering for a clickable image while ensuring no reference grammar is open-coded in the scanner. Fenced code
+  was already correct because `defaultTitle` takes it verbatim.
+  **Tier-2 evidence:** the characterization test now asserts both code-span spellings remain literal, and a
+  scratch-store `createExtract` → write → reload test reads `[a](b).md`, quoted `title: "[a](b)"`, and the
+  unchanged markdown body from durable bytes. Notes-local; no ArchiveCore contract or corpus touched.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/ExtractBuilder.swift, ArchiveNotes/macOS/Tests/ArchiveNotesTests/ExtractBuilderTests.swift | XS | low | Tier-2
 - [x] **W3.notes-image-dest-paren — a `)` in an inline image's PATH truncated the reference AND spilled the
   rest of the path into the note body as prose [XS · LOW · data-shaped · hand-edit entry only].** ✅ **SHIPPED
   2026-08-12** — `8946e55` (code + 9 tests) and the commit whose subject begins

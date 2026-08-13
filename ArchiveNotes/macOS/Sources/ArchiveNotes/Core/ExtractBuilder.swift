@@ -392,39 +392,17 @@ struct ExtractBuilder {
 
     nonisolated private static func strippedTitleLine(_ line: String) -> String {
         var s = line
-        // Drop inline images entirely so an image-only line reads as empty and is skipped. The
-        // grammar comes from `InlineImageMarkdown` so that an ESCAPED alt text
-        // (`![Moore \[draft\]](assets/p1.png)`) is still recognised as an image — against the old
-        // local pattern it survived stripping and became the extract's title
-        // (W3.notes-thumb-line-duplicates-fu1).
-        s = s.replacingOccurrences(of: InlineImageMarkdown.strippingPatternSource,
-                                   with: "", options: .regularExpression)
         s = s.trimmingCharacters(in: .whitespaces)
         // Strip leading block markers: ATX headings, blockquotes, unordered + ordered list bullets.
         s = s.replacingOccurrences(of: #"^\s*(#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)+"#,
                                    with: "", options: .regularExpression)
-        // Reduce a LINK to its label — kept, not deleted, because the label is what CommonMark
-        // renders and usually the good title. A pasted URL is ordinary use and the editor writes it
-        // `[Label](https://example.com)`, so before this the whole construct became the extract's
-        // `title:` AND its filename, the scheme's `/` turning into `-` on the way
-        // (`https---example.com`) — W3.notes-extract-title-link-markdown.
-        //
-        // Placed HERE, in the middle of the pass, for two reasons that are both load-bearing:
-        //  - AFTER the image strip, because the two patterns differ only by the bang, so a link match
-        //    would otherwise eat the `[alt](path)` out of an image and leave a `!`;
-        //  - AFTER the block-marker strip and BEFORE `strippedInlineMarkers`, because a `#` inside a
-        //    link LABEL is literal text (`[# Heading](u)` renders `# Heading`) while the label's
-        //    escapes and emphasis markers are not — the label is `escapeAlt` output, so it owes the
-        //    same resolving pass as any other inline text, and `$1` is what hands it over.
-        s = s.replacingOccurrences(of: InlineImageMarkdown.linkPatternSource,
-                                   with: "$1", options: .regularExpression)
         s = strippedInlineMarkers(s)
         return s.trimmingCharacters(in: .whitespaces)
     }
 
-    /// Drop inline emphasis markers and resolve backslash escapes — in ONE pass, because they cannot
-    /// be two: an escape is precisely what says a marker is not a marker, and a code span is what says
-    /// neither of them applies at all.
+    /// Drop inline images, reduce links to their labels, then drop emphasis markers and resolve
+    /// backslash escapes. Code spans are protected before the reference passes, because their contents
+    /// are literal CommonMark text rather than title markup.
     ///
     /// **W3.notes-image-label-trailing-backslash.** This used to be `[*_`]` → `""` with no unescaping
     /// at all, so `MarkdownBridge.escapeMarkdown`'s own output came back through it wrong in both
@@ -449,10 +427,73 @@ struct ExtractBuilder {
     /// and renders nothing), and an *unmatched* backtick run is dropped as a stray marker rather than
     /// shown literally.
     ///
-    /// The escape half repeats `InlineImageMarkdown.unescapeAlt`'s loop, and stopped being able to
-    /// share it once code spans entered — but the rule deciding *which* backslashes are escapes is
-    /// sourced from the grammar owner (`isEscapable`), so the two cannot drift on that.
+    /// Images go first because a link pass would otherwise eat an image's `[alt](path)` suffix and
+    /// leave a `!`; links then reduce to their labels. Both patterns come from the grammar owner.
+    /// That work happens only after `protectingCodeSpans` has replaced code content with collision-free
+    /// sentinels, so a reference inside code reaches the filename verbatim
+    /// (`W3.notes-extract-title-code-span-references`). The escape half repeats
+    /// `InlineImageMarkdown.unescapeAlt`'s loop, and stopped being able to share it once code spans
+    /// entered — but the rule deciding *which* backslashes are escapes is sourced from the grammar
+    /// owner (`isEscapable`), so the two cannot drift on that.
     nonisolated private static func strippedInlineMarkers(_ line: String) -> String {
+        let (protected, codeSpans) = protectingCodeSpans(in: line)
+        var s = protected
+        s = s.replacingOccurrences(of: InlineImageMarkdown.strippingPatternSource,
+                                   with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: InlineImageMarkdown.linkPatternSource,
+                                   with: "$1", options: .regularExpression)
+        s = strippedNonCodeInlineMarkers(s)
+        for (token, content) in codeSpans {
+            s = s.replacingOccurrences(of: token, with: content)
+        }
+        return s
+    }
+
+    /// Replace each matched code span with a token that cannot occur in this line. Regexes can then
+    /// work on the non-code portions as one string, preserving image-before-link ordering even for an
+    /// image wrapped in a link. An escaped backtick stays in ordinary text and an unmatched run stays
+    /// for `strippedNonCodeInlineMarkers` to discard, matching the previous title behaviour.
+    nonisolated private static func protectingCodeSpans(in line: String) ->
+        (protected: String, codeSpans: [(token: String, content: String)]) {
+        let chars = Array(line)
+        var sentinel = "\u{E000}"
+        while line.contains(sentinel) { sentinel.append("\u{E000}") }
+
+        var protected = ""
+        protected.reserveCapacity(line.count)
+        var codeSpans: [(token: String, content: String)] = []
+        var i = 0
+        while i < chars.count {
+            let ch = chars[i]
+            if ch == "\\" {
+                protected.append(ch)
+                i += 1
+                if i < chars.count {
+                    protected.append(chars[i])
+                    i += 1
+                }
+            } else if ch == "`" {
+                let run = backtickRunLength(chars, at: i)
+                if let close = closingBacktickRun(chars, after: i + run, length: run) {
+                    let token = "\(sentinel)\(codeSpans.count)\(sentinel)"
+                    codeSpans.append((token, codeSpanContent(chars[(i + run)..<close])))
+                    protected += token
+                    i = close + run
+                } else {
+                    protected += String(repeating: "`", count: run)
+                    i += run
+                }
+            } else {
+                protected.append(ch)
+                i += 1
+            }
+        }
+        return (protected, codeSpans)
+    }
+
+    /// The marker and escape pass after matched code spans have been protected. It deliberately has
+    /// no code-span branch: any remaining backtick run is unmatched and therefore a stray marker.
+    nonisolated private static func strippedNonCodeInlineMarkers(_ line: String) -> String {
         let chars = Array(line)
         var out = ""
         out.reserveCapacity(chars.count)
@@ -470,16 +511,7 @@ struct ExtractBuilder {
                 afterBackslash = true
                 i += 1
             } else if ch == "`" {
-                // A backtick run opens a code span only if a run of exactly the same length closes it.
-                // An ESCAPED backtick never reaches here — the branch above consumed it — which is
-                // also CommonMark's rule.
-                let run = backtickRunLength(chars, at: i)
-                if let close = closingBacktickRun(chars, after: i + run, length: run) {
-                    out += codeSpanContent(chars[(i + run)..<close])
-                    i = close + run
-                } else {
-                    i += run
-                }
+                i += backtickRunLength(chars, at: i)
             } else if ch == "*" || ch == "_" {
                 i += 1
             } else {
