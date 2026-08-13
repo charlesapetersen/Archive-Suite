@@ -210,7 +210,9 @@ macOS/Sources/ArchiveNotes/
                                    append (snapshot copy via NoteStore.importAsset), defaultTitle
                                    (which is also the .md FILENAME, so its stripping pass resolves
                                    backslash escapes and exempts code spans + fenced blocks —
-                                   W3.notes-image-label-trailing-backslash),
+                                   W3.notes-image-label-trailing-backslash — and DROPS an image but
+                                   REDUCES a link to its label, the label then going through the same
+                                   escape pass: W3.notes-extract-title-link-markdown),
                                    extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1);
                                    passagePayload (copy side) + pastedExtractMarkdown (paste side) (W7-S2);
                                    pastedExtractMarkdown(from:importingAssetsVia:) imports paste bytes into
@@ -219,7 +221,11 @@ macOS/Sources/ArchiveNotes/
                                    the S3 jump-to-source side) + EditorPassageSource (the live
                                    PassageSelectionSource over a value snapshot of the editor text —
                                    D7 independence; snapshotMarkdown → CommonMark + inline-image bytes) (W7-S2)
-    InlineImageMarkdown.swift      The ONE owner of the `![alt](path)` grammar — escape-aware pattern
+    InlineImageMarkdown.swift      The ONE owner of the `![alt](path)` grammar — AND of the bang-less
+                                   `[label](dest)` LINK form, since CommonMark's image is a link with a
+                                   bang in front; both are built from one referenceSource(image:
+                                   allowEmpty:), so they cannot drift (W3.notes-extract-title-link-
+                                   markdown) — escape-aware pattern
                                    (possessive: backtracking here is waste), emit(alt:path:), the
                                    label escape/unescape pair (CommonMark ASCII-punctuation rule), and
                                    the destination pair destination(_:)/decodeDestination(_:): both of

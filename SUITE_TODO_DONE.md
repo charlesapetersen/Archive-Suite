@@ -5443,7 +5443,54 @@ explain why not.
   touched. No migration written because there is nothing to migrate (standing premise, owner 2026-08-01).
   **Residual filed: `W3.notes-extract-title-link-markdown`** — the same title pass strips images but not
   LINKS, so a first line that is a pasted URL names the file `[Label](https---example.com).md`. Pre-existing,
-  untouched here, and more reachable than anything in this item.
+  untouched here, and more reachable than anything in this item. ✅ SHIPPED 2026-08-12, entry below.
+- [x] **W3.notes-extract-title-link-markdown — a first line that is a LINK titled the extract with the raw
+  markdown, so the `.md` was filed as `[Label](https---example.com).md` [S · LOW · data-shaped].** ✅ **SHIPPED
+  2026-08-12** — `152f480` (code + 13 new tests) and the commit whose subject begins
+  `fix(notes,trackers): W3.notes-extract-title-link-markdown`, which carries this move (a self-referential sha
+  cannot be written into its own commit).
+  Filed by the `W3.notes-image-label-trailing-backslash` adversarial pass. `ExtractBuilder.strippedTitleLine`
+  stripped inline IMAGES, emphasis, code and leading block markers, but not LINKS, so `defaultTitle` returned
+  the whole construct — into the extract's `title:` front matter *and*, via `NoteStore.sanitizedTitle` (which
+  maps only `/` and `:`), its FILENAME, the scheme's `/` becoming `-`.
+  📌 **Reachability is PROVEN, not asserted.** The markdown in the Tier-2 disk test is not hand-written: it is
+  `MarkdownBridge.serialize`'s output for an `.link` run — i.e. what a pasted URL becomes. Pre-fix that test
+  reads `[Example Doc](https---example.com).md` off a real (scratch) disk. A first assertion pins the emitter's
+  shape, so if `serialize` ever stops writing `[text](url)` the test says *re-check the premise* rather than
+  quietly guarding nothing.
+  **The fix REDUCES rather than deletes** — an image-only line has no title in it, but a link's LABEL is what
+  CommonMark renders and usually the title the operator meant. Its POSITION in the pass is three decisions:
+  *after* the image strip (the two patterns differ only by the bang, so a link match would otherwise eat the
+  `[alt](path)` out of an image and leave a `!`); *after* the leading-block-marker strip (a `#` inside a link
+  label is literal text — `[# Heading](u)` renders `# Heading`); *before* `strippedInlineMarkers` (the label is
+  `escapeAlt`/`escapeMarkdown` output, so it owes the same escape-resolving pass as any other inline text —
+  `$1` is what hands it over). Each of the three has its own test.
+  The pattern comes from **`InlineImageMarkdown`**, which now builds both spellings from one
+  `referenceSource(image:allowEmpty:)`: CommonMark's image *is* a link with a bang in front, and a second
+  nearly-identical pattern elsewhere is the exact failure that type exists to prevent (cf. the two `isEscapable`
+  copies in the item above). `patternSource`/`strippingPatternSource` are byte-identical by construction — the
+  same expression, refactored — so the editor's image rendering is untouched.
+  ⛔ **DECIDED OUT OF SCOPE (the filing asked): an autolink `<https://…>` and a bare URL.** Neither is reachable
+  from the emitter (`MarkdownBridge.serialize` writes every link as `[text](url)`), and CommonMark renders both
+  AS the URL — so reducing them would swap `<https---x>.md` for `https---x.md`, no real gain for a wider
+  grammar. What is ugly there is `sanitizedTitle`'s mapping of `:` and `/`, which is not this pass's business.
+  **Pinned by a test** so the decision is visible rather than looking like an omission.
+  📌 Gate was **MUTATION** (sources reverted, tests kept): **10 red**, including all three assertions of the
+  Tier-2 scratch-store disk test. Four stay green against both versions on purpose — the over-fix guards (an
+  image is still DELETED and leaves no `!`; brackets that are not a reference are left alone) plus the
+  out-of-scope and fenced-verbatim pins.
+  Verified: Notes unit bundle **838 tests / 84 suites**, `** TEST SUCCEEDED **`, no new warnings;
+  `ArchiveNotesUITests` **20/20** in the headless Tart VM (361.0 s, off the owner's screen) — run because the
+  refactor touches the grammar the EDITOR renders images with, not just the title path. `defaultTitle` has
+  exactly ONE call site (`createExtract`) and `append` does not re-title, so there is no second surface;
+  `InlineImageMarkdown` is Notes-local (nothing in ArchiveCore) → no cross-app rebuild owed; and the reduction
+  only ever REMOVES characters, so it introduces no new filename character class. Scratch `mktemp` stores only,
+  no corpus touched. No migration written because there is nothing to migrate (standing premise, owner
+  2026-08-01).
+  **Residual filed: `W3.notes-extract-title-code-span-references`** — the image and link passes are line-wide
+  regexes, so a reference inside a CODE SPAN is stripped/reduced even though CommonMark renders it literally.
+  Pre-existing in shape (the image strip has always done this) and widened here to links; pinned by a
+  characterization test that flips when it is fixed.
 - [x] **W3.notes-image-dest-paren — a `)` in an inline image's PATH truncated the reference AND spilled the
   rest of the path into the note body as prose [XS · LOW · data-shaped · hand-edit entry only].** ✅ **SHIPPED
   2026-08-12** — `8946e55` (code + 9 tests) and the commit whose subject begins

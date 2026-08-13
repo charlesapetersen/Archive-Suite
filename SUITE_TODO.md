@@ -1263,19 +1263,26 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-extract-title-link-markdown — a first line that is a LINK titles the extract with the raw markdown, so the `.md` is filed as `[Label](https---example.com).md` [S · LOW · data-shaped].**
-  Filed 2026-08-12 by the `W3.notes-image-label-trailing-backslash` adversarial pass, which found it while
-  clearing that item's title path. **Pre-existing and untouched by it** — and far more reachable than any
-  escape case in that item, because a pasted URL is ordinary use. `ExtractBuilder.strippedTitleLine` strips
-  inline IMAGES (`![…](…)`), emphasis, code and leading block markers, but not LINKS; `MarkdownBridge.swift`
-  emits one as `[\(inner)](\(urlStr))`, so `defaultTitle` returns the whole construct. It lands in the
-  extract's `title:` front matter *and*, via `NoteStore.sanitizedTitle` (which maps only `/` and `:`), its
-  filename — the `/` of the scheme becoming `-`, hence `https---example.com`.
-  The fix is the same shape as the image strip that is already there: reduce a link to its LABEL (CommonMark's
-  rendering) rather than deleting it, since the label is usually the good title. Note the label is itself
-  escaped markdown, so it must go through the same escape-resolving pass — do it INSIDE `strippedTitleLine`,
-  after the image strip and before `strippedInlineMarkers`, not as a fourth regex bolted on the end.
-  ⚠️ An autolink (`<https://…>`) and a bare URL are different shapes; decide whether they are in scope.
+- [ ] **W3.notes-extract-title-code-span-references — a markdown reference inside a CODE SPAN is still stripped from the extract title, so a first line of `` `[a](b)` `` names the file `a.md` instead of `[a](b).md` [XS · LOW · data-shaped].**
+  Filed 2026-08-12 by the `W3.notes-extract-title-link-markdown` adversarial pass. **Pre-existing in shape and
+  widened by it:** `ExtractBuilder.strippedTitleLine` runs the image strip and the new link reduction as
+  line-wide REGEXES, before the char-by-char `strippedInlineMarkers` that is the only part of the pass that
+  knows what a code span is. CommonMark processes no reference inside one — `` `![a](b)` `` and `` `[a](b)` ``
+  render literally — and `MarkdownBridge.wrapInlineCode` writes the operator's text into backticks **raw**, so
+  this deletes code the operator actually typed, in a string that becomes the extract's `title:` front matter
+  and its `.md` filename. The image half has behaved this way since the strip was written; the link half
+  inherited it 2026-08-12 rather than introducing it.
+  ⚠️ **The cheap fix is the wrong one.** Skipping a line that merely *contains* a backtick would give up
+  ordinary titles, and a fourth regex cannot decide a span (a backtick run opens one only if a run of exactly
+  the same length closes it — `strippedInlineMarkers` already implements that rule, and `defaultTitle` carries
+  fenced-block state across lines for the same reason). The real fix is to teach the existing scanner the
+  reference grammar, taking the pattern from `InlineImageMarkdown` (which now owns both spellings via
+  `referenceSource(image:allowEmpty:)`) rather than open-coding a second copy of it in the scanner — that
+  duplication is the failure mode that type exists to prevent. Note a FENCED block is already exempt and
+  correct: `defaultTitle` takes those lines verbatim.
+  Pinned meanwhile by `ExtractTitleTests` → "a reference inside a code span is reduced anyway (known
+  divergence)", which flips when this lands. Reachability is real but narrow (an operator whose first line is
+  code containing a markdown reference), which is why it is LOW rather than folded into the item that found it.
   Tier-2 (it writes a filename). | ArchiveNotes/Editor | Tier-2
 - [ ] **W3.notes-header-field-terminator — `serializeHeader` writes every field value RAW into a line-based, comment-delimited header, so a terminator or a `-->` inside `link`/`display` truncates the durable link, leaks pasted text into the note body, or splits one block into two and destroys the first one's provenance [S–M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-paste-url-line-split` adversarial pass; **pre-existing**, and NOT the
