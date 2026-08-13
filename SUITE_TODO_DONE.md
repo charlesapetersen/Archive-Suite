@@ -6086,6 +6086,29 @@ explain why not.
   | ArchiveNotes/Sources | Tier-1 (gated Tier-2 anyway — it decides what provenance the operator's note
   keeps) | done
 
+- [x] **W3.notes-paste-url-line-split-fu1 — two Reader links separated by a VERTICAL TAB or U+2028 collapsed
+  into one line: page links yielded nothing, and doc-level links yielded one block whose `relativePath`
+  swallowed the next link [XS · LOW · provenance].** ✅ **SHIPPED 2026-08-12** — commit whose subject begins
+  `fix(notes,trackers): W3.notes-paste-url-line-split-fu1`.
+  Filed by the parent CR/CRLF fix; **pre-existing** and not a regression. `BlockParser.splitLines` deliberately
+  recognizes only LF, CRLF, and lone CR, so a pasted list separated by VT `U+000B` (Word soft break), FF
+  `U+000C`, LINE SEPARATOR `U+2028`, or PARAGRAPH SEPARATOR `U+2029` arrived as one line. Re-measured against
+  `adbe271`, the parent bug survived in both shapes: page links (`page=` last, as Reader emits) produced zero
+  entries because the swallowed text contaminated the page number, while doc-level links produced a plausible
+  single entry whose `rel` named `a.pdf<SEP>archivereader://…`.
+  **The scope decision is the fix.** `SourceBlockPaster` normalizes those four separators to LF only for its
+  plain-text pasteboard fallback, then still calls `BlockParser.splitLines` for canonical CR/LF behavior.
+  `BlockParser`, front matter, and note bodies therefore keep their existing semantics; a focused guard proves
+  the global parser still sees one line while the paster yields two clean entries. Widening
+  `containsLineTerminator` alone was never a fix — it turns the bad doc-level entry into the same zero-entry
+  result as page links — so the existing guard stays the backstop only for percent-encoded terminators.
+  **Acceptance is explicit:** both two-page and two-doc link pairs are asserted over every rich-text
+  separator, including their `relativePath`s rather than just their count; `SourceBlockPasterTests` is now 28
+  tests. Verified: Notes unit bundle **839 Swift Testing tests / 84 suites + XCTest 220**, `** TEST
+  SUCCEEDED **`, no new warnings. Pure parsing tests only; no store or corpus write, no ArchiveCore change,
+  and no GUI owed.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Sources/SourceBlockPaster.swift, ArchiveNotes/macOS/Tests/ArchiveNotesTests/SourceBlockPasterTests.swift | XS | low | Tier-1
+
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
   command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine

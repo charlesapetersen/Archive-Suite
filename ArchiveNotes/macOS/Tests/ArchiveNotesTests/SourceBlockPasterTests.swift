@@ -168,6 +168,14 @@ final class SourceBlockPasterTests: XCTestCase {
         ("LF", "\n"), ("CRLF", "\r\n"), ("lone CR", "\r")
     ]
 
+    /// Rich-text applications use these as visual row boundaries. They are deliberately PASTE-only:
+    /// `BlockParser.splitLines` keeps them as note-body text, while `scanURLs` turns each into a URL-row
+    /// boundary before it delegates the resulting CR/LF parsing to that shared authority.
+    private static let richTextLineSeparators: [(name: String, sep: String)] = [
+        ("VERTICAL TAB", "\u{000B}"), ("FORM FEED", "\u{000C}"),
+        ("LINE SEPARATOR", "\u{2028}"), ("PARAGRAPH SEPARATOR", "\u{2029}")
+    ]
+
     func testScanURLsTwoLinksSplitOnEveryLineTerminator() {
         for (name, sep) in Self.lineTerminators {
             let text = scanLink("a.pdf", page: 1) + sep + scanLink("Letters/b.pdf") + sep
@@ -181,6 +189,26 @@ final class SourceBlockPasterTests: XCTestCase {
             XCTAssertEqual(entries[0].anchor.page, 1, "\(name)")
             XCTAssertEqual(entries[1].kind, .readerDoc, "\(name)")
             XCTAssertEqual(entries[1].anchor.display, "b", "\(name)")
+        }
+    }
+
+    /// The issue's two distinct failures need separate rows: page links are dropped when the separator
+    /// contaminates `page=`, while doc-level links still return a plausible count with the second URL
+    /// swallowed into `rel`. Assert the actual rels in BOTH shapes for every rich-text separator.
+    func testScanURLsTwoPageAndDocLinksSplitOnEveryRichTextSeparator() {
+        for (name, sep) in Self.richTextLineSeparators {
+            let pages = SourceBlockPaster.scanURLs(in: scanLink("a.pdf", page: 1) + sep
+                                                    + scanLink("Letters/b.pdf", page: 2))
+            XCTAssertEqual(pages.count, 2, "\(name): both page links should be recognized")
+            XCTAssertEqual(pages.compactMap(relativePath(of:)), ["a.pdf", "Letters/b.pdf"],
+                           "\(name): page-link rels must be clean")
+            XCTAssertEqual(pages.compactMap(\.anchor.page), [1, 2], "\(name): pages must survive")
+
+            let docs = SourceBlockPaster.scanURLs(in: scanLink("a.pdf") + sep + scanLink("Letters/b.pdf"))
+            XCTAssertEqual(docs.count, 2, "\(name): both doc-level links should be recognized")
+            XCTAssertEqual(docs.compactMap(relativePath(of:)), ["a.pdf", "Letters/b.pdf"],
+                           "\(name): doc-level rels must be clean")
+            XCTAssertTrue(docs.allSatisfy { $0.kind == .readerDoc }, "\(name): doc-level kind")
         }
     }
 
@@ -210,20 +238,16 @@ final class SourceBlockPasterTests: XCTestCase {
         XCTAssertEqual(entries.compactMap(relativePath(of:)), ["a.pdf", "b.pdf"])
     }
 
-    /// The trim half of the fix, isolated. `BlockParser.splitLines` CONSUMES a CR/LF terminator, so for
-    /// those the trim has nothing left to remove — mutating it back to `.whitespaces` keeps every row
-    /// above green, which is why this test exists. What `.whitespacesAndNewlines` still reaches is the
-    /// separators `splitLines` does not treat as line breaks and a rich-text paste really produces:
-    /// VERTICAL TAB (Word's soft break) and LINE/PARAGRAPH SEPARATOR (what an `NSTextView` copies).
-    /// Measured with `.whitespaces`: VT survives into the rel verbatim, and U+2028/U+2029 arrive as a
-    /// TRAILING SPACE — both anchors that cannot resolve.
-    func testScanURLsTrimsTrailingNonCRLFSeparators() {
-        for (name, sep) in [("VERTICAL TAB", "\u{000B}"), ("FORM FEED", "\u{000C}"),
-                            ("LINE SEPARATOR", "\u{2028}"), ("PARAGRAPH SEPARATOR", "\u{2029}")] {
-            let entries = SourceBlockPaster.scanURLs(in: scanLink("a.pdf") + sep)
-            XCTAssertEqual(entries.count, 1, "\(name): link should still be recognized")
-            XCTAssertEqual(entries.first.flatMap(relativePath(of:)), "a.pdf",
-                           "\(name): separator must not survive into the rel")
+    /// The local scope is the whole point: a rich-text separator is a row boundary for a pasted link list,
+    /// not a new line rule for the operator's Markdown. This fails if the tempting global `splitLines`
+    /// widening is used instead of the paster-local normalization.
+    func testScanURLsKeepsRichTextSeparatorsOutOfTheGlobalLineParser() {
+        for (name, sep) in Self.richTextLineSeparators {
+            let text = scanLink("a.pdf") + sep + scanLink("b.pdf")
+            XCTAssertEqual(BlockParser.splitLines(text).count, 1,
+                           "\(name): note parsing must keep its existing line semantics")
+            XCTAssertEqual(SourceBlockPaster.scanURLs(in: text).compactMap(relativePath(of:)), ["a.pdf", "b.pdf"],
+                           "\(name): the paste seam must split both links locally")
         }
     }
 

@@ -1325,40 +1325,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   `\\` — the pair is asymmetric, so a `display` containing a double quote or a backslash is not a fixed point.
   Whatever guard this item lands, make the quoting symmetric in the same pass; it is the same two functions.
   | ArchiveNotes/Store | Tier-2 (it decides the bytes of the operator's `.md`)
-- [ ] **W3.notes-paste-url-line-split-fu1 — two Reader links separated by a VERTICAL TAB or U+2028 still collapse into one line: page links then yield NOTHING, and doc-level links yield ONE block whose `relativePath` has swallowed the next link [XS · LOW · provenance].**
-  Filed 2026-08-11 by the `W3.notes-paste-url-line-split` fix, which measured it while closing the CR/CRLF
-  case; **pre-existing** and NOT a regression of that fix — the shape was equally broken before it.
-  `BlockParser.splitLines` treats only LF, CR LF and a lone CR as line breaks, so a paste whose links are
-  separated by VERTICAL TAB `U+000B` (a Word soft break), FORM FEED `U+000C`, LINE SEPARATOR `U+2028` or
-  PARAGRAPH SEPARATOR `U+2029` (what an `NSTextView` copies for a soft break) arrives as ONE line.
-  **Re-measured 2026-08-11 against the shipped fix `adbe271` by the completing session (throwaway probe
-  test, two links joined by each of the four separators), and the parent bug survives in BOTH its shapes:**
-  - **page** links (`page=` last — Reader's own Copy-Archive-Link shape) → **0 entries**, all four
-    separators: the swallowed text lands on the trailing `page=` item and `Int` rejects the whole link.
-  - **doc-level** links → **1 entry with a corrupted `rel`**, all four, i.e. an anchor filed against a path
-    that cannot exist: `"a.pdf<SEP>archivereader://reveal?root=…"` (the swallow ends at the next `&`, so the
-    second link's own `rel` is simply lost). The new `BlockParser.containsLineTerminator` guard does **not**
-    catch it (`\r`/`\n` only, by design), so this shape is silent bad provenance rather than a drop — the
-    outcome the parent item cared about most.
-  ⚠️ **Correction to this item's first draft, written before that re-measurement:** it said `U+2028`/`U+2029`
-  "arrive as a plain SPACE". They do not — measured, all four separators survive into the `rel` **verbatim**.
-  Nothing about the fix depends on the difference, but a filing whose detail does not reproduce is a filing
-  the next session stops trusting, and this family is seven items deep on exactly that kind of detail.
-  Only the TRAILING separator case is fixed (the `.whitespacesAndNewlines` trim reaches it, and
-  `testScanURLsTrimsTrailingNonCRLFSeparators` pins it — that test is also the only mutation-proof for the
-  trim half, since `splitLines` consumes CR/LF and so leaves the trim nothing to do on those rows).
-  **The decision is where to split, and it is not obviously in `splitLines`.** Widening that function's
-  terminator set would change how front matter is found and how every block body is parsed
-  (`FrontMatterCodec`, `BlockParser`, `ExtractBuilder` all route through it) — Tier-2, and it would make the
-  app treat a `U+2028` inside an operator's own note as a line break, which may not be wanted. The cheaper
-  option is a paster-local pre-split of the pasted TEXT only, leaving note parsing alone. Pick deliberately.
-  ⚠️ Widening `containsLineTerminator` INSTEAD is not a fix — it converts the doc-level shape from one broken
-  block into zero blocks, which is the page-link outcome, not the wanted one. Split first; the guard is the
-  backstop for what arrives percent-encoded.
-  Acceptance: two links joined by each of the four separators → two entries with clean `relativePath`s, in
-  BOTH the page and the doc-level shape — assert the rels, not just the count, because the doc-level shape
-  already returns a plausible count with the wrong content.
-  | ArchiveNotes/Sources | Tier-1
 - [ ] **W21.vmgui-winsize-writeback — closing the Extracts window in `setUp` fires `.onDisappear`, which writes the SHARED window-size prefs both windows restore from [S · LOW · latent].**
   Filed 2026-08-04. `NotesBrowserView.swift:70` `.onDisappear { … NotesAppSettings.setWindowSize(w.frame.size) }`
   writes the single shared `windowW`/`windowH` keys, and `configureWindow` restores BOTH windows from them.

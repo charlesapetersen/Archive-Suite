@@ -96,9 +96,15 @@ struct SourceBlockPaster {
     /// trailing `page=` item, `Int("1\r\n")` is nil, the whole link is rejected), and a pair of
     /// doc-level links yielded ONE block whose `relativePath` had swallowed the next link
     /// (`"A.pdf\r\narchivereader://reveal?root=…"`).
+    ///
+    /// Rich-text paste also uses VT, FF, LINE SEPARATOR and PARAGRAPH SEPARATOR as row boundaries.
+    /// Normalize those four *only here*, before asking the canonical parser to split: widening
+    /// `BlockParser.splitLines` would rewrite front-matter and note-body semantics. This is intentionally not a wider
+    /// `containsLineTerminator` guard — splitting first preserves both links
+    /// (W3.notes-paste-url-line-split-fu1).
     static func scanURLs(in text: String) -> [PasteEntry] {
         var entries: [PasteEntry] = []
-        for line in BlockParser.splitLines(text) {
+        for line in BlockParser.splitLines(normalizedPastedText(text)) {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let url = URL(string: trimmed),
                   case .readerReveal(_, let rel, let page) = DurableLink(url: url),
@@ -121,6 +127,16 @@ struct SourceBlockPaster {
             ))
         }
         return entries
+    }
+
+    /// Paste-only line separators. `BlockParser` deliberately does not recognize these: in a note body
+    /// they are text, but in a copied Reader-link list they are the same row boundary as a newline.
+    private static let pastedTextOnlyLineSeparators = ["\u{000B}", "\u{000C}", "\u{2028}", "\u{2029}"]
+
+    private static func normalizedPastedText(_ text: String) -> String {
+        pastedTextOnlyLineSeparators.reduce(text) { partial, separator in
+            partial.replacingOccurrences(of: separator, with: "\n")
+        }
     }
 
     // MARK: - Thumbnail import

@@ -3,6 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W3.notes-paste-url-line-split-fu1) — rich-text line breaks merged distinct Reader links
+
+**2026-08-12.** A copied Reader-link list can use VT, FF, U+2028, or U+2029 as its row separator. Those are
+not note-body line breaks, so changing the shared parser would have made a broader, data-format-altering
+change. `SourceBlockPaster` now normalizes only its plain-text paste input before using the canonical parser;
+page and document links each split into clean entries, while `BlockParser` is explicitly pinned to retain its
+prior behavior. The tests are pure parsing checks and make no store or corpus write.
+
 ## ✅ FIXED (W3.notes-extract-title-code-span-references) — code typed into an inline span became parsed filename markup
 
 **2026-08-12.** Extract titles are durable: `createExtract` writes them to front matter and uses the same

@@ -512,11 +512,12 @@ macOS/Tests/ArchiveNotesTests/
                                    unknown-fields preserved, absent-header=freeform, malformed tolerated,
                                    chip-first-char, consecutive-chips, second-round-trip-no-op,
                                    thumb-line-consumed, insert-block-seam, leading-text-preserved
-  SourceBlockPasterTests.swift     27 tests: payload→entries (page/doc/invalid/oversized/multi/
+  SourceBlockPasterTests.swift     28 tests: payload→entries (page/doc/invalid/oversized/multi/
                                    terminator-bearing-rel), scanURLs (page/doc/multi/non-archive/empty/
                                    non-PDF; and W3.notes-paste-url-line-split: two links over LF·CRLF·
-                                   lone-CR, single terminated line, blank/junk lines, trailing VT·FF·
-                                   U+2028·U+2029, percent-encoded %0D rejected), thumbnail
+                                   lone-CR, plus page/doc pairs over paste-only VT·FF·U+2028·U+2029,
+                                   parser-scope guard, single terminated line, blank/junk lines,
+                                   percent-encoded %0D rejected), thumbnail
                                    import (page/doc/collision), pasteboardHasArchiveLinks (UTI/text/no),
                                    readPasteboard (UTI/text/empty), block header §6 round-trip
   PasteboardPassageTests.swift     18 tests (W7-S2): write→read round-trip (incl. asset bytes),
