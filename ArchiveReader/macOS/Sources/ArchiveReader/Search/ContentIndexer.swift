@@ -62,6 +62,16 @@ final class ContentIndexer: ObservableObject {
 #if DEBUG
     /// Deterministic completion seam for async driver tests; not part of user-visible state.
     private(set) var completedPassesForTesting = 0
+
+    /// Close a scratch index before its test directory is reclaimed. Production owns its cache for the
+    /// process lifetime; tests deliberately use short-lived directories and must not unlink an open WAL.
+    func closeForTesting() async {
+        task?.cancel()
+        _ = await task?.value
+        task = nil
+        pending = nil
+        await index.close()
+    }
 #endif
 
     /// Point the driver at a specific index file. The app path uses `init()`; tests pass a scratch

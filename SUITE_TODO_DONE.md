@@ -16,6 +16,22 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
+
+- [x] **`W18.reader-breadcrumb` — Reader Box/Folder provenance breadcrumb column. ✅ SHIPPED 2026-08-13** —
+  commit whose subject begins `feat(reader,trackers): W18 add provenance column`. The existing native table
+  column picker now includes a display-only **Provenance** column backed by the content index's page-2
+  `Classification` value (`Box`, `Folder`, `Document Start`, or `Continuation`). It is hidden once for both
+  fresh and previously customized layouts; after that migration, an explicit show/hide choice persists.
+  Missing or not-yet-indexed values render as an em dash, and the column deliberately has no sort contract.
+
+  The join is read-only and bulk-prepares one SQLite statement for the visible path set. Tests prove the
+  column definition and preference migration, the content-index join (including missing/legacy rows), the
+  nav model's asynchronous publication from an injected scratch index, and pixels rendered by the actual
+  AppKit cell formatter. **Gate:** ordinary signed Debug build green; Reader smoke **400 tests / 0 failures**;
+  write-surface lint clean. No corpus write surface changed.
+
+
 ## Processor build/test gate follow-up (found 2026-08-12)
 
 - [x] **`W21.e2e-fu1` — the documented phone↔Mac Tier-2 harness reaches pairing and completes the full

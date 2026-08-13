@@ -13,6 +13,7 @@ enum SettingsKey {
     static let readFilterDefault = "readFilterDefault"
     static let warnNearDuplicate = "warnNearDuplicateTags"
     static let hiddenColumns = "ar.hiddenColumns"    // [String] — column IDs the user has hidden
+    static let provenanceColumnPreferenceV1 = "ar.provenanceColumnPreferenceV1"
     // Document-viewer "last used becomes the default" layout (DV-1/DV-2): zoom per pane, window size.
     static let viewerLeftZoom = "viewerLeftZoom"     // scaleFactor; 0 = fit-to-pane
     static let viewerRightZoom = "viewerRightZoom"   // scaleFactor; 0 = fit-to-pane
@@ -67,10 +68,25 @@ enum AppSettings {
     }
 
     static var hiddenColumns: Set<String> {
-        Set(d.stringArray(forKey: SettingsKey.hiddenColumns) ?? [])
+        hiddenColumns(in: d)
     }
     static func setHiddenColumns(_ hidden: Set<String>) {
-        d.set(Array(hidden).sorted(), forKey: SettingsKey.hiddenColumns)
+        setHiddenColumns(hidden, in: d)
+    }
+    /// Migrate the new optional column into every pre-W18 layout once. The separate marker distinguishes
+    /// an old saved layout from a user who subsequently chose to show every optional column.
+    static func hiddenColumns(in defaults: UserDefaults) -> Set<String> {
+        var hidden = Set(defaults.stringArray(forKey: SettingsKey.hiddenColumns) ?? [])
+        if !defaults.bool(forKey: SettingsKey.provenanceColumnPreferenceV1) {
+            hidden.insert("classification")
+            defaults.set(Array(hidden).sorted(), forKey: SettingsKey.hiddenColumns)
+            defaults.set(true, forKey: SettingsKey.provenanceColumnPreferenceV1)
+        }
+        return hidden
+    }
+    static func setHiddenColumns(_ hidden: Set<String>, in defaults: UserDefaults) {
+        defaults.set(Array(hidden).sorted(), forKey: SettingsKey.hiddenColumns)
+        defaults.set(true, forKey: SettingsKey.provenanceColumnPreferenceV1)
     }
 
     static var warnNearDuplicateTags: Bool { bool(SettingsKey.warnNearDuplicate, true) }

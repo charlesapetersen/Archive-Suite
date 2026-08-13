@@ -1302,22 +1302,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   all. Note this is *host-only*: `W21.vmgui-d` deliberately avoids it entirely (the VM's keychain holds no
   ArchiveProcessor items, so nothing prompts there). | files: — | XS | low | **owner**
 
-## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
-Wishlist items the owner promoted to near-term after the 2026-07-18 wishlist review. **Note:** the owner also
-asked to queue the **Android `targetSdk` 34→36** bump, but grounding against the real `build.gradle.kts` found
-it **already shipped (`8eb4ef4`)** — the wishlist claim was stale (now corrected in
-`ArchiveProcessor/POTENTIAL_FEATURES.md`). So only the one item below was queued.
-- [ ] **W18.reader-breadcrumb — Reader Box/Folder provenance breadcrumb column [S–M].** Surface each document's
-  Box/Folder provenance (the `Classification` value — `Box`/`Folder`/`Document Start`/`Continuation`) as an
-  optional nav-table column. It is the one unshipped residual of the shipped "Select Document Run" feature
-  (Reader `POTENTIAL_FEATURES.md` High §). **Display-only, no writes → Tier-1** (not a tag-write path). Reuse the
-  existing customizable-column machinery (`Views/AppKitTableView.swift` + `ColumnPickerHeaderView`); the
-  `Classification` already lives in the content index (`Search/ContentIndex.swift`, the same value that drives
-  `DocumentRuns`), so the work is joining it into the nav row model + adding a hide-by-default column (mirror the
-  Notes Sources-column pattern). Daemon-buildable ($0/no key); build + the 186 Reader unit tests + a `RenderProbe`
-  assertion for the new column. **Live GUI confirm → owner tail** (the fixture XCUITest / sighted loop).
-  | files: ArchiveReader/macOS/Sources/ArchiveReader/Views/, Core/ArchiveFile.swift, Search/ContentIndex.swift | S–M | low | none
-
 - [ ] **W22.notes-rename — Archive Notes cannot rename a note from the UI at all [M].** Owner decision
   2026-08-02 (daemon-report walkthrough): **this is a GAP, not a design choice.** He was offered the
   "titles are derived from the archival source, so renaming is intentionally not offered" reading and

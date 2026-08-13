@@ -114,6 +114,17 @@ enum RenderProbe {
         return pngData(from: cg)
     }
 
+    /// Render the real AppKit view used by a table cell. Kept separate from the SwiftUI overload so a
+    /// test cannot accidentally prove that a look-alike SwiftUI label draws while the NSTableCell does not.
+    @MainActor
+    static func pngData(fromAppKitView view: NSView, size: CGSize) -> Data? {
+        view.frame = CGRect(origin: .zero, size: size)
+        view.layoutSubtreeIfNeeded()
+        guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        return bitmap.representation(using: .png, properties: [:])
+    }
+
     /// Encode a `CGImage` to PNG data.
     static func pngData(from cgImage: CGImage) -> Data? {
         let out = NSMutableData()

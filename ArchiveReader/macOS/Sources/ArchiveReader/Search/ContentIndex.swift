@@ -265,8 +265,19 @@ actor ContentIndex {
     }
 
     func classifications(for paths: [String]) -> [String: String] {
+        guard !paths.isEmpty,
+              let stmt = prepare("SELECT classification FROM fts WHERE rowid = "
+                                 + "(SELECT rowid FROM files WHERE path = ?) LIMIT 1;") else { return [:] }
+        defer { sqlite3_finalize(stmt) }
         var out: [String: String] = [:]
-        for p in paths { if let c = classification(for: p) { out[p] = c } }
+        for path in paths {
+            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
+            bindText(stmt, 1, path)
+            if sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) {
+                let value = String(cString: c)
+                if !value.isEmpty { out[path] = value }
+            }
+        }
         return out
     }
 

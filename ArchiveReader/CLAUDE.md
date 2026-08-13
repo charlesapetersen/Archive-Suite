@@ -228,7 +228,9 @@ writes against the real corpus — always a copy.
   shipped `435b8c4`) — virtualized rows + `NSTableViewDiffableDataSource` incremental snapshots + a
   150ms-debounced filter off the keystroke path, so it stays smooth at scale. (This replaced the SwiftUI
   `Table`, which at 40k janked: scroll stutter, per-keystroke whole-collection main-thread re-diff, slow sort.)
-  Columns: Document date, File name, File type, File tags, Read/Unread (+ optional Box/Folder provenance).
+  Columns: Document date, File name, File type, File tags, Read/Unread, plus the display-only **Provenance**
+  (`Box`/`Folder`/`Document Start`/`Continuation`) column. Provenance is hidden by default and can be shown
+  from the native right-click column-header picker; the choice persists (`W18.reader-breadcrumb`).
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
   draggable gray splitter with center grab handle, **default 2/3 : 1/3** — the split, per-pane zoom,
   and window size then persist as the next viewer's default (DV-1/DV-2; **no** per-document reset).
@@ -289,7 +291,8 @@ writes against the real corpus — always a copy.
 - **Tag editing:** warn when a new subject differs only by case from an existing one (on).
 
 > PLAN's §Options listed controls that did **not** ship as toggles (viewer zoom/fit-mode & reset-per-
-> document, "skip OCR header", date-display format, default sort levels, Box/Folder column, controlled-
+> document, "skip OCR header", date-display format, default sort levels, Box/Folder column *as an Options
+> toggle* (W18 instead ships it in the native column-header picker), controlled-
 > vocabulary restriction, large-edit confirm threshold, animation speed, in-panel archive-root
 > management). The shipped panel is the leaner set above; archive roots are chosen via
 > File ▸ Choose Archive Folder…, not the Options panel.
@@ -367,7 +370,8 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
   TriageNavigation.swift      Pure next/previous-unread selection math (skip read, wrap/stop) for G4
                               keyboard triage; touches no file — the caller writes via TagWriter.
-  AppSettings.swift           UserDefaults-backed option accessors the models read at point of use.
+  AppSettings.swift           UserDefaults-backed option accessors the models read at point of use;
+                              one-time default-hidden migration for the optional Provenance column.
 Search/                       Discovery + disposable caches (never the corpus):
   ArchiveLibrary.swift        Warm-cache publication, background revalidation, honest health/absence,
                               verified-write ordering, and FSEvents merge for one granted root.
@@ -386,12 +390,14 @@ Search/                       Discovery + disposable caches (never the corpus):
 Views/
   NavigationModel.swift       Nav view model: filter/sort/selection, folder tree, smart-folder counts,
                               view-state persistence, inline + corpus-wide edits — all via TagWriter.
-                              Smart-folder scope: `scope`/`baseFtsPaths`/`applyScope`/`clearUserFilters`.
+                              Smart-folder scope: `scope`/`baseFtsPaths`/`applyScope`/`clearUserFilters`;
+                              publishes content-index classification for read-only nav-row provenance.
   NavigationWindowView.swift  Results Table (customizable columns), filter bar, sidebar+tag-cloud panels,
                               toolbar, context menus, sheets, header-click sort, focus shortcuts, FlowLayout.
   AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (NSTableViewDiffableDataSource):
                               virtualized rows, incremental snapshot apply, 150ms-debounced filter;
-                              ContextMenuTableView + ContextMenuActions trampoline to NavigationModel.
+                              ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
+                              optional default-hidden Provenance column uses the existing header picker.
   SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
                               (List(selection:)+OutlineGroup). Durable smart-folder highlight; folder
                               selection exits the scope.

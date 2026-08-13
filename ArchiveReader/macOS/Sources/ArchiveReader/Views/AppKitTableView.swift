@@ -9,6 +9,29 @@ import ArchiveCore
 /// and AppKit-native column-header sorting. The data model (`NavigationModel.displayed`) and tag
 /// mutations (`NavigationModel`) are unchanged — this is a VIEW-layer swap only.
 struct AppKitTableView: NSViewRepresentable {
+    struct ColumnDefinition {
+        let id: String
+        let title: String
+        let width: CGFloat
+        let minWidth: CGFloat
+        let maxWidth: CGFloat
+        let sortField: SortField?
+    }
+
+    /// One source for construction and tests. Provenance is display-only and receives a one-time
+    /// default-hidden migration; the existing header picker then persists the explicit user choice.
+    static let columnDefinitions: [ColumnDefinition] = [
+        .init(id: "flag", title: "⚑", width: 26, minWidth: 26, maxWidth: 30, sortField: nil),
+        .init(id: "warning", title: "⚠︎", width: 24, minWidth: 24, maxWidth: 28, sortField: nil),
+        .init(id: "date", title: "Document date", width: 140, minWidth: 110, maxWidth: 220, sortField: .date),
+        .init(id: "name", title: "File name", width: 320, minWidth: 200, maxWidth: 800, sortField: .name),
+        .init(id: "type", title: "Type", width: 56, minWidth: 44, maxWidth: 80, sortField: .fileType),
+        .init(id: "classification", title: "Provenance", width: 132, minWidth: 100, maxWidth: 220, sortField: nil),
+        .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects),
+        .init(id: "priority", title: "Priority", width: 72, minWidth: 60, maxWidth: 100, sortField: .priority),
+        .init(id: "read", title: "Read", width: 84, minWidth: 70, maxWidth: 110, sortField: .readState),
+    ]
+
     @ObservedObject var model: NavigationModel
     @Binding var selection: Set<ArchiveFile.ID>
     var fontSize: CGFloat
@@ -67,18 +90,7 @@ struct AppKitTableView: NSViewRepresentable {
             coordinator?.parent.buildContextMenu(selIDs)
         }
 
-        let columns: [(id: String, title: String, width: CGFloat, minWidth: CGFloat, maxWidth: CGFloat, sortField: SortField?)] = [
-            ("flag",     "⚑",             26,  26,   30,  nil),
-            ("warning",  "⚠︎",             24,  24,   28,  nil),
-            ("date",     "Document date",  140, 110,  220, .date),
-            ("name",     "File name",      320, 200,  800, .name),
-            ("type",     "Type",           56,  44,   80,  .fileType),
-            ("tags",     "File tags",      300, 160,  600, .subjects),
-            ("priority", "Priority",       72,  60,   100, .priority),
-            ("read",     "Read",           84,  70,   110, .readState),
-        ]
-
-        for col in columns {
+        for col in Self.columnDefinitions {
             let tc = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(col.id))
             tc.title = col.title
             tc.width = col.width
@@ -356,6 +368,12 @@ struct AppKitTableView: NSViewRepresentable {
                 tf.stringValue = file.fileType
                 tf.textColor = .secondaryLabelColor
 
+            case "classification":
+                Self.configureProvenanceTextField(
+                    tf, classification: parent.model.classification(for: file.url.path),
+                    fontSize: currentFontSize
+                )
+
             case "priority":
                 tf.stringValue = file.priority.map { "P\($0)" } ?? "—"
                 tf.textColor = .secondaryLabelColor
@@ -395,6 +413,17 @@ struct AppKitTableView: NSViewRepresentable {
                 out.append(NSAttributedString(string: seg.text, attributes: attrs))
             }
             return out
+        }
+
+        /// The actual provenance-cell formatter, exposed internally so the headless pixel guard renders
+        /// the same AppKit control and styling the table uses rather than a look-alike test view.
+        static func configureProvenanceTextField(_ textField: NSTextField,
+                                                 classification: String?, fontSize: CGFloat) {
+            textField.stringValue = classification ?? "—"
+            textField.font = NSFont.systemFont(ofSize: fontSize)
+            textField.textColor = .secondaryLabelColor
+            textField.lineBreakMode = .byTruncatingTail
+            textField.toolTip = classification
         }
 
         // MARK: NSTableViewDelegate

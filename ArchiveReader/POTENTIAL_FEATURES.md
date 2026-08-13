@@ -7,8 +7,8 @@ one suite.
 ## High priority — SHIPPED in v1 (2026-07-05) ✅
 All High-priority items are implemented (see `CLAUDE.md` §Implementation map):
 - ✅ **Document-run / provenance convenience** — opt-in "Select Document Run" via the content index's
-  classification (degrades to a single item when absent; never auto-groups). *Residual:* a dedicated
-  Box/Folder provenance breadcrumb column is not yet surfaced.
+  classification (degrades to a single item when absent; never auto-groups), plus the optional,
+  default-hidden Provenance nav-table column (`W18.reader-breadcrumb`).
 - ✅ **Reading-session resume** — the selection is persisted (≤500) and restored on next launch.
 - ✅ **App-side notes / flags OUTSIDE the corpus** — `NotesStore` (UserDefaults); flag column + editor.
 - ✅ **Corpus data-quality dashboard** — the library-health popover (stethoscope in the status bar).

@@ -21,7 +21,7 @@ struct FolderNode: Identifiable, Hashable, Sendable {
 final class NavigationModel: ObservableObject {
     let library: ArchiveLibrary
     let rootStore: RootFolderStore
-    let indexer = ContentIndexer()
+    let indexer: ContentIndexer
     let notes = NotesStore()
     let savedSearches = SavedSearchStore()
     let excludedFolders: ExcludedFoldersStore
@@ -79,6 +79,9 @@ final class NavigationModel: ObservableObject {
     /// top-ranked hits of the active full-text query. Empty when no query is active. The list reads it
     /// via `searchSnippet(for:)` to render a preview line under matching rows.
     @Published private(set) var ftsSnippets: [String: String] = [:]
+    /// Page-2 `Classification:` values published by the disposable content index for nav-row display.
+    /// Missing/unindexed rows stay absent and render as an em dash; classification never drives a write.
+    @Published private(set) var classifications: [String: String] = [:]
     @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
     @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
     @Published private(set) var indexingProgress: (done: Int, total: Int)?
@@ -121,8 +124,10 @@ final class NavigationModel: ObservableObject {
     /// looking at that same object or an exclusion added in Settings would not narrow the list. A test
     /// passing a throwaway `defaults` gets its own instance on that domain instead — nothing else
     /// observes it, and nothing it persists reaches the owner's `ar.excludedFolders`.
-    init(defaults: UserDefaults = .standard, excludedFolders: ExcludedFoldersStore? = nil) {
+    init(defaults: UserDefaults = .standard, excludedFolders: ExcludedFoldersStore? = nil,
+         indexer: ContentIndexer = ContentIndexer()) {
         self.defaults = defaults
+        self.indexer = indexer
         self.library = ArchiveLibrary(defaults: defaults)
         self.rootStore = RootFolderStore(defaults: defaults)
         self.excludedFolders = excludedFolders
@@ -472,13 +477,16 @@ final class NavigationModel: ObservableObject {
     /// The detected non-standard-PDF status for a file, if the content index has seen it yet.
     func formatStatus(for path: String) -> PDFFormatStatus? { formatStatuses[path] }
 
+    /// Box/Folder/Document Start/Continuation from the content index, for the optional provenance column.
+    func classification(for path: String) -> String? { classifications[path] }
+
     /// Whether another currently-displayed row shares this file's base name (case-insensitive) — the
     /// nav list then surfaces the containing folder to disambiguate. Read-only display aid.
     func isDuplicatedName(_ name: String) -> Bool { DuplicateNames.isDuplicated(name, in: duplicatedNames) }
 
     private var formatGeneration = 0
-    /// Fold the content index's per-file format flags (+ the corpus needs-attention count) into the
-    /// model, then recompute. Generation-guarded so a slower earlier refresh can't clobber a newer one
+    /// Fold the content index's per-file classification + format flags (+ needs-attention count) into
+    /// the model, then recompute. Generation-guarded so a slower earlier refresh can't clobber a newer one
     /// (same pattern as `runFullTextSearch`). Triggered on library change and when an index pass finishes.
     func refreshFormatStatuses() {
         formatGeneration += 1
@@ -487,9 +495,11 @@ final class NavigationModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             let statuses = await self.indexer.formatStatuses(for: paths)
+            let classifications = await self.indexer.classifications(for: paths)
             let count = await self.indexer.needsAttentionCount(among: paths)   // R-5: scope to the current library
             guard generation == self.formatGeneration else { return }   // superseded by a newer refresh
             self.formatStatuses = statuses
+            self.classifications = classifications
             self.needsAttentionCount = count
             self.recompute()
         }
