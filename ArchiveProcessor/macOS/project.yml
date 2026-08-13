@@ -15,10 +15,10 @@ settings:
     # ArchiveReader/macOS/project.yml. Short version: an ad-hoc designated requirement is pinned to the
     # CDHASH, so every rebuild invalidates every TCC grant and macOS re-prompts forever; a cert pins it
     # to the CERT, which is stable.
-    # NOTE: unlike Reader/Notes, this target gets NO com.apple.security.get-task-allow. Its entitlements
-    # are xcodegen-GENERATED from the `entitlements.properties` map below, which is not config-scoped —
-    # adding it there would ship a debugger-attach entitlement in RELEASE builds too. Processor has no
-    # test target, so nothing needs it.
+    # NOTE: unlike Reader/Notes, this target declares NO debug-only entitlement. The
+    # `entitlements.properties` map below is shared by every config, so putting get-task-allow or
+    # disable-library-validation there would weaken Release. Xcode injects get-task-allow into Debug on its
+    # own; the target config below suppresses that base-entitlement injection in Release (W28.cert-fu2).
     # Self-signed, local-only, never notarized. Create it with ops/setup-signing-cert.sh.
     CODE_SIGN_IDENTITY: "Archive Suite Dev"
     CODE_SIGN_STYLE: Manual
@@ -41,6 +41,19 @@ targets:
         INFOPLIST_FILE: Sources/ArchiveProcessor/Info.plist
         SWIFT_VERSION: "6.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          # Xcode 16 otherwise puts the app body in ArchiveProcessor.debug.dylib. The suite's local
+          # self-signed certificate has no Team ID, so hardened-runtime library validation rejects that
+          # dylib at launch even though both files use the same identity (W28.cert-fu2). Processor has no
+          # app-hosted XCTest target and no SwiftUI previews, so keep the ordinary executable layout in
+          # Debug instead of weakening library validation.
+          ENABLE_DEBUG_DYLIB: NO
+        Release:
+          # Measured on the signed product: Xcode injected get-task-allow even though the shared entitlement
+          # map never declared it. Keep the explicit network/file entitlements below, but refuse Xcode's
+          # debugger base entitlement in the distributed build. Hardened runtime remains enabled above.
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
     entitlements:
       path: Sources/ArchiveProcessor/ArchiveProcessor.entitlements
       properties:

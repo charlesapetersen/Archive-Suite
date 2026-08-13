@@ -151,6 +151,29 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Signing + TCC consent (owner, 2026-08-07)
 
+- [x] **W28.cert-fu2 — Processor's ordinary Debug build launches under the suite's self-signed certificate.
+  ✅ SHIPPED 2026-08-12** — commit whose subject begins `fix(processor,trackers): W28.cert-fu2`.
+  A clean baseline build succeeded but `test-recovery.sh` aborted before `main`: Xcode 16 split the app body
+  into `ArchiveProcessor.debug.dylib`, then hardened-runtime library validation rejected it because the
+  self-signed certificate has no Team ID. This was not a W3.cap-r3-fu8 failure; the same source passed with
+  the command-line `ENABLE_DEBUG_DYLIB=NO` experiment.
+
+  **Chosen fix: disable the split dylib in Processor's Debug target config, not library validation.** The app
+  has no app-hosted XCTest target requiring injection and no SwiftUI previews, so it needs neither that layout
+  nor Reader/Notes' explicit `disable-library-validation`. `project.yml` now generates
+  `ENABLE_DEBUG_DYLIB = NO` for Debug only. Xcode still auto-injects `get-task-allow` into Debug, which also
+  corrects the old docs' claim that Processor got none.
+
+  🔺 **The Release signature audit caught a second, pre-existing defect:** Xcode injected
+  `get-task-allow = true` even though the shared map never declared it. Release now sets
+  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`; this keeps the explicit network/file entitlements and hardened
+  runtime while removing debugger attachment. The ordinary clean Debug recovery suite passed all 193 checks,
+  and the optimized Release artifact passed the same direct, scratch-only driver. Build settings and the
+  signed bundles prove Release remains `ENABLE_DEBUG_DYLIB = YES`, Debug contains no
+  `ArchiveProcessor.debug.dylib`, and the Release signature contains neither `get-task-allow` nor
+  `disable-library-validation`. No source, corpus, network, OCR, or GUI behavior changed. The default daemon
+  gate's inability to catch a successful build that aborts before `main` is queued separately as W28.cert-fu3.
+
 - [x] **W26.fixturehang-b — the fixture lane no longer starts FSEvents on the main thread, so the gate can
   no longer HANG. ✅ DONE (half of W26.fixturehang; that item STAYS OPEN for the leak)** — this commit.
   **The carve-out's stated premise was false, and that is the durable finding.** `startWatcherInline`

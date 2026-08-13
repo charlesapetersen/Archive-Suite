@@ -364,9 +364,15 @@ Versioning is by **git tag** (`vMAJOR.MINOR.PATCH`, e.g. `v3.8.1`) — the tag i
 (`CODE_SIGN_IDENTITY: "Archive Suite Dev"`, not ad-hoc since 2026-08-07), still not notarized, so a fresh
 macOS may need right-click→Open the first time. Rationale + setup: root [`CLAUDE.md`](../CLAUDE.md)
 §*Conventions* and [`../ops/setup-signing-cert.sh`](../ops/setup-signing-cert.sh). Unlike Reader/Notes this
-target gets **no** `get-task-allow` / `disable-library-validation`: its entitlements are xcodegen-generated
-from `project.yml`'s `entitlements.properties`, which is not config-scoped, so adding them would ship
-debugger-attach in Release too — and Processor has no test target that needs them.
+target **declares** no `get-task-allow` / `disable-library-validation`: its entitlements are xcodegen-generated
+from `project.yml`'s `entitlements.properties`, which is not config-scoped, so adding them would ship the key
+in every configuration. Xcode still injects `get-task-allow` into the Debug signature automatically. Processor
+has no app-hosted XCTest target or SwiftUI previews, so W28.cert-fu2 sets `ENABLE_DEBUG_DYLIB: NO` in the
+target's **Debug config** and never needs `disable-library-validation`. Release keeps its default executable
+layout, hardened runtime, and strict library validation; its target config also sets
+`CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO`, because the signed-product audit caught Xcode injecting
+`get-task-allow` into Release despite its absence from the map. The Release signature must contain neither
+debug entitlement.
 
 **GitHub CLI gotcha:** the real CLI is **`/opt/homebrew/bin/gh`** — call it by full path, because a shadowing Python tool named `gh` is first on `PATH` (bare `gh` fails with an argparse error). It is authenticated as `charlesapetersen` (`repo` scope), so `gh release create` can publish and upload assets.
 

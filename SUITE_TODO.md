@@ -20,23 +20,18 @@ Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
-## Signing + Debug execution follow-up (found 2026-08-12)
+## Processor build/test gate follow-up (found 2026-08-12)
 
-- [ ] **`W28.cert-fu2` — Processor's ordinary Debug build cannot launch with the suite's self-signed
-  certificate [S · MED · test/launch outage].** A clean `ArchiveProcessor` Debug build succeeds, but launching
-  either the app or its headless recovery driver aborts in dyld: the main executable and Xcode 16's
-  `ArchiveProcessor.debug.dylib` have “different Team IDs” (the self-signed identity has no Team ID), so
-  hardened-runtime library validation refuses the dylib. This makes the documented `launch.sh`,
-  `test-smoke.sh`, and recovery-driver paths fail after a clean build. A command-line rebuild with
-  `ENABLE_DEBUG_DYLIB=NO` launches the identical source and passes the recovery suite, confirming the
-  diagnosis. Reader and Notes solved this with **Debug-only** `disable-library-validation` /
-  `get-task-allow` entitlements, but Processor's generated entitlements are not configuration-scoped and
-  must never weaken Release. Fix the Debug target configuration only—either disable the debug dylib or wire
-  a genuinely Debug-only entitlement file—then prove an ordinary clean Debug build can launch while the
-  Release signature contains neither debug entitlement. | ArchiveProcessor/project.yml + build scripts | S | risk med
+- [ ] **`W28.cert-fu3` — the default daemon gate cannot detect a signed Processor build that aborts before
+  `main` [XS–S · LOW · blind gate] (blocked-on: W21.recovery-timeout).** The gate's free Processor lane ends
+  after `xcodebuild`; that command was green throughout W28.cert-fu2 even though the product could not launch.
+  The recovery driver is a scratch-only, no-OCR launch probe, but its current fixed 60-second deadline has an
+  independently queued headroom defect. After W21.recovery-timeout ships, give the default gate a bounded
+  Processor launch step using the just-built gate artifact (not stale `build/DD`), and prove it catches a
+  pre-`main` abort without enabling the paid OCR lane or reaching the host GUI. | ops/autonomous/health-gate.sh + ArchiveProcessor/scripts/test-recovery.sh | S | risk low
 
 - [ ] **`W21.e2e-fu1` — the documented phone↔Mac Tier-2 harness cannot reach pairing [XS–S · MED · broken
-  gate] (blocked-on: W28.cert-fu2).** Two pre-existing harness failures were measured while verifying
+  gate].** Two pre-existing harness failures were measured while verifying
   `W3.cap-r3-fu8`, before any fixture reached OCR. First, `e2e-phone-mac.sh` computes its Xcode project as
   `$(cd "$HERE/..")/ArchiveProcessor`, producing the nonexistent
   `ArchiveProcessor/ArchiveProcessor`; its real project is `ArchiveProcessor/macOS`. A temporary path alias
@@ -44,8 +39,8 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   so the `Connect` node is off-screen and `tap_text "Connect"` fails (the captured `04-filled.png` visibly
   showed the keyboard). Fix both paths without permitting a physical-device target, then run the full
   emulator-only E2E to `RESULT: PASS`; keep all output isolated and retain the existing token/year and phone
-  screenshot assertions. Blocked on the ordinary Debug launch fix because the harness rebuilds and launches
-  that configuration itself. | ArchiveProcessor/scripts/{e2e-phone-mac,android-ui-drive}.sh | S | risk med
+  screenshot assertions. The ordinary Debug launch prerequisite shipped as `W28.cert-fu2`; the harness can
+  now rebuild and launch that configuration itself. | ArchiveProcessor/scripts/{e2e-phone-mac,android-ui-drive}.sh | S | risk med
 
 ## Open-sourcing the repo (owner, 2026-08-11)
 

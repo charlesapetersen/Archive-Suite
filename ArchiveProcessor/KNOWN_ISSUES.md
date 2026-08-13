@@ -4,24 +4,27 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
-## ⚠️ OPEN (W28.cert-fu2): a normal Processor Debug build cannot launch under the suite's self-signed certificate
+## ✅ FIXED (W28.cert-fu2): a normal Processor Debug build could not launch under the suite's self-signed certificate
 
-**Found 2026-08-12 while verifying W3.cap-r3-fu8.** The build succeeds, but dyld aborts before either the app
+**Found and fixed 2026-08-12.** The build succeeded, but dyld aborted before either the app
 or its headless recovery driver reaches `main`: Xcode 16's `ArchiveProcessor.debug.dylib` and the launcher
-are reported as having different Team IDs. The local self-signed identity has no Team ID, while the hardened
-runtime still enforces library validation. Consequently the documented clean-Debug `launch.sh`,
-`test-smoke.sh`, and recovery-driver paths are not executable.
+were reported as having different Team IDs. The local self-signed identity has no Team ID, while the hardened
+runtime still enforced library validation. Consequently the documented clean-Debug `launch.sh`,
+`test-smoke.sh`, and recovery-driver paths were not executable.
 
-Rebuilding with the command-line override `ENABLE_DEBUG_DYLIB=NO` makes the same source launch and the full
-recovery suite pass, which isolates the failure to Debug linkage/signing rather than W3.cap-r3-fu8. Reader
-and Notes use Debug-only `disable-library-validation` / `get-task-allow` entitlements; Processor cannot copy
-that setting into its current generated entitlements because they are not configuration-scoped and would
-weaken Release. The queued fix must be Debug-only and must also prove the Release signature keeps both debug
-entitlements absent.
+The target now sets `ENABLE_DEBUG_DYLIB: NO` in **Debug only**, making Xcode link the app body into the
+ordinary executable that was already signed and accepted. Processor has no app-hosted XCTest target or
+SwiftUI previews, so it needs neither the split dylib nor Reader/Notes' explicit
+`disable-library-validation` entitlement. Xcode does inject `get-task-allow` into Debug automatically.
+
+The signed-product audit found that Xcode also injected `get-task-allow` into Release despite its absence
+from the shared entitlements map. The Release target now sets `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO`:
+hardened runtime and the explicitly declared network/file entitlements remain, while the signature contains
+neither debugger entitlement.
 
 ## ⚠️ OPEN (W21.e2e-fu1): the phone↔Mac Tier-2 harness cannot reach pairing
 
-**Found 2026-08-12 while verifying W3.cap-r3-fu8; blocked on W28.cert-fu2.** The harness fails before OCR in
+**Found 2026-08-12 while verifying W3.cap-r3-fu8.** The harness fails before OCR in
 two independent, pre-existing places. `e2e-phone-mac.sh` appends `/ArchiveProcessor` after already resolving
 the ArchiveProcessor app root, so its Xcode project path is a nonexistent
 `ArchiveProcessor/ArchiveProcessor` instead of `ArchiveProcessor/macOS`. With a temporary path alias around
@@ -30,8 +33,8 @@ below the visible accessibility tree and `tap_text "Connect"` fails. The preserv
 attempt visibly showed the keyboard covering the lower form.
 
 The queued fix must keep the emulator-only / explicit-serial safety boundary, correct the project path, make
-IME dismissal deterministic, and run the unchanged round-trip assertions to `RESULT: PASS`. It is blocked on
-W28.cert-fu2 because the harness itself performs an ordinary Debug rebuild and launch.
+IME dismissal deterministic, and run the unchanged round-trip assertions to `RESULT: PASS`. Its ordinary
+Debug build-and-launch prerequisite now works after W28.cert-fu2.
 
 ## ✅ FIXED (W3.cap-r3-fu8): manifest resume no longer disguises a failed segment as staged
 
