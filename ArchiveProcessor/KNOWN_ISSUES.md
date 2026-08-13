@@ -4,6 +4,50 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ---
 
+## ⚠️ OPEN (W28.cert-fu2): a normal Processor Debug build cannot launch under the suite's self-signed certificate
+
+**Found 2026-08-12 while verifying W3.cap-r3-fu8.** The build succeeds, but dyld aborts before either the app
+or its headless recovery driver reaches `main`: Xcode 16's `ArchiveProcessor.debug.dylib` and the launcher
+are reported as having different Team IDs. The local self-signed identity has no Team ID, while the hardened
+runtime still enforces library validation. Consequently the documented clean-Debug `launch.sh`,
+`test-smoke.sh`, and recovery-driver paths are not executable.
+
+Rebuilding with the command-line override `ENABLE_DEBUG_DYLIB=NO` makes the same source launch and the full
+recovery suite pass, which isolates the failure to Debug linkage/signing rather than W3.cap-r3-fu8. Reader
+and Notes use Debug-only `disable-library-validation` / `get-task-allow` entitlements; Processor cannot copy
+that setting into its current generated entitlements because they are not configuration-scoped and would
+weaken Release. The queued fix must be Debug-only and must also prove the Release signature keeps both debug
+entitlements absent.
+
+## ⚠️ OPEN (W21.e2e-fu1): the phone↔Mac Tier-2 harness cannot reach pairing
+
+**Found 2026-08-12 while verifying W3.cap-r3-fu8; blocked on W28.cert-fu2.** The harness fails before OCR in
+two independent, pre-existing places. `e2e-phone-mac.sh` appends `/ArchiveProcessor` after already resolving
+the ArchiveProcessor app root, so its Xcode project path is a nonexistent
+`ArchiveProcessor/ArchiveProcessor` instead of `ArchiveProcessor/macOS`. With a temporary path alias around
+that bug, the API-36 pairing drive fills Host, Port, and Token but leaves Gboard visible; `Connect` remains
+below the visible accessibility tree and `tap_text "Connect"` fails. The preserved `04-filled.png` from the
+attempt visibly showed the keyboard covering the lower form.
+
+The queued fix must keep the emulator-only / explicit-serial safety boundary, correct the project path, make
+IME dismissal deterministic, and run the unchanged round-trip assertions to `RESULT: PASS`. It is blocked on
+W28.cert-fu2 because the harness itself performs an ordinary Debug rebuild and launch.
+
+## ✅ FIXED (W3.cap-r3-fu8): manifest resume no longer disguises a failed segment as staged
+
+**Fixed 2026-08-12.** The current staging manifest persists both each staged record and its retained per-page
+OCR inputs, but resume rebuilt every status row as `.staged`. A `.noOutput` or `.incompleteOutput` record was
+still correctly refused by finalization—so its source remained recoverable—but it returned after a crash with
+a success label, outside `failedGroupIds`, and with no retry action.
+
+Resume now sends a current record through the same `labelStagedRecord` classifier as first-write and rotation-
+regeneration paths. Failed records return failed and retryable; relaunch itself starts no OCR, so replacement
+spend remains an explicit operator decision. Retained pages also restore the true page count used by the row
+and retry-cost sheet (artifact counts are zero for no output and one for a merged multi-page PDF). A legacy or
+damaged record without matching retained inputs deliberately keeps the prior `.staged` fallback: guessing with
+an empty result list could call a complete text-bearing document image-only. Finalize/deletion decisions are
+unchanged and still key only off on-disk filing plus completeness.
+
 ## ✅ FIXED (W25.modelsync-fu): the retry sheets opened on the wrong model — and one on the wrong provider
 
 **Found 2026-08-02** (adversarial review of W25.modelsync; pre-existing, not introduced by it). **Fixed

@@ -7318,6 +7318,28 @@ explain why not.
   Findings 6 and 7 and the corrections to 1, 2, 3, 8, 9 ship in this commit; 1, 2 and 5's second leg ship as
   fu10/fu11 and a fu9 amendment; 4 ships as two recorded 0-RED mutants. Nothing the pass found required
   reverting or reshaping the guard.
+- [x] **W3.cap-r3-fu8 [LOW · bookkeeping] — ✅ SHIPPED 2026-08-12** — commit whose subject begins `fix(processor,trackers): W3.cap-r3-fu8`.
+  **Decision: YES, a resumed failed segment is retryable—but relaunch never retries it.** The alternative was
+  not free or safe-looking: finalization already refused `.noOutput` / `.incompleteOutput`, preserving every
+  source, while the hardcoded `.staged` row hid that refusal and left no recovery action. Current-manifest
+  resume now routes its staged record plus exact `retained.pages[].result` through the same
+  `labelStagedRecord` used by both writers. This changes only the label and available operator action;
+  finalize/deletion still key on `executePlans.filedGroupIds` and `pagesComplete`.
+  **Money boundary, driven rather than promised:** loading the manifest leaves the stub paid-start count
+  unchanged; only the existing no-argument bulk `retryFailed()` consumes the restored failed set, starts one
+  replacement call, and re-stages normally. The same retained inputs restore the real page count behind the
+  row and model-choice estimate—output URL counts are 0 for this failure and 1 for any merged document.
+  Legacy/unpaired records deliberately keep `.staged`; classifying with no retained results could falsely call
+  a complete text-bearing document image-only. Test 26 creates the current manifest through real
+  ingest → stub OCR → transient staging refusal → persist, then loads it into a distinct processor. With the
+  old hardcoded label restored, its label/retry/restage checks are **3 RED** while fixture and no-auto-spend
+  stay green; with the fix, the full scratch recovery driver is **193/193 green**. The final Processor Debug
+  build is green with `ENABLE_DEBUG_DYLIB=NO`; the ordinary Debug linkage failure was independently reproduced
+  and filed as `W28.cert-fu2`. The required emulator E2E was attempted but reached neither pairing nor OCR:
+  its pre-existing wrong project path and API-36 IME drive failures are filed as `W21.e2e-fu1` (blocked on the
+  Debug launch fix). The item-specific gate used no network, paid OCR, real backup, corpus, or GUI.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureProcessor.swift, LiveCaptureRecoveryTestDriver.swift | Capture | Tier-2
+
 - [x] **W3.cap-r3-fu6 [LOW · bookkeeping] — ✅ DONE 2026-08-04** (`61fc680` fix; `b2ff7d1` test + mutants;
   this commit, the adversarial pass's corrections + trackers). The item's own recommendation was the right
   one: extract the taxonomy so there is ONE labeller. `finalizeSegment`'s A1 branch is now

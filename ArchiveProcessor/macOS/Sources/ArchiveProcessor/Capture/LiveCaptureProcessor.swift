@@ -457,10 +457,30 @@ final class LiveCaptureProcessor: ObservableObject {
         for s in restored {
             finalizedGroups.insert(s.groupId)
             groupCollectionKey[s.groupId] = s.collectionKey
+            let type = CaptureGroupType(rawValue: s.type) ?? .document
+            let saved = retained[s.groupId]
+            // A failed record can have zero output URLs, and a merged N-page record has one PDF. The retained
+            // inputs are the exact source-page count for a current manifest — use them so a resumed retry's
+            // row and model-choice cost estimate do not claim 0p/1p. Legacy records keep the old output count.
+            let pageCount = max(saved?.pages.count ?? 0, max(s.imageURLs.count, s.pdfURLs.count))
             if !statuses.contains(where: { $0.id == s.groupId }) {
                 statuses.append(SegmentStatus(id: s.groupId, index: statuses.count + 1,
-                    type: CaptureGroupType(rawValue: s.type) ?? .document,
-                    pageCount: max(s.imageURLs.count, s.pdfURLs.count), phase: .staged))
+                    type: type,
+                    pageCount: pageCount, phase: .staged))
+            }
+            // W3.cap-r3-fu8 — a current manifest carries the exact per-page OCR results beside its staged
+            // record, so resume owes the same label as both write paths. The old hardcoded `.staged` made a
+            // `.noOutput` / `.incompleteOutput` record look successful and left it outside `failedGroupIds`:
+            // finalize still (correctly) refused to file it, but the operator saw no failure and had no retry
+            // action. Relabelling makes the existing bulk retry AVAILABLE; it does not run it, so relaunch
+            // spends nothing until the operator explicitly asks.
+            //
+            // A kept legacy bare-array record has no `RetainedSegment`, and a damaged current manifest may
+            // also lack the matching entry. Do not approximate from filenames: passing an empty result list
+            // would mislabel a complete text-bearing document as image-only. Preserve the old `.staged`
+            // fallback when the evidence is absent; recovery data stays visible and untouched either way.
+            if let saved {
+                labelStagedRecord(s.groupId, type: type, outcome: s, results: saved.pages.map(\.result))
             }
         }
         // Restore the "current collection" so subsequent captures file under the right Box.
@@ -994,17 +1014,17 @@ final class LiveCaptureProcessor: ObservableObject {
     /// into `.succeededNoText` — cannot change when/what gets deleted; it only fixes what the operator sees
     /// and what bulk-retry re-runs.
     ///
-    /// W3.cap-r3-fu6 — extracted so there is exactly ONE labeller for the TWO sites that write a record.
-    /// `finalizeSegment` calls it on the first write; `applyRotationReviewAndFinalize` replaces the record
-    /// WHOLESALE and used to leave the old label sitting on the new bytes, which could disagree in both
-    /// directions: a `.noOutput` segment that regenerated cleanly stayed `.failed` and stayed in
-    /// `failedGroupIds` (so the collection sheet warned about a segment that was fine, and obeying that
-    /// warning re-bought its OCR), and a `.staged` segment whose regeneration produced nothing kept its
-    /// success label over an empty record that finalize then silently declined to file.
+    /// W3.cap-r3-fu6 / fu8 — extracted so there is exactly ONE labeller for all THREE sites that publish a
+    /// record's status. `finalizeSegment` calls it on the first write; `applyRotationReviewAndFinalize`
+    /// replaces the record WHOLESALE; and `loadStagingManifest` reconstructs the row after a relaunch from
+    /// the persisted record + retained page results. The latter two used to leave or manufacture `.staged`
+    /// independently, so the record and row could disagree in both directions: a `.noOutput` segment that
+    /// regenerated cleanly stayed `.failed` (inviting a paid retry of good output), while a `.staged` segment
+    /// that regenerated or resumed with nothing kept a success label over a record finalize silently declined.
     ///
-    /// `results` is the per-page OCR, in page order. Both callers have it EXACTLY, not approximately:
-    /// `finalizeSegment` passes what it awaited, and the regeneration passes `RetainedSegment.pages`'
-    /// `result`s — the same values, since a rotation edit rebuilds `OCRResult` preserving `text`,
+    /// `results` is the per-page OCR, in page order. All three callers have it EXACTLY, not approximately:
+    /// `finalizeSegment` passes what it awaited, while regeneration and current-manifest resume pass
+    /// `RetainedSegment.pages`' `result`s — the same values, since a rotation edit rebuilds `OCRResult` preserving `text`,
     /// `errorMessage` and `errorCode` (and `PageWork` is Codable, so they survive a manifest resume). Note
     /// this is why the regeneration must NOT reach for `RetainedSegment.texts` instead: `texts` maps a nil
     /// text to `""`, so `anyText` computed from it would conflate "OCR returned nothing" with "OCR returned
@@ -2121,6 +2141,22 @@ final class LiveCaptureProcessor: ObservableObject {
         self.stagingDir = stagingDir
         self.config = config
         self.staged = staged
+    }
+
+    /// Test-only ($0, W3.cap-r3-fu8): write the current manifest after a driver-created transient staging
+    /// failure has cleared. The real failure path persists before it labels, while the directory is still
+    /// deliberately unwritable; this second write creates the crash/relaunch input without fabricating the
+    /// processor's private `RetainedSegment` representation in the test.
+    func _recoveryTestPersistManifest() { persistManifest() }
+
+    /// Test-only ($0, W3.cap-r3-fu8): enter the REAL manifest loader without `activate`'s legacy-root prune.
+    /// A recovery test redirects `CaptureSession.backupRoot`, so the production prune would misclassify any
+    /// genuine legacy dirs outside that scratch root as orphaned. This seam keeps the test scratch-only while
+    /// exercising the exact decode + status reconstruction that runs after a relaunch.
+    func _recoveryTestLoadManifest(stagingDir: URL, config: SessionProcessingConfig) {
+        self.stagingDir = stagingDir
+        self.config = config
+        loadStagingManifest()
     }
 
     /// Test-only (W3.cap-r6): THE straggler. Appends a staged segment exactly as `finalizeSegment` does, so

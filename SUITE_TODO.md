@@ -20,6 +20,33 @@ Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
+## Signing + Debug execution follow-up (found 2026-08-12)
+
+- [ ] **`W28.cert-fu2` — Processor's ordinary Debug build cannot launch with the suite's self-signed
+  certificate [S · MED · test/launch outage].** A clean `ArchiveProcessor` Debug build succeeds, but launching
+  either the app or its headless recovery driver aborts in dyld: the main executable and Xcode 16's
+  `ArchiveProcessor.debug.dylib` have “different Team IDs” (the self-signed identity has no Team ID), so
+  hardened-runtime library validation refuses the dylib. This makes the documented `launch.sh`,
+  `test-smoke.sh`, and recovery-driver paths fail after a clean build. A command-line rebuild with
+  `ENABLE_DEBUG_DYLIB=NO` launches the identical source and passes the recovery suite, confirming the
+  diagnosis. Reader and Notes solved this with **Debug-only** `disable-library-validation` /
+  `get-task-allow` entitlements, but Processor's generated entitlements are not configuration-scoped and
+  must never weaken Release. Fix the Debug target configuration only—either disable the debug dylib or wire
+  a genuinely Debug-only entitlement file—then prove an ordinary clean Debug build can launch while the
+  Release signature contains neither debug entitlement. | ArchiveProcessor/project.yml + build scripts | S | risk med
+
+- [ ] **`W21.e2e-fu1` — the documented phone↔Mac Tier-2 harness cannot reach pairing [XS–S · MED · broken
+  gate] (blocked-on: W28.cert-fu2).** Two pre-existing harness failures were measured while verifying
+  `W3.cap-r3-fu8`, before any fixture reached OCR. First, `e2e-phone-mac.sh` computes its Xcode project as
+  `$(cd "$HERE/..")/ArchiveProcessor`, producing the nonexistent
+  `ArchiveProcessor/ArchiveProcessor`; its real project is `ArchiveProcessor/macOS`. A temporary path alias
+  proved the next failure: on API 36, `android-ui-drive.sh`'s conditional `hide_ime` leaves Gboard visible,
+  so the `Connect` node is off-screen and `tap_text "Connect"` fails (the captured `04-filled.png` visibly
+  showed the keyboard). Fix both paths without permitting a physical-device target, then run the full
+  emulator-only E2E to `RESULT: PASS`; keep all output isolated and retain the existing token/year and phone
+  screenshot assertions. Blocked on the ordinary Debug launch fix because the harness rebuilds and launches
+  that configuration itself. | ArchiveProcessor/scripts/{e2e-phone-mac,android-ui-drive}.sh | S | risk med
+
 ## Open-sourcing the repo (owner, 2026-08-11)
 
 - [ ] **`W29.drive-secret` — the Drive cloud relay has NO usable client secret; mint a new one and enter it.**
@@ -1717,18 +1744,6 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   `pages` to sources that still exist, letting the EXISTING `guard !pages.isEmpty else { beginFinalize() }`
   skip the bogus review entirely — but that is the finalize path and wants its own Tier-2 gate rather than
   riding along. Found 2026-08-04 by `W3.cap-r3-fu12`'s adversarial pass. | Capture | Tier-2
-- [ ] **W3.cap-r3-fu8 [LOW · bookkeeping]** `LiveCaptureProcessor` manifest-resume path (~`staged = restored`)
-  — a **THIRD labeller**, and the last one that can disagree with its record. Resume rebuilds a status row per
-  restored segment with `phase: .staged` hardcoded, so a `.noOutput`/`.incompleteOutput` record recovered from
-  the manifest comes back wearing a success label and outside `failedGroupIds` — the same class as fu6's
-  backward half, on the path fu6 did not touch. `W3.cap-r3-fu6` extracted `labelStagedRecord` and this site
-  could route through it (`retained` is restored alongside `staged`, so `pages[].result` is available), but it
-  was DELIBERATELY left out of that item: doing it newly puts resumed segments into the retry set, which is a
-  money-path behaviour change — "Retry failed" would offer to re-buy OCR for a segment recovered from a crash
-  — and it wants its own decision and its own Tier-2 gate rather than riding along. Decide first whether a
-  resumed failed segment SHOULD be retryable (it probably should: the alternative is that it is invisible),
-  then route the site through the one labeller. Found 2026-08-04 by `W3.cap-r3-fu6`'s pass; pre-existing.
-  | Capture | Tier-2
 - [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
   `removePhotoIfSafe:606`. An operator ✕ on a page whose segment is already staged (or mid-finalize) trashes
   the source anyway, so `PDFGenerator.generate` can't embed it and writes a visible PLACEHOLDER image page

@@ -81,6 +81,9 @@ import ArchiveCore
 ///      gesture. Both controls are driven from that state end to end (Finish → files on disk; Clear → abandons
 ///      and leaves every processed file recoverable), the gate is measured in both directions, and an orphaned
 ///      in-flight row is proved not to count as processing (Test 25).
+///  23. A current staging manifest restores the label its record actually earns (W3.cap-r3-fu8), rather than
+///      hardcoding `.staged`: a `.noOutput` segment returns as failed and retryable, resume itself buys no OCR,
+///      and only the operator's existing bulk retry starts the replacement call (Test 26).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -3187,6 +3190,89 @@ enum LiveCaptureRecoveryTestDriver {
                 UserDefaults.standard.removeObject(forKey: DefaultsKeys.reviewRotation)
             }
             LiveCaptureProcessor._recoveryTestOCRGate = nil
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // --- Test 26 (W3.cap-r3-fu8): the CURRENT manifest-resume path is the third writer of a status row.
+        // It used to hardcode `.staged` even when the record beside it said no output / incomplete output,
+        // hiding a failed segment from both the row and `failedGroupIds`. Finalize still refused the record,
+        // so the Recovery Core kept every source, but the operator had no visible recovery action.
+        //
+        // THE MONEY DECISION: resumed failures SHOULD be retryable, but resume must not retry them. Rebuilding
+        // the label puts them into the existing bulk set; only the operator pressing that button calls
+        // `retryFailed` and buys OCR. Checks 3 and 4 pin both halves independently.
+        //
+        // MUTATION PROOF (measured before the production change): with the loader's hardcoded `.staged`
+        // restored, checks 2, 4 and 5 are RED — the row lies / set is empty, the no-argument bulk retry buys
+        // nothing, and therefore nothing can re-stage. The manifest premise and no-auto-spend guard stay green,
+        // so those failures cannot be a bad fixture or an accidental call during load.
+        if isolatedBackup {
+            let rsOut = tmp.appendingPathComponent("fu8out", isDirectory: true)
+            let rsStaging = tmp.appendingPathComponent(
+                "APStaging-fu8-\(String(UUID().uuidString.prefix(8)))", isDirectory: true)
+            try? fm.createDirectory(at: rsStaging, withIntermediateDirectories: true)
+            let rsConfig = SessionProcessingConfig(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                // `.human` — no document reaches the tag LLM; all calls below are the $0 OCR stub.
+                taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                outputDirectory: rsOut, contextCharCount: 0, sendPreviousImage: false,
+                customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                textColumns: 1)
+            let rsSession = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            rsSession._recoveryTestBeginLive(config: rsConfig, stagingDir: rsStaging)
+            let rsWriter = rsSession.liveProcessor
+            func rsSettle(_ cond: () -> Bool) async -> Bool {
+                for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+                return cond()
+            }
+
+            // Create the record through the real ingest → OCR → finalize path. The transient write refusal
+            // makes `writeSegmentFiles` return an empty record, so the first classifier earns `.noOutput`.
+            try? fm.setAttributes([.posixPermissions: NSNumber(value: 0o555)], ofItemAtPath: rsStaging.path)
+            rsSession.ingest(jpeg: Data("synthetic page bytes".utf8), groupId: "R1", seq: 1,
+                             type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+            rsWriter.segmentResolved(groupId: "R1")
+            let rsFailed = await rsSettle { rsWriter.failedGroupIds == ["R1"] }
+            try? fm.setAttributes([.posixPermissions: NSNumber(value: 0o755)], ofItemAtPath: rsStaging.path)
+            rsWriter._recoveryTestPersistManifest()
+            let rsManifest = rsStaging.appendingPathComponent("staging-manifest.json")
+            check("a real no-output segment is persisted as the CURRENT manifest resume fixture (fu8)",
+                  rsFailed && fm.fileExists(atPath: rsManifest.path)
+                      && rsWriter.staged.first { $0.groupId == "R1" }?.pdfURLs.isEmpty == true)
+
+            // A distinct processor is the relaunched app. The seam skips only the unsafe global legacy prune;
+            // decode and status reconstruction are the production `loadStagingManifest` implementation.
+            let rsStartsBeforeResume = LiveCaptureProcessor._recoveryTestOCRStarts.count
+            let rsResumed = LiveCaptureProcessor(session: rsSession)
+            rsResumed._recoveryTestLoadManifest(stagingDir: rsStaging, config: rsConfig)
+            let rsRow = rsResumed.statuses.first { $0.id == "R1" }
+            check("a resumed no-output record returns FAILED, with its reason, and is offered for retry (fu8)",
+                  rsRow?.phase == .failed && rsRow?.failureKind == .noOutput
+                      && rsRow?.pageCount == 1
+                      && rsResumed.failedGroupIds == ["R1"] && rsResumed.isFinalized("R1"))
+            check("resume itself buys NO replacement OCR — retry remains an operator decision (fu8)",
+                  LiveCaptureProcessor._recoveryTestOCRStarts.count == rsStartsBeforeResume)
+
+            // Drive the exact no-argument bulk action that reads `failedGroupIds`; passing ["R1"] explicitly
+            // would make this green even if resume still hid the segment, and would prove the wrong thing.
+            rsResumed.retryFailed()
+            let rsRetryStarted = LiveCaptureProcessor._recoveryTestOCRStarts.count == rsStartsBeforeResume + 1
+            check("the existing bulk retry buys exactly one replacement call only after the operator asks (fu8)",
+                  rsRetryStarted)
+            let rsRestaged = await rsSettle {
+                rsResumed.staged.contains { $0.groupId == "R1" }
+                    && !rsResumed.failedGroupIds.contains("R1")
+            }
+            check("the explicitly retried resumed segment re-stages through the ordinary recovery path (fu8)",
+                  rsRestaged && rsResumed.statuses.first { $0.id == "R1" }?.phase == .succeededPlaceholderImage)
+
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
