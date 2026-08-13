@@ -1,0 +1,13 @@
+# Tags that are deliberately in NEITHER plan queue region, so check-handoff.sh step 3 must not fail on them.
+#
+# Step 3's rule — "every open SUITE_TODO item must be visible in the plan" — is right for the 27-item gap it
+# was written for, but wrong for an item whose own spec forbids BOTH regions. That is a real category, not a
+# loophole: an item can be out of scope until a QUALITATIVE bar is met, which is different from awaiting an
+# owner gate. Parking such an item in the HOLD QUEUE mislabels it and makes the "held back" count lie.
+#
+# ⛔ Adding a tag here is a policy act. Only add one when the item's OWN spec in SUITE_TODO.md explicitly says
+# it must not be mirrored, and cite that line. Never add one to silence the check.
+#
+# format:  <tag><TAB or spaces><SUITE_TODO.md citation> — <reason>
+Import   SUITE_TODO.md §"Archive Notes — DEVONthink import" (~L1376-1379) — "never mirror it into …WORK QUEUE… Do not put it in the plan's HOLD QUEUE either: it is not awaiting an owner *gate*, it is out of scope until a qualitative bar is met." Owner directive 2026-08-01; plans retained in full.
+ZZZ.fake  no citation

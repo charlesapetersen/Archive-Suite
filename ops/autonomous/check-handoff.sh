@@ -130,7 +130,23 @@ else
   P="$(mktemp)"; T="$(mktemp)"; trap 'rm -f "$P" "$T"' EXIT
   items "$PLAN" 1 | cut -f1 | sort -u > "$P"
   items "$TODO" 0 | awk -F'\t' '$2==" "{print $1}' | sort -u > "$T"
-  missing="$(comm -23 "$T" "$P")"
+  # Some items are deliberately in NEITHER region because their own spec forbids both — out of scope until a
+  # qualitative bar is met, which is NOT the same as awaiting an owner gate (parking those in HOLD QUEUE
+  # mislabels them and makes the "held back" count lie). Those tags live in handoff-exempt.txt with a citation.
+  EX="$(mktemp)"; trap 'rm -f "$P" "$T" "$EX"' EXIT
+  # Beside THIS script, not under $ROOT: the list and the rule that reads it ship together, so running a
+  # worktree's copy honours that worktree's list. ($ROOT is the primary checkout, which is a different tree.)
+  exempt_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/handoff-exempt.txt"
+  if [ -f "$exempt_file" ]; then
+    grep -vE '^[[:space:]]*(#|$)' "$exempt_file" | awk '{print $1}' | sort -u > "$EX"
+  else
+    : > "$EX"
+  fi
+  missing="$(comm -23 "$T" "$P" | comm -23 - "$EX")"
+  exempted="$(comm -23 "$T" "$P" | comm -12 - "$EX")"
+  [ -n "$exempted" ] && printf '%s\n' "$exempted" | while read -r t; do
+    [ -n "$t" ] && printf '  \033[36mi\033[0m %s — in neither region ON PURPOSE (ops/autonomous/handoff-exempt.txt)\n' "$t"
+  done
   if [ -n "$missing" ]; then
     n="$(printf '%s\n' "$missing" | grep -c .)"
     fail "$n open SUITE_TODO item(s) have NO checkbox line in the plan — the daemon cannot see them:"
