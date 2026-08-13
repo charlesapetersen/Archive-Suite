@@ -275,6 +275,54 @@ chk "L no HOLD item leaked into the WQ archive"     "! grep -q 'owner-gated' '$S
 chk "L the OPEN work item stayed inline"            "grep -q 'WQOPEN' '$qp'"
 chk "L no conservation failure"                     "! grep -qi 'conservation FAIL' '$SANDBOX/outL.txt'"
 
+# ---------- Case M: BUG 5 — the region budgets must ADD UP to the plan's context budget ----------
+# The 2026-08-12 failure was not a broken pass. All three passes were CORRECT and all three no-op'd, because
+# SL(30000)+DR(30000)+WQ(70000)+~40 KB of unmanageable prose = a ~170 KB ceiling against a 150 KB allowance.
+# A compactor that cannot reach its own target looks exactly like one that is switched off, and the same shape
+# had already shipped twice (WQ_MAX_BYTES=120000 on 2026-08-10). So the sum is an ASSERTION now, not a comment:
+# change either script's numbers and this goes RED in the health gate instead of surfacing as a park weeks later.
+CBS="$HERE/../context-budget.sh"
+# Pull the DEFAULT out of a `VAR="${VAR:-N}"` (or the nested `${VAR:-${OLD:-N}}`) assignment at column 0.
+defval(){ awk -v v="$2" '$0 ~ "^"v"=" { if (match($0, /:-[0-9]+\}/)) print substr($0, RSTART+2, RLENGTH-3); exit }' "$1"; }
+M_UNM=$(defval "$SCRIPT" UNMANAGED_ALLOWANCE); M_SL=$(defval "$SCRIPT" SL_MAX_BYTES)
+M_DR=$(defval "$SCRIPT" DR_MAX_BYTES);         M_WQ=$(defval "$SCRIPT" WQ_MAX_BYTES)
+M_ACT=$(defval "$CBS" ACT_PCT)
+M_BUD=$(awk -F'\t' '$1==".maintenance/AUTONOMOUS_PLAN.md"{print $2; exit}' "$CBS" 2>/dev/null)
+chk "M all four compactor constants parsed"  "[ -n '$M_UNM' ] && [ -n '$M_SL' ] && [ -n '$M_DR' ] && [ -n '$M_WQ' ]"
+chk "M plan budget + ACT_PCT read from context-budget.sh" "[ -n '$M_BUD' ] && [ -n '$M_ACT' ]"
+if [ -n "$M_UNM" ] && [ -n "$M_SL" ] && [ -n "$M_DR" ] && [ -n "$M_WQ" ] && [ -n "$M_BUD" ] && [ -n "$M_ACT" ]; then
+  M_CEIL=$(( M_UNM + M_SL + M_DR + M_WQ ))
+  chk "M CEILING ($M_CEIL) fits the plan budget ($M_BUD)" "[ $M_CEIL -le $M_BUD ]"
+  # …and fits it with room to spare: at ACT_PCT the daemon spends a whole SESSION trimming. A ceiling above
+  # that line means a legitimately-full plan periodically costs a session for no defect.
+  chk "M CEILING is under ACT_PCT ($M_ACT%) so a saturated plan never costs a trim session" \
+      "[ $(( M_CEIL * 100 )) -le $(( M_BUD * M_ACT )) ]"
+fi
+
+# ---------- Case N: the runtime CEILING RECONCILIATION fires when the UNMANAGED prose outgrows its allowance ----------
+# Case M guards the constants; only this can guard the prose, which grows with nobody editing a number.
+np="$SANDBOX/plan.md"; rm -f "$np" "$np.bak"
+mkdir -p "$SANDBOX/ops/autonomous"
+printf '.maintenance/AUTONOMOUS_PLAN.md\t100000\n' > "$SANDBOX/ops/autonomous/context-budget.sh"
+{ printf '# P\n\nRUN STATUS: IN_PROGRESS\n\n## PRIME DIRECTIVES\n'
+  for i in $(seq 1 300); do printf -- '- directive %d %s\n' "$i" "$(head -c 200 /dev/zero | tr '\0' 'd')"; done
+  printf '\n## RESUME PROTOCOL\n1. y\n\n## WORK QUEUE\n- [ ] OPEN1\n\n## Session Log\n- SLOG entry 1\n\n## Daemon Report\n\n(preamble)\n'
+} > "$np"
+AUTONOMOUS_PLAN="$np" AUTONOMOUS_SESSION_ARCHIVE="$SANDBOX/slog-arch3.md" AUTONOMOUS_DR_ARCHIVE="$SANDBOX/mr-arch3.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$SANDBOX/wq-arch3.md" \
+  bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/outN.txt" 2>&1
+chk "N ceiling breach reported"                  "grep -q 'CEILING .* > plan budget' '$SANDBOX/outN.txt'"
+chk "N names the UNMANAGED prose as the cause"   "grep -q 'UNMANAGED prose is what overran' '$SANDBOX/outN.txt'"
+chk "N says do NOT raise the budget"             "grep -q 'do NOT raise the budget' '$SANDBOX/outN.txt'"
+chk "N did not change the exit code (no abort)"  "! grep -q 'ABORTED pass' '$SANDBOX/outN.txt'"
+chk "N left the plan's unmanaged prose alone"    "[ \"\$(grep -c '^- directive ' '$np')\" = 300 ]"
+# …and it must stay QUIET when the sum does fit, or it is noise on every cycle and nobody reads it.
+printf '.maintenance/AUTONOMOUS_PLAN.md\t400000\n' > "$SANDBOX/ops/autonomous/context-budget.sh"
+AUTONOMOUS_PLAN="$np" AUTONOMOUS_SESSION_ARCHIVE="$SANDBOX/slog-arch3.md" AUTONOMOUS_DR_ARCHIVE="$SANDBOX/mr-arch3.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$SANDBOX/wq-arch3.md" \
+  bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/outN2.txt" 2>&1
+chk "N silent when the ceiling fits"             "! grep -q 'CEILING' '$SANDBOX/outN2.txt'"
+
 echo ""
 echo "=================== $PASS passed, $FAIL failed ==================="
 [ "$FAIL" = 0 ]

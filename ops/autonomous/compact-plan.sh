@@ -51,7 +51,40 @@ TRIGGER="${TRIGGER:-10}"    # only compact when the log exceeds this many entrie
 # Pass 1 is now a MIRROR of Pass 2 — newest-first, structural entry detection, whole-entry ordinal split,
 # line-conservation check — plus a BYTE BUDGET on both passes so that a future authoring drift can never
 # again silently un-bound the file: entry COUNT is a proxy for cost, bytes are the cost.
-SL_MAX_BYTES="${SL_MAX_BYTES:-30000}"   # Session Log region byte budget (~7.5k tokens); 0 disables
+# ===== 2026-08-12 — BUG 5: THE THREE REGION BUDGETS DID NOT ADD UP TO THE FILE'S BUDGET =====
+# This script bounds THREE regions. The plan also holds sections NO pass touches — PRIME DIRECTIVES, the
+# standing-premise / DEVONthink / paced-review banners, OWNER AUTHORIZATIONS, RESUME PROTOCOL, GUI
+# VERIFICATION, HOLD QUEUE, E2E findings — measured 39,887 B on 2026-08-12. So the LARGEST plan this script
+# can ever settle at is
+#
+#     UNMANAGED  +  SL_MAX_BYTES  +  DR_MAX_BYTES  +  WQ_MAX_BYTES          <- the CEILING
+#
+# and that has to be SMALLER than the plan's allowance in context-budget.sh, or the compactor cannot satisfy
+# the gate no matter how correctly it runs. Nothing checked it. Under the old 30000/30000/70000 the ceiling
+# was ~169,900 B against a 180,000 B allowance — it fitted by accident, not by design. On 2026-08-12 `a14c81c`
+# re-derived that allowance from 180,000 to 150,000 and these three constants were not revisited, so the
+# ceiling was suddenly 20 KB ABOVE the budget. The plan then sat at 144,402 B / 96% while all three passes
+# reported a CORRECT no-op (29,969 <= 30,000 — by THIRTY-ONE BYTES; 26,021 <= 30,000; 48,525 <= 70,000), and
+# the daemon's doc pre-gate dispatched a session to fix a file its own compactor was configured to be unable
+# to fix. Same shape as the WQ_MAX_BYTES=120000 bug one section down: a threshold that cannot be reached is
+# indistinguishable from a compactor that is switched off, and BOTH times the visible symptom was a no-op.
+#
+# THE NUMBERS BELOW ARE NOW DERIVED FROM THAT SUM, not chosen one at a time (all measured 2026-08-12):
+#   unmanaged allowance   45,000   39,887 actual + ~13%, for prose the owner adds to the banners
+#   SL_MAX_BYTES          20,000   ~5 recent Session Log entries at the measured 3.7 KB each
+#   DR_MAX_BYTES          24,000   the 8 entries DR_KEEP ALREADY allows, measured at 23,723 B — so this stops
+#                                  being a second, looser cap that silently overrides the count one
+#   WQ_MAX_BYTES          44,000   the measured 35,060 B floor + ~9 KB of queue growth between firings
+#   ----------------------------
+#   CEILING              133,000 = 89% of the 150,000 allowance, i.e. under context-budget.sh's ACT_PCT (93%),
+#                                  so even a fully saturated plan never costs a trim session.
+# Today's SETTLED size is far under the ceiling: 39,887 + 19,294 + 23,723 + 35,060 = 117,964 B (79%).
+# ⚠️ IF YOU CHANGE THE PLAN'S BUDGET IN context-budget.sh, RE-DO THIS SUM. Both halves are now guarded:
+# prove-compact.sh asserts the CONSTANTS fit the allowance (health-gate step `compact-proof`), and the CEILING
+# RECONCILIATION block at the foot of this script re-measures the UNMANAGED region every cycle — because that
+# half is prose, and prose grows without anyone editing a constant.
+UNMANAGED_ALLOWANCE="${UNMANAGED_ALLOWANCE:-45000}"  # budgeted size of the sections no pass can touch
+SL_MAX_BYTES="${SL_MAX_BYTES:-20000}"   # Session Log region byte budget (~5k tokens); 0 disables
 # An entry header in the Session Log is a COLUMN-0 line that is either a "- " bullet or date-led
 # (20YY-MM-DD…). Continuations are indented or blank, so — unlike Daemon Report — a preceding blank line is
 # NOT required (entries here are not reliably blank-separated; requiring it would under-count). Heuristic
@@ -88,7 +121,14 @@ SEC_HEADER_RE='^## (PRIME DIRECTIVES|RESUME PROTOCOL|WORK QUEUE|HOLD QUEUE|E2E f
 DR_ARCHIVE="${AUTONOMOUS_DR_ARCHIVE:-${AUTONOMOUS_MR_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_DAEMON_REPORT_ARCHIVE.md}}"
 DR_KEEP="${DR_KEEP:-${MR_KEEP:-8}}"         # recent Daemon Report entries to retain inline
 DR_TRIGGER="${DR_TRIGGER:-${MR_TRIGGER:-12}}" # only rotate when the section exceeds this many entries (else no-op)
-DR_MAX_BYTES="${DR_MAX_BYTES:-${MR_MAX_BYTES:-30000}}"   # Daemon Report region byte budget (~7.5k tokens); 0 disables
+# 24000, not 30000, per BUG 5's sum above. It is deliberately set to what DR_KEEP=8 ACTUALLY costs (measured
+# 23,723 B on the live plan: 825 B preamble + 8 entries averaging 2.8 KB), so the byte cap and the count cap
+# agree instead of the byte one quietly permitting a section 30% larger than the count one ever would.
+# ⛔ DO NOT lower this below what DR_KEEP allows without reading the hazard note above Pass 2: the entries this
+# section holds are the ones the OWNER has not been walked through yet, and archiving one is how a decision
+# never reaches him. On 2026-08-12 the newest `### ✅ … walkthrough done` marker sat at entry 3 of 9, so
+# entries 1–2 were unsettled — a keep of 8 is four times the cushion, a keep of 2 would not be.
+DR_MAX_BYTES="${DR_MAX_BYTES:-${MR_MAX_BYTES:-24000}}"   # Daemon Report region byte budget (~6k tokens); 0 disables
 
 [ -f "$PLAN" ] || { echo "compact-plan: no plan at $PLAN — skip"; exit 0; }
 
@@ -389,8 +429,8 @@ echo "compact-plan: archived $DR_CUT Daemon Report entries (newest $DR_EKEEP kep
 # delete, line conservation, idempotent.
 QUEUE_ARCHIVE="${AUTONOMOUS_QUEUE_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_WORK_QUEUE_ARCHIVE.md}"
 # WORK QUEUE region byte budget; 0 disables Pass 3.
-# ⚠️ 2026-08-10 — WAS 120000, WHICH THIS PASS COULD NEVER REACH. context-budget.sh caps the WHOLE plan at
-# 180,000 B, and the non-queue sections run ~94 KB, so the plan hits its own gate at a queue size around
+# ⚠️ 2026-08-10 — WAS 120000, WHICH THIS PASS COULD NEVER REACH. context-budget.sh then capped the WHOLE plan
+# at 180,000 B (it is 150,000 since `a14c81c`), and the non-queue sections ran ~94 KB, so the plan hit its own gate at a queue size around
 # 86 KB — well under a 120 KB trigger. Net effect: Pass 3 no-op'd every cycle since it landed (the archive
 # file had never been created), the plan drifted to 195,708 B / 108% of budget, and the gate PARKED the run
 # instead — the machinery to fix it existed and was simply unreachable.
@@ -401,10 +441,15 @@ QUEUE_ARCHIVE="${AUTONOMOUS_QUEUE_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_WORK_QU
 #     plan -> 127,551 B (71% of budget), floor 33,833 B**.
 # That second figure is the one that matters, and it is the point of the safety rule above: Pass 3's reach is
 # bounded by what the TRACKERS can vouch for, not by this threshold. A tracker gap silently halves it.
-# Why 70000 and not lower: it must sit above the settled floor or Pass 3 re-fires every cycle archiving
-# nothing and churning the .bak for no gain. 33,833 leaves ample headroom, so 70000 both fires now and then
-# cleanly no-ops (verified in both states).
-WQ_MAX_BYTES="${WQ_MAX_BYTES:-70000}"
+# Why not lower: it must sit above the settled floor or Pass 3 re-fires every cycle archiving nothing — a
+# cheap no-op (the QD>0 guard exits before the .bak is written) but a pointless one.
+# ⚠️ 2026-08-12 — 70000 WAS ITSELF UNREACHABLE, for the SAME reason 120000 had been: not because the number was
+# absurd, but because nobody re-checked it against BUG 5's sum when the plan's allowance was re-derived from
+# 180,000 to 150,000. The queue region sat at 48,525 B holding 13,465 B of archivable shipped items, and Pass 3
+# no-op'd on every cycle while the plan reached 96% of budget. 44000 is the measured floor (35,060 B with
+# today's tracker state) plus ~9 KB of growth headroom, and it fires now. That the SAME latent shape recurred
+# within two days is why the ceiling is now ASSERTED (prove-compact.sh) rather than re-derived by hand.
+WQ_MAX_BYTES="${WQ_MAX_BYTES:-44000}"
 
 (
 [ "$WQ_MAX_BYTES" -gt 0 ] || { echo "compact-plan: WQ pass disabled (WQ_MAX_BYTES=0)"; exit 0; }
@@ -475,6 +520,50 @@ cp "$PLAN" "$PLAN.bak" || { rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
 mv "$QTMP" "$PLAN"; rm -f "$QDROP" "$SAFEF"
 echo "compact-plan: archived $QD WORK QUEUE line(s) of completed items; plan $QO -> $QK lines; archive=$QUEUE_ARCHIVE"
 ) || { echo "compact-plan: Pass 3 (WORK QUEUE) exited nonzero — plan left untouched by Pass 3 (see message above)"; ABORTED="$ABORTED pass3"; }
+
+# ===== CEILING RECONCILIATION (2026-08-12, BUG 5) — is this script even CAPABLE of holding the plan? =====
+# prove-compact.sh asserts the CONSTANTS half of BUG 5's sum (it runs on fixtures and must not read the real
+# plan). This is the other half, and it can only be done here: UNMANAGED is PROSE — the directive banners, the
+# hold queue, the resume protocol — and prose grows without anyone touching a constant, so an allowance that
+# is honest today is a fiction six weeks from now. Re-measured every cycle against the live plan.
+#
+# It deliberately does NOT change the exit code. Nothing FAILED in this run — the passes may all have
+# compacted perfectly; what this reports is that the NEXT overage will be unfixable BY COMPACTION, which is a
+# standing configuration defect rather than a per-run event. The exit code stays what the EXIT-CODE CONTRACT
+# above says it is (a pass aborted), so the daemon's ⚠⚠ line keeps meaning exactly one thing. The value of
+# printing it here is that it lands in daemon.log directly above the no-op lines that are the symptom — so
+# the session the doc pre-gate eventually dispatches reads the diagnosis instead of re-deriving it, which on
+# 2026-08-12 was most of the work.
+CB="$REPO/ops/autonomous/context-budget.sh"
+[ -f "$CB" ] || CB="$(cd "$(dirname "$0")" && pwd)/context-budget.sh"   # $0 may be the ~/.local/bin install
+PLAN_ALLOWANCE=$(awk -F'\t' '$1==".maintenance/AUTONOMOUS_PLAN.md" {print $2; exit}' "$CB" 2>/dev/null)
+if [ -n "${PLAN_ALLOWANCE:-}" ] && [ -f "$PLAN" ]; then
+  # UNMANAGED = every byte outside the three managed regions, incl. the three section headers themselves
+  # (no pass can remove those). Same region rule as the passes: a real section header is blank-preceded OR
+  # named in $SEC_HEADER_RE, so a '## ' pasted mid-body cannot mis-close a region here either.
+  UNMANAGED=$(awk -v sec="$SEC_HEADER_RE" '
+    {
+      if (/^## / && (prevblank || $0 ~ sec)) {
+        man = ($0 ~ /^## Session Log/ || $0 ~ /^## (Daemon Report|Morning Review)/ || $0 ~ /^## WORK QUEUE/)
+        unm += length($0) + 1; prevblank = 0; next
+      }
+      if (!man) unm += length($0) + 1
+      prevblank = ($0 ~ /^[[:space:]]*$/)
+    }
+    END { print unm+0 }' "$PLAN")
+  CEILING=$(( UNMANAGED + SL_MAX_BYTES + DR_MAX_BYTES + WQ_MAX_BYTES ))
+  if [ "$CEILING" -gt "$PLAN_ALLOWANCE" ]; then
+    echo "compact-plan: ⚠⚠ CEILING $CEILING B > plan budget $PLAN_ALLOWANCE B — this compactor CANNOT hold the"
+    echo "compact-plan:    plan under budget even when every pass runs perfectly, so a future no-op will be"
+    echo "compact-plan:    correct AND useless. unmanaged=${UNMANAGED} (allowance ${UNMANAGED_ALLOWANCE}) +"
+    echo "compact-plan:    SL=${SL_MAX_BYTES} + DR=${DR_MAX_BYTES} + WQ=${WQ_MAX_BYTES}. Re-do BUG 5's sum in"
+    echo "compact-plan:    this script's header — do NOT raise the budget in context-budget.sh."
+    if [ "$UNMANAGED" -gt "$UNMANAGED_ALLOWANCE" ]; then
+      echo "compact-plan:    The UNMANAGED prose is what overran ($UNMANAGED > $UNMANAGED_ALLOWANCE): trim a"
+      echo "compact-plan:    banner or give a grown section its own pass; shrinking the three caps only defers it."
+    fi
+  fi
+fi
 
 # ===== Final verdict (2026-08-06) — see the EXIT-CODE CONTRACT note above =====
 if [ -n "$ABORTED" ]; then
