@@ -16,6 +16,33 @@ never a source of queue candidates. **Do not rename or move this file without up
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 
+## Processor build/test gate follow-up (found 2026-08-12)
+
+- [x] **`W21.e2e-fu1` — the documented phone↔Mac Tier-2 harness reaches pairing and completes the full
+  round trip. ✅ SHIPPED 2026-08-13** — commit whose subject begins
+  `fix(processor,trackers): W21.e2e-fu1 restore phone-Mac gate`.
+  The baseline failed before build because it derived the nonexistent `ArchiveProcessor/ArchiveProcessor`
+  project; a temporary path alias exposed API-36 Gboard covering `Connect`, while `KEYCODE_ESCAPE` left it
+  visible. The Mac project now resolves to `ArchiveProcessor/macOS`; the driver gates Back on WindowManager's
+  real IME visibility and waits for the keyboard to disappear, preserving its emulator-only target checks.
+
+  The newly reachable pairing found a third, pre-existing defect: W16.lan2 made LAN use `lanToken`, while
+  the test-only READY line still publishes the six-character Drive-relay `token`. That `Capture/` source fix
+  is owner-gated as W21.e2e-fu2; this scripts-only repair reads the same persisted high-entropy bearer the
+  running server loaded. Adversarial review caught that the old filled-form screenshot and logs could expose
+  persistent credentials, so the final harness never logs/screenshots the LAN bearer, redacts the stale
+  relay code, and makes its run directory `0700`. It also routes both raw backups and finalized output under
+  that `/tmp` root instead of writing test photos into Pictures.
+
+  **Functional gate:** the exact current script built and launched ordinary signed Debug, paired the API-36
+  emulator, captured/uploaded three fixtures, ran real OCR, finalized three PDFs, and returned
+  `RESULT: PASS`. All three unique tokens (`MEMO-ALPHA-4471`, `LETTER-BRAVO-8823`,
+  `REPORT-CHARLIE-1590`) and years (`1962`, `1958`, `1974`) survived; all phone screenshot assertions passed.
+  Final artifacts prove `folder=` is under the private run's `backup/`, both token logs are redacted, and no
+  filled-form screenshot exists. No real corpus or physical device was touched; three small OCR calls were
+  the intended Tier-2 cost.
+
+
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 
 - [x] **`W30.ceiling` — `compact-plan.sh`'s three region budgets did not add up to the plan's file budget, so

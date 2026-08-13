@@ -22,19 +22,32 @@ from the shared entitlements map. The Release target now sets `CODE_SIGN_INJECT_
 hardened runtime and the explicitly declared network/file entitlements remain, while the signature contains
 neither debugger entitlement.
 
-## ⚠️ OPEN (W21.e2e-fu1): the phone↔Mac Tier-2 harness cannot reach pairing
+## ✅ FIXED (W21.e2e-fu1): the phone↔Mac Tier-2 harness could not reach pairing
 
-**Found 2026-08-12 while verifying W3.cap-r3-fu8.** The harness fails before OCR in
-two independent, pre-existing places. `e2e-phone-mac.sh` appends `/ArchiveProcessor` after already resolving
-the ArchiveProcessor app root, so its Xcode project path is a nonexistent
-`ArchiveProcessor/ArchiveProcessor` instead of `ArchiveProcessor/macOS`. With a temporary path alias around
-that bug, the API-36 pairing drive fills Host, Port, and Token but leaves Gboard visible; `Connect` remains
-below the visible accessibility tree and `tap_text "Connect"` fails. The preserved `04-filled.png` from the
-attempt visibly showed the keyboard covering the lower form.
+**Found 2026-08-12 while verifying W3.cap-r3-fu8; fixed 2026-08-13.** The script now resolves the real
+`macOS` XcodeGen directory. API-36 keyboard dismissal checks WindowManager's actual IME window, sends Back
+only while it is visible, and waits for it to disappear; the old `KEYCODE_ESCAPE` path was mutation-proven
+to leave Gboard over `Connect`.
 
-The queued fix must keep the emulator-only / explicit-serial safety boundary, correct the project path, make
-IME dismissal deterministic, and run the unchanged round-trip assertions to `RESULT: PASS`. Its ordinary
-Debug build-and-launch prerequisite now works after W28.cert-fu2.
+The first complete pairing attempt exposed W16.lan2's stale READY credential (tracked separately below).
+Until that owner-gated source seam is corrected, the harness reads the persisted high-entropy LAN token used
+by `CaptureServer`, never logs or screenshots it, redacts the stale relay code from READY/Mac-log artifacts,
+and makes the entire run directory owner-private. Both raw backup and finalized output now stay under the
+per-run `/tmp` root. The exact current harness completed all three emulator→Mac fixtures through OCR and
+finalize, with every unique token + year and every required phone screenshot present.
+
+## ⚠️ OPEN (W21.e2e-fu2): the test-only LAN READY line publishes the cloud-relay credential
+
+**Found 2026-08-13 while running W21.e2e-fu1.** W16.lan2 correctly split the six-character Drive relay
+`token` from the 32-character `lanToken` authenticated by `CaptureServer`, but
+`CaptureSession.serverDidStart` still writes `token` in its `LIVECAPTURE_READY` line. A phone that pairs
+with that advertised value reaches the Mac and gets HTTP 401; the E2E screenshot and UI diagnostic both
+confirmed the mismatch before any photo or paid OCR call.
+
+The scripts-only W21.e2e-fu1 workaround reads the persisted `LiveCaptureLANToken` used by the running
+server. The source seam should still be corrected so its LAN READY contract is truthful, while
+`relayReceiverDidStart` keeps publishing the relay token. That change lives in `Capture/` and is therefore
+parked for a named owner authorization; do not fold it into an unrelated harness edit.
 
 ## ✅ FIXED (W3.cap-r3-fu8): manifest resume no longer disguises a failed segment as staged
 

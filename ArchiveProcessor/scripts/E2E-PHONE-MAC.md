@@ -42,6 +42,11 @@ pixel source. This is the sole fully-deterministic, unattended route.
   - `LIVECAPTURE_AUTOFINALIZE=1` → on `POST /session/complete` → drain-gated `requestFinish`→`finalize`, then write `DONE.txt`.
   - `LIVECAPTURE_TESTOUT=<dir>` → isolated output dir + where `DONE.txt` lands (never the real corpus).
 - **B3:** this orchestrator + `assert_mac.py` + `pdftext.swift` + `e2e-fixtures/` (known docs + `ground_truth.json`).
+  The orchestrator reads the listener port from `LIVECAPTURE_READY`, then reads the running app's persisted
+  high-entropy `LiveCaptureLANToken` for pairing. The READY line still publishes the old Drive-relay code
+  after W16.lan2's credential split; the harness redacts it from both READY and Mac-log artifacts. Correcting
+  that `Capture/` seam is owner-gated as W21.e2e-fu2. The filled pairing form is deliberately not screenshot:
+  it contains the persistent LAN bearer.
 
 The companion has **no session-finish UI** (it finishes per-segment; whole-session finalize is a Mac
 action), so the harness itself sends `POST /session/complete` over the documented Bearer route.
@@ -57,8 +62,9 @@ export OCR_KEY="<gemini-key>"       # optional; falls back to the Keychain Gemin
 caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh
 ```
 Prereqs: `ap_test36` AVD + the android-36 system image installed; the Mac free/awake (it's a live GUI app);
-xcodegen on PATH. Artifacts (screencaps, `mac.log`, `REPORT.txt`, `out/`) land in a per-run `/tmp/ap-e2e-*`
-dir. Exit 0 = PASS. `KEEP_EMU=always|onfail|never` controls emulator teardown (default `onfail`).
+xcodegen on PATH. Artifacts (raw backup, screencaps, `mac.log`, `REPORT.txt`, finalized `out/`) all land in a
+new, owner-private `/tmp/ap-e2e-*` dir (`E2E_RUNDIR` must name a nonexistent path with that prefix). Exit 0
+= PASS. `KEEP_EMU=always|onfail|never` controls emulator teardown (default `onfail`).
 
 ## Cost
 Tiny — 3 fixtures × `gemini-2.5-flash-lite` (a few cents). Isolated output; never touches the real corpus.

@@ -26,7 +26,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"                 # …/ArchiveProcessor/scr
 DRIVER="$HERE/android-ui-drive.sh"                    # proven emulator + UI driver (subcommands)
 FIXTURES="$HERE/e2e-fixtures"                          # doc*.jpg + ground_truth.json
 GT="$FIXTURES/ground_truth.json"
-APPROOT="$(cd "$HERE/.." && pwd)/ArchiveProcessor"    # the XcodeGen project dir
+APPROOT="$(cd "$HERE/../macOS" && pwd)"               # the XcodeGen project dir
 export PATH="/opt/homebrew/bin:$PATH"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 ADB="$(command -v adb || echo "$ANDROID_HOME/platform-tools/adb")"
@@ -37,15 +37,48 @@ READYFILE="$RUN/ready.txt"
 MACLOG="$RUN/mac.log"
 REPORT="$RUN/REPORT.txt"
 SHOTS="$RUN/shots"
-mkdir -p "$TESTOUT" "$SHOTS"
+case "$RUN" in
+  /tmp/ap-e2e-*/*|/tmp/ap-e2e-) printf '[e2e] FAIL: E2E_RUNDIR must be one dedicated /tmp/ap-e2e-* directory\n' >&2; exit 2;;
+  /tmp/ap-e2e-*) ;;
+  *) printf '[e2e] FAIL: E2E_RUNDIR must be a dedicated /tmp/ap-e2e-* path\n' >&2; exit 2;;
+esac
+umask 077                                               # private from the instant the run directory is created
+mkdir "$RUN" || { printf '[e2e] FAIL: cannot atomically claim fresh run directory: %s\n' "$RUN" >&2; exit 2; }
+mkdir "$TESTOUT" "$SHOTS"
 export OUT="$SHOTS"                                    # android-ui-drive.sh screencaps land here
 
 log(){ printf '\033[35m[e2e]\033[0m %s\n' "$*" | tee -a "$REPORT"; }
 MAC_PID=""; KEEP_EMU="${KEEP_EMU:-onfail}"
-cleanup(){ [ -n "$MAC_PID" ] && kill "$MAC_PID" 2>/dev/null; }
+redact_ready_token(){
+  # Until W21.e2e-fu2, the app writes its six-character Drive-relay credential here. The READY file is
+  # complete before this runs, so replacing it cannot detach a live writer from its artifact path.
+  [ -f "$READYFILE" ] && sed -i '' -E 's/token=[^ ]+/token=[REDACTED]/g' "$READYFILE"
+}
+redact_closed_maclog(){
+  # sed -i replaces an inode. Call this only after wait has closed the Mac process's stdout/stderr, or later
+  # diagnostics would continue into an unlinked inode and silently disappear from the retained mac.log.
+  [ -f "$MACLOG" ] && sed -i '' -E 's/token=[^ ]+/token=[REDACTED]/g' "$MACLOG"
+}
+cleanup(){
+  if [ -n "$MAC_PID" ]; then
+    kill "$MAC_PID" 2>/dev/null || true
+    wait "$MAC_PID" 2>/dev/null || true
+    MAC_PID=""
+  fi
+  redact_ready_token
+  redact_closed_maclog
+}
 die(){ printf '\033[31m[e2e] FAIL:\033[0m %s\n' "$*" | tee -a "$REPORT" >&2; cleanup
        [ "$KEEP_EMU" = never ] && "$ADB" emu kill 2>/dev/null; exit 1; }
-trap cleanup EXIT
+
+# Defensive cleanup: scrub any token-bearing artifact even if a child/older driver revision emitted one.
+# shellcheck disable=SC2329  # invoked by the EXIT trap below
+sanitize_artifacts(){
+  redact_ready_token
+  [ -f "$REPORT" ] && sed -i '' -E 's/ \(token [^)]*\)/ (token [REDACTED])/g' "$REPORT"
+  rm -f "$SHOTS/04-filled.png"
+}
+trap 'cleanup; sanitize_artifacts' EXIT
 
 # --- 0. preflight ------------------------------------------------------------
 KEY="${OCR_KEY:-$(security find-generic-password -s com.archiveprocessor.app -a Gemini -w 2>/dev/null)}"
@@ -67,6 +100,7 @@ APP="$APPROOT/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/
 log "launching headless Mac session (real OCR, auto-skip-tags, auto-finalize, isolated output)…"
 rm -f "$READYFILE" "$TESTOUT/DONE.txt"
 ARCHIVEPROC_HEADLESS=1 \
+ARCHIVEPROC_TEST_BACKUP_ROOT="$RUN/backup" \
 LIVECAPTURE_AUTOSTART=1 \
 LIVECAPTURE_READYFILE="$READYFILE" \
 LIVECAPTURE_OCRKEY="$KEY" \
@@ -84,16 +118,24 @@ for _ in $(seq 1 60); do
 done
 grep -q "LIVECAPTURE_READY " "$READYFILE" 2>/dev/null || die "no READY line after 60s (see $MACLOG)"
 PORT="$(grep -o 'port=[0-9]*' "$READYFILE" | head -1 | cut -d= -f2)"
-TOKEN="$(grep -o 'token=[^ ]*' "$READYFILE" | head -1 | cut -d= -f2)"
-[ -n "$PORT" ] && [ -n "$TOKEN" ] || die "could not parse port/token from READY line: $(cat "$READYFILE")"
-log "Mac listening on LAN port $PORT (token ${TOKEN:0:6}…)"
+# W16.lan2 split the LAN bearer from the six-character Drive-relay code, but the test-only LAN READY line
+# still reports the relay `token` (W21.e2e-fu2, owner-gated because the seam lives in Capture/). Read the
+# same persisted LAN credential CaptureServer loaded; never print or screenshot it.
+TOKEN="$(defaults read com.archiveprocessor.app LiveCaptureLANToken 2>/dev/null)"
+[ -n "$PORT" ] && [ "${#TOKEN}" -ge 32 ] \
+  || die "could not resolve port + high-entropy LAN token after READY (see $READYFILE)"
+# Production mints only this 31-symbol alphabet. Fail closed on a corrupted defaults value before it reaches
+# either an emulator-shell stdin command or curl's stdin config parser; future longer tokens remain allowed.
+case "$TOKEN" in *[!ABCDEFGHJKMNPQRSTUVWXYZ23456789]*) die "persisted LAN token has invalid characters";; esac
+redact_ready_token
+log "Mac listening on LAN port $PORT"
 
 # --- 3. emulator + app + pair over LAN (proven driver subcommands) -----------
 # The emulator is launched (backgrounded) inside `boot` and survives as an
 # adb-tracked orphan across subsequent subcommands.
 bash "$DRIVER" boot            || die "emulator boot failed"
 bash "$DRIVER" install         || die "app install failed"
-bash "$DRIVER" pair "$PORT" "$TOKEN" || die "pairing failed"
+printf '%s\n' "$TOKEN" | bash "$DRIVER" pair "$PORT" || die "pairing failed"
 
 # --- 4. inject the known documents through the REAL capture path -------------
 bash "$DRIVER" inject-flow "$FIXTURES" "$GT" || die "inject-flow failed"
@@ -107,8 +149,10 @@ bash "$DRIVER" inject-flow "$FIXTURES" "$GT" || die "inject-flow failed"
 # 10.0.2.2:$PORT (what the emulator paired to) forwards to the Mac's 127.0.0.1:$PORT.
 sleep 3
 log "sending POST /session/complete (Bearer) → Mac auto-finalize…"
-code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
-  -H "Authorization: Bearer $TOKEN" "http://127.0.0.1:$PORT/session/complete")
+code=$(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | \
+  curl --config - -s -o /dev/null -w '%{http_code}' -X POST \
+    "http://127.0.0.1:$PORT/session/complete")
+unset TOKEN
 [ "$code" = "200" ] || log "WARN: /session/complete returned HTTP $code (continuing)"
 
 log "waiting for Mac auto-finalize (DONE.txt, up to 300s)…"

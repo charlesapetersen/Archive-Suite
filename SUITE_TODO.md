@@ -30,17 +30,14 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   Processor launch step using the just-built gate artifact (not stale `build/DD`), and prove it catches a
   pre-`main` abort without enabling the paid OCR lane or reaching the host GUI. | ops/autonomous/health-gate.sh + ArchiveProcessor/scripts/test-recovery.sh | S | risk low
 
-- [ ] **`W21.e2e-fu1` — the documented phone↔Mac Tier-2 harness cannot reach pairing [XS–S · MED · broken
-  gate].** Two pre-existing harness failures were measured while verifying
-  `W3.cap-r3-fu8`, before any fixture reached OCR. First, `e2e-phone-mac.sh` computes its Xcode project as
-  `$(cd "$HERE/..")/ArchiveProcessor`, producing the nonexistent
-  `ArchiveProcessor/ArchiveProcessor`; its real project is `ArchiveProcessor/macOS`. A temporary path alias
-  proved the next failure: on API 36, `android-ui-drive.sh`'s conditional `hide_ime` leaves Gboard visible,
-  so the `Connect` node is off-screen and `tap_text "Connect"` fails (the captured `04-filled.png` visibly
-  showed the keyboard). Fix both paths without permitting a physical-device target, then run the full
-  emulator-only E2E to `RESULT: PASS`; keep all output isolated and retain the existing token/year and phone
-  screenshot assertions. The ordinary Debug launch prerequisite shipped as `W28.cert-fu2`; the harness can
-  now rebuild and launch that configuration itself. | ArchiveProcessor/scripts/{e2e-phone-mac,android-ui-drive}.sh | S | risk med
+- [ ] **`W21.e2e-fu2` — the test-only LAN READY line still publishes the six-character Drive-relay token
+  after W16.lan2 split the LAN credential [XS · MED · lying test seam] — ⛔ NEEDS THE OWNER.**
+  `CaptureSession.serverDidStart` writes `token` under `LIVECAPTURE_AUTOSTART`, but `CaptureServer` now
+  authenticates the 32-character `lanToken`; the E2E therefore reaches the Mac and receives HTTP 401 before
+  any upload. W21.e2e-fu1 works around the stale seam in its script by reading the persisted LAN token.
+  Correct the source READY line to publish `lanToken`, keep the file-relay READY line on `token`, and add a
+  regression proof that distinguishes the two credentials. **HOLD:** this test-only branch still lives in
+  `Capture/`, so the repo requires a per-item authorization before editing it. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift + recovery driver | XS | risk med | needs: owner
 
 ## Open-sourcing the repo (owner, 2026-08-11)
 
