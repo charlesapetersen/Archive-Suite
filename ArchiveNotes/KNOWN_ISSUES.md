@@ -3,6 +3,20 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W3.notes-header-field-terminator) — block metadata could break its own durable header
+
+**2026-08-12.** `BlockParser.serializeHeader` interpolated source and unknown-field values directly into a
+line-based HTML-comment header. A CR/LF could inject another field or block, and `-->` could close the header
+early and leak metadata into the operator's body. Every string field now passes one metadata-only sanitizer:
+CR, CRLF, and LF fold to spaces through the parser's canonical line grammar, while `-->` becomes the visible,
+stable `-- >`. Unquoted fields also take the reader's edge-whitespace canonical form on their first write;
+display quotes and backslashes are escaped symmetrically with `unquote`.
+
+Thumbnail insertion uses the same sanitized anchor because `display` and `thumbRef` also enter the body's
+Markdown image grammar there; sanitizing only the header would leave the adjacent image line malformed. The
+Tier-2 scratch-store test runs two real load/save cycles, asserts the raw durable bytes converge, and proves
+ordinary CRLF body prose remains untouched. No real Notes store or archive corpus is used.
+
 ## ✅ FIXED (W3.notes-paste-url-line-split-fu1) — rich-text line breaks merged distinct Reader links
 
 **2026-08-12.** A copied Reader-link list can use VT, FF, U+2028, or U+2029 as its row separator. Those are

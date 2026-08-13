@@ -6109,6 +6109,35 @@ explain why not.
   and no GUI owed.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Sources/SourceBlockPaster.swift, ArchiveNotes/macOS/Tests/ArchiveNotesTests/SourceBlockPasterTests.swift | XS | low | Tier-1
 
+- [x] **W3.notes-header-field-terminator — raw block-header values could truncate durable links, inject
+  provenance, leak into body prose, or split one block into two [S–M · MED · data-shaped].** ✅ **SHIPPED
+  2026-08-12** — commit whose subject begins `fix(notes,trackers): W3.notes-header-field-terminator`.
+  Filed by the Reader-link paste adversarial pass; **pre-existing**. Reachability was confirmed before the
+  fix: `SourceAnchor.notePassage` derives `display` from an operator-controlled note title, Zotero derives it
+  from citation metadata, and the paste/debug seams accept source anchors too. The bug was at the common
+  serializer, not any one producer: every source/unknown string was interpolated raw into a line-based HTML
+  comment, while `display` also enters a thumbnail's body Markdown.
+  **The invariant now has one owner.** `BlockParser.sanitizedHeaderFieldValue` folds LF, CRLF, and lone CR
+  through the existing `splitLines` grammar, joining readable pieces with one space, and makes an embedded
+  comment closer visibly inert (`-->` → `-- >`). `serializeHeader` applies it to every string source field
+  and unknown-field value; only metadata is touched, never block markdown. `display` now uses a symmetric
+  quote encoder for the quote/backslash escapes `unquote` already decodes. The adversarial review caught the
+  boundary case before shipping: unquoted fields now take the parser's edge-whitespace canonical form on the
+  first write, so a leading/trailing terminator cannot require a second save to settle.
+  **The sixth shape did not get hand-waved.** `buildInsertableBlock` asks the same sanitizer for its anchor
+  before authoring either the chip or `![display](thumb)`, so the header and thumbnail body line cannot
+  disagree. This is the only extra seam; paste, extract, Zotero, and debug producers stay free of duplicate
+  guards.
+  **Acceptance:** all five originally measured destructive shapes plus quote/backslash symmetry are in
+  `BlockChipTests.testParseSerializeParsePreservesBlockStructureAndIsAFixedPoint`; a dedicated thumbnail
+  insertion test covers the second grammar. `NoteStoreTests.unsafeBlockHeaderFieldsConvergeAcrossDiskSaveCycles`
+  uses a scratch `mktemp` store for two real load/save cycles, reads the durable bytes, proves a field cannot
+  mint a line-start header or extra comment closer, and asserts CRLF body prose remains exact. Focused result:
+  **22 XCTest + 20 Swift Testing, 0 failures**. Full Notes smoke: **840 Swift Testing tests / 84 suites +
+  XCTest 221**, `** TEST SUCCEEDED **`; only the pre-existing AppIntents metadata-skip warnings. Notes-local;
+  no ArchiveCore contract, corpus, or host GUI.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Store/BlockParser.swift, Editor/MarkdownBridge.swift, ArchiveNotes/macOS/Tests/ArchiveNotesTests/BlockChipTests.swift, NoteStoreTests.swift | S–M | medium | Tier-2
+
 - [x] **W21.screen — the daemon must never draw on the owner's screen [M]** — **DONE 2026-07-30** (owner
   reported the daemon running a GUI test on their display mid-morning). Root cause was **not** a rogue GUI
   command: both unit bundles are **app-hosted** (`TEST_HOST = the .app`), so the routine

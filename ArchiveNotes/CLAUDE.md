@@ -404,7 +404,8 @@ macOS/Tests/ArchiveNotesTests/
                                    captured-value confirm), move/replicate (incl. smart-folder refusal),
                                    batched folder-delete, stranded fresh read, locations (W6-S5)
   NotesItemDragTests.swift         6 tests: id-codec round-trip, malformed/foreign→[], ⌥/plain op (W6-S5)
-  NoteStoreTests.swift             13 tests: create/load/rename/delete/allItemIDs/assets/sanitize/mdURL
+  NoteStoreTests.swift             20 tests: create/load/rename/delete/allItemIDs/assets/sanitize/mdURL;
+                                   repeated-save body/header/thumb fixed points on scratch stores
   RootMarkerStoreTests.swift       5 tests: fresh/idempotent/corrupt-guard/empty/JSON-round-trip
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
                                    collision-dedup, verify-re-read, no-label, concurrent-third-party,
@@ -508,10 +509,11 @@ macOS/Tests/ArchiveNotesTests/
                                    preserves path, multiple/empty-alt/second-round-trip, image+bold,
                                    scratch-store write+disambiguate+resolve, attachment metadata,
                                    downsample, parse-with-asset-store
-  BlockChipTests.swift             13 tests: multi-block round-trip, reader-page/zotero/note-passage,
+  BlockChipTests.swift             22 tests: multi-block round-trip, reader-page/zotero/note-passage,
                                    unknown-fields preserved, absent-header=freeform, malformed tolerated,
                                    chip-first-char, consecutive-chips, second-round-trip-no-op,
-                                   thumb-line-consumed, insert-block-seam, leading-text-preserved
+                                   header line/fixed-point table (including hostile field values), thumb
+                                   insertion/deletion/escaping, insert-block seam, leading-text preserved
   SourceBlockPasterTests.swift     28 tests: payload→entries (page/doc/invalid/oversized/multi/
                                    terminator-bearing-rel), scanURLs (page/doc/multi/non-archive/empty/
                                    non-PDF; and W3.notes-paste-url-line-split: two links over LF·CRLF·

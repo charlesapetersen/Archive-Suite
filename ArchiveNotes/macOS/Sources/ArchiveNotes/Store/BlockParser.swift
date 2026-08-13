@@ -155,6 +155,38 @@ enum BlockParser {
         text.unicodeScalars.contains(where: isLineTerminator)
     }
 
+    /// Fold metadata that is about to enter the line-based block-header grammar into one safe line.
+    /// This deliberately applies only to header FIELD values, never to the operator's block markdown.
+    /// `splitLines` remains the single authority for LF / CR LF / lone-CR handling; joining with one
+    /// space preserves the readable pieces without allowing a value to mint another header field.
+    /// An embedded HTML-comment closer is separated visibly so it cannot end the header early.
+    static func sanitizedHeaderFieldValue(_ value: String) -> String {
+        let singleLine = containsLineTerminator(value)
+            ? splitLines(value).joined(separator: " ")
+            : value
+        return singleLine.replacingOccurrences(of: "-->", with: "-- >")
+    }
+
+    /// The same invariant for every string field of a source anchor. `MarkdownBridge` uses this at
+    /// the one seam that authors a thumbnail body line, so `display` and `thumbRef` cannot be safe in
+    /// the header while still breaking the `![display](thumb)` line beside it.
+    static func sanitizedHeaderSource(_ source: SourceAnchor) -> SourceAnchor {
+        SourceAnchor(
+            link: source.link.map(sanitizedUnquotedHeaderFieldValue),
+            display: source.display.map(sanitizedHeaderFieldValue),
+            page: source.page,
+            thumbRef: source.thumbRef.map(sanitizedUnquotedHeaderFieldValue),
+            zoteroSelect: source.zoteroSelect.map(sanitizedUnquotedHeaderFieldValue),
+            noteRef: source.noteRef.map(sanitizedUnquotedHeaderFieldValue)
+        )
+    }
+
+    /// `parseHeader` trims unquoted values. Match that canonical form on the first write, including
+    /// when a boundary terminator folded to a boundary space, so save one and save two are identical.
+    private static func sanitizedUnquotedHeaderFieldValue(_ value: String) -> String {
+        sanitizedHeaderFieldValue(value).trimmingCharacters(in: .whitespaces)
+    }
+
     /// True if `index` begins a line within `body` (the start of `body` counts).
     private static func isAtLineStart(_ index: String.Index, in body: String) -> Bool {
         guard let previous = body[..<index].unicodeScalars.last else { return true }
@@ -231,22 +263,32 @@ enum BlockParser {
     private static func serializeHeader(_ block: Block) -> String {
         var parts: [String] = ["<!-- block: \(block.kind.rawValue)"]
 
-        if let src = block.source {
+        if let source = block.source {
+            let src = sanitizedHeaderSource(source)
             if let v = src.link        { parts.append("     link: \(v)") }
-            if let v = src.display     { parts.append("     display: \"\(v)\"") }
+            if let v = src.display     { parts.append("     display: \(quote(v))") }
             if let v = src.page        { parts.append("     page: \(v)") }
             if let v = src.thumbRef    { parts.append("     thumb: \(v)") }
             if let v = src.zoteroSelect { parts.append("     zotero: \(v)") }
             if let v = src.noteRef     { parts.append("     note: \(v)") }
         }
         for (k, v) in block.unknownHeaderFields {
-            parts.append("     \(k): \(v)")
+            parts.append("     \(k): \(sanitizedUnquotedHeaderFieldValue(v))")
         }
 
         if parts.count == 1 {
             return parts[0] + " -->\n"
         }
         return parts.dropLast().joined(separator: "\n") + "\n" + parts.last! + " -->\n"
+    }
+
+    /// `unquote` already decodes these two escapes. Encode them in the opposite order so a display
+    /// containing a literal backslash beside a quote round-trips instead of changing on every save.
+    private static func quote(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 
     private static func unquote(_ s: String) -> String {

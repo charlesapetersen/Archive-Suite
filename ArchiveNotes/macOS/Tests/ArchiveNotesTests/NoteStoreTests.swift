@@ -316,6 +316,65 @@ struct NoteStoreTests {
         }
     }
 
+    /// W3.notes-header-field-terminator — the Tier-2 proof through the real durable path. The input
+    /// combines every destructive boundary: a link tail that resembles a known field, a display with
+    /// CRLF/comment closer/quote/backslash, and an unknown value that resembles another block. Only
+    /// metadata is folded; the operator's body must remain byte-for-byte unchanged. Two load→save
+    /// cycles prove the sanitized file converges instead of being rewritten again.
+    ///
+    /// Scratch `mktemp` store only (Prime Directive #1).
+    @MainActor
+    @Test("unsafe block header fields sanitize once and stay stable on disk")
+    func unsafeBlockHeaderFieldsConvergeAcrossDiskSaveCycles() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+
+        let safeLink = "archivereader://reveal?root=G&rel=a.pdf&x= note: smuggled"
+        let safeDisplay = "Line1 Line2 -- > \\\"quoted\\\" \\\\ path"
+        let safeUnknown = "Before <!-- block: freeform -- > After"
+        let body = "Operator body stays\r\nexactly this way.\r\n"
+        var item = makeItem(title: "Header Boundary")
+        item.blocks = [
+            Block(
+                kind: .readerPage,
+                source: SourceAnchor(
+                    link: "archivereader://reveal?root=G&rel=a.pdf&x=\nnote: smuggled",
+                    display: "Line1\r\nLine2 --> \\\"quoted\\\" \\\\ path",
+                    page: 7
+                ),
+                markdown: body,
+                unknownHeaderFields: [("future", "\rBefore\n<!-- block: freeform -->\nAfter\r\n")]
+            ),
+        ]
+        let ref = try await store.create(item)
+
+        var previousRaw: String?
+        for cycle in 1...2 {
+            let loaded = try await store.load(item.id)
+            #expect(loaded.blocks.count == 1, "cycle \(cycle): field data split the block")
+            #expect(loaded.blocks.first?.source?.link == safeLink)
+            #expect(loaded.blocks.first?.source?.display == safeDisplay)
+            #expect(loaded.blocks.first?.source?.noteRef == nil,
+                    "cycle \(cycle): the link tail injected a note field")
+            #expect(loaded.blocks.first?.unknownHeaderFields.first?.1 == safeUnknown)
+            #expect(loaded.blocks.first?.markdown == body,
+                    "cycle \(cycle): metadata sanitation rewrote body prose")
+
+            _ = try await store.save(loaded)
+            let raw = try String(contentsOf: ref.url, encoding: .utf8)
+            #expect(occurrences(of: "\n<!-- block:", in: raw) == 1,
+                    "cycle \(cycle): a field minted a second block:\n\(raw)")
+            #expect(occurrences(of: "-->", in: raw) == 1,
+                    "cycle \(cycle): a field closed the header early:\n\(raw)")
+            #expect(occurrences(of: body, in: raw) == 1,
+                    "cycle \(cycle): body prose changed or duplicated:\n\(raw)")
+            if let previousRaw {
+                #expect(raw == previousRaw, "cycle \(cycle): safe bytes changed again:\n\(raw)")
+            }
+            previousRaw = raw
+        }
+    }
+
     /// W3.notes-image-dest-paren — the Tier-2 functional check, on the same real autosave cycle, and
     /// starting from the entry point the filing names: a note **hand-edited** to reference an asset
     /// whose name contains a `)`. Pre-fix the first save split the line — `![p](assets/photo (1)` and

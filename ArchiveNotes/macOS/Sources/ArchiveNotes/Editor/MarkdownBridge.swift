@@ -195,19 +195,20 @@ enum MarkdownBridge {
         onJump: (@Sendable (SourceAnchor) -> Void)? = nil,
         passageSummaries: [ItemSummary] = []
     ) -> NSAttributedString {
+        let safeAnchor = BlockParser.sanitizedHeaderSource(anchor)
         let block = Block(
-            kind: kind, source: anchor, markdown: "",
+            kind: kind, source: safeAnchor, markdown: "",
             unknownHeaderFields: unknownHeaderFields
         )
         let chip = buildChipAttributedString(
             block: block, fontSize: fontSize, onReveal: onReveal,
             onPreview: onPreview, onJump: onJump, passageSummaries: passageSummaries
         )
-        guard let thumb = anchor.thumbRef, !thumb.isEmpty else { return chip }
+        guard let thumb = safeAnchor.thumbRef, !thumb.isEmpty else { return chip }
 
         let combined = NSMutableAttributedString(attributedString: chip)
         combined.append(parseSingleBody(
-            InlineImageMarkdown.emit(alt: anchor.display ?? "", path: thumb),
+            InlineImageMarkdown.emit(alt: safeAnchor.display ?? "", path: thumb),
             fontSize: fontSize, assetStore: assetStore
         ))
         return combined

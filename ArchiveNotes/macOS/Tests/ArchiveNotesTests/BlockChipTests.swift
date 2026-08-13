@@ -511,6 +511,99 @@ final class BlockChipTests: XCTestCase {
             let second = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: serialized))
             XCTAssertEqual(second, serialized, "\(name): second round-trip is not a fixed point")
         }
+
+        // W3.notes-header-field-terminator — these values begin as in-memory metadata, not as an
+        // already-damaged header string. Before the fix, every first serialization below either
+        // truncated provenance, injected a field/block, leaked into the body, or failed to settle.
+        let dangerousCases: [(name: String, block: Block, expected: Block)] = [
+            unsafeHeaderCase(
+                name: "link tail after LF",
+                source: SourceAnchor(link: "archivereader://reveal?root=G&rel=a.pdf&x=\njunk"),
+                expectedSource: SourceAnchor(link: "archivereader://reveal?root=G&rel=a.pdf&x= junk")
+            ),
+            unsafeHeaderCase(
+                name: "link cannot inject note field",
+                source: SourceAnchor(link: "archivereader://reveal?root=G&rel=a.pdf&x=\nnote: smuggled"),
+                expectedSource: SourceAnchor(link: "archivereader://reveal?root=G&rel=a.pdf&x= note: smuggled")
+            ),
+            unsafeHeaderCase(
+                name: "unquoted fields canonicalize boundary terminators immediately",
+                source: SourceAnchor(link: "\rarchivereader://x\r\n"),
+                unknown: [("future", "\nvalue\r")],
+                expectedSource: SourceAnchor(link: "archivereader://x"),
+                expectedUnknown: [("future", "value")]
+            ),
+            unsafeHeaderCase(
+                name: "display CRLF stays one field",
+                source: SourceAnchor(display: "Line1\r\nLine2"),
+                expectedSource: SourceAnchor(display: "Line1 Line2")
+            ),
+            unsafeHeaderCase(
+                name: "display cannot close comment",
+                source: SourceAnchor(display: "A-->LEAK"),
+                expectedSource: SourceAnchor(display: "A-- >LEAK")
+            ),
+            unsafeHeaderCase(
+                name: "display cannot mint a second block",
+                source: SourceAnchor(display: "Before\n<!-- block: freeform -->\nAfter"),
+                unknown: [("future", "Line1\nnote: injected-->tail")],
+                expectedSource: SourceAnchor(display: "Before <!-- block: freeform -- > After"),
+                expectedUnknown: [("future", "Line1 note: injected-- >tail")]
+            ),
+            unsafeHeaderCase(
+                name: "quoted display escapes symmetrically",
+                source: SourceAnchor(display: "A \\\"quoted\\\" \\\\ path"),
+                expectedSource: SourceAnchor(display: "A \\\"quoted\\\" \\\\ path")
+            ),
+        ]
+
+        for (name, block, expected) in dangerousCases {
+            let first = BlockParser.serialize(leadingText: nil, blocks: [block])
+            let parsed = BlockParser.parse(first)
+
+            XCTAssertEqual(parsed.blocks.count, 1,
+                           "\(name): a field split or destroyed the block:\n\(first)")
+            XCTAssertEqual(parsed.blocks.first, expected,
+                           "\(name): provenance/body did not survive the first serialization:\n\(first)")
+
+            let second = BlockParser.serialize(leadingText: parsed.leadingText, blocks: parsed.blocks)
+            XCTAssertEqual(second, first, "\(name): storage serialization is not a fixed point")
+            // The editor's established canonical form drops a final body newline. Its own SECOND pass
+            // must be stable, and the safe source/body structure must survive that canonicalization.
+            let editorFirst = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: first))
+            let editorBlocks = BlockParser.parse(editorFirst).blocks
+            XCTAssertEqual(editorBlocks.count, 1, "\(name): editor pass split the safe block")
+            XCTAssertEqual(editorBlocks.first?.source, expected.source,
+                           "\(name): editor pass changed the safe provenance")
+            let editorSecond = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: editorFirst))
+            XCTAssertEqual(editorSecond, editorFirst, "\(name): editor round-trip is not a fixed point")
+        }
+    }
+
+    /// `display` is the one source value written into TWO grammars when a pasted block owns a thumb:
+    /// the header and the body's Markdown image alt. Sanitizing only `serializeHeader` leaves that body
+    /// line split, so this goes through the real insertion seam and requires both spellings to agree.
+    func testInsertedThumbSanitizesDisplayInHeaderAndBodyTogether() {
+        let expectedDisplay = "Line1 Line2 -- > \\\"quoted\\\" \\\\ path"
+        let inserted = MarkdownBridge.buildInsertableBlock(
+            kind: .readerPage,
+            anchor: SourceAnchor(
+                link: "archivereader://x",
+                display: "Line1\r\nLine2 --> \\\"quoted\\\" \\\\ path",
+                page: 3,
+                thumbRef: "assets/p3.png"
+            )
+        )
+        let serialized = MarkdownBridge.serialize(inserted)
+        let parsed = BlockParser.parse(serialized)
+
+        XCTAssertEqual(parsed.blocks.count, 1, "The display split its own block:\n\(serialized)")
+        XCTAssertEqual(parsed.blocks.first?.source?.display, expectedDisplay)
+        XCTAssertEqual(parsed.blocks.first?.markdown,
+                       InlineImageMarkdown.emit(alt: expectedDisplay, path: "assets/p3.png"))
+
+        let second = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: serialized))
+        XCTAssertEqual(second, serialized, "The inserted thumb block is not a fixed point")
     }
 
     /// A chip inserted MID-LINE — `buildInsertableBlock` drops one wherever the caret happens to sit
@@ -548,6 +641,22 @@ final class BlockChipTests: XCTestCase {
     /// constantly.
     private func occurrences(of needle: String, in haystack: String) -> Int {
         haystack.components(separatedBy: needle).count - 1
+    }
+
+    private func unsafeHeaderCase(
+        name: String,
+        source: SourceAnchor,
+        unknown: [(String, String)] = [],
+        expectedSource: SourceAnchor,
+        expectedUnknown: [(String, String)] = []
+    ) -> (name: String, block: Block, expected: Block) {
+        let body = "Operator body.\n"
+        return (
+            name,
+            Block(kind: .readerPage, source: source, markdown: body, unknownHeaderFields: unknown),
+            Block(kind: .readerPage, source: expectedSource, markdown: body,
+                  unknownHeaderFields: expectedUnknown)
+        )
     }
 
     /// True when every `<!-- block:` in `md` begins a line — the precondition `BlockParser.parse`
