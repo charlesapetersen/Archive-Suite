@@ -5452,6 +5452,29 @@ explain why not.
   RETIRED + read-alias `P8`–`P10`→`Q1`–`Q3`, `P7`→unrated; `Q3`=old `P10`), records the companions as `Q` emitters
   + the phone↔Mac protocol as a SHARED HOTSPOT, and keeps the Notes date-projection row. Source of truth for q2–q7. | Tier-2 (SPEC) | S
 
+- [x] **W19.q2 — ArchiveCore: `parseQuality` in shared `DocumentTags` + legacy Priority alias [M].** ✅ **SHIPPED
+  2026-08-13** — the commit whose subject begins `feat(core,trackers): W19.q2` (a self-referential sha cannot be
+  written into its own commit). `Q1`/`Q2`/`Q3` → 1–3, absence = unrated, and the retired `P8`/`P9`/`P10` alias to
+  `Q1`/`Q2`/`Q3` on read with `P7` → unrated — no corpus rewrite, `raw` still verbatim. Canonical and legacy
+  spellings are **ONE last-token-wins facet** (`isRatingToken` decides membership, `parseQuality` the value), so a
+  shadowed token is demoted to a subject and a facet edit still removes exactly one token. `TagEditOp.setQuality`
+  is the facet's write primitive: `DocumentTags.qualityTag(for:)` is the single place a token is spelled, unrated
+  and every off-scale value add NOTHING (**`Q0` is never written**, and the initializer normalizes it away), and
+  the removal is that file's one `qualityToken` whichever spelling it used.
+  ⚠️ **Two design notes a later item should not "fix" back.** (1) **`priority`/`priorityToken` are DERIVED, not a
+  stored mirror** — `priority` is `quality + 7` and `priorityToken` returns the winner ONLY when it is P-spelled.
+  A stored second copy is what makes a rating readable two ways, and the first draft of this item shipped exactly
+  that: `priorityToken` mirrored the canonical token, so the Reader's still-live Priority cell would have removed
+  a `Q2` and written a `P9` in its place. Deriving makes `.setPriority` provably unable to reach a canonical
+  rating, which is why it can stay until `W19.q3` retires it. (2) **`parsePriority` stays LENIENT about a
+  zero-padded `P07`.** Tightening it looks like conformance but inverts the consequence: a token this parser
+  REJECTS is no longer consumed as a facet, so it lands in `.subjects` and becomes a Subjects **vocabulary
+  suggestion** — the exact class of leak `TagVocabulary`'s facet filter exists to stop. Lenient read, strict
+  write. Verified: ArchiveCore 222 XCTest + 105 swift-testing green (10 new tests), all three apps build, Reader
+  + Notes unit bundles pass, `lint-write-surface.sh` clean, and the Processor `finder-tags` + `tag-vocabulary`
+  gates pass — the latter now seeds a `Q2` so the app-level harvest proves a rating never becomes a subject.
+  | Tier-2 shared-Core | M
+
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 

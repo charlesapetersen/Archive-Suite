@@ -271,8 +271,8 @@ private func phaseHarvest(scratch: URL, root: URL) {
           "\(afterHarvest.sorted())")
     check("the harvest did NOT learn the marker colour off a labelled file",
           !afterHarvest.contains("Purple"), "\(afterHarvest.sorted())")
-    check("the harvest did NOT learn read-state or date tokens",
-          afterHarvest.isDisjoint(with: ["Unread", "Read", "1971", "P8"]), "\(afterHarvest.sorted())")
+    check("the harvest did NOT learn read-state, date or rating tokens",
+          afterHarvest.isDisjoint(with: ["Unread", "Read", "1971", "P8", "Q2"]), "\(afterHarvest.sorted())")
     check("the relaunched vocabulary still holds everything it arrived with",
           afterHarvest.isSuperset(of: onLaunch), "lost \(onLaunch.subtracting(afterHarvest).sorted())")
     check("the provider is ready", SystemTagsProvider.shared.isReady)

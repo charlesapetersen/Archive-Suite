@@ -68,6 +68,70 @@ final class TagEditingTests: XCTestCase {
         XCTAssertEqual(d.remove, ["P9"])
     }
 
+    // MARK: Quality edits (W19.q2) — the facet's only write primitive
+
+    func testSetQualityWritesTheCanonicalTokenAndReplacesTheWinner() {
+        let d = TagEditing.delta(for: .setQuality(3), given: tags(["Q1", "1980"]))
+        XCTAssertEqual(d.add, ["Q3"])
+        XCTAssertEqual(d.remove, ["Q1"])
+    }
+
+    // The owner-locked clause: unrated writes NO tag. A clear removes, and adds nothing.
+    func testSetQualityNilClearsAndNeverWritesQ0() {
+        let d = TagEditing.delta(for: .setQuality(nil), given: tags(["Q2", "Economics"]))
+        XCTAssertTrue(d.add.isEmpty, "unrated is the absence of a token")
+        XCTAssertEqual(d.remove, ["Q2"])
+
+        // An off-scale value cannot become a token either — it degrades to a clear.
+        XCTAssertTrue(TagEditing.delta(for: .setQuality(0), given: tags(["Q2"])).add.isEmpty)
+        XCTAssertTrue(TagEditing.delta(for: .setQuality(4), given: tags(["Q2"])).add.isEmpty)
+    }
+
+    // Setting a rating on a legacy file RETIRES the P token instead of leaving two ratings on one file.
+    func testSetQualityOnALegacyPriorityFileRetiresTheLegacyToken() {
+        let d = TagEditing.delta(for: .setQuality(1), given: tags(["P10", "Economics"]))
+        XCTAssertEqual(d.add, ["Q1"])
+        XCTAssertEqual(d.remove, ["P10"], "one facet, one winner, whichever spelling it used")
+
+        // Including the retired P7, which reads as unrated but is still the facet's token.
+        let cleared = TagEditing.delta(for: .setQuality(nil), given: tags(["P7", "Economics"]))
+        XCTAssertTrue(cleared.add.isEmpty)
+        XCTAssertEqual(cleared.remove, ["P7"])
+    }
+
+    // R-1 for the new facet: a SUBJECT that merely parses as a rating is never destroyed.
+    func testSetQualityPreservesCollidingSubject() {
+        let t = tags(["Q1", "Economics", "Q3"])
+        XCTAssertEqual(t.quality, 3)
+        XCTAssertEqual(t.qualityToken, "Q3")
+        XCTAssertTrue(t.subjects.contains("Q1"), "the shadowed token stays visible as a subject")
+        let d = TagEditing.delta(for: .setQuality(2), given: t)
+        XCTAssertEqual(d.add, ["Q2"])
+        XCTAssertEqual(d.remove, ["Q3"], "only the consumed winner — never a facet predicate")
+    }
+
+    // The retired Priority cell cannot reach a canonical rating: `priorityToken` is P-only by construction.
+    func testRetiredSetPriorityCannotRemoveACanonicalQualityToken() {
+        let t = tags(["Q2", "Economics"])
+        XCTAssertEqual(t.priority, 9, "it still READS as the old P9")
+        XCTAssertNil(t.priorityToken)
+        XCTAssertTrue(TagEditing.delta(for: .setPriority(nil), given: t).remove.isEmpty,
+                      "the retired edit must not destroy a Quality rating it cannot see")
+    }
+
+    func testGroupSummaryReportsQualityAndTheRetiredView() {
+        // `nil` = the selection disagrees; `.some(nil)` = they agree, and agree on UNRATED.
+        let mixed = GroupTagSummary([tags(["Q1"]), tags(["P10"])])
+        XCTAssertNil(mixed.commonQuality, "1 vs 3 — no common value")
+
+        let agreeing = GroupTagSummary([tags(["Q3"]), tags(["P10", "Economics"])])
+        XCTAssertEqual(agreeing.commonQuality, .some(3), "the two spellings are the same rating")
+        XCTAssertEqual(agreeing.commonPriority, .some(10))
+
+        let unrated = GroupTagSummary([tags(["P7"]), tags(["Economics"])])
+        XCTAssertEqual(unrated.commonQuality, .some(nil), "P7 and no-token are both unrated")
+    }
+
     func testSetMonthWithTwoMonthShapedTokens() {
         let t = tags(["03 March", "05 May", "1980"])
         XCTAssertEqual(t.month?.number, 5)

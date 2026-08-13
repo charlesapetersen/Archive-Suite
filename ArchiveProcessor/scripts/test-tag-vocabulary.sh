@@ -97,6 +97,9 @@ func seed(_ rel: String, _ tags: [String], _ label: Int?) {
 }
 seed("a.pdf", ["Purple", "Harvested Subject A", "1971", "Unread"], 3)
 seed("Box 3/Folder 7/b.pdf", ["Harvested Subject B", "P8", "Read"], nil)
+// A canonical Quality token, on its own file: two rating tokens on ONE file legitimately collide (the
+// shadowed loser is demoted to a subject, as for any facet), which is not what this check is about.
+seed("Box 3/Folder 8/c.pdf", ["Harvested Subject B", "Q2", "Unread"], nil)
 SWIFT
 if ! xcrun swiftc -swift-version 6 "$WORK/seed.swift" -o "$WORK/seed" 2>"$WORK/seed.err"; then
   echo "  [FAIL] fixture seeder build:"; head -20 "$WORK/seed.err"; exit 1

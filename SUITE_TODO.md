@@ -893,11 +893,6 @@ Priority is **retired** (no app or companion writes `P` anymore); legacy `P8`–
 Shared-contract (Tier-2) — SPEC first, then the shared parser, then each app + companions; every code item must
 **build + test all three apps**, scratch-only. **This wave REPLACES existing priority UI/plumbing — merge, don't
 add a second control alongside.**
-- [ ] **W19.q2 — ArchiveCore: `parseQuality` in shared `DocumentTags` + legacy Priority alias [M].** `Q1`/`Q2`/`Q3`
-  → 1–3 (absence = 0); include Quality in facet classification with the **subject-collision rule** (a subject
-  literally `"Q2"` survives — facet parse is display/sort/filter only, never a destructive write). **Fold the old
-  `parsePriority` into the alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3`, `P7` as unrated (read-only; nothing
-  writes `P`). Unit tests. **Tier-2 shared-Core → build+test Reader + Processor + Notes.** | packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift, Tests/ | M | med | none
 - [ ] **W19.date — Notes: project front-matter date → existing Year/Month/Day/Decade tags [M].** `NotesTagProjector`
   additionally projects the item's `date`+`datePrecision` into the existing date facets (reuse
   `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.

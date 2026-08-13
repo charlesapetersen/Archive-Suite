@@ -53,12 +53,12 @@ public struct DocumentTags: Sendable, Equatable {
     public var day: Int?
     public var dateUncertain: Bool
     public var decade: Int?           // decade START year, e.g. 1970 (from "1970s"); nil when absent
-    public var priority: Int?         // 7...10 (P10 highest)
+    public var quality: Int?          // 1...3; nil = unrated (the wire never carries Q0)
     public var readState: ReadState?
     public var color: ArchiveColor?
     public var subjects: [String]     // everything not claimed by another facet, verbatim
 
-    // The EXACT verbatim raw token that was consumed for each single-valued date/priority facet
+    // The EXACT verbatim raw token that was consumed for each single-valued date/quality facet
     // (the "last one wins" winner). These — never a facet PREDICATE over all tokens — are what a
     // facet-replacing edit removes, so a subject that merely parses as a facet is never destroyed.
     // `nil` when the facet is absent. (See CORE DIRECTIVE: classification must not drive a write.)
@@ -66,21 +66,47 @@ public struct DocumentTags: Sendable, Equatable {
     public var monthToken: String?
     public var dayToken: String?
     public var decadeToken: String?   // the verbatim raw token consumed for the decade facet ("1970s")
-    public var priorityToken: String?
+    public var qualityToken: String?  // canonical Q1...Q3 or a retired P7...P10 alias
+
+    // MARK: Transitional Priority surface (DERIVED — retired by W19.q3)
+    //
+    // Priority is retired: Quality is the only rating facet, and `quality`/`qualityToken` above are the
+    // only stored state for it. These two are computed VIEWS of that one facet, kept solely so the
+    // pre-W19 Reader surfaces (column, filter, sort, inline edit) keep compiling until W19.q3 renames
+    // them. Deriving rather than mirroring is deliberate: a stored second copy can disagree with the
+    // facet depending on which initializer built it, and a rating that reads two different ways is
+    // exactly how a facet edit removes the wrong token.
+
+    /// The rating on the retired 8...10 Priority scale (`Q1` → 8, `Q2` → 9, `Q3` → 10). `nil` when
+    /// unrated — including a legacy `P7`, which the owner-locked W19 mapping defines AS unrated.
+    public var priority: Int? { quality.map { $0 + 7 } }
+
+    /// The verbatim raw token consumed for the rating facet, but **only when it is a legacy `P` token**.
+    /// `nil` for a canonical `Q1`–`Q3`, so the retired `.setPriority` edit can never remove a canonical
+    /// Quality token — it stays exactly as narrow as it was before Quality existed.
+    public var priorityToken: String? {
+        guard let t = qualityToken, let first = t.first, first == "P" || first == "p" else { return nil }
+        return t
+    }
 
     public init(
         raw: [String], labelNumber: Int?,
         year: Int?, month: Month?, day: Int?, dateUncertain: Bool, decade: Int?,
-        priority: Int?, readState: ReadState?, color: ArchiveColor?, subjects: [String],
-        yearToken: String?, monthToken: String?, dayToken: String?, decadeToken: String?, priorityToken: String?
+        quality: Int?, readState: ReadState?, color: ArchiveColor?, subjects: [String],
+        yearToken: String?, monthToken: String?, dayToken: String?, decadeToken: String?,
+        qualityToken: String?
     ) {
         self.raw = raw; self.labelNumber = labelNumber
         self.year = year; self.month = month; self.day = day
         self.dateUncertain = dateUncertain; self.decade = decade
-        self.priority = priority; self.readState = readState; self.color = color
+        // Normalize off-scale values to unrated so `Q0` — which the wire never carries — cannot enter
+        // the model through a hand-built value either.
+        self.quality = quality.flatMap { (1...3).contains($0) ? $0 : nil }
+        self.readState = readState; self.color = color
         self.subjects = subjects
         self.yearToken = yearToken; self.monthToken = monthToken; self.dayToken = dayToken
-        self.decadeToken = decadeToken; self.priorityToken = priorityToken
+        self.decadeToken = decadeToken
+        self.qualityToken = qualityToken
     }
 
     /// Chronological sort key derived from the date tags. **No epoch limit** (medieval-safe).
@@ -144,26 +170,26 @@ public struct DocumentTags: Sendable, Equatable {
 
 extension DocumentTags {
     /// Classify a raw tag array (+ optional Finder label number) into facets.
-    /// Order of checks matters: read-state / priority / month / day are recognized before the
-    /// generic bare-number "year" test so a `P7` or `Day 25` is never mistaken for a year.
+    /// Order of checks matters: read-state / quality (including legacy Priority aliases) / month / day
+    /// are recognized before the generic bare-number "year" test.
     public static func parse(raw: [String], labelNumber: Int?) -> DocumentTags {
         var year: Int?
         var month: Month?
         var day: Int?
         var dateUncertain = false
         var decade: Int?
-        var priority: Int?
+        var quality: Int?
         var readState: ReadState?
         var subjects: [String] = []
 
-        // The verbatim raw token consumed for each single-valued date/priority facet ("last one
+        // The verbatim raw token consumed for each single-valued date/quality facet ("last one
         // wins"). When a SECOND token also parses as the same facet, the previous winner is demoted
         // back to a subject so it stays visible AND so a facet edit only ever removes this one token.
         var yearToken: String?
         var monthToken: String?
         var dayToken: String?
         var decadeToken: String?
-        var priorityToken: String?
+        var qualityToken: String?
 
         let color = labelNumber.flatMap(ArchiveColor.init(labelNumber:))
 
@@ -181,10 +207,13 @@ extension DocumentTags {
                 dateUncertain = true
                 continue
             }
-            // Priority Pn (7...10).
-            if let p = parsePriority(s) {
-                if let prev = priorityToken { subjects.append(prev) }   // demote the shadowed collision
-                priority = p; priorityToken = token
+            // Quality — canonical `Q1`...`Q3` plus the retired Priority spellings, aliased on read
+            // (`P10`→3, `P9`→2, `P8`→1, `P7`→unrated). ONE facet with ONE last-token-wins winner
+            // whichever way it is spelled, so a shadowed token is demoted to a subject and stays
+            // visible, and a facet edit still only ever removes this single winner.
+            if isRatingToken(s) {
+                if let prev = qualityToken { subjects.append(prev) }
+                quality = parseQuality(s); qualityToken = token
                 continue
             }
             // Month "MM Month".
@@ -224,8 +253,9 @@ extension DocumentTags {
         return DocumentTags(
             raw: raw, labelNumber: labelNumber,
             year: year, month: month, day: day, dateUncertain: dateUncertain, decade: decade,
-            priority: priority, readState: readState, color: color, subjects: subjects,
-            yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, decadeToken: decadeToken, priorityToken: priorityToken
+            quality: quality, readState: readState, color: color, subjects: subjects,
+            yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, decadeToken: decadeToken,
+            qualityToken: qualityToken
         )
     }
 
@@ -234,10 +264,44 @@ extension DocumentTags {
         "July", "August", "September", "October", "November", "December",
     ]
 
+    /// The retired Priority spelling, `P7`...`P10`. Nothing WRITES these any more (W19); this exists so
+    /// `parseQuality` can alias them on read, and so the pre-W19 Reader surfaces keep resolving until
+    /// W19.q3. Deliberately lenient about a zero-padded `P07`: a lenient read in front of a strict write
+    /// heals a malformed token, and — more to the point here — a token this recognizes is CONSUMED as a
+    /// facet, so tightening it would silently promote `P07` into the Subjects vocabulary instead.
     public static func parsePriority(_ s: String) -> Int? {
         guard let first = s.first, first == "P" || first == "p" else { return nil }
         guard let n = Int(s.dropFirst()), (7...10).contains(n) else { return nil }
         return n
+    }
+
+    /// Canonical rating tokens in ascending order. Absence represents unrated; `Q0` is never a token.
+    public static let qualityTokens = ["Q1", "Q2", "Q3"]
+
+    /// The tag to WRITE for a rating, and the single place that spells one. `nil` for unrated and for any
+    /// off-scale value, because unrated is written as the ABSENCE of a token — the wire never carries `Q0`.
+    public static func qualityTag(for quality: Int?) -> String? {
+        guard let q = quality, (1...3).contains(q) else { return nil }
+        return qualityTokens[q - 1]
+    }
+
+    /// Parse the unified Quality facet, 1...3. Retired Priority values alias on read without rewriting any
+    /// bytes: `P8`→1, `P9`→2, `P10`→3, while `P7` is unrated and therefore returns `nil` — as does any
+    /// token that is not a rating at all, `Q0` included. Use `isRatingToken` to tell those two apart.
+    public static func parseQuality(_ s: String) -> Int? {
+        if let first = s.first, first == "Q" || first == "q",
+           let n = Int(s.dropFirst()), (1...3).contains(n), s.count == 2 {
+            return n
+        }
+        guard let legacy = parsePriority(s), legacy >= 8 else { return nil }
+        return legacy - 7
+    }
+
+    /// Whether the token OCCUPIES the rating facet, regardless of what it evaluates to. The retired `P7`
+    /// does — it is a recognized rating spelling that happens to mean unrated — which is what keeps it out
+    /// of the Subjects vocabulary. A literal `Q0` does NOT, so it stays an ordinary subject.
+    public static func isRatingToken(_ s: String) -> Bool {
+        parseQuality(s) != nil || parsePriority(s) == 7
     }
 
     /// "MM Month" where MM is 1...12 and the name matches that month (case-insensitive).

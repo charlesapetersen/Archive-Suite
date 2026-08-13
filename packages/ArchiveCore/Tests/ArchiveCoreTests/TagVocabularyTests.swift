@@ -228,7 +228,9 @@ final class TagVocabularyTests: XCTestCase {
     func testStructuralFacetsNeverBecomeSubjectSuggestions() {
         let s = store()
         // Exactly what a real-tagging write puts on an output file.
-        s.add(rawTags: ["1968", "03 March", "Day 4", "P9", "taxes", "elections", "Unread"])
+        s.add(rawTags: ["1968", "03 March", "Day 4", "Q2", "taxes", "elections", "Unread"])
+        s.add(rawTags: ["P9"])
+        s.add(rawTags: ["P7"])
         XCTAssertEqual(Set(s.snapshot()), ["taxes", "elections"])
     }
 

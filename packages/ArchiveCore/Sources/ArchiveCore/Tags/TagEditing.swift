@@ -1,10 +1,10 @@
 import Foundation
 
 /// A single user-intended tag edit. `TagEditing.delta(for:given:)` turns it into a per-file
-/// `TagDelta` that the coordinated writer applies safely. Facet-replacing ops (year/month/day/priority)
+/// `TagDelta` that the coordinated writer applies safely. Facet-replacing ops (year/month/day/quality)
 /// remove ONLY the one raw token that file actually consumed for the facet (`DocumentTags.yearToken`
 /// etc.), so a heterogeneous group is handled per file and a subject that merely parses as that facet
-/// (e.g. a subject literally "1984" or "P8") is never destroyed. Classification never drives a write.
+/// (e.g. a subject literally "1984" or "Q2") is never destroyed. Classification never drives a write.
 public enum TagEditOp: Sendable, Equatable {
     case addSubject(String)
     case removeSubject(String)
@@ -12,6 +12,10 @@ public enum TagEditOp: Sendable, Equatable {
     case setMonth(Int?)         // 1...12, or nil to clear
     case setDay(Int?)           // 1...31, or nil to clear
     case setDateUncertain(Bool)
+    case setQuality(Int?)       // 1...3, or nil to clear (unrated writes NO token — never `Q0`)
+    /// RETIRED, and retired by W19.q3: the pre-W19 spelling of the rating edit, still here only because
+    /// the Reader's Priority cells drive it. It writes a `P` token, which nothing should do any more —
+    /// use `setQuality`.
     case setPriority(Int?)      // 7...10, or nil to clear
     case setColor(ArchiveColor?)// box / folder, or nil to clear
 }
@@ -38,7 +42,16 @@ public enum TagEditing {
             } else {
                 return tags.dateUncertain ? TagDelta(remove: tokens(in: tags) { $0.caseInsensitiveCompare("Date Uncertain") == .orderedSame }) : TagDelta()
             }
+        case .setQuality(let q):
+            // Unrated is the ABSENCE of a token, so a clear (and any off-scale value) adds nothing —
+            // `Q0` is never written. The removal is the ONE token this file consumed for the facet,
+            // whichever spelling it used, so setting or clearing a rating on a legacy `P8`-`P10` file
+            // retires that token instead of leaving two ratings on the same file.
+            return TagDelta(add: DocumentTags.qualityTag(for: q).map { [$0] } ?? [],
+                            remove: tags.qualityToken.map { [$0] } ?? [])
         case .setPriority(let p):
+            // RETIRED — see `TagEditOp.setPriority`. `priorityToken` is P-only by construction, so this
+            // can never remove a canonical `Q` token: the retired cell cannot destroy a real rating.
             return TagDelta(add: p.map { ["P\($0)"] } ?? [], remove: tags.priorityToken.map { [$0] } ?? [])
         case .setColor(let c):
             return TagDelta(color: c.map { .set($0) } ?? .clear)
@@ -47,7 +60,7 @@ public enum TagEditing {
 
     /// The delta that turns a file's current subject tokens (`old` = `file.subjects`) into the edited
     /// set (`new`) produced by the inline token editor — a single `TagDelta` so one editing session is
-    /// one write + one undo step. SUBJECTS ONLY: date/priority/read/color facets are edited by their own
+    /// one write + one undo step. SUBJECTS ONLY: date/quality/read/color facets are edited by their own
     /// cells and never appear in `new`, so they are neither added nor removed here. Pure/testable.
     public static func subjectDelta(from old: [String], to new: [String]) -> TagDelta {
         func key(_ s: String) -> String { s.trimmingCharacters(in: .whitespaces) }
@@ -80,6 +93,8 @@ public struct GroupTagSummary: Sendable, Equatable {
     public var subjectsOnAll: [String]
     public var subjectsOnSome: [String]
     public var commonYear: Int??
+    public var commonQuality: Int??
+    /// RETIRED alongside `TagEditOp.setPriority` (W19.q3): the same rating on the old 8...10 scale.
     public var commonPriority: Int??
     public var commonReadState: ReadState??
     public var commonColor: ArchiveColor??
@@ -88,7 +103,8 @@ public struct GroupTagSummary: Sendable, Equatable {
         count = files.count
         guard let first = files.first else {
             subjectsOnAll = []; subjectsOnSome = []
-            commonYear = nil; commonPriority = nil; commonReadState = nil; commonColor = nil
+            commonYear = nil; commonQuality = nil; commonPriority = nil
+            commonReadState = nil; commonColor = nil
             return
         }
         let subjectSets = files.map { Set($0.subjects) }
@@ -98,6 +114,7 @@ public struct GroupTagSummary: Sendable, Equatable {
         subjectsOnSome = union.subtracting(all).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
 
         commonYear = Self.common(files.map(\.year))
+        commonQuality = Self.common(files.map(\.quality))
         commonPriority = Self.common(files.map(\.priority))
         commonReadState = Self.common(files.map(\.readState))
         commonColor = Self.common(files.map(\.color))
