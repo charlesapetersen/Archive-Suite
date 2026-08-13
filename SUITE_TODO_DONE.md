@@ -5447,6 +5447,15 @@ explain why not.
 
 ## Owner-only environment jobs
 
+- [x] **`W29.drive-secret` — mint a new Drive OAuth client secret and enter it.** ✅ **DONE by the owner
+  2026-08-13.** He created a new **Desktop** OAuth client in his GCP project, pasted the secret into Settings →
+  Live Capture, and **Settings then reported signed in** — which is the real verification: a completed OAuth
+  round-trip proves the credential works, not merely that it was stored. The previous secret was **deactivated**
+  (not rotated) on 2026-08-12 after it was found in a since-deleted planning doc, so the cloud relay had no
+  usable credential at all between those dates; LAN and USB capture were unaffected throughout.
+  Note for the next time this is touched: no keychain partition-list work is needed for `DriveClientSecret` —
+  see the withdrawn half (b) of `W21.seed-fu`, which explains why adding it would be a mistake. | owner
+
 - [x] **W21.seed — seed the Processor login-Keychain "Always Allow".** ✅ **DONE by the owner 2026-08-13.** He
   launched `./launch.sh processor` interactively and clicked **Always Allow**.
   ⚠️ **Two corrections to the record, both worth carrying.** (1) **The docs claimed this was already done, and

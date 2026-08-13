@@ -41,21 +41,6 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 
 ## Open-sourcing the repo (owner, 2026-08-11)
 
-- [ ] **`W29.drive-secret` — the Drive cloud relay has NO usable client secret; mint a new one and enter it.**
-  The Desktop OAuth client secret was found in a since-deleted execution plan during the publication scrub
-  (`W29.pub1`) and the owner **deactivated** it on 2026-08-12. Deactivated, **not replaced** — so this is the
-  current, expected state, and a session that finds Drive sign-in failing should **not** treat it as a
-  regression, chase it through `DriveAuth`/`DriveClient`, or "fix" it in code. There is nothing wrong with
-  the code. Two steps, both owner-only: (1) in the Google Cloud console, add a new secret on the Desktop
-  OAuth client; (2) paste it into the Processor's **Settings → Live Capture**, which stores it in the
-  Keychain as `DriveClientSecret` — the value is trimmed on use (`DriveAuth.init`), since a pasted trailing
-  space reads back as `invalid_client`. Step 2 needs no build work first: Processor was **Debug-built clean
-  on 2026-08-12, zero warnings**, so the Settings pane is reachable as soon as you want it. Expect to re-authorise Drive on the Mac afterwards: a refresh token is redeemed *with*
-  the client secret, so the old grant died with it. **Unaffected:** the LAN and USB transports (no accounts,
-  no keys) and both phone companions (installed-app clients carry no secret — they are bound by package name
-  + signing SHA-1). Setup steps: [`ArchiveProcessor/ArchiveCapture/README-oauth.md`](ArchiveProcessor/ArchiveCapture/README-oauth.md).
-  | ArchiveProcessor | S | risk low | **needs:** owner (Google Cloud console + a GUI paste)
-
 ## Autonomous daemon — handoff integrity (2026-08-13)
 
 - [ ] **`W21.seed-fu` — the Keychain partition fix does not cover `DriveClientSecret`, and "Always Allow" is
@@ -65,15 +50,21 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   owner got one prompt at launch and then **five more just to open Settings** — the ACL is per keychain ITEM and
   `SettingsView` eagerly reads every provider credential. So the cost of an unseeded machine is ~6 modal prompts,
   and an UNATTENDED session that opens Settings would hang on the first one rather than fail loudly.
-  **(b) `ops/autonomous/fix-keychain-access.sh` has a stale `CANDIDATES` list** (`:25` — `Gemini Anthropic
-  Mistral OpenAI Gateway`). It omits **`DriveClientSecret`**, which exists in the login keychain today. That
-  matters right now: `W29.drive-secret` has the owner mint and paste a NEW Drive secret, and the partition fix
-  will not cover it, so the daemon can hit a prompt or a denial on the cloud-relay path. The recorded marker
-  `~/.local/state/archive-autonomous/keychain-partition-fixed` reads `2026-07-17 | Gemini Anthropic Mistral` —
-  i.e. it records only what was PRESENT when it last ran, so a key added later is invisible to it.
-  Fix: add `DriveClientSecret` to `CANDIDATES`; have `daemon.sh` compare the marker against the accounts
-  actually present and warn on a new one (the script's own `:72` comment says this was the intent); and correct
-  the `W21.seed` wording wherever it survives so the next machine is told to expect ~6 prompts, not one.
+  **(b) ~~`fix-keychain-access.sh` omits `DriveClientSecret`~~ — WITHDRAWN 2026-08-13, the omission is CORRECT
+  and deliberate.** Filed in error and corrected within the hour, before any code changed. The comment
+  immediately above `CANDIDATES` (`:23-24`) states the reasoning: *"Non-provider items (Drive secrets, gateway
+  config) are left alone: the CLI never reads them, so touching their partition lists would risk an app
+  re-prompt for no gain."* The partition-list fix exists so **scripts** reading a key through `/usr/bin/security`
+  do not prompt; `DriveClientSecret` is read by the **app**, which created the item and therefore already owns
+  it. Adding it would have risked causing the very re-prompt the finding claimed to prevent. **Do not "fix"
+  this.** Recorded rather than deleted because the wrong version of this finding is plausible enough to be
+  re-derived by the next reader of that `CANDIDATES` line.
+  **(c) The one real residue:** the script's own `:72` comment says the marker is recorded *"so daemon.sh can
+  warn if a NEW key (e.g. an OpenAI key added later) is"* added — and no such warning exists. The marker reads
+  `2026-07-17 | Gemini Anthropic Mistral` while `CANDIDATES` lists five, so a provider key added since is
+  invisible. Have `daemon.sh` compare the marker against the provider accounts actually present and warn on a
+  new one. Also correct the `W21.seed` wording wherever it survives, so the next machine is told to expect ~6
+  prompts, one per credential, not one.
   | ops/autonomous/fix-keychain-access.sh, daemon.sh | S | med | none
 
 - [ ] **`W31.handoff-gate` — make the handoff gate a *gate*: wire `check-handoff.sh` into `health-gate.sh`,
