@@ -37,6 +37,30 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   + signing SHA-1). Setup steps: [`ArchiveProcessor/ArchiveCapture/README-oauth.md`](ArchiveProcessor/ArchiveCapture/README-oauth.md).
   | ArchiveProcessor | S | risk low | **needs:** owner (Google Cloud console + a GUI paste)
 
+## Autonomous daemon — document budgets (owner, 2026-08-12)
+
+- [ ] **`W30.dr-walkthrough-anchor` — `compact-plan.sh` Pass 2 can archive Daemon Report entries the OWNER HAS
+  NOT BEEN WALKED THROUGH, and can archive past the newest `### ✅ … walkthrough done` marker [S · MED ·
+  owner-facing].** Filed 2026-08-12 by the `W30.ceiling` pass; **PRE-EXISTING and untouched by it** — that item
+  deliberately set `DR_MAX_BYTES` to exactly what `DR_KEEP=8` already permits (23,723 B) so it could not make
+  this worse, which is how the hazard was noticed rather than introduced.
+  Pass 2 rotates oldest-first on a pure count/byte rule. It has no notion of *settled*. The walkthrough
+  procedure in the root `CLAUDE.md` reads the section newest-first and **stops at the newest
+  `### ✅ … walkthrough done` heading**, so that marker is the only thing separating decisions the owner still
+  owes an answer to from ones he has already closed. Two distinct losses follow, and the archive file is not a
+  mitigation for either because nothing reads it during a walkthrough:
+  (1) an **unsettled** entry above the marker is archived → a decision is silently never surfaced to him;
+  (2) the **marker itself** is archived → the next walkthrough has no stop-anchor and re-raises settled items,
+  which that same `CLAUDE.md` section calls out as a named failure ("Do not re-raise settled items").
+  Measured on the live plan 2026-08-12: 9 entries, newest ✅ marker at **entry 3**, so entries 1–2 were unsettled
+  and a keep of 8 was ample. The exposure is a weekend of daemon fires with no walkthrough — entries accrue at
+  roughly one per session, so 8 is one busy day, not one week.
+  **Fix:** clamp `DR_EKEEP` so the split never crosses the newest `### ✅ … walkthrough` heading (keep at least
+  through that ordinal), independent of `DR_KEEP`/`DR_MAX_BYTES`; if that clamp would exceed the byte budget,
+  say so loudly rather than cutting — an over-budget plan is a trim session, a lost decision is not recoverable
+  by any later session. Needs a `prove-compact.sh` case per marker position (above / at / below the cut) plus
+  the no-marker-at-all case, which must keep today's behaviour. | ops/autonomous | S | risk med
+
 ## Reader test hardening (owner-reviewed 2026-07-18)
 
 - [ ] **`W29.t2-fu1` — let `SnapshotTests` run in the GUI VM.** It skips there today because the reference

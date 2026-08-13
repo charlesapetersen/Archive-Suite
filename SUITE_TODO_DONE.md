@@ -18,6 +18,42 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 
+- [x] **`W30.ceiling` — `compact-plan.sh`'s three region budgets did not add up to the plan's file budget, so
+  every no-op it reported was correct AND useless.** Shipped `62582c7` (+ the live compaction run, same session).
+  The doc pre-gate asked a session to trim `.maintenance/AUTONOMOUS_PLAN.md` (144,402 B, **96%** of its 150,000
+  allowance) *after* running the compactor first. The compactor had reported three no-ops and every one of them
+  was right: Session Log 29,969 ≤ 30,000 — **by thirty-one bytes** — Daemon Report 26,021 ≤ 30,000, WORK QUEUE
+  48,525 ≤ 70,000 while holding 13,465 B of archivable shipped items.
+  **The defect was arithmetic, not a pass.** The compactor bounds three regions; the plan also holds ~39,887 B
+  of prose no pass can touch (PRIME DIRECTIVES, the standing banners, RESUME PROTOCOL, GUI VERIFICATION, HOLD
+  QUEUE, E2E findings). Its **ceiling** — the largest plan it can ever settle at — was
+  `39,887 + 30,000 + 30,000 + 70,000 ≈ 169,900 B` against a 150,000 B budget. It was *configured to be incapable*
+  of satisfying the gate. That was not drift: `a14c81c` re-derived the allowance from 180,000 → 150,000 earlier
+  the same day without revisiting the three constants, which had fitted the old number by accident. Two days
+  before, the same latent shape had shipped as `WQ_MAX_BYTES=120000` — a threshold the pass could never reach.
+  Both times the symptom was a no-op, because **a compactor that cannot reach its own target is
+  indistinguishable from one that is switched off**.
+  **Fix:** constants re-derived *from* the sum — `UNMANAGED_ALLOWANCE` 45,000 (new) · `SL_MAX_BYTES` 20,000 ·
+  `DR_MAX_BYTES` 24,000 · `WQ_MAX_BYTES` 44,000 → **ceiling 133,000 = 89%**, under `context-budget.sh`'s
+  `ACT_PCT` (93%), so even a saturated plan never costs a trim session. `DR_MAX_BYTES` is the one *not* simply
+  tightened: 24,000 is exactly what `DR_KEEP=8` already permits (measured 23,723 B), so this cannot archive a
+  Daemon Report entry the old code would have kept — those entries are decisions the owner has not been walked
+  through yet (see the open `W30.dr-walkthrough-anchor`).
+  **Both halves of the sum are asserted now**, because re-deriving it by hand is what failed twice:
+  `prove-compact.sh` **Case M** reads the constants out of `compact-plan.sh` and the allowance + `ACT_PCT` out of
+  `context-budget.sh` and asserts the ceiling fits both — change either script and the health gate goes RED
+  instead of the run parking weeks later; a **CEILING RECONCILIATION** block at the foot of `compact-plan.sh`
+  re-measures the *unmanaged* region against the live plan every cycle (that half is prose, and prose grows
+  without anyone editing a constant), printing loudly but deliberately **not** touching the exit code — nothing
+  failed in *that* run, the report is that the *next* overage will be unfixable by compaction. **Case N** proves
+  it fires, names the cause, and stays quiet when the sum does fit.
+  **Verified:** `prove-compact` 72 → **82 passed / 0 failed**, `prove-context-budget` 20/0 (both green on
+  pristine `main` first). Mutation-proved on scratch copies — restoring `WQ_MAX_BYTES=70000` reddens Case M
+  (ceiling 159,000 > 150,000), deleting the reconciliation block reddens Case N. Live run: plan **144,402 →
+  117,964 B (96% → 79%)**, per-session orientation total 456,869 → 430,431 (91% → 86%), open `[ ]` items 38 → 38,
+  every anchor and both `### ✅ … walkthrough` markers still inline, and `next-queue-item.sh` still resolves its
+  `(blocked-on:)` tags.
+
 - [x] **`W30.docheal` — the daemon self-heals a document overage instead of parking, and the budgets stop being
   arbitrary.** Owner: *"This keeps happening and I really want to fix it… if it could self heal that would be
   great."* Two separate defects, one symptom.
