@@ -5445,6 +5445,22 @@ explain why not.
   | files: OCR/BatchInterruptTailContract.swift, Capture/BatchResumeTestDriver.swift | XS | low | none
 
 
+## Owner-only environment jobs
+
+- [x] **W21.seed — seed the Processor login-Keychain "Always Allow".** ✅ **DONE by the owner 2026-08-13.** He
+  launched `./launch.sh processor` interactively and clicked **Always Allow**.
+  ⚠️ **Two corrections to the record, both worth carrying.** (1) **The docs claimed this was already done, and
+  they were wrong for a month.** `AGENTS.md` §GUI verification and the 2026-07-16 owner-disposition note in
+  `SUITE_TODO.md` both asserted the Always Allow was seeded; the prompt appearing on 2026-08-13 proves it was
+  not. That claim is load-bearing — it is part of why sessions are told to stop deferring visual checks as "GUI
+  blocked" — so a Processor host GUI check attempted between 2026-07-16 and 2026-08-13 would have hung on a
+  modal prompt an unattended session cannot answer. The disposition note is annotated in place rather than
+  rewritten, since it is a dated record of what was believed. (2) **It is not one click.** One prompt at launch,
+  then **five more to open Settings**, because the ACL is per keychain ITEM and `SettingsView` reads every
+  provider credential eagerly. Follow-up `W21.seed-fu` covers the residue: `fix-keychain-access.sh`'s
+  `CANDIDATES` omits `DriveClientSecret`, and the partition marker records only what was present when it ran,
+  so a later-added key re-prompts silently. | XS | owner
+
 ## Wave 19 — Notes date-mirror + Quality facet (MERGES/replaces Priority) (owner-reviewed 2026-07-18)
 
 - [x] **W19.q1 — SPEC: the Quality facet + Notes-as-date-emitter.** DONE `06fabcc`, **merge revision** 2026-07-18

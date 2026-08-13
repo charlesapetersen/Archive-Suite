@@ -58,6 +58,24 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
 
 ## Autonomous daemon — handoff integrity (2026-08-13)
 
+- [ ] **`W21.seed-fu` — the Keychain partition fix does not cover `DriveClientSecret`, and "Always Allow" is
+  per-ITEM, so a later-added credential silently re-prompts [S · MED · ops].** Filed 2026-08-13 from working
+  `W21.seed`. Two facts learned by doing it, neither of which was written down:
+  **(a) It is not one click.** The item said "click Always Allow on the login-Keychain prompt" (singular). The
+  owner got one prompt at launch and then **five more just to open Settings** — the ACL is per keychain ITEM and
+  `SettingsView` eagerly reads every provider credential. So the cost of an unseeded machine is ~6 modal prompts,
+  and an UNATTENDED session that opens Settings would hang on the first one rather than fail loudly.
+  **(b) `ops/autonomous/fix-keychain-access.sh` has a stale `CANDIDATES` list** (`:25` — `Gemini Anthropic
+  Mistral OpenAI Gateway`). It omits **`DriveClientSecret`**, which exists in the login keychain today. That
+  matters right now: `W29.drive-secret` has the owner mint and paste a NEW Drive secret, and the partition fix
+  will not cover it, so the daemon can hit a prompt or a denial on the cloud-relay path. The recorded marker
+  `~/.local/state/archive-autonomous/keychain-partition-fixed` reads `2026-07-17 | Gemini Anthropic Mistral` —
+  i.e. it records only what was PRESENT when it last ran, so a key added later is invisible to it.
+  Fix: add `DriveClientSecret` to `CANDIDATES`; have `daemon.sh` compare the marker against the accounts
+  actually present and warn on a new one (the script's own `:72` comment says this was the intent); and correct
+  the `W21.seed` wording wherever it survives so the next machine is told to expect ~6 prompts, not one.
+  | ops/autonomous/fix-keychain-access.sh, daemon.sh | S | med | none
+
 - [ ] **`W31.handoff-gate` — make the handoff gate a *gate*: wire `check-handoff.sh` into `health-gate.sh`,
   and stop new items being filed without a plan mirror [S–M · MED · ops].** Filed 2026-08-13 by the
   pre-restart readiness audit. `ops/autonomous/check-handoff.sh` **exists and passes** as of that date, but
@@ -630,6 +648,12 @@ W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
   source; the live-key smoke remains the final ID confirmation, but nothing is blocked on it: the provider is
   additive + opt-in.)_
 - [ ] **W13.cli Phase 0 — install `gemini` + `codex` CLIs and confirm entitlements (owner).** Was buried in this
+  ⏸ **PARKED by the owner 2026-08-13** — *"Park the gemini and codex CLI for now."* Neither CLI is installed on
+  the machine (`command -v gemini` / `codex` → nothing; `claude` is at `~/.local/bin/claude`). **Nothing is
+  blocked by this**: the fake-CLI harness already covers the whole Local Agent code path at $0, `claude` is
+  Phase-0-validated, and the only thing waiting is the final "shipped" stamp on `W13.cli-1…4` plus the
+  `gemini`/`codex` invocation details, which stay `VERIFY` placeholders. Do NOT install them, do not chase the
+  entitlement spike, and do not re-raise this — un-park it only if the owner asks.
   prose note with no checkbox, so nothing ever tracked it (owner asked for it to be a real item, 2026-07-16).
   Install both CLIs, sign in with the enterprise/Edu accounts, and confirm each is entitled to run OCR. Gates the
   real-CLI live OCR smoke for W13.cli-1…4 (the `claude` path additionally can't run inside a Claude Code session —
@@ -1316,12 +1340,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   `XCUIApplication` handling into the `@MainActor` test methods). Not new — the file has been untouched since
   `73e91338` (W8-S8b) — and it does NOT need the VM or a GUI run: `xcodebuild build-for-testing` on the Notes
   scheme reproduces and verifies it. Daemon-buildable, $0. | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift | S | low | none
-- [ ] **W21.seed — OWNER, one-time ~2 min: seed the Processor login-Keychain "Always Allow" [XS].** ⛔ **This
-  gates every Processor GUI check.** Launch `./launch.sh processor` **interactively** once and click **Always
-  Allow** on the login-Keychain prompt so the stable "Archive Suite Dev" cert requirement sticks across rebuilds
-  (memory `processor-keychain-stable-signing`). Until then the Processor cannot be GUI-verified on the HOST at
-  all. Note this is *host-only*: `W21.vmgui-d` deliberately avoids it entirely (the VM's keychain holds no
-  ArchiveProcessor items, so nothing prompts there). | files: — | XS | low | **owner**
 
 - [ ] **W22.notes-rename — Archive Notes cannot rename a note from the UI at all [M].** Owner decision
   2026-08-02 (daemon-report walkthrough): **this is a GAP, not a design choice.** He was offered the
@@ -1493,7 +1511,10 @@ Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unl
 Owner went through the owner-only queue. Recorded here so none of it gets re-surfaced as an open ask:
 - **Environment: TCC grants (Accessibility / Screen Recording / Automation) are SET, verified live.** Sessions can
   drive + screenshot the GUI themselves — see `AGENTS.md` → *GUI verification*. The Processor's Keychain
-  "Always Allow" is **seeded**, so its GUI launches unattended. **Stop deferring visual checks to the owner as
+  "Always Allow" is **seeded**, so its GUI launches unattended. ⚠️ **THIS SENTENCE WAS WRONG, and stayed wrong
+  for a month — corrected 2026-08-13.** `W21.seed` was worked that day and the login-Keychain prompt **did**
+  appear, so the Processor was never actually seeded when this was written. It is seeded NOW. Left in place
+  rather than rewritten because it is a dated record of what was believed. **Stop deferring visual checks to the owner as
   "GUI blocked"** — that claim was stale and cost the owner a lot of pointless eyeballing.
 - [ ] **R13d REVERSED — remove `ArchiveSuite` stamping from Notes; drop the exclusion feature entirely
   (owner decision 2026-07-16: "Forget about excluding other tagged files. Notes should no longer tag things as

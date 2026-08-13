@@ -218,7 +218,7 @@ will run it, make your worktree path contain a space.
 ### GUI verification — you can drive it yourself; don't punt it to the owner
 
 **All the TCC grants are in place (verified 2026-07-16): Screen Recording, Accessibility, and Automation** —
-plus `cliclick` at `/opt/homebrew/bin/cliclick`, and the Processor's Keychain **"Always Allow" is seeded** so
+plus `cliclick` at `/opt/homebrew/bin/cliclick`, and the Processor's Keychain **"Always Allow" is seeded as of 2026-08-13** (`W21.seed`; it was asserted here from 2026-07-16 but was NOT actually true until then — and it takes ~6 prompts, one per credential, not one) so
 its GUI launches unattended. Quick self-check: `screencapture -x /tmp/x.png` writes a non-empty file, and
 `osascript -e 'tell application "System Events" to return name of first process whose frontmost is true'`
 returns the frontmost app.
