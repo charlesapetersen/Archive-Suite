@@ -11,3 +11,4 @@
 # format:  <tag><TAB or spaces><SUITE_TODO.md citation> — <reason>
 Import   SUITE_TODO.md §"Archive Notes — DEVONthink import" (~L1376-1379) — "never mirror it into …WORK QUEUE… Do not put it in the plan's HOLD QUEUE either: it is not awaiting an owner *gate*, it is out of scope until a qualitative bar is met." Owner directive 2026-08-01; plans retained in full.
 ZZZ.fake  no citation
+W13.cli  SUITE_TODO.md §"Provider expansion (Wave 13)" — ⏸ PARKED by the owner 2026-08-13 ("Park the gemini and codex CLI for now."). Not awaiting an owner GATE and not workable: neither CLI is installed and he asked for it not to be chased. Nothing is blocked — the fake-CLI harness covers the Local Agent path at $0 and `claude` is Phase-0-validated. Un-park only if he asks.
