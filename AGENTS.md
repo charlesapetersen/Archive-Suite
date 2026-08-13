@@ -72,13 +72,13 @@ sat unreachable this way and would have been skipped entirely, with no error. Mi
 `## WORK QUEUE` as one-liners ("full spec in `SUITE_TODO.md` §… — read that first"), keeping the **tags
 byte-identical** so `blocked-on` resolves.
 
-**4. HIGH-severity findings on irreversible paths are owner-gated by default.**
-Anything touching `Capture/`·`Net/`, finalize/manifest, file-writing tag/output, or `SPEC/tag-format.md` needs a
-per-item entry in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md) before the daemon may execute it. The
-category is **never** authorized wholesale. Each grant carries ⛔ constraints that are part of the grant, not
-advice — read the entry and obey it verbatim, and STOP rather than proceed on a narrower reading. Note a grant
-is a *licence*, not a queue entry: the item must also sit in the plan's WORK QUEUE region to be actionable.
-If you file such a finding, say so explicitly and leave it for the owner.
+**4. Irreversible-path findings are gated by TIER-2, not by an owner signature — see §*Gating baseline*.**
+The old rule here required a per-item entry in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md) for
+anything touching `Capture/`·`Net/`, finalize/manifest, file-writing tag/output or `SPEC/tag-format.md`. **That
+requirement was lifted by the owner on 2026-08-13.** Do not re-impose it, and do not leave such an item for
+the owner on those grounds. The full replacement policy, and the two things that ARE still owner-gated, are in
+§*Gating baseline* below. Existing grants in `OWNER_AUTHORIZATIONS.md` remain a permanent record and their ⛔
+constraints still bind the items they name.
 
 **5. Filing a review: queue it, don't just write a report.**
 A review report on its own is not tracked work. Turn each confirmed finding into a `[ ]` item in
@@ -129,6 +129,47 @@ the owner has said so (housekeeping GCs a clean merged one by itself); an **unco
 cut from lost work, and it also collides with the daemon, which would have picked the very same `W19.q2` off
 the queue and re-implemented it from scratch. Its trackers were untouched and correctly so — the item was
 not done. Checkpoint-commit at every green point; that is the whole lesson from that cycle.
+
+## Gating baseline — TIER-2 IS THE GATE (owner, 2026-08-13)
+
+**Default: if Tier-2 is satisfied, the daemon may execute it. No owner signature.** Tier-2 is unchanged and
+still mandatory — adversarial self-review plus a functional test, on scratch copies, never the real corpus
+(root [`CLAUDE.md`](CLAUDE.md) → *How we work* step 3). What changed is that Tier-2 is now the WHOLE gate for
+the irreversible-code categories, rather than Tier-2 *plus* a named entry in `OWNER_AUTHORIZATIONS.md`.
+
+**Only two things are still owner-gated:**
+
+1. ⛔ **A write to the REAL corpus** — `~/Desktop/Google Drive/Archival Photos/` (~102k PDFs, irreplaceable,
+   predates the apps). Untouched by this change and not negotiable. Reader's Core Directive and
+   scratch-copy-only testing stand exactly as before.
+2. ⛔ **Work only the owner can perform or judge** — an API key, an account, a physical device, a GUI paste in
+   a console he owns, or a matter of subjective taste. Not a safety gate; simply nobody else can do it.
+
+**What is NO LONGER a gate, and why — so nobody re-imposes it from an older doc:**
+
+- **`Capture/`·`Net/`, finalize/manifest, file-writing tag/output.** The per-item rule was written 2026-07-07,
+  the day after a live-capture finalize deleted a run's originals, on the premise that these paths write
+  irreplaceable data. The 2026-08-01 STANDING PREMISE voided that premise: no app in this suite has produced
+  data the owner intends to keep, and the corpus these paths do NOT write to is the only irreplaceable thing.
+  The authorization also bought no safety that Tier-2 wasn't already buying — it certified only that the owner
+  had personally read the item, which is why five items sat parked for weeks while the actual safety mechanism
+  was never the bottleneck.
+- **Money.** Owner, 2026-08-13: *"We don't need my permission for spending money. The daemon only spends tiny
+  amounts and the keys are capped."* This reverses an emphatic earlier ⛔ in root `CLAUDE.md`, which is kept
+  struck-through there rather than deleted. **The cost discipline is NOT lifted:** cheapest capable model,
+  smallest input set that proves the behaviour, and state the cost before a large run. No permission, no blank
+  cheque.
+- **`SPEC/tag-format.md`.** Owner, 2026-08-13: *"nothing real has been created by these apps yet."* A SPEC
+  change is still the highest-risk shared surface in the repo and still lands with every affected app in ONE
+  reviewed unit — that is Tier-2's job, and Tier-2 already required exactly that.
+
+**A genuine behaviour question is still a question.** Where an item says "decide X versus Y" and there is no
+correct answer (`W3.cap-r3-fu3`, `-fu4`, `-fu12-fu1`), bring it to the owner — but as a *question*, at Daemon
+Report, not as a safety gate. Filing it and moving on is right; parking the whole item as owner-gated is not.
+
+**The structural mechanism is unchanged:** what physically keeps the daemon off an item is its absence from
+the plan's `## WORK QUEUE` region (`ops/autonomous/next-queue-item.sh` walks only that). The HOLD QUEUE is
+therefore now reserved for the two categories above and for open behaviour questions.
 
 ## Ownership lanes (safe to run in parallel)
 

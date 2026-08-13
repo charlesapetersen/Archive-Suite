@@ -183,8 +183,17 @@ depends on the apps' current settings, structure or outputs.
 - ⛔ **The real corpus stays sacred.** `~/Desktop/Google Drive/Archival Photos/` (~102k PDFs) is irreplaceable
   and predates the apps — which is exactly *why* it isn't app output. The Reader's Core Directive and
   scratch‑copy‑only testing are untouched.
-- ⛔ **Money paths are unchanged.** Stranding a live paid batch costs real money regardless of whether any
-  output matters (the W16 `bat3`/`bat5`/`bat2-fu2` work is framed around money, not data).
+- ✅ **Money paths NO LONGER need a per-item owner grant (owner, 2026-08-13).** *"We don't need my permission
+  for spending money. The daemon only spends tiny amounts and the keys are capped."* This reverses the bullet
+  that stood here — kept below, struck through, because it was emphatic and a later reader will otherwise
+  assume this file drifted. What is **removed** is the *authorization gate*: a money-touching item no longer
+  waits on a named entry in `OWNER_AUTHORIZATIONS.md`. What **stands** is the cost discipline in each app's
+  guide — cheapest capable model, smallest input set that proves the behaviour, and say what a run will cost
+  before a big one. Not-permission, but not a blank cheque either. See §*Gating baseline* in
+  [`AGENTS.md`](AGENTS.md).
+- ~~⛔ **Money paths are unchanged.** Stranding a live paid batch costs real money regardless of whether any
+  output matters (the W16 `bat3`/`bat5`/`bat2-fu2` work is framed around money, not data).~~ *(superseded
+  2026-08-13, above.)*
 - ⛔ **Tier‑2 review, scratch‑only tests and no‑force git discipline all stand.** "No production data" means
   **no compatibility burden** — it does not mean less care, and it does not skip a gate.
 

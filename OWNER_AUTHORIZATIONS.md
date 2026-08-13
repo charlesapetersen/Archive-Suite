@@ -8,11 +8,35 @@ history, review and recoverability like any other durable artifact. Moved out of
 `.maintenance/AUTONOMOUS_PLAN.md` on 2026-08-01 for exactly that reason — it previously existed only as a
 gitignored section on a single laptop, with no record of who granted what, when, or under which constraints.
 
+## ⭐ READ FIRST — this file is now a RECORD, not a gate (owner, 2026-08-13)
+
+**The per-item authorization requirement was lifted.** `Capture/`·`Net/`, finalize/manifest, file-writing
+tag/output, money paths and `SPEC/tag-format.md` **no longer need an entry here** before the daemon may work
+them. **Tier-2 is the gate** — adversarial review plus a functional test on scratch copies. The full policy,
+including the only two things still owner-gated (a write to the real corpus; work only the owner can perform
+or judge), is in [`AGENTS.md`](AGENTS.md) → §*Gating baseline*.
+
+Owner's words: on the categories, *"I'm not sure why I need to authorize these kinds of things. The baseline
+assumption that I need to do these authorizations should be changed as well."* On money, *"we don't need my
+permission for spending money. The daemon only spends tiny amounts and the keys are capped."* On the SPEC,
+*"nothing real has been created by these apps yet."*
+
+**What this file is still for.** Two things, both durable:
+1. **The existing grants below remain binding on the items they name.** A grant's ⛔ constraints were often a
+   deliberate *design* choice, not a safety formality — `R13d`'s no-strip rule is the clearest case — and
+   those choices survive the gate being lifted. Read the entry for an item you are about to work.
+2. **A record of decisions with their reasoning**, marked discharged when the item ships rather than deleted,
+   because the constraint history is why a later change is or isn't allowed to revisit that code.
+
+**Do not re-impose the old gate** from a stale sentence in an older doc, and do not park an item as
+owner-gated on the grounds that it touches one of the de-gated categories.
+
 ## How this file works
 
-- **The hold-queue categories still stand in general.** This file is the ONLY place that narrows them, and it
+- ~~**The hold-queue categories still stand in general.** This file is the ONLY place that narrows them, and it
   does so **per item, never per category**. If an item is not listed here by tag, it is still hold-queue.
-  A category is never authorized wholesale.
+  A category is never authorized wholesale.~~ *(Superseded 2026-08-13 — see the banner above. An item not
+  listed here is now governed by Tier-2, not by the hold queue.)*
 - **An entry is a licence plus its limits.** The ⛔ constraints inside a grant are part of the grant, not
   advice. Read the entry before starting the item and obey it verbatim. If you cannot satisfy a constraint,
   STOP and flag it to Daemon Report — do not proceed on a narrower reading of it.
@@ -31,6 +55,21 @@ gitignored section on a single laptop, with no record of who granted what, when,
 *(Granted across the 2026-07-28, 2026-07-29 and 2026-08-01 Daemon Report walkthroughs — each entry states
 its own date. Verbatim as recorded when granted.)*
 
+- **`W21.e2e-fu2` · `W17.stg1` · `W17.det1` — AUTHORIZED 2026-08-13, and then made moot the same hour.**
+  Granted individually in the walkthrough that also lifted the gate itself, so they are the last three items
+  ever to have needed a signature. Recorded because their **constraints are design decisions that still bind**:
+  - `W21.e2e-fu2` — correct the READY line to publish `lanToken`. ⛔ The **file-relay READY line stays on
+    `token`**; ship a regression proof that distinguishes the two credentials, since the whole defect was one
+    credential standing in for the other.
+  - `W17.stg1` — `schemaVersion` + fingerprint on the staging manifest. ⛔ **Manifest only — NO per-source
+    content hash** (the owner's earlier decision, unchanged). ⛔ A corrupt or unknown-version manifest is
+    **renamed** to `staging-manifest.corrupt-<ts>.json` and surfaced in a banner — **never auto-deleted, never
+    silently continued**; silent-open is the bug being fixed. Prove in the `$0` `LIVECAPTURE_RECOVERYTEST`
+    driver, scratch copies only. Prerequisite `W3.cap-r4` shipped 2026-08-02.
+  - `W17.det1` — stranded-session detection. ⛔ **Pure logic only: no new SwiftUI, no banner, no Recovery
+    screen.** Count goes on the existing status line / log. The at-launch banner is revisited only once this has
+    been seen to fire — the point is to settle empirically whether stranded sessions occur before spending any
+    design-review time on UI.
 - **`W26.docs-spec` — AUTHORIZED to edit `SPEC/tag-format.md` (doc-only), 2026-08-11.** Correct the three
   places the shared contract still describes **Spotlight** as the Reader's tag-discovery mechanism, which
   `W26.walk2` removed: the API table's *"Spotlight view … Reader `ArchiveLibrary`"* row, the
@@ -55,6 +94,17 @@ its own date. Verbatim as recorded when granted.)*
   what the suite already relies on. Also land tu0's scratch premise test. Normal Tier-2 gate still applies.
 - **`R13d` — AUTHORIZED to remove the `ArchiveSuite` "Suite marker" row from `SPEC/tag-format.md`, WITH A HARD
   CONSTRAINT: do NOT strip existing stamps.** The owner chose the no-strip variant deliberately.
+  - ✅ **CONSTRAINT REVERSED BY THE OWNER, 2026-08-13 — STRIPPING IS NOW AUTHORIZED.** Asked directly (the
+    2026-08-01 note below says to ask, and that this question had become cheap), he chose the clean end state:
+    `R13d` now **also removes `ArchiveSuite` stamps already written**, so the marker is gone everywhere and no
+    inert-legacy carve-out survives. Rationale on record: only test material is affected, and the standing
+    premise's own words are *"No inert-legacy carve-outs — rules that exist to avoid disturbing already-written
+    app output are moot"* and *"Prefer the right end state to the compatible one."* Released from the HOLD
+    QUEUE into the WORK QUEUE at the same time — it had been authorized-but-unqueued, i.e. unpickable AND
+    uncounted, since 2026-07-16.
+    ⛔ **Still binding:** scratch copies only, never a real store, and the strip is a real tag WRITE, so it is
+    Tier-2 with a functional proof that a stripped note keeps every OTHER tag it had. The "NEVER add the marker
+    to a strip list" line in the bullets below is what has been reversed — nothing else in this grant is.
   - ⚠️ **PREMISE PARTLY VOID (2026-08-01).** Every "the owner's real note `.md` files" justification below is
     written against notes that **do not exist** — see §STANDING PREMISE. The no-strip rule therefore protects
     test material, not research data, and is now a *preference on record* rather than a data-safety
