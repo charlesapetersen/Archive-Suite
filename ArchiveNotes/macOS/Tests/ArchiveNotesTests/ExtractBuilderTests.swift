@@ -222,6 +222,147 @@ struct ExtractTitleTests {
                                                               passage("Second line")],
                                             fallbackDate: epoch) == "First line")
     }
+
+    // MARK: - W3.notes-image-label-trailing-backslash — the title path resolves escapes
+    //
+    // `strippedTitleLine` deleted `*`, `_` and `` ` `` unconditionally and never unescaped anything, so
+    // `MarkdownBridge.escapeMarkdown`'s own output came back through it wrong in both directions — and
+    // the result is durable, becoming the extract's `title:` front matter AND (via `sanitizedTitle`,
+    // which maps only `/` and `:`) its `.md` filename. Every case below is written as what the EDITOR
+    // writes for ordinary typed prose, because that is what makes them reachable rather than theoretical.
+
+    /// The plain case, and the one that motivated the item: brackets are escaped on the way out, so
+    /// they have to be resolved on the way back or the backslashes are the title.
+    @Test("an escaped bracket in the first line does not put a backslash in the title")
+    func escapedBracketIsResolved() {
+        // Typed `Real [Title]` → `escapeMarkdown` → `Real \[Title\]`.
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"Real \[Title\]"#)],
+                                            fallbackDate: epoch) == "Real [Title]")
+    }
+
+    /// The worse direction: deleting a marker unconditionally kept the backslash that protected it,
+    /// so an escaped asterisk lost the asterisk and *gained* nothing but the escape.
+    @Test("an escaped emphasis marker survives as itself, without its backslash")
+    func escapedEmphasisMarkerIsLiteral() {
+        // Typed `Real *not emphasis*` → `escapeMarkdown` → `Real \*not emphasis\*`.
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"Real \*not emphasis\*"#)],
+                                            fallbackDate: epoch) == "Real *not emphasis*")
+        // Same for `_` and a backtick, which the same pass deleted.
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"a \_b\_ \`c\`"#)],
+                                            fallbackDate: epoch) == "a _b_ `c`")
+    }
+
+    /// An escape is what says a leading marker is not a block marker — so the escaped form must not be
+    /// stripped as a bullet, and must not leave the backslash behind either.
+    @Test("an escaped leading bullet is literal text, backslash and all resolved")
+    func escapedLeadingBulletIsLiteral() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"\* not a bullet"#)],
+                                            fallbackDate: epoch) == "* not a bullet")
+    }
+
+    /// A backslash the operator actually typed is written doubled, and must come back single — the
+    /// same growth trap `unescapeAlt` exists to prevent, one field over.
+    @Test("a literal backslash comes back single, not doubled")
+    func literalBackslashIsNotDoubled() {
+        // Typed `C:\path` → `escapeMarkdown` → `C:\\path`.
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"C:\\path"#)],
+                                            fallbackDate: epoch) == #"C:\path"#)
+    }
+
+    /// Text that merely *looks* like an image is not one, and reads back as what was typed.
+    @Test("an escaped image-looking line titles with the text the operator typed")
+    func escapedImageLookalikeIsPlainText() {
+        // Typed `![alt](x)` → `escapeMarkdown` → `!\[alt\](x)`; no `![`, so it is not a reference.
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"!\[alt\](x)"#)],
+                                            fallbackDate: epoch) == "![alt](x)")
+    }
+
+    /// The item's own second surface. `![a\](x)` alone is NOT an image reference — the label crosses
+    /// the escaped `]` and never closes — and CommonMark renders it as the literal text `![a](x)`.
+    /// That is now exactly the title, where before it was the raw markdown with the backslash in it.
+    @Test("a label ending in a lone backslash titles with CommonMark's rendering of the line")
+    func loneTrailingBackslashLabelReadsAsItsRendering() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"![a\](x)"#)],
+                                            fallbackDate: epoch) == "![a](x)")
+    }
+
+    /// Green before and after, on purpose: a line ending on a lone backslash has nothing to escape, so
+    /// the trailing backslash is kept. This guards the tail branch the loop needs and would otherwise
+    /// never exercise. (CommonMark would read a hard line break and render nothing — a deliberate
+    /// departure, unreachable from the emitter, documented on `strippedInlineMarkers`.)
+    @Test("a line ending on a lone backslash keeps it")
+    func trailingLoneBackslashIsKept() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"Title\"#)],
+                                            fallbackDate: epoch) == #"Title\"#)
+    }
+
+    // MARK: - Code is exempt from both halves of the pass
+    //
+    // `MarkdownBridge` writes code content RAW — `wrapInlineCode` escapes nothing, and a code-block run
+    // is `result += runText`. So a title pass that unescapes there deletes a backslash the operator
+    // actually typed, and one that deletes `*`/`_` there (as the pre-fix pass did) eats their code.
+
+    /// The regression the adversarial pass caught. Green against the PRE-fix code too — which is the
+    /// point: the old pass never unescaped anything, so it got code right by accident, and a flat
+    /// unescape would have broken it. This is the guard that says the fix did not trade one bug for
+    /// another; only the intermediate version fails it.
+    @Test("a code span's content is taken verbatim — no unescaping")
+    func codeSpanContentIsVerbatim() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"`re.sub(r'\.', '')`"#)],
+                                            fallbackDate: epoch) == #"re.sub(r'\.', '')"#)
+    }
+
+    /// The mirror-image bug, PRE-EXISTING and fixed by the same rule: emphasis markers are not markers
+    /// inside a code span, so deleting them ate the operator's code.
+    @Test("a code span keeps the emphasis characters in its content")
+    func codeSpanKeepsMarkerCharacters() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`a*b_c`")],
+                                            fallbackDate: epoch) == "a*b_c")
+    }
+
+    /// `wrapInlineCode` widens the fence and pads with spaces when the text itself holds a backtick —
+    /// so the reader has to un-pad, or the title gains two spaces.
+    @Test("a widened code span un-pads exactly one space each side")
+    func widenedCodeSpanIsUnpadded() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`` a`b ``")],
+                                            fallbackDate: epoch) == "a`b")
+    }
+
+    /// An unmatched backtick has no closing run, so it is not a span. It is dropped as a stray marker
+    /// (the old behaviour) rather than shown — and, crucially, the rest of the line is still processed
+    /// as ordinary text, not swallowed as code.
+    @Test("an unmatched backtick does not turn the rest of the line into code")
+    func unmatchedBacktickIsAStrayMarker() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(#"a `b \[c\]"#)],
+                                            fallbackDate: epoch) == "a b [c]")
+    }
+
+    /// A fence is the one piece of the grammar a single line cannot decide, so `defaultTitle` carries
+    /// it. The fence line strips to nothing, which makes the first CODE line the title — verbatim.
+    @Test("a fenced block's first line titles the extract verbatim")
+    func fencedBlockFirstLineIsVerbatim() {
+        // A regex-ish code line: a backslash before punctuation, and an emphasis character. Pre-fix
+        // the markers were deleted and the backslash kept — `a\bc`, code the operator never wrote.
+        let md = "```swift\na\\*b_c\nmore\n```"
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(md)],
+                                            fallbackDate: epoch) == #"a\*b_c"#)
+    }
+
+    /// …and the fence must actually CLOSE, or every following line would be read as code.
+    @Test("text after a closed fence is processed as markdown again")
+    func textAfterAClosedFenceIsMarkdownAgain() {
+        let md = "```\n\n```\nReal \\[Title\\]"
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage(md)],
+                                            fallbackDate: epoch) == "Real [Title]")
+    }
+
+    /// The over-fix guard: an ordinary inline-code line still loses its backticks, so a code-only first
+    /// line names the extract after the code rather than after a pair of delimiters.
+    @Test("an ordinary code span still loses its delimiters")
+    func ordinaryCodeSpanLosesItsDelimiters() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`plain code`")],
+                                            fallbackDate: epoch) == "plain code")
+    }
 }
 
 // MARK: - Passage building + persistence
@@ -602,6 +743,36 @@ struct ExtractNestedSourceHeaderTests {
         #expect(reloaded.blocks.count == 2)            // one passage per covered source block, no more
         #expect(reloaded.blocks.allSatisfy { $0.kind == .notePassage })
         #expect(reloaded.blocks.allSatisfy { $0.source?.notePassageTarget != nil })
+    }
+
+    /// **W3.notes-image-label-trailing-backslash — the Tier-2 disk check.** The title path's output is
+    /// not an in-memory nicety: it is written to the extract's `title:` front matter *and* projected
+    /// into the `.md` filename, and `sanitizedTitle` maps only `/` and `:` — so a backslash the title
+    /// pass failed to resolve lands in a real filename on a real disk. Copying a passage of ordinary
+    /// prose containing brackets is the reachable route (`escapeMarkdown` writes them escaped), so this
+    /// goes through the whole `createExtract` → write → reload cycle on a scratch store and reads the
+    /// RAW bytes back. Pre-fix both assertions are `Real \[Title\]`.
+    @Test("an escaped first line lands unescaped in the front matter AND the filename")
+    func escapedFirstLineIsResolvedOnDisk() async throws {
+        let (store, tmp) = try scratch(); defer { cleanup(tmp) }
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1968",
+            // What the editor writes when the operator types `Real [Title]` as the first line.
+            segments: [.init(sourceBlockIndex: 0, markdown: #"Real \[Title\]"# + "\nbody\n")])
+        let builder = ExtractBuilder(store: store, now: { Date(timeIntervalSince1970: 1_000_000_000) })
+        let created = try await builder.createExtract(from: ExtractBuilder.passageBlocks(from: payload))
+
+        let url = try await store.mdURL(for: created.id)
+        #expect(url.lastPathComponent == "Real [Title].md",
+                "the filename kept the escapes: \(url.lastPathComponent)")
+
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        #expect(raw.contains("title: Real [Title]\n"),
+                "the front matter kept the escapes:\n\(raw)")
+
+        // And it survives the round trip, so the next save is not a rename.
+        let reloaded = try await store.load(created.id)
+        #expect(reloaded.title == "Real [Title]")
     }
 
     /// The choke-point half: even a passage handed straight to `createExtract` — bypassing the

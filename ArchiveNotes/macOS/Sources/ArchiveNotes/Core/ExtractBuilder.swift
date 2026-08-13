@@ -221,8 +221,15 @@ struct ExtractBuilder {
     // MARK: - Default title
 
     /// First non-empty snapshot line, stripped of Markdown markers (`#`, `*`, `_`, `>`, list
-    /// bullets), whitespace-trimmed, truncated to 80 chars on a word boundary; falls back to
-    /// `"Extract <yyyy-MM-dd>"` when the snapshot is image-/whitespace-only.
+    /// bullets), **with its backslash escapes resolved**, whitespace-trimmed, truncated to 80 chars on
+    /// a word boundary; falls back to `"Extract <yyyy-MM-dd>"` when the snapshot is
+    /// image-/whitespace-only.
+    ///
+    /// The unescaping is not cosmetic: this string is written to the extract's `title:` front matter
+    /// *and* projected into its `.md` FILENAME (`NoteStore.sanitizedTitle` maps only `/` and `:`), so a
+    /// backslash left unresolved lands on disk. Code spans and fenced blocks are exempt, because their
+    /// content is emitted raw — see `strippedInlineMarkers` for the whole rule
+    /// (`W3.notes-image-label-trailing-backslash`).
     ///
     /// Takes the blocks as **persisted** (i.e. post-`coercedToNotesOnly`), not the raw passages: a
     /// `<!-- block: …` line nested in the markdown is not title material, and reading it as one put
@@ -235,10 +242,28 @@ struct ExtractBuilder {
     /// with the first 80 characters of the WHOLE passage (`W3.notes-extract-title-line-split`). PDF text
     /// extraction hands back both forms. Note the block seam is the same bug: the markdowns are joined
     /// with `"\n"`, so a block ending in a lone `"\r"` makes a `"\r\n"` grapheme at the join.
+    /// A FENCED CODE BLOCK is carried across lines here rather than inside `strippedTitleLine`,
+    /// because a fence is the one piece of this grammar a single line cannot decide. Its content is
+    /// title material — the fence lines themselves strip to nothing, so the first code line is what
+    /// names the extract — and inside it there are no markers and no escapes to resolve, so the line
+    /// is taken VERBATIM. `MarkdownBridge` emits code-block runs raw (`inCodeBlock` → `result +=
+    /// runText`), so anything else would rewrite the operator's own code into the filename
+    /// (W3.notes-image-label-trailing-backslash). An unclosed fence runs to the end, as CommonMark says.
     nonisolated static func defaultTitle(fromFirstLineOf blocks: [Block], fallbackDate: Date) -> String {
         let combined = blocks.map { $0.markdown }.joined(separator: "\n")
+        var fence: (marker: Character, length: Int)?
         for rawLine in BlockParser.splitLines(combined) {
-            let cleaned = strippedTitleLine(String(rawLine))
+            let line = String(rawLine)
+            if let delimiter = fenceDelimiter(line) {
+                if let open = fence {
+                    if delimiter.marker == open.marker, delimiter.length >= open.length { fence = nil }
+                } else {
+                    fence = delimiter
+                }
+                continue
+            }
+            let cleaned = fence == nil ? strippedTitleLine(line)
+                                       : line.trimmingCharacters(in: .whitespaces)
             if !cleaned.isEmpty { return truncateOnWordBoundary(cleaned, max: 80) }
         }
         return "Extract " + isoDay(fallbackDate)
@@ -365,9 +390,125 @@ struct ExtractBuilder {
         // Strip leading block markers: ATX headings, blockquotes, unordered + ordered list bullets.
         s = s.replacingOccurrences(of: #"^\s*(#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)+"#,
                                    with: "", options: .regularExpression)
-        // Strip inline emphasis / code markers.
-        s = s.replacingOccurrences(of: #"[*_`]"#, with: "", options: .regularExpression)
+        s = strippedInlineMarkers(s)
         return s.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Drop inline emphasis markers and resolve backslash escapes — in ONE pass, because they cannot
+    /// be two: an escape is precisely what says a marker is not a marker, and a code span is what says
+    /// neither of them applies at all.
+    ///
+    /// **W3.notes-image-label-trailing-backslash.** This used to be `[*_`]` → `""` with no unescaping
+    /// at all, so `MarkdownBridge.escapeMarkdown`'s own output came back through it wrong in both
+    /// directions, and the result is durable — it becomes the extract's `title:` front matter *and*,
+    /// via `NoteStore.sanitizedTitle` (which maps only `/` and `:`), its `.md` filename:
+    ///
+    /// - a typed `Real [Title]` is written `Real \[Title\]` and titled the extract with the
+    ///   backslashes in it;
+    /// - a typed `Real *not emphasis*` is written `Real \*not emphasis\*`, and deleting the markers
+    ///   unconditionally *kept the backslashes that protected them* — `Real \not emphasis\`.
+    ///
+    /// **A CODE SPAN is exempt from both, and that is not a nicety.** `MarkdownBridge.wrapInlineCode`
+    /// writes the operator's text into backticks *raw* — it escapes nothing, because CommonMark
+    /// processes neither escapes nor emphasis inside a code span. Unescaping there would delete a
+    /// backslash the operator actually typed: a first line of `` `re.sub(r'\.', '')` `` would be
+    /// titled — and filed on disk — as `re.sub(r'.', '')`. The old pass had the mirror-image bug, in
+    /// that it deleted `*` and `_` from code content, so honouring the span fixes that too.
+    ///
+    /// Outside a code span this is CommonMark's own reading of the line: the plain text any other
+    /// viewer renders. Two deliberate departures, both unreachable from the emitter and both kept for
+    /// a title's sake — a line ending in a lone backslash keeps it (CommonMark reads a hard line break
+    /// and renders nothing), and an *unmatched* backtick run is dropped as a stray marker rather than
+    /// shown literally.
+    ///
+    /// The escape half repeats `InlineImageMarkdown.unescapeAlt`'s loop, and stopped being able to
+    /// share it once code spans entered — but the rule deciding *which* backslashes are escapes is
+    /// sourced from the grammar owner (`isEscapable`), so the two cannot drift on that.
+    nonisolated private static func strippedInlineMarkers(_ line: String) -> String {
+        let chars = Array(line)
+        var out = ""
+        out.reserveCapacity(chars.count)
+        var i = 0
+        var afterBackslash = false
+        while i < chars.count {
+            let ch = chars[i]
+            if afterBackslash {
+                // An escaped marker is literal text: keep it, drop the backslash that said so.
+                if !InlineImageMarkdown.isEscapable(ch) { out.append("\\") }
+                out.append(ch)
+                afterBackslash = false
+                i += 1
+            } else if ch == "\\" {
+                afterBackslash = true
+                i += 1
+            } else if ch == "`" {
+                // A backtick run opens a code span only if a run of exactly the same length closes it.
+                // An ESCAPED backtick never reaches here — the branch above consumed it — which is
+                // also CommonMark's rule.
+                let run = backtickRunLength(chars, at: i)
+                if let close = closingBacktickRun(chars, after: i + run, length: run) {
+                    out += codeSpanContent(chars[(i + run)..<close])
+                    i = close + run
+                } else {
+                    i += run
+                }
+            } else if ch == "*" || ch == "_" {
+                i += 1
+            } else {
+                out.append(ch)
+                i += 1
+            }
+        }
+        // A hand-edited line can end on a lone backslash; the emitter never writes one.
+        if afterBackslash { out.append("\\") }
+        return out
+    }
+
+    /// Length of the backtick run starting at `i`.
+    nonisolated private static func backtickRunLength(_ chars: [Character], at i: Int) -> Int {
+        var n = 0
+        while i + n < chars.count, chars[i + n] == "`" { n += 1 }
+        return n
+    }
+
+    /// Index of the next backtick run of *exactly* `length`, at or after `from`; nil if there is none.
+    /// Exactly, not at-least — that is what lets a single `` ` `` sit inside a `` … `` span, which is
+    /// precisely how `wrapInlineCode` writes text that itself contains a backtick.
+    nonisolated private static func closingBacktickRun(_ chars: [Character],
+                                                       after from: Int,
+                                                       length: Int) -> Int? {
+        var i = from
+        while i < chars.count {
+            guard chars[i] == "`" else { i += 1; continue }
+            let run = backtickRunLength(chars, at: i)
+            if run == length { return i }
+            i += run
+        }
+        return nil
+    }
+
+    /// A code span's content: CommonMark strips one leading and one trailing space when both are there
+    /// and the content is not all spaces — exactly the pair `wrapInlineCode` adds when it widens the
+    /// fence for a backtick in the text.
+    nonisolated private static func codeSpanContent(_ slice: ArraySlice<Character>) -> String {
+        let s = String(slice)
+        guard s.count >= 2, s.hasPrefix(" "), s.hasSuffix(" "), s.contains(where: { $0 != " " })
+        else { return s }
+        return String(s.dropFirst().dropLast())
+    }
+
+    /// A fenced-code delimiter line — three or more backticks or tildes, indented at most three
+    /// spaces — as `(marker, run length)`, or nil. A backtick fence's info string may not itself
+    /// contain a backtick, which is what keeps an ordinary `` `a` `` line from opening a block.
+    nonisolated private static func fenceDelimiter(_ line: String) -> (marker: Character, length: Int)? {
+        var s = Substring(line)
+        var indent = 0
+        while indent < 3, s.first == " " { s = s.dropFirst(); indent += 1 }
+        guard let marker = s.first, marker == "`" || marker == "~" else { return nil }
+        let length = s.prefix(while: { $0 == marker }).count
+        guard length >= 3 else { return nil }
+        if marker == "`", s.dropFirst(length).contains("`") { return nil }
+        return (marker, length)
     }
 
     nonisolated private static func truncateOnWordBoundary(_ s: String, max: Int) -> String {

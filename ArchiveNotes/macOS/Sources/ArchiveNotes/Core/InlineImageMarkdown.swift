@@ -90,6 +90,16 @@ enum InlineImageMarkdown {
     private static let escapableASCII: Set<Character> =
         Set(##"!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"##)
 
+    /// Whether a backslash *before* `ch` escapes it (CommonMark: ASCII punctuation only) rather than
+    /// standing for a literal backslash.
+    ///
+    /// Exposed because `unescapeAlt` is not the only place that has to resolve an escape:
+    /// `ExtractBuilder.strippedTitleLine` reads the same inline text to name an extract, and it has to
+    /// agree with the label about which backslashes exist. Two private copies of this set is how the
+    /// label and the title path came to disagree in the first place
+    /// (`W3.notes-image-label-trailing-backslash`).
+    static func isEscapable(_ ch: Character) -> Bool { escapableASCII.contains(ch) }
+
     /// Write one image reference. The **only** way the app should produce this grammar.
     static func emit(alt: String, path: String) -> String {
         "![\(escapeAlt(alt))](\(destination(path)))"

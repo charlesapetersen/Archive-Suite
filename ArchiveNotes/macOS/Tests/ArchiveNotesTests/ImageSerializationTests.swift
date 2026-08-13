@@ -310,6 +310,65 @@ struct ImageSerializationTests {
         }
     }
 
+    // MARK: - W3.notes-image-label-trailing-backslash — a KEPT behaviour, pinned so it stays a choice
+    //
+    // A label ending in a lone `\` lets the label cross the escaped `]`, so `![a\](x) and ![b](y)` is
+    // ONE reference (alt `a\](x) and ![b`, path `y`) where the pre-fu1 bracket-free pattern found two.
+    // That reads like a bug and is not one: it is CommonMark's own parse, every other viewer agrees,
+    // and the app cannot produce the input — `escapeAlt` doubles a backslash. Refusing a lone trailing
+    // backslash would be one line and a divergence from the spec the emitter now conforms to, so the
+    // behaviour is KEPT. These two tests are what make that a decision rather than an accident: the
+    // first fails if someone "fixes" the reading, the second fails if the emitter ever starts writing
+    // the input that reaches it.
+
+    /// The kept reading, pinned in FULL: not just "one reference" but *which* one — the label crosses
+    /// the escaped `]` and swallows `](x) and ![b`, which is where the prose goes and why `x` is
+    /// orphaned. Asserting only the count would let a different wrong parse through.
+    @Test("A label ending in a lone backslash reads as CommonMark reads it: one reference")
+    func loneTrailingBackslashLabelIsOneReferenceByDesign() {
+        let parsed = MarkdownBridge.parse(markdown: #"![a\](x) and ![b](y)"#, fontSize: 14)
+        var paths: [String] = []
+        var alts: [String] = []
+        parsed.enumerateAttribute(.noteImageRelPath,
+                                  in: NSRange(location: 0, length: parsed.length)) { val, _, _ in
+            if let p = val as? String { paths.append(p) }
+        }
+        parsed.enumerateAttribute(.attachment,
+                                  in: NSRange(location: 0, length: parsed.length)) { val, _, _ in
+            if let a = val as? InlineImageAttachment { alts.append(a.altText) }
+        }
+        #expect(paths == ["y"],
+                """
+                The label-crossing reading changed. It is a deliberate CommonMark conformance, not a \
+                bug — read W3.notes-image-label-trailing-backslash before changing it. Got: \(paths)
+                """)
+        #expect(alts == [#"a](x) and ![b"#],
+                "the swallowed prose is the damage this item declines to fix; it moved: \(alts)")
+    }
+
+    /// Why the above is affordable: the emitter can never write a label ending in a lone backslash, so
+    /// the merge is reachable only by hand-editing raw markdown. A `display` ending in `\` round-trips.
+    @Test("An alt text ending in a backslash is emitted doubled, and round-trips as two references")
+    func emitterCannotWriteALoneTrailingBackslashLabel() {
+        let emitted = InlineImageMarkdown.emit(alt: #"a\"#, path: "x")
+        #expect(emitted == #"![a\\](x)"#, "the emitter stopped doubling the backslash: \(emitted)")
+
+        let line = emitted + " and " + InlineImageMarkdown.emit(alt: "b", path: "y")
+        let parsed = MarkdownBridge.parse(markdown: line, fontSize: 14)
+        var paths: [String] = []
+        parsed.enumerateAttribute(.noteImageRelPath,
+                                  in: NSRange(location: 0, length: parsed.length)) { val, _, _ in
+            if let p = val as? String { paths.append(p) }
+        }
+        #expect(paths == ["x", "y"], "the emitted pair did not read back as two references: \(paths)")
+
+        let serialized = MarkdownBridge.serialize(parsed)
+        #expect(serialized.contains(#"![a\\](x)"#), "\(serialized.debugDescription)")
+        #expect(serialized.contains("![b](y)"), "\(serialized.debugDescription)")
+        #expect(serialized.contains(" and "),
+                "the prose between the two references was absorbed: \(serialized.debugDescription)")
+    }
+
     /// An unbalanced `(` in the path is not a reference at all — CommonMark's reading, and the safe
     /// one: it stays the operator's own text instead of matching a truncated path and re-emitting a
     /// line they never wrote.
