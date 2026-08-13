@@ -290,16 +290,20 @@ superseded planning docs deleted outright. Two commits that held nothing but a `
 The original history is kept as a git bundle **outside the repo, untracked and unpublished**:
 
 ```
-~/Claude/archive-suite-full-backup-2026-08-11.bundle
+~/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle
 ```
+
+*Moved there 2026-08-13* (owner: keep `~/Claude/` itself clean — see that folder's `README.md`). It sat at
+`~/Claude/archive-suite-full-backup-2026-08-11.bundle` until then, which is the path older docs quote. **The
+path now contains spaces — quote it in every command**, as with this checkout's own path.
 
 | | |
 |---|---|
-| SHA‑256 | `491776575b3305551cae6b422256bb723ea89ba80d6dbf0f8df8f20d3d030048` |
+| SHA‑256 | `491776575b3305551cae6b422256bb723ea89ba80d6dbf0f8df8f20d3d030048` (re‑verified after the move) |
 | Size | 28,428,854 bytes (27 MB) |
 | Contents | 42 refs, 1,017 commits, complete history; original `HEAD` = `3ea86c4` |
-| Verify | `git bundle verify ~/Claude/archive-suite-full-backup-2026-08-11.bundle` (run from inside a repo) |
-| Read it | `git clone --bare ~/Claude/archive-suite-full-backup-2026-08-11.bundle /tmp/as-original` |
+| Verify | `git bundle verify "$HOME/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle"` (run from inside a repo) |
+| Read it | `git clone --bare "$HOME/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle" /tmp/as-original` |
 
 **⛔ Never push it, commit it, or merge from it.** It is the *un‑scrubbed* history, so it still carries the
 personal email addresses, home‑directory paths, the old account name, the GCP project number, and — the

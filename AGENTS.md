@@ -104,8 +104,31 @@ queued as **`W23.h5`**. Two copies, both outside `main`:
 Re-derive against current `main` — do not merge it. Everything else in it is probably superseded (the
 run-config work was re-implemented as `W16.cfg1`–`cfg5`), but "probably" is why it was kept.
 
-**Quickest check that your handoff is complete:** run `ops/autonomous/next-queue-item.sh` and confirm the first
-`ok` line is the item you *intend* the daemon to do next, and that no item you just finished still appears.
+**7. Run the gate, don't re-read the list — `ops/autonomous/check-handoff.sh`.**
+Items 1–6 are a prose checklist, and a prose checklist is not a gate. One command now checks all of it,
+read-only, in a couple of seconds: uncommitted/unpushed work in any worktree, primary-vs-`origin/main`, a
+dirty primary tree, **every open `SUITE_TODO` item being visible in the plan**, both tracker guards, and it
+prints what the daemon would pick up next for you to eyeball. **A clean run is the definition of "handed
+off".** It is not yet a `health-gate.sh` step — that is `W31.handoff-gate`.
+
+**⚠️ The mirroring failure is NOT an external-agent problem — read this before blaming the handoff.** Item 3
+was written after the 2026-07-29 Codex handoff, and it is easy to conclude that mirroring is a thing *Codex*
+forgets. On 2026-08-13 a pre-restart audit found **27 open `SUITE_TODO` items with no checkbox line anywhere
+in the plan** — invisible to `next-queue-item.sh`, skipped in silence. Attributing all 27
+(`git log -S<tag> -- SUITE_TODO.md`) put **every one of them in a commit written in this project's own
+convention** — `fix(notes): W23.m14 — …`, `fix(ops): two status lines that lied`, `docs(trackers): …`. Three
+came from one commit (`c0be2cc`), two more from another (`763eade`). The pattern is a session closing a
+parent item, filing the `-fu` follow-up it *just discovered* into `SUITE_TODO`, and never mirroring it. So:
+**whenever you FILE a new item, mirror it in the same commit — daemon, interactive session, or external
+agent alike.** Filing is exactly when the omission happens, because the item you just wrote feels handled.
+
+**What the 2026-08-13 Codex cycle actually got wrong, for calibration:** one thing, and it was not the
+trackers. It left `W19.q2` as **107 lines of green, passing, uncommitted work with zero commits** in
+`suite-wt-20260813-011700-w19q2` — item 6's checkpoint rule, unfollowed. A *stray* worktree is tolerable and
+the owner has said so (housekeeping GCs a clean merged one by itself); an **uncommitted** one is one power
+cut from lost work, and it also collides with the daemon, which would have picked the very same `W19.q2` off
+the queue and re-implemented it from scratch. Its trackers were untouched and correctly so — the item was
+not done. Checkpoint-commit at every green point; that is the whole lesson from that cycle.
 
 ## Ownership lanes (safe to run in parallel)
 
