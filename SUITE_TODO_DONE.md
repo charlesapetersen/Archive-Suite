@@ -5353,6 +5353,61 @@ explain why not.
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 
+- [x] **W3.notes-image-label-trailing-backslash — the TITLE half is fixed; the label-merge half is DECLINED
+  on purpose [S · LOW · data-shaped].** ✅ **SHIPPED 2026-08-12** — `fc837bf` (code + 18 new/changed tests)
+  and the commit whose subject begins `fix(notes,trackers): W3.notes-image-label-trailing-backslash`, which
+  carries this move (a self-referential sha cannot be written into its own commit).
+  ⛔ **READ THIS BEFORE "FIXING" THE HEADLINE BUG — it was NOT fixed, and that is the decision.** A label
+  ending in a lone `\` still merges `![a\](x) and ![b](y)` into ONE reference (alt `a](x) and ![b`, path
+  `y`), still absorbs the prose between them and still orphans `x`. That is **CommonMark's own parse** — the
+  old two-reference reading was the non-conforming one — and it is **unreachable from any in-app producer**,
+  since `InlineImageMarkdown.escapeAlt` doubles a backslash. Refusing a lone trailing backslash would be one
+  line and a divergence from the spec the emitter now conforms to. The daemon put the recommendation to the
+  owner on 2026-08-12 ("leave it: conformance is worth more than guarding an input the app cannot produce");
+  it is now **pinned by two tests** in `ImageSerializationTests` that assert the swallowed ALT TEXT, not just
+  the reference count, so a later "improvement" fails loudly instead of looking like a fix.
+  **What DID ship is the durable half — the two title-path surfaces, both of which reach a FILENAME.**
+  `ExtractBuilder.strippedTitleLine`'s last step deleted every `*`, `_` and backtick unconditionally and
+  never resolved a backslash escape, while `MarkdownBridge.escapeMarkdown` escapes `\ * _ ` [ ]` on the way
+  out — so the editor's own output came back through it wrong in both directions, into the extract's `title:`
+  front matter *and* its `.md` filename (`NoteStore.sanitizedTitle` maps only `/` and `:`). Typed
+  `Real [Title]` → written `Real \[Title\]` → filed as `Real \[Title\].md`; typed `Real *x*` → written
+  `Real \*x\*` → the markers deleted and the escapes KEPT, `Real \x\`. Both measured on disk, not reasoned
+  about. Replaced with one escape-aware pass, `strippedInlineMarkers`, whose escapable-character rule comes
+  from the new `InlineImageMarkdown.isEscapable` — the grammar owner — because two private copies of that set
+  is exactly how the label and the title path came to disagree in the first place.
+  🔺 **THE ADVERSARIAL PASS CHANGED THE FIX, and caught a regression the filing could not have predicted.** A
+  flat unescape rewrites real CODE: `MarkdownBridge.wrapInlineCode` writes the operator's text into backticks
+  **raw** and a code-block run is `result += runText`, because CommonMark processes neither escapes nor
+  emphasis inside code. A first line of `` `re.sub(r'\.', '')` `` would have been titled — and filed — as
+  `re.sub(r'.', '')`, deleting a backslash the operator typed. So the pass now honours code spans (matched
+  backtick runs, with CommonMark's one-space un-padding for the widened `` … `` form `wrapInlineCode` writes
+  when the text holds a backtick), and `defaultTitle` carries fenced-block state ACROSS lines, since a fence
+  is the one part of this grammar a single line cannot decide. That also fixed the **mirror-image
+  pre-existing bug** the old pass had — it deleted `*` and `_` out of code content.
+  📌 Gate was **MUTATION** (source reverted, tests kept): 11 of the new tests red, including all three
+  assertions of the Tier-2 scratch-store disk test, which runs the whole `createExtract` → write → reload
+  cycle on an `mktemp` store and reads the RAW `.md` back — pre-fix `Real \[Title\].md` on disk. Three tests
+  pass against BOTH versions on purpose: two over-fix guards (an ordinary title is untouched; a plain code
+  span still loses its delimiters) and the code-span-verbatim guard, which fails only against the
+  intermediate flat-unescape version and is therefore the one that says the fix traded nothing away.
+  📌 The adversarial pass also cleared what did NOT break, and those checks are worth keeping: `defaultTitle`
+  has ONE call site (`createExtract`) and `append` does not re-title, so there is no repeated-unescape growth
+  path; the title reaches markdown only as a header FIELD (`SourceAnchor.notePassage(sourceTitle:)`), never
+  back into a block body, so it cannot be re-read as title material; the newly-reachable filename characters
+  (`*`, `_`, backtick — and `\` becomes *rarer*, not commoner) are read by nothing that reinterprets them
+  (`NoteStore` finds a note's file by EXTENSION not name, the index is UUID-keyed, deep links carry a UUID,
+  tag writes are API-level with no shell, and no script in the tree globs notes `.md`) — and arbitrary
+  punctuation was already reachable through `ZoteroAutoFill`, so this is not a new class; and the escaped-`#`
+  / escaped-bullet ordering is right, because an escaped line starts with `\` and the leading-block-marker
+  regex cannot match it.
+  Verified: Notes unit bundle **824 tests / 84 suites**, `** TEST SUCCEEDED **`, forced recompile of all four
+  touched files, **no new warnings**; `ArchiveNotesUITests` **20/20** in the headless Tart VM (363.9 s, off the owner's screen).
+  Notes-local, nothing in ArchiveCore → no cross-app rebuild owed. Scratch `mktemp` stores only, no corpus
+  touched. No migration written because there is nothing to migrate (standing premise, owner 2026-08-01).
+  **Residual filed: `W3.notes-extract-title-link-markdown`** — the same title pass strips images but not
+  LINKS, so a first line that is a pasted URL names the file `[Label](https---example.com).md`. Pre-existing,
+  untouched here, and more reachable than anything in this item.
 - [x] **W3.notes-image-dest-paren — a `)` in an inline image's PATH truncated the reference AND spilled the
   rest of the path into the note body as prose [XS · LOW · data-shaped · hand-edit entry only].** ✅ **SHIPPED
   2026-08-12** — `8946e55` (code + 9 tests) and the commit whose subject begins

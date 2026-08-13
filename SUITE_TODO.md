@@ -1239,34 +1239,20 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W3.notes-image-label-trailing-backslash — a label ending in a LONE `\` swallows the rest of the line: two image references merge into one, the prose between them disappears and one asset is orphaned — and the same input defeats the title stripper, so it lands in an extract's title AND its filename [S · LOW · data-shaped · hand-edit / legacy entry only].**
-  Filed 2026-08-12 by the `W3.notes-thumb-line-duplicates-fu1` adversarial pass, which found it in the fix it
-  was reviewing. **Introduced by that fix, and knowingly kept** — read the trade before "fixing" it.
-  `![a\](x) and ![b](y)`: the escape-aware label may cross an escaped `\]`, so it consumes
-  `a\](x) and ![b` and the match ends at the SECOND `]` — **one** reference (alt `a\](x) and ![b`, path `y`)
-  where the old bracket-free pattern found two. The visible prose ` and ` is absorbed into an alt text, the
-  `x` asset is orphaned, and re-saving writes `![a\](x) and !\[b](y)`, a **stable fixed point**, so it does
-  not self-heal. Alone, `![a\](x)` simply stops matching and reloads as prose — the very failure fu1 fixed,
-  relocated to a rarer input.
-  ⚠️ **This is CommonMark's own reading** (`\]` inside a label is an escaped bracket, so the label continues),
-  which is why it was not "corrected" back: the old two-reference reading was the non-conforming one, and any
-  other Markdown viewer would agree with the new behaviour. It is also **unreachable from any in-app
-  producer** — `InlineImageMarkdown.escapeAlt` doubles a backslash, so the emitter can only ever write
-  `![a\\](x)`, which round-trips correctly (verified). The entry points are a raw-mode hand edit, or a note
-  written by the pre-fu1 raw emitter from a `display` ending in `\`.
-  **Second surface, same input, and this one reaches a durable record:** `ExtractBuilder.strippedTitleLine`
-  no longer strips `![a\](x)`, so `defaultTitle` returns the raw markdown as the extract's `title:` front
-  matter *and* its `.md` filename (`NoteStore.sanitizedTitle` maps only `/` and `:`, so brackets and
-  backslashes pass straight through).
-  **A THIRD, purely PRE-EXISTING gap belongs with it**, because it is the same function and the same fix:
-  `strippedTitleLine` strips `*`/`_`/backtick but never *unescapes*, so a first line of ordinary prose reading
-  `Real [Title]` — which `MarkdownBridge.escapeMarkdown` writes as `Real \[Title\]` — becomes the title and
-  the filename with literal backslashes in it. fu1 introduced a CommonMark unescaper
-  (`InlineImageMarkdown.unescapeAlt`) and deliberately did not reach into the title path with it; this is
-  where that would go.
-  Decide the shape deliberately: requiring the label's escapes to be *balanced*, or refusing a lone trailing
-  backslash, is one line in `InlineImageMarkdown` — but either diverges from CommonMark, which is a real cost
-  now that the emitter conforms. Tier-2. | ArchiveNotes/Editor | Tier-2
+- [ ] **W3.notes-extract-title-link-markdown — a first line that is a LINK titles the extract with the raw markdown, so the `.md` is filed as `[Label](https---example.com).md` [S · LOW · data-shaped].**
+  Filed 2026-08-12 by the `W3.notes-image-label-trailing-backslash` adversarial pass, which found it while
+  clearing that item's title path. **Pre-existing and untouched by it** — and far more reachable than any
+  escape case in that item, because a pasted URL is ordinary use. `ExtractBuilder.strippedTitleLine` strips
+  inline IMAGES (`![…](…)`), emphasis, code and leading block markers, but not LINKS; `MarkdownBridge.swift`
+  emits one as `[\(inner)](\(urlStr))`, so `defaultTitle` returns the whole construct. It lands in the
+  extract's `title:` front matter *and*, via `NoteStore.sanitizedTitle` (which maps only `/` and `:`), its
+  filename — the `/` of the scheme becoming `-`, hence `https---example.com`.
+  The fix is the same shape as the image strip that is already there: reduce a link to its LABEL (CommonMark's
+  rendering) rather than deleting it, since the label is usually the good title. Note the label is itself
+  escaped markdown, so it must go through the same escape-resolving pass — do it INSIDE `strippedTitleLine`,
+  after the image strip and before `strippedInlineMarkers`, not as a fourth regex bolted on the end.
+  ⚠️ An autolink (`<https://…>`) and a bare URL are different shapes; decide whether they are in scope.
+  Tier-2 (it writes a filename). | ArchiveNotes/Editor | Tier-2
 - [ ] **W3.notes-header-field-terminator — `serializeHeader` writes every field value RAW into a line-based, comment-delimited header, so a terminator or a `-->` inside `link`/`display` truncates the durable link, leaks pasted text into the note body, or splits one block into two and destroys the first one's provenance [S–M · MED · data-shaped].**
   Filed 2026-08-11 by the `W3.notes-paste-url-line-split` adversarial pass; **pre-existing**, and NOT the
   same bug — that item fixed the *scanner* (`SourceBlockPaster`), which is where a malformed value is

@@ -207,7 +207,10 @@ macOS/Sources/ArchiveNotes/
                                    only, off in the real app, out of Release) mechanically refuse a tag
                                    write outside scratch (W8-S2 §5)
     ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
-                                   append (snapshot copy via NoteStore.importAsset), defaultTitle,
+                                   append (snapshot copy via NoteStore.importAsset), defaultTitle
+                                   (which is also the .md FILENAME, so its stripping pass resolves
+                                   backslash escapes and exempts code spans + fenced blocks —
+                                   W3.notes-image-label-trailing-backslash),
                                    extract-references-notes-only coercion; PassageSelectionSource seam (W7-S1);
                                    passagePayload (copy side) + pastedExtractMarkdown (paste side) (W7-S2);
                                    pastedExtractMarkdown(from:importingAssetsVia:) imports paste bytes into
@@ -229,7 +232,11 @@ macOS/Sources/ArchiveNotes/
                                    parenthesised path survives stripping and becomes an extract's title)
                                    and the asset re-key, which spells its string match with
                                    destinationLiteral rather than interpolating `](ref)`
-                                   (W3.notes-thumb-line-duplicates-fu1)
+                                   (W3.notes-thumb-line-duplicates-fu1). isEscapable(_:) exposes the
+                                   CommonMark ASCII-punctuation set as the ONE authority on which
+                                   backslashes are escapes — the title path resolves them too, and two
+                                   private copies of that set is how these two came to disagree
+                                   (W3.notes-image-label-trailing-backslash)
     NotePassageResolve.swift       Pure jump-to-source + provenance-chip logic over the in-memory
                                    [ItemSummary]: resolve(anchor:)→PassageResolution taxonomy, chipLabel
                                    (live title, snapshot fallback), isSourceMissing, scrollRange
