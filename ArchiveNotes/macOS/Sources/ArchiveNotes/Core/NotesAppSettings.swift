@@ -89,6 +89,19 @@ enum NotesAppSettings {
         store.set(Double(s.height), forKey: NotesLayoutSettingsKey.windowH)
     }
 
+    /// Persist a browser window's final size unless its disappearance was caused by the UI harness.
+    /// The harness deliberately closes the auto-opened Extracts scene before every test; letting that
+    /// close write the shared Notes/Extracts size keys recreates the off-screen-control failure mode
+    /// from W21.vmgui-c. Ordinary Debug and Release closes still use the existing persistence path.
+    static func persistWindowSizeOnDisappear(
+        _ size: CGSize,
+        isUITestHarness: Bool,
+        into store: UserDefaults = .standard
+    ) {
+        guard !isUITestHarness else { return }
+        setWindowSize(size, into: store)
+    }
+
     /// Item-list columns the user has hidden (W6-S3 consumes this; the key lives here so the layout
     /// key set is centralized). Mirrors Reader's `AppSettings.hiddenColumns`.
     static var hiddenColumns: Set<String> { current.hiddenColumns }

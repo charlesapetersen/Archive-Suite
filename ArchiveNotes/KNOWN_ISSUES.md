@@ -3,6 +3,20 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W21.vmgui-winsize-writeback) — fixture setup could overwrite the shared browser-window size
+
+**2026-08-12.** The GUI harness deliberately closes the auto-opened Extracts scene before every test so its
+unscoped element queries see exactly one window. That close also fired `NotesBrowserView.onDisappear`, which
+wrote the Extracts frame into the single `an.windowWidth` / `an.windowHeight` pair restored by both browser
+windows. It happened to be harmless in five green lanes, but it was the same persistence path whose stale
+undersized value previously put controls off-screen and made four UI tests look like product failures.
+
+Window-close persistence now refuses only a DEBUG fixture-harness launch (`-ANUITestStorePath` is nonempty).
+Normal Debug and Release closes still persist through the existing path, and the one-window test precondition
+is unchanged. An isolated-defaults test seeds a remembered size, simulates the harness close, proves the
+effective persisted value stays unchanged, then proves an ordinary close still replaces it. Removing the
+guard makes that exact test fail; restoring it returns the focused suite to green.
+
 ## ✅ FIXED (W3.notes-header-field-terminator) — block metadata could break its own durable header
 
 **2026-08-12.** `BlockParser.serializeHeader` interpolated source and unknown-field values directly into a

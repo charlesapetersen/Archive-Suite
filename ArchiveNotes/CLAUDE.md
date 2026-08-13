@@ -198,6 +198,7 @@ macOS/Sources/ArchiveNotes/
     NotesAppSettings.swift         Browser layout/window persistence: NotesLayoutSettingsKey (an.* keys)
                                    + NotesLayoutSettings(reading:) (validated, clamped) + NotesAppSettings
                                    point-of-use accessor (window size, hidden columns) — mirrors Reader AppSettings;
+                                   fixture-harness window closes cannot overwrite the shared size (W21);
                                    windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4);
                                    windowHiddenColumns(for:)/setWindowHiddenColumns per-window column visibility —
                                    Note window defaults to hiding the always-blank Sources column (W14.4d)
@@ -397,6 +398,8 @@ macOS/Sources/ArchiveNotes/
 macOS/Tests/ArchiveNotesTests/
   SmokePlaceholderTests.swift      Trivial test for the smoke gate
   ArchiveCoreWiringTests.swift     DurableLink/RootMarker/ArchiveSuiteMarker from Notes target
+  NotesAppSettingsTests.swift      20 tests: isolated-defaults layout persistence/clamping, including
+                                   harness-close suppression + ordinary-close write-through (W21)
   NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable + matches (all facets,
                                    ALL/ANY, date range, membership), effective merge, tolerant decode (W6-S4)
   NotesReplicationTests.swift      16 Tier-2 scratch-store tests: guard (replicant-quiet / last→pending

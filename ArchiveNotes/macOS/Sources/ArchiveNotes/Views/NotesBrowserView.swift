@@ -67,7 +67,14 @@ struct NotesBrowserView: View {
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)
         .task { await model.bootstrap() }   // open the store + load organization + items (idempotent)
         .toolbar { toolbar }
-        .onDisappear { if let w = window { NotesAppSettings.setWindowSize(w.frame.size) } }
+        .onDisappear {
+            if let w = window {
+                NotesAppSettings.persistWindowSizeOnDisappear(
+                    w.frame.size,
+                    isUITestHarness: Self.isUITestHarness
+                )
+            }
+        }
         // The mandatory delete-last-instance confirmation (§3.6, W6-S5). Set by a guarded membership
         // removal (Remove-from-folder / MOVE source-removal); no note is deleted until the user
         // confirms here. "Permanently" is the spec wording — the note actually moves to the Trash.
@@ -174,6 +181,7 @@ struct NotesBrowserView: View {
 #else
     /// Release / non-UITest builds carry no probe (the harness is DEBUG-only).
     private var indexReadyProbe: some View { EmptyView() }
+    private static var isUITestHarness: Bool { false }
 #endif
 
     private var kindLabel: String { nav.windowKind == .extract ? "Extract" : "Note" }

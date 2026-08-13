@@ -6998,6 +6998,22 @@ explain why not.
   green lanes — and G14 went 1101.600 s → 37.1 s, so its 18-minute outlier was the two-window state too, not a
   separate problem.** Residual risk filed as `W21.vmgui-winsize-writeback`. | ArchiveNotes/Tests + ops | Tier-2
 
+- [x] **W21.vmgui-winsize-writeback — fixture setup could overwrite the shared browser-window size [S · LOW · latent].** ✅ **SHIPPED 2026-08-12** — commit whose subject begins `fix(notes,trackers): W21.vmgui-winsize-writeback`.
+  The one-window precondition remains load-bearing and unchanged: the harness still closes the auto-opened
+  Extracts scene before every test. What no longer happens is that scene's `.onDisappear` writing its frame
+  into the one `windowW` / `windowH` pair both browser windows restore. `NotesBrowserView` passes its existing
+  DEBUG `-ANUITestStorePath` gate to `NotesAppSettings.persistWindowSizeOnDisappear`; the helper refuses only
+  that fixture-harness close. Release hardcodes the gate false, and a normal Debug close also writes exactly
+  as before.
+  **Tier-2 mechanism proof:** the isolated-defaults regression seeds the remembered shared size, attempts a
+  different harness close, and proves the effective persisted value stays unchanged; it then simulates an
+  ordinary close and proves write-through. Removing only the guard makes that test RED; restoring it makes
+  the full 20-test `NotesAppSettingsTests` suite green. Independent find→refute review found no surviving
+  issue. Full Notes smoke: **841 Swift Testing tests / 84 suites + XCTest 221**, `** TEST SUCCEEDED **`;
+  off-screen Tart VM: **ArchiveNotesUITests 20/20** in 351 s. Notes-local; no store, corpus, ArchiveCore, or
+  host GUI.
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesBrowserView.swift, Core/NotesAppSettings.swift, ArchiveNotes/macOS/Tests/ArchiveNotesTests/NotesAppSettingsTests.swift | S | low | Tier-2
+
 - [x] **W21.vmgui-flakereport — the flake guard retried, learned the answer, and then threw it away — ✅ DONE 2026-08-04** (this commit).
   `gui-vm-gate.sh`'s `show_failures()` looped BOTH attempts and `sort -u`'d them, printing the union directly
   beneath "RED — reproducible UITest failure in: <app>". The APP-level guard was always right (it clears an app

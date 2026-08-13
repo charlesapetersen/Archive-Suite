@@ -1263,17 +1263,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
   and the owner restarts it. Read-only reporting change; no daemon behaviour change.
   | files: ops/autonomous/daemon.sh | S | low | none
-- [ ] **W21.vmgui-winsize-writeback — closing the Extracts window in `setUp` fires `.onDisappear`, which writes the SHARED window-size prefs both windows restore from [S · LOW · latent].**
-  Filed 2026-08-04. `NotesBrowserView.swift:70` `.onDisappear { … NotesAppSettings.setWindowSize(w.frame.size) }`
-  writes the single shared `windowW`/`windowH` keys, and `configureWindow` restores BOTH windows from them.
-  Before the one-window precondition landed this write never happened (the close button was occluded, so the
-  click never fired); now it happens once per test. ⚠️ **This is the mechanism of `W21.vmgui-c`**, where an
-  undersized window put controls off-screen, four UITests failed as "not hittable", and they were misfiled as
-  product bugs for two days. Believed benign — both windows restore from the SAME keys, so they should already
-  be the same size and the write a no-op — and five green lanes agree. But "probably a no-op" is the reasoning
-  this lane keeps punishing. Cheapest close-out: assert the two frames match before closing, or skip the size
-  write under `Self.isUITestHarness`. If it ever bites, DELETE the setUp close — window scoping is the
-  load-bearing fix and carries the lane alone. | ArchiveNotes/Views + Tests | Tier-2
 - [ ] **W21.vmgui-g5-flake — `testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock` is FLAKY in the VM [S · LOW].**
   Filed 2026-08-04. It failed attempt 1 at **46.250 s** and PASSED attempt 2 at **18.154 s** in the same gate
   run — a 2.5× spread, so something on that path has a long poll that occasionally loses. Not a regression

@@ -50,6 +50,29 @@ struct NotesAppSettingsTests {
         #expect(NotesLayoutSettings(reading: d).windowSize == nil)
     }
 
+    @Test func uiTestWindowCloseDoesNotOverwriteSharedWindowSize() {
+        let d = scratchDefaults()
+        let remembered = CGSize(width: 1200, height: 800)
+        NotesAppSettings.setWindowSize(remembered, into: d)
+
+        // The harness closes the auto-opened Extracts scene before every test. Its frame must never
+        // become the shared size both Notes and Extracts restore from; an ordinary close still writes.
+        NotesAppSettings.persistWindowSizeOnDisappear(
+            CGSize(width: 640, height: 560),
+            isUITestHarness: true,
+            into: d
+        )
+        #expect(NotesLayoutSettings(reading: d).windowSize == remembered)
+
+        let ordinaryClose = CGSize(width: 1280, height: 900)
+        NotesAppSettings.persistWindowSizeOnDisappear(
+            ordinaryClose,
+            isUITestHarness: false,
+            into: d
+        )
+        #expect(NotesLayoutSettings(reading: d).windowSize == ordinaryClose)
+    }
+
     // MARK: panel-width clamping
 
     @Test func treeWidthClampsBelowMin() {
