@@ -21,6 +21,11 @@ import Foundation
 /// destination and CommonMark does not, so a path with a space was readable here and broken in every
 /// other viewer.
 ///
+/// **W3.notes-extract-title-link-markdown.** It also owns the bang-less form, `[label](dest)` — a
+/// LINK — because CommonMark's image *is* a link with a bang in front, and the title pass needs to
+/// recognise one to reduce it to its label. Spelling that as a second, nearly-identical pattern
+/// somewhere else is the same mistake as the two `isEscapable` sets below.
+///
 /// Emitting and matching live together on purpose: they are two halves of one grammar, and the
 /// failure mode is that changing one without the other is invisible until a note is reloaded.
 enum InlineImageMarkdown {
@@ -72,15 +77,39 @@ enum InlineImageMarkdown {
         return #"(<"# + angleDestUnit + q + #">|(?!<)(?:"# + bareDestUnit + #")"# + q + #")"#
     }
 
+    /// The inline-reference grammar, with the leading `!` that makes it an image optional. CommonMark
+    /// defines an image as exactly that — a link with a bang in front — so the two are one grammar
+    /// here, not two that have to be kept in step.
+    ///
+    /// **Capture groups: 1 = the label, still escaped; 2 = the destination, still spelled.** A caller
+    /// that KEEPS the label owes it the same escape-resolving pass the label was written with
+    /// (`unescapeAlt`, or the equivalent inside `ExtractBuilder.strippedInlineMarkers`) — the label is
+    /// `escapeAlt`'s output, not plain text.
+    private static func referenceSource(image: Bool, allowEmpty: Bool) -> String {
+        (image ? #"!\["# : #"\["#) + altGroup + #"\]\("# + destGroup(allowEmpty: allowEmpty) + #"\)"#
+    }
+
     /// `![alt](path)` as the app writes and reads it. The destination must be non-empty, so neither
     /// `![a]()` nor `![a](<>)` is an image reference.
-    static let patternSource = #"!\["# + altGroup + #"\]\("# + destGroup(allowEmpty: false) + #"\)"#
+    static let patternSource = referenceSource(image: true, allowEmpty: false)
 
     /// The same grammar, tolerating an EMPTY destination — for callers that *strip* image references
     /// rather than read them (`ExtractBuilder.strippedTitleLine`, where an `![a]()` line should
     /// still read as empty rather than become a title).
-    static let strippingPatternSource =
-        #"!\["# + altGroup + #"\]\("# + destGroup(allowEmpty: true) + #"\)"#
+    static let strippingPatternSource = referenceSource(image: true, allowEmpty: true)
+
+    /// A LINK — the same grammar without the bang — for the one caller that reduces one to its LABEL
+    /// rather than deleting it: `ExtractBuilder.strippedTitleLine`, where a first line that is a
+    /// pasted URL used to title the extract (and name its file) with the raw
+    /// `[Label](https://example.com)` (`W3.notes-extract-title-link-markdown`). The label is
+    /// CommonMark's rendering of the construct, and usually the good title.
+    ///
+    /// An empty destination is tolerated for the same reason as above, one step further: `[a]()` IS a
+    /// link, and it renders as `a`.
+    ///
+    /// ⚠️ **Strip images FIRST.** This differs from `strippingPatternSource` only by the bang, so it
+    /// matches the `[alt](path)` inside an `![alt](path)` and would leave the `!` behind as a title.
+    static let linkPatternSource = referenceSource(image: false, allowEmpty: true)
 
     static let pattern = try! NSRegularExpression(pattern: patternSource)
 

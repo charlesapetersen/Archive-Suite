@@ -221,7 +221,8 @@ struct ExtractBuilder {
     // MARK: - Default title
 
     /// First non-empty snapshot line, stripped of Markdown markers (`#`, `*`, `_`, `>`, list
-    /// bullets), **with its backslash escapes resolved**, whitespace-trimmed, truncated to 80 chars on
+    /// bullets), with inline images dropped and inline LINKS reduced to their label,
+    /// **with its backslash escapes resolved**, whitespace-trimmed, truncated to 80 chars on
     /// a word boundary; falls back to `"Extract <yyyy-MM-dd>"` when the snapshot is
     /// image-/whitespace-only.
     ///
@@ -230,6 +231,18 @@ struct ExtractBuilder {
     /// backslash left unresolved lands on disk. Code spans and fenced blocks are exempt, because their
     /// content is emitted raw — see `strippedInlineMarkers` for the whole rule
     /// (`W3.notes-image-label-trailing-backslash`).
+    ///
+    /// **Two OUT-OF-SCOPE spellings of a URL, decided in `W3.notes-extract-title-link-markdown`.** An
+    /// autolink (`<https://…>`) keeps its angle brackets and a bare URL is already plain text — neither
+    /// is reachable from the emitter (`MarkdownBridge.serialize` writes every link as `[text](url)`),
+    /// and CommonMark renders both AS the URL, so reducing them would trade `<https---x>.md` for
+    /// `https---x.md`. The ugliness there is `sanitizedTitle`'s mapping of `:` and `/`, not this pass.
+    ///
+    /// **Known divergence, pre-existing in shape and now shared by links:** the image and link passes
+    /// are regexes over the whole line, so a reference inside a CODE SPAN is stripped/reduced even
+    /// though CommonMark renders it literally (`` `[a](b)` `` titles as `a`, not `[a](b)`). Only the
+    /// escape/emphasis half of the pass knows about code spans. Tracked as
+    /// `W3.notes-extract-title-code-span-references`.
     ///
     /// Takes the blocks as **persisted** (i.e. post-`coercedToNotesOnly`), not the raw passages: a
     /// `<!-- block: …` line nested in the markdown is not title material, and reading it as one put
@@ -390,6 +403,21 @@ struct ExtractBuilder {
         // Strip leading block markers: ATX headings, blockquotes, unordered + ordered list bullets.
         s = s.replacingOccurrences(of: #"^\s*(#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)+"#,
                                    with: "", options: .regularExpression)
+        // Reduce a LINK to its label — kept, not deleted, because the label is what CommonMark
+        // renders and usually the good title. A pasted URL is ordinary use and the editor writes it
+        // `[Label](https://example.com)`, so before this the whole construct became the extract's
+        // `title:` AND its filename, the scheme's `/` turning into `-` on the way
+        // (`https---example.com`) — W3.notes-extract-title-link-markdown.
+        //
+        // Placed HERE, in the middle of the pass, for two reasons that are both load-bearing:
+        //  - AFTER the image strip, because the two patterns differ only by the bang, so a link match
+        //    would otherwise eat the `[alt](path)` out of an image and leave a `!`;
+        //  - AFTER the block-marker strip and BEFORE `strippedInlineMarkers`, because a `#` inside a
+        //    link LABEL is literal text (`[# Heading](u)` renders `# Heading`) while the label's
+        //    escapes and emphasis markers are not — the label is `escapeAlt` output, so it owes the
+        //    same resolving pass as any other inline text, and `$1` is what hands it over.
+        s = s.replacingOccurrences(of: InlineImageMarkdown.linkPatternSource,
+                                   with: "$1", options: .regularExpression)
         s = strippedInlineMarkers(s)
         return s.trimmingCharacters(in: .whitespaces)
     }

@@ -363,6 +363,151 @@ struct ExtractTitleTests {
         #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`plain code`")],
                                             fallbackDate: epoch) == "plain code")
     }
+
+    // MARK: - W3.notes-extract-title-link-markdown — a link titles with its LABEL
+    //
+    // The pass stripped images, emphasis, code and leading block markers, but not LINKS — so a first
+    // line that was one titled the extract with the raw construct, and `sanitizedTitle` (which maps
+    // only `/` and `:`) turned that into the filename `[Label](https---example.com).md`. Reachable by
+    // ordinary use: `MarkdownBridge.serialize` writes every `.link` run as `[text](url)`, and pasting
+    // a URL is how one gets there. The fix REDUCES rather than deletes, because the label is what
+    // CommonMark renders and usually the title the operator meant.
+
+    @Test("a link titles the extract with its label, not the raw markdown")
+    func linkTitlesWithItsLabel() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[Example Doc](https://example.com)\nbody")],
+            fallbackDate: epoch) == "Example Doc")
+    }
+
+    /// The auto-detected paste: the editor makes the URL its own label, so the title is the URL. Still
+    /// an improvement — the filename goes from `[https---example.com](https---example.com).md` to
+    /// `https---example.com.md` — and it is exactly CommonMark's rendering. What remains ugly there is
+    /// `sanitizedTitle`'s mapping of `:` and `/`, which is not this pass's business.
+    @Test("a link whose label IS the URL titles with the URL alone")
+    func selfLabelledLinkTitlesWithTheURL() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[https://example.com](https://example.com)")],
+            fallbackDate: epoch) == "https://example.com")
+    }
+
+    /// The label is `escapeAlt`/`escapeMarkdown` output, not plain text — which is why the reduction
+    /// happens BEFORE `strippedInlineMarkers` rather than after it. A bracketed document title is the
+    /// reachable shape (`Moore [draft]` is written `Moore \[draft\]`).
+    @Test("an escaped label is unescaped like any other inline text")
+    func linkLabelGoesThroughTheEscapePass() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage(#"[Moore \[draft\]](https://example.com)"#)],
+            fallbackDate: epoch) == "Moore [draft]")
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[a *b* `c`](https://example.com)")],
+            fallbackDate: epoch) == "a b c")
+    }
+
+    /// A destination with balanced parentheses is one destination — the grammar owner's rule, and the
+    /// case a hand-rolled `[^)]+` would have split, leaving `Foo_(bar)` welded onto the title.
+    @Test("a parenthesised URL is one destination, in both spellings")
+    func parenthesisedURLIsOneDestination() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[Foo](https://en.wikipedia.org/wiki/Foo_(bar))")],
+            fallbackDate: epoch) == "Foo")
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[Foo](<https://en.wikipedia.org/wiki/Foo_(bar)>)")],
+            fallbackDate: epoch) == "Foo")
+    }
+
+    /// Block markers are stripped first, so a linked heading reads as its label…
+    @Test("a linked heading titles with the label")
+    func linkedHeadingTitlesWithTheLabel() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("# [Title](https://example.com)")],
+            fallbackDate: epoch) == "Title")
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("- [Item](https://example.com)")],
+            fallbackDate: epoch) == "Item")
+    }
+
+    /// …and the ORDER is why: a `#` inside a link label is literal inline text, not a heading marker,
+    /// so it must survive. Reducing links before the block-marker strip would eat it.
+    @Test("a hash inside a link label is not a heading marker")
+    func hashInsideALabelSurvives() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[# Not a heading](https://example.com)")],
+            fallbackDate: epoch) == "# Not a heading")
+    }
+
+    /// An empty label renders as nothing, so the line is empty and the next one names the extract —
+    /// the same rule an image-only line already followed.
+    @Test("a link with an empty label reads as an empty line")
+    func emptyLabelLinkIsAnEmptyLine() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[](https://example.com)\nReal Title")],
+            fallbackDate: epoch) == "Real Title")
+    }
+
+    /// An image inside a link is CommonMark-legal and is exactly the shape a thumbnail line takes if
+    /// it is ever made clickable. The image goes first, leaving an empty label, so the line is empty.
+    @Test("an image wrapped in a link still reads as an empty line")
+    func linkedImageIsAnEmptyLine() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("[![pic](assets/x.png)](https://example.com)\nReal Title")],
+            fallbackDate: epoch) == "Real Title")
+    }
+
+    /// The over-fix guard that matters most: an IMAGE is still DELETED, not reduced to its alt text.
+    /// The two patterns differ only by the bang, so a link pass running first — or an image pass that
+    /// missed — would title this `!pic`.
+    @Test("an image is still deleted, and leaves no bang behind")
+    func imageIsStillDeletedNotReduced() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("![pic](assets/x.png) Caption")],
+            fallbackDate: epoch) == "Caption")
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("![pic](assets/x.png)\nReal Title")],
+            fallbackDate: epoch) == "Real Title")
+    }
+
+    /// The other over-fix guard: brackets that are not a reference are ordinary text and stay put.
+    @Test("brackets that are not a link are left alone")
+    func nonLinkBracketsAreLeftAlone() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("[Not a link] and text")],
+                                            fallbackDate: epoch) == "[Not a link] and text")
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("[Unclosed](no paren")],
+                                            fallbackDate: epoch) == "[Unclosed](no paren")
+    }
+
+    /// **Decided out of scope** (see `defaultTitle`): an autolink is not reachable from the emitter and
+    /// CommonMark renders it AS the URL, so reducing it would swap `<https---x>.md` for `https---x.md`
+    /// — no real gain for a wider grammar. Pinned so the decision is visible if it is ever revisited.
+    @Test("an autolink keeps its angle brackets — out of scope, by decision")
+    func autolinkIsOutOfScope() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("<https://example.com>")],
+                                            fallbackDate: epoch) == "<https://example.com>")
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("https://example.com")],
+                                            fallbackDate: epoch) == "https://example.com")
+    }
+
+    /// **Known divergence, pinned rather than fixed** — `W3.notes-extract-title-code-span-references`.
+    /// The image and link passes are line-wide regexes, so a reference inside a code span is reduced
+    /// even though CommonMark renders it literally. Pre-existing in shape (the image strip has always
+    /// done this) and widened here to links; fixing it means teaching the code-span scanner the
+    /// reference grammar, which is a bigger change than this item. This test flips when that lands.
+    @Test("a reference inside a code span is reduced anyway (known divergence)")
+    func referenceInsideACodeSpanIsReducedAnyway() {
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`[a](b)`")],
+                                            fallbackDate: epoch) == "a")
+        #expect(ExtractBuilder.defaultTitle(fromFirstLineOf: [passage("`![a](b)` tail")],
+                                            fallbackDate: epoch) == "tail")
+    }
+
+    /// A fenced block is exempt for real — `defaultTitle` takes those lines verbatim, so a code line
+    /// that happens to be a link is the operator's code and keeps its markdown.
+    @Test("a link inside a fenced block is taken verbatim")
+    func linkInsideAFenceIsVerbatim() {
+        #expect(ExtractBuilder.defaultTitle(
+            fromFirstLineOf: [passage("```\n[a](b)\n```")],
+            fallbackDate: epoch) == "[a](b)")
+    }
 }
 
 // MARK: - Passage building + persistence
@@ -773,6 +918,44 @@ struct ExtractNestedSourceHeaderTests {
         // And it survives the round trip, so the next save is not a rename.
         let reloaded = try await store.load(created.id)
         #expect(reloaded.title == "Real [Title]")
+    }
+
+    /// **W3.notes-extract-title-link-markdown — the Tier-2 disk check, with its reachability proved
+    /// rather than asserted.** The markdown is not hand-written here: it comes out of
+    /// `MarkdownBridge.serialize`, which is what turns a pasted URL (an `.link` run in the editor)
+    /// into `[Label](https://example.com)`. That construct then named the extract AND its file, the
+    /// scheme's `/` becoming `-` in `sanitizedTitle` — pre-fix, both assertions below read
+    /// `[Example Doc](https---example.com)`.
+    @Test("a pasted link lands on disk as its label, in the front matter AND the filename")
+    func linkFirstLineIsReducedToItsLabelOnDisk() async throws {
+        let (store, tmp) = try scratch(); defer { cleanup(tmp) }
+
+        // What the editor actually emits for a link run — the emitter, not a guess about it.
+        let run = NSMutableAttributedString(string: "Example Doc")
+        run.addAttribute(.link, value: URL(string: "https://example.com")!,
+                         range: NSRange(location: 0, length: run.length))
+        let emitted = MarkdownBridge.serialize(run)
+        #expect(emitted.contains("[Example Doc](https://example.com)"),
+                "the emitter no longer writes this shape — re-check the premise: \(emitted)")
+
+        let payload = NotesPassagePayload(
+            sourceNoteId: UUID(), sourceTitle: "Src", sourceDateDisplay: "1968",
+            segments: [.init(sourceBlockIndex: 0, markdown: emitted + "\nbody\n")])
+        let builder = ExtractBuilder(store: store, now: { Date(timeIntervalSince1970: 1_000_000_000) })
+        let created = try await builder.createExtract(from: ExtractBuilder.passageBlocks(from: payload))
+
+        let url = try await store.mdURL(for: created.id)
+        #expect(url.lastPathComponent == "Example Doc.md",
+                "raw markdown reached the filename: \(url.lastPathComponent)")
+
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        #expect(raw.contains("title: Example Doc\n"), "raw markdown reached the front matter:\n\(raw)")
+        #expect(raw.contains("[Example Doc](https://example.com)"),
+                "the BODY must keep the link — only the title is reduced:\n\(raw)")
+
+        // Survives the round trip, so the next save is not a rename.
+        let reloaded = try await store.load(created.id)
+        #expect(reloaded.title == "Example Doc")
     }
 
     /// The choke-point half: even a passage handed straight to `createExtract` — bypassing the
