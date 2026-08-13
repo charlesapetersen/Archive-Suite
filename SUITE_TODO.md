@@ -1715,6 +1715,14 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   AX for **future** affordances, and killing fu7's P6/P7 + fu11's M5 as measurements. Filed
   2026-08-04 by `W3.cap-r3-fu10`'s adversarial pass. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu12-fu1 [LOW · behaviour decision]** `LiveCaptureView.clearButton` — **in the emptied-pane
+  ✅ **DECIDED by the owner 2026-08-13: PUT THE COUNT IN THE LABEL, AND CONFIRM.** The button reads what it
+  does — "Discard 3 processed documents" — and asks before doing it. Both halves of the finding are in scope:
+  it stops reading as harmless beside "Cancel finish" (documented as costing nothing), and abandoning paid work
+  stops being one unconfirmed click. **Also preserve `finalizeSummary`, or state explicitly in the confirmation
+  that the record of what the finish did not file goes with it** — that record was the second half of the
+  complaint and must not be dropped silently. Confirmation-only and hide-when-empty were both offered and not
+  taken (the latter partly reverses `W3.cap-r3-fu12`, which drew that header cluster precisely so stranded
+  staged work stayed reachable). Tier-2 (Capture), scratch only.
   arm, Clear is an unlabelled, uncounted, unconfirmed "abandon paid work" button, and it wipes the one record
   of what a partly-failed finish did not file.** `W3.cap-r3-fu12` put it beside "Cancel finish" — which is
   documented as costing nothing — in a pane whose body reads "Waiting for photos…". It now carries a `.help`
@@ -1742,6 +1750,14 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   skip the bogus review entirely — but that is the finalize path and wants its own Tier-2 gate rather than
   riding along. Found 2026-08-04 by `W3.cap-r3-fu12`'s adversarial pass. | Capture | Tier-2
 - [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
+  ✅ **DECIDED by the owner 2026-08-13: REFUSE THE DELETE, and say why.** Give `removePhoto` the same
+  `isFinalized` guard `removePhotoIfSafe` already carries two lines below it, and tell the operator the segment
+  is already staged so retry/re-stage is the route. Rationale on record: it is consistent with the sibling
+  function, adds no machinery, and never silently degrades a document — the operator learns immediately instead
+  of finding a placeholder page later. **Exclude-and-re-stage was OFFERED AND NOT TAKEN** (it re-does work
+  already paid for on a live-processing session, and makes ✕ far heavier than it looks), as was the
+  refuse-plus-explicit-re-stage-affordance variant. So the intended behaviour is now settled — do NOT
+  re-litigate it; implement the guard. Tier-2 (Capture), scratch only.
   `removePhotoIfSafe:606`. An operator ✕ on a page whose segment is already staged (or mid-finalize) trashes
   the source anyway, so `PDFGenerator.generate` can't embed it and writes a visible PLACEHOLDER image page
   (`.placeholder` → `.succeededPlaceholderImage` + the finish warning; the source is retained by W23.h5 and
@@ -1751,6 +1767,14 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   staged segment, as `removePhotoIfSafe` does, vs. exclude the page and re-stage) rather than leaving it
   incidental. Pre-existing. | Capture | Tier-2
 - [ ] **W3.cap-r3-fu4 [LOW · behaviour decision]** `LiveCaptureProcessor.swift:1215` — after Finish the app
+  ✅ **DECIDED by the owner 2026-08-13: REMEMBER FILED GROUPS; refuse the join and message the operator.**
+  Add a durable "filed this session" set so a late page for an already-filed group gets the same honest "kept in
+  the Backup Folder, start a NEW segment" message it would have received two seconds earlier, instead of
+  silently opening a second one-page document. **Keeping `finalizedGroups` populated was OFFERED AND NOT
+  TAKEN**, on the ground the item itself records: `isFinalized` also gates `CaptureSession.removePhotoIfSafe`,
+  which would then refuse to remove pages of a group whose sources are already retired — so the durable set is
+  the cleaner of the two and does not inherit that side effect. Accepting the second document with a warning was
+  also offered and not taken. Tier-2 (Capture), scratch only.
   forgets that a groupId was ever filed, so a late re-upload silently opens a SECOND document for it instead
   of being told it cannot join. `finalize` drops each filed group from `finalizedGroups`, which is the only
   record that it finalized — so the "a late page arrived … kept in the Backup Folder, start a NEW segment"
