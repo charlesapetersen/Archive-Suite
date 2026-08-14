@@ -47,21 +47,39 @@ ok "read the real per-file budgets out of the script (CLAUDE.md=$CLAUDE_B, AGENT
 # run <root> -> stdout+stderr; sets RC
 run() { OUT="$(bash "$SCRIPT" "$1" 2>&1)"; RC=$?; }
 
-echo "== 1. a file OVER budget: exit 1 + a machine-readable OVER line the daemon can parse =="
+echo "== 1. a file over its PER-FILE cap is ADVISORY: exit 0, but still machine-readable (owner, 2026-08-13) =="
+# ⚠️ CONTRACT CHANGED 2026-08-13. This case asserted `exit 1`, which reddened the health gate and made
+# doc_pregate dispatch a trim session for a single long document. The owner demoted per-file to advisory
+# ("causing a lot more trouble than it's worth") after a per-file trim deleted AGENTS.md's whole policy
+# section. Only the ORIENTATION TOTAL fails now — asserted in case 1b below. The machine-readable OVER line is
+# deliberately UNCHANGED, because doc_pregate still parses it for its advisory log line.
 R="$T/r1"; mkdir -p "$R"
 fill "$R/CLAUDE.md" $(( CLAUDE_B + 500 ))
 run "$R"
-[ "$RC" = 1 ] && ok "exit 1 when a document is over budget" || no "expected exit 1, got $RC"
+[ "$RC" = 0 ] && ok "exit 0 — a per-file overage no longer fails the gate" || no "expected exit 0 (advisory), got $RC"
 # The pre-gate's parser: $1=="context-budget:" && $2=="OVER" -> $3 is the path. Assert that exact shape.
 got="$(printf '%s\n' "$OUT" | awk '$1=="context-budget:" && $2=="OVER"{print $3}')"
-[ "$got" = "CLAUDE.md" ] && ok "emits 'context-budget: OVER CLAUDE.md …' in the field order doc_pregate parses" \
+[ "$got" = "CLAUDE.md" ] && ok "still emits 'context-budget: OVER CLAUDE.md …' in the field order doc_pregate parses" \
   || no "the OVER line does not parse to the path (got '$got')"
 printf '%s\n' "$OUT" | grep -q "^context-budget: OVER CLAUDE.md $(( CLAUDE_B + 500 )) $CLAUDE_B$" \
   && ok "the OVER line carries bytes and budget too" || no "OVER line is missing the bytes/budget fields"
-# the human line the health gate quotes into the park note must survive alongside it
-printf '%s\n' "$OUT" | grep -q '✗ context-budget: OVER budget: CLAUDE.md' \
-  && ok "the human 'OVER budget:' line is unchanged (the gate report and park note quote it)" \
-  || no "the human OVER line changed — health-gate.sh's report and the park note both quote it verbatim"
+printf '%s\n' "$OUT" | grep -q 'ADVISORY since 2026-08-13' \
+  && ok "the human line says ADVISORY, so a reader cannot mistake it for a failure" \
+  || no "the advisory wording is missing — a bare 'OVER budget:' reads as a gate failure"
+
+echo "== 1b. the ORIENTATION TOTAL over budget: exit 1 (this is the one that still gates) =="
+R="$T/r1b"; mkdir -p "$R"
+# Push the always-read set past ORIENT_TOTAL without any single file being over its own cap is impossible
+# here (the caps sum below the total by design — case 6), so drive it the honest way: one huge tracker.
+TOTAL_B="$(grep -m1 '^ORIENT_TOTAL=' "$SCRIPT" | sed 's/[^0-9]//g')"
+mkdir -p "$R/.maintenance"
+fill "$R/.maintenance/AUTONOMOUS_PLAN.md" $(( TOTAL_B + 1000 ))
+run "$R"
+[ "$RC" = 1 ] && ok "exit 1 when the per-session orientation TOTAL is over" || no "expected exit 1 on TOTAL, got $RC"
+printf '%s\n' "$OUT" | grep -q '^context-budget: TOTAL OVER ' \
+  && ok "emits the machine-readable 'TOTAL OVER' line doc_pregate dispatches on" || no "missing TOTAL OVER line"
+printf '%s\n' "$OUT" | grep -q '✗ context-budget: PER-SESSION ORIENTATION TOTAL over budget' \
+  && ok "the human TOTAL line is intact (the gate report and park note quote it)" || no "human TOTAL line changed"
 
 echo
 echo "== 2. the NEAR tier (>=ACT_PCT) — what the daemon trims PRE-EMPTIVELY so nothing ever parks =="

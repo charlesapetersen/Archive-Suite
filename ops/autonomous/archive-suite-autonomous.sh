@@ -554,6 +554,18 @@ doc_pregate() {
   near="$(_budget_files "$out" NEAR)"; near="${near% }"
   tstate="$(_budget_total "$out")"
 
+  # ⚠️ OWNER DECISION 2026-08-13 — per-file budgets are ADVISORY; only the ORIENTATION TOTAL dispatches.
+  # This function used to queue a trim session for any file OVER *or merely NEAR* its cap. With three documents
+  # sitting permanently at 92-99%, that turned a standing condition into standing pressure: sessions were handed
+  # prose-shrinking instead of queue work, and the trim that followed deleted a whole policy section from
+  # AGENTS.md. Per-file overage is now logged and ignored here. `$over`/`$near` are still parsed, only for the
+  # log line. ⛔ Do not re-arm them without the owner. See context-budget.sh's exit block for the full record.
+  over_total_only=""; [ "$tstate" = "OVER" ] && over_total_only=1
+  if [ -n "$over" ] || [ -n "$near" ]; then
+    log "doc pre-gate: advisory only — over=[${over:-none}] near=[${near:-none}]; per-file caps do not gate work (owner, 2026-08-13)."
+  fi
+  over=""; near=""
+
   # 1. Everything comfortably within budget — clear any stale request so a satisfied one can't loop.
   if [ -z "$over" ] && [ -z "$near" ] && [ "$tstate" != "OVER" ]; then
     if [ -f "$DOCFIX" ] || [ -f "$DOCFIX_TRIES" ]; then

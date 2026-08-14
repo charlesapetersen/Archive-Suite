@@ -67,7 +67,8 @@
 # The daemon reads the machine-readable `context-budget: OVER|WARN|TOTAL …` lines below to decide what to
 # repair (doc_pregate() in archive-suite-autonomous.sh). Keep them stable, and keep them one-per-line.
 #
-# EXIT: 0 = every file within budget (warnings still printed) · 1 = at least one OVER budget.
+# EXIT: 0 = the PER-SESSION ORIENTATION TOTAL is within budget (per-file overages are printed as ADVISORY and
+#        do NOT affect the exit code — owner, 2026-08-13) · 1 = the orientation TOTAL is over.
 set -u
 
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -196,16 +197,26 @@ elif [ "$opct" -ge "$TOTAL_WARN_PCT" ]; then echo "context-budget: TOTAL WARN $o
 else                                         echo "context-budget: TOTAL OK $osum $ORIENT_TOTAL"
 fi
 
-if [ -n "$over" ] || [ -n "$total_over" ]; then
+# ── OWNER DECISION 2026-08-13: PER-FILE IS ADVISORY. ONLY THE TOTAL FAILS. ──────────────────────────
+# The per-file caps used to fail this script, which REDDENED the health gate and made `doc_pregate` dispatch a
+# trim session — so a prose edit could stop all engineering work, and three chronically-NEAR documents kept the
+# pressure permanent. The owner's words: the byte budget "is causing a lot more trouble than it's worth".
+# The evidence for that was earned the same day: the per-file cap on `AGENTS.md` is what prompted a trim that
+# DELETED the repo's whole §Gating baseline policy section, and the falling byte count was reported as success.
+# The PER-SESSION ORIENTATION TOTAL still fails, because that is the number tied to real cost — every session
+# reads that set — whereas which individual file carries the bytes is an editorial matter, not a gate.
+# ⛔ Do NOT restore a per-file `exit 1` without the owner. Raising a budget is still the wrong reflex: prefer
+# moving rationale OUT of the always-read set to a referenced tier over deleting the reasoning itself.
+if [ -n "$total_over" ]; then
   # Keep this exact wording: the health gate quotes it and the park note is parsed from it.
   [ -n "$over" ] && echo "✗ context-budget: OVER budget:$over"
-  if [ -n "$total_over" ]; then
-    echo "✗ context-budget: PER-SESSION ORIENTATION TOTAL over budget: $osum > $ORIENT_TOTAL bytes"
-    echo "  Shrink a TRACKER (AUTONOMOUS_PLAN.md / SUITE_TODO.md) — together they are ~72% of this number."
-  fi
+  echo "✗ context-budget: PER-SESSION ORIENTATION TOTAL over budget: $osum > $ORIENT_TOTAL bytes"
+  echo "  Shrink a TRACKER (AUTONOMOUS_PLAN.md / SUITE_TODO.md) — together they are ~72% of this number."
   echo "  Fix the DOCUMENT, not the budget (see this script's header for the per-file remedy)."
   exit 1
 fi
+[ -n "$over" ] && echo "⚠ context-budget: OVER budget (ADVISORY since 2026-08-13, not a failure):$over"
+
 [ -n "$warned" ] && echo "⚠ context-budget: approaching budget (>=${WARN_PCT}%):$warned"
 [ "$opct" -ge "$TOTAL_WARN_PCT" ] && echo "⚠ context-budget: per-session orientation at ${opct}% of $ORIENT_TOTAL bytes"
 echo "✓ context-budget: all orientation documents within budget"

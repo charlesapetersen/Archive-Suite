@@ -186,7 +186,8 @@ bash "$ROOT/ops/autonomous/check-todo-stubs.sh" || true
 # nothing warned — the docs just got bigger and every session silently paid. This step is free (pure
 # shell, zero tokens), which is the point: context is the expensive thing to spend and the cheap thing to
 # measure. It is a REAL step (not step_skippable): being over budget is a fact, never inconclusive.
-# When it REDs, fix the DOCUMENT, not the budget — per-file remedies are in context-budget.sh's header.
+# It now REDs ONLY on the per-session ORIENTATION TOTAL (owner, 2026-08-13 — per-file caps are advisory, so a
+# single long document cannot stop engineering work). When it REDs, shrink a TRACKER; do not raise the budget.
 step context-budget bash "$ROOT/ops/autonomous/context-budget.sh" "$ROOT"
 
 # …and prove the guard still speaks the language the daemon parses. Since 2026-08-12 the doc pre-gate
