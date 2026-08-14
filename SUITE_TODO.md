@@ -949,7 +949,16 @@ add a second control alongside.**
   `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
   Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
   W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q3 — Reader: Quality REPLACES the Priority column/filter/editor** (blocked-on: W19.q2) **[M].** The
+- [ ] **W19.q3 — Reader: Quality REPLACES the Priority column/filter/editor** (blocked-on: W19.q2) **[M].**
+  ⚠️ **READ FIRST — q2's adversarial review changed what you inherit (2026-08-13).** The Reader's existing
+  Priority cells ALREADY write canonical `Q1`-`Q3`: `TagEditOp.setPriority` is now a thin alias for
+  `.setQuality`, so nothing writes a `P` token any more. What is left for you is the READ/label side — the
+  column header, the filter chips and the inline menu still SAY `P8`/`P9`/`P10`, and `DocumentTags.priority`
+  still reports the retired 8...10 scale (a legacy `P` token reports its OWN literal value, `P7` included, so
+  the pre-W19 chips keep matching rather than matching nothing). So this item is a rename plus repointing those
+  surfaces at `quality`/`commonQuality`, then deleting `priority`, `priorityToken`, `commonPriority` and
+  `.setPriority`. ⚠️ Note `P7` has NO Quality equivalent — it maps to unrated — so the `P7` chip and button
+  GO rather than becoming a `Q0`. The
   existing Priority nav facet **becomes** the Quality facet (column + filter + inline edit) — rename `P`→`Q` in
   the UI, don't add a parallel control. Edit via `TagWriter` (set `Q1`–`Q3`; clear = remove the token, never write
   `Q0`). Legacy `P8`–`P10` still display as `Q1`–`Q3` via the q2 alias. Tier-2 (tag write). Build + Reader unit

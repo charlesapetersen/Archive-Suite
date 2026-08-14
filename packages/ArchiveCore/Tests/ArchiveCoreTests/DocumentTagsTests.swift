@@ -68,7 +68,9 @@ final class DocumentTagsTests: XCTestCase {
     func testPriorityParsing() {
         XCTAssertEqual(DocumentTags.parsePriority("P10"), 10)
         XCTAssertEqual(DocumentTags.parsePriority("p7"), 7)
-        XCTAssertEqual(DocumentTags.parsePriority("P07"), 7, "a lenient read heals a malformed token")
+        XCTAssertNil(DocumentTags.parsePriority("P07"), "EXACT match only — see parsePriority")
+        XCTAssertNil(DocumentTags.parsePriority("P010"))
+        XCTAssertNil(DocumentTags.parsePriority("P+7"), "Int() accepts a leading +; the facet must not")
         XCTAssertNil(DocumentTags.parsePriority("P6"))
         XCTAssertNil(DocumentTags.parsePriority("Proposal"))
     }
@@ -78,7 +80,7 @@ final class DocumentTagsTests: XCTestCase {
     func testQualityParserAcceptsOnlyTheWireScaleAndPublishesCanonicalTokens() {
         XCTAssertEqual(DocumentTags.qualityTokens, ["Q1", "Q2", "Q3"])
         XCTAssertEqual(DocumentTags.parseQuality("Q1"), 1)
-        XCTAssertEqual(DocumentTags.parseQuality("q2"), 2, "case-insensitive, as `p7` always was")
+        XCTAssertNil(DocumentTags.parseQuality("q2"), "case-SENSITIVE: a `q2` subject is not a rating")
         XCTAssertEqual(DocumentTags.parseQuality("Q3"), 3)
         XCTAssertNil(DocumentTags.parseQuality("Q0"), "unrated is represented by no token")
         XCTAssertNil(DocumentTags.parseQuality("Q4"))
@@ -113,8 +115,11 @@ final class DocumentTagsTests: XCTestCase {
     func testLegacyPriorityAliasesIntoQualityWithoutARewrite() {
         // (token, quality, the retired 8...10 view). `P7` is a recognized rating token that MEANS
         // unrated — so it is consumed rather than left to become a Subjects suggestion.
+        // `priority` reports a legacy token's OWN literal value, so `P7` still reads 7 for the pre-W19
+        // Reader surfaces even though its QUALITY is unrated. Deriving it from quality alone made P7
+        // unrepresentable and silently broke the Reader's P7 filter chip and saved smart folders.
         let aliases: [(token: String, quality: Int?, priority: Int?)] = [
-            ("P7", nil, nil), ("P8", 1, 8), ("P9", 2, 9), ("P10", 3, 10),
+            ("P7", nil, 7), ("P8", 1, 8), ("P9", 2, 9), ("P10", 3, 10),
         ]
         for alias in aliases {
             XCTAssertEqual(DocumentTags.parseQuality(alias.token), alias.quality, alias.token)

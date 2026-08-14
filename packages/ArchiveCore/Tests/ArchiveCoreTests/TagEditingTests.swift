@@ -21,10 +21,13 @@ final class TagEditingTests: XCTestCase {
         XCTAssertEqual(d.remove, ["1980"])
     }
 
+    // `.setPriority` is a RETIRED ALIAS for `.setQuality` (W19): it maps 8...10 down and writes the CANONICAL
+    // token, because the wave's contract is that no app writes `P` any more — and because adding a `P` while
+    // removing only a `P` could leave two rating tokens on one file.
     func testSetPriorityReplaces() {
         let d = TagEditing.delta(for: .setPriority(10), given: tags(["P9", "1980"]))
-        XCTAssertEqual(d.add, ["P10"])
-        XCTAssertEqual(d.remove, ["P9"])
+        XCTAssertEqual(d.add, ["Q3"], "the retired op writes the canonical token")
+        XCTAssertEqual(d.remove, ["P9"], "and retires the legacy one it replaces")
     }
 
     func testMonthTokenFormat() {
@@ -64,8 +67,8 @@ final class TagEditingTests: XCTestCase {
         XCTAssertEqual(t.priorityToken, "P9")
         XCTAssertTrue(t.subjects.contains("P8"))
         let d = TagEditing.delta(for: .setPriority(10), given: t)
-        XCTAssertEqual(d.add, ["P10"])
-        XCTAssertEqual(d.remove, ["P9"])
+        XCTAssertEqual(d.add, ["Q3"])
+        XCTAssertEqual(d.remove, ["P9"], "only the consumed winner — the shadowed P8 subject survives")
     }
 
     // MARK: Quality edits (W19.q2) — the facet's only write primitive
@@ -110,13 +113,28 @@ final class TagEditingTests: XCTestCase {
         XCTAssertEqual(d.remove, ["Q3"], "only the consumed winner — never a facet predicate")
     }
 
-    // The retired Priority cell cannot reach a canonical rating: `priorityToken` is P-only by construction.
-    func testRetiredSetPriorityCannotRemoveACanonicalQualityToken() {
+    // The retired Priority cell operates on the ONE rating facet, whatever spelling it carries — so it can
+    // neither strand two rating tokens on a file nor silently no-op on a Q-rated one.
+    func testRetiredSetPriorityActsOnTheOneRatingFacet() {
         let t = tags(["Q2", "Economics"])
-        XCTAssertEqual(t.priority, 9, "it still READS as the old P9")
-        XCTAssertNil(t.priorityToken)
-        XCTAssertTrue(TagEditing.delta(for: .setPriority(nil), given: t).remove.isEmpty,
-                      "the retired edit must not destroy a Quality rating it cannot see")
+        XCTAssertEqual(t.priority, 9, "a canonical Q2 still READS as the old P9")
+        XCTAssertNil(t.priorityToken, "but it is not a legacy token")
+
+        // "None" genuinely clears, where the first version of this was a silent no-op the UI could not report.
+        let cleared = TagEditing.delta(for: .setPriority(nil), given: t)
+        XCTAssertTrue(cleared.add.isEmpty)
+        XCTAssertEqual(cleared.remove, ["Q2"])
+
+        // And setting a value cannot leave BOTH a P and a Q on one file.
+        let set = TagEditing.delta(for: .setPriority(9), given: t)
+        XCTAssertEqual(set.add, ["Q2"])
+        XCTAssertEqual(set.remove, ["Q2"])
+        XCTAssertFalse(set.add.contains { $0.hasPrefix("P") }, "no app writes P any more")
+
+        // P7 is unrated, so the retired button for it CLEARS rather than writing an unrated token.
+        let p7 = TagEditing.delta(for: .setPriority(7), given: tags(["Q3"]))
+        XCTAssertTrue(p7.add.isEmpty, "P7 maps to unrated, and unrated writes no token")
+        XCTAssertEqual(p7.remove, ["Q3"])
     }
 
     func testGroupSummaryReportsQualityAndTheRetiredView() {

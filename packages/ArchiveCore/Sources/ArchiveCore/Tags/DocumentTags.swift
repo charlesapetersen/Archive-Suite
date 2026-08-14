@@ -77,9 +77,18 @@ public struct DocumentTags: Sendable, Equatable {
     // facet depending on which initializer built it, and a rating that reads two different ways is
     // exactly how a facet edit removes the wrong token.
 
-    /// The rating on the retired 8...10 Priority scale (`Q1` → 8, `Q2` → 9, `Q3` → 10). `nil` when
-    /// unrated — including a legacy `P7`, which the owner-locked W19 mapping defines AS unrated.
-    public var priority: Int? { quality.map { $0 + 7 } }
+    /// The rating on the retired 8...10 Priority scale, for the pre-W19 Reader surfaces only.
+    ///
+    /// A **legacy `P` token reports its own literal value**, so a `P7`-tagged file still reads `7` exactly as it
+    /// did before Quality existed. A **canonical `Q` token maps onto the scale** (`Q1` → 8, `Q2` → 9, `Q3` → 10).
+    /// The first clause is load-bearing and was missing in the first version of this: deriving purely from
+    /// `quality` made `P7` unrepresentable (`parseQuality("P7")` is nil by contract), which silently broke the
+    /// Reader's `P7` filter chip, its column value, and any saved smart folder selecting P7 — a control that
+    /// matches nothing is worse than one that is absent, and removing the control is W19.q3's job, not q2's.
+    public var priority: Int? {
+        if let t = priorityToken, let legacy = DocumentTags.parsePriority(t) { return legacy }
+        return quality.map { $0 + 7 }
+    }
 
     /// The verbatim raw token consumed for the rating facet, but **only when it is a legacy `P` token**.
     /// `nil` for a canonical `Q1`–`Q3`, so the retired `.setPriority` edit can never remove a canonical
@@ -267,11 +276,18 @@ extension DocumentTags {
     /// The retired Priority spelling, `P7`...`P10`. Nothing WRITES these any more (W19); this exists so
     /// `parseQuality` can alias them on read, and so the pre-W19 Reader surfaces keep resolving until
     /// W19.q3. Deliberately lenient about a zero-padded `P07`: a lenient read in front of a strict write
-    /// heals a malformed token, and — more to the point here — a token this recognizes is CONSUMED as a
-    /// facet, so tightening it would silently promote `P07` into the Subjects vocabulary instead.
+    /// **EXACT match only** — `P7`, `P8`, `P9`, `P10`, upper or lower case, and nothing else.
+    /// ⚠️ An earlier version of this was deliberately LENIENT about zero-padding, on the reasoning that a token
+    /// this parser rejects becomes a SUBJECT and so leaks into the Subjects vocabulary. That reasoning inverted
+    /// the SPEC's own ranking of the two risks, and the adversarial pass caught it: `Int("07")`/`Int("+7")` mean
+    /// the lenient set included `P07`, `P007`, `P010`, `P+7` — **exactly the shape of an archival box/folder
+    /// code**. Any such SUBJECT then won the rating facet, and a rating edit REMOVES the facet's token, so
+    /// leniency bought a cosmetic vocabulary annoyance at the price of a **destructive write on a real subject**.
+    /// Classification must never drive a write. Strict here; the vocabulary can tolerate a stray suggestion.
     public static func parsePriority(_ s: String) -> Int? {
         guard let first = s.first, first == "P" || first == "p" else { return nil }
-        guard let n = Int(s.dropFirst()), (7...10).contains(n) else { return nil }
+        let digits = String(s.dropFirst())
+        guard let n = Int(digits), (7...10).contains(n), digits == String(n) else { return nil }
         return n
     }
 
@@ -289,10 +305,10 @@ extension DocumentTags {
     /// bytes: `P8`→1, `P9`→2, `P10`→3, while `P7` is unrated and therefore returns `nil` — as does any
     /// token that is not a rating at all, `Q0` included. Use `isRatingToken` to tell those two apart.
     public static func parseQuality(_ s: String) -> Int? {
-        if let first = s.first, first == "Q" || first == "q",
-           let n = Int(s.dropFirst()), (1...3).contains(n), s.count == 2 {
-            return n
-        }
+        // Case-SENSITIVE and exact: the SPEC's Quality row says "exactly one of `Q1` `Q2` `Q3`", and every
+        // token in the contract except Read/Unread is an exact match. Accepting `q2` would consume a
+        // fiscal-quarter subject as the rating facet — and a rating edit then removes it from the file.
+        if s.count == 2, s.first == "Q", let n = Int(s.dropFirst()), (1...3).contains(n) { return n }
         guard let legacy = parsePriority(s), legacy >= 8 else { return nil }
         return legacy - 7
     }

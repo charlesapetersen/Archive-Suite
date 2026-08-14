@@ -44,15 +44,28 @@ public enum TagEditing {
             }
         case .setQuality(let q):
             // Unrated is the ABSENCE of a token, so a clear (and any off-scale value) adds nothing —
-            // `Q0` is never written. The removal is the ONE token this file consumed for the facet,
+            // `Q0` is never written. The removal NAMES the one token this file consumed for the facet
+            // — though note the writer matches by VALUE, so a duplicate copy of that same token which
+            // `parse` had demoted to `.subjects` goes with it (Reader `TagWriter.apply`). The end state is
+            // the intended one (one rating, no orphan), but it is not literally "one token removed".
+            // The removal is the token this file consumed for the facet,
             // whichever spelling it used, so setting or clearing a rating on a legacy `P8`-`P10` file
             // retires that token instead of leaving two ratings on the same file.
             return TagDelta(add: DocumentTags.qualityTag(for: q).map { [$0] } ?? [],
                             remove: tags.qualityToken.map { [$0] } ?? [])
         case .setPriority(let p):
-            // RETIRED — see `TagEditOp.setPriority`. `priorityToken` is P-only by construction, so this
-            // can never remove a canonical `Q` token: the retired cell cannot destroy a real rating.
-            return TagDelta(add: p.map { ["P\($0)"] } ?? [], remove: tags.priorityToken.map { [$0] } ?? [])
+            // RETIRED — see `TagEditOp.setPriority`. It is now a thin ALIAS for `.setQuality`, mapping the old
+            // 8...10 scale down (`P8`→1, `P9`→2, `P10`→3) and treating `P7`/nil as a clear, per the owner-locked
+            // W19 mapping. Two reasons it forwards rather than writing a `P`:
+            //   1. It cannot leave TWO rating tokens on one file. The previous version added `P9` while removing
+            //      only `priorityToken` — nil on a `Q`-rated file — so `.setPriority(9)` on a `Q2` file left BOTH
+            //      tokens, and which one won then depended on tag ORDER. The old "provably cannot destroy a
+            //      canonical rating" claim was true of the removal half and silent about the add half.
+            //   2. The wave's owner-locked contract is that **no app writes `P` any more**. Forwarding satisfies
+            //      that without waiting for W19.q3 to relabel the Reader's cells.
+            // Consequence worth knowing: the Reader's "None" button now genuinely clears a `Q` rating instead of
+            // being a silent no-op, and its `P7` button clears rather than writing an unrated token.
+            return delta(for: .setQuality(p.flatMap { (8...10).contains($0) ? $0 - 7 : nil }), given: tags)
         case .setColor(let c):
             return TagDelta(color: c.map { .set($0) } ?? .clear)
         }

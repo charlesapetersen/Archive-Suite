@@ -5486,8 +5486,28 @@ explain why not.
   is the facet's write primitive: `DocumentTags.qualityTag(for:)` is the single place a token is spelled, unrated
   and every off-scale value add NOTHING (**`Q0` is never written**, and the initializer normalizes it away), and
   the removal is that file's one `qualityToken` whichever spelling it used.
-  ⚠️ **Two design notes a later item should not "fix" back.** (1) **`priority`/`priorityToken` are DERIVED, not a
-  stored mirror** — `priority` is `quality + 7` and `priorityToken` returns the winner ONLY when it is P-spelled.
+  ⚠️ **AMENDED 2026-08-13 by the adversarial review this item never got before shipping — read this before the
+  two notes below, because the review overturned parts of both.** Four defects, all introduced by the very
+  design the notes defend:
+  • **`P7` became unrepresentable.** `priority` derived purely from `quality` could only be nil/8/9/10, and
+    `parseQuality("P7")` is nil by contract — so a `P7` file reported NO priority where it used to report 7,
+    silently breaking the Reader's `P7` filter chip, its column value and any saved smart folder selecting P7.
+    Fixed: a legacy `P` token now reports its OWN literal value; only a canonical `Q` maps onto 8...10.
+  • **`.setPriority` could strand TWO rating tokens on one file** — it added `P9` while removing only
+    `priorityToken`, which is nil on a `Q`-rated file, so which token won then depended on tag ORDER. The
+    "provably cannot reach a canonical rating" claim below was true of the REMOVAL half and silent about the
+    ADD half. Fixed: `.setPriority` is now a thin alias for `.setQuality`, so it writes the canonical token and
+    acts on the one facet whatever its spelling — which also makes the Reader's "None" genuinely clear a rating
+    instead of being a silent no-op the UI could not report.
+  • **Keeping `parsePriority` LENIENT was the wrong call, and the original strict version was right.** `Int()`
+    accepts `+` and unbounded leading zeros, so the lenient set included `P07`, `P007`, `P010`, `P+7` —
+    **exactly the shape of an archival box/folder code.** Any such SUBJECT then won the rating facet, and a
+    rating edit REMOVES the facet's token, so leniency traded a cosmetic vocabulary-suggestion annoyance for a
+    **destructive write on a real subject**. Classification must never drive a write. Now strict.
+  • **`parseQuality` accepted lowercase `q1`–`q3`**, against the SPEC's exact-match invariant — so a
+    fiscal-quarter subject was consumed as the rating. Now case-sensitive.
+  ⚠️ **One design note a later item should not "fix" back** (the other, on leniency, is retired above).
+  (1) **`priority`/`priorityToken` are DERIVED, not a stored mirror** — `priority` is `quality + 7` and `priorityToken` returns the winner ONLY when it is P-spelled.
   A stored second copy is what makes a rating readable two ways, and the first draft of this item shipped exactly
   that: `priorityToken` mirrored the canonical token, so the Reader's still-live Priority cell would have removed
   a `Q2` and written a `P9` in its place. Deriving makes `.setPriority` provably unable to reach a canonical
