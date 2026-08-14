@@ -31,7 +31,7 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   pre-`main` abort without enabling the paid OCR lane or reaching the host GUI. | ops/autonomous/health-gate.sh + ArchiveProcessor/scripts/test-recovery.sh | S | risk low
 
 - [ ] **`W21.e2e-fu2` — the test-only LAN READY line still publishes the six-character Drive-relay token
-  after W16.lan2 split the LAN credential [XS · MED · lying test seam] — ⛔ NEEDS THE OWNER.**
+  after W16.lan2 split the LAN credential [XS · MED · lying test seam] — Tier-2.**
   `CaptureSession.serverDidStart` writes `token` under `LIVECAPTURE_AUTOSTART`, but `CaptureServer` now
   authenticates the 32-character `lanToken`; the E2E therefore reaches the Mac and receives HTTP 401 before
   any upload. W21.e2e-fu1 works around the stale seam in its script by reading the persisted LAN token.
@@ -39,7 +39,7 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   regression proof that distinguishes the two credentials. **Tier-2** because the seam lives in `Capture/` —
   adversarial review + a functional test, scratch only. (This carried a **HOLD** for a per-item authorization
   until 2026-08-13, when that requirement was lifted; the grant recorded in `OWNER_AUTHORIZATIONS.md` still
-  binds its constraints: the file-relay READY line stays on `token`.) | ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift + recovery driver | XS | risk med | needs: owner
+  binds its constraints: the file-relay READY line stays on `token`.) | ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift + recovery driver | XS | risk med | Tier-2
 
 ## Open-sourcing the repo (owner, 2026-08-11)
 
@@ -803,7 +803,7 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
-- [ ] **W16.bat5-fu2 — ⛔ NEEDS THE OWNER. The other two journal mutators still lose their fact when Stop
+- [ ] **W16.bat5-fu2 — The other two journal mutators still lose their fact when Stop
   closes the journal; for `markBatchChunkConsumed` that means a Resume re-materializes a chunk whose pages
   were already written [S · LOW].** Filed 2026-08-03 from the `W16.bat5-fu` adversarial pass; the residual
   that item deliberately did **not** widen into (its grant is explicit: no widening of `cancel()` beyond the
@@ -1481,7 +1481,7 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   3. **Durable link:** encode the PDF path **and** the resolved JPEG path explicitly — the partner is not
      re-derivable, so a citation must pin what was actually cited. ⚠️ This changes `DurableLink`
      (`packages/ArchiveCore/Sources/ArchiveCore/Links/DurableLink.swift`) — a shared ArchiveCore type + cross-app
-     URL contract → **still HOLD-QUEUE / owner-gated**, and it must rebuild all three app test bundles.
+     URL contract → **Tier-2** (de-gated 2026-08-13), and it must rebuild all three app test bundles.
      Old links without the JPEG field must keep parsing (additive/optional).
   4. **Switch UI:** View-menu item + keyboard shortcut, **no** toolbar button; the choice is **sticky per
      document** (needs a small persisted per-file preference store).
@@ -1496,14 +1496,15 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   discovery was Spotlight-only would have put ~286k files at the mercy of the same dead index that caused the
   2026-08-04 incident) and **`W26.verify`** (the 100k+ scale lane has **never been run**; it is the measurement
   that says whether doubling the walk is affordable, and it carries `W26.idx`'s unrun warm-start lanes too).
-  `walk1` and `walk2` have both shipped, so only `W26.verify` still gates this.
-  ⚠️ **This edge is documentation, and deliberately cannot be anything else.** `next-queue-item.sh` takes its
-  *candidates* from the plan's `## WORK QUEUE` region only (it reads `SUITE_TODO` just to resolve tag state),
-  and this item is **kept out of that region on purpose** — it is owner-gated (`DurableLink` is a cross-app
-  contract, §3). Mirroring the line into the plan to "make the edge live" would make the item **pickable by the
-  daemon**, which is the opposite of what is wanted. So the tag + edge exist to be read by a human and to give
-  the item a stable name; the thing actually keeping the daemon off it is its absence from the plan queue.
-  | Reader + Notes + ArchiveCore (durable-link/image entity) | M–L | med | **owner** (DurableLink/SPEC change)
+  `walk1`, `walk2` **and `W26.verify` have all shipped** (`W26.verify` is `[x]` in `SUITE_TODO_DONE.md`; do not
+  confuse it with `W26.verify-fu1`/`-fu2`, which are separate items — that misreading happened on 2026-08-13).
+  **So nothing blocks this any more.**
+  ⚠️ **The paragraph that used to sit here said this item was deliberately kept OUT of the plan's WORK QUEUE
+  because `DurableLink`/SPEC made it owner-gated. That is obsolete:** SPEC and cross-app-contract edits were
+  de-gated on 2026-08-13 (TIER-2 IS THE GATE — `AGENTS.md` §*Gating baseline*), so the item is now mirrored
+  into the WORK QUEUE and is legitimately pickable. It is still **Tier-2** and still rebuilds all three app
+  test bundles; that is a bar to clear, not a gate to wait behind.
+  | Reader + Notes + ArchiveCore (durable-link/image entity) | M–L | med | Tier-2 (DurableLink/SPEC)
 
 ## Suite doc hygiene (owner / small) — 2026-07-16
 ## Owner GUI-pass follow-ups — 2026-07-16 (from the interactive Reader + Processor GUI review)

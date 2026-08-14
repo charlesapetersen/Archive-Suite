@@ -61,7 +61,7 @@ TARGETS=(
 # For those, put an explicit `policy-ok` marker on the line — a comment in Markdown, e.g.
 # `<!-- policy-ok: continuation of the struck-through pre-2026-08-13 rule above -->`. Explicit beats a fuzzy
 # proximity window: the marker is greppable, and it forces whoever adds it to say why.
-HIST='~~|superseded|SUPERSEDED|no longer|NO LONGER|REMOVED from|was lifted|do NOT put them back|until 2026-08-13|since 2026-08-13|de-gated|DE-GATED|NARROWED|reversed|REVERSED|WITHDRAWN|WAS WRONG|corrected 2026-08-13|historical|used to|check-policy-coherence|policy-ok'
+HIST='~~|superseded|SUPERSEDED|no longer|NO LONGER|REMOVED from|was lifted|do NOT put them back|until 2026-08-13|since 2026-08-13|de-gated|DE-GATED|NARROWED|reversed|REVERSED|WITHDRAWN|WAS WRONG|corrected 2026-08-13|historical|used to|check-policy-coherence|policy-ok|obsolete|retained as the record|That is obsolete'
 
 rule() {
   local id="$1" pat="$2" why="$3" exc="${4:-$HIST}" hit=0
@@ -95,6 +95,14 @@ rule "money-not-gated" \
 rule "spec-not-owner-gated" \
   '(SPEC|tag-format)[^.]{0,60}(HOLD.?QUEUE|owner.?gate|owner hold)|owner hold-queue' \
   'a SPEC/tag-format edit is Tier-2, not owner-gated, since 2026-08-13'
+
+# Added 2026-08-13 after the adversarial review found the FIRST pass of these fixes had cleared the prose
+# sentence on an item but left its bolded TITLE and its trailing metadata field saying "NEEDS THE OWNER" /
+# "needs: owner" — and resume-prompt.txt defines that literal token as must-not-execute. A gate marker can hide
+# in three places in one entry; the earlier rules only looked at one of them.
+rule "no-stale-owner-marker" \
+  'NEEDS THE OWNER|NEEDS OWNER|\| *needs: owner|owner-gated by default|HOLD QUEUE — money|Do NOT auto-fix|still HOLD-QUEUE' \
+  'an item offered as actionable must not carry an owner-gate marker in its title, body or metadata tail'
 
 rule "unlisted-is-not-hold" \
   'not named in the committed file by tag is still hold-queue|is still hold-queue' \

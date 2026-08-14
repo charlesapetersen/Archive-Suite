@@ -111,77 +111,18 @@ dirty primary tree, **every open `SUITE_TODO` item being visible in the plan**, 
 prints what the daemon would pick up next for you to eyeball. **A clean run is the definition of "handed
 off".** It is not yet a `health-gate.sh` step — that is `W31.handoff-gate`.
 
-**⚠️ The mirroring failure is NOT an external-agent problem — read this before blaming the handoff.** Item 3
-was written after the 2026-07-29 Codex handoff, and it is easy to conclude that mirroring is a thing *Codex*
-forgets. On 2026-08-13 a pre-restart audit found **27 open `SUITE_TODO` items with no checkbox line anywhere
-in the plan** — invisible to `next-queue-item.sh`, skipped in silence. Attributing all 27
-(`git log -S<tag> -- SUITE_TODO.md`) put **every one of them in a commit written in this project's own
-convention** — `fix(notes): W23.m14 — …`, `fix(ops): two status lines that lied`, `docs(trackers): …`. Three
-came from one commit (`c0be2cc`), two more from another (`763eade`). The pattern is a session closing a
-parent item, filing the `-fu` follow-up it *just discovered* into `SUITE_TODO`, and never mirroring it. So:
-**whenever you FILE a new item, mirror it in the same commit — daemon, interactive session, or external
-agent alike.** Filing is exactly when the omission happens, because the item you just wrote feels handled.
+**⚠️ The mirroring failure is NOT an external-agent problem.** On 2026-08-13, 27 open `SUITE_TODO` items had
+no checkbox line anywhere in the plan — invisible to `next-queue-item.sh`. Attribution (`git log -S<tag> --
+SUITE_TODO.md`) put **every one in a commit in this project's own convention**, three from `c0be2cc` alone. The
+pattern is a session closing a parent item, filing the `-fu` it just found, and not mirroring it — filing is
+exactly when the omission happens, because the item you just wrote feels handled. **So: whenever you FILE an
+item, mirror it in the same commit** — daemon, interactive session or external agent alike.
 
-**What the 2026-08-13 Codex cycle actually got wrong, for calibration:** one thing, and it was not the
-trackers. It left `W19.q2` as **107 lines of green, passing, uncommitted work with zero commits** in
-`suite-wt-20260813-011700-w19q2` — item 6's checkpoint rule, unfollowed. A *stray* worktree is tolerable and
-the owner has said so (housekeeping GCs a clean merged one by itself); an **uncommitted** one is one power
-cut from lost work, and it also collides with the daemon, which would have picked the very same `W19.q2` off
-the queue and re-implemented it from scratch. Its trackers were untouched and correctly so — the item was
-not done. Checkpoint-commit at every green point; that is the whole lesson from that cycle.
-
-## Gating baseline — TIER-2 IS THE GATE (owner, 2026-08-13)
-
-**Default: if Tier-2 is satisfied, the daemon may execute it. No owner signature.** Tier-2 is unchanged and
-still mandatory — adversarial self-review plus a functional test, on scratch copies, never the real corpus
-(root [`CLAUDE.md`](CLAUDE.md) → *How we work* step 3). What changed is that Tier-2 is now the WHOLE gate for
-the irreversible-code categories, rather than Tier-2 *plus* a named entry in `OWNER_AUTHORIZATIONS.md`.
-
-**Only two things are still owner-gated:**
-
-1. ⛔ **A write to the REAL corpus** — `~/Desktop/Google Drive/Archival Photos/` (~102k PDFs, irreplaceable,
-   predates the apps). Untouched by this change and not negotiable. Reader's Core Directive and
-   scratch-copy-only testing stand exactly as before.
-2. ⛔ **Work only the owner can perform or judge** — an API key, an account, a physical device, a GUI paste in
-   a console he owns, or a matter of subjective taste. Not a safety gate; simply nobody else can do it.
-
-**What is NO LONGER a gate, and why — so nobody re-imposes it from an older doc:**
-
-- **`Capture/`·`Net/`, finalize/manifest, file-writing tag/output.** The per-item rule was written 2026-07-07,
-  the day after a live-capture finalize deleted a run's originals, on the premise that these paths write
-  irreplaceable data. The 2026-08-01 STANDING PREMISE voided that premise: no app in this suite has produced
-  data the owner intends to keep, and the corpus these paths do NOT write to is the only irreplaceable thing.
-  The authorization also bought no safety that Tier-2 wasn't already buying — it certified only that the owner
-  had personally read the item, which is why five items sat parked for weeks while the actual safety mechanism
-  was never the bottleneck.
-- **Money.** Owner, 2026-08-13: *"We don't need my permission for spending money. The daemon only spends tiny
-  amounts and the keys are capped."* This reverses an emphatic earlier ⛔ in root `CLAUDE.md`, which is kept
-  struck-through there rather than deleted. **The cost discipline is NOT lifted:** cheapest capable model,
-  smallest input set that proves the behaviour, and state the cost before a large run. No permission, no blank
-  cheque.
-- **`SPEC/tag-format.md`.** Owner, 2026-08-13: *"nothing real has been created by these apps yet."* A SPEC
-  change is still the highest-risk shared surface in the repo and still lands with every affected app in ONE
-  reviewed unit — that is Tier-2's job, and Tier-2 already required exactly that.
-
-**A POLICY change is itself Tier-2 — and its blast radius is PROSE.** Learned the hard way on the day this
-section was written: the change was made in four files and the old rule turned out to be restated in **ten
-more**, three of them dangerously (the plan's general decision rule, `ops/autonomous/README.md`'s reference
-definition of WS10, and an item spec that still instructed the opposite of what the owner had just decided).
-Every one of those passed `check-tracker-sync.sh`, `check-todo-stubs.sh`, `check-handoff.sh` and
-`context-budget.sh`, because **all of those read checkbox and byte state and none of them reads prose.** So:
-after changing a policy, do not stop at the file that DEFINES it — sweep for every place that RESTATES it,
-including `.maintenance/AUTONOMOUS_PLAN.md` and `ops/autonomous/resume-prompt.txt` (what every session
-actually reads, and the two files no commit hook can see). Then run
-**`ops/autonomous/check-policy-coherence.sh`**, which turns each known contradiction into a failing rule, and
-add a rule for whatever you just changed so it cannot come back.
-
-**A genuine behaviour question is still a question.** Where an item says "decide X versus Y" and there is no
-correct answer (`W3.cap-r3-fu3`, `-fu4`, `-fu12-fu1`), bring it to the owner — but as a *question*, at Daemon
-Report, not as a safety gate. Filing it and moving on is right; parking the whole item as owner-gated is not.
-
-**The structural mechanism is unchanged:** what physically keeps the daemon off an item is its absence from
-the plan's `## WORK QUEUE` region (`ops/autonomous/next-queue-item.sh` walks only that). The HOLD QUEUE is
-therefore now reserved for the two categories above and for open behaviour questions.
+**What the 2026-08-13 Codex cycle actually got wrong, for calibration:** one thing, and not the trackers. It
+left `W19.q2` as **107 lines of green, passing, uncommitted work with zero commits**. A *stray* worktree is
+tolerable and the owner has said so; an **uncommitted** one is one power cut from lost work, and it collided
+with the daemon, which would have picked the same item off the queue and redone it. Checkpoint-commit at every
+green point — that is the whole lesson.
 
 ## Ownership lanes (safe to run in parallel)
 
