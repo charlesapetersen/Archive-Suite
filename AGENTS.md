@@ -163,6 +163,18 @@ the irreversible-code categories, rather than Tier-2 *plus* a named entry in `OW
   change is still the highest-risk shared surface in the repo and still lands with every affected app in ONE
   reviewed unit — that is Tier-2's job, and Tier-2 already required exactly that.
 
+**A POLICY change is itself Tier-2 — and its blast radius is PROSE.** Learned the hard way on the day this
+section was written: the change was made in four files and the old rule turned out to be restated in **ten
+more**, three of them dangerously (the plan's general decision rule, `ops/autonomous/README.md`'s reference
+definition of WS10, and an item spec that still instructed the opposite of what the owner had just decided).
+Every one of those passed `check-tracker-sync.sh`, `check-todo-stubs.sh`, `check-handoff.sh` and
+`context-budget.sh`, because **all of those read checkbox and byte state and none of them reads prose.** So:
+after changing a policy, do not stop at the file that DEFINES it — sweep for every place that RESTATES it,
+including `.maintenance/AUTONOMOUS_PLAN.md` and `ops/autonomous/resume-prompt.txt` (what every session
+actually reads, and the two files no commit hook can see). Then run
+**`ops/autonomous/check-policy-coherence.sh`**, which turns each known contradiction into a failing rule, and
+add a rule for whatever you just changed so it cannot come back.
+
 **A genuine behaviour question is still a question.** Where an item says "decide X versus Y" and there is no
 correct answer (`W3.cap-r3-fu3`, `-fu4`, `-fu12-fu1`), bring it to the owner — but as a *question*, at Daemon
 Report, not as a safety gate. Filing it and moving on is right; parking the whole item as owner-gated is not.

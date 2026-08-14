@@ -45,7 +45,7 @@ pixel source. This is the sole fully-deterministic, unattended route.
   The orchestrator reads the listener port from `LIVECAPTURE_READY`, then reads the running app's persisted
   high-entropy `LiveCaptureLANToken` for pairing. The READY line still publishes the old Drive-relay code
   after W16.lan2's credential split; the harness redacts it from both READY and Mac-log artifacts. Correcting
-  that `Capture/` seam is owner-gated as W21.e2e-fu2. The filled pairing form is deliberately not screenshot:
+  that `Capture/` seam is W21.e2e-fu2 (Tier-2, not owner-gated since 2026-08-13). The filled pairing form is deliberately not screenshot:
   it contains the persistent LAN bearer.
 
 The companion has **no session-finish UI** (it finishes per-segment; whole-session finalize is a Mac

@@ -610,6 +610,7 @@ parity tests — spanning 31 distinct sections: §2 (locked decisions D1–D10),
 lines), §16.x (interface contract), §D.x (Zotero).
 
 Deleting or relocating it means rewiring all 65 references inside shipped code for no functional gain. It was
-also **not** promoted to `SPEC/` — that would make it a cross-app contract and put every future edit behind the
-owner hold-queue, an ongoing tax on a Notes-internal document. If you are tempted to "tidy" it away, read the
+also **not** promoted to `SPEC/` — that would make a Notes-internal document a cross-app contract, dragging
+every future edit through the all-three-apps Tier-2 unit for no functional gain. (No longer an *owner* gate:
+SPEC edits were de-gated 2026-08-13, but the coupling cost stands, which is what the argument rests on.) If you are tempted to "tidy" it away, read the
 CLOSED item in `SUITE_TODO.md` §*Suite doc hygiene* first: the deletion has been mis-scoped twice.

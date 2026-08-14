@@ -144,7 +144,8 @@ autonomous daemon does this automatically:
   `--record <unit>` stamps it reviewed at HEAD.
 - The daemon's resume prompt (STEP 2.0) runs it every session: if a review is **due**, that session *is* the
   review — `lean-review` on the one named unit (read-only), confirmed findings appended as `[ ]` fix items
-  (HIGH-on-irreversible → the needs-owner hold queue), then `--record` + commit. Proven by
+  (HIGH-on-irreversible → an ordinary `[ ]` item marked **Tier-2**, **NOT** the hold queue — owner 2026-08-13,
+  `AGENTS.md` §*Gating baseline*), then `--record` + commit. Proven by
   `ops/autonomous/tests/prove-review-cadence.sh`.
 
 The unit table above stays the single source of truth; the picker embeds the same units (iOS still skipped)

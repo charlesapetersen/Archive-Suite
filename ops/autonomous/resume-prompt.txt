@@ -121,7 +121,8 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   sentence used to name "W15.tu0 and R13d" and was six grants out of date by the time anyone noticed.)
   An item named there IS pickable — read its entry first and obey every constraint attached to it VERBATIM;
   the ⛔ constraints are part of the grant, not advice, and several are hard limits on money or delete paths
-  (R13d, for one, carries a do-NOT-strip constraint). If you cannot satisfy a constraint, STOP and surface it
+  (`W17.stg1`, for one, forbids a per-source content hash and requires a corrupt manifest be RENAMED, never
+  auto-deleted). If you cannot satisfy a constraint, STOP and surface it
   rather than proceeding on a narrower reading. **A grant is a licence, not a queue entry:** the item must
   ALSO be in the plan's WORK QUEUE region to be actionable — an item sitting in "## HOLD QUEUE" is not
   pickable no matter what the authorizations file says. ⚠️ Since 2026-08-13 that file is a **RECORD, not a

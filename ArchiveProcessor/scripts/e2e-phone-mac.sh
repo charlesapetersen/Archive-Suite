@@ -119,7 +119,7 @@ done
 grep -q "LIVECAPTURE_READY " "$READYFILE" 2>/dev/null || die "no READY line after 60s (see $MACLOG)"
 PORT="$(grep -o 'port=[0-9]*' "$READYFILE" | head -1 | cut -d= -f2)"
 # W16.lan2 split the LAN bearer from the six-character Drive-relay code, but the test-only LAN READY line
-# still reports the relay `token` (W21.e2e-fu2, owner-gated because the seam lives in Capture/). Read the
+# still reports the relay `token` (W21.e2e-fu2 — Tier-2 because the seam lives in Capture/; de-gated 2026-08-13). Read the
 # same persisted LAN credential CaptureServer loaded; never print or screenshot it.
 TOKEN="$(defaults read com.archiveprocessor.app LiveCaptureLANToken 2>/dev/null)"
 [ -n "$PORT" ] && [ "${#TOKEN}" -ge 32 ] \

@@ -30,7 +30,7 @@ only while it is visible, and waits for it to disappear; the old `KEYCODE_ESCAPE
 to leave Gboard over `Connect`.
 
 The first complete pairing attempt exposed W16.lan2's stale READY credential (tracked separately below).
-Until that owner-gated source seam is corrected, the harness reads the persisted high-entropy LAN token used
+Until that source seam is corrected (`W21.e2e-fu2`, Tier-2 — not owner-gated since 2026-08-13), the harness reads the persisted high-entropy LAN token used
 by `CaptureServer`, never logs or screenshots it, redacts the stale relay code from READY/Mac-log artifacts,
 and makes the entire run directory owner-private. Both raw backup and finalized output now stay under the
 per-run `/tmp` root. The exact current harness completed all three emulator→Mac fixtures through OCR and

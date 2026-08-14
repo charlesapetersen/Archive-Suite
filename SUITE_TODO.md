@@ -36,8 +36,10 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   authenticates the 32-character `lanToken`; the E2E therefore reaches the Mac and receives HTTP 401 before
   any upload. W21.e2e-fu1 works around the stale seam in its script by reading the persisted LAN token.
   Correct the source READY line to publish `lanToken`, keep the file-relay READY line on `token`, and add a
-  regression proof that distinguishes the two credentials. **HOLD:** this test-only branch still lives in
-  `Capture/`, so the repo requires a per-item authorization before editing it. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift + recovery driver | XS | risk med | needs: owner
+  regression proof that distinguishes the two credentials. **Tier-2** because the seam lives in `Capture/` —
+  adversarial review + a functional test, scratch only. (This carried a **HOLD** for a per-item authorization
+  until 2026-08-13, when that requirement was lifted; the grant recorded in `OWNER_AUTHORIZATIONS.md` still
+  binds its constraints: the file-relay READY line stays on `token`.) | ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift + recovery driver | XS | risk med | needs: owner
 
 ## Open-sourcing the repo (owner, 2026-08-11)
 
@@ -214,7 +216,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 ## Owner-reported bugs (2026-08-02) — follow-ons
 
 - [ ] **W25.retry-backend — in gateway / Local Agent mode the retry sheets are decorative, and Live Capture's
-  retry silently bills a metered API [M · MONEY · needs: owner decision].** Found 2026-08-03 by the
+  retry silently bills a metered API [M · MONEY].** Found 2026-08-03 by the
   adversarial review of W25.modelsync-fu; **pre-existing mechanism**, filed rather than fixed because the
   right behaviour is an owner call. (a) Process Files: `retryOne` + the modal loop pass the run's
   `gateway`/`localAgent`, and `performOCRCall`'s precedence is localAgent → gateway → provider, so the
@@ -225,8 +227,12 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   branch *dearer* by seeding the session's selected model instead of the family's cheapest. (c) A
   gateway-only operator can't retry at all: both sheets load the provider-named Keychain account, never
   `"Gateway"`, and Retry is `.disabled(apiKey.isEmpty)`.
-  **Decide first:** should a retry reproduce the run's backend (drop the picker), stay a labelled escape
-  hatch to the direct API (must show the $0 → metered jump), or offer both? Full write-up:
+  ✅ **DECIDED (owner, 2026-08-13): a retry REPRODUCES the run's backend, and the provider/model picker is
+  DROPPED.** It was a false affordance — in gateway mode it announced a model it never called — so this removes
+  a lie rather than a feature, and the safe default is that a retry costs what the run cost. A labelled escape
+  hatch to the direct API, and offering both, were each OFFERED AND NOT TAKEN. Part **(c)** — a gateway-only
+  operator cannot retry at all, because both sheets load the provider-named Keychain account and never
+  `"Gateway"` — is a straight bug and ships with it. Full write-up:
   `ArchiveProcessor/KNOWN_ISSUES.md` → *W25.retry-backend*.
 - [ ] **W25.retry-estimate — the retry cost quotes omit rotation and image scale [XS–S · LOW].** Same review.
   Both retry estimates call `CostEstimator.estimate` without `rotationMode:`/`imageScale:` (defaulting `.off`
@@ -818,11 +824,13 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   those writes go through the same `persistPendingBatchMutation` and so fail on the same closed journal, so
   the exposure is probably limited to files materialized *after* the Stop. If that is right this is cosmetic
   (duplicate PDFs at fresh non-colliding paths, per the B7 rule) rather than a money bug, and may not be worth
-  building. **Owner-gated** on the standing precedent: it is a change to what the cancel path does with the
-  journal, and every one of those has been granted item by item. Do NOT fold into `W16.bat5-fu` (shipped) or
-  `W16.bat8` (different file, different trigger).
-  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | **NEEDS OWNER**
-- [ ] **W16.bat8 — ⛔ NEEDS THE OWNER. A stale in-memory interrupted-run manifest makes a paid batch
+  building. **Tier-2** (money path, scratch only) — **workable since 2026-08-13**, when the owner lifted the per-item
+  money gate: *"we don't need my permission for spending money. The daemon only spends tiny amounts and the
+  keys are capped."* The historical grants' ⛔ constraints still bind. It remains a change to what the cancel path does with the
+  journal, which was historically granted item by item — treat that as a reason for care, not a gate. Do NOT
+  fold into `W16.bat5-fu` (shipped) or `W16.bat8` (different file, different trigger).
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | Tier-2
+- [ ] **W16.bat8 — A stale in-memory interrupted-run manifest makes a paid batch
   journal its results into the WRONG file, so a relaunch re-fetches chunks already paid for [S · MED ·
   money].** Found by the `W16.bat7` adversarial pass (2026-08-03); **pre-existing**, and covered by no
   grant. `saveResultToPendingRun` (`+Pipeline.swift:724`) routes to the paid-batch journal only when
@@ -842,9 +850,11 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   **Smallest root cause: `dismissPendingRun()` clears the banner but not the state it describes.** A second
   candidate is making `saveResultToPendingRun` prefer a live paid batch over any run manifest — that is a
   change to which durable file a paid result lands in, which is why this is owner-gated rather than folded in.
-  ⛔ **HOLD QUEUE — money path.** Every change to what the paid-batch journal records has been granted item
-  by item (bat2-fu2, bat3, bat5, bat6, bat7); this changes it too. Do NOT auto-fix. Tier-2, scratch only.
-  | files: OCR/OCRProcessor+Pipeline.swift | S | med | **NEEDS OWNER**
+  **Tier-2, money path, scratch only — workable now.** Authorized by the owner 2026-08-04 with fix direction
+  **(a)** chosen (`OWNER_AUTHORIZATIONS.md`), and the money gate itself was lifted 2026-08-13. Every change to
+  what the paid-batch journal records was historically granted item by item (bat2-fu2, bat3, bat5, bat6, bat7);
+  those grants' ⛔ constraints still bind.
+  | files: OCR/OCRProcessor+Pipeline.swift | S | med | Tier-2
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
@@ -1517,8 +1527,13 @@ Owner went through the owner-only queue. Recorded here so none of it gets re-sur
   - **⚠️ Decide the projector semantics deliberately — this is the Tier-2 trap.** `NotesTagProjector` *manages*
     its token set: if the marker stays "managed" but merely "not desired", the next projection **strips
     `ArchiveSuite` from the owner's existing note files** (a real tag WRITE). Removing it from the managed set
-    instead leaves existing stamps in place, inert. Default = **leave existing stamps alone** (no corpus write);
-    only strip them if the owner explicitly asks. Whichever is chosen, prove it with a scratch-copy test.
+    instead leaves existing stamps in place, inert. ✅ **THE OWNER ASKED, 2026-08-13: STRIP.** He was put the
+    question directly (his grant said to ask once it became cheap) and chose the clean end state, so the
+    deliverable is that the marker keeps its managed status long enough to **REMOVE existing `ArchiveSuite`
+    stamps**, and then the surface goes. ⚠️ This is a real tag WRITE → Tier-2, scratch copies only, never a real
+    store, with a functional proof that a stripped note keeps every OTHER tag it had. The former default —
+    *leave existing stamps alone* — is **REVERSED**; do not implement it. Rationale and the amended grant:
+    `OWNER_AUTHORIZATIONS.md` §`R13d`.
   - Retire the now-unused marker surface: `packages/ArchiveCore/Sources/ArchiveCore/ArchiveSuiteMarker.swift`
     (check `Links/RootMarker.swift` — the root marker is a *separate* durable-link concern and must survive).
   - **SPEC** (`SPEC/tag-format.md:71`, the "Suite marker" row) — the tag/PDF contract is the **highest-risk shared

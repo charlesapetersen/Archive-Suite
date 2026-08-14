@@ -179,7 +179,21 @@ if [ -x "$ROOT/ops/autonomous/check-todo-stubs.sh" ]; then
 fi
 
 # ---------------------------------------------------------------------------------------------------
-head_ "5. eyeball what the daemon would pick up next"
+head_ "5. the repo's PROSE does not contradict its own policy"
+# The gap that let a policy change be inert in ten places while every other check stayed green: the others all
+# read checkbox and byte state, none reads prose. See check-policy-coherence.sh's header for the incident.
+if [ -x "$(dirname "${BASH_SOURCE[0]}")/check-policy-coherence.sh" ]; then
+  if out="$("$(dirname "${BASH_SOURCE[0]}")/check-policy-coherence.sh" 2>&1)"; then
+    printf '%s\n' "$out" | tail -1 | sed 's/^/  /'
+  else
+    fail "check-policy-coherence.sh reports the prose contradicting current policy:"
+    printf '%s\n' "$out" | sed -n '/──/,$p' | sed 's/^/     /'
+  fi
+else
+  warn "check-policy-coherence.sh not found or not executable"
+fi
+
+head_ "6. eyeball what the daemon would pick up next"
 # AGENTS.md's own closing instruction: confirm the first `ok` line is the item you INTEND to be next, and
 # that nothing you just finished still appears. Only a human can judge that, so this prints, never fails.
 if [ -x "$ROOT/ops/autonomous/next-queue-item.sh" ]; then

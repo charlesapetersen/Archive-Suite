@@ -562,10 +562,14 @@ bottleneck is fixing those, not finding more. **To re-enable:** flip `REVIEW_ENA
 re-install from the **primary checkout** (`git merge --ff-only origin/main` there first — `daemon.sh` installs
 from `$REPO`'s working tree, not `origin/main`) and restart it.
 
-**Needs-owner HOLD QUEUE (WS10, 2026-07-17).** The daemon **never auto-executes** irreversible / highest-
-blast-radius work: **Tier-3 releases** (DMG / `gh release` / version tags), **SPEC / `tag-format` changes**
-(the cross-app data contract), anything that **writes the real corpus**, and any **HIGH review finding on an
-irreversible path** (routed here by WS11). The resume prompt (STEP 2) skips the plan's `## HOLD QUEUE` /
+**Needs-owner HOLD QUEUE (WS10, 2026-07-17; NARROWED BY THE OWNER 2026-08-13).** The daemon **never
+auto-executes**: **Tier-3 releases** (DMG / `gh release` / version tags), anything that **writes the REAL
+corpus** (`~/Desktop/Google Drive/Archival Photos/`), and **work only the owner can perform or judge** (a key,
+an account, a device, subjective taste).
+⚠️ **REMOVED from this list on 2026-08-13 — do NOT put them back:** `SPEC` / `tag-format` changes, HIGH review
+findings on irreversible paths, and money. **TIER-2 IS THE GATE** for those now — see `AGENTS.md` §*Gating
+baseline*. This paragraph is the reference definition other docs cite as "WS10", so it being a superset of the
+real gate is how sessions came to park work the owner had released. The resume prompt (STEP 2) skips the plan's `## HOLD QUEUE` /
 `[hold]` / `needs: owner` items and surfaces them to Daemon Report + `STATUS.md`. A defense-in-depth backstop
 reinforces the soft rule: the daemon's `--disallowedTools` blocks the **direct** invocation of `hdiutil` and
 `gh release` (the two release steps) — catching a casual/accidental attempt. It's not a hard boundary (a child

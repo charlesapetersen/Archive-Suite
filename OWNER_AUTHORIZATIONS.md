@@ -34,7 +34,8 @@ owner-gated on the grounds that it touches one of the de-gated categories.
 ## How this file works
 
 - ~~**The hold-queue categories still stand in general.** This file is the ONLY place that narrows them, and it
-  does so **per item, never per category**. If an item is not listed here by tag, it is still hold-queue.
+  does so **per item, never per category**. If an item is not listed here by tag, it is still hold-queue.~~
+  <!-- policy-ok: continuation of the struck-through pre-2026-08-13 rule; the strikethrough opens two lines up -->
   A category is never authorized wholesale.~~ *(Superseded 2026-08-13 — see the banner above. An item not
   listed here is now governed by Tier-2, not by the hold queue.)*
 - **An entry is a licence plus its limits.** The ⛔ constraints inside a grant are part of the grant, not
@@ -93,7 +94,7 @@ its own date. Verbatim as recorded when granted.)*
   already load-bearing and proven end-to-end by `W15.tu1`'s shipped test (`2f5c3ae`), so this only writes down
   what the suite already relies on. Also land tu0's scratch premise test. Normal Tier-2 gate still applies.
 - **`R13d` — AUTHORIZED to remove the `ArchiveSuite` "Suite marker" row from `SPEC/tag-format.md`, WITH A HARD
-  CONSTRAINT: do NOT strip existing stamps.** The owner chose the no-strip variant deliberately.
+  CONSTRAINT: do NOT strip existing stamps.** The owner chose the no-strip variant deliberately. <!-- policy-ok: the ORIGINAL 2026-07-16 wording, kept as the record; REVERSED 2026-08-13 in the ✅ bullet above -->
   - ✅ **CONSTRAINT REVERSED BY THE OWNER, 2026-08-13 — STRIPPING IS NOW AUTHORIZED.** Asked directly (the
     2026-08-01 note below says to ask, and that this question had become cheap), he chose the clean end state:
     `R13d` now **also removes `ArchiveSuite` stamps already written**, so the marker is gone everywhere and no

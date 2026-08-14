@@ -216,7 +216,7 @@ Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, 
 ## API Keys & LLM Calls
 - **LLM/API calls are allowed and expected** — this app is built around them, and running them is a normal part of development and verification. The constraint is **cost, not permission**: keep spending low and get a key first.
 - **Do not store API keys in code or config files** — Keychain, or user-provided at runtime, only.
-- Before any **paid** run: (1) write a short test plan, (2) estimate the cost, (3) request the appropriate API key from the user. Once you have the key, proceed with the run.
+- Before any **paid** run: (1) write a short test plan, (2) estimate the cost **and state it**, (3) use an already-provisioned key (`$OCR_KEY` / Keychain). **No permission step** — money was de-gated 2026-08-13 (`../AGENTS.md` §*Gating baseline*); ask the owner ONLY if no key exists for that provider at all.
 - Keep costs low: prefer the cheapest capable model for tests (e.g., `gemini-2.5-flash-lite`, `claude-sonnet-4-6`) and the smallest input set that proves the behavior.
 
 ---
