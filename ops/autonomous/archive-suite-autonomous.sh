@@ -548,7 +548,7 @@ doc_pregate() {
   [ "$DOC_PREGATE" = 1 ] || return 0
   [ -x "$BUDGET_CMD" ] || { log "doc pre-gate: no budget script at $BUDGET_CMD — skipping (fail-open)."; return 0; }
 
-  local out over near tstate n over_files near_files
+  local out over tstate n over_files near_files
   out="$("$BUDGET_CMD" "$REPO" 2>&1)"
   over_files="$(_budget_files "$out" OVER)"; over_files="${over_files% }"
   near_files="$(_budget_files "$out" NEAR)"; near_files="${near_files% }"
@@ -562,7 +562,7 @@ doc_pregate() {
   #
   # THE SPLIT MATTERS — and getting it wrong was a regression caught in review the same hour. Two different
   # questions are being asked of the same data, and only ONE of them was de-gated:
-  #   * `$over`/`$near`  → do we DISPATCH (a session, or a pending fix request)? TOTAL-only now.
+  #   * `$over`          → do we DISPATCH (a session, or a pending fix request)? TOTAL-only now.
   #   * `$over_files`    → which documents are actually over? Still needed by the MECHANICAL remedy at 3a,
   #                        because when the TOTAL is over, the plan is usually why (it plus SUITE_TODO are ~72%
   #                        of the total) and the compactor fixes it in-cycle for free. A first version blanked
@@ -572,12 +572,13 @@ doc_pregate() {
   if [ -n "$over_files" ] || [ -n "$near_files" ]; then
     log "doc pre-gate: per-file advisory — over=[${over_files:-none}] near=[${near_files:-none}]; per-file caps do not gate work (owner, 2026-08-13)."
   fi
-  # Dispatch inputs: the TOTAL alone decides. The mechanical remedy still reads $over_files.
-  over=""; near=""
+  # Dispatch input: the TOTAL alone decides. The mechanical remedy still reads $over_files. There is no `near`
+  # dispatch variable any more — NEAR is measured, logged, and otherwise ignored (see the retired case 2).
+  over=""
   [ "$tstate" = "OVER" ] && over="$over_files"
 
   # 1. Everything comfortably within budget — clear any stale request so a satisfied one can't loop.
-  if [ -z "$over" ] && [ -z "$near" ] && [ "$tstate" != "OVER" ]; then
+  if [ -z "$over" ] && [ "$tstate" != "OVER" ]; then
     if [ -f "$DOCFIX" ] || [ -f "$DOCFIX_TRIES" ]; then
       log "doc pre-gate: every guarded document is within budget — clearing the pending fix request."
       rm -f "$DOCFIX" "$DOCFIX_TRIES" "$DOCFIX_HEAD"
@@ -585,16 +586,12 @@ doc_pregate() {
     return 0
   fi
 
-  # 2. Nothing OVER, but something is NEAR its limit -> trim it PRE-EMPTIVELY, so OVER is never reached.
-  #    Rate-limited by the presence of a pending request: without that this would re-ask every cycle for a
-  #    file that is legitimately allowed to sit at 93% while a session gets to it.
-  if [ -z "$over" ] && [ "$tstate" != "OVER" ]; then
-    rm -f "$DOCFIX_TRIES" "$DOCFIX_HEAD"
-    [ -f "$DOCFIX" ] && return 0
-    _docfix_write ADVISORY "$near" "$out"
-    log "doc pre-gate: NEAR budget ($near) — queued a PRE-EMPTIVE trim; nothing is over, so the gate still runs."
-    return 0
-  fi
+  # 2. RETIRED 2026-08-13. This queued a PRE-EMPTIVE trim whenever a file was merely NEAR its cap, which is the
+  #    mechanism the owner objected to: three documents sit permanently at 92-99%, so it asked every cycle
+  #    forever. Deleted rather than left in place, because with `near` now unconditionally empty it was DEAD CODE
+  #    that still read as live — and `_docfix_write ADVISORY "$near"` would have written an empty file list. The
+  #    NEAR state is still measured and still LOGGED as advisory above; it just does not dispatch.
+  #    ⛔ Do not re-add a NEAR dispatch. If the orientation TOTAL is the problem, case 3 handles it.
 
   # 3. Something IS over.
   # ⚠️ Word this CAREFULLY. The gate's park note says "NOTHING IS WRONG WITH THE CODE: every build and test
@@ -606,20 +603,26 @@ doc_pregate() {
   # which document is over, and that the document guard is not a build or a test.
   log "doc pre-gate: OVER budget (${over:-per-session orientation total}) — this is the document-SIZE guard, not a build or a test. Repairing before the gate runs."
 
-  # 3a. The mechanical remedy, where it applies. This is the one document a script can fix.
-  case " $over_files " in
-    *" .maintenance/AUTONOMOUS_PLAN.md "*)
-      if [ -x "$COMPACTOR" ]; then
-        log "doc pre-gate: AUTONOMOUS_PLAN.md is over — running the compactor (mechanical, in-cycle, no session)."
-        "$COMPACTOR" "$REPO" >>"$LOG" 2>&1 || log "doc pre-gate: compactor rc=$? — detail just above in this log."
-        out="$("$BUDGET_CMD" "$REPO" 2>&1)"
-        over_files="$(_budget_files "$out" OVER)"; over_files="${over_files% }"
-        tstate="$(_budget_total "$out")"
-        over=""; [ "$tstate" = "OVER" ] && over="$over_files"
-      else
-        log "doc pre-gate: AUTONOMOUS_PLAN.md is over but no compactor at $COMPACTOR — falling through to a session."
-      fi ;;
-  esac
+  # 3a. The mechanical remedy. The plan is the one document a script can fix, so TRY IT BEFORE SPENDING A
+  #     SESSION. ⚠️ Condition widened 2026-08-13: it used to require the plan be over its OWN per-file cap. Now
+  #     that per-file caps are advisory and the TOTAL is the gate, that was the wrong test — `ORIENT_TOTAL`
+  #     (500,000) is deliberately TIGHTER than the sum of the per-file caps (518,000), so the total can be over
+  #     while every individual file is inside its cap, leaving `$over_files` empty. That is now the EXPECTED
+  #     shape of a total overage, and the old test would have skipped the free in-cycle compactor and handed a
+  #     whole session work a script does for nothing. Run the compactor whenever the total is over and the plan
+  #     is present; it is a no-op when there is nothing to archive (proved: prove-compact.sh's three-way no-op).
+  if [ "$tstate" = "OVER" ] && [ -f "$REPO/.maintenance/AUTONOMOUS_PLAN.md" ]; then
+    if [ -x "$COMPACTOR" ]; then
+      log "doc pre-gate: orientation total over — running the plan compactor first (mechanical, in-cycle, no session)."
+      "$COMPACTOR" "$REPO" >>"$LOG" 2>&1 || log "doc pre-gate: compactor rc=$? — detail just above in this log."
+      out="$("$BUDGET_CMD" "$REPO" 2>&1)"
+      over_files="$(_budget_files "$out" OVER)"; over_files="${over_files% }"
+      tstate="$(_budget_total "$out")"
+      over=""; [ "$tstate" = "OVER" ] && over="$over_files"
+    else
+      log "doc pre-gate: the orientation total is over but no compactor at $COMPACTOR — falling through to a session."
+    fi
+  fi
   if [ -z "$over" ] && [ "$tstate" != "OVER" ]; then
     log "doc pre-gate: back within budget after compaction — the daemon fixed it itself, no session needed."
     rm -f "$DOCFIX" "$DOCFIX_TRIES" "$DOCFIX_HEAD"
