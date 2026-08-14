@@ -24,8 +24,10 @@ STEP 1 — RECOVER STATE (always, first):
   **GUI is unattended now — there is no `gui-mode` flag.** GUI work runs OFF the owner's screen in the headless
   Tart VM (XCUITest + pixel capture; STEP 3.5), and Live-Capture E2E runs on the Android emulator with
   `-no-window` — neither needs the owner or the physical display. **Nothing you run may draw on that display**;
-  a PreToolUse hook enforces it (STEP 3.5). The only things the daemon must NOT auto-do are the hold-queue (owner-gated:
-  releases / SPEC / real-corpus / HIGH-risk findings) and `(blocked-on:)`-dependent items — both below.
+  a PreToolUse hook enforces it (STEP 3.5). The only things the daemon must NOT auto-do are the hold-queue
+  (owner-gated: **Tier-3 releases**, a **write to the REAL corpus**, and work only the owner can perform or
+  judge) and `(blocked-on:)`-dependent items — both below. ⚠️ **SPEC changes and HIGH findings on irreversible
+  paths are NO LONGER hold-queue** (owner, 2026-08-13 — TIER-2 IS THE GATE; see `AGENTS.md` §*Gating baseline*).
   If the plan's "RUN STATUS:" line reads COMPLETE, there is nothing to do — stop immediately.
 
 STEP 1.5 — DOC BUDGET FIX (only when the daemon has asked for one — it PREEMPTS the work queue):
@@ -74,8 +76,11 @@ STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `o
       - READ-ONLY: a review FILES findings, it does NOT fix them. For each CONFIRMED (refute-verified) finding,
         append a `[ ]` fix item to SUITE_TODO.md / KNOWN_ISSUES.md (the `W3.f1…` pattern) — these tracked edits
         are your STEP-4 commit+push. A HIGH finding on an irreversible path (Capture/Net/finalize,
-        TagWriter/file-safety, the tag/PDF SPEC) → the **needs-owner HOLD queue** (WS10), flagged, NOT
-        auto-fixed. No code fixes in a review session.
+        TagWriter/file-safety, the tag/PDF SPEC) is filed as an ORDINARY `[ ]` work item — **do NOT route it to
+        the HOLD queue** (owner, 2026-08-13: TIER-2 IS THE GATE, `AGENTS.md` §*Gating baseline*; that routing is
+        what left five items parked for weeks). Only a real-corpus write, a Tier-3 release, or something only
+        the owner can do still goes to HOLD. Note it is Tier-2 in the item so whoever fixes it knows.
+        Still true either way: no code fixes in a review session.
       - The report file + the cadence stamp are gitignored state in the PRIMARY checkout — write them by
         ABSOLUTE path (like the plan), NOT in your worktree: report → `<REPO>/.maintenance/review/<unit>.md`;
         then in STEP 5 run `ops/autonomous/next-review-unit.sh --record "<unit>"` so the cadence advances.
@@ -99,10 +104,17 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   autonomously actionable — STOP (the idle backoff/park handles it). (Authoring note: a prerequisite `<tag>` is
   the prereq item's leading tag — the first token after its checkbox, e.g. `W15.a`; keep it distinctive.)
   NEVER auto-pick a HOLD-QUEUE item (WS10). The plan's "## HOLD QUEUE (owner-gated)" section — and any item
-  tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute: **Tier-3 releases**
-  (DMG/`gh release`/version tags), **SPEC / `tag-format` changes** (the cross-app data contract), anything
-  that **writes the real corpus**, and any **HIGH review finding on an irreversible path** (Capture/Net/
-  finalize, TagWriter/file-safety) routed here by STEP 2.0. **ONE EXCEPTION MECHANISM:** the COMMITTED file
+  tagged `[hold]` / `needs: owner` — is work the unattended daemon must NOT execute. As of **2026-08-13** that
+  is a MUCH shorter list than this prompt used to give: **Tier-3 releases** (DMG/`gh release`/version tags),
+  anything that **writes the REAL corpus** (`~/Desktop/Google Drive/Archival Photos/`), and **work only the
+  owner can perform or judge** (a key, an account, a device, subjective taste).
+  ⚠️ **REMOVED from that list by the owner on 2026-08-13 — do NOT put them back:** `SPEC`/`tag-format` changes,
+  and HIGH findings on irreversible paths (Capture/·Net/·finalize, TagWriter/file-safety), and money. **TIER-2
+  IS THE GATE** for all of those now — adversarial review plus a functional test on scratch copies. His words:
+  *"I'm not sure why I need to authorize these kinds of things"*; on money, *"the daemon only spends tiny
+  amounts and the keys are capped"*; on the SPEC, *"nothing real has been created by these apps yet."* Full
+  policy: `AGENTS.md` §*Gating baseline*. Cost discipline is NOT lifted — cheapest capable model, smallest
+  input set, say what a big run costs. **ALSO STILL TRUE:** the COMMITTED file
   `OWNER_AUTHORIZATIONS.md` at the repo root lists specific items, BY TAG, that the owner has explicitly
   cleared. (Moved there from the plan on 2026-08-01 — the plan's "## OWNER AUTHORIZATIONS" heading is now only
   a pointer stub. READ THE FILE; do not rely on any list of tags quoted elsewhere, including here. This
@@ -112,8 +124,10 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   (R13d, for one, carries a do-NOT-strip constraint). If you cannot satisfy a constraint, STOP and surface it
   rather than proceeding on a narrower reading. **A grant is a licence, not a queue entry:** the item must
   ALSO be in the plan's WORK QUEUE region to be actionable — an item sitting in "## HOLD QUEUE" is not
-  pickable no matter what the authorizations file says. Nothing else narrows the categories: a category is
-  never authorized wholesale, only item by item. Skip everything else: surface each
+  pickable no matter what the authorizations file says. ⚠️ Since 2026-08-13 that file is a **RECORD, not a
+  gate**: an item's ABSENCE from it no longer means anything, so never park work because it is unlisted. Its
+  grants still BIND the items they name, because their ⛔ constraints are usually design decisions rather than
+  safety formalities. Skip everything else: surface each
   to Daemon Report + `STATUS.md` and move on. If the ONLY remaining actionable "[ ]" items are hold-queue,
   there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
   backstop also blocks the most dangerous outward actions — `hdiutil`, `gh release` — at the tool layer, so a
