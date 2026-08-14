@@ -575,7 +575,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   each shown only when the search index cannot be opened or was not fully written. **Neither has ever been
   drawn by anything.** This is NOT a skipped VM run: no fixture produces a corrupt index, so there is no path
   to the state to drive. The state machine behind them is covered by 23 headless tests; only the drawing is
-  unproven. **Do:** teach the GUI fixture builders (`ops/gui/…make-gui-fixture.sh` and the Notes equivalent)
+  unproven. **Do:** teach the GUI fixture builders (`ArchiveReader/scripts/make-gui-fixture.sh` and `ArchiveNotes/scripts/make-notes-fixture.sh` — they live under each app's `scripts/`, NOT under `ops/gui/`, which the first draft of this line implied)
   an opt-in mode that overwrites the scratch fixture's `content-index-v2.sqlite3` / `notes-index-v1.sqlite3`
   with a kilobyte of junk, then add a UITest per app asserting the warning appears — **and, more importantly,
   that the next attempt recovers on its own once the bad file is replaced**, which is the actual point of the
@@ -585,16 +585,22 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   | files: ops/gui/*, ArchiveReader UITests, ArchiveNotes UITests | Tier-1 | S
 
 - [ ] **W23.m4-fu — a page-specific reveal opens a NEW window per page instead of navigating an open one
-  [S · LOW · UX].** Residual of W23.m4, filed 2026-07-31 from the Daemon Report. Since m4, the cited page is
+  [S · LOW · UX] — ⛔ DO NOT IMPLEMENT UNPROMPTED: the owner chose to KEEP the current behaviour.**
+  ⚠️ **This item is filed as the REVERSAL of a decision, not as work.** It is contingent on a judgement only the
+  owner can make — *"implement it only if window sprawl becomes a real annoyance"* <!-- policy-ok: this IS the gated item, parked in the plan's HOLD QUEUE as owner judgement --> — so a session must NOT pick
+  it up on its own. It sat in the actionable WORK QUEUE until 2026-08-13, when a walk of the first five queue
+  items caught that `next-queue-item.sh` was offering it as `ok`: the metadata tail carried no owner marker, so
+  the daemon would have implemented a change the owner had explicitly declined. Parked in the plan's HOLD QUEUE
+  as owner-judgement (gating category 2). Residual of W23.m4, filed 2026-07-31 from the Daemon Report. Since m4, the cited page is
   part of the document window's `openWindow(id:value:)` value, so SwiftUI value identity gives two links to
   *different* pages of the same document two windows (same page → one). **Owner reviewed and chose to keep
   the current behaviour** — one view per citation is what you want when comparing two passages — so this is
-  filed as the reversal, not as a bug: implement it only if window sprawl becomes a real annoyance when
+  filed as the reversal, not as a bug: implement it only if window sprawl becomes a real annoyance when <!-- policy-ok: gated, see the ⛔ header of this item -->
   clicking through a note that cites many pages of one document. **Do (if picked up):** look up an already-open
   window for that document in a window registry and navigate it to the cited page rather than opening a
   second one; keep an explicit "open in new window" affordance so the compare-two-passages workflow survives.
   Needs the registry, so it is its own item and not a tweak.
-  | files: ArchiveReader/macOS/Sources/ArchiveReader/ (document window open path) | Tier-1 | S | LOW
+  | files: ArchiveReader/macOS/Sources/ArchiveReader/ (document window open path) | Tier-1 | S | **owner judgement**
 
 - [ ] **W23.l4-fu — no UITest drives the Notes metadata strip, so the date warning row is unverified
   pixels [XS–S].** Owner decision, 2026-07-31 Daemon Report: close this with a **test**, not a recurring

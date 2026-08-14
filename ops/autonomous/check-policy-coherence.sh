@@ -118,6 +118,14 @@ rule "no-stale-decide-first" \
   'Decide first:' \
   'an item still asking the owner to decide something he has decided'
 
+# Added 2026-08-13 after the THIRD instance of one shape: an item whose spec records a decision NOT to do the
+# work, sitting in the actionable queue with no owner marker (R13d's no-strip default, W25.retry-backend's
+# "Decide first", and W23.m4-fu — caught only by walking the first five items the resolver would offer). The
+# daemon reads the one-liner, follows the pointer, and implements something the owner declined.
+rule "no-declined-work-offered" \
+  'chose to keep the current behaviour|implement it only if|filed as the reversal' \
+  'an item recording a decision AGAINST the work must be owner-gated, not offered as actionable'
+
 printf '\n\033[1m── gates that MUST survive (the inverse risk: too permissive) ──\033[0m\n'
 must_exist() {
   local id="$1" pat="$2" n
