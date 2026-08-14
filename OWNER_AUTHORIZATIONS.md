@@ -23,8 +23,10 @@ permission for spending money. The daemon only spends tiny amounts and the keys 
 
 **What this file is still for.** Two things, both durable:
 1. **The existing grants below remain binding on the items they name.** A grant's ⛔ constraints were often a
-   deliberate *design* choice, not a safety formality — `R13d`'s no-strip rule is the clearest case — and
-   those choices survive the gate being lifted. Read the entry for an item you are about to work.
+   deliberate *design* choice, not a safety formality, and those choices survive the gate being lifted.
+   (The example first written here was `R13d`'s no-strip rule — a bad choice, since the owner REVERSED exactly
+   that rule the same day. A live example: `W17.stg1`'s "no per-source content hash, and a corrupt manifest is
+   RENAMED never auto-deleted".) Read the entry for an item you are about to work.
 2. **A record of decisions with their reasoning**, marked discharged when the item ships rather than deleted,
    because the constraint history is why a later change is or isn't allowed to revisit that code.
 
@@ -36,7 +38,7 @@ owner-gated on the grounds that it touches one of the de-gated categories.
 - ~~**The hold-queue categories still stand in general.** This file is the ONLY place that narrows them, and it
   does so **per item, never per category**. If an item is not listed here by tag, it is still hold-queue.~~
   <!-- policy-ok: continuation of the struck-through pre-2026-08-13 rule; the strikethrough opens two lines up -->
-  A category is never authorized wholesale.~~ *(Superseded 2026-08-13 — see the banner above. An item not
+  ~~A category is never authorized wholesale.~~ *(Superseded 2026-08-13 — see the banner above. An item not
   listed here is now governed by Tier-2, not by the hold queue.)*
 - **An entry is a licence plus its limits.** The ⛔ constraints inside a grant are part of the grant, not
   advice. Read the entry before starting the item and obey it verbatim. If you cannot satisfy a constraint,
@@ -112,15 +114,21 @@ its own date. Verbatim as recorded when granted.)*
     requirement. **Do NOT unilaterally start stripping**: it was an explicit, deliberate owner choice, and a
     later general directive about compatibility is not the same as him reversing a specific decision. If a
     clean design wants stripping, ASK — that question is now cheap to answer, where before it was not.
-    Everything else in this grant stands as written.
-  - Remove the marker from `NotesTagProjector`'s **managed set**, so stamps already written to the owner's real
-    note `.md` files are left **INERT** — present, unmanaged, never touched again.
-  - **NEVER** add the marker to any strip/cleanup list, and never run a projection whose effect is to delete
+    **↑ THAT QUESTION WAS ASKED AND ANSWERED ON 2026-08-13: STRIP.** The three bullets below are the pre-reversal
+    instructions, kept as the record and **struck through so nobody implements them.** <!-- policy-ok: quoted to retire -->
+  - ~~Remove the marker from `NotesTagProjector`'s **managed set**, so stamps already written to the owner's real
+    note `.md` files are left **INERT** — present, unmanaged, never touched again.~~ <!-- policy-ok: reversed 2026-08-13 -->
+  - ~~**NEVER** add the marker to any strip/cleanup list, and never run a projection whose effect is to delete
     `ArchiveSuite` from existing files. Stripping is a real tag WRITE across the owner's notes and is NOT
-    authorized. If you believe stripping is required for correctness, STOP and flag to Daemon Report instead.
-  - Required functional proof (Tier-2, scratch copies only, never the real store): project over a note that
-    ALREADY carries `ArchiveSuite` and assert the tag is still present and byte-identical afterwards, and that
-    no other managed subject was lost. A test that only proves "new notes get no marker" is INSUFFICIENT.
+    authorized.~~ <!-- policy-ok: reversed 2026-08-13 --> ⚠️ **REVERSED — stripping IS authorized.** The
+    "STOP and flag to Daemon Report" instruction that followed is therefore also void; do not park the item on it.
+  - ~~Required functional proof: project over a note that ALREADY carries `ArchiveSuite` and assert the tag is
+    still present and byte-identical afterwards.~~ <!-- policy-ok: reversed 2026-08-13 --> ⚠️ **THIS TEST NOW
+    ASSERTS THE WRONG OUTCOME** and was the sharpest hazard in this grant: obeying it verbatim would have made a
+    session either implement the reversed behaviour or park the item. **The required proof is now the opposite:**
+    project over a note that ALREADY carries `ArchiveSuite` and assert the marker is **GONE** afterwards **and
+    that every OTHER tag on that note survives** — Tier-2, scratch copies only, never the real store. A test
+    that only proves "new notes get no marker" is still INSUFFICIENT.
 - **`W3.cap-r1` — AUTHORIZED (granted 2026-07-29).** The tag/PDF-SPEC Capture fix at
   `LiveCaptureProcessor.swift:640/647/673`. Authorized because it is the highest-value Capture finding: today all
   three sites are `_ = try? MacOSTagger.applyTags(...)`, so a PDF can land byte-perfect, count as **filed**, have

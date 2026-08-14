@@ -34,7 +34,9 @@ ROOT="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" 2>/dev/null && pwd)"
 [ -d "$ROOT" ] || { echo "check-handoff: cannot resolve the primary checkout" >&2; exit 2; }
 PLAN="${AUTONOMOUS_PLAN:-$ROOT/.maintenance/AUTONOMOUS_PLAN.md}"
 TODO="$ROOT/SUITE_TODO.md"
-DONE_FILE="$ROOT/SUITE_TODO_DONE.md"
+# NB: SUITE_TODO_DONE.md is deliberately NOT read here, unlike in check-tracker-sync.sh. Step 3 asks only
+# "is every OPEN item visible in the plan", and a shipped item is not open — so the archive cannot answer it.
+# (check-tracker-sync.sh must read the archive for a different question: whether the two files AGREE on state.)
 
 fails=0; warns=0
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
@@ -55,14 +57,30 @@ dirty_wt=0
 while IFS= read -r wt; do
   [ -n "$wt" ] || continue
   [ "$wt" = "$ROOT" ] && continue
-  if [ -n "$(git -C "$wt" status --porcelain 2>/dev/null)" ]; then
+  # A FAILED `status` also yields empty stdout, so ask about the exit code before reading the output —
+  # a moved/deleted worktree dir, a locked index or a stale gitdir must not read as "clean".
+  if ! st="$(git -C "$wt" status --porcelain 2>/dev/null)"; then
+    fail "cannot read status of $wt (moved, deleted without prune, locked, or permissions) — judge by hand"
+    dirty_wt=1
+  elif [ -n "$st" ]; then
     fail "worktree has UNCOMMITTED work: $wt"
     git -C "$wt" status --porcelain 2>/dev/null | sed 's/^/       /'
     dirty_wt=1
   else
-    unpushed="$(git -C "$wt" log --oneline @{u}..HEAD 2>/dev/null | wc -l | tr -d ' ')"
-    if [ "${unpushed:-0}" != "0" ] 2>/dev/null; then
-      fail "worktree has $unpushed UNPUSHED commit(s): $wt"
+    # ⚠️ NEVER use `@{u}..HEAD` here. A worktree branch created with `git worktree add -b` has NO upstream,
+    # `git log @{u}..HEAD` then FATALS to suppressed stderr, `wc -l` counts an empty stream as 0, and the
+    # worktree was reported "clean" however many unpushed commits it held — a false CLEAN on precisely the
+    # 2026-07-29 loss this step exists to prevent. Reproduced 2026-08-13 with a one-commit probe worktree.
+    # This repo integrates on ONE branch, so compare against `origin/main` and never mind the upstream.
+    base="$(git -C "$wt" rev-parse --verify -q origin/main 2>/dev/null)"
+    if [ -z "$base" ]; then
+      fail "cannot resolve origin/main from $wt — unable to judge whether its commits are pushed"
+      dirty_wt=1
+    elif ! unpushed="$(git -C "$wt" rev-list --count "$base"..HEAD 2>/dev/null)" || [ -z "$unpushed" ]; then
+      fail "cannot count commits in $wt (detached HEAD, or a broken gitdir) — judge it by hand"
+      dirty_wt=1
+    elif [ "$unpushed" -gt 0 ]; then
+      fail "worktree has $unpushed commit(s) NOT on origin/main: $wt"
       dirty_wt=1
     else
       warn "stray worktree, clean (fine — housekeeping will GC it once merged): $wt"

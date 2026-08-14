@@ -125,6 +125,12 @@ must_exist() {
   if [ "${n:-0}" -ge "${3:-1}" ]; then printf '  %s %s (%s file(s))\n' "$(green '✓')" "$id" "$n"
   else printf '  %s %s — expected >=%s file(s), found %s\n' "$(red '✗')" "$id" "${3:-1}" "$n"; fails=$((fails+1)); fi
 }
+# ⚠️ Added 2026-08-13 after the worst error of that day: a byte-budget trim DELETED the whole §Gating baseline
+# section from AGENTS.md, leaving four dangling pointers to it and the policy stated nowhere — and THIS CHECKER
+# passed, because it only looked for FORBIDDEN phrases. A ratchet that asserts what must be ABSENT and never what
+# must be PRESENT cannot notice the authority disappearing. Assert the policy exists before asserting its edges.
+must_exist "policy-section-exists" '^## Gating baseline — TIER-2 IS THE GATE' 1
+must_exist "three-owner-gates-named" 'Still owner-gated — these three' 1
 must_exist "real-corpus-still-gated" 'REAL corpus|real corpus' 5
 must_exist "tier3-release-still-gated" 'Tier-3 release|gh release' 2
 must_exist "tier2-still-mandatory" 'Tier-2' 8

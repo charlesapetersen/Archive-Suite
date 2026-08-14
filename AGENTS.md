@@ -105,11 +105,9 @@ Re-derive against current `main` — do not merge it. Everything else in it is p
 run-config work was re-implemented as `W16.cfg1`–`cfg5`), but "probably" is why it was kept.
 
 **7. Run the gate, don't re-read the list — `ops/autonomous/check-handoff.sh`.**
-Items 1–6 are a prose checklist, and a prose checklist is not a gate. One command now checks all of it,
-read-only, in a couple of seconds: uncommitted/unpushed work in any worktree, primary-vs-`origin/main`, a
-dirty primary tree, **every open `SUITE_TODO` item being visible in the plan**, both tracker guards, and it
-prints what the daemon would pick up next for you to eyeball. **A clean run is the definition of "handed
-off".** It is not yet a `health-gate.sh` step — that is `W31.handoff-gate`.
+Items 1–6 are a prose checklist, and a checklist is not a gate. One read-only command checks all of it and
+prints what the daemon would take next. **A clean run is the definition of "handed off".** Not yet a
+`health-gate.sh` step — that is `W31.handoff-gate`.
 
 **⚠️ The mirroring failure is NOT an external-agent problem.** On 2026-08-13, 27 open `SUITE_TODO` items had
 no checkbox line anywhere in the plan — invisible to `next-queue-item.sh`. Attribution (`git log -S<tag> --
@@ -123,6 +121,49 @@ left `W19.q2` as **107 lines of green, passing, uncommitted work with zero commi
 tolerable and the owner has said so; an **uncommitted** one is one power cut from lost work, and it collided
 with the daemon, which would have picked the same item off the queue and redone it. Checkpoint-commit at every
 green point — that is the whole lesson.
+
+## Gating baseline — TIER-2 IS THE GATE (owner, 2026-08-13)
+
+**Default: if Tier-2 is satisfied, the daemon may execute it. No owner signature.** Tier-2 itself is unchanged
+and still mandatory — adversarial self-review + a functional test, scratch copies, never the real corpus (root
+[`CLAUDE.md`](CLAUDE.md) → *How we work* step 3). What changed is that Tier-2 is now the WHOLE gate for the
+irreversible-code categories, not Tier-2 *plus* a named entry in `OWNER_AUTHORIZATIONS.md`.
+
+**Still owner-gated — these three, and nothing else:**
+1. ⛔ **A write to the REAL corpus** — `~/Desktop/Google Drive/Archival Photos/` (~102k PDFs, irreplaceable,
+   predates the apps). Reader's Core Directive and scratch-copy-only testing stand exactly as before.
+2. ⛔ **Work only the owner can perform or judge** — a key, an account, a device, a console paste, taste.
+3. ⛔ **Tier-3 releases** — a DMG, `gh release`, or a version tag. **Never part of the 2026-08-13 narrowing**;
+   it is the one category that reaches outside this machine, and `--disallowedTools` blocks `hdiutil` and
+   `gh release` at the tool layer as defence in depth.
+
+**NO LONGER a gate — do NOT re-impose it from an older doc:** `Capture/`·`Net/`, finalize/manifest,
+file-writing tag/output, **money**, and `SPEC/tag-format.md`. The per-item rule was written 2026-07-07 on the
+premise that these paths write irreplaceable data; the 2026-08-01 STANDING PREMISE voided it (no app here has
+produced data the owner keeps, and the corpus these paths do not write is the only irreplaceable thing), and
+the signature bought nothing Tier-2 did not — which is why five items sat parked for weeks. His words: on
+money, *"the daemon only spends tiny amounts and the keys are capped"*; on the SPEC, *"nothing real has been
+created by these apps yet."* **Cost discipline is NOT lifted:** cheapest capable model, smallest input set,
+state the cost of a big run. No permission, no blank cheque.
+
+**A POLICY change is itself Tier-2, and its blast radius is PROSE.** On 2026-08-13 the change was made in four
+files and the old rule was restated in **ten more** — including the plan's general decision rule,
+`ops/autonomous/README.md`'s reference definition of WS10, and an item spec that still instructed the opposite
+of what the owner had just decided. All ten passed every existing check, because those read checkbox and byte
+state and **none reads prose**. So after changing policy, sweep for RESTATEMENTS, not just the defining file —
+especially `.maintenance/AUTONOMOUS_PLAN.md` and `ops/autonomous/resume-prompt.txt`, which no commit hook can
+see — then run **`ops/autonomous/check-policy-coherence.sh`** and add a rule for what you changed.
+⚠️ **This very section was DELETED by accident on 2026-08-13** while trimming this file under its byte budget,
+leaving four dangling pointers to it and no policy anywhere; the coherence checker passed, because it looked
+only for forbidden phrases and not for the policy's PRESENCE. It now asserts this heading exists. When you trim
+a doc, diff what left — a byte count falling is not evidence of compression.
+
+**A genuine behaviour question is still a question.** Where an item says "decide X versus Y" and there is no
+correct answer, bring it to the owner as a *question* at Daemon Report — file it and move on; do not park the
+item as owner-gated.
+
+**The structural mechanism is unchanged:** what physically keeps the daemon off an item is its absence from the
+plan's `## WORK QUEUE` (`ops/autonomous/next-queue-item.sh` walks only that).
 
 ## Ownership lanes (safe to run in parallel)
 

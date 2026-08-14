@@ -5515,7 +5515,7 @@ explain why not.
   zero-padded `P07`.** Tightening it looks like conformance but inverts the consequence: a token this parser
   REJECTS is no longer consumed as a facet, so it lands in `.subjects` and becomes a Subjects **vocabulary
   suggestion** — the exact class of leak `TagVocabulary`'s facet filter exists to stop. Lenient read, strict
-  write. Verified: ArchiveCore 222 XCTest + 105 swift-testing green (10 new tests), all three apps build, Reader
+  write. Verified: ArchiveCore 222 XCTest + 105 swift-testing green (**14** new test funcs — the "10" first recorded here and in `a8c1453` was an undercount), all three apps build, Reader
   + Notes unit bundles pass, `lint-write-surface.sh` clean, and the Processor `finder-tags` + `tag-vocabulary`
   gates pass — the latter now seeds a `Q2` so the app-level harvest proves a rating never becomes a subject.
   | Tier-2 shared-Core | M

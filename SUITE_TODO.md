@@ -644,14 +644,14 @@ W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
   the current GPT-5 generation (gpt-5-nano/-mini/5.4-mini/5.4/5.5) priced per the owner-provided SoCOCRbench
   source; the live-key smoke remains the final ID confirmation, but nothing is blocked on it: the provider is
   additive + opt-in.)_
-- [ ] **W13.cli Phase 0 — install `gemini` + `codex` CLIs and confirm entitlements (owner).** Was buried in this
+- [ ] **W13.cli Phase 0 — install `gemini` + `codex` CLIs and confirm entitlements (owner).** Was buried in a
+  prose note with no checkbox, so nothing ever tracked it (owner asked for it to be a real item, 2026-07-16).
   ⏸ **PARKED by the owner 2026-08-13** — *"Park the gemini and codex CLI for now."* Neither CLI is installed on
   the machine (`command -v gemini` / `codex` → nothing; `claude` is at `~/.local/bin/claude`). **Nothing is
   blocked by this**: the fake-CLI harness already covers the whole Local Agent code path at $0, `claude` is
   Phase-0-validated, and the only thing waiting is the final "shipped" stamp on `W13.cli-1…4` plus the
   `gemini`/`codex` invocation details, which stay `VERIFY` placeholders. Do NOT install them, do not chase the
   entitlement spike, and do not re-raise this — un-park it only if the owner asks.
-  prose note with no checkbox, so nothing ever tracked it (owner asked for it to be a real item, 2026-07-16).
   Install both CLIs, sign in with the enterprise/Edu accounts, and confirm each is entitled to run OCR. Gates the
   real-CLI live OCR smoke for W13.cli-1…4 (the `claude` path additionally can't run inside a Claude Code session —
   nested-session guard). The fake-CLI harness already covers the code path at $0, so this gates only final
