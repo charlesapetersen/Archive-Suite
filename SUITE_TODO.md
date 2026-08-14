@@ -69,6 +69,26 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   prompts, one per credential, not one.
   | ops/autonomous/fix-keychain-access.sh, daemon.sh | S | med | none
 
+- [ ] **`W31.handoff-fp` — three ways `check-handoff.sh` can still report CLEAN while something is wrong
+  [S–M · MED · ops].** Filed 2026-08-13 from the adversarial review of the script itself. The CRITICAL it also
+  found (a no-upstream worktree's unpushed commits reading as "clean") is FIXED in `e056eef`; these three are
+  real, understood, and deliberately NOT fixed yet because each needs a design call rather than a patch:
+  **(a) Step 3 reads the PRIMARY checkout's `SUITE_TODO.md` and plan, but the Usage line invites you to run the
+  script from a worktree.** So the exact failure step 3 exists for — filing a `-fu` and not mirroring it — passes
+  green when the filing is still uncommitted in your own worktree, which is when you would run it. Fixing it is
+  not just swapping the path: the plan is gitignored and lives ONLY in the primary, so the two halves of the
+  comparison legitimately come from different trees. Probably: read `SUITE_TODO` from `$TREE` and the plan from
+  the primary, and say so in the output.
+  **(b) Step 3 prints its green line when ZERO SUITE_TODO items parse.** An empty or unparseable tracker yields
+  an empty "missing" set, which reads as success. Needs a floor ("expected >= N open items") — and reaching an
+  overall CLEAN that way needs a second fault, since `check-tracker-sync.sh` missing is only a `warn`.
+  **(c) A failed `git fetch` and a missing `origin/main` are warnings only,** so step 2's single assertion — the
+  primary is level with the remote — can go unmade while the run still reports CLEAN. Offline is a legitimate
+  state, so the call is whether "handed off" should be *possible* offline. Suggest: FAIL, with an explicit
+  `HANDOFF_OFFLINE=1` escape.
+  Also worth doing while in there: the exemption key is an item's first WORD (`Import`), so a second bullet
+  starting with the same word would be silently swallowed — first-occurrence-wins. | ops/autonomous/check-handoff.sh | S–M | med | none
+
 - [ ] **`W31.handoff-gate` — make the handoff gate a *gate*: wire `check-handoff.sh` into `health-gate.sh`,
   and stop new items being filed without a plan mirror [S–M · MED · ops].** Filed 2026-08-13 by the
   pre-restart readiness audit. `ops/autonomous/check-handoff.sh` **exists and passes** as of that date, but
