@@ -219,5 +219,11 @@ fi
 
 [ -n "$warned" ] && echo "⚠ context-budget: approaching budget (>=${WARN_PCT}%):$warned"
 [ "$opct" -ge "$TOTAL_WARN_PCT" ] && echo "⚠ context-budget: per-session orientation at ${opct}% of $ORIENT_TOTAL bytes"
-echo "✓ context-budget: all orientation documents within budget"
+if [ -n "$over" ]; then
+  # Do NOT claim every document is within budget when one is not — the per-file cap is advisory, but the
+  # statement would be false, and a session quotes this line as evidence. Say what is true instead.
+  echo "✓ context-budget: per-session orientation TOTAL within budget (per-file advisory above:$over)"
+else
+  echo "✓ context-budget: all orientation documents within budget"
+fi
 exit 0

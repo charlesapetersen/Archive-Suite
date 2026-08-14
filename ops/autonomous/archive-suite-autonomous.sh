@@ -548,23 +548,33 @@ doc_pregate() {
   [ "$DOC_PREGATE" = 1 ] || return 0
   [ -x "$BUDGET_CMD" ] || { log "doc pre-gate: no budget script at $BUDGET_CMD — skipping (fail-open)."; return 0; }
 
-  local out over near tstate n
+  local out over near tstate n over_files near_files
   out="$("$BUDGET_CMD" "$REPO" 2>&1)"
-  over="$(_budget_files "$out" OVER)"; over="${over% }"
-  near="$(_budget_files "$out" NEAR)"; near="${near% }"
+  over_files="$(_budget_files "$out" OVER)"; over_files="${over_files% }"
+  near_files="$(_budget_files "$out" NEAR)"; near_files="${near_files% }"
   tstate="$(_budget_total "$out")"
 
   # ⚠️ OWNER DECISION 2026-08-13 — per-file budgets are ADVISORY; only the ORIENTATION TOTAL dispatches.
-  # This function used to queue a trim session for any file OVER *or merely NEAR* its cap. With three documents
+  # This function used to queue a trim SESSION for any file OVER *or merely NEAR* its cap. With three documents
   # sitting permanently at 92-99%, that turned a standing condition into standing pressure: sessions were handed
   # prose-shrinking instead of queue work, and the trim that followed deleted a whole policy section from
-  # AGENTS.md. Per-file overage is now logged and ignored here. `$over`/`$near` are still parsed, only for the
-  # log line. ⛔ Do not re-arm them without the owner. See context-budget.sh's exit block for the full record.
-  over_total_only=""; [ "$tstate" = "OVER" ] && over_total_only=1
-  if [ -n "$over" ] || [ -n "$near" ]; then
-    log "doc pre-gate: advisory only — over=[${over:-none}] near=[${near:-none}]; per-file caps do not gate work (owner, 2026-08-13)."
+  # AGENTS.md. ⛔ Do not re-arm per-file dispatch without the owner.
+  #
+  # THE SPLIT MATTERS — and getting it wrong was a regression caught in review the same hour. Two different
+  # questions are being asked of the same data, and only ONE of them was de-gated:
+  #   * `$over`/`$near`  → do we DISPATCH (a session, or a pending fix request)? TOTAL-only now.
+  #   * `$over_files`    → which documents are actually over? Still needed by the MECHANICAL remedy at 3a,
+  #                        because when the TOTAL is over, the plan is usually why (it plus SUITE_TODO are ~72%
+  #                        of the total) and the compactor fixes it in-cycle for free. A first version blanked
+  #                        `$over` before 3a's `case " $over " in *AUTONOMOUS_PLAN.md*`, making that branch
+  #                        unreachable — so a TOTAL overage would have burned a whole session on work a script
+  #                        does for nothing.
+  if [ -n "$over_files" ] || [ -n "$near_files" ]; then
+    log "doc pre-gate: per-file advisory — over=[${over_files:-none}] near=[${near_files:-none}]; per-file caps do not gate work (owner, 2026-08-13)."
   fi
+  # Dispatch inputs: the TOTAL alone decides. The mechanical remedy still reads $over_files.
   over=""; near=""
+  [ "$tstate" = "OVER" ] && over="$over_files"
 
   # 1. Everything comfortably within budget — clear any stale request so a satisfied one can't loop.
   if [ -z "$over" ] && [ -z "$near" ] && [ "$tstate" != "OVER" ]; then
@@ -597,14 +607,15 @@ doc_pregate() {
   log "doc pre-gate: OVER budget (${over:-per-session orientation total}) — this is the document-SIZE guard, not a build or a test. Repairing before the gate runs."
 
   # 3a. The mechanical remedy, where it applies. This is the one document a script can fix.
-  case " $over " in
+  case " $over_files " in
     *" .maintenance/AUTONOMOUS_PLAN.md "*)
       if [ -x "$COMPACTOR" ]; then
         log "doc pre-gate: AUTONOMOUS_PLAN.md is over — running the compactor (mechanical, in-cycle, no session)."
         "$COMPACTOR" "$REPO" >>"$LOG" 2>&1 || log "doc pre-gate: compactor rc=$? — detail just above in this log."
         out="$("$BUDGET_CMD" "$REPO" 2>&1)"
-        over="$(_budget_files "$out" OVER)"; over="${over% }"
+        over_files="$(_budget_files "$out" OVER)"; over_files="${over_files% }"
         tstate="$(_budget_total "$out")"
+        over=""; [ "$tstate" = "OVER" ] && over="$over_files"
       else
         log "doc pre-gate: AUTONOMOUS_PLAN.md is over but no compactor at $COMPACTOR — falling through to a session."
       fi ;;
