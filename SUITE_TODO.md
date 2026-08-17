@@ -109,6 +109,24 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
   Also worth doing while in there: the exemption key is an item's first WORD (`Import`), so a second bullet
   starting with the same word would be silently swallowed — first-occurrence-wins. | ops/autonomous/check-handoff.sh | S–M | med | none
 
+- [ ] **`W31.handoff-fp2` — an item whose first character is not alphanumeric is invisible to BOTH tracker
+  guards, and neither can report it [XS–S · MED · ops].** Found 2026-08-16 by the priority reset, which is
+  also how it was proved: `check-handoff.sh` printed *"every open SUITE_TODO item has a checkbox line in the
+  plan"* while `**(later)** behavior/data follow-ons` (now `W33.storage`) had **no line in the plan at all**.
+  Mechanism: both `check-handoff.sh:134` and the identical grammar in `check-tracker-sync.sh` strip bold and a
+  leading backtick, then require `^[A-Za-z0-9][A-Za-z0-9._-]*`. A leading `(` — or any other punctuation —
+  makes `match()` fail, so `emit()` prints nothing and the item never enters either side of the comparison.
+  This is **not** the same as the three paths in `W31.handoff-fp`: those are checks that pass on a bad state;
+  this is an item that cannot be seen at all, which is strictly worse, because the "missing" set it should
+  land in is computed by set difference and an absent element can never appear in one.
+  **Fix:** emit a distinct `⚠️ UNPARSEABLE ITEM` line (with the offending text) rather than silently skipping,
+  in both scripts, and count it as a `fail` in `check-handoff.sh`. That is better than widening the grammar to
+  accept punctuation — a bullet with no tag cannot be mirrored, `blocked-on`-resolved or archived either, so
+  the right outcome is to be told to give it a tag. Add the case to `prove-tracker-sync.sh` and to
+  `prove-handoff.sh` when `W31.handoff-gate` creates it. ⚠️ Do NOT close `W31.handoff-fp` (b) — its
+  "expected >= N open items" floor is the backstop that would have caught the aggregate drift; this is the
+  per-item cause. | ops/autonomous/check-handoff.sh, check-tracker-sync.sh | XS–S | med | none
+
 - [ ] **`W31.handoff-gate` — make the handoff gate a *gate*: wire `check-handoff.sh` into `health-gate.sh`,
   and stop new items being filed without a plan mirror [S–M · MED · ops].** Filed 2026-08-13 by the
   pre-restart readiness audit. `ops/autonomous/check-handoff.sh` **exists and passes** as of that date, but
@@ -1638,7 +1656,13 @@ before any Notes-specific work.
     prove every A–D item is actually done + **wired** (not "built but dead" again) before flipping this checkbox.
     Use headless render guards (`RenderProbe`/`DocumentRenderGuardTests`) for pixel truth (thumbnail / PDF pane
     actually drew) and the live sighted loop (`ops/gui/`) for chip / empty-state / raw-parse-banner rendering.
-- [ ] **(later)** behavior/data follow-ons (W0 already unified the *code*): **unified suite storage path** — Tier-2, separately gated.
+- [ ] **W33.storage — unified suite storage path** [needs scoping · Tier-2, separately gated]. Behaviour/data
+  follow-on; W0 already unified the *code*. **Given a real tag 2026-08-16** — it was filed as `**(later)**`,
+  and the tag grammar shared by `check-handoff.sh:134` and `check-tracker-sync.sh` matches
+  `^[A-Za-z0-9][A-Za-z0-9._-]*` after stripping bold, so a leading `(` made `match()` fail and the item was
+  dropped from BOTH guards before either could compare it. It was the 28th item invisible to the daemon and
+  neither guard could ever have said so — see `W31.handoff-fp2`. **Scope it before working it:** its only
+  surviving sub-bullet is DROPPED (below), so what "unified storage path" now means is undecided.
   - ~~Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**~~ — **DROPPED
     (owner 2026-07-16).** The whole `ArchiveSuite` marker/exclusion feature is reversed: Notes stops stamping it
     (see the "R13d REVERSED" item above) and nothing will consume it, so there is nothing to hide, back-fill, or
