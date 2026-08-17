@@ -1163,7 +1163,8 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
     own label carries no `accessibilityIdentifier`; (2) **Notes has no in-GUI rename path for an item title**
     — `renameFolder`/`renameTemplate` exist, but no `renameItem`; the list's title cell is a read-only
     `NSTextField` and the metadata inspector edits only date/quality — so the check's stated trigger cannot
-    be performed at all. ⚠️ **Blocker (2) is now separately queued as `W22.notes-rename`** (owner called it a
+    be performed at all. ⚠️ **Blocker (2) is now separately queued as `W9.b3`** (retagged from
+    `W22.notes-rename` 2026-08-16 when it merged with gap-closure plan item B3; owner called it a
     gap, 2026-08-02) — if that ships first, the trigger exists and only blocker (1) remains, so re-read this
     entry before picking an option below. Options, cheapest first: (a) a DEBUG `testBox` seam reporting each chip's resolved
     label + `passageSourceMissing` state, read from the text storage where the chips are re-styled — proves
@@ -1422,7 +1423,18 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   `73e91338` (W8-S8b) — and it does NOT need the VM or a GUI run: `xcodebuild build-for-testing` on the Notes
   scheme reproduces and verifies it. Daemon-buildable, $0. | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift | S | low | none
 
-- [ ] **W22.notes-rename — Archive Notes cannot rename a note from the UI at all [M].** Owner decision
+- [ ] **`W9.b3` — Archive Notes cannot retitle or re-tag a note from the UI at all [S–M · Tier-2].**
+  **⚠️ Retagged from `W22.notes-rename` on 2026-08-16 and MERGED with gap-closure plan item B3 — they were the
+  same work filed twice, once from the owner's 2026-08-02 walkthrough and once from the 2026-07-16
+  plan-vs-build review. This entry is now canonical for both;** the W9 decomposition block above cross-refers
+  here rather than repeating it. **From plan B3, in addition to the rename below:** add `setTags(_:to:)`
+  alongside `setTitle`, both routed through the audited `mutateItem` path, and a **tag editor** in the metadata
+  inspector — `setTags` must write front-matter **and** run `NotesTagProjector` so Finder tags stay in sync,
+  which is what makes the whole item Tier-2 rather than Tier-1. Extend `NotesTagProjectorSafetyTests`.
+  ⚠️ **Ordering with `R13d REVERSED`:** R13d ships first (TIER 4 vs this item's TIER 5) and *removes* the
+  `ArchiveSuite` marker outright, so the marker half of the post-rename assertion below will be moot by the
+  time this runs — assert on the projected **subjects** only, and do not re-add a marker check.
+  Owner decision
   2026-08-02 (daemon-report walkthrough): **this is a GAP, not a design choice.** He was offered the
   "titles are derived from the archival source, so renaming is intentionally not offered" reading and
   rejected it. Verified 2026-08-01 (by `W21.vmgui-c`) and re-verified 2026-08-02: `NotesModel` has
@@ -1634,28 +1646,166 @@ purpose-built for the historian's provenance-first workflow. **Owner decision po
 the `ArchiveSuite` *exclusion* effect is deferred to the later behavior/data follow-on (see `00 §2` call-out).
 **Confirmed (owner):** the FULL **ArchiveCore extraction + Reader/Processor migration is W0 — done FIRST** (`00a`),
 before any Notes-specific work.
-- [ ] **W9 (gap-closure)** post-ship reconciliation from the 2026-07-16 plan-vs-build review (all W0–W8 verified
-  substantially complete + data-safe; these are the promised-but-absent / partial / built-but-not-wired deltas)
-  — `09-gap-closure.md` — mixed Tier-1/Tier-2 per item; ends with a **verification review (Phase E)** that gates
-  deleting the plan:
-  - **Phase A — docs/tracker (DOC):** write `ArchiveNotes/README.md` + `AGENTS.md`; add Notes to root `README.md`;
-    finish the SPEC `ArchiveSuite` marker section (**Tier-2**); delete shipped plans `00a`/`03`/`07`/`08`; fix stale
-    `SUITE_TODO`/`CLAUDE.md`-map entries; add `SMOKE_TEST.md`; drop `@testable` in `DocumentTagsTests`.
-  - **Phase B — wire built-but-dead features (HIGH→MED):** Zotero auto-fill action + note-level chips (dead code,
-    no UI); note retitle/tag-edit path; page-thumbnail render end-to-end (Reader passes `thumbnailer:nil`); consume
-    `archivenotes://open`; embed image bytes on the extract menu path; guided root re-grant. Mostly **Tier-2**.
-    **Verify the render items** (page-thumbnail end-to-end) with a headless render guard — the `RenderProbe`/
-    `DocumentRenderGuardTests` pattern over Notes' in-app `PDFThumbnailer` — so a blank thumbnail can't pass.
-  - **Phase C — safety-net tooling (MED):** add `archivecore` smoke step; Processor write-surface lint; extend the
-    lint to ArchiveCore (uncaught `import AppKit` in Core) + run on Notes; scope Notes smoke to `-only-testing`;
-    (opt) fix the documented tag-projector concurrent lost-update race. **Tier-2**.
-  - **Phase D — secondary UI/polish (LOW–MED):** folder drag-reparent, richer row context menu, template-body
-    editing, quality quick-edit, `roundup` UI-or-remove, raw-parse-failure banner, empty states, off-main
-    large-paste parse + minor coverage/cosmetic. Tier-1.
-  - **Phase E — verification review:** re-run the plan-vs-build gap analysis + drive the features at runtime to
-    prove every A–D item is actually done + **wired** (not "built but dead" again) before flipping this checkbox.
-    Use headless render guards (`RenderProbe`/`DocumentRenderGuardTests`) for pixel truth (thumbnail / PDF pane
-    actually drew) and the live sighted loop (`ops/gui/`) for chip / empty-state / raw-parse-banner rendering.
+### W9 gap-closure — DECOMPOSED 2026-08-16 (was one checkbox hiding Phases A–E)
+
+⚠️ **`W9` as a single item is GONE.** It was one `- [ ]` standing for a 390-line, five-phase plan, and the
+daemon could not have done it: `resume-prompt.txt:9` calls an item that needs more than ~2 sessions mis-sized,
+`09-gap-closure.md` contains **zero checkboxes**, and `ARCHIVE_NOTES_PROGRESS.md` — the mechanism that made
+Wave 11's multi-phase build drainable one sub-task per session — was **retired 2026-08-01** with no
+replacement. So a session could do a whole phase, commit real work, and have nothing to flip; six of those and
+`MAX_NOCOMPLETE=6` parks the entire run (`archive-suite-autonomous.sh:134`). Its queue mirror also cited
+`execution-plans/09-gap-closure.md`, which does not exist — the file is at
+`execution-plans/archive-notes/09-gap-closure.md`.
+
+**Progress now lives in these tags, not in the plan file.** ⛔ Do **not** add checkboxes to
+`09-gap-closure.md` and do not resurrect a progress file — the 2026-08-01 tracker consolidation retired that
+pattern deliberately (`execution-plans/tracker-consolidation.md` finding F2). The plan stays the *detail*;
+these items are the *state*. Each maps 1:1 to a plan sub-item ID, so `W9.b4` is plan item **B4**, verbatim.
+
+**Phase A is done except one item, and one is now moot.** A1, A2, A3, A5, A6, A7, A8, A9 and A11 all shipped
+2026-07-18. **A4 is NOT recreated here**: `R13d REVERSED` says in its own scope that it *"inverts W9 Phase A's
+'finish the SPEC `ArchiveSuite` marker section'* — that sub-task is now 'remove it'". Writing the SPEC section
+A4 asks for would be work `R13d` then deletes. ⛔ Do not file A4 again. **D5** also shipped (W14.4b,
+live-verified 2026-07-17).
+
+**Two CANDIDATE findings come first.** The 2026-07-18 GUI sweep was cut short by a usage limit and left two
+unconfirmed findings. `W9.cand1` is potentially **HIGH** and gates the value of all of Phase B — confirm it
+before building anything else in Notes.
+
+- [ ] **`W9.cand1` — CONFIRM FIRST: can a note be created from the GUI at all? [S · potentially HIGH · gui].**
+  Plan addendum 2026-07-18. With the app on the scratch fixture, **⌘N created no note** (item count unchanged
+  on disk across two attempts) and the toolbar **"New" pencil created nothing**; there is **no `File` menu** at
+  all, so ⌘N appears unbound. Benign explanations that must be ruled out first: the New menu may need a real
+  folder selected (the sweep was on the "All Notes" pseudo-row), a new empty note may live in memory/index
+  until first edit, or the click may have missed the split-button. **If creation is genuinely unreachable this
+  is HIGH — a note app you cannot add a note to** — and combined with `W9.b3` (no in-app retitle) notes could
+  be neither created nor renamed. Drive it on the Notes VM lane, scratch fixture only. Outcome is either a
+  HIGH bug item or a downgrade to a UX note. | ArchiveNotes GUI | S | low | **needs:** gui
+
+- [ ] **`W9.a10` — prove the doc-sync hook fires for `packages/` [XS–S · Tier-2 autonomous-setup].** Plan A10.
+  The W0 plan asked to prove the doc-sync backstop catches a `packages/ArchiveCore` code change with no doc
+  touch; it was never proved. ⚠️ Tier-2 per the autonomous-setup change discipline — prove the mechanism on a
+  planted change before trusting it. | .claude/hooks/docsync-*.sh | XS–S | low | none
+
+**Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
+than with Notes features.
+
+- [ ] **`W9.c1` — the gate never runs ArchiveCore's 100 tests [S].** Plan C1. They run only via a manual
+  `swift test`. Add an `archivecore` case to the root `test-smoke.sh` and include it in `all`, ahead of the apps
+  that depend on it. | test-smoke.sh | S | low | none
+- [ ] **`W9.c2` — Processor has no write-surface lint [S · Tier-2].** Plan C2. Reader has one; Processor does
+  not. Ban `setResourceValue(s)`/`setxattr` across `ArchiveProcessor/macOS/Sources`, allow-list
+  `PDFDocument.write` in `PDFGenerator.swift`/`mergeDocumentPDFs`. Must trip on a planted violation, not just
+  pass clean. **Tier-2** — it guards the irreplaceable-data write path. | ArchiveProcessor/scripts/ | S | med | none
+- [ ] **`W9.c3` — the write-surface lint never scans ArchiveCore or Notes, and Core imports AppKit [S–M ·
+  Tier-2].** Plan C3. The Reader lint scans only Reader and has no `import SwiftUI|AppKit` guard, which is why
+  `packages/ArchiveCore/.../Thumbnails/PDFThumbnailer.swift:4` imports AppKit into the UI-free Core uncaught.
+  Scan `Sources/ArchiveCore` (write API only in `TagWrite.swift`, no UI imports) and add a Notes scan. Then
+  decide `PDFThumbnailer` deliberately: move it behind a Core-safe boundary / into an app target, or carve a
+  documented exception. | ArchiveReader/scripts/lint-write-surface.sh | S–M | med | none
+- [ ] **`W9.c4` — the Notes smoke gate builds and drives the GUI target [XS].** Plan C4.
+  `ArchiveNotes/test-smoke.sh` runs `xcodebuild test -scheme ArchiveNotes` with no
+  `-only-testing:ArchiveNotesTests`, so the "free" gate builds the UITest bundle and drives it when the fixture
+  is present. Add the restriction; keep the GUI target opt-in. | ArchiveNotes/test-smoke.sh | XS | low | none
+
+**Phase B — wire the built-but-dead features.** The high-value core: library code that shipped without a UI
+entry point. Mostly **Tier-2** (they write note front-matter or project Finder tags).
+
+- [ ] **`W9.b1` — Zotero auto-fill is unreachable from the UI [M · Tier-2].** Plan B1. `ZoteroAutoFillModel`
+  exists and nothing can invoke it. Add `Note ▸ Auto-fill from Zotero` resolving the focused `ZoteroRef` →
+  `client.fetchCSL` → `AutoFillPlan` → confirmation sheet (fill-empty policy) → save via the audited store
+  path; route citation through `fetchCitation(styleID:)` so `zoteroCSLStyleID` takes effect. Verify with a stub
+  transport as in `ZoteroLocalServerTests`; Zotero-down must degrade gracefully. | ArchiveNotes Zotero/ +
+  ArchiveNotesCommands.swift | M | med | none
+- [ ] **`W9.b2` — note-level Zotero chips are never rendered, and there is no attach-at-note-level path [M ·
+  Tier-2].** Plan B2. Render `ZoteroChipView` for `selectedItem.zotero` in the inspector; add an attach path
+  populating `item.zotero` via `mutateItem`; feed the clipboard-detect dedup the note's existing links (fixes
+  the empty-`attachedLinks` banner). Meets S4 "chips clickable at note **and** block level". | ArchiveNotes
+  Zotero/ + NoteMetadataInspector.swift | M | med | none
+  - ⚠️ **`W9.b3` (plan B3 — note retitle + tag editing) is NOT listed here.** Its checkbox is the retagged
+    former `W22.notes-rename` entry further down this file, which already carries the owner's 2026-08-02
+    decisions (full affordance not inspector-only; renaming renames the file on disk), the correction that
+    shrank it to S–M, and the one assertion that genuinely remains. Plan B3's extra scope (`setTags` + the
+    inspector tag editor + projector sync) was folded into it. One checkbox, not two — do not re-file it here.
+- [ ] **`W9.b4` — page thumbnails never render end-to-end [M · Tier-2].** Plan B4. Reader passes
+  `thumbnailer:nil`. ⚠️ **Verify with a headless render guard** (`RenderProbe`/`DocumentRenderGuardTests` over
+  Notes' in-app `PDFThumbnailer`) — XCUITest reads the accessibility tree, not pixels, so a blank thumbnail
+  would pass a UITest. | ArchiveNotes + ArchiveCore Thumbnails/ | M | med | none
+- [ ] **`W9.b5` — `archivenotes://open` is never consumed [S].** Plan B5. The scheme is registered; nothing
+  selects/raises the note. | ArchiveNotes | S | low | none
+- [ ] **`W9.b6` — the extract command path does not embed image bytes [S–M · Tier-2].** Plan B6. | ArchiveNotes
+  Editor/ | S–M | med | none
+- [ ] **`W9.b7` — guided root re-grant is not wired [S].** Plan B7. | ArchiveNotes | S | low | none
+- [ ] **`W9.b8` — no manual author editing, for notes or extracts [S–M · Tier-2].** Plan B8 (spec-vs-build,
+  2026-07-17 addendum — spec intent that never entered a wave plan). Writes front-matter. | ArchiveNotes | S–M
+  | med | none
+- [ ] **`W9.b9` — no outbound "Copy Link to Note/Extract" [S–M].** Plan B9 (spec-vs-build). This is the
+  **originator of the Scrivener round-trip** — without it the durable-link story only works inbound. |
+  ArchiveNotes | S–M | low | none
+
+**Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
+shippable. **D5 is already shipped** (W14.4b) and is not listed.
+
+- [ ] **`W9.d1` — folder move/reorder & drag-to-reparent UI [M].** Plan D1. Wire `.onMove` + folder-onto-folder
+  drop → `model.moveFolder` (the cycle-guard already exists). | Views/NotesFolderTreeView.swift | M | low | none
+- [ ] **`W9.d2` — the item-row context menu is a stub [S].** Plan D2. Open / Reveal in Finder / New from
+  Template / Set Quality ▸ / Delete…. | Views/NotesContextMenu.swift | S | low | none
+- [ ] **`W9.d3` — template body editing is not routed in-app [M].** Plan D3. | Views/TemplatesManagerView.swift
+  | M | low | none
+- [ ] **`W9.d4` — no quality quick-edit [S].** Plan D4. Inline borderless quality `Menu` (None + 5–1) in the
+  list/detail cell plus a context-menu "Set Quality ▸". ⚠️ Coordinate with `W19.q3`/`W19.q4`, which redefine
+  Quality across the Suite — do this AFTER them or build it against the post-W19 vocabulary. |
+  Views/QualityControl.swift, NotesTableView.swift | S | low | none
+- [ ] **`W9.d6` — the `roundup` date field has no UI and is always false: add it or remove it [S–M].** Plan D6.
+  It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
+  codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,
+  FrontMatterCodec.swift | S–M | low | none
+- [ ] **`W9.d7` — a raw→styled parse failure degrades silently [S].** Plan D7. Detect a genuine failure in
+  `switchMode` and surface the non-destructive banner. | Editor/MarkdownEditorView.swift | S | low | none
+- [ ] **`W9.d8` — no empty-state UI [S].** Plan D8. Empty note list / empty folder. | Views/NotesBrowserView.swift
+  | S | low | none
+- [ ] **`W9.d9` — smart folders have no live match-count badge [S].** Plan D9. | Core/NotesFolderNode.swift | S
+  | low | none
+- [ ] **`W9.d10` — the extract inspector has no provenance summary [S].** Plan D10. Distinct source notes +
+  counts (the aggregate column already exists). | NoteMetadataInspector.swift | S | low | none
+- [ ] **`W9.d11` — large-paste parse runs on the main actor despite the header claim [S–M · perf].** Plan D11.
+  `MarkdownBridge` is `@MainActor` and `insertLargeTextAsync` parses inside `MainActor.run`. Either produce a
+  Sendable AST off-main as designed, **or** drop the "pure nonisolated" header claim and the stale comment —
+  the doc lying is the part that must not survive. | Editor/MarkdownBridge.swift | S–M | low | none
+- [ ] **`W9.d12` — the small-correctness batch (~11 items) [M].** Plan D12, kept as one item because every
+  member is XS: block-header chip thumbnail render · ordered-list renumber-from-first · focus-on-appear token ·
+  drop-cursor + AppKit drop reliability · `NSFileCoordinator` around Trash delete · extract paste degradation
+  string · `e2e-durable-links.sh` step-5 negative parity · delete vestigial `NoteBody`/`NoteBlock` ·
+  `nestedListMixed` + debounce/snapshot tests · retire-or-extract `SearchGeneration` · filename↔front-matter
+  divergence log line · **provenance-chip initial visibility** (the compact editor can render scrolled past
+  block 0, hiding the chip that is the whole point of an extract, until a manual scroll-to-top). ⚠️ If a
+  session cannot land the whole bag, split it rather than leaving it unflippable. | ArchiveNotes | M | low | none
+- [ ] **`W9.cand2` — CONFIRM: a freshly pasted note-passage provenance block renders as raw HTML comment
+  [S].** Plan addendum 2026-07-18, CANDIDATE. After a W14.3 copy-passage→paste-into-extract, the chip showed as
+  the literal `<!-- block: note-passage … -->` in the **styled** editor and persisted across reselect/reload,
+  while pre-existing chips render correctly — so it may be specific to the freshly pasted block not being
+  re-styled. Bytes import correctly (W14.3), so this is rendering, not data. Confirm on a clean paste; if real,
+  either the paste path must re-run chip styling or the pasted block's on-disk form differs from what
+  `MarkdownBridge` chip-parses. Folds into `W9.d12` if confirmed trivial. | Editor/ | S | low | **needs:** gui
+
+**Phase E — verification review. Do LAST; it gates deleting the plan.** This phase exists because the W0–W8
+checkboxes overstated completion once already; do not repeat that on the fixes. Use the paced method in
+`REVIEW.md`, one subsystem per session, never a giant fan-out.
+
+- [ ] **`W9.e1` — re-run the plan-vs-build gap analysis over every A–D item [M]** (blocked-on: W9.b1, W9.b2,
+  W9.b3, W9.b4, W9.b5, W9.b6, W9.b7, W9.b8, W9.b9). Plan E1. | ArchiveNotes | M | low | none
+- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]**
+  (blocked-on: W9.e1). Plan E2 — and the 2026-07-18 addendum's own unfinished business: note delete +
+  delete-last-instance guard, tag editing, quality quick-edit, manual author, keyword FTS + quality/tag/date
+  filters, folder create/rename/delete + move/reorder + replicate, templates, context menu, Zotero
+  attach/auto-fill, source-block paste, Copy Link, deep-link, smart folders, empty state. Headless render
+  guards for pixel truth; the Notes VM lane for the rest. | ops/gui/ + ArchiveNotes | M | low | **needs:** gui
+- [ ] **`W9.e3` — prove the safety net actually bites on a planted violation [S]** (blocked-on: W9.c2, W9.c3).
+  Plan E3. A lint that has never failed is not a guard — same class as `W26.oracle-fu1`. | scripts/ | S | low | none
+- [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (blocked-on: W9.e1,
+  W9.e2, W9.e3). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
+  convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
+
 - [ ] **W33.storage — unified suite storage path** [needs scoping · Tier-2, separately gated]. Behaviour/data
   follow-on; W0 already unified the *code*. **Given a real tag 2026-08-16** — it was filed as `**(later)**`,
   and the tag grammar shared by `check-handoff.sh:134` and `check-tracker-sync.sh` matches
