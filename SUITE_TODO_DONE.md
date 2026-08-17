@@ -8034,3 +8034,383 @@ deliberately NOT migrated: `Wave 11 (Archive Notes) COMPLETE`, a milestone marke
 - [x] **W8.1** `404e197` — (a) `displayedByID` rebuild gated by `displayedGeneration` counter — skips O(N) dict rebuild on unrelated `updateNSView` calls (selection, scroll, font size). (b) `tagCloud` cached with `_tagCloudCache`, invalidated in `recompute()`. 193 tests green, 0 warnings. GUI-verify deferred to Daemon Report (perf-only, no visible UI change).
 - [x] **W8.2** `dff252f` — M3 handleOCRResult PDF gen → Task.detached(.utility); M4 processBatchResults rotation → bounded-concurrent withTaskGroup; M5 Anthropic batch → incremental JSON serialization. Tier-2 APPROVE (18 attack vectors). Build clean 0 warnings.
 - [x] **W9.1 — L1–L4 low-severity fixes** `78700d7` — L1 Gemini cancelBatch apiKey → urlComponentEncoded; L2
+
+## Autonomous daemon — full review, Wave 32 (2026-08-16) — ALL 26 SHIPPED
+
+Filed and fixed the same day; the record commit is `47cdf42` and the fixes follow it. Verification for the
+whole wave: `ops/autonomous/tests/prove-daemon.sh` went from **114 passed / 19 failed** on a clean tree to
+**136 passed / 0 failed**, and the other 13 `prove-*` harnesses are green. Three of the HIGHs were live on
+the machine when found (`W32.plist-relogin`, `W32.needs-you-blind`, `W32.dr-preamble`) and each was proved
+fixed against real data rather than a fixture — see the individual entries.
+
+⚠️ **Two fixes changed a test fixture rather than the code, and that was the finding**: `prove-daemon.sh` and
+`prove-exit-logging.sh` had never seeded `$STATE/resume-prompt.txt`, so they were exercising a state
+production cannot be in (daemon.sh always renders one). The daemon now refuses to start without it.
+
+Full read of `ops/autonomous/` (30 scripts, ~8,300 lines) — the L0 plan / L1 daemon / L2 prompt stack,
+`daemon.sh`, the plist, both gates, the watchdog, the compactor and every `check-*.sh`. Five dimension
+finders, then **every finding re-verified by hand against the live tree, the real
+`~/.local/state/archive-autonomous/daemon.log`, and constructed fixtures** — the agents' refute pass was
+lost to a usage cutoff, so the verification here is manual rather than delegated. **26 confirmed** (7 HIGH /
+11 MED / 8 LOW); 3 candidates were REFUTED and are recorded at the bottom so they are not re-derived.
+
+Three of the HIGHs are **live on this machine right now**, not hypothetical, and two of those are the
+"reports CLEAN while something is wrong" class this repo has shipped before. The daemon is **stopped**;
+none of this was fixed by starting it.
+
+> **Method note worth keeping:** the most productive single act was running `tests/prove-daemon.sh` and
+> reading `daemon.log`. Static reading found real bugs, but the *stale suite* and the *login auto-start*
+> were both found by observing actual behaviour. `prove-daemon.sh` is excluded from the health gate by
+> design (runtime), which is exactly how it rotted — see `W32.prove-stale`.
+
+### HIGH
+
+- [x] **`W32.plist-relogin` — every "stop" is only as durable as the login session: the LaunchAgent plist
+  survives `stop`/park/COMPLETE, so the next GUI login silently restarts the daemon [S · HIGH · ops].**
+  `daemon.sh stop` (`:100`), `park_run` (`:425`) and the plan-COMPLETE path (`:1044`) all stop the daemon with
+  `launchctl bootout` alone. `bootout` unloads the job from the *current* `gui/$UID` domain; it writes no
+  persistent disable (that is `launchctl disable`) and nothing anywhere removes
+  `~/Library/LaunchAgents/com.archivesuite.autonomous.plist`, which daemon.sh installed at `:186` with
+  `RunAtLoad=true` + `KeepAlive=true`. launchd re-bootstraps `~/Library/LaunchAgents` at the next GUI login,
+  so the job comes back and `RunAtLoad` starts it.
+  **Observed, not theorised** — `daemon.log` + `sysctl kern.boottime`: the run at pid 1442 stops logging
+  2026-08-05 15:25:38 with **no `daemon down` line** (a hard power-off, untrappable); the machine boots
+  21:56:53; `=== daemon up (pid 1701) ===` at **22:00:20**, 3.5 min later, with no human start and no
+  `daemon.sh` preflight. The plist is on disk right now (2,230 B, Aug 13 20:32) while the job is unloaded,
+  and `launchctl print-disabled gui/504` names no archivesuite entry.
+  **Why it matters most:** a park is the daemon saying *it needs a human*. `park_run` deliberately leaves
+  `RUN STATUS: IN_PROGRESS` (`:403`) so a restart resumes with no edit, and startup wipes `idle.since` +
+  `nocomplete.count` (`:325`) — so the resumed run gets a **full fresh window on the very item that parked
+  it**, and `:935` deletes `~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt` before the owner reads it, taking
+  `status-digest.sh`'s "it parked and left you a note" hint with it. It also breaks the owner's standing rule
+  that **starting the daemon is his call alone** — here the machine starts it.
+  Three places assert the opposite and are wrong: `daemon.sh:15`, `daemon.sh:176-178`, `README.md:80`
+  ("survives a crash, NOT a logout/reboot"). The inference is backwards — a LaunchAgent loading at GUI login
+  is precisely *why* it returns. | ops/autonomous/daemon.sh, archive-suite-autonomous.sh, README.md | S | high | none
+
+- [x] **`W32.stop-lock` — `daemon.sh stop` never clears `engine.lock`, so the next `start` no-ops for up to
+  25 minutes while printing "✅ daemon is up and starting its first session" [S · HIGH · ops].**
+  The lock is created + heartbeat-touched every 60 s for the child's lifetime (`:1099-1101`) and removed only
+  on normal session completion (`:1211`) and in `park_run` (`:413`). `stop` boots out and `pkill`s but touches
+  no state; the `EXIT` trap *detects* the leftover (`session-in-flight=YES`, `:903`) and does not remove it.
+  So a `stop` during an in-flight session — the common case, sessions run 10–45 min — leaves a lock <60 s old,
+  and the next daemon's `tick()` step 3 skips every cycle until it ages past `$STALE` (1500 s).
+  **Observed twice.** 2026-08-05: `daemon down … session-in-flight=YES` → `daemon up (pid 1353)` 14:20:18 →
+  **13 consecutive** `engine busy (lock … old) — skip` lines → `stale lock (1508s) — taking over` at 14:42:22.
+  **22 minutes of the window lost.** Again 2026-08-11 (`08:35:56` down → `08:55:38` up → `engine busy (lock
+  1214s old)`). Meanwhile daemon.sh's verify poll (`:205`) passes — the process *is* up and `daemon up` *is* in
+  the log — so it prints the ✅ and the owner walks away. `README.md:88` promises "a stop loses nothing and the
+  next `daemon.sh start` continues the queue."
+  Fix: `rm -f "$STATE/engine.lock"` in the `stop` arm (a stop is definitionally an intentional shutdown, so the
+  lock is stale by construction); belt-and-braces, write the daemon pid into the lock and have step 3 treat a
+  lock whose pid is dead as stale regardless of age. | ops/autonomous/daemon.sh | S | high | none
+
+- [x] **`W32.prove-stale` — the daemon's own regression suite has been RED on main since 2026-08-13: 19
+  assertions still assert a policy the owner retired, and nothing runs it [M · HIGH · ops].**
+  `tests/prove-daemon.sh` on a clean tree at `8eaf788`: **114 passed, 19 failed**, every failure in the WS13
+  doc-pre-gate block (`28a`, `28b`, `28c`, `28d`, `28f`, `28i`). Cause: `7311aff` (2026-08-13) made per-file
+  document budgets **ADVISORY** so only the orientation TOTAL gates — and updated
+  `tests/prove-context-budget.sh` but **not** `prove-daemon.sh`, whose WS13 fixtures still drive *per-file*
+  overages and assert the retired per-file dispatch. `28h` (the TOTAL path) passes, so the current policy is
+  covered; everything asserting the old one fails.
+  **The code is right and the tests are wrong** — confirmed by reading `context-budget.sh:71`/`:218`
+  (per-file OVER is advisory, exit 0) and `doc_pregate`'s `⛔ Do not re-arm per-file dispatch without the
+  owner`. ⛔ **Do not "fix" this by restoring per-file dispatch.**
+  **Why HIGH:** `README.md:406` mandates *"Run it before installing ANY daemon change"* — and it is one of
+  only two harnesses deliberately **not** wired into `health-gate.sh` (runtime: ~10 min). So a red suite is
+  invisible and nothing forces it green. A reviewer running it now cannot tell a regression they just
+  introduced from the 19 that were already there — which is the whole value of the suite, gone. This is the
+  README's own *"an unrun test is worse than no test"* warning, realised.
+  Fix: rewrite `28a-28f`/`28i` against TOTAL-only dispatch; keep at least one case pinning that a per-file
+  overage is logged as advisory and dispatches **nothing**. | ops/autonomous/tests/prove-daemon.sh | M | high | none
+
+- [x] **`W32.needs-you-blind` — `status-digest.sh`'s "Needs you" is structurally blind to the Daemon Report:
+  its detector matches a shape that section has never used [S · HIGH · owner-facing].**
+  `:198` counts openers with `^[[:space:]]*- \[ \]` and `:201` quotes the first with
+  `^[[:space:]]*- (\[ \]|\*\*\[)`. The section's entries are authored as `### <date> — …` H3 headers.
+  **Measured on the live plan: 0 matches for the digest's pattern, 8 for `### <date>`.** Across the whole
+  338 KB `AUTONOMOUS_DAEMON_REPORT_ARCHIVE.md` there are 58 `### <date>` headers, 52 `- **[` bullets and
+  **zero** `- [ ]` rows — the pattern has never matched a single entry in the section's recorded history.
+  Both branches at `:202-206` are dead, so not even the degraded "notes are waiting for you" line fires.
+  The daemon writes this same renderer to `$STATE/STATUS.md` every cycle and on park, so **the file the owner
+  reads after an overnight run asserts nothing needs him while unwalked action items sit in the plan.**
+  `compact-plan.sh:314` was already fixed for this exact drift and now accepts all three real shapes;
+  status-digest was never updated. `tests/prove-status.sh:170-173` pins the obsolete shape in its fixture, so
+  the suite stays green over the hole.
+  Fix: reuse Pass 2's three shapes (`^### 20…`, `^- \*\*\[`, `^\*\*\[`) for both the count and the quote, stop
+  the scan at the newest `### ✅ … walkthrough` heading (root CLAUDE.md's don't-re-raise-settled rule), and
+  change the prove-status fixture to the authored shape. | ops/autonomous/status-digest.sh, tests/prove-status.sh | S | high | none
+
+- [x] **`W32.dr-preamble` — the compactor's region trim-target ignores each region's preamble, so a region
+  settles permanently OVER its target while printing a clean no-op [M · HIGH · ops].**
+  ⚠️ **These are compact-plan.sh's own REGION budgets (`SL_MAX_BYTES` 20,000 / `DR_MAX_BYTES` 24,000 /
+  `WQ_MAX_BYTES` 44,000) — internal trim triggers for three regions inside the single file
+  `.maintenance/AUTONOMOUS_PLAN.md`. They are NOT the per-document budgets in `context-budget.sh`, which have
+  been ADVISORY since 2026-08-13 (owner) with only the per-session ORIENTATION TOTAL gating. Nothing here
+  re-arms a per-file document cap, and nothing here REDs a gate on its own.** The two are easy to conflate
+  because both are called "budget" and both live in `ops/autonomous/`; they are separate mechanisms.
+  The trigger measures the whole region including its preamble (`:319-326`), but the effective-keep walk only
+  starts accumulating at the first entry (`if (e > 0) sz[e] += …`, `:351`). The settled size is therefore
+  `preamble + Σ(entries that fit)` — always `preamble` bytes above the cap. Once trimmed to `DR_KEEP` the pass
+  prints `DR nothing to cut (MN=8 effective DR_KEEP=8) — no-op`, exits 0, and raises no alarm (that needs
+  `MN<2`): a correct-looking no-op that can never resolve the overage.
+  **Live right now:** Daemon Report region **24,816 B against `DR_MAX_BYTES=24,000`**, and that exact no-op
+  line appears on every one of the last five cycles in `daemon.log`. Reproduced from scratch: a plan with a
+  5.9 KB preamble compacts once (58,487 → 26,526 B) then freezes 2,526 B over its cap across runs 2–4.
+  Pass 1 has the identical shape at `:204-219`; its Session Log preamble is 1 B today, so it is latent there.
+  **Consequence — via the TOTAL, which is the only thing that gates.** The compactor is the only mechanism
+  bounding the plan's contribution to the per-session orientation total. A region that can no longer be
+  trimmed is unreclaimed growth in that total. The orientation total is at **433,066 / 500,000 (86%) today**,
+  so this is **not** currently causing a park; it removes the headroom that keeps it from becoming one. When
+  the total does go over, `doc_pregate` runs the compactor as the free mechanical remedy first (`:614`), the
+  compactor "correctly" no-ops, and the run falls through to spending a session — or, if the gate is reached,
+  parks — for growth a script was supposed to reclaim. That is the 2026-08-10/08-12 shape, from the very
+  mechanism added to prevent it. It also invalidates the CEILING reconciliation (`:544-553`), which counts
+  preamble bytes as belonging to the managed regions.
+  Fix: seed the keep walk with the preamble so the budget spent is the quantity the trigger measures (both
+  passes); extend the CEILING sum by the three measured preambles; add a `prove-compact.sh` case with a fat
+  preamble asserting the region actually lands under its cap. | ops/autonomous/compact-plan.sh | M | high | none
+
+- [x] **`W32.fingerprint-primary` — progress, the attempt cap and the health-gate cadence are all measured
+  from the PRIMARY checkout's HEAD, which the run's own commits never move [M · HIGH · ops].**
+  Sessions work in `../suite-wt-*` worktrees and ship with `git push origin HEAD:main`. That advances the
+  shared `refs/remotes/origin/main` — `housekeeping()` says so itself at `:823` — but **not** `$REPO`'s HEAD
+  or its working-tree `SUITE_TODO.md`. The only thing that syncs them is the `git pull --rebase origin main`
+  the *session* runs as STEP 1 of the resume prompt. So `work_fingerprint()` (`:303`) and `completed_items()`
+  (`:344-349`) read state that a session's own work does not touch.
+  **Certain consequence, every run:** progress is credited **one cycle late** — the session that did the work
+  scores `advanced nothing`, and the next session (which merely pulled) gets the reset. The WS4 attempt-cap
+  accounting is out of phase by the same cycle.
+  **Conditional and far worse:** the sync is a `git pull --rebase`, which git **refuses on a dirty tree**
+  (`rc=128`, proven). Leave one uncommitted *tracked* file in the primary — a state `health-gate.sh:152-156`
+  deliberately reports as warning-only, noting "a build can leave transient tracked churn on some setups" —
+  and the primary's HEAD freezes. Then `health_gate()`'s `rev-list --count "$last..HEAD"` (`:681`) is **0
+  forever, so the periodic gate never becomes due again** and unlimited commits pile onto `origin/main`
+  completely ungated, while the backoff climbs to its ceiling and 72 h later parks with "every remaining queue
+  item looks blocked on you. Nothing was lost" — false about a run that shipped dozens of commits.
+  The primary is clean today (`git status --porcelain` empty; HEAD == origin/main == last-gate), so the frozen
+  -gate half is **latent, not active**. The one-cycle-late half is active.
+  This also contradicts the function's own stated invariant at `:292-295` ("progress is DERIVED, never
+  self-reported — the session can't forget to set a flag"): it is derived from state only the session's own
+  `git pull` can update.
+  Fix: fingerprint the ref the push actually advances — `git -C "$REPO" rev-parse origin/main`. Have
+  `completed_items()` read `git show origin/main:SUITE_TODO.md` / `…_DONE.md` rather than the working tree,
+  and have `health_gate()` count `"$last..origin/main"` and store `rev-parse origin/main`.
+  | ops/autonomous/archive-suite-autonomous.sh | M | high | none
+
+- [x] **`W32.restart-counters` — two of the four park counters survive a daemon restart, so a restart can park
+  on its first cycle [S · HIGH · ops].**
+  `:325` clears `idle.since` and `nocomplete.count` at startup with an explicit rationale: *"a stale stamp/count
+  from a PRIOR run makes the first cycle PARK immediately — turning the owner's restart (an explicit 'try
+  again' signal) into a single retry. Arming a run always buys a full window."* Two later-added counters of
+  the identical shape were never given the same treatment:
+  **(a) `$GATE_TO`** (`gate-timeouts`, `:452`/`:695`) parks at `GATE_MAX_TIMEOUTS=2`. It is cleared only on a
+  *conclusive* gate result, so a single timeout can sit at `1` on disk for weeks across many restarts while no
+  gate is due, and then one flaky 50-min timeout parks a healthy run on its **first** gate rather than its
+  second.
+  **(b) `$DOCFIX_TRIES` + `$DOCFIX_HEAD`** (`:125-126`) park at `DOCFIX_MAX=3`. These are partly protected —
+  an attempt only counts when HEAD has moved (`:643`) — but the count itself persists, so a restart after the
+  owner fixed something (which moves HEAD) can park immediately.
+  Neither is mentioned in README's "an owner restart always buys a full window" invariant, so code and
+  documented principle disagree. Fix: add both to the startup clear (note `$GATE_TO` is declared at `:452`,
+  below `:325`, so either hoist the declaration or add a second `rm -f`).
+  | ops/autonomous/archive-suite-autonomous.sh | S | high | none
+
+### MED
+
+- [x] **`W32.dry-run-stop` — `daemon.sh --dry-run stop` performs a REAL stop [S · MED · ops].** The `DRYRUN`
+  guard sits at `:121`, *after* the dispatch `case` at `:91-117`, and the `stop` and `status` arms `exit 0`
+  from inside it. So `--dry-run stop` runs a real `launchctl bootout` plus three real `pkill`s — killing the
+  daemon, the in-flight session and any in-flight health gate — and never reaches the line that says nothing
+  was done. Only `start`/`nohup` honour the flag. Fix: check `$DRYRUN` inside the `stop` arm (and `status` is
+  already read-only, so state that), or move the dispatch below the guard.
+  | ops/autonomous/daemon.sh | S | med | none
+
+- [x] **`W32.park-reason` — every park is logged as "SIGTERM … the laptop lid closing", so the one diagnostic
+  built to say why the daemon went down names the wrong cause on 100% of parks [S · MED · ops].**
+  `park_run`'s `launchctl bootout` (`:425`) SIGTERMs this process, which fires the TERM trap (`:909`) and
+  overwrites `_EXIT_REASON` before `_log_exit` runs. **All four parks in `daemon.log` show it** — e.g.
+  `04:39:07 !!!!!!!!!!!! PARKED (health gate RED (x2))` followed at `04:39:09` by `daemon down … reason:
+  SIGTERM — launchd bootout/stop, logout, shutdown, or the laptop lid closing`. The exit-reason line was added
+  (2026-07-29) precisely because a silent disappearance had cost real diagnosis time and produced a wrong
+  conclusion; on a park it now produces a wrong conclusion of its own. Fix: set
+  `_EXIT_REASON="parked ($reason)"` at the top of `park_run`, before the bootout. | ops/autonomous/archive-suite-autonomous.sh | S | med | none
+
+- [x] **`W32.tree-cpu` — `_tree_cpu` truncates the running total on every iteration, so a tree of sub-1%
+  processes always sums to 0 and the watchdog's CPU-liveness signal silently fails [S · MED · ops].**
+  `:976` does `total="$(awk … 'BEGIN{printf "%d", t + c}')"` **inside** the loop, discarding each process's
+  fractional part. **Proven:** six processes at 0.9% sum to **0** (true 5.4); summing first and truncating once
+  gives 5. Against `HB_CPU=3`, a genuinely-working tree of many low-CPU processes reads as idle, so the
+  watchdog's "spare it, it's busy" branch never fires and the session is killed after `HB_IDLE_N` polls.
+  Error is bounded by the process count, so wider trees are more wrong. Fix: accumulate in awk (or as a
+  float) and truncate once at the end. | ops/autonomous/archive-suite-autonomous.sh | S | med | none
+
+- [x] **`W32.path-growth` — `tick()` prepends the shim dir to the DAEMON's own `PATH` every cycle, unbounded
+  [S · MED · ops].** `:1125` `export PATH="$REPO/ops/autonomous/bin:$PATH"` runs in the daemon's long-lived
+  shell, not a subshell, so PATH grows **51 bytes per cycle** (measured) and never shrinks; `:1106` also
+  re-sources `$STATE/env` under `set -a`, which may re-prepend more. Over the 2-week unattended run this repo
+  explicitly targets that is hundreds of KB of environment, eventually risking `E2BIG` on every child exec —
+  i.e. the failure lands on the one thing the daemon exists to do. Fix: compute the shim PATH once at startup,
+  or prepend only when absent. | ops/autonomous/archive-suite-autonomous.sh | S | med | none
+
+- [x] **`W32.usage-guess` — the "usage-limit fast-fail" verdict is a 10-second timing guess when the
+  structured answer is already in the log [S · MED · ops].** `:1202` decides with `rc != 0 && elapsed < 10`,
+  while `$SLOG` contains the CLI's own `{"type":"rate_limit_event","rate_limit_info":{"status":"rejected",…}}`
+  — the exact string `_meaningful_bytes` (`:985`) already greps for, carrying `resetsAt`. Verified against the
+  real log: the 2026-08-13 evening was a genuine five-hour limit and the heuristic happened to be right.
+  It is wrong in both directions: a rejection slower than 10 s reads as a real no-op, and **any** non-usage
+  fast failure — a missing `claude` binary (rc 127), a bad flag, an MCP init failure, an empty prompt — is
+  reported as "likely USAGE-LIMIT fast-fail, not an empty queue" on every cycle for up to `IDLE_STOP` = **72
+  hours**, and then parks with a *second* wrong message: "every remaining queue item looks blocked on you
+  (owner/GUI-gated). Nothing was lost." Three days of a dead run described to the owner as an owner-gated
+  queue. Fix: branch on the structured event; keep the timing check only as a fallback.
+  | ops/autonomous/archive-suite-autonomous.sh | S | med | none
+
+- [x] **`W32.preflight-gap` — the daemon re-execs without daemon.sh's prerequisite checks, and guards neither
+  `$CLAUDE` nor the rendered prompt [S · MED · ops].** The plist's `ProgramArguments` is the daemon script
+  itself, so **every** `KeepAlive` relaunch and every login auto-start (see `W32.plist-relogin`) skips
+  daemon.sh's preflight entirely. The daemon refuses to start on a bad `$REPO` (`:32-40`) and guards every
+  other external command it calls — `$STATUS_CMD` (`:198`), `$BUDGET_CMD` (`:549`), `$COMPACTOR` (`:615`),
+  `$GATE_CMD` (`:687`) — but not the two that matter most: `$CLAUDE` (`:43`, used at `:1141`) and
+  `$PROMPT` (`$STATE/resume-prompt.txt`, `cat`'d into `-p` at `:1141`). A missing CLI exits 127 in
+  milliseconds; a missing prompt yields `claude -p ""`. Both then hit `W32.usage-guess` and read as a usage
+  limit for 72 h. Fix: `[ -x "$CLAUDE" ]` and `[ -s "$PROMPT" ]` as refuse-to-start checks beside the `$REPO`
+  validation (launchd's `ThrottleInterval=60` bounds the retry and `launchd.err.log` makes it visible).
+  | ops/autonomous/archive-suite-autonomous.sh | S | med | none
+
+- [x] **`W32.lock-heartbeat-race` — `park_run` deletes the lock while the heartbeat that recreates it is still
+  running [S · MED · ops].** The two park paths that hold the lock (`:373`, `:441`) are reached from `tick()`
+  at `:1195`/`:1207` — after the heartbeat subshell is spawned (`:1101`) and **before** `kill "$hb"` (`:1210`).
+  `park_run` removes the lock at `:413` and then spends real time on log + Desktop file + `notify()` (curl
+  `--max-time 15`) + `write_status()` + `osascript` before the bootout at `:425` kills the process. A
+  heartbeat `touch` landing in that window recreates the lock with a fresh mtime, and tick's own `rm` at
+  `:1211` never runs. **Proven** by a scaled reproduction: at window/period 0.9 the lock survived every run;
+  at 0.3 (an 18 s park inside the real 60 s heartbeat) 6/30. That reinstates exactly the 25-minute
+  `engine busy` stall the comment at `:409-412` says `:413` exists to prevent, and makes `_log_exit` report
+  `session-in-flight=YES` when none was. Fix: kill the heartbeat before releasing the lock (hoist its pid to a
+  global and `kill`+`wait` it at the top of `park_run`). | ops/autonomous/archive-suite-autonomous.sh | S | med | none
+
+- [x] **`W32.pass3-overrun` — the compactor's Pass 3 can archive `[x]` items out of a section it was never
+  meant to touch, silently [M · MED · ops].** `:115-117` promises that an unlisted, non-blank-preceded section
+  "over-runs → the anchor guard aborts the pass, plan untouched". For Pass 3 that is false: its region test
+  (`:487`) does not close, the pass runs on, and every `[x]` item in the following section whose first token is
+  in `SAFE` is moved to the archive. No guard fires — the anchor list (`:504`) does not name that section,
+  headers are never dropped, the open-item guard (`:511`) counts only `[ ]`, and line conservation holds
+  because the line landed in the archive. Exit 0 with a normal "archived N line(s)" message. **Reproduced:** a
+  `## OWNER DECISIONS PENDING` section written without a preceding blank line had its `- [x] **W99.gated**`
+  item silently archived. This is the sibling of the BUG 4 hazard at `:105-107`; naming HOLD QUEUE in
+  `SEC_HEADER_RE` fixed that instance and left the mechanism. Fix: make the region bound enforceable — assert
+  every dropped line number falls inside the WORK QUEUE region, or count ticked bullets *outside* the region
+  before and after and abort on a change. | ops/autonomous/compact-plan.sh | M | med | none
+
+- [x] **`W32.pass3-safe-tags` — Pass 3's "done-state independently recorded" invariant is defeated by ordinary
+  English words being treated as item tags [S · MED · ops].** `SAFE` (`:470-474`) accepts any `[x]` bullet at
+  any indentation in either tracker and takes its **first token** as a tag. Those files are mostly prose, so
+  ~75 of the 325 extracted "tags" are words like `Add`, `The`, `No`, `Verify`, `Remove`, `Close`, `Notes`,
+  `Reader`, `Wave`. Any plan WORK QUEUE `[x]` whose first token collides is archived even though its done-state
+  is recorded nowhere — precisely the case `:421-426` says Pass 3 must leave behind. Once archived it is also
+  out of reach of `check-handoff.sh` and `check-tracker-sync.sh`, so the tracker gap becomes invisible instead
+  of getting fixed, and a `(blocked-on: …)` can resolve off a coincidence. **Reproduced**; and the live plan
+  already carries two milestone markers whose whole tag is the bare word `Wave` (`L442`, `L465`), surviving only
+  because no tracker bullet currently starts with it — in an 813 KB archive that gains prose bullets every
+  session. Fix: require a tag to look like one — column-0 bullets only, and the token must contain a `.`, the
+  same restriction `check-tracker-sync.sh:85` already applies. | ops/autonomous/compact-plan.sh | S | med | none
+
+- [x] **`W32.pass3-tear` — Pass 3 tears a done item whose write-up contains a blank line, leaving orphaned
+  prose in the plan and half an entry in the archive [S · MED · ops].** `dropping` is cleared by any blank line
+  (`:496`), so only the first paragraph travels. The rest stays in the plan attached to nothing — reading as if
+  it belongs to the next item — while the archive's copy is truncated mid-write-up. Every guard passes (no byte
+  is lost) and the pass exits 0. **Reproduced.** This is Bug 3 (`:47-49`, "PASS 1 TORE MULTI-LINE ENTRIES")
+  reintroduced in Pass 3; Passes 1 and 2 were both rewritten to move whole spans and both carry an explicit
+  heuristic-LIMIT note, while Pass 3's comment at `:481` claims the opposite ("Move the WHOLE span"). No live
+  instance today, but queue entries are routinely multi-line. Fix: end a span structurally (checkbox / `## ` /
+  `### ` / column-0 non-continuation) rather than on the first blank line. | ops/autonomous/compact-plan.sh | S | med | none
+
+- [x] **`W32.fence-order` — `check-tracker-sync.sh` ends the WORK QUEUE region on a `## ` inside a code fence,
+  unlike the resolver it claims to mirror, so a fenced heading makes it report CLEAN over real drift
+  [S · MED · ops].** `items()` orders its rules region-end → fence; `next-queue-item.sh:95-98` orders them
+  fence → region-end. So a column-0 `## ` inside a fenced example — a normal way to quote the plan's own
+  heading grammar, and the pattern `compact-plan.sh` guards as "Case I" — truncates the region for the check
+  but not for the resolver. Every item below that fence is invisible to the check while the daemon still offers
+  it. **Reproduced:** with a fenced `## Session Log …` block in the queue, `next-queue-item.sh` happily offered
+  `W99.beta` (already `[x]` in SUITE_TODO — shipped work about to be redone) and `W99.gamma` (no tracker entry
+  at all), while `check-tracker-sync.sh` printed `✓ … agree on all 1 shared items` and exited 0. The failure
+  direction is the dangerous one, and the header's "PARSING MIRRORS next-queue-item.sh DELIBERATELY" premise is
+  false. `check-handoff.sh:139-142` carries the same code. Latent today (0 fence lines in the live plan).
+  Fix: move the region-end rule below the fence/blockquote rules in both, and add a fixture.
+  | ops/autonomous/check-tracker-sync.sh, check-handoff.sh | S | med | none
+
+### LOW
+
+- [x] **`W32.classify-names` — `_classify_red`'s document-step list names two steps that do not exist
+  [S · LOW · ops].** `:488` matches `context-budget|tracker-sync|coherence`. `health-gate.sh` has no step named
+  `coherence` at all, and its tracker step is `tracker-sync-proof`. Only `context-budget` is real — which is
+  why document self-heal still works — but the list reads as broader coverage than it has, and a future
+  document step will be misclassified as CODE (skipping self-heal, parking with "a reproducible build/test
+  regression"). Fix: match the real step names and drop the dead ones. | ops/autonomous/archive-suite-autonomous.sh | S | low | none
+
+- [x] **`W32.source-guard` — three destructive side effects run ABOVE the source guard whose comment promises
+  everything above it is safe to source [S · LOW · ops].** `:874-879` explicitly blesses `. archive-suite-autonomous.sh`
+  to inspect `$DENY`/`$ALLOW`. But `:190` `mkdir -p "$STATE"`, `:212` sources the operator's alert secret into
+  the caller's shell, and `:325` `rm -f "$IDLE_SINCE" "$NOCOMPLETE"` all run first. **Proven:** sourcing the
+  real script wiped a seeded `idle.since` and `nocomplete.count` — i.e. inspecting the deny-list while a run is
+  live resets its 72 h idle clock and its stuck-item streak. Also, with `AUTONOMOUS_REPO` unset (the normal
+  state for a reader), `:35`'s `exit 2` **terminates the maintainer's interactive shell**. Fix: move the three
+  statements below the guard and make `:35` return rather than exit when sourced. | ops/autonomous/archive-suite-autonomous.sh | S | low | none
+
+- [x] **`W32.stub-count` — the ticked-stub guard and the counter it protects disagree on what an item is
+  [S · LOW · ops].** `check-todo-stubs.sh:47` matches column-0 `- [x] ` only; `status-digest.sh:142`'s
+  `done_todo` counts `^[[:space:]]*[-*][[:space:]]+\[[xX]\]` across both trackers. So the guard reports CLEAN
+  while the digest's total already includes indented sub-steps (3 live today, inside "357 finished"), and a
+  column-0 `* [x]` bullet is a genuine double-count the guard cannot see — a false CLEAN on the one defect it
+  exists for. Same asymmetry for `open_todo` (55 column-0 `- [ ]` vs a reported 60). Fix: count column-0
+  bullets in the digest and widen the guard to `^[-*][[:space:]]+`. | ops/autonomous/check-todo-stubs.sh, status-digest.sh | S | low | none
+
+- [x] **`W32.docfix-note` — the doc-budget park note asserts the compactor ran even when it did not
+  [XS · LOW · ops].** `:660` states unconditionally "compact-plan.sh ran (it can only shrink …)", including on
+  the path where `:623` just logged "no compactor at $COMPACTOR — falling through to a session". Fix: make the
+  bullet conditional on the branch actually taken. | ops/autonomous/archive-suite-autonomous.sh | XS | low | none
+
+- [x] **`W32.complete-substring` — the stale-COMPLETE guard is an unanchored substring match [XS · LOW · ops].**
+  `daemon.sh:159` greps the first 90 chars of the RUN STATUS line for `COMPLETE`, so
+  `RUN STATUS: IN_PROGRESS — finish the COMPLETE-path cleanup` refuses to start with a message about editing a
+  status line that is already correct. Fails in the safe direction (refuses to start, never a false start).
+  Fix: anchor on `^RUN STATUS:[[:space:]]*COMPLETE`. | ops/autonomous/daemon.sh | XS | low | none
+
+- [x] **`W32.budget-space` — `_budget_files` takes awk `$3` as the whole path [XS · LOW · ops].** `:544` means a
+  guarded document whose name contains a space is handed to the session under a truncated name. No such
+  document today; the repo path itself has a space, so the class is live here. Fix: take `$3` through end of
+  line. | ops/autonomous/archive-suite-autonomous.sh | XS | low | none
+
+- [x] **`W32.compact-total` — dead computation in the compactor [XS · LOW · ops].** `compact-plan.sh:151`
+  computes `TOTAL=$(awk 'END{print NR}' "$PLAN")` and never reads it (the only shellcheck warning in the whole
+  daemon tree). Harmless, but in a file whose history is "a pass silently did nothing for weeks" a dead
+  measurement is worth removing rather than leaving to be mistaken for a guard. | ops/autonomous/compact-plan.sh | XS | low | none
+
+- [x] **`W32.label-state` — `$LABEL` does not name the state dir its own comment says it names
+  [XS · LOW · ops].** `:25` documents `$LABEL` as the "unique slug: names the state dir + launchd job", but
+  `$STATE` (`:42`) is hardcoded to `…/archive-autonomous`; only `$JOB` derives from it. Reusing the template
+  per its stated contract (set `AUTONOMOUS_LABEL`) gives two daemons distinct launchd jobs that **share** one
+  `engine.lock`, `daemon.log` and `resume-prompt.txt` — so each sees the other's heartbeat as "engine busy" and
+  a takeover feeds the wrong project's prompt to `claude -p`. Fix: derive `$STATE` from `$LABEL` (and mirror in
+  `daemon.sh:35`), or correct the comment and the reuse instructions. | ops/autonomous/archive-suite-autonomous.sh, daemon.sh | XS | low | none
+
+### ⛔ REFUTED — checked and NOT bugs, recorded so they are not re-derived
+
+- **`install` hot-swapping the running daemon is NOT a hazard.** `daemon.sh:132` installs runtime copies
+  *before* the double-launch guard at `:148`, so a `start` against a live daemon does rewrite
+  `~/.local/bin/archive-suite-autonomous.sh` while it is executing. **Proven safe:** BSD `install` replaces via
+  a temp file + rename (inode changes), so the running bash keeps its original inode and cannot be corrupted.
+  (The resume-prompt re-render at `:136` *is* a truncating `>` redirect, but the daemon `cat`s it fresh each
+  cycle, so the worst case is one cycle reading a partial prompt.)
+- **`budget-contract` being classified as a CODE step is defensible.** It runs `prove-context-budget.sh`, a
+  test harness, not a document-size measurement — so grouping it with the other `*-proof` steps rather than
+  with `context-budget` is right. (The dead names in that list are real: see `W32.classify-names`.)
+- **The usage-limit heuristic's 10-second threshold is not the bug.** Widening it would not help; the
+  mechanism is wrong regardless of the constant. Folded into `W32.usage-guess`.
+- **`$?` inside the compactor's failure branches is correct.** `:617` (`cmd || log "…rc=$?"`) and `:1228-1229`
+  (`if cmd; then :; else log "…rc=$?"`) both report the compactor's status, verified by experiment — bash does
+  not reset `$?` before the `else` arm. Only an intervening command would clobber it, and neither site has one.
+- **`_has_claude_descendant` correctly matches the real CLI.** `~/.local/bin/claude` resolves to
+  `~/.local/share/claude/versions/2.1.222` — a binary *not* named `claude` — but the second pattern
+  `*/claude/*` matches the `claude/` path component, and the repo at `~/Claude` (capital C) correctly does not.

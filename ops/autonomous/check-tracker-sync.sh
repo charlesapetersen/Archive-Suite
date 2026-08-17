@@ -53,12 +53,21 @@ items() {
         if (!(id in seen)) { seen[id] = 1; print id "\t" st }
       }
     }
-    region && /^## WORK QUEUE/ { inq = 1; next }
-    region && inq && /^## /    { inq = 0 }
-    region && !inq             { next }
+    # ⚠️ W32.fence-order — THE FENCE RULE MUST COME FIRST, exactly as it does in next-queue-item.sh:95-98.
+    # This block used to test the region end BEFORE the fence, so a column-0 `## ` inside a fenced example —
+    # a normal way to quote the plan own heading grammar, and the shape compact-plan.sh guards as Case I —
+    # closed the WORK QUEUE region HERE but not in the resolver. Every queue item below that fence became
+    # invisible to this check while the daemon happily went on offering it. Reproduced: the resolver offered
+    # an item already [x] in SUITE_TODO (shipped work about to be redone) and one with no tracker entry at
+    # all, while this script printed OK-agree-on-all-1-shared-items and exited 0. The header
+    # "PARSING MIRRORS next-queue-item.sh DELIBERATELY" claim is only true if the ORDER matches too, and the
+    # failure direction is the dangerous one — silence over real drift.
     /^[[:space:]]*(```|~~~)/   { infence = !infence; next }   # backtick OR tilde code fence
     infence                    { next }
     /^[[:space:]]*>/           { next }                       # blockquote: commentary, not an item
+    region && /^## WORK QUEUE/ { inq = 1; next }
+    region && inq && /^## /    { inq = 0 }
+    region && !inq             { next }
     /^[[:space:]]*[-*][[:space:]]+\[[ xX]\]/ { emit() }
   ' "$1"
 }

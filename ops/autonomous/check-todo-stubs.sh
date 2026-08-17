@@ -44,9 +44,14 @@ stubs="$(awk '
   /^[[:space:]]*(```|~~~)/ { infence = !infence; next }
   infence                  { next }
   /^[[:space:]]*>/         { next }
-  /^- \[[xX]\][[:space:]]/ {
+  # W32.stub-count — accept a column-0 `*` bullet too, not just `-`. status-digest.sh counts BOTH bullet
+  # characters in "N finished", so a column-0 `* [x] W26.foo` was a genuine double-count that this guard —
+  # the one check written for exactly that defect — could not see: a false CLEAN on its own subject.
+  # The COLUMN-0 restriction stays, and is deliberate: an INDENTED ticked bullet is a finished SUB-STEP, not
+  # an item, and the digest counts those on purpose (prove-status.sh [0b] pins it, "no under-counting").
+  /^[-*][[:space:]]+\[[xX]\][[:space:]]/ {
     t = $0
-    sub(/^- \[[xX]\][[:space:]]*/, "", t)
+    sub(/^[-*][[:space:]]+\[[xX]\][[:space:]]*/, "", t)
     sub(/^\*+[[:space:]]*/, "", t)
     sub(/^`/, "", t)
     tag = "-"
@@ -66,7 +71,7 @@ printf '%s\n' "$stubs" | while IFS=: read -r ln tag text; do
   # Say whether it is CONFIRMED double-counted (its tag is also done in the archive) or merely misplaced —
   # different fixes, and the owner-facing count is only wrong in the first case.
   dup=""
-  if [ "$tag" != "-" ] && grep -qE "^[[:space:]]*[-*][[:space:]]+\[[xX]\][[:space:]]*\*+${tag}([^A-Za-z0-9._-]|$)" "$TODO_DONE" 2>/dev/null; then
+  if [ "$tag" != "-" ] && grep -qE "^[[:space:]]*[-*][[:space:]]+\[[xX]\][[:space:]]*\**${tag}([^A-Za-z0-9._-]|$)" "$TODO_DONE" 2>/dev/null; then
     dup=" — ALSO done in SUITE_TODO_DONE.md, so it is counted TWICE in \"N finished\""
   fi
   echo "      L${ln}: ${text}${dup}"

@@ -28,21 +28,56 @@ LABEL="${AUTONOMOUS_LABEL:-archivesuite}"                            # unique sl
 # EnvironmentVariables under launchd and via the exported var on the nohup lane. There is deliberately no
 # hardcoded fallback: guessing wrong means the daemon works in a directory that does not exist and every
 # cycle fails obscurely, which is worse than refusing to start.
+# W32.source-guard — a refusal must not kill an interactive shell that merely SOURCED this file. The header
+# below (§SOURCE GUARD) explicitly blesses `. archive-suite-autonomous.sh` to inspect $DENY/$ALLOW, and the
+# normal state for someone doing that is AUTONOMOUS_REPO unset — under which the bare `exit 2` here used to
+# terminate their shell. Executed: refuse and exit 2, unchanged. Sourced: say so and keep loading the config,
+# which is the whole point; the run loop still cannot start, because it lives below the source guard.
+_SOURCED=0; [ "${BASH_SOURCE[0]}" != "${0}" ] && _SOURCED=1
+_refuse() {   # callers print their own reason first; exits 2 when executed, returns 0 when sourced
+  [ "$_SOURCED" = 1 ] || exit 2
+  echo "  (sourced, not executed — config still loaded for inspection; the daemon will NOT start.)" >&2
+  return 0
+}
 REPO="${AUTONOMOUS_REPO:-}"
 if [ -z "$REPO" ]; then
   echo "archive-suite-autonomous: AUTONOMOUS_REPO is unset. Start via ops/autonomous/daemon.sh, which sets" >&2
   echo "it from its own checkout, or export it yourself: AUTONOMOUS_REPO=/path/to/Archive\\ Suite $0" >&2
-  exit 2
+  _refuse
 fi
-if [ ! -d "$REPO/.git" ] && [ ! -f "$REPO/.git" ]; then
+if [ -n "$REPO" ] && [ ! -d "$REPO/.git" ] && [ ! -f "$REPO/.git" ]; then
   echo "archive-suite-autonomous: AUTONOMOUS_REPO='$REPO' is not a git checkout — refusing to start." >&2
-  exit 2
+  _refuse
 fi
+# W32.preflight-gap — the CLI and the rendered prompt are checked HERE, not only in daemon.sh. The plist's
+# ProgramArguments is this script, so every launchd KeepAlive relaunch (and every login auto-start) skips
+# daemon.sh's prerequisites entirely. Both of these fail SILENTLY at the launch site: a missing CLI exits 127
+# in milliseconds and a missing prompt yields `claude -p ""` — and either then matches the fast-fail verdict
+# below and is logged as "likely USAGE-LIMIT" every cycle for up to IDLE_STOP (72 h) before parking with a
+# second wrong message. Refusing to start is right: launchd's ThrottleInterval=60 bounds the retry and
+# launchd.err.log makes the reason visible. (These two checks are deliberately placed AFTER $REPO's, matching
+# its refuse-to-start pattern; $CLAUDE/$PROMPT are resolved just below, so the checks live after that block.)
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"     # L0 durable plan (keep it gitignored)
-STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"  # runtime state (logs, lock, resume prompt)
+# W32.label-state — $LABEL names this too, as its comment above always claimed. It used to be hardcoded to
+# `archive-autonomous`, so reusing the template per its own stated contract (just set AUTONOMOUS_LABEL) gave
+# two daemons correctly-distinct launchd jobs that SHARED one engine.lock, daemon.log and resume-prompt.txt —
+# each seeing the other's heartbeat as "engine busy", and a lock takeover feeding the WRONG project's prompt
+# to `claude -p`. The default below is byte-identical to the old literal for LABEL=archivesuite, so this
+# instance's state dir does not move. `daemon.sh` derives the same path the same way.
+STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${LABEL}-autonomous}"  # runtime state (logs, lock, resume prompt)
 CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
 # =======================================================================================================
 LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
+# …and the two W32.preflight-gap checks the block above explains. `-s` not `-f` for the prompt: an empty
+# rendered prompt is as useless as a missing one and produces the same silent `claude -p ""`.
+[ -x "$CLAUDE" ] || {
+  echo "archive-suite-autonomous: claude CLI not executable at '$CLAUDE' — refusing to start." >&2
+  echo "  (it MUST live outside ~/Desktop for launchd/TCC). Start via ops/autonomous/daemon.sh." >&2
+  _refuse; }
+[ -s "$PROMPT" ] || {
+  echo "archive-suite-autonomous: L2 resume prompt missing or empty at '$PROMPT' — refusing to start." >&2
+  echo "  ops/autonomous/daemon.sh renders it from the committed template; run that rather than this." >&2
+  _refuse; }
 # The plan compactor, used in TWO places: the between-cycles housekeeping call, and health_gate()'s
 # self-repair of a document-only RED. One definition so those can never drift onto different binaries.
 COMPACTOR="${AUTONOMOUS_COMPACTOR:-$HOME/.local/bin/compact-plan.sh}"
@@ -187,7 +222,8 @@ DENY=(
   "Bash(hdiutil:*)" "Bash(gh release:*)" "Bash(/opt/homebrew/bin/gh release:*)"
 )
 
-mkdir -p "$STATE"
+# (`mkdir -p "$STATE"` moved below the SOURCE GUARD — W32.source-guard. Nothing above the guard writes to
+# $STATE: every function here is defined, not called, and log() only runs inside the loop.)
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
 
 # WS5 — regenerate the one-screen $STATE/STATUS.md digest. Cheap (greps + git log + df), read-only, never
@@ -209,7 +245,9 @@ write_status() {   # $1 (optional) = a park reason -> STATUS.md shows PARKED eve
 # NON-exported shell vars means notify() (same shell) sees them and the child never does.
 # Also deliberately does NOT source $STATE/env here: that file may set PATH, and this runs before the
 # `caffeinate` launch below — a PATH without /usr/bin would silently fail to keep the Mac awake.
-[ -f "$STATE/alert.env" ] && . "$STATE/alert.env"
+# (The `. "$STATE/alert.env"` itself moved below the SOURCE GUARD — W32.source-guard: sourcing this file to
+# read $DENY/$ALLOW used to pull the operator's alert credential into the maintainer's interactive shell.
+# notify() reads $ALERT_URL/$ALERT_AUTH as `${…:-}`, so it is safe before they are set.)
 
 # ===== Remote alerting (WS6) — reach an owner who is NOT at the machine =====
 # Everything else the daemon does on a blocking event (a Desktop file + an osascript notification) is useless
@@ -298,9 +336,26 @@ disk_ok() {
 # RUN STATUS + WORK QUEUE, and the GUI gate. Session Log / Daemon Report / E2E findings are EXCLUDED ON
 # PURPOSE: a no-op session still appends its reasoning there, and hashing that churn would reset the backoff
 # every single cycle and silently restore the old spin.
+# W32.fingerprint-primary — hash the ref the run's own push ACTUALLY advances. Sessions work in
+# ../suite-wt-* worktrees and ship with `git push origin HEAD:main`, which moves the shared
+# refs/remotes/origin/main (housekeeping() relies on exactly that at its SCOPE note) but NOT $REPO's own HEAD.
+# Only the NEXT session's `git pull --rebase` (resume-prompt STEP 1) moved that, so the session that did the
+# work scored "advanced nothing" and the following one got the credit — progress was always a cycle late. And
+# because that pull is a rebase, git REFUSES it on a dirty primary (rc=128, verified), so one stray
+# uncommitted tracked file froze HEAD permanently: the run then read as idle forever and parked at 72 h with
+# "every remaining queue item looks blocked on you" about a run that had shipped dozens of commits.
+# origin/main is purely local to read (no fetch, so this can never hang the loop on a dead network) and needs
+# no cooperation from the session — which restores the stated invariant that progress is DERIVED, not
+# self-reported. Falls back to HEAD if there is no origin/main yet (a fresh clone).
 work_fingerprint() {
   {
+    # BOTH refs, because either can be the one that moves. In production the session pushes to origin/main
+    # from a worktree and the primary's HEAD does not move until the NEXT session pulls; in a setup where
+    # work is committed locally instead, HEAD moves and origin/main does not. Hashing both is strictly more
+    # sensitive than either alone and cannot MISS progress, which is the direction that matters: a missed
+    # move backs a productive run off toward a false park, while a spurious one only delays a backoff.
     git -C "$REPO" rev-parse HEAD 2>/dev/null || echo no-head
+    git -C "$REPO" rev-parse origin/main 2>/dev/null || echo no-origin
     grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null || echo no-status
     awk '/^## WORK QUEUE/{f=1;print;next} f && /^## /{exit} f' "$PLAN" 2>/dev/null
   } | shasum -a 256 2>/dev/null | cut -d' ' -f1
@@ -315,14 +370,19 @@ work_fingerprint() {
 # would have suppressed that work indefinitely. So an unchanged fingerprint only means "keep backing off"
 # (still retrying, just rarely); a CHANGED one is a positive signal to retry NOW.
 BACKOFF="$INTERVAL"
+# pid of tick()'s lock heartbeat subshell, so park_run() can stop it before releasing the lock
+# (W32.lock-heartbeat-race). Empty whenever no session is in flight.
+LOCK_HB_PID=""
 IDLE_SINCE="$STATE/idle.since"
 NOCOMPLETE="$STATE/nocomplete.count"   # WS4: consecutive committed-but-completed-nothing sessions
-# Clear BOTH counters at every daemon startup so on-disk state shares the daemon's lifetime (BACKOFF is
+# Clear EVERY park counter at daemon startup so on-disk state shares the daemon's lifetime (BACKOFF is
 # in-memory and resets on start; these must too). Otherwise a stale stamp/count from a PRIOR run makes the
 # first cycle PARK immediately — turning the owner's restart (an explicit "try again" signal) into a single
 # retry. Arming a run always buys a full window. (idle.since was a confirmed-HIGH review finding, 2026-07-16;
 # nocomplete.count gets the same treatment for the same reason — see README "Idle backoff"/"Attempt cap".)
-rm -f "$IDLE_SINCE" "$NOCOMPLETE" 2>/dev/null || true
+# The clear itself moved below the SOURCE GUARD (W32.source-guard) — sourcing this file to inspect
+# $DENY/$ALLOW used to wipe a LIVE run's idle clock and attempt streak — and now covers all four counters
+# (W32.restart-counters), not just these two.
 
 note_progress() {   # something moved -> back to the productive cadence
   [ "$BACKOFF" != "$INTERVAL" ] && log "progress — backoff reset to ${INTERVAL}s."
@@ -339,14 +399,36 @@ note_progress() {   # something moved -> back to the productive cadence
 # Matches only a checkbox at a list-item position (`[-*] [x]`, any indent), NOT `[x]` in prose. Errs toward
 # COUNTING a completion: a MISSED completion would false-park (bad); a spurious one only misses a runaway,
 # which the budget cap + idle backoff still backstop. A missing SUITE_TODO.md -> that half is 0 (fail-safe).
+# W32.fingerprint-primary, same reasoning: read the TRACKERS out of origin/main rather than the primary's
+# working tree, which the run's own commits never touch (only the next session's pull does). Reading the
+# working copy made an item completion observable a cycle late, and invisible entirely if that pull was ever
+# blocked. `git show` is local and cheap; a failure yields empty, which the numeric guards below read as 0 —
+# the same fail-safe the missing-file case already had. ($PLAN is gitignored and lives only in the primary,
+# so the WORK QUEUE half correctly still reads the file.)
+# Read a tracker from origin/main, falling back to the primary's working copy ONLY if that ref cannot be
+# read at all (no origin/main yet, or the path is absent there) — never merely because the count came back 0,
+# which is a legitimate answer and must not silently switch sources.
+_tracker_ticks() {   # $1 = repo-relative path, $2 = the checkbox regex
+  local w o body
+  w=$(grep -cE "$2" "$REPO/$1" 2>/dev/null); case "$w" in ''|*[!0-9]*) w=0 ;; esac
+  o=0
+  if body="$(git -C "$REPO" show "origin/main:$1" 2>/dev/null)"; then
+    o=$(printf '%s\n' "$body" | grep -cE "$2"); case "$o" in ''|*[!0-9]*) o=0 ;; esac
+  fi
+  # The LARGER of the two, for the same reason the fingerprint hashes both refs: a completion lands in the
+  # working copy or in origin/main depending on whether the session pushed from a worktree or committed here,
+  # and MISSING one false-parks a healthy run (the confirmed-HIGH failure this counter already had once).
+  [ "$o" -gt "$w" ] && w="$o"
+  printf '%s\n' "$w"
+}
 completed_items() {
   local q t d re='^[[:space:]]*[-*][[:space:]]+\[[xX]\]'
   q=$(awk '/^## WORK QUEUE/{f=1;next} f && /^## /{exit} f' "$PLAN" 2>/dev/null | grep -cE "$re")
-  t=$(grep -cE "$re" "$REPO/SUITE_TODO.md" 2>/dev/null)
+  t=$(_tracker_ticks SUITE_TODO.md "$re")
   # Since 2026-08-01 a finished item is MOVED to SUITE_TODO_DONE.md rather than ticked in place, so the count
   # of `[x]` left in SUITE_TODO no longer grows on completion — it stays ~0. Counting the archive is what keeps
   # "an item completed" observable here. (A missing file -> 0, fail-safe, as with the other halves.)
-  d=$(grep -cE "$re" "$REPO/SUITE_TODO_DONE.md" 2>/dev/null)
+  d=$(_tracker_ticks SUITE_TODO_DONE.md "$re")
   case "$q" in ''|*[!0-9]*) q=0 ;; esac
   case "$t" in ''|*[!0-9]*) t=0 ;; esac
   case "$d" in ''|*[!0-9]*) d=0 ;; esac
@@ -405,7 +487,25 @@ backoff_sleep() {
 #   $1 = short reason (log + notification title)   $2 = the owner-facing message
 park_run() {
   local reason="$1" m="$2"
+  # W32.park-reason — claim the exit reason BEFORE the bootout below SIGTERMs us. That signal fires the TERM
+  # trap, which overwrites $_EXIT_REASON, so every park in daemon.log was logged as "SIGTERM — launchd
+  # bootout/stop, logout, shutdown, or the laptop lid closing" (all four parks on record). The exit-reason
+  # line exists precisely so a death is not misattributed; on the one path where the daemon knows exactly why
+  # it is dying, it was guessing wrong.
+  _EXIT_REASON="PARKED ($reason) — the daemon stopped itself; it needs you"
   rm -f "$IDLE_SINCE" 2>/dev/null || true   # belt-and-braces: never leave a stamp a restart could trip over
+  # W32.lock-heartbeat-race — kill the lock heartbeat BEFORE releasing the lock. tick() spawns a subshell that
+  # `touch`es $LOCK every 60s for the child's lifetime, and both lock-holding park paths are reached from
+  # tick() BEFORE its `kill "$hb"`. park_run then spends real time below (log + Desktop file + notify's curl
+  # --max-time 15 + write_status + osascript) before the bootout kills us, so a heartbeat tick landing in that
+  # window re-created the lock with a fresh mtime — and tick()'s own `rm` never runs, because bootout killed
+  # us first. Proven by scaled reproduction. That reinstated the exact 25-minute "engine busy" stall the next
+  # comment says this `rm` exists to prevent, and made _log_exit report session-in-flight=YES with none.
+  if [ -n "${LOCK_HB_PID:-}" ]; then
+    kill "$LOCK_HB_PID" 2>/dev/null || true
+    wait "$LOCK_HB_PID" 2>/dev/null || true
+    LOCK_HB_PID=""
+  fi
   # Release the engine lock HERE, not in the caller's post-verdict cleanup: under `keepalive` (WS1) the
   # `launchctl bootout` below SIGTERMs THIS process the instant it's called (verified), so everything textually
   # after it — including tick()'s `rm -f "$LOCK"` — never runs. Without this, an idle/attempt-cap park (both
@@ -422,6 +522,14 @@ park_run() {
   osascript -e 'on run argv
 display notification ("Run parked: " & (item 1 of argv) & ". See ARCHIVE-SUITE-RUN-PARKED.txt on your Desktop.") with title "Archive Suite: autonomous run parked" sound name "Basso"
 end run' "$reason" >/dev/null 2>&1 || true
+  # W32.plist-relogin — a park has to outlive the login session. `bootout` only unloads the job from the
+  # CURRENT gui/$UID domain and writes no persistent disable, so with the LaunchAgent still installed
+  # (RunAtLoad=true) the next GUI login re-bootstrapped it and the run RESUMED — on the very item that parked
+  # it, with a full fresh window (park deliberately leaves RUN STATUS: IN_PROGRESS, and startup wipes the
+  # counters), and the "daemon up" path then deletes the Desktop park note before the owner reads it. A park
+  # is the daemon saying it needs a human; it must not restart itself. Removing the file is the durable stop —
+  # `daemon.sh start` re-renders and reinstalls it, so the owner loses nothing and remains the only starter.
+  rm -f "$HOME/Library/LaunchAgents/$JOB.plist" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)/$JOB" 2>/dev/null || true
 }
 
@@ -450,6 +558,19 @@ note_no_progress() {
 # $glog holds its output. The cap matters because the gate runs SYNCHRONOUSLY in the daemon loop — a hang
 # (e.g. an unexpected GUI/keychain prompt on some xcodebuild path) would otherwise freeze the WHOLE daemon.
 GATE_STATE="$STATE/last-gate"; GATE_TO="$STATE/gate-timeouts"; glog="$STATE/last-gate.log"
+# The ref the gate cadence measures (W32.fingerprint-primary). Work can arrive on EITHER ref — origin/main
+# when a session pushes from its worktree (the production shape), HEAD when it is committed here — so the tip
+# is "whichever is further along", recomputed each time rather than pinned once. Counting HEAD alone froze the
+# cadence at 0 whenever the primary could not pull, silently switching the regression gate off for good.
+_gate_tip() {
+  local ch co
+  ch="$(git -C "$REPO" rev-list --count HEAD 2>/dev/null || echo 0)"
+  co="$(git -C "$REPO" rev-list --count origin/main 2>/dev/null || echo 0)"
+  case "$ch" in ''|*[!0-9]*) ch=0 ;; esac
+  case "$co" in ''|*[!0-9]*) co=0 ;; esac
+  if [ "$co" -gt "$ch" ]; then printf 'origin/main\n'; else printf 'HEAD\n'; fi
+}
+GATE_REF="$(_gate_tip)"
 _run_gate_once() {
   "$GATE_CMD" >"$glog" 2>&1 &
   local gpid=$! waited=0
@@ -484,9 +605,16 @@ _classify_red() {
     # A DOCUMENT step failing means a file is oversized or the trackers disagree — the CODE is fine. Every
     # other step in health-gate.sh builds or tests code. (coherence/tracker-sync are warn-only by construction
     # so they cannot actually reach $fails; they are listed defensively, not because they can RED today.)
+    # W32.classify-names — these must be REAL step names from health-gate.sh's `step`/`step_skippable` lines.
+    # The list used to read `context-budget|tracker-sync|coherence`, of which only the first exists: the gate
+    # has no `coherence` step at all, and its tracker step is `tracker-sync-proof`. Document self-heal still
+    # worked (context-budget is the only step that measures document SIZE), but the list advertised coverage
+    # it did not have. Keep this in sync with health-gate.sh; a document step that is missing here is parked
+    # as "a reproducible build/test regression", which is the misreport this classification exists to stop.
+    # NOTE the `*-proof` steps are deliberately NOT here: they run test harnesses, so they are code.
     case "$s" in
-      context-budget|tracker-sync|coherence) doc_list="${doc_list:+$doc_list }$s" ;;
-      *)                                     has_code=1 ;;
+      context-budget) doc_list="${doc_list:+$doc_list }$s" ;;
+      *)              has_code=1 ;;
     esac
   done
 }
@@ -541,14 +669,21 @@ _docfix_write() {   # $1 = REQUIRED|ADVISORY   $2 = space-separated file list   
   } > "$DOCFIX.tmp" 2>/dev/null && mv -f "$DOCFIX.tmp" "$DOCFIX" 2>/dev/null || rm -f "$DOCFIX.tmp" 2>/dev/null
 }
 # Parse one state out of the machine-readable block. $1 = report, $2 = OVER|NEAR|WARN.
-_budget_files() { printf '%s\n' "$1" | awk -v k="$2" '$1=="context-budget:" && $2==k {print $3}' | tr '\n' ' '; }
+# W32.budget-space — take the path as fields 3..NF-2, not bare $3: context-budget.sh emits
+# `context-budget: <STATE> <path> <size> <budget>`, so a path containing a space was truncated at the first
+# one and the session was handed a fix request naming a file that does not exist. No guarded document has a
+# space today, but this repo's own root path does, so the class is live here.
+_budget_files() {
+  printf '%s\n' "$1" | awk -v k="$2" '$1=="context-budget:" && $2==k {
+    out=$3; for (i=4; i<=NF-2; i++) out=out" "$i; print out }' | tr '\n' ' '
+}
 _budget_total() { printf '%s\n' "$1" | awk '$1=="context-budget:" && $2=="TOTAL" {print $3; exit}'; }
 
 doc_pregate() {
   [ "$DOC_PREGATE" = 1 ] || return 0
   [ -x "$BUDGET_CMD" ] || { log "doc pre-gate: no budget script at $BUDGET_CMD — skipping (fail-open)."; return 0; }
 
-  local out over tstate n over_files near_files
+  local out over tstate n over_files near_files _compactor_ran=0
   out="$("$BUDGET_CMD" "$REPO" 2>&1)"
   over_files="$(_budget_files "$out" OVER)"; over_files="${over_files% }"
   near_files="$(_budget_files "$out" NEAR)"; near_files="${near_files% }"
@@ -611,10 +746,13 @@ doc_pregate() {
   #     shape of a total overage, and the old test would have skipped the free in-cycle compactor and handed a
   #     whole session work a script does for nothing. Run the compactor whenever the total is over and the plan
   #     is present; it is a no-op when there is nothing to archive (proved: prove-compact.sh's three-way no-op).
-  if [ "$tstate" = "OVER" ] && [ -f "$REPO/.maintenance/AUTONOMOUS_PLAN.md" ]; then
+  # $PLAN, not a hardcoded .maintenance/AUTONOMOUS_PLAN.md: the plan path is overridable (AUTONOMOUS_PLAN),
+  # so the hardcoded form silently skipped the free mechanical remedy whenever the two disagreed.
+  if [ "$tstate" = "OVER" ] && [ -f "$PLAN" ]; then
     if [ -x "$COMPACTOR" ]; then
       log "doc pre-gate: orientation total over — running the plan compactor first (mechanical, in-cycle, no session)."
       "$COMPACTOR" "$REPO" >>"$LOG" 2>&1 || log "doc pre-gate: compactor rc=$? — detail just above in this log."
+      _compactor_ran=1   # W32.docfix-note: the park note below must only claim this if it is true
       out="$("$BUDGET_CMD" "$REPO" 2>&1)"
       over_files="$(_budget_files "$out" OVER)"; over_files="${over_files% }"
       tstate="$(_budget_total "$out")"
@@ -650,14 +788,22 @@ doc_pregate() {
   fi
   if [ "$DOCFIX_MAX" -gt 0 ] && [ "$n" -gt "$DOCFIX_MAX" ]; then
     rm -f "$DOCFIX_TRIES" "$DOCFIX" "$DOCFIX_HEAD"
+    # W32.docfix-note — say which remedies ACTUALLY ran. This bullet used to assert "compact-plan.sh ran"
+    # unconditionally, including on the branch that had just logged there is no compactor at $COMPACTOR.
+    local _compactor_note
+    if [ "$_compactor_ran" = 1 ]; then
+      _compactor_note="compact-plan.sh ran (it can only shrink .maintenance/AUTONOMOUS_PLAN.md);"
+    else
+      _compactor_note="compact-plan.sh did NOT run — none is installed at $COMPACTOR, so the one mechanical remedy was never available. Installing it (ops/autonomous/daemon.sh does this) may be the whole fix;"
+    fi
     park_run "documents over budget after $DOCFIX_MAX trim attempts" \
       "Archive Suite autonomous run PARKED — a document has been OVER its size budget for $DOCFIX_MAX
 consecutive sessions and the trims did not bring it under. This is the document-SIZE guard: it measures bytes,
 so it is not a build or a test failure. (It also says nothing either way about the code — this check runs
 BEFORE the gate, so no build or suite has run at this point.)
 OVER BUDGET: ${over:-per-session orientation total}
-Both remedies have ALREADY been tried, so there is nothing left to hand-run:
-  * compact-plan.sh ran (it can only shrink .maintenance/AUTONOMOUS_PLAN.md);
+What has already been tried:
+  * ${_compactor_note}
   * $DOCFIX_MAX sessions were given the trim as their one item and did not finish it.
 That pattern usually means the BUDGET is wrong rather than the document — see the header of
 ops/autonomous/context-budget.sh, which explains how each number was derived and what justifies raising one.
@@ -675,10 +821,22 @@ Then restart it:  ./ops/autonomous/daemon.sh start"
 # restarts; a missing/invalid sha fails OPEN (due now). Must be called only when no other engine is active.
 health_gate() {
   [ "$GATE_EVERY" -gt 0 ] || return 0
-  local last cnt
+  local last cnt cnt_h cnt_o
   last="$(cat "$GATE_STATE" 2>/dev/null)"
   if [ -n "$last" ] && git -C "$REPO" cat-file -e "$last^{commit}" 2>/dev/null; then
-    cnt="$(git -C "$REPO" rev-list --count "$last..HEAD" 2>/dev/null || echo "$GATE_EVERY")"
+    # W32.fingerprint-primary — count against the ref the run's pushes actually advance. Counting
+    # "$last..HEAD" meant the cadence tracked the PRIMARY's HEAD, which only the next session's `git pull`
+    # moves; if that pull was ever blocked (a dirty primary makes `pull --rebase` refuse), the count stuck at
+    # 0 and the periodic gate NEVER became due again while commits kept landing on origin/main — the
+    # regression gate silently switching itself off, with no alarm anywhere.
+    # Whichever ref is FURTHER AHEAD of the last green — same both-refs reasoning as the fingerprint. Using
+    # HEAD alone froze the cadence at 0 whenever the primary could not pull (a dirty tree makes `pull --rebase`
+    # refuse), so the periodic gate silently stopped becoming due while commits kept landing on origin/main.
+    cnt_h="$(git -C "$REPO" rev-list --count "$last..HEAD" 2>/dev/null || echo 0)"
+    cnt_o="$(git -C "$REPO" rev-list --count "$last..origin/main" 2>/dev/null || echo 0)"
+    case "$cnt_h" in ''|*[!0-9]*) cnt_h=0 ;; esac
+    case "$cnt_o" in ''|*[!0-9]*) cnt_o=0 ;; esac
+    if [ "$cnt_o" -gt "$cnt_h" ]; then cnt="$cnt_o"; GATE_REF="origin/main"; else cnt="$cnt_h"; GATE_REF="HEAD"; fi
   else
     cnt="$GATE_EVERY"     # never gated, or a stale/invalid sha -> fail OPEN (run the gate now)
   fi
@@ -706,8 +864,8 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   rm -f "$GATE_TO" 2>/dev/null || true     # a conclusive result (green/red) resets the timeout streak
 
   if [ "$GATE_RC" -eq 0 ]; then
-    git -C "$REPO" rev-parse HEAD > "$GATE_STATE" 2>/dev/null || true
-    log "health gate GREEN @ $(git -C "$REPO" rev-parse --short HEAD 2>/dev/null)."
+    git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
+    log "health gate GREEN @ $(git -C "$REPO" rev-parse --short "$(_gate_tip)" 2>/dev/null)."
     return 10
   fi
 
@@ -717,7 +875,7 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   log "health gate RED — retrying ONCE before parking (guards against a flaky test / transient xcodebuild error)…"
   _run_gate_once
   if [ "$GATE_RC" -eq 0 ]; then
-    git -C "$REPO" rev-parse HEAD > "$GATE_STATE" 2>/dev/null || true
+    git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
     log "health gate GREEN on retry — the first failure was transient (not parking)."
     return 10
   fi
@@ -755,7 +913,7 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
         || log "self-repair: compact-plan aborted a pass (rc=$?) — detail just above in this log."
       _run_gate_once
       if [ "$GATE_RC" -eq 0 ]; then
-        git -C "$REPO" rev-parse HEAD > "$GATE_STATE" 2>/dev/null || true
+        git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
         log "health gate GREEN after SELF-REPAIR — a document was over budget and the daemon fixed it itself (not parking)."
         return 10
       fi
@@ -882,6 +1040,24 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
+# ---- Startup side effects (W32.source-guard) ---------------------------------------------------------
+# These three used to sit up in the config block, ABOVE the guard, which made the guard's own promise
+# ("everything above is config + function definitions, safe to source") false: sourcing the file to read
+# $DENY/$ALLOW created directories, pulled the operator's alert credential into the interactive shell, and
+# WIPED a live run's idle clock + attempt streak. They belong here, where "the daemon is really starting" is
+# established. Order matters: $STATE must exist before anything writes into it.
+mkdir -p "$STATE"
+# Alert config, sourced WITHOUT `set -a` — see the rationale block above notify(): $STATE/env is the CHILD's
+# environment, $STATE/alert.env is the daemon's, and the credential must never reach a session.
+[ -f "$STATE/alert.env" ] && . "$STATE/alert.env"
+# Every park counter, per the rationale above $IDLE_SINCE. W32.restart-counters: $GATE_TO and the two
+# doc-budget files were added later and never got this treatment, so they outlived the daemon that wrote
+# them — a single earlier gate timeout sitting at 1 on disk (it is cleared only by a CONCLUSIVE gate, so it
+# can persist for weeks across restarts) made the next run park on its FIRST timeout instead of its second,
+# and a doc-budget count of 3 parked a restarted run as soon as HEAD moved. An owner restart buys a full
+# window for ALL of them or the invariant is not an invariant.
+rm -f "$IDLE_SINCE" "$NOCOMPLETE" "$GATE_TO" "$DOCFIX_TRIES" "$DOCFIX_HEAD" 2>/dev/null || true
+
 # ---- WHY the daemon used to vanish without a trace (added 2026-07-29) --------------------------------
 # Only the NORMAL loop exit logged "=== daemon down ===" (bottom of file). `trap 'exit 0' TERM INT` exited
 # immediately, so a SIGTERM logged NOTHING — and SIGTERM is what launchd sends on `bootout`, logout and
@@ -968,14 +1144,19 @@ _terminate_tree() {
 
 # Integer sum of %CPU across pid $1's process tree. macOS `ps %cpu` is a decaying average over recent real
 # time, so a tree quiet for HB_STALL decays toward 0 while a live build/test stays high.
+# W32.tree-cpu — accumulate as a FLOAT and truncate ONCE, at the end. This used to round to an integer on
+# every iteration, discarding each process's fractional part, so the error grew with the process count and a
+# tree of sub-1% processes summed to exactly 0: six at 0.9% gave 0 rather than 5 (measured). Against
+# HB_CPU=3 that turns a working tree into an "idle" one, so the watchdog's spare-it branch never fires and a
+# healthy session is killed after HB_IDLE_N polls — the false-kill the two-signal design exists to avoid.
 _tree_cpu() {
   local p cpu total=0
   for p in $(_descendants "$1"); do
     cpu="$(ps -o %cpu= -p "$p" 2>/dev/null | tr -d ' ')"
     case "$cpu" in ''|*[!0-9.]*) continue ;; esac
-    total="$(awk -v t="$total" -v c="$cpu" 'BEGIN{printf "%d", t + c}')"
+    total="$(awk -v t="$total" -v c="$cpu" 'BEGIN{printf "%.2f", t + c}')"
   done
-  printf '%s\n' "$total"
+  awk -v t="$total" 'BEGIN{printf "%d\n", t}'
 }
 
 # Meaningful log bytes = size of the stream-json log EXCLUDING rate_limit_event lines, so a rate-limit spin
@@ -1041,6 +1222,11 @@ tick() {
   # 1. Done? unload + stop.
   if grep -q '^RUN STATUS: COMPLETE' "$PLAN" 2>/dev/null; then
     log "plan RUN STATUS: COMPLETE — daemon stopping."
+    _EXIT_REASON="plan RUN STATUS: COMPLETE — the run finished its queue"   # W32.park-reason, same as park
+    # W32.plist-relogin — a finished run must stay finished. Without removing the LaunchAgent, the next GUI
+    # login re-bootstrapped the job and the daemon came back up on a COMPLETE plan, immediately re-stopped,
+    # and repeated that at every login. `daemon.sh start` reinstalls it.
+    rm -f "$HOME/Library/LaunchAgents/$JOB.plist" 2>/dev/null || true
     launchctl bootout "gui/$(id -u)/$JOB" 2>/dev/null || true
     return 9
   fi
@@ -1100,6 +1286,7 @@ tick() {
   local ppid=$$
   ( while kill -0 "$ppid" 2>/dev/null; do touch "$LOCK" 2>/dev/null; sleep 60; done ) &
   local hb=$!
+  LOCK_HB_PID=$hb   # so park_run() can stop it before releasing the lock (W32.lock-heartbeat-race)
 
   # 5. Optional per-project env hook (e.g. a test API key) into the child env, without ever printing it.
   #    Archive Suite: $STATE/ocr-key.env holds `OCR_KEY=…` for the E2E (absent by default -> Keychain fallback).
@@ -1122,7 +1309,15 @@ tick() {
   # `./ArchiveNotes/test-smoke.sh` — no `xcodebuild` in the string — and the script's own whole-scheme
   # `xcodebuild test` ran ArchiveNotesUITests on the owner's screen. The shim intercepts the exec itself,
   # at any nesting depth — each shim refusing only the argv forms that reach the screen (see _gui-shim).
-  export PATH="$REPO/ops/autonomous/bin:$PATH"
+  # W32.path-growth — prepend ONCE, not once per cycle. tick() runs in the daemon's own long-lived shell, so
+  # an unconditional prepend grew $PATH by 51 bytes every cycle (measured) and never shrank; over the 2-week
+  # unattended run this repo targets that is hundreds of KB of environment, eventually risking E2BIG on the
+  # very `claude -p` exec the daemon exists to perform. The guard is a whole-component match, so a directory
+  # merely CONTAINING this path as a substring cannot suppress it.
+  case ":$PATH:" in
+    *":$REPO/ops/autonomous/bin:"*) ;;
+    *) export PATH="$REPO/ops/autonomous/bin:$PATH" ;;
+  esac
 
   log "launching fresh resume session (backstop ${MAXRUN}s, budget \$$BUDGET, health-wd on)…"
   cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; return 0; }
@@ -1198,16 +1393,28 @@ tick() {
     # window is exhausted (see the Watchdog note above) and cannot move the fingerprint, so it lands here
     # looking identical to "there was nothing to do". Reading that as an idle queue is the same misreport
     # W23.status1 fixed one layer up in `daemon.sh status`; this is the log line it left behind.
+    # W32.usage-guess — ASK THE LOG, don't time the process. The CLI emits a structured
+    # {"type":"rate_limit_event","rate_limit_info":{"status":"rejected",…}} into $SLOG — the same string
+    # _meaningful_bytes() already filters on — so the answer is recorded rather than inferred. The old test
+    # was `rc != 0 && elapsed < 10`, wrong in both directions: a rejection slower than 10s read as a genuine
+    # no-op, and ANY other fast failure (a missing CLI exiting 127, a bad flag, an MCP init error, an empty
+    # prompt) was reported as "likely USAGE-LIMIT" every cycle for up to IDLE_STOP — 72 hours — and then
+    # parked with a SECOND wrong message ("every remaining queue item looks blocked on you"). Three days of a
+    # dead run described to the owner as an owner-gated queue. The timing heuristic is kept only as a
+    # fallback, and now says "unrecognised" rather than naming a cause it has not established.
     local _elapsed=$(( SECONDS - _t0 ))
-    if [ "$rc" -ne 0 ] && [ "$_elapsed" -lt 10 ]; then
-      log "session (rc=$rc) exited after ${_elapsed}s — likely USAGE-LIMIT fast-fail, not an empty queue; backing off."
+    if grep -q '"type":"rate_limit_event"' "$SLOG" 2>/dev/null \
+       && grep -q '"status":"rejected"' "$SLOG" 2>/dev/null; then
+      log "session (rc=$rc) hit a USAGE LIMIT (rate_limit_event: rejected, after ${_elapsed}s) — not an empty queue; backing off until it resets."
+    elif [ "$rc" -ne 0 ] && [ "$_elapsed" -lt 10 ]; then
+      log "session (rc=$rc) died after only ${_elapsed}s with NO rate-limit event — NOT a usage limit. Check $SLOG (a missing/!x claude CLI, a bad flag, or an MCP/init failure all look like this)."
     else
       log "session (rc=$rc) advanced nothing (queue + tip unchanged) — no progress."
     fi
     note_no_progress || verdict=9
   fi
 
-  kill "$hb" 2>/dev/null || true
+  kill "$hb" 2>/dev/null || true; LOCK_HB_PID=""
   rm -f "$LOCK" 2>/dev/null || true
   housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
   # Keep the durable plan small: archive old Session Log entries AND rotate the Daemon Report tail (WS8) so

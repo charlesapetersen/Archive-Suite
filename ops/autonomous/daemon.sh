@@ -12,7 +12,9 @@
 # Run from the PRIMARY checkout:
 #   ./ops/autonomous/daemon.sh start   # install + verify prereqs + launch under launchd KeepAlive, so a
 #                                      #   CRASH/OOM/kill auto-restarts (WS1) — best for a long unattended run.
-#                                      #   Survives a daemon crash, NOT a logout/reboot (reboot out of scope).
+#                                      #   Survives a daemon crash AND, until you `stop`, a logout/reboot:
+#                                      #   launchd re-bootstraps ~/Library/LaunchAgents at the next GUI login
+#                                      #   (W32.plist-relogin). `stop` removes the plist, so a stop sticks.
 #   ./ops/autonomous/daemon.sh         # same thing — a bare invocation still means `start`.
 #   ./ops/autonomous/daemon.sh stop    # stop it (boots out the launchd job first, then kills the process)
 #   ./ops/autonomous/daemon.sh status  # daemon state + supervisor + RUN STATUS + recent log (read-only)
@@ -32,7 +34,10 @@ set -uo pipefail
 sed_repl() { printf '%s' "$1" | sed -e 's/[\\&]/\\&/g'; }
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"          # this script's checkout = where the daemon works
-STATE="$HOME/.local/state/archive-autonomous"
+# One slug, derived the same way the daemon derives it (W32.label-state) so the two can never disagree about
+# which state dir / launchd job they mean. Same literal values as before for LABEL=archivesuite.
+LABEL="${AUTONOMOUS_LABEL:-archivesuite}"
+STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${LABEL}-autonomous}"
 BIN="$HOME/.local/bin"
 CLAUDE="$BIN/claude"
 DAEMON_SRC="$REPO/ops/autonomous/archive-suite-autonomous.sh"
@@ -42,7 +47,8 @@ COMPACT_DST="$BIN/compact-plan.sh"
 PROMPT_SRC="$REPO/ops/autonomous/resume-prompt.txt"
 PLAN="$REPO/.maintenance/AUTONOMOUS_PLAN.md"
 LOG="$STATE/daemon.log"
-JOB="com.archivesuite.autonomous"                        # launchd label (matches the .plist + the daemon's $JOB)
+LOCK="$STATE/engine.lock"                                # must match the daemon's own $LOCK (W32.stop-lock)
+JOB="com.${LABEL}.autonomous"                            # launchd label (matches the .plist + the daemon's $JOB)
 PLIST_SRC="$REPO/ops/autonomous/com.archivesuite.autonomous.plist"
 PLIST_DST="$HOME/Library/LaunchAgents/$JOB.plist"
 GUI_DOMAIN="gui/$(id -u)"                                 # per-user launchd domain for the LaunchAgent
@@ -91,6 +97,14 @@ if [ "${1:-}" = "--dry-run" ]; then DRYRUN=1; shift; fi
 case "${1:-start}" in
   status) shift; status "$@"; exit 0 ;;   # extra args (e.g. --details) pass through to the digest
   stop)
+    # W32.dry-run-stop: --dry-run must be honoured HERE. The generic guard lives below the dispatch, and this
+    # arm exits before reaching it, so `--dry-run stop` used to perform a REAL stop — bootout + three pkills,
+    # killing the daemon, the in-flight session and any in-flight build — while the operator was asking what it
+    # WOULD do. (`status` needs no such guard: it is read-only by construction.)
+    [ -n "$DRYRUN" ] && {
+      echo "daemon.sh --dry-run stop: would bootout $GUI_DOMAIN/$JOB, remove $PLIST_DST, kill the loop +"
+      echo "  any resume session + any in-flight health gate, and clear $LOCK — NOTHING was stopped."
+      exit 0; }
     # bootout FIRST — under `keepalive` (launchd KeepAlive=true) a plain pkill would just be relaunched, so we
     # must remove the launchd job before killing anything. Harmless no-op if the run is the plain nohup mode
     # (no such job). THEN pkill the loop + any resume session it spawned: a bare `claude -p` child is NOT
@@ -98,15 +112,31 @@ case "${1:-start}" in
     # (reparented to init, running off stale state — the repeated-orphan bug); match sessions by the resume
     # prompt's distinctive phrase. Neither pattern matches daemon.sh itself or an interactive Claude session.
     booted=0; launchctl bootout "$GUI_DOMAIN/$JOB" 2>/dev/null && { booted=1; echo "launchd job booted out."; }
+    # W32.plist-relogin — AND REMOVE THE PLIST. `bootout` only unloads the job from the CURRENT gui/$UID
+    # domain; it writes no persistent disable. launchd re-bootstraps ~/Library/LaunchAgents at the NEXT GUI
+    # login, so leaving the file behind meant an intentional stop lasted only until the next login and the
+    # daemon then started ITSELF — observed 2026-08-05 (hard power-off 15:25 with no `daemon down` line, boot
+    # 21:56:53, `daemon up (pid 1701)` 22:00:20, no human involved). Starting this daemon is the owner's call
+    # alone, so a stop has to outlive the login session. Nothing is lost: `start` re-renders and re-installs
+    # the plist every time (see the keepalive branch below).
+    rm -f "$PLIST_DST" 2>/dev/null || true
     k=0
     pkill -f 'archive-suite-autonomous\.sh' && k=1
     pkill -f 'autonomous maintenance session for the Archive Suite' && k=1
     # WS7: a health gate in flight is `bash health-gate.sh` -> xcodebuild — matched by NEITHER pattern above
     # (same bare-child orphan class we fixed for sessions), so kill it too, else `stop` leaves a build running.
     pkill -f 'ops/autonomous/health-gate\.sh' 2>/dev/null && { k=1; echo "in-flight health gate stopped."; }
+    # W32.stop-lock — release the engine lock. `stop` is the ONE place that knows the shutdown is intentional,
+    # so a lock left behind here is stale by construction. Without this, a stop during an in-flight session
+    # (the common case — sessions run 10-45 min) left a lock <60s old and the NEXT `start` no-op'd
+    # "engine busy — skip" every cycle until it aged past $STALE (25 min), while daemon.sh still printed
+    # "✅ daemon is up and starting its first session". Observed twice: 2026-08-05 (13 consecutive skips,
+    # 22 minutes lost) and 2026-08-11. The EXIT trap only ever REPORTED this ("session-in-flight=YES").
+    rm -f "$LOCK" 2>/dev/null || true
     if [ "$k" = 1 ]; then echo "daemon + any resume session stopped."
     elif [ "$booted" = 1 ]; then echo "launchd job stopped (its process was already down)."
     else echo "daemon was not running."; fi
+    echo "launchd job removed ($PLIST_DST) — it will NOT come back at the next login; '$0 start' reinstalls it."
     exit 0 ;;
   start|keepalive) MODE='keepalive' ;; # DEFAULT (2026-07-17): launchd KeepAlive so a crash/kill auto-restarts (WS1).
                                        # A BARE `./daemon.sh` still means `start` (renamed from `arm` 2026-08-06):
@@ -156,7 +186,11 @@ fi
 # 4. guard the stale-COMPLETE footgun (a finished run leaves RUN STATUS: COMPLETE; the daemon
 #    would start and immediately stop). Make the fix explicit instead of silently no-op'ing.
 st="$(runstatus)"
-if printf '%s' "$st" | grep -q 'COMPLETE'; then
+# W32.complete-substring — ANCHORED. This used to be an unanchored `grep -q 'COMPLETE'` over the first 90
+# chars, so an IN_PROGRESS plan whose one-line note merely mentioned the word (e.g. "RUN STATUS: IN_PROGRESS
+# — finish the COMPLETE-path cleanup") refused to start, telling the owner to fix a status line that was
+# already correct. Only a line that genuinely READS complete should trip this.
+if printf '%s' "$st" | grep -qE '^RUN STATUS:[[:space:]]*COMPLETE'; then
   cat >&2 <<EOF
 RUN STATUS is COMPLETE — the daemon would start then immediately stop.
 To (re)start a run, edit:
@@ -174,7 +208,10 @@ if [ "$MODE" = keepalive ]; then
   # Install the LaunchAgent + (re)bootstrap it. RunAtLoad launches the daemon; KeepAlive=true relaunches it
   # on any bootout-less death (crash/OOM/stray signal). `daemon.sh stop`, park, and plan-COMPLETE all bootout,
   # so intentional stops still stick. NOTE: a LaunchAgent loads in your GUI login session — it survives a
-  # daemon CRASH, not a logout/reboot (reboot-survival is deliberately out of scope). (GUI verification now
+  # daemon CRASH — and ALSO a logout/reboot, which was long documented here as out of scope and is not:
+  # launchd re-bootstraps ~/Library/LaunchAgents at the next GUI login and RunAtLoad starts the job. That is
+  # why `stop`/park/COMPLETE now REMOVE the plist (W32.plist-relogin) — otherwise an intentional stop lasted
+  # only until the next login and the daemon restarted itself, unasked. (GUI verification now
   # runs off-screen in the Tart VM regardless of supervisor — ops/gui/README §3 — so no host TCC grant matters.)
   # launchd expands neither `~` nor `$HOME` in a path, so the committed template carries a __HOME__
   # placeholder and the real home is rendered in here. Lint the RENDERED file — that is what launchd loads.

@@ -167,16 +167,30 @@ echo "[8] 'Needs you' stays empty when nothing is wrong, and fills when things a
 touch "$S/keychain-partition-fixed"            # otherwise the keychain ask is (correctly) always present
 OUT="$(RUNNING=1 run)"
 printf '%s' "$OUT" | grep -q 'Nothing right now' && ok "quiet when there is nothing to ask" || bad "invented an ask" "$OUT"
-write_plan "- [ ] held thing" "- [ ] decide this thing"
+# W32.needs-you-blind — the Daemon Report fixture must use the shape the section ACTUALLY uses (`### <date>`
+# H3 headers). It used to say `- [ ] decide this thing`, a shape that has never appeared in the section or in
+# 338 KB of its archive — so this assertion passed while the renderer was structurally blind to every real
+# entry. A fixture that models a format the code never meets is how that hole stayed green.
+write_plan "- [ ] held thing" "### 2026-08-12 — decide this thing"
 OUT="$(RUNNING=1 run)"
 printf '%s' "$OUT" | grep -q 'held back for you' && ok "hold queue surfaced" || bad "hold queue missed" "$OUT"
-printf '%s' "$OUT" | grep -q 'waiting on your decision' && ok "daemon-report count surfaced" || bad "daemon report missed" "$OUT"
+printf '%s' "$OUT" | grep -q 'not been walked through' && ok "daemon-report count surfaced" || bad "daemon report missed" "$OUT"
+# …and the scan must STOP at the newest walkthrough marker, so settled entries are never re-raised
+# (root CLAUDE.md is emphatic about that). One entry above the marker, one below -> exactly 1 reported.
+write_plan "" "### 2026-08-13 — unwalked one
+
+### ✅ 2026-08-12 walkthrough done
+
+### 2026-08-11 — already settled, must NOT be re-raised"
+OUT="$(RUNNING=1 run)"
+printf '%s' "$OUT" | grep -q '1 Daemon Report entr' \
+  && ok "counts only entries ABOVE the newest walkthrough marker" || bad "settled entries re-raised" "$OUT"
 OUT="$(RUNNING=1 TASKPORT=1 run)"
 printf '%s' "$OUT" | grep -q 'security setting is still relaxed' && ok "taskport surfaced" || bad "taskport missed" "$OUT"
 write_plan "" ""
 
 echo "[9] a '## ' heading inside Daemon Report ends the scan (documented trap — must not silently empty)"
-printf 'RUN STATUS: x\n\n## Daemon Report\n## Oops\n- [ ] hidden\n' > "$P"
+printf 'RUN STATUS: x\n\n## Daemon Report\n## Oops\n### 2026-08-12 — hidden\n' > "$P"
 OUT="$(RUNNING=1 run)"
 # Deterministic, so assert it rather than accepting either outcome: the awk ends the section at the first
 # `## `, so the item below it is invisible here. That is by design (it bounds the section) but it is also a

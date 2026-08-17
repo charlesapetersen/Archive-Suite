@@ -77,8 +77,14 @@ brought it back. The model is simple: **the only thing that stops it is a `launc
 intentional stop performs (`daemon.sh stop`, park, plan-COMPLETE); any other death leaves the job registered, so
 launchd relaunches (throttled to 60s). Proven on-machine by `tests/prove-keepalive.sh`; the dispatch (that
 bare `arm` selects this) by `tests/prove-daemon-dispatch.sh`.
-- **Survives a daemon crash, NOT a logout/reboot** — a LaunchAgent only loads at GUI login (reboot-survival is
-  deliberately out of scope; it'd need auto-login, defeated by FileVault anyway — see "don't reboot" below).
+- **Survives a daemon crash — and, while the job is installed, a logout/reboot too.** ⚠️ This bullet said the
+  opposite until 2026-08-16 (`W32.plist-relogin`), and the inference was backwards: "a LaunchAgent only loads
+  at GUI login" is exactly *why* it comes back — it loads at the NEXT login. `launchctl bootout` unloads the
+  job from the current `gui/$UID` domain and writes no persistent disable, so with the plist still in
+  `~/Library/LaunchAgents` (`RunAtLoad=true`) the daemon restarted itself at the next login. Observed:
+  hard power-off 2026-08-05 15:25 (no `daemon down` line), boot 21:56:53, `daemon up (pid 1701)` 22:00:20,
+  no human involved. **`stop`, a park and a plan-COMPLETE now delete the plist**, so an intentional stop
+  outlives the login session and starting the daemon stays the owner's decision alone. `start` reinstalls it.
 - May log `Operation not permitted` until `/bin/bash` has **Full Disk Access** (System Settings → Privacy).
 
 **Opt-in — detached nohup (`./ops/autonomous/daemon.sh nohup`).** macOS has **no `setsid`**, so a subshell +

@@ -64,6 +64,10 @@ RUN STATUS: ${1:-IN_PROGRESS} — test
 EOF
 }
 STATE="$T/state"; mkdir -p "$STATE"
+# The L2 resume prompt. daemon.sh renders this into $STATE before launching, so production never runs without
+# one — but this harness never seeded it and the daemon never checked, so the suite exercised a state the real
+# system cannot be in. The daemon now refuses to start without one (W32.preflight-gap). Stub claude ignores it.
+printf 'autonomous maintenance session for the Archive Suite (prove-exit-logging fixture prompt)\n' > "$STATE/resume-prompt.txt"
 # Fake claude: sleeps so a session is genuinely IN FLIGHT when we signal the daemon (that is the case that
 # used to vanish silently, and it is what leaves a stale engine.lock behind).
 cat > "$T/claude" <<STUB
@@ -119,7 +123,15 @@ if kill -0 "$p" 2>/dev/null; then
   bad "daemon did not self-exit on RUN STATUS: COMPLETE (harness problem)"; kill -9 "$p" 2>/dev/null
 else
   if [ "$(downlines)" = "1" ]; then ok "normal exit logs exactly ONE 'daemon down' line (no double-log)"; else bad "normal exit: expected 1 line, got $(downlines)"; fi
-  if grep -q 'fell out of the main loop' "$LOG"; then ok "normal exit names the loop-exit reason"; else bad "normal-exit reason missing; got: $(grep 'daemon down' "$LOG" || echo '<none>')"; fi
+  # W32.park-reason — the terminal paths now name their ACTUAL cause instead of the generic catch-all. This
+  # scenario drives RUN STATUS: COMPLETE, so the reason must say so. It used to read "fell out of the main
+  # loop (rc 9 — RUN STATUS: COMPLETE, or parked)", which lumped two very different endings together; worse,
+  # a PARK never reached it at all, because park_run's `launchctl bootout` SIGTERMs the daemon and the TERM
+  # trap overwrote the reason — so every park on record was logged as "the laptop lid closing". Accept either
+  # specific terminal wording, and still refuse the signal wording (asserted separately below).
+  if grep -qE 'RUN STATUS: COMPLETE — the run finished its queue|PARKED \(|fell out of the main loop' "$LOG"; then
+    ok "normal exit names the loop-exit reason"
+  else bad "normal-exit reason missing; got: $(grep 'daemon down' "$LOG" || echo '<none>')"; fi
   if grep -q 'reason: SIGTERM' "$LOG"; then bad "normal exit wrongly blamed SIGTERM"; else ok "normal exit does NOT blame a signal"; fi
 fi
 

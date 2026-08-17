@@ -136,12 +136,15 @@ else
           if (!(id in seen)) { seen[id] = 1; print id "\t" st }
         }
       }
-      region && /^## (WORK|HOLD) QUEUE/ { inq = 1; next }
-      region && inq && /^## /           { inq = 0 }
-      region && !inq                    { next }
+      # W32.fence-order — fence rule FIRST, matching next-queue-item.sh (and check-tracker-sync.sh, fixed
+      # with it). A column-0 `## ` inside a fenced example otherwise truncates the region here but not in the
+      # resolver, hiding every item below it. Same bug, same file-pair; fixed in both so they cannot drift.
       /^[[:space:]]*(```|~~~)/ { infence = !infence; next }
       infence                  { next }
       /^[[:space:]]*>/         { next }
+      region && /^## (WORK|HOLD) QUEUE/ { inq = 1; next }
+      region && inq && /^## /           { inq = 0 }
+      region && !inq                    { next }
       /^[[:space:]]*[-*][[:space:]]+\[[ xX]\]/ { emit() }
     ' "$1"
   }

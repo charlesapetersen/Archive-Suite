@@ -148,8 +148,6 @@ ABORTED=""
 H=$(grep -nE '^## Session Log' "$PLAN" | head -1 | cut -d: -f1)
 [ -n "$H" ] || { echo "compact-plan: no '## Session Log' header — skip"; exit 0; }
 
-TOTAL=$(awk 'END{print NR}' "$PLAN")
-
 # Count entries AND region bytes in one pass. Region = header .. the next SECTION header after it. Entry
 # header rule per the note above: column-0 '- ' bullet OR date-led. Regexes are awk-PROGRAM literals, never
 # via -v (BSD awk strips backslashes from -v values).
@@ -208,11 +206,12 @@ if [ "$SL_MAX_BYTES" -gt 0 ]; then
       if (inreg) {
         if (/^- / || /^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/) e++
         if (e > 0) sz[e] += length($0) + 1
+        else       pre  += length($0) + 1   # W32.dr-preamble, same as Pass 2 — see the note there
       }
       prevblank = ($0 ~ /^[[:space:]]*$/)
     }
     END {
-      run = 0; fit = 0
+      run = pre + 0; fit = 0
       for (i = 1; i <= e && i <= keep; i++) { run += sz[i]; if (run > budget) break; fit++ }
       if (fit < 1) fit = 1
       print fit
@@ -340,6 +339,14 @@ fi
 
 # Effective keep from the byte budget, newest-first (this section is already prepend-ordered), clamped to
 # [1, DR_KEEP] — so one enormous entry cannot hold the section over budget indefinitely.
+#
+# ⚠️ W32.dr-preamble — THE BUDGET MUST BE SPENT ON THE SAME BYTES THE TRIGGER MEASURES. $MREGB (above) is the
+# WHOLE region, preamble included; this walk used to start accumulating only at the first entry (`if (e > 0)`),
+# so the size it settled on was `preamble + Σ(entries that fit)` — permanently `preamble` bytes ABOVE the cap.
+# Once trimmed to DR_KEEP the pass then printed "DR nothing to cut … — no-op", exit 0, no alarm (that needs
+# MN<2): a correct-looking no-op that could never resolve the overage. Live when found — the Daemon Report sat
+# at 24,816B against a 24,000B budget with that no-op on every cycle. Seeding `run` with the preamble is the
+# honest fix: those bytes are real orientation cost, so they must be paid for out of the same budget.
 DR_EKEEP="$DR_KEEP"
 if [ "$DR_MAX_BYTES" -gt 0 ]; then
   DR_EKEEP=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" -v keep="$DR_KEEP" -v budget="$DR_MAX_BYTES" '
@@ -349,11 +356,12 @@ if [ "$DR_MAX_BYTES" -gt 0 ]; then
       if (inreg) {
         if ((/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) e++
         if (e > 0) sz[e] += length($0) + 1
+        else       pre  += length($0) + 1   # standing preamble: kept whatever we cut, so it is spent first
       }
       prevblank = ($0 ~ /^[[:space:]]*$/)
     }
     END {
-      run = 0; fit = 0
+      run = pre + 0; fit = 0
       for (i = 1; i <= e && i <= keep; i++) { run += sz[i]; if (run > budget) break; fit++ }
       if (fit < 1) fit = 1
       print fit
@@ -467,10 +475,25 @@ QREGB=$(awk -v h="$QH" -v sec="$SEC_HEADER_RE" '
 [ "$QREGB" -gt "$WQ_MAX_BYTES" ] || { echo "compact-plan: WORK QUEUE ${QREGB}B <= budget ${WQ_MAX_BYTES}B — no-op"; exit 0; }
 
 # Tags recorded [x] in the trackers (the ONLY items Pass 3 may touch).
+#
+# ⚠️ W32.pass3-safe-tags — A TAG MUST LOOK LIKE A TAG. This used to accept any `[x]` bullet at ANY indentation
+# and take its first token, but the trackers are mostly PROSE, so ~75 of the 325 extracted "tags" were ordinary
+# words — Add, The, No, Verify, Remove, Close, Notes, Reader, Wave. Any plan WORK QUEUE `[x]` whose first token
+# collided with one was archived even though its done-state was recorded NOWHERE, which is precisely the case
+# the header above says Pass 3 must leave behind ("plan-only entries are a tracker gap to fix, not a compaction
+# target"). Once archived it is also out of reach of check-handoff.sh and check-tracker-sync.sh, so the gap
+# becomes invisible instead of getting fixed, and a `(blocked-on: …)` can resolve off a coincidence. The live
+# plan already carries two markers whose whole tag is the bare word `Wave`, surviving only because no tracker
+# bullet happens to start with it. Two restrictions, both borrowed from checks that already apply them:
+#   * COLUMN-0 bullets only — an indented `- [x]` is a finished SUB-STEP, not an item (check-todo-stubs.sh's rule);
+#   * the token must contain a `.` — what check-tracker-sync.sh:85 already requires, to keep prose out.
 SAFE=$(awk '
-  match($0, /^[[:space:]]*[-*][[:space:]]+\[[xX]\][[:space:]]*/) {
+  match($0, /^[-*][[:space:]]+\[[xX]\][[:space:]]*/) {
     rest = substr($0, RLENGTH+1); sub(/^\*+[[:space:]]*/, "", rest)
-    if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) print substr(rest, 1, RLENGTH)
+    if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+      tag = substr(rest, 1, RLENGTH)
+      if (tag ~ /\./) print tag
+    }
   }' "$TODOF" "$DONEF" | sort -u)
 [ -n "$SAFE" ] || { echo "compact-plan: WQ no tracker-recorded done tags — no-op"; exit 0; }
 
@@ -479,26 +502,59 @@ SAFEF=$(mktemp) || { rm -f "$QTMP" "$QDROP"; exit 1; }
 printf '%s\n' "$SAFE" > "$SAFEF"
 
 # Move the WHOLE span of each safe [x] item (its line + continuation lines) to the archive.
-awk -v h="$QH" -v sec="$SEC_HEADER_RE" -v drop="$QDROP" -v safef="$SAFEF" '
-  BEGIN { while ((getline t < safef) > 0) if (t != "") safe[t]=1 }
+#
+# ⚠️ W32.pass3-overrun — PASS 3'S REGION CLOSES AT ANY COLUMN-0 '## '. The shared rule (blank-preceded OR named
+# in SEC_HEADER_RE) is right for Passes 1-2, but for Pass 3 it is unsafe in the one direction that matters: a
+# NEW section that is neither listed nor blank-preceded did not close the region, so the pass ran on and
+# archived that section's `[x]` items out of the plan — silently. No guard could fire (the anchor list does not
+# name it, headers are never dropped, the open-item guard counts only `[ ]`, and line conservation holds
+# because the line landed in the archive). Reproduced with a `## OWNER DECISIONS PENDING` section. That is the
+# sibling of the BUG 4 hazard above; naming HOLD QUEUE in SEC_HEADER_RE fixed one instance and left the
+# mechanism. Closing at any column-0 '## ' makes the bound structural. The cost is only LESS compaction if
+# someone pastes a '## ' mid-item — safe in the direction that matters, and Pass 2's Case I (which requires a
+# mid-body '## ' NOT to truncate) is untouched, because this rule is local to Pass 3.
+#
+# ⚠️ W32.pass3-tear — A BLANK LINE NO LONGER ENDS AN ITEM. `dropping` used to clear on any blank line, so only
+# the FIRST paragraph of a multi-paragraph write-up travelled: the rest stayed in the plan attached to nothing
+# (reading as if it belonged to the next item) while the archive's copy was truncated mid-write-up. Every guard
+# passed and the pass exited 0 — Bug 3 ("PASS 1 TORE MULTI-LINE ENTRIES") reintroduced here, contradicting this
+# function's own "Move the WHOLE span" claim. Blank lines are now HELD and settled by what follows them: an
+# indented continuation means the item goes on (the blanks go with it), anything else ends the span (the blanks
+# stay in the plan). Held lines are always flushed to exactly one side, so line conservation still holds.
+awk -v h="$QH" -v drop="$QDROP" -v safef="$SAFEF" '
+  BEGIN { while ((getline t < safef) > 0) if (t != "") safe[t]=1; nheld = 0 }
   function is_cb(l) { return l ~ /^[[:space:]]*[-*][[:space:]]+\[[ xX]\]/ }
+  function flush(to_drop,   i) {
+    for (i = 1; i <= nheld; i++) { if (to_drop) print held[i] >> drop; else print held[i] }
+    nheld = 0
+  }
   {
-    if (NR == h) { inreg=1; prevblank=0; print; next }
-    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
+    if (NR == h) { inreg=1; print; next }
+    if (inreg && /^## /) { flush(0); dropping = 0; inreg = 0 }
     if (inreg) {
       if (is_cb($0)) {
-        dropping = 0
+        flush(0); dropping = 0
         if ($0 ~ /^[[:space:]]*[-*][[:space:]]+\[[xX]\]/) {
           rest = $0; sub(/^[[:space:]]*[-*][[:space:]]+\[[xX]\][[:space:]]*/, "", rest)
           sub(/^\*+[[:space:]]*/, "", rest)
-          if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/) && (substr(rest,1,RLENGTH) in safe)) dropping = 1
+          if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+            tag = substr(rest, 1, RLENGTH)
+            if (tag ~ /\./ && (tag in safe)) dropping = 1
+          }
         }
-      } else if ($0 ~ /^[[:space:]]*$/ || /^## / || /^### / || /^> /) dropping = 0
-      if (dropping) { print >> drop; prevblank = ($0 ~ /^[[:space:]]*$/); next }
+      } else if (/^### / || /^> /) { flush(0); dropping = 0 }
+      else if ($0 ~ /^[[:space:]]*$/) {
+        if (dropping) { held[++nheld] = $0; next }   # decide once we see what follows
+      }
+      else if (dropping) {
+        if ($0 ~ /^[[:space:]]/) flush(1)            # indented continuation -> same item, blanks go with it
+        else { flush(0); dropping = 0 }              # column-0 prose -> the span ended
+      }
+      if (dropping) { print >> drop; next }
     }
     print
-    prevblank = ($0 ~ /^[[:space:]]*$/)
   }
+  END { flush(0) }
 ' "$PLAN" > "$QTMP" || { rm -f "$QTMP" "$QDROP" "$SAFEF"; exit 1; }
 
 for a in '^## PRIME DIRECTIVES' '^## RESUME PROTOCOL' '^## WORK QUEUE' '^## Session Log' '^RUN STATUS:'; do

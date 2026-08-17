@@ -192,15 +192,36 @@ security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<
   add_need "Keychain not set up — it may interrupt you with a password box. Run once: ./ops/autonomous/fix-keychain-access.sh"
 [ "$hold" -gt 0 ] 2>/dev/null && \
   add_need "$hold task(s) are held back for you to decide (they touch things with no undo)"
-# Daemon Report: count OPEN checkboxes, then quote the first. Handles both shapes — the `- [ ]` checklist
-# rows and the older `- **[YYYY-MM-DD] …` prose entries. Sub-headings inside the section must stay ###; a
-# `## ` there correctly ends the scan (and would silently empty this list, so it is worth knowing).
-mr_open="$(awk '/^## (Daemon Report|Morning Review)/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- \[ \]/{c++} END{print c+0}' "$PLAN" 2>/dev/null)"
+# Daemon Report: count the UNWALKED entries, then quote the newest.
+#
+# ⚠️ W32.needs-you-blind — MATCH THE SHAPE THE SECTION ACTUALLY USES. This counted `- [ ]` rows and quoted
+# `- [ ]` / `- **[`, none of which the Daemon Report has EVER used: entries are authored as `### <date> — …`
+# H3 headers. Measured when found — 0 matches against the live plan's 8 entries, and across the whole 338 KB
+# AUTONOMOUS_DAEMON_REPORT_ARCHIVE.md (58 `### <date>` headers, 52 `- **[` bullets) not one `- [ ]` row. Both
+# branches below were therefore dead, so "Needs you" was structurally blind to the entire section — and the
+# daemon writes this renderer to $STATE/STATUS.md every cycle and on park, so the file the owner reads after
+# an overnight run asserted nothing needed him while action items sat unread. compact-plan.sh:314 was fixed
+# for this same drift and accepts all three shapes; this is the same list, kept deliberately identical.
+#
+# The scan also STOPS at the newest `### ✅ … walkthrough` heading: everything below one is settled, and root
+# CLAUDE.md is emphatic that re-raising a settled item wastes the owner's time. Sub-headings inside the
+# section must stay ###; a `## ` there correctly ends the scan.
+DR_ENTRY_RE='/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/'
+mr_open="$(awk "
+  /^## (Daemon Report|Morning Review)/{f=1;next}
+  f&&/^## /{exit}
+  f&&/^### .*✅.*[Ww]alkthrough/{exit}
+  f&&($DR_ENTRY_RE){c++}
+  END{print c+0}" "$PLAN" 2>/dev/null)"
 mr_open="$(num "$mr_open")"
 # Real newlines via add_need, printed with %s not %b — plan text can contain backslashes that %b would eat.
-mr="$(awk '/^## (Daemon Report|Morning Review)/{f=1;next} f&&/^## /{exit} f&&/^[[:space:]]*- (\[ \]|\*\*\[)/{print; exit}' "$PLAN" 2>/dev/null | tr -d '\\\r' | sed 's/^[[:space:]]*//' | cut -c1-64)"
+mr="$(awk "
+  /^## (Daemon Report|Morning Review)/{f=1;next}
+  f&&/^## /{exit}
+  f&&/^### .*✅.*[Ww]alkthrough/{exit}
+  f&&($DR_ENTRY_RE){print; exit}" "$PLAN" 2>/dev/null | tr -d '\\\r' | sed 's/^[[:space:]]*//' | cut -c1-64)"
 if [ "$mr_open" -gt 0 ] 2>/dev/null; then
-  add_need "$mr_open thing(s) waiting on your decision — first: ${mr}…"
+  add_need "$mr_open Daemon Report entr(ies) you have not been walked through — newest: ${mr}…"
 elif [ -n "$mr" ]; then
   add_need "Notes are waiting for you to read — first: ${mr}…"
 fi
