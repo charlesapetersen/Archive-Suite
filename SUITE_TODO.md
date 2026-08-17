@@ -1708,6 +1708,30 @@ than with Notes features.
   `-only-testing:ArchiveNotesTests`, so the "free" gate builds the UITest bundle and drives it when the fixture
   is present. Add the restriction; keep the GUI target opt-in. | ArchiveNotes/test-smoke.sh | XS | low | none
 
+The remaining two Phase C items are heavier than C1–C4 and sit in **TIER 5**, not with the gate work:
+
+- [ ] **`W9.c5` — the tag-projector concurrent lost-update race [LOW–MED · Tier-2]** (blocked-on: W9.b3).
+  Plan C5, documented in `KNOWN_ISSUES.md` (`08` S2). Two concurrent projections of the same file can drop a
+  subject. **Not currently triggerable** — the projector is never driven concurrently — which is exactly why it
+  is gated on `W9.b3`: that item adds `setTags`, the first feature that could enqueue concurrent projections
+  for one item. Serialize per-item projection (item-keyed actor/queue) so the read-modify-write is atomic, and
+  restore the plan's `concurrentProjectionsNeverCorrupt` "loses nothing" assertion. Scratch store only.
+  **Done:** the `KNOWN_ISSUES.md` entry is closed. | ArchiveNotes Core/NotesTagProjector.swift | S–M | med | none
+- [ ] **`W9.c6` — nothing proves the spec's 100k-note / 2M-word scale target [M · Tier-2].** Plan C6
+  (spec-vs-build). The original spec said *"operate at the scale of 100,000 notes and 2 million words without
+  being slow. Build for scale from the beginning."* The architecture **is** built for it (FTS5 + bm25, WAL +
+  `synchronous=NORMAL` + `busy_timeout`, DB-backed org-graph, virtualized `NSTableView`, 150 ms-debounced +
+  generation-coalesced search, incremental off-main indexing with mtime-skip) — but the only perf test,
+  `EditorPerfTests`, stresses a single ~50k-word *document*, not a 100k-note *corpus*. Generate a **scratch**
+  store (mktemp/`TESTOUT` — ⛔ never the real Notes store, per the Reader Prime Directive and the
+  never-mutate-live-app-root rule) of ~100k UUID-folder notes totalling ~2M words, then assert bounded
+  wall-times for (a) a full `buildIndexFromDisk` incremental build, (b) an FTS search round-trip, (c)
+  `allSummaries()` + one `NotesNavigationModel.recompute()`/sort. Env-gate it so ordinary `swift test` is not
+  slowed, and assert the scratch-path guard holds. **Conditional follow-up:** if `recompute()`'s in-memory
+  `NotesFilter.matches` scan + sort exceeds a frame budget at 100k on `@MainActor`, move it off-main (return a
+  `Sendable [UUID]`) — the one scale claim the current in-memory-filter design leaves unproven. |
+  ArchiveNotes/macOS/Tests/ + ArchiveNotes/scripts/ | M | med | none
+
 **Phase B — wire the built-but-dead features.** The high-value core: library code that shipped without a UI
 entry point. Mostly **Tier-2** (they write note front-matter or project Finder tags).
 
