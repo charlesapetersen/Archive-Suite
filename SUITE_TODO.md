@@ -20,6 +20,28 @@ Processor source = `ArchiveProcessor/macOS/Sources/ArchiveProcessor/`.
 Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app at runtime) | owner
 (account/manual) | corpus-write (safety-sensitive).
 
+## ⭐ PRIORITY ORDER lives in the plan, not in this file's section order (reset 2026-08-16)
+
+**The section order below carries NO priority meaning.** Work order is the `### TIER 0…6` blocks under
+`## WORK QUEUE` in `.maintenance/AUTONOMOUS_PLAN.md`, which is also what `next-queue-item.sh` reads
+top-to-bottom. This file stays the tracker of record for *detail*; the plan holds the *order*. One place
+each, so they cannot drift.
+
+**Why it was reset (owner, 2026-08-16).** Three superseded schemes had stacked up here and every one of them
+had decayed: the `P0`/`P1`/`P2` buckets (2026-07-09), the `⭐ TOP PRIORITY — pre-flight for a 2-week
+unattended run` banner (2026-07-16), and `Wave 23 — TOP OF THE DRAIN` (2026-07-29). Nine headings held zero
+items and zero prose; the ⭐ banner was empty while pointing at nothing; Wave 23's "drains first" outlived its
+own condition, which this repo's `CLAUDE.md` records as MET on 2026-08-01. Meanwhile the plan's queue had the
+**newest and highest-consequence items last**, because they were appended: a session would have worked six LOW
+Wave-23 follow-ups before reaching `W30.dr-walkthrough-anchor`, the one open item that can permanently lose a
+decision the owner is owed. The dead headings are deleted; the ones that still carry a completion record are
+left alone.
+
+**The premise it was set on:** no app in the Suite is in use until all of this work is done, and all four
+eventual uses are in scope (bulk OCR · Notes + Zotero · Reader triage · phone capture). So no use case ranks
+the work; irreversibility, honest gates and verification leverage do. The reasoning is written out in full at
+the head of the plan's `## WORK QUEUE` — read it there before re-ordering anything.
+
 ## Processor build/test gate follow-up (found 2026-08-12)
 
 - [ ] **`W28.cert-fu3` — the default daemon gate cannot detect a signed Processor build that aborts before
@@ -40,8 +62,6 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   adversarial review + a functional test, scratch only. (This carried a **HOLD** for a per-item authorization
   until 2026-08-13, when that requirement was lifted; the grant recorded in `OWNER_AUTHORIZATIONS.md` still
   binds its constraints: the file-relay READY line stays on `token`.) | ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift + recovery driver | XS | risk med | Tier-2
-
-## Open-sourcing the repo (owner, 2026-08-11)
 
 ## Autonomous daemon — handoff integrity (2026-08-13)
 
@@ -147,8 +167,6 @@ Legend — effort S/M/L · risk low/med/high · **needs:** none | gui (drive app
   Then the VM becomes the reference machine and the skip inverts to the host. Worth doing only if
   reference-image coverage in automation is wanted; `RenderProbe`/`DocumentRenderGuardTests` already give
   automation reference-free pixel guards. | Reader | M | risk low | **needs:** none
-
-## ⭐ TOP PRIORITY — pre-flight for a 2-week unattended run (owner, 2026-07-16)
 
 ## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
 
@@ -475,7 +493,17 @@ this file cited them live; they are folded into `SUITE_TODO_DONE.md` §"Wave 26 
 surviving code/doc citations were confirmed self-sufficient before deleting.
 
 
-## ⚠️ Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29) — TOP OF THE DRAIN
+## Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29)
+
+⚠️ **This section carried "TOP OF THE DRAIN" until the 2026-08-16 priority reset — it no longer drains
+first, and that is not a demotion of the review.** All 34 original findings shipped; the 7 left are `-fu`
+follow-ups, every one of them LOW. The root `CLAUDE.md` already records the "drain Wave 23 first" condition as
+MET on 2026-08-01. Two of the seven were promoted out of the LOW tail on their own merits — `W26.oracle-fu1`
+to TIER 0 (a tag oracle that reports PASS for tags it could not read devalues every Tier-2 tag assertion made
+since) and `W23.m14-fu` to TIER 5 (on first Reader use against an unmounted external volume it reports the
+owner's irreplaceable corpus as missing files). The rest sit in TIER 6: real, cheap, and nothing depends on
+them. ⛔ Do NOT restore a "drains first" marker here without a fresh owner decision — the argument that Wave 23
+is drained has already been made to him and he kept the review pause anyway.
 
 **Source.** An owner-commissioned static full-suite review by Codex, 2026-07-29, against remote `main`
 `bfcb38e`. Read-only: nothing was fixed, built, or run. Scope = Processor (macOS + Android; iOS only for severe
@@ -1052,7 +1080,6 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
   `~/Archive/Glazer Gemini 2.5 LLM`, **not** the corpus — so "walks ~123k real corpus files" is not what
   happens on this machine today. The hazard is real but root-dependent; say which you measured.
 
-## Notes test hardening (from the 2026-07-29 health-gate RED)
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 From the 2026-07-28 Daemon Report walkthrough. The VM lane (`ops/gui/vm-gui-runner.sh`, built 2026-07-28,
 Reader UITests **15/15** in-VM) is the only way GUI verification runs unattended on this machine — but it is
@@ -1541,7 +1568,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   test bundles; that is a bar to clear, not a gate to wait behind.
   | Reader + Notes + ArchiveCore (durable-link/image entity) | M–L | med | Tier-2 (DurableLink/SPEC)
 
-## Suite doc hygiene (owner / small) — 2026-07-16
 ## Owner GUI-pass follow-ups — 2026-07-16 (from the interactive Reader + Processor GUI review)
 Surfaced during the owner's live GUI pass. Each is scoped + daemon-buildable unless flagged owner-decision/Tier-2. Legend as above.
 ### Owner dispositions — Daemon-Report sweep, 2026-07-16
@@ -1625,12 +1651,9 @@ flash; text selection after cycling (fresh `PDFView` per page); zoom persistence
 default incl. trackpad-pinch (`PDFViewScaleChanged` capture); top-anchored zoom; splitter persistence.
 Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`ArchiveReaderApp`.
 
-## P0 — Finish the Suite publish (network back)
-## P1 — Quick local wins (S, low-risk, no network)
 ## P2 — Reader features (no network; local build/test)
 **→ Reader P2 is COMPLETE** (non-standard-PDF cluster · tag near-duplicate finder · document-viewer bugs · dup-filename; side-by-side dropped).
 
-## P2 — Reader performance
 ## Owner-requested batch (2026-07-09) — Processor output + Reader UX/viewer
 Captured verbatim from the owner; file hints are from the Reader/Processor Implementation Maps (verify
 at implementation). Not yet scoped into execution plans — the **decades** item likely warrants one
@@ -1673,7 +1696,6 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 ### Archive Reader — search
 ### Archive Reader — sort & smart folders
 ### Archive Reader — viewer & preview
-## Owner-requested (2026-07-10) — Reader
 ## Deferred from the 2026-07-09/10 autonomous run → queued for next autonomous run
 Correctness bugs from that run's review shipped (`848c9d2`, `f866a0f`, `14118c0`); the items below were
 consciously deferred (perf-only / LOW / GUI infra / new idea). All armed in `.maintenance/AUTONOMOUS_PLAN.md`
@@ -1694,7 +1716,6 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 > `ArchiveProcessor/CLAUDE.md` §Function 3; the relay contract in `SPEC/relay-object-format.md`; the
 > on-device walkthrough in `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md`.
 
-## Flagged — need the owner present / GUI / a scratch-corpus write
 ## Excluded (not "now": need cost / owner accounts)
 - Processor Tier-1 `test-smoke.sh` / Tier-2 `test-tier2.sh` (real OCR → keys + API cost); Reader cloud-drive support; Reader creation-date-mirror (would write metadata onto the real corpus).
 - ~~Processor App-Store / Play submission (Phase 4)~~ — **DROPPED (owner 2026-07-16: "we're not doing this any
