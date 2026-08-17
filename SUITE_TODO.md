@@ -2096,6 +2096,21 @@ Design-level ideas the owner wants recorded but explicitly de-prioritised. An au
 **skip** these: they need the owner's scoping before any code is written.
 
 ### ⛔ DECLINED — settled, do NOT re-raise in Daemon Report
+- **Auditing the daemon runs that started themselves at login (`W32.plist-relogin`) — DECLINED by the owner
+  2026-08-16.** Until `9b05a62` every `stop`/park/COMPLETE only `launchctl bootout`ed the job and left the
+  LaunchAgent plist installed with `RunAtLoad=true`, so the next GUI login restarted the daemon with no human
+  — observed in `daemon.log` on 2026-08-05 (power-off 15:25, boot 21:56:53, `daemon up (pid 1701)` 22:00:20).
+  That violated the standing rule that **only the owner starts the daemon**, and the runs it produced spent
+  budget and pushed to `main` unasked. He was offered a read-only log audit (every `daemon up` with no
+  preceding human start, what those sessions committed, rough cost) and the same audit plus an
+  owner-start-token file the daemon would refuse to run without; **both declined.** His reasoning: the fix has
+  landed — all three stop paths remove the plist, `start` reinstalls it, and the plist is gone from
+  `~/Library/LaunchAgents/` — so the exposure is closed going forward, and the commits those sessions produced
+  went through the ordinary gates and stand as ordinary work. ⛔ **Do not re-open the audit, and do not file a
+  start-token guard.** A later session reading that same `daemon.log` evidence will find exactly what prompted
+  the offer; it has been made and turned down. Full fix record: `SUITE_TODO_DONE.md`
+  §*"Autonomous daemon — full review, Wave 32"* (`W32.plist-relogin`).
+
 - **Changing the Tier-2 mutation-proof discipline so a proof can't touch the owner's real defaults domain —
   DECLINED by the owner 2026-08-10.** Context: closing `W26.fixturehang` required planting each hunk's old
   behaviour back to prove a test went red, and those runs by construction write the real
