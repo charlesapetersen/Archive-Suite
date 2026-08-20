@@ -174,8 +174,8 @@ falls between Feb 28 and Mar 1) and renders as typed. 33 new tests, scratch stor
 8 passed, **4 failures = exactly the deterministic G3/G6/G8/G11 tabled below**, so no regression; the sighted
 VNC capture shows the app launching and drawing normally with this change in. **No UITest drives the metadata
 strip**, so the new warning row's pixels are unverified — deliberately said rather than implied. (Harness
-note: the runner reports `VM 'archive-gui-runner' not found` when `tart` is simply absent from a non-login
-shell's PATH — export `/opt/homebrew/bin` first; folded into W21.vmgui-a's "make failures LOUD" work.)
+note: the runner's non-login-shell Tart-path diagnosis and its loud fixture-build reporting were resolved
+by W21.vmgui-a in `d250d67`; both entry points now use `tart-lib.sh`'s one configuration table.)
 
 ## ✅ HARDENED (W23.l2) — `NotesIndexer`'s prune gate now survives a superseded task
 

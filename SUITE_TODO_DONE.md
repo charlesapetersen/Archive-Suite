@@ -6092,6 +6092,19 @@ explain why not.
   without a diagnostic would be a no-op-risky change to the Live Capture network path. | CaptureServer.swift |
   S | low | done
 
+- [x] **W21.vmgui-a — `APP` argument + one per-app config table in both scripts [M].** **CLOSED
+  2026-08-20 — implementation already shipped in `d250d67`; this is the missed tracker reconciliation.**
+  `ops/gui/tart-lib.sh` provides the single `archive_app_field` table consumed by both
+  `vm-gui-runner.sh` and `gui-vm-gate.sh`: Reader and Notes each supply project/spec/scheme/test bundle,
+  per-app guest DerivedData, app/process names, scratch fixture builder/path/launch argument, and artifact
+  prefix. Processor is intentionally a loud unknown app until **W21.vmgui-d** creates its test target.
+  The old unmounted `fixture-src` guess is replaced by an explicit read-only `corpus` mount and guest-side
+  `$GC`; fixture output and genuine failures are named through the shared `tart_build_fixture` status protocol,
+  never swallowed. Current hermetic proof `ops/autonomous/tests/prove-vm-lane.sh` passed **61/0**, covering the
+  table, worktree-safe corpus resolution, failure visibility, and both entry points' absence of raw fixture
+  execs. No VM or GUI was launched for this tracker closure.
+  | ops/gui/{tart-lib,vm-gui-runner}.sh, ops/autonomous/{gui-vm-gate.sh,tests/prove-vm-lane.sh} | M | med | done
+
 - [x] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** ✅ **DONE this commit.**
   `BlockKind` is an `NSAttributedString` attribute value under `an.blockKind`, so AppKit bridges it to
   Objective-C and hashes it during Markdown styling. The enum's associated values are all synthesizable, so

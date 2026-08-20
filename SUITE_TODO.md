@@ -961,31 +961,16 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
   happens on this machine today. The hazard is real but root-dependent; say which you measured.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
-From the 2026-07-28 Daemon Report walkthrough. The VM lane (`ops/gui/vm-gui-runner.sh`, built 2026-07-28,
-Reader UITests **15/15** in-VM) is the only way GUI verification runs unattended on this machine — but it is
-**hardcoded to the Reader**, so a 10-day-old Processor + Notes backlog still reads "GUI blocked → Morning
-Review": the Anthropic key-wizard visual, the multi-page-PDF auto-re-OCR visuals, the three Notes **W14.4
-b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. Generalizing drains them off-screen.
+From the 2026-07-28 Daemon Report walkthrough. The headless VM lane is now shared by Reader and Notes:
+`W21.vmgui-a` shipped one per-app configuration table for both entry points, and `W21.vmgui-c` made the Notes
+suite green. The remaining GUI gap is **Processor**, which still has no test target and carries the Keychain
+risk described below. Completing the lane drains that backlog off-screen; it must retain the existing Reader
+and Notes behavior rather than reintroducing Reader-only assumptions.
 
-- [ ] **W21.vmgui — generalize the headless-VM GUI lane to Archive Processor + Archive Notes [L]** — one lane,
-  three apps, sub-steps in the order below (**Notes before Processor**: Notes already has the UITest target, the
-  scratch fixture builder and a 13/13 GUI-on baseline; Processor is greenfield **and** carries the Keychain risk).
-  **Reader-specific assumptions to parametrize — the complete list** (`ops/gui/vm-gui-runner.sh`): `PROJ_REL` +
-  `SPEC_REL` (L29–30), `SCHEME` (L31), `ONLY_TESTING` (L32 — the *only* env-overridable one today), `GUEST_DD=
-  /Users/admin/dd-reader` (L34), `GUEST_APP` (L35), `GUEST_FIXTURE=…/ArchiveReader/AR-GUI-Fixture` (L36), the
-  fixture builder `ArchiveReader/scripts/make-gui-fixture.sh` + its `AR_FIXTURE_SRC` env (L95–96), `pkill -x
-  ArchiveReader` (L97), the `-ARUITestRootPath` launch arg (L98), and the artifact name `sighted-launch.png`
-  (L103) — **plus the same six in `ops/autonomous/gui-vm-gate.sh`** (`GUEST_PROJ`, `-scheme`, `-only-testing:`,
-  `GUEST_DD`, the Reader-only fixture-absent WARN, and the `--spec` handed to `xcodegen`).
-  - [ ] **W21.vmgui-a — `APP` argument + one per-app config table in both scripts [M].** `vm-gui-runner.sh
-    [reader|processor|notes] [xcuitest|sighted|both]` (keep today's arg order + env overrides working). Per-app:
-    project/spec/scheme/only-testing, `GUEST_DD=/Users/admin/dd-<app>`, app bundle, `pkill` name, fixture builder
-    + fixture path + launch arg, artifact prefix. **Also fix the LATENT fixture bug this exposes (verified
-    2026-07-28):** L95–96 passes `AR_FIXTURE_SRC='$GUEST_REPO/../fixture-src'` → `/Volumes/My Shared Files/
-    fixture-src`, but only `repo` + `out` are mounted (`--dir=repo:… --dir=out:…`, L55), so that path does not
-    exist and the in-VM fixture build can never succeed — and `>/dev/null 2>&1 || true` swallows it. It is
-    currently MASKED by the `[ -d "$GUEST_FIXTURE" ] ||` guard plus a fixture baked into the VM image, so it will
-    bite silently the first time the image is rebuilt. Make a failed fixture build LOUD (warn + name it), never silent.
+- [ ] **W21.vmgui — complete the headless-VM GUI lane for Archive Processor [L]** — Reader and Notes already
+  use the shared per-app table; Processor remains deliberately unknown until `W21.vmgui-d` creates a safe
+  UITest target. `W21.vmgui-b` first removes the need for any real fixture corpus, then `W21.vmgui-d` brings
+  Processor into the table with its scratch launch and Keychain safeguards.
   - [ ] **W21.vmgui-b — corpus-free fixtures so the VM never needs the real corpora [S].** Both builders require
     gitignored test corpora that **do not exist in a worktree and are not on the mount**: Reader's
     `make-gui-fixture.sh` hard-exits when `<10` PDFs are found under `Test files/Brown Gemini`, Notes'
