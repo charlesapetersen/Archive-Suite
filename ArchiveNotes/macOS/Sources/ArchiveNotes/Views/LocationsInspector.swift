@@ -42,7 +42,9 @@ struct LocationsInspector: View {
                         }
                         .buttonStyle(.borderless)
                         .help("Remove from “\(folder.name)”")
-                        .accessibilityIdentifier("an.locations.remove")
+                        // Folder-specific so the scratch-only W21.vmgui-c-fu test can deterministically
+                        // remove both homes of a replicated cited source before the last-instance dialog.
+                        .accessibilityIdentifier("an.locations.remove.\(folder.id.uuidString.lowercased())")
                     }
                     .font(.caption)
                 }

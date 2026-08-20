@@ -162,6 +162,9 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                onJumpBlock: onJumpBlock,
                                                passageSummaries: passageSummaries)
             textView.textStorage?.setAttributedString(styled)
+#if DEBUG
+            textView.refreshUITestPassageChipStateSnapshot()
+#endif
         }
         context.coordinator.lastAppliedMarkdown = markdown
         context.coordinator.lastPassageGeneration = passageGeneration
@@ -242,6 +245,9 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                    onJumpBlock: coordinator.onJumpBlock,
                                                    passageSummaries: coordinator.passageSummaries)
                 textView.textStorage?.setAttributedString(styled)
+#if DEBUG
+                textView.refreshUITestPassageChipStateSnapshot()
+#endif
                 if let savedOrigin {
                     // A chip-label refresh barely changes layout — restore the prior scroll offset so
                     // the reactive re-style is invisible to a reader who isn't editing the extract.
@@ -376,6 +382,9 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                    onJumpBlock: onJumpBlock,
                                                    passageSummaries: passageSummaries)
                 textView.textStorage?.setAttributedString(styled)
+#if DEBUG
+                textView.refreshUITestPassageChipStateSnapshot()
+#endif
             }
 
             // Clear undo across the toggle — intentional design decision (plan §6).

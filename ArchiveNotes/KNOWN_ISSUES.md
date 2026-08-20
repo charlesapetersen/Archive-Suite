@@ -737,10 +737,15 @@ responder and XCUITest cannot reliably make the styled TextKit-2 text view first
 verbatim. The control strip now wraps to **two rows**, so a tenth control can never again push the last one
 past the fixed-width detail pane and off-window — the exact failure that hid `reveal`/`zoteroOpen`.
 
-**Still open: W14.4 (c), the cross-window chip recolour** — `SUITE_TODO.md` `W21.vmgui-c-fu`. Two independent
-blockers: the chip is an `NSTextAttachmentViewProvider` subview that is not in the a11y tree at all, and Notes
-has **no in-GUI rename path for an item title**, so the check's stated trigger cannot be performed. Filed
-rather than half-asserted.
+**CLOSED: W14.4 (c), the cross-window chip recolour** — `W21.vmgui-c-fu` adds a DEBUG-only probe that reads
+the actual `BlockHeaderAttachment` state in the rendered Extracts text storage after its cited Note-window
+source is trashed through the production last-instance confirmation. The attachment provider remains outside
+the accessibility tree and Notes still has no in-GUI item-title rename (`W9.b3` is separate), but neither
+blocks this stronger deterministic route: `passageSourceMissing` is the chip provider's direct grey/accent
+tint input. The test first proves the live resolved label + non-missing state, then proves the inactive other
+window re-styles that same chip to the preserved snapshot label + missing state. Its mutating leg rejects an
+`AN_GUI_FIXTURE_PATH` override and requires the canonical generated Notes scratch root/marker before clicking
+either remove control.
 
 **The warn tier is now EMPTY.** While this was open the gate held `notes` in
 `AUTONOMOUS_GUI_VM_WARN_APPS` so the suite still ran and reported every gate without parking a multi-day

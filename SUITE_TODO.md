@@ -995,25 +995,7 @@ assumptions.
     the check could only assert the selection half. New DEBUG seams: `an.editor.test.copyPassage` /
     `.pastePassage` (⌘C/⌘V route to the first responder, which XCUITest can't reliably make the styled text
     view), and the control strip now wraps to two rows so a tenth control can't push the last one
-    off-window again. **W14.4 (c) is NOT discharged** — see `W21.vmgui-c-fu`.
-  - [ ] **W21.vmgui-c-fu — W14.4 (c) cross-window chip recolour is not assertable from XCUITest [S · LOW].**
-    The last of W21.vmgui-c's four owner-eye checks, and the only one that could not be automated — filed
-    rather than half-asserted. TWO independent blockers, both verified 2026-08-01: (1) the provenance chip is
-    an `NSTextAttachmentViewProvider` subview and is **not in the accessibility tree at all** (not merely
-    un-hittable — `ArchiveNotes/KNOWN_ISSUES.md`), so neither its label nor its colour is observable, and its
-    own label carries no `accessibilityIdentifier`; (2) **Notes has no in-GUI rename path for an item title**
-    — `renameFolder`/`renameTemplate` exist, but no `renameItem`; the list's title cell is a read-only
-    `NSTextField` and the metadata inspector edits only date/quality — so the check's stated trigger cannot
-    be performed at all. ⚠️ **Blocker (2) is now separately queued as `W9.b3`** (retagged from
-    `W22.notes-rename` 2026-08-16 when it merged with gap-closure plan item B3; owner called it a
-    gap, 2026-08-02) — if that ships first, the trigger exists and only blocker (1) remains, so re-read this
-    entry before picking an option below. Options, cheapest first: (a) a DEBUG `testBox` seam reporting each chip's resolved
-    label + `passageSourceMissing` state, read from the text storage where the chips are re-styled — proves
-    the reactive `itemsGeneration` mechanism deterministically, driven by TRASHING a cited note (which G8
-    shows is drivable) rather than renaming one; (b) a sighted VNC before/after capture of the chip's pixels;
-    (c) give the chip label an a11y identifier and check whether a view-provider subview can be made
-    queryable at all. The underlying mechanism is unit-covered (`NotePassageResolveTests` chipLabel /
-    isSourceMissing) and shipped `d615589`, so this is a verification gap, not a suspected defect.
+    off-window again. **W14.4 (c) is now deterministically covered by `W21.vmgui-c-fu`.**
   - [ ] **W21.vmgui-d — Processor lane from zero, then drain the Processor GUI backlog [L]** (blocked-on:
     W21.vmgui-c). Processor has **no test target of any kind**, **no `schemes:` block** (it relies on Xcode
     autocreation), **zero `accessibilityIdentifier`s** in `Sources/` (vs 4 files Reader / 11 Notes) and **no

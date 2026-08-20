@@ -6143,6 +6143,21 @@ explain why not.
   | ArchiveReader/macOS/{Sources/ArchiveReader/Views/{TagEditorView,RenameTagSheet}.swift,
     Tests/ArchiveReaderUITests/{FixtureUITestCase,NavigationUITests}.swift} | S | low | done
 
+- [x] **W21.vmgui-c-fu — W14.4 (c) cross-window chip recolour is assertable from XCUITest [S · LOW].** ✅
+  **DONE this commit.** The DEBUG-only `an.editor.test.passageChips` accessibility child publishes a cached
+  JSON snapshot of each rendered `BlockHeaderAttachment`'s cited id, resolved label, and
+  `passageSourceMissing` value at the same renderer-time `setAttributedString` points that apply the style.
+  It has no click handler or SwiftUI binding, so reading it cannot trigger a late re-style. The new off-screen
+  UI test opens the generated Extracts fixture, proves its cited note's live label/accent state, then leaves
+  that window inactive while it removes the cited source's two folder memberships through the production
+  last-instance confirmation. It finally requires the already-open Extracts renderer to retain the snapshot
+  label and report `missing: true` — the direct grey/accent tint input. Before either mutation it rejects an
+  `AN_GUI_FIXTURE_PATH` override and requires the canonical non-symlink Notes fixture path plus its exact root
+  marker. Focused final VM proof passed **1/1** in 63.5 s; the full off-screen Notes UI suite passed **21/21**
+  in 443.5 s; and the unit-only Notes smoke gate passed **842 Swift Testing + 221 XCTest**. No real store,
+  corpus, or host GUI was opened.
+  | ArchiveNotes/macOS/{Sources/ArchiveNotes/{Editor/{EditorTextView,MarkdownEditorView}.swift,Views/LocationsInspector.swift},Tests/ArchiveNotesUITests/NotesGUITests.swift} | S | low | done
+
 - [x] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** ✅ **DONE this commit.**
   `BlockKind` is an `NSAttributedString` attribute value under `an.blockKind`, so AppKit bridges it to
   Objective-C and hashes it during Markdown styling. The enum's associated values are all synthesizable, so

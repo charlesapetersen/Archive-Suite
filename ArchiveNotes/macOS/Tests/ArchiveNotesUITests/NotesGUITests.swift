@@ -22,10 +22,10 @@ class NotesFixtureUITestCase: XCTestCase {
     /// where `make-notes-fixture.sh` writes the fixture (the pitfall that skipped the Reader Wave-7
     /// harness). The Debug-only Route-B temporary-exception entitlement grants read of `/Users/`, so
     /// both this `fileExists` check and the app's own read of the launch-arg path succeed.
-    static let fixturePath: String = {
-        if let override = ProcessInfo.processInfo.environment["AN_GUI_FIXTURE_PATH"], !override.isEmpty {
-            return override
-        }
+    /// The one generated path that a UI test is allowed to mutate. Keep this separate from
+    /// `fixturePath`: read-only harness experiments may point the latter elsewhere, but a test that drives
+    /// a write must reject that override before it touches the store (W21.vmgui-c-fu).
+    static let canonicalFixturePath: String = {
         let realHome: String
         if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
             realHome = String(cString: dir)
@@ -33,6 +33,13 @@ class NotesFixtureUITestCase: XCTestCase {
             realHome = FileManager.default.homeDirectoryForCurrentUser.path
         }
         return "\(realHome)/Library/Application Support/ArchiveNotes/AN-GUI-Fixture"
+    }()
+
+    static let fixturePath: String = {
+        if let override = ProcessInfo.processInfo.environment["AN_GUI_FIXTURE_PATH"], !override.isEmpty {
+            return override
+        }
+        return canonicalFixturePath
     }()
 
     // Fixed fixture item UUIDs (match make-notes-fixture.sh).
@@ -56,6 +63,37 @@ class NotesFixtureUITestCase: XCTestCase {
         try setUpOnMainActor()
         defer { tearDownOnMainActor() }
         try body()
+    }
+
+    /// Guard a test that invokes a durable store write. The app is deliberately launchable against an
+    /// alternate fixture for read-only diagnostics, so `fixturePath` alone cannot establish this safety
+    /// boundary. Require the generated fixture's exact final path, a real (non-symlink) directory, and its
+    /// deterministic root marker before the test can click a mutating control.
+    func requireCanonicalScratchFixtureForStoreWrites() throws {
+        guard Self.fixturePath == Self.canonicalFixturePath else {
+            throw FixtureWriteSafetyError("AN_GUI_FIXTURE_PATH is not permitted for a mutating test")
+        }
+
+        let root = URL(fileURLWithPath: Self.canonicalFixturePath)
+        let values = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isDirectory == true, values.isSymbolicLink != true else {
+            throw FixtureWriteSafetyError("canonical GUI fixture must be a non-symlink directory")
+        }
+
+        let marker = root.appendingPathComponent(".archive-suite-root.json")
+        guard let data = FileManager.default.contents(atPath: marker.path),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["guid"] as? String == "a11ce5e7-1000-4000-8000-000000000001",
+              object["name"] as? String == "AN-GUI-Fixture",
+              object["kind"] as? String == "notes" else {
+            throw FixtureWriteSafetyError("canonical GUI fixture is missing its generated Notes root marker")
+        }
+    }
+
+    private struct FixtureWriteSafetyError: LocalizedError {
+        let message: String
+        init(_ message: String) { self.message = message }
+        var errorDescription: String? { message }
     }
 
     private func setUpOnMainActor() throws {
@@ -476,6 +514,29 @@ class NotesFixtureUITestCase: XCTestCase {
     }
     func copyPassageOutcome(timeout: TimeInterval = 8) -> String {
         seamOutcome("an.editor.test.copyPassage", timeout: timeout)
+    }
+
+    /// Read the DEBUG snapshot of note-passage chips from this window's rendered text storage. The
+    /// attachment-view-provider chip is absent from the accessibility tree, so its label/tint cannot be
+    /// queried directly; this reads a non-interactive AX child of `EditorTextView`, whose cached value is
+    /// formed from the actual attachments at renderer time without mutating SwiftUI state or triggering
+    /// `updateNSView`. The returned
+    /// dictionaries contain `id`, `label`, and `missing`. `scope` is mandatory once two windows are open.
+    func passageChipStates(timeout: TimeInterval = 8, in scope: XCUIElement? = nil) -> [[String: Any]]? {
+        let probe = (scope ?? mainWindow).descendants(matching: .any)["an.editor.test.passageChips"]
+        guard probe.waitForExistence(timeout: timeout) else { return nil }
+
+        var states: [[String: Any]]?
+        _ = pollUntil(timeout: timeout) {
+            guard let raw = probe.value as? String,
+                  let data = raw.data(using: .utf8),
+                  let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                return false
+            }
+            states = parsed
+            return true
+        }
+        return states
     }
 
     /// Ensure the editor is in STYLED mode: block-chip seams (G6/G11) scan the text storage for
@@ -904,7 +965,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// `.wasLastInstance` WITHOUT mutating, and the view raises a mandatory confirmation. **Cancel** keeps
     /// the note on disk (and its membership); only **Delete Note** moves it to the Trash
     /// (`NoteStore.delete` → `FileManager.trashItem`, recoverable — never `removeItem`). Driven entirely
-    /// through a11y ids: `an.locations.remove` (Locations inspector) →
+    /// through a folder-specific a11y id (`an.locations.remove.<folder-id>`, Locations inspector) →
     /// `an.dialog.deleteLastInstance.{cancel,confirm}`.
     ///
     /// Target = the Zotero note (`idZotero`, a real `kind: note`), the sole member of "Ideas". No check
@@ -926,8 +987,8 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         selectItem(uuid: Self.idZotero)
 
-        // Sole membership → the Locations inspector shows exactly one Remove control (unambiguous id).
-        let remove = app.descendants(matching: .any)["an.locations.remove"]
+        // Sole membership → this folder-specific remove control is unambiguous.
+        let remove = app.descendants(matching: .any)["an.locations.remove.\(Self.folderIdeas)"]
         XCTAssertTrue(remove.waitForExistence(timeout: 10), "Locations ▸ Remove should be present")
 
         // --- Cancel leg: the confirmation must appear, and cancelling must NOT delete the note. ---
@@ -943,7 +1004,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "Cancel must leave the membership intact")
 
         // --- Confirm leg: Delete moves the note out of items/ (to the Trash) + drops the membership. ---
-        let remove2 = app.descendants(matching: .any)["an.locations.remove"]
+        let remove2 = app.descendants(matching: .any)["an.locations.remove.\(Self.folderIdeas)"]
         XCTAssertTrue(remove2.waitForExistence(timeout: 8), "Remove should still be present after Cancel")
         _ = pollUntil(timeout: 8) { app.activate(); return remove2.isHittable }
         remove2.click()
@@ -956,6 +1017,88 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "Delete Note must move the item out of items/ (to the Trash); items = \(itemDirs())")
         XCTAssertFalse((organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idZotero]),
                        "Delete Note must drop the last membership from organization.json")
+    }
+
+    /// W21.vmgui-c-fu — a note-passage chip in the Extracts window must react when its cited note is
+    /// trashed from the Note window. The attachment provider is not in the accessibility tree, so the
+    /// DEBUG-only `an.editor.test.passageChips` probe reads the *rendered text storage* after
+    /// `passageGeneration` re-styles it. `passageSourceMissing` is the provider's direct tint input
+    /// (`.secondaryLabelColor` when true; accent otherwise), making the visual state deterministic without
+    /// a brittle pixel-coordinate assertion. The source has two fixture memberships: removing the first
+    /// proves it stays live; removing the second reaches the real last-instance confirmation and recoverable
+    /// trash path. The guard rejects any environment override before either mutating click.
+    func testW21_CrossWindowPassageChipReStylesAfterSourceTrash() throws {
+        try withFixture { try runW21_CrossWindowPassageChipReStylesAfterSourceTrash() }
+    }
+
+    private func runW21_CrossWindowPassageChipReStylesAfterSourceTrash() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
+
+        let expectedLabel = "Moore on Intel culture — 1968"
+        let noteWin = mainWindow
+        let extractWin = try openExtractsWindow()
+        defer { closeExtractsWindow(extractWin) }
+
+        // The extract's initial rendered storage must resolve the still-live cited note, not merely retain
+        // the markdown snapshot. Scope every query because both windows own an editor/test strip.
+        frontWindow(named: "Extracts")
+        let extractCell = extractWin.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+        XCTAssertTrue(extractCell.waitForExistence(timeout: 10), "the fixture extract should be listed")
+        _ = pollUntil(timeout: 10) { app.activate(); return extractCell.isHittable }
+        XCTAssertTrue(extractCell.isHittable, "the extract row should be selectable")
+        extractCell.click()
+        let extractEditor = extractWin.textViews["an.editor.text"]
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            ((extractEditor.value as? String) ?? "").contains("Moore says he and Noyce")
+        }, "the extract editor should load before observing its chip")
+
+        let before = passageChipStates(in: extractWin)
+        let beforeSource = before?.first { ($0["id"] as? String) == Self.idReader }
+        XCTAssertEqual(beforeSource?["label"] as? String, expectedLabel,
+                       "a live cited note should contribute its resolved title/date label")
+        XCTAssertEqual(beforeSource?["missing"] as? Bool, false,
+                       "before trashing, the rendered provider must use the non-missing/accent state")
+
+        // Delete the source through the production Locations inspector. Removing Ideas leaves the Reading
+        // membership intact, so this is specifically a two-home → last-home transition, not a direct delete.
+        frontWindow(named: "Archive Notes")
+        selectItem(uuid: Self.idReader)
+        let ideasRemove = noteWin.descendants(matching: .any)["an.locations.remove.\(Self.folderIdeas)"]
+        XCTAssertTrue(ideasRemove.waitForExistence(timeout: 10), "the Ideas membership remove control should exist")
+        _ = pollUntil(timeout: 8) { app.activate(); return ideasRemove.isHittable }
+        XCTAssertTrue(ideasRemove.isHittable, "the Ideas remove control should be hittable")
+        ideasRemove.click()
+        XCTAssertTrue(pollUntil(timeout: 12) {
+            guard let memberships = organizationMemberships() else { return false }
+            return !memberships.contains([Self.folderIdeas, Self.idReader])
+                && memberships.contains([Self.folderReading, Self.idReader])
+                && itemDirs().contains(Self.idReader)
+        }, "removing one home must keep the cited source live in Reading")
+
+        let readingRemove = noteWin.descendants(matching: .any)["an.locations.remove.\(Self.folderReading)"]
+        XCTAssertTrue(readingRemove.waitForExistence(timeout: 10), "the remaining Reading remove control should exist")
+        _ = pollUntil(timeout: 8) { app.activate(); return readingRemove.isHittable }
+        XCTAssertTrue(readingRemove.isHittable, "the Reading remove control should be hittable")
+        readingRemove.click()
+        let confirm = app.descendants(matching: .any)["an.dialog.deleteLastInstance.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10),
+                      "removing the last source home must require the production confirmation")
+        confirm.click()
+        XCTAssertTrue(pollUntil(timeout: 15) {
+            !itemDirs().contains(Self.idReader)
+                && !(organizationMemberships() ?? []).contains([Self.folderReading, Self.idReader])
+        }, "confirming must move the cited source out of the scratch items directory")
+
+        // Keep Extracts inactive: making it key would render its editor and could itself perform the
+        // re-style this test is meant to prove happened reactively after the source trash. The passive
+        // accessibility child below returns its last renderer-time snapshot without touching the editor.
+        var afterSource: [String: Any]?
+        XCTAssertTrue(pollUntil(timeout: 15) {
+            afterSource = passageChipStates(timeout: 3, in: extractWin)?
+                .first { ($0["id"] as? String) == Self.idReader }
+            return afterSource?["label"] as? String == expectedLabel
+                && afterSource?["missing"] as? Bool == true
+        }, "the existing Extracts editor must re-style its cited chip as missing after source trash; state = \(String(describing: afterSource))")
     }
 
     /// G10 — Jump-to-source (W7-S3, 00-overview §7). An extract's `note-passage` provenance chip carries
@@ -1109,8 +1252,9 @@ final class NotesGUITests: NotesFixtureUITestCase {
     //
     // Each of these shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour
     // never once driven through the real UI. They run here, off-screen in the Tart VM, which is what
-    // W21.vmgui-c exists for. W14.4's third tail — (c) the cross-window chip recolour — is deliberately
-    // NOT here; the reason is in `testG14`'s comment.
+    // W21.vmgui-c exists for. W14.4's third tail — (c) the cross-window chip recolour — is now covered
+    // separately by `testW21_CrossWindowPassageChipReStylesAfterSourceTrash`, which needs a deliberate,
+    // scratch-only source trash rather than G14's read-only raise/focus setup.
 
     /// G12 — per-window column visibility (W14.4 d). The Note window hides the `sources` column, which is
     /// always blank for notes; the Extracts window shows it. `NotesAppSettings.defaultHiddenColumns(for:)`
@@ -1277,11 +1421,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// the *selection* half while claiming a raise it never observed. Both windows are asserted at each
     /// step (one key, the other not), because "the target is key" alone would also hold if nothing moved.
     ///
-    /// NOT covered here — W14.4 (c), the cross-window chip recolour. The chip is an
-    /// `NSTextAttachmentViewProvider` subview and, per `ArchiveNotes/KNOWN_ISSUES.md`, is not in the
-    /// accessibility tree at all (not merely un-hittable), so neither its label nor its colour is
-    /// observable from XCUITest; and Notes has no in-GUI rename path for an item title, so the stated
-    /// trigger cannot be performed either. Tracked as its own item rather than half-asserted here.
+    /// W14.4 (c)'s cross-window chip recolour is intentionally separate in
+    /// `testW21_CrossWindowPassageChipReStylesAfterSourceTrash`: it must trash the cited note in the
+    /// generated fixture and observe the other window's freshly re-styled text storage. Keeping this G14
+    /// route read-only makes its raise/focus proof independent of that Tier-2 mutation.
     func testG14_CreateExtractAndJumpRaiseTheFeaturingWindow() throws {
         try withFixture { try runG14_CreateExtractAndJumpRaiseTheFeaturingWindow() }
     }

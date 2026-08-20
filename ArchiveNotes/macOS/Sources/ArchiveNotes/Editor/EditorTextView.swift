@@ -4,6 +4,20 @@ import AppKit
 /// downgrades to TextKit 1 and disables NSTextAttachmentViewProvider (future chips).
 final class EditorTextView: NSTextView {
 
+#if DEBUG
+    /// A non-interactive AX child that exposes a cached snapshot of this *already-rendered* text storage.
+    /// It must not be a SwiftUI button/state value: changing SwiftUI state re-enters
+    /// `MarkdownEditorView.updateNSView` and could itself perform the `passageGeneration` re-style the
+    /// W21.vmgui-c-fu test is meant to prove.
+    private lazy var passageChipStateProbe = PassageChipStateProbe(textView: self)
+
+    override func accessibilityChildren() -> [Any]? {
+        var children = super.accessibilityChildren() ?? []
+        children.append(passageChipStateProbe)
+        return children
+    }
+#endif
+
     /// Font size for formatting actions triggered from keyboard overrides (Tab/Return/Backspace).
     var configuredFontSize: CGFloat = 14
 
@@ -459,6 +473,38 @@ final class EditorTextView: NSTextView {
         return tryPasteImage(from: NSPasteboard.general)
     }
 
+#if DEBUG
+    /// JSON snapshot of every rendered note-passage chip's source id, resolved label, and missing state.
+    /// This reads the current text storage because `MarkdownEditorView.updateNSView` replaces that storage
+    /// when `passageGeneration` changes; a model-only probe could pass without the reactive re-style. The
+    /// DEBUG-only W21.vmgui-c-fu test consumes this after deleting a cited scratch note in the other window.
+    func uiTestPassageChipStates() -> String {
+        guard let storage = textStorage else { return "unavailable:noTextStorage" }
+        var states: [[String: Any]] = []
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) {
+            value, _, _ in
+            guard let chip = value as? BlockHeaderAttachment,
+                  let target = chip.sourceBox.anchor.notePassageTarget else { return }
+            states.append([
+                "id": target.id.uuidString.lowercased(),
+                "label": chip.passageLiveLabel ?? chip.sourceBox.anchor.display ?? "",
+                "missing": chip.passageSourceMissing
+            ])
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "unavailable:encoding"
+        }
+        return json
+    }
+
+    /// Cache the storage snapshot at the same point the renderer applies it. The AX child only returns this
+    /// `String`; querying it cannot cause a SwiftUI update or a late re-style (W21.vmgui-c-fu).
+    func refreshUITestPassageChipStateSnapshot() {
+        passageChipStateProbe.snapshot = uiTestPassageChipStates()
+    }
+#endif
+
     /// Fire the "Jump to Source" action of the FIRST note-passage block chip in the document — via the
     /// SAME `onJump` callback the chip button's `jumpClicked` invokes, with the SAME `SourceAnchor`.
     /// Only the button-CLICK gesture is bypassed: the chip is a TextKit-2 attachment-view-provider
@@ -521,3 +567,33 @@ final class EditorTextView: NSTextView {
     }
 #endif
 }
+
+#if DEBUG
+/// An accessibility-only child of `EditorTextView`, retained by its owning view for as long as the editor
+/// exists. Its value is a renderer-time snapshot of the text storage, with no click handler, binding, or
+/// SwiftUI state update. The one-point frame is inside the editor only to give XCUITest a real visible AX
+/// frame; it has no backing visual view and is omitted from Release.
+private final class PassageChipStateProbe: NSAccessibilityElement {
+    // AX getters are synchronous Obj-C entry points. The parent and snapshot are set on the main thread by
+    // `EditorTextView`; the getter only returns the already-formed String and never touches AppKit storage.
+    nonisolated(unsafe) private weak var textView: EditorTextView?
+    nonisolated(unsafe) var snapshot = "[]"
+
+    init(textView: EditorTextView) {
+        self.textView = textView
+        super.init()
+    }
+
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
+    override func accessibilityLabel() -> String? { "Rendered passage chip state" }
+    override func accessibilityIdentifier() -> String? { "an.editor.test.passageChips" }
+    override func accessibilityParent() -> Any? { textView }
+    override func accessibilityFrameInParentSpace() -> NSRect {
+        NSRect(x: 1, y: 1, width: 1, height: 1)
+    }
+    override func accessibilityValue() -> Any? {
+        return snapshot
+    }
+}
+#endif
