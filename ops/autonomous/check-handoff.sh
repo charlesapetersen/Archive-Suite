@@ -15,15 +15,17 @@
 # belongs to whoever is at the keyboard — daemon, interactive session, or Codex — which is exactly why this
 # script takes no argument about who you are.
 #
-# Read-only with respect to worktrees: it runs no build and edits no tracked file or plan. It does fetch remote
-# refs to verify the published state. Safe to run at any time, including while the daemon is running. It is
-# deliberately NOT wired into `health-gate.sh` yet — that is `W31.handoff-gate` in `SUITE_TODO.md`, since a
-# new gate step is Tier-2 autonomous-setup discipline.
+# Read-only with respect to worktrees: it runs no build and edits no tracked file or plan. The default FULL
+# mode fetches remote refs to verify the published state and is the final external-agent handoff check.
+# `HANDOFF_MODE=visibility` is the health-gate subset: it deliberately checks only that every open tracker item
+# is visible in the primary plan. It neither fetches nor judges mid-session worktrees, so a daemon can use it
+# at every periodic gate without confusing active work for a failed handoff.
 #
-# Usage:  ./ops/autonomous/check-handoff.sh            # from anywhere in the repo or a worktree
-#         HANDOFF_OFFLINE=1 ./ops/autonomous/check-handoff.sh
-#         HANDOFF_EXPECT_OPEN=0 ./ops/autonomous/check-handoff.sh  # intentional final closure only
-# Exit:   0 = handed off cleanly · 1 = at least one FAIL · 2 = cannot run (bad repo/plan)
+# Usage:  ./ops/autonomous/check-handoff.sh                         # full handoff, from any checkout
+#         HANDOFF_OFFLINE=1 ./ops/autonomous/check-handoff.sh       # intentional offline full handoff
+#         HANDOFF_EXPECT_OPEN=0 ./ops/autonomous/check-handoff.sh   # intentional final closure only
+#         HANDOFF_MODE=visibility ./ops/autonomous/check-handoff.sh # gate-safe tracker→plan check
+# Exit:   0 = clean · 1 = at least one FAIL · 2 = invalid input or mode
 set -uo pipefail
 
 # Resolve the PRIMARY checkout from wherever we are — a worktree's common dir points at it. Never write a
@@ -51,6 +53,11 @@ case "$HANDOFF_OFFLINE" in
   0|1) ;;
   *) echo "check-handoff: HANDOFF_OFFLINE must be 0 or 1 (got '$HANDOFF_OFFLINE')" >&2; exit 2 ;;
 esac
+HANDOFF_MODE="${HANDOFF_MODE:-full}"
+case "$HANDOFF_MODE" in
+  full|visibility) ;;
+  *) echo "check-handoff: HANDOFF_MODE must be full or visibility (got '$HANDOFF_MODE')" >&2; exit 2 ;;
+esac
 # NB: SUITE_TODO_DONE.md is deliberately NOT read here, unlike in check-tracker-sync.sh. Step 3 asks only
 # "is every OPEN item visible in the plan", and a shipped item is not open — so the archive cannot answer it.
 # (check-tracker-sync.sh must read the archive for a different question: whether the two files AGREE on state.)
@@ -63,8 +70,10 @@ head_() { printf '\n\033[1m── %s\033[0m\n' "$*"; }
 
 echo "check-handoff: primary checkout $ROOT"
 [ "$TREE" = "$ROOT" ] || echo "check-handoff: tracker checkout $TREE (plan remains primary-only)"
+[ "$HANDOFF_MODE" = visibility ] && echo "check-handoff: visibility mode (no remote/worktree handoff checks)"
 
 # ---------------------------------------------------------------------------------------------------
+if [ "$HANDOFF_MODE" = full ]; then
 head_ "1. no worktree is holding uncommitted work"
 # A STRAY worktree is tolerable (the owner said so explicitly): the daemon's housekeeping GCs a clean,
 # already-merged one by itself. Uncommitted work inside one is NOT tolerable — that is the near-miss of
@@ -135,6 +144,7 @@ if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then
 else
   ok "primary checkout tree is clean"
 fi
+fi
 
 # ---------------------------------------------------------------------------------------------------
 head_ "3. every open SUITE_TODO item is VISIBLE in the plan"
@@ -143,7 +153,11 @@ head_ "3. every open SUITE_TODO item is VISIBLE in the plan"
 # items the two files SHARE, so an item present in one and absent from the other is outside its question.
 # Parking an owner-gated item in `## HOLD QUEUE` counts as visible: it is not offered, but it IS counted.
 if [ ! -f "$PLAN" ]; then
-  warn "no plan at $PLAN — skipping (nothing to hand off to)"
+  if [ "$HANDOFF_MODE" = visibility ]; then
+    fail "no plan at $PLAN — the daemon has nowhere to see newly filed work"
+  else
+    warn "no plan at $PLAN — skipping (nothing to hand off to)"
+  fi
 elif [ ! -f "$TODO" ]; then
   fail "no SUITE_TODO.md at $TODO"
 else
@@ -227,6 +241,16 @@ else
   elif [ "$open_floor_ok" = 1 ]; then
     ok "every open SUITE_TODO item has a checkbox line in the plan"
   fi
+fi
+
+if [ "$HANDOFF_MODE" = visibility ]; then
+  printf '\n'
+  if [ "$fails" -gt 0 ]; then
+    printf '\033[31mHANDOFF VISIBILITY: %d FAIL(s)\033[0m — mirror the tracker item before the daemon can continue.\n' "$fails"
+    exit 1
+  fi
+  printf '\033[32mHANDOFF VISIBILITY: CLEAN\033[0m\n'
+  exit 0
 fi
 
 # ---------------------------------------------------------------------------------------------------

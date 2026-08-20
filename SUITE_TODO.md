@@ -82,30 +82,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
   prompts, one per credential, not one.
   | ops/autonomous/fix-keychain-access.sh, daemon.sh | S | med | none
 
-- [ ] **`W31.handoff-gate` — make the handoff gate a *gate*: wire `check-handoff.sh` into `health-gate.sh`,
-  and stop new items being filed without a plan mirror [S–M · MED · ops].** Filed 2026-08-13 by the
-  pre-restart readiness audit. `ops/autonomous/check-handoff.sh` **exists and passes** as of that date, but
-  nothing runs it automatically, so it only helps an agent who remembers to type it — the same weakness as
-  the prose checklist it replaced.
-  **Root cause it exists to close, and the attribution matters:** the audit found **27 open `SUITE_TODO`
-  items with no checkbox line anywhere in `.maintenance/AUTONOMOUS_PLAN.md`** — unreachable by
-  `next-queue-item.sh`, and invisible to `check-tracker-sync.sh` too, because that guard compares the items
-  the two files SHARE and so cannot see one that is missing from a file entirely. `git log -S<tag> --
-  SUITE_TODO.md` on all 27 put **every one in a commit in this project's own convention** (`fix(notes):
-  W23.m14 — …`, `fix(ops): two status lines that lied`, `docs(trackers): …`) — three from `c0be2cc` alone,
-  two from `763eade`. So this is **not** an external-agent problem: it is what happens when a session closes
-  a parent item, files the `-fu` it just found, and does not mirror it. All 27 were routed on 2026-08-13
-  (15 daemon-buildable → `## WORK QUEUE` with the Wave-23 block first, 8 owner-gated → `## HOLD QUEUE`,
-  4 umbrella items → the queue tail), and the held-back count corrected 5 → 13.
-  **Two halves.** (a) Add a `handoff` step to `health-gate.sh` calling `check-handoff.sh` — ⚠️ **Tier-2 per
-  the autonomous-setup change discipline** (adversarial review + prove-the-mechanism before install), plus a
-  `prove-handoff.sh` in `ops/autonomous/tests/` alongside the other 15 proofs; mind the spaced-path hazard
-  (the gate only ever runs at `…/Archive Suite`, so quote every expansion — `W26.gatepath`). Note the check
-  FAILS on an uncommitted worktree, which is correct for a handoff but wrong for a mid-session gate, so it
-  needs a mode flag or the gate must call only the tracker-visibility half. (b) Consider making
-  `check-tracker-sync.sh` itself assert set-EQUALITY rather than agreement-on-the-intersection, which would
-  have caught all 27 at the first health gate after each was filed. | ops/autonomous/ | S–M | med | none
-
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 
 ## Reader test hardening (owner-reviewed 2026-07-18)

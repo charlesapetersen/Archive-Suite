@@ -152,6 +152,11 @@ step_skippable fixture-scripts bash "$ROOT/ArchiveReader/scripts/test-fixture-sc
 # launch, rather than merely checking that the command text still mentions `test-recovery.sh`.
 step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-launch-gate.sh"
 
+# W31.handoff-gate: an open tracker item must be mirrored into the primary plan or `next-queue-item.sh` cannot
+# offer it. Use only check-handoff's visibility mode here: full handoff rightly rejects an active worktree and
+# fetches origin, neither of which is a deterministic mid-session gate condition.
+step handoff env HANDOFF_MODE=visibility bash "$ROOT/ops/autonomous/check-handoff.sh"
+
 # Coherence: WARN-ONLY (never REDs the gate). A dirty TRACKED tree hints at a half-committed/aborted state,
 # but it's fragile as a park trigger — the gate must not false-park a healthy run over it (and a build can
 # leave transient tracked churn on some setups). The builds + unit suites above are the real RED signal.
@@ -243,6 +248,7 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
 step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
+step handoff-proof  bash "$ROOT/ops/autonomous/tests/prove-handoff.sh"
 step vm-lane-proof  bash "$ROOT/ops/autonomous/tests/prove-vm-lane.sh"
 
 # W26.fixwarn-fu1 (2026-08-10) — the SIX remaining hermetic harnesses. Wiring them one at a time is how this

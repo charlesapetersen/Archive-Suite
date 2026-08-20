@@ -80,6 +80,21 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Autonomous handoff integrity (owner decision, 2026-08-19)
 
+- [x] **`W31.handoff-gate` — make the handoff gate a *gate*: wire `check-handoff.sh` into `health-gate.sh`,
+  and stop new items being filed without a plan mirror [S–M · MED · ops].** Shipped 2026-08-19 (**this
+  commit**). The health gate now runs `HANDOFF_MODE=visibility`: the exact open-tracker → primary-plan check
+  that catches a filed-but-unmirrored item, without fetching the remote or rejecting a live worktree during a
+  daemon session. The default remains the full final-handoff check. A missing primary plan now fails the
+  visibility mode explicitly because the daemon would have nowhere to see new work. `check-tracker-sync.sh`
+  retains its intentional shared-item agreement check; the new direct visibility check is the complementary
+  missing-item guard.
+  **Functional proof:** the new hermetic `prove-handoff.sh` drives the shipped checker through mirrored,
+  unmirrored, missing-plan, malformed-item, and invalid-mode cases, and blocks `git fetch` and `git worktree`
+  to prove the health-gate mode remains local (**13/0**). `prove-gate-report.sh` confirms every proof is wired
+  or expressly excluded (**29/0**); shell syntax and diff validation are green. README count and final-handoff
+  guidance now describe the limited gate mode. | ops/autonomous/check-handoff.sh, health-gate.sh,
+  tests/prove-handoff.sh, README.md | S–M | med
+
 - [x] **`W31.handoff-fp` — three ways `check-handoff.sh` could report CLEAN while something was wrong
   [S–M · MED · ops].** Shipped 2026-08-19 (**this commit**). The user chose the conservative defaults: an
   offline handoff fails unless `HANDOFF_OFFLINE=1` explicitly accepts the missing remote comparison; zero

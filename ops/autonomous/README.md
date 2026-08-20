@@ -450,7 +450,7 @@ ops/autonomous/tests/prove-todo-stubs.sh       # the ticked-stub lint: a COLUMN-
 
 ### Which of these actually run, and the assertion that keeps it that way (W26.fixwarn-fu1, 2026-08-10)
 
-**11 of the 13 `tests/prove-*.sh` harnesses are `health-gate.sh` steps**, so they run on every gate rather
+**15 of the 17 `tests/prove-*.sh` harnesses are `health-gate.sh` steps**, so they run on every gate rather
 than when someone remembers. That took five hand-sweeps, and each one found the previous had missed some:
 `f64649b` wired four, `W26.fixwarn` a fifth, and counting them to justify the word "fifth" turned up **seven**
 more that nothing ran — `prove-compact.sh` had been RED *and* unwatched for weeks, `prove-status.sh` sat at
@@ -472,7 +472,7 @@ line with the reasons in the prose above it:
 that is stale, or that is in fact wired, REDs too. A comment mentioning a harness does not count as wiring.
 It lives there because it must live in a step that is *independently* wired: an assertion inside the harness
 it is asserting about stops running the moment that step is dropped, which is the failure being closed.
-So **harness #14 cannot land unwatched** — and adding a name to the exclusion line is not a snooze button.
+So **no new proof harness can land unwatched** — and adding a name to the exclusion line is not a snooze button.
 
 ### Tracker sync — `check-tracker-sync.sh` (WARN-only in the gate)
 
@@ -515,6 +515,9 @@ plan, but it fetches remote refs so it can verify publication.
   continuing. Historical done entries are not daemon candidates and are intentionally outside this open-item rule.
 - Run it from the checkout being handed off: `./ops/autonomous/check-handoff.sh`. It exits `0` only when clean,
   `1` for a failed handoff, and `2` for invalid input or override values.
+- The health gate calls the explicit `HANDOFF_MODE=visibility` subset instead of the full check. It fails if an
+  open `SUITE_TODO.md` item lacks a primary-plan mirror, but deliberately does not fetch or reject a live
+  worktree mid-session. The full default remains the only check that authorizes a final handoff.
 
 ### Ticked stubs — `check-todo-stubs.sh` (WARN-only in the gate, W26.donecount 2026-08-10)
 
