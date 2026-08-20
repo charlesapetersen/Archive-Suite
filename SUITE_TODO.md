@@ -1483,11 +1483,6 @@ before building anything else in Notes.
   be neither created nor renamed. Drive it on the Notes VM lane, scratch fixture only. Outcome is either a
   HIGH bug item or a downgrade to a UX note. | ArchiveNotes GUI | S | low | **needs:** gui
 
-- [ ] **`W9.a10` — prove the doc-sync hook fires for `packages/` [XS–S · Tier-2 autonomous-setup].** Plan A10.
-  The W0 plan asked to prove the doc-sync backstop catches a `packages/ArchiveCore` code change with no doc
-  touch; it was never proved. ⚠️ Tier-2 per the autonomous-setup change discipline — prove the mechanism on a
-  planted change before trusting it. | .claude/hooks/docsync-*.sh | XS–S | low | none
-
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 

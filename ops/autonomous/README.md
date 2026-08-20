@@ -694,7 +694,10 @@ autonomous run for a different repo:
   — otherwise the daemon can never detect COMPLETE and never unloads.
 - **Respect the repo's Stop/commit hooks.** This repo has a doc-sync Stop hook that blocks a turn if code
   shipped without touching a tracker. The resume prompt tells each session to flip a `SUITE_TODO.md` checkbox
-  in the same commit (or `touch .claude/.docsync-ok` for infra-only). Port the equivalent for a new repo.
+  in the same commit (or `touch .docsync-ok` for infra-only). The root-level acknowledgement is deliberate:
+  agents cannot write under `.claude/`, where the hooks and their settings live. `prove-docsync-packages.sh`
+  hermetically confirms the hook also catches a `packages/ArchiveCore` source-only change. Port the equivalent
+  for a new repo.
 - **One bounded item per fresh session, commit+push each.** A single long session is the *worst* case for
   context and dies whole on a usage cutoff. Fresh resumes off the durable plan are the best case — and they're
   what make a mid-run usage cutoff a no-op (the next cycle just continues).

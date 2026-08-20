@@ -15,6 +15,24 @@ never a source of queue candidates. **Do not rename or move this file without up
 
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
+## W9 gap-closure — Phase A safety-net (2026-08-19)
+
+- [x] **`W9.a10` — prove the doc-sync hook fires for `packages/` [XS–S · Tier-2 autonomous-setup].** **SHIPPED
+  2026-08-19** (commit whose subject begins `test(ops,trackers): W9 prove doc-sync package coverage`). The W0
+  plan required evidence that the doc-sync backstop catches a `packages/ArchiveCore` code change with no tracker
+  touch; the existing proof coverage did not reach that path.
+
+  **Tier-2 mechanism proof:** `prove-docsync-packages.sh` creates a private Git history containing an actual
+  `packages/ArchiveCore` Swift-only commit, invokes the real Stop hook with its test baseline/head overrides,
+  and verifies exit 2 plus the missing-tracker diagnosis. It then appends `SUITE_TODO.md` in the same range and
+  verifies the hook passes and advances its baseline. The proof is a health-gate step, checks that it is wired
+  exactly once, and runs without a remote, source-checkout mutation, corpus, GUI, or network. It reports
+  **7 passed, 0 failed** both directly and under the unattended gate environment; `prove-gate-report.sh`
+  remains **29/0** with all 19 proof harnesses watched or deliberately excluded. The autonomous README also
+  corrects the infra-only acknowledgement path to the intentional root-level `.docsync-ok`. |
+  .claude/hooks/docsync-guard.sh, ops/autonomous/{health-gate.sh,tests/prove-docsync-packages.sh,README.md} |
+  XS–S | low | done
+
 
 ## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
 
