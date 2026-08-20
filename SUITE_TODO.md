@@ -1203,15 +1203,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | **owner**
 
-- [ ] **W23.notes-uitest-launch-warn — the launch-seam unit tests emit 10 avoidable actor-isolation warnings [XS · LOW].**
-  Filed 2026-08-20 while verifying W23.notes-uitest-warn. A fresh Notes `build-for-testing` has no diagnostics
-  from `NotesGUITests.swift`, but emits ten Swift 6 warnings from
-  `Tests/ArchiveNotesUITests/UITestLaunchTests.swift:23-38`: its otherwise pure launch-argument tests use the
-  `@MainActor` `XCUIApplication.archiveUITestApp()` factory and `launchArguments` from a nonisolated
-  `XCTestCase`. There is no lifecycle-override constraint in this small test class, so confirm a class-level
-  `@MainActor` annotation eliminates precisely those warnings while preserving test discovery. Compile-only;
-  no GUI run or fixture is required. | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/UITestLaunchTests.swift | XS | low | none
-
 - [ ] **`W9.b3` — Archive Notes cannot retitle or re-tag a note from the UI at all [S–M · Tier-2].**
   **⚠️ Retagged from `W22.notes-rename` on 2026-08-16 and MERGED with gap-closure plan item B3 — they were the
   same work filed twice, once from the owner's 2026-08-02 walkthrough and once from the 2026-07-16

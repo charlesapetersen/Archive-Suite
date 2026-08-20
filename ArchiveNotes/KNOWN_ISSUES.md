@@ -12,7 +12,15 @@ test target. The shared fixture launch and shutdown now run through `withFixture
 `@MainActor` test method, with `defer` preserving teardown on every return path; the test bodies themselves
 remain private helpers. A fresh compile-only build reports zero diagnostics from `NotesGUITests.swift`. No GUI
 test was run and no real store or corpus was opened. The separate ten-warning launch-seam test class is tracked
-as `W23.notes-uitest-launch-warn`, rather than being folded into this lifecycle fix.
+and fixed as `W23.notes-uitest-launch-warn`, rather than being folded into this lifecycle fix.
+
+## ✅ FIXED (W23.notes-uitest-launch-warn) — launch-seam tests now declare their UI isolation
+
+**2026-08-20.** The five pure launch-argument tests call the `@MainActor` `XCUIApplication` factory and inspect
+its `launchArguments`, but their class was nonisolated. A class-level `@MainActor` annotation removes all ten
+fresh-build diagnostics without the lifecycle compatibility problem present in the fixture base. The fresh
+compile-only build reports zero diagnostics from `UITestLaunchTests.swift`, and the built test bundle retains
+all five public test-method symbols. No GUI test, fixture, real store, or corpus was opened.
 
 ## ✅ FIXED (W21.vmgui-g5-flake) — the source-block UI check could retry against the wrong note
 

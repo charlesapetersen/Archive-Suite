@@ -4291,6 +4291,14 @@ explain why not.
   `NotesGUITests.swift`**. The same fresh log exposed the distinct ten-warning launch-seam test class, filed as
   **W23.notes-uitest-launch-warn** rather than treating it as part of this item.
   | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift | S | low | none
+- [x] **W23.notes-uitest-launch-warn — the launch-seam unit tests emit 10 avoidable actor-isolation warnings [XS · LOW].**
+  ✅ **DONE this commit.** Unlike the fixture base, this five-method test class has no lifecycle overrides, so
+  one class-level `@MainActor` correctly expresses its use of the main-actor `XCUIApplication` launch factory
+  and `launchArguments`. Fresh `xcodebuild -scheme ArchiveNotes -destination 'platform=macOS'
+  -derivedDataPath ./build/W23LaunchFixedDD build-for-testing` succeeded with **0 diagnostics from
+  `UITestLaunchTests.swift`**. The compiled bundle retains all five public launch-seam test method symbols;
+  that inspection and the build are non-executing, so no GUI test, fixture, real store, or corpus was opened.
+  | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/UITestLaunchTests.swift | XS | low | none
 - [x] **W23.h5-fu — Process Files still can't tell a placeholder PDF from a real one (the signal now exists;
   nothing there reads it) [XS–S · LOW].** ✅ DONE inside **W23.m5** exactly as this entry required —
   `ff792a9` (all five `generate` call sites now capture `ImagePageOutcome`, surfaced through W23.m5's

@@ -8,6 +8,7 @@
 
 import XCTest
 
+@MainActor
 final class UITestLaunchTests: XCTestCase {
 
     /// The flag itself, spelled the way AppKit reads it. Written out literally rather than referencing
