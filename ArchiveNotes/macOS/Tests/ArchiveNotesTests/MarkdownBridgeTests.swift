@@ -23,6 +23,18 @@ struct MarkdownBridgeTests {
         #expect(kind != nil)
     }
 
+    /// `BlockKind` crosses the AppKit bridge as an NSAttributedString attribute value. It must be Hashable so
+    /// that bridge never falls back to Objective-C's slow boxed `-hash` path during Markdown styling.
+    @Test @MainActor
+    func blockKindAttributeValueIsHashable() {
+        let kind = BlockKind.listItem(ordered: true, depth: 1, ordinal: 2)
+        let attributed = NSMutableAttributedString(string: "item")
+        attributed.addAttribute(.noteBlockKind, value: kind, range: NSRange(location: 0, length: attributed.length))
+
+        #expect(attributed.attribute(.noteBlockKind, at: 0, effectiveRange: nil) as? BlockKind == kind)
+        #expect(Set([kind, kind, BlockKind.plain]).count == 2)
+    }
+
     // MARK: - Serialize basics
 
     @Test @MainActor

@@ -3,6 +3,15 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W21.hash) — Markdown styling no longer bridges `BlockKind` through a slow Objective-C hash
+
+**2026-08-20.** `BlockKind` is stored as an `NSAttributedString` attribute during Markdown styling. It was
+`Equatable` but not `Hashable`, so AppKit emitted a performance warning whenever Objective-C asked its boxed
+value for `-hash`. The enum now uses synthesized `Hashable`; a focused test stamps it into the real custom
+attribute, reads it back, and uses `Set<BlockKind>` so a removed conformance cannot compile. A fresh Debug
+build and the screen-suppressed 221-test unit smoke are green, and the ArchiveNotes launch log no longer has
+the prior `BlockKind` hash warning. No GUI test, real Notes store, or corpus was opened.
+
 ## ✅ FIXED (W23.notes-uitest-warn) — UI-test fixture setup no longer obscures new compiler warnings
 
 **2026-08-20.** `NotesFixtureUITestCase` is main-actor isolated because it drives `XCUIApplication`, but

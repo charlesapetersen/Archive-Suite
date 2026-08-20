@@ -20,7 +20,7 @@ extension NSAttributedString.Key {
 // MARK: - BlockKind (paragraph-level semantic)
 
 /// Semantic paragraph kind stamped by the Styler, read by the serializer.
-enum BlockKind: Sendable, Equatable {
+enum BlockKind: Sendable, Hashable {
     case plain
     case heading(Int)        // 1–6
     case blockquote

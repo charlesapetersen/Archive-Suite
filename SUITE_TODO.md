@@ -1123,17 +1123,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** On every Notes launch the console
-  logs *"Obj-C `-hash` invoked on a Swift value of type `ArchiveNotes.BlockKind` that is Equatable but not
-  Hashable; this can lead to severe performance problems."* Diagnosed 2026-07-28: `BlockKind` is declared
-  `Sendable, Equatable` (`Editor/MarkdownAttributes.swift:19`) but is stored as an **`NSAttributedString`
-  attribute value** under the custom key `.noteBlockKind` (`"an.blockKind"`, same file L6–7), so AppKit bridges it
-  to Obj-C and calls `-hash` on it — a boxed/slow hash on every markdown parse (chip styling). Fix: add `Hashable`
-  to the conformance list; all payloads are synthesizable (`Int`, `String?`, `(ordered: Bool, depth: Int,
-  ordinal: Int)`), so no manual `hash(into:)` is needed. Pre-existing, **not** caused by W14.4. Tier-1 (no data
-  path): build clean + `ArchiveNotesTests` green + confirm the warning is gone from a launch log.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/MarkdownAttributes.swift | XS | low | none
-
 - [ ] **W21.verify — verify the three release `// VERIFY` desk checks against live vendor docs [S].** These sat
   on the owner's manual list but are **not GUI checks** — no app launch, no VM, no key. They are "does this
   hard-coded fact still match the vendor's live model list / console flow", which a session can do with web

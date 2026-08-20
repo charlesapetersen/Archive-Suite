@@ -6092,6 +6092,17 @@ explain why not.
   without a diagnostic would be a no-op-risky change to the Live Capture network path. | CaptureServer.swift |
   S | low | done
 
+- [x] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** ✅ **DONE this commit.**
+  `BlockKind` is an `NSAttributedString` attribute value under `an.blockKind`, so AppKit bridges it to
+  Objective-C and hashes it during Markdown styling. The enum's associated values are all synthesizable, so
+  adding `Hashable` is the complete fix; the focused bridge test stamps a list-item value into an attributed
+  string, round-trips it through the custom key, and uses a `Set<BlockKind>` (removing the conformance makes
+  that test fail to compile). Fresh Debug build succeeded with no source warnings, and the screen-suppressed
+  Notes unit smoke passed **221 tests**; its ArchiveNotes launch log contains no prior `BlockKind` Objective-C
+  `-hash` performance warning. No GUI test, real Notes store, or corpus was opened.
+  | ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/MarkdownAttributes.swift,
+    ArchiveNotes/macOS/Tests/ArchiveNotesTests/MarkdownBridgeTests.swift | XS | low | done
+
 - [x] **`W21.e2e-fu2` — the test-only LAN READY line published the six-character Drive-relay token after
   W16.lan2 split the LAN credential [XS · MED · lying test seam] — Tier-2.** **SHIPPED 2026-08-19** (**this
   commit**). The LAN `CaptureServer` authenticates the persistent high-entropy `lanToken`, so its headless
