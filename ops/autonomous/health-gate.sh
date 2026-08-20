@@ -5,9 +5,9 @@
 # LLM) — that's why the daemon runs it directly rather than spending a session on it.
 #
 # FREE by default: Reader + Notes smoke (build + unit suites, via the existing ./test-smoke.sh) + a Processor
-# BUILD (compile-break check — NOT the paid OCR smoke) + the write-surface lint and the four other hermetic
-# script gates (W26.lint-fu) + a light coherence check. Set AUTONOMOUS_GATE_OCR=1 to also run the paid
-# Processor OCR smoke (a few cents). Exit 0 = GREEN, nonzero = RED.
+# BUILD AND HEADLESS LAUNCH (compile/startup check — NOT the paid OCR smoke) + the write-surface lint and the
+# hermetic script gates (W26.lint-fu) + a light coherence check. Set AUTONOMOUS_GATE_OCR=1 to also
+# run the paid Processor OCR smoke (a few cents). Exit 0 = GREEN, nonzero = RED.
 #
 # Run from anywhere (cd's to the repo root). Builds into gitignored build dirs; makes NO commits, no edits.
 set -uo pipefail
@@ -102,9 +102,11 @@ step_skippable() {
 # draw" (blank PDF pane, blank thumbnail) is caught in this gate without the UITest hang. See ops/gui/README.md.
 step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot -derivedDataPath ./build/gate-DD'
 step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotes  -destination "platform=macOS" -only-testing:ArchiveNotesTests  -derivedDataPath ./build/gate-DD'
-# Processor: BUILD only (free) — catches compile breaks without the paid OCR round-trip. xcodebuild exits
-# nonzero on a build error, which is the pass/fail signal (own DD so it can't clobber a live build/DD).
+# Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
+# ($0, no network, no OCR, no GUI) and confirms the app reached main; a build alone cannot catch a pre-main
+# abort. `ARCHIVEPROC_TEST_BINARY` is explicit so this cannot accidentally pass against stale build/DD.
 step processor-build bash -c 'cd ArchiveProcessor/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/gate-DD build'
+step processor-launch bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-recovery.sh'
 # Opt-in paid OCR smoke. PREREQ before enabling this in an unattended run: the Gemini key must be readable
 # WITHOUT a prompt — test-smoke.sh reads it via `security find-generic-password`, so run the WS12 keychain
 # fix (ops/autonomous/fix-keychain-access.sh) first, else this either prompts (→ the daemon's GATE_MAXRUN
@@ -145,6 +147,10 @@ step finder-tags              env PYTHONDONTWRITEBYTECODE=1 bash "$ROOT/ArchiveP
 # checkout the owner put it in. The gate runs from the primary checkout, where it is present — but
 # any other clone, and every git worktree, has no such directory. RED there would be a lie.
 step_skippable fixture-scripts bash "$ROOT/ArchiveReader/scripts/test-fixture-scripts.sh"
+
+# W28.cert-fu3: prove the launch gate itself runs a binary that aborts before main and reports a failing
+# launch, rather than merely checking that the command text still mentions `test-recovery.sh`.
+step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-launch-gate.sh"
 
 # Coherence: WARN-ONLY (never REDs the gate). A dirty TRACKED tree hints at a half-committed/aborted state,
 # but it's fragile as a park trigger — the gate must not false-park a healthy run over it (and a build can

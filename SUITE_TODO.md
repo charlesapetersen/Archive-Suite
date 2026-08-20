@@ -44,13 +44,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 
 ## Processor build/test gate follow-up (found 2026-08-12)
 
-- [ ] **`W28.cert-fu3` — the default daemon gate cannot detect a signed Processor build that aborts before
-  `main` [XS–S · LOW · blind gate] (blocked-on: W21.recovery-timeout).** The gate's free Processor lane ends
-  after `xcodebuild`; that command was green throughout W28.cert-fu2 even though the product could not launch.
-  The recovery driver is a scratch-only, no-OCR launch probe, but its current fixed 60-second deadline has an
-  independently queued headroom defect. After W21.recovery-timeout ships, give the default gate a bounded
-  Processor launch step using the just-built gate artifact (not stale `build/DD`), and prove it catches a
-  pre-`main` abort without enabling the paid OCR lane or reaching the host GUI. | ops/autonomous/health-gate.sh + ArchiveProcessor/scripts/test-recovery.sh | S | risk low
 
 - [ ] **`W21.e2e-fu2` — the test-only LAN READY line still publishes the six-character Drive-relay token
   after W16.lan2 split the LAN credential [XS · MED · lying test seam] — Tier-2.**

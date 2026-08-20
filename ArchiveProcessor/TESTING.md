@@ -267,7 +267,9 @@ existing scratch, key-free, no-network execution remains unchanged.
 
 **Live Capture data safety**
 - **`test-recovery.sh`** — the DATA-SAFETY invariants: confirm-before-delete, keep-on-failed-backup, and the
-  recovered-photo hold. 45 checks as of 2026-07-31.
+  recovered-photo hold. Its direct invocation uses `macOS/build/DD`; the free daemon gate injects its freshly
+  built `macOS/build/gate-DD` app binary so this same synthetic launch probe also catches a pre-`main` abort.
+  45 checks as of 2026-07-31.
 - **`test-manifest-persistence.sh`** — manifest durability + completion acknowledgements: a session's record
   survives a crash, and an ack is only emitted once the write is durable. 86 checks as of 2026-07-31.
 - **`test-network-session.sh`** — paid-POST retry safety and limiter cancellation accounting, injected so no

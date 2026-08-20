@@ -34,6 +34,25 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Processor build/test gate follow-up (found 2026-08-12)
 
+- [x] **`W28.cert-fu3` — the default daemon gate could not detect a signed Processor build that aborts before
+  `main` [XS–S · LOW · blind gate] (blocked-on: W21.recovery-timeout).** **SHIPPED 2026-08-19** (commit whose
+  subject begins `fix(ops,processor,trackers): W28 gate launch artifact`). The free Processor lane ended at
+  `xcodebuild`; that command was green throughout W28.cert-fu2 despite the product aborting before `main`.
+  The recovery driver was already a scratch-only, no-OCR launch probe, but did not have a way to receive the
+  gate's just-built app artifact.
+
+  **Fix:** `test-recovery.sh` now accepts an explicit test-binary override while preserving its direct-run
+  `build/DD` default. `health-gate.sh` builds into `macOS/build/gate-DD` then immediately launches *that exact
+  binary* through the headless recovery driver. No paid OCR, network, or host GUI lane is enabled. The new
+  `prove-processor-launch-gate.sh` is a gate step itself, guards the artifact path and build→launch ordering,
+  and runs the real recovery script against a scratch executable that exits before `main`.
+
+  **Verified:** the proof reports **8/0**, including the injected pre-main abort failing with the early-exit
+  diagnostic and no false PASS; the standard gate-report proof is **29/0** and confirms every proof harness is
+  wired or explicitly excluded. An ordinary Debug build into `gate-DD` completed, then its actual unattended
+  recovery launch returned `ALL PASS`. | ops/autonomous/health-gate.sh, tests/prove-processor-launch-gate.sh,
+  ArchiveProcessor/scripts/test-recovery.sh, ArchiveProcessor/TESTING.md, ops/autonomous/README.md | S | low | done
+
 - [x] **`W21.e2e-fu1` — the documented phone↔Mac Tier-2 harness reaches pairing and completes the full
   round trip. ✅ SHIPPED 2026-08-13** — commit whose subject begins
   `fix(processor,trackers): W21.e2e-fu1 restore phone-Mac gate`.

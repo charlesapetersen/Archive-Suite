@@ -10,9 +10,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source "$PWD/scripts/test-report-wait.sh"
 
-bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
+default_bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
+# The normal direct invocation uses build/DD. The autonomous gate injects its just-built gate-DD artifact so
+# this launch check cannot accidentally pass by exercising an older local app binary.
+bin="${ARCHIVEPROC_TEST_BINARY:-$default_bin}"
 if [ ! -x "$bin" ]; then
-    echo "ArchiveProcessor is not built; run the documented Debug build first." >&2
+    echo "ArchiveProcessor test binary is not executable: $bin" >&2
     exit 1
 fi
 

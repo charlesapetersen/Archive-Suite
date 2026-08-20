@@ -202,8 +202,11 @@ OVER state is not reached at all. `AUTONOMOUS_DOC_PREGATE=0` disables the whole 
 Contract proof: `tests/prove-context-budget.sh` (a gate step) + `tests/prove-daemon.sh` §28a–g.
 
 The gate is deterministic (build/test), so the **daemon runs it directly** — no session, no LLM. Default checks are **free**: build all
-three apps + Reader/Notes **unit** suites + the write-surface lint and four other hermetic script gates + a
-coherence check (clean tree); `AUTONOMOUS_GATE_OCR=1` adds the paid Processor OCR smoke.
+three apps + a headless Processor launch of that just-built artifact + Reader/Notes **unit** suites + the
+write-surface lint and hermetic script gates + a coherence check (clean tree);
+`AUTONOMOUS_GATE_OCR=1` adds the paid Processor OCR smoke. The Processor launch runs the synthetic recovery
+driver with no key, network, OCR, or GUI; it is specifically what catches an app that builds but aborts before
+`main`, and it never reuses a stale `build/DD` binary.
 - **Unit tests via `-only-testing:<UnitBundle>`, not the whole scheme** — load-bearing: the schemes also hold
   UITest bundles, and running a UITest pops the macOS "Enable UI Automation" prompt, which would **hang the
   gate** (it runs synchronously in the daemon loop) and wake you. (`./test-smoke.sh reader|notes` run the full
