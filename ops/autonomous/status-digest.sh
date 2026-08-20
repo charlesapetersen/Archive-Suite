@@ -24,12 +24,71 @@ PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
 JOB="com.archivesuite.autonomous"; GUI_DOMAIN="gui/$(id -u)"
 LOG="$STATE/daemon.log"
 DAEMON_CMD="./ops/autonomous/daemon.sh"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# The resolver already owns the definition of runnable work. Status must ask it before telling the owner
+# that a HOLD QUEUE is the reason nothing is moving; a held release cannot explain a backoff while another
+# ordinary item is ready to run.
+QUEUE_RESOLVER="${AUTONOMOUS_QUEUE_RESOLVER:-$HERE/next-queue-item.sh}"
 
 DETAILS=0
 case "${1:-}" in -d|--details|--detail|-v|--verbose|full) DETAILS=1 ;; esac
 
 g() { git -C "$REPO" "$@" 2>/dev/null; }
 num() { case "${1:-}" in ''|*[!0-9]*) echo 0 ;; *) echo "$1" ;; esac; }
+
+# Snapshot the queue once. The resolver is read-only and returns one `ok<TAB>…` row per runnable item;
+# `3`/`4` mean it conclusively found no runnable row (empty/all dependency-blocked). A malformed or absent
+# resolver is deliberately UNKNOWN, never evidence that the owner is holding the run up.
+queue_snapshot() {
+  QUEUE_OUTPUT=""; QUEUE_RC=2; QUEUE_HAS_OK=0; QUEUE_HAS_NO_RUNNABLE=0
+  [ -x "$QUEUE_RESOLVER" ] || return 0
+  QUEUE_OUTPUT="$("$QUEUE_RESOLVER" "$REPO" 2>/dev/null)"; QUEUE_RC=$?
+  if printf '%s\n' "$QUEUE_OUTPUT" | awk -F '\t' '$1 == "ok" { found=1 } END { exit !found }'; then
+    QUEUE_HAS_OK=1
+  fi
+  case "$QUEUE_RC" in
+    3|4) [ "$QUEUE_HAS_OK" = 0 ] && QUEUE_HAS_NO_RUNNABLE=1 ;;
+  esac
+}
+
+# A worktree checkpoint alone is not enough — it may belong to an ordinary interactive session. Conversely,
+# the daemon's process alone has no item identity. The two together are positive evidence that the live
+# unattended session is working on a checkpoint it has not yet handed back to the primary checkout.
+#
+# ⛔ This MUST NOT read engine.lock. Its mtime is a 60-second mutual-exclusion heartbeat, not a task or
+# session timestamp; prove-status.sh enforces that the renderer never reads it.
+active_session_checkpoint() {
+  local base parent wt ahead latest stamp subject tag now age
+  pgrep -f 'autonomous maintenance session for the Archive Suite' >/dev/null 2>&1 || return 1
+  # Compare to the PRIMARY checkout itself, not origin/main. A daemon session pushes from its worktree before
+  # the primary fast-forwards, and that pushed-but-not-yet-merged checkpoint is still live work here.
+  base="$(g rev-parse --verify -q HEAD 2>/dev/null)"
+  [ -n "$base" ] || return 1
+  # Git prints canonical worktree paths (for example `/private/var/...` on macOS), while an environment
+  # override may use the `/var/...` alias. Canonicalise before applying the sibling-worktree boundary.
+  parent="$(cd "$(dirname "$REPO")" && pwd -P)"
+  while IFS= read -r wt; do
+    [ -n "$wt" ] && [ "$wt" != "$REPO" ] || continue
+    case "$wt" in "$parent"/suite-wt-*) ;; *) continue ;; esac
+    ahead="$(git -C "$wt" rev-list --count "$base..HEAD" 2>/dev/null)"
+    case "$ahead" in ''|*[!0-9]*|0) continue ;; esac
+    latest="$(git -C "$wt" log -1 --format='%ct%x09%s' 2>/dev/null)"
+    stamp="${latest%%$'\t'*}"; subject="${latest#*$'\t'}"
+    now="$(date +%s)"; age=$(( now - $(num "$stamp") )); [ "$age" -lt 0 ] && age=0
+    tag="$(printf '%s\n' "$subject" | grep -oE 'W[0-9][A-Za-z0-9._-]*' | head -1)"
+    printf '%s\t%s\t%s' "${tag:-the current queued item}" "$ahead" "$(human_secs "$age")"
+    return 0
+  done < <(g worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+  return 1
+}
+
+# Keep the backoff explanation tied to the daemon's recorded verdict rather than guessing from the presence
+# of a HOLD QUEUE. The log has the precise failure class (usage cap, short startup failure, or no progress).
+last_backoff_reason() {
+  tail -n 80 "$LOG" 2>/dev/null \
+    | grep -E 'hit a USAGE LIMIT|died after only|advanced nothing \(queue \+ tip unchanged\)|no progress \(idle ' \
+    | tail -1 | sed 's/^[0-9-]* [0-9:]*  //' | cut -c1-150
+}
 
 # Colour only when a human is watching. The daemon redirects this into STATUS.md, and escape codes in a
 # file are worse than no colour at all.
@@ -70,6 +129,7 @@ running=0; pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1 && running=1
 supervised=0; launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1 && supervised=1
 since="$(cat "$STATE/idle.since" 2>/dev/null)"
 STATE_HINT=""
+queue_snapshot
 
 if [ -n "${STATUS_PARKED:-}" ]; then
   # Set by the daemon while it is parking: the process is still alive for another moment, so the pgrep
@@ -77,7 +137,11 @@ if [ -n "${STATUS_PARKED:-}" ]; then
   STATE_ICON="${AMB}◆${OFF}"; STATE_LINE="Stopped itself — everything left needs a decision from you"
   STATE_HINT="reason: $(printf '%s' "$STATUS_PARKED" | tr -d '\n' | cut -c1-70)"
 elif [ "$running" = 1 ]; then
-  case "$since" in
+  if checkpoint="$(active_session_checkpoint)"; then
+    IFS=$'\t' read -r checkpoint_item checkpoint_count checkpoint_age <<< "$checkpoint"
+    STATE_ICON="${GRN}●${OFF}"; STATE_LINE="Working on $checkpoint_item"
+    STATE_HINT="A live session has $(plural "$checkpoint_count" checkpoint) ahead of the primary checkout; latest checkpoint $checkpoint_age ago."
+  else case "$since" in
     ''|*[!0-9]*)
       STATE_ICON="${GRN}●${OFF}"; STATE_LINE="Working now"
       # ⛔ DO NOT re-add a "— N into its current task" suffix here from engine.lock's mtime (removed
@@ -106,10 +170,19 @@ elif [ "$running" = 1 ]; then
         STATE_HINT="This is NOT out of work; it retries by itself. Idle $(human_secs "$idle")."
       else
         STATE_ICON="${AMB}◐${OFF}"
-        STATE_LINE="Running, but not finding anything it can do ($(human_secs "$idle"))"
-        STATE_HINT="Usually means the remaining tasks are waiting on you — see 'Needs you' below."
+        reason="$(last_backoff_reason)"
+        if [ "$QUEUE_HAS_OK" = 1 ]; then
+          STATE_LINE="Waiting to retry — runnable work remains ($(human_secs "$idle"))"
+          STATE_HINT="${reason:-The queue still has runnable work; it will retry by itself.}"
+        elif [ "$QUEUE_HAS_NO_RUNNABLE" = 1 ]; then
+          STATE_LINE="Running, but no eligible work is queued ($(human_secs "$idle"))"
+          STATE_HINT="See 'Needs you' below for an actionable hold, if there is one."
+        else
+          STATE_LINE="Running, waiting to retry ($(human_secs "$idle"))"
+          STATE_HINT="${reason:-The queue could not be checked, so this report is not assigning blame.}"
+        fi
       fi ;;
-  esac
+  esac; fi
 elif [ "$supervised" = 1 ]; then
   # Job loaded but no process: either between restarts, or crash-looping. Never let those read alike.
   lec="$(launchctl print "$GUI_DOMAIN/$JOB" 2>/dev/null | awk -F'= ' '/last exit code/{gsub(/[^0-9-]/,"",$2); print $2; exit}')"
@@ -190,7 +263,7 @@ security authorizationdb read system.privilege.taskport 2>/dev/null | grep -q '<
   add_need "A security setting is still relaxed (password-free taskport) — see ~/Desktop/REVERT-TASKPORT-SECURITY.txt"
 [ -f "$STATE/keychain-partition-fixed" ] || \
   add_need "Keychain not set up — it may interrupt you with a password box. Run once: ./ops/autonomous/fix-keychain-access.sh"
-[ "$hold" -gt 0 ] 2>/dev/null && \
+[ "$hold" -gt 0 ] 2>/dev/null && [ "$QUEUE_HAS_NO_RUNNABLE" = 1 ] && \
   add_need "$hold task(s) are held back for you to decide (they touch things with no undo)"
 # Daemon Report: count the UNWALKED entries, then quote the newest.
 #

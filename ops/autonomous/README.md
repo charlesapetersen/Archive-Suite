@@ -106,8 +106,8 @@ tail -f ~/.local/state/archive-autonomous/last-session.log      # the most recen
 `daemon.sh stop` is the right stopper in both modes: under `keepalive` a bare `pkill` would just be relaunched by
 launchd, so `stop` boots out the job first. (`daemon.sh status --details` shows which mode is in force, under
 *restart on crash*.)
-`./daemon.sh status` opens with a plain-language **state line** — *Working now* / *Paused — it hit the usage cap*
-/ *Running, but not finding anything it can do* / *Stopped itself* / *Set to run, but not running right now* /
+`./daemon.sh status` opens with a plain-language **state line** — *Working now* / *Working on W…* / *Paused — it hit the usage cap*
+/ *Waiting to retry — runnable work remains* / *Running, but no eligible work is queued* / *Stopped itself* / *Set to run, but not running right now* /
 *Not running* — so a parked run is never mistaken for a crash, and a throttled one is never mistaken for an
 empty queue. The daemon self-terminates when the plan's `RUN STATUS:` line
 reads `COMPLETE`, **or** when it parks (see below).
@@ -320,14 +320,21 @@ Archive Suite — overnight worker   Fri 31 Jul, 09:03
 
 The state line is the point of the whole thing, because each state implies a **different owner action**, and
 two of them were historically reported as each other:
-*Working now* · *Paused — it hit the usage cap* (wait; it retries itself) · *Running, but not finding anything
-it can do* (unblock it) · *Stopped itself* = parked (decide something) · *Set to run, but not running right
+*Working now* · *Working on W…* · *Paused — it hit the usage cap* (wait; it retries itself) · *Waiting to retry —
+runnable work remains* (wait; the last daemon-log verdict says why) · *Running, but no eligible work is queued*
+(unblock it) · *Stopped itself* = parked (decide something) · *Set to run, but not running right
 now* (crash-looping) · *Not running*.
 
 `daemon.sh status --details` adds the diagnostics that used to clutter the default view — current commit, plan
 line, restart-on-crash mode, disk, spare worktrees, keychain state, GUI lane, whether paced reviews are on,
 and the last log lines. Nothing was deleted, only demoted; anything genuinely *wrong* still surfaces under
 **Needs you** with no flag.
+
+When a live unattended session has a checkpoint ahead of the primary checkout in its separate worktree, the state line names that
+work item and the checkpoint age instead of letting a stale `idle.since` stamp call it idle. This deliberately
+does **not** use `engine.lock`: its mtime is a heartbeat lease, not a task duration. Before status attributes a
+pause to the HOLD QUEUE, it also asks `next-queue-item.sh`; any runnable item suppresses that unrelated owner
+ask and the state instead preserves the daemon log's backoff reason.
 
 Before this rewrite, `daemon.sh status` printed six sections of its own and *then* pasted the digest underneath,
 so the run state and plan line each appeared twice in two different wordings — and the `GUI` and `keychain`
@@ -336,7 +343,7 @@ sections were fixed text that had stopped telling anyone anything. One renderer,
 The daemon rewrites `$STATE/STATUS.md` from the same renderer every cycle + on park (colour is suppressed off
 a terminal, so the file stays clean text). Read-only, non-fatal, degrades gracefully — it exits 0 and still
 prints a report with no repo, plan or state at all, because it is what you run when something is already
-broken. Covered by `ops/autonomous/tests/prove-status.sh` (34 checks: every state, the jargon budget, and the
+broken. Covered by `ops/autonomous/tests/prove-status.sh` (47 checks: every state, the jargon budget, and the
 no-ANSI-in-a-file rule). Check in with:
 `cat ~/.local/state/archive-autonomous/STATUS.md` (or `./ops/autonomous/daemon.sh status`).
 

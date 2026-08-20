@@ -1233,29 +1233,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   originally-suggested `@preconcurrency import Dispatch` may be a no-op — **reproduce the warnings on a fresh
   clean build FIRST** and only then choose the fix. `Net/` is a Tier-2 no-undo path, so treat any behavioural
   change as Tier-2 even though this is nominally a warning cleanup. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift | S | low | none
-- [ ] **W21.status-idle — `daemon.sh status` reports "nothing it can do" while a session is actively mid-item,
-  and blames the HOLD QUEUE for it [S · LOW · ops].** Filed 2026-08-02 from the daemon-report walkthrough,
-  where the headline read *"◐ Running, but not finding anything it can do (2 hours)"* and *"Needs you: 2
-  task(s) are held back for you to decide"* — while a session launched at 08:18 had already committed
-  `d67b9cb` (`W3.cap-r5` checkpoint 1/2) in its worktree and was mid-`Edit` on the trackers. It shipped
-  minutes later as `1f43498`. **Both halves of the headline were wrong**, in two independent ways:
-  (1) *liveness* — the idle clock is driven by `idle.since` + the pushed tip on `main`, so a session that is
-  running and has committed only to its own worktree reads as zero progress; nothing consults `engine.lock`,
-  the running `claude` process, or `git log main..HEAD` in the live `suite-wt-*`. (2) *attribution* — the
-  "Needs you" line pins the idleness on the HOLD QUEUE without asking the resolver, but
-  `next-queue-item.sh` was returning `W3.cap-r5`/`r4`/`r3` and ~20 more as `ok`; the held items were gating
-  nothing. The real cause was six consecutive USAGE-LIMIT fast-fails (rc=1 after 6–8s, backing off
-  180s→1800s), which `daemon.log` names correctly and the headline discards.
-  **Fix direction:** before printing the idle headline, check for a live session (lock + worktree commits
-  ahead of `main`) and say *"working on `<item>` since `<t>`"* instead; and gate the "Needs you → held back"
-  attribution on `next-queue-item.sh` actually returning no `ok` item, otherwise report the backoff reason
-  from `daemon.log`. ⚠️ This is **the mirror image of the known "status says *productive* while every session
-  exits rc=1" bug** — same root shape (the headline summarizes state it does not measure), so fix both
-  directions or the next one lands as a new surprise. **Tier-2 per the autonomous-setup change discipline**
-  (adversarial review + prove-the-mechanism before install), and remember `daemon.sh` installs from the PRIMARY
-  checkout's working tree — a fix landed via worktree+push is not live until the primary is fast-forwarded
-  and the owner restarts it. Read-only reporting change; no daemon behaviour change.
-  | files: ops/autonomous/daemon.sh | S | low | none
 - [ ] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
   Filed 2026-07-31 from the W23.m9-fu2 session. A **clean** build of the Notes scheme emits 22 Swift 6
   warnings from `Tests/ArchiveNotesUITests/NotesGUITests.swift:55-77` — "main actor-isolated property `app`

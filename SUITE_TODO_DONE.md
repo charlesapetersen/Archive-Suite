@@ -6042,6 +6042,23 @@ explain why not.
   allowance. | ArchiveProcessor/scripts/test-report-wait.sh, test-{recovery,manifest-persistence,merge-safety,batch-resume}.sh,
   Capture/MergeSafetyTestDriver.swift, ArchiveProcessor/TESTING.md | S | low | done
 
+- [x] **W21.status-idle — `daemon.sh status` reported no work and blamed the HOLD QUEUE while a session was
+  actively mid-item [S · LOW · ops].** **SHIPPED 2026-08-19** (commit whose subject begins
+  `fix(ops,trackers): W21 report active daemon work`). The renderer now identifies the truthful productive
+  state only when both signals agree: a live daemon-owned resume session and a `suite-wt-*` worktree checkpoint
+  ahead of the primary checkout. It names the queued work item's tag and reports the latest checkpoint age,
+  taking precedence over a stale `idle.since` value. It deliberately does **not** use `engine.lock`, whose
+  changing mtime is only a mutual-exclusion heartbeat and cannot measure task duration.
+
+  The digest also snapshots the existing read-only queue resolver. A runnable `ok` result now says that work
+  remains and retains the daemon log's actual backoff verdict; it suppresses the unrelated HOLD QUEUE owner
+  ask. The held-work ask appears only when the resolver conclusively finds no runnable queue item (empty or
+  dependency-blocked); an unreadable resolver never assigns blame. **Tier-2 proof:** `prove-status.sh` reports
+  **47 passed, 0 failed**, including a live separate worktree against the `/private/var` path canonicalisation
+  macOS Git returns, stale-idle precedence, the no-session false-positive guard, runnable-work attribution,
+  and all-blocked hold attribution. Shell syntax and whitespace checks are clean. | ops/autonomous/{status-digest.sh,
+  tests/prove-status.sh,README.md} | S | low | done
+
 - [x] **W3.notes-extract-smuggles-a-source-header — a chip-inclusive selection put a raw
   `reader-page`/`zotero-*` header INSIDE an extract, straight past the coercion that exists to forbid it
   [M · MED · invariant].** ✅ **SHIPPED 2026-08-11** (the commit whose subject begins

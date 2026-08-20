@@ -30,18 +30,23 @@ bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); printf '    
 BIN="$T/bin"; mkdir -p "$BIN"
 mkstub() { printf '#!/bin/sh\n%s\n' "$2" > "$BIN/$1"; chmod +x "$BIN/$1"; }
 # RUNNING / SUPERVISED / TASKPORT are read at CALL time from the environment, so each case can flip them.
-mkstub pgrep    'case "${RUNNING:-0}" in 1) echo 4242; exit 0;; *) exit 1;; esac'
+mkstub pgrep    'case "$*" in
+  *archive-suite-autonomous.sh*) [ "${RUNNING:-0}" = 1 ] && { echo 4242; exit 0; } ;;
+  *"autonomous maintenance session for the Archive Suite"*) [ "${SESSION:-0}" = 1 ] && { echo 4343; exit 0; } ;;
+  *health-gate*) [ "${HEALTH_GATE:-0}" = 1 ] && { echo 4444; exit 0; } ;;
+esac
+exit 1'
 mkstub launchctl 'case "${SUPERVISED:-0}" in 1) echo "last exit code = ${LASTEXIT:-0}"; exit 0;; *) exit 1;; esac'
 mkstub security  'case "${TASKPORT:-0}" in 1) echo "<string>allow</string>";; esac; exit 0'
 # df/date/git/awk etc. still come from the real PATH, appended after the stubs.
-run() { PATH="$BIN:$PATH" AUTONOMOUS_REPO="$R" AUTONOMOUS_STATE="$S" AUTONOMOUS_PLAN="$P" bash "$DIGEST" "$@" 2>&1; }
+run() { PATH="$BIN:$PATH" AUTONOMOUS_REPO="$R" AUTONOMOUS_STATE="$S" AUTONOMOUS_PLAN="$P" SESSION="${SESSION:-0}" bash "$DIGEST" "$@" 2>&1; }
 
 # ---- a throwaway repo + plan + state dir -------------------------------------------------------------
 git -C "$R" init -q; git -C "$R" config user.email t@t; git -C "$R" config user.name t
 printf -- '- [ ] one\n- [ ] two\n- [x] three\n' > "$R/SUITE_TODO.md"
 git -C "$R" add -A; git -C "$R" commit -qm "seed: the first change"
 P="$R/plan.md"; S="$T/state"; mkdir -p "$S"
-write_plan() { printf 'RUN STATUS: IN_PROGRESS — test\n\n## HOLD QUEUE\n%s\n\n## Daemon Report\n%s\n\n## Next\n' "${1:-}" "${2:-}" > "$P"; }
+write_plan() { printf 'RUN STATUS: IN_PROGRESS — test\n\n## WORK QUEUE\n%s\n\n## HOLD QUEUE\n%s\n\n## Daemon Report\n%s\n\n## Next\n' "${3:-}" "${1:-}" "${2:-}" > "$P"; }
 write_plan "" ""
 : > "$S/daemon.log"
 
@@ -144,8 +149,31 @@ printf '%s' "$OUT" | grep -qi 'not finding anything' \
 echo "[4] running + idle + NO rate limit -> genuinely out of work (the other reading, still available)"
 rm -f "$S/last-session.log"
 OUT="$(RUNNING=1 run)"
-printf '%s' "$OUT" | grep -qi 'not finding anything' && ok "idle-no-work state" || bad "idle-no-work wrong" "$OUT"
+printf '%s' "$OUT" | grep -qi 'no eligible work is queued' && ok "idle-no-work state" || bad "idle-no-work wrong" "$OUT"
 printf '%s' "$OUT" | grep -qi 'Paused' && bad "claims throttled with no 429 present" "$OUT" || ok "does not invent a cap"
+write_plan "" "" "- [ ] **W99.ready — ordinary runnable task**"
+printf '2026-08-19 00:00:00  session (rc=1) died after only 4s with NO rate-limit event — NOT a usage limit. Check the session log.\n' > "$S/daemon.log"
+OUT="$(RUNNING=1 run)"
+printf '%s' "$OUT" | grep -q 'Waiting to retry — runnable work remains' && ok "runnable queue changes the idle headline" || bad "runnable work still reads empty" "$OUT"
+printf '%s' "$OUT" | grep -q 'died after only 4s' && ok "runnable queue keeps the daemon-log backoff reason" || bad "backoff reason was discarded" "$OUT"
+write_plan "" ""
+: > "$S/daemon.log"
+rm -f "$S/idle.since"
+
+echo "[4b] an active daemon session with an unpushed worktree checkpoint is WORKING, not stale-idle"
+A="$T/suite-wt-status-active"; git -C "$R" worktree add -q -b wt/status-active "$A"
+printf 'checkpoint\n' > "$A/checkpoint"
+git -C "$A" add checkpoint; git -C "$A" commit -qm 'fix(ops): W21.status-idle checkpoint'
+echo "$(( $(date +%s) - 7200 ))" > "$S/idle.since"
+export SESSION=1
+OUT="$(RUNNING=1 run)"
+printf '%s' "$OUT" | grep -q 'Working on W21.status-idle' && ok "live session + ahead worktree names its item" || bad "active worktree was hidden by stale idle" "$OUT"
+printf '%s' "$OUT" | grep -q 'checkpoint ahead of the primary checkout' && ok "active state explains its evidence" || bad "active state omitted checkpoint evidence" "$OUT"
+printf '%s' "$OUT" | grep -qi 'waiting to retry\|no eligible work' && bad "active state still reads idle" "$OUT" || ok "active state takes precedence over idle stamp"
+export SESSION=0
+OUT="$(RUNNING=1 run)"
+printf '%s' "$OUT" | grep -qi 'no eligible work is queued' && ok "an ahead worktree without the daemon session does not fake liveness" || bad "checkpoint alone faked liveness" "$OUT"
+unset SESSION
 rm -f "$S/idle.since"
 
 echo "[5] STATUS_PARKED wins over a live process (the daemon sets it mid-park)"
@@ -171,10 +199,15 @@ printf '%s' "$OUT" | grep -q 'Nothing right now' && ok "quiet when there is noth
 # H3 headers). It used to say `- [ ] decide this thing`, a shape that has never appeared in the section or in
 # 338 KB of its archive — so this assertion passed while the renderer was structurally blind to every real
 # entry. A fixture that models a format the code never meets is how that hole stayed green.
-write_plan "- [ ] held thing" "### 2026-08-12 — decide this thing"
+write_plan "- [ ] held thing" "### 2026-08-12 — decide this thing" "- [ ] **W99.ready — ordinary runnable task**"
 OUT="$(RUNNING=1 run)"
-printf '%s' "$OUT" | grep -q 'held back for you' && ok "hold queue surfaced" || bad "hold queue missed" "$OUT"
+printf '%s' "$OUT" | grep -q 'held back for you' && bad "hold queue blamed despite runnable work" "$OUT" || ok "runnable work suppresses the unrelated hold-queue blame"
 printf '%s' "$OUT" | grep -q 'not been walked through' && ok "daemon-report count surfaced" || bad "daemon report missed" "$OUT"
+# Only an actually exhausted resolver result lets a held item become an owner ask. This is an all-blocked
+# queue rather than a missing queue, so the proof reaches next-queue-item.sh's real dependency result (rc 4).
+write_plan "- [ ] held thing" "" "- [ ] **W99.blocked — waits for its prerequisite** (blocked-on: W98.missing)"
+OUT="$(RUNNING=1 run)"
+printf '%s' "$OUT" | grep -q 'held back for you' && ok "hold queue surfaced only when no runnable work remains" || bad "exhausted queue did not surface its hold" "$OUT"
 # …and the scan must STOP at the newest walkthrough marker, so settled entries are never re-raised
 # (root CLAUDE.md is emphatic about that). One entry above the marker, one below -> exactly 1 reported.
 write_plan "" "### 2026-08-13 — unwalked one
