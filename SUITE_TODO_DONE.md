@@ -17,6 +17,16 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase A safety-net (2026-08-19)
 
+- [x] **`W9.c4` — the Notes smoke gate builds and drives the GUI target [XS].** **SHIPPED 2026-08-20**
+  (commit whose subject begins `test(notes,ops,trackers): W9 scope Notes smoke to units`). Notes smoke now
+  uses a dedicated `ArchiveNotesUnit` scheme and always selects `ArchiveNotesTests`, even outside the daemon,
+  so an ordinary free run cannot build or schedule `ArchiveNotesUITests`; the GUI suite remains an explicit
+  scratch-only, off-screen VM invocation. **Verification:** a hermetic normal-environment wrapper proof
+  records the exact unit scheme/selector and rejects a GUI target; a fresh DerivedData unit-scheme run proves
+  no UI-test product is built; the real Notes smoke and Notes Debug build pass without a visible GUI,
+  corpus/store write, network, or credentials. | ArchiveNotes/test-smoke.sh, ArchiveNotes/scripts/test-smoke-unit-scope.sh,
+  ops/autonomous/ | XS | low | done
+
 - [x] **`W9.c3` — the write-surface lint never scans ArchiveCore or Notes, and Core imports AppKit [S–M ·
   Tier-2].** **SHIPPED 2026-08-20** (commit whose subject begins
   `fix(core,reader,notes,trackers): W9 keep ArchiveCore UI-free`). The earlier W26 work had already

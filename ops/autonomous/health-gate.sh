@@ -85,8 +85,9 @@ step_skippable() {
 # UNIT tests only — `-only-testing:<UnitBundle>`, NOT the whole scheme. This is load-bearing for an UNATTENDED
 # gate: the schemes also contain UITest bundles (ArchiveReaderUITests / ArchiveNotesUITests), and running a
 # UITest pops the macOS "Enable UI Automation" / taskport prompt — which would HANG this gate (and, since the
-# daemon runs the gate synchronously, the whole daemon) and wake the owner. `./test-smoke.sh reader|notes`
-# runs the FULL scheme, so the gate does NOT use it; it invokes the unit bundle directly. (build is implied.)
+# daemon runs the gate synchronously, the whole daemon) and wake the owner. Reader's smoke wrapper selects
+# the unit bundle when this gate sets ARCHIVE_UNATTENDED; Notes' wrapper now does so on every run (W9.c4).
+# The gate still invokes the unit bundles directly, with build implied.
 # NOTE — `-only-testing:<UnitBundle>` does NOT mean "no GUI". Both unit bundles are APP-HOSTED
 # (TEST_HOST = the .app), so this LAUNCHES the real app. Until 2026-07-30 that put a window on the owner's
 # screen for the whole run (Reader 2m52s, Notes 49s) on every gate — the daemon's single biggest screen
@@ -101,7 +102,7 @@ step_skippable() {
 # PDF page / SwiftUI view to a bitmap headlessly (no "Enable UI Automation"/TCC prompt) — so "did it actually
 # draw" (blank PDF pane, blank thumbnail) is caught in this gate without the UITest hang. See ops/gui/README.md.
 step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot -derivedDataPath ./build/gate-DD'
-step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotes  -destination "platform=macOS" -only-testing:ArchiveNotesTests  -derivedDataPath ./build/gate-DD'
+step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
 # Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
 # ($0, no network, no OCR, no GUI) and confirms the app reached main; a build alone cannot catch a pre-main
 # abort. `ARCHIVEPROC_TEST_BINARY` is explicit so this cannot accidentally pass against stale build/DD.

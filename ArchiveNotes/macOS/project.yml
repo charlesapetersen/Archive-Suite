@@ -83,6 +83,20 @@ targets:
         ENABLE_HARDENED_RUNTIME: NO
 
 schemes:
+  # The free smoke / autonomous gate must not even build the GUI-test runner. Keep that target only in
+  # ArchiveNotes below, where the VM harness selects it explicitly.
+  ArchiveNotesUnit:
+    build:
+      targets:
+        ArchiveNotes: all
+        ArchiveNotesTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - ArchiveNotesTests
+
   ArchiveNotes:
     build:
       targets:

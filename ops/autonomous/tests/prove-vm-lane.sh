@@ -141,10 +141,13 @@ case "$o" in *REAL_XCODEBUILD_RAN*) ok "INTERACTIVE: whole-scheme test passes th
 
 echo "== 7. the smoke scripts guard themselves (the documented entry point must be correct, not just blocked) =="
 for f in ArchiveNotes/test-smoke.sh ArchiveReader/test-smoke.sh; do
-  grep -q 'ARCHIVE_UNATTENDED' "$ROOT/$f" && grep -q 'only-testing' "$ROOT/$f" \
-    && ok "$f restricts itself to the unit bundle when unattended" \
-    || no "$f has no unattended guard — it will run the scheme's UITest bundle on the host"
+  grep -q 'only-testing' "$ROOT/$f" \
+    && ok "$f selects its unit bundle (Notes unconditionally; Reader when unattended)" \
+    || no "$f has no unit-target selector — it can run the scheme's UITest bundle on the host"
 done
+grep -q 'ArchiveNotesUnit' "$ROOT/ArchiveNotes/test-smoke.sh" \
+  && ok "Notes smoke uses the unit-only scheme (it cannot build ArchiveNotesUITests)" \
+  || no "Notes smoke still uses the mixed ArchiveNotes scheme"
 
 echo "== 8. VM boot mode never puts a window on the owner's display =="
 RUNNER="$ROOT/ops/gui/vm-gui-runner.sh"

@@ -209,8 +209,9 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
 `main`, and it never reuses a stale `build/DD` binary.
 - **Unit tests via `-only-testing:<UnitBundle>`, not the whole scheme** — load-bearing: the schemes also hold
   UITest bundles, and running a UITest pops the macOS "Enable UI Automation" prompt, which would **hang the
-  gate** (it runs synchronously in the daemon loop) and wake you. (`./test-smoke.sh reader|notes` run the full
-  scheme, so the gate does *not* use them.)
+  gate** (it runs synchronously in the daemon loop) and wake you. Notes smoke now uses its unit target on every
+  invocation through its dedicated `ArchiveNotesUnit` scheme; Reader does so whenever this gate supplies
+  `ARCHIVE_UNATTENDED=1`. The gate still invokes both unit targets directly.
 - **Pixel-level "did it render" checks run in the gate too** — `DocumentRenderGuardTests` (`RenderProbe`) is a
   plain unit test inside `ArchiveReaderTests`: it renders a PDF page / view to a bitmap and asserts non-blank,
   with no "Enable UI Automation" prompt. So render regressions (blank PDF pane, blank thumbnail) are caught
@@ -270,8 +271,8 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
   session ran `./ArchiveNotes/test-smoke.sh`, whose own whole-scheme `xcodebuild test` drove
   ArchiveNotesUITests on the owner's display while the hook saw a string with no `xcodebuild` in it. Two
   layers behind it now: (a) both `test-smoke.sh` scripts run **only the unit bundle** when
-  `ARCHIVE_UNATTENDED=1`, pointing at the VM for the UITests — the documented command is now *correct*, not
-  merely blocked; (b) **`ops/autonomous/bin/` — one PATH shim per screen-reaching binary** (`xcodebuild`,
+  `ARCHIVE_UNATTENDED=1` — and Notes does so even interactively — pointing at the VM for the UITests; (b)
+  **`ops/autonomous/bin/` — one PATH shim per screen-reaching binary** (`xcodebuild`,
   `open`, `osascript`, `cliclick`, `emulator`, all symlinks to `_gui-shim`), prepended for the child, so the
   exec is caught no matter how many scripts deep it happens. Shimming `xcodebuild` alone was the first cut
   and left the same hole for every other mechanism — the Processor's smoke test reaches the screen with

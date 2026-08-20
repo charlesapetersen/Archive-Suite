@@ -1424,10 +1424,10 @@ per-window kind round-trip; `NotesNavigationModelTests` window defaults). Consci
   changes (or the disposable index is deleted + rebuilt). Only affects a dev DB created before this
   change; a fresh index is correct from first build.
 
-## Test harness — headless full-scheme run crashes — RESOLVED 2026-07-14 (W8-S6)
+## Test harness — headless unit run crashes — RESOLVED 2026-07-14 (W8-S6)
 
-Running the **whole** `ArchiveNotes` unit scheme headless (`xcodebuild test …`, and therefore
-`test-smoke.sh notes`) used to abort the shared Swift-Testing process with:
+Running the **whole** `ArchiveNotesTests` unit target headless (`xcodebuild test …`) used to abort the
+shared Swift-Testing process with:
 
 ```
 NSInvalidArgumentException: -[ArchiveNotes.BlockHeaderChipView performClick:]: unrecognized selector
@@ -1440,9 +1440,11 @@ NSInvalidArgumentException: -[ArchiveNotes.BlockHeaderChipView performClick:]: u
   why W4-S7 reported "**92 non-display** tests green").
 - **Fix (W8-S6):** the test now invokes the Reveal **button's** target/action directly (and finally
   asserts the callback received the anchor); the vestigial `performClick:`-on-the-view line is gone.
-  Verified headless: `xcodebuild test -only-testing:ArchiveNotesTests` →
+  Verified headless: `xcodebuild test -scheme ArchiveNotesUnit -only-testing:ArchiveNotesTests` →
   **TEST SUCCEEDED · 492 Swift-Testing tests in 59 suites + 187 XCTest · 0 failures · no abort**. The
-  whole-scheme smoke gate (`test-smoke.sh notes`) is green headless again.
+  unit smoke gate (`test-smoke.sh notes`) is green headless again. Since W9.c4, that command explicitly
+  uses the UI-free `ArchiveNotesUnit` scheme and selects `ArchiveNotesTests`; GUI tests remain opt-in
+  through the off-screen VM harness.
 
 ## Build/test gotchas (XcodeGen + Swift Testing, 2026-07-13)
 

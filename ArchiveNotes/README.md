@@ -77,7 +77,9 @@ cd ArchiveNotes && ./test-smoke.sh
 GUI verification uses the XCUITest harness (`ArchiveNotesUITests`) with a scratch fixture built by
 [`scripts/make-notes-fixture.sh`](scripts/make-notes-fixture.sh) and driven by
 [`scripts/gui-drive-notes.sh`](scripts/gui-drive-notes.sh) — see
-[`scripts/GUI-HARNESS.md`](scripts/GUI-HARNESS.md). The durable-link scenario has a build-free proof,
+[`scripts/GUI-HARNESS.md`](scripts/GUI-HARNESS.md). It is deliberately opt-in (off-screen via
+`ops/gui/vm-gui-runner.sh notes xcuitest`), never part of the `ArchiveNotesUnit` smoke scheme. The
+durable-link scenario has a build-free proof,
 [`scripts/e2e-durable-links.sh`](scripts/e2e-durable-links.sh). **Never point any of these at the real
 store or corpus** — [GUI_SAFETY.md](GUI_SAFETY.md).
 

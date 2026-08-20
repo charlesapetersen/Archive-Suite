@@ -33,7 +33,9 @@ this file is authoritative for Notes‑specific work.
   durable links, suite marker.
 - **Build:** `cd ArchiveNotes/macOS && xcodegen generate && xcodebuild -scheme ArchiveNotes -configuration Debug -derivedDataPath ./build/DD build`
 - **Run:** `./launch.sh notes` from the repo root, or `cd ArchiveNotes && ./launch.sh`.
-- **Test:** `./test-smoke.sh notes` from the repo root, or `cd ArchiveNotes && ./test-smoke.sh`.
+- **Test:** `./test-smoke.sh notes` from the repo root, or `cd ArchiveNotes && ./test-smoke.sh`. It uses the
+  `ArchiveNotesUnit` scheme and selects `ArchiveNotesTests`, so it cannot build the UI-test runner;
+  `ArchiveNotesUITests` stays an explicit off-screen VM action.
 - **GUI harness (W8-S7/S8, complete):** `scripts/make-notes-fixture.sh` builds a SCRATCH store at
   `~/Library/Application Support/ArchiveNotes/AN-GUI-Fixture` (notes + reader-page/Zotero/extract items,
   replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`

@@ -7,7 +7,7 @@ step.
 
 **Two gates, both cheap:**
 - **Unit smoke** (no GUI, no corpus): `./test-smoke.sh notes` (repo root) or `cd ArchiveNotes &&
-  ./test-smoke.sh` — build + the full unit suite. Run this before every push.
+  ./test-smoke.sh` — build + the full `ArchiveNotesTests` unit suite. Run this before every push.
 - **Driven GUI smoke** (this file): launch the app against a **scratch** store and drive it with
   [`scripts/gui-drive-notes.sh`](scripts/gui-drive-notes.sh) (`cliclick` for pointer input, `osascript`
   for keys/menus) + capture-and-read, or run the `ArchiveNotesUITests` XCUITest suite for deterministic

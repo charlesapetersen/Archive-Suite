@@ -234,8 +234,8 @@ daemon always sets it), `.claude/hooks/no-host-gui.sh` hard-DENIES host UITest r
 Simulator — always naming the VM route to take instead. Don't engineer around a denial: take the VM lane, or
 leave the item for the owner. Interactive sessions are unaffected. **A hook only sees the command string, so
 a wrapper script slips past it** — that is how `./ArchiveNotes/test-smoke.sh` put ArchiveNotesUITests on the
-owner's screen on 2026-07-30. Two more layers close it: the smoke scripts restrict themselves to the unit
-bundle when unattended, and **`ops/autonomous/bin/` holds a PATH shim per screen-reaching binary** —
+owner's screen on 2026-07-30. Two more layers close it: smoke scripts select the unit bundle when unattended
+(and Notes now does so on every invocation), and **`ops/autonomous/bin/` holds a PATH shim per screen-reaching binary** —
 `xcodebuild`, `open`, `osascript`, `cliclick`, `emulator` — which the daemon prepends, so the exec is caught
 at any nesting depth. Each refuses only the argv forms that draw (a whole-scheme `xcodebuild test`,
 `open -a`/`open *.app`, an AppleScript that drives an app, any `cliclick`, a windowed `emulator`) and passes

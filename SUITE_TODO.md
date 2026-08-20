@@ -1486,11 +1486,6 @@ before building anything else in Notes.
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 
-- [ ] **`W9.c4` — the Notes smoke gate builds and drives the GUI target [XS].** Plan C4.
-  `ArchiveNotes/test-smoke.sh` runs `xcodebuild test -scheme ArchiveNotes` with no
-  `-only-testing:ArchiveNotesTests`, so the "free" gate builds the UITest bundle and drives it when the fixture
-  is present. Add the restriction; keep the GUI target opt-in. | ArchiveNotes/test-smoke.sh | XS | low | none
-
 The remaining two Phase C items are heavier than C1–C4 and sit in **TIER 5**, not with the gate work:
 
 - [ ] **`W9.c5` — the tag-projector concurrent lost-update race [LOW–MED · Tier-2]** (blocked-on: W9.b3).

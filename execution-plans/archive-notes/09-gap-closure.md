@@ -262,10 +262,13 @@ tests run only via a manual `swift test`; nothing in the gate runs them.
   Notes scan stays clean; thumbnail rendering remains pixel-valid on scratch PDFs; the two app-host suppression
   tests pass. **Tier-2.**
 
-**C4. Scope the Notes smoke gate to unit tests.** — **MED** — `08` §2. `ArchiveNotes/test-smoke.sh` runs
-`xcodebuild test -scheme ArchiveNotes` without `-only-testing:ArchiveNotesTests`, so the GUI target is built
-and (if the fixture is present) driven by the "free" gate.
-- *Files:* `ArchiveNotes/test-smoke.sh`. *Steps:* add `-only-testing:ArchiveNotesTests`; keep the GUI target opt-in. *Verify:* the smoke run no longer invokes `ArchiveNotesUITests`. *Tier-1.*
+**C4. Scope the Notes smoke gate to unit tests.** — **MED** — `08` §2. `ArchiveNotes/test-smoke.sh` now
+always runs the dedicated `ArchiveNotesUnit` scheme with `-only-testing:ArchiveNotesTests`, so its free default
+cannot build or drive the GUI target; `ArchiveNotesUITests` remains an explicit off-screen VM action.
+- *Files:* `ArchiveNotes/macOS/project.yml`, `ArchiveNotes/test-smoke.sh`, its hermetic scope proof, and
+  VM-safety documentation/proof. *Verify:* a normal-environment wrapper capture proves the exact unit
+  scheme/selector and rejects the GUI target;
+  the real smoke run stays green. *Tier-1.*
 
 **C5. (Optional) Fix the tag-projector concurrent lost-update race.** — **LOW-MED (documented)** — `08` S2 /
 `KNOWN_ISSUES.md`. Two concurrent same-file projections can drop a subject; not currently triggered because
