@@ -1203,13 +1203,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | **owner**
 
-- [ ] **W21.warn — 2 pre-existing non-Sendable `DispatchWorkItem` warnings in `Net/CaptureServer.swift` [S · LOW].**
-  `TimeoutHandle(DispatchWorkItem { [weak self, weak conn] … })` at `CaptureServer.swift:151` captures a
-  non-`Sendable` `DispatchWorkItem` in a `@Sendable` context; surfaces only on a full clean build. ⚠️ The file
-  imports **only `Foundation` + `Network`** (verified 2026-07-28), and Foundation re-exports Dispatch, so the
-  originally-suggested `@preconcurrency import Dispatch` may be a no-op — **reproduce the warnings on a fresh
-  clean build FIRST** and only then choose the fix. `Net/` is a Tier-2 no-undo path, so treat any behavioural
-  change as Tier-2 even though this is nominally a warning cleanup. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift | S | low | none
 - [ ] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
   Filed 2026-07-31 from the W23.m9-fu2 session. A **clean** build of the Notes scheme emits 22 Swift 6
   warnings from `Tests/ArchiveNotesUITests/NotesGUITests.swift:55-77` — "main actor-isolated property `app`

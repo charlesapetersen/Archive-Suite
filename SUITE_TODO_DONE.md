@@ -6064,6 +6064,15 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **W21.warn — 2 pre-existing non-Sendable `DispatchWorkItem` warnings in `Net/CaptureServer.swift`
+  [S · LOW].** **CLOSED 2026-08-20 — unreproducible on current main; no source change.** A fresh, clean
+  Processor Debug build compiled `CaptureServer.swift` and emitted neither the claimed
+  `DispatchWorkItem`/non-Sendable diagnostics nor another warning from that file. The only warning in the
+  full log was the unrelated AppIntents metadata note. `TimeoutHandle` has already wrapped its
+  `DispatchWorkItem` as `@unchecked Sendable` since `f832ff2`; adding `@preconcurrency import Dispatch`
+  without a diagnostic would be a no-op-risky change to the Live Capture network path. | CaptureServer.swift |
+  S | low | done
+
 - [x] **`W21.e2e-fu2` — the test-only LAN READY line published the six-character Drive-relay token after
   W16.lan2 split the LAN credential [XS · MED · lying test seam] — Tier-2.** **SHIPPED 2026-08-19** (**this
   commit**). The LAN `CaptureServer` authenticates the persistent high-entropy `lanToken`, so its headless
