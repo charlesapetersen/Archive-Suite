@@ -23,7 +23,8 @@ bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
 run() {
   printf '%s\n' "$1" > "$T/plan.md"
   printf '%s\n' "$2" > "$T/todo.md"
-  OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" bash "$CHECK" 2>&1)"; RC=$?
+  : > "$T/done.md"
+  OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
 }
 
 echo "prove-tracker-sync — drift must be loud, asymmetry must be silent"
@@ -135,7 +136,7 @@ run '## WORK QUEUE
 - [ ] **W8.a**
 
 ## HOLD QUEUE' '- [ ] **W8.a**'
-OUT="$(TRACKER_SYNC_QUIET=1 AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" bash "$CHECK" 2>&1)"; RC=$?
+OUT="$(TRACKER_SYNC_QUIET=1 AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
 [ -z "$OUT" ] && [ "$RC" = 0 ] && ok "quiet mode prints nothing when in sync" || bad "quiet mode printed: '$OUT' rc=$RC"
 
 printf '## WORK QUEUE\n- [ ] **W8.a**\n\n## HOLD QUEUE\n' > "$T/plan.md"
@@ -143,7 +144,28 @@ printf -- '- [x] **W8.a**\n' > "$T/todo.md"
 OUT="$(TRACKER_SYNC_QUIET=1 AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" bash "$CHECK" 2>&1)"; RC=$?
 [ -n "$OUT" ] && [ "$RC" = 1 ] && ok "quiet mode still reports DRIFT (quiet != silent about failure)" || bad "quiet mode swallowed a divergence"
 
-# ---- 10. THE ARCHIVE IS PART OF THE SAME TRACKER ------------------------------------------------------
+# ---- 10. malformed open items must be LOUD, not absent from the comparison -----------------------------
+# `**(later)**` was a real live entry in 2026-08-16. Its punctuation first character did not match the tag
+# grammar, so neither side emitted it and a green equality check proved an empty set instead of the tracker.
+run '## WORK QUEUE
+- [ ] **W10.valid — visible work**
+
+## HOLD QUEUE' '- [ ] **W10.valid — visible work**
+- [ ] **(later)** behavior/data follow-on with no tag'
+[ "$RC" = 1 ] && ok "punctuation-led open item -> exit 1 (not a silent equality)" || bad "unparseable item expected rc=1, got $RC"
+case "$OUT" in *"UNPARSEABLE ITEM"*) ok "names the malformed-item condition";; *) bad "unparseable condition missing: $OUT";; esac
+case "$OUT" in *"**(later)** behavior/data follow-on with no tag"*) ok "prints the offending source line";; *) bad "offending line missing: $OUT";; esac
+
+# A pre-consolidation DONE archive entry can be historically malformed but cannot be offered by the daemon;
+# only OPEN items are a current handoff defect. This prevents a stale archival shape from drowning out one live
+# error (the two have opposite remedies).
+printf '## WORK QUEUE\n- [ ] **W10.valid — visible work**\n\n## HOLD QUEUE\n' > "$T/plan.md"
+printf -- '- [ ] **W10.valid — visible work**\n' > "$T/todo.md"
+printf -- '- [x] **⌘0 = historical done notation**\n' > "$T/done.md"
+OUT="$(AUTONOMOUS_PLAN="$T/plan.md" AUTONOMOUS_TODO="$T/todo.md" AUTONOMOUS_TODO_DONE="$T/done.md" bash "$CHECK" 2>&1)"; RC=$?
+[ "$RC" = 0 ] && ok "historical DONE punctuation remains out of the open-item guard" || bad "done archive item incorrectly failed: $OUT"
+
+# ---- 11. THE ARCHIVE IS PART OF THE SAME TRACKER ------------------------------------------------------
 # Regression: splitting done items into SUITE_TODO_DONE.md (consolidation phase 2) dropped coverage from 100
 # shared items to 34 and made the guard's founding case invisible — "[x] in the tracker" now often means
 # "lives in the archive", so comparing SUITE_TODO alone can never see it.

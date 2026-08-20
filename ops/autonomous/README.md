@@ -507,6 +507,9 @@ plan, but it fetches remote refs so it can verify publication.
   exception for an intentional offline handoff; it does not pretend publication was checked.
 - An exemption consumes one matching item only. A second open bullet with the same first word is left loud;
   it must receive a real, mirrorable tag instead of silently inheriting the first item's exception.
+- Any open checkbox bullet whose title does not begin with an alphanumeric tag prints `UNPARSEABLE ITEM` and
+  fails the handoff. It cannot be queued, mirrored, blocked-on resolved, or archived safely; name it before
+  continuing. Historical done entries are not daemon candidates and are intentionally outside this open-item rule.
 - Run it from the checkout being handed off: `./ops/autonomous/check-handoff.sh`. It exits `0` only when clean,
   `1` for a failed handoff, and `2` for invalid input or override values.
 

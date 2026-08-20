@@ -149,7 +149,7 @@ elif [ ! -f "$TODO" ]; then
 else
   # Same tag grammar as check-tracker-sync.sh: strip bold markers AND an optional leading backtick.
   items() {
-    awk -v region="$2" '
+    awk -v region="$2" -v bad="$3" -v source="$4" '
       function emit(  st, t, id) {
         st = (tolower($0) ~ /\[x\]/) ? "x" : " "
         match($0, /^[[:space:]]*[-*][[:space:]]+\[[ xX]\][[:space:]]*/)
@@ -162,6 +162,10 @@ else
           # bullet that happens to begin the same way; comm below consumes that one exemption and leaves a
           # second unmatched occurrence loud instead of silently applying first-occurrence-wins.
           print id "\t" st
+        } else if (st == " ") {
+          # A visible open checkbox needs a real tag. Keep its complete source line for the diagnostic rather
+          # than allowing a punctuation-led item to disappear before the plan comparison sees it.
+          print source ": " $0 > bad
         }
       }
       # W32.fence-order — fence rule FIRST, matching next-queue-item.sh (and check-tracker-sync.sh, fixed
@@ -176,15 +180,25 @@ else
       /^[[:space:]]*[-*][[:space:]]+\[[ xX]\]/ { emit() }
     ' "$1"
   }
-  P="$(mktemp)"; T="$(mktemp)"; trap 'rm -f "$P" "$T"' EXIT
+  P="$(mktemp)"; T="$(mktemp)"; BP="$(mktemp)"; BT="$(mktemp)"
+  trap 'rm -f "$P" "$T" "$BP" "$BT"' EXIT
   # Do not de-duplicate here. `comm`'s multiplicity means a real exemption consumes exactly one matching
   # open item; a second bullet starting with the same first word remains missing and cannot be swallowed.
-  items "$PLAN" 1 | cut -f1 | sort > "$P"
-  items "$TODO" 0 | awk -F'\t' '$2==" "{print $1}' | sort > "$T"
+  items "$PLAN" 1 "$BP" "primary plan" | cut -f1 | sort > "$P"
+  items "$TODO" 0 "$BT" "SUITE_TODO" | awk -F'\t' '$2==" "{print $1}' | sort > "$T"
   open_count="$(wc -l < "$T" | tr -d '[:space:]')"
   open_floor_ok=1
   if [ "$open_count" -lt "$HANDOFF_EXPECT_OPEN" ]; then
     fail "only $open_count parsable open SUITE_TODO item(s) in $TODO (need >= $HANDOFF_EXPECT_OPEN) — an empty or unparseable tracker cannot be handed off; set HANDOFF_EXPECT_OPEN=0 only for an intentional final closure"
+    open_floor_ok=0
+  fi
+  unparseable="$(cat "$BP" "$BT")"
+  if [ -n "$unparseable" ]; then
+    n_unparseable="$(printf '%s\n' "$unparseable" | grep -c .)"
+    fail "$n_unparseable UNPARSEABLE OPEN ITEM(s) cannot be handed off — every item needs an alphanumeric tag:"
+    printf '%s\n' "$unparseable" | while IFS= read -r bad; do
+      [ -n "$bad" ] && printf '       \033[31m⚠ UNPARSEABLE ITEM\033[0m — %s\n' "$bad"
+    done
     open_floor_ok=0
   fi
   # Some items are deliberately in NEITHER region because their own spec forbids both — out of scope until a

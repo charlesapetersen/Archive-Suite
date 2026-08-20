@@ -89,23 +89,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
   prompts, one per credential, not one.
   | ops/autonomous/fix-keychain-access.sh, daemon.sh | S | med | none
 
-- [ ] **`W31.handoff-fp2` — an item whose first character is not alphanumeric is invisible to BOTH tracker
-  guards, and neither can report it [XS–S · MED · ops].** Found 2026-08-16 by the priority reset, which is
-  also how it was proved: `check-handoff.sh` printed *"every open SUITE_TODO item has a checkbox line in the
-  plan"* while `**(later)** behavior/data follow-ons` (now `W33.storage`) had **no line in the plan at all**.
-  Mechanism: `items()` in both checkers strips bold and a
-  leading backtick, then require `^[A-Za-z0-9][A-Za-z0-9._-]*`. A leading `(` — or any other punctuation —
-  makes `match()` fail, so `emit()` prints nothing and the item never enters either side of the comparison.
-  This is **not** the same as the three paths in `W31.handoff-fp`: those are checks that pass on a bad state;
-  this is an item that cannot be seen at all, which is strictly worse, because the "missing" set it should
-  land in is computed by set difference and an absent element can never appear in one.
-  **Fix:** emit a distinct `⚠️ UNPARSEABLE ITEM` line (with the offending text) rather than silently skipping,
-  in both scripts, and count it as a `fail` in `check-handoff.sh`. That is better than widening the grammar to
-  accept punctuation — a bullet with no tag cannot be mirrored, `blocked-on`-resolved or archived either, so
-  the right outcome is to be told to give it a tag. Add the case to `prove-tracker-sync.sh` and to
-  `prove-handoff.sh` when `W31.handoff-gate` creates it. The now-shipped `W31.handoff-fp` open-item floor is
-  the aggregate backstop; this remains the per-item cause. | ops/autonomous/check-handoff.sh, check-tracker-sync.sh | XS–S | med | none
-
 - [ ] **`W31.handoff-gate` — make the handoff gate a *gate*: wire `check-handoff.sh` into `health-gate.sh`,
   and stop new items being filed without a plan mirror [S–M · MED · ops].** Filed 2026-08-13 by the
   pre-restart readiness audit. `ops/autonomous/check-handoff.sh` **exists and passes** as of that date, but

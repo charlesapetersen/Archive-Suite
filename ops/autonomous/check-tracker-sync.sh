@@ -41,7 +41,7 @@ grep -qE '^## WORK QUEUE' "$PLAN" || { echo "check-tracker-sync: no '## WORK QUE
 # $1 = file, $2 = 1 to restrict to the plan's WORK QUEUE region (an item parked in the HOLD QUEUE is not
 # offered as work, so it is not the same assertion and must not be compared), 0 to scan the whole file.
 items() {
-  awk -v region="$2" '
+  awk -v region="$2" -v bad="$3" -v source="$4" '
     function emit(  st, t, id) {
       st = (tolower($0) ~ /\[x\]/) ? "x" : " "
       match($0, /^[[:space:]]*[-*][[:space:]]+\[[ xX]\][[:space:]]*/)
@@ -51,6 +51,10 @@ items() {
       if (match(t, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) {
         id = substr(t, 1, RLENGTH)
         if (!(id in seen)) { seen[id] = 1; print id "\t" st }
+      } else if (st == " ") {
+        # An OPEN checkbox without an alphanumeric tag cannot be mirrored, offered, blocked-on resolved, or
+        # archived reliably. Do not discard it before the comparison can say what it saw.
+        print source ": " $0 > bad
       }
     }
     # ⚠️ W32.fence-order — THE FENCE RULE MUST COME FIRST, exactly as it does in next-queue-item.sh:95-98.
@@ -72,10 +76,12 @@ items() {
   ' "$1"
 }
 
-P="$(mktemp)"; T="$(mktemp)"; trap 'rm -f "$P" "$T"' EXIT
-items "$PLAN" 1 | sort > "$P"
+P="$(mktemp)"; T="$(mktemp)"; BP="$(mktemp)"; BT="$(mktemp)"; BD="$(mktemp)"
+trap 'rm -f "$P" "$T" "$BP" "$BT" "$BD"' EXIT
+items "$PLAN" 1 "$BP" "plan WORK QUEUE" | sort > "$P"
 # SUITE_TODO first so a live entry wins over a stale archived twin (first-occurrence-wins, as in the resolver).
-{ items "$TODO" 0; items "$TODO_DONE" 0; } | awk -F'\t' '!seen[$1]++' | sort > "$T"
+{ items "$TODO" 0 "$BT" "SUITE_TODO"; items "$TODO_DONE" 0 "$BD" "SUITE_TODO_DONE"; } \
+  | awk -F'\t' '!seen[$1]++' | sort > "$T"
 
 TAB="$(printf '\t')"
 # Compare only items present in BOTH. An item in one file and not the other is NOT drift: the plan mirrors a
@@ -93,10 +99,18 @@ report="$(printf '%s\n' "$both" | awk -F"$TAB" 'NF==3 && $2 != $3')"
 # ("Waves 13–23 COMPLETE") and other prose bullets, which are legitimately plan-only, stay quiet.
 untracked="$(awk -F"$TAB" '$2==" " && $1 ~ /\./ {print $1}' "$P" \
              | while IFS= read -r t; do grep -qxF -- "$t" <(cut -f1 "$T") || echo "$t"; done)"
+unparseable="$(cat "$BP" "$BT" "$BD")"
 
-if [ -z "$report" ] && [ -z "$untracked" ]; then
+if [ -z "$report" ] && [ -z "$untracked" ] && [ -z "$unparseable" ]; then
   [ "$QUIET" = 1 ] || echo "  ✓ tracker-sync: plan WORK QUEUE and SUITE_TODO agree on all $overlap shared items"
   exit 0
+fi
+
+if [ -n "$unparseable" ]; then
+  printf '%s\n' "$unparseable" | while IFS= read -r bad; do
+    [ -n "$bad" ] && echo "  ⚠ UNPARSEABLE ITEM — $bad"
+  done
+  echo "      Give every open checkbox item an alphanumeric tag so the queue and dependency resolver can name it."
 fi
 
 if [ -n "$untracked" ]; then

@@ -79,6 +79,20 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   The README and root handoff rule now document the two-source check, explicit overrides, one-item exemptions,
   and the fetch side effect. | ops/autonomous/check-handoff.sh, ops/autonomous/README.md, AGENTS.md | S–M | med
 
+- [x] **`W31.handoff-fp2` — a punctuation-led item was invisible to both tracker guards [XS–S · MED · ops].**
+  Shipped 2026-08-19 (**this commit**). `**(later)**` (now correctly tagged `W33.storage`) began with `(` after
+  bold/backtick stripping, so `items()` rejected it silently and the set comparison had no element to report.
+  **Fix:** both guards now emit `⚠ UNPARSEABLE ITEM` with the original source line for every **open** checkbox
+  whose title lacks an alphanumeric tag. `check-handoff.sh` counts that as a failure and never prints the
+  visibility green line; `check-tracker-sync.sh` returns failure too, so direct users and the handoff wrapper
+  both see it. Historical done-only punctuation entries remain outside this live-queue rule: they cannot be
+  offered by the daemon and should not drown a current malformed filing.
+  **Verified:** `prove-tracker-sync.sh` **29/0**, including the real `**(later)**` form, exact diagnostic, and
+  historical-done distinction; a disposable local primary/remote run proves the real handoff checker passes a
+  valid queue then fails with that source line after the malformed filing. Shell syntax and diff checks green.
+  `prove-handoff.sh` remains part of the separate `W31.handoff-gate` health-gate wiring item. | ops/autonomous/
+  check-handoff.sh, check-tracker-sync.sh, tests/prove-tracker-sync.sh | XS–S | med
+
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 
 - [x] **`W30.ceiling` — `compact-plan.sh`'s three region budgets did not add up to the plan's file budget, so
