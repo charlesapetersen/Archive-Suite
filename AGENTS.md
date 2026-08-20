@@ -241,7 +241,7 @@ at any nesting depth. Each refuses only the argv forms that draw (a whole-scheme
 `open -a`/`open *.app`, an AppleScript that drives an app, any `cliclick`, a windowed `emulator`) and passes
 everything else straight through. The **health gate** sets `ARCHIVE_UNATTENDED=1` itself, because it runs in
 the daemon loop where no PreToolUse hook applies. Related: the unit suites are app-hosted
-(they launch the real `.app`) but draw nothing since 2026-07-30 — ArchiveCore `ArchiveTestHost`.
+(they launch the real `.app`) but draw nothing since 2026-07-30 — each app's local `ArchiveTestHost`.
 
 Rules while driving: point the app at a **scratch copy, never the real corpus** (choosing a folder clobbers the
 owner's root bookmark — see the Reader Core Directive), and quit the app when done

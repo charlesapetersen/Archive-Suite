@@ -90,7 +90,7 @@ step_skippable() {
 # NOTE — `-only-testing:<UnitBundle>` does NOT mean "no GUI". Both unit bundles are APP-HOSTED
 # (TEST_HOST = the .app), so this LAUNCHES the real app. Until 2026-07-30 that put a window on the owner's
 # screen for the whole run (Reader 2m52s, Notes 49s) on every gate — the daemon's single biggest screen
-# intrusion. Fixed at the source, not here: ArchiveCore `ArchiveTestHost` makes each app draw nothing when
+# intrusion. Fixed at the source, not here: each app's local `ArchiveTestHost` makes it draw nothing when
 # it is only a unit-test host, pinned by TestHostWindowSuppressionTests in both suites. Side effect worth
 # knowing: with no UI to build, the Reader suite went 172s → ~2s. Don't "simplify" that away.
 # -skip-testing the ONE known-environmental failure: DeepLinkTests.testRevealAndSelectNoRoot fails whenever

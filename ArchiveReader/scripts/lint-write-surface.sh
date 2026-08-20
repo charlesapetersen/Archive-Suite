@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # lint-write-surface.sh — enforce the Core Directive (ArchiveReader/CLAUDE.md) at the source level,
-# across BOTH the Reader app target AND the shared ArchiveCore package it delegates its writes to.
+# across the Reader app target, shared ArchiveCore package, and the Notes rules it shares.
 #
 #   1) A Finder-tag write API (setResourceValue(s) / setxattr) may appear ONLY at the audited
 #      write choke-point — ArchiveCore's `CoordinatedTagWriter` (Tags/TagWrite.swift).
 #   2) NO file in either tree may call a move / rename / delete / trash / content-write API,
 #      except at the individually audited sites in the ALLOW list below.
+#   3) ArchiveCore must remain UI-free: no `import AppKit` or `import SwiftUI` in its sources.
 #
 # Run before every commit; exit non-zero on violation. It is ALSO run by the daemon's health gate
 # (`ops/autonomous/health-gate.sh`, step `write-surface-lint`, with its self-test alongside as step
@@ -20,7 +21,8 @@
 # Directive violation fixed in W26.deny sat. And because the Reader's own `TagWriter` is now a
 # *delta adapter* over `CoordinatedTagWriter`, the app target has ZERO tag-write hits of its own:
 # rule 1 was passing VACUOUSLY. Both trees are linted now, and the whole permitted tag-write
-# surface of the suite is the three exact lines allowed below.
+# surface of the suite is the three exact lines allowed below. W26.lint-fu then added the Notes
+# tag-write and enumerator scopes; W9.c3 adds the UI-free ArchiveCore import boundary.
 #
 # ── ALLOWANCES ARE (file, exact source line) PAIRS — never whole files ────────────────────────
 # A file-level exemption inside ArchiveCore would be a permanent unchecked hole in the package
@@ -90,6 +92,7 @@ SRC_NOTES="ArchiveNotes/macOS/Sources/ArchiveNotes"
 SRC_TAGWRITE=(    "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
 SRC_DESTRUCTIVE=( "$SRC_READER" "$SRC_CORE" )
 SRC_ENUMERATOR=(  "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
+SRC_UI_FREE=(     "$SRC_CORE" )
 
 # The UNION — every tree any rule reads. Guard (a) below existence-checks exactly these, so a tree
 # that appears in a rule list but not here would never be checked, and a rename would put that rule
@@ -163,7 +166,7 @@ done
 # (a2) With per-rule source lists, guard (a) only protects what the UNION names. A tree added to one
 #      rule but not to `SRCS` would go unchecked, so a later rename of it would silently narrow that
 #      rule back to nothing — the same vacuous pass, one indirection further away.
-for src in "${SRC_TAGWRITE[@]}" "${SRC_DESTRUCTIVE[@]}" "${SRC_ENUMERATOR[@]}"; do
+for src in "${SRC_TAGWRITE[@]}" "${SRC_DESTRUCTIVE[@]}" "${SRC_ENUMERATOR[@]}" "${SRC_UI_FREE[@]}"; do
   in_union=0
   for u in "${SRCS[@]}"; do [ "$u" = "$src" ] && in_union=1; done
   if [ "$in_union" -eq 0 ]; then
@@ -253,6 +256,14 @@ scan destructive \
 scan_stream enumerator \
   "FileManager.enumerator without errorHandler: — it SILENTLY skips directories it cannot read:" \
   < <(enumerators_without_error_handler "${SRC_ENUMERATOR[@]}")
+
+# 4) ArchiveCore is a shared domain package, so app frameworks belong in the app targets. Anchor the
+# import statement while accepting leading import attributes such as `@preconcurrency`: prose explaining
+# this rule is not an import, and neither is a type name containing it.
+scan ui-import \
+  "UI-framework import in ArchiveCore (move the code behind an app boundary):" \
+  '^[[:space:]]*(@[^[:space:]]+[[:space:]]+)*import[[:space:]]+(AppKit|SwiftUI)($|[[:space:]])' \
+  "${SRC_UI_FREE[@]}"
 
 # The scopes are not uniform, so neither is the claim: naming only the union would report the
 # destructive-write rule as covering a tree it deliberately does not read.

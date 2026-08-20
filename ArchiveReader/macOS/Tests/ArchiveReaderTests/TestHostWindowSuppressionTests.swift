@@ -12,6 +12,7 @@
 import XCTest
 import AppKit
 import ArchiveCore
+@testable import ArchiveReader
 
 final class TestHostWindowSuppressionTests: XCTestCase {
 

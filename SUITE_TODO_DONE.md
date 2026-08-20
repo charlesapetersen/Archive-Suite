@@ -17,6 +17,22 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase A safety-net (2026-08-19)
 
+- [x] **`W9.c3` — the write-surface lint never scans ArchiveCore or Notes, and Core imports AppKit [S–M ·
+  Tier-2].** **SHIPPED 2026-08-20** (commit whose subject begins
+  `fix(core,reader,notes,trackers): W9 keep ArchiveCore UI-free`). The earlier W26 work had already
+  extended the lint's direct-tag-write and silent-walker rules to ArchiveCore and Notes; this completion
+  adds the missing UI boundary. ArchiveCore now rejects `import AppKit` / `import SwiftUI` (including an
+  attributed import), `PDFThumbnailer` renders and encodes with CoreGraphics/ImageIO, and the app-host
+  window helper lives in the Reader and Notes targets instead of the shared package.
+
+  **Tier-2 mechanism proof:** the scratch-only lint harness reports **22/0**, covering direct tag writes,
+  destructive writes, walker error handling, Notes coverage, and all three UI-import variants while
+  accepting documentation prose. `swift test` reports **223 XCTest + 106 Swift Testing cases green** (four
+  intentional scale skips), including a scratch-PDF top/bottom orientation check against PDFKit; the Reader pixel render guard passes against scratch PDFs; both focused
+  app-host suppression tests pass unattended; and Debug builds are green for Reader, Notes, and Processor.
+  No corpus or Notes-store write, visible GUI, network, or credentials are used. | packages/ArchiveCore/, ArchiveReader/, ArchiveNotes/,
+  ops/autonomous/, execution-plans/archive-notes/09-gap-closure.md | S–M | med | done
+
 - [x] **`W9.c2` — Processor has no write-surface lint [S · Tier-2].** **SHIPPED 2026-08-20** (commit whose
   subject begins `test(processor,ops,trackers): W9 lint Processor write surface`). Direct
   `setResourceValue(s)` and `setxattr` are now forbidden throughout the Processor's macOS sources. The only

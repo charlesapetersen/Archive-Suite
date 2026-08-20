@@ -249,13 +249,18 @@ tests run only via a manual `swift test`; nothing in the gate runs them.
 `ArchiveProcessor/scripts/lint-write-surface.sh` exists.
 - *Files:* NEW `ArchiveProcessor/scripts/lint-write-surface.sh`. *Steps:* mirror Reader's; ban `setResourceValue(s)`/`setxattr` over `ArchiveProcessor/macOS/Sources`, allow-list `PDFDocument.write` in `PDFGenerator.swift`/`mergeDocumentPDFs`. *Verify:* clean on current tree; trips on a planted violation. **Tier-2** (guards the irreplaceable-data write path).
 
-**C3. Extend the write-surface / UI-import lint to ArchiveCore (and run it on Notes).** — **MED (functional)** —
-`00a` S3 + `08` §1.3. The Reader lint scans only Reader; it never scans `packages/ArchiveCore` and has no
-`import SwiftUI|AppKit` guard — which is why `packages/ArchiveCore/.../Thumbnails/PDFThumbnailer.swift:4`
-imports AppKit into the UI-free Core uncaught. The Notes sources were also never linted.
-- *Files:* `ArchiveReader/scripts/lint-write-surface.sh` (or a shared lint), a Notes lint invocation.
-- *Steps:* scan `Sources/ArchiveCore` — write API only in `TagWrite.swift`, and **no** `import SwiftUI|AppKit`; add a Notes scan. Then decide `PDFThumbnailer`'s AppKit dependency: either move it behind a Core-safe boundary / into an app target (see §16.7 deviation) or carve a documented exception.
-- *Verify:* lint flags the current `PDFThumbnailer` AppKit import (then the chosen fix clears it); Notes scan clean. **Tier-2.**
+**C3. Complete the write-surface / UI-import lint boundary for ArchiveCore (and Notes).** — **MED (functional)** —
+`00a` S3 + `08` §1.3. W26 later extended the Reader lint's tag-write and error-reporting walker rules to
+`packages/ArchiveCore` and Notes, but ArchiveCore still had no `import SwiftUI|AppKit` guard. That left
+`PDFThumbnailer` and the app-host window helper importing AppKit inside the UI-free shared package.
+- *Files:* `ArchiveReader/scripts/lint-write-surface.sh` and its mutation proof; ArchiveCore thumbnail code;
+  Reader/Notes app-target test-host helpers.
+- *Steps:* retain the existing Core and Notes source scans; reject every AppKit/SwiftUI import in
+  `Sources/ArchiveCore`; replace thumbnail AppKit encoding with CoreGraphics/ImageIO; put app-host window
+  suppression in each app target rather than the shared package.
+- *Verify:* planted AppKit and SwiftUI imports fail while prose passes; Core has no UI imports; the existing
+  Notes scan stays clean; thumbnail rendering remains pixel-valid on scratch PDFs; the two app-host suppression
+  tests pass. **Tier-2.**
 
 **C4. Scope the Notes smoke gate to unit tests.** — **MED** — `08` §2. `ArchiveNotes/test-smoke.sh` runs
 `xcodebuild test -scheme ArchiveNotes` without `-only-testing:ArchiveNotesTests`, so the GUI target is built
@@ -368,8 +373,8 @@ auto-asserted via spies/DEBUG seams).
 
 `CoordinatedTagWriter` shared across all three apps (vs. `02` §10 "don't share in run 1"); `NotesFilter`
 dates as `Int?` not `SortDate?` (`SortDate` never created, §16.3); `Item.sortDate` reimplements the SPEC
-formula under a parity test rather than calling `ArchiveCore.DocumentTags.sortDate`; `PDFThumbnailer` placed
-in ArchiveCore (§16.7 said app target — see C3); source-block UI realized as an editor chip attachment +
+formula under a parity test rather than calling `ArchiveCore.DocumentTags.sortDate`; `PDFThumbnailer` retained
+in ArchiveCore but rendered through CoreGraphics/ImageIO (no AppKit; W9.c3); source-block UI realized as an editor chip attachment +
 `ReaderPreviewPopover` rather than a standalone `SourceBlockView`; unit suites use swift-testing `@Test`
 rather than the sketched XCTest; and the `FolderGraph→OrganizationStore` / `SmartQuery→VFolder.queryJSON`
 renames (authorized by overview §16).

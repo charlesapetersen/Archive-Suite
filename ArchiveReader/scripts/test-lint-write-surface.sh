@@ -250,6 +250,37 @@ SWIFT
 expect 1 "a tag write in the NOTES tree FAILS (the choke-point rule is suite-wide)" \
   "Store/PlantedNotesTagWrite.swift"
 
+echo "── W9.c3: ArchiveCore has no AppKit or SwiftUI imports ─────────────────────"
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Boundary"
+cat > "$SCRATCH/$CORE_SRC/Boundary/PlantedAppKitImport.swift" <<'SWIFT'
+import Foundation
+import AppKit
+SWIFT
+expect 1 "an AppKit import in ArchiveCore FAILS" "Boundary/PlantedAppKitImport.swift"
+
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Boundary"
+cat > "$SCRATCH/$CORE_SRC/Boundary/PlantedSwiftUIImport.swift" <<'SWIFT'
+import SwiftUI
+SWIFT
+expect 1 "a SwiftUI import in ArchiveCore FAILS" "Boundary/PlantedSwiftUIImport.swift"
+
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Boundary"
+cat > "$SCRATCH/$CORE_SRC/Boundary/PlantedAttributedImport.swift" <<'SWIFT'
+@preconcurrency import AppKit
+SWIFT
+expect 1 "an attributed AppKit import in ArchiveCore FAILS" "Boundary/PlantedAttributedImport.swift"
+
+fresh_tree
+mkdir -p "$SCRATCH/$CORE_SRC/Boundary"
+cat > "$SCRATCH/$CORE_SRC/Boundary/PlantedImportProse.swift" <<'SWIFT'
+// import AppKit belongs in an app target; this is documentation, not an import.
+struct PlantedImportProse {}
+SWIFT
+expect 0 "AppKit spelling in ArchiveCore prose still passes" "lint clean"
+
 echo "── …and rule 2 deliberately does NOT: Notes writes .md files for a living ──"
 fresh_tree
 mkdir -p "$SCRATCH/$NOTES_SRC/Store"

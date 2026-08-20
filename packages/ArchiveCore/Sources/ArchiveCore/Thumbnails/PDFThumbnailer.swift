@@ -1,7 +1,9 @@
 // PDFThumbnailer.swift — actor: render PDF page -> PNG Data + disk LRU cache
 import Foundation
 import PDFKit
-import AppKit
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 
 /// Renders PDF pages to PNG thumbnails with a two-tier cache (disk + caller-side in-memory).
 ///
@@ -87,29 +89,47 @@ public actor PDFThumbnailer {
             return nil
         }
 
-        // Isolate: copy the page into a throwaway document (PDFPaneView pattern)
-        guard let copy = sourcePage.copy() as? PDFPage else { return nil }
-        let throwaway = PDFDocument()
-        throwaway.insert(copy, at: 0)
-        guard let isolated = throwaway.page(at: 0) else { return nil }
-
-        let mediaBox = isolated.bounds(for: .cropBox)
+        let mediaBox = sourcePage.bounds(for: .cropBox)
         guard mediaBox.width > 0, mediaBox.height > 0 else { return nil }
 
         let aspect = mediaBox.height / mediaBox.width
         let pxWidth = spec.pointWidth * spec.scale
         let pxHeight = pxWidth * aspect
-        let thumbSize = CGSize(width: pxWidth, height: pxHeight)
-
-        let image = isolated.thumbnail(of: thumbSize, for: .cropBox)
-
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let pngData = rep.representation(using: .png, properties: [:]) else {
+        let width = Int(pxWidth.rounded(.up))
+        let height = Int(pxHeight.rounded(.up))
+        guard width > 0, height > 0,
+              let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else {
             return nil
         }
 
-        return pngData
+        // Both the raw bitmap context and PDF page use Quartz's bottom-left coordinate system. Draw
+        // directly into a private bitmap: neither the source PDF nor its PDFPage is modified.
+        let scale = CGFloat(width) / mediaBox.width
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: -mediaBox.minX, y: -mediaBox.minY)
+        sourcePage.draw(with: .cropBox, to: context)
+
+        guard let image = context.makeImage() else { return nil }
+        let pngData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            pngData,
+            UTType.png.identifier as CFString,
+            1,
+            nil
+        ) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return pngData as Data
     }
 
     // MARK: - Disk cache management

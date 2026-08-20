@@ -63,7 +63,7 @@ move: same root GUID, new absolute path, one re-grant — never a silent wrong f
 store, still never the corpus.
 
 The **unit** suite (`ArchiveNotesTests`) is app-hosted — it launches `ArchiveNotes.app` — but the app renders
-nothing when it is only a unit-test host (ArchiveCore `ArchiveTestHost`, pinned by
+nothing when it is only a unit-test host (its app-local `ArchiveTestHost`, pinned by
 `TestHostWindowSuppressionTests`). That is a *screen*-safety guarantee, not a file-safety one; every rule above
 still applies unchanged.
 

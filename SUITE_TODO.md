@@ -1486,12 +1486,6 @@ before building anything else in Notes.
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 
-- [ ] **`W9.c3` — the write-surface lint never scans ArchiveCore or Notes, and Core imports AppKit [S–M ·
-  Tier-2].** Plan C3. The Reader lint scans only Reader and has no `import SwiftUI|AppKit` guard, which is why
-  `packages/ArchiveCore/.../Thumbnails/PDFThumbnailer.swift:4` imports AppKit into the UI-free Core uncaught.
-  Scan `Sources/ArchiveCore` (write API only in `TagWrite.swift`, no UI imports) and add a Notes scan. Then
-  decide `PDFThumbnailer` deliberately: move it behind a Core-safe boundary / into an app target, or carve a
-  documented exception. | ArchiveReader/scripts/lint-write-surface.sh | S–M | med | none
 - [ ] **`W9.c4` — the Notes smoke gate builds and drives the GUI target [XS].** Plan C4.
   `ArchiveNotes/test-smoke.sh` runs `xcodebuild test -scheme ArchiveNotes` with no
   `-only-testing:ArchiveNotesTests`, so the "free" gate builds the UITest bundle and drives it when the fixture

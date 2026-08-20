@@ -285,7 +285,7 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
   `TestHostWindowSuppressionTests`. Window suppression is per-app opt-in, so that assertion is what makes it
   cover the Processor the day it gains a test target (W21.vmgui-d). The other half of that guarantee is in the apps themselves: the
   unit bundles are app-hosted, so `xcodebuild test -only-testing:<App>Tests` launches the real `.app` — it now
-  draws nothing under a test host (ArchiveCore `ArchiveTestHost` + `TestHostWindowSuppressionTests`).
+  draws nothing under a test host (each app's local `ArchiveTestHost` + `TestHostWindowSuppressionTests`).
 - **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once — a real regression is
   deterministic and fails again (→ park), but a flaky XCTest / transient `xcodebuild` blip passes the retry
   (→ green, no park). This is what keeps a routine flake from false-parking a multi-day run.

@@ -2,6 +2,7 @@
 import Testing
 import Foundation
 import PDFKit
+import AppKit
 @testable import ArchiveCore
 
 // MARK: - ThumbnailCacheKey
@@ -131,6 +132,36 @@ struct PDFThumbnailerTests {
         return dir
     }
 
+    /// Creates a scratch page whose halves let the renderer test orientation, not merely non-blank output.
+    private func makeOrientationPDF() throws -> (URL, URL) {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PDFThumbOrientation-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        let image = NSImage(size: NSSize(width: 100, height: 200))
+        image.lockFocus()
+        NSColor.blue.setFill()
+        NSRect(x: 0, y: 0, width: 100, height: 100).fill()
+        NSColor.red.setFill()
+        NSRect(x: 0, y: 100, width: 100, height: 100).fill()
+        image.unlockFocus()
+
+        let document = PDFDocument()
+        guard let page = PDFPage(image: image) else { throw CocoaError(.fileWriteUnknown) }
+        document.insert(page, at: 0)
+        let pdfURL = dir.appendingPathComponent("orientation.pdf")
+        guard document.write(to: pdfURL) else { throw CocoaError(.fileWriteUnknown) }
+        return (pdfURL, dir)
+    }
+
+    private func redMinusBlue(_ rep: NSBitmapImageRep, yFraction: CGFloat) -> CGFloat? {
+        guard let color = rep.colorAt(x: rep.pixelsWide / 2, y: Int(CGFloat(rep.pixelsHigh) * yFraction))?
+                .usingColorSpace(.deviceRGB) else {
+            return nil
+        }
+        return color.redComponent - color.blueComponent
+    }
+
     @Test func rendersPage1ToPNG() async throws {
         let (pdfURL, tempDir) = try makeScratchPDF()
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -166,6 +197,39 @@ struct PDFThumbnailerTests {
         )
 
         #expect(data != nil)
+    }
+
+    @Test func preservesPDFKitThumbnailOrientation() async throws {
+        let (pdfURL, tempDir) = try makeOrientationPDF()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let cacheDir = try makeCacheDir()
+        defer { try? FileManager.default.removeItem(at: cacheDir) }
+
+        let spec = PDFThumbnailer.Spec(pointWidth: 100, scale: 1)
+        let thumbnailer = PDFThumbnailer(cacheDirectory: cacheDir)
+        guard let actualData = await thumbnailer.png(
+            fileURL: pdfURL, page: 1, spec: spec, linkKey: "test://orientation", mtime: Date()
+        ), let actualRep = NSBitmapImageRep(data: actualData),
+              let expectedDocument = PDFDocument(url: pdfURL),
+              let page = expectedDocument.page(at: 0) else {
+            Issue.record("thumbnail renderer unexpectedly degraded")
+            return
+        }
+
+        let expected = page.thumbnail(of: NSSize(width: 100, height: 200), for: .cropBox)
+        guard let expectedTIFF = expected.tiffRepresentation,
+              let expectedRep = NSBitmapImageRep(data: expectedTIFF),
+              let expectedTop = redMinusBlue(expectedRep, yFraction: 0.75),
+              let expectedBottom = redMinusBlue(expectedRep, yFraction: 0.25),
+              let actualTop = redMinusBlue(actualRep, yFraction: 0.75),
+              let actualBottom = redMinusBlue(actualRep, yFraction: 0.25) else {
+            Issue.record("could not sample rendered thumbnail pixels")
+            return
+        }
+
+        #expect(expectedTop * expectedBottom < 0, "fixture must distinguish top from bottom")
+        #expect(actualTop * expectedTop > 0, "top half must retain PDFKit's orientation")
+        #expect(actualBottom * expectedBottom > 0, "bottom half must retain PDFKit's orientation")
     }
 
     @Test func cacheHitReturnsSameData() async throws {

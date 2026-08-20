@@ -174,14 +174,16 @@ add {"1981"}`. All of the following hold for every delta.
     (`setResourceValue(s)`, `setxattr`, `FileManager` mutators, `PDFDocument.write`). The lint is one
     layer; the real guarantee is that only the audited writer touches tag-write APIs and *nothing*
     imports move/rename/delete/content-write APIs.
-    *Scope, corrected in W26.lint (2026-08-05):* the lint covers **both** `macOS/Sources/ArchiveReader`
-    **and** `packages/ArchiveCore/Sources/ArchiveCore`. It used to be Reader-only, which meant it did
-    not look at `ArchiveCore/Tags/TagWrite.swift` — the actual choke-point, and where W26.deny's
-    tag-destroying bug sat. Since Reader's `TagWriter` delegates, the app target has **zero** tag-write
-    hits of its own, so rule 1 was passing vacuously. The suite's entire permitted tag-write surface is
-    now three exact lines in `TagWrite.swift`; allowances are `(file, exact source line)` pairs, never
-    whole files. ⚠️ **Nothing runs the lint for you** (`W26.lint-fu`) — run it, and its self-test
-    `scripts/test-lint-write-surface.sh`, before committing Reader or ArchiveCore work.
+    *Scope, corrected in W26 and W9.c3 (2026-08):* the lint covers `macOS/Sources/ArchiveReader`,
+    `packages/ArchiveCore/Sources/ArchiveCore`, and the tag-write / walker rules in
+    `ArchiveNotes/macOS/Sources/ArchiveNotes`. It used to be Reader-only, which meant it did not look
+    at `ArchiveCore/Tags/TagWrite.swift` — the actual choke-point, and where W26.deny's tag-destroying
+    bug sat. Since Reader's `TagWriter` delegates, the app target has **zero** tag-write hits of its
+    own, so rule 1 was passing vacuously. The suite's entire permitted tag-write surface is now three
+    exact lines in `TagWrite.swift`; allowances are `(file, exact source line)` pairs, never whole
+    files. ArchiveCore also rejects `import AppKit` / `import SwiftUI`, keeping its thumbnail renderer
+    on CoreGraphics/ImageIO and app-host screen suppression in each app target. The health gate runs
+    this lint and its mutation proof; run both locally before committing Reader or ArchiveCore work.
 
 Risk tiering (mirrors Archive Processor): `TagWriter` and anything it touches is **Tier-2
 adversarial-review + property/integration tests on scratch copies** on every change. Never test tag
@@ -443,7 +445,7 @@ UI shipped in two owner-requested batches (Batch 1 refinements; Batch 2: sidebar
 item-4 wins, tag rename) — see `git log` for the detail.
 `ArchiveReader/Tests/ArchiveReaderTests/` — 30 test files (266 tests). `scripts/lint-write-surface.sh`
 enforces the write surface across the Reader target **and** `packages/ArchiveCore` (W26.lint);
-`scripts/test-lint-write-surface.sh` is its 9-check self-test — it plants violations in a `mktemp` copy of
+`scripts/test-lint-write-surface.sh` is its 22-check self-test — it plants violations in a `mktemp` copy of
 both trees and asserts the lint fails, because a lint that cannot fail is exactly what this one was.
 Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 (Index health, W23.m9: `ContentIndexRecoveryTests` proves `open()` leaves no half-open handle;
