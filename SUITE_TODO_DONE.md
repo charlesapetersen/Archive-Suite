@@ -81,7 +81,7 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   `ACT_PCT` (93%), so even a saturated plan never costs a trim session. `DR_MAX_BYTES` is the one *not* simply
   tightened: 24,000 is exactly what `DR_KEEP=8` already permits (measured 23,723 B), so this cannot archive a
   Daemon Report entry the old code would have kept — those entries are decisions the owner has not been walked
-  through yet (see the open `W30.dr-walkthrough-anchor`).
+  through yet (the now-shipped `W30.dr-walkthrough-anchor` makes that invariant explicit).
   **Both halves of the sum are asserted now**, because re-deriving it by hand is what failed twice:
   `prove-compact.sh` **Case M** reads the constants out of `compact-plan.sh` and the allowance + `ACT_PCT` out of
   `context-budget.sh` and asserts the ceiling fits both — change either script and the health gate goes RED
@@ -96,6 +96,30 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   117,964 B (96% → 79%)**, per-session orientation total 456,869 → 430,431 (91% → 86%), open `[ ]` items 38 → 38,
   every anchor and both `### ✅ … walkthrough` markers still inline, and `next-queue-item.sh` still resolves its
   `(blocked-on:)` tags.
+
+- [x] **`W30.dr-walkthrough-anchor` — `compact-plan.sh` Pass 2 could archive Daemon Report entries the OWNER
+  HAD NOT BEEN WALKED THROUGH, and could archive past the newest `### ✅ … walkthrough done` marker [S · MED ·
+  owner-facing].** Shipped 2026-08-19 (**this commit**). Filed 2026-08-12 by the `W30.ceiling` pass;
+  **PRE-EXISTING and untouched by it** — that item deliberately set `DR_MAX_BYTES` to exactly what
+  `DR_KEEP=8` already permits (23,723 B) so it could not make this worse, which is how the hazard was noticed
+  rather than introduced.
+  Pass 2 rotated oldest-first on a pure count/byte rule. It had no notion of *settled*. The walkthrough
+  procedure in the root `CLAUDE.md` reads the section newest-first and **stops at the newest
+  `### ✅ … walkthrough done` heading**, so that marker is the only thing separating decisions the owner still
+  owes an answer to from ones he has already closed. Two distinct losses followed, and the archive file was not
+  a mitigation for either because nothing reads it during a walkthrough: (1) an **unsettled** entry above the
+  marker could be archived, silently never reaching him; (2) the **marker itself** could be archived, so the
+  next walkthrough had no stop-anchor and re-raised settled items.
+  Measured on the live plan 2026-08-12: 9 entries, newest ✅ marker at **entry 3**, so entries 1–2 were unsettled
+  and a keep of 8 was ample. The exposure was a weekend of daemon fires with no walkthrough — entries accrue at
+  roughly one per session, so 8 is one busy day, not one week.
+  **Fix:** the marker is now detected as a Daemon Report entry, and Pass 2 clamps `DR_EKEEP` through the newest
+  marker, independently of `DR_KEEP`. If that retained prefix exceeds `DR_MAX_BYTES`, it fails loudly with the
+  plan untouched rather than archiving a decision. `prove-compact.sh` Case O proves markers above, at and below
+  the cut; the historical no-marker behavior; and over-budget markers both at the normal cut and as the newest
+  entry. **Verified:** `bash -n` both scripts; `prove-compact` **97 passed / 0 failed**. The adversarial review
+  specifically found and covered the newest-anchor case, where the old minimum one-entry retention could have
+  masked an over-budget marker. | ops/autonomous | S | risk med
 
 - [x] **`W30.docheal` — the daemon self-heals a document overage instead of parking, and the budgets stop being
   arbitrary.** Owner: *"This keeps happening and I really want to fix it… if it could self heal that would be

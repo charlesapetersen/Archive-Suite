@@ -70,7 +70,7 @@ make_plan(){
 
 run(){ AUTONOMOUS_PLAN="$1" AUTONOMOUS_SESSION_ARCHIVE="$SANDBOX/slog-arch.md" \
        AUTONOMOUS_DR_ARCHIVE="${MRARCH:-$SANDBOX/mr-arch.md}" \
-       KEEP="${KEEP:-12}" TRIGGER="${TRIGGER:-40}" DR_KEEP="${DR_KEEP:-15}" DR_TRIGGER="${DR_TRIGGER:-25}" \
+       KEEP="${KEEP:-12}" TRIGGER="${TRIGGER:-40}" DR_KEEP="${DR_KEEP:-15}" DR_TRIGGER="${DR_TRIGGER:-25}" DR_MAX_BYTES="${DR_MAX_BYTES:-24000}" \
        bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/out.txt" 2>&1; }
 
 section(){ # print lines of a '## X' section (exclusive of next '## ') from file $1, header $2
@@ -117,6 +117,40 @@ cp "$PLAN" "$SANDBOX/preC.md"
 run "$PLAN"
 chk "C total no-op (plan unchanged)"           "diff -q '$SANDBOX/preC.md' '$PLAN' >/dev/null"
 chk "C no MR .bak created"                      "[ ! -f '$PLAN.bak' ]"
+
+# ---------- W30.dr-walkthrough-anchor: never archive unwalked owner decisions or the stop marker ----------
+# The marker is itself the H3 header for its entry. Test it above, at, and below an ordinary DR_KEEP=3 cut;
+# the below-cut case must retain one extra entry. Without any marker, the historical three-entry rotation remains.
+mark_walkthrough(){
+  local f="$1" ordinal="$2"
+  perl -0pi -e "s/^\\*\\*\\[2026-07-0?${ordinal}\\] MR entry ${ordinal} — headline\\.\\*\\*/### ✅ 2026-08-16 — walkthrough done; marker ${ordinal}/m" "$f"
+}
+assert_anchor_case(){
+  local ordinal="$1" kept="$2" label="$3"
+  PLAN="$(make_plan 5 10)"; mark_walkthrough "$PLAN" "$ordinal"
+  DR_KEEP=3 DR_TRIGGER=5 run "$PLAN"
+  chk "O $label marker survives inline"         "grep -q 'walkthrough done; marker $ordinal' '$PLAN'"
+  chk "O $label keeps $kept entries"            "[ \"\$(grep -Ec '^\\*\\*\\[|^### ' '$PLAN')\" = $kept ]"
+  chk "O $label archives the next oldest entry" "grep -q 'MR entry $((kept + 1)) —' '$SANDBOX/mr-arch.md' && ! grep -q 'MR entry $((kept + 1)) —' '$PLAN'"
+}
+assert_anchor_case 2 3 "above cut"
+assert_anchor_case 3 3 "at cut"
+assert_anchor_case 4 4 "below cut"
+
+PLAN="$(make_plan 5 10)"
+DR_KEEP=3 DR_TRIGGER=5 run "$PLAN"
+chk "O no-marker plan keeps the ordinary three entries" "[ \"\$(grep -c '^\\*\\*\\[' '$PLAN')\" = 3 ]"
+chk "O no-marker plan archives entry 4 as before"       "grep -q 'MR entry 4 —' '$SANDBOX/mr-arch.md' && ! grep -q 'MR entry 4 —' '$PLAN'"
+
+PLAN="$(make_plan 5 10)"; mark_walkthrough "$PLAN" 4; cp "$PLAN" "$SANDBOX/preO-budget.md"
+DR_KEEP=3 DR_TRIGGER=5 DR_MAX_BYTES=200 run "$PLAN"
+chk "O over-budget anchor leaves the plan untouched"    "diff -q '$SANDBOX/preO-budget.md' '$PLAN' >/dev/null"
+chk "O over-budget anchor emits a loud alarm"            "grep -q 'ALARM.*walkthrough anchor' '$SANDBOX/out.txt'"
+
+PLAN="$(make_plan 5 10)"; mark_walkthrough "$PLAN" 1; cp "$PLAN" "$SANDBOX/preO-newest-budget.md"
+DR_KEEP=3 DR_TRIGGER=5 DR_MAX_BYTES=100 run "$PLAN"
+chk "O over-budget newest anchor leaves the plan untouched" "diff -q '$SANDBOX/preO-newest-budget.md' '$PLAN' >/dev/null"
+chk "O over-budget newest anchor emits a loud alarm"        "grep -q 'ALARM.*walkthrough anchor' '$SANDBOX/out.txt'"
 
 # ---------- Case D: no Daemon Report header at all — Pass 2 skips cleanly ----------
 PLAN="$(make_plan 60 0)"

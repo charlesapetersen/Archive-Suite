@@ -280,11 +280,11 @@ echo "compact-plan: archived $CUT Session Log entries (newest $EKEEP kept of $N)
 #   * The split is a SINGLE awk pass keyed on the entry ORDINAL — never wc/sed line ranges — so a plan whose
 #     last line lacks a trailing newline can't silently drop that line (`wc -l` undercounts it; awk's NR/print
 #     counts AND re-terminates it). A line-CONSERVATION check (kept + dropped == original) backstops any bug.
-#   * An entry HEADER is detected STRUCTURALLY, not by header text: a column-0 '**[' line whose PREVIOUS line is
-#     blank. Entries are blank-separated and newest-prepended, so this matches every real header shape — plain
-#     '**[2026-07-17] …', date+qualifier '**[2026-07-14, GUI-ON session] …', and non-date '**[HISTORICAL …]' /
-#     '**[owner …]' — which a date-shaped regex misses (→ under-rotation). A CONTIGUOUS-body mid-line that
-#     starts with '**[' (a '**[note]' bullet, a quoted '**[2026-05-09]' cross-ref) is correctly treated as body
+#   * An entry HEADER is detected STRUCTURALLY, not by header text: a column-0 '**[' line or a date-led H3 whose
+#     PREVIOUS line is blank. Entries are blank-separated and newest-prepended, so this matches every real header
+#     shape — plain '**[2026-07-17] …', date+qualifier '**[2026-07-14, GUI-ON session] …', non-date
+#     '**[HISTORICAL …]' / '**[owner …]', and the settled `### ✅ … walkthrough done` anchor. A CONTIGUOUS-body
+#     mid-line that starts with '**[' (a '**[note]' bullet, a quoted '**[2026-05-09]' cross-ref) is correctly treated as body
 #     (not blank-preceded), so the cut doesn't tear the entry. A header written WITHOUT a blank separator merges
 #     into the entry above (safe: content stays together). Heuristic LIMIT (LOW, conservation-safe): a body that
 #     itself contains a blank line immediately followed by a column-0 '**[' paragraph WOULD be mis-split as a new
@@ -310,7 +310,7 @@ MN=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" '
   {
     if (NR == h) { inreg=1; prevblank=0; next }
     if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
-    if (inreg && (/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) c++
+    if (inreg && (/^### (✅ )?20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) c++
     prevblank = ($0 ~ /^[[:space:]]*$/)
   }
   END { print c+0 }' "$PLAN")
@@ -337,8 +337,24 @@ if [ "$DR_OVER" = 1 ] && [ "$MN" -lt 2 ]; then
   echo "compact-plan:    The entry-header rule no longer matches the authored format. FIX THE DETECTOR in this script."
 fi
 
+# Find the newest settled-walkthrough anchor as an ENTRY ordinal. The owner's walkthrough reads newest-first
+# and stops here: everything above it is still owed, while archiving the anchor makes a future walkthrough
+# re-raise settled decisions. A missing marker deliberately returns 0, preserving the historical rotation rule.
+DR_ANCHOR_ORD=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" '
+  {
+    if (NR == h) { inreg=1; prevblank=0; next }
+    if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
+    if (inreg && (/^### (✅ )?20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) {
+      e++
+      if (anchor == 0 && $0 ~ /^### ✅ 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9].*walkthrough done/) anchor=e
+    }
+    prevblank = ($0 ~ /^[[:space:]]*$/)
+  }
+  END { print anchor+0 }' "$PLAN")
+
 # Effective keep from the byte budget, newest-first (this section is already prepend-ordered), clamped to
-# [1, DR_KEEP] — so one enormous entry cannot hold the section over budget indefinitely.
+# [1, DR_KEEP] — so one enormous entry cannot hold the section over budget indefinitely. The walkthrough-anchor
+# clamp below may deliberately raise it above DR_KEEP: losing an owner decision is worse than an over-budget plan.
 #
 # ⚠️ W32.dr-preamble — THE BUDGET MUST BE SPENT ON THE SAME BYTES THE TRIGGER MEASURES. $MREGB (above) is the
 # WHOLE region, preamble included; this walk used to start accumulating only at the first entry (`if (e > 0)`),
@@ -347,14 +363,14 @@ fi
 # MN<2): a correct-looking no-op that could never resolve the overage. Live when found — the Daemon Report sat
 # at 24,816B against a 24,000B budget with that no-op on every cycle. Seeding `run` with the preamble is the
 # honest fix: those bytes are real orientation cost, so they must be paid for out of the same budget.
-DR_EKEEP="$DR_KEEP"
+DR_BYTE_EKEEP="$DR_KEEP"
 if [ "$DR_MAX_BYTES" -gt 0 ]; then
-  DR_EKEEP=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" -v keep="$DR_KEEP" -v budget="$DR_MAX_BYTES" '
+  DR_BYTE_EKEEP=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" -v keep="$DR_KEEP" -v budget="$DR_MAX_BYTES" '
     {
       if (NR == h) { inreg=1; prevblank=0; next }
       if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
       if (inreg) {
-        if ((/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) e++
+        if ((/^### (✅ )?20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) e++
         if (e > 0) sz[e] += length($0) + 1
         else       pre  += length($0) + 1   # standing preamble: kept whatever we cut, so it is spent first
       }
@@ -367,7 +383,31 @@ if [ "$DR_MAX_BYTES" -gt 0 ]; then
       print fit
     }' "$PLAN")
 fi
-[ -n "$DR_EKEEP" ] && [ "$DR_EKEEP" -ge 1 ] || DR_EKEEP="$DR_KEEP"
+[ -n "$DR_BYTE_EKEEP" ] && [ "$DR_BYTE_EKEEP" -ge 1 ] || DR_BYTE_EKEEP="$DR_KEEP"
+DR_EKEEP="$DR_BYTE_EKEEP"
+
+# Never split through the newest settled-walkthrough marker. If retaining all still-unwalked entries plus that
+# anchor cannot fit the byte budget, leave Pass 2 untouched and fail loudly: the overage needs human trimming,
+# whereas an archived owner decision cannot be recovered by a later walkthrough.
+if [ "$DR_ANCHOR_ORD" -gt 0 ]; then
+  DR_ANCHOR_BYTES=$(awk -v h="$MH" -v sec="$SEC_HEADER_RE" -v anchor="$DR_ANCHOR_ORD" '
+    {
+      if (NR == h) { inreg=1; prevblank=0; next }
+      if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0
+      if (inreg && (/^### (✅ )?20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) e++
+      if (inreg && (e == 0 || e <= anchor)) bytes += length($0) + 1
+      prevblank = ($0 ~ /^[[:space:]]*$/)
+    }
+    END { print bytes+0 }' "$PLAN")
+  if [ "$DR_MAX_BYTES" -gt 0 ] && [ "$DR_ANCHOR_BYTES" -gt "$DR_MAX_BYTES" ]; then
+    echo "compact-plan: ⚠⚠ ALARM — keeping $DR_ANCHOR_ORD Daemon Report entries through the newest walkthrough anchor costs ${DR_ANCHOR_BYTES}B, above the ${DR_MAX_BYTES}B budget."
+    echo "compact-plan:    Pass 2 left the plan untouched; trim prose or raise the retention budget by policy, never archive an unwalked owner decision."
+    exit 1
+  fi
+  if [ "$DR_ANCHOR_ORD" -gt "$DR_EKEEP" ]; then
+    DR_EKEEP="$DR_ANCHOR_ORD"
+  fi
+fi
 
 DR_CUT=$((MN - DR_EKEEP))
 [ "$DR_CUT" -gt 0 ] || { echo "compact-plan: DR nothing to cut (MN=$MN effective DR_KEEP=$DR_EKEEP) — no-op"; exit 0; }
@@ -383,7 +423,7 @@ awk -v h="$MH" -v sec="$SEC_HEADER_RE" -v keep="$DR_EKEEP" -v drop="$MDROP" '
   {
     if (NR == h) { inreg=1; prevblank=0; print; next }   # the header itself is always kept
     if (inreg && /^## / && (prevblank || (sec != "" && $0 ~ sec))) inreg=0             # region ends at the next real SECTION header (BUG 4)
-    if (inreg && (/^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) entry++          # crossing a real entry header advances the ordinal
+    if (inreg && (/^### (✅ )?20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ || /^- \*\*\[/ || /^\*\*\[/) && prevblank) entry++          # crossing a real entry header advances the ordinal
     if (inreg && entry > keep) print >> drop              # entries DR_KEEP+1..end -> archived
     else print                                            # preamble, kept entries, all after-region lines
     prevblank = ($0 ~ /^[[:space:]]*$/)
