@@ -1237,16 +1237,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | **owner**
 
-- [ ] **W21.smoke — fix stale de-nesting paths in `ArchiveProcessor/scripts/test-smoke.sh` [S].** Verified
-  2026-07-28: line 23 sets `APPDIR="ArchiveProcessor"`, so `APP` resolves to
-  `ArchiveProcessor/ArchiveProcessor/build/DD/…/ArchiveProcessor.app` — a path that **does not exist** (the
-  de-nesting `7706368` moved the Xcode project to `macOS/`). Fix: `APPDIR="macOS"` (→
-  `macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app`). ⚠️ **Correction to the original 2026-07-17 note,
-  which was WRONG on its second claim:** the "`Test Files/` doesn't exist" part is false — `cd "$(dirname
-  "$0")/.."` makes `REPO=ArchiveProcessor/`, and both `Test Files/Ground Truth Segmentation/Herrnstein` and the
-  `Test Files/Herrnstein` fallback exist, so section [3] needs no change. Don't "fix" that half. The owner has to
-  run the script once interactively because section [2] `open`s the app (login-Keychain modal → see W21.seed).
-  | files: ArchiveProcessor/scripts/test-smoke.sh | S | low | none
 - [ ] **W21.warn — 2 pre-existing non-Sendable `DispatchWorkItem` warnings in `Net/CaptureServer.swift` [S · LOW].**
   `TimeoutHandle(DispatchWorkItem { [weak self, weak conn] … })` at `CaptureServer.swift:151` captures a
   non-`Sendable` `DispatchWorkItem` in a `@Sendable` context; surfaces only on a full clean build. ⚠️ The file

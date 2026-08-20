@@ -20,7 +20,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
-APPDIR="ArchiveProcessor"
+APPDIR="macOS"
 APP="$APPDIR/build/DD/Build/Products/Debug/ArchiveProcessor.app"
 KC_SERVICE="com.archiveprocessor.app"
 OUT="$REPO/.maintenance/test-results"; mkdir -p "$OUT"

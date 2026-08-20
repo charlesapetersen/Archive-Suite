@@ -5992,6 +5992,18 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **W21.smoke — fix stale de-nesting paths in `ArchiveProcessor/scripts/test-smoke.sh` [S].** **SHIPPED
+  2026-08-19** (**this commit**). The script starts at `ArchiveProcessor/`, but its app selector still named the
+  old nested directory removed by de-nesting `7706368`, so both its build command and launch path were wrong.
+  `APPDIR` now selects `macOS`, yielding the real Debug product at
+  `macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app`. Section [3]'s two existing fixture paths remain
+  unchanged as required; a clean worktree excludes those ignored fixtures, so the no-cost verification supplied
+  one disposable one-pixel image and removed it afterward.
+  **Verified:** corrected `scripts/test-smoke.sh` in unattended mode with Keychain access disabled — fresh
+  XcodeGen + Debug build passed with **0 warnings**, launch was intentionally skipped, network OCR was skipped,
+  and both fake-CLI checks passed (**3 passed, 0 failed**). No real corpus, key, OCR charge, or host window.
+  | ArchiveProcessor/scripts/test-smoke.sh | S | low | done
+
 - [x] **W21.recovery-timeout — `test-recovery.sh`'s 60 s wait was running out of headroom [S · LOW · ops].**
   **SHIPPED 2026-08-19** (commit whose subject begins
   `fix(processor,trackers): W21 recovery timeout diagnostics`). Filed 2026-08-03 from `W3.cap-r3-fu2`. The
