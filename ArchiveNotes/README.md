@@ -75,7 +75,8 @@ cd ArchiveNotes && ./test-smoke.sh
 ```
 
 GUI verification uses the XCUITest harness (`ArchiveNotesUITests`) with a scratch fixture built by
-[`scripts/make-notes-fixture.sh`](scripts/make-notes-fixture.sh) and driven by
+[`scripts/make-notes-fixture.sh`](scripts/make-notes-fixture.sh) — its default generates the embedded
+Reader PDFs and does not require any corpus — and driven by
 [`scripts/gui-drive-notes.sh`](scripts/gui-drive-notes.sh) — see
 [`scripts/GUI-HARNESS.md`](scripts/GUI-HARNESS.md). It is deliberately opt-in (off-screen via
 `ops/gui/vm-gui-runner.sh notes xcuitest`), never part of the `ArchiveNotesUnit` smoke scheme. The

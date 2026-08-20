@@ -126,12 +126,14 @@ ArchiveReaderUITests **15/15** in the VM; `sighted` → `sighted-reader.png`, a 
 Reader on `AR-GUI-Fixture` (11 documents, tags, parsed dates, OCR-fail badges).
 
 **GUI fixture:** fixtured Reader UITests need `ArchiveReader/scripts/make-gui-fixture.sh` (a tagged scratch
-corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). It honors `AR_FIXTURE_SRC` (point it
-at a mounted corpus) and `AR_FIXTURE_DST` (build somewhere throwaway), and takes the first 10 real PDFs —
-robust to a slimmed/strided corpus. Since `W26.scripts` (2026-08-07) it neither `mdimport`s nor waits on
-`mdfind`: it reads the tags back off disk and **exits non-zero** if the fixture is wrong. That matters most
-here — the guest boots with a cold Spotlight index, so the old poll could only ever time out and warn.
-Its own gate is `ArchiveReader/scripts/test-fixture-scripts.sh` (26 checks, run it by hand — `W26.lint-fu`).
+corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). Its default generates 10 small,
+text-bearing PDFs, so it works from a bare worktree mount; `AR_FIXTURE_SRC` is only an explicit optional
+read-only sample override, and `AR_FIXTURE_DST` builds somewhere throwaway. Since `W26.scripts` (2026-08-07)
+it neither `mdimport`s nor waits on `mdfind`: it reads the tags back off disk and **exits non-zero** if the
+fixture is wrong. That matters most here — the guest boots with a cold Spotlight index, so the old poll could
+only ever time out and warn. `ArchiveReader/scripts/test-fixture-scripts.sh` proves both Reader and Notes
+GUI builders work with no source corpus (and still exercises Reader's separate corpus-backed smoke fixture
+when that optional sample is locally present).
 
 **THE GUEST'S SCREEN SIZE IS NOT THE VM'S CONFIGURED ONE (W21.vmgui-c, measured 2026-08-01).** `tart run
 --no-graphics` attaches no display, so the guest's WindowServer boots at its headless default **1024×768** —
@@ -157,8 +159,8 @@ unattended now (CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/ho
 that for unattended runs. VM TCC grants live on the VM's disk (re-apply if the VM is rebuilt).
 
 **One table, one wait — `ops/gui/tart-lib.sh`.** The per-app config (project/scheme/UITest bundle/guest
-DerivedData/app bundle/fixture + its builder/launch arg/pre-run), the guest-agent wait, and the corpus
-resolution are **shared** by `vm-gui-runner.sh` and `ops/autonomous/gui-vm-gate.sh`. That is load-bearing,
+DerivedData/app bundle/fixture + its builder/launch arg/pre-run) and the guest-agent wait are **shared** by
+`vm-gui-runner.sh` and `ops/autonomous/gui-vm-gate.sh`. That is load-bearing,
 not tidiness: the guest-agent fix below originally landed in the gate *only*, leaving the interactive
 runner — the script this README, the resume prompt, CLAUDE.md and AGENTS.md all point people at — broken in
 exactly the way the gate had just been fixed. Adding an app is one block in that table.
@@ -180,11 +182,12 @@ Bugs found on 2026-07-30 that are worth not re-introducing:
   missing by 2026-07-30, so `vm-gui-runner.sh sighted` could not run at all. It is a plain venv — recreate
   with `python3 -m venv ~/.tart-mirror/vncenv && ~/.tart-mirror/vncenv/bin/pip install vncdotool`. The
   runner now fails with that exact command in the message instead of a bare "not found".
-- **A failed in-VM fixture build is now LOUD.** It used to be `>/dev/null 2>&1 || true`, which is how the
-  unmounted-path bug above stayed invisible: the fixtured UITests just XCTSkipped and the suite still
-  reported success. Same class as the silent green.
+- **A failed in-VM fixture build is now LOUD.** It used to be `>/dev/null 2>&1 || true`, which is how an
+  earlier unmounted source-path bug stayed invisible: the fixtured UITests just XCTSkipped and the suite
+  still reported success. Same class as the silent green.
 
 **Fixtures** are built inside the VM on demand (idempotent, scratch-only, persisting on the VM disk):
 `ArchiveReader/scripts/make-gui-fixture.sh` → `AR-GUI-Fixture`, `ArchiveNotes/scripts/make-notes-fixture.sh` →
-`AN-GUI-Fixture`. Their source PDFs are **gitignored** (primary checkout only), so the gate mounts that corpus as
-its own `corpus:` share rather than reaching under the repo mount — which is what lets it run from a worktree.
+`AN-GUI-Fixture`. Both generate their text-bearing PDF input by default, so the VM mounts only the worktree
+and artifact directory — never a real corpus. A deliberately requested real sample remains an optional,
+read-only source override outside the normal lane; never mount anything under `~/Desktop/Google Drive`.

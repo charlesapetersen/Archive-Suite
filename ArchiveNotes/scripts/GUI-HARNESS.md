@@ -96,7 +96,8 @@ File ▸ Choose Store Folder… (it persists over the owner's real root).
 ## Files
 
 - `make-notes-fixture.sh` — builds the scratch fixture (notes/reader-page/Zotero/extract items,
-  replicated membership, embedded scratch Reader corpus, initial Finder-tag projection).
+  replicated membership, generated embedded scratch Reader corpus, initial Finder-tag projection). It is
+  corpus-free by default; `NOTES_FIXTURE_CORPUS` is an explicit read-only sample override.
 - `gui-drive-notes.sh` — sourced cliclick/osascript/capture/tag-read drive library (scratch-only; reads
   tags to assert, never drives the store picker). Calibrate its table geometry against a
   `gui_capture_window` shot before trusting row-index clicks.

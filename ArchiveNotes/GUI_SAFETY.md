@@ -16,10 +16,10 @@ suite therefore routes through the projector against **scratch copies only**.
 ## Rules
 
 1. **Scratch before any tag-write check.** Build a scratch store (and, for reveal checks, an embedded
-   scratch Reader corpus of *copies*) before driving anything that writes a tag. The canonical builder is
+   scratch Reader corpus of generated PDFs) before driving anything that writes a tag. The canonical builder is
    [`scripts/make-notes-fixture.sh`](scripts/make-notes-fixture.sh) → `~/Library/Application
-   Support/ArchiveNotes/AN-GUI-Fixture` (a **sibling** of the real `…/ArchiveNotes/Store`, never it). The
-   real corpus is only ever a **read-only `ditto` source**.
+   Support/ArchiveNotes/AN-GUI-Fixture` (a **sibling** of the real `…/ArchiveNotes/Store`, never it). Its
+   default never reads a corpus; `NOTES_FIXTURE_CORPUS` is an explicit read-only sample override only.
 2. **Confirm the granted root is scratch before ANY write.** A read-only visual check (does the panel
    collapse, does the list render) is always safe; a **write** check (inline subject edit, replicate,
    delete-last-instance) runs **only** when the active store is a confirmed scratch copy.

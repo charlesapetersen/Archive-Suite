@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # make-gui-fixture.sh — build a SCRATCH tagged-PDF fixture for XCUITests.
 #
-# Copies a curated handful of real PDFs from the test corpus, strips all inherited
-# tags, then applies a deliberate VARIETY of Finder tags via the `tag` CLI so that
-# XCUITests can assert against known tag state. Also generates one image-only (no
-# text layer) PDF and one non-PDF image for format-degrade tests.
+# Generates text-bearing PDFs, then applies a deliberate VARIETY of Finder tags via
+# the `tag` CLI so that XCUITests can assert against known tag state. Also generates
+# one image-only (no text layer) PDF and one non-PDF image for format-degrade tests.
+# A deliberately supplied sample directory may replace the generated PDFs, but the
+# default never needs a corpus outside this worktree.
 #
 # The fixture lands at ~/Library/Application Support/ArchiveReader/AR-GUI-Fixture
 # (Route B — outside the sandbox container, which the UITest runner cannot see past;
@@ -20,7 +21,8 @@
 # Idempotent: rm -rf + rebuild on every run. NEVER touches the real corpus.
 #
 # Usage:  ./scripts/make-gui-fixture.sh
-# Env:    AR_FIXTURE_SRC — source corpus dir (default: the repo's Test files/Brown Gemini)
+# Env:    AR_FIXTURE_SRC — optional source corpus dir. When set, its first 10 PDFs
+#                          replace the generated text-bearing PDFs.
 #         AR_FIXTURE_DST — where to build (default: the Application Support path above).
 #                          Overriding it is how the test harness builds a throwaway
 #                          fixture on an unindexed volume without clobbering the real one.
@@ -28,11 +30,11 @@
 set -euo pipefail
 
 TAG=/opt/homebrew/bin/tag
-SRC="${AR_FIXTURE_SRC:-$HOME/Claude/Archive Suite/Test files/Brown Gemini}"
+SRC="${AR_FIXTURE_SRC:-}"
 DST="${AR_FIXTURE_DST:-$HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture}"
 
 # --- preflight ---
-[ -d "$SRC" ] || { echo "error: source corpus not found: $SRC" >&2; exit 1; }
+[ -z "$SRC" ] || [ -d "$SRC" ] || { echo "error: source corpus not found: $SRC" >&2; exit 1; }
 command -v "$TAG" >/dev/null || { echo "error: tag CLI not found ($TAG); brew install tag" >&2; exit 1; }
 
 # The next step is `rm -rf "$DST"`, and DST is now settable from the environment (AR_FIXTURE_DST),
@@ -48,18 +50,56 @@ case "$DST" in
   *) echo "error: AR_FIXTURE_DST must be an absolute path at least two components deep: $DST" >&2; exit 1 ;;
 esac
 [ "$DST" != "$HOME" ] || { echo "error: refusing to rebuild the fixture at \$HOME" >&2; exit 1; }
-case "$DST" in
-  "$SRC"|"$SRC"/*) echo "error: refusing to write the fixture inside the source corpus: $DST" >&2; exit 1 ;;
-esac
+if [ -n "$SRC" ]; then
+  case "$DST" in
+    "$SRC"|"$SRC"/*) echo "error: refusing to write the fixture inside the source corpus: $DST" >&2; exit 1 ;;
+  esac
+fi
 
 # --- idempotent rebuild ---
 rm -rf "$DST"
 mkdir -p "$DST"
 
-# --- copy a curated set of real PDFs (ditto preserves xattrs, but we strip below) ---
-# The canonical fixture names the tag assignments + UITests expect. We copy the
-# first 10 real PDFs the corpus provides into THESE names (see loop below), so the
-# fixture is stable even when the corpus is slimmed to a strided sample.
+# --- optional sample copy or synthetic text-bearing PDFs ---------------------------
+# The canonical fixture names the tag assignments + UITests expect. The default
+# fixture writes its own small, uncompressed two-page text PDFs, so the VM can
+# build from a bare repo mount. They intentionally expose their text literally in
+# the content stream: this is a useful proof that the ordinary documents differ
+# from the image-only `IMG_NOTEXT` negative-control PDF below.
+write_text_pdf() {  # write_text_pdf <path> <visible text>
+  python3 - "$1" "$2" <<'PY'
+import sys
+
+path, text = sys.argv[1:]
+text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+stream1 = ("BT\n/F1 20 Tf\n72 720 Td\n(" + text + " - image page) Tj\nET\n").encode("ascii")
+stream2 = ("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text: " + text + ") Tj\nET\n").encode("ascii")
+objects = [
+    b"<< /Type /Catalog /Pages 2 0 R >>",
+    b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+    b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 5 0 R >>",
+    b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>",
+    b"<< /Length %d >>\nstream\n" % len(stream1) + stream1 + b"endstream",
+    b"<< /Length %d >>\nstream\n" % len(stream2) + stream2 + b"endstream",
+    b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+]
+pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+offsets = [0]
+for number, obj in enumerate(objects, 1):
+    offsets.append(len(pdf))
+    pdf.extend(("%d 0 obj\n" % number).encode("ascii"))
+    pdf.extend(obj)
+    pdf.extend(b"\nendobj\n")
+xref = len(pdf)
+pdf.extend(("xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)).encode("ascii"))
+for offset in offsets[1:]:
+    pdf.extend(("%010d 00000 n \n" % offset).encode("ascii"))
+pdf.extend(("trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)).encode("ascii"))
+with open(path, "wb") as handle:
+    handle.write(pdf)
+PY
+}
+
 FILES=(
   "00001 IMG — Brown.pdf"   # will be: year + month + subject + P9 + Read
   "00002 IMG — Brown.pdf"   # will be: year + subject + P8 + Unread
@@ -72,19 +112,27 @@ FILES=(
   "00009 IMG — Brown.pdf"   # will be: year + subject + NO read-state (tri-state neither)
   "00010 IMG — Brown.pdf"   # will be: year + subject + P8 + Unread (sort tie-breaker test)
 )
-# Don't require specific source names: the corpus may be SLIMMED to a strided
-# sample (commit c07c98c removed the old consecutive 00002–00010). Take the first
-# 10 real PDFs the corpus provides and rename them into the canonical fixture
-# names above — the tag assignments below (and the UITests) key off the canonical
-# names + applied tags, not the source identity, so the fixture stays stable.
-SRCFILES=()   # portable (bash 3.2 has no `mapfile`)
-while IFS= read -r pdf; do SRCFILES+=("$pdf"); done < <(ls "$SRC"/*.pdf 2>/dev/null | head -10)
-[ "${#SRCFILES[@]}" -eq 10 ] || { echo "error: need >=10 source PDFs in $SRC, found ${#SRCFILES[@]}" >&2; exit 1; }
-i=0
-for name in "${FILES[@]}"; do
-  ditto "${SRCFILES[$i]}" "$DST/$name"
-  i=$((i+1))
-done
+if [ -n "$SRC" ]; then
+  # Don't require specific source names: a deliberate source corpus may be slimmed
+  # to a strided sample. Take its first 10 PDFs and rename them into the canonical
+  # fixture names: tag assignments and UITests key off these names, not source identity.
+  SRCFILES=()   # portable (bash 3.2 has no `mapfile`)
+  while IFS= read -r pdf; do SRCFILES+=("$pdf"); done < <(ls "$SRC"/*.pdf 2>/dev/null | head -10)
+  [ "${#SRCFILES[@]}" -eq 10 ] || { echo "error: need >=10 source PDFs in $SRC, found ${#SRCFILES[@]}" >&2; exit 1; }
+  i=0
+  for name in "${FILES[@]}"; do
+    ditto "${SRCFILES[$i]}" "$DST/$name"
+    i=$((i+1))
+  done
+  echo "make-gui-fixture: copied 10 PDFs from optional source $SRC" >&2
+else
+  i=1
+  for name in "${FILES[@]}"; do
+    write_text_pdf "$DST/$name" "Reader synthetic fixture page $i"
+    i=$((i+1))
+  done
+  echo "make-gui-fixture: generated 10 text-bearing PDFs (no corpus required)" >&2
+fi
 
 # --- generate a single-page image-only PDF (no text layer) ---
 # A minimal valid PDF: one page with a gray filled rectangle, no text objects at all.

@@ -18,7 +18,7 @@
 #                                              one REPLICATED item (member of both)
 #   <FIXTURE>/reader-corpus/                    embedded scratch Reader corpus with
 #                                              its own RootMarker {kind:reader} +
-#                                              copied PDFs, so durable links resolve
+#                                              generated PDFs, so durable links resolve
 #   …and the initial Finder-tag projection (title-cased subjects + ArchiveSuite)
 #   applied to each note `.md` via the `tag` CLI, so the projector's starting
 #   state is known (same reasoning as the Reader fixture: git can't store xattrs).
@@ -27,7 +27,8 @@
 #   * DST is a FIXED scratch subfolder `…/ArchiveNotes/AN-GUI-Fixture` — a sibling
 #     of the real store `…/ArchiveNotes/Store`, NEVER it, and never the corpus. A
 #     hard guard aborts if DST is not exactly that scratch path before any `rm -rf`.
-#   * The source corpus is a READ-ONLY `ditto` source (copied out, never written).
+#   * An optional source corpus is a READ-ONLY `ditto` source (copied out, never
+#     written). The default generates PDFs, so the fixture works in a worktree/VM.
 #   * Tag writes here hit only the scratch `.md` COPIES via the `tag` CLI.
 #   The sandboxed app reads this store via the UITest-only Route-B
 #   temporary-exception entitlement (§3.2).
@@ -61,10 +62,13 @@ case "$DST" in
     echo "make-notes-fixture: REFUSING — DST resolves to a protected location: $DST" >&2; exit 2 ;;
 esac
 
-# --- Source corpus (READ-ONLY ditto source; gitignored → primary checkout) ---
-SRC="${NOTES_FIXTURE_CORPUS:-$HOME/Claude/Archive Suite/ArchiveProcessor/Test Files/DeaverLLM}"
+# --- Optional source corpus (READ-ONLY ditto source) --------------------------
+SRC="${NOTES_FIXTURE_CORPUS:-}"
 TAG="${TAG:-/opt/homebrew/bin/tag}"
 N_PDFS="${N_PDFS:-8}"
+case "$N_PDFS" in
+  ''|*[!0-9]*|0) echo "make-notes-fixture: N_PDFS must be a positive integer" >&2; exit 2 ;;
+esac
 
 # --- Deterministic identity (fixed GUIDs/UUIDs → reproducible durable links) --
 NOTES_ROOT_GUID="a11ce5e7-1000-4000-8000-000000000001"
@@ -90,6 +94,43 @@ EPOCH="$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED" +%s 2>/dev/null || echo 1
 echo "make-notes-fixture: rebuilding $DST" >&2
 rm -rf "$DST"
 mkdir -p "$DST/items" "$DST/Templates" "$DST/reader-corpus"
+
+# A small uncompressed two-page text PDF. The default fixture must not depend on
+# a gitignored corpus or a third mount in the VM; these pages are enough for the
+# durable-link reveal and make the fixture's text-bearing premise inspectable.
+write_text_pdf() {  # write_text_pdf <path> <visible text>
+  python3 - "$1" "$2" <<'PY'
+import sys
+
+path, text = sys.argv[1:]
+text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+stream1 = ("BT\n/F1 20 Tf\n72 720 Td\n(" + text + " - image page) Tj\nET\n").encode("ascii")
+stream2 = ("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text: " + text + ") Tj\nET\n").encode("ascii")
+objects = [
+    b"<< /Type /Catalog /Pages 2 0 R >>",
+    b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+    b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 5 0 R >>",
+    b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>",
+    b"<< /Length %d >>\nstream\n" % len(stream1) + stream1 + b"endstream",
+    b"<< /Length %d >>\nstream\n" % len(stream2) + stream2 + b"endstream",
+    b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+]
+pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+offsets = [0]
+for number, obj in enumerate(objects, 1):
+    offsets.append(len(pdf))
+    pdf.extend(("%d 0 obj\n" % number).encode("ascii"))
+    pdf.extend(obj)
+    pdf.extend(b"\nendobj\n")
+xref = len(pdf)
+pdf.extend(("xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)).encode("ascii"))
+for offset in offsets[1:]:
+    pdf.extend(("%010d 00000 n \n" % offset).encode("ascii"))
+pdf.extend(("trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)).encode("ascii"))
+with open(path, "wb") as handle:
+    handle.write(pdf)
+PY
+}
 
 # --- Root marker (Notes store) ----------------------------------------------
 cat > "$DST/.archive-suite-root.json" <<EOF
@@ -232,22 +273,27 @@ cat > "$DST/reader-corpus/.archive-suite-root.json" <<EOF
 {"guid":"$CORPUS_ROOT_GUID","name":"AN-GUI-Fixture Corpus","kind":"reader","createdAt":"$CREATED"}
 EOF
 
-if [ -d "$SRC" ]; then
+if [ -n "$SRC" ]; then
+  [ -d "$SRC" ] || { echo "make-notes-fixture: source corpus not found: $SRC" >&2; exit 1; }
   count=0
   while IFS= read -r f; do
     [ "$count" -ge "$N_PDFS" ] && break
     ditto "$SRC/$f" "$DST/reader-corpus/$f"     # ditto preserves the tag xattr
     count=$((count + 1))
   done < <(cd "$SRC" && ls *.pdf 2>/dev/null | sort)
-  # A simply-named copy so the reader-page rel=sample.pdf resolves without encoding.
-  first_pdf="$(cd "$SRC" && ls *.pdf 2>/dev/null | sort | head -1 || true)"
-  if [ -n "$first_pdf" ]; then
-    ditto "$SRC/$first_pdf" "$DST/reader-corpus/sample.pdf"
-  fi
-  echo "make-notes-fixture: copied $count PDFs into reader-corpus/ (+ sample.pdf)" >&2
+  [ "$count" -eq "$N_PDFS" ] || {
+    echo "make-notes-fixture: need $N_PDFS source PDFs in $SRC, found $count" >&2; exit 1;
+  }
+  first_pdf="$(cd "$SRC" && ls *.pdf 2>/dev/null | sort | head -1)"
+  ditto "$SRC/$first_pdf" "$DST/reader-corpus/sample.pdf"
+  echo "make-notes-fixture: copied $count PDFs from optional source into reader-corpus/ (+ sample.pdf)" >&2
 else
-  echo "make-notes-fixture: WARNING — corpus source not found ($SRC); reader-corpus has no PDFs." >&2
-  echo "make-notes-fixture:   the notes store is still valid; the reveal (G6) check needs real PDFs." >&2
+  for i in $(seq 1 "$N_PDFS"); do
+    name="fixture-$(printf '%02d' "$i").pdf"
+    write_text_pdf "$DST/reader-corpus/$name" "Notes synthetic fixture page $i"
+  done
+  ditto "$DST/reader-corpus/fixture-01.pdf" "$DST/reader-corpus/sample.pdf"
+  echo "make-notes-fixture: generated $N_PDFS text-bearing PDFs in reader-corpus/ (+ sample.pdf; no corpus required)" >&2
 fi
 
 # --- Initial Finder-tag projection (title-cased subjects + ArchiveSuite) ------

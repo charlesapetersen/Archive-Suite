@@ -223,15 +223,16 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
   `write-surface-lint` + `write-surface-lint-proof` (the Reader/Core Directive's automated half, and the proof
   it can still fail), `processor-write-surface-lint` + its proof (no direct Processor tag write and only the
   two audited PDF output sites), `tag-vocabulary` (the Processor's tag-write hook + `$HOME`-walk prohibition),
-  `finder-tags` (the E2E oracle reads xattrs, not Spotlight) and `fixture-scripts` (the Reader fixture
-  builders need no Spotlight, plus the `rm -rf` guard on their new destination overrides). The original five
+  `finder-tags` (the E2E oracle reads xattrs, not Spotlight) and `fixture-scripts` (the Reader and Notes GUI
+  builders are corpus-free and need no Spotlight, plus the `rm -rf` guard on Reader's destination override).
+  The original five
   measured ~105 s; the two new source-only checks add only a small amount, and all seven remain
   no key/network/GUI/app build, `mktemp` scratch only, and placed **before** the ~15–20 min VM lane so a RED
   surfaces early. All seven were run green on a clean tree before wiring — a gate must not start RED.
-  - `fixture-scripts` is the one **skippable** member: it needs `/opt/homebrew/bin/tag` and the
-    **gitignored** `Test files/Brown Gemini` corpus, which exists only in the checkout the owner put it in.
-    It exits **3 + `SKIPPED:`** for a missing prerequisite (never for a failed check), so a machine without
-    them gets `⊘ … NOT VERIFIED: fixture-scripts` rather than a false park. Same contract as `gui-vm`.
+  - `fixture-scripts` is the one **skippable** member: it needs `/opt/homebrew/bin/tag`, but no corpus.
+    It exits **3 + `SKIPPED:`** only for that missing prerequisite (never for a failed check), so a machine
+    without it gets `⊘ … NOT VERIFIED: fixture-scripts` rather than a false park. Reader's older,
+    corpus-backed smoke-fixture subcheck is simply reported as not run when its optional sample is absent.
 - **GUI UITests in a headless VM (`AUTONOMOUS_GUI_VM`, ON by default since 2026-07-28; `=0` to disable).** That
   last gap — real *interaction / whole-window* UITests — now runs in the gate WITHOUT a screen:
   `ops/autonomous/gui-vm-gate.sh` runs **every app's** UITest bundle inside the Tart VM (`ops/gui/README.md` §3)
@@ -445,7 +446,7 @@ ops/autonomous/tests/prove-keepalive.sh        # WS1 launchd half: a THROWAWAY L
                                                # bash-only harness). Run interactively; auto-cleans.
 ops/autonomous/tests/prove-review-cadence.sh   # WS11 review picker: delta-aware unit choice, cooldown,
                                                # record-resets, never-reviewed coverage, iOS skipped ($0).
-ops/autonomous/tests/prove-vm-lane.sh          # the VM lane: per-app table, VM lock, corpus resolution, the
+ops/autonomous/tests/prove-vm-lane.sh          # the VM lane: per-app table, VM lock, corpus-free mounts, the
                                                # exit-code -> owner-text mapping (the silent-green regression,
                                                # twice), the xcodebuild PATH shim, smoke-script self-guards.
 ops/autonomous/tests/prove-no-host-gui.sh      # the host-GUI firewall (.claude/hooks/no-host-gui.sh): all four

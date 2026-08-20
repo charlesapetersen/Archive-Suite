@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-fixture-scripts.sh — prove the two Reader fixture builders need no Spotlight (W26.scripts).
+# test-fixture-scripts.sh — prove the GUI fixture builders are corpus-free and need no Spotlight.
 #
 # `make-gui-fixture.sh` and `smoke-setup.sh` used to `mdimport` their output and then poll `mdfind`
 # for up to 60 s / 40 s waiting for the tags to appear in the index. Reader discovery is a
@@ -21,10 +21,9 @@
 #      breaks the fixture in one specific way and must be caught by name; a verification nobody can
 #      make fail is the same vacuous pass in a new place.
 #
-# Everything is built in a mktemp dir via the scripts' `AR_FIXTURE_DST` / `AR_SMOKE_DST` overrides —
-# which is ALSO the unindexed volume the gate asks for, so layer 2 doubles as the real condition.
-# The owner's real fixture at ~/Library/Application Support/ArchiveReader is never touched, and the
-# source corpus is only ever read.
+# Everything is built in a mktemp dir via the scripts' destination overrides — which is ALSO the
+# unindexed volume the gate asks for, so layer 2 doubles as the real condition. The primary GUI
+# builders use their generated-PDF default; an optional source corpus is never needed or touched.
 #
 # Usage: ArchiveReader/scripts/test-fixture-scripts.sh
 #   exit 0 = every check passed · 1 = a check FAILED · 3 = a prerequisite is missing, nothing ran.
@@ -34,10 +33,9 @@ set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GUI_FIXTURE="$REPO/ArchiveReader/scripts/make-gui-fixture.sh"
+NOTES_FIXTURE="$REPO/ArchiveNotes/scripts/make-notes-fixture.sh"
 SMOKE="$REPO/ArchiveReader/scripts/smoke-setup.sh"
-CORPUS="${AR_FIXTURE_SRC:-$HOME/Claude/Archive Suite/Test files/Brown Gemini}"
-# smoke-setup.sh has no SRC override — it hardcodes this. Spelled out rather than reusing $CORPUS so
-# an AR_FIXTURE_SRC in the environment cannot silently point the smoke cases somewhere else.
+# smoke-setup.sh has no source override and remains a separate, corpus-backed smoke fixture.
 SMOKE_SRC="$HOME/Claude/Archive Suite/Test files/Brown Gemini"
 
 pass=0; failed=0
@@ -49,7 +47,7 @@ ok()   { echo "✓ $1"; pass=$((pass+1)); }
 bad()  { echo "✗ $1"; [ -n "${2:-}" ] && printf '%s\n' "$2" | sed 's/^/    /'; failed=$((failed+1)); }
 # An absent PREREQUISITE is not a failed check. Exit 3 is the health gate's "ran nothing,
 # inconclusive" code (`step_skippable` in `ops/autonomous/health-gate.sh`; wired by `W26.lint-fu`,
-# 2026-08-07, which asked whether a missing `tag` CLI or corpus should RED the gate and answered
+# 2026-08-07, which asked whether a missing `tag` CLI should RED the gate and answered
 # no — for the same reason the VM lane skips, an absent prerequisite is not a regression, and a
 # gate that parks over one teaches its reader to ignore parks). It is still NON-ZERO, so a human
 # `if ./test-fixture-scripts.sh` reads it as "not proven" exactly as before; the `SKIPPED:` prefix
@@ -79,10 +77,15 @@ run_shimmed() {
 }
 
 echo "── preflight ───────────────────────────────────────────────────────────────"
-if [ -d "$CORPUS" ]; then ok "source corpus present: $CORPUS"
-else skip "source corpus missing: $CORPUS (set AR_FIXTURE_SRC)"; fi
 if [ -x /opt/homebrew/bin/tag ]; then ok "tag CLI present"
 else skip "tag CLI missing — brew install tag"; fi
+if [ -d "$SMOKE_SRC" ]; then
+  HAVE_SMOKE_CORPUS=1
+  ok "optional smoke-setup corpus present: $SMOKE_SRC"
+else
+  HAVE_SMOKE_CORPUS=0
+  echo "⊘ smoke-setup's separate corpus-backed portion will be skipped: $SMOKE_SRC"
+fi
 
 echo "── 1. static: no Spotlight query left in either script ─────────────────────"
 for s in "$GUI_FIXTURE" "$SMOKE"; do
@@ -97,7 +100,7 @@ done
 
 echo "── 2+3. make-gui-fixture.sh ────────────────────────────────────────────────"
 GDST="$SCRATCH/AR-GUI-Fixture"
-run_shimmed "AR_FIXTURE_SRC=$CORPUS" "AR_FIXTURE_DST=$GDST" -- "$GUI_FIXTURE"
+run_shimmed "AR_FIXTURE_SRC=" "AR_FIXTURE_DST=$GDST" -- "$GUI_FIXTURE"
 if [ "$RC" -eq 0 ]; then ok "builds on an unindexed volume with Spotlight shimmed out"
 else bad "exited rc=$RC on an unindexed volume" "$OUT"; fi
 
@@ -115,6 +118,19 @@ else bad "expected 12 fixture files, got $n_files"; fi
 
 if [ -f "$GDST/.archive-suite-root.json" ]; then ok "root marker written (W23.m4 — durable links)"
 else bad "root marker .archive-suite-root.json missing"; fi
+
+if grep -aqF "Reader synthetic fixture page 1" "$GDST/00001 IMG — Brown.pdf"; then
+  ok "default GUI PDFs carry synthetic text (no source corpus needed)"
+else
+  bad "default GUI PDF is not the text-bearing synthetic fixture"
+fi
+if command -v pdfinfo >/dev/null 2>&1; then
+  reader_pages="$(pdfinfo "$GDST/00001 IMG — Brown.pdf" 2>/dev/null | awk '/^Pages:/ {print $2}')"
+  if [ "$reader_pages" = 2 ]; then ok "default Reader PDF keeps the standard two-page shape"
+  else bad "default Reader PDF is not two pages" "pdfinfo Pages: ${reader_pages:-unreadable}"; fi
+else
+  echo "⊘ pdfinfo unavailable — skipped the optional PDF page-count parse"
+fi
 
 # Exact-token count, the same trap the script itself avoids: "Read" is a substring of "Unread".
 count_read_state() {
@@ -154,7 +170,7 @@ expect_mutant() {
   if cmp -s "$mscript" "$GUI_FIXTURE"; then
     bad "mutant '$name' changed NOTHING — the sed no longer matches, so this case is vacuous"; return
   fi
-  run_shimmed "AR_FIXTURE_SRC=$CORPUS" "AR_FIXTURE_DST=$mdir/out" -- "$mscript"
+  run_shimmed "AR_FIXTURE_SRC=" "AR_FIXTURE_DST=$mdir/out" -- "$mscript"
   if [ "$RC" -eq 0 ]; then bad "mutant '$name' PASSED — the on-disk check does not catch it" "$OUT"; return; fi
   if ! printf '%s' "$OUT" | grep -qF "$needle"; then
     bad "mutant '$name' failed, but never said '$needle'" "$OUT"; return
@@ -179,6 +195,37 @@ expect_mutant "the scratch PNG is left behind (a file too many)" \
   's/^rm -f "\$TMPPNG"$/: rm -f "$TMPPNG"/' \
   "want 12"
 
+echo "── 2. Archive Notes synthetic fixture ───────────────────────────────────────"
+NOTES_HOME="$SCRATCH/notes-home"
+run_shimmed "HOME=$NOTES_HOME" "NOTES_FIXTURE_CORPUS=" -- "$NOTES_FIXTURE"
+NDST="$NOTES_HOME/Library/Application Support/ArchiveNotes/AN-GUI-Fixture"
+if [ "$RC" -eq 0 ]; then ok "Notes fixture builds with no source corpus"
+else bad "Notes fixture exited rc=$RC without a source corpus" "$OUT"; fi
+
+last="$(printf '%s' "$OUT" | tail -1)"
+if [ "$last" = "$NDST" ]; then ok "Notes fixture emits its scratch path on stdout"
+else bad "Notes fixture stdout is not its scratch path" "got: $last"; fi
+
+n_notes_pdfs="$(find "$NDST/reader-corpus" -type f -name '*.pdf' 2>/dev/null | wc -l | tr -d ' ')"
+expected_notes_pdfs=$((8 + 1)) # N_PDFS generated PDFs + sample.pdf
+if [ "$n_notes_pdfs" -eq "$expected_notes_pdfs" ]; then
+  ok "Notes fixture has 8 generated reader PDFs plus sample.pdf"
+else
+  bad "Notes fixture PDF count is wrong" "expected $expected_notes_pdfs, got $n_notes_pdfs"
+fi
+if grep -aqF "Notes synthetic fixture page 1" "$NDST/reader-corpus/sample.pdf"; then
+  ok "Notes durable-link sample is a text-bearing synthetic PDF"
+else
+  bad "Notes durable-link sample is not the synthetic text-bearing PDF"
+fi
+if command -v pdfinfo >/dev/null 2>&1; then
+  notes_pages="$(pdfinfo "$NDST/reader-corpus/sample.pdf" 2>/dev/null | awk '/^Pages:/ {print $2}')"
+  if [ "$notes_pages" = 2 ]; then ok "Notes durable-link sample keeps the standard two-page shape"
+  else bad "Notes durable-link sample is not two pages" "pdfinfo Pages: ${notes_pages:-unreadable}"; fi
+else
+  echo "⊘ pdfinfo unavailable — skipped the optional Notes PDF page-count parse"
+fi
+
 echo "── 4. the DST override cannot aim rm -rf somewhere that matters ────────────"
 # AR_FIXTURE_DST / AR_SMOKE_DST are new (W26.scripts) and they feed a `rm -rf`, so the guard that
 # came with them is tested here rather than trusted. Each case must be refused BEFORE the delete —
@@ -198,53 +245,59 @@ guard_refused() {  # guard_refused <name> <script> <sentinel-dir-or-empty> <env�
 }
 
 guard_refused "a one-component fixture DST" "$GUI_FIXTURE" "" \
-  "AR_FIXTURE_SRC=$CORPUS" "AR_FIXTURE_DST=/tmp"
+  "AR_FIXTURE_SRC=" "AR_FIXTURE_DST=/tmp"
 guard_refused "the fixture DST is \$HOME" "$GUI_FIXTURE" "" \
-  "AR_FIXTURE_SRC=$CORPUS" "AR_FIXTURE_DST=$HOME"
+  "AR_FIXTURE_SRC=" "AR_FIXTURE_DST=$HOME"
 # My first cut of the guard passed this one: "$HOME/" is the same directory but a different string,
 # so the equality check missed it and the depth check was happy — i.e. the exact path the guard
 # exists for was the one it let through.
 guard_refused "the fixture DST is \$HOME with a trailing slash" "$GUI_FIXTURE" "" \
-  "AR_FIXTURE_SRC=$CORPUS" "AR_FIXTURE_DST=$HOME/"
+  "AR_FIXTURE_SRC=" "AR_FIXTURE_DST=$HOME/"
 guard_refused "the smoke DST is /" "$SMOKE" "" "AR_SMOKE_DST=/"
 guard_refused "the fixture DST is inside the source corpus" "$GUI_FIXTURE" "$SCRATCH/fakesrc" \
   "AR_FIXTURE_SRC=$SCRATCH/fakesrc" "AR_FIXTURE_DST=$SCRATCH/fakesrc/out"
-guard_refused "the smoke DST is inside the real Test files corpus" "$SMOKE" "" \
-  "AR_SMOKE_DST=$SMOKE_SRC/out"
+if [ "$HAVE_SMOKE_CORPUS" -eq 1 ]; then
+  guard_refused "the smoke DST is inside the real Test files corpus" "$SMOKE" "" \
+    "AR_SMOKE_DST=$SMOKE_SRC/out"
+fi
 
 echo "── 2+3. smoke-setup.sh ─────────────────────────────────────────────────────"
-SDST="$SCRATCH/AR-Smoke"
-rm -f "$TRIPWIRE"
-run_shimmed "AR_SMOKE_DST=$SDST" -- "$SMOKE" 5
-if [ "$RC" -eq 0 ]; then ok "builds on an unindexed volume with Spotlight shimmed out"
-else bad "exited rc=$RC on an unindexed volume" "$OUT"; fi
+if [ "$HAVE_SMOKE_CORPUS" -eq 1 ]; then
+  SDST="$SCRATCH/AR-Smoke"
+  rm -f "$TRIPWIRE"
+  run_shimmed "AR_SMOKE_DST=$SDST" -- "$SMOKE" 5
+  if [ "$RC" -eq 0 ]; then ok "builds on an unindexed volume with Spotlight shimmed out"
+  else bad "exited rc=$RC on an unindexed volume" "$OUT"; fi
 
-if [ ! -f "$TRIPWIRE" ]; then ok "never invoked mdimport/mdfind"
-else bad "reached for Spotlight" "$(cat "$TRIPWIRE")"; fi
+  if [ ! -f "$TRIPWIRE" ]; then ok "never invoked mdimport/mdfind"
+  else bad "reached for Spotlight" "$(cat "$TRIPWIRE")"; fi
 
-n_smoke=$(ls "$SDST" 2>/dev/null | wc -l | tr -d ' ')
-if [ "$n_smoke" -eq 5 ]; then ok "5 copies made"
-else bad "expected 5 copies, got $n_smoke"; fi
+  n_smoke=$(ls "$SDST" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$n_smoke" -eq 5 ]; then ok "5 copies made"
+  else bad "expected 5 copies, got $n_smoke"; fi
 
-# The one claim the old poll never checked: ditto carried the tag xattr across.
-n_smoke_tagged="$(count_read_state "$SDST")"
-if [ "$n_smoke_tagged" -eq 5 ]; then ok "all 5 copies kept their Finder tags"
-else bad "expected 5 tagged copies, got $n_smoke_tagged"; fi
+  # The one claim the old poll never checked: ditto carried the tag xattr across.
+  n_smoke_tagged="$(count_read_state "$SDST")"
+  if [ "$n_smoke_tagged" -eq 5 ]; then ok "all 5 copies kept their Finder tags"
+  else bad "expected 5 tagged copies, got $n_smoke_tagged"; fi
 
-# Mutant: `cp -X` copies the bytes but drops extended attributes. The copy still looks right — same
-# names, same sizes — and only the xattr comparison can tell. If this passes, the verification is
-# decorative and the scratch corpus could go untagged unnoticed, which is the whole failure this
-# script exists to prevent.
-mdir="$SCRATCH/mutant-smoke"; mkdir -p "$mdir"
-sed 's|^  ditto "\$SRC/\$f" "\$DST/\$f".*$|  cp -X "$SRC/$f" "$DST/$f"|' "$SMOKE" > "$mdir/smoke-setup.sh"
-if cmp -s "$mdir/smoke-setup.sh" "$SMOKE"; then
-  bad "smoke mutant changed NOTHING — the sed no longer matches, so this case is vacuous"
+  # Mutant: `cp -X` copies the bytes but drops extended attributes. The copy still looks right — same
+  # names, same sizes — and only the xattr comparison can tell. If this passes, the verification is
+  # decorative and the scratch corpus could go untagged unnoticed, which is the whole failure this
+  # script exists to prevent.
+  mdir="$SCRATCH/mutant-smoke"; mkdir -p "$mdir"
+  sed 's|^  ditto "\$SRC/\$f" "\$DST/\$f".*$|  cp -X "$SRC/$f" "$DST/$f"|' "$SMOKE" > "$mdir/smoke-setup.sh"
+  if cmp -s "$mdir/smoke-setup.sh" "$SMOKE"; then
+    bad "smoke mutant changed NOTHING — the sed no longer matches, so this case is vacuous"
+  else
+    run_shimmed "AR_SMOKE_DST=$mdir/out" -- "$mdir/smoke-setup.sh" 5
+    if [ "$RC" -eq 0 ]; then bad "mutant 'cp -X drops the tag xattr' PASSED — the copy check is decorative" "$OUT"
+    elif ! printf '%s' "$OUT" | grep -qF "tags did not survive the copy"; then
+      bad "mutant 'cp -X' failed, but never named the surviving tags" "$OUT"
+    else ok "mutant caught: cp -X drops the tag xattr"; fi
+  fi
 else
-  run_shimmed "AR_SMOKE_DST=$mdir/out" -- "$mdir/smoke-setup.sh" 5
-  if [ "$RC" -eq 0 ]; then bad "mutant 'cp -X drops the tag xattr' PASSED — the copy check is decorative" "$OUT"
-  elif ! printf '%s' "$OUT" | grep -qF "tags did not survive the copy"; then
-    bad "mutant 'cp -X' failed, but never named the surviving tags" "$OUT"
-  else ok "mutant caught: cp -X drops the tag xattr"; fi
+  echo "⊘ skipped smoke-setup's separate corpus-backed checks; GUI fixture coverage above is corpus-free"
 fi
 
 echo

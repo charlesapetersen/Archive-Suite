@@ -962,22 +962,16 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 From the 2026-07-28 Daemon Report walkthrough. The headless VM lane is now shared by Reader and Notes:
-`W21.vmgui-a` shipped one per-app configuration table for both entry points, and `W21.vmgui-c` made the Notes
-suite green. The remaining GUI gap is **Processor**, which still has no test target and carries the Keychain
-risk described below. Completing the lane drains that backlog off-screen; it must retain the existing Reader
-and Notes behavior rather than reintroducing Reader-only assumptions.
+`W21.vmgui-a` shipped one per-app configuration table for both entry points, `W21.vmgui-b` made its fixtures
+corpus-free, and `W21.vmgui-c` made the Notes suite green. The remaining GUI gap is **Processor**, which still
+has no test target and carries the Keychain risk described below. Completing the lane drains that backlog
+off-screen; it must retain the existing Reader and Notes behavior rather than reintroducing Reader-only
+assumptions.
 
 - [ ] **W21.vmgui — complete the headless-VM GUI lane for Archive Processor [L]** — Reader and Notes already
   use the shared per-app table; Processor remains deliberately unknown until `W21.vmgui-d` creates a safe
-  UITest target. `W21.vmgui-b` first removes the need for any real fixture corpus, then `W21.vmgui-d` brings
-  Processor into the table with its scratch launch and Keychain safeguards.
-  - [ ] **W21.vmgui-b — corpus-free fixtures so the VM never needs the real corpora [S].** Both builders require
-    gitignored test corpora that **do not exist in a worktree and are not on the mount**: Reader's
-    `make-gui-fixture.sh` hard-exits when `<10` PDFs are found under `Test files/Brown Gemini`, Notes'
-    `make-notes-fixture.sh` only warns and leaves `reader-corpus/` empty. Add a synthetic source mode to both
-    (Reader already writes a raw minimal PDF inline for its no-text-layer fixture — extend that to N text-bearing
-    pages) so the lane is corpus-independent. If a real sample is ever wanted, mount it as a **read-only** third
-    share — **never** mount anything under `~/Desktop/Google Drive`.
+  UITest target. `W21.vmgui-b` removed the need for a real fixture corpus; `W21.vmgui-d` now brings Processor
+  into the table with its scratch launch and Keychain safeguards.
   - [x] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** DONE 2026-08-01
     `de43be3` (the lane) + this commit (the checks). **12/12 → 15/15 in the VM**, `notes` out of
     `AUTONOMOUS_GUI_VM_WARN_APPS` (now empty by default, so a Notes UITest failure REDs the gate again).

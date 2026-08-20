@@ -6098,12 +6098,25 @@ explain why not.
   `vm-gui-runner.sh` and `gui-vm-gate.sh`: Reader and Notes each supply project/spec/scheme/test bundle,
   per-app guest DerivedData, app/process names, scratch fixture builder/path/launch argument, and artifact
   prefix. Processor is intentionally a loud unknown app until **W21.vmgui-d** creates its test target.
-  The old unmounted `fixture-src` guess is replaced by an explicit read-only `corpus` mount and guest-side
-  `$GC`; fixture output and genuine failures are named through the shared `tart_build_fixture` status protocol,
-  never swallowed. Current hermetic proof `ops/autonomous/tests/prove-vm-lane.sh` passed **61/0**, covering the
-  table, worktree-safe corpus resolution, failure visibility, and both entry points' absence of raw fixture
-  execs. No VM or GUI was launched for this tracker closure.
+  The old unmounted `fixture-src` guess was initially replaced by an explicit read-only `corpus` mount and
+  guest-side `$GC`; fixture output and genuine failures are named through the shared `tart_build_fixture` status
+  protocol, never swallowed. That temporary corpus configuration is superseded by `W21.vmgui-b` below. The
+  contemporary hermetic proof passed **61/0**, covering the table, worktree-safe corpus resolution, failure
+  visibility, and both entry points' absence of raw fixture execs. No VM or GUI was launched for this tracker
+  closure.
   | ops/gui/{tart-lib,vm-gui-runner}.sh, ops/autonomous/{gui-vm-gate.sh,tests/prove-vm-lane.sh} | M | med | done
+
+- [x] **W21.vmgui-b — corpus-free fixtures so the VM never needs the real corpora [S].** ✅ **DONE this
+  commit.** Reader now generates ten small, valid two-page text PDFs by default; Notes generates eight of
+  the same shape plus its `sample.pdf` durable-link target. Both preserve an explicit optional read-only source
+  override for a deliberately requested sample, but the normal VM path mounts only the worktree and artifact
+  directory — never a real corpus. The obsolete corpus resolver, guest `$GC`, corpus mount, and fixture-skip
+  branches are gone from both VM entry points. `test-fixture-scripts.sh` forces the corpus-free defaults, proves
+  their text and two-page PDF shape, and continues its separate legacy smoke-fixture checks only when that
+  optional local sample is available. The two builder/VM proofs passed **33/33** and **67/0** respectively;
+  syntax and whitespace checks are clean. No VM, GUI, real corpus, or real Notes store was opened.
+  | ArchiveReader/scripts/{make-gui-fixture,test-fixture-scripts}.sh,
+    ArchiveNotes/scripts/make-notes-fixture.sh, ops/{gui,autonomous}, fixture/VM docs | S | low | done
 
 - [x] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** ✅ **DONE this commit.**
   `BlockKind` is an `NSAttributedString` attribute value under `an.blockKind`, so AppKit bridges it to

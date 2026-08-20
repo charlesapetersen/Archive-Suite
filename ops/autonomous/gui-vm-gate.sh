@@ -49,12 +49,11 @@ APPS="${AUTONOMOUS_GUI_VM_APPS:-reader notes}"
 WARN_APPS="${AUTONOMOUS_GUI_VM_WARN_APPS:-}"
 ART="${ART_DIR:-$HOME/.tart-mirror/vm-artifacts}"
 GLOG="$ART/gui-vm-gate.log"
-# Per-app table, the guest-agent wait and the corpus resolution are SHARED with ops/gui/vm-gui-runner.sh
+# Per-app table and the guest-agent wait are SHARED with ops/gui/vm-gui-runner.sh
 # via ops/gui/tart-lib.sh. That sharing is deliberate and load-bearing: on 2026-07-30 the guest-agent race
 # was fixed HERE and not in the runner, leaving the interactive entry point broken in exactly the way this
 # one had just been fixed. One copy, so a fix cannot land in only half the lane.
 . "$ROOT/ops/gui/tart-lib.sh"
-CORPUS_SRC="$(archive_corpus_src "$ROOT")"
 
 skip() { echo "GUI-VM gate SKIPPED: $*"; exit 3; }
 
@@ -95,7 +94,6 @@ tart_lock_acquire "${AUTONOMOUS_GUI_VM_LOCKWAIT:-300}" \
 boot_vm() {
   tart stop "$VM" >/dev/null 2>&1 || true
   local mounts=(--dir=repo:"$ROOT" --dir=out:"$ART")
-  [ -n "$CORPUS_SRC" ] && mounts+=(--dir=corpus:"$CORPUS_SRC")
   VM_BOOTED=1
   tart run "$VM" --no-graphics "${mounts[@]}" >>"$GLOG" 2>&1 &
   tart ip "$VM" --wait 120 >/dev/null 2>&1 || return 1
@@ -164,9 +162,6 @@ run_app_once() {   # $1 = app, $2 = attempt number
   # gate go GREEN on the few unfixtured tests and hide the real coverage. Build it if absent
   # (idempotent, scratch-only, persists on the VM disk between runs) and shout if it still isn't there.
   if [ -n "$mk" ]; then
-    if [ -z "$CORPUS_SRC" ]; then
-      echo "WARN[$app]: no source corpus found on the host — cannot build the GUI fixture; fixtured UITests will XCTSkip." | tee -a "$log"
-    else
       # REBUILD EVERY ATTEMPT — not "only if absent". The UITests MUTATE the fixture and are written
       # against a fresh one: NotesGUITests.swift:81-88 says the fixture "is (re)built EXTERNALLY … before
       # each GUI run" and "the next pre-run rebuild returns the fixture to 4 items"; G8 trashes the Zotero
@@ -186,7 +181,6 @@ run_app_once() {   # $1 = app, $2 = attempt number
         1) echo "WARN[$app]: GUI fixture rebuild FAILED in the guest (exit $TART_FIXTURE_RC; see $log) — fixtured UITests will XCTSkip." | tee -a "$log" ;;
         *) echo "WARN[$app]: could not read the GUI fixture build's exit status back from the guest — tart's transport, NOT necessarily the build (see $log). The presence check below is the real verdict." | tee -a "$log" ;;
       esac
-    fi
     tart exec "$VM" bash -lc "[ -d '$fixture' ]" >/dev/null 2>&1 \
       || echo "WARN[$app]: GUI fixture absent after the rebuild — fixtured UITests will XCTSkip, so a GREEN run would NOT mean what you think." | tee -a "$log"
   fi

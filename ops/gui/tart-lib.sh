@@ -10,9 +10,8 @@
 # Works under both `set -euo pipefail` (the runner) and `set -uo pipefail` (the gate) — keep it that way:
 # no bare `[ ... ]` as the last statement of a function, no unguarded command substitution on failure.
 
-GUEST_REPO="${GUEST_REPO:-/Volumes/My Shared Files/repo}"      # --dir=repo:<suite root>
-GUEST_CORPUS="${GUEST_CORPUS:-/Volumes/My Shared Files/corpus}" # --dir=corpus:<fixture PDFs>
-GUEST_HOME="${GUEST_HOME:-/Users/admin}"                        # the Cirrus image's user
+GUEST_REPO="${GUEST_REPO:-/Volumes/My Shared Files/repo}" # --dir=repo:<suite root>
+GUEST_HOME="${GUEST_HOME:-/Users/admin}"                   # the Cirrus image's user
 
 # ---------------------------------------------------------------------------------------------------
 # `tart` must be FINDABLE before any of the helpers below mean anything (SUITE_TODO W21.vmgui-path).
@@ -56,8 +55,8 @@ tart_require() {
 #   procname               : `pkill -x` name
 #   fixture                : guest scratch fixture dir the UITests XCTSkip without
 #   mkfixture              : guest command to BUILD that fixture. Evaluated inside a remote `bash -lc`
-#                            with $GR = the repo mount and $GC = the corpus mount — hence single quotes
-#                            here: these must expand in the GUEST, not on the host.
+#                            with $GR = the repo mount — hence single quotes here: it must expand in
+#                            the GUEST, not on the host. Both builders synthesize their own PDFs.
 #   launcharg              : DEBUG-only launch argument pointing the app at the scratch fixture
 #   prerun                 : guest command to run before each attempt (blank = none)
 # ---------------------------------------------------------------------------------------------------
@@ -71,7 +70,7 @@ archive_app_field() {
     reader:appbundle) echo "$GUEST_HOME/dd-reader/Build/Products/Debug/ArchiveReader.app" ;;
     reader:procname)  echo "ArchiveReader" ;;
     reader:fixture)   echo "$GUEST_HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture" ;;
-    reader:mkfixture) echo 'AR_FIXTURE_SRC="$GC" bash "$GR/ArchiveReader/scripts/make-gui-fixture.sh"' ;;
+    reader:mkfixture) echo 'bash "$GR/ArchiveReader/scripts/make-gui-fixture.sh"' ;;
     reader:launcharg) echo "-ARUITestRootPath" ;;
     reader:prerun)    echo "" ;;
 
@@ -83,7 +82,7 @@ archive_app_field() {
     notes:appbundle)  echo "$GUEST_HOME/dd-notes/Build/Products/Debug/ArchiveNotes.app" ;;
     notes:procname)   echo "ArchiveNotes" ;;
     notes:fixture)    echo "$GUEST_HOME/Library/Application Support/ArchiveNotes/AN-GUI-Fixture" ;;
-    notes:mkfixture)  echo 'NOTES_FIXTURE_CORPUS="$GC" bash "$GR/ArchiveNotes/scripts/make-notes-fixture.sh"' ;;
+    notes:mkfixture)  echo 'bash "$GR/ArchiveNotes/scripts/make-notes-fixture.sh"' ;;
     notes:launcharg)  echo "-ANUITestStorePath" ;;
     # Notes only: wipe the GUEST app container first. organization.json is loaded ONLY when the
     # container's index DB has no folders, so a container left from a previous run shadows the fixture's
@@ -155,13 +154,13 @@ tart_build_fixture() {
   glog="$TART_FIXTURE_TMP/$tok.log"; grc="$TART_FIXTURE_TMP/$tok.rc"
   TART_FIXTURE_TAIL=""; TART_FIXTURE_RC=""
   # `|| true` on purpose: THIS exec's status is the exact thing we have learned not to trust.
-  # $GR/$GC are assigned in the guest so the mkfixture strings (which keep them unexpanded) resolve there.
+  # $GR is assigned in the guest so the mkfixture strings (which keep it unexpanded) resolve there.
   # A SUBSHELL around $mk, not a brace group: a builder that ends in `exit N` would otherwise take the
   # guest shell down with it and the status line below would never be written — i.e. a real failure would
   # arrive as "unknown", which is the one classification that must stay reserved for transport trouble.
   tart exec "$vm" bash -lc "
     mkdir -p '$TART_FIXTURE_TMP'
-    GR='$GUEST_REPO'; GC='$GUEST_CORPUS'
+    GR='$GUEST_REPO'
     ( $mk ) > '$glog' 2>&1
     echo '$tok' \$? > '$grc'
   " >/dev/null 2>&1 || true
@@ -263,19 +262,3 @@ tart_lock_release() {
 }
 
 # ---------------------------------------------------------------------------------------------------
-# archive_corpus_src ROOT — the host dir of real PDFs the fixture builders copy from, or "" if none.
-#
-# This corpus is GITIGNORED, so it exists only in the primary checkout — never in a worktree. Mounting it
-# as its own `corpus:` share (instead of reaching for it under the repo mount) is what lets the VM lane run
-# identically from either. The old `$GUEST_REPO/../fixture-src` guess resolved to an unmounted path, so the
-# in-VM fixture build could never succeed — and `|| true` hid it.
-archive_corpus_src() {
-  local root="${1:-}" c
-  for c in "$root/ArchiveProcessor/Test Files/DeaverLLM" \
-           "$HOME/Claude/Archive Suite/ArchiveProcessor/Test Files/DeaverLLM" \
-           "$HOME/.tart-mirror/fixture-src"; do
-    if [ -d "$c" ]; then echo "$c"; return 0; fi
-  done
-  echo ""
-  return 0
-}

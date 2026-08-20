@@ -140,15 +140,13 @@ step tag-vocabulary           bash "$ROOT/ArchiveProcessor/scripts/test-tag-voca
 # leave a `__pycache__` dir in ArchiveProcessor/scripts on every gate run. The repo ignores that path
 # now as well, but the gate should not be dirtying the checkout it is judging in the first place.
 step finder-tags              env PYTHONDONTWRITEBYTECODE=1 bash "$ROOT/ArchiveProcessor/scripts/test-finder-tags.sh"
-# The odd one out: it needs `/opt/homebrew/bin/tag` and the `Test files/Brown Gemini` corpus, and it
-# PREFLIGHTS both. W26.lint-fu asked which way that should go here — RED, or a WARN-skip like the VM
-# lane — and the answer is a skip, for the VM lane's reason: an absent prerequisite is not a
-# regression, and a gate that parks the run over one teaches its reader to ignore parks. The script
-# was changed to exit 3 with a `SKIPPED:` line for exactly (and only) those two cases, so the lane is
-# named in the "NOT VERIFIED:" tail of the summary instead of passing silently.
-# This is not hypothetical: `Test files/` is GITIGNORED, so the corpus exists only in whichever
-# checkout the owner put it in. The gate runs from the primary checkout, where it is present — but
-# any other clone, and every git worktree, has no such directory. RED there would be a lie.
+# The odd one out: it needs `/opt/homebrew/bin/tag` and PREFLIGHTS it. W26.lint-fu asked which way a
+# missing prerequisite should go here — RED, or a WARN-skip like the VM lane — and the answer is a skip,
+# for the VM lane's reason: an absent prerequisite is not a regression, and a gate that parks the run
+# over one teaches its reader to ignore parks. The script exits 3 with a `SKIPPED:` line for exactly
+# that missing CLI, so the lane is named in the "NOT VERIFIED:" tail of the summary instead of passing
+# silently. Its Reader and Notes GUI builders generate their PDFs by default, so a gitignored corpus is
+# no longer a gate prerequisite; the old corpus-backed smoke-fixture portion reports itself separately.
 step_skippable fixture-scripts bash "$ROOT/ArchiveReader/scripts/test-fixture-scripts.sh"
 
 # W28.cert-fu3: prove the launch gate itself runs a binary that aborts before main and reports a failing

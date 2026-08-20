@@ -24,7 +24,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-. "$HERE/tart-lib.sh"          # per-app table + tart_wait_agent + archive_corpus_src (read its header)
+. "$HERE/tart-lib.sh"          # per-app table + tart_wait_agent (read its header)
 
 VM="${VM_NAME:-archive-gui-runner}"
 REPO="${REPO_PATH:-$(cd "$HERE/../.." && pwd)}"                  # suite root (this worktree)
@@ -67,7 +67,6 @@ GUEST_APP="$(archive_app_field "$APP" appbundle)"   # procname is read by tart_k
 GUEST_FIXTURE="$(archive_app_field "$APP" fixture)"; MKFIXTURE="$(archive_app_field "$APP" mkfixture)"
 LAUNCHARG="$(archive_app_field "$APP" launcharg)";  PRERUN="$(archive_app_field "$APP" prerun)"
 ONLY_TESTING="${ONLY_TESTING:-$(archive_app_field "$APP" tests)}"
-CORPUS_SRC="$(archive_corpus_src "$REPO")"
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""
 
 # Belt-and-braces: close a Screen Sharing window if one appears anyway. With `--no-graphics
@@ -109,11 +108,6 @@ ensure_vm() {
   # not ours to close (see close_vm_viewer).
   SS_WAS_RUNNING=0; pgrep -x "Screen Sharing" >/dev/null 2>&1 && SS_WAS_RUNNING=1
   local mounts=(--dir=repo:"$REPO" --dir=out:"$ART")
-  if [ -n "$CORPUS_SRC" ]; then
-    mounts+=(--dir=corpus:"$CORPUS_SRC")
-  else
-    warn "no fixture corpus found on the host — the in-VM fixture build will be skipped and fixtured UITests will XCTSkip."
-  fi
 
   # BOOT MODE IS PER LANE, and this is not cosmetic (owner reported a visible window, 2026-07-30).
   #   xcuitest — needs NO display at all: it only shells into the guest over the agent. `--no-graphics`
@@ -184,7 +178,6 @@ gen_project() {
 # --- the scratch GUI fixture, built INSIDE the guest (idempotent; persists on the VM disk) ---
 ensure_fixture() {
   [ -n "$MKFIXTURE" ] || return 0
-  [ -n "$CORPUS_SRC" ] || { warn "no corpus mounted — cannot build the GUI fixture; fixtured UITests will XCTSkip."; return 0; }
   # REBUILD every run, not "only if absent". The UITests mutate the fixture and are written against a
   # fresh one (NotesGUITests.swift:81-88: rebuilt "before each GUI run"; G8 trashes the Zotero note, G5
   # pastes a block into it). Build-if-absent lets those pass at most once, then fail forever and look

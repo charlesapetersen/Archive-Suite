@@ -37,11 +37,19 @@ done
 archive_app_known reader && ok "archive_app_known reader" || no "archive_app_known reader"
 archive_app_known processor && no "processor must be UNKNOWN (no UITest target — an unknown app must be loud, not an empty run)" \
                             || ok "processor is unknown (loud, not a silent empty run)"
-# The mkfixture strings are eval'd inside a REMOTE bash -lc; $GR/$GC must survive the host unexpanded.
-case "$(archive_app_field notes mkfixture)" in
-  *'$GC'*|*'$GR'*) ok "mkfixture keeps \$GR/\$GC unexpanded for the guest" ;;
-  *) no "mkfixture expanded \$GR/\$GC on the host — the guest command will be wrong" ;;
-esac
+# The mkfixture strings are eval'd inside a REMOTE bash -lc; $GR must survive the host unexpanded.
+# They must not ask for $GC: the builders synthesize their own PDFs, so a worktree VM needs only repo + out.
+for app in reader notes; do
+  mk="$(archive_app_field "$app" mkfixture)"
+  case "$mk" in
+    *'$GR'*) ok "$app mkfixture keeps \$GR unexpanded for the guest" ;;
+    *) no "$app mkfixture expanded \$GR on the host — the guest command will be wrong" ;;
+  esac
+  case "$mk" in
+    *'$GC'*|*GUEST_CORPUS*|*FIXTURE_CORPUS*) no "$app mkfixture still depends on a corpus mount" ;;
+    *) ok "$app mkfixture is corpus-free" ;;
+  esac
+done
 
 echo "== 2. VM lock (one writer for a single shared VM + artifact dir) =="
 export TART_LOCK_DIR="$TMP/.vm.lock"
@@ -62,13 +70,15 @@ mkdir -p "$TART_LOCK_DIR"; echo $$ > "$TART_LOCK_DIR/pid"
 [ -d "$TART_LOCK_DIR" ] && ok "release is a no-op when the lock isn't held" || no "release freed a lock we never held"
 rm -rf "$TART_LOCK_DIR"; unset TART_LOCK_DIR
 
-echo "== 3. corpus resolution (gitignored corpus => must work from a worktree too) =="
-mkdir -p "$TMP/fake/ArchiveProcessor/Test Files/DeaverLLM"
-[ "$(archive_corpus_src "$TMP/fake")" = "$TMP/fake/ArchiveProcessor/Test Files/DeaverLLM" ] \
-  && ok "prefers the corpus under the given root" || no "did not prefer the root's corpus"
-out="$(HOME="$TMP/nohome" archive_corpus_src "$TMP/empty")"
-[ -z "$out" ] && ok "returns empty when no corpus exists (caller must warn, not silently XCTSkip)" \
-              || no "returned '$out' with no corpus present"
+echo "== 3. corpus-free VM mounts (a worktree needs only repo + artifacts) =="
+grep -q 'archive_corpus_src' "$LIB" \
+  && no "tart-lib still resolves a gitignored corpus" || ok "tart-lib has no corpus-resolution helper"
+for f in ops/gui/vm-gui-runner.sh ops/autonomous/gui-vm-gate.sh; do
+  grep -q -- '--dir=corpus:' "$ROOT/$f" \
+    && no "$f still mounts a corpus share" || ok "$f mounts no corpus share"
+  grep -q 'CORPUS_SRC' "$ROOT/$f" \
+    && no "$f still skips fixture construction without a corpus" || ok "$f always attempts its scratch fixture build"
+done
 
 echo "== 4. THE REGRESSION THAT KEEPS COMING BACK: exit code -> owner-visible text =="
 # Drive health-gate's real step_skippable with a stub gate per exit code. A FAILING or UNRUN lane must
