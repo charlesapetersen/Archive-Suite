@@ -215,16 +215,18 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
   plain unit test inside `ArchiveReaderTests`: it renders a PDF page / view to a bitmap and asserts non-blank,
   with no "Enable UI Automation" prompt. So render regressions (blank PDF pane, blank thumbnail) are caught
   headlessly; only *interaction / whole-window* checks still need GUI-on. → `ops/gui/README.md`.
-- **Five Tier-2 script gates that nothing was running** (`W26.lint-fu`, 2026-08-07). Wave 26 shipped a
+- **Seven Tier-2 script gates that nothing was running** (`W26.lint-fu`, expanded by `W9.c2`). Wave 26 shipped a
   harness for each of its guarantees and wired **none** of them to a caller — the write-surface lint's own
   header even claimed "also invoked by the autonomous build", measured false on 2026-08-05. A guarantee that
-  reads as enforced and isn't is the vacuous-pass failure one level up, so all five run here now:
-  `write-surface-lint` + `write-surface-lint-proof` (the Core Directive's automated half, and the proof it
-  can still fail), `tag-vocabulary` (the Processor's tag-write hook + `$HOME`-walk prohibition),
+  reads as enforced and isn't is the vacuous-pass failure one level up, so all seven run here now:
+  `write-surface-lint` + `write-surface-lint-proof` (the Reader/Core Directive's automated half, and the proof
+  it can still fail), `processor-write-surface-lint` + its proof (no direct Processor tag write and only the
+  two audited PDF output sites), `tag-vocabulary` (the Processor's tag-write hook + `$HOME`-walk prohibition),
   `finder-tags` (the E2E oracle reads xattrs, not Spotlight) and `fixture-scripts` (the Reader fixture
-  builders need no Spotlight, plus the `rm -rf` guard on their new destination overrides). Together ~105 s,
+  builders need no Spotlight, plus the `rm -rf` guard on their new destination overrides). The original five
+  measured ~105 s; the two new source-only checks add only a small amount, and all seven remain
   no key/network/GUI/app build, `mktemp` scratch only, and placed **before** the ~15–20 min VM lane so a RED
-  surfaces early. All five were run green on a clean tree before wiring — a gate must not start RED.
+  surfaces early. All seven were run green on a clean tree before wiring — a gate must not start RED.
   - `fixture-scripts` is the one **skippable** member: it needs `/opt/homebrew/bin/tag` and the
     **gitignored** `Test files/Brown Gemini` corpus, which exists only in the checkout the owner put it in.
     It exits **3 + `SKIPPED:`** for a missing prerequisite (never for a failed check), so a machine without

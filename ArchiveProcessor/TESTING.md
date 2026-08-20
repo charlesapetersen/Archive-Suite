@@ -354,6 +354,13 @@ existing scratch, key-free, no-network execution remains unchanged.
   report tags it actually wrote.
 
 **File & tag safety (no undo → Tier-2 territory)**
+- **`scripts/lint-write-surface.sh`** — source-level backstop for Processor's write boundary: direct
+  `setResourceValue(s)`/`setxattr` is forbidden across all macOS sources, and the only permitted
+  `PDFDocument.write` calls are the two exact output sites in `OCR/PDFGenerator.swift` (`generate` and
+  `mergeDocumentPDFs`). It and its mutation proof run in the autonomous health gate.
+- **`scripts/test-lint-write-surface.sh`** — copies only Processor source into `mktemp`, then proves the lint
+  rejects planted direct tag writes, raw `setxattr`, and PDF writes both inside `PDFGenerator` and a new source
+  file; a missing source root also fails rather than passing vacuously. No app, corpus, OCR, Keychain, or network.
 - **`test-output-file-safety.sh`** — `OutputFileSafety`, in a fresh temporary directory only.
 - **`test-merge-safety.sh`** — merged-PDF tag transfer.
 - **`test-collection-organize.sh`** — collision-safe collection organization.

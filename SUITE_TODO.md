@@ -1486,10 +1486,6 @@ before building anything else in Notes.
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 
-- [ ] **`W9.c2` — Processor has no write-surface lint [S · Tier-2].** Plan C2. Reader has one; Processor does
-  not. Ban `setResourceValue(s)`/`setxattr` across `ArchiveProcessor/macOS/Sources`, allow-list
-  `PDFDocument.write` in `PDFGenerator.swift`/`mergeDocumentPDFs`. Must trip on a planted violation, not just
-  pass clean. **Tier-2** — it guards the irreplaceable-data write path. | ArchiveProcessor/scripts/ | S | med | none
 - [ ] **`W9.c3` — the write-surface lint never scans ArchiveCore or Notes, and Core imports AppKit [S–M ·
   Tier-2].** Plan C3. The Reader lint scans only Reader and has no `import SwiftUI|AppKit` guard, which is why
   `packages/ArchiveCore/.../Thumbnails/PDFThumbnailer.swift:4` imports AppKit into the UI-free Core uncaught.

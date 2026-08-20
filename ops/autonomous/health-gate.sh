@@ -122,16 +122,18 @@ step processor-launch bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$
 # it, which is the same failure as a lint that passes vacuously, moved up one level: the guarantee
 # reads as enforced and is not.
 #
-# All five are free and hermetic — no key, no network, no GUI, no app build, mktemp scratch only,
-# and no real-corpus path anywhere. Measured here on 2026-08-07: 0 s / 16 s / 65 s / 3 s / 20 s
-# ≈ 105 s, against GATE_MAXRUN=50 min. They sit ahead of the ~15-20 min VM lane deliberately, so a
-# RED lands in the gate's first few minutes.
+# All seven are free and hermetic — no key, no network, no GUI, no app build, mktemp scratch only,
+# and no real-corpus path anywhere. The original five measured ≈105 s on 2026-08-07; W9.c2 adds
+# two fast source-only checks. They sit ahead of the ~15-20 min VM lane deliberately, so a RED lands
+# in the gate's first few minutes.
 #
-# The four below are REAL steps: each was run green on a clean tree before being wired (the item's
-# "the gate must not start RED"), and each failure mode is a fact about the source, never
-# inconclusive.
+# These seven named gate checks below are REAL steps: each was run green on a clean tree before being
+# wired (the item's "the gate must not start RED"), and each failure mode is a fact about the source,
+# never inconclusive.
 step write-surface-lint       bash "$ROOT/ArchiveReader/scripts/lint-write-surface.sh"
 step write-surface-lint-proof bash "$ROOT/ArchiveReader/scripts/test-lint-write-surface.sh"
+step processor-write-surface-lint       bash "$ROOT/ArchiveProcessor/scripts/lint-write-surface.sh"
+step processor-write-surface-lint-proof bash "$ROOT/ArchiveProcessor/scripts/test-lint-write-surface.sh"
 step tag-vocabulary           bash "$ROOT/ArchiveProcessor/scripts/test-tag-vocabulary.sh"
 # PYTHONDONTWRITEBYTECODE: this one imports `finder_tags.py` from the source tree, so CPython would
 # leave a `__pycache__` dir in ArchiveProcessor/scripts on every gate run. The repo ignores that path

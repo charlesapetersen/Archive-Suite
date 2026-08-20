@@ -17,6 +17,21 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase A safety-net (2026-08-19)
 
+- [x] **`W9.c2` — Processor has no write-surface lint [S · Tier-2].** **SHIPPED 2026-08-20** (commit whose
+  subject begins `test(processor,ops,trackers): W9 lint Processor write surface`). Direct
+  `setResourceValue(s)` and `setxattr` are now forbidden throughout the Processor's macOS sources. The only
+  permitted `PDFDocument.write` calls are the two exact output sites in `OCR/PDFGenerator.swift`, so an added
+  write in that file must be explicitly re-audited too.
+
+  **Tier-2 mechanism proof:** the lint's scratch-only mutation harness verifies clean source, direct Finder
+  metadata and raw-xattr violations, extra PDF writes inside and outside `PDFGenerator`, multiline and direct
+  PDF calls (including optional chaining), a missing source root, and exactly-once health-gate wiring
+  (**11 passed, 0 failed**). The lint and
+  proof both pass under the unattended-gate environment; `prove-gate-report.sh` remains **29/0**. A normal
+  Processor Debug build is green. No app, corpus, output folder, OCR, Keychain, or network is used. |
+  ArchiveProcessor/scripts/{lint-write-surface.sh,test-lint-write-surface.sh}, ops/autonomous/{health-gate.sh,README.md},
+  ArchiveProcessor/TESTING.md | S | med | done
+
 - [x] **`W9.a10` — prove the doc-sync hook fires for `packages/` [XS–S · Tier-2 autonomous-setup].** **SHIPPED
   2026-08-19** (commit whose subject begins `test(ops,trackers): W9 prove doc-sync package coverage`). The W0
   plan required evidence that the doc-sync backstop catches a `packages/ArchiveCore` code change with no tracker
