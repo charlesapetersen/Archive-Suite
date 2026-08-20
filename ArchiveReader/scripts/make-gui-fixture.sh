@@ -73,7 +73,8 @@ import sys
 path, text = sys.argv[1:]
 text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 stream1 = ("BT\n/F1 20 Tf\n72 720 Td\n(" + text + " - image page) Tj\nET\n").encode("ascii")
-stream2 = ("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text: " + text + ") Tj\nET\n").encode("ascii")
+stream2 = ("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text: " + text
+           + ". California archival records.) Tj\nET\n").encode("ascii")
 objects = [
     b"<< /Type /Catalog /Pages 2 0 R >>",
     b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",

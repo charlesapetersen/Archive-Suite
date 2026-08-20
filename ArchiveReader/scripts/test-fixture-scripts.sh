@@ -124,6 +124,11 @@ if grep -aqF "Reader synthetic fixture page 1" "$GDST/00001 IMG — Brown.pdf"; 
 else
   bad "default GUI PDF is not the text-bearing synthetic fixture"
 fi
+if grep -aqF "California archival records" "$GDST/00001 IMG — Brown.pdf"; then
+  ok "default Reader OCR page retains the body-only California search fixture"
+else
+  bad "default Reader OCR page lacks the California search fixture"
+fi
 if command -v pdfinfo >/dev/null 2>&1; then
   reader_pages="$(pdfinfo "$GDST/00001 IMG — Brown.pdf" 2>/dev/null | awk '/^Pages:/ {print $2}')"
   if [ "$reader_pages" = 2 ]; then ok "default Reader PDF keeps the standard two-page shape"

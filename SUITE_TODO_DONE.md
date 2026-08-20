@@ -6118,6 +6118,15 @@ explain why not.
   | ArchiveReader/scripts/{make-gui-fixture,test-fixture-scripts}.sh,
     ArchiveNotes/scripts/make-notes-fixture.sh, ops/{gui,autonomous}, fixture/VM docs | S | low | done
 
+- [x] **W21.vmgui-b-fu — keep the Reader OCR-search fixture contract in the synthetic PDFs [XS · regression]**
+  (`origin: W21.vmgui-b`). ✅ **DONE this commit.** The first corpus-free Reader VM run at baseline `a197f55`
+  ran 28 UI tests but failed exactly `NavigationUITests.testOCRSearchShowsKeywordInContextSnippet`: the generated
+  PDFs carried text but omitted its required body-only term `California`. The synthetic second page now retains
+  `California archival records` in the PDF body (never in a filename), and `test-fixture-scripts.sh` pins that
+  contract. The scratch fixture proof passed **34/34**; the off-screen Reader VM suite passed **28/28** with no
+  failures. No real corpus or host GUI was opened.
+  | ArchiveReader/scripts/{make-gui-fixture,test-fixture-scripts}.sh | XS | low | done
+
 - [x] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** ✅ **DONE this commit.**
   `BlockKind` is an `NSAttributedString` attribute value under `an.blockKind`, so AppKit bridges it to
   Objective-C and hashes it during Markdown styling. The enum's associated values are all synthesizable, so
