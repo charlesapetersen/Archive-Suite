@@ -5992,6 +5992,23 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **`W21.e2e-fu2` — the test-only LAN READY line published the six-character Drive-relay token after
+  W16.lan2 split the LAN credential [XS · MED · lying test seam] — Tier-2.** **SHIPPED 2026-08-19** (**this
+  commit**). The LAN `CaptureServer` authenticates the persistent high-entropy `lanToken`, so its headless
+  READY line now publishes that same bearer; the E2E reads it directly instead of reaching into the running
+  app's defaults. The separate file-relay READY line deliberately remains on the six-character SPEC-pinned
+  Drive token. The E2E keeps the bearer stdin-only and redacts READY/mac-log artifacts; its stderr readiness
+  line is now redacted too, so the newly-published token is not duplicated into a log sink.
+  **Tier-2 proof:** the rebuilt, scratch-only `test-recovery.sh` app driver reported `ALL PASS`, including all
+  three discriminators: LAN READY carries `lanToken`, LAN stderr is `[REDACTED]`, and file relay keeps
+  `token`; Debug build and shell/diff checks are green. Independent adversarial review found the initial
+  stderr secret sink and one stale E2E guide, both fixed and re-reviewed clean. The prescribed full emulator
+  E2E was attempted with `KEEP_EMU=never`, but its Keychain Gemini lookup hung before either app/emulator
+  launched; it was stopped with no OCR charge or output. That unavailable-key precondition is recorded in the
+  primary daemon report, not misclassified as a protocol failure. | CaptureSession.swift,
+  LiveCaptureRecoveryTestDriver.swift, scripts/{e2e-phone-mac,android-ui-drive}.sh,
+  scripts/E2E-PHONE-MAC.md | XS | med | Tier-2
+
 - [x] **W21.smoke — fix stale de-nesting paths in `ArchiveProcessor/scripts/test-smoke.sh` [S].** **SHIPPED
   2026-08-19** (**this commit**). The script starts at `ArchiveProcessor/`, but its app selector still named the
   old nested directory removed by de-nesting `7706368`, so both its build command and launch path were wrong.

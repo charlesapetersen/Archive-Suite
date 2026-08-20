@@ -170,6 +170,24 @@ enum LiveCaptureRecoveryTestDriver {
         ])
         check("all-present plan reports allFiled + the group filed", good.allFiled && good.filedGroupIds.contains("C"))
 
+        // --- W21.e2e-fu2: the headless LAN E2E must receive the bearer its receiver actually authenticates;
+        // the file-relay READY line remains on the six-character Drive token. These call the exact formatters
+        // used by the two production callbacks, but do not bind a port, start USB forwarding, or write outside
+        // this driver's existing scratch process. Never include either credential in a diagnostic.
+        let readySession = CaptureSession()
+        func readyToken(_ line: String) -> String? {
+            line.split(separator: " ").first { $0.hasPrefix("token=") }.map { String($0.dropFirst(6)) }
+        }
+        let lanReady = readySession._testLANReadyLine(port: 43210)
+        let lanReadyLog = readySession._testLANReadyLogLine(port: 43210)
+        let relayReady = readySession._testFileRelayReadyLine(relayDir: tmp.appendingPathComponent("relay").path)
+        check("W21.e2e-fu2: LAN READY publishes the high-entropy lanToken, never the Drive-relay token",
+              readyToken(lanReady) == readySession.lanToken && readyToken(lanReady) != readySession.token)
+        check("W21.e2e-fu2: LAN readiness stderr is redacted, never a second bearer sink",
+              readyToken(lanReadyLog) == "[REDACTED]" && !lanReadyLog.contains(readySession.lanToken))
+        check("W21.e2e-fu2: file-relay READY keeps the 6-char Drive token, never the LAN bearer",
+              readyToken(relayReady) == readySession.token && readyToken(relayReady) != readySession.lanToken)
+
         // --- Test 5 (review finding #2): an INCOMPLETE segment (a page produced no PDF) is skipped — never
         // filed, and its (present) PDF is NOT moved, so its sources stay put. ---
         let out5 = tmp.appendingPathComponent("out5", isDirectory: true)

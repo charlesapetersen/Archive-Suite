@@ -506,7 +506,7 @@ final class CaptureSession: ObservableObject {
         relayRunning = true
         statusMessage = "Live Capture relay watching \(relayDir) — photos arrive as the phone uploads."
         if ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" {
-            let line = "LIVECAPTURE_READY transport=fileRelay token=\(token) relayDir=\(relayDir) folder=\(incomingFolder.path)\n"
+            let line = fileRelayReadyLine(relayDir: relayDir)
             if let path = ProcessInfo.processInfo.environment["LIVECAPTURE_READYFILE"] {
                 try? line.write(toFile: path, atomically: true, encoding: .utf8)
             }
@@ -522,15 +522,30 @@ final class CaptureSession: ObservableObject {
         serverRunning = true
         statusMessage = "Listening on port \(port). Scan the QR on the phone to connect."
         if ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" {
-            let line = "LIVECAPTURE_READY port=\(port) token=\(token) folder=\(incomingFolder.path)\n"
+            let line = lanReadyLine(port: port)
             if let path = ProcessInfo.processInfo.environment["LIVECAPTURE_READYFILE"] {
                 try? line.write(toFile: path, atomically: true, encoding: .utf8)
             }
-            FileHandle.standardError.write(Data(line.utf8))
+            FileHandle.standardError.write(Data(lanReadyLogLine(port: port).utf8))
         }
         // Keep the USB reverse tunnel asserted (re-asserted on a timer so a replug self-heals).
         USBBridge.startReverse(port: port)
     }
+
+    // These test-only helpers deliberately share the exact production formatters above. The headless E2E
+    // consumes the LAN line, while the Drive-file-relay listener must keep its SPEC-pinned short token.
+    private func fileRelayReadyLine(relayDir: String) -> String {
+        "LIVECAPTURE_READY transport=fileRelay token=\(token) relayDir=\(relayDir) folder=\(incomingFolder.path)\n"
+    }
+    private func lanReadyLine(port: UInt16) -> String {
+        "LIVECAPTURE_READY port=\(port) token=\(lanToken) folder=\(incomingFolder.path)\n"
+    }
+    private func lanReadyLogLine(port: UInt16) -> String {
+        lanReadyLine(port: port).replacingOccurrences(of: "token=\(lanToken)", with: "token=[REDACTED]")
+    }
+    func _testFileRelayReadyLine(relayDir: String) -> String { fileRelayReadyLine(relayDir: relayDir) }
+    func _testLANReadyLine(port: UInt16) -> String { lanReadyLine(port: port) }
+    func _testLANReadyLogLine(port: UInt16) -> String { lanReadyLogLine(port: port) }
 
     func serverDidStop() {
         serverRunning = false

@@ -11,8 +11,8 @@
 #   printf '%s\n' "$token" | scripts/android-ui-drive.sh all <port>  # boot+install+pair+flow
 #   scripts/android-ui-drive.sh shot <name>          # one screenshot
 # The Mac side (headless) is launched separately with LIVECAPTURE_AUTOSTART=1 LIVECAPTURE_READYFILE=… .
-# The READY line supplies its port; until W21.e2e-fu2, its `token` is the Drive-relay code and is NOT valid
-# for LAN pairing. `e2e-phone-mac.sh` obtains the persisted LAN bearer without logging or screenshotting it.
+# Its LAN READY line supplies both the port and the valid high-entropy bearer; `e2e-phone-mac.sh` reads it
+# without logging or screenshotting it. The distinct file-relay READY line intentionally stays on `token`.
 set -uo pipefail
 
 SDK="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"

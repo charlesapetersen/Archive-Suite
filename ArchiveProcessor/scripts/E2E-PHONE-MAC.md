@@ -42,11 +42,11 @@ pixel source. This is the sole fully-deterministic, unattended route.
   - `LIVECAPTURE_AUTOFINALIZE=1` → on `POST /session/complete` → drain-gated `requestFinish`→`finalize`, then write `DONE.txt`.
   - `LIVECAPTURE_TESTOUT=<dir>` → isolated output dir + where `DONE.txt` lands (never the real corpus).
 - **B3:** this orchestrator + `assert_mac.py` + `pdftext.swift` + `e2e-fixtures/` (known docs + `ground_truth.json`).
-  The orchestrator reads the listener port from `LIVECAPTURE_READY`, then reads the running app's persisted
-  high-entropy `LiveCaptureLANToken` for pairing. The READY line still publishes the old Drive-relay code
-  after W16.lan2's credential split; the harness redacts it from both READY and Mac-log artifacts. Correcting
-  that `Capture/` seam is W21.e2e-fu2 (Tier-2, not owner-gated since 2026-08-13). The filled pairing form is deliberately not screenshot:
-  it contains the persistent LAN bearer.
+  The LAN `LIVECAPTURE_READY` line publishes both the listener port and the high-entropy bearer the receiver
+  authenticates, so the orchestrator never reads the running app's persisted defaults. It redacts that bearer
+  from READY and Mac-log artifacts immediately after pairing; the app's stderr readiness line is redacted too.
+  The distinct file-relay READY line intentionally keeps the six-character Drive-relay `token`. The filled
+  pairing form is deliberately not screenshot: it contains the persistent LAN bearer.
 
 The companion has **no session-finish UI** (it finishes per-segment; whole-session finalize is a Mac
 action), so the harness itself sends `POST /session/complete` over the documented Bearer route.

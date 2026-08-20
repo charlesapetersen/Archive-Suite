@@ -50,8 +50,8 @@ export OUT="$SHOTS"                                    # android-ui-drive.sh scr
 log(){ printf '\033[35m[e2e]\033[0m %s\n' "$*" | tee -a "$REPORT"; }
 MAC_PID=""; KEEP_EMU="${KEEP_EMU:-onfail}"
 redact_ready_token(){
-  # Until W21.e2e-fu2, the app writes its six-character Drive-relay credential here. The READY file is
-  # complete before this runs, so replacing it cannot detach a live writer from its artifact path.
+  # The READY file briefly carries the LAN bearer needed for emulator pairing. The app has finished its one
+  # READY write before this runs, so replacing it cannot detach a live writer from its artifact path.
   [ -f "$READYFILE" ] && sed -i '' -E 's/token=[^ ]+/token=[REDACTED]/g' "$READYFILE"
 }
 redact_closed_maclog(){
@@ -117,16 +117,16 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 grep -q "LIVECAPTURE_READY " "$READYFILE" 2>/dev/null || die "no READY line after 60s (see $MACLOG)"
-PORT="$(grep -o 'port=[0-9]*' "$READYFILE" | head -1 | cut -d= -f2)"
-# W16.lan2 split the LAN bearer from the six-character Drive-relay code, but the test-only LAN READY line
-# still reports the relay `token` (W21.e2e-fu2 — Tier-2 because the seam lives in Capture/; de-gated 2026-08-13). Read the
-# same persisted LAN credential CaptureServer loaded; never print or screenshot it.
-TOKEN="$(defaults read com.archiveprocessor.app LiveCaptureLANToken 2>/dev/null)"
+READY_LINE="$(grep '^LIVECAPTURE_READY port=' "$READYFILE" | head -1)"
+PORT="$(printf '%s\n' "$READY_LINE" | sed -n 's/.* port=\([0-9][0-9]*\).*/\1/p')"
+# W21.e2e-fu2: this test-only LAN READY line publishes the exact high-entropy bearer CaptureServer
+# authenticates. Read it from the line (never defaults), then keep it stdin-only/redacted thereafter.
+TOKEN="$(printf '%s\n' "$READY_LINE" | sed -n 's/.* token=\([^ ]*\).*/\1/p')"
 [ -n "$PORT" ] && [ "${#TOKEN}" -ge 32 ] \
   || die "could not resolve port + high-entropy LAN token after READY (see $READYFILE)"
 # Production mints only this 31-symbol alphabet. Fail closed on a corrupted defaults value before it reaches
 # either an emulator-shell stdin command or curl's stdin config parser; future longer tokens remain allowed.
-case "$TOKEN" in *[!ABCDEFGHJKMNPQRSTUVWXYZ23456789]*) die "persisted LAN token has invalid characters";; esac
+case "$TOKEN" in *[!ABCDEFGHJKMNPQRSTUVWXYZ23456789]*) die "READY LAN token has invalid characters";; esac
 redact_ready_token
 log "Mac listening on LAN port $PORT"
 

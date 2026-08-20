@@ -45,17 +45,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 ## Processor build/test gate follow-up (found 2026-08-12)
 
 
-- [ ] **`W21.e2e-fu2` — the test-only LAN READY line still publishes the six-character Drive-relay token
-  after W16.lan2 split the LAN credential [XS · MED · lying test seam] — Tier-2.**
-  `CaptureSession.serverDidStart` writes `token` under `LIVECAPTURE_AUTOSTART`, but `CaptureServer` now
-  authenticates the 32-character `lanToken`; the E2E therefore reaches the Mac and receives HTTP 401 before
-  any upload. W21.e2e-fu1 works around the stale seam in its script by reading the persisted LAN token.
-  Correct the source READY line to publish `lanToken`, keep the file-relay READY line on `token`, and add a
-  regression proof that distinguishes the two credentials. **Tier-2** because the seam lives in `Capture/` —
-  adversarial review + a functional test, scratch only. (This carried a **HOLD** for a per-item authorization
-  until 2026-08-13, when that requirement was lifted; the grant recorded in `OWNER_AUTHORIZATIONS.md` still
-  binds its constraints: the file-relay READY line stays on `token`.) | ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift + recovery driver | XS | risk med | Tier-2
-
 ## Autonomous daemon — handoff integrity (2026-08-13)
 
 - [ ] **`W21.seed-fu` — the Keychain partition fix does not cover `DriveClientSecret`, and "Always Allow" is
