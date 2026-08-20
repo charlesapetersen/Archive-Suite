@@ -88,6 +88,21 @@ status() {
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
+# W21.seed-fu — a successful partition-list repair records exactly which provider accounts existed then.
+# Compare that durable snapshot with today's *attribute-only* Keychain probes before an unattended run: a
+# newly added provider would otherwise reintroduce the prompt the marker claims was prevented. The helper's
+# one account list is also used by fix-keychain-access.sh; DriveClientSecret is intentionally excluded because
+# the CLI never reads it and touching its partition list risks an app prompt for no gain.
+KEYCHAIN_PROVIDER_LIB="$REPO/ops/autonomous/keychain-provider-accounts.sh"
+warn_unmarked_keychain_provider() {
+  local login_keychain="$HOME/Library/Keychains/login.keychain-db" missing
+  missing="$(keychain_unmarked_present_provider_accounts "$STATE/keychain-partition-fixed" "$login_keychain")"
+  [ -n "$missing" ] || return 0
+  missing="$(printf '%s\n' "$missing" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  echo "WARNING: Keychain partition repair predates present provider key(s): $missing"
+  echo "  Run ./ops/autonomous/fix-keychain-access.sh before unattended OCR; it needs one login-password entry."
+}
+
 # Optional `--dry-run` as the FIRST arg: preview the resolved launch mode + exit BEFORE any install/launch.
 # An EXPLICIT flag (NOT an ambient env var) on purpose — an env var could be exported once while iterating and
 # then silently turn a real `daemon.sh` into a success-reporting no-op; a flag you have to type can't be inherited.
@@ -156,7 +171,10 @@ esac
 [ -f "$DAEMON_SRC" ] || fail "daemon script missing: $DAEMON_SRC"
 [ -f "$PROMPT_SRC" ] || fail "L2 resume prompt missing: $PROMPT_SRC"
 [ -f "$PLAN" ]       || fail "L0 plan missing: $PLAN — write it (queue + directives) before starting."
+[ -r "$KEYCHAIN_PROVIDER_LIB" ] || fail "keychain provider list missing: $KEYCHAIN_PROVIDER_LIB"
+. "$KEYCHAIN_PROVIDER_LIB"
 mkdir -p "$BIN" "$STATE"
+warn_unmarked_keychain_provider
 
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
 install -m 755 "$DAEMON_SRC" "$DAEMON_DST"

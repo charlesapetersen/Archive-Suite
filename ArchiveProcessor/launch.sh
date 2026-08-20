@@ -61,7 +61,7 @@ else
   DEV_CERT="Archive Suite Dev"
   if security find-identity -p codesigning 2>/dev/null | grep -q "$DEV_CERT"; then
     if codesign --force --preserve-metadata=entitlements,requirements,flags,runtime --sign "$DEV_CERT" "$APP" >/dev/null 2>&1; then
-      echo "✓ Re-signed with stable dev identity ($DEV_CERT) — one Keychain 'Always Allow' now sticks across rebuilds."
+      echo "✓ Re-signed with stable dev identity ($DEV_CERT) — each provider's Keychain 'Always Allow' now sticks across rebuilds."
     else
       echo "⚠ Stable re-sign failed — launching ad-hoc (Keychain may re-prompt)."
     fi

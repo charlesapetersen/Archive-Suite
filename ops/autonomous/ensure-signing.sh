@@ -5,7 +5,7 @@
 # Keychain ties an item's "Always Allow" to the requesting app's code signature, so an ad-hoc rebuild is
 # seen as a "different app" and the Keychain RE-PROMPTS for API-key access on every build — which blocks
 # unattended autonomous runs (this actually happened, 2026-07-16). A stable self-signed cert gives one
-# persistent Designated Requirement, so a single "Always Allow" sticks across all future rebuilds.
+# persistent Designated Requirement, so each provider item's "Always Allow" sticks across future rebuilds.
 # ArchiveProcessor/launch.sh re-signs the built Debug app with this identity before launching it.
 #
 # The cert is LOCAL to this Mac's login keychain and is NEVER committed (it's a private key). It does not

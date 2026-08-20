@@ -222,7 +222,7 @@ step budget-contract bash "$ROOT/ops/autonomous/tests/prove-context-budget.sh"
 # compactor is broken and the plan WILL drift back over budget — fix the compactor, don't skip this.
 step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 
-# Same argument, for the three OTHER hermetic ops harnesses. All are seconds long, sandbox-only (mktemp
+# Same argument, for the four OTHER hermetic ops harnesses. All are seconds long, sandbox-only (mktemp
 # fixtures + an isolated $HOME) and deterministic, so there is no reason to leave them unwatched:
 #   * prove-status.sh — the ONE status renderer the owner reads. It sat silently at 34/2 until 2026-08-06, and
 #     the cause was the harness itself reading the owner's REAL ~/Desktop park note: 34/2 with that file
@@ -236,6 +236,10 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     step instead of the FAILING one — a regression that is only ever observed during an incident, and that
 #     misreported three of the owner's parks before it was fixed. Self-referential on purpose: nothing else
 #     watches the gate's own honesty.
+#   * prove-keychain-partition.sh — the one-time provider-key repair and the daemon's stale-marker warning.
+#     It replaces `security` with a fixture stub, so it proves the complete shared account list, no secret
+#     read/write, no false-covered marker after a partial repair, and the later-added-provider warning without
+#     touching the login Keychain.
 #   * prove-vm-lane.sh — the GUI lane's exit-code -> owner-visible-text mapping, the per-app table, the VM
 #     lock, and (W26.fixwarn) that a `tart exec` transport error is never mistaken for a failed fixture
 #     build. Missed by the 2026-08-08 sweep above, so it was the fifth harness in the same position: ~4 s,
@@ -247,6 +251,7 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     its own mktemp, so it never touches the shared VM or the shared lock.
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
+step keychain-partition-proof bash "$ROOT/ops/autonomous/tests/prove-keychain-partition.sh"
 step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
 step handoff-proof  bash "$ROOT/ops/autonomous/tests/prove-handoff.sh"
 step vm-lane-proof  bash "$ROOT/ops/autonomous/tests/prove-vm-lane.sh"

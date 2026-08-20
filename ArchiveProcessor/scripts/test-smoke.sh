@@ -10,10 +10,11 @@
 #   4. OUTPUT   — writes a timestamped PASS/FAIL report under .maintenance/test-results/ (gitignored).
 #
 # Keys are read from the app's Keychain (service com.archiveprocessor.app, account = provider name).
-# The FIRST time, macOS pops a "security wants to use the … keychain" dialog — click "Always Allow"
-# (this is the "log in with the Keychain credentials at the beginning" step). After that it never
-# prompts again and runs fully unattended. To run headless with NO prompt at all (e.g. cron), export
-# AP_GEMINI_KEY / AP_MISTRAL_KEY first and they win over the Keychain. Keys are never printed.
+# A `security wants to use the … keychain` prompt is NOT fixed by clicking "Always Allow" there: stop and
+# run ../ops/autonomous/fix-keychain-access.sh first, which repairs the command-line partition list. The
+# Processor's own access is per provider item too; Settings can show about six "Always Allow" prompts on an
+# unseeded machine. To run headless with NO prompt at all (e.g. cron), export AP_GEMINI_KEY /
+# AP_MISTRAL_KEY first and they win over the Keychain. Keys are never printed.
 #
 # It does NOT drive the Process Files GUI pipeline (review dialogs need interaction) — that's the
 # Tier-2 GUI checklist in TESTING.md. Usage: ./scripts/test-smoke.sh

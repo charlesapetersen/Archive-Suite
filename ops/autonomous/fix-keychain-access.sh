@@ -16,13 +16,17 @@
 # step printed at the end is NOT optional. Recoverable (one click), never a lockout.
 set -uo pipefail
 
-SVC="com.archiveprocessor.app"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+[ -r "$HERE/keychain-provider-accounts.sh" ] || { echo "missing keychain provider list: $HERE/keychain-provider-accounts.sh" >&2; exit 2; }
+. "$HERE/keychain-provider-accounts.sh"
+
+SVC="$KEYCHAIN_PROVIDER_SERVICE"
 LOGIN_KC="$HOME/Library/Keychains/login.keychain-db"
 # All LLM-provider key accounts the app stores under $SVC (the ones a smoke/E2E run reads via /usr/bin/
 # security). MUST include Mistral — scripts/test-smoke.sh reads it via the CLI, so omitting it would leave a
 # live prompt while this script reports success. Non-provider items (Drive secrets, gateway config) are left
 # alone: the CLI never reads them, so touching their partition lists would risk an app re-prompt for no gain.
-CANDIDATES=(Gemini Anthropic Mistral OpenAI Gateway)
+CANDIDATES=("${KEYCHAIN_PROVIDER_ACCOUNTS[@]}")
 
 echo "== fix-keychain-access =="
 [ -f "$LOGIN_KC" ] || { echo "no login keychain at $LOGIN_KC"; exit 1; }
@@ -84,8 +88,9 @@ wake you again for them.
 
 ONE more step to be safe — confirm the APP still has access under the new partition list:
   ./launch.sh processor
-If (and only if) the Processor prompts for the key, click **Always Allow** once — that re-adds the app to the
-partition list. Do this now, while you're here, so an unattended GUI-verify session never hangs on it later.
+If the Processor prompts for a key, click **Always Allow** for that provider item — Settings reads providers
+eagerly, so a fully unseeded machine can show about six prompts. Do this now, while you're here, so an
+unattended GUI-verify session never hangs on one later.
 
 Re-run this script after you rotate or re-add any API key.
 EOF

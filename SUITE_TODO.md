@@ -47,29 +47,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 
 ## Autonomous daemon — handoff integrity (2026-08-13)
 
-- [ ] **`W21.seed-fu` — the Keychain partition fix does not cover `DriveClientSecret`, and "Always Allow" is
-  per-ITEM, so a later-added credential silently re-prompts [S · MED · ops].** Filed 2026-08-13 from working
-  `W21.seed`. Two facts learned by doing it, neither of which was written down:
-  **(a) It is not one click.** The item said "click Always Allow on the login-Keychain prompt" (singular). The
-  owner got one prompt at launch and then **five more just to open Settings** — the ACL is per keychain ITEM and
-  `SettingsView` eagerly reads every provider credential. So the cost of an unseeded machine is ~6 modal prompts,
-  and an UNATTENDED session that opens Settings would hang on the first one rather than fail loudly.
-  **(b) ~~`fix-keychain-access.sh` omits `DriveClientSecret`~~ — WITHDRAWN 2026-08-13, the omission is CORRECT
-  and deliberate.** Filed in error and corrected within the hour, before any code changed. The comment
-  immediately above `CANDIDATES` (`:23-24`) states the reasoning: *"Non-provider items (Drive secrets, gateway
-  config) are left alone: the CLI never reads them, so touching their partition lists would risk an app
-  re-prompt for no gain."* The partition-list fix exists so **scripts** reading a key through `/usr/bin/security`
-  do not prompt; `DriveClientSecret` is read by the **app**, which created the item and therefore already owns
-  it. Adding it would have risked causing the very re-prompt the finding claimed to prevent. **Do not "fix"
-  this.** Recorded rather than deleted because the wrong version of this finding is plausible enough to be
-  re-derived by the next reader of that `CANDIDATES` line.
-  **(c) The one real residue:** the script's own `:72` comment says the marker is recorded *"so daemon.sh can
-  warn if a NEW key (e.g. an OpenAI key added later) is"* added — and no such warning exists. The marker reads
-  `2026-07-17 | Gemini Anthropic Mistral` while `CANDIDATES` lists five, so a provider key added since is
-  invisible. Have `daemon.sh` compare the marker against the provider accounts actually present and warn on a
-  new one. Also correct the `W21.seed` wording wherever it survives, so the next machine is told to expect ~6
-  prompts, one per credential, not one.
-  | ops/autonomous/fix-keychain-access.sh, daemon.sh | S | med | none
 
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 

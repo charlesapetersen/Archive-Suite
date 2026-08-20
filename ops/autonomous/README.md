@@ -391,10 +391,12 @@ productive session and wakes you.
 ```bash
 ./ops/autonomous/fix-keychain-access.sh    # adds apple:,apple-tool: to each key item's partition list
 ```
-Then launch the app once (`./launch.sh processor`) and click **Always Allow** if *it* prompts, to confirm the
-app still has access under the new partition list. **Re-run after rotating/re-adding any API key** (a
+Then launch the app once (`./launch.sh processor`) and click **Always Allow** for each provider item it prompts
+for; Settings reads credentials eagerly, so a fully unseeded machine can show about six prompts. This confirms
+the app still has access under the new partition list. **Re-run after rotating/re-adding any API key** (a
 re-created item gets a fresh, empty partition list). `daemon.sh status --details` shows whether the fix is
-applied, and if it is *not*, the default view says so under **Needs you** without the flag.
+applied, and if it is *not*, the default view says so under **Needs you** without the flag. Before a start,
+`daemon.sh` also warns if a provider key exists but was added after the marker's recorded account list.
 (Owner chose this over env-key injection to keep keys in the Keychain — no plaintext key file.)
 
 ## Reading `daemon.log` when the run is down (exit reasons, added 2026-07-29)

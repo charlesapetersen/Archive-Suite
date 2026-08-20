@@ -26,9 +26,12 @@ set that proves the behavior. A full run below is ≤ ~40 images unless you opt 
 ./scripts/test-smoke.sh
 ```
 
-The **first** time, macOS pops a Keychain prompt ("`security` wants to use the … keychain") because the
-script reads your saved API keys — click **Always Allow**. That is the "log in with the Keychain
-credentials at the beginning" step; after that it never prompts again and truly runs unattended.
+If `security` prompts for the Keychain, stop the smoke run and first run
+`../ops/autonomous/fix-keychain-access.sh` from `ArchiveProcessor/` (or `./ops/autonomous/fix-keychain-access.sh`
+from the Suite root). Clicking **Always Allow** on that command-line
+prompt does not repair its partition list. After the repair, launch the Processor and allow access for every
+provider item it asks about: Settings reads credentials eagerly, so an unseeded machine can show roughly six
+prompts. Then the smoke run is genuinely unattended; re-run the repair after rotating or adding a provider key.
 
 **What it proves**
 1. **Build** — `xcodegen generate` + `xcodebuild` Debug succeeds, and reports the warning count (should be 0).

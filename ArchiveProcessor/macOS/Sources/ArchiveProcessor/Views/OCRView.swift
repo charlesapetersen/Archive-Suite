@@ -877,7 +877,7 @@ struct OCRView: View {
             }
             .padding(.horizontal, 8)
 
-            Text("macOS may ask you to allow Keychain access the first time you save or retrieve a key. Click \"Always Allow\" to avoid repeated prompts.")
+            Text("macOS may ask you to allow Keychain access for each provider item. Click \"Always Allow\" for every prompt; Settings may read several keys at once.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

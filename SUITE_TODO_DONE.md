@@ -6059,6 +6059,24 @@ explain why not.
   and all-blocked hold attribution. Shell syntax and whitespace checks are clean. | ops/autonomous/{status-digest.sh,
   tests/prove-status.sh,README.md} | S | low | done
 
+- [x] **W21.seed-fu — the Keychain partition repair's marker did not warn when a later-added provider key
+  would make unattended `security` access prompt [S · MED · ops].** **SHIPPED 2026-08-19** (commit whose
+  subject begins `fix(ops,trackers): W21 warn on stale keychain marker`). Provider account names now live in one
+  source-only helper consumed by both the repair and daemon. Before a daemon start, attribute-only Keychain
+  probes compare present provider items with the marker and warn with the exact unmarked accounts. A missing or
+  unreadable marker remains the pre-existing "Keychain not set up" state rather than a false accusation.
+  `DriveClientSecret` stays deliberately excluded: it is app-owned OAuth state, never read by the CLI, and
+  changing its partition list could cause the app prompt this item avoids.
+
+  The repair, smoke guide, app wording, and signing/launch guidance now distinguish the command-line partition
+  list from the app's per-provider **Always Allow** prompts — Settings can ask roughly six times on a fully
+  unseeded machine. **Tier-2 proof:** the new hermetic `prove-keychain-partition.sh` reports **10 passed, 0
+  failed** against a stubbed `security`, including a partial-repair marker guard, later-added OpenAI warning,
+  and Drive exclusion; it is a health-gate step and the gate-report proof remains **29/0**. Shell syntax and
+  a freshly generated Processor Debug build are green; no real Keychain, password, API call, corpus, or GUI was
+  touched. | ops/autonomous/{keychain-provider-accounts.sh,fix-keychain-access.sh,daemon.sh,health-gate.sh,
+  tests/prove-keychain-partition.sh}, ArchiveProcessor/{TESTING.md,scripts/test-smoke.sh,launch.sh} | S | med | done
+
 - [x] **W3.notes-extract-smuggles-a-source-header — a chip-inclusive selection put a raw
   `reader-page`/`zotero-*` header INSIDE an extract, straight past the coercion that exists to forbid it
   [M · MED · invariant].** ✅ **SHIPPED 2026-08-11** (the commit whose subject begins
