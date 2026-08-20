@@ -21,8 +21,9 @@ Two entry points:
   defect `W26.deny` fixed on the Swift side (`ArchiveCore.TagXattr.inspect`). Only the exact
   `No such xattr` signature confirms absence; everything unrecognised is `unreadable`, so a future
   macOS wording change degrades to "I could not look", never to a false "there is nothing here".
-* `disk_tags(path)` -> `(names, label)` — the compatibility shape `tier2_assert.py` has always used,
-  which reports `([], 0)` for both empty and unreadable. New callers should prefer `read_tags`.
+* `disk_tags(path)` -> `(names, label)` — the legacy compatibility shape, which reports `([], 0)` for both
+  empty and unreadable. New callers should prefer `read_tags`; `tier2_assert.py` does, because its verdict
+  depends on being able to distinguish those answers.
 """
 import binascii
 import plistlib
@@ -85,7 +86,8 @@ def disk_tags(path):
     """(tag_names:[str], label_number:int) from the file's Finder-tag xattr; ([],0) if none.
 
     Compatibility shape: collapses ABSENT and UNREADABLE into the same empty answer, which is why
-    `read_tags` exists. Kept because `tier2_assert.py`'s hard checks are written against this shape.
+    `read_tags` exists. Kept for legacy callers; any oracle whose verdict depends on tags must use
+    `read_tags` and reject UNREADABLE.
     """
     names, label, _status = read_tags(path)
     return names, label
@@ -165,7 +167,7 @@ def _self_test():
         check(disk_tags(tagged) == (['1962', '03 March', 'Red', 'Unread'], 6), "disk_tags on tagged file")
         check(disk_tags(untagged) == ([], 0), "disk_tags on untagged file")
         check(disk_tags(os.path.join(d, 'vanished.pdf')) == ([], 0),
-              "disk_tags collapses unreadable to ([],0) as tier2_assert.py expects")
+              "disk_tags collapses unreadable to ([],0) for legacy compatibility")
 
         print("[finder_tags] the mdls differential this module exists to remove")
         mdls = subprocess.run(['mdls', '-name', 'kMDItemUserTags', tagged],

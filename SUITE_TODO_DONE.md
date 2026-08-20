@@ -2320,6 +2320,25 @@ explain why not.
   inside this item. The equivalence proof above is what stands in for it, and it is stronger than a single
   live run: it compares every assertion's text against the predecessor instead of just checking a verdict.
 
+- [x] **W26.oracle-fu1 — `tier2_assert.py` reported a PASS for tags it could not read [S · low · Tier-2 ·
+  money-lane oracle].** Shipped 2026-08-19 (**this commit**). Filed while shipping `W26.oracle`; it was
+  deliberately deferred because that item changed `assert_mac.py`, not this separate Process Files oracle.
+  `tier2_assert.py` called `disk_tags(pdf_path)`, the compatibility shape that collapses *verified no tags*
+  and *could not read the tags* into the same `([], 0)`. Its `mode == 'none'` check therefore passed for a
+  denied, vanished or malformed tag xattr, reporting that the pipeline wrote no tags without being able to
+  read them. That was the W26.deny distinction (`2956f3c`) missing from the one driver that really tags files.
+  **Fix:** consume `read_tags` directly and fail closed on `UNREADABLE` before every mode-specific assertion;
+  a verified-absent xattr remains the valid no-tags result for `none`. The legacy `disk_tags` documentation now
+  names its lossy shape so another oracle cannot adopt it by mistake.
+  **Tier-2 proof:** `test-finder-tags.sh` now adds an isolated, no-key lane using a hand-written `manifest.tsv`
+  and scratch PDF. It forces an unreadable xattr through `none`, `copySource`, and `automatic`, requiring each
+  to fail with the blind-read diagnostic and never report PASS; it also proves `none` still passes for a
+  verified-absent xattr. The test fails against the predecessor: `none`/`copySource` falsely pass, while
+  `automatic` mislabels the blind read as a missing `Unread` tag. **Verified:** Processor Debug build; Python
+  syntax; `test-finder-tags.sh` green, including all three existing xattr/Spotlight lanes and the new oracle
+  lane. Independent adversarial review found no remaining P0–P2 issue. Scratch only; no OCR key, network,
+  paid call, or corpus. | ArchiveProcessor/scripts | S | risk low | Tier-2
+
 - [x] **W26.fsev-fu2 — a first scan against a root that will not open no longer spins "Scanning…" for ever
   [S · low · Tier-1]. ✅ SHIPPED 2026-08-06** — `5b4a8c8` (the deadline) → this commit (5 tests, 4 mutants,
   the lanes, trackers).

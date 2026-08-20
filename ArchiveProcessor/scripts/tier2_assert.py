@@ -13,9 +13,10 @@ Segmentation accuracy vs the LLM is reported as a metric, not a hard gate.
 """
 import sys, re, os, csv, glob, logging
 
-# The Finder-tag xattr read is shared with assert_mac.py — one Spotlight-free reader, one place.
-# (`disk_tags` lived here until W26.oracle; its behaviour is unchanged.)
-from finder_tags import disk_tags
+# The Finder-tag xattr read is shared with assert_mac.py — one Spotlight-free reader, one place. Unlike the
+# legacy compatibility shape, this preserves the distinction between verified-empty and unreadable so the
+# Tier-2 oracle cannot report a blind tag read as a pass.
+from finder_tags import read_tags, UNREADABLE
 
 logging.getLogger("pypdf").setLevel(logging.ERROR)   # silence "Ignoring wrong pointing object" noise
 try:
@@ -88,16 +89,18 @@ def main():
         check(npages == 2, f"{name}: pageCount={npages} (want 2)")
         check(p2.startswith('Extracted text.'), f"{name}: page-2 header not 'Extracted text.' (got {p2[:20]!r})")
 
-        tags, lbl = disk_tags(pdf_path)
-        unread_last = (len(tags) > 0 and tags[-1] == 'Unread')
+        tags, lbl, tag_status = read_tags(pdf_path)
         sidecar = os.path.exists(os.path.splitext(pdf_path)[0] + '.json')
 
-        if mode == 'none':
+        if tag_status == UNREADABLE:
+            check(False, f"{name}: could not READ Finder tags (tag xattr unreadable; refusing a blind pass)")
+        elif mode == 'none':
             check(tags == [], f"{name}: mode=none but tags={tags}")
             check(lbl == 0, f"{name}: mode=none but labelNumber={lbl}")
         elif mode == 'copySource':
             check('Unread' not in tags, f"{name}: copySource must not stamp Unread (tags={tags})")
         elif mode == 'automatic':
+            unread_last = (len(tags) > 0 and tags[-1] == 'Unread')
             check(unread_last, f"{name}: Unread not last (tags={tags})")
             cls = e['classification']
             if cls == 'box_label':
@@ -118,10 +121,10 @@ def main():
                             or t in ('Date Uncertain', 'Unread', 'Red', 'Purple', 'Box', 'Folder'))]
                 if not (2 <= len(subjects) <= 6):
                     warns.append(f"{name}: {len(subjects)} subject tags (spec says 2-6): {subjects}")
-                # A JSON sidecar is written per SEGMENT, on the document_start page only —
-                # continuation pages share it and correctly have none of their own.
-                if e['classification'] == 'document_start':
-                    check(sidecar, f"{name}: document_start missing JSON sidecar")
+        # A JSON sidecar is written per SEGMENT, on the document_start page only — continuation pages share it
+        # and correctly have none of their own. This is independent of whether the tag xattr could be read.
+        if mode == 'automatic' and e['classification'] == 'document_start':
+            check(sidecar, f"{name}: document_start missing JSON sidecar")
 
     if check_exports:
         imgs = [x for x in glob.glob(os.path.join(run_dir, '*'))

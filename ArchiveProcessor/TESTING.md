@@ -71,7 +71,11 @@ clicking**, via a headless hook built into the app (`Capture/ProcessFilesTestDri
   status). **All PDF / Finder-tag / sidecar verification is done externally** by `scripts/tier2_assert.py`
   reading the run dir *after* the app exits. Finder tags come from `scripts/finder_tags.py`, which reads the
   `com.apple.metadata:_kMDItemUserTags` **xattr** directly — shared with `scripts/assert_mac.py` since
-  `W26.oracle`, and verified by `./scripts/test-finder-tags.sh` (~2 s, no key, no app build).
+  `W26.oracle`, and verified by `./scripts/test-finder-tags.sh` (~2 s, no key, no app build). That proof also
+  runs `tier2_assert.py` in every tagging mode against a hand-written scratch manifest whose xattr read is
+  deliberately unreadable: the Process Files oracle must fail closed and name the blind read, never pass as
+  though tags were verified absent, while a verified-absent xattr remains valid for `none`
+  (`W26.oracle-fu1`).
   ⚠️ **The parenthetical that used to sit here — *"reading tags in-process contends with Spotlight and
   wedges"* — is an UNVERIFIED rationale for this whole out-of-process architecture, and is flagged as
   `execution-plans/despotlight.md` §"Site 8" rather than acted on.** No tag read on this path has ever gone

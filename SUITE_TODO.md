@@ -211,7 +211,8 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   `mdfind` polling, and the docs. Measured read-only on the real corpus: **123,028 files / 102,478 PDFs walked
   in 10.15 s single-threaded**, which is why it was safe. The plan's **declined designs** survive in
   `SUITE_TODO_DONE.md` §"Wave 26 — DECLINED DESIGNS"; the completion audit is `./ops/despotlight-audit.sh`.
-  One item remains open — `W26.oracle-fu1`, self-contained under **Wave 26** below.
+  The final follow-up, `W26.oracle-fu1`, shipped 2026-08-19; the completion record is under **Wave 26** in
+  `SUITE_TODO_DONE.md`.
 - `archive-notes/09-gap-closure.md` — **IN PROGRESS (Archive Notes post-ship reconciliation; W9; mixed Tier-1/Tier-2)**:
   closes the plan-vs-build + spec-vs-build deltas found after W0–W8 shipped (docs/tracker sync, wire built-but-dead
   features, re-arm safety-net lint/smoke tooling, secondary UI polish), then a **Phase-E verification review** that
@@ -438,20 +439,6 @@ second scope nothing could ever stop. 763 + 189 Notes tests, Release clean, 0 ne
 
 ✅ **W26.notesabsence-fu2 — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.**
 
-- [ ] **W26.oracle-fu1 — `tier2_assert.py` reports a PASS for tags it could not read [S · low · Tier-2 ·
-  money-lane oracle].** Filed 2026-08-06 while shipping `W26.oracle`; **pre-existing**, and deliberately not
-  fixed there (one item per change — the swap was `assert_mac.py`'s). `tier2_assert.py` calls
-  `disk_tags(pdf_path)`, the compatibility shape that collapses *verified no tags* and *could not read the
-  tags* into the same `([], 0)`. Its `mode == 'none'` hard check is `check(tags == [], …)` — so a denied,
-  vanished or malformed tag xattr on a driver output **passes** the assertion that the pipeline wrote no
-  tags. That is the W26.deny defect (`2956f3c`) surviving in the Python oracle for the one lane that really
-  tags files. Fix: call `read_tags` and fail closed on `unreadable` in every mode, not just `none`.
-  ⚠️ **It needs neither a key nor the paid lane, contrary to how it looks:** `tier2_assert.py` is a pure
-  function of a run dir, so a `mktemp` dir holding a hand-written `manifest.tsv` plus tagged scratch files
-  drives every branch for free — that is exactly how `W26.oracle` proved its own change byte-identical. Do
-  not defer this waiting for `test-tier2.sh` (which costs money and, on this machine, cannot run at all —
-  see the pypdf note in the Daemon Report). **Test:** a run dir whose output PDF is `0o000` must FAIL with a
-  message naming the unreadable read, in `none` and `automatic` alike.
 ✅ **W26.docs — SHIPPED 2026-08-07 (this commit); full entry in `SUITE_TODO_DONE.md`.**
 
 ✅ **W26.docs-fu1 — SHIPPED 2026-08-09 (this commit); full entry in `SUITE_TODO_DONE.md`.** One of the two

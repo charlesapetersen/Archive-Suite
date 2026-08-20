@@ -1,9 +1,10 @@
 #!/bin/bash
 # test-finder-tags.sh — the Spotlight-free Finder-tag read, and the E2E oracle that depends on it.
 #
-# Two lanes, no app build, no key, no cost, no network:
+# Three lanes, no app build, no key, no cost, no network:
 #   1. `finder_tags.py --self-test`  — every status branch of the reader against a scratch fixture.
 #   2. `assert_mac.py` end-to-end    — a TESTOUT whose expected year exists ONLY as a Finder tag.
+#   3. `tier2_assert.py`             — every Process Files tagging mode fails closed when its tag read is blind.
 #
 # Lane 2 is the point. It builds the incident (Wave 26 · W26.oracle) inside the test lane: a fixture
 # under /tmp that Spotlight has never indexed, tagged on disk. Four assertions, and each one is there
@@ -118,3 +119,78 @@ PY
 
 echo
 echo "RESULT: PASS — reader self-test + oracle differential both green"
+
+echo
+echo "=== lane 3: tier2_assert.py rejects unreadable tags in every mode ==="
+python3 - "$HERE" <<'PY' || exit 1
+import contextlib, io, os, shutil, sys, tempfile
+
+here = sys.argv[1]
+sys.path.insert(0, here)
+import tier2_assert
+
+fails = []
+
+
+def check(cond, msg):
+    print(("  ok   " if cond else "  FAIL ") + msg)
+    if not cond:
+        fails.append(msg)
+
+
+root = tempfile.mkdtemp(prefix='ap-tier2-assert-oracletest-', dir='/tmp')
+old_argv, old_facts, old_pdf_reader = (sys.argv, tier2_assert.pdf_facts, tier2_assert.PdfReader)
+try:
+    pdf = os.path.join(root, 'doc.pdf')
+    with open(pdf, 'wb') as f:
+        f.write(b'%PDF-1.4 scratch fixture\n')
+    with open(os.path.join(root, 'doc.json'), 'w') as f:
+        f.write('{}\n')
+    with open(os.path.join(root, 'manifest.tsv'), 'w') as f:
+        f.write('# provider scratch\n')
+        f.write('doc.pdf\tdocument_start\tsucceeded\n')
+
+    # The PDF structure is separately asserted by pypdf in production. This scratch test isolates the tag
+    # oracle: a valid two-page/text answer makes a failure prove that `read_tags` is fail-closed, not PDF noise.
+    tier2_assert.PdfReader = object()
+    tier2_assert.pdf_facts = lambda _path: (2, 'Extracted text. scratch')
+
+    # This is a real unreadable output fixture, not merely a mocked status:
+    # finder_tags.read_tags must return UNREADABLE for the output xattr when
+    # the PDF is mode 000.
+    os.chmod(pdf, 0o000)
+
+    for mode in ('none', 'copySource', 'automatic'):
+        sys.argv = ['tier2_assert.py', root, mode]
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = tier2_assert.main()
+        text = out.getvalue()
+        check(rc == 1, f'{mode}: unreadable tag read -> FAIL (rc={rc})')
+        check('could not READ Finder tags' in text, f'{mode}: failure names the unreadable tag read')
+        check('RESULT: PASS' not in text, f'{mode}: never reports a blind PASS')
+        if mode == 'automatic':
+            check('Unread not last' not in text,
+                  'automatic: does not misreport a blind read as a missing Unread tag')
+
+    # The converse is load-bearing: an xattr that is demonstrably absent is the valid no-tags result for
+    # PROCESSFILES_TAGGING=none, not an unreadable failure with a more convenient name.
+    os.chmod(pdf, 0o644)
+    sys.argv = ['tier2_assert.py', root, 'none']
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        rc = tier2_assert.main()
+    check(rc == 0, f'none: verified-absent tag xattr -> PASS (rc={rc})')
+    check('RESULT: PASS' in out.getvalue(), 'none: distinguishes verified absence from unreadable')
+finally:
+    sys.argv = old_argv
+    tier2_assert.pdf_facts, tier2_assert.PdfReader = old_facts, old_pdf_reader
+    if os.path.exists(pdf):
+        os.chmod(pdf, 0o644)
+    shutil.rmtree(root, ignore_errors=True)
+
+if fails:
+    print(f'\nRESULT: FAIL ({len(fails)} failures)')
+    sys.exit(1)
+print('\nRESULT: PASS — tier2_assert rejects every blind tag read')
+PY
