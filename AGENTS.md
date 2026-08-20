@@ -105,8 +105,9 @@ Re-derive against current `main` — do not merge it. Everything else in it is p
 run-config work was re-implemented as `W16.cfg1`–`cfg5`), but "probably" is why it was kept.
 
 **7. Run the gate, don't re-read the list — `ops/autonomous/check-handoff.sh`.**
-Items 1–6 are a prose checklist, and a checklist is not a gate. One read-only command checks all of it and
-prints what the daemon would take next. **A clean run is the definition of "handed off".** Not yet a
+Items 1–6 are a prose checklist, and a checklist is not a gate. One command checks all of it, fetches remote
+refs, edits no worktree, and prints what the daemon would take next. **A clean run is the definition of "handed
+off".** Not yet a
 `health-gate.sh` step — that is `W31.handoff-gate`.
 
 **⚠️ The mirroring failure is NOT an external-agent problem.** On 2026-08-13, 27 open `SUITE_TODO` items had

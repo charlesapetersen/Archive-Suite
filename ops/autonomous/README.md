@@ -492,6 +492,24 @@ is that drift is silent**, so `health-gate.sh` now runs `check-tracker-sync.sh` 
 - It doubles as the **equivalence check for the tracker consolidation** — "do both sources report the same
   item state?" is exactly the assertion a strangler migration needs while both lists still exist.
 
+### Final handoff — `check-handoff.sh` (direct, before declaring a batch done)
+
+`check-handoff.sh` is the final, stricter check for the external-agent handoff in root `AGENTS.md`; unlike the
+WARN-only tracker check, a failure means the batch is **not** handed off. It does not edit a working tree or the
+plan, but it fetches remote refs so it can verify publication.
+
+- When run from a worktree, it reads `SUITE_TODO.md` from **that checkout** but the ignored plan from the
+  **primary checkout**. That catches an uncommitted follow-up that was filed in the worktree but never mirrored
+  into the primary plan — the moment the old primary-only comparison falsely called clean.
+- It expects at least one parsable open item by default. A blank or malformed tracker therefore fails rather
+  than yielding an empty-set success. Only an intentional final closure may use `HANDOFF_EXPECT_OPEN=0`.
+- A fresh `origin/main` comparison is required by default. `HANDOFF_OFFLINE=1` is the explicit, visibly warned
+  exception for an intentional offline handoff; it does not pretend publication was checked.
+- An exemption consumes one matching item only. A second open bullet with the same first word is left loud;
+  it must receive a real, mirrorable tag instead of silently inheriting the first item's exception.
+- Run it from the checkout being handed off: `./ops/autonomous/check-handoff.sh`. It exits `0` only when clean,
+  `1` for a failed handoff, and `2` for invalid input or override values.
+
 ### Ticked stubs — `check-todo-stubs.sh` (WARN-only in the gate, W26.donecount 2026-08-10)
 
 `SUITE_TODO.md` holds **OPEN items only**; shipping MOVES the whole entry to `SUITE_TODO_DONE.md`. A `[x]` left

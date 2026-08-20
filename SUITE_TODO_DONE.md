@@ -59,6 +59,26 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   the intended Tier-2 cost.
 
 
+## Autonomous handoff integrity (owner decision, 2026-08-19)
+
+- [x] **`W31.handoff-fp` — three ways `check-handoff.sh` could report CLEAN while something was wrong
+  [S–M · MED · ops].** Shipped 2026-08-19 (**this commit**). The user chose the conservative defaults: an
+  offline handoff fails unless `HANDOFF_OFFLINE=1` explicitly accepts the missing remote comparison; zero
+  parsable open items fails unless `HANDOFF_EXPECT_OPEN=0` explicitly declares an intentional final closure.
+  **Fix:** Step 3 now compares the current checkout's `SUITE_TODO.md` with the primary-only ignored plan, and
+  labels both sources, so an uncommitted `-fu` filing is visible instead of being hidden by the old primary
+  tracker. It requires at least one parsed open item by default, and validates both override values rather than
+  silently accepting a typo. Step 2 treats a failed fetch or absent `origin/main` as a failed remote verification
+  by default; the offline escape is a warning that names exactly what was not checked. Exemptions now consume one
+  matching first word: a second `Import…` bullet stays missing instead of silently inheriting the first item's
+  exception.
+  **Functional proof:** a disposable primary/worktree pair and local bare remote exercised all four regressions:
+  matching sources pass; an unmirrored worktree filing fails and names its tag; a duplicate exempt first word
+  fails; blank tracker default/override/invalid override branches are distinct; failed fetch fails by default
+  and the explicit offline exception remains visibly warned (**14/0**). `bash -n` and diff validation green.
+  The README and root handoff rule now document the two-source check, explicit overrides, one-item exemptions,
+  and the fetch side effect. | ops/autonomous/check-handoff.sh, ops/autonomous/README.md, AGENTS.md | S–M | med
+
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 
 - [x] **`W30.ceiling` — `compact-plan.sh`'s three region budgets did not add up to the plan's file budget, so

@@ -15,17 +15,22 @@
 # belongs to whoever is at the keyboard — daemon, interactive session, or Codex — which is exactly why this
 # script takes no argument about who you are.
 #
-# Read-only: it runs no build, writes nothing, and touches no state. Safe to run at any time, including
-# while the daemon is running. It is deliberately NOT wired into `health-gate.sh` yet — that is
-# `W31.handoff-gate` in `SUITE_TODO.md`, since a new gate step is Tier-2 autonomous-setup discipline.
+# Read-only with respect to worktrees: it runs no build and edits no tracked file or plan. It does fetch remote
+# refs to verify the published state. Safe to run at any time, including while the daemon is running. It is
+# deliberately NOT wired into `health-gate.sh` yet — that is `W31.handoff-gate` in `SUITE_TODO.md`, since a
+# new gate step is Tier-2 autonomous-setup discipline.
 #
 # Usage:  ./ops/autonomous/check-handoff.sh            # from anywhere in the repo or a worktree
+#         HANDOFF_OFFLINE=1 ./ops/autonomous/check-handoff.sh
+#         HANDOFF_EXPECT_OPEN=0 ./ops/autonomous/check-handoff.sh  # intentional final closure only
 # Exit:   0 = handed off cleanly · 1 = at least one FAIL · 2 = cannot run (bad repo/plan)
 set -uo pipefail
 
 # Resolve the PRIMARY checkout from wherever we are — a worktree's common dir points at it. Never write a
 # bare `cd "$REPO"`: with REPO unset that is `cd ""`, which bash and zsh treat as a silent no-op (rc 0).
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "check-handoff: not inside a git repo" >&2; exit 2; }
+TREE="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -d "$TREE" ] || { echo "check-handoff: cannot resolve the checkout being checked" >&2; exit 2; }
 # `--git-common-dir` answers RELATIVELY (`.git`) when you are standing in the primary checkout and
 # absolutely when you are in a worktree, so `dirname` alone yields `.` in the primary case. `git worktree
 # list` always answers absolutely, and step 1 identifies the primary by comparing against this value — so
@@ -33,7 +38,19 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "check-handoff: not inside a g
 ROOT="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" 2>/dev/null && pwd)"
 [ -d "$ROOT" ] || { echo "check-handoff: cannot resolve the primary checkout" >&2; exit 2; }
 PLAN="${AUTONOMOUS_PLAN:-$ROOT/.maintenance/AUTONOMOUS_PLAN.md}"
-TODO="$ROOT/SUITE_TODO.md"
+# The plan is deliberately primary-only (it is ignored), but a handoff from a worktree must inspect THAT
+# checkout's uncommitted SUITE_TODO edit. Otherwise the exact moment a follow-up is filed but not mirrored
+# reads green because the primary still has the old tracker.
+TODO="${AUTONOMOUS_TODO:-$TREE/SUITE_TODO.md}"
+HANDOFF_EXPECT_OPEN="${HANDOFF_EXPECT_OPEN:-1}"
+case "$HANDOFF_EXPECT_OPEN" in
+  ''|*[!0-9]*) echo "check-handoff: HANDOFF_EXPECT_OPEN must be a non-negative integer (got '$HANDOFF_EXPECT_OPEN')" >&2; exit 2 ;;
+esac
+HANDOFF_OFFLINE="${HANDOFF_OFFLINE:-0}"
+case "$HANDOFF_OFFLINE" in
+  0|1) ;;
+  *) echo "check-handoff: HANDOFF_OFFLINE must be 0 or 1 (got '$HANDOFF_OFFLINE')" >&2; exit 2 ;;
+esac
 # NB: SUITE_TODO_DONE.md is deliberately NOT read here, unlike in check-tracker-sync.sh. Step 3 asks only
 # "is every OPEN item visible in the plan", and a shipped item is not open — so the archive cannot answer it.
 # (check-tracker-sync.sh must read the archive for a different question: whether the two files AGREE on state.)
@@ -45,6 +62,7 @@ warn() { printf '  \033[33m!\033[0m %s\n' "$*"; warns=$((warns + 1)); }
 head_() { printf '\n\033[1m── %s\033[0m\n' "$*"; }
 
 echo "check-handoff: primary checkout $ROOT"
+[ "$TREE" = "$ROOT" ] || echo "check-handoff: tracker checkout $TREE (plan remains primary-only)"
 
 # ---------------------------------------------------------------------------------------------------
 head_ "1. no worktree is holding uncommitted work"
@@ -94,14 +112,21 @@ head_ "2. the PRIMARY checkout is level with origin/main"
 # The daemon reads the plan from the primary checkout, measures review deltas against ITS HEAD, and
 # `daemon.sh` installs the daemon scripts from ITS working tree — so a lagging primary silently
 # re-installs stale daemon scripts the next time the owner starts it.
-git -C "$ROOT" fetch origin --quiet 2>/dev/null || warn "could not fetch origin (offline?) — comparison may be stale"
-if counts="$(git -C "$ROOT" rev-list --left-right --count HEAD...origin/main 2>/dev/null)"; then
+remote_ready=0
+if git -C "$ROOT" fetch origin --quiet 2>/dev/null && git -C "$ROOT" rev-parse --verify -q origin/main >/dev/null 2>&1; then
+  remote_ready=1
+elif [ "$HANDOFF_OFFLINE" = 1 ]; then
+  warn "could not fetch or resolve origin/main — HANDOFF_OFFLINE=1 accepts no remote comparison"
+else
+  fail "could not fetch and resolve origin/main — cannot verify the primary is published (set HANDOFF_OFFLINE=1 only for an intentional offline handoff)"
+fi
+if [ "$remote_ready" = 1 ] && counts="$(git -C "$ROOT" rev-list --left-right --count HEAD...origin/main 2>/dev/null)"; then
   ahead="$(echo "$counts" | cut -f1)"; behind="$(echo "$counts" | cut -f2)"
   [ "$behind" = 0 ] || fail "primary is $behind commit(s) BEHIND origin/main — run: git -C \"\$primary\" merge --ff-only origin/main"
   [ "$ahead"  = 0 ] || fail "primary is $ahead commit(s) AHEAD of origin/main (unpushed)"
   [ "$behind" = 0 ] && [ "$ahead" = 0 ] && ok "primary == origin/main"
-else
-  warn "no origin/main to compare against"
+elif [ "$remote_ready" = 1 ]; then
+  fail "cannot compare primary HEAD with origin/main — judge neither as published"
 fi
 
 if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then
@@ -133,7 +158,10 @@ else
         sub(/^`/, "", t)
         if (match(t, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) {
           id = substr(t, 1, RLENGTH)
-          if (!(id in seen)) { seen[id] = 1; print id "\t" st }
+          # Preserve duplicate first words. The exemption file authorizes one specific item, not every later
+          # bullet that happens to begin the same way; comm below consumes that one exemption and leaves a
+          # second unmatched occurrence loud instead of silently applying first-occurrence-wins.
+          print id "\t" st
         }
       }
       # W32.fence-order — fence rule FIRST, matching next-queue-item.sh (and check-tracker-sync.sh, fixed
@@ -149,8 +177,16 @@ else
     ' "$1"
   }
   P="$(mktemp)"; T="$(mktemp)"; trap 'rm -f "$P" "$T"' EXIT
-  items "$PLAN" 1 | cut -f1 | sort -u > "$P"
-  items "$TODO" 0 | awk -F'\t' '$2==" "{print $1}' | sort -u > "$T"
+  # Do not de-duplicate here. `comm`'s multiplicity means a real exemption consumes exactly one matching
+  # open item; a second bullet starting with the same first word remains missing and cannot be swallowed.
+  items "$PLAN" 1 | cut -f1 | sort > "$P"
+  items "$TODO" 0 | awk -F'\t' '$2==" "{print $1}' | sort > "$T"
+  open_count="$(wc -l < "$T" | tr -d '[:space:]')"
+  open_floor_ok=1
+  if [ "$open_count" -lt "$HANDOFF_EXPECT_OPEN" ]; then
+    fail "only $open_count parsable open SUITE_TODO item(s) in $TODO (need >= $HANDOFF_EXPECT_OPEN) — an empty or unparseable tracker cannot be handed off; set HANDOFF_EXPECT_OPEN=0 only for an intentional final closure"
+    open_floor_ok=0
+  fi
   # Some items are deliberately in NEITHER region because their own spec forbids both — out of scope until a
   # qualitative bar is met, which is NOT the same as awaiting an owner gate (parking those in HOLD QUEUE
   # mislabels them and makes the "held back" count lie). Those tags live in handoff-exempt.txt with a citation.
@@ -174,7 +210,7 @@ else
     printf '%s\n' "$missing" | sed 's/^/       /'
     echo "       → mirror the daemon-buildable ones into '## WORK QUEUE' as one-liners with BYTE-IDENTICAL"
     echo "         tags (so blocked-on resolves), and park the owner-gated ones in '## HOLD QUEUE'."
-  else
+  elif [ "$open_floor_ok" = 1 ]; then
     ok "every open SUITE_TODO item has a checkbox line in the plan"
   fi
 fi
