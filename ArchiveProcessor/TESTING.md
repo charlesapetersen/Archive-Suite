@@ -258,6 +258,13 @@ Run one directly: `ArchiveProcessor/scripts/<name>.sh`. They are the right home 
 not need pixels — which, given the Processor still has **no test target at all** (`project.yml` declares
 neither a unit nor a UITest bundle — SUITE_TODO `W21.vmgui-d`), is where nearly all of its coverage lives.
 
+The four long-running report drivers (`test-recovery.sh`, `test-manifest-persistence.sh`,
+`test-merge-safety.sh`, and `test-batch-resume.sh`) share one bounded report waiter: 180 seconds for the
+three former 60-second waits, and the batch-resume driver's existing 300 seconds for its 80-Stop sweep. Each
+logs every completed check, so a missing report now identifies the elapsed time, completed-check count, and
+last check seen; an early app exit is reported separately from a true timeout. This is diagnostic-only: their
+existing scratch, key-free, no-network execution remains unchanged.
+
 **Live Capture data safety**
 - **`test-recovery.sh`** — the DATA-SAFETY invariants: confirm-before-delete, keep-on-failed-backup, and the
   recovered-photo hold. 45 checks as of 2026-07-31.

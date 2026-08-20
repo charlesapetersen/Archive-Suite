@@ -5,6 +5,7 @@
 # (W16.bat2-fu — BatchCancelWiringContract: the real cancel() with both cancel-path seams stubbed).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source "$PWD/scripts/test-report-wait.sh"
 
 bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
 [ -x "$bin" ] || { echo "ArchiveProcessor is not built" >&2; exit 1; }
@@ -29,8 +30,7 @@ trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
 # W16.bat2-fu2 that is the empty redirected state directory above rather than the operator's own, so the
 # suite no longer slows down (or times out) in proportion to how large a real interrupted run is. The
 # generous wait is kept anyway: a timeout here reads as a failed contract, and buying that certainty costs
-# nothing on a green run.
-for _ in $(seq 1 300); do [ -f "$report" ] && break; sleep 1; done
-if [ ! -f "$report" ]; then tail -80 "$log" >&2; exit 1; fi
+# nothing on a green run. The shared waiter also says how far the driver got before it stopped.
+wait_for_test_report "$report" "$log" "$pid" "Batch-resume" "BATCHRESUME" 300
 cat "$report"
 grep -q '^ALL PASS$' "$report"

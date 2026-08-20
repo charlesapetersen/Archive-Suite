@@ -1278,34 +1278,6 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   `Test Files/Herrnstein` fallback exist, so section [3] needs no change. Don't "fix" that half. The owner has to
   run the script once interactively because section [2] `open`s the app (login-Keychain modal → see W21.seed).
   | files: ArchiveProcessor/scripts/test-smoke.sh | S | low | none
-- [ ] **W21.recovery-timeout — `test-recovery.sh`'s 60 s wait is running out of headroom [S · LOW · ops].**
-  Filed 2026-08-03 from `W3.cap-r3-fu2`. The script polls 60× 1 s for the driver's report and then declares a
-  timeout; the green suite now takes **~28 s** and has grown 89 → 113 → 127 → 133 checks in four sessions,
-  several of the newer sections holding a real 10 s settle. Nothing is wrong today, but the margin is halved
-  and the failure mode is bad: a spurious timeout looks exactly like a real hang, and either way it prints no
-  verdict at all (that ambiguity is exactly what left `fu2`'s M4 mutant undiagnosed).
-  🔺 **NO LONGER HYPOTHETICAL — measured 2026-08-04 by `W3.cap-r3-fu11`, and it cost that item a round.** Its
-  mutant pass observed the ALL-PASS suite at **15 s** (163 checks) but **81 s and 79 s on two of the five
-  mutants** (M1 and M3): a Clear that gets through strands the regeneration, and every downstream settle then
-  runs to its timeout. So a REAL regression of a data-safety guard does not print `FAIL: …` — it blows the
-  60 s wait and prints "Recovery data-safety test timed out", which reads as a hang. Worse, the first mutant
-  pass read that missing report as **0 RED**, i.e. as the guard being untested, which is the exact wrong
-  conclusion. The pattern generalises: the failing case is systematically SLOWER than the passing one, so the
-  wait is calibrated against precisely the wrong run.
-  🔺 **A SECOND, INDEPENDENT WAY IT BLOWS — measured 2026-08-04 by `W3.cap-r3-fu9`: parasitic CPU load.** The
-  same green suite (170 checks) ran **73 s → timeout** and then **19 s → ALL PASS** on the same commit, minutes
-  apart; the only difference was 8 orphaned busy-loop shells from an earlier session's load test eating ~1.3
-  cores (killed in between — see that session's Daemon Report note). So the wait is calibrated not just against
-  the wrong RUN but against the wrong MACHINE STATE, and an iteration-counted `Task.sleep` settle stretches ~6×
-  under load, which no amount of check-level care fixes (that item's own new section had to switch its negative
-  wait to a wall-clock DEADLINE for the same reason). It also cost a debugging round: the first failing run
-  looked like a logic bug in the new section. **Whatever the fix, make the timeout message name what it
-  measured** (elapsed, checks completed, last check seen) so the next reader is not left choosing between
-  "hang", "slow machine" and "real FAIL". Fix is cheap — raise
-  the wait (180 s), or better, poll for process EXIT as well as the report file so a genuine crash/hang is
-  distinguished from "not finished yet" in the message. Same shape in the sibling drivers
-  (`test-manifest-persistence.sh`, `test-merge-safety.sh`, `test-batch-resume.sh`), so fix the pattern once
-  and apply it. | files: ArchiveProcessor/scripts/test-*.sh | S | low | none
 - [ ] **W21.warn — 2 pre-existing non-Sendable `DispatchWorkItem` warnings in `Net/CaptureServer.swift` [S · LOW].**
   `TimeoutHandle(DispatchWorkItem { [weak self, weak conn] … })` at `CaptureServer.swift:151` captures a
   non-`Sendable` `DispatchWorkItem` in a `@Sendable` context; surfaces only on a full clean build. ⚠️ The file

@@ -24,6 +24,7 @@ enum MergeSafetyTestDriver {
         var results: [String] = []
         func check(_ name: String, _ condition: Bool) {
             results.append("\(condition ? "PASS" : "FAIL"): \(name)")
+            NSLog("MERGESAFETY \(condition ? "PASS" : "FAIL"): \(name)")
         }
         func writePDF(_ url: URL) -> Bool {
             var mediaBox = CGRect(x: 0, y: 0, width: 72, height: 72)

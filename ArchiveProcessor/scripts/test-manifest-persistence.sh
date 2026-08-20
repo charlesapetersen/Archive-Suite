@@ -2,6 +2,7 @@
 # Headless synthetic regression for Live Capture manifest durability and completion acknowledgements.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source "$PWD/scripts/test-report-wait.sh"
 
 bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
 [ -x "$bin" ] || { echo "ArchiveProcessor is not built" >&2; exit 1; }
@@ -15,7 +16,6 @@ ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
 
-for _ in $(seq 1 60); do [ -f "$report" ] && break; sleep 1; done
-if [ ! -f "$report" ]; then tail -40 "$log" >&2; exit 1; fi
+wait_for_test_report "$report" "$log" "$pid" "Manifest persistence" "MANIFESTTEST"
 cat "$report"
 grep -q '^ALL PASS$' "$report"

@@ -5958,6 +5958,27 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **W21.recovery-timeout — `test-recovery.sh`'s 60 s wait was running out of headroom [S · LOW · ops].**
+  **SHIPPED 2026-08-19** (commit whose subject begins
+  `fix(processor,trackers): W21 recovery timeout diagnostics`). Filed 2026-08-03 from `W3.cap-r3-fu2`. The
+  original script polled 60× 1 s for the driver's final report; a green suite had grown 89 → 113 → 127 → 133
+  checks, while real mutants took 79–81 s and parasitic CPU load pushed a green run to 73 s. A missing final
+  report therefore read identically for a slow machine, an assertion failure that exhausted its settles, and a
+  real hang — the ambiguity that misdiagnosed `fu2`'s M4 mutant.
+
+  **Fix:** the four report-only drivers share `scripts/test-report-wait.sh`, which checks for the final report,
+  observes an early app exit, and on either failure reports elapsed time, completed checks, and the last
+  `NSLog` progress check seen. Recovery, manifest persistence, and merge safety now have 180 seconds; the
+  batch-resume driver retains its justified 300 seconds for the 80-Stop sweep. `MergeSafetyTestDriver` now
+  emits the same per-check progress signal as the other three. The shared routine changes diagnostics only;
+  every driver retains its existing key-free, no-network scratch isolation.
+
+  **Verified:** forced no-report timeout and early-exit probes each reported the measured elapsed time, one
+  completed check, and the correct last check. Debug build green; all four real headless drivers reported
+  `ALL PASS`; independent adversarial review caught and then confirmed preservation of batch-resume's 300 s
+  allowance. | ArchiveProcessor/scripts/test-report-wait.sh, test-{recovery,manifest-persistence,merge-safety,batch-resume}.sh,
+  Capture/MergeSafetyTestDriver.swift, ArchiveProcessor/TESTING.md | S | low | done
+
 - [x] **W3.notes-extract-smuggles-a-source-header — a chip-inclusive selection put a raw
   `reader-page`/`zotero-*` header INSIDE an extract, straight past the coercion that exists to forbid it
   [M · MED · invariant].** ✅ **SHIPPED 2026-08-11** (the commit whose subject begins
