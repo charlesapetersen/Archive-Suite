@@ -49,7 +49,16 @@ class NotesFixtureUITestCase: XCTestCase {
 
     var app: XCUIApplication!
 
-    override func setUpWithError() throws {
+    /// Run one test's scratch-fixture lifecycle from its `@MainActor` test method. XCTest's macOS lifecycle
+    /// overrides are nonisolated in the Swift 6 SDK, so putting this UI work in `setUpWithError` would
+    /// weaken its actor checking. `defer` always shuts down the scratch app after the test body returns.
+    func withFixture(_ body: () throws -> Void) throws {
+        try setUpOnMainActor()
+        defer { tearDownOnMainActor() }
+        try body()
+    }
+
+    private func setUpOnMainActor() throws {
         continueAfterFailure = false
         try XCTSkipUnless(
             FileManager.default.fileExists(atPath: Self.fixturePath),
@@ -83,12 +92,10 @@ class NotesFixtureUITestCase: XCTestCase {
         // the container remembers, and no matter which test leaked. `openExtractsWindow()` re-opens it via
         // Window ▸ Extracts when G12/G14 need it, so nothing loses coverage.
         //
-        // Written INLINE, on locals, rather than as a helper method: `setUpWithError` is nonisolated, so
-        // calling an instance method from it is `sending 'self' risks causing data races` — a hard error,
-        // where touching these `@MainActor` XCUITest members directly is only one of the 22 warnings already
-        // tracked as `W23.notes-uitest-warn`. Best-effort by design — no assertion. This runs before EVERY
-        // test, so asserting here would turn an unrelated window hiccup into a suite-wide failure; if the
-        // close does not take, the test that needs one window fails on its own terms with its own message.
+        // Written INLINE, on locals, to keep this best-effort precondition beside the test lifecycle that
+        // owns it — no assertion. This runs before EVERY test, so asserting here would turn an unrelated
+        // window hiccup into a suite-wide failure; if the close does not take, the test that needs one window
+        // fails on its own terms with its own message.
         // 8 s, not 1 s: the secondary scene comes up a BEAT AFTER the main one, so a 1 s sample returned
         // false, skipped the close, and the window then opened anyway — G0 still failed on two matches.
         // On a fresh container (the norm, since `notes:prerun` wipes it) this returns almost immediately
@@ -116,21 +123,18 @@ class NotesFixtureUITestCase: XCTestCase {
         // items/**/*.md — not Spotlight), so wait for a KNOWN seeded row to appear. This is the
         // reliable gate; the hidden `an.status.indexReady` probe (§3.4) is verified separately by
         // `waitForIndexReady` (its 1×1 clear-color queryability was flagged UNVERIFIED at W8-S7).
-        // Scoped to the main window like every other lookup — but through the LOCAL `window` above, not the
-        // `mainWindow` property: `setUpWithError` is nonisolated, so referencing an instance member here is
-        // `sending 'self' risks causing data races`. That is the same trap that killed the first version of
-        // this one-window work; the local costs nothing and sidesteps it entirely.
+        // Scoped to the main window like every other lookup — through the LOCAL `window` above, which keeps
+        // this readiness gate bound to the primary window captured immediately after launch.
         let seed = window.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"]
         XCTAssertTrue(seed.waitForExistence(timeout: 25), "a seeded note row should populate the list")
     }
 
-    override func tearDownWithError() throws {
+    private func tearDownOnMainActor() {
         app?.terminate()
         app = nil
     }
 
-    // NOTE: the "one window before every test" precondition lives INLINE in `setUpWithError` above, not in a
-    // helper here — a nonisolated `setUp` cannot call an instance method without `sending 'self'`. The
+    // NOTE: the "one window before every test" precondition lives INLINE in `setUpOnMainActor` above. The
     // subclass keeps `closeExtractsWindow(_:)` for its own end-of-test tidy-up (W21.vmgui-g14-leak).
 
     // MARK: - Fixture lifecycle
@@ -515,6 +519,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// in the a11y tree and flips to a non-empty token once the initial index build settles, so a later
     /// FTS/relevance check can safely gate on it.
     func testG0_IndexReadyProbeResolvesAfterInitialBuild() throws {
+        try withFixture { try runG0_IndexReadyProbeResolvesAfterInitialBuild() }
+    }
+
+    private func runG0_IndexReadyProbeResolvesAfterInitialBuild() throws {
         XCTAssertTrue(indexReadyProbe.waitForExistence(timeout: 10),
                       "the an.status.indexReady probe should be present in the accessibility tree")
         XCTAssertTrue(waitForIndexReady(timeout: 30),
@@ -523,6 +531,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
     /// G1 — Create a note (⌘N / the New menu) → a new `items/<uuid>/<Title>.md` appears on disk.
     func testG1_CreateNoteWritesNewItemFile() throws {
+        try withFixture { try runG1_CreateNoteWritesNewItemFile() }
+    }
+
+    private func runG1_CreateNoteWritesNewItemFile() throws {
         let before = itemDirs()
         XCTAssertGreaterThanOrEqual(before.count, 4, "fixture should have its seeded notes")
 
@@ -561,6 +573,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// asterisks, in styled mode) — since the toggle itself is a stateless icon button. Uses the plain
     /// note (no source-block chip): a chip's durable-link/thumbnail render is a separate check (G5/G6).
     func testG3_RawMarkdownToggleShowsSourceAndIsLossless() throws {
+        try withFixture { try runG3_RawMarkdownToggleShowsSourceAndIsLossless() }
+    }
+
+    private func runG3_RawMarkdownToggleShowsSourceAndIsLossless() throws {
         let uuid = Self.idPlain
         let bodyBefore = noteBody(uuid: uuid)
         XCTAssertNotNil(bodyBefore, "should read the plain note body off disk")
@@ -630,6 +646,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// shortly after); the coordinator flushes the `![](…)` write-back so the reference is on disk at once.
     /// A before-snapshot of `assets/` tolerates a dirty fixture. The mutated note is wiped by the next rebuild.
     func testG4_PasteImageWritesAssetAndInlineReference() throws {
+        try withFixture { try runG4_PasteImageWritesAssetAndInlineReference() }
+    }
+
+    private func runG4_PasteImageWritesAssetAndInlineReference() throws {
         let uuid = Self.idPlain
         guard let png = Self.makePNGData() else {
             return XCTFail("should build PNG bytes for the pasteboard")
@@ -686,6 +706,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// styled first. The added block is additive; the note is left dirty and wiped by the next pre-run
     /// fixture rebuild. Disk-asserted, so it's independent of the org-graph / INDEX-DB caveat.
     func testG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock() throws {
+        try withFixture { try runG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock() }
+    }
+
+    private func runG5_PasteArchiveLinkAsSourceBlockWritesReaderPageBlock() throws {
         let uuid = Self.idZotero
         let bodyBefore = rawMarkdown(inItemDir: uuid) ?? ""
         XCTAssertFalse(bodyBefore.isEmpty, "should read the Zotero note off disk")
@@ -768,6 +792,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// disk (the runner can't delete under `/Users/`) and wiped by the next pre-run fixture rebuild — the
     /// assertion tolerates a dirty fixture by subtracting the pre-test `itemDirs()` snapshot.
     func testG9_CreateExtractFromSelectionWritesExtractItem() throws {
+        try withFixture { try runG9_CreateExtractFromSelectionWritesExtractItem() }
+    }
+
+    private func runG9_CreateExtractFromSelectionWritesExtractItem() throws {
         let before = itemDirs()
         XCTAssertGreaterThanOrEqual(before.count, 4, "fixture should have its seeded notes")
 
@@ -827,6 +855,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// `organization.json` loads fresh and its folder graph is present. `idPlain` is not the G8 delete
     /// target, so the two folder-graph checks don't interact even though both mutate `organization.json`.
     func testG7_ReplicateItemIntoFolderAddsMembership() throws {
+        try withFixture { try runG7_ReplicateItemIntoFolderAddsMembership() }
+    }
+
+    private func runG7_ReplicateItemIntoFolderAddsMembership() throws {
         guard let before = organizationMemberships() else {
             return XCTFail("should read the fixture organization.json")
         }
@@ -879,6 +911,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// after G8 depends on it (G9 extracts from `idPlain`), so trashing it in the confirm leg is safe;
     /// the next pre-run fixture rebuild restores it. Needs the folder graph loaded (DEBUG index-DB seam).
     func testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes() throws {
+        try withFixture { try runG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes() }
+    }
+
+    private func runG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes() throws {
         XCTAssertTrue(itemDirs().contains(Self.idZotero), "fixture: the Zotero note should exist on disk")
         guard let before = organizationMemberships() else {
             return XCTFail("should read the fixture organization.json")
@@ -942,6 +978,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// `NotePassageResolveTests.scrollRange`; visual scroll position is owner-eye). Read-only w.r.t. the
     /// store (no writes), so no file-safety surface beyond the shared scratch-fixture launch.
     func testG10_JumpToSourceSelectsSourceNoteInNoteWindow() throws {
+        try withFixture { try runG10_JumpToSourceSelectsSourceNoteInNoteWindow() }
+    }
+
+    private func runG10_JumpToSourceSelectsSourceNoteInNoteWindow() throws {
         // Scope to the Note window explicitly: the Extracts window may also be open (state restoration),
         // and both would carry an `an.editor.text` / `an.filter.kind`. The source note is a `.note`, so it
         // only ever appears in THIS window's list anyway, but scoping keeps the editor query unambiguous.
@@ -1018,6 +1058,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// `WorkspaceOpenSpy` read-back (`an.editor.test.lastOpenedURL`). Under `-ANUITestStorePath` the open
     /// is RECORDED, not dispatched, so no external app launches. Read-only w.r.t. the store.
     func testG6_RevealSourceBlockDispatchesReaderDeepLink() throws {
+        try withFixture { try runG6_RevealSourceBlockDispatchesReaderDeepLink() }
+    }
+
+    private func runG6_RevealSourceBlockDispatchesReaderDeepLink() throws {
         // The reader-page note (idReader) is a kind:note → present in the default Note window list.
         _ = selectItem(uuid: Self.idReader)
         XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor should exist")
@@ -1042,6 +1086,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// open path via the DEBUG seam (`an.editor.test.zoteroOpen`) and asserts the dispatched URL through
     /// the `WorkspaceOpenSpy` read-back. Under `-ANUITestStorePath` the open is RECORDED, not dispatched.
     func testG11_ZoteroChipDispatchesSelectLink() throws {
+        try withFixture { try runG11_ZoteroChipDispatchesSelectLink() }
+    }
+
+    private func runG11_ZoteroChipDispatchesSelectLink() throws {
         // The Zotero note (idZotero) is a kind:note → present in the default Note window list.
         _ = selectItem(uuid: Self.idZotero)
         XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor should exist")
@@ -1076,6 +1124,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// and blank for notes, and an empty `NSTextField` may not surface in the a11y tree at all — so on a
     /// note row this check could not tell "column hidden" from "cell empty".
     func testG12_SourcesColumnIsHiddenInTheNoteWindowAndShownInTheExtractsWindow() throws {
+        try withFixture { try runG12_SourcesColumnIsHiddenInTheNoteWindowAndShownInTheExtractsWindow() }
+    }
+
+    private func runG12_SourcesColumnIsHiddenInTheNoteWindowAndShownInTheExtractsWindow() throws {
         let noteWin = app.windows["Archive Notes"]
         XCTAssertTrue(noteWin.waitForExistence(timeout: 10), "the Note window should exist")
 
@@ -1120,6 +1172,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// keystroke is bypassed (the literal ⌘C/⌘V gesture stays owner-eye, like G2's typing).
     /// Writes only inside the scratch fixture — `idPlain`'s and `idExtract`'s own `assets/`.
     func testG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract() throws {
+        try withFixture { try runG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract() }
+    }
+
+    private func runG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract() throws {
         guard let png = Self.makePNGData() else {
             return XCTFail("should build PNG bytes for the pasteboard")
         }
@@ -1227,6 +1283,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// observable from XCUITest; and Notes has no in-GUI rename path for an item title, so the stated
     /// trigger cannot be performed either. Tracked as its own item rather than half-asserted here.
     func testG14_CreateExtractAndJumpRaiseTheFeaturingWindow() throws {
+        try withFixture { try runG14_CreateExtractAndJumpRaiseTheFeaturingWindow() }
+    }
+
+    private func runG14_CreateExtractAndJumpRaiseTheFeaturingWindow() throws {
         let noteWin = app.windows["Archive Notes"]
         XCTAssertTrue(noteWin.waitForExistence(timeout: 10), "the Note window should exist")
         let extractWin = try openExtractsWindow()

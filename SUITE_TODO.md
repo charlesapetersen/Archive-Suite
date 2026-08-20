@@ -1203,19 +1203,14 @@ b/c/d** checks, and the Notes **W14.3** extract copy→paste image flow. General
   - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | **owner**
 
-- [ ] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
-  Filed 2026-07-31 from the W23.m9-fu2 session. A **clean** build of the Notes scheme emits 22 Swift 6
-  warnings from `Tests/ArchiveNotesUITests/NotesGUITests.swift:55-77` — "main actor-isolated property `app`
-  can not be referenced from a nonisolated context", and the same for `launch()`/`activate()`/`terminate()`/
-  `waitForExistence` and the static `fixturePath`. The `setUp`/`tearDown` overrides are nonisolated while
-  every `XCUIApplication` member they touch is `@MainActor`. **Why it matters beyond tidiness:** they are
-  invisible on an incremental build and appear only on a fresh one (a new worktree's DerivedData), so a
-  session that greps its build log for `warning:` sees a wall of 22 and cannot tell a NEW warning from this
-  backdrop — which is exactly what the repo's "no new warnings" gate depends on being able to do. Fix is
-  annotation-only: `@MainActor override func setUpWithError()` / `tearDownWithError()` (or hoist the
-  `XCUIApplication` handling into the `@MainActor` test methods). Not new — the file has been untouched since
-  `73e91338` (W8-S8b) — and it does NOT need the VM or a GUI run: `xcodebuild build-for-testing` on the Notes
-  scheme reproduces and verifies it. Daemon-buildable, $0. | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift | S | low | none
+- [ ] **W23.notes-uitest-launch-warn — the launch-seam unit tests emit 10 avoidable actor-isolation warnings [XS · LOW].**
+  Filed 2026-08-20 while verifying W23.notes-uitest-warn. A fresh Notes `build-for-testing` has no diagnostics
+  from `NotesGUITests.swift`, but emits ten Swift 6 warnings from
+  `Tests/ArchiveNotesUITests/UITestLaunchTests.swift:23-38`: its otherwise pure launch-argument tests use the
+  `@MainActor` `XCUIApplication.archiveUITestApp()` factory and `launchArguments` from a nonisolated
+  `XCTestCase`. There is no lifecycle-override constraint in this small test class, so confirm a class-level
+  `@MainActor` annotation eliminates precisely those warnings while preserving test discovery. Compile-only;
+  no GUI run or fixture is required. | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/UITestLaunchTests.swift | XS | low | none
 
 - [ ] **`W9.b3` — Archive Notes cannot retitle or re-tag a note from the UI at all [S–M · Tier-2].**
   **⚠️ Retagged from `W22.notes-rename` on 2026-08-16 and MERGED with gap-closure plan item B3 — they were the

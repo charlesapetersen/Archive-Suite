@@ -3,6 +3,17 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W23.notes-uitest-warn) — UI-test fixture setup no longer obscures new compiler warnings
+
+**2026-08-20.** `NotesFixtureUITestCase` is main-actor isolated because it drives `XCUIApplication`, but
+XCTest's `setUpWithError` / `tearDownWithError` overrides remain nonisolated in the Swift 6 SDK. That mismatch
+emitted 22 warnings on every fresh `build-for-testing`, masking any newly introduced warning in the Notes UI
+test target. The shared fixture launch and shutdown now run through `withFixture` from each discovered
+`@MainActor` test method, with `defer` preserving teardown on every return path; the test bodies themselves
+remain private helpers. A fresh compile-only build reports zero diagnostics from `NotesGUITests.swift`. No GUI
+test was run and no real store or corpus was opened. The separate ten-warning launch-seam test class is tracked
+as `W23.notes-uitest-launch-warn`, rather than being folded into this lifecycle fix.
+
 ## ✅ FIXED (W21.vmgui-g5-flake) — the source-block UI check could retry against the wrong note
 
 **2026-08-12.** G5 first synthesized ⌘⇧V, waited up to ten seconds for disk, selected another note to flush,
@@ -1094,9 +1105,9 @@ durable link → select the Zotero fixture note (`idZotero`, a real `kind: note`
 **Edit ▸ Paste as Source Block(s) (⌘⇧V)** → flush the editor write-back (select-away, W7-S6 inline flush) →
 assert the note's `.md` gains a `<!-- block: reader-page … -->` block that preserves the durable link, and the
 note's original `zotero-item` block survives (paste is additive). Passes live (~15 s, no hang); G1 + G3 + G9 +
-SmokeUITest all still green in the same run (**TEST EXECUTE SUCCEEDED**). 0 new warnings (the 22 residual
-`NotesGUITests.swift` warnings are pre-existing base-class `setUpWithError` main-actor-isolation notes, W8-S7's
-accepted "32 residual" — none in the G5 additions). File-safe: the block write landed only in the scratch
+SmokeUITest all still green in the same run (**TEST EXECUTE SUCCEEDED**). 0 new warnings at the time (the 22
+then-residual `NotesGUITests.swift` base-class `setUpWithError` main-actor-isolation notes were later removed
+by `W23.notes-uitest-warn`; none were in the G5 additions). File-safe: the block write landed only in the scratch
 fixture's `idZotero` note; the real Store is absent and `notesStoreRootBookmark` was not persisted.
 
 - **Uses the plain-text fallback** (`SourceBlockPaster.scanURLs`), not the custom UTI, so no `ArchiveLinkPayload`

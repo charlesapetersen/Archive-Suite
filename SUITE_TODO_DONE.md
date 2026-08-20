@@ -4280,6 +4280,17 @@ explain why not.
   `DocumentTags.sortDateKey(year:month:day:decade:)` — **validate at the input seam, do not change the shared
   sort formula.** No current Notes date-validation item covers impossible combinations.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Views/NoteMetadataInspector,Store/Item}.swift | XS–S | low | none
+- [x] **W23.notes-uitest-warn — 22 pre-existing actor-isolation warnings in `NotesGUITests.swift` [S · LOW].**
+  ✅ **DONE this commit.** XCTest's macOS lifecycle overrides are nonisolated in the current Swift 6 SDK, so
+  annotating those overrides directly is invalid. The shared scratch-fixture lifecycle now lives in
+  `NotesFixtureUITestCase.withFixture(_:)`, invoked by every discovered `@MainActor` test method; each original
+  body is a private `runG…` helper, and `defer` retains shutdown on every return path. This changes test
+  harness structure only: it still launches solely against the pre-built scratch fixture, and no GUI run was
+  needed or performed. Fresh `xcodebuild -scheme ArchiveNotes -destination 'platform=macOS'
+  -derivedDataPath ./build/W23FixtureLifecycleDD build-for-testing` succeeded with **0 diagnostics from
+  `NotesGUITests.swift`**. The same fresh log exposed the distinct ten-warning launch-seam test class, filed as
+  **W23.notes-uitest-launch-warn** rather than treating it as part of this item.
+  | files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift | S | low | none
 - [x] **W23.h5-fu — Process Files still can't tell a placeholder PDF from a real one (the signal now exists;
   nothing there reads it) [XS–S · LOW].** ✅ DONE inside **W23.m5** exactly as this entry required —
   `ff792a9` (all five `generate` call sites now capture `ImagePageOutcome`, surfaced through W23.m5's
