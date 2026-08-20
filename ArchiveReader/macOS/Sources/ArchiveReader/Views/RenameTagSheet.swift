@@ -29,7 +29,10 @@ struct RenameTagSheet: View {
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Text("New name").frame(width: 80, alignment: .leading)
-                TextField(oldTag, text: $newTag).textFieldStyle(.roundedBorder).onSubmit { commit() }
+                TextField(oldTag, text: $newTag)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { commit() }
+                    .accessibilityIdentifier("ar.renameTag.newName")
             }
             if model.nearDuplicateSubjects(of: trimmedNew).isEmpty == false {
                 Label("A tag differing only by case already exists.", systemImage: "exclamationmark.triangle")
@@ -40,6 +43,7 @@ struct RenameTagSheet: View {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Rename \(count) File\(count == 1 ? "" : "s")") { commit() }
                     .keyboardShortcut(.defaultAction).disabled(!canRename)
+                    .accessibilityIdentifier("ar.renameTag.commit")
             }
         }
         .padding(18)

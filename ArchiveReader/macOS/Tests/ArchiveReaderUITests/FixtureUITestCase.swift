@@ -12,7 +12,7 @@ import Darwin   // getpwuid / getuid — resolve the REAL home from the password
 @MainActor
 class FixtureUITestCase: XCTestCase {
 
-    /// Absolute path to the pre-built GUI fixture, resolved against the REAL home.
+    /// Canonical, generated GUI-fixture root, resolved against the REAL home.
     ///
     /// The XCUITest runner is sandboxed, so `FileManager.homeDirectoryForCurrentUser`
     /// / `NSHomeDirectory()` resolve to the sandbox CONTAINER
@@ -22,12 +22,10 @@ class FixtureUITestCase: XCTestCase {
     /// database (`getpwuid`), which the sandbox container does NOT redirect; the Debug-only
     /// Route-B temporary-exception entitlement (W7.3) grants read access to `/Users/`, so both
     /// the `fileExists` check (this test process) and the app's own read of the launch-arg
-    /// path succeed. An explicit `AR_GUI_FIXTURE_PATH` env var, if set, overrides (verbatim).
-    static let fixturePath: String = {
-        if let override = ProcessInfo.processInfo.environment["AR_GUI_FIXTURE_PATH"],
-           !override.isEmpty {
-            return override
-        }
+    /// path succeed. Non-mutating fixture tests may use an explicit `AR_GUI_FIXTURE_PATH` override;
+    /// a test that edits Finder tags must reject it before it can write (see
+    /// `requireGeneratedScratchFixtureForTagWrites`).
+    static let canonicalFixturePath: String = {
         let realHome: String
         if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
             realHome = String(cString: dir)
@@ -35,6 +33,14 @@ class FixtureUITestCase: XCTestCase {
             realHome = FileManager.default.homeDirectoryForCurrentUser.path
         }
         return "\(realHome)/Library/Application Support/ArchiveReader/AR-GUI-Fixture"
+    }()
+
+    static let fixturePath: String = {
+        if let override = ProcessInfo.processInfo.environment["AR_GUI_FIXTURE_PATH"],
+           !override.isEmpty {
+            return override
+        }
+        return canonicalFixturePath
     }()
 
     var app: XCUIApplication!
@@ -113,6 +119,28 @@ class FixtureUITestCase: XCTestCase {
         field.typeText(text)
     }
 
+    /// A tag-mutating UI test may run ONLY against the root rebuilt by
+    /// `make-gui-fixture.sh`. `AR_GUI_FIXTURE_PATH` remains useful for read-only fixture tests, but
+    /// accepting it here would make a misconfigured scheme capable of marking, editing, and renaming a
+    /// real archive. The fixed root, non-symlink check, and exact marker together fail closed before
+    /// the app launches any write action.
+    func requireGeneratedScratchFixtureForTagWrites() throws {
+        guard Self.fixturePath == Self.canonicalFixturePath else {
+            throw FixtureSafetyError("refusing tag writes through AR_GUI_FIXTURE_PATH; use the generated "
+                                     + "AR-GUI-Fixture root")
+        }
+        let root = URL(fileURLWithPath: Self.canonicalFixturePath, isDirectory: true)
+        let values = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isDirectory == true, values.isSymbolicLink != true else {
+            throw FixtureSafetyError("refusing tag writes: the canonical GUI fixture root is not a real directory")
+        }
+        let marker = try Data(contentsOf: root.appendingPathComponent(".archive-suite-root.json"))
+        let expected = Data((#"{"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}"# + "\n").utf8)
+        guard marker == expected else {
+            throw FixtureSafetyError("refusing tag writes: the canonical GUI fixture marker is missing or altered")
+        }
+    }
+
     /// Press a keyboard shortcut.
     func pressKey(_ key: String, modifiers: XCUIElement.KeyModifierFlags) {
         app.typeKey(key, modifierFlags: modifiers)
@@ -138,4 +166,10 @@ class FixtureUITestCase: XCTestCase {
         }
         return matches.firstMatch
     }
+}
+
+private struct FixtureSafetyError: LocalizedError {
+    let reason: String
+    init(_ reason: String) { self.reason = reason }
+    var errorDescription: String? { reason }
 }

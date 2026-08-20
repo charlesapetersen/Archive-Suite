@@ -6127,6 +6127,22 @@ explain why not.
   failures. No real corpus or host GUI was opened.
   | ArchiveReader/scripts/{make-gui-fixture,test-fixture-scripts}.sh | XS | low | done
 
+- [x] **W21.vmgui-e — drain the Reader `W14.2-fu` §6-guard smoke on the existing Reader lane [S].** ✅
+  **DONE this commit.** A new `NavigationUITests` scratch-fixture UI test selects generated `00002` (initially
+  `Unread`), invokes the real Mark Read toolbar action, uses the real tag editor to add `VM Identity Smoke`,
+  narrows the in-memory tag filter to that single tag, then drives Tags ▸ Rename Tag… to `VM Identity Verified`.
+  It re-reads the fixture's Finder tags after each step and requires final `Read` + renamed tag with the old tag
+  absent; the test itself contains no write API. Before any write it rejects `AR_GUI_FIXTURE_PATH`, a symlink,
+  or a missing/altered fixed `AR-GUI-Fixture` root marker; the override remains available only to non-mutating
+  fixture tests. Stable accessibility IDs expose the tag-editor and rename-sheet controls without changing their
+  behavior. The guest rebuilds `AR-GUI-Fixture` before every run and receives it only through
+  `-ARUITestRootPath`; it never chooses or mounts the owner's archive root. Focused off-screen VM
+  proof passed **1/1** in 38.9 s and its rendered screenshot shows the one-file scratch selection plus the
+  rename status; final Reader VM suite passed **29/29** in 384.2 s. Fresh Reader Debug build and write-surface
+  lint are clean. No real corpus or host GUI was opened.
+  | ArchiveReader/macOS/{Sources/ArchiveReader/Views/{TagEditorView,RenameTagSheet}.swift,
+    Tests/ArchiveReaderUITests/{FixtureUITestCase,NavigationUITests}.swift} | S | low | done
+
 - [x] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** ✅ **DONE this commit.**
   `BlockKind` is an `NSAttributedString` attribute value under `an.blockKind`, so AppKit bridges it to
   Objective-C and hashes it during Markdown styling. The enum's associated values are all synthesizable, so

@@ -236,4 +236,114 @@ final class NavigationUITests: FixtureUITestCase {
         // The OCR query should have filtered the list to a matching subset of the fixture.
         XCTAssertGreaterThanOrEqual(rowCount, 1, "OCR search should keep at least one matching row")
     }
+
+    // MARK: - Matched-identity tag writes (W21.vmgui-e)
+
+    /// Exercise all three normal UI write paths that must carry a fresh, matching identity into the
+    /// audited writer: a group-editor subject edit, a corpus-wide rename, and the Mark Read toolbar
+    /// action. The VM fixture is generated afresh and lives outside every real archive root; reading its
+    /// tags back here proves the operations actually committed instead of merely presenting controls.
+    func testMatchedIdentityWritesSucceedOnScratchFixture() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        let targetName = "00002 IMG — Brown.pdf"
+        let addedTag = "VM Identity Smoke"
+        let renamedTag = "VM Identity Verified"
+
+        // Narrow to one predictable Unread fixture document before every write. Its basename remains
+        // unchanged throughout, so neither test data nor a user archive is ever renamed.
+        typeInField("ar.filter.name", text: "00002")
+        XCTAssertTrue(waitForRowCount(1), "name filter should isolate the intended scratch document")
+        clickRow(0)
+        XCTAssertTrue(waitForTags(on: targetName, containing: ["Unread"]),
+                      "the generated scratch fixture should begin Unread")
+
+        // (1) Normal selected-file triage: NavigationModel.mark → TagWriter.setReadState(expecting:).
+        toolbarButton("ar.toolbar.markRead").click()
+        XCTAssertTrue(waitForTags(on: targetName, containing: ["Read"], excluding: ["Unread"]),
+                      "Mark Read should complete against the selected scratch document")
+
+        // (2) Group editor: NavigationModel.applyEdit → TagWriter.apply(expecting:).
+        toolbarButton("ar.toolbar.editTags").click()
+        let addField = app.textFields["ar.tagEditor.addSubject"]
+        XCTAssertTrue(addField.waitForExistence(timeout: 5), "Edit Tags should present its subject field")
+        addField.click()
+        addField.typeText(addedTag)
+        let addButton = app.buttons["ar.tagEditor.addSubjectButton"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 5))
+        addButton.click()
+        XCTAssertTrue(waitForTags(on: targetName, containing: [addedTag]),
+                      "the editor's subject addition should be verified on the scratch document")
+        app.buttons["Done"].click()
+
+        // Remove the basename narrowing before proving that the tag-cloud selection itself limits the
+        // result to this one document. That makes `filter.subjects` (the source read by beginRenameTag)
+        // a required part of the test instead of accidentally relying on a filtered table or token order.
+        let nameField = app.textFields["ar.filter.name"]
+        nameField.click()
+        pressKey("a", modifiers: .command)
+        nameField.typeText(XCUIKeyboardKey.delete.rawValue)
+        waitForRows(minimum: 2, timeout: 5)
+        XCTAssertGreaterThanOrEqual(rowCount, 2, "clearing the name filter should restore the fixture list")
+
+        // Restrict Rename Tag… to the freshly-added, one-file subject. Clicking the real tag-cloud
+        // control avoids a long synthetic text event inside NSTokenField, while setting the same
+        // `filter.subjects` state that makes NavigationModel.beginRenameTag choose this exact token.
+        let tagCloudToggle = toolbarButton("ar.toolbar.tagCloud")
+        let tagButton = app.buttons.matching(identifier: "ar.tagCloud.tag")
+            .matching(NSPredicate(format: "label == %@", addedTag)).firstMatch
+        for _ in 0..<2 where !tagButton.exists {
+            tagCloudToggle.click()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
+        XCTAssertTrue(tagButton.waitForExistence(timeout: 5), "tag cloud should expose the added scratch tag")
+        tagButton.click()
+        XCTAssertTrue(waitForRowCount(1), "tag filter should retain the one matching scratch document")
+
+        // (3) Corpus-wide rename: NavigationModel.renameTag → TagWriter.renameToken(expecting:),
+        // independently re-verifying the one matching scratch file.
+        app.activate()
+        app.menuBars.menuBarItems["Tags"].click()
+        let renameItem = app.menuItems["Rename Tag…"]
+        XCTAssertTrue(renameItem.waitForExistence(timeout: 5), "Tags menu should expose Rename Tag…")
+        renameItem.click()
+        let renameField = app.textFields["ar.renameTag.newName"]
+        XCTAssertTrue(renameField.waitForExistence(timeout: 5), "Rename Tag should present its name field")
+        renameField.click()
+        renameField.typeText(renamedTag)
+        let renameButton = app.buttons["ar.renameTag.commit"]
+        XCTAssertTrue(renameButton.waitForExistence(timeout: 5))
+        renameButton.click()
+        XCTAssertTrue(waitForTags(on: targetName, containing: ["Read", renamedTag], excluding: [addedTag]),
+                      "the matched-identity rename should replace only the selected scratch tag")
+        captureScreenshot("w21-vmgui-e-matched-identity-writes")
+    }
+
+    private func waitForTags(on filename: String,
+                             containing required: [String],
+                             excluding forbidden: [String] = [],
+                             timeout: TimeInterval = 10) -> Bool {
+        let file = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(filename)
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let names = ((try? file.resourceValues(forKeys: [.tagNamesKey]))?.tagNames) ?? []
+            let containsRequired = required.allSatisfy { wanted in
+                names.contains { $0.caseInsensitiveCompare(wanted) == .orderedSame }
+            }
+            let excludesForbidden = forbidden.allSatisfy { unwanted in
+                !names.contains { $0.caseInsensitiveCompare(unwanted) == .orderedSame }
+            }
+            if containsRequired && excludesForbidden { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        } while Date() < deadline
+        return false
+    }
+
+    private func waitForRowCount(_ expected: Int, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if rowCount == expected { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        } while Date() < deadline
+        return rowCount == expected
+    }
 }

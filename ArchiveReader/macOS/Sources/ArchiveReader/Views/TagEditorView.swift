@@ -60,8 +60,10 @@ struct TagEditorView: View {
                 TextField("Add subject…", text: $subjectDraft)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(addSubject)
+                    .accessibilityIdentifier("ar.tagEditor.addSubject")
                 Button("Add", action: addSubject)
                     .disabled(subjectDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityIdentifier("ar.tagEditor.addSubjectButton")
             }
             let dups = model.nearDuplicateSubjects(of: subjectDraft)
             if !dups.isEmpty {

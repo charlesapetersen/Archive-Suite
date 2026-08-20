@@ -1058,15 +1058,6 @@ assumptions.
     ⚠️ The **live-key** halves stay keyed/owner and do NOT drain here: the multi-page-PDF *live run*, the OpenAI
     rotation *smoke*, Local Agent *live OCR*, `test-localagent.sh`, and the W14.5 legacy-manifest E2E all spend
     against the owner's real accounts or need a signed-in host CLI.
-  - [ ] **W21.vmgui-e — drain the Reader `W14.2-fu` §6-guard smoke on the EXISTING Reader lane [S].** This one
-    needs none of `-a`..`-d`: `vm-gui-runner.sh reader` already runs 15/15 in the VM today, so the check can be
-    discharged now. Point the in-VM Reader at the scratch `AR-GUI-Fixture` (the `-ARUITestRootPath` override the
-    lane already passes) and edit/rename/mark a tag to confirm normal **matched-identity** writes still succeed
-    after the §6 write-target identity guard was armed at all six `NavigationModel` call sites. ⚠️ **NEVER**
-    File ▸ Choose Archive Folder, and never the owner's real root (memory `never-mutate-live-app-root`). The
-    guard is invisible and already unit-proven, so this is confidence-only — but it is free, so it should not
-    sit on the owner's manual list. | files: ops/gui/vm-gui-runner.sh (invocation only) | S | low | none
-
   **Acceptance criteria (all must hold):**
   1. `vm-gui-runner.sh reader xcuitest` is still **15/15** (regression baseline), `notes` matches its host
      baseline (G0–G11 + Smoke, 13/13 recorded 2026-07-15) **with no `XCTSkip`**, and `processor` runs its new
