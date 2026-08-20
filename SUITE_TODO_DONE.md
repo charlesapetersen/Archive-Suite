@@ -33,6 +33,19 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   .claude/hooks/docsync-guard.sh, ops/autonomous/{health-gate.sh,tests/prove-docsync-packages.sh,README.md} |
   XS–S | low | done
 
+- [x] **`W9.c1` — the gate never runs ArchiveCore's 100 tests [S].** **SHIPPED 2026-08-19** (commit whose
+  subject begins `test(suite,trackers): W9 add ArchiveCore smoke lane`). The shared package's suite had to be
+  requested manually, so the suite smoke `all` path could reach dependent apps without directly exercising
+  the tag/PDF/link contract they share.
+
+  `test-smoke.sh archivecore` now runs `swift test` in `packages/ArchiveCore`, and default `all` runs that
+  lane first, before Reader, Notes, and the paid Processor OCR path. Its help, suite README, and Processor
+  test guide describe all five choices and the free-versus-paid boundary. **Verified:** the new direct lane
+  passes **222 XCTest cases plus 105 Swift Testing cases** (four deliberate scale tests skipped); a fully
+  stubbed dispatcher proof records `swift test` before each app lane, so it proves the `all` ordering without
+  an OCR request, app launch, or corpus access. | test-smoke.sh, README.md, ArchiveProcessor/CLAUDE.md | S |
+  low | done
+
 
 ## Pulled forward from POTENTIAL_FEATURES (owner, 2026-07-18)
 

@@ -84,6 +84,18 @@ root:
 or per app: `cd ArchiveReader && ./bootstrap.sh && ./launch.sh`. Requires macOS 14+, Xcode 16,
 `brew install xcodegen`. See [CLAUDE.md](CLAUDE.md) for conventions and the release process.
 
+## Test from source
+
+The suite smoke dispatcher starts with the shared contract, then its app consumers:
+
+```bash
+./test-smoke.sh archivecore  # ArchiveCore unit tests only; free and headless
+./test-smoke.sh all          # ArchiveCore, Reader, Notes, then the paid Processor OCR smoke
+```
+
+Use `reader`, `notes`, or `processor` to run one app lane instead. The Processor lane makes two small OCR
+requests; all other lanes are free and do not use a corpus.
+
 **Optional — the Drive cloud relay.** Live Capture's LAN and USB transports need no setup at all. The
 Google Drive relay, for reading rooms whose Wi‑Fi blocks device‑to‑device traffic, needs an OAuth
 client you create yourself: it is bound to your app's package name and signing key, so no shared one

@@ -1486,9 +1486,6 @@ before building anything else in Notes.
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 
-- [ ] **`W9.c1` — the gate never runs ArchiveCore's 100 tests [S].** Plan C1. They run only via a manual
-  `swift test`. Add an `archivecore` case to the root `test-smoke.sh` and include it in `all`, ahead of the apps
-  that depend on it. | test-smoke.sh | S | low | none
 - [ ] **`W9.c2` — Processor has no write-surface lint [S · Tier-2].** Plan C2. Reader has one; Processor does
   not. Ban `setResourceValue(s)`/`setxattr` across `ArchiveProcessor/macOS/Sources`, allow-list
   `PDFDocument.write` in `PDFGenerator.swift`/`mergeDocumentPDFs`. Must trip on a planted violation, not just

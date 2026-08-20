@@ -307,8 +307,8 @@ review of the whole accumulated diff since the last release** (the *find → ref
 defects, a second set of agents tries to refute each, only survivors are real), and a **live smoke test** if
 the OCR/tagging/PDF path changed. Cut the release only after it comes back clean.
 
-**Smoke tests (the cheap regression gate).** Two repeatable, unattended scripts make Tier-1 a one-liner —
-run them before pushing an OCR/pipeline change or as a sanity gate:
+**Smoke tests (the cheap regression gate).** The suite dispatcher and the app-local scripts make Tier-1 a
+one-liner — run the relevant lane before pushing an OCR/pipeline change or as a sanity gate:
 - **`ArchiveProcessor/test-smoke.sh`** — headless end-to-end OCR: reads the Gemini key from the Keychain
   (never printed/persisted), builds Debug, then drives the **real** Process-Files pipeline
   (OCR → segmentation → tagging → PDF) on exactly **2 tiny images** via `ProcessFilesTestDriver`
@@ -319,9 +319,11 @@ run them before pushing an OCR/pipeline change or as a sanity gate:
   few cents). A key-free run log persists under `.maintenance/test-results/` (gitignored) for FAIL triage.
 - **`ArchiveReader/test-smoke.sh`** — Reader build + full unit-test suite (`xcodebuild test`, ~135 tests);
   no OCR/network/corpus.
-- **`./test-smoke.sh processor|reader|all`** (Suite root; mirrors `launch.sh`) dispatches to both; default
-  `all` runs Reader (free) then Processor. `chmod +x`'d; the dispatcher calls `bash <script>` so it works
-  even if the exec bit is lost. This is the deeper Tier-1 companion to the pre-existing
+- **`./test-smoke.sh archivecore|processor|reader|notes|all`** (Suite root; mirrors `launch.sh`) dispatches to
+  the shared ArchiveCore package and all three apps. `archivecore` runs `swift test` in
+  `packages/ArchiveCore`; default `all` runs it **first**, before Reader, Notes, and Processor, so a shared
+  contract failure is reported before a dependent app build or paid OCR. `chmod +x`'d; the dispatcher calls
+  `bash <script>` so it works even if the exec bit is lost. This is the deeper Tier-1 companion to the pre-existing
   `scripts/test-smoke.sh` (raw per-provider OCR calls) and `scripts/test-tier2.sh` (multi-case pipeline).
 
 **Visual / render verification.** XCUITest reports only the accessibility tree, not pixels — it won't catch a
