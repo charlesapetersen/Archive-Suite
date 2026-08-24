@@ -1091,6 +1091,20 @@ assumptions.
   Docs-only unless a fact is wrong; then it becomes a small code fix in the same commit. No corpus, no keys,
   no GUI. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMRotationDetector,Models/CostEstimator,Models/ProviderKeySpec,Models/LocalAgentSpec}.swift | S | low | none
 
+- [ ] **W21.seed-fu2 — the stale-marker Keychain warning compares NAMES, so a key rotated after the marker is invisible to it [S · MED · ops].**
+  `W21.seed-fu` (`2c4ff4e`) warns at start when a present provider account is absent from the partition-repair
+  marker's name list. That is the wrong comparison for the case that actually bites. Measured 2026-08-24:
+  Gemini **is** named in the marker (`2026-07-17 13:52:14 | Gemini Anthropic Mistral`), yet its keychain item's
+  `mdat` is `20260813232213Z` — re-created on 2026-08-13, nearly a month after the repair ran. A re-created item
+  gets a fresh, empty partition list (`fix-keychain-access.sh` header says exactly this and tells you to re-run
+  after rotating a key), so `/usr/bin/security` blocks. That block is what stopped the `W21.e2e-fu2` E2E rerun on
+  2026-08-19 for nearly two minutes, and `warn_unmarked_keychain_provider` stayed silent through it because the
+  name was present. Running the proven helper by hand on 2026-08-24 returns `Gateway`, never Gemini — so the
+  warning has a real blind spot precisely where the owner needed it. Fix: compare each present provider item's
+  `mdat` against the marker timestamp as well as its account name, and warn when the item is newer than the
+  repair. Keep the existing name check — a wholly unlisted account is still worth naming. Extend the hermetic
+  fake-Keychain proof with a rotated-after-marker fixture; it must fail before the fix. No key, no network, no
+  GUI. | files: ops/autonomous/{keychain-provider-accounts.sh,daemon.sh,tests/prove-keychain-partition.sh} | S | med | open
 - [ ] **W22.localagent-provenance — the Local Agent backend is invisible in every durable record [S–M].**
   Found 2026-07-29 while verifying the owner's Local-Agent run: a run performed by the local `claude` CLI is
   recorded everywhere as if the selected API provider did it. Three sites, one cause — the Local Agent was
