@@ -301,6 +301,15 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
 - Owner prereq for the unit-test steps: `DevToolsSecurity -enable` (one-time; already enabled here) so
   `xcodebuild test` doesn't prompt for the debugger. Run `ops/autonomous/health-gate.sh` yourself once to
   confirm it's green + prompt-free before arming a long run.
+- Owner prereq for `keychain-partition-proof`: **`brew install ripgrep`** (installed here 2026-08-24). That
+  harness is the only thing in this repo that shells out to `rg`, and the dependency was invisible until
+  2026-08-24 because it was authored in an agent sandbox that ships its own `rg` — it measured 10/0 there
+  and 9/1 under this gate. Worse than the miss was its shape: an absent `rg` made the harness assert
+  `daemon is not wired to the marker comparison`, so a missing brew package would have parked the run
+  against a daemon that is wired correctly. It is now `step_skippable` and exits **3 + `SKIPPED:`** when
+  `rg` is absent — the same contract `fixture-scripts` uses above and `gui-vm` uses for the VM lane, and
+  the third skippable step in the gate. An unprovisioned machine gets
+  `⊘ … SKIPPED` rather than a false park.
 
 **STATUS — the check-in surface (rewritten 2026-07-31 for readability).** `status-digest.sh` is **the one
 status renderer**; `daemon.sh status` is a thin forwarder that adds no formatting of its own. The default view is

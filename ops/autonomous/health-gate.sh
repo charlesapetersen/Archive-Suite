@@ -238,6 +238,7 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     misreported three of the owner's parks before it was fixed. Self-referential on purpose: nothing else
 #     watches the gate's own honesty.
 #   * prove-keychain-partition.sh — the one-time provider-key repair and the daemon's stale-marker warning.
+#     SKIPPABLE (the third, after fixture-scripts and gui-vm): it greps with `rg`, so it needs ripgrep.
 #     It replaces `security` with a fixture stub, so it proves the complete shared account list, no secret
 #     read/write, no false-covered marker after a partial repair, and the later-added-provider warning without
 #     touching the login Keychain.
@@ -255,7 +256,9 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     its own mktemp, so it never touches the shared VM or the shared lock.
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
-step keychain-partition-proof bash "$ROOT/ops/autonomous/tests/prove-keychain-partition.sh"
+# step_skippable, not step: this harness greps with `rg`, which is a brew prereq rather than a repo file,
+# so a machine without ripgrep must report ⊘ NOT VERIFIED — not park the run. See the harness header.
+step_skippable keychain-partition-proof bash "$ROOT/ops/autonomous/tests/prove-keychain-partition.sh"
 step docsync-packages-proof  bash "$ROOT/ops/autonomous/tests/prove-docsync-packages.sh"
 step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
 step handoff-proof  bash "$ROOT/ops/autonomous/tests/prove-handoff.sh"

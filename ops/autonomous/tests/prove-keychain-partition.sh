@@ -4,12 +4,29 @@
 # Runs the REAL repair script and marker-comparison helper against a fake `security`; it cannot open the
 # login Keychain, obtain a password, or change a partition list. The fixture deliberately contains a
 # DriveClientSecret-shaped non-provider account only as a name outside the provider list — no real secret.
+#
+# EXTERNAL PREREQ: `rg` (ripgrep), used by step [3] to grep `daemon.sh`. It is the only `rg` in this repo —
+# everything else greps with `grep` — and it arrived on 2026-08-19 (`2c4ff4e`) from an agent sandbox that
+# ships its own `rg` at `/Applications/ChatGPT.app/Contents/Resources/rg`. So it measured 10/0 there and
+# 9/1 under the health gate, whose PATH is `/opt/homebrew/bin` + this repo's shims and had no `rg` at all.
+# The 9/1 is the reason for the guard below: with `rg` absent, bash prints `rg: command not found`, the
+# `&&` chain falls through, and the harness asserts `daemon is not wired to the marker comparison` — a RED
+# gate and a PARKED run, blamed on daemon wiring that is in fact correct. (`daemon.sh` does call both
+# helpers; verified.) Compare the note on `prove-vm-lane.sh` in `health-gate.sh`, which records that that
+# harness needs nothing from the gate's PATH line: that is the standard these harnesses are held to.
+#
+# A missing prerequisite therefore exits **3 + `SKIPPED:`** and the gate runs this through
+# `step_skippable`, exactly as `fixture-scripts` does for `/opt/homebrew/bin/tag` — a machine without the
+# tool gets a loud `⊘ … SKIPPED` instead of a false park (`ops/autonomous/README.md`). Never let this
+# become a plain `exit 1`: an unrunnable check must not read as a failed one.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FIX="$HERE/../fix-keychain-access.sh"
 LIB="$HERE/../keychain-provider-accounts.sh"
 [ -f "$FIX" ] && [ -f "$LIB" ] || { echo "FATAL: keychain repair/helper missing"; exit 2; }
+# Not a FATAL and not a failure: an absent tool means this proof did not RUN. See the header.
+command -v rg >/dev/null 2>&1 || { echo "SKIPPED: ripgrep (rg) is not on PATH — install it with: brew install ripgrep"; exit 3; }
 
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 export HOME="$T/home"; mkdir -p "$HOME/Library/Keychains" "$T/state" "$T/bin"
