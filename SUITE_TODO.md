@@ -1105,6 +1105,11 @@ assumptions.
   wholly unlisted account. ⛔ Note the false-positive mode before designing it: any in-app Always Allow bumps `mdat`
   without necessarily breaking the CLI, so a bare newer-than test will cry wolf — record per-item `mdat` at repair
   time and compare per item, or state plainly that the warning means "re-verify", not "broken".
+  ⛔ **Normalise the clocks.** Keychain `mdat` is UTC (trailing `Z`); the marker's first field is written by
+  `date '+%F %T'`, i.e. LOCAL. Comparing them as strings or as same-zone timestamps is wrong by the UTC offset —
+  done accidentally on 2026-08-24, which reported a correctly-covered Gemini as `NEWER than repair`. On a
+  US/Pacific machine that is a 7-8 hour window in which a broken item reads as fine, or a fine one as broken.
+  Convert both to epoch seconds before comparing, and pin it with a fixture whose `mdat` sits inside that offset.
   **Folded in (owner, 2026-08-24): `Gateway` does not belong in `KEYCHAIN_PROVIDER_ACCOUNTS`.** Nothing reads it
   through the CLI — a repo-wide sweep of `find-generic-password` finds only Gemini plus the two variable-driven
   call sites (the attribute probe and the repair itself). It is an app-owned item, the same category as
