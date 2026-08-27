@@ -6158,6 +6158,25 @@ explain why not.
   corpus, or host GUI was opened.
   | ArchiveNotes/macOS/{Sources/ArchiveNotes/{Editor/{EditorTextView,MarkdownEditorView}.swift,Views/LocationsInspector.swift},Tests/ArchiveNotesUITests/NotesGUITests.swift} | S | low | done
 
+- [x] **W21.vmgui-d — Processor lane from zero, then drain the Processor GUI backlog [L].** **SHIPPED
+  2026-08-27 `a63f86d`.** Processor now has a DEBUG-only `ArchiveProcessorUITests` target and explicit scheme,
+  canonical guest-only IN/OUT fixture, headless Keychain guard, and stable accessibility IDs for the Process
+  Files, Anthropic wizard, multi-page re-OCR, and Local Agent surfaces. The shared VM table supplies Processor's
+  project, test bundle, scratch launch, DerivedData, artifact location, and process name; all three app lanes
+  retain independent artifacts and incremental build products. The Processor VM suite passed **4/4** plus a
+  sighted capture; Reader passed **29/29**, Notes **21/21**, all three Debug builds and ArchiveCore's 106 tests
+  passed, and the fake-Tart gate mechanism proof passed its full round-robin/failure matrix. No corpus, API key,
+  CLI login, guest Keychain access, or host GUI was used.
+  | ArchiveProcessor/macOS/{project.yml,Sources/ArchiveProcessor,Tests/ArchiveProcessorUITests},
+    ArchiveProcessor/scripts/make-gui-fixture.sh, ops/{gui,autonomous} | L | med | done
+
+- [x] **W21.vmgui — complete the headless-VM GUI lane for Archive Processor [L].** **SHIPPED 2026-08-27
+  `a63f86d`.** The GUI VM now routes Reader, Notes, and Processor one at a time through a fail-open round-robin
+  gate, with each app's logs, screenshots, and result bundle under its own artifact directory. The 6 GiB guest
+  storage guard prunes only disposable result bundles; an inconclusive launch or full guest disk SKIPs rather
+  than REDs. Docs, the unattended Processor smoke guidance, and the ignored daemon plan were synchronized with
+  the new route. | ops/{gui,autonomous}, ArchiveProcessor/, suite docs | L | med | done
+
 - [x] **W21.hash — make `ArchiveNotes.BlockKind` conform to `Hashable` [XS].** ✅ **DONE this commit.**
   `BlockKind` is an `NSAttributedString` attribute value under `an.blockKind`, so AppKit bridges it to
   Objective-C and hashes it during Markdown styling. The enum's associated values are all synthesizable, so

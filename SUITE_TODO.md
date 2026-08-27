@@ -967,10 +967,9 @@ corpus-free, and `W21.vmgui-c` made the Notes suite green. The remaining GUI gap
 test target and carried the Keychain risk described below. Completing the lane drained that backlog off-screen
 while retaining the existing Reader and Notes behavior rather than reintroducing Reader-only assumptions.
 
-- [x] **W21.vmgui — complete the headless-VM GUI lane for Archive Processor [L]** — DONE 2026-08-27, this
-  commit: Reader and Notes retain their shared per-app table while Processor gains its scratch-only, headless
-  VM lane; all three app routes are verified and the gate now rotates one route per run. Reader, Notes, and
-  Processor use the shared per-app table with corpus-free scratch fixtures and launch safeguards.
+**W21.vmgui is complete — see [`SUITE_TODO_DONE.md`](SUITE_TODO_DONE.md) for its 2026-08-27 completion
+record.** Reader, Notes, and Processor use the shared per-app table with corpus-free scratch fixtures and
+launch safeguards; the gate rotates one route per run.
   - [x] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** DONE 2026-08-01
     `de43be3` (the lane) + this commit (the checks). **12/12 → 15/15 in the VM**, `notes` out of
     `AUTONOMOUS_GUI_VM_WARN_APPS` (now empty by default, so a Notes UITest failure REDs the gate again).
