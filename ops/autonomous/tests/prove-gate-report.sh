@@ -108,7 +108,26 @@ case "$out" in *"HEALTH GATE: RED"*)   no "an all-green run printed a RED verdic
 case "$out" in *"failing output"*)     no "an all-green run printed a failing-output block" ;;    *) ok "an all-green run prints no failing-output block" ;; esac
 case "$out" in *"GREENDECOY"*)         no "a passing step's output leaked to the gate's stdout" ;; *) ok "passing steps stay quiet on stdout" ;; esac
 
-# --- 5. EVERY prove-*.sh is either a gate step or an explicit, honest exclusion (W26.fixwarn-fu1) ---------
+# --- 5. Reader's no-root deep-link regression must remain in the unit lane (W20.deeplink-isolation) -------
+# The environmental exclusion once made this test invisible on machines with a saved archive bookmark. Its
+# fixture-defaults seam is now safe, but deleting the skip alone is fragile: a later gate edit could quietly
+# restore it. Inspect the executable `step reader` line rather than comments, then the real gate run proves
+# the named XCTest executes.
+echo
+echo "== Reader no-root deep-link coverage is active =="
+reader_step="$(grep -E '^[[:space:]]*step[[:space:]]+reader[[:space:]]' "$GATE")"
+[ -n "$reader_step" ] || { echo "FATAL: could not find the executable reader step in $GATE"; exit 1; }
+case "$reader_step" in
+  *'-only-testing:ArchiveReaderTests'*) ok "Reader gate selects ArchiveReaderTests" ;;
+  *) no "Reader gate no longer selects ArchiveReaderTests (got: $reader_step)" ;;
+esac
+case "$reader_step" in
+  *'-skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot'*)
+    no "Reader gate excludes DeepLinkTests.testRevealAndSelectNoRoot — W20 regression coverage is disabled" ;;
+  *) ok "Reader gate does not exclude DeepLinkTests.testRevealAndSelectNoRoot" ;;
+esac
+
+# --- 6. EVERY prove-*.sh is either a gate step or an explicit, honest exclusion (W26.fixwarn-fu1) ---------
 #
 # WHY THIS LIVES HERE. Five separate hand-sweeps wired harnesses into the gate and each one found the
 # previous sweep had missed some: `f64649b` took four, W26.fixwarn a fifth, and counting them to justify the

@@ -94,14 +94,14 @@ step_skippable() {
 # intrusion. Fixed at the source, not here: each app's local `ArchiveTestHost` makes it draw nothing when
 # it is only a unit-test host, pinned by TestHostWindowSuppressionTests in both suites. Side effect worth
 # knowing: with no UI to build, the Reader suite went 172s → ~2s. Don't "simplify" that away.
-# -skip-testing the ONE known-environmental failure: DeepLinkTests.testRevealAndSelectNoRoot fails whenever
-# this machine's shared com.archivereader.app defaults hold a persisted archiveRootBookmark (NavigationModel
-# resolves a root, so the "No archive folder" assertion fails) — it's env, not a regression, and without the
-# skip the gate would RED (false-park) on every run. Documented in KNOWN_ISSUES; fix it and drop the skip.
+# DeepLinkTests.testRevealAndSelectNoRoot is deliberately INCLUDED: W26.fixturehang made the defaults
+# injectable and the test now passes an unpinned `fixtureDefaults()` suite to NavigationModel. It cannot
+# resolve the owner's `archiveRootBookmark`, so a regression in the no-root path must RED rather than hide
+# behind an environmental skip. See ArchiveReader/KNOWN_ISSUES.md (W20.deeplink-isolation).
 # Pixel-truth runs here too: DocumentRenderGuardTests (RenderProbe) lives INSIDE ArchiveReaderTests and renders a
 # PDF page / SwiftUI view to a bitmap headlessly (no "Enable UI Automation"/TCC prompt) — so "did it actually
 # draw" (blank PDF pane, blank thumbnail) is caught in this gate without the UITest hang. See ops/gui/README.md.
-step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot -derivedDataPath ./build/gate-DD'
+step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -derivedDataPath ./build/gate-DD'
 step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
 # Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
 # ($0, no network, no OCR, no GUI) and confirms the app reached main; a build alone cannot catch a pre-main
@@ -254,6 +254,8 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     first AND under a bare /usr/bin:/bin, because tart-lib.sh resolves Homebrew itself. It also cannot
 #     collide with the gui-vm step that drives the REAL lane — it stubs `tart` and points TART_LOCK_DIR at
 #     its own mktemp, so it never touches the shared VM or the shared lock.
+#   * prove-gui-vm.sh — the real round-robin gate with fake Tart/XcodeGen. It verifies each app's turn,
+#     retry and fail-open outcomes, and per-app artifact isolation without starting a VM, Xcode, or GUI.
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
 # step_skippable, not step: this harness greps with `rg`, which is a brew prereq rather than a repo file,
@@ -263,6 +265,7 @@ step docsync-packages-proof  bash "$ROOT/ops/autonomous/tests/prove-docsync-pack
 step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
 step handoff-proof  bash "$ROOT/ops/autonomous/tests/prove-handoff.sh"
 step vm-lane-proof  bash "$ROOT/ops/autonomous/tests/prove-vm-lane.sh"
+step gui-vm-proof   bash "$ROOT/ops/autonomous/tests/prove-gui-vm.sh"
 
 # W26.fixwarn-fu1 (2026-08-10) — the SIX remaining hermetic harnesses. Wiring them one at a time is how this
 # list came to be wrong five times: `f64649b` swept four in, W26.fixwarn found a fifth, and counting them to

@@ -340,6 +340,14 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## Reader test hardening (owner-reviewed 2026-07-18)
 
+- [x] **`W20.deeplink-isolation` — isolate `DeepLinkTests.testRevealAndSelectNoRoot` from real defaults.**
+  The `W26.fixturehang` seam was already in place: `RootFolderStore`, `ArchiveLibrary`, and
+  `NavigationModel` accept injected defaults, and this test already supplies an unpinned `fixtureDefaults()`
+  suite. This completion removes the stale health-gate skip, so the test now runs and proves the no-root path
+  without reading, writing, stashing, or removing the owner's `archiveRootBookmark`; its injected suite has
+  no bookmark to resolve. Targeted test and the gate-equivalent Reader unit command pass with no real-corpus
+  access. `KNOWN_ISSUES.md` now records the resolved hazard. **Shipped: this commit.** | Reader | S–M
+
 - [x] **`W29.t1` — `DeepLinkTests.testRevealAndSelectNoRoot` read the owner's real preferences.** It built a
   bare `NavigationModel()`, which defaults to `UserDefaults.standard` — and inside the app-hosted test
   bundle that IS the shipping Reader's domain. On any machine where the owner has ever chosen an archive

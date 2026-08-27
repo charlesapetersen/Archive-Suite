@@ -913,42 +913,6 @@ add a second control alongside.**
   emulator E2E (`scripts/e2e-phone-mac.sh`) = owner tail** (companions have no unit tests — the E2E is the gate).
   | files: ArchiveProcessor/ArchiveCapture/, ArchiveProcessor/ArchiveCaptureiOS/, Net/CaptureServer.swift, Net/RelayObjectFormat.swift | M | med | owner(E2E)
 
-## Reader test hardening (owner-reviewed 2026-07-18)
-From the review of Reader `KNOWN_ISSUES.md` "Open risks / to verify" — almost all entries were already settled in
-code; the owner queued only this one (the others are pruned/soft-backlog there). See that file for the record.
-- [ ] **W20.deeplink-isolation — isolate `DeepLinkTests.testRevealAndSelectNoRoot` from the machine's real defaults [S–M].**
-  The test builds `NavigationModel()` with no `-ARUITestRootPath`, so `RootFolderStore.resolveSaved()` reads
-  `UserDefaults.standard` and picks up the owner's persisted `archiveRootBookmark` → the "no archive folder"
-  assertion fails on this machine. The WS7 health gate currently `-skip-testing`s it, so the **no-root deep-link
-  path has zero automated coverage here.** Fix: make `RootFolderStore`'s defaults **injectable** (it hardcodes
-  `UserDefaults.standard` at `RootFolderStore.swift:15/58`) and have the test inject a **volatile
-  `UserDefaults(suiteName:)` with no bookmark**; then drop the `-skip-testing` line in
-  `ops/autonomous/health-gate.sh`. ⚠️ **Do NOT** stash/remove the machine's real `archiveRootBookmark` — that's
-  the never-mutate-live-root hazard; inject a throwaway defaults instead. **Tier-2** (touches the security-scoped
-  bookmark store) — adversarial review; daemon-buildable (build + Reader unit tests, scratch-only). Restores
-  coverage + removes the skip. | files: ArchiveReader/macOS/Sources/ArchiveReader/Search/RootFolderStore.swift, Tests/ArchiveReaderTests/DeepLinkTests.swift, ops/autonomous/health-gate.sh | S–M | low | none
-  🔺 **ESCALATED 2026-08-06 — it no longer fails, it HANGS, and it reads the real corpus while it does.**
-  Observed while running the Reader lane for `W26.vocab`: the case sat for **6+ minutes with no progress**
-  and had to be killed. The mechanism is the same defaults leak, but Wave 26 changed what happens next —
-  discovery used to hand the picked-up real root to Spotlight (an instant empty answer on a dead index,
-  which is the whole incident) and now hands it to `CorpusWalker`, which dutifully walks ~123k real files
-  from inside a unit test. So the artifact went from "one red assertion" to "a multi-minute unit run that
-  touches `~/Desktop/Google Drive/Archival Photos`". Read-only, and nothing writes — but a test bundle has
-  no business reading the corpus at all, and any future lane that runs the suite WITHOUT the
-  `-skip-testing` line now stalls rather than reporting a failure. This makes the item's priority
-  higher than "restore coverage": it is now also a real-corpus-contact and a wall-clock problem.
-  🔻 **UPDATE 2026-08-07 — the prescribed seam ALREADY EXISTS; do not re-derive it.** `W26.fixturehang`
-  made `RootFolderStore`, `ArchiveLibrary` **and** `NavigationModel` take an injected `UserDefaults`, and
-  added `fixtureDefaults(pinnedTo:)` in `ArchiveReaderTests` as the one way to mint a throwaway domain. So
-  the fix here is now `NavigationModel(defaults: fixtureDefaults())` — one line — plus this item's OWN
-  remaining deliverable, which is the part `W26.fixturehang` deliberately left: **drop the
-  `-skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot` from
-  `ops/autonomous/health-gate.sh:80` and prove the case now runs green in the gate.** The four *other*
-  pin-writing cases in that file were migrated by the sweep; this one writes no pin, which is why it was
-  left. ⚠️ Also re-measure the escalation before repeating it: read 2026-08-07, the owner's granted root is
-  `~/Archive/Glazer Gemini 2.5 LLM`, **not** the corpus — so "walks ~123k real corpus files" is not what
-  happens on this machine today. The hazard is real but root-dependent; say which you measured.
-
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 From the 2026-07-28 Daemon Report walkthrough. The headless VM lane is now shared by Reader and Notes:
 `W21.vmgui-a` shipped one per-app configuration table for both entry points, `W21.vmgui-b` made its fixtures

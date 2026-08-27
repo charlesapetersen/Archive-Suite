@@ -460,6 +460,9 @@ ops/autonomous/tests/prove-review-cadence.sh   # WS11 review picker: delta-aware
 ops/autonomous/tests/prove-vm-lane.sh          # the VM lane: per-app table, VM lock, corpus-free mounts, the
                                                # exit-code -> owner-text mapping (the silent-green regression,
                                                # twice), the xcodebuild PATH shim, smoke-script self-guards.
+ops/autonomous/tests/prove-gui-vm.sh           # the real GUI-VM gate under fake Tart/XcodeGen: all three
+                                               # round-robin turns, retry/fail-open classification, and
+                                               # per-app artifacts; no VM, GUI, Xcode, corpus, or network.
 ops/autonomous/tests/prove-no-host-gui.sh      # the host-GUI firewall (.claude/hooks/no-host-gui.sh): all four
                                                # blocked lanes deny, their legitimate neighbours (VM lane,
                                                # unit-only tests, `emulator -no-window`, read-only simctl) still

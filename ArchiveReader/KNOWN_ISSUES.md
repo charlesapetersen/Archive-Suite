@@ -181,15 +181,11 @@ the three non-obvious decisions and the mutation results, in `SUITE_TODO_DONE.md
 ✅ **The walk's own `opendir` now has a deadline too** — see the `W26.fsev-fu2` entry above. Its probe still
 blocks; the difference is that the list stops claiming to be scanning and says the folder has not answered.
 
-**Practical consequence for testing — UNCHANGED, still skip it.** The long-known `DeepLinkTests` environment
-artifact (`testRevealAndSelectNoRoot` picks up the owner's real persisted `archiveRootBookmark`) presented as
-a **hang of the entire `ArchiveReaderTests` bundle** through this code path. The main-thread half of that is
-gone by construction, but whether the bundle still hangs is **not verified**: confirming it means provoking a
-TCC prompt on the owner's physical screen, which an unattended session may not do — and `CorpusWalker`'s
-`opendir` can still block on the same root (`W26.fsev-fu2` bounded the *report*, not the syscall), which
-leaves a test that waits on the library waiting. Keep running the unit lane with
-`-skip-testing:ArchiveReaderTests/DeepLinkTests`. Proper isolation of the test itself is
-`W20.deeplink-isolation`.
+**Practical consequence for testing — resolved by `W20.deeplink-isolation`.** The no-root deep-link test now
+constructs `NavigationModel(defaults: fixtureDefaults())`; that unpinned, throwaway domain has no
+`archiveRootBookmark`, so it never resolves or walks the owner's saved root. The Reader gate includes the test
+again rather than hiding it with `-skip-testing`; a no-root regression now fails visibly without any real-corpus
+contact or TCC prompt.
 
 ## ✅ FIXED (`W26.walk2`) — Release discovery was Spotlight-only and could blame an unreadable index on files
 
@@ -436,17 +432,12 @@ the bundle temp dir; the `ArchiveFile` paths need not exist (an unreadable file 
 mechanisms proven non-vacuous by neutering. The same fix shipped in Notes the same day — see
 `../ArchiveNotes/KNOWN_ISSUES.md`.
 
-## `DeepLinkTests.testRevealAndSelectNoRoot` fails on a machine with a persisted archive root (environmental)
-The unit-test host shares the `com.archivereader.app` UserDefaults domain, so if this machine has a persisted
-`archiveRootBookmark` (e.g. left by a GUI/XCUITest session pointing at the `AR-GUI-Fixture`), `NavigationModel()`
-resolves a root and the test's "No archive folder" assertion fails. It's **environmental, not a regression** —
-the diff under test touches no NavigationModel/DeepLink/RootFolderStore code. The WS7 health gate
-(`ops/autonomous/health-gate.sh`) therefore runs the Reader unit suite with
-`-skip-testing:ArchiveReaderTests/DeepLinkTests/testRevealAndSelectNoRoot` so it doesn't false-park the
-autonomous run. **Real fix (then drop the skip) — QUEUED 2026-07-18 as `W20.deeplink-isolation`:** isolate the
-test's defaults (inject a volatile `UserDefaults(suiteName:)` with no bookmark), so it doesn't read the machine's
-persisted archive root. ⚠️ Must NOT be "fixed" by stashing/removing the machine's real `archiveRootBookmark`
-(that's the never-mutate-live-root hazard) — inject a throwaway defaults instead.
+## ✅ FIXED (`W20.deeplink-isolation`) — the no-root deep-link test could read the owner's saved root
+The app-hosted unit bundle shares `com.archivereader.app` defaults, so a bare `NavigationModel()` could resolve
+the owner's persisted `archiveRootBookmark`; the no-root assertion then failed or spent time discovering a root
+the test did not own. `W26.fixturehang` provided injectable defaults and `fixtureDefaults()`; the test now uses
+an unpinned throwaway suite, so its `RootFolderStore` deterministically has no bookmark. The health gate now
+runs this case normally. Nothing stashes, removes, reads, or writes the real bookmark.
 
 ## GUI-pass regressions in the AppKit nav table + tag filter (2026-07-16 — owner GUI re-test)
 An interactive GUI pass surfaced three display/interaction bugs in shipped Reader features. Two fixed, one deferred:
@@ -692,8 +683,6 @@ are now settled in code + tests. Kept as a short record:
   equal. **The note's NFC/NFD "false-fail" fear is already neutralized** — Swift `String` comparison is
   canonical-equivalence-aware — so only the trim case is unpinned. Assurance-only, not a correctness gap; left
   as a soft backlog item.
-- **QUEUED (owner-reviewed 2026-07-18) — the `DeepLinkTests` no-root flake real-fix** (top of this file) is now
-  tracked as **`W20.deeplink-isolation`** in `SUITE_TODO.md`.
 
 ## Environment notes
 - Xcode 26.3 / Swift 6.2 toolchain; XcodeGen 2.45.2 at `/opt/homebrew/bin/xcodegen`.
