@@ -27,19 +27,20 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 echo "== 1. per-app table (one source of truth for both entry points) =="
 # shellcheck disable=SC1090
 . "$LIB"
-for app in reader notes; do
+for app in reader notes processor; do
   miss=""
-  for f in spec proj scheme tests dd appbundle procname fixture mkfixture launcharg; do
+  for f in spec proj scheme tests dd appbundle procname fixture mkfixture launchcmd; do
     [ -n "$(archive_app_field "$app" "$f")" ] || miss="$miss $f"
   done
   [ -z "$miss" ] && ok "$app: every field populated" || no "$app: empty field(s):$miss"
 done
 archive_app_known reader && ok "archive_app_known reader" || no "archive_app_known reader"
-archive_app_known processor && no "processor must be UNKNOWN (no UITest target — an unknown app must be loud, not an empty run)" \
-                            || ok "processor is unknown (loud, not a silent empty run)"
+archive_app_known processor && ok "archive_app_known processor" || no "processor must be known (it has a VM UITest target)"
+archive_app_known imaginary && no "unknown app must be loud, not a silently empty VM run" \
+                            || ok "unknown app is loud (not a silent empty run)"
 # The mkfixture strings are eval'd inside a REMOTE bash -lc; $GR must survive the host unexpanded.
 # They must not ask for $GC: the builders synthesize their own PDFs, so a worktree VM needs only repo + out.
-for app in reader notes; do
+for app in reader notes processor; do
   mk="$(archive_app_field "$app" mkfixture)"
   case "$mk" in
     *'$GR'*) ok "$app mkfixture keeps \$GR unexpanded for the guest" ;;

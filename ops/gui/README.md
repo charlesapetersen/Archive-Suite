@@ -60,6 +60,13 @@ runner's own temp dir and prints `[shot] <name>: wrote <path>`; `collect_shots` 
 over the *unsandboxed* `tart exec`. Don't route this through the result bundle instead: a failed or killed run
 leaves the `.xcresult` **unfinalized**, and `xcresulttool` refuses one with no `Info.plist`.
 
+**Reader's committed snapshot reference** is also guest-rendered. `SnapshotTests` is included in the default
+Reader VM selector and compares there; it intentionally skips on the host because the two renderers differ.
+For an intended visual change only, temporarily set its `recordMode` to `.all` and run the Reader VM lane.
+The test records a uniquely named PNG in its sandbox-local tmp directory and the runner promotes it to
+`__Snapshots__/` only after the VM test reports success. Restore `.missing` and run the lane again to compare;
+never copy a reference from the host by hand.
+
 **One-time setup** (`brew install cirruslabs/cli/tart crane`; `vncdotool` in a venv at `~/.tart-mirror/vncenv`):
 build the VM from Cirrus's `macos-tahoe-xcode:26.3` (macOS 26 + Xcode 26.3 — matches host). The image is
 ~63 GB; pull it **resumably** by mirroring into a local registry then cloning (a network drop costs ≤512 MB,
@@ -151,8 +158,8 @@ Reader is green at either size. If you ever debug "element is not hittable" in t
 Processor's new 4-check suite uses only a guest `mktemp` IN/OUT fixture and `ARCHIVEPROC_HEADLESS=1`: no corpus,
 no API key, no CLI login, and no guest-Keychain access. It visibly checks the Anthropic wizard, multi-page
 auto-re-OCR, and Local Agent wizard/cost panes; `processor sighted` confirms a normal headless launch draws with
-no Keychain sheet. **Reader is 29/29, Notes is 21/21, and Processor is 4/4 in the VM** (the current suite
-sizes), so the **warn tier**
+no Keychain sheet. **Reader is 29/29 UI checks plus its 1/1 VM-only snapshot comparison, Notes is 21/21, and
+Processor is 4/4 in the VM** (the current suite sizes), so the **warn tier**
 (`AUTONOMOUS_GUI_VM_WARN_APPS`) is **empty by default** and a UITest failure in any app REDs the gate. Don't
 re-add an app to it without a tracked item — a permanent warn tier is a disabled test with extra steps. The gate is **ON by default**
 (`AUTONOMOUS_GUI_VM=0` disables); a missing VM / boot failure / guest-agent timeout **skips** (never parks), and
@@ -165,7 +172,7 @@ view/interaction changes here off-screen — the old `gui-mode` flag was retired
 (CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/hooks/no-host-gui.sh` now *enforces* that for
 unattended runs. VM TCC grants live on the VM's disk (re-apply if the VM is rebuilt).
 
-**One table, one wait — `ops/gui/tart-lib.sh`.** The per-app config (project/scheme/UITest bundle/guest
+**One table, one wait — `ops/gui/tart-lib.sh`.** The per-app config (project/scheme/test selectors/guest
 DerivedData/app bundle/fixture + its builder/launch command/pre-run) and the guest-agent wait are **shared** by
 `vm-gui-runner.sh` and `ops/autonomous/gui-vm-gate.sh`. That is load-bearing,
 not tidiness: the guest-agent fix below originally landed in the gate *only*, leaving the interactive

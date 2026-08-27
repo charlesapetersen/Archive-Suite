@@ -235,8 +235,8 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
     corpus-backed smoke-fixture subcheck is simply reported as not run when its optional sample is absent.
 - **GUI UITests in a headless VM (`AUTONOMOUS_GUI_VM`, ON by default since 2026-07-28; `=0` to disable).** That
   last gap — real *interaction / whole-window* UITests — now runs in the gate WITHOUT a screen:
-  `ops/autonomous/gui-vm-gate.sh` runs **one app's** UITest bundle inside the Tart VM (`ops/gui/README.md` §3)
-  — Reader, Notes, or Processor — off the owner's display and
+  `ops/autonomous/gui-vm-gate.sh` runs **one app's** configured test selectors inside the Tart VM
+  (`ops/gui/README.md` §3) — Reader, Notes, or Processor — off the owner's display and
   with no "Enable UI Automation" host prompt. **Fail-open** (Tier-2 posture): a missing VM / boot failure /
   guest-agent timeout **skips** (never parks — so it's inert on a machine with no VM built); it REDs only on a
   *reproducible* UITest failure (keyed on the `** TEST FAILED **` marker, with its own retry-once). It adds

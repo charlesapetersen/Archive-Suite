@@ -355,6 +355,14 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   inherited by an app-hosted test process (measured, and now commented at both ends). Automation keeps its
   pixel coverage through `RenderProbe`/`DocumentRenderGuardTests`, which need no committed reference.
   Follow-up `W29.t2-fu1` below. | Reader | M
+- [x] **`W29.t2-fu1` — run `SnapshotTests` in the GUI VM.** The Tart guest is now the committed-reference
+  renderer and the host intentionally skips. In temporary `.all` mode, the sandboxed test records a nonempty
+  uniquely named PNG in its own tmp directory, confirms the recording diagnostic, and emits a dedicated
+  `[shot]` marker. The VM runner copies only that marker's one file into `__Snapshots__/`, and only after
+  `** TEST SUCCEEDED **`; comparison mode cannot promote a reference. Reader's default VM selector now runs
+  both the UI suite and this VM-only unit test, using the same validated comma-separated selector helper as the
+  periodic GUI gate. Verified by guest record + pixel inspection, guest comparison, host skip, and the full
+  default Reader VM lane. **Shipped: this commit.** | Reader | M
 
 ## Signing + TCC consent (owner, 2026-08-07)
 

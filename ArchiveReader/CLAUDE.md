@@ -456,6 +456,8 @@ Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 (`assertRendersNonBlank`, `nonWhiteFraction`, `meanLuminance`); `DocumentRenderGuardTests.swift` guards the
 2-page PDF SPEC (page 0 scan / page 1 OCR) headlessly — no app launch, no TCC prompt, health-gate-safe.
 Reference-image diffs: `SnapshotTests.swift` (swift-snapshot-testing SPM dep; refs in `__Snapshots__/`).
+The Tart VM is its reference renderer: it compares there and deliberately skips on the host; see
+`ops/gui/README.md` for the guarded guest-only re-recording flow.
 Live sighted loop for the running app: `ops/gui/` (`capture-window.sh` + `cliclick`). See `ops/gui/README.md`.
 
 ## Stack & Build

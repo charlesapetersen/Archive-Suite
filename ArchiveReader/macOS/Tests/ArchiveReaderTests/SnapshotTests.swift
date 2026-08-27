@@ -4,9 +4,11 @@
 // diffs ("does it still look the way it did?"). Runs headless in the unit bundle — no app
 // launch, no XCUITest, no TCC prompt.
 //
-// References live in `__Snapshots__/` next to this file and are committed. To regenerate after
-// an intended visual change, set `record = true` once, run, then set it back and commit the new
-// PNG. `perceptualPrecision` absorbs sub-perceptual antialiasing drift from OS updates.
+// References live in `__Snapshots__/` next to this file and are committed. The Tart VM is the reference
+// renderer: to regenerate after an intended visual change, set `recordMode` to `.all` once and run the
+// Reader VM lane. The test writes its sandbox-local recording to tmp and the unsandboxed runner copies it
+// back to `__Snapshots__/`; set it back to `.missing` and re-run to compare. `perceptualPrecision` absorbs
+// sub-perceptual antialiasing drift from OS updates.
 //
 // A failing diff writes both the reference and the failing render to disk; open them (or ask a
 // session to `Read` them) to adjudicate whether a change is a real regression.
@@ -17,26 +19,17 @@ import SnapshotTesting
 
 final class SnapshotTests: XCTestCase {
 
-    /// `.all` regenerates the reference (flip here, run once, flip back, commit the new PNG);
-    /// `.missing` records only when no reference exists yet, otherwise compares.
+    /// `.all` regenerates the guest reference through the VM runner (flip here, run once, flip back);
+    /// `.missing` compares against the committed guest-rendered reference.
     private let recordMode: SnapshotTestingConfiguration.Record = .missing
+    private let referenceFileName = "testDeterministicViewMatchesReference.1.png"
 
     /// True inside the Tart GUI VM (an Apple-Virtualization guest reports `hw.model` as `VirtualMac*`).
     ///
-    /// **Why this test skips in the VM, when everything else runs there.** A pixel reference is only
-    /// meaningful against one renderer, and the same view rasterises differently on the host and in the
-    /// guest — so one of the two must be the reference machine and the other must not compare. That
-    /// choice is forced, not preferred: **the reference cannot be recorded in the VM.** The repo is a
-    /// read-only shared mount there and the test host is sandboxed, so recording fails with *"You don't
-    /// have permission to save the file … in the folder SnapshotTests"* (measured 2026-08-12). Since the
-    /// reference can only ever be produced on the host, the host is where it must be compared.
-    ///
-    /// The visual coverage automation *does* get is `RenderProbe` / `DocumentRenderGuardTests`, which
-    /// assert on rendered pixels without needing a committed reference and so run fine in the guest.
-    ///
-    /// Making this run in the VM means teaching the test to write its recording to the guest's own tmp
-    /// and having `vm-gui-runner.sh` copy it back — the same trick `collect_shots` already does for
-    /// screenshots. That is unbuilt; see `SUITE_TODO.md`.
+    /// Snapshot pixels are renderer-specific: the Tart guest is the one reference machine, so this test
+    /// deliberately skips on the host. The app-hosted test runner is sandboxed and cannot update the shared
+    /// repo; its intentional `.all` recording therefore goes to its own tmp directory, emits a `[shot]`
+    /// path, and `vm-gui-runner.sh` copies that one named artifact back to the committed reference.
     private var isVirtualMachine: Bool {
         var size = 0
         guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else { return false }
@@ -48,13 +41,11 @@ final class SnapshotTests: XCTestCase {
 
     @MainActor
     func testDeterministicViewMatchesReference() throws {
-        try XCTSkipIf(
+        try XCTSkipUnless(
             isVirtualMachine,
             """
-            Skipped in the GUI VM: the committed reference is host-rendered and the guest rasterises \
-            differently, so comparing here reports a renderer difference rather than a change to the \
-            view. It cannot be re-recorded here either — the repo is a read-only shared mount and this \
-            test host is sandboxed. Run the Reader's tests on the host for this one assertion.
+            Skipped on the host: SnapshotTests uses the Tart VM as its reference renderer because host and \
+            guest rasterise this view differently. Run `ops/gui/vm-gui-runner.sh reader xcuitest`.
             """
         )
         // Pure geometry + colour (no text) → stable across runs on this machine.
@@ -72,10 +63,29 @@ final class SnapshotTests: XCTestCase {
         let host = NSHostingController(rootView: view)
         host.view.frame = CGRect(x: 0, y: 0, width: 300, height: 180)
 
-        assertSnapshot(
-            of: host,
-            as: .image(precision: 0.99, perceptualPrecision: 0.98),
-            record: recordMode
-        )
+        let strategy = Snapshotting<NSViewController, NSImage>.image(
+            precision: 0.99, perceptualPrecision: 0.98)
+        if recordMode == .all {
+            let fileManager = FileManager.default
+            let recordingDirectory = fileManager.temporaryDirectory
+                .appendingPathComponent("ArchiveReaderSnapshotTests-\(UUID().uuidString)", isDirectory: true)
+            let recordedReference = recordingDirectory.appendingPathComponent(referenceFileName)
+            let message = verifySnapshot(
+                of: host,
+                as: strategy,
+                named: "1",
+                record: .all,
+                snapshotDirectory: recordingDirectory.path
+            )
+            XCTAssertTrue(message?.contains("Record mode is on. Automatically recorded snapshot") == true,
+                          "the VM recording must be explicitly confirmed by SnapshotTesting")
+            XCTAssertTrue(fileManager.isReadableFile(atPath: recordedReference.path),
+                          "the VM reference must be written to the test host's own temporary directory")
+            XCTAssertGreaterThan(try Data(contentsOf: recordedReference).count, 0,
+                                 "the VM reference must contain rendered pixels before it is promoted")
+            print("[shot] reader-snapshot-reference: wrote \(recordedReference.path)")
+        } else {
+            assertSnapshot(of: host, as: strategy, named: "1", record: recordMode)
+        }
     }
 }

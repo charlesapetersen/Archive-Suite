@@ -68,6 +68,8 @@ GUEST_APP="$(archive_app_field "$APP" appbundle)"   # procname is read by tart_k
 GUEST_FIXTURE="$(archive_app_field "$APP" fixture)"; MKFIXTURE="$(archive_app_field "$APP" mkfixture)"
 LAUNCHCMD="$(archive_app_field "$APP" launchcmd)";  PRERUN="$(archive_app_field "$APP" prerun)"
 ONLY_TESTING="${ONLY_TESTING:-$(archive_app_field "$APP" tests)}"
+TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
+  || die "invalid VM test selector list '$ONLY_TESTING' (comma-separated Xcode test identifiers only)"
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""
 
 # Belt-and-braces: close a Screen Sharing window if one appears anyway. With `--no-graphics
@@ -247,15 +249,18 @@ run_xcuitest() {
     rm -rf '$GUEST_DD/uitest.xcresult'
     xcodebuild test \
       -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
-      -only-testing:'$ONLY_TESTING' -destination 'platform=macOS' \
+      $TEST_ARGS -destination 'platform=macOS' \
       -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/uitest.xcresult' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " 2>&1 | tee "$APP_ART/xcuitest.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
   log "XCUITest log: $APP_ART/xcuitest.log"
   collect_shots
   collect_xcresult
-  grep -q '\*\* TEST SUCCEEDED \*\*' "$APP_ART/xcuitest.log" 2>/dev/null \
-    || warn "no '** TEST SUCCEEDED **' marker for $APP — read the log before believing this run passed."
+  if grep -q '\*\* TEST SUCCEEDED \*\*' "$APP_ART/xcuitest.log" 2>/dev/null; then
+    collect_snapshot_reference
+  else
+    warn "no '** TEST SUCCEEDED **' marker for $APP — read the log before believing this run passed."
+  fi
 }
 
 # --- bring the tests' screenshots back to the host (STEP 3.5's "READ the screenshot") ---------------
@@ -288,6 +293,37 @@ collect_shots() {
     fi
   done <<< "$paths"
   log "$n screenshot(s) collected into $dest — READ them; pixels are the point of a GUI check."
+}
+
+# An intentional Reader snapshot re-record is not an ordinary diagnostic shot. The sandboxed test writes the
+# reference into its own tmp directory and names exactly one `[shot] reader-snapshot-reference` line; only a
+# green VM test may promote that artifact into the shared, guest-rendered reference. The Tart guest agent is
+# unsandboxed and can write the repo share even though the app-hosted test process cannot.
+collect_snapshot_reference() {
+  [ "$APP" = reader ] || return 0
+  local path target paths count
+  paths="$(sed -nE 's/^\[shot\] reader-snapshot-reference: wrote (.+)$/\1/p' "$APP_ART/xcuitest.log" \
+    | sort -u || true)"
+  [ -n "$paths" ] || return 0
+  count="$(printf '%s\n' "$paths" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [ "$count" -ne 1 ]; then
+    warn "refusing to promote multiple Reader snapshot recordings from one VM run"
+    return 0
+  fi
+  path="$paths"
+  case "$path" in
+    "$GUEST_HOME"/Library/Containers/com.archivereader.app/Data/tmp/ArchiveReaderSnapshotTests-*/testDeterministicViewMatchesReference.1.png) ;;
+    *)
+      warn "refusing Reader snapshot recording outside the test host's expected temporary directory"
+      return 0
+      ;;
+  esac
+  target="$GUEST_REPO/ArchiveReader/macOS/Tests/ArchiveReaderTests/__Snapshots__/SnapshotTests/testDeterministicViewMatchesReference.1.png"
+  if tart exec "$VM" bash -lc "cp \"$path\" \"$target\"" >/dev/null 2>&1; then
+    log "Reader VM reference updated at ArchiveReader/macOS/Tests/ArchiveReaderTests/__Snapshots__/SnapshotTests/testDeterministicViewMatchesReference.1.png"
+  else
+    warn "Reader snapshot recording was not copied back to the committed reference"
+  fi
 }
 
 # Keep the result bundle beside the textual log and screenshots. It is useful when Xcode finalized it,

@@ -96,6 +96,8 @@ run_gate() { # mode expected-exit label
 run_gate pass 0 round-reader
 want "$CALLS" 'ArchiveReader/macOS/ArchiveReader.xcodeproj' 'first round selects Reader'
 want_not "$CALLS" 'ArchiveNotes/macOS/ArchiveNotes.xcodeproj' 'first round does not also run Notes'
+want "$CALLS" '-only-testing:ArchiveReaderUITests -only-testing:ArchiveReaderTests/SnapshotTests' \
+  'Reader gate keeps both the UI suite and VM-only snapshot selector'
 want "$STATE" 'reader' 'state records Reader'
 [ -f "$ART/reader/xcuitest-attempt1.log" ] && pass 'Reader log is namespaced' || bad 'Reader log is namespaced'
 

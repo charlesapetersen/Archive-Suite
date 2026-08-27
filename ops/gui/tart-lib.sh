@@ -49,7 +49,7 @@ tart_require() {
 # archive_app_field APP FIELD — the single per-app config table for the whole GUI lane.
 # Adding an app is one block here, not a fork of either script.
 #   spec/proj/scheme/tests : xcodegen spec (host, repo-relative), .xcodeproj (repo-relative), scheme,
-#                            UITest bundle
+#                            comma-separated Xcode test identifiers (the UI bundle plus any VM-only unit proof)
 #   dd                     : guest DerivedData (one per app, so they can't clobber each other)
 #   appbundle              : built .app inside dd — the sighted lane launches this
 #   procname               : `pkill -x` name
@@ -67,7 +67,7 @@ archive_app_field() {
     reader:spec)      echo "ArchiveReader/macOS/project.yml" ;;
     reader:proj)      echo "ArchiveReader/macOS/ArchiveReader.xcodeproj" ;;
     reader:scheme)    echo "ArchiveReader" ;;
-    reader:tests)     echo "ArchiveReaderUITests" ;;
+    reader:tests)     echo "ArchiveReaderUITests,ArchiveReaderTests/SnapshotTests" ;;
     reader:dd)        echo "$GUEST_HOME/dd-reader" ;;
     reader:appbundle) echo "$GUEST_HOME/dd-reader/Build/Products/Debug/ArchiveReader.app" ;;
     reader:procname)  echo "ArchiveReader" ;;
@@ -113,6 +113,22 @@ archive_app_field() {
 }
 
 archive_app_known() { [ -n "$(archive_app_field "$1" scheme)" ]; }
+
+# archive_xcode_test_args SELECTORS — turn the comma-separated table/override value into safe xcodebuild
+# `-only-testing:` arguments. Both VM entry points use this helper so the Reader's VM-only unit snapshot
+# proof cannot run interactively but silently disappear from the periodic gate (or vice versa).
+archive_xcode_test_args() {
+  local selectors="$1" selector
+  local -a selected=()
+  [ -n "$selectors" ] || return 1
+  case "$selectors" in ,*|*,|*,,*) return 1 ;; esac
+  IFS=',' read -r -a selected <<< "$selectors"
+  for selector in "${selected[@]}"; do
+    [ -n "$selector" ] || return 1
+    [[ "$selector" == *[![:alnum:]_./-]* ]] && return 1
+    printf '%s ' "-only-testing:$selector"
+  done
+}
 
 # ---------------------------------------------------------------------------------------------------
 # tart_wait_agent VM [SECONDS] — block until the Tart Guest Agent answers. 0 = ready, 1 = timed out.

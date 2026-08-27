@@ -170,11 +170,15 @@ is_success() { grep -q '\*\* TEST SUCCEEDED \*\*' "$(applog "$1" "$2")" 2>/dev/n
 is_processor_no_window() { [ "$1" = processor ] && grep -q '^PROCESSOR_UI_NO_WINDOW$' "$(applog "$1" "$2")" 2>/dev/null; }
 
 run_app_once() {   # $1 = app, $2 = attempt number
-  local app="$1" attempt="$2" log fixture mk prerun proj scheme tests dd bundle frc ddrc result_art
+  local app="$1" attempt="$2" log fixture mk prerun proj scheme tests test_args dd bundle frc ddrc result_art
   mkdir -p "$(app_art "$app")"
   log="$(applog "$app" "$attempt")"; : > "$log"
   proj="$(archive_app_field "$app" proj)";   scheme="$(archive_app_field "$app" scheme)"
   tests="$(archive_app_field "$app" tests)"; dd="$(archive_app_field "$app" dd)"
+  test_args="$(archive_xcode_test_args "$tests")" || {
+    echo "SKIP[$app]: invalid VM test selector list '$tests'" >>"$log"
+    return 0
+  }
   fixture="$(archive_app_field "$app" fixture)"; mk="$(archive_app_field "$app" mkfixture)"
   prerun="$(archive_app_field "$app" prerun)"
   # CHECKED, not fire-and-forget (W21.vmgui-g14-leak). This used to be a bare
@@ -253,7 +257,7 @@ run_app_once() {   # $1 = app, $2 = attempt number
   "${TO[@]}" tart exec "$VM" bash -lc "
     rm -rf '$bundle'
     xcodebuild test -project '$GUEST_REPO/$proj' -scheme '$scheme' \
-      -only-testing:$tests -destination 'platform=macOS' \
+      $test_args -destination 'platform=macOS' \
       -derivedDataPath '$dd' -resultBundlePath '$bundle' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " >>"$log" 2>&1

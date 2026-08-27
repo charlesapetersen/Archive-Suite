@@ -50,17 +50,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 
-## Reader test hardening (owner-reviewed 2026-07-18)
-
-- [ ] **`W29.t2-fu1` — let `SnapshotTests` run in the GUI VM.** It skips there today because the reference
-  can only be recorded on the host: the guest mounts the repo read-only and the test host is sandboxed, so
-  a recording write fails outright (`W29.t2`). The fix is the trick `vm-gui-runner.sh`'s `collect_shots`
-  already uses for screenshots — have the test record into the guest's own tmp, print
-  `[shot] <name>: wrote <path>`, and let the (unsandboxed) `tart exec` copy it back to `__Snapshots__/`.
-  Then the VM becomes the reference machine and the skip inverts to the host. Worth doing only if
-  reference-image coverage in automation is wanted; `RenderProbe`/`DocumentRenderGuardTests` already give
-  automation reference-free pixel guards. | Reader | M | risk low | **needs:** none
-
 ## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
 
 **Focus now:** the **wired (USB) + wireless (LAN/Wi-Fi) phone↔Mac transmission** path and the **Android**
