@@ -99,8 +99,8 @@ this plan). Each item is independently shippable in its own worktree per the rep
 **A3. Decide & resolve `ArchiveNotes/AGENTS.md`. — ✅ DONE (W9 Phase A docs, 2026-07-18).** — planned in `01` S5 Files; absent. Peers have one; root `AGENTS.md:5` routes readers to `ArchiveNotes/CLAUDE.md` instead (worked around). *Decision:* created the app-local lane doc like the peers (both peers ship one), and fixed root `AGENTS.md:5` to route to `ArchiveNotes/AGENTS.md`.
 - *Files:* NEW `ArchiveNotes/AGENTS.md` **or** an explicit note in `CLAUDE.md`/root `AGENTS.md` folding the lane in. *Steps:* either create the app-local lane doc like the peers, or record the decision to keep it in root `AGENTS.md` and fix the plan's expectation. *Verify:* the routing in root `AGENTS.md` matches reality. *Tier-1.*
 
-**A4. Complete the SPEC `ArchiveSuite` marker delta.** — `01` S5/§6: the facet-table row landed (`SPEC/tag-format.md:71`), but the dedicated prose section and the change-protocol relaxation note did not.
-- *Files:* `SPEC/tag-format.md`. *Steps:* add the "### Suite membership marker (`ArchiveSuite`)" section (Class / Cardinality / Parse-order / **Deferred: not consumed by Reader/Processor in run 1**); add the additive/read-only exception note to "Divergence risk & change protocol" (~line 205) explaining why this landed without a three-way change. *Verify:* delta is strictly additive; no existing rule altered. **Tier-2** (SPEC change — adversarial prose review).
+**A4. Removed by R13d.** The former `ArchiveSuite` marker surface and its SPEC row were intentionally deleted;
+do not recreate the deferred exclusion feature.
 
 **A5. Shipped execution plans — DONE (`78e9b46`).** The per-wave plans (`00a`, `01`–`08`) were pruned on ship; only `00-overview.md` is retained (the authoritative interface contract) alongside this plan.
 - *Remaining verify (folds into E4):* confirm nothing in `SUITE_TODO.md`/docs points at a deleted plan file, and that `00-overview.md` + `09-gap-closure.md` are the only files left under `execution-plans/archive-notes/`. *Tier-1.*
@@ -361,8 +361,8 @@ in the same commit — the docs move with the code. *Tier per the items reviewed
 
 ## Explicitly out of scope (plan-stated deferrals — NOT gaps)
 
-Recorded here so a future reviewer doesn't re-flag them: Reader/Processor *consuming* the `ArchiveSuite`
-marker + corpus back-fill (D4); Processor stamping the marker; mirroring **author/date/quality** into Finder tags (see the A11 deviation note below); a
+Recorded here so a future reviewer doesn't re-flag them: mirroring **author/date/quality** into Finder tags
+(see the A11 deviation note below); a
 single merged unified-writer signature; unifying the page-2 header *builder*; a shared suite-wide storage
 path; page-within-merged-PDF scroll navigation; editor tables/footnotes/task-lists/strikethrough/HTML and
 undo-across-raw-toggle; per-block stable GUIDs and the reverse "N extracts derive from this note" index;
@@ -386,9 +386,9 @@ renames (authorized by overview §16).
 durability section said other metadata "e.g. **author and date**" should go in macOS tags, and its tags
 section wanted a **quality** ordering "akin to the priority tag in Reader … **not** a regular tag"
 (Reader's priority *is* a projected Finder tag). The build instead keeps `authors`, `date`, and `quality`
-in the note's `.md` **YAML front-matter** (authoritative, durable plain text) and projects **only subjects
-+ the `ArchiveSuite` marker** to Finder tags — overview **D2** (front-matter authoritative; mirror only
-subjects + marker; "no author/date/quality pollution of the global tag namespace"), **D4** ("no `Author:`
+in the note's `.md` **YAML front-matter** (authoritative, durable plain text) and projects **only subjects**
+to Finder tags — overview **D2** (front-matter authoritative; mirror only subjects; "no
+author/date/quality pollution of the global tag namespace"), **D4** ("no `Author:`
 facet"), **D9** (quality = front-matter `1..5` + priority-style UI, "not a Finder tag this run").
 **Functionally sound, no work required:** front-matter YAML still satisfies the original "durable against
 this program no longer being developed" intent. **Open owner decision (→ Daemon Report):** whether to

@@ -1172,9 +1172,8 @@ launch safeguards; the gate rotates one route per run.
   alongside `setTitle`, both routed through the audited `mutateItem` path, and a **tag editor** in the metadata
   inspector — `setTags` must write front-matter **and** run `NotesTagProjector` so Finder tags stay in sync,
   which is what makes the whole item Tier-2 rather than Tier-1. Extend `NotesTagProjectorSafetyTests`.
-  ⚠️ **Ordering with `R13d REVERSED`:** R13d ships first (TIER 4 vs this item's TIER 5) and *removes* the
-  `ArchiveSuite` marker outright, so the marker half of the post-rename assertion below will be moot by the
-  time this runs — assert on the projected **subjects** only, and do not re-add a marker check.
+  **R13d is complete:** it removed the `ArchiveSuite` marker outright, so assert on projected **subjects**
+  only and do not re-add a marker check.
   Owner decision
   2026-08-02 (daemon-report walkthrough): **this is a GAP, not a design choice.** He was offered the
   "titles are derived from the archival source, so renaming is intentionally not offered" reading and
@@ -1203,8 +1202,8 @@ launch safeguards; the gate rotates one route per run.
   which is why this is nearer **S–M** than the **M** first filed.
   **What genuinely remains to be checked inside the item** (one assertion, not a redesign): the store does
   `moveItem` and *then* an atomic overwrite (`Data.write(options: [.atomic])`, `:259`), while
-  `NotesTagProjector` writes the managed Finder tags onto that same `.md`. Assert the projected subjects **and**
-  the `ArchiveSuite` marker are still on the file after a rename. ⚠️ If they are NOT, that is a **pre-existing
+  `NotesTagProjector` writes the managed Finder tags onto that same `.md`. Assert the projected subjects are
+  still on the file after a rename. ⚠️ If they are NOT, that is a **pre-existing
   defect on every `mutateItem` path** (`setDate`/`setQuality`/`setBody` all do the same atomic overwrite) —
   **file it separately; do NOT absorb it into this item or let it grow the diff.**
   **Free to get right now and stops being free later:** per the 2026-08-01 STANDING PREMISE, Notes holds only
@@ -1350,43 +1349,14 @@ Owner went through the owner-only queue. Recorded here so none of it gets re-sur
   appear, so the Processor was never actually seeded when this was written. It is seeded NOW. Left in place
   rather than rewritten because it is a dated record of what was believed. **Stop deferring visual checks to the owner as
   "GUI blocked"** — that claim was stale and cost the owner a lot of pointless eyeballing.
-- [ ] **R13d REVERSED — remove `ArchiveSuite` stamping from Notes; drop the exclusion feature entirely
-  (owner decision 2026-07-16: "Forget about excluding other tagged files. Notes should no longer tag things as
-  ArchiveSuite").** The marker was only ever written, never consumed (no Reader filtering / Processor stamping /
-  back-fill), so the whole feature goes rather than getting finished. Scope:
-  - Stop stamping: drop `suiteMarker` from the managed vocabulary (`ArchiveNotes/Core/NotesTagVocabulary.swift:11`
-    → `ArchiveSuiteMarker.tagName`) so `NotesTagProjector` neither adds **nor removes** it; the marker-filter in
-    `Core/ItemSummaryDisplay.swift:39-43` then becomes dead and can go too.
-  - **⚠️ Decide the projector semantics deliberately — this is the Tier-2 trap.** `NotesTagProjector` *manages*
-    its token set: if the marker stays "managed" but merely "not desired", the next projection **strips
-    `ArchiveSuite` from the owner's existing note files** (a real tag WRITE). Removing it from the managed set
-    instead leaves existing stamps in place, inert. ✅ **THE OWNER ASKED, 2026-08-13: STRIP.** He was put the
-    question directly (his grant said to ask once it became cheap) and chose the clean end state, so the
-    deliverable is that the marker keeps its managed status long enough to **REMOVE existing `ArchiveSuite`
-    stamps**, and then the surface goes. ⚠️ This is a real tag WRITE → Tier-2, scratch copies only, never a real
-    store, with a functional proof that a stripped note keeps every OTHER tag it had. The former default —
-    *leave existing stamps alone* — is **REVERSED**; do not implement it. Rationale and the amended grant:
-    `OWNER_AUTHORIZATIONS.md` §`R13d`.
-  - Retire the now-unused marker surface: `packages/ArchiveCore/Sources/ArchiveCore/ArchiveSuiteMarker.swift`
-    (check `Links/RootMarker.swift` — the root marker is a *separate* durable-link concern and must survive).
-  - **SPEC** (`SPEC/tag-format.md:71`, the "Suite marker" row) — the tag/PDF contract is the **highest-risk shared
-    surface**: update it in the SAME commit as the code. This also **inverts W9 Phase A's "finish the SPEC
-    `ArchiveSuite` marker section"** — that sub-task is now "remove it".
-  - Drop the `(later)` behavior/data follow-on's marker half (Reader hides `ArchiveSuite` / corpus back-fill /
-    Processor stamping) — see that item below.
-  **Tier-2** (tag-write path + the shared SPEC): adversarial review + a scratch-copy functional test; NEVER the
-  real corpus. | files: ArchiveNotes Core/{NotesTagVocabulary,NotesTagProjector,ItemSummaryDisplay}.swift,
-  packages/ArchiveCore/ArchiveSuiteMarker.swift, SPEC/tag-format.md | M | med | none
-
 ## Archive Notes — NEW APP (SHIPPED W0–W8, 2026-07; `execution-plans/archive-notes/00-overview.md` retained)
 Owner-specced third Suite app; foundational decisions locked (D1–D10, `00-overview.md §2`). **All waves shipped;
 the per-wave plans (`00a`, `01`–`08`) were deleted on ship** (git history + the W0–W8 `[x]` records below are the
 account); only `00-overview.md` is retained as the authoritative interface contract. DevonThink informs **only**
 the 3-pane browsing shell — everything else (note appearance, link/provenance UI, replication semantics) is
-purpose-built for the historian's provenance-first workflow. **Owner decision points (early):** (a) **R13d** —
-the `ArchiveSuite` *exclusion* effect is deferred to the later behavior/data follow-on (see `00 §2` call-out).
-**Confirmed (owner):** the FULL **ArchiveCore extraction + Reader/Processor migration is W0 — done FIRST** (`00a`),
-before any Notes-specific work.
+purpose-built for the historian's provenance-first workflow. **R13d removed the former `ArchiveSuite`
+marker/exclusion feature; no later convergence work remains for it.** **Confirmed (owner):** the FULL
+**ArchiveCore extraction + Reader/Processor migration is W0 — done FIRST** (`00a`), before any Notes-specific work.
 ### W9 gap-closure — DECOMPOSED 2026-08-16 (was one checkbox hiding Phases A–E)
 
 ⚠️ **`W9` as a single item is GONE.** It was one `- [ ]` standing for a 390-line, five-phase plan, and the
@@ -1404,9 +1374,8 @@ pattern deliberately (`execution-plans/tracker-consolidation.md` finding F2). Th
 these items are the *state*. Each maps 1:1 to a plan sub-item ID, so `W9.b4` is plan item **B4**, verbatim.
 
 **Phase A is done except one item, and one is now moot.** A1, A2, A3, A5, A6, A7, A8, A9 and A11 all shipped
-2026-07-18. **A4 is NOT recreated here**: `R13d REVERSED` says in its own scope that it *"inverts W9 Phase A's
-'finish the SPEC `ArchiveSuite` marker section'* — that sub-task is now 'remove it'". Writing the SPEC section
-A4 asks for would be work `R13d` then deletes. ⛔ Do not file A4 again. **D5** also shipped (W14.4b,
+2026-07-18. **A4 is NOT recreated here:** R13d shipped the intended removal of the `ArchiveSuite` marker
+surface. ⛔ Do not file A4 again. **D5** also shipped (W14.4b,
 live-verified 2026-07-17).
 
 **Two CANDIDATE findings come first.** The 2026-07-18 GUI sweep was cut short by a usage limit and left two
@@ -1556,10 +1525,9 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
   neither guard could ever have said so — see `W31.handoff-fp2`. **Scope it before working it:** its only
   surviving sub-bullet is DROPPED (below), so what "unified storage path" now means is undecided.
   - ~~Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**~~ — **DROPPED
-    (owner 2026-07-16).** The whole `ArchiveSuite` marker/exclusion feature is reversed: Notes stops stamping it
-    (see the "R13d REVERSED" item above) and nothing will consume it, so there is nothing to hide, back-fill, or
-    stamp. This also removes the only reason for a corpus-wide tag back-fill — the Suite's single
-    highest-risk operation. Do not re-propose it.
+    (owner 2026-07-16; R13d shipped the removal).** Nothing consumes or emits the old marker, so there is
+    nothing to hide, back-fill, or stamp. This also removes the only reason for a corpus-wide tag back-fill —
+    the Suite's single highest-risk operation. Do not re-propose it.
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no

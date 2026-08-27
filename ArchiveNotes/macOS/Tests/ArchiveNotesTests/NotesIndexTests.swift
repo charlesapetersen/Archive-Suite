@@ -227,10 +227,10 @@ import Foundation
 
         let id = UUID()
         let now = Date()
-        let tagsJSON = "[\"History\",\"ArchiveSuite\"]"
+        let tagsJSON = "[\"History\",\"Archives\"]"
 
         try await index.upsertBatch([
-            makeRow(id: id, title: "Test Summary", kind: .extract, tags: "History ArchiveSuite",
+            makeRow(id: id, title: "Test Summary", kind: .extract, tags: "History Archives",
                     authors: "Smith Jones", authorsJSON: "[\"Smith\",\"Jones\"]",
                     date: "1920-03", datePrecision: .month,
                     dateUncertain: true, sortDate: 19200300, quality: 4,
@@ -248,7 +248,7 @@ import Foundation
         #expect(summary?.authors == ["Smith", "Jones"])
         #expect(summary?.sortDate == 19200300)
         #expect(summary?.quality == 4)
-        #expect(summary?.managedTags == ["History", "ArchiveSuite"])
+        #expect(summary?.managedTags == ["History", "Archives"])
     }
 
     /// The `source_count` column (W7-S4) round-trips through insert → UPDATE → both projections. This

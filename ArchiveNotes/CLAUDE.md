@@ -11,7 +11,7 @@ this file is authoritative for Notes‑specific work.
   `~/Library/Application Support/ArchiveNotes/`). The archive corpus is **read‑only** — durable‑link
   resolution and page rendering only; no tag writes, no moves, no deletes on corpus files.
 - The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors front‑matter onto the
-  note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. It projects **only `tags` (subjects) + the `ArchiveSuite` marker**;
+  note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. It projects **only `tags` (subjects)**;
   `authors`, `date`, and `quality` stay **front‑matter‑only** (authoritative, durable plain‑text YAML)
   — a deliberate deviation from the original spec (which wanted author/date in macOS tags and a quality
   ordering "akin to Reader's priority tag"): front‑matter still satisfies "durable against this program
@@ -192,7 +192,7 @@ macOS/Sources/ArchiveNotes/
                                    + deterministic nil-last multi-level sort over ItemSummary (W6-S3;
                                    adapts Reader LibrarySort)
     ItemSummaryDisplay.swift       Pure item-list cell rendering: displayDate (decade/year/month/day),
-                                   qualityStars, displayTags (hides ArchiveSuite marker) (W6-S3);
+                                   qualityStars, displayTags (W6-S3);
                                    sourcesText (count for extracts, blank otherwise) (W7-S4)
     NotesFolderNode.swift          Id-keyed folder-tree node + buildNormalForest (group-by-parentId,
                                    sortOrder→name sort, distinct-subtree counts, orphan/cycle-safe)
@@ -204,7 +204,7 @@ macOS/Sources/ArchiveNotes/
                                    windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4);
                                    windowHiddenColumns(for:)/setWindowHiddenColumns per-window column visibility —
                                    Note window defaults to hiding the always-blank Sources column (W14.4d)
-    NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects + ArchiveSuite marker)
+    NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files;
                                    isScratchPath + a DEBUG scratch-write guard (test/GUI-drive contexts
                                    only, off in the real app, out of Release) mechanically refuse a tag
@@ -399,7 +399,7 @@ macOS/Sources/ArchiveNotes/
 
 macOS/Tests/ArchiveNotesTests/
   SmokePlaceholderTests.swift      Trivial test for the smoke gate
-  ArchiveCoreWiringTests.swift     DurableLink/RootMarker/ArchiveSuiteMarker from Notes target
+  ArchiveCoreWiringTests.swift     DurableLink/RootMarker from Notes target
   NotesAppSettingsTests.swift      20 tests: isolated-defaults layout persistence/clamping, including
                                    harness-close suppression + ordinary-close write-through (W21)
   NotesFilterTests.swift           NotesFilter defaults/isEmpty/Codable/Equatable + matches (all facets,
@@ -417,10 +417,10 @@ macOS/Tests/ArchiveNotesTests/
                                    boundary-guard, recover-managed
   NotesTagProjectorSafetyTests.swift  10 crown-jewel safety tests (W8-S2, Tier-2, scratch .md +
                                    data-fork byte-equality): §3 read-failure aborts (no []-coercion,
-                                   neighbors untouched), concurrent-projections-never-corrupt (marker
-                                   + both racing subjects survive — §10 closed the lost-update race, W15.tu4),
-                                   §5 unmanaged-tag lossless, §6 "ArchiveSuite"-subject collision
-                                   (single/whole-string/marker-never-stripped), §8/§9 disk-backed
+                                   neighbors untouched), concurrent-projections-never-corrupt (both racing
+                                   subjects survive — §10 closed the lost-update race, W15.tu4), §5 unmanaged-tag
+                                   lossless + legacy-marker strip, §6 "ArchiveSuite" as an ordinary subject,
+                                   §8/§9 disk-backed
                                    verify + reconcile-via-fresh-delta, §5 no-op no-mtime-churn,
                                    title-casing, §7 label-never-written, isScratchPath predicate +
                                    scratch-guard-live-under-XCTest
@@ -593,7 +593,6 @@ packages/ArchiveCore/              Shared read-side contract — see root CLAUDE
   PDF/                             ExtractedContent (PDFHeaderParser), PDFFormatStatus
   Links/                           DurableLink, RootMarker, ArchiveLinkPayload + UTI
   Thumbnails/                      PDFThumbnailer actor, ThumbnailCacheKey (disk LRU)
-  ArchiveSuiteMarker.swift         Suite membership tag recognition + filter
 ```
 
 The map grows with each wave (W2 storage, W3 editor, W4 linking, W5 Zotero, W6 viewers,

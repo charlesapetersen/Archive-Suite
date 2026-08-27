@@ -4,7 +4,6 @@
 // convention (SPEC; Reader W3.f6 pinned the same locale for PDF dates).
 
 import Foundation
-import ArchiveCore
 
 extension ItemSummary {
     /// Human-readable date for the Date column, derived from `date` + `datePrecision` per the SPEC
@@ -35,12 +34,9 @@ extension ItemSummary {
         return String(repeating: "★", count: filled) + String(repeating: "☆", count: 5 - filled)
     }
 
-    /// Comma-joined subjects for the Tags column (read-only here). The managed-tags projection carries
-    /// the title-cased subjects plus the `ArchiveSuite` provenance marker; the marker is an internal
-    /// concern and is hidden from the list, matching Reader's topical-tags display.
+    /// Comma-joined subjects for the Tags column (read-only here).
     var displayTags: String {
         managedTags
-            .filter { $0.caseInsensitiveCompare(ArchiveSuiteMarker.tagName) != .orderedSame }
             .joined(separator: ", ")
     }
 

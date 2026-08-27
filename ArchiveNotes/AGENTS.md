@@ -57,8 +57,8 @@ worktree." Notes depends on the local `packages/ArchiveCore` Swift package.
   change there must build + test **all three** apps' test bundles (a non-exhaustive switch broke the
   Notes bundle once — see `KNOWN_ISSUES.md`).
 - **The tag/PDF contract** — [`../SPEC/tag-format.md`](../SPEC/tag-format.md). Reader, Processor, and
-  Notes must interpret tags/date facets/the `ArchiveSuite` marker identically; a divergence risks
-  corrupting or mis-reading irreplaceable data.
+  Notes must interpret the shared tags and date facets identically; a divergence risks corrupting or
+  mis-reading irreplaceable data.
 - **The on-disk front-matter format** (`Store/FrontMatterCodec.swift`) — must round-trip losslessly
   (unknown keys preserved byte-for-byte); it *is* the durable note format.
 - **`macOS/project.yml`** (never hand-edit `.pbxproj`; edit `project.yml` + `xcodegen generate`).

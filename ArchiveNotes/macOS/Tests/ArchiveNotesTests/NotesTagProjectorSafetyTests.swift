@@ -87,7 +87,7 @@ struct NotesTagProjectorSafetyTests {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
 
         // A real, pre-seeded sibling in the same item dir — must be byte- and tag-untouched.
-        let sibling = try makeScratchFile(in: dir, name: "Real Note.md", tags: ["History", "ArchiveSuite"])
+        let sibling = try makeScratchFile(in: dir, name: "Real Note.md", tags: ["History"])
         let siblingBytes = try fileBytes(sibling)
         let siblingTags = Set(try readTags(sibling))
 
@@ -99,7 +99,7 @@ struct NotesTagProjectorSafetyTests {
         var threw = false
         do {
             _ = try NotesTagProjector.project(
-                ["Economics", "ArchiveSuite"], previouslyManaged: [], to: missing, itemDir: dir)
+                ["Economics"], previouslyManaged: [], to: missing, itemDir: dir)
         } catch {
             threw = true // an unreadable/coordination abort — the point is it did not WRITE.
             if let e = error as? TagWriteError {
@@ -120,20 +120,20 @@ struct NotesTagProjectorSafetyTests {
         #expect(Set(try readTags(sibling)) == siblingTags)
     }
 
-    // MARK: - Concurrency: never corrupt, never lose the marker (torn-write / wipe guard)
+    // MARK: - Concurrency: never corrupt or lose a projected subject (torn-write / wipe guard)
 
-    @Test("concurrent same-file projections keep BOTH racing subjects + marker; never corrupt (§10, W15.tu4)")
+    @Test("concurrent same-file projections keep BOTH racing subjects; never corrupt (§10, W15.tu4)")
     func concurrentProjectionsNeverCorrupt() async throws {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
         let url = try makeScratchFile(in: dir, tags: [])
         let bytesBefore = try fileBytes(url)
 
-        // Two genuinely-parallel projections, each adding a DISTINCT subject + the marker.
+        // Two genuinely-parallel projections, each adding a distinct subject.
         let a = Task.detached {
-            try NotesTagProjector.project(["Economics", "ArchiveSuite"], previouslyManaged: [], to: url, itemDir: dir)
+            try NotesTagProjector.project(["Economics"], previouslyManaged: [], to: url, itemDir: dir)
         }
         let b = Task.detached {
-            try NotesTagProjector.project(["History", "ArchiveSuite"], previouslyManaged: [], to: url, itemDir: dir)
+            try NotesTagProjector.project(["History"], previouslyManaged: [], to: url, itemDir: dir)
         }
         // Neither call throws — coordination keeps each write self-consistent.
         _ = try await a.value
@@ -142,13 +142,12 @@ struct NotesTagProjectorSafetyTests {
         let after = Set(try readTags(url))
         // W15.tu4 — the assertion is now STRONGER than at W8-S2: the §10 per-resolved-path lock
         // (W15.tu3, inside ArchiveCore.CoordinatedTagWriter) serializes the two same-file writes, so
-        // BOTH racing subjects survive — not just the marker. Each projection passes
+        // BOTH racing subjects survive. Each projection passes
         // previouslyManaged: [] (so it removes nothing), and the second to acquire the lock reads the
         // first's committed tags fresh and merely appends its own subject → exactly the two subjects
-        // plus the marker, deterministically, in either interleaving.
-        #expect(after == ["Economics", "History", "ArchiveSuite"],
-                "both racing subjects survive + marker; no lost update, no invented/torn token (§10)")
-        #expect(try readTags(url).filter { $0 == "ArchiveSuite" }.count == 1, "marker present exactly once")
+        // deterministically, in either interleaving.
+        #expect(after == ["Economics", "History"],
+                "both racing subjects survive; no lost update, no invented/torn token (§10)")
         #expect(try fileBytes(url) == bytesBefore, "CORE DIRECTIVE: file bytes never change")
         // NOTE (W15.tu4): before W15.tu3 this test could assert only the weaker invariants (marker
         // never lost, no corruption/wipe) because `.contentIndependentMetadataOnly` does not
@@ -166,25 +165,26 @@ struct NotesTagProjectorSafetyTests {
     @Test("§5 hand-applied unrelated Finder tag preserved verbatim; bytes unchanged")
     func preExistingUnrelatedTagPreservedLossless() throws {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
-        // A hand-applied, projector-unmanaged tag (with a space) alongside a managed subject + marker.
+        // A hand-applied, projector-unmanaged tag (with a space) alongside a managed subject + legacy marker.
         let url = try makeScratchFile(in: dir, tags: ["Do Not Sync", "History", "ArchiveSuite"])
         let bytesBefore = try fileBytes(url)
 
-        // Previously managed {History, ArchiveSuite}; now project {Economics, ArchiveSuite}.
+        // The legacy marker is not supplied as previously managed. This proves R13d's new cleanup
+        // rule rather than the pre-existing generic delta: remove only the legacy marker and preserve
+        // every other existing tag, all on this scratch file.
         _ = try NotesTagProjector.project(
-            ["Economics", "ArchiveSuite"], previouslyManaged: ["History", "ArchiveSuite"], to: url, itemDir: dir)
+            ["History"], previouslyManaged: ["History"], to: url, itemDir: dir)
 
         let after = Set(try readTags(url))
         #expect(after.contains("Do Not Sync"), "unmanaged user tag must survive verbatim")
-        #expect(after.contains("Economics"), "new managed subject added")
-        #expect(after.contains("ArchiveSuite"), "marker preserved")
-        #expect(!after.contains("History"), "previously-managed, now-undesired token removed")
+        #expect(after.contains("History"), "current managed subject must survive")
+        #expect(!after.contains("ArchiveSuite"), "legacy marker stripped")
         #expect(try fileBytes(url) == bytesBefore, "CORE DIRECTIVE: file bytes never change")
     }
 
-    // MARK: - §6 the one genuinely ambiguous token: subject literally "ArchiveSuite"
+    // MARK: - §6 the former marker name is now an ordinary subject
 
-    @Test("§6 subject literally 'ArchiveSuite' — single token, whole-string match, marker never stripped")
+    @Test("§6 subject literally 'ArchiveSuite' — single token, whole-string match")
     func subjectLiterallyArchiveSuiteCollision() throws {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
         let url = try makeScratchFile(in: dir, tags: [])
@@ -199,14 +199,13 @@ struct NotesTagProjectorSafetyTests {
         // (b) whole-string: the near-miss is its own independent token, present once.
         #expect(after1.filter { $0 == "ArchiveSuiteReport" }.count == 1)
 
-        // (c) dropping the SUBJECT "ArchiveSuite" from front-matter must NOT strip the mandatory
-        //     membership marker (the marker is added independently of any subject).
+        // (c) dropping the subject removes it, because it is no longer a separate membership marker.
         let item2 = makeItem(tags: ["ArchiveSuiteReport"])
         let desired2 = NotesTagVocabulary.managedTokens(for: item2)
         _ = try NotesTagProjector.project(desired2, previouslyManaged: managed1, to: url, itemDir: dir)
         let after2 = try readTags(url)
-        #expect(after2.filter { $0 == "ArchiveSuite" }.count == 1,
-                "the suite marker survives dropping the identically-named subject")
+        #expect(!after2.contains("ArchiveSuite"),
+                "dropping the ordinary subject removes its exact token")
         #expect(after2.contains("ArchiveSuiteReport"))
     }
 
@@ -219,7 +218,7 @@ struct NotesTagProjectorSafetyTests {
 
         // (A) A reported-success projection's managed set must equal the managed tokens ACTUALLY on
         //     disk (an independent reader): verify-by-re-read is real, not a blind claim.
-        let desired: Set<String> = ["History", "Economics", "ArchiveSuite"]
+        let desired: Set<String> = ["History", "Economics"]
         let reported = try NotesTagProjector.project(desired, previouslyManaged: [], to: url, itemDir: dir)
         guard case let .success(onDisk, _) = TagReading.read(url) else {
             Issue.record("independent ground-truth re-read failed"); return
@@ -233,11 +232,11 @@ struct NotesTagProjectorSafetyTests {
         try (url as NSURL).setResourceValue(t, forKey: .tagNamesKey)
 
         _ = try NotesTagProjector.project(
-            ["History", "ArchiveSuite"], previouslyManaged: reported, to: url, itemDir: dir)
+            ["History"], previouslyManaged: reported, to: url, itemDir: dir)
         let after = Set(try readTags(url))
         #expect(after.contains("Do Not Sync"), "concurrent third-party tag preserved (no blind full-array restore)")
         #expect(!after.contains("Economics"), "dropped managed token removed via delta")
-        #expect(after.isSuperset(of: ["History", "ArchiveSuite"]))
+        #expect(after.isSuperset(of: ["History"]))
     }
 
     // MARK: - §5 idempotent no-op: identical projection writes nothing (no mod-date churn)
@@ -246,7 +245,7 @@ struct NotesTagProjectorSafetyTests {
     func noOpDeltaWritesNothing() throws {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
         let url = try makeScratchFile(in: dir, tags: [])
-        let desired: Set<String> = ["History", "ArchiveSuite"]
+        let desired: Set<String> = ["History"]
 
         let managed = try NotesTagProjector.project(desired, previouslyManaged: [], to: url, itemDir: dir)
         let mtime1 = try mtime(url)
@@ -261,9 +260,9 @@ struct NotesTagProjectorSafetyTests {
         #expect(Set(try readTags(url)) == desired)
     }
 
-    // MARK: - §5 title-casing via the shared convention; canonical marker casing
+    // MARK: - §5 title-casing via the shared convention
 
-    @Test("§5 subjects title-cased via the shared convention; ArchiveSuite emitted canonically")
+    @Test("§5 subjects title-cased via the shared convention")
     func titleCasingMatchesSharedConvention() throws {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
         let url = try makeScratchFile(in: dir, tags: [])
@@ -278,9 +277,6 @@ struct NotesTagProjectorSafetyTests {
         #expect(after.contains("Economic Policy"))
         #expect(after.contains("Jerry Brown"))
         #expect(after.contains("HISTORY"), "already-capitalized words are preserved, not down-cased")
-        // The marker is emitted with its canonical casing (added directly, never title-cased).
-        #expect(after.contains(ArchiveSuiteMarker.tagName))
-        #expect(after.contains("ArchiveSuite"))
     }
 
     // MARK: - §7 label never written (drift guard) + bytes unchanged
@@ -294,7 +290,7 @@ struct NotesTagProjectorSafetyTests {
         let bytesBefore = try fileBytes(url)
 
         _ = try NotesTagProjector.project(
-            ["History", "ArchiveSuite"], previouslyManaged: ["ArchiveSuite"], to: url, itemDir: dir)
+            ["History"], previouslyManaged: ["ArchiveSuite"], to: url, itemDir: dir)
 
         #expect(normalizedLabel(try readLabel(url)) == normalizedLabel(labelBefore),
                 "the color label must not drift across a tag-only write")
@@ -332,9 +328,8 @@ struct NotesTagProjectorSafetyTests {
         let dir = try makeScratchItemDir(); defer { cleanup(dir) }
         let url = try makeScratchFile(in: dir, tags: [])
         let managed = try NotesTagProjector.project(
-            ["History", "ArchiveSuite"], previouslyManaged: [], to: url, itemDir: dir)
+            ["History"], previouslyManaged: [], to: url, itemDir: dir)
         #expect(managed.contains("History"))
-        #expect(managed.contains("ArchiveSuite"))
-        #expect(Set(try readTags(url)) == ["History", "ArchiveSuite"])
+        #expect(Set(try readTags(url)) == ["History"])
     }
 }

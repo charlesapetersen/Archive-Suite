@@ -361,43 +361,6 @@ struct RootMarkerTests {
     }
 }
 
-@Suite("ArchiveSuiteMarker")
-struct ArchiveSuiteMarkerTests {
-    @Test func isMarkerExactMatch() {
-        #expect(ArchiveSuiteMarker.isMarker("ArchiveSuite") == true)
-    }
-
-    @Test func isMarkerCaseSensitive() {
-        #expect(ArchiveSuiteMarker.isMarker("archivesuite") == false)
-        #expect(ArchiveSuiteMarker.isMarker("ARCHIVESUITE") == false)
-        #expect(ArchiveSuiteMarker.isMarker("Archive Suite") == false)
-    }
-
-    @Test func isMarkerRejectsSubstrings() {
-        #expect(ArchiveSuiteMarker.isMarker("ArchiveSuiteExtra") == false)
-        #expect(ArchiveSuiteMarker.isMarker("") == false)
-    }
-
-    @Test func filterOutMarker() {
-        let tags = ["History", "ArchiveSuite", "1962", "Letters"]
-        let filtered = ArchiveSuiteMarker.filterOutMarker(from: tags)
-        #expect(filtered == ["History", "1962", "Letters"])
-    }
-
-    @Test func filterOutMarkerPreservesCollisionSubject() {
-        // A user subject literally named "ArchiveSuite" WILL be filtered —
-        // this is by design (the marker IS that string). The collision case
-        // is handled at a higher level (NotesTagProjector), not here.
-        let tags = ["ArchiveSuite"]
-        let filtered = ArchiveSuiteMarker.filterOutMarker(from: tags)
-        #expect(filtered.isEmpty)
-    }
-
-    @Test func tagNameConstant() {
-        #expect(ArchiveSuiteMarker.tagName == "ArchiveSuite")
-    }
-}
-
 @Suite("ArchiveLinkPayload")
 struct ArchiveLinkPayloadTests {
     @Test func codableRoundTrip() throws {

@@ -1246,12 +1246,19 @@ W8-S3 completed the `NotesIndex` verification layer (plan §1.4) and hardened th
 
 W8-S2 landed the **crown-jewel** `NotesTagProjectorSafetyTests` (10 scratch-file tests) covering every
 `TagWriter`/`CoordinatedTagWriter` invariant the projector reimplements: read-failure aborts (never
-coerce a failed read to `[]`), lossless preservation of unmanaged tags, the `"ArchiveSuite"`-subject
-collision (single token / whole-string match / marker never stripped by dropping the subject),
-verify-by-re-read backed by an independent ground-truth read + reconcile-via-fresh-delta, idempotent
-no-op (no mod-date churn), shared-convention title-casing, the §7 label-drift guard, and a data-fork
-byte-equality assertion on every write. Also added a DEBUG **scratch-write guard** to `NotesTagProjector`
-(see below). All green; existing `NotesTagProjectorTests` (9) unaffected.
+coerce a failed read to `[]`), lossless preservation of unmanaged tags, the exact retired-`ArchiveSuite`
+strip while every other tag survives, `ArchiveSuite` as an ordinary current subject, verify-by-re-read
+backed by an independent ground-truth read + reconcile-via-fresh-delta, idempotent no-op (no mod-date
+churn), shared-convention title-casing, the §7 label-drift guard, and a data-fork byte-equality assertion
+on every write. Also added a DEBUG **scratch-write guard** to `NotesTagProjector` (see below). All green;
+existing `NotesTagProjectorTests` (9) unaffected.
+
+- **FIXED — `R13d` (this commit): `ArchiveSuite` membership tagging was retired.** The shared marker API,
+  SPEC row, fixture stamp, and list-only hiding rule are gone. `NotesTagProjector` has one deliberate
+  transition rule: it strips the exact old stamp during projection unless a current front-matter subject
+  requests that exact spelling. Its scratch-only functional proof starts with the old stamp plus both a
+  current managed subject and an unrelated Finder tag, then verifies that only the old stamp disappears and
+  the note bytes never change. No real Notes store or corpus was touched.
 
 - **FIXED — mechanism W15.tu3 (2026-07-28, `f52756d`); regression-pinned across all three callers W15.tu4.** A per-resolved-path serialization lock now lives
   inside `ArchiveCore.CoordinatedTagWriter` (Safety §10): the full read→modify→verify→write is mutually
@@ -1274,8 +1281,8 @@ byte-equality assertion on every write. Also added a DEBUG **scratch-write guard
   same `.md` (each adding a distinct subject) each read the pre-write state, and the later `setxattr`
   wins — so one subject is superseded (a lost update; verified deterministic-loss / nondeterministic-
   winner across runs). **File-safety guarantees that DO hold** and are pinned by the suite: no corruption
-  / no torn array (each `setxattr` is atomic), the `ArchiveSuite` marker is never lost or duplicated, the
-  file is never wiped, and bytes never change. **Why it's latent, not an active bug:** all three apps
+  / no torn array (each `setxattr` is atomic), the file is never wiped, and bytes never change. **Why it's
+  latent, not an active bug:** all three apps
   write one-writer-per-file — Reader/Processor batch tag edits across *different* files, Notes saves one
   note at a time, and the projector isn't yet wired to any concurrent path. It would only bite if a future
   design ran the projector on a background re-index *concurrently* with an interactive save of the **same**

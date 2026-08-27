@@ -55,9 +55,9 @@ every other surface is designed from the historian's workflow up, not copied fro
 | # | Decision | Choice | Consequence |
 |---|----------|--------|-------------|
 | D1 | On-disk note/extract format | **Markdown + assets**, one **UUID-named folder** per item: `<store>/<uuid>/<Title>.md` + `<uuid>/assets/` | Durable, greppable, tool-agnostic; title=filename with no collisions; UUID = stable link identity |
-| D2 | Metadata store | **YAML front-matter is authoritative** for *all* metadata; **mirror only subject tags + `ArchiveSuite`** into macOS Finder tags (regenerable projection, not source of truth) | No author/date/quality pollution of the global tag namespace; front-matter is the standard durable answer |
+| D2 | Metadata store | **YAML front-matter is authoritative** for *all* metadata; **mirror only subject tags** into macOS Finder tags (regenerable projection, not source of truth) | No author/date/quality pollution of the global tag namespace; front-matter is the standard durable answer |
 | D3 | Organization / replication | **Purely virtual** — flat pile of UUID folders on disk; the folder tree, "home", working-folders, and replication are **many-to-many records in the index DB** | Replication is trivial (a membership row); moving computers = move one folder; disk is not the tree |
-| D4 | Shared-tag SPEC change | **Additive + read-aware, NO corpus back-fill** this run | SPEC gains only the `ArchiveSuite` membership marker; **no `Author:` facet**; existing corpus untouched (lowest risk) |
+| D4 | Shared-tag SPEC change | **No corpus back-fill** this run | **No `Author:` facet**; existing corpus untouched (lowest risk) |
 | D5 | Durable link identity | **Root-marker file (GUID+name) + root-relative path**, carried in custom URL schemes | Survives moving the whole install to a new computer after a one-time root re-grant |
 | D6 | Editor | **Rich-text WYSIWYG + formatting toolbar**, Markdown as the saved format, with a **per-note raw-Markdown toggle** | `NSTextView`/TextKit + attributed↔Markdown bridge; user never sees syntax unless they ask |
 | D7 | Extract semantics | **Snapshot + provenance link** (extract owns editable text; link back to source note+passage; jump-to-source; note edits don't change the extract) | Extract has its own title/date/author/tags; can be segmented with blocks linking to *different* notes |
@@ -65,18 +65,9 @@ every other surface is designed from the historian's workflow up, not copied fro
 | D9 | Quality ("ordering") tag | Front-matter `quality: 1..5` (5 = highest), **priority-style UI** (dedicated control, not a free-form tag) | Notes-internal; not a Finder tag this run; not in the shared SPEC |
 | D10 | App shape | A **third native macOS app** `ArchiveNotes/` (bundle `com.archivenotes.app`), sandboxed like Reader + `network.client` for Zotero localhost | Own 3-pane windows (Notes viewer + Extracts viewer); reads Reader's corpus only via durable links |
 
-**Deferred to future iterations** (explicitly out of scope for run 1, tracked in §13): corpus back-fill of
-`ArchiveSuite`; Processor stamping `ArchiveSuite` on new output; Reader parsing/hiding the new marker
-(only needed once the corpus carries it); the unified single storage path for all three apps; mirroring
-author/date/quality into Finder tags; multi-root corpus support; iOS/companion anything.
-
-> ⚠️ **Owner call-out (R13d — the `ArchiveSuite` *exclusion* behavior).** Because corpus back-fill,
-> Processor stamping, and Reader parsing/filtering of the marker are all deferred to the convergence wave,
-> run 1 only **stamps** `ArchiveSuite` on Notes' *own* files — it does **not** yet *exclude* unrelated
-> tagged files anywhere (the marker is defined and written, but nothing consumes it). The owner's
-> emphatically-requested "exclude non-suite files" effect therefore **does not function until convergence
-> ships**. This matches the chosen additive/no-back-fill scope (D4), but confirm the deferral is acceptable
-> — or promote the convergence wave earlier if active exclusion is wanted in run 1.
+**Deferred to future iterations** (explicitly out of scope for run 1, tracked in §13): the unified single
+storage path for all three apps; mirroring author/date/quality into Finder tags; multi-root corpus support;
+iOS/companion anything.
 
 ---
 
@@ -230,9 +221,8 @@ My own gloss: this cuts against the "Noyce as sole culture-setter" story…
 - **Schema evolution**: additive only; unknown keys preserved on round-trip (never dropped); `schema`
   bumped when the reader must special-case older files.
 
-The Finder-tag **mirror** (D2) writes exactly `tags` (title-cased per the shared convention) **+**
-`ArchiveSuite`, nothing else, via the audited projector (§9). It is regenerable from front-matter and never
-the source of truth.
+The Finder-tag **mirror** (D2) writes exactly `tags` (title-cased per the shared convention), nothing else,
+via the audited projector (§9). It is regenerable from front-matter and never the source of truth.
 
 ---
 
@@ -313,20 +303,20 @@ source blocks in one step. These are **read-only w.r.t. the corpus** (Tier-1/2, 
 
 ## 9. Finder-tag mirror — the one file-safety surface (D2)
 
-Notes is authoritative in front-matter, but it **does** write a narrow Finder-tag projection (subjects +
-`ArchiveSuite`) onto its own `.md` files. Writing Finder tags is the one place Notes touches the
+Notes is authoritative in front-matter, but it **does** write a narrow Finder-tag projection (subjects) onto
+its own `.md` files. Writing Finder tags is the one place Notes touches the
 irreplaceable-data safety envelope, so it obeys **every** invariant proven in Reader's `TagWriter`:
 1. Single audited choke-point (`NotesTagProjector`, `02`), `NSFileCoordinator(.contentIndependentMetadataOnly)`.
 2. **Trustworthy-read guard** — a failed/nil read aborts; never coerced to `[]` (the anti-tag-wipe rule).
 3. Lossless delta: `new = (fresh − remove) + add`; untouched tokens preserved verbatim.
 4. Verify-by-re-read (multiset-equal) before returning success.
-5. Only ever adds/removes the projected tokens (subjects it manages + `ArchiveSuite`); never touches a
-   token it didn't write.
+5. Only ever adds/removes the projected subjects; the one-way R13d cleanup strips the exact retired
+   `ArchiveSuite` stamp while preserving every other tag.
 
 Because Notes writes **only its own newly-created files**, and never the Reader/Processor corpus, the blast
 radius is bounded — but the invariants are non-negotiable (Tier-2 for anything in this projector). See `08`
-for the adversarial tests (tag-wipe attempt, concurrent write, unreadable file, collision with a subject
-literally named `ArchiveSuite`).
+for the adversarial tests (tag-wipe attempt, concurrent write, unreadable file, retired-stamp strip, and an
+ordinary subject literally named `ArchiveSuite`).
 
 ---
 
@@ -343,8 +333,7 @@ Notes-specific work.** Detailed in `00a-archivecore-refactor.md`.
   parser (`DocumentTags`, `sortDate`, `isDateFacetLike`, `ArchiveColor`), the tag **read + write** path
   (`TagReading`, `TagWriter`, `TagEditing` — the audited choke-point with all seven invariants),
   `PDFTextExtractor` + `PDFFormatStatus`, the Processor's tag **vocabulary/formatting** (title-casing, month/
-  day/decade token builders, `GeneratedTags` emit order), and the new `RootMarker`/`DurableLink` types +
-  `ArchiveSuite` marker recognition.
+  day/decade token builders, `GeneratedTags` emit order), and the new `RootMarker`/`DurableLink` types.
 - **Reader and Processor migrate ONTO ArchiveCore in W0**, deleting their now-duplicated copies. This is a
   **behavior-preserving refactor** — parity (identical build + green tests + green smokes) is the acceptance
   bar, not new behavior. Staged so every sub-task leaves *all* apps building + green.
@@ -359,10 +348,8 @@ Notes-specific work.** Detailed in `00a-archivecore-refactor.md`.
   (S3/S4 in `00a`) get adversarial review + scratch-corpus functional tests. See `00a` for the full staging,
   rollback, and parity strategy.
 
-> Still deferred to the *later* convergence follow-on (NOT part of W0): teaching Reader to parse/**hide** the
-> `ArchiveSuite` marker in its UI, the corpus **back-fill**, Processor **stamping** `ArchiveSuite` on new
-> output, and the unified suite-wide storage path (§2, §15). W0 unifies the *code*; those items change
-> *behavior/data* and stay their own gated steps.
+> Still deferred to the *later* convergence follow-on (NOT part of W0): the unified suite-wide storage path
+> (§2, §15). W0 unifies the *code*; that item changes behavior/data and stays separately gated.
 
 ---
 
@@ -391,8 +378,8 @@ Differences for Notes (`02`):
   dev/test tag writes happen on **scratch copies** (`mktemp`), never the owner's data (memory
   `archive-test-run-safety`; Reader Prime Directive).
 - **Tier-2** (adversarial review + a functional test on scratch copies) for: the `NotesTagProjector` (§9),
-  the front-matter/organization atomic writers + delete-last-instance path (§3.6, `02`), the `ArchiveSuite`
-  SPEC addition, and the Reader deep-link/reveal + Copy-link path (`04`). **Tier-1** for pure UI/editor/index
+  the front-matter/organization atomic writers + delete-last-instance path (§3.6, `02`), and the Reader
+  deep-link/reveal + Copy-link path (`04`). **Tier-1** for pure UI/editor/index
   work with no irreplaceable-data surface, but always: clean build, **no new warnings**, unit tests, and GUI
   verification where feasible.
 - **Shared-contract change** (`SPEC/tag-format.md` + ArchiveCore) is the coordinated, atomic risk — see `01`.
@@ -409,7 +396,7 @@ separately-gated follow-on. "Tier" per §12.
 
 | Wave | Plan | Goal | Depends on | Tier |
 |------|------|------|-----------|------|
-| **W0** | `00a` | **ArchiveCore extraction + suite-wide migration — DONE FIRST.** Create `packages/ArchiveCore`; move the shared tag/PDF/date contract (facet parser + `sortDate` + read + the audited **write** path + Processor vocabulary/formatting + `PDFTextExtractor`/`PDFFormatStatus` + new `RootMarker`/`DurableLink` + `ArchiveSuite` recognition) out of Reader & Processor; migrate **both shipping apps** onto it. Behavior-preserving, parity-gated, one audited write seam. | — | **Tier-2** (TagWriter + both shipping apps + SPEC) |
+| **W0** | `00a` | **ArchiveCore extraction + suite-wide migration — DONE FIRST.** Create `packages/ArchiveCore`; move the shared tag/PDF/date contract (facet parser + `sortDate` + read + the audited **write** path + Processor vocabulary/formatting + `PDFTextExtractor`/`PDFFormatStatus` + new `RootMarker`/`DurableLink`) out of Reader & Processor; migrate **both shipping apps** onto it. Behavior-preserving, parity-gated, one audited write seam. | — | **Tier-2** (TagWriter + both shipping apps + SPEC) |
 | **W1** | `01` | Third-app scaffold (`ArchiveNotes/`, project.yml, entitlements, launch/bootstrap/test-smoke, root dispatcher, DMG entry, AGENTS/CLAUDE), app skeleton + empty 3-pane shell that builds & launches, **depending on the W0 ArchiveCore** | W0 | Tier-2 (scaffold) |
 | **W2** | `02` | Note/extract **store** (UUID folders, front-matter I/O, atomic saves, `NotesTagProjector`), **virtual folders + replication** model + `organization.json`, **SQLite FTS5 index** + incremental build | W1 | Tier-2 (writers) |
 | **W3** | `03` | **Rich-text/Markdown editor** (NSTextView/TextKit, attributed↔Markdown bridge, formatting toolbar, inline images + paste, raw-Markdown toggle, block rendering) | W1 (W2 for persistence) | Tier-1 |
@@ -418,7 +405,7 @@ separately-gated follow-on. "Tier" per §12.
 | **W6** | `06` | **Viewers**: note & extract 3-pane windows, folder-tree sidebar (mutable), item list, search+filter(kind/tag/keyword)+date-sort, replication UI + delete-last-instance guard, templates (folder-assigned), dates & quality UI | W2, W3 | Tier-2 (delete path) |
 | **W7** | `07` | **Extracts**: Create-Extract (snapshot+provenance), extract blocks→notes, jump-to-source, extract-viewer featuring | W2, W3, W6 | Tier-1 |
 | **W8** | `08` | **Tests & GUI verification**: unit suites (front-matter, md-bridge, projector safety, index, folders/replication, links), XCUITest+cliclick GUI harness, smoke gate, end-to-end scratch-corpus run | W1–W7 | Tier-1 |
-| **(later)** | — | **Behavior/data follow-ons** (NOT W0, which unifies only the *code*): teach Reader to parse/**hide** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**; unified suite storage path | W0–W8 | Tier-2, separately gated |
+| **(later)** | — | **Behavior/data follow-on** (NOT W0, which unifies only the *code*): unified suite storage path | W0–W8 | Tier-2, separately gated |
 
 Estimated bounded sub-tasks per wave are enumerated in each plan file; expect ~3–6 sessions per wave.
 
@@ -448,8 +435,6 @@ durable architecture into `ArchiveNotes/CLAUDE.md`.
 5. Zotero: write-back (creating Zotero items from Notes) — read-only for now.
 6. Scrivener specifics: confirm Scrivener honors custom URL schemes in its link fields (it does for
    standard hyperlinks; validate the `archivenotes://` round-trip on the owner's Scrivener during W4 GUI).
-7. **R13d exclusion activation** — when to turn on `ArchiveSuite`-based exclusion of non-suite files (needs
-   the deferred back-fill + Processor stamping + Reader filtering; see the §2 call-out).
 
 ---
 

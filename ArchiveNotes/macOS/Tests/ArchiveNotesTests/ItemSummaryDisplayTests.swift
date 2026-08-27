@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import ArchiveCore
 @testable import ArchiveNotes
 
 /// W6-S3: pure item-list cell rendering (`ItemSummary` display helpers).
@@ -57,13 +56,13 @@ struct ItemSummaryDisplayTests {
 
     // MARK: displayTags
 
-    @Test func displayTagsHidesArchiveSuiteMarker() {
+    @Test func displayTagsShowsEveryManagedSubject() {
         let s = sum(date: nil, precision: nil,
-                    managedTags: ["History", ArchiveSuiteMarker.tagName, "Letters"])
-        #expect(s.displayTags == "History, Letters")
+                    managedTags: ["History", "ArchiveSuite", "Letters"])
+        #expect(s.displayTags == "History, ArchiveSuite, Letters")
     }
-    @Test func displayTagsEmptyWhenOnlyMarker() {
-        #expect(sum(date: nil, precision: nil, managedTags: [ArchiveSuiteMarker.tagName]).displayTags == "")
+    @Test func displayTagsEmptyOnlyWhenThereAreNoSubjects() {
+        #expect(sum(date: nil, precision: nil, managedTags: ["ArchiveSuite"]).displayTags == "ArchiveSuite")
         #expect(sum(date: nil, precision: nil, managedTags: []).displayTags == "")
     }
 }

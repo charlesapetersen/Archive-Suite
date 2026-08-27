@@ -6,25 +6,6 @@ import ArchiveCore
 /// construct + use its public types at runtime (not just compile time).
 final class ArchiveCoreWiringTests: XCTestCase {
 
-    // MARK: - ArchiveSuiteMarker
-
-    func testSuiteMarkerTagName() {
-        XCTAssertEqual(ArchiveSuiteMarker.tagName, "ArchiveSuite")
-    }
-
-    func testSuiteMarkerRecognition() {
-        XCTAssertTrue(ArchiveSuiteMarker.isMarker("ArchiveSuite"))
-        XCTAssertFalse(ArchiveSuiteMarker.isMarker("archivesuite"))
-        XCTAssertFalse(ArchiveSuiteMarker.isMarker("Archive Suite"))
-        XCTAssertFalse(ArchiveSuiteMarker.isMarker(""))
-    }
-
-    func testSuiteMarkerFilterOutMarker() {
-        let tags = ["History", "ArchiveSuite", "Tech", "1968"]
-        let filtered = ArchiveSuiteMarker.filterOutMarker(from: tags)
-        XCTAssertEqual(filtered, ["History", "Tech", "1968"])
-    }
-
     // MARK: - DurableLink
 
     func testDurableLinkNotesOpenRoundTrip() {

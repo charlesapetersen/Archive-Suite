@@ -6827,6 +6827,16 @@ explain why not.
 
 ## Owner GUI-pass follow-ups — 2026-07-16 (from the interactive Reader + Processor GUI review)
 
+- [x] **`R13d REVERSED` — remove `ArchiveSuite` stamping from Notes; drop the exclusion feature entirely.**
+  The shared `ArchiveSuiteMarker` API, Notes vocabulary stamp, fixture stamps, list hiding rule, and SPEC
+  row are gone; `RootMarker` remains the separate durable-link mechanism. The owner’s amended 2026-08-13
+  direction chose the clean end state, so the projector removes the retired exact token during projection
+  unless the current front matter deliberately uses that same spelling as a subject. Tier-2 adversarial review
+  found and corrected the strip oracle: the scratch-only functional test now begins with `ArchiveSuite`, a
+  current managed subject, and an unrelated Finder tag, then proves only the old stamp is removed while both
+  other tags and the file’s bytes survive. No real Notes store or corpus was touched. **Shipped: this commit.**
+  | ArchiveNotes, ArchiveCore, SPEC, suite docs | M | Tier-2
+
 - [x] **Guided key setup for Anthropic (Processor).** The onboarding wizard's `onboardable` list is
   `[.gemini, .mistral, .openai]` — Anthropic has only a manual key field. Add `ProviderKeySpec.anthropic`
   (console.anthropic.com deep links, `sk-ant-` precheck, cost/privacy notes) so Anthropic gets the same guided flow.

@@ -79,7 +79,6 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
 | **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). Box/folder pages carry the literal subjects `Box`/`Folder`. OCR failures carry `OCR Failed`. |
 | **Color label** | `.labelNumberKey` + color-name token | 0–1 | **Red = 6 ⇒ box** photo; **Purple = 3 ⇒ folder** photo. Only these two are meaningful to the Suite. |
-| **Suite marker** | literal `ArchiveSuite` | 0–1 | Stamped by Archive Notes onto its own `.md` files (via `NotesTagProjector`) to mark them as suite-managed. **Not emitted by Reader or Processor.** Recognized by `ArchiveSuiteMarker.isMarker` (case-sensitive exact match). The subject-collision rule below applies: a user document with a subject literally named `"ArchiveSuite"` is handled at the projector level, not by the marker recognizer. |
 
 **Subject-collision rule (critical).** Facet detection is heuristic and lossy-by-design; the raw
 array is the source of truth. A subject that happens to equal a facet token must survive: e.g. a

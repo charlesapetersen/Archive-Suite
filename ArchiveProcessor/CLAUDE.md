@@ -273,7 +273,7 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
   `CoordinatedTagWriter` (`Tags/TagWrite.swift`) is the single Finder-tag write choke-point — Processor's
   `MacOSTagger` is a *fresh-write adapter* over it and Reader's `TagWriter` a *delta adapter*, so no app calls
   `setResourceValue` directly and the coordinated write + verify can't drift. `DocumentTags`, `PDFFormatStatus`,
-  `DurableLink`, `ArchiveSuiteMarker`, and `PDFThumbnailer` are the shared cross-app types. A change here is
+  `DurableLink` and `PDFThumbnailer` are the shared cross-app types. A change here is
   **Tier-2** and must build+test **all three** apps (Reader + Processor + Notes), not just Processor. SPEC:
   [`../SPEC/tag-format.md`](../SPEC/tag-format.md); build lane: `swift test` in `packages/ArchiveCore` (~100
   tests; wired via `project.yml` → `packages: ArchiveCore`, `path: ../../packages/ArchiveCore`).

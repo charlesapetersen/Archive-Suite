@@ -86,7 +86,7 @@ struct NotesTagProjectorTests {
 
         // Point at a non-existent file — read will fail inside coordination.
         let bogus = dir.appendingPathComponent("does-not-exist.md")
-        let desired: Set<String> = ["History", "ArchiveSuite"]
+        let desired: Set<String> = ["History"]
         do {
             _ = try NotesTagProjector.project(desired, previouslyManaged: [], to: bogus, itemDir: dir)
             Issue.record("Expected an error for unreadable file")
@@ -103,12 +103,12 @@ struct NotesTagProjectorTests {
         let dir = try makeScratchDir()
         defer { cleanup(dir) }
 
-        // Pre-seed the file with a user-added tag that is NOT in our managed set.
+        // Pre-seed with a user tag and the retired legacy marker.
         let url = try makeScratchFile(in: dir, tags: ["UserCustomTag", "ArchiveSuite", "History"])
         let previouslyManaged: Set<String> = ["History", "ArchiveSuite"]
 
-        // Now project with a changed subject set: remove "History", add "Economics".
-        let desired: Set<String> = ["Economics", "ArchiveSuite"]
+        // Now project with a changed subject set: remove "History" and the legacy marker, add Economics.
+        let desired: Set<String> = ["Economics"]
         let result = try NotesTagProjector.project(desired, previouslyManaged: previouslyManaged, to: url, itemDir: dir)
 
         let after = try readTags(url)
@@ -116,12 +116,11 @@ struct NotesTagProjectorTests {
         #expect(after.contains("UserCustomTag"), "User tag must be preserved")
         // "History" should be gone (we previously managed it, now it's not desired).
         #expect(!after.contains("History"), "Previously managed tag should be removed")
-        // "Economics" + "ArchiveSuite" should be present.
+        // Economics should be present, and the old marker must be stripped.
         #expect(after.contains("Economics"), "New managed tag should be added")
-        #expect(after.contains("ArchiveSuite"), "Suite marker should be present")
+        #expect(!after.contains("ArchiveSuite"), "Legacy marker should be stripped")
         // Result should reflect what's managed.
         #expect(result.contains("Economics"))
-        #expect(result.contains("ArchiveSuite"))
     }
 
     // MARK: - §5 Removes only previously managed tokens
@@ -131,28 +130,28 @@ struct NotesTagProjectorTests {
         let dir = try makeScratchDir()
         defer { cleanup(dir) }
 
-        // File has "Science" (managed) + "MyPersonalTag" (unmanaged) + "ArchiveSuite".
+        // File has "Science" (managed) + "MyPersonalTag" (unmanaged) + a legacy marker.
         let url = try makeScratchFile(in: dir, tags: ["Science", "MyPersonalTag", "ArchiveSuite"])
         let previouslyManaged: Set<String> = ["Science", "ArchiveSuite"]
 
-        // Project with empty subjects — only the marker remains managed.
-        let desired: Set<String> = ["ArchiveSuite"]
+        // Project with empty subjects — all previously managed tokens are removed.
+        let desired: Set<String> = []
         _ = try NotesTagProjector.project(desired, previouslyManaged: previouslyManaged, to: url, itemDir: dir)
 
         let after = try readTags(url)
         #expect(!after.contains("Science"), "Previously managed tag removed")
         #expect(after.contains("MyPersonalTag"), "Unmanaged tag preserved")
-        #expect(after.contains("ArchiveSuite"), "Marker preserved")
+        #expect(!after.contains("ArchiveSuite"), "Legacy marker stripped")
     }
 
-    // MARK: - §6 ArchiveSuite-named subject collision: no dup, no accidental removal
+    // MARK: - §6 ArchiveSuite is now an ordinary subject: no dup
 
-    @Test("ArchiveSuite subject collision — no dup, no removal")
+    @Test("ArchiveSuite subject remains an ordinary subject — no dup")
     func archiveSuiteSubjectCollisionNoDup() async throws {
         let dir = try makeScratchDir()
         defer { cleanup(dir) }
 
-        // The user has a subject literally named "ArchiveSuite".
+        // The former marker name is now simply a user subject.
         let url = try makeScratchFile(in: dir, tags: [])
         let item = makeItem(tags: ["ArchiveSuite", "History"])
         let desired = NotesTagVocabulary.managedTokens(for: item)
@@ -161,9 +160,9 @@ struct NotesTagProjectorTests {
         let result = try NotesTagProjector.project(desired, previouslyManaged: [], to: url, itemDir: dir)
 
         let after = try readTags(url)
-        // "ArchiveSuite" appears exactly once (deduped).
-        let markerCount = after.filter { $0 == "ArchiveSuite" }.count
-        #expect(markerCount == 1, "ArchiveSuite must appear exactly once, got \(markerCount)")
+        // "ArchiveSuite" appears exactly once (deduped as a normal subject).
+        let subjectCount = after.filter { $0 == "ArchiveSuite" }.count
+        #expect(subjectCount == 1, "ArchiveSuite must appear exactly once, got \(subjectCount)")
         #expect(after.contains("History"), "Subject tag present")
         #expect(result.contains("ArchiveSuite"))
     }
@@ -180,7 +179,7 @@ struct NotesTagProjectorTests {
         defer { cleanup(dir) }
 
         let url = try makeScratchFile(in: dir, tags: [])
-        let desired: Set<String> = ["History", "Economics", "ArchiveSuite"]
+        let desired: Set<String> = ["History", "Economics"]
         _ = try NotesTagProjector.project(desired, previouslyManaged: [], to: url, itemDir: dir)
 
         // Re-read and confirm the tags match.
@@ -205,7 +204,7 @@ struct NotesTagProjectorTests {
         try (url as NSURL).setResourceValue(6, forKey: .labelNumberKey)
         let labelBefore = try readLabel(url)
 
-        let desired: Set<String> = ["History", "ArchiveSuite"]
+        let desired: Set<String> = ["History"]
         _ = try NotesTagProjector.project(desired, previouslyManaged: [], to: url, itemDir: dir)
 
         let labelAfter = try readLabel(url)
@@ -222,8 +221,8 @@ struct NotesTagProjectorTests {
 
         let url = try makeScratchFile(in: dir, tags: [])
 
-        // First projection: add History + ArchiveSuite.
-        let desired1: Set<String> = ["History", "ArchiveSuite"]
+        // First projection: add History.
+        let desired1: Set<String> = ["History"]
         let managed1 = try NotesTagProjector.project(desired1, previouslyManaged: [], to: url, itemDir: dir)
 
         // Simulate a third-party adding a tag between projections.
@@ -232,13 +231,12 @@ struct NotesTagProjectorTests {
         try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
 
         // Second projection: same desired, with managed1 as previouslyManaged.
-        let desired2: Set<String> = ["History", "ArchiveSuite"]
+        let desired2: Set<String> = ["History"]
         _ = try NotesTagProjector.project(desired2, previouslyManaged: managed1, to: url, itemDir: dir)
 
         let after = try readTags(url)
         #expect(after.contains("ThirdPartyTag"), "Third-party tag must survive re-projection")
         #expect(after.contains("History"))
-        #expect(after.contains("ArchiveSuite"))
     }
 
     // MARK: - Component-boundary guard
@@ -252,7 +250,7 @@ struct NotesTagProjectorTests {
         let outsideDir = dir.deletingLastPathComponent()
         let url = try makeScratchFile(in: outsideDir, name: "escape.md")
 
-        let desired: Set<String> = ["ArchiveSuite"]
+        let desired: Set<String> = ["History"]
         do {
             _ = try NotesTagProjector.project(desired, previouslyManaged: [], to: url, itemDir: dir)
             Issue.record("Expected outsideItemDir error")
@@ -270,14 +268,14 @@ struct NotesTagProjectorTests {
         let dir = try makeScratchDir()
         defer { cleanup(dir) }
 
-        // File already has some managed-looking tags + an unmanaged one.
+        // File already has a managed-looking subject, a retired marker, and an unmanaged tag.
         let url = try makeScratchFile(in: dir, tags: ["History", "ArchiveSuite", "Random"])
         let item = makeItem(tags: ["history"]) // lowercase in front-matter
 
         let recovered = NotesTagProjector.recoverPreviouslyManaged(for: item, from: url)
-        // "History" matches titleCased("history"); "ArchiveSuite" matches the marker.
+        // "History" matches titleCased("history"). The retired marker is no longer managed.
         #expect(recovered.contains("History"))
-        #expect(recovered.contains("ArchiveSuite"))
+        #expect(!recovered.contains("ArchiveSuite"))
         // "Random" is not a candidate managed token.
         #expect(!recovered.contains("Random"))
     }

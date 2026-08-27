@@ -95,7 +95,7 @@ its own date. Verbatim as recorded when granted.)*
   strings), beside the existing multiset rule. **No behaviour change, no code path altered** — the fact is
   already load-bearing and proven end-to-end by `W15.tu1`'s shipped test (`2f5c3ae`), so this only writes down
   what the suite already relies on. Also land tu0's scratch premise test. Normal Tier-2 gate still applies.
-- **`R13d` — AUTHORIZED to remove the `ArchiveSuite` "Suite marker" row from `SPEC/tag-format.md`, WITH A HARD
+- **`R13d` — ✅ DISCHARGED 2026-08-27 (this commit); originally authorized to remove the `ArchiveSuite` "Suite marker" row from `SPEC/tag-format.md`, WITH A HARD
   CONSTRAINT: do NOT strip existing stamps.** The owner chose the no-strip variant deliberately. <!-- policy-ok: the ORIGINAL 2026-07-16 wording, kept as the record; REVERSED 2026-08-13 in the ✅ bullet above -->
   - ✅ **CONSTRAINT REVERSED BY THE OWNER, 2026-08-13 — STRIPPING IS NOW AUTHORIZED.** Asked directly (the
     2026-08-01 note below says to ask, and that this question had become cheap), he chose the clean end state:
@@ -422,4 +422,3 @@ its own date. Verbatim as recorded when granted.)*
     adjacent one in the batch code.
   - **Not data loss — money.** Results already written stay written; the cost is paying twice. Frame the fix
     and its proof around re-spend, and do not over-correct into withholding or deleting anything.
-

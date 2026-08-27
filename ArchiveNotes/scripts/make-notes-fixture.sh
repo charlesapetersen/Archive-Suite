@@ -19,7 +19,7 @@
 #   <FIXTURE>/reader-corpus/                    embedded scratch Reader corpus with
 #                                              its own RootMarker {kind:reader} +
 #                                              generated PDFs, so durable links resolve
-#   …and the initial Finder-tag projection (title-cased subjects + ArchiveSuite)
+#   …and the initial Finder-tag projection (title-cased subjects)
 #   applied to each note `.md` via the `tag` CLI, so the projector's starting
 #   state is known (same reasoning as the Reader fixture: git can't store xattrs).
 #
@@ -296,15 +296,14 @@ else
   echo "make-notes-fixture: generated $N_PDFS text-bearing PDFs in reader-corpus/ (+ sample.pdf; no corpus required)" >&2
 fi
 
-# --- Initial Finder-tag projection (title-cased subjects + ArchiveSuite) ------
+# --- Initial Finder-tag projection (title-cased subjects) ---------------------
 # Mirrors what NotesTagProjector would write, so the projector's starting state
 # is known. Read-only source corpus is never tagged; only the scratch note copies.
 if [ -x "$TAG" ]; then
-  "$TAG" -a "Silicon Valley,Intel,ArchiveSuite"     "$DST/items/$ID_PLAIN/My First Note.md"
-  "$TAG" -a "Intel,Corporate Culture,ArchiveSuite"  "$DST/items/$ID_READER/Moore on Intel culture.md"
-  "$TAG" -a "Computing History,ArchiveSuite"        "$DST/items/$ID_ZOTERO/Lovelace paper.md"
-  "$TAG" -a "ArchiveSuite"                           "$DST/items/$ID_EXTRACT/On egalitarian culture.md"
-  echo "make-notes-fixture: applied initial Finder-tag projection to 4 notes" >&2
+  "$TAG" -a "Silicon Valley,Intel"     "$DST/items/$ID_PLAIN/My First Note.md"
+  "$TAG" -a "Intel,Corporate Culture"  "$DST/items/$ID_READER/Moore on Intel culture.md"
+  "$TAG" -a "Computing History"        "$DST/items/$ID_ZOTERO/Lovelace paper.md"
+  echo "make-notes-fixture: applied initial Finder-tag projection to 3 notes" >&2
 else
   echo "make-notes-fixture: WARNING — tag CLI not found at $TAG; skipped initial tag projection." >&2
 fi

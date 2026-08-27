@@ -5,8 +5,8 @@ import ArchiveCore
 //  NotesTagProjector — the AUDITED Finder-tag mirror for Archive Notes.
 //
 //  Reimplements every TagWriter invariant (CoordinatedTagWriter.write) for the narrow projection
-//  use case: Notes mirrors an item's front-matter subjects (title-cased) + the ArchiveSuite
-//  membership marker onto the note's own .md file via Finder tags.
+//  use case: Notes mirrors an item's front-matter subjects (title-cased) onto the note's own .md
+//  file via Finder tags.
 //
 //  This is the ONLY place Notes touches file-level tag metadata. It writes ONLY files under
 //  <NotesStore>/items/<uuid>/ (component-boundary guard). It never touches color labels,
@@ -17,8 +17,9 @@ import ArchiveCore
 //   §2 Fresh read inside coordination (TagWrite.swift:93-102).
 //   §3 Trustworthy-read guard — read failure aborts, never coerced to [] (TagReading.swift:6-9).
 //   §4 Lossless delta: remove only previously-managed; add only desired (TagWrite.swift:44-50).
-//   §5 Only adds/removes projected tokens. remove ⊆ previouslyManaged. Exact whole-string match.
-//   §6 ArchiveSuite collision: deduped by "not already present" (TagWrite.swift:48).
+//   §5 Only adds/removes projected tokens, except the explicit one-way retired-marker cleanup.
+//      Every removal is an exact whole-string match.
+//   §6 Dedup projected subjects by adding only tokens that are not already present (TagWrite.swift:48).
 //   §7 No label writes. Verify label unchanged after write (drift guard).
 //   §8 Verify by re-read, multiset-equal (TagWrite.swift:127).
 //   §9 Per-path in-process serialization (W15.tu3): concurrent projections of the SAME note file
@@ -28,6 +29,12 @@ import ArchiveCore
 // ============================================================================================
 
 enum NotesTagProjector {
+    /// The former membership token is a one-way cleanup exception to the usual "remove only what
+    /// this caller previously managed" rule. The owner chose the clean end state: remove every
+    /// legacy exact-match stamp on the next projection, while a current front-matter subject of the
+    /// same spelling remains in `desired` and therefore survives.
+    private static let retiredTokens: Set<String> = ["ArchiveSuite"]
+
     enum ProjectError: Error, Sendable {
         case unreadable(String)
         case verificationFailed(String)
@@ -82,13 +89,15 @@ enum NotesTagProjector {
 
         let result = try CoordinatedTagWriter.write(url) { currentTags, currentLabel in
             // §4 Lossless delta: compute what to remove and what to add.
-            // remove = tokens we previously managed that are no longer desired.
+            // Remove previously managed tokens that are no longer desired, plus the explicitly
+            // retired legacy membership token. This is exact whole-string matching; no prefix or
+            // case-folding can remove a nearby user tag.
             let toRemove = previouslyManaged.subtracting(desired)
-            // §5 Only remove tokens in previouslyManaged — exact whole-string match.
+                .union(retiredTokens.subtracting(desired))
             var newTags = currentTags.filter { token in
                 !toRemove.contains(token)
             }
-            // Add desired tokens not already present (dedup — §6 handles ArchiveSuite collision).
+            // Add desired tokens not already present (dedup — §6).
             for token in desired where !newTags.contains(token) {
                 newTags.append(token)
             }

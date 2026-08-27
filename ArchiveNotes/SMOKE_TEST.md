@@ -63,7 +63,7 @@ step.
       citation style / advanced host+port), @AppStorage-bound.
 - [ ] **O. Tag projection (Tier-2, scratch only)** — a subject edit projects onto the note's **own**
       `.md` Finder tags (assert via `tag -l` on the scratch `.md`); corpus never touched; the
-      `ArchiveSuite` marker is never stripped.
+      retired `ArchiveSuite` stamp is stripped while every other tag remains.
 - [ ] **P. Quit** — `osascript -e 'quit app "ArchiveNotes"'`; the terminate flush drains any pending
       autosave debounce so a force-quit within the window can't lose an edit.
 

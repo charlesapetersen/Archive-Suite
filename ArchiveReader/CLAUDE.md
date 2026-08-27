@@ -433,7 +433,7 @@ types both apps must interpret *identically* now live in one package instead of 
 year/month/Day N/decade/priority/read/color/subjects; `sortDate` medieval-safe, `displayDate`,
 `dateIsSpeculative`), `TagReading`/`TagEditing`, `PDFFormatStatus`/`ExtractedContent`, `GeneratedTags`, the
 durable-link types (`DurableLink`/`ArchiveLinkPayload`/`RootMarker`), `PDFThumbnailer`/`ThumbnailCacheKey`,
-and `ArchiveSuiteMarker`. **The Finder-tag write choke-point is `ArchiveCore.CoordinatedTagWriter`**
+**The Finder-tag write choke-point is `ArchiveCore.CoordinatedTagWriter`**
 (`Tags/TagWrite.swift`): Reader's `TagWriter` is a thin *delta adapter* over it and Processor's `MacOSTagger`
 is the *fresh-write adapter* — no app calls `setResourceValue` directly, so the coordinated metadata-only
 write + verify can never drift between apps. **Build lane:** `swift test` in `packages/ArchiveCore` (~100

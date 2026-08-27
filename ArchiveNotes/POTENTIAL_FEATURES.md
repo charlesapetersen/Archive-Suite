@@ -13,13 +13,13 @@ evidence these are one suite.
 > **Reader/Notes PDF+JPEG dual image reference** (same SUITE_TODO section), the **W9 gap-closure** phases
 > (built-but-dead wiring / safety-net tooling / UI polish — near-term gaps, not wishlist), **W15.tu3** (the
 > `CoordinatedTagWriter` per-path write serialization), and the **§16 Interface-Contract doc-fold** (SUITE_TODO
-> *Suite doc hygiene*). The old ArchiveSuite-marker "convergence" deferrals in `00-overview.md` §2/§10/§13 are
-> being **removed** per the R13d-reversed owner decision — do **not** resurrect them here.
+> *Suite doc hygiene*). R13d removed the old ArchiveSuite-marker "convergence" deferrals from
+> `00-overview.md`; do **not** resurrect them here.
 
 ## Medium priority
 
 - **Mirror author/date/quality to Finder tags for cross-app parity** — today Notes keeps `authors`/`date`/`quality`
-  **front-matter-only** (overview decisions D2/D4/D9); the projector writes only subjects + the suite marker.
+  **front-matter-only** (overview decisions D2/D4/D9); the projector writes only subjects.
   Additionally mirroring author/date/quality into macOS Finder tags would let Reader/Processor sort/browse Notes
   items chronologically and by author like corpus files. **A deferred OWNER DECISION** (flagged to Morning
   Review): it needs a shared-contract `Author:` facet in `SPEC/tag-format.md`, so it is **Tier-2** and touches all
