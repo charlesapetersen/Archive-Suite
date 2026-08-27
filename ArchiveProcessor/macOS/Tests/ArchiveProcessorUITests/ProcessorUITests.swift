@@ -114,6 +114,19 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-local-agent-cost-and-wizard")
     }
 
+    func testFinishingScrimBlocksLiveCaptureKeyboardAndAccessibilityRoutes() throws {
+        relaunch(extra: ["-APUITestLiveCaptureFinishingScrim"])
+
+        XCTAssertTrue(element("live.finishing-throbber").waitForExistence(timeout: 10),
+                      "the no-sheet regeneration state must render its finishing scrim")
+        let start = element("live.start")
+        XCTAssertTrue(start.exists, "the underlying Live Capture control must remain in the rendered panel")
+        // The assertion deliberately checks SwiftUI's enabled state, not only pointer hit-testing: disabled
+        // is the shared gate that excludes macOS keyboard navigation and VoiceOver activation behind the scrim.
+        XCTAssertFalse(start.isEnabled, "the finishing scrim must disable underlying keyboard/AX controls")
+        attachScreenshot("processor-live-capture-finishing-scrim")
+    }
+
     private func relaunch(extra: [String] = []) {
         app.terminate()
         app.launchArguments = UITestLaunch.arguments([

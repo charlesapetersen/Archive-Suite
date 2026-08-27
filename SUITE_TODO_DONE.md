@@ -7405,6 +7405,18 @@ explain why not.
   window is modal to the pointer only; making it modal to focus + AX interacts with the VM lane's own test, so
   it is `(blocked-on: W21.vmgui-d)`.
 
+- [x] **W3.cap-r3-fu10-fu1 [LOW · completeness] — ✅ DONE 2026-08-27 (this commit).** The no-sheet finishing
+  window now disables the real `LiveCaptureView` `HSplitView` with the same
+  `LiveCaptureProcessor.isFinishingScrimUp` predicate that draws the pointer scrim. This preserves the
+  non-modal tab picker while making every current and future panel affordance unavailable to Keyboard
+  navigation and VoiceOver for precisely the regeneration window. A DEBUG-only, `-APUITestMode`-gated launch
+  seam creates that state without a receiver, OCR, Keychain, network, input, output, or finalize write; the
+  off-screen `ProcessorUITests` case proves the actual throbber renders and an underlying Start control is
+  accessibility-disabled. The complete Processor VM suite was 5/5 green and its visual capture clean; the
+  final focused VM test and scratch-only `test-recovery.sh` were green. Post-diff Tier-2 review verified that
+  the seam and all references are DEBUG-only, and that the overlay is applied outside the disabled panel. Test
+  instructions now live in `ArchiveProcessor/TESTING.md`. | Capture/Views | Tier-2
+
 - [x] **W3.cap-r3-fu11 [LOW · data · re-graded MED → LOW by fu10] — ✅ DONE 2026-08-04** (`fb833ea` fix;
   `c903bb8` Test 22; this commit, five mutants + the adversarial pass + trackers). The Captured pane's Clear
   button was `session.clear(); liveProc.clearSessionState()` — **two calls and no gate**, live in the exact

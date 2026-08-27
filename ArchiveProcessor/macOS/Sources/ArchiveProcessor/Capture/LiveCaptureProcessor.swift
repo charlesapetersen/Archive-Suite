@@ -202,6 +202,15 @@ final class LiveCaptureProcessor: ObservableObject {
     /// the text viewer) can each be up in this window, floating ABOVE the scrim. Those are precisely the
     /// entries the model-layer guards exist for — see `retryFailed`.
     var isFinishingScrimUp: Bool { isFinalizing && !showFinalizeSheet && !showRotationReview }
+#if DEBUG
+    /// DEBUG-only UI seam for the off-screen VM test. It exposes the same no-sheet regeneration state the
+    /// view branches on without starting OCR, a receiver, or any file-writing finalize path.
+    func _uiTestShowFinishingScrim() {
+        isFinalizing = true
+        showFinalizeSheet = false
+        showRotationReview = false
+    }
+#endif
     @Published private(set) var finalizeSummary: String?
     /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
     @Published private(set) var failedGroupIds: Set<String> = []

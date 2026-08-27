@@ -3,8 +3,15 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var processor = OCRProcessor()
     @StateObject private var capture = CaptureSession()
+#if DEBUG
+    @State private var mode: Mode = (
+        ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1"
+        || ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim
+    ) ? .live : .files
+#else
     @State private var mode: Mode =
         ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1" ? .live : .files
+#endif
     @AppStorage(DefaultsKeys.hasSeenKeyOnboarding) private var hasSeenKeyOnboarding = false
     @State private var showKeyOnboarding = false
 
@@ -30,6 +37,14 @@ struct ContentView: View {
             }
         }
         .onAppear {
+#if DEBUG
+            // The UI test needs the exact no-sheet regeneration window, but manufacturing it through a
+            // real finalize would write files. This explicit launch switch changes only the observed model
+            // flag: no receiver, OCR, Keychain, network, source, or output directory is touched.
+            if ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim {
+                capture.liveProcessor._uiTestShowFinishingScrim()
+            }
+#endif
             LiveCaptureTestDriver.runIfRequested(session: capture)
             FileRelayTestDriver.runIfRequested(session: capture)
             ProcessFilesTestDriver.runIfRequested()

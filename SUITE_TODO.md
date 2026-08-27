@@ -1744,23 +1744,6 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
 > fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
 > except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu10-fu1 [LOW · completeness] (blocked-on: W21.vmgui-d)** `LiveCaptureView` overlay — the
-  finishing window is now modal to the POINTER only. `W3.cap-r3-fu10` decided the panel should be frozen while
-  the regeneration runs and expressed that with `.frame`+`.contentShape`, but a hit-test scrim is neither a
-  focus ring nor an AX barrier: with macOS "Keyboard navigation" on (off by default) ⇥+Space still reaches a
-  control behind the overlay, and with no `.accessibilityAddTraits(.isModal)` a VoiceOver client can activate
-  what the pointer cannot. So the decision is expressed at partial strength, and every future affordance added
-  to this panel inherits the same silent hole. The one-liners that would close it (`.isModal` on the overlay,
-  or `.disabled(liveProc.isFinishingScrimUp)` on the panel content) would
-  retire fu7's unkillable P6/P7 mutants — but `.isModal` can hide from XCUITest the very buttons
-  `W21.vmgui-d`'s own hit-test assertion needs to find, which is why this waits for the lane rather than
-  guessing. ⚠️ **Updated 2026-08-04:** an earlier version also said these one-liners "would make
-  `W3.cap-r3-fu11` moot". They would not, and fu11 has since **SHIPPED** (`fb833ea`/`c903bb8`) with a
-  model-layer `guard !isFinalizing` in `clearSession()` — because a view-layer barrier, `.isModal` included,
-  cannot make the Clear button's two halves refuse ATOMICALLY, which is the property that item turned on. So
-  this item's value is unchanged and is now purely what its title says: making the window modal to focus and
-  AX for **future** affordances, and killing fu7's P6/P7 + fu11's M5 as measurements. Filed
-  2026-08-04 by `W3.cap-r3-fu10`'s adversarial pass. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu12-fu1 [LOW · behaviour decision]** `LiveCaptureView.clearButton` — **in the emptied-pane
   ✅ **DECIDED by the owner 2026-08-13: PUT THE COUNT IN THE LABEL, AND CONFIRM.** The button reads what it
   does — "Discard 3 processed documents" — and asks before doing it. Both halves of the finding are in scope:

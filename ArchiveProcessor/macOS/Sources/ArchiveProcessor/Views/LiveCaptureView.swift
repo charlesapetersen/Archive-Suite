@@ -67,28 +67,15 @@ struct LiveCaptureView: View {
         // to, and `.ignoresSafeArea()` reclaims safe-area INSETS rather than a sibling's layout space. So the
         // operator can still leave the tab.
         //
-        // NOT YET OBSERVED, and deliberately separated from the decision above. That today's code ACHIEVES
-        // the freeze is a code-read inference, not a measurement: a `Color` is hit-testable, so an overlay of
-        // one should eat the clicks. The specific reason to keep the doubt is that this overlay sits over an
-        // **`HSplitView`**, which is AppKit-backed (`NSSplitView`) — overlaying bridged AppKit content is the
-        // case where the SwiftUI hit-test story is least certain, and the split DIVIDER especially may not be
-        // covered at all. That is the thing for `W21.vmgui-d` to look at, not the general platitude.
-        //
-        // WHAT A SCRIM DOES NOT BUY EVEN IF IT WORKS, which is why the model-layer guards stay. It stops the
-        // POINTER and nothing else. Three routes go straight through it: (a) a presented sheet floats ABOVE
+        // The overlay is still a pointer barrier, but a scrim alone does not constrain focus or accessibility.
+        // A presented sheet floats ABOVE
         // the overlay — the predicate does not mention `modelChoiceTarget`, so the model sheet is up with the
-        // scrim uselessly behind it; (b) keyboard focus, since hit testing is not the focus ring — with
-        // macOS's "Keyboard navigation" setting on (System Settings → Keyboard; OFF by default, and note it
-        // is a different feature from the Accessibility one named "Full Keyboard Access"), ⇥+Space still
-        // reaches a control behind an overlay; (c) accessibility clients, since there is no
-        // `.accessibilityAddTraits(.isModal)` here — VoiceOver can activate what the pointer cannot.
-        // ⚠️ (b) and (c) are REASONED, not measured, and are flagged as such rather than asserted, since
-        // inferring reachability without observing it is the exact error this item was filed to correct.
-        // `.disabled` covers (b) and (c) as well as (a); this modifier covers none of them. Neither layer
-        // subsumes the other. Closing (b)/(c) at the overlay — making the window modal to focus and AX and
-        // not only to the pointer — is filed as `W3.cap-r3-fu10-fu1`, because the obvious one-liners interact
-        // with the VM lane's own test (an `.isModal` container can hide the very buttons that test needs to
-        // find) and that is a decision to take with the lane in hand.
+        // scrim uselessly behind it. Keyboard focus and accessibility activation similarly bypass hit testing.
+        // `W3.cap-r3-fu10-fu1` therefore disables the real split panel for this same narrow window, preserving
+        // the overlay above it. The VM test proves the throbber renders while the underlying Start control is
+        // visible but accessibility-disabled; that is the shared SwiftUI predicate for keyboard and AX
+        // activation, not merely a pointer inference. The model-layer guards remain the durable backstop.
+        .disabled(liveProc.isFinishingScrimUp)
         .overlay {
             if liveProc.isFinishingScrimUp {
                 ZStack {
@@ -96,10 +83,9 @@ struct LiveCaptureView: View {
                     VStack(spacing: 10) {
                         ProgressView().controlSize(.large)
                         Text("Finishing — processing segments…").font(.callout).foregroundStyle(.secondary)
-                            // A stable hook for the Processor's future VM GUI lane (`W21.vmgui-d`): wait on
-                            // this, then assert a panel button behind the scrim is NOT `isHittable`. That is
-                            // the one observation that can confirm the paragraph above; a headless driver
-                            // cannot see hit-testing at all.
+                            // The VM UI test waits on this, then confirms the underlying Start control remains
+                            // visible but accessibility-disabled. It is the rendered counterpart of
+                            // `LiveCaptureProcessor.isFinishingScrimUp`.
                             .accessibilityIdentifier("live.finishing-throbber")
                     }
                     .padding(24)
@@ -231,6 +217,7 @@ struct LiveCaptureView: View {
                             } else {
                                 Button("Start") { session.start() }
                                     .buttonStyle(.borderedProminent)
+                                    .accessibilityIdentifier("live.start")
                             }
                         }
                         // DUAL receiver status: the Mac always listens on the LAN AND (when signed into Drive)

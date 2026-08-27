@@ -13,6 +13,11 @@ enum ProcessorUITestConfiguration {
 
     static var inputDirectory: URL? { urlValue(after: "-APUITestInputDirectory") }
     static var outputDirectory: URL? { urlValue(after: "-APUITestOutputDirectory") }
+    /// Opens the real Live Capture view with only its non-writing finishing-scrim state armed. This lets the
+    /// VM UI test inspect the focus/AX barrier without starting a receiver, OCR, or a finalize operation.
+    static var showsLiveCaptureFinishingScrim: Bool {
+        isActive && arguments.contains("-APUITestLiveCaptureFinishingScrim")
+    }
     static var droppedPDF: URL? {
         if let path = urlValue(after: "-APUITestDroppedPDFPath") { return path }
         guard arguments.contains("-APUITestSyntheticMultiPagePDF") else { return nil }

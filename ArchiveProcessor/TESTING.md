@@ -273,6 +273,10 @@ existing scratch, key-free, no-network execution remains unchanged.
   recovered-photo hold. Its direct invocation uses `macOS/build/DD`; the free daemon gate injects its freshly
   built `macOS/build/gate-DD` app binary so this same synthetic launch probe also catches a pre-`main` abort.
   45 checks as of 2026-07-31.
+- **`ArchiveProcessorUITests/ProcessorUITests/testFinishingScrimBlocksLiveCaptureKeyboardAndAccessibilityRoutes`**
+  — off-screen VM GUI proof that the no-sheet finishing scrim renders over the real Live Capture panel while
+  its underlying controls are accessibility-disabled. The DEBUG-only launch seam arms no receiver, OCR,
+  finalization, network, input, or output; run it through `ops/gui/vm-gui-runner.sh processor xcuitest`.
 - **`test-manifest-persistence.sh`** — manifest durability + completion acknowledgements: a session's record
   survives a crash, and an ack is only emitted once the write is durable. 86 checks as of 2026-07-31.
 - **`test-network-session.sh`** — paid-POST retry safety and limiter cancellation accounting, injected so no
