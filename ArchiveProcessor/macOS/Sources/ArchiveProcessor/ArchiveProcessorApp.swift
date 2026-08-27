@@ -3,6 +3,11 @@ import SwiftUI
 @main
 struct ArchiveProcessorApp: App {
     init() {
+#if DEBUG
+        // This happens before any view reads @AppStorage. The UI suite supplies disposable paths and
+        // ARCHIVEPROC_HEADLESS=1, so it never opens a Keychain item or a remembered real folder.
+        ProcessorUITestConfiguration.installScratchDefaults()
+#endif
         OCRProcessor.requestNotificationPermission()
         // One-time: adopt the new default rotation mode (llmSingle — overlaps OCR, ~same accuracy)
         // for users still sitting on the old llmMajority default.

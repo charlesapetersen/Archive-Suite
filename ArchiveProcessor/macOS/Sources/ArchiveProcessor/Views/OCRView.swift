@@ -113,7 +113,14 @@ struct OCRView: View {
     init(processor: OCRProcessor) {
         _processor = ObservedObject(wrappedValue: processor)
         _apiKey = State(initialValue: "")
+#if DEBUG
+        // The UI suite owns this temporary output directory. Never recover the operator's
+        // last-selected folder, even though visual tests never start a paid run.
+        _outputDirectory = State(initialValue: ProcessorUITestConfiguration.outputDirectory
+                                 ?? ModelSelectionStore.savedOutputDirectory())
+#else
         _outputDirectory = State(initialValue: ModelSelectionStore.savedOutputDirectory())
+#endif
     }
 
     private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
@@ -192,6 +199,13 @@ struct OCRView: View {
             }
             // Warm the system-tag suggestions if a manual tagging mode is already selected.
             if taggingMode.isManual { SystemTagsProvider.shared.warmUp() }
+#if DEBUG
+            // XCUITest cannot reliably hand a Finder file promise to the AppKit drop receiver in a
+            // headless guest. Feed its scratch PDF through the exact same URL admission method instead.
+            if droppedFiles.isEmpty, let testPDF = ProcessorUITestConfiguration.droppedPDF {
+                handleDroppedURLs([testPDF])
+            }
+#endif
         }
         .onChange(of: taggingModeRaw) { _, _ in
             if taggingMode.isManual { SystemTagsProvider.shared.warmUp() }
@@ -382,13 +396,16 @@ struct OCRView: View {
                                 Text(mode.displayName).tag(mode.rawValue)
                             }
                         }
+                        .accessibilityIdentifier("ap.ocr.taggingPicker")
                         Text(isMultiPagePDFReOCR
                              ? "Not applied to a multi-page PDF — it is re-OCR'd into one alternating image/OCR-text PDF (a pure document rebuild, no tagging)."
                              : taggingMode.detail)
                             .font(.caption2).foregroundStyle(.tertiary)
+                            .accessibilityIdentifier("ap.ocr.reOCRExplanation")
                     }
                     .padding(4)
                 }
+                .accessibilityIdentifier("ap.ocr.taggingPanel")
                 .disabled(isMultiPagePDFReOCR)
 
 
@@ -399,12 +416,14 @@ struct OCRView: View {
                             HStack {
                                 Image(systemName: "infinity.circle").foregroundStyle(.secondary)
                                 Text("Included in your subscription — usage limits apply.")
+                                    .accessibilityIdentifier("ap.ocr.localAgentCost")
                                 Spacer()
                             }
                             Text("The \(localAgentTool.displayName) CLI uses your subscription login — no per-page charge. If you hit your plan's usage window, the app paces and resumes when it resets. It runs at a low concurrency (1–2), so expect it to be slower than a metered API.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 2)
+                                .accessibilityIdentifier("ap.ocr.localAgentPacing")
                         }
                         .padding(4)
                     }
@@ -655,6 +674,7 @@ struct OCRView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("ap.ocr.dropZone")
     }
 
     /// Segmentation decided on the phone (Live Capture handoff), shown next to each file so the

@@ -285,6 +285,10 @@ struct SettingsView: View {
         .padding(14)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .windowBackgroundColor))
+        // Expose the fixed pane as one read-only AX summary. Some macOS releases flatten the nested
+        // caption rows inside a Form, but this stable parent still represents the text the operator sees.
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ap.settings.costPane")
     }
 
     /// Cost/pacing summary for the Local Agent CLI backend. There is no per-token dollar figure (the CLI
@@ -295,10 +299,15 @@ struct SettingsView: View {
         Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: "infinity.circle").foregroundStyle(.secondary)
-            Text("Included in your subscription — usage limits apply.").font(.caption)
+            Text("Included in your subscription — usage limits apply.")
+                .font(.caption)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ap.settings.localAgentCost")
         Text("The \(localAgentTool.displayName) CLI uses your existing subscription login, so there's no per-page charge. Hit your plan's usage window and the app paces automatically, then resumes when it resets.")
             .font(.caption2).foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("ap.settings.localAgentPacing")
 
         Divider().padding(.vertical, 2)
         Text("PACING").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
@@ -346,6 +355,7 @@ struct SettingsView: View {
                     HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint (base URL, model ID, optional pricing) — useful for self-hosted or institutional proxies. Local CLI Agent runs OCR through a locally installed, signed-in CLI (Claude Code / Gemini / Codex) using your existing subscription — no API key and no per-token cost. Exactly one backend is active at a time.")
                 }
             }
+            .accessibilityIdentifier("ap.settings.backendPicker")
 
             if useGateway {
                 HStack {
@@ -382,6 +392,7 @@ struct SettingsView: View {
                         HelpButton(text: "Which LLM service performs OCR and tagging. Each has its own models, pricing, and API key.")
                     }
                 }
+                .accessibilityIdentifier("ap.settings.providerPicker")
                 Picker(selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
                     ForEach(models) { m in
                         Text(customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName).tag(m)
@@ -418,6 +429,7 @@ struct SettingsView: View {
                 HelpButton(text: "Which locally installed CLI performs OCR and tagging. Each authenticates with its own subscription login (Claude Code, Gemini CLI, or OpenAI Codex CLI) — no API key is used. Only Claude Code is verified on this machine so far; Gemini/Codex support is best-effort pending their setup check.")
             }
         }
+        .accessibilityIdentifier("ap.settings.localAgentToolPicker")
         TextField("CLI path (optional — auto-detected if blank)", text: $localAgentBinaryPath)
         TextField("Model (optional — CLI default if blank)", text: $localAgentModel)
         HStack {
@@ -431,6 +443,7 @@ struct SettingsView: View {
             Button { showLocalAgentWizard = true } label: {
                 Label("Set up (guided)…", systemImage: "wand.and.stars")
             }
+            .accessibilityIdentifier("ap.settings.localAgentGuidedSetup")
             HelpButton(text: "Step-by-step setup for Claude Code or the Gemini CLI: how to install, sign in with your subscription, and verify — no API key needed.")
         }
         if !localAgentStatus.isEmpty {
@@ -460,6 +473,7 @@ struct SettingsView: View {
             Button { showKeyWizard = true } label: {
                 Label("Set up keys (guided) — Gemini, Mistral & OpenAI", systemImage: "wand.and.stars")
             }
+            .accessibilityIdentifier("ap.settings.guidedKeySetup")
             keyField("Anthropic", account: LLMProvider.anthropic.rawValue, text: $anthropicKey)
             keyField("Gemini", account: LLMProvider.gemini.rawValue, text: $geminiKey)
             keyField("Mistral", account: LLMProvider.mistral.rawValue, text: $mistralKey)

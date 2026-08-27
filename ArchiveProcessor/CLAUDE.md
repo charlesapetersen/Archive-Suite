@@ -327,12 +327,14 @@ one-liner — run the relevant lane before pushing an OCR/pipeline change or as 
   `scripts/test-smoke.sh` (raw per-provider OCR calls) and `scripts/test-tier2.sh` (multi-case pipeline).
 
 **Visual / render verification.** XCUITest reports only the accessibility tree, not pixels — it won't catch a
-GUI that renders blank/wrong. The Processor has **no unit-test target**, so the headless render guards
-(`RenderProbe` / `DocumentRenderGuardTests`) live in the Reader bundle — but they guard the **2-page PDF
-output** the Processor writes (`PDFGenerator`), verifying the Reader-side read of exactly what the Processor
-produced. For the Processor's own GUI (setup wizards, Settings rows, review flows) drive the **live sighted
-loop** — `ops/gui/capture-window.sh` + `cliclick` → read the shot — rather than deferring visual checks to the
-owner. See [`../ops/gui/README.md`](../ops/gui/README.md) and `AGENTS.md` → *GUI verification*.
+GUI that renders blank/wrong. Reader's headless render guards (`RenderProbe` / `DocumentRenderGuardTests`)
+therefore still protect the **2-page PDF output** Processor writes (`PDFGenerator`), verifying the Reader-side
+read of exactly what Processor produced. Processor now also has the `ArchiveProcessorUITests` UI target:
+run `ops/gui/vm-gui-runner.sh processor xcuitest` for its $0, off-screen scratch checks and
+`ops/gui/vm-gui-runner.sh processor sighted` to **read pixels**. The suite sets `ARCHIVEPROC_HEADLESS=1` and
+guest `mktemp` IN/OUT paths, so it cannot use a key, CLI login, or a real corpus; it covers the Anthropic
+key-wizard copy, multi-page-PDF auto-re-OCR UI, and Local Agent wizard/cost panes. See
+[`../ops/gui/README.md`](../ops/gui/README.md) and `AGENTS.md` → *GUI verification*.
 
 **Full phone↔Mac round-trip E2E — `scripts/e2e-phone-mac.sh`** (see `scripts/E2E-PHONE-MAC.md`). The only
 test that exercises *both* real apps end to end: a real headless Mac session (`LIVECAPTURE_AUTOSTART`) paired

@@ -57,7 +57,9 @@ tart_require() {
 #   mkfixture              : guest command to BUILD that fixture. Evaluated inside a remote `bash -lc`
 #                            with $GR = the repo mount — hence single quotes here: it must expand in
 #                            the GUEST, not on the host. Both builders synthesize their own PDFs.
-#   launcharg              : DEBUG-only launch argument pointing the app at the scratch fixture
+#   launchcmd              : guest command that launches the built app against `$GUEST_FIXTURE_PATH`
+#                            (Processor also sets ARCHIVEPROC_HEADLESS here; its no-key state is a hard
+#                            requirement, not an inherited-shell assumption)
 #   prerun                 : guest command to run before each attempt (blank = none)
 # ---------------------------------------------------------------------------------------------------
 archive_app_field() {
@@ -71,7 +73,7 @@ archive_app_field() {
     reader:procname)  echo "ArchiveReader" ;;
     reader:fixture)   echo "$GUEST_HOME/Library/Application Support/ArchiveReader/AR-GUI-Fixture" ;;
     reader:mkfixture) echo 'bash "$GR/ArchiveReader/scripts/make-gui-fixture.sh"' ;;
-    reader:launcharg) echo "-ARUITestRootPath" ;;
+    reader:launchcmd) echo 'open "$GUEST_APP_PATH" --args -ARUITestRootPath "$GUEST_FIXTURE_PATH"' ;;
     reader:prerun)    echo "" ;;
 
     notes:spec)       echo "ArchiveNotes/macOS/project.yml" ;;
@@ -83,15 +85,29 @@ archive_app_field() {
     notes:procname)   echo "ArchiveNotes" ;;
     notes:fixture)    echo "$GUEST_HOME/Library/Application Support/ArchiveNotes/AN-GUI-Fixture" ;;
     notes:mkfixture)  echo 'bash "$GR/ArchiveNotes/scripts/make-notes-fixture.sh"' ;;
-    notes:launcharg)  echo "-ANUITestStorePath" ;;
+    notes:launchcmd)  echo 'open "$GUEST_APP_PATH" --args -ANUITestStorePath "$GUEST_FIXTURE_PATH"' ;;
     # Notes only: wipe the GUEST app container first. organization.json is loaded ONLY when the
     # container's index DB has no folders, so a container left from a previous run shadows the fixture's
     # folder graph and makes the folder-tree UITests (G7/G8) nondeterministic — the INDEX-DB CAVEAT in
     # make-notes-fixture.sh. This is the VM's throwaway container, never the owner's.
     notes:prerun)     echo 'rm -rf "$HOME/Library/Containers/com.archivenotes.app"' ;;
 
-    # Processor has no test target of ANY kind yet (SUITE_TODO W21.vmgui-d), so it is deliberately absent:
-    # an unknown app must be a loud error, not a silently-empty run.
+    processor:spec)       echo "ArchiveProcessor/macOS/project.yml" ;;
+    processor:proj)       echo "ArchiveProcessor/macOS/ArchiveProcessor.xcodeproj" ;;
+    processor:scheme)     echo "ArchiveProcessor" ;;
+    processor:tests)      echo "ArchiveProcessorUITests" ;;
+    processor:dd)         echo "$GUEST_HOME/dd-processor" ;;
+    processor:appbundle)  echo "$GUEST_HOME/dd-processor/Build/Products/Debug/ArchiveProcessor.app" ;;
+    processor:procname)   echo "ArchiveProcessor" ;;
+    processor:fixture)    echo "$GUEST_HOME/ArchiveProcessor-GUI-Fixture" ;;
+    processor:mkfixture)  echo 'bash "$GR/ArchiveProcessor/scripts/make-gui-fixture.sh"' ;;
+    # LaunchServices, unlike a direct executable invocation, activates a SwiftUI scene. Set the
+    # headless flag in the guest launch environment first: `open` does not reliably inherit a shell's
+    # one-command environment assignment. Remove it once LaunchServices has handed the app its process.
+    processor:launchcmd)  echo 'launchctl setenv ARCHIVEPROC_HEADLESS 1; open "$GUEST_APP_PATH" --args -NSTreatUnknownArgumentsAsOpen NO -APUITestMode -APUITestInputDirectory "$GUEST_FIXTURE_PATH/IN" -APUITestOutputDirectory "$GUEST_FIXTURE_PATH/OUT"; sleep 1; launchctl unsetenv ARCHIVEPROC_HEADLESS' ;;
+    processor:prerun)     echo "" ;;
+
+    # An unknown app must be a loud error, never a silently empty VM run.
     *) echo "" ;;
   esac
 }
@@ -172,6 +188,43 @@ tart_build_fixture() {
   case "$TART_FIXTURE_RC" in ''|*[!0-9]*) TART_FIXTURE_RC=""; return 2 ;; esac
   if [ "$TART_FIXTURE_RC" = 0 ]; then return 0; fi
   return 1
+}
+
+# ---------------------------------------------------------------------------------------------------
+# tart_prepare_gui_dd VM APP — retain each app's incremental DerivedData but reclaim disposable test
+# result bundles before the next run. The guest image has about 33 GB free, and three independent Xcode
+# products plus unbounded `.xcresult` bundles can otherwise fill it across a daemon run. Returning a
+# distinct status lets callers make disk/transport trouble an honest SKIP rather than a false test RED.
+#
+#   0 = the named app's DerivedData is ready for reuse
+#   1 = guest storage is below TART_GUI_MIN_FREE_KB (default 6 GiB): do not start a build
+#   2 = guest command/transport failed: state is unknown
+#
+# The only recursive removal is an exact, table-derived `*.xcresult` child of the app's own DD tree;
+# compiled products and shared caches stay warm. Call only after tart_wait_agent.
+TART_GUI_MIN_FREE_KB="${TART_GUI_MIN_FREE_KB:-6291456}"
+tart_prepare_gui_dd() {
+  local vm="$1" app="$2" dd output rc=0
+  dd="$(archive_app_field "$app" dd)"
+  [ -n "$dd" ] || return 2
+  output="$(tart exec "$vm" bash -lc "
+    set -e
+    available=\$(df -Pk '$GUEST_HOME' | awk 'NR == 2 { print \$4 }')
+    case \"\$available\" in ''|*[!0-9]*) echo 'storage: could not determine free space'; exit 2 ;; esac
+    if [ \"\$available\" -lt '$TART_GUI_MIN_FREE_KB' ]; then
+      echo \"storage: only \${available} KiB free (need at least $TART_GUI_MIN_FREE_KB KiB)\"
+      exit 1
+    fi
+    mkdir -p '$dd'
+    find '$dd' -mindepth 1 -maxdepth 1 -type d -name '*.xcresult' -prune -exec rm -rf {} +
+    echo \"storage: reusing $dd (\${available} KiB free)\"
+  " 2>&1)" || rc=$?
+  TART_GUI_DD_NOTE="$output"
+  case "$rc" in
+    0) return 0 ;;
+    1) return 1 ;;
+    *) return 2 ;;
+  esac
 }
 
 # ---------------------------------------------------------------------------------------------------

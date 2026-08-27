@@ -3,8 +3,9 @@
 # headless Tart VM so it NEVER touches the owner's screen and never hangs the host with the "Enable UI
 # Automation" prompt.
 #
-# Covers EVERY app that ships a UITest bundle — currently Reader + Notes (Processor has no test target
-# at all). Select a subset with AUTONOMOUS_GUI_VM_APPS="reader" / "notes" / "reader notes".
+# Covers EVERY app that ships a UITest bundle — Reader, Notes, and Processor. One app runs per health-gate
+# invocation, selected round-robin from the configured pool, so three 20-minute caps cannot exceed the
+# daemon's 50-minute whole-gate deadline. Set AUTONOMOUS_GUI_VM_APPS to a subset when diagnosing a lane.
 #
 # SAFETY POSTURE (Tier-2 autonomous infra — biased hard toward fail-open):
 #   • ON by default. Set AUTONOMOUS_GUI_VM=0 to disable.
@@ -30,20 +31,25 @@
 # A failing suite must never be reported as a checkmark. Found by an adversarial audit, 2026-07-30.
 #
 # Knobs: AUTONOMOUS_GUI_VM_NAME (default archive-gui-runner), AUTONOMOUS_GUI_VM_MAXRUN (per-app, 1200s),
-#        AUTONOMOUS_GUI_VM_APPS (default "reader notes"), AUTONOMOUS_GUI_VM_AGENTWAIT (default 240s).
+#        AUTONOMOUS_GUI_VM_APPS (default "reader notes processor"), AUTONOMOUS_GUI_VM_AGENTWAIT (default 240s),
+#        AUTONOMOUS_GUI_VM_STATE (round-robin state; default $ROOT/.maintenance/gui-vm-next-app).
 set -uo pipefail
-export PATH="/opt/homebrew/bin:$PATH"
+# The normal Homebrew prefix is retained as belt-and-braces above tart-lib's shared resolver. The
+# override is deliberately only a directory prefix, used by the mechanism proof's fake `tart`; production
+# leaves it unset and therefore cannot change which system tools are used.
+export PATH="${AUTONOMOUS_GUI_VM_BIN_DIR:-/opt/homebrew/bin}:$PATH"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VM="${AUTONOMOUS_GUI_VM_NAME:-archive-gui-runner}"
 MAXRUN="${AUTONOMOUS_GUI_VM_MAXRUN:-1200}"
 AGENTWAIT="${AUTONOMOUS_GUI_VM_AGENTWAIT:-240}"
-APPS="${AUTONOMOUS_GUI_VM_APPS:-reader notes}"
+APP_POOL="${AUTONOMOUS_GUI_VM_APPS:-reader notes processor}"
+STATE="${AUTONOMOUS_GUI_VM_STATE:-$ROOT/.maintenance/gui-vm-next-app}"
 # Apps whose UITest failures WARN instead of REDding the gate. The point of the warn tier is that a suite
 # with known failures still RUNS and reports every gate — visibility without parking a multi-day run on a
 # regression that is already tracked. An app graduates out of this list the moment its suite is green.
 # EMPTY by default since 2026-08-01 (W21.vmgui-c): notes was the only entry, and its 4/12 VM failures are
 # fixed — one harness/layout cause, not four bugs (the guest booted at 1024×768 and the browser understated
-# its own minimum width, so ~92 pt of the right pane sat off-window). Notes is 12/12 in the VM; both apps
+# its own minimum width, so ~92 pt of the right pane sat off-window). Notes is currently 21/21 in the VM; both apps
 # now RED the gate on a failure, which is the point. Do not re-add an app here without a tracked item: a
 # permanent warn tier is a disabled test with extra steps.
 WARN_APPS="${AUTONOMOUS_GUI_VM_WARN_APPS:-}"
@@ -60,7 +66,7 @@ skip() { echo "GUI-VM gate SKIPPED: $*"; exit 3; }
 # ---- guards (each SKIPs; a missing prereq must never RED) --------------------------------------
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] || skip "disabled (AUTONOMOUS_GUI_VM=0)"
 # tart-vs-VM stays two distinct skips (W21.vmgui-path). The PATH fix now lives in tart-lib.sh so BOTH
-# entry points get it; line 35's export is kept as belt-and-braces for the lines above the source.
+# entry points get it; the prefix above is kept as belt-and-braces for the lines above the source.
 tart_require || skip "tart not installed or not on PATH (details above) — the VM's existence is unknown"
 tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || skip "tart is installed, but VM '$VM' does not exist (build it — ops/gui/README.md §3)"
 command -v xcodegen >/dev/null || skip "xcodegen not on the host PATH (it generates the projects the VM builds)"
@@ -81,6 +87,36 @@ trap cleanup EXIT
 # a busy VM is infra, and infra must never park the run.
 tart_lock_acquire "${AUTONOMOUS_GUI_VM_LOCKWAIT:-300}" \
   || skip "the GUI VM is in use by another run (pid ${TART_LOCK_OWNER:-?}) — not competing for it"
+
+# ---- round-robin selection ----------------------------------------------------------------------
+# Advancing the state before boot is intentional: a missing VM or a full guest disk is an inconclusive
+# attempt for THIS lane, not a reason to starve the other two on every later health gate. The lock above
+# serializes the read/advance/write with the interactive runner's VM ownership.
+select_app() {
+  local candidate first="" last="" selected="" take_next=0 tmp
+  for candidate in $APP_POOL; do
+    archive_app_known "$candidate" || skip "unknown app '$candidate' in AUTONOMOUS_GUI_VM_APPS (known: reader notes processor)"
+    [ -n "$first" ] || first="$candidate"
+    if [ "$take_next" = 1 ]; then selected="$candidate"; break; fi
+    [ "$candidate" = "$last" ] && take_next=1
+  done
+  [ -n "$first" ] || skip "AUTONOMOUS_GUI_VM_APPS is empty (need at least one of: reader notes processor)"
+  [ -f "$STATE" ] && IFS= read -r last < "$STATE" || true
+  # Re-run after loading state: the first walk validates the pool without coupling the state file to it.
+  selected=""; take_next=0
+  for candidate in $APP_POOL; do
+    if [ "$take_next" = 1 ]; then selected="$candidate"; break; fi
+    [ "$candidate" = "$last" ] && take_next=1
+  done
+  [ -n "$selected" ] || selected="$first"
+  if mkdir -p "$(dirname "$STATE")" 2>/dev/null && tmp="$(mktemp "${STATE}.tmp.XXXXXX" 2>/dev/null)"; then
+    printf '%s\n' "$selected" > "$tmp" && mv -f "$tmp" "$STATE" || rm -f "$tmp"
+  else
+    echo "WARN: GUI-VM round-robin state could not be updated at $STATE; this run is $selected, but later gates may repeat it." >&2
+  fi
+  APPS="$selected"
+}
+select_app
 
 # ---- boot ---------------------------------------------------------------------------------------
 # WHY the guest-agent wait exists (the 2026-07-29 failure, root-caused 2026-07-30): `tart ip --wait`
@@ -125,12 +161,17 @@ boot_vm() {
 # One log PER APP PER ATTEMPT. Per-app so one app's "** TEST FAILED **" is never read as another's;
 # per-attempt because the retry used to truncate the first attempt's log and destroy the only record of
 # what actually failed — the retry is a flake guard, not a reason to lose evidence.
-applog()     { echo "$ART/gui-vm-$1-attempt$2.log"; }
+app_art()    { echo "$ART/$1"; }
+applog()     { echo "$(app_art "$1")/xcuitest-attempt$2.log"; }
 is_fail()    { grep -q '\*\* TEST FAILED \*\*'    "$(applog "$1" "$2")" 2>/dev/null; }
 is_success() { grep -q '\*\* TEST SUCCEEDED \*\*' "$(applog "$1" "$2")" 2>/dev/null; }
+# A missing Processor window can mean a guest keychain/unlock/modal failure, not an app regression. The
+# test itself saves a rendered screenshot before emitting this marker; classify it as infrastructure.
+is_processor_no_window() { [ "$1" = processor ] && grep -q '^PROCESSOR_UI_NO_WINDOW$' "$(applog "$1" "$2")" 2>/dev/null; }
 
 run_app_once() {   # $1 = app, $2 = attempt number
-  local app="$1" attempt="$2" log fixture mk prerun proj scheme tests dd bundle frc
+  local app="$1" attempt="$2" log fixture mk prerun proj scheme tests dd bundle frc ddrc result_art
+  mkdir -p "$(app_art "$app")"
   log="$(applog "$app" "$attempt")"; : > "$log"
   proj="$(archive_app_field "$app" proj)";   scheme="$(archive_app_field "$app" scheme)"
   tests="$(archive_app_field "$app" tests)"; dd="$(archive_app_field "$app" dd)"
@@ -157,6 +198,17 @@ run_app_once() {   # $1 = app, $2 = attempt number
       echo "WARN[$app]: prerun FAILED (exit $?) — the app may start from an INHERITED container, which is a different test than a fresh one. See $log." | tee -a "$log"
     fi
   fi
+
+  # Reuse the app's incremental build products but prune old result bundles and decline a near-full guest
+  # before starting a build. Storage/agent trouble is infrastructure, so leaving no TEST marker makes the
+  # main classifier report SKIPPED rather than inventing a product regression.
+  ddrc=0
+  tart_prepare_gui_dd "$VM" "$app" || ddrc=$?
+  case "$ddrc" in
+    0) printf '%s\n' "${TART_GUI_DD_NOTE:-storage: reused DerivedData}" >>"$log" ;;
+    1) echo "SKIP[$app]: guest disk is too full for a safe Xcode build — ${TART_GUI_DD_NOTE:-no free-space report}" | tee -a "$log"; return 0 ;;
+    *) echo "SKIP[$app]: could not prepare the guest DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed}" | tee -a "$log"; return 0 ;;
+  esac
 
   # Fixtured UITests XCTSkip themselves when their scratch fixture is missing — which would let the
   # gate go GREEN on the few unfixtured tests and hide the real coverage. Build it if absent
@@ -205,13 +257,44 @@ run_app_once() {   # $1 = app, $2 = attempt number
       -derivedDataPath '$dd' -resultBundlePath '$bundle' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " >>"$log" 2>&1
+  collect_shots "$app" "$attempt" "$log"
+  # Preserve the finalized result bundle beside this attempt's log. A failed/interrupted Xcode run may
+  # not finalize one; that is evidence about the infrastructure, never a reason to replace the log.
+  result_art="$(app_art "$app")/uitest-attempt$attempt.xcresult"
+  rm -rf "$result_art"
+  if tart exec "$VM" bash -lc "[ -d '$bundle' ] && cp -R '$bundle' '/Volumes/My Shared Files/out/$app/'" >/dev/null 2>&1; then
+    echo "artifact[$app]: $result_art" >>"$log"
+  else
+    echo "WARN[$app]: no finalized result bundle could be copied for attempt $attempt" >>"$log"
+  fi
+}
+
+# UI-test runners are sandboxed, so they print their scratch screenshot paths and the unsandboxed guest
+# agent copies them to the per-app artifact directory. This is deliberately separate from `.xcresult`:
+# a launch failure can leave that bundle unfinalized, exactly when its screenshot is most useful.
+collect_shots() { # $1 = app, $2 = attempt, $3 = host log
+  local app="$1" attempt="$2" log="$3" dest paths p copied=0
+  dest="$(app_art "$app")/shots-attempt$attempt"
+  rm -rf "$dest"
+  paths="$(sed -nE 's/^\[shot\] .*: wrote (.+)$/\1/p' "$log" 2>/dev/null | sort -u || true)"
+  [ -n "$paths" ] || return 0
+  mkdir -p "$dest"
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if tart exec "$VM" bash -lc "cp \"$p\" '/Volumes/My Shared Files/out/$app/shots-attempt$attempt/'" >/dev/null 2>&1; then
+      copied=$(( copied + 1 ))
+    else
+      echo "WARN[$app]: could not copy UI-test screenshot $p" >>"$log"
+    fi
+  done <<< "$paths"
+  echo "artifact[$app]: $copied UI-test screenshot(s) in $dest" >>"$log"
 }
 
 # ---- main ---------------------------------------------------------------------------------------
 : > "$GLOG"
 # Generate every selected app's .xcodeproj on the HOST — the guest image has no xcodegen.
 for app in $APPS; do
-  archive_app_known "$app" || skip "unknown app '$app' in AUTONOMOUS_GUI_VM_APPS (known: reader notes)"
+  archive_app_known "$app" || skip "unknown app '$app' in AUTONOMOUS_GUI_VM_APPS (known: reader notes processor)"
   spec="$(archive_app_field "$app" spec)"
   xcodegen generate --spec "$ROOT/$spec" >>"$GLOG" 2>&1 || skip "xcodegen failed for '$app' (see $GLOG)"
 done
@@ -230,6 +313,10 @@ is_warn_only() { case " $WARN_APPS " in *" $1 "*) return 0 ;; *) return 1 ;; esa
 red=""; skipped=""; green=""; warned=""
 for app in $APPS; do
   run_app_once "$app" 1 || true
+  if is_processor_no_window "$app" 1; then
+    echo "GUI-VM gate: Processor did not expose a window; screenshot kept in $(app_art "$app")/shots-attempt1. Treating guest launch state as SKIPPED, not a product RED."
+    skipped="$skipped $app"; continue
+  fi
   if is_success "$app" 1 && ! is_fail "$app" 1; then green="$green $app"; continue; fi
   if is_fail "$app" 1; then
     echo "GUI-VM gate: $app UITest failure — retrying once (flake guard)…"

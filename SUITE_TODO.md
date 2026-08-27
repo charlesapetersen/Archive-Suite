@@ -963,15 +963,14 @@ code; the owner queued only this one (the others are pruned/soft-backlog there).
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 From the 2026-07-28 Daemon Report walkthrough. The headless VM lane is now shared by Reader and Notes:
 `W21.vmgui-a` shipped one per-app configuration table for both entry points, `W21.vmgui-b` made its fixtures
-corpus-free, and `W21.vmgui-c` made the Notes suite green. The remaining GUI gap is **Processor**, which still
-has no test target and carries the Keychain risk described below. Completing the lane drains that backlog
-off-screen; it must retain the existing Reader and Notes behavior rather than reintroducing Reader-only
-assumptions.
+corpus-free, and `W21.vmgui-c` made the Notes suite green. The remaining GUI gap was **Processor**, which had no
+test target and carried the Keychain risk described below. Completing the lane drained that backlog off-screen
+while retaining the existing Reader and Notes behavior rather than reintroducing Reader-only assumptions.
 
-- [ ] **W21.vmgui — complete the headless-VM GUI lane for Archive Processor [L]** — Reader and Notes already
-  use the shared per-app table; Processor remains deliberately unknown until `W21.vmgui-d` creates a safe
-  UITest target. `W21.vmgui-b` removed the need for a real fixture corpus; `W21.vmgui-d` now brings Processor
-  into the table with its scratch launch and Keychain safeguards.
+- [x] **W21.vmgui — complete the headless-VM GUI lane for Archive Processor [L]** — DONE 2026-08-27, this
+  commit: Reader and Notes retain their shared per-app table while Processor gains its scratch-only, headless
+  VM lane; all three app routes are verified and the gate now rotates one route per run. Reader, Notes, and
+  Processor use the shared per-app table with corpus-free scratch fixtures and launch safeguards.
   - [x] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** DONE 2026-08-01
     `de43be3` (the lane) + this commit (the checks). **12/12 → 15/15 in the VM**, `notes` out of
     `AUTONOMOUS_GUI_VM_WARN_APPS` (now empty by default, so a Notes UITest failure REDs the gate again).
@@ -996,10 +995,10 @@ assumptions.
     `.pastePassage` (⌘C/⌘V route to the first responder, which XCUITest can't reliably make the styled text
     view), and the control strip now wraps to two rows so a tenth control can't push the last one
     off-window again. **W14.4 (c) is now deterministically covered by `W21.vmgui-c-fu`.**
-  - [ ] **W21.vmgui-d — Processor lane from zero, then drain the Processor GUI backlog [L]** (blocked-on:
-    W21.vmgui-c). Processor has **no test target of any kind**, **no `schemes:` block** (it relies on Xcode
-    autocreation), **zero `accessibilityIdentifier`s** in `Sources/` (vs 4 files Reader / 11 Notes) and **no
-    UITest launch-arg override** — all four must be created: (1) an `ArchiveProcessorUITests` target
+  - [x] **W21.vmgui-d — Processor lane from zero, then drain the Processor GUI backlog [L]** (blocked-on:
+    W21.vmgui-c). Processor previously had **no test target of any kind**, **no `schemes:` block** (it relied on
+    Xcode autocreation), **zero `accessibilityIdentifier`s** in `Sources/` (vs 4 files Reader / 11 Notes), and no
+    UITest launch-arg override. This item creates all four: (1) an `ArchiveProcessorUITests` target
     (`bundle.ui-testing`, `TEST_TARGET_NAME: ArchiveProcessor`, `CODE_SIGN_IDENTITY: "-"`,
     `CODE_SIGNING_REQUIRED: NO`, **`ENABLE_HARDENED_RUNTIME: NO`** — the W7.1 finding: an ad-hoc-signed runner
     can't load the xctest plugin under hardened runtime, and `settings.base` sets it YES); (2) an explicit
@@ -1008,7 +1007,11 @@ assumptions.
     on exactly the surfaces under check (Settings provider rows + "Set up (guided)…", `ProviderKeyWizard`, the
     drop zone + Tagging panel in `OCRView`); (4) a scratch launch config (guest `mktemp` IN/OUT) — Processor is
     **not sandboxed**, so no temporary-exception entitlement is needed.
-    **Keychain posture — why the VM is the right place, and how to keep it that way.** The host prompt comes from
+    **DONE 2026-08-27, this commit:** scratch-only Processor VM suite **4/4**, existing Reader **29/29**, and
+    Notes **21/21** all passed; the sighted Processor capture is
+    `~/.tart-mirror/vm-artifacts/processor/sighted.png`, its XCUITest evidence is
+    `~/.tart-mirror/vm-artifacts/processor/xcuitest.log` and `processor/shots/`. The fixture never mounts a
+    corpus or writes a key. **Keychain posture — why the VM is the right place, and how to keep it that way.** The host prompt comes from
     `ContentView.maybePresentKeyOnboarding` (5 eager `KeychainHelper.load`s on first launch) plus
     `SettingsView.loadKeys()` (5 more on appear): the host keychain *has* those items, and an ad-hoc rebuild
     changes the code identity so their ACL no longer matches → macOS prompts. **The VM is a different machine

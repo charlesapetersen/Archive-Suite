@@ -40,6 +40,8 @@ struct LocalAgentWizard: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .padding()
+                .accessibilityLabel("Local Agent setup tools: \(specs.map(\.displayName).joined(separator: ", "))")
+                .accessibilityIdentifier("ap.localAgentWizard.toolPicker")
             }
 
             ScrollView {
@@ -83,14 +85,16 @@ private struct LocalAgentStep: View {
                     Label("Install \(spec.displayName)", systemImage: "arrow.down.circle")
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("ap.localAgentWizard.install")
                 if let docs = spec.docsURL {
                     Button { openURL(docs) } label: { Label("Docs", systemImage: "book") }
                         .buttonStyle(.bordered)
+                        .accessibilityIdentifier("ap.localAgentWizard.docs")
                 }
             }
 
-            noteRow("person.badge.key", spec.entitlementNote)
-            noteRow("checkmark.shield", spec.tosNote)
+            noteRow("person.badge.key", spec.entitlementNote, identifier: "ap.localAgentWizard.entitlementNote")
+            noteRow("checkmark.shield", spec.tosNote, identifier: "ap.localAgentWizard.tosNote")
 
             Divider().padding(.vertical, 4)
 
@@ -120,11 +124,13 @@ private struct LocalAgentStep: View {
         }
     }
 
-    private func noteRow(_ icon: String, _ text: String) -> some View {
+    private func noteRow(_ icon: String, _ text: String, identifier: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: icon).foregroundStyle(.secondary)
             Text(text).font(.caption).foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
     }
 
     private func detectAndVerify() {

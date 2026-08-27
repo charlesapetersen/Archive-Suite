@@ -48,12 +48,12 @@ interactive check on *this* machine, and #3 (below) for full GUI tests **unatten
 macOS VM has its *own* virtual display, so XCUITest **and** the sighted pixel loop run entirely off your
 monitor. This is the daemon-safe GUI lane.
 
-**Run:** `ops/gui/vm-gui-runner.sh [reader|notes] [xcuitest|sighted|both]` (default `reader both`; the app
+**Run:** `ops/gui/vm-gui-runner.sh [reader|notes|processor] [xcuitest|sighted|both]` (default `reader both`; the app
 argument is optional, so the old `vm-gui-runner.sh xcuitest` form still means "reader"). Artifacts (`.xcresult`, PNGs) land in
-`~/.tart-mirror/vm-artifacts/` — `Read` the PNGs to eyeball renders. Drive the VM with `tart exec <vm> …`
-(no SSH — Cirrus images ship the guest agent).
+`~/.tart-mirror/vm-artifacts/<app>/` — `Read` the PNGs to eyeball renders. Drive the VM with
+`tart exec <vm> …` (no SSH — Cirrus images ship the guest agent).
 
-**Screenshots a UITest takes** land in `vm-artifacts/shots-<app>/` as `uitest-<name>.png`. A test **cannot**
+**Screenshots a UITest takes** land in `vm-artifacts/<app>/shots/` as `uitest-<name>.png`. A test **cannot**
 write there itself — the XCUITest runner is **sandboxed**, so the `--dir=out:` share is not writable from
 inside it (measured 2026-08-09, `W26.docs-fu1`). `FixtureUITestCase.captureScreenshot` therefore writes to the
 runner's own temp dir and prints `[shot] <name>: wrote <path>`; `collect_shots` copies those out afterwards
@@ -147,19 +147,26 @@ It reports what actually took effect and WARNs — loudly, with the consequence 
 Reader is green at either size. If you ever debug "element is not hittable" in this lane, print
 `NSScreen.screens` and the window frame from the test **first**; `tart get` is not evidence about the guest.
 
-**Status (2026-08-01):** the gate covers **every app with a UITest bundle** — Reader *and* Notes (Processor has
-no test target). Pick a subset with `AUTONOMOUS_GUI_VM_APPS="reader"`. **Reader is 15/15 and Notes is 12/12 in
-the VM**, so the **warn tier** (`AUTONOMOUS_GUI_VM_WARN_APPS`) is **empty by default** and a UITest failure in
-either app REDs the gate. Don't re-add an app to it without a tracked item — a permanent warn tier is a
-disabled test with extra steps. The gate is **ON by default**
+**Status (2026-08-27):** the gate covers **every app with a UITest bundle** — Reader, Notes, and Processor.
+Processor's new 4-check suite uses only a guest `mktemp` IN/OUT fixture and `ARCHIVEPROC_HEADLESS=1`: no corpus,
+no API key, no CLI login, and no guest-Keychain access. It visibly checks the Anthropic wizard, multi-page
+auto-re-OCR, and Local Agent wizard/cost panes; `processor sighted` confirms a normal headless launch draws with
+no Keychain sheet. **Reader is 29/29, Notes is 21/21, and Processor is 4/4 in the VM** (the current suite
+sizes), so the **warn tier**
+(`AUTONOMOUS_GUI_VM_WARN_APPS`) is **empty by default** and a UITest failure in any app REDs the gate. Don't
+re-add an app to it without a tracked item — a permanent warn tier is a disabled test with extra steps. The gate is **ON by default**
 (`AUTONOMOUS_GUI_VM=0` disables); a missing VM / boot failure / guest-agent timeout **skips** (never parks), and
-it REDs only on a reproducible `** TEST FAILED **` (retry-once). `GATE_MAXRUN` is 50 min to absorb the VM step.
-Sessions also verify view/interaction changes here off-screen — the old `gui-mode` flag was retired, GUI is
-unattended now (CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/hooks/no-host-gui.sh` now *enforces*
-that for unattended runs. VM TCC grants live on the VM's disk (re-apply if the VM is rebuilt).
+it REDs only on a reproducible `** TEST FAILED **` (retry-once). The daemon's gate runs **one** of
+`reader notes processor` per invocation, round-robin via its gitignored `.maintenance/gui-vm-next-app` state
+file (or `AUTONOMOUS_GUI_VM_STATE`); `AUTONOMOUS_GUI_VM_APPS` can narrow that pool while diagnosing. This avoids
+three 20-minute caps exceeding the 50-minute whole-gate deadline. It retains each app's separate DerivedData,
+prunes stale result bundles, and SKIPs before building when the guest has under 6 GiB free. Sessions also verify
+view/interaction changes here off-screen — the old `gui-mode` flag was retired, GUI is unattended now
+(CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/hooks/no-host-gui.sh` now *enforces* that for
+unattended runs. VM TCC grants live on the VM's disk (re-apply if the VM is rebuilt).
 
 **One table, one wait — `ops/gui/tart-lib.sh`.** The per-app config (project/scheme/UITest bundle/guest
-DerivedData/app bundle/fixture + its builder/launch arg/pre-run) and the guest-agent wait are **shared** by
+DerivedData/app bundle/fixture + its builder/launch command/pre-run) and the guest-agent wait are **shared** by
 `vm-gui-runner.sh` and `ops/autonomous/gui-vm-gate.sh`. That is load-bearing,
 not tidiness: the guest-agent fix below originally landed in the gate *only*, leaving the interactive
 runner — the script this README, the resume prompt, CLAUDE.md and AGENTS.md all point people at — broken in

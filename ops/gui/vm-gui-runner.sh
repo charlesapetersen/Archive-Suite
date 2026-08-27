@@ -14,7 +14,7 @@
 #              screencapture/cliclick) on purpose — see README "Why VNC": a headless VM has no capturable
 #              display until a viewer attaches, and VNC-injected input bypasses the guest's TCC entirely.
 #
-# USAGE:  ops/gui/vm-gui-runner.sh [reader|notes] [xcuitest|sighted|both]      (default: reader both)
+# USAGE:  ops/gui/vm-gui-runner.sh [reader|notes|processor] [xcuitest|sighted|both] (default: reader both)
 #         The app argument is optional, so the old call form still works: a bare
 #         `vm-gui-runner.sh xcuitest` still means "reader, xcuitest".
 # ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, AGENT_WAIT.
@@ -40,13 +40,14 @@ case "${1:-}" in
   *)                     APP="$1"; [ -n "${2:-}" ] && LANE="$2" ;;
 esac
 
-mkdir -p "$ART"
 log() { printf '\033[36m[vm-gui]\033[0m %s\n' "$*"; }
 warn(){ printf '\033[33m[vm-gui] WARN:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[31m[vm-gui] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
-archive_app_known "$APP" || die "unknown app '$APP' (use: reader | notes). Processor has no UITest target yet — SUITE_TODO W21.vmgui-d."
+archive_app_known "$APP" || die "unknown app '$APP' (use: reader | notes | processor)."
 case "$LANE" in xcuitest|sighted|both) : ;; *) die "unknown lane '$LANE' (use: xcuitest | sighted | both)" ;; esac
+APP_ART="$ART/$APP"
+mkdir -p "$APP_ART"
 
 # One writer at a time: this script and the health gate share one VM name and one artifact dir, and each
 # begins by stopping the VM and truncating logs. Without the lock a run started while the daemon's gate is
@@ -65,7 +66,7 @@ SPEC_REL="$(archive_app_field "$APP" spec)";        PROJ_REL="$(archive_app_fiel
 SCHEME="$(archive_app_field "$APP" scheme)";        GUEST_DD="$(archive_app_field "$APP" dd)"
 GUEST_APP="$(archive_app_field "$APP" appbundle)"   # procname is read by tart_kill_app, not needed here
 GUEST_FIXTURE="$(archive_app_field "$APP" fixture)"; MKFIXTURE="$(archive_app_field "$APP" mkfixture)"
-LAUNCHARG="$(archive_app_field "$APP" launcharg)";  PRERUN="$(archive_app_field "$APP" prerun)"
+LAUNCHCMD="$(archive_app_field "$APP" launchcmd)";  PRERUN="$(archive_app_field "$APP" prerun)"
 ONLY_TESTING="${ONLY_TESTING:-$(archive_app_field "$APP" tests)}"
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""
 
@@ -103,7 +104,7 @@ ensure_vm() {
     ensure_display
     return 0
   fi
-  local runlog="$ART/tart-run.log"; : > "$runlog"
+  local runlog="$APP_ART/tart-run.log"; : > "$runlog"
   # Snapshot BEFORE the boot: if the owner already had Screen Sharing open, tart's auto-opened viewer is
   # not ours to close (see close_vm_viewer).
   SS_WAS_RUNNING=0; pgrep -x "Screen Sharing" >/dev/null 2>&1 && SS_WAS_RUNNING=1
@@ -130,7 +131,7 @@ ensure_vm() {
   log "booting $VM (${gfx[*]}) + repo/artifact shares…"
   VM_BOOTED=1
   tart run "$VM" "${gfx[@]}" "${mounts[@]}" >>"$runlog" 2>&1 &
-  echo $! > "$ART/tart-run.pid"
+  echo $! > "$APP_ART/tart-run.pid"
   if [ "$LANE" != "xcuitest" ]; then
     # Parse the one-shot VNC endpoint tart prints: vnc://:PASSWORD@127.0.0.1:PORT
     local i; for i in $(seq 1 60); do grep -q 'vnc://' "$runlog" && break; sleep 1; done
@@ -227,6 +228,13 @@ run_xcuitest() {
   # last stopped, the app-under-test included (→ tart_kill_app).
   tart_kill_app "$VM" "$APP"
   [ -n "$PRERUN" ] && tart exec "$VM" bash -lc "$PRERUN" >/dev/null 2>&1
+  local ddrc=0
+  tart_prepare_gui_dd "$VM" "$APP" || ddrc=$?
+  case "$ddrc" in
+    0) log "${TART_GUI_DD_NOTE:-storage: reusing DerivedData}" ;;
+    1) die "the VM guest is too full for a safe $APP build — ${TART_GUI_DD_NOTE:-no free-space report}. Free space, then rerun." ;;
+    *) die "could not prepare the VM's $APP DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed}." ;;
+  esac
   log "building + running $ONLY_TESTING for $APP in the VM…"
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
   # before executing a single test. Remove it first.
@@ -242,10 +250,11 @@ run_xcuitest() {
       -only-testing:'$ONLY_TESTING' -destination 'platform=macOS' \
       -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/uitest.xcresult' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
-  " 2>&1 | tee "$ART/xcuitest-$APP.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
-  log "XCUITest log: $ART/xcuitest-$APP.log"
+  " 2>&1 | tee "$APP_ART/xcuitest.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
+  log "XCUITest log: $APP_ART/xcuitest.log"
   collect_shots
-  grep -q '\*\* TEST SUCCEEDED \*\*' "$ART/xcuitest-$APP.log" 2>/dev/null \
+  collect_xcresult
+  grep -q '\*\* TEST SUCCEEDED \*\*' "$APP_ART/xcuitest.log" 2>/dev/null \
     || warn "no '** TEST SUCCEEDED **' marker for $APP — read the log before believing this run passed."
 }
 
@@ -259,20 +268,20 @@ run_xcuitest() {
 # finalized, and that is exactly the state a failed or killed run leaves behind — recovering the shots
 # then means classifying `…xcresult/Data` blobs by magic bytes.
 collect_shots() {
-  local dest="$ART/shots-$APP" n=0 p paths
+  local dest="$APP_ART/shots" n=0 p paths
   # Clear the directory FIRST, unconditionally. If this run took no shots, an absent dir has to mean
   # "no shots this run" — leaving the previous run's PNGs there is worse than having none, because the
   # next session reads them as evidence about a run that never produced them.
   rm -rf "$dest"
   # Greedy `.*` so a shot name containing a colon still resolves (the last ": wrote " wins), and `|| true`
   # because a missing log is not a reason to abort the run under `set -e`.
-  paths="$(sed -nE 's/^\[shot\] .*: wrote (.+)$/\1/p' "$ART/xcuitest-$APP.log" 2>/dev/null | sort -u || true)"
+  paths="$(sed -nE 's/^\[shot\] .*: wrote (.+)$/\1/p' "$APP_ART/xcuitest.log" 2>/dev/null | sort -u || true)"
   [ -n "$paths" ] || return 0
   mkdir -p "$dest"
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     # The guest paths contain spaces but no quotes, so double-quoting inside the -lc string is enough.
-    if tart exec "$VM" bash -lc "cp \"$p\" '/Volumes/My Shared Files/out/shots-$APP/'" >/dev/null 2>&1; then
+    if tart exec "$VM" bash -lc "cp \"$p\" '/Volumes/My Shared Files/out/$APP/shots/'" >/dev/null 2>&1; then
       n=$(( n + 1 ))
     else
       warn "a test wrote a screenshot at $p but it could not be collected"
@@ -281,7 +290,26 @@ collect_shots() {
   log "$n screenshot(s) collected into $dest — READ them; pixels are the point of a GUI check."
 }
 
+# Keep the result bundle beside the textual log and screenshots. It is useful when Xcode finalized it,
+# but never the only screenshot channel: an interrupted test leaves its bundle unreadable.
+collect_xcresult() {
+  local dest="$APP_ART/uitest.xcresult"
+  rm -rf "$dest"
+  if tart exec "$VM" bash -lc "[ -d '$GUEST_DD/uitest.xcresult' ] && cp -R '$GUEST_DD/uitest.xcresult' '/Volumes/My Shared Files/out/$APP/'" >/dev/null 2>&1; then
+    log "XCUITest result bundle: $dest"
+  else
+    warn "no finalized XCUITest result bundle could be collected for $APP"
+  fi
+}
+
 build_for_sighted() {
+  local ddrc=0
+  tart_prepare_gui_dd "$VM" "$APP" || ddrc=$?
+  case "$ddrc" in
+    0) log "${TART_GUI_DD_NOTE:-storage: reusing DerivedData}" ;;
+    1) die "the VM guest is too full for a safe $APP build — ${TART_GUI_DD_NOTE:-no free-space report}. Free space, then rerun." ;;
+    *) die "could not prepare the VM's $APP DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed}." ;;
+  esac
   log "building $SCHEME in the VM (for the sighted lane)…"
   # CODE_SIGN_IDENTITY=- : guest has no keychain for the host's cert (W28.cert; see gui-vm-gate.sh).
   tart exec "$VM" bash -lc "xcodebuild build-for-testing -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' -destination 'platform=macOS' -derivedDataPath '$GUEST_DD' CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" >/dev/null
@@ -298,15 +326,17 @@ run_sighted() {
   [ -n "$PRERUN" ] && tart exec "$VM" bash -lc "$PRERUN" >/dev/null 2>&1
   log "launching $APP in the VM against its scratch fixture…"
   tart exec "$VM" bash -lc "
-    open '$GUEST_APP' --args $LAUNCHARG '$GUEST_FIXTURE'
+    GUEST_APP_PATH='$GUEST_APP'
+    GUEST_FIXTURE_PATH='$GUEST_FIXTURE'
+    $LAUNCHCMD
     sleep 9
   "
   local vnc=( "$VNCDOTOOL" -s "$VNC_HOST::$VNC_PORT" -p "$VNC_PASS" )
   log "capturing $APP off-screen over VNC…"
-  "${vnc[@]}" capture "$ART/sighted-$APP.png"
-  log "artifact: $ART/sighted-$APP.png  (Read it to eyeball the render)"
+  "${vnc[@]}" capture "$APP_ART/sighted.png"
+  log "artifact: $APP_ART/sighted.png  (Read it to eyeball the render)"
   # Example off-screen interaction (framebuffer coords): adapt as needed.
-  # "${vnc[@]}" move 765 269 click 1 pause 1 capture "$ART/sighted-$APP-after-click.png"
+  # "${vnc[@]}" move 765 269 click 1 pause 1 capture "$APP_ART/sighted-after-click.png"
 }
 
 log "app=$APP  lane=$LANE  vm=$VM"
@@ -327,4 +357,4 @@ case "$LANE" in
   sighted)  build_for_sighted; run_sighted ;;
   both)     run_xcuitest; build_for_sighted; run_sighted ;;
 esac
-log "done. Artifacts in $ART"
+log "done. Artifacts in $APP_ART"

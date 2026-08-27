@@ -37,6 +37,7 @@ struct ProviderKeyWizard: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .padding()
+                .accessibilityIdentifier("ap.keyWizard.providerPicker")
             }
 
             ScrollView {
@@ -83,6 +84,8 @@ private struct ProviderKeyStep: View {
                         Text("\(i + 1).").bold().frame(width: 18, alignment: .trailing)
                         Text(step)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("ap.keyWizard.step.\(i)")
                 }
             }
             .padding(12)
@@ -93,10 +96,13 @@ private struct ProviderKeyStep: View {
                 Label("Open \(spec.displayName)", systemImage: "safari")
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("ap.keyWizard.openConsole")
 
-            if let card = spec.cardNote { noteRow("exclamationmark.bubble", card) }
-            noteRow("dollarsign.circle", spec.costNote)
-            noteRow("lock.circle", spec.privacyNote)
+            if let card = spec.cardNote {
+                noteRow("exclamationmark.bubble", card, identifier: "ap.keyWizard.cardNote")
+            }
+            noteRow("dollarsign.circle", spec.costNote, identifier: "ap.keyWizard.costNote")
+            noteRow("lock.circle", spec.privacyNote, identifier: "ap.keyWizard.privacyNote")
             if let warn = geminiRegionWarning {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -121,6 +127,7 @@ private struct ProviderKeyStep: View {
                     else { SecureField("\(spec.displayName) API key", text: $key) }
                 }
                 .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("ap.keyWizard.keyField")
                 .onChange(of: key) { _, _ in status = nil; testStatus = nil }
                 Button { reveal.toggle() } label: { Image(systemName: reveal ? "eye.slash" : "eye") }
                     .buttonStyle(.borderless)
@@ -177,11 +184,13 @@ private struct ProviderKeyStep: View {
         #endif
     }
 
-    private func noteRow(_ icon: String, _ text: String) -> some View {
+    private func noteRow(_ icon: String, _ text: String, identifier: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Image(systemName: icon).foregroundStyle(.secondary)
             Text(text).font(.caption).foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
     }
 
     private func validate() {

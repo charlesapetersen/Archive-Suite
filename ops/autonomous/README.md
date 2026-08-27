@@ -235,13 +235,15 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
     corpus-backed smoke-fixture subcheck is simply reported as not run when its optional sample is absent.
 - **GUI UITests in a headless VM (`AUTONOMOUS_GUI_VM`, ON by default since 2026-07-28; `=0` to disable).** That
   last gap — real *interaction / whole-window* UITests — now runs in the gate WITHOUT a screen:
-  `ops/autonomous/gui-vm-gate.sh` runs **every app's** UITest bundle inside the Tart VM (`ops/gui/README.md` §3)
-  — Reader and Notes since 2026-07-30 (`AUTONOMOUS_GUI_VM_APPS` selects a subset) — off the owner's display and
+  `ops/autonomous/gui-vm-gate.sh` runs **one app's** UITest bundle inside the Tart VM (`ops/gui/README.md` §3)
+  — Reader, Notes, or Processor — off the owner's display and
   with no "Enable UI Automation" host prompt. **Fail-open** (Tier-2 posture): a missing VM / boot failure /
   guest-agent timeout **skips** (never parks — so it's inert on a machine with no VM built); it REDs only on a
   *reproducible* UITest failure (keyed on the `** TEST FAILED **` marker, with its own retry-once). It adds
   ~15–20 min (VM boot + build + UITests), which is why `GATE_MAXRUN` is now **50 min** (below) — at 30 a slow
-  cold run could blow the cap and false-park. The VM's TCC grants live on its disk (re-apply if it is rebuilt).
+  cold run could blow the cap and false-park. It rotates `reader notes processor` via a gitignored state file
+  (`AUTONOMOUS_GUI_VM_STATE`; `AUTONOMOUS_GUI_VM_APPS` can narrow the pool), so three per-app caps never add up
+  inside one gate. The VM's TCC grants live on its disk (re-apply if it is rebuilt).
   - **Skip ≠ pass** (fixed 2026-07-30 after the gate reported a GREEN GUI lane that had run zero tests): the
     script exits **3 for SKIPPED**, distinct from 0/1, and `health-gate.sh` runs it through `step_skippable`,
     which prints `⊘ gui-vm SKIPPED — <reason>` and appends `— but NOT VERIFIED: gui-vm` to the summary line.
@@ -260,9 +262,9 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
     visibility without parking a multi-day run. Empty it again as soon as that suite is green — a permanent
     warn tier is a disabled test.
   - **Per-attempt result bundles + logs.** `xcodebuild` refuses to overwrite an existing `-resultBundlePath`,
-    so a fixed path made every *retry* fail before running a test — laundering a real RED into a skip. Each
-    attempt gets its own bundle and its own `gui-vm-<app>-attempt<n>.log`, so the retry can't destroy attempt
-    1's evidence either. Both were found by running the gate for real on 2026-07-30.
+  so a fixed path made every *retry* fail before running a test — laundering a real RED into a skip. Each
+  attempt gets its own bundle and log below `~/.tart-mirror/vm-artifacts/<app>/`, so the retry can't destroy
+  attempt 1's evidence either. Both were found by running the gate for real on 2026-07-30.
 - **The host screen is off-limits to a session, mechanically.** The daemon exports `ARCHIVE_UNATTENDED=1`, and
   `.claude/hooks/no-host-gui.sh` (PreToolUse/Bash) hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/
   `capture-window.sh`/`cliclick`/`osascript`, a windowed Android emulator, and the iOS Simulator — each denial
