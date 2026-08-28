@@ -873,9 +873,6 @@ add a second control alongside.**
   `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
   Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
   W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q4 — Notes: project front-matter quality → `Q1`–`Q3`** (blocked-on: W19.q2) **[M].** `NotesTagProjector`
-  maps the item's front-matter `quality` to the 0–3 scale and projects `Q1`/`Q2`/`Q3`; **0/unrated writes no
-  quality token** (and removes a stale one). Tier-2 (projector tag write; scratch-only). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
 - [ ] **W19.q6 — Processor: USER-SET Quality in the interactive tagging UIs** (blocked-on: W19.q5) **[M].** The
   user sets the 0–3 rating while capturing/processing. **Merge into the existing priority entry** (don't add a
   second control): a 0–3 selector in **(a)** the **Live Capture per-segment tag card** (`Views/LiveCaptureView.swift`)
@@ -1445,7 +1442,7 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
   Template / Set Quality ▸ / Delete…. | Views/NotesContextMenu.swift | S | low | none
 - [ ] **`W9.d3` — template body editing is not routed in-app [M].** Plan D3. | Views/TemplatesManagerView.swift
   | M | low | none
-- [ ] **`W9.d4` — no quality quick-edit [S].** Plan D4. Inline borderless quality `Menu` (None + 5–1) in the
+- [ ] **`W9.d4` — no quality quick-edit [S].** Plan D4. Inline borderless quality `Menu` (None + 1–3) in the
   list/detail cell plus a context-menu "Set Quality ▸". ⚠️ Coordinate with `W19.q3`/`W19.q4`, which redefine
   Quality across the Suite — do this AFTER them or build it against the post-W19 vocabulary. |
   Views/QualityControl.swift, NotesTableView.swift | S | low | none

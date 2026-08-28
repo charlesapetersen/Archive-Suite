@@ -178,7 +178,7 @@ authors: [Gordon E. Moore]
 date: 1968
 date_precision: year
 date_uncertain: false
-quality: 4
+quality: 3
 tags: [intel, corporate culture]
 roundup: false
 created: $CREATED

@@ -55,18 +55,18 @@ every other surface is designed from the historian's workflow up, not copied fro
 | # | Decision | Choice | Consequence |
 |---|----------|--------|-------------|
 | D1 | On-disk note/extract format | **Markdown + assets**, one **UUID-named folder** per item: `<store>/<uuid>/<Title>.md` + `<uuid>/assets/` | Durable, greppable, tool-agnostic; title=filename with no collisions; UUID = stable link identity |
-| D2 | Metadata store | **YAML front-matter is authoritative** for *all* metadata; **mirror only subject tags** into macOS Finder tags (regenerable projection, not source of truth) | No author/date/quality pollution of the global tag namespace; front-matter is the standard durable answer |
+| D2 | Metadata store | **YAML front-matter is authoritative** for *all* metadata; mirror subject tags plus the canonical `Q1`...`Q3` Quality facet into macOS Finder tags (regenerable projection, not source of truth) | Author/date stay out of the global tag namespace; front-matter remains the durable answer |
 | D3 | Organization / replication | **Purely virtual** — flat pile of UUID folders on disk; the folder tree, "home", working-folders, and replication are **many-to-many records in the index DB** | Replication is trivial (a membership row); moving computers = move one folder; disk is not the tree |
 | D4 | Shared-tag SPEC change | **No corpus back-fill** this run | **No `Author:` facet**; existing corpus untouched (lowest risk) |
 | D5 | Durable link identity | **Root-marker file (GUID+name) + root-relative path**, carried in custom URL schemes | Survives moving the whole install to a new computer after a one-time root re-grant |
 | D6 | Editor | **Rich-text WYSIWYG + formatting toolbar**, Markdown as the saved format, with a **per-note raw-Markdown toggle** | `NSTextView`/TextKit + attributed↔Markdown bridge; user never sees syntax unless they ask |
 | D7 | Extract semantics | **Snapshot + provenance link** (extract owns editable text; link back to source note+passage; jump-to-source; note edits don't change the extract) | Extract has its own title/date/author/tags; can be segmented with blocks linking to *different* notes |
 | D8 | Zotero | **Read metadata** via Zotero's local HTTP API / Better BibTeX (auto-fill author/date/title + formatted citation), degrade gracefully if Zotero isn't running | Paste `zotero://select/…` (item **and** attachment) → chip + fetched metadata; note-level and per-block |
-| D9 | Quality ("ordering") tag | Front-matter `quality: 1..5` (5 = highest), **priority-style UI** (dedicated control, not a free-form tag) | Notes-internal; not a Finder tag this run; not in the shared SPEC |
+| D9 | Quality ("ordering") tag | Front-matter `quality: 1..3` (3 = highest), **Quality UI** (dedicated control, not a free-form tag) | Projects canonical `Q1`...`Q3` onto the note's own `.md`; `0`/unrated projects no Q token |
 | D10 | App shape | A **third native macOS app** `ArchiveNotes/` (bundle `com.archivenotes.app`), sandboxed like Reader + `network.client` for Zotero localhost | Own 3-pane windows (Notes viewer + Extracts viewer); reads Reader's corpus only via durable links |
 
 **Deferred to future iterations** (explicitly out of scope for run 1, tracked in §13): the unified single
-storage path for all three apps; mirroring author/date/quality into Finder tags; multi-root corpus support;
+storage path for all three apps; mirroring author/date into Finder tags; multi-root corpus support;
 iOS/companion anything.
 
 ---
@@ -87,7 +87,7 @@ for which viewer features light up. Fields (front-matter, §5):
 - `title` (mirrors the `.md` filename; rename keeps them in sync)
 - `authors` ([String], 0..N) — front-matter only (D2)
 - `date` + `date_precision` (`decade|year|month|day`) + `date_uncertain` (Bool) — see §7
-- `quality` (Int 1..5, optional) — D9
+- `quality` (Int 1..3, optional; `0` means unrated/no value) — D9, mirrored as Q1...Q3 per D2
 - `tags` ([String], subjects; the shared controlled vocabulary — mirrored to Finder tags per D2)
 - `sources` — ordered per-block source anchors (§3.3); at item level, a convenience union of block sources
 - `zotero` — Zotero refs at item level (§3.4)
@@ -189,7 +189,7 @@ authors: [Gordon E. Moore]
 date: 1968
 date_precision: year          # decade | year | month | day
 date_uncertain: false
-quality: 4                     # 1..5, optional (5 = highest); priority-style UI
+quality: 3                     # 1..3, optional (3 = highest); Quality UI; projects Q3
 tags: [Silicon Valley, Intel, Corporate Culture]
 roundup: false
 zotero:
@@ -303,14 +303,14 @@ source blocks in one step. These are **read-only w.r.t. the corpus** (Tier-1/2, 
 
 ## 9. Finder-tag mirror — the one file-safety surface (D2)
 
-Notes is authoritative in front-matter, but it **does** write a narrow Finder-tag projection (subjects) onto
-its own `.md` files. Writing Finder tags is the one place Notes touches the
+Notes is authoritative in front-matter, but it **does** write a narrow Finder-tag projection (subjects plus
+the canonical Q1...Q3 Quality facet) onto its own `.md` files. Writing Finder tags is the one place Notes touches the
 irreplaceable-data safety envelope, so it obeys **every** invariant proven in Reader's `TagWriter`:
 1. Single audited choke-point (`NotesTagProjector`, `02`), `NSFileCoordinator(.contentIndependentMetadataOnly)`.
 2. **Trustworthy-read guard** — a failed/nil read aborts; never coerced to `[]` (the anti-tag-wipe rule).
 3. Lossless delta: `new = (fresh − remove) + add`; untouched tokens preserved verbatim.
 4. Verify-by-re-read (multiset-equal) before returning success.
-5. Only ever adds/removes the projected subjects; the one-way R13d cleanup strips the exact retired
+5. Only ever adds/removes projected subjects and Quality facets; the one-way R13d cleanup strips the exact retired
    `ArchiveSuite` stamp while preserving every other tag.
 
 Because Notes writes **only its own newly-created files**, and never the Reader/Processor corpus, the blast
@@ -429,9 +429,9 @@ durable architecture into `ArchiveNotes/CLAUDE.md`.
    with thin per-app adapters (Reader delta-mutate, Processor fresh-write, Notes projector); revisit only if
    a fuller single unified-writer API is later wanted.
 3. Whether Notes and Reader should ever share **one window / unified view** (currently separate apps).
-4. Mirroring **author/date/quality** into Finder tags — e.g. cross-app chronological filtering
-   (date/quality) or author faceting of notes. Author would additionally need a SPEC `Author:` facet
-   (a shared-contract change); all three are front-matter-only in run 1 (D2/D4/D9).
+4. Mirroring **author/date** into Finder tags — e.g. cross-app chronological filtering or author
+   faceting of notes. Author would additionally need a SPEC `Author:` facet (a shared-contract change);
+   both remain front-matter-only (D2/D4).
 5. Zotero: write-back (creating Zotero items from Notes) — read-only for now.
 6. Scrivener specifics: confirm Scrivener honors custom URL schemes in its link fields (it does for
    standard hyperlinks; validate the `archivenotes://` round-trip on the owner's Scrivener during W4 GUI).

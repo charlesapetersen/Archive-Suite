@@ -59,10 +59,10 @@ struct NotesTagProjectorSafetyTests {
         try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date ?? Date.distantPast
     }
 
-    private func makeItem(tags: [String]) -> Item {
+    private func makeItem(tags: [String], quality: Int? = nil) -> Item {
         Item(
             id: UUID(), kind: .note, title: "Test", authors: [],
-            date: nil, datePrecision: nil, dateUncertain: false, quality: nil,
+            date: nil, datePrecision: nil, dateUncertain: false, quality: quality,
             tags: tags, zotero: [], roundup: false,
             created: Date(), modified: Date(), schema: 1,
             blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil
@@ -261,6 +261,39 @@ struct NotesTagProjectorSafetyTests {
     }
 
     // MARK: - §5 title-casing via the shared convention
+
+    @Test("W19.q4 Quality mirror replaces stale Q and Q0 writes no token without touching bytes")
+    func canonicalQualityProjectionIsLosslessAndBytePreserving() throws {
+        let dir = try makeScratchItemDir(); defer { cleanup(dir) }
+        let url = try makeScratchFile(in: dir, tags: ["History", "Q1", "Do Not Sync"])
+        let bytesBefore = try fileBytes(url)
+
+        // A 3-quality note emits Q3; its known prior quality token Q1 is removed, while an unrelated
+        // Finder tag and the current subject survive exactly. This performs the real audited Finder-tag
+        // write on a scratch item file only.
+        let rated = makeItem(tags: ["history"], quality: 3)
+        let ratedDesired = NotesTagVocabulary.managedTokens(for: rated)
+        #expect(ratedDesired == ["History", "Q3"])
+        _ = try NotesTagProjector.project(
+            ratedDesired,
+            previouslyManaged: NotesTagVocabulary.qualityTokens,
+            to: url,
+            itemDir: dir)
+        #expect(Set(try readTags(url)) == ["History", "Q3", "Do Not Sync"])
+        #expect(try fileBytes(url) == bytesBefore, "Finder metadata writes must never alter note bytes")
+
+        // Q0/unrated is absence, not a Q0 token. It removes only the former Quality facet.
+        let unrated = makeItem(tags: ["history"], quality: 0)
+        let unratedDesired = NotesTagVocabulary.managedTokens(for: unrated)
+        #expect(!unratedDesired.contains(where: { ["Q1", "Q2", "Q3", "Q0"].contains($0) }))
+        _ = try NotesTagProjector.project(
+            unratedDesired,
+            previouslyManaged: NotesTagVocabulary.qualityTokens,
+            to: url,
+            itemDir: dir)
+        #expect(Set(try readTags(url)) == ["History", "Do Not Sync"])
+        #expect(try fileBytes(url) == bytesBefore, "clearing a Finder Quality tag must not alter note bytes")
+    }
 
     @Test("§5 subjects title-cased via the shared convention")
     func titleCasingMatchesSharedConvention() throws {

@@ -54,16 +54,18 @@ step.
 - [ ] **K. Durable-link resolve / re-grant** — a `reader-page` source block resolves and previews; a
       moved source root offers an in-app re-grant that re-resolves by GUID (wrong folder rejected).
       *(Build-free proof: `scripts/e2e-durable-links.sh`; unit gate: `DurableLinkE2ETests`.)*
-- [ ] **L. Metadata edit** — date and quality edits in the inspector persist to front-matter (author /
-      title / tag editing land as the gap-closure Phase B items wire in).
+- [ ] **L. Metadata edit** — date and quality edits in the inspector persist to front-matter; quality
+      1–3 also mirrors Q1–Q3 only onto the note's own `.md`, while clear/0 removes its Q token. Author /
+      title / subject editing land as the gap-closure Phase B items wire in.
 - [ ] **M. Replication + delete-last-instance guard** — replicate a note into a second folder
       (membership, not a copy); removing a replicant is quiet; removing the **last** instance prompts a
       modal (fresh re-check at confirm) → Trash (recoverable).
 - [ ] **N. Options (⌘,)** — the Settings window shows the Zotero section (enable / clipboard-detect /
       citation style / advanced host+port), @AppStorage-bound.
-- [ ] **O. Tag projection (Tier-2, scratch only)** — a subject edit projects onto the note's **own**
-      `.md` Finder tags (assert via `tag -l` on the scratch `.md`); corpus never touched; the
-      retired `ArchiveSuite` stamp is stripped while every other tag remains.
+- [ ] **O. Tag projection (Tier-2, scratch only)** — set Quality 1–3 and assert Q1–Q3 on the note's
+      **own** `.md` via `tag -l`; set 0/clear and assert no Q token. A user Finder tag and color label
+      must remain; corpus never touched; the retired `ArchiveSuite` stamp is stripped while every other
+      tag remains.
 - [ ] **P. Quit** — `osascript -e 'quit app "ArchiveNotes"'`; the terminate flush drains any pending
       autosave debounce so a force-quit within the window can't lose an edit.
 

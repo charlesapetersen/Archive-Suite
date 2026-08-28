@@ -38,7 +38,7 @@ final class NotesFilterTests: XCTestCase {
 
     func testNonEmptyQualities() {
         var filter = NotesFilter()
-        filter.qualities = [7, 8]
+        filter.qualities = [2, 3]
         XCTAssertFalse(filter.isEmpty)
     }
 
@@ -78,7 +78,7 @@ final class NotesFilterTests: XCTestCase {
         filter.tags = ["History", "Tech"]
         filter.tagCombine = .any
         filter.kind = .notes
-        filter.qualities = [7, 8, 9]
+        filter.qualities = [1, 2, 3]
         filter.dateFrom = 19600000
         filter.dateTo = 19691231
         filter.folderId = folderId
@@ -91,7 +91,7 @@ final class NotesFilterTests: XCTestCase {
         XCTAssertEqual(decoded.tags, ["History", "Tech"])
         XCTAssertEqual(decoded.tagCombine, .any)
         XCTAssertEqual(decoded.kind, .notes)
-        XCTAssertEqual(decoded.qualities, [7, 8, 9])
+        XCTAssertEqual(decoded.qualities, [1, 2, 3])
         XCTAssertEqual(decoded.dateFrom, 19600000)
         XCTAssertEqual(decoded.dateTo, 19691231)
         XCTAssertEqual(decoded.folderId, folderId)
@@ -144,9 +144,9 @@ final class NotesFilterTests: XCTestCase {
     }
 
     func testQualityMatch() {
-        var f = NotesFilter(); f.qualities = [4, 5]
-        XCTAssertTrue(f.matches(item(quality: 5), folderItemIDs: nil))
-        XCTAssertFalse(f.matches(item(quality: 3), folderItemIDs: nil))
+        var f = NotesFilter(); f.qualities = [2, 3]
+        XCTAssertTrue(f.matches(item(quality: 3), folderItemIDs: nil))
+        XCTAssertFalse(f.matches(item(quality: 1), folderItemIDs: nil))
         XCTAssertFalse(f.matches(item(quality: nil), folderItemIDs: nil))   // undated quality excluded
     }
 
@@ -193,30 +193,30 @@ final class NotesFilterTests: XCTestCase {
     }
 
     func testFacetsCombineWithAND() {
-        var f = NotesFilter(); f.kind = .notes; f.qualities = [5]; f.searchText = "war"
-        XCTAssertTrue(f.matches(item("The war years", kind: .note, quality: 5), folderItemIDs: nil))
-        XCTAssertFalse(f.matches(item("The war years", kind: .extract, quality: 5), folderItemIDs: nil))
-        XCTAssertFalse(f.matches(item("The war years", kind: .note, quality: 4), folderItemIDs: nil))
-        XCTAssertFalse(f.matches(item("Peace times", kind: .note, quality: 5), folderItemIDs: nil))
+        var f = NotesFilter(); f.kind = .notes; f.qualities = [3]; f.searchText = "war"
+        XCTAssertTrue(f.matches(item("The war years", kind: .note, quality: 3), folderItemIDs: nil))
+        XCTAssertFalse(f.matches(item("The war years", kind: .extract, quality: 3), folderItemIDs: nil))
+        XCTAssertFalse(f.matches(item("The war years", kind: .note, quality: 2), folderItemIDs: nil))
+        XCTAssertFalse(f.matches(item("Peace times", kind: .note, quality: 3), folderItemIDs: nil))
     }
 
     // MARK: - effective(base:user:)
 
     func testEffectiveUserWinsElseBase() {
-        var base = NotesFilter(); base.kind = .extracts; base.qualities = [5]; base.searchText = "base"
+        var base = NotesFilter(); base.kind = .extracts; base.qualities = [3]; base.searchText = "base"
         base.dateFrom = 19000000; base.folderId = UUID()
         var user = NotesFilter(); user.kind = .both; user.searchText = ""   // both/blank → inherit base
         var eff = NotesFilter.effective(base: base, user: user)
         XCTAssertEqual(eff.kind, .extracts)
-        XCTAssertEqual(eff.qualities, [5])
+        XCTAssertEqual(eff.qualities, [3])
         XCTAssertEqual(eff.searchText, "base")
         XCTAssertEqual(eff.dateFrom, 19000000)
         XCTAssertEqual(eff.folderId, base.folderId)
 
-        user.kind = .notes; user.qualities = [7]; user.searchText = "user"; user.dateFrom = 20000000
+        user.kind = .notes; user.qualities = [1]; user.searchText = "user"; user.dateFrom = 20000000
         eff = NotesFilter.effective(base: base, user: user)
         XCTAssertEqual(eff.kind, .notes)            // user wins
-        XCTAssertEqual(eff.qualities, [7])
+        XCTAssertEqual(eff.qualities, [1])
         XCTAssertEqual(eff.searchText, "user")
         XCTAssertEqual(eff.dateFrom, 20000000)
     }

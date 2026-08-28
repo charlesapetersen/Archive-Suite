@@ -121,6 +121,10 @@ do not recreate the deferred exclusion feature.
 - *Files:* `.claude/hooks/docsync-*.sh` (+ their config). *Steps:* verify/extend scope so a `packages/ArchiveCore` code change without a doc touch is caught. *Verify:* a dry-run trips the hook. **Tier-2** (autonomous-setup change — prove the mechanism before install).
 
 **A11. Reconcile the original spec's "author/date/quality → macOS Finder tags" durability intent. — ✅ DONE (W9 Phase A, 2026-07-18).** — **DOC**
+> **Historical record — superseded in part by W19.q4 (2026-08-28).** The text below accurately records
+> the July-18 state. Quality now projects as canonical `Q1`...`Q3`; only its author/date deferral remains
+> current. See the current *Deviations to record* entry and overview D2/D9.
+
 (spec-vs-build). The original spec's durability section says "other metadata, e.g. **author and date**, should
 go in macOS tags," and its tags section wants a **quality** ordering "akin to the priority tag in Reader …
 **not** a regular tag" — and Reader's priority *is* a projected Finder tag. The build instead keeps `authors`,
@@ -361,7 +365,7 @@ in the same commit — the docs move with the code. *Tier per the items reviewed
 
 ## Explicitly out of scope (plan-stated deferrals — NOT gaps)
 
-Recorded here so a future reviewer doesn't re-flag them: mirroring **author/date/quality** into Finder tags
+Recorded here so a future reviewer doesn't re-flag them: mirroring **author/date** into Finder tags
 (see the A11 deviation note below); a
 single merged unified-writer signature; unifying the page-2 header *builder*; a shared suite-wide storage
 path; page-within-merged-PDF scroll navigation; editor tables/footnotes/task-lists/strikethrough/HTML and
@@ -382,17 +386,16 @@ in ArchiveCore but rendered through CoreGraphics/ImageIO (no AppKit; W9.c3); sou
 rather than the sketched XCTest; and the `FolderGraph→OrganizationStore` / `SmartQuery→VFolder.queryJSON`
 renames (authorized by overview §16).
 
-**Author/date/quality → front-matter, not Finder tags (A11 — spec-vs-build).** The original spec's
+**Author/date → front-matter; Quality → canonical Q tag (A11 — spec-vs-build).** The original spec's
 durability section said other metadata "e.g. **author and date**" should go in macOS tags, and its tags
 section wanted a **quality** ordering "akin to the priority tag in Reader … **not** a regular tag"
-(Reader's priority *is* a projected Finder tag). The build instead keeps `authors`, `date`, and `quality`
-in the note's `.md` **YAML front-matter** (authoritative, durable plain text) and projects **only subjects**
-to Finder tags — overview **D2** (front-matter authoritative; mirror only subjects; "no
-author/date/quality pollution of the global tag namespace"), **D4** ("no `Author:`
-facet"), **D9** (quality = front-matter `1..5` + priority-style UI, "not a Finder tag this run").
+(Reader's priority *is* a projected Finder tag). The build keeps `authors` and `date` in the note's
+**YAML front-matter** (authoritative, durable plain text), while it projects the front-matter Quality
+value as canonical `Q1`...`Q3` on the note's own `.md` Finder tags alongside its subjects — overview
+**D2**, **D4** ("no `Author:` facet"), and **D9** (Quality = front-matter `1..3`, zero/unrated = no Q
+token).
 **Functionally sound, no work required:** front-matter YAML still satisfies the original "durable against
 this program no longer being developed" intent. **Open owner decision (→ Daemon Report):** whether to
-*additionally* mirror author/date/quality to Finder tags for cross-app (Reader/Processor) parity — if
-adopted, a **Tier-2** projection change through `NotesTagProjector` (five tag-safety invariants) plus, for
-author, a **HOLD-QUEUE** SPEC `Author:` facet. Until then it stays deferred (out-of-scope list above, now
-naming **author** explicitly).
+*additionally* mirror author/date to Finder tags for cross-app (Reader/Processor) parity — if adopted,
+author needs a **Tier-2** projection change through `NotesTagProjector` and a **HOLD-QUEUE** SPEC `Author:`
+facet. Until then author/date stay deferred (out-of-scope list above).

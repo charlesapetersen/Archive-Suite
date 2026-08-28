@@ -3,7 +3,7 @@ import AppKit
 
 /// The item-list filter bar (06-viewers §4, W6-S4). Binds a per-window `NotesNavigationModel` and
 /// surfaces the kind segmented control, a keyword search field (drives FTS — bm25 relevance,
-/// as-you-type), quality (★1–★5) toggles, a tag filter with ALL/ANY combine + chips, a year date
+/// as-you-type), quality (★1–★3) toggles, a tag filter with ALL/ANY combine + chips, a year date
 /// range, and Save-as-Smart-Folder / Clear. The shared folder/smart-folder SCOPE comes from the tree
 /// (`NotesModel.scope`) and is merged with this window's filter at `recompute()`.
 ///
@@ -111,11 +111,11 @@ struct NotesFilterBar: View {
         }
     }
 
-    /// ★5…★1 toggle row (highest first), binding `filter.qualities`. Structurally copied from Reader's
+    /// ★3…★1 toggle row (highest first), binding `filter.qualities`. Structurally copied from Reader's
     /// priority toggles (`NavigationWindowView.swift:256-267`, there `[10,9,8,7]`).
     private var qualityToggles: some View {
         HStack(spacing: 2) {
-            ForEach([5, 4, 3, 2, 1], id: \.self) { q in
+            ForEach([3, 2, 1], id: \.self) { q in
                 let on = nav.filter.qualities.contains(q)
                 Button {
                     if on { nav.filter.qualities.remove(q) } else { nav.filter.qualities.insert(q) }

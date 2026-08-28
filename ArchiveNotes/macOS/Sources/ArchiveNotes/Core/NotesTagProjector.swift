@@ -5,8 +5,8 @@ import ArchiveCore
 //  NotesTagProjector — the AUDITED Finder-tag mirror for Archive Notes.
 //
 //  Reimplements every TagWriter invariant (CoordinatedTagWriter.write) for the narrow projection
-//  use case: Notes mirrors an item's front-matter subjects (title-cased) onto the note's own .md
-//  file via Finder tags.
+//  use case: Notes mirrors an item's title-cased front-matter subjects and canonical Quality facet
+//  (`Q1`...`Q3`) onto the note's own .md file via Finder tags.
 //
 //  This is the ONLY place Notes touches file-level tag metadata. It writes ONLY files under
 //  <NotesStore>/items/<uuid>/ (component-boundary guard). It never touches color labels,
@@ -19,7 +19,7 @@ import ArchiveCore
 //   §4 Lossless delta: remove only previously-managed; add only desired (TagWrite.swift:44-50).
 //   §5 Only adds/removes projected tokens, except the explicit one-way retired-marker cleanup.
 //      Every removal is an exact whole-string match.
-//   §6 Dedup projected subjects by adding only tokens that are not already present (TagWrite.swift:48).
+//   §6 Dedup projected tokens by adding only tokens that are not already present (TagWrite.swift:48).
 //   §7 No label writes. Verify label unchanged after write (drift guard).
 //   §8 Verify by re-read, multiset-equal (TagWrite.swift:127).
 //   §9 Per-path in-process serialization (W15.tu3): concurrent projections of the SAME note file
@@ -51,6 +51,9 @@ enum NotesTagProjector {
     ///     own that are now gone). Empty on first projection (add-only, safe).
     ///   - url: The note's .md file URL.
     ///   - itemDir: The item's directory URL (for the component-boundary guard).
+    ///   - expectedIdentity: Optional identity captured immediately after the front-matter write. When
+    ///     supplied, the audited writer rejects a delayed projection against a newer replacement at
+    ///     the same path.
     ///
     /// - Returns: The managed set actually present after the write (persist as next call's
     ///   `previouslyManaged`).
@@ -61,7 +64,9 @@ enum NotesTagProjector {
         _ desired: Set<String>,
         previouslyManaged: Set<String>,
         to url: URL,
-        itemDir: URL
+        itemDir: URL,
+        qualityToken: String? = nil,
+        expectedIdentity: FileIdentity? = nil
     ) throws -> Set<String> {
         // Component-boundary guard: the URL must be under the item's directory.
         // resolvingSymlinksInPath() resolves symlinks (not just lexical `..`), preventing a
@@ -87,7 +92,7 @@ enum NotesTagProjector {
         }
         #endif
 
-        let result = try CoordinatedTagWriter.write(url) { currentTags, currentLabel in
+        let result = try CoordinatedTagWriter.write(url, expectedIdentity: expectedIdentity) { currentTags, currentLabel in
             // §4 Lossless delta: compute what to remove and what to add.
             // Remove previously managed tokens that are no longer desired, plus the explicitly
             // retired legacy membership token. This is exact whole-string matching; no prefix or
@@ -97,9 +102,27 @@ enum NotesTagProjector {
             var newTags = currentTags.filter { token in
                 !toRemove.contains(token)
             }
-            // Add desired tokens not already present (dedup — §6).
-            for token in desired where !newTags.contains(token) {
+
+            // A user may legitimately choose a Q-looking subject such as `Q1`. ArchiveCore parses
+            // the *last* Q token as the Quality facet, so preserve every such subject but force the
+            // actual front-matter Quality token to the end of the raw tag array. Without this, set
+            // iteration (or a pre-existing order) could make a Q-looking subject override the
+            // authoritative Quality in Reader. Re-appending this one token is metadata-only and
+            // leaves the subject's spelling intact.
+            if let qualityToken {
+                precondition(desired.contains(qualityToken),
+                             "the explicit Quality token must also be a desired managed token")
+                newTags.removeAll { $0 == qualityToken }
+            }
+
+            // Add desired subjects in stable order (dedup — §6). Keep the explicit Quality token
+            // out of this loop: it is appended last below for ArchiveCore's last-token-wins parser.
+            for token in desired.subtracting(qualityToken.map { [$0] } ?? []).sorted()
+                where !newTags.contains(token) {
                 newTags.append(token)
+            }
+            if let qualityToken, !newTags.contains(qualityToken) {
+                newTags.append(qualityToken)
             }
 
             // No-op: if tags unchanged, skip the write.

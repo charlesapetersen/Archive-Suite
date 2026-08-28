@@ -1,10 +1,25 @@
 import Foundation
+import ArchiveCore
 
 /// Reference to a persisted note on disk (Sendable for cross-actor transport).
 struct ItemRef: Sendable {
     let id: UUID
     let url: URL
     let mtime: Double
+    /// Monotonic, NoteStore-local revision for this item's last save. Unlike a filesystem identifier,
+    /// this changes even when a metadata-preserving replacement retains the same inode.
+    let revision: UInt64
+    /// Captured immediately after a store write so a deferred tag projection can prove the file was not
+    /// replaced by a later edit before it reaches the audited writer.
+    let identity: FileIdentity?
+
+    init(id: UUID, url: URL, mtime: Double, revision: UInt64 = 0, identity: FileIdentity? = nil) {
+        self.id = id
+        self.url = url
+        self.mtime = mtime
+        self.revision = revision
+        self.identity = identity
+    }
 }
 
 /// The outcome of one atomic item transaction (`NoteStore.withItem`/`withTemplate`): the item
@@ -25,6 +40,12 @@ struct ItemTransaction: Sendable {
 /// delete-last-membership guard (00-overview section 3.6) is enforced by the caller (W6 UI),
 /// not here -- this is the low-level primitive that assumes the guard already passed.
 actor NoteStore {
+
+    /// Each successful item/template content save advances its local revision. Finder metadata writes
+    /// do not, so a projection can prove it still belongs to the exact front-matter save that queued it.
+    /// This actor-local token is necessary because `replaceItemAt` may preserve a filesystem object's
+    /// resource identifier while replacing its YAML bytes.
+    private var revisions: [UUID: UInt64] = [:]
 
     enum StoreError: Error, Sendable {
         case rootUnavailable
@@ -77,14 +98,14 @@ actor NoteStore {
 
     // MARK: - CRUD (notes — thin wrappers over the container-generic workers)
 
-    func create(_ item: Item) throws -> ItemRef { try createEntry(item, in: itemDir(item.id)) }
+    func create(_ item: Item) throws -> ItemRef { recordRevision(try createEntry(item, in: itemDir(item.id))) }
     func load(_ id: UUID) throws -> Item { try loadEntry(id, in: itemDir(id)) }
 
     /// Whole-item overwrite. ⚠️ **W23.h2 — to EDIT an existing item, use `withItem` instead.** Pairing
     /// `load` with `save` re-opens the lost-update window this store now closes: the save writes the
     /// *whole* item, so it silently discards every field a concurrent edit changed in between. This
     /// primitive is for callers that already hold the authoritative item (tests, a full re-write).
-    func save(_ item: Item) throws -> ItemRef { try saveEntry(item, in: itemDir(item.id)) }
+    func save(_ item: Item) throws -> ItemRef { recordRevision(try saveEntry(item, in: itemDir(item.id))) }
 
     /// Move the item directory to the Trash (recoverable). Never `removeItem`.
     ///
@@ -139,7 +160,7 @@ actor NoteStore {
                            _ mutate: (inout Item) throws -> Void) throws -> ItemTransaction {
         var item = try loadEntry(id, in: dir)
         try mutate(&item)
-        let ref = try saveEntry(item, in: dir)
+        let ref = recordRevision(try saveEntry(item, in: dir))
         return ItemTransaction(item: item, ref: ref)
     }
 
@@ -152,6 +173,34 @@ actor NoteStore {
     }
 
     func mdURL(for id: UUID) throws -> URL { try mdURL(for: id, in: itemDir(id)) }
+
+    /// Read the current authoritative item and the identity/mtime of the same on-disk revision. This
+    /// is used after an optimistic metadata projection loses its identity check: callers must not put
+    /// the older transaction into the disposable index and briefly show stale metadata in the UI.
+    func currentItemTransaction(_ id: UUID) throws -> ItemTransaction {
+        let url = try mdURL(for: id)
+        let item = try loadEntry(id, in: itemDir(id))
+        let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)?
+            .timeIntervalSinceReferenceDate ?? Date().timeIntervalSinceReferenceDate
+        return ItemTransaction(
+            item: item,
+            ref: ItemRef(id: id, url: url, mtime: mtime,
+                         revision: revisions[id] ?? 0, identity: FileIdentity.capture(url)))
+    }
+
+    /// Execute a synchronous metadata operation only while `ref` is still this item's most recent
+    /// NoteStore save. The actor remains isolated for the entire operation, so another Notes edit
+    /// cannot replace the YAML file between the revision check and its Finder-tag reconciliation.
+    /// Returns false when a newer save already exists; callers fresh-read and reconcile that revision
+    /// rather than writing stale metadata or index rows.
+    func performIfCurrent(
+        _ ref: ItemRef,
+        _ operation: @Sendable (ItemRef) throws -> Void
+    ) throws -> Bool {
+        guard (revisions[ref.id] ?? 0) == ref.revision else { return false }
+        try operation(ref)
+        return true
+    }
 
     /// Every on-disk item as an `ItemRef` (id + `.md` URL + mtime) for a full index (re)build. Items
     /// whose `.md` can't be located are skipped (best-effort, like `allTemplates`). The mtime uses the
@@ -170,10 +219,14 @@ actor NoteStore {
 
     // MARK: - CRUD (templates — same primitives, stored under Templates/)
 
-    func createTemplate(_ item: Item) throws -> ItemRef { try createEntry(item, in: templateDir(item.id)) }
+    func createTemplate(_ item: Item) throws -> ItemRef {
+        recordRevision(try createEntry(item, in: templateDir(item.id)))
+    }
     func loadTemplate(_ id: UUID) throws -> Item { try loadEntry(id, in: templateDir(id)) }
     /// Whole-template overwrite — see `save`'s warning; to EDIT a template use `withTemplate`.
-    func saveTemplate(_ item: Item) throws -> ItemRef { try saveEntry(item, in: templateDir(item.id)) }
+    func saveTemplate(_ item: Item) throws -> ItemRef {
+        recordRevision(try saveEntry(item, in: templateDir(item.id)))
+    }
 
     /// Move the template directory to the Trash (recoverable). Never `removeItem`.
     func deleteTemplate(_ id: UUID) throws { try deleteEntry(id, in: templateDir(id)) }
@@ -198,6 +251,13 @@ actor NoteStore {
 
     // MARK: - Container-generic workers (shared by notes + templates)
 
+    private func recordRevision(_ ref: ItemRef) -> ItemRef {
+        let revision = (revisions[ref.id] ?? 0) &+ 1
+        revisions[ref.id] = revision
+        return ItemRef(id: ref.id, url: ref.url, mtime: ref.mtime,
+                       revision: revision, identity: ref.identity)
+    }
+
     private func createEntry(_ item: Item, in dir: URL) throws -> ItemRef {
         let fm = FileManager.default
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -212,7 +272,7 @@ actor NoteStore {
 
         let mtime = (try? fm.attributesOfItem(atPath: fileURL.path)[.modificationDate] as? Date)?
             .timeIntervalSinceReferenceDate ?? Date().timeIntervalSinceReferenceDate
-        return ItemRef(id: item.id, url: fileURL, mtime: mtime)
+        return ItemRef(id: item.id, url: fileURL, mtime: mtime, identity: FileIdentity.capture(fileURL))
     }
 
     private func loadEntry(_ id: UUID, in dir: URL) throws -> Item {
@@ -254,13 +314,20 @@ actor NoteStore {
             try fm.moveItem(at: currentURL, to: targetURL)
         }
 
-        // Write updated content atomically.
+        // Replace content atomically while retaining the existing file metadata. Finder tags and the
+        // color label belong to this note file, not its YAML bytes; `Data.write(.atomic)` alone swaps
+        // in a new inode and silently drops those xattrs before NotesTagProjector can fresh-read and
+        // reconcile them. FileManager's default replacement preserves destination metadata without
+        // deciding or writing any tag value here (NotesTagProjector remains the only tag writer).
         let text = FrontMatterCodec.encode(item)
-        try Data(text.utf8).write(to: targetURL, options: [.atomic])
+        let replacementURL = dir.appendingPathComponent(".notes-replacement-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: replacementURL) }
+        try Data(text.utf8).write(to: replacementURL)
+        _ = try fm.replaceItemAt(targetURL, withItemAt: replacementURL, backupItemName: nil, options: [])
 
         let mtime = (try? fm.attributesOfItem(atPath: targetURL.path)[.modificationDate] as? Date)?
             .timeIntervalSinceReferenceDate ?? Date().timeIntervalSinceReferenceDate
-        return ItemRef(id: item.id, url: targetURL, mtime: mtime)
+        return ItemRef(id: item.id, url: targetURL, mtime: mtime, identity: FileIdentity.capture(targetURL))
     }
 
     private func deleteEntry(_ id: UUID, in dir: URL) throws {

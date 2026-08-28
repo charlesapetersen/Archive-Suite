@@ -34,11 +34,11 @@ struct NotesSortTests {
     }
 
     @Test func qualityNilLast() {
-        let items = [sum("a", quality: nil), sum("b", quality: 5), sum("c", quality: 2)]
+        let items = [sum("a", quality: nil), sum("b", quality: 3), sum("c", quality: 2)]
         let asc = NotesSort.sorted(items, by: desc(.quality, true)).map(\.title)
-        #expect(asc == ["c", "b", "a"])   // 2 < 5 < (unrated last)
+        #expect(asc == ["c", "b", "a"])   // 2 < 3 < (unrated last)
         let dsc = NotesSort.sorted(items, by: desc(.quality, false)).map(\.title)
-        #expect(dsc == ["b", "c", "a"])   // 5 > 2, unrated still last
+        #expect(dsc == ["b", "c", "a"])   // 3 > 2, unrated still last
     }
 
     @Test func kindSortByRawValue() {

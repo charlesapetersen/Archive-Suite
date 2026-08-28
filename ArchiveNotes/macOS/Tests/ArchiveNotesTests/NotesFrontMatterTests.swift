@@ -30,7 +30,7 @@ struct NotesFrontMatterTests {
             date: "1968-03-25",
             datePrecision: .day,
             dateUncertain: true,
-            quality: 4,
+            quality: 3,
             tags: ["Foo", "Bar, Baz"],
             zotero: [
                 ZoteroRef(selectLink: "zotero://select/library/items/ABCD1234",
@@ -332,7 +332,7 @@ struct NotesFrontMatterTests {
             date: hasDate ? "1970-06-15" : nil,
             datePrecision: hasDate ? precisions.randomElement(using: &rng) : nil,
             dateUncertain: Bool.random(using: &rng),
-            quality: Bool.random(using: &rng) ? Int.random(in: 1...5, using: &rng) : nil,
+            quality: Bool.random(using: &rng) ? Int.random(in: 1...3, using: &rng) : nil,
             tags: tags,
             zotero: [],
             roundup: Bool.random(using: &rng),

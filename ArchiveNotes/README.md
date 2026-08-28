@@ -17,7 +17,8 @@ words**.
   `~/Library/Application Support/ArchiveNotes/`). The archive **corpus is read-only** — durable-link
   resolution and page rendering only; never a tag write, move, rename, or delete on a corpus file.
 - The **only** Finder-tag writer is `NotesTagProjector`, which mirrors a note's front-matter subjects
-  onto that note's **own** `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs.
+  and canonical Quality (`Q1`–`Q3`; 0/unrated has no Q tag) onto that note's **own** `.md` file via
+  `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs.
 - Never test against the real store or corpus — scratch/`mktemp`/`TESTOUT` output only. Full protocol:
   [GUI_SAFETY.md](GUI_SAFETY.md).
 

@@ -105,7 +105,7 @@ struct NotesModelBodyTests {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let id = try await makeNote(env, title: "Keep Me")
         await env.model.setDate("1968", precision: .year, for: id)
-        await env.model.setQuality(4, for: id)
+        await env.model.setQuality(3, for: id)
 
         await env.model.setBody("A totally new body.", for: id)
 
@@ -113,7 +113,7 @@ struct NotesModelBodyTests {
         #expect(r.title == "Keep Me")
         #expect(r.date == "1968")
         #expect(r.datePrecision == .year)
-        #expect(r.quality == 4)
+        #expect(r.quality == 3)
         #expect(r.dateUncertain == false)
         #expect(r.trailingBodyRaw == "A totally new body.")
     }

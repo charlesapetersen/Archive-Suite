@@ -104,13 +104,13 @@ struct NotesItemTransactionTests {
         let id = UUID()
         _ = try await store.create(Self.blankItem(id: id, body: "body"))
 
-        async let a: ItemTransaction? = try? store.withItem(id) { $0.quality = 4 }
+        async let a: ItemTransaction? = try? store.withItem(id) { $0.quality = 3 }
         async let b: ItemTransaction? = try? store.withItem(id) { $0.date = "1968"; $0.datePrecision = .year }
         async let c: ItemTransaction? = try? store.withItem(id) { $0.dateUncertain = true }
         _ = await (a, b, c)
 
         let r = try await store.load(id)
-        #expect(r.quality == 4)
+        #expect(r.quality == 3)
         #expect(r.date == "1968")
         #expect(r.datePrecision == .year)
         #expect(r.dateUncertain)
@@ -235,12 +235,12 @@ struct NotesItemTransactionTests {
         _ = try await env.store.create(Self.blankItem(id: id, body: "before"))
 
         async let bodyEdit: Void = env.model.setBody("after", for: id)
-        async let qualityEdit: Void = env.model.setQuality(4, for: id)
+        async let qualityEdit: Void = env.model.setQuality(3, for: id)
         _ = await (bodyEdit, qualityEdit)
 
         let r = try await env.store.load(id)
         #expect(r.trailingBodyRaw == "after")
-        #expect(r.quality == 4)
+        #expect(r.quality == 3)
         await Self.tearDown(env)
     }
 

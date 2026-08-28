@@ -18,12 +18,12 @@ evidence these are one suite.
 
 ## Medium priority
 
-- **Mirror author/date/quality to Finder tags for cross-app parity** — today Notes keeps `authors`/`date`/`quality`
-  **front-matter-only** (overview decisions D2/D4/D9); the projector writes only subjects.
-  Additionally mirroring author/date/quality into macOS Finder tags would let Reader/Processor sort/browse Notes
-  items chronologically and by author like corpus files. **A deferred OWNER DECISION** (flagged to Morning
-  Review): it needs a shared-contract `Author:` facet in `SPEC/tag-format.md`, so it is **Tier-2** and touches all
-  three apps. This is the standout cross-app-parity item. _(CLAUDE.md Core-Directive bullet; 00-overview §15.4.)_
+- **Mirror author/date to Finder tags for cross-app parity** — Notes already projects its canonical
+  `Q1`...`Q3` Quality facet, but keeps `authors`/`date` front-matter-only (overview decisions D2/D4).
+  Mirroring author/date into macOS Finder tags could let Reader/Processor browse Notes items chronologically and
+  by author like corpus files. **A deferred OWNER DECISION** (flagged to Morning Review): author needs a
+  shared-contract `Author:` facet in `SPEC/tag-format.md`, so it is **Tier-2** and touches all three apps.
+  _(CLAUDE.md Core-Directive bullet; 00-overview §15.4.)_
 - **Unified suite-wide storage path + migration** — a suite-level default root plus a migration that re-keys
   Reader's path-keyed index and the Notes store, serving the owner's "move to a new computer easily" goal.
   Tier-2, separately gated. _(00-overview §15.1 / §2 deferred list; also noted in `SUITE_TODO.md` as a `(later)`

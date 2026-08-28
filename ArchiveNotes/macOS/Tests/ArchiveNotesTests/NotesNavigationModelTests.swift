@@ -202,13 +202,13 @@ struct NotesNavigationModelTests {
     @Test func qualityAndDateFacetsNarrowDisplayed() async throws {
         let (model, index, root) = try await makeModel()
         defer { Task { await cleanup(root, index) } }
-        let hi = sumQ("hi", quality: 5, sortDate: 19750000)
+        let hi = sumQ("hi", quality: 3, sortDate: 19750000)
         let lo = sumQ("lo", quality: 2, sortDate: 19750000)
-        let old = sumQ("old", quality: 5, sortDate: 19500000)
+        let old = sumQ("old", quality: 3, sortDate: 19500000)
         model.replaceItems([hi, lo, old])
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
 
-        nav.filter.qualities = [5]
+        nav.filter.qualities = [3]
         #expect(Set(nav.displayed.map(\.title)) == ["hi", "old"])
         nav.filter.dateFrom = 19700000                            // 1970 onward
         #expect(nav.displayed.map(\.title) == ["hi"])             // old (1950) drops out
@@ -251,7 +251,7 @@ struct NotesNavigationModelTests {
         defer { Task { await cleanup(root, index) } }
         model.replaceItems([sum("a", kind: .note)])
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
-        nav.filter.qualities = [5]
+        nav.filter.qualities = [3]
         nav.filter.tags = ["X"]
         nav.searchText = "zzz"
         nav.sort = [NoteSortDescriptor(field: .relevance)]
@@ -268,7 +268,7 @@ struct NotesNavigationModelTests {
         let (model, index, root) = try await makeModel()
         defer { Task { await cleanup(root, index) } }
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
-        nav.filter.qualities = [5]
+        nav.filter.qualities = [3]
         nav.searchText = "brown"
 
         await nav.saveAsSmartFolder(named: "My Search")
@@ -276,7 +276,7 @@ struct NotesNavigationModelTests {
         #expect(smart != nil)
         let decoded = smart?.queryJSON
             .flatMap { try? JSONDecoder().decode(NotesFilter.self, from: Data($0.utf8)) }
-        #expect(decoded?.qualities == [5])
+        #expect(decoded?.qualities == [3])
         #expect(decoded?.searchText == "brown")   // live keyword folded into the durable query
         #expect(decoded?.kind == .notes)          // window kind (user wins over base .both)
     }

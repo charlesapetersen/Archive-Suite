@@ -10,16 +10,13 @@ this file is authoritative for Notes‑specific work.
 - Notes writes **only its own store** (UUID‑folder Markdown+assets under
   `~/Library/Application Support/ArchiveNotes/`). The archive corpus is **read‑only** — durable‑link
   resolution and page rendering only; no tag writes, no moves, no deletes on corpus files.
-- The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors front‑matter onto the
-  note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. It projects **only `tags` (subjects)**;
-  `authors`, `date`, and `quality` stay **front‑matter‑only** (authoritative, durable plain‑text YAML)
-  — a deliberate deviation from the original spec (which wanted author/date in macOS tags and a quality
-  ordering "akin to Reader's priority tag"): front‑matter still satisfies "durable against this program
-  no longer being developed," and keeping author/date/quality out of the global Finder‑tag namespace
-  avoids polluting the shared vocabulary (overview decisions **D2/D4/D9**). *Additionally* mirroring
-  author/date/quality to Finder tags for cross‑app (Reader/Processor) parity is a **deferred owner
-  decision** (author would also need a SPEC `Author:` facet) — see the W9 gap‑closure plan's
-  out‑of‑scope list.
+- The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors title-cased front‑matter
+  `tags` (subjects) **and the canonical Quality facet `Q1`–`Q3`** onto the note's own `.md` file via
+  `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. Front-matter remains authoritative:
+  `quality` 0/unrated writes no Q tag, and invalid values never invent one. `authors` and `date` stay
+  **front‑matter‑only** (authoritative, durable plain‑text YAML); an author facet remains a deferred
+  owner decision. This keeps the global Finder vocabulary limited to the shared subject and Quality
+  contract (overview decisions **D2/D4/D9**).
 - Test/scratch output goes to `mktemp` / `TESTOUT` — **never** the real store or corpus during dev/test.
 - **Full protocol:** [`GUI_SAFETY.md`](GUI_SAFETY.md) — the scratch-corpus rules (never drive the store
   picker; confirm scratch before any tag write) + the DEBUG scratch-write guard that mechanically aborts
@@ -168,7 +165,8 @@ macOS/Sources/ArchiveNotes/
                                    dangling-cleanup)/templates(matching:), create/duplicate/rename/delete
                                    template, newItem(kind:in:from:) instantiation (W6-S6); mutateItem
                                    write path (load→atomic .md save→one-row re-index→publish) behind
-                                   setDate/setDateUncertain/setQuality (W6-S7, front-matter only) and
+                                   setDate/setDateUncertain/setQuality (W6-S7; Quality mirrors Q1–Q3 on
+                                   the note's own `.md`, date remains front-matter only) and
                                    loadBody/setBody (W7-S1a, body markdown⇄(trailingBodyRaw,blocks));
                                    openItem(id:block:)/pendingOpen/consumeOpen — the shared cross-window
                                    jump-to-source channel + resolvePassage (W7-S3); bootstrap now runs
@@ -204,7 +202,8 @@ macOS/Sources/ArchiveNotes/
                                    windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4);
                                    windowHiddenColumns(for:)/setWindowHiddenColumns per-window column visibility —
                                    Note window defaults to hiding the always-blank Sources column (W14.4d)
-    NotesTagVocabulary.swift       Managed-token vocabulary (titleCased subjects)
+    NotesTagVocabulary.swift       Managed-token vocabulary (title-cased subjects + canonical Q1–Q3;
+                                   Q0/unrated has no Finder token)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files;
                                    isScratchPath + a DEBUG scratch-write guard (test/GUI-drive contexts
                                    only, off in the real app, out of Release) mechanically refuse a tag
@@ -339,7 +338,7 @@ macOS/Sources/ArchiveNotes/
                                    (W6-S3). Drag source (NotesTableDataSource pasteboardWriterForRow,
                                    id-only) + accent-glyph replicant title styling (W6-S5)
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
-                                   bm25 relevance as-you-type) · quality ★1–★5 toggles · tag ALL/ANY +
+                                   bm25 relevance as-you-type) · quality ★1–★3 toggles · tag ALL/ANY +
                                    chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)
     LocationsInspector.swift       Detail-pane "Locations" — every folder the selected item is in, each
                                    a scope shortcut + guarded Remove (replicant→quiet, last→modal) (W6-S5)
@@ -415,15 +414,19 @@ macOS/Tests/ArchiveNotesTests/
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
                                    collision-dedup, verify-re-read, no-label, concurrent-third-party,
                                    boundary-guard, recover-managed
-  NotesTagProjectorSafetyTests.swift  10 crown-jewel safety tests (W8-S2, Tier-2, scratch .md +
+  NotesTagProjectorSafetyTests.swift  11 crown-jewel safety tests (W8-S2/W19.q4, Tier-2, scratch .md +
                                    data-fork byte-equality): §3 read-failure aborts (no []-coercion,
                                    neighbors untouched), concurrent-projections-never-corrupt (both racing
                                    subjects survive — §10 closed the lost-update race, W15.tu4), §5 unmanaged-tag
                                    lossless + legacy-marker strip, §6 "ArchiveSuite" as an ordinary subject,
                                    §8/§9 disk-backed
                                    verify + reconcile-via-fresh-delta, §5 no-op no-mtime-churn,
-                                   title-casing, §7 label-never-written, isScratchPath predicate +
-                                   scratch-guard-live-under-XCTest
+                                   title-casing, Q1→Q3 / Q0-clears quality projection, §7 label-never-
+                                   written, isScratchPath predicate + scratch-guard-live-under-XCTest
+  QualityWriteTests.swift           9 scratch-store tests: 0...3 canonicalization, Q1...Q3 projection
+                                   + clear, unrelated-tag/label preservation, Q-looking-subject ordering,
+                                   and actor-revision Q1→Q3 / Q3→body race reconciliation for Finder tags,
+                                   index, and live list
   NotesIndexTests.swift            16 tests: bm25 ordering, sanitizer, mtime-skip, prune, WAL,
                                    search, summaryRoundTrip, org tables exist; + W8-S3: reindex-
                                    replaces-body, prune-gate ×4 (empty-snapshot-never-wipes /

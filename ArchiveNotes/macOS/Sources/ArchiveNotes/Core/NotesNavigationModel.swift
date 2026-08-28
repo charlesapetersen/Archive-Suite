@@ -160,7 +160,7 @@ final class NotesNavigationModel: ObservableObject {
         selection = id.map { [$0] } ?? []
     }
 
-    // MARK: Metadata edits (W6-S7 — dates & quality; front-matter only, never a Finder tag)
+    // MARK: Metadata edits (W6-S7 — front-matter date + front-matter-backed Quality mirror)
 
     /// Set the date + precision for `id`, forwarding to the shared model (§16.1). The metadata inspector
     /// composes the canonical string for the chosen precision; the model normalizes + persists + re-indexes.
@@ -173,7 +173,8 @@ final class NotesNavigationModel: ObservableObject {
         await model.setDateUncertain(uncertain, for: id)
     }
 
-    /// Set the quality (None + 1…5) for `id` — front-matter `quality`, never a Finder tag (D9).
+    /// Set 0...3 Quality for `id`. The model persists front-matter and mirrors valid Q1...Q3 only onto
+    /// this note's own `.md` file; date and authors remain front-matter only.
     func setQuality(_ quality: Int?, for id: UUID) async {
         await model.setQuality(quality, for: id)
     }

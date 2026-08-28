@@ -244,14 +244,14 @@ struct FrontMatterDateWriteTests {
     func preservesOtherFields() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let item = Item(id: UUID(), kind: .note, title: "Keep", authors: ["Auth"], date: nil,
-                        datePrecision: nil, dateUncertain: false, quality: 4, tags: ["Subject"],
+                        datePrecision: nil, dateUncertain: false, quality: 3, tags: ["Subject"],
                         zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
                         blocks: [], unknownFrontMatter: [], trailingBodyRaw: "Body")
         _ = try await env.store.create(item)
         await env.model.setDate("1970-05", precision: .month, for: item.id)
         let r = try await env.store.load(item.id)
         #expect(r.date == "1970-05" && r.datePrecision == .month)   // changed…
-        #expect(r.quality == 4)                                     // …rest untouched
+        #expect(r.quality == 3)                                     // …rest untouched
         #expect(r.tags == ["Subject"])
         #expect(r.authors == ["Auth"])
         #expect(r.title == "Keep")

@@ -127,6 +127,12 @@ final class NotesModel: ObservableObject {
     private var noteStore: NoteStore?
     private var didBootstrap = false
 
+    #if DEBUG
+    /// Test-only scheduling seam for actor-revision reconciliation. Production builds contain no
+    /// hook; the test pauses the first quality edit after its atomic save to force the stale order.
+    var qualityProjectionTestHook: (@Sendable (ItemTransaction) async -> Void)?
+    #endif
+
     /// Where the app-lifecycle triggers for the stale-mirror retry come from (W23.m10-fu) — `.default`
     /// in the app, a private centre under test so one posted notification reaches one model.
     private let notificationCenter: NotificationCenter
@@ -683,10 +689,10 @@ final class NotesModel: ObservableObject {
 
     // MARK: Metadata edits (W6-S7 — dates & quality, §16.1)
     //
-    // Front-matter ONLY (00-overview D2/D9): a note's date + quality live in its own `.md` YAML, never
-    // in a macOS Finder tag. These methods DELIBERATELY do not touch `NotesTagProjector` — subjects are
-    // the one projected facet. Each loads the item through the `NoteStore` actor, mutates a single
-    // field, writes it back atomically, re-indexes that one row, and refreshes the shared `allItems` so
+    // Front-matter is authoritative (00-overview D2/D9): a note's date + quality live in its own `.md`
+    // YAML. Date remains front-matter only; a quality edit additionally mirrors its canonical Q1...Q3
+    // facet onto that same `.md` file through `NotesTagProjector` (never the archive corpus). Each edit
+    // atomically writes the front-matter, re-indexes that one row, and refreshes shared `allItems` so
     // both windows' lists + the detail header update live.
 
     /// Set the item's date + precision (a `nil`/blank date clears the date entirely). The pair is
@@ -706,12 +712,88 @@ final class NotesModel: ObservableObject {
         await mutateItem(id, "set date uncertainty") { $0.dateUncertain = uncertain }
     }
 
-    /// Set the quality rating (1...5, 5 highest; `nil` clears it — the "None" case). Written to the
-    /// front-matter `quality` key ONLY (priority-style, D9) — never a Finder tag. Values are clamped
-    /// into 1...5 defensively (the UI offers only None + 1…5).
+    /// Set the quality rating on the canonical 0...3 scale. `nil`, 0, and invalid inputs are unrated;
+    /// the front-matter therefore has no quality key and the Finder mirror has no Q token. A valid
+    /// 1...3 value is durable front-matter plus exactly its matching Q1/Q2/Q3 tag on this note's own
+    /// `.md` file. The archive corpus is never touched.
     func setQuality(_ quality: Int?, for id: UUID) async {
-        let clamped = quality.map { min(max($0, 1), 5) }
-        await mutateItem(id, "set the quality") { $0.quality = clamped }
+        guard let noteStore else { return }
+        let canonical = quality.flatMap { (1...3).contains($0) ? $0 : nil }
+        do {
+            let tx = try await noteStore.withItem(id) { item in
+                item.quality = canonical
+                item.modified = Date()
+            }
+
+            #if DEBUG
+            if let qualityProjectionTestHook {
+                await qualityProjectionTestHook(tx)
+            }
+            #endif
+
+            // Keep the front-matter source of truth visible even if the independent Finder metadata
+            // operation fails. The projector itself fresh-reads, coordinates, and verifies the tag
+            // write; its quality-token ownership is exact and cannot remove a current Q-looking subject
+            // because `desired` protects every token still named by front-matter.
+            let indexTx = try await reconcileQualityProjection(from: tx, noteStore: noteStore)
+
+            if let index {
+                try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
+            }
+            await reloadItems()
+        } catch { report(error, "set the quality") }
+    }
+
+    /// Project only the Quality facet's known previous values. Current subjects are in `desired` so a
+    /// current literal subject named Q1/Q2/Q3 survives, while stale quality values are removed exactly.
+    /// Subject removal stays on its own future edit path; this quality action never claims ownership of
+    /// arbitrary subject tokens.
+    nonisolated private static func projectQualityTag(for item: Item, ref: ItemRef) throws {
+        let url = ref.url
+        _ = try NotesTagProjector.project(
+            NotesTagVocabulary.qualityProjectionTokens(for: item),
+            previouslyManaged: NotesTagVocabulary.qualityTokens,
+            to: url,
+            itemDir: url.deletingLastPathComponent(),
+            qualityToken: NotesTagVocabulary.qualityToken(for: item.quality),
+            expectedIdentity: ref.identity)
+    }
+
+    /// Reconcile the Quality projection to a transaction's exact saved revision. A second Notes edit
+    /// may replace the same `.md` while this `@MainActor` method is awaiting the store; NoteStore's
+    /// monotonic revision admits the projection only while that saved YAML is still current, then this
+    /// helper fresh-reads and projects the newer authoritative revision. Every ordinary Notes mutation
+    /// calls this too, so a body/date autosave cannot leave a just-written Q value absent merely
+    /// because it overtook the original Quality edit.
+    /// The retry is deliberately bounded: sustained edits still each run their own reconciliation, and
+    /// an honest error is better than an unbounded UI task under a continuously-changing file.
+    private func reconcileQualityProjection(
+        from initial: ItemTransaction,
+        noteStore: NoteStore
+    ) async throws -> ItemTransaction {
+        var current = initial
+        for attempt in 0..<2 {
+            do {
+                let candidate = current
+                let projected = try await noteStore.performIfCurrent(candidate.ref) { ref in
+                    try Self.projectQualityTag(for: candidate.item, ref: ref)
+                }
+                if projected { return candidate }
+
+                // Don't index/publish the older ItemTransaction. Read both YAML and its current
+                // revision atomically through NoteStore, then give that revision one fair projection
+                // attempt. A later ordinary mutation also reaches this same helper.
+                current = try await noteStore.currentItemTransaction(current.item.id)
+                if attempt == 1 {
+                    report(NoteStore.StoreError.writeFailed(
+                        "quality projection was superseded twice by newer edits"), "project the quality tag")
+                }
+            } catch {
+                report(error, "project the quality tag")
+                return current
+            }
+        }
+        return current
     }
 
     // MARK: Note body load / save (W7-S1a — the editor↔item wiring that gates W7 Extracts)
@@ -772,8 +854,9 @@ final class NotesModel: ObservableObject {
                 mutate(&item)
                 item.modified = Date()
             }
+            let indexTx = try await reconcileQualityProjection(from: tx, noteStore: noteStore)
             if let index {
-                try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)])
+                try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
             }
             await reloadItems()
         } catch { report(error, action) }

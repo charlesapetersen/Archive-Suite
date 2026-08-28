@@ -5760,6 +5760,16 @@ explain why not.
   parser-only protocol concern until W19.q7. Tier-2: guarded scratch metadata proof + isolated-VM AppKit
   picker proof, shared-Core test suite, all three app builds, and adversarial review. | Tier-2 shared-Core/tag path | M
 
+- [x] **W19.q4 — Notes: project front-matter quality → `Q1`–`Q3` [M].** ✅ **SHIPPED 2026-08-28**
+  — this commit, `feat(notes): project canonical Quality tags` (a self-referential SHA cannot be written
+  into its own commit). Quality is now canonical 0–3 in Notes: 1–3 projects Q1–Q3 only on the note's
+  own `.md`, while zero/unrated clears the Q facet. The audited lossless projection preserves unrelated
+  Finder tags, labels, data bytes, and literal Q-looking subjects; its intended Q token is raw-last for
+  ArchiveCore's parser. Actor-scoped revisions serialize each projection with Notes saves, so forced
+  Q1→Q3 and Q3→body races converge the YAML, Finder metadata, index, and live list. Tier-2: scratch
+  metadata/label/byte proofs, focused QualityWrite suite (9 tests), full Notes suite (847 tests / 84
+  suites), and adversarial review. | Tier-2 tag path | M
+
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 

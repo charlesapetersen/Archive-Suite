@@ -1244,14 +1244,20 @@ W8-S3 completed the `NotesIndex` verification layer (plan §1.4) and hardened th
 
 ## Tag projector safety suite + a latent concurrent-write race (W8-S2, 2026-07-14)
 
-W8-S2 landed the **crown-jewel** `NotesTagProjectorSafetyTests` (10 scratch-file tests) covering every
+W8-S2 landed the **crown-jewel** `NotesTagProjectorSafetyTests` (now 11 scratch-file tests) covering every
 `TagWriter`/`CoordinatedTagWriter` invariant the projector reimplements: read-failure aborts (never
 coerce a failed read to `[]`), lossless preservation of unmanaged tags, the exact retired-`ArchiveSuite`
 strip while every other tag survives, `ArchiveSuite` as an ordinary current subject, verify-by-re-read
 backed by an independent ground-truth read + reconcile-via-fresh-delta, idempotent no-op (no mod-date
 churn), shared-convention title-casing, the §7 label-drift guard, and a data-fork byte-equality assertion
-on every write. Also added a DEBUG **scratch-write guard** to `NotesTagProjector` (see below). All green;
-existing `NotesTagProjectorTests` (9) unaffected.
+on every write. W19.q4 adds the canonical Quality fixture: stale Q1 becomes Q3, Q0/unrated writes no
+quality token, an unrelated Finder tag survives, and both writes retain the note bytes. The paired
+`QualityWriteTests` integration fixture proves an atomic front-matter save preserves that unrelated tag
+and the existing color label before the audited projector reconciles Q. Also added a DEBUG
+actor-revision scheduling seam: forced Q1→Q3 and Q3→body interleavings prove that a stale save cannot
+overwrite the current Finder Q facet or publish a stale Quality to the index/live list. Also added a DEBUG
+**scratch-write guard** to `NotesTagProjector` (see below). All green; existing
+`NotesTagProjectorTests` (9) unaffected.
 
 - **FIXED — `R13d` (this commit): `ArchiveSuite` membership tagging was retired.** The shared marker API,
   SPEC row, fixture stamp, and list-only hiding rule are gone. `NotesTagProjector` has one deliberate

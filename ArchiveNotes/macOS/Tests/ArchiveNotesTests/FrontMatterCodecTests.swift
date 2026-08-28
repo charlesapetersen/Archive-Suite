@@ -16,7 +16,7 @@ final class FrontMatterCodecTests: XCTestCase {
         date: 1968
         date_precision: year
         date_uncertain: false
-        quality: 4
+        quality: 3
         tags: [Silicon Valley, Intel, Corporate Culture]
         roundup: false
         zotero:
@@ -67,7 +67,7 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertEqual(item.date, "1968")
         XCTAssertEqual(item.datePrecision, .year)
         XCTAssertEqual(item.dateUncertain, false)
-        XCTAssertEqual(item.quality, 4)
+        XCTAssertEqual(item.quality, 3)
         XCTAssertEqual(item.tags, ["Silicon Valley", "Intel", "Corporate Culture"])
         XCTAssertEqual(item.roundup, false)
         XCTAssertEqual(item.schema, 1)

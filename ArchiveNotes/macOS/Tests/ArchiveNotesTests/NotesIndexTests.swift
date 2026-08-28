@@ -233,7 +233,7 @@ import Foundation
             makeRow(id: id, title: "Test Summary", kind: .extract, tags: "History Archives",
                     authors: "Smith Jones", authorsJSON: "[\"Smith\",\"Jones\"]",
                     date: "1920-03", datePrecision: .month,
-                    dateUncertain: true, sortDate: 19200300, quality: 4,
+                    dateUncertain: true, sortDate: 19200300, quality: 3,
                     created: now, modified: now, managedTags: tagsJSON)
         ])
 
@@ -247,7 +247,7 @@ import Foundation
         #expect(summary?.dateUncertain == true)
         #expect(summary?.authors == ["Smith", "Jones"])
         #expect(summary?.sortDate == 19200300)
-        #expect(summary?.quality == 4)
+        #expect(summary?.quality == 3)
         #expect(summary?.managedTags == ["History", "Archives"])
     }
 

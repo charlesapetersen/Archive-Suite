@@ -253,8 +253,8 @@ private struct ItemListPane: View {
 
 // MARK: - Detail pane
 
-/// Right pane: a compact header, the locations inspector, and the metadata inspector (date + quality,
-/// W6-S7 — front-matter only, never a Finder tag) for the currently-selected item, above the W3 editor.
+/// Right pane: a compact header, the locations inspector, and the metadata inspector (date front-matter
+/// plus the front-matter-backed Q1...Q3 mirror) for the currently-selected item, above the W3 editor.
 /// The header is the visible "selection → detail" signal (W6-S3). The editor is bound to the selected
 /// item's body and autosaves through `NoteStore` (W7-S1a — `NoteEditorPane` + `NoteBodyEditorModel`).
 private struct DetailPane: View {
@@ -271,7 +271,7 @@ private struct DetailPane: View {
             }
             if let summary = nav.selectedSummary {
                 Divider()
-                NoteMetadataInspector(nav: nav, item: summary)   // date + quality (front-matter only, W6-S7)
+                NoteMetadataInspector(nav: nav, item: summary)   // date + front-matter-backed Quality
             }
             Divider()
             NoteEditorPane(nav: nav)

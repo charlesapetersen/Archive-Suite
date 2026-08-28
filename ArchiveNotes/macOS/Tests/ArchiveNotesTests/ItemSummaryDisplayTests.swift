@@ -44,14 +44,14 @@ struct ItemSummaryDisplayTests {
     // MARK: qualityStars
 
     @Test func qualityStarsFilledAndEmpty() {
-        #expect(sum(date: nil, precision: nil, quality: 4).qualityStars == "★★★★☆")
-        #expect(sum(date: nil, precision: nil, quality: 5).qualityStars == "★★★★★")
-        #expect(sum(date: nil, precision: nil, quality: 1).qualityStars == "★☆☆☆☆")
+        #expect(sum(date: nil, precision: nil, quality: 3).qualityStars == "★★★")
+        #expect(sum(date: nil, precision: nil, quality: 2).qualityStars == "★★☆")
+        #expect(sum(date: nil, precision: nil, quality: 1).qualityStars == "★☆☆")
     }
     @Test func qualityStarsUnratedAndClamped() {
         #expect(sum(date: nil, precision: nil, quality: nil).qualityStars == "—")
-        #expect(sum(date: nil, precision: nil, quality: 0).qualityStars == "—")    // guard q >= 1
-        #expect(sum(date: nil, precision: nil, quality: 9).qualityStars == "★★★★★") // clamp to 5
+        #expect(sum(date: nil, precision: nil, quality: 0).qualityStars == "—")
+        #expect(sum(date: nil, precision: nil, quality: 9).qualityStars == "—")
     }
 
     // MARK: displayTags

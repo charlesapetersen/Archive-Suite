@@ -27,11 +27,10 @@ extension ItemSummary {
         }
     }
 
-    /// Quality rendered as filled/empty stars (quality of 5 max), or "—" when unrated.
+    /// Quality rendered on the canonical three-star scale, or "—" when unrated/invalid.
     var qualityStars: String {
-        guard let q = quality, q >= 1 else { return "—" }
-        let filled = min(q, 5)
-        return String(repeating: "★", count: filled) + String(repeating: "☆", count: 5 - filled)
+        guard let q = quality, (1...3).contains(q) else { return "—" }
+        return String(repeating: "★", count: q) + String(repeating: "☆", count: 3 - q)
     }
 
     /// Comma-joined subjects for the Tags column (read-only here).
