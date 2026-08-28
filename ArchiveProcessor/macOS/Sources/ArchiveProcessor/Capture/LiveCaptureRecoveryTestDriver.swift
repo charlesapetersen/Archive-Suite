@@ -450,6 +450,52 @@ enum LiveCaptureRecoveryTestDriver {
         check("...and is NOT promoted to a Finder colour label (the app assigned no colour)",
               labelOf(redPDF) == 0)
 
+        // The Live Capture staging path still receives the pre-q7 phone field, but it must never write
+        // that P spelling back out. This drives the real PageWork.priority → staged-PDF writer.
+        let qualityDoc = makeJPEG("quality.jpg", in: tagDir)
+        let qualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [qualityDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: ["1948"], pagePriority: "P10",
+            jsonTags: GeneratedTags(), stampUnread: true)
+        let qualityPDF = qualitySeg.pdfURLs.first ?? tagDir
+        check("Live Capture canonicalizes phone P10 to Q3 and does not write P",
+              tagsOf(qualityPDF).contains("Q3") && !tagsOf(qualityPDF).contains("P10"))
+
+        // This must also hold when the Writer's copy-source/no-tagging semantics would otherwise pass
+        // supplied names through verbatim. P9 is a phone value, not a source tag, so stage it as Q2.
+        let copyQualityDoc = makeJPEG("copy-quality.jpg", in: tagDir)
+        let copyQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [copyQualityDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: ["1948"], pagePriority: "P9",
+            jsonTags: GeneratedTags(), stampUnread: false)
+        let copyQualityPDF = copyQualitySeg.pdfURLs.first ?? tagDir
+        check("copy-source staging canonicalizes phone P9 to Q2 instead of writing P",
+              tagsOf(copyQualityPDF).contains("Q2") && !tagsOf(copyQualityPDF).contains("P9"))
+
+        // The same boundary feeds the merged PDF. P7 is explicit unrated, so it clears a generated
+        // Q rather than escaping as a subject or retaining a stale rating through the merge.
+        let clearQualityA = makeJPEG("clear-quality-a.jpg", in: tagDir)
+        let clearQualityB = makeJPEG("clear-quality-b.jpg", in: tagDir)
+        let clearQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [clearQualityA, clearQualityB], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: ["1948", "Q2"], pagePriority: "P7",
+            jsonTags: GeneratedTags(), stampUnread: false, doMerge: true)
+        let clearQualityPDF = clearQualitySeg.pdfURLs.first ?? tagDir
+        check("copy-source merge treats phone P7 as an explicit clear without writing P",
+              !tagsOf(clearQualityPDF).contains(where: DocumentTags.isRatingToken)
+              && tagsOf(clearQualityPDF).contains("1948"))
+
+        // Unlike copy source, No tagging has no phone-rating boundary at all. The staged artifact is
+        // new, so an empty tag read-back proves P10 did not create Q3 or any other tag as a side effect.
+        let noTagQualityDoc = makeJPEG("no-tag-quality.jpg", in: tagDir)
+        let noTagQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [noTagQualityDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, pagePriority: "P10", jsonTags: GeneratedTags(),
+            stampUnread: false, taggingMode: TaggingMode.none)
+        let noTagQualityPDF = noTagQualitySeg.pdfURLs.first ?? tagDir
+        check("no-tagging staging leaves phone P10 entirely out of Finder metadata",
+              tagsOf(noTagQualityPDF).isEmpty)
+
         // (b) The app's OWN colour still lands. A box segment carries Red as an actual Finder label, exactly
         // once — proving (a) narrowed the colour source rather than disabling colouring altogether.
         let boxSrc = makeJPEG("boxlabel.jpg", in: tagDir)

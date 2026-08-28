@@ -2644,9 +2644,10 @@ extension OCRProcessor {
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
-            // Live Capture: layer per-page phone priority on top now that box/folder Red/Purple is
-            // final, and before merge folds appliedTags into merged PDFs.
-            applyCapturePriorityTags(runConfig: runConfig)
+            // Live Capture: layer per-page phone Quality on top now that box/folder Red/Purple is
+            // final, and before merge folds appliedTags into merged PDFs. The current phone Priority
+            // wire field is accepted but canonicalized to Q by this call.
+            applyCaptureQualityTags(runConfig: runConfig)
 
             // Live Capture dual output: write each original image next to its PDF (same base + tags),
             // before merge repoints outputURLMap and before organization moves files.

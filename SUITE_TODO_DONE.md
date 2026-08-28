@@ -5738,6 +5738,19 @@ explain why not.
   gates pass — the latter now seeds a `Q2` so the app-level harvest proves a rating never becomes a subject.
   | Tier-2 shared-Core | M
 
+- [x] **W19.q5 — Processor: recognize + preserve Quality; retire priority code paths (foundation) [S–M].**
+  ✅ **SHIPPED 2026-08-27** — the commit whose subject begins `feat(processor): preserve Quality`.
+  `MacOSTagger` now treats shared Q/P spellings as one rating intent: fresh Processor re-tags retain an
+  existing Quality, `P8`–`P10` canonicalize to Q at the Live Capture boundary, and `P7` clears rather than
+  becoming an ordinary subject. It never emits a rating from OCR. The first component's actual Quality
+  crosses a merge when generated tags lack one, and the PDF→image mirror preserves Q. Tier-2 scratch proof:
+  Debug build; `test-processfiles-tagwarn.sh` (79 checks) and `test-recovery.sh` (including real staged
+  phone-P10→Q3, verbatim-mode P9→Q2, and merged-P7 clear) green; `test-finder-tags.sh` green;
+  adversarial review clean, with No tagging separately proven to leave phone P10 out of Finder metadata.
+  Current retained records require their captured tag mode/unread policy, so rotation replay cannot adopt a
+  later Settings choice; older retained-policy records are unsupported. No bulk corpus rewrite —
+  P remains an accepted phone input until W19.q7 replaces the wire field. | Tier-2 tag path | S–M
+
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 

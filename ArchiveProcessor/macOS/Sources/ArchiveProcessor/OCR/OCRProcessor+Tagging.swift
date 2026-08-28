@@ -85,7 +85,7 @@ extension OCRProcessor {
     /// This is the same rule everything else already follows — `TagGenerator` when it builds a fresh
     /// `GeneratedTags`, `applyBoxFolderLabelTags` on a label PDF, `performDocumentMerging` on a merged
     /// PDF, and — since W23.m5-fu2 — the review flows on a reclassification. The two **read-append-rewrite** sites
-    /// (`applyCapturePriorityTags`, `exportOriginalImages`) had no such source: they re-applied an array
+    /// (`applyCaptureQualityTags`, `exportOriginalImages`) had no such source: they re-applied an array
     /// of tag NAMES read back off disk, so `MacOSTagger`'s raw-array colour DETECTION ran over it and a
     /// document whose subject tag is literally "Red" was promoted to Finder label 6 — which the Reader
     /// reads as a **box** photo. Deriving the colour here makes a rewrite land exactly the label the
@@ -296,28 +296,46 @@ extension OCRProcessor {
         guard index >= 0, index < preGroupedMonths.count, let m = preGroupedMonths[index] else { return nil }
         return GeneratedTags.monthTag(m)
     }
-    /// Live Capture: layer each page's phone-set priority ("P10"…"P7") onto whatever the tagging
-    /// phase applied. macOS tag application replaces, so read → append → re-apply; also record it in
-    /// the job's appliedTags so document merging carries it. No-op outside a pre-grouped run.
-    func applyCapturePriorityTags(runConfig: SessionProcessingConfig? = nil) {
+    /// Live Capture: layer each page's phone-set Priority or canonical Quality rating onto
+    /// whatever the tagging phase applied. `preGroupedPriorities` remains the current wire field until
+    /// the phone protocol is renamed in W19.q7, but this writer emits only Q tokens. macOS tag application
+    /// replaces, so read → replace the rating intent → re-apply; also record the canonical token in the
+    /// job's appliedTags so document merging carries it. No-op outside a pre-grouped run.
+    func applyCaptureQualityTags(runConfig: SessionProcessingConfig? = nil) {
         guard !preGroupedPriorities.isEmpty else { return }
-        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
+        let settings = lateRunOutputSettings(for: runConfig)
+        // "No tagging" means exactly that, including the post-tagging phone boundary. In particular,
+        // do not read/rewrite an output merely to translate P to Q: that would turn a no-tag run into
+        // a Quality-tagging run and could also canonicalize or strip metadata it promised to leave alone.
+        guard settings.taggingMode != .none else { return }
+        let stampUnread = settings.stampUnread
         for i in jobs.indices where i < preGroupedPriorities.count {
             guard let raw = preGroupedPriorities[i]?.trimmingCharacters(in: .whitespaces), !raw.isEmpty,
+                  DocumentTags.isRatingToken(raw),
                   let outputPDF = outputURLMap[jobs[i].sourceURL] else { continue }
             guard var tags = try? MacOSTagger.readTags(from: outputPDF) else { continue }
-            if !tags.contains(raw) {
+            // Keep the raw token for a real-tagging call so MacOSTagger can distinguish P7 (explicit
+            // clear) from no rating at all. Copy-source and no-tagging are verbatim by contract, so
+            // they must receive the canonical Q directly instead — otherwise the compatibility input
+            // would escape as a fresh P write. In either mode P7 is represented by no rating token.
+            tags.removeAll { DocumentTags.isRatingToken($0) }
+            if stampUnread {
                 tags.append(raw)
-                // Read-append-rewrite of whatever the tagging phase already applied — follow the
-                // run's mode so a real-tagging output keeps "Unread" last and its label intact.
-                // W23.m5-fu: the tags are an array read back off DISK, so the colour must come from
-                // the page's classification (as the fresh write's did) — never from detection over
-                // those names, which promoted a subject tag "Red" to the box label.
-                tagOutput(tags, at: outputPDF, source: jobs[i].sourceURL,
-                          appColor: Self.authoritativeColor(forJob: jobs[i]),
-                          colorIsAuthoritative: true, stampUnread: stampUnread)
+            } else if let quality = DocumentTags.qualityTag(for: DocumentTags.parseQuality(raw)) {
+                tags.append(quality)
             }
-            if !jobs[i].appliedTags.contains(raw) { jobs[i].appliedTags.append(raw) }
+            // Read-replace-rewrite of whatever the tagging phase already applied — follow the run's
+            // mode so a real-tagging output keeps "Unread" last and its label intact. W23.m5-fu: the
+            // tags are an array read back off DISK, so the colour must come from the page's
+            // classification (as the fresh write's did) — never from detection over those names,
+            // which promoted a subject tag "Red" to the box label.
+            tagOutput(tags, at: outputPDF, source: jobs[i].sourceURL,
+                      appColor: Self.authoritativeColor(forJob: jobs[i]),
+                      colorIsAuthoritative: true, stampUnread: stampUnread)
+            jobs[i].appliedTags.removeAll { DocumentTags.isRatingToken($0) }
+            if let quality = DocumentTags.qualityTag(for: DocumentTags.parseQuality(raw)) {
+                jobs[i].appliedTags.append(quality)
+            }
         }
     }
 
@@ -1134,14 +1152,26 @@ extension OCRProcessor {
                 let tagged = segmentJobs.first(where: { !$0.appliedTags.isEmpty })
                     ?? (stampUnread ? segmentJobs.first : nil)
                 if let tagged {
+                    var tagsToApply = tagged.appliedTags
+                    // `appliedTags` is the Processor's generated list, not a record of a later
+                    // user-set Finder Quality. Before replacing the component PDFs, carry the first
+                    // page's actual rating across if the generated list supplied none. This read must
+                    // succeed: losing a rating is worse than leaving the recoverable component PDFs
+                    // in place, and the surrounding `do` already has that failure behavior.
+                    if !tagsToApply.contains(where: DocumentTags.isRatingToken) {
+                        let sourceTags = try MacOSTagger.readTags(from: firstOutputPDF)
+                        if let quality = MacOSTagger.canonicalQualityToken(in: sourceTags) {
+                            tagsToApply.append(quality)
+                        }
+                    }
                     // Derive the authoritative color from the classification so a subject
                     // tag "Red"/"Purple" isn't promoted to a Finder color label.
                     let color: String? = tagged.classification == .boxLabel ? "Red" :
                                          tagged.classification == .folderLabel ? "Purple" : nil
                     if let tagWriter {
-                        try tagWriter(tagged.appliedTags, mergedURL, color, true)
+                        try tagWriter(tagsToApply, mergedURL, color, true)
                     } else {
-                        _ = try MacOSTagger.applyTags(tagged.appliedTags, to: mergedURL,
+                        _ = try MacOSTagger.applyTags(tagsToApply, to: mergedURL,
                                                      appColor: color, colorIsAuthoritative: true,
                                                      stampUnread: stampUnread)
                     }

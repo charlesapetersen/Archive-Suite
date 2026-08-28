@@ -19,6 +19,15 @@ import ArchiveCore
 /// crash skipped, left behind.
 struct MacOSTagger {
 
+    /// What a tag array says about the one Quality facet. `clear` is distinct from `unspecified`:
+    /// a `P7` is the former (the owner-defined unrated spelling), while ordinary generated tags
+    /// are the latter and must not erase a rating the user already set on the output.
+    private enum RatingIntent {
+        case unspecified
+        case clear
+        case set(String)
+    }
+
     /// Read macOS Finder tags from a file. Throws on read failure so callers in the
     /// read-append-rewrite pattern bail instead of silently wiping existing tags with [].
     static func readTags(from url: URL) throws -> [String] {
@@ -29,6 +38,24 @@ struct MacOSTagger {
         case .failure(let message):
             throw TagWriteError.unreadable(message)
         }
+    }
+
+    /// Return a canonical `Q1`…`Q3` for the last rating token in `tags`, or nil for both an
+    /// unspecified rating and the explicit-unrated `P7`. Callers that need to distinguish those two
+    /// use `ratingIntent(in:)` inside this adapter.
+    static func canonicalQualityToken(in tags: [String]) -> String? {
+        guard case let .set(token) = ratingIntent(in: tags) else { return nil }
+        return token
+    }
+
+    private static func ratingIntent(in tags: [String]) -> RatingIntent {
+        for token in tags.reversed() where DocumentTags.isRatingToken(token) {
+            if let canonical = DocumentTags.qualityTag(for: DocumentTags.parseQuality(token)) {
+                return .set(canonical)
+            }
+            return .clear       // P7: the retired spelling for an intentionally unrated document.
+        }
+        return .unspecified
     }
 
     /// Apply macOS Finder tags to a file via the shared audited primitive.
@@ -66,6 +93,20 @@ struct MacOSTagger {
             // Drop any incoming "Unread" so we can re-add it exactly once, last.
             var incoming = tags
             incoming.removeAll { $0.caseInsensitiveCompare("Unread") == .orderedSame }
+            let incomingRating = ratingIntent(in: incoming)
+            // Every real-tagging write produces at most one canonical Quality token. A rating carried
+            // by this operation wins; otherwise retain the verified current rating so a re-tag, merge,
+            // or image mirror cannot silently treat it as an unknown subject and drop it. `P7` is an
+            // explicit clear, not an absence of intent. P spellings are consumed and re-emitted
+            // only as Q by this real-tagging transform; the separate copy-source branch above remains
+            // a literal source-tag pass-through.
+            let qualityToken: String?
+            switch incomingRating {
+            case .set(let token): qualityToken = token
+            case .clear: qualityToken = nil
+            case .unspecified: qualityToken = canonicalQualityToken(in: current)
+            }
+            incoming.removeAll { DocumentTags.isRatingToken($0) }
             let filtered = incoming.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
 
             let colorTagName: String?
@@ -89,6 +130,7 @@ struct MacOSTagger {
 
             var allTagNames = textTags
             if let color = colorTagName { allTagNames.insert(color, at: 0) }
+            if let quality = qualityToken { allTagNames.append(quality) }
             allTagNames.append("Unread")   // always the final tag on every real-tagging output
 
             // Compute the intended label: color's Finder index, or 0 (clear) when no color.

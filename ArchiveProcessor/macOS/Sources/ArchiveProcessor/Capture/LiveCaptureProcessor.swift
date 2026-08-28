@@ -964,6 +964,7 @@ final class LiveCaptureProcessor: ObservableObject {
         let writeJSON = config.enableSegmentJSON && gType == .document
         let jsonTags = tags
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
+        let taggingMode = config.taggingMode
         let stampUnread = config.taggingMode.stampsUnread
 
         // B8: `computeTags` above may have suspended on an LLM tagging call. Re-check BEFORE writing the
@@ -979,6 +980,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
+                                   taggingMode: taggingMode,
                                    stampUnread: stampUnread)
         }.value
 
@@ -1009,6 +1011,7 @@ final class LiveCaptureProcessor: ObservableObject {
             boxLabelText: gType == .box ? texts.first : nil,
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
             exportedImageMB: exportedImageMB, textColumns: textColumns,
+            taggingMode: taggingMode,
             stampUnread: stampUnread)
         persistManifest()
         for p in group.photos { pageTasks[PageKey(p)] = nil }   // free memory
@@ -1128,44 +1131,24 @@ final class LiveCaptureProcessor: ObservableObject {
         let pdfImageMB: Double
         let exportedImageMB: Double
         let textColumns: Int
-        /// Nil only for a legacy manifest that pre-dates this field. Rotation regeneration then uses
-        /// the recovered session config, matching the old global-at-activation behavior.
-        let stampUnread: Bool?
-
-        // Custom decoder: decodeIfPresent for fields added after the original manifest so old staged
-        // sessions remain recoverable. A nil legacy tag policy is resolved from the session config below.
-        init(from decoder: Decoder) throws {
-            let c = try decoder.container(keyedBy: CodingKeys.self)
-            groupId = try c.decode(String.self, forKey: .groupId)
-            type = try c.decode(CaptureGroupType.self, forKey: .type)
-            order = try c.decode(Int.self, forKey: .order)
-            pages = try c.decode([PageWork].self, forKey: .pages)
-            baseTags = try c.decode([String].self, forKey: .baseTags)
-            doMerge = try c.decode(Bool.self, forKey: .doMerge)
-            model = try c.decode(LLMModel.self, forKey: .model)
-            gatewayName = try c.decodeIfPresent(String.self, forKey: .gatewayName)
-            writeJSON = try c.decode(Bool.self, forKey: .writeJSON)
-            jsonTags = try c.decode(GeneratedTags.self, forKey: .jsonTags)
-            texts = try c.decode([String].self, forKey: .texts)
-            boxLabelText = try c.decodeIfPresent(String.self, forKey: .boxLabelText)
-            outputImageFile = try c.decode(Bool.self, forKey: .outputImageFile)
-            pdfImageMB = try c.decode(Double.self, forKey: .pdfImageMB)
-            exportedImageMB = try c.decode(Double.self, forKey: .exportedImageMB)
-            textColumns = try c.decodeIfPresent(Int.self, forKey: .textColumns) ?? 1
-            stampUnread = try c.decodeIfPresent(Bool.self, forKey: .stampUnread)
-        }
+        /// Exact policy captured at staging time. Rotation regeneration must use this rather than whatever
+        /// the operator selects in Settings after the segment was staged.
+        let taggingMode: TaggingMode
+        let stampUnread: Bool
 
         // Memberwise init (matches the synthesized one the callers already use).
         init(groupId: String, type: CaptureGroupType, order: Int,
              pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
              writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
+             taggingMode: TaggingMode,
              stampUnread: Bool) {
             self.groupId = groupId; self.type = type; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName; self.writeJSON = writeJSON; self.jsonTags = jsonTags
             self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
             self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
+            self.taggingMode = taggingMode
             self.stampUnread = stampUnread
         }
     }
@@ -1175,6 +1158,7 @@ final class LiveCaptureProcessor: ObservableObject {
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
+        taggingMode: TaggingMode,
         stampUnread: Bool
     ) -> StagedSegment {
         let fm = FileManager.default
@@ -1207,10 +1191,15 @@ final class LiveCaptureProcessor: ObservableObject {
             // withhold the deletion. Erring here keeps a photo we could have deleted; erring the other way
             // destroys an irreplaceable page.
             if imagePage != .embedded { placeholderSources.append(page.sourceURL) }
-            var tagList = baseTags
-            if let pr = page.priority, !tagList.contains(pr) { tagList.append(pr) }
-            if !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
-                untaggedOutputs.append(stagedPDF)
+            switch taggingMode {
+            case .none:
+                // No tagging means no Finder metadata write whatsoever, including the phone boundary.
+                break
+            default:
+                let tagList = tagsByApplyingPhonePriority(baseTags, priority: page.priority)
+                if !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
+                    untaggedOutputs.append(stagedPDF)
+                }
             }
             pdfURLs.append(stagedPDF)
 
@@ -1218,8 +1207,14 @@ final class LiveCaptureProcessor: ObservableObject {
             if outputImageFile {
                 let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
                 if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB, rotationDegrees: page.result.rotationDegrees) {
-                    if !tagStagedArtifact(tagList, at: stagedImg, appColor: appColor, stampUnread: stampUnread) {
-                        untaggedOutputs.append(stagedImg)
+                    switch taggingMode {
+                    case .none:
+                        break
+                    default:
+                        let tagList = tagsByApplyingPhonePriority(baseTags, priority: page.priority)
+                        if !tagStagedArtifact(tagList, at: stagedImg, appColor: appColor, stampUnread: stampUnread) {
+                            untaggedOutputs.append(stagedImg)
+                        }
                     }
                     imageURLs.append(stagedImg)
                 }
@@ -1244,15 +1239,19 @@ final class LiveCaptureProcessor: ObservableObject {
             let mergedURL = stagingDir.appendingPathComponent(base + "_merged.pdf")
             do {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: pdfURLs, outputURL: mergedURL)
-                var tagList = baseTags
-                if let pr = pages.first?.priority, !tagList.contains(pr) { tagList.append(pr) }
                 // The per-page PDFs are about to be deleted, so a tag failure recorded against one of them is
                 // moot — the merged file replaces them and carries its own verdict. Drop them BEFORE tagging
                 // the merged output so the warning only ever names artifacts that still exist.
                 let constituents = Set(pdfURLs)
                 untaggedOutputs.removeAll { constituents.contains($0) }
-                if !tagStagedArtifact(tagList, at: mergedURL, appColor: appColor, stampUnread: stampUnread) {
-                    untaggedOutputs.append(mergedURL)
+                switch taggingMode {
+                case .none:
+                    break
+                default:
+                    let tagList = tagsByApplyingPhonePriority(baseTags, priority: pages.first?.priority)
+                    if !tagStagedArtifact(tagList, at: mergedURL, appColor: appColor, stampUnread: stampUnread) {
+                        untaggedOutputs.append(mergedURL)
+                    }
                 }
                 for u in pdfURLs { try? fm.removeItem(at: u) }
                 pdfURLs = [mergedURL]
@@ -1263,6 +1262,24 @@ final class LiveCaptureProcessor: ObservableObject {
                              pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText,
                              pagesComplete: pagesComplete, placeholderSources: placeholderSources,
                              untaggedOutputs: untaggedOutputs)
+    }
+
+    /// The phone still sends the pre-W19.q7 Priority field, but that field is not a source Finder tag:
+    /// it is a user rating intent. In enabled tagging modes, resolve it once before every
+    /// staged-PDF/image/merge write so a copy-source-style verbatim write cannot accidentally create a
+    /// fresh P tag. `TaggingMode.none` never calls this helper. Existing `baseTags` are otherwise
+    /// untouched — that preserves a literal P copied from a source when there is no phone rating
+    /// to replace it. P7 is the old explicit-unrated choice, so it removes any rating.
+    nonisolated private static func tagsByApplyingPhonePriority(_ baseTags: [String], priority raw: String?) -> [String] {
+        guard let raw = raw?.trimmingCharacters(in: .whitespaces), DocumentTags.isRatingToken(raw) else {
+            return baseTags
+        }
+        var tags = baseTags
+        tags.removeAll { DocumentTags.isRatingToken($0) }
+        if let quality = DocumentTags.qualityTag(for: DocumentTags.parseQuality(raw)) {
+            tags.append(quality)
+        }
+        return tags
     }
 
     /// W3.cap-r1 — apply this segment's Finder tags to ONE staged artifact and report whether the write
@@ -1580,10 +1597,6 @@ final class LiveCaptureProcessor: ObservableObject {
         // detached write runs — but that is a property of the surroundings, not of this line.)
         let regenInputs: [String: RetainedSegment] = Dictionary(
             uniqueKeysWithValues: segsToRegen.map { ($0.groupId, $0) })
-        // Legacy retained manifests had no per-run unread policy. Before this fix, activation set the
-        // recovered session config on the global immediately before regeneration; this fallback preserves
-        // that behavior while every new manifest carries the exact original value.
-        let legacyStampUnread = config?.taggingMode.stampsUnread ?? true
         isFinalizing = true
         Task { [weak self] in
             let regenerated: [StagedSegment] = await Task.detached { () -> [StagedSegment] in
@@ -1596,7 +1609,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
                                            exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,
-                                           stampUnread: seg.stampUnread ?? legacyStampUnread)
+                                           taggingMode: seg.taggingMode,
+                                           stampUnread: seg.stampUnread)
                 }
             }.value
             guard let self else { return }
@@ -2109,25 +2123,29 @@ final class LiveCaptureProcessor: ObservableObject {
     /// than two correct halves wired to nothing. No OCR, no network: the OCR result is supplied.
     ///
     /// W3.cap-r1 extends it: the same staging run also reports which artifacts came back UNTAGGED, and the
-    /// tag inputs (`type`/`baseTags`/`jsonTags`/`stampUnread`) are injectable so a test can drive the
-    /// colour-authority decision. The defaults reproduce the original W23.h5 call exactly.
+    /// tag inputs (`type`/`baseTags`/`pagePriority`/`jsonTags`/`stampUnread`/`taggingMode`) are injectable
+    /// so a test can drive colour-authority, Quality-canonicalization and no-tagging decisions. The
+    /// defaults reproduce the original W23.h5 call exactly.
     nonisolated static func _recoveryTestStageSegment(
         sources: [URL], stagingDir: URL, model: LLMModel,
         type: CaptureGroupType = .document, baseTags: [String] = [],
-        jsonTags: GeneratedTags = GeneratedTags(), stampUnread: Bool = false, doMerge: Bool = false
+        pagePriority: String? = nil, jsonTags: GeneratedTags = GeneratedTags(),
+        stampUnread: Bool = false, taggingMode: TaggingMode? = nil, doMerge: Bool = false
     ) -> (pdfCount: Int, pagesComplete: Bool?, placeholderSources: [URL],
           untaggedOutputs: [URL], pdfURLs: [URL]) {
         let pages = sources.map {
             PageWork(sourceURL: $0,
                      result: OCRResult(text: "text", classification: nil, errorMessage: nil, errorCode: nil),
-                     priority: nil)
+                     priority: pagePriority)
         }
+        let effectiveTaggingMode = taggingMode ?? (stampUnread ? .automatic : .copySource)
         let seg = writeSegmentFiles(groupId: "T", type: type, collectionKey: "T", order: 0,
                                     pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                     gatewayName: nil, stagingDir: stagingDir, writeJSON: false,
                                     jsonTags: jsonTags, texts: [], boxLabelText: nil,
                                     outputImageFile: false, pdfImageMB: 0, exportedImageMB: 0,
-                                    textColumns: 1, stampUnread: stampUnread)
+                                    textColumns: 1, taggingMode: effectiveTaggingMode,
+                                    stampUnread: stampUnread)
         return (seg.pdfURLs.count, seg.pagesComplete, seg.placeholderSources ?? [],
                 seg.untaggedOutputs ?? [], seg.pdfURLs)
     }

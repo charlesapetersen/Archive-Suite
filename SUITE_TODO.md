@@ -889,11 +889,6 @@ add a second control alongside.**
 - [ ] **W19.q4 — Notes: project front-matter quality → `Q1`–`Q3`** (blocked-on: W19.q2) **[M].** `NotesTagProjector`
   maps the item's front-matter `quality` to the 0–3 scale and projects `Q1`/`Q2`/`Q3`; **0/unrated writes no
   quality token** (and removes a stale one). Tier-2 (projector tag write; scratch-only). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q5 — Processor: recognize + preserve Quality; retire priority code paths (foundation)** (blocked-on: W19.q2) **[S–M].**
-  Parse Quality for free via the shared `DocumentTags`; ensure Processor tag writes **preserve** an existing
-  `Q1`–`Q3` token (never strip a rating as an unknown subject on re-tag / merge / mirror-to-image). Repoint the
-  existing priority-writing path (`OCR/OCRProcessor+Tagging.swift` `applyCapturePriorityTags`) to emit `Q`, and
-  stop emitting `P`. Never auto-emit from OCR. Foundation for q6/q7. Tier-2 (tag path). | ArchiveProcessor/.../Tagging/, OCR/, Capture/ | S–M | med | none
 - [ ] **W19.q6 — Processor: USER-SET Quality in the interactive tagging UIs** (blocked-on: W19.q5) **[M].** The
   user sets the 0–3 rating while capturing/processing. **Merge into the existing priority entry** (don't add a
   second control): a 0–3 selector in **(a)** the **Live Capture per-segment tag card** (`Views/LiveCaptureView.swift`)

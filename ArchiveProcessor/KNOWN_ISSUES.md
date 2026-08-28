@@ -190,14 +190,14 @@ Four decisions worth keeping:
   placeholder inside the merged PDF — the page an operator would actually re-shoot.
 
 **Guard:** `scripts/test-processfiles-tagwarn.sh` (`ProcessFilesTagWarningTestDriver`,
-`PROCESSFILES_TAGWARN_TEST=1`) — 74 $0 checks, no OCR/network/GUI, synthetic files in a temp dir.
+`PROCESSFILES_TAGWARN_TEST=1`) — 79 $0 checks, no OCR/network/GUI, synthetic files in a temp dir.
 `chflags uchg` makes the tagger genuinely fail; a real production site (`applyBoxFolderLabelTags`) proves
 the WIRING and that fixing the permission clears the warning; merge, the summary copy and the h5-fu
 placeholder path are all driven end to end. Proven non-vacuous by six neuters, each turning exactly the
 expected checks RED.
 
 **The colour half — also FIXED now (W23.m5-fu, 2026-07-31, `5342d2b` + the trackers commit).** The two
-read-append-rewrite sites (`applyCapturePriorityTags`, `exportOriginalImages`) re-applied tags as a raw
+read-append-rewrite sites (`applyCaptureQualityTags`, `exportOriginalImages`) re-applied tags as a raw
 `[String]`, so `MacOSTagger`'s Red/Purple DETECTION ran over names read back off disk: a document whose
 **subject** tag is literally "Red" was stamped with Finder label 6 — and the Reader reads a red label as
 a **box** photo. Both sites now pass the colour explicitly, derived from the page's classification by
@@ -208,6 +208,26 @@ so a rewrite reproduces the label the FRESH write intended. Note the fix is **no
 `colorIsAuthoritative: true`: with no colour to pass, that strips the label off every genuine box/folder
 PDF — a dedicated neuter holds that line. Copy-source mode was never affected (verbatim names, label
 untouched). 12 of the guard checks cover this, driving both real production functions.
+
+**Quality persistence + the phone boundary — FIXED (W19.q5, 2026-08-27; the commit whose
+subject begins `feat(processor): preserve Quality`).** A normal re-tag used to treat `Q1`–`Q3` as unknown
+subjects and discard them, the Live Capture post-pass wrote its old `P7`–`P10` spellings back to Finder,
+and a merge replaced its first component with generated `appliedTags` that might not include a user-set
+Quality. The audited `MacOSTagger` transform now treats every shared rating spelling as one explicit
+intent: an incoming `Q` wins, a phone `P8`–`P10` maps to its one canonical `Q`, and `P7` explicitly
+clears the facet. With no incoming rating it preserves the current rating while re-tagging, canonicalizing
+any retained `P` on that ordinary write; it never invents a rating from OCR. No-tagging is a true
+no-op at the phone boundary. Copy-source still
+copies existing source tags verbatim, but its phone-boundary input is canonicalized before that pass-through
+can create a fresh P. The merge reads the
+retired first component's actual rating before it replaces it when generated tags supplied none, and the
+image mirror carries the PDF's `Q` unchanged. `test-processfiles-tagwarn.sh` drives fresh re-tag, P7 clear,
+merge and image-mirror cases on disk; `test-recovery.sh` drives the real phone `P10` → staged-`Q3`
+path. Live Capture canonicalizes the same boundary before individual PDFs, image mirrors and a merged PDF,
+including verbatim-mode writes; P7 clears there too, while No tagging bypasses that boundary completely.
+Current retained records require and retain their explicit tagging mode and unread policy, so a rotation
+replay cannot adopt a later Settings choice; older retained-policy records are unsupported. There is no bulk
+corpus rewrite: P remains an accepted phone input until W19.q7 changes the wire field.
 
 **The reclassification half — also FIXED now (W23.m5-fu2, 2026-07-31, `7a0043c` + the trackers commit).**
 The sentence above says the review flows "already follow" the classification rule. They did — but only by

@@ -208,6 +208,9 @@ enum ProcessFilesTagWarningTestDriver {
         let page1 = mergeDir.appendingPathComponent("page-1.pdf")
         let page2 = mergeDir.appendingPathComponent("page-2.pdf")
         writeOnePagePDF(page1); writeOnePagePDF(page2)
+        // A user-set Quality can be present on the component even though it was not part of the
+        // Processor's generated `appliedTags` list. The merge must carry it before retiring page-1.
+        _ = OCRProcessor.writeOutputTags(["Q2", "User-rated"], to: page1, stampUnread: true)
         let merger = OCRProcessor()
         merger.taggingMode = .automatic
         var job1 = OCRJob(sourceURL: src1)
@@ -226,6 +229,8 @@ enum ProcessFilesTagWarningTestDriver {
               merger.untaggedOutputs.isEmpty)
         check("merge KEEPS the placeholder warning against the page it belongs to",
               merger.placeholderOutputs == ["source-2.jpg"])
+        check("merge carries an existing user-set Quality from the retired first component",
+              mergedURL.map { tagsOf($0).contains("Q2") && !tagsOf($0).contains("P9") } == true)
 
         // --- 5. The summary. Silence when clean; specific when not; truncated past three. ---
         check("no warning at all when both records are empty",
@@ -291,9 +296,10 @@ enum ProcessFilesTagWarningTestDriver {
         try? fm.createDirectory(at: colourDir, withIntermediateDirectories: true)
         /// One processor holding a single job, wired the way the pre-grouped Live Capture path leaves it.
         func wiredProcessor(source: URL, output: URL,
-                            classification: DocumentClassification?) -> OCRProcessor {
+                            classification: DocumentClassification?,
+                            taggingMode: TaggingMode = .automatic) -> OCRProcessor {
             let p = OCRProcessor()
-            p.taggingMode = .automatic          // stampsUnread → a real-tagging rewrite, label written
+            p.taggingMode = taggingMode
             var job = OCRJob(sourceURL: source)
             job.classification = classification
             p.jobs = [job]
@@ -301,7 +307,7 @@ enum ProcessFilesTagWarningTestDriver {
             return p
         }
 
-        // 7a. `applyCapturePriorityTags` — the phone's per-page priority, layered on after tagging.
+        // 7a. `applyCaptureQualityTags` — legacy phone Priority is canonicalized to Quality after tagging.
         let redSource = colourDir.appendingPathComponent("IMG_7001.jpg")
         let redPDF = colourDir.appendingPathComponent("redscare.pdf")
         writeOnePagePDF(redPDF)
@@ -310,10 +316,11 @@ enum ProcessFilesTagWarningTestDriver {
         let redCapture = wiredProcessor(source: redSource, output: redPDF,
                                         classification: .documentStart)
         redCapture.preGroupedPriorities = ["P10"]
-        redCapture.applyCapturePriorityTags()
+        redCapture.applyCaptureQualityTags()
         check("a phone-priority rewrite does NOT promote the subject tag \"Red\" to a Finder label",
               labelOf(redPDF) == 0)
-        check("...and it still layered the phone's priority on", tagsOf(redPDF).contains("P10"))
+        check("...and it canonicalizes the phone's P10 to Q3 without writing P",
+              tagsOf(redPDF).contains("Q3") && !tagsOf(redPDF).contains("P10"))
         check("...and \"Red\" is still a searchable subject tag", tagsOf(redPDF).contains("Red"))
 
         let boxSource = colourDir.appendingPathComponent("IMG_7002.jpg")
@@ -324,12 +331,67 @@ enum ProcessFilesTagWarningTestDriver {
         let boxCapture = wiredProcessor(source: boxSource, output: boxLabelPDF,
                                         classification: .boxLabel)
         boxCapture.preGroupedPriorities = ["P9"]
-        boxCapture.applyCapturePriorityTags()
+        boxCapture.applyCaptureQualityTags()
         check("a genuine box label KEEPS its red Finder label through that rewrite",
               labelOf(boxLabelPDF) == 6)
-        check("...with the priority added and \"Red\" still present exactly once",
-              tagsOf(boxLabelPDF).contains("P9")
+        check("...with Q2 added and \"Red\" still present exactly once",
+              tagsOf(boxLabelPDF).contains("Q2") && !tagsOf(boxLabelPDF).contains("P9")
               && tagsOf(boxLabelPDF).filter { $0 == "Red" }.count == 1)
+
+        // P7 is the old explicit unrated setting. It must clear a prior Quality, not turn into an
+        // unrecognized subject or leave the prior rating in place.
+        let clearSource = colourDir.appendingPathComponent("IMG_7005.jpg")
+        let clearPDF = colourDir.appendingPathComponent("unrated.pdf")
+        writeOnePagePDF(clearPDF)
+        _ = OCRProcessor.writeOutputTags(["History", "Q2"], to: clearPDF, stampUnread: true)
+        let clearCapture = wiredProcessor(source: clearSource, output: clearPDF,
+                                          classification: .documentStart)
+        clearCapture.preGroupedPriorities = ["P7"]
+        clearCapture.applyCaptureQualityTags()
+        check("the legacy P7 setting clears Quality without writing P",
+              !tagsOf(clearPDF).contains(where: DocumentTags.isRatingToken)
+              && tagsOf(clearPDF).contains("History"))
+
+        // Copy-source/no-tagging calls intentionally pass their received tag names through verbatim.
+        // The P field from the phone is not a copied source tag, so it must be canonicalized
+        // before that path too; otherwise a P writer survives outside the automatic-mode proof above.
+        let copySource = colourDir.appendingPathComponent("IMG_7006.jpg")
+        let copyPDF = colourDir.appendingPathComponent("copysource-quality.pdf")
+        writeOnePagePDF(copyPDF)
+        _ = OCRProcessor.writeOutputTags(["History", "Q1"], to: copyPDF, stampUnread: false)
+        let copyCapture = wiredProcessor(source: copySource, output: copyPDF,
+                                         classification: .documentStart, taggingMode: .copySource)
+        copyCapture.preGroupedPriorities = ["P9"]
+        copyCapture.applyCaptureQualityTags()
+        check("copy-source canonicalizes the phone P9 to Q2 instead of freshly writing P",
+              tagsOf(copyPDF).contains("Q2") && !tagsOf(copyPDF).contains("P9")
+              && tagsOf(copyPDF).contains("History"))
+
+        // "No tagging" is not a copy-source spelling. It must leave this legacy phone field and
+        // already-written metadata completely alone rather than silently turning the run into Q tagging.
+        let noTagSource = colourDir.appendingPathComponent("IMG_7007.jpg")
+        let noTagPDF = colourDir.appendingPathComponent("none-quality.pdf")
+        writeOnePagePDF(noTagPDF)
+        _ = OCRProcessor.writeOutputTags(["History", "Q1"], to: noTagPDF, stampUnread: false)
+        let noTagBefore = tagsOf(noTagPDF)
+        let noTagLabelBefore = labelOf(noTagPDF)
+        let noTagCapture = wiredProcessor(source: noTagSource, output: noTagPDF,
+                                          classification: .documentStart, taggingMode: .none)
+        noTagCapture.preGroupedPriorities = ["P10"]
+        noTagCapture.applyCaptureQualityTags()
+        check("no-tagging leaves a phone priority and existing Finder metadata entirely untouched",
+              tagsOf(noTagPDF) == noTagBefore && labelOf(noTagPDF) == noTagLabelBefore
+              && !tagsOf(noTagPDF).contains("P10"))
+
+        // Fresh Processor re-tags do not contain a quality because OCR never emits one; retain the
+        // existing user setting rather than silently dropping it as an unknown subject.
+        let retagPDF = colourDir.appendingPathComponent("retag-quality.pdf")
+        writeOnePagePDF(retagPDF)
+        _ = OCRProcessor.writeOutputTags(["Original", "Q2"], to: retagPDF, stampUnread: true)
+        _ = OCRProcessor.writeOutputTags(["Retagged"], to: retagPDF, stampUnread: true)
+        check("a fresh re-tag preserves an existing Q2 and never writes a P token",
+              tagsOf(retagPDF).contains("Q2") && tagsOf(retagPDF).contains("Retagged")
+              && !tagsOf(retagPDF).contains(where: { DocumentTags.parsePriority($0) != nil }))
 
         // 7b. `exportOriginalImages` — the dual output's image mirrors its PDF's tags.
         // W16.cfg6: the export size is injected, not poked into a process-global. This driver used to
@@ -350,8 +412,7 @@ enum ProcessFilesTagWarningTestDriver {
         // the same-file guard skips; a distinct base is what a real run's dedup'd output looks like.
         let exportPDF = colourDir.appendingPathComponent("page-7003.pdf")
         writeOnePagePDF(exportPDF)
-        _ = OCRProcessor.writeOutputTags(GeneratedTags(subjectTags: ["Red", "1948"]), to: exportPDF,
-                                         stampUnread: true)
+        _ = OCRProcessor.writeOutputTags(["Red", "1948", "Q3"], to: exportPDF, stampUnread: true)
         let exporter = wiredProcessor(source: exportSource, output: exportPDF,
                                       classification: .documentStart)
         exporter.exportOriginals = true
@@ -359,7 +420,8 @@ enum ProcessFilesTagWarningTestDriver {
         let exportedImage = colourDir.appendingPathComponent("page-7003.jpg")
         check("the dual output's image was written", fm.fileExists(atPath: exportedImage.path))
         check("...and it mirrors the PDF's tags",
-              tagsOf(exportedImage).contains("Red") && tagsOf(exportedImage).contains("1948"))
+              tagsOf(exportedImage).contains("Red") && tagsOf(exportedImage).contains("1948")
+              && tagsOf(exportedImage).contains("Q3"))
         check("...without inventing a Finder colour from the subject tag \"Red\"",
               labelOf(exportedImage) == 0)
 
