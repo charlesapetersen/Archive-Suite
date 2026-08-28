@@ -24,13 +24,13 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertTrue(LibraryFilter(read: .all).matches(marker))
     }
 
-    func testPriorityFilterExcludesUnprioritized() {
-        let p10 = file("a", ["Unread", "P10", "1980"])
-        let p9 = file("b", ["Unread", "P9", "1980"])
+    func testQualityFilterExcludesUnrated() {
+        let q3 = file("a", ["Unread", "Q3", "1980"])
+        let q2 = file("b", ["Unread", "Q2", "1980"])
         let none = file("c", ["Unread", "1980"])
-        let f = LibraryFilter(priorities: [10])
-        XCTAssertTrue(f.matches(p10))
-        XCTAssertFalse(f.matches(p9))
+        let f = LibraryFilter(qualities: [3])
+        XCTAssertTrue(f.matches(q3))
+        XCTAssertFalse(f.matches(q2))
         XCTAssertFalse(f.matches(none))
     }
 
@@ -61,13 +61,13 @@ final class LibrarySortFilterTests: XCTestCase {
     }
 
     func testCombinedFilterMatchesWorkflowExample() {
-        // "Cold War" + Unread + P10 — the canonical triage query.
-        let hit = file("a", ["Cold War", "Unread", "P10", "1962"])
-        let wrongPriority = file("b", ["Cold War", "Unread", "P9", "1962"])
-        let alreadyRead = file("c", ["Cold War", "Read", "P10", "1962"])
-        let f = LibraryFilter(subjects: ["Cold War"], priorities: [10], read: .unread)
+        // "Cold War" + Unread + Q3 — the canonical triage query.
+        let hit = file("a", ["Cold War", "Unread", "Q3", "1962"])
+        let wrongQuality = file("b", ["Cold War", "Unread", "Q2", "1962"])
+        let alreadyRead = file("c", ["Cold War", "Read", "Q3", "1962"])
+        let f = LibraryFilter(subjects: ["Cold War"], qualities: [3], read: .unread)
         XCTAssertTrue(f.matches(hit))
-        XCTAssertFalse(f.matches(wrongPriority))
+        XCTAssertFalse(f.matches(wrongQuality))
         XCTAssertFalse(f.matches(alreadyRead))
     }
 
@@ -111,14 +111,14 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertEqual(sorted, ["jan", "jan25", "mar"])  // Jan(0) < Jan-25 < March
     }
 
-    func testPrioritySortNilLast() {
+    func testQualitySortNilLast() {
         let files = [
-            file("p9", ["P9", "1980"]),
+            file("q2", ["Q2", "1980"]),
             file("none", ["1980"]),
-            file("p10", ["P10", "1980"]),
+            file("q3", ["Q3", "1980"]),
         ]
-        let sorted = LibrarySort.sorted(files, by: [ARSortDescriptor(field: .priority, ascending: true)]).map(\.name)
-        XCTAssertEqual(sorted, ["p9", "p10", "none"])  // 9<10 ascending; unprioritized last
+        let sorted = LibrarySort.sorted(files, by: [ARSortDescriptor(field: .quality, ascending: true)]).map(\.name)
+        XCTAssertEqual(sorted, ["q2", "q3", "none"])  // Q2<Q3 ascending; unrated last
     }
 
     // MARK: - LibraryFilter.effective (base-scope merge)
@@ -130,11 +130,11 @@ final class LibrarySortFilterTests: XCTestCase {
     }
 
     func testEffectiveInheritsBaseWhenUserNeutral() {
-        let base = LibraryFilter(priorities: [10], read: .unread, searchText: "memo")
+        let base = LibraryFilter(qualities: [3], read: .unread, searchText: "memo")
         let user = LibraryFilter()   // neutral
         let eff = LibraryFilter.effective(base: base, user: user)
         XCTAssertEqual(eff.read, .unread)
-        XCTAssertEqual(eff.priorities, [10])
+        XCTAssertEqual(eff.qualities, [3])
         XCTAssertEqual(eff.searchText, "memo")
     }
 

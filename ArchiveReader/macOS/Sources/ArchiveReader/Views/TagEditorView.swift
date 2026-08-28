@@ -28,7 +28,7 @@ struct TagEditorView: View {
                     Divider()
                     dateSection(s)
                     Divider()
-                    prioritySection(s)
+                    qualitySection(s)
                     Divider()
                     colorSection(s)
                     Divider()
@@ -133,15 +133,15 @@ struct TagEditorView: View {
         }
     }
 
-    // MARK: Priority
+    // MARK: Quality
 
-    @ViewBuilder private func prioritySection(_ s: GroupTagSummary) -> some View {
+    @ViewBuilder private func qualitySection(_ s: GroupTagSummary) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            title("Priority" + (s.commonPriority == nil ? "  (mixed)" : ""))
+            title("Quality" + (s.commonQuality == nil ? "  (mixed)" : ""))
             HStack {
-                facetButton("None", current: s.commonPriority == .some(nil)) { model.applyEdit(.setPriority(nil)) }
-                ForEach([7, 8, 9, 10], id: \.self) { p in
-                    facetButton("P\(p)", current: s.commonPriority == .some(p)) { model.applyEdit(.setPriority(p)) }
+                facetButton("None", current: s.commonQuality == .some(nil)) { model.applyEdit(.setQuality(nil)) }
+                ForEach([1, 2, 3], id: \.self) { q in
+                    facetButton("Q\(q)", current: s.commonQuality == .some(q)) { model.applyEdit(.setQuality(q)) }
                 }
             }
         }

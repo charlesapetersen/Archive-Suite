@@ -27,24 +27,6 @@ struct ReadStateCell: View {
     }
 }
 
-/// Priority cell — a borderless menu (None / P7–P10) for this one file.
-struct PriorityCell: View {
-    @ObservedObject var model: NavigationModel
-    let file: ArchiveFile
-    var body: some View {
-        Menu {
-            Button("None") { model.applyEdit(.setPriority(nil), to: file) }
-            ForEach([10, 9, 8, 7], id: \.self) { p in
-                Button("P\(p)") { model.applyEdit(.setPriority(p), to: file) }
-            }
-        } label: {
-            Text(file.priority.map { "P\($0)" } ?? "—").foregroundStyle(.secondary)
-        }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Set this file's priority")
-    }
-}
-
 /// Document-date cell — click to edit year / month / day / uncertain in a popover, for this file.
 struct DateCell: View {
     @ObservedObject var model: NavigationModel
@@ -112,7 +94,7 @@ struct DateCell: View {
 
 /// File-tags cell — INLINE editor (no popover): the file's subject tags render as removable token
 /// chips right in the row; type to add (with autocomplete from existing corpus tags), ⌫/× to remove.
-/// Shows and edits `file.subjects` (priority/color/date facets have their own cells). Commits diff-and-
+/// Shows and edits `file.subjects` (quality/color/date facets have their own cells). Commits diff-and-
 /// route through `TagWriter` via `model.commitSubjectEdit`. Multi-file edits still use the ⌘I editor.
 struct TagsCell: View {
     @ObservedObject var model: NavigationModel

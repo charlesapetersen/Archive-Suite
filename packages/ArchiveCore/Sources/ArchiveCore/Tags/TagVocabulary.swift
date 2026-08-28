@@ -38,7 +38,7 @@ public struct TagVocabularyRoot: Sendable, Equatable, Codable {
 ///
 /// Every ingest path runs its raw tag names through `DocumentTags.parse` and keeps only `.subjects`, so
 /// date tokens (`1968`, `03 March`, `Day 4`, `1970s`, `Date Uncertain`), quality (`Q1`…`Q3` plus the
-/// retired `P7`…`P10` aliases), read state
+/// current phone-wire `P7`…`P10` aliases until W19.q7 changes that protocol), read state
 /// (`Read`/`Unread`) and the file's own marker colour never become subject suggestions. This is load-bearing
 /// rather than cosmetic: source 3 above writes a trailing `Unread` on *every* real-tagging output, so an
 /// unfiltered vocabulary would guarantee "Unread" as a permanent suggestion in a field labelled *Subjects*.

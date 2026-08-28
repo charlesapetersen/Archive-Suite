@@ -5,7 +5,7 @@ import Foundation
 /// CRITICAL: this distinguishes a **confirmed** read (even one that legitimately found zero tags)
 /// from an **unreadable** file. A read failure must NEVER be silently coerced into "no tags" — that
 /// is the trap that would let a later write append `Read` to a file whose real tags couldn't be read,
-/// destroying subject/date/priority tags. (Safety Protocol §3.) `CoordinatedTagWriter` will refuse
+/// destroying subject/date/quality tags. (Safety Protocol §3.) `CoordinatedTagWriter` will refuse
 /// to write on `.failure`.
 public enum TagReadResult: Sendable, Equatable {
     case success(tagNames: [String], labelNumber: Int?)

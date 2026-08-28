@@ -35,4 +35,21 @@ final class TagEditingIntegrationTests: XCTestCase {
         let after = Set((try url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? [])
         XCTAssertEqual(after, ["1984", "Jerry Brown", "1982"])
     }
+
+    func testApplySetQualityWritesCanonicalTokenAndPreservesBytes() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("quality.pdf")
+        let bytes = Data("scratch PDF bytes".utf8)
+        try bytes.write(to: url)
+        try (url as NSURL).setResourceValue(["P9", "Unread", "History"], forKey: .tagNamesKey)
+
+        let current = try XCTUnwrap(TagReading.readTags(url))
+        _ = try TagWriter.apply(TagEditing.delta(for: .setQuality(3), given: current), to: url)
+
+        let after = Set((try url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? [])
+        XCTAssertEqual(after, ["Q3", "Unread", "History"])
+        XCTAssertEqual(try Data(contentsOf: url), bytes, "Quality editing changes Finder metadata only")
+    }
 }

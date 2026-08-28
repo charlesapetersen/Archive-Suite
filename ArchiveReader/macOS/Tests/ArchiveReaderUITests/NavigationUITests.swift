@@ -123,12 +123,41 @@ final class NavigationUITests: FixtureUITestCase {
         // NSTableHeaderView may be exposed differently — check the table's column headers.
         // At minimum, verify the table itself is present (covered by setUp).
         // Check that key column header texts are reachable.
-        let expectedHeaders = ["Document date", "File name", "File tags", "Priority", "Read"]
+        let expectedHeaders = ["Document date", "File name", "File tags", "Quality", "Read"]
         for title in expectedHeaders {
             let headerCell = table.staticTexts[title]
             XCTAssertTrue(headerCell.exists || table.buttons[title].exists,
                 "Column header '\(title)' should be visible in the table")
         }
+    }
+
+    // MARK: - Quality controls (W19.q3)
+
+    func testQualityControlsUseCanonicalScale() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        waitForRows(minimum: 5, timeout: 10)
+
+        for q in 1...3 {
+            XCTAssertTrue(app.descendants(matching: .any)["ar.filter.quality.Q\(q)"].waitForExistence(timeout: 3),
+                          "Quality filter Q\(q) should be reachable")
+        }
+        XCTAssertFalse(app.descendants(matching: .any)["ar.filter.priority.P7"].exists,
+                       "The retired P7 control must not survive as a fake Q0")
+
+        // Fixture file 00002 has phone-wire P8 input. The rendered, editable table control must expose
+        // it as canonical Q1 rather than leaving the old P label in the live AppKit table.
+        let menu = app.popUpButtons["ar.quality.menu.00002 IMG — Brown.pdf"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "Quality column should provide a per-file editor")
+        XCTAssertEqual(menu.value as? String, "Q1")
+
+        // Select an actual value and read the generated scratch document back. This proves the visible
+        // AppKit popup reaches NavigationModel.applyEdit → TagWriter rather than merely displaying Q1.
+        menu.click()
+        let q3 = app.menuItems["Q3"]
+        XCTAssertTrue(q3.waitForExistence(timeout: 5), "Quality popup should offer Q3")
+        q3.click()
+        XCTAssertTrue(waitForTags(on: "00002 IMG — Brown.pdf", containing: ["Q3"], excluding: ["P8"]),
+                      "the in-table Quality picker should write canonical Q3 to the scratch document")
     }
 
     // MARK: - Header-click sort (W5.c3)

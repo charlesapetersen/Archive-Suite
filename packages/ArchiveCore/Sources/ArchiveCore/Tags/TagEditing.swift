@@ -13,10 +13,6 @@ public enum TagEditOp: Sendable, Equatable {
     case setDay(Int?)           // 1...31, or nil to clear
     case setDateUncertain(Bool)
     case setQuality(Int?)       // 1...3, or nil to clear (unrated writes NO token — never `Q0`)
-    /// RETIRED, and retired by W19.q3: the pre-W19 spelling of the rating edit, still here only because
-    /// the Reader's Priority cells drive it. It writes a `P` token, which nothing should do any more —
-    /// use `setQuality`.
-    case setPriority(Int?)      // 7...10, or nil to clear
     case setColor(ArchiveColor?)// box / folder, or nil to clear
 }
 
@@ -53,19 +49,6 @@ public enum TagEditing {
             // retires that token instead of leaving two ratings on the same file.
             return TagDelta(add: DocumentTags.qualityTag(for: q).map { [$0] } ?? [],
                             remove: tags.qualityToken.map { [$0] } ?? [])
-        case .setPriority(let p):
-            // RETIRED — see `TagEditOp.setPriority`. It is now a thin ALIAS for `.setQuality`, mapping the old
-            // 8...10 scale down (`P8`→1, `P9`→2, `P10`→3) and treating `P7`/nil as a clear, per the owner-locked
-            // W19 mapping. Two reasons it forwards rather than writing a `P`:
-            //   1. It cannot leave TWO rating tokens on one file. The previous version added `P9` while removing
-            //      only `priorityToken` — nil on a `Q`-rated file — so `.setPriority(9)` on a `Q2` file left BOTH
-            //      tokens, and which one won then depended on tag ORDER. The old "provably cannot destroy a
-            //      canonical rating" claim was true of the removal half and silent about the add half.
-            //   2. The wave's owner-locked contract is that **no app writes `P` any more**. Forwarding satisfies
-            //      that without waiting for W19.q3 to relabel the Reader's cells.
-            // Consequence worth knowing: the Reader's "None" button now genuinely clears a `Q` rating instead of
-            // being a silent no-op, and its `P7` button clears rather than writing an unrated token.
-            return delta(for: .setQuality(p.flatMap { (8...10).contains($0) ? $0 - 7 : nil }), given: tags)
         case .setColor(let c):
             return TagDelta(color: c.map { .set($0) } ?? .clear)
         }
@@ -107,8 +90,6 @@ public struct GroupTagSummary: Sendable, Equatable {
     public var subjectsOnSome: [String]
     public var commonYear: Int??
     public var commonQuality: Int??
-    /// RETIRED alongside `TagEditOp.setPriority` (W19.q3): the same rating on the old 8...10 scale.
-    public var commonPriority: Int??
     public var commonReadState: ReadState??
     public var commonColor: ArchiveColor??
 
@@ -116,7 +97,7 @@ public struct GroupTagSummary: Sendable, Equatable {
         count = files.count
         guard let first = files.first else {
             subjectsOnAll = []; subjectsOnSome = []
-            commonYear = nil; commonQuality = nil; commonPriority = nil
+            commonYear = nil; commonQuality = nil
             commonReadState = nil; commonColor = nil
             return
         }
@@ -128,7 +109,6 @@ public struct GroupTagSummary: Sendable, Equatable {
 
         commonYear = Self.common(files.map(\.year))
         commonQuality = Self.common(files.map(\.quality))
-        commonPriority = Self.common(files.map(\.priority))
         commonReadState = Self.common(files.map(\.readState))
         commonColor = Self.common(files.map(\.color))
         _ = first

@@ -6,7 +6,7 @@ final class SavedSearchCodableTests: XCTestCase {
         var f = LibraryFilter()
         f.subjects = ["Cold War", "Jerry Brown"]
         f.subjectCombine = .any
-        f.priorities = [10, 9]
+        f.qualities = [3, 2]
         f.read = .unread
         f.searchText = "brown"
         let data = try JSONEncoder().encode(f)
@@ -14,14 +14,10 @@ final class SavedSearchCodableTests: XCTestCase {
         XCTAssertEqual(f, back)
     }
 
-    func testPathPrefixCodableAndBackwardCompat() throws {
+    func testPathPrefixCodableRoundtrip() throws {
         var f = LibraryFilter(); f.pathPrefix = "/root/Brown"
         let back = try JSONDecoder().decode(LibraryFilter.self, from: JSONEncoder().encode(f))
         XCTAssertEqual(back.pathPrefix, "/root/Brown")
-        // A smart folder saved before pathPrefix existed must still decode (→ nil).
-        let old = #"{"subjects":[],"subjectCombine":"all","priorities":[],"read":"all","searchText":""}"#
-        let decoded = try JSONDecoder().decode(LibraryFilter.self, from: Data(old.utf8))
-        XCTAssertNil(decoded.pathPrefix)
     }
 }
 
@@ -35,15 +31,15 @@ final class SavedSearchStoreTests: XCTestCase {
 
     func testAddDeletePersist() {
         let (store, d, name) = makeStore(); defer { d.removePersistentDomain(forName: name) }
-        var f = LibraryFilter(); f.subjects = ["Cold War"]; f.priorities = [10]; f.read = .unread
-        store.add(name: "Cold War P10 Unread", filter: f, fullTextQuery: "proposition 13")
+        var f = LibraryFilter(); f.subjects = ["Cold War"]; f.qualities = [3]; f.read = .unread
+        store.add(name: "Cold War Q3 Unread", filter: f, fullTextQuery: "proposition 13")
         XCTAssertEqual(store.searches.count, 1)
         let id = store.searches[0].id
 
         let reloaded = SavedSearchStore(defaults: d)
         XCTAssertEqual(reloaded.searches.count, 1)
-        XCTAssertEqual(reloaded.searches[0].name, "Cold War P10 Unread")
-        XCTAssertEqual(reloaded.searches[0].filter.priorities, [10])
+        XCTAssertEqual(reloaded.searches[0].name, "Cold War Q3 Unread")
+        XCTAssertEqual(reloaded.searches[0].filter.qualities, [3])
         XCTAssertEqual(reloaded.searches[0].fullTextQuery, "proposition 13")
 
         store.delete(id)
@@ -101,7 +97,7 @@ final class SavedSearchStoreTests: XCTestCase {
     func testSaveApplyRoundTripReloads() {
         let (store, d, name) = makeStore(); defer { d.removePersistentDomain(forName: name) }
         var f = LibraryFilter()
-        f.subjects = ["Economics"]; f.subjectCombine = .any; f.priorities = [9, 8]
+        f.subjects = ["Economics"]; f.subjectCombine = .any; f.qualities = [2, 1]
         f.read = .read; f.searchText = "memo"; f.pathPrefix = "/root/Box 3"; f.needsAttentionOnly = true
         store.add(name: "Round Trip", filter: f, fullTextQuery: "deficit")
         // Reload from a fresh store (persist → reload) and confirm the saved filter is intact so it can

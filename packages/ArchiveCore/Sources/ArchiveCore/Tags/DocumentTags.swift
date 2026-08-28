@@ -66,37 +66,7 @@ public struct DocumentTags: Sendable, Equatable {
     public var monthToken: String?
     public var dayToken: String?
     public var decadeToken: String?   // the verbatim raw token consumed for the decade facet ("1970s")
-    public var qualityToken: String?  // canonical Q1...Q3 or a retired P7...P10 alias
-
-    // MARK: Transitional Priority surface (DERIVED — retired by W19.q3)
-    //
-    // Priority is retired: Quality is the only rating facet, and `quality`/`qualityToken` above are the
-    // only stored state for it. These two are computed VIEWS of that one facet, kept solely so the
-    // pre-W19 Reader surfaces (column, filter, sort, inline edit) keep compiling until W19.q3 renames
-    // them. Deriving rather than mirroring is deliberate: a stored second copy can disagree with the
-    // facet depending on which initializer built it, and a rating that reads two different ways is
-    // exactly how a facet edit removes the wrong token.
-
-    /// The rating on the retired 8...10 Priority scale, for the pre-W19 Reader surfaces only.
-    ///
-    /// A **legacy `P` token reports its own literal value**, so a `P7`-tagged file still reads `7` exactly as it
-    /// did before Quality existed. A **canonical `Q` token maps onto the scale** (`Q1` → 8, `Q2` → 9, `Q3` → 10).
-    /// The first clause is load-bearing and was missing in the first version of this: deriving purely from
-    /// `quality` made `P7` unrepresentable (`parseQuality("P7")` is nil by contract), which silently broke the
-    /// Reader's `P7` filter chip, its column value, and any saved smart folder selecting P7 — a control that
-    /// matches nothing is worse than one that is absent, and removing the control is W19.q3's job, not q2's.
-    public var priority: Int? {
-        if let t = priorityToken, let legacy = DocumentTags.parsePriority(t) { return legacy }
-        return quality.map { $0 + 7 }
-    }
-
-    /// The verbatim raw token consumed for the rating facet, but **only when it is a legacy `P` token**.
-    /// `nil` for a canonical `Q1`–`Q3`, so the retired `.setPriority` edit can never remove a canonical
-    /// Quality token — it stays exactly as narrow as it was before Quality existed.
-    public var priorityToken: String? {
-        guard let t = qualityToken, let first = t.first, first == "P" || first == "p" else { return nil }
-        return t
-    }
+    public var qualityToken: String?  // canonical Q1...Q3 or current phone P7...P10 wire input
 
     public init(
         raw: [String], labelNumber: Int?,
@@ -179,7 +149,7 @@ public struct DocumentTags: Sendable, Equatable {
 
 extension DocumentTags {
     /// Classify a raw tag array (+ optional Finder label number) into facets.
-    /// Order of checks matters: read-state / quality (including legacy Priority aliases) / month / day
+    /// Order of checks matters: read-state / quality (including the current phone P wire spellings) / month / day
     /// are recognized before the generic bare-number "year" test.
     public static func parse(raw: [String], labelNumber: Int?) -> DocumentTags {
         var year: Int?
@@ -216,7 +186,7 @@ extension DocumentTags {
                 dateUncertain = true
                 continue
             }
-            // Quality — canonical `Q1`...`Q3` plus the retired Priority spellings, aliased on read
+            // Quality — canonical `Q1`...`Q3` plus current phone `P7`...`P10` wire spellings, aliased on read
             // (`P10`→3, `P9`→2, `P8`→1, `P7`→unrated). ONE facet with ONE last-token-wins winner
             // whichever way it is spelled, so a shadowed token is demoted to a subject and stays
             // visible, and a facet edit still only ever removes this single winner.
@@ -273,9 +243,8 @@ extension DocumentTags {
         "July", "August", "September", "October", "November", "December",
     ]
 
-    /// The retired Priority spelling, `P7`...`P10`. Nothing WRITES these any more (W19); this exists so
-    /// `parseQuality` can alias them on read, and so the pre-W19 Reader surfaces keep resolving until
-    /// W19.q3. Deliberately lenient about a zero-padded `P07`: a lenient read in front of a strict write
+    /// The current phone Priority wire spelling, `P7`...`P10`. Reader does not write these; this parser
+    /// accepts them until W19.q7 changes the phone protocol. Deliberately strict about a zero-padded `P07`:
     /// **EXACT match only** — `P7`, `P8`, `P9`, `P10`, upper or lower case, and nothing else.
     /// ⚠️ An earlier version of this was deliberately LENIENT about zero-padding, on the reasoning that a token
     /// this parser rejects becomes a SUBJECT and so leaks into the Subjects vocabulary. That reasoning inverted
@@ -301,7 +270,7 @@ extension DocumentTags {
         return qualityTokens[q - 1]
     }
 
-    /// Parse the unified Quality facet, 1...3. Retired Priority values alias on read without rewriting any
+    /// Parse the unified Quality facet, 1...3. Current phone `P` values alias on read without rewriting any
     /// bytes: `P8`→1, `P9`→2, `P10`→3, while `P7` is unrated and therefore returns `nil` — as does any
     /// token that is not a rating at all, `Q0` included. Use `isRatingToken` to tell those two apart.
     public static func parseQuality(_ s: String) -> Int? {
@@ -313,7 +282,7 @@ extension DocumentTags {
         return legacy - 7
     }
 
-    /// Whether the token OCCUPIES the rating facet, regardless of what it evaluates to. The retired `P7`
+    /// Whether the token OCCUPIES the rating facet, regardless of what it evaluates to. The phone-wire `P7`
     /// does — it is a recognized rating spelling that happens to mean unrated — which is what keeps it out
     /// of the Subjects vocabulary. A literal `Q0` does NOT, so it stays an ordinary subject.
     public static func isRatingToken(_ s: String) -> Bool {

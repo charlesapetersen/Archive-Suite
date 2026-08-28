@@ -28,7 +28,7 @@ struct AppKitTableView: NSViewRepresentable {
         .init(id: "type", title: "Type", width: 56, minWidth: 44, maxWidth: 80, sortField: .fileType),
         .init(id: "classification", title: "Provenance", width: 132, minWidth: 100, maxWidth: 220, sortField: nil),
         .init(id: "tags", title: "File tags", width: 300, minWidth: 160, maxWidth: 600, sortField: .subjects),
-        .init(id: "priority", title: "Priority", width: 72, minWidth: 60, maxWidth: 100, sortField: .priority),
+        .init(id: "quality", title: "Quality", width: 72, minWidth: 60, maxWidth: 100, sortField: .quality),
         .init(id: "read", title: "Read", width: 84, minWidth: 70, maxWidth: 110, sortField: .readState),
     ]
 
@@ -258,6 +258,9 @@ struct AppKitTableView: NSViewRepresentable {
             if colID == "tags" {
                 return makeTagTokenCell(tableView: tableView, itemID: itemID, file: file)
             }
+            if colID == "quality" {
+                return makeQualityMenuCell(tableView: tableView, file: file)
+            }
 
             let cellID = NSUserInterfaceItemIdentifier("cell.\(colID)")
             let cell: NSTableCellView
@@ -374,10 +377,6 @@ struct AppKitTableView: NSViewRepresentable {
                     fontSize: currentFontSize
                 )
 
-            case "priority":
-                tf.stringValue = file.priority.map { "P\($0)" } ?? "—"
-                tf.textColor = .secondaryLabelColor
-
             case "read":
                 let state = file.readState
                 tf.stringValue = state?.rawValue ?? "—"
@@ -388,6 +387,61 @@ struct AppKitTableView: NSViewRepresentable {
             }
 
             return cell
+        }
+
+        /// The actual in-table Quality editor. The former SwiftUI `QualityCell` stopped being part of
+        /// the rendered hierarchy when this list moved to AppKit, so keeping its menu alone would leave
+        /// the visible Quality column read-only. This popup keeps the one-file edit path beside the
+        /// value it changes and still routes every selection through `NavigationModel.applyEdit` →
+        /// `TagWriter`.
+        private func makeQualityMenuCell(tableView: NSTableView, file: ArchiveFile?) -> NSView {
+            let cellID = NSUserInterfaceItemIdentifier("cell.quality")
+            let cell: NSTableCellView
+            let menu: QualityPopUpButton
+            if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView,
+               let existing = reused.subviews.compactMap({ $0 as? QualityPopUpButton }).first {
+                cell = reused
+                menu = existing
+            } else {
+                cell = NSTableCellView()
+                cell.identifier = cellID
+                menu = QualityPopUpButton(frame: .zero, pullsDown: false)
+                menu.translatesAutoresizingMaskIntoConstraints = false
+                menu.controlSize = .small
+                menu.target = self
+                menu.action = #selector(qualityMenuChanged(_:))
+                cell.addSubview(menu)
+                NSLayoutConstraint.activate([
+                    menu.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 1),
+                    menu.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -1),
+                    menu.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                ])
+            }
+
+            menu.removeAllItems()
+            for value in [nil, 1, 2, 3] as [Int?] {
+                menu.addItem(withTitle: value.map { "Q\($0)" } ?? "None")
+            }
+            guard let file else {
+                menu.isEnabled = false
+                menu.file = nil
+                menu.setAccessibilityIdentifier("")
+                return cell
+            }
+
+            menu.isEnabled = true
+            menu.file = file
+            menu.selectItem(at: (file.quality ?? 0))
+            menu.toolTip = "Set this file's quality"
+            menu.setAccessibilityIdentifier("ar.quality.menu.\(file.name)")
+            menu.setAccessibilityLabel("Quality for \(file.name)")
+            return cell
+        }
+
+        @objc private func qualityMenuChanged(_ sender: QualityPopUpButton) {
+            guard let file = sender.file else { return }
+            let quality = sender.indexOfSelectedItem == 0 ? nil : sender.indexOfSelectedItem
+            parent.model.applyEdit(.setQuality(quality), to: file)
         }
 
         /// The dimmed keyword-in-context second line for a full-text hit: matched OCR terms emphasised
@@ -677,6 +731,13 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     @objc private func resetSort(_ sender: NSMenuItem) {
         onResetSort?()
     }
+}
+
+/// A reusable Quality popup needs the current value-object because AppKit menu targets receive only
+/// the selected control. The row's `ArchiveFile` is revalidated by `NavigationModel` before writing.
+@MainActor
+private final class QualityPopUpButton: NSPopUpButton {
+    var file: ArchiveFile?
 }
 
 // MARK: - Context-menu NSTableView subclass

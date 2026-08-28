@@ -3,7 +3,7 @@
 A native macOS app that lets a **historian read through PDFs of historical documents** that were
 tagged by the sibling app **Archive Processor** (same author, `../Archive Processor`). Archive
 Reader is the *reading & triage* companion: find tagged PDFs, list them in chronological order,
-filter by subject / priority / read-state, read them two-up (image + OCR text), copy text and
+filter by subject / quality / read-state, read them two-up (image + OCR text), copy text and
 file links, and mark them Read as you go.
 
 > **Status:** Shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate tag
@@ -21,7 +21,7 @@ Archival image files are **irreplaceable** and their tagging was **extremely tim
 - The app **MUST NOT** delete, move, rename, trash, re-save, or alter any file's **bytes/contents**
   or **location** — ever.
 - The app **MUST NOT** mangle, drop, or lose any tag *unintentionally*.
-- The app **MAY edit macOS Finder tags** — add / remove / change subject, date, priority, color,
+- The app **MAY edit macOS Finder tags** — add / remove / change subject, date, quality, color,
   and read-state tags, for a single file **or a group** — but **only** as a *deliberate user
   action*, routed through one audited choke-point (`TagWriter`), applied as a precise **delta**
   (add-set / remove-set) to a **freshly-read** tag array, and **verified** afterward. Finder-tag
@@ -69,7 +69,9 @@ paths also contain **non-breaking spaces** U+00A0).
 - **Date Uncertain:** flags that the date is **speculative** — the file *usually still has a Year
   tag*. So these files sort by their (speculative) year like any dated file; the nav window renders
   the derived date in **italics** to signal speculation (never dumped to the end).
-- **Priority:** exactly one of `P7 P8 P9 P10` (P10 highest). Box/folder pages & some docs have none.
+- **Quality:** exactly one of `Q1 Q2 Q3` (`Q3` highest); unrated writes no Quality token. Box/folder
+  pages & some docs have none. Until W19.q7 changes the phone protocol, its current `P7`–`P10` wire
+  spelling is translated into this facet (`P7` = unrated, `P8`→`Q1`, `P9`→`Q2`, `P10`→`Q3`).
 - **Read state:** `Read` or `Unread` (Archive Processor stamps `Unread` last on new output).
 - **Subject:** 2–6 free-form-ish strings (`Jerry Brown`, `DP chapters`, `Economics`, …). May be a
   controlled vocabulary. **Subjects can collide with other facets** (a subject literally `1984`,
@@ -123,7 +125,7 @@ files. This is the primary sort key.
 
 ## Safety Protocol — `TagWriter` (the single write choke-point for ALL tag edits)
 
-Every tag write — subject/date/priority/color edits, group edits, and Read/Unread triage — goes
+Every tag write — subject/date/quality/color edits, group edits, and Read/Unread triage — goes
 through **one** function. It is the *entire* write surface. An edit is expressed as a **delta**:
 `{ add: Set<String>, remove: Set<String>, color: ColorChange? }`. A Read/Unread swap is just the
 delta `remove {opposite}, add {target}`. "Set the year to 1981" is `remove {matching Year token(s)},
@@ -256,7 +258,7 @@ writes against the real corpus — always a copy.
   mutation routes through `mark(.read)` → `TagWriter` (undoable); the next/previous math is pure (`TriageNavigation`).
 - `⌘⇧C` Copy Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
 - `⌘L` focus tag filter · `⌘⌥F` Search OCR text · `⌘⇧K` Clear filters & search
-- *Menu-only (no shortcut):* Sort by Date/Name/Priority/Read-state · Rename Tag… · Find Similar Tags… ·
+- *Menu-only (no shortcut):* Sort by Date/Name/Quality/Read-state · Rename Tag… · Find Similar Tags… ·
   Save Current Search… · Select Document Run · Open in Default App
 
 *Document window* (the **focused pane** carries an accent border; switch it with `⌘⌥←`/`⌘⌥→`)
@@ -398,13 +400,14 @@ Views/
                               toolbar, context menus, sheets, header-click sort, focus shortcuts, FlowLayout.
   AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (NSTableViewDiffableDataSource):
                               virtualized rows, incremental snapshot apply, 150ms-debounced filter;
+                              the Quality-column popup is the per-file Quality editor;
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
                               optional default-hidden Provenance column uses the existing header picker.
   SidebarView.swift           Left sidebar: Smart Folders (saved searches) + a navigable folder tree
                               (List(selection:)+OutlineGroup). Durable smart-folder highlight; folder
                               selection exits the scope.
-  InlineEditCells.swift       In-list single-file editors: ReadStateCell (1-click toggle), PriorityCell
-                              (menu), DateCell / TagsCell (popovers). Multi-file edits use the ⌘I editor.
+  InlineEditCells.swift       Supporting SwiftUI cell views retained from the pre-AppKit table: ReadStateCell,
+                              DateCell / TagsCell. Multi-file edits use the ⌘I editor.
   SubjectTokenField.swift     Inline NSTokenField subject editor per row: autocomplete from the corpus;
                               edit-start-base diff → ONE TagWriter delta; commits the field's tokens on
                               blur — WYSIWYG, so a typed-but-not-Return'd word sticks (owner 2026-07-08;
@@ -430,7 +433,7 @@ Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bo
 **`packages/ArchiveCore` (shared Swift package — the safety-critical tag/PDF/link contract).** The domain
 types both apps must interpret *identically* now live in one package instead of being duplicated per app
 (extracted in the W0 refactor, `49c0162`–`b90800f`): `DocumentTags` (tag→facet parser —
-year/month/Day N/decade/priority/read/color/subjects; `sortDate` medieval-safe, `displayDate`,
+year/month/Day N/decade/quality/read/color/subjects; `sortDate` medieval-safe, `displayDate`,
 `dateIsSpeculative`), `TagReading`/`TagEditing`, `PDFFormatStatus`/`ExtractedContent`, `GeneratedTags`, the
 durable-link types (`DurableLink`/`ArchiveLinkPayload`/`RootMarker`), `PDFThumbnailer`/`ThumbnailCacheKey`,
 **The Finder-tag write choke-point is `ArchiveCore.CoordinatedTagWriter`**
@@ -487,7 +490,7 @@ the Reader *reads and edits* them — and will eventually ship together as **Arc
 Archive Reader realizes several items already on Archive Processor's own `POTENTIAL_FEATURES.md`
 (full-text search, filter-by-tag, browse, side-by-side original/OCR view).
 
-**The shared contract is the risk.** Both apps must interpret tags, date facets, priorities,
+**The shared contract is the risk.** Both apps must interpret tags, date facets, quality,
 color/markers, the `Read/Unread` convention, and the 2-page PDF + `Classification:` format
 *identically* — a divergence would corrupt or mis-read irreplaceable data. That contract is the real
 thing to keep in sync — authoritatively in [`../SPEC/tag-format.md`](../SPEC/tag-format.md)

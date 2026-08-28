@@ -858,12 +858,13 @@ the same three lines and landing them separately would silently revert part of t
 ## Wave 19 — Notes date-mirror + Quality facet (MERGES/replaces Priority) (owner-reviewed 2026-07-18)
 Owner decision from the wishlist review, refined: (a) Notes mirrors its front-matter **date** into Finder tags
 (reuse the existing Year/Month/Day/Decade facets — **no** SPEC change); (b) **no author** tags; (c) a **single
-rating facet, `Q1`/`Q2`/`Q3`**, that **MERGES WITH + REPLACES the legacy Priority facet** — they were redundant
+rating facet, `Q1`/`Q2`/`Q3`**, that **MERGES WITH + REPLACES the Priority facet** — they were redundant
 ("how important is this document"). Owner-locked contract: 0–3 scale, **`Q0`/unrated writes NO tag** (so the wire
 only carries `Q1`/`Q2`/`Q3`); **`Q3` = old `P10`**, mapping `P10`→`Q3` / `P9`→`Q2` / `P8`→`Q1` / `P7`→unrated.
-Priority is **retired** (no app or companion writes `P` anymore); legacy `P8`–`P10` on pre-W19 files **alias to
-`Q1`–`Q3` on read** — no corpus rewrite. Human-set everywhere, never LLM-emitted: Notes (front-matter), Reader
-(edit), Processor's interactive tagging, **and the phone companions** (the old priority control now emits `Q`).
+Priority is **retired** from public app surfaces. Until W19.q7 changes the current phone wire field, the
+companions emit `P7`–`P10` and the Mac boundary translates it (`P7`→unrated; `P8`–`P10`→`Q1`–`Q3`); no historical
+data migration is required. Human-set everywhere, never LLM-emitted: Notes (front-matter), Reader (edit),
+Processor's interactive tagging, and the phone companions.
 Shared-contract (Tier-2) — SPEC first, then the shared parser, then each app + companions; every code item must
 **build + test all three apps**, scratch-only. **This wave REPLACES existing priority UI/plumbing — merge, don't
 add a second control alongside.**
@@ -872,20 +873,6 @@ add a second control alongside.**
   `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
   Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
   W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q3 — Reader: Quality REPLACES the Priority column/filter/editor** (blocked-on: W19.q2) **[M].**
-  ⚠️ **READ FIRST — q2's adversarial review changed what you inherit (2026-08-13).** The Reader's existing
-  Priority cells ALREADY write canonical `Q1`-`Q3`: `TagEditOp.setPriority` is now a thin alias for
-  `.setQuality`, so nothing writes a `P` token any more. What is left for you is the READ/label side — the
-  column header, the filter chips and the inline menu still SAY `P8`/`P9`/`P10`, and `DocumentTags.priority`
-  still reports the retired 8...10 scale (a legacy `P` token reports its OWN literal value, `P7` included, so
-  the pre-W19 chips keep matching rather than matching nothing). So this item is a rename plus repointing those
-  surfaces at `quality`/`commonQuality`, then deleting `priority`, `priorityToken`, `commonPriority` and
-  `.setPriority`. ⚠️ Note `P7` has NO Quality equivalent — it maps to unrated — so the `P7` chip and button
-  GO rather than becoming a `Q0`. The
-  existing Priority nav facet **becomes** the Quality facet (column + filter + inline edit) — rename `P`→`Q` in
-  the UI, don't add a parallel control. Edit via `TagWriter` (set `Q1`–`Q3`; clear = remove the token, never write
-  `Q0`). Legacy `P8`–`P10` still display as `Q1`–`Q3` via the q2 alias. Tier-2 (tag write). Build + Reader unit
-  tests; live GUI confirm → owner tail. | ArchiveReader/.../Core/, Views/ | M | med | none
 - [ ] **W19.q4 — Notes: project front-matter quality → `Q1`–`Q3`** (blocked-on: W19.q2) **[M].** `NotesTagProjector`
   maps the item's front-matter `quality` to the 0–3 scale and projects `Q1`/`Q2`/`Q3`; **0/unrated writes no
   quality token** (and removes a stale one). Tier-2 (projector tag write; scratch-only). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none

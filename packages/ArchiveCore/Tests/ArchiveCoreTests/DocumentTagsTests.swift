@@ -13,7 +13,7 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertEqual(t.year, 1983)
         XCTAssertEqual(t.month?.number, 1)
         XCTAssertEqual(t.month?.name, "January")
-        XCTAssertEqual(t.priority, 9)
+        XCTAssertEqual(t.quality, 2)
         XCTAssertEqual(t.readState, .unread)
         XCTAssertNil(t.color)
         XCTAssertFalse(t.dateIsSpeculative)
@@ -21,13 +21,13 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertEqual(Set(t.subjects), ["DP chapters", "Jerry Brown", "Speeches", "NCII"])
     }
 
-    // Real box marker 00001: Red label + "Red" token, no date/priority.
+    // Real box marker 00001: Red label + "Red" token, no date/quality.
     func testBoxMarkerFoldsColorAndIsUndated() {
         let raw = ["Red", "Unread", "DP chapters", "Jerry Brown"]
         let t = DocumentTags.parse(raw: raw, labelNumber: 6)
         XCTAssertEqual(t.color, .box)
         XCTAssertNil(t.year)
-        XCTAssertNil(t.priority)
+        XCTAssertNil(t.quality)
         XCTAssertEqual(t.readState, .unread)
         XCTAssertFalse(t.subjects.contains("Red"))  // color token, not a subject
         XCTAssertEqual(Set(t.subjects), ["DP chapters", "Jerry Brown"])
@@ -63,9 +63,9 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertTrue(t.subjects.contains("Read later"))
     }
 
-    // The retired `P` spelling still parses on read (W19: nothing writes it any more). Zero-padding is
-    // accepted on purpose — see `parsePriority`: a token it rejects becomes a SUBJECT instead.
-    func testPriorityParsing() {
+    // The current phone `P` spelling parses on read until W19.q7 changes the wire. Zero-padding is
+    // rejected: a token it rejects stays a SUBJECT instead.
+    func testPhonePriorityWireParsing() {
         XCTAssertEqual(DocumentTags.parsePriority("P10"), 10)
         XCTAssertEqual(DocumentTags.parsePriority("p7"), 7)
         XCTAssertNil(DocumentTags.parsePriority("P07"), "EXACT match only — see parsePriority")
@@ -99,7 +99,7 @@ final class DocumentTagsTests: XCTestCase {
         let unrated = DocumentTags.parse(raw: ["History", "1968"], labelNumber: nil)
         XCTAssertNil(unrated.quality, "no rating token present = unrated")
         XCTAssertNil(unrated.qualityToken)
-        XCTAssertNil(unrated.priority)
+        XCTAssertNil(unrated.quality)
     }
 
     // A literal `Q0` is not a rating token at all, so it must stay an ordinary subject — the mirror image
@@ -112,37 +112,22 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertTrue(tags.subjects.contains("Q0"))
     }
 
-    func testLegacyPriorityAliasesIntoQualityWithoutARewrite() {
-        // (token, quality, the retired 8...10 view). `P7` is a recognized rating token that MEANS
-        // unrated — so it is consumed rather than left to become a Subjects suggestion.
-        // `priority` reports a legacy token's OWN literal value, so `P7` still reads 7 for the pre-W19
-        // Reader surfaces even though its QUALITY is unrated. Deriving it from quality alone made P7
-        // unrepresentable and silently broke the Reader's P7 filter chip and saved smart folders.
-        let aliases: [(token: String, quality: Int?, priority: Int?)] = [
-            ("P7", nil, 7), ("P8", 1, 8), ("P9", 2, 9), ("P10", 3, 10),
+    func testPhonePriorityTokensAliasIntoQualityWithoutARewrite() {
+        // `P7` is a recognized phone rating token that means unrated, so it is consumed rather than
+        // becoming a Subjects suggestion.
+        let aliases: [(token: String, quality: Int?)] = [
+            ("P7", nil), ("P8", 1), ("P9", 2), ("P10", 3),
         ]
         for alias in aliases {
             XCTAssertEqual(DocumentTags.parseQuality(alias.token), alias.quality, alias.token)
             XCTAssertTrue(DocumentTags.isRatingToken(alias.token), alias.token)
             let tags = DocumentTags.parse(raw: [alias.token, "History"], labelNumber: nil)
             XCTAssertEqual(tags.quality, alias.quality, alias.token)
-            XCTAssertEqual(tags.priority, alias.priority, alias.token)
             XCTAssertEqual(tags.qualityToken, alias.token,
-                           "even legacy P7 is a recognized retired-facet token, not a subject")
-            XCTAssertEqual(tags.priorityToken, alias.token, "a P token IS the legacy token")
+                           "even phone P7 is a recognized rating token, not a subject")
             XCTAssertFalse(tags.subjects.contains(alias.token), alias.token)
             XCTAssertEqual(tags.raw, [alias.token, "History"], "parsing never rewrites legacy bytes")
         }
-    }
-
-    // The transitional 8...10 view is DERIVED from the one facet, so the two can never disagree.
-    func testCanonicalQualityPublishesTheRetiredPriorityViewButNoLegacyToken() {
-        let tags = DocumentTags.parse(raw: ["Q1", "History"], labelNumber: nil)
-        XCTAssertEqual(tags.quality, 1)
-        XCTAssertEqual(tags.priority, 8, "Q1 reads as the old P8 for the pre-W19 Reader surfaces")
-        XCTAssertEqual(tags.qualityToken, "Q1")
-        XCTAssertNil(tags.priorityToken,
-                     "a canonical Q token is NOT a legacy token — the retired edit must not touch it")
     }
 
     func testCanonicalAndLegacyQualityTokensShareOneLastWinnerFacet() {
@@ -155,8 +140,6 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertEqual(canonicalWins.quality, 2)
         XCTAssertEqual(canonicalWins.qualityToken, "Q2")
         XCTAssertTrue(canonicalWins.subjects.contains("P10"), "the shadowed collision stays visible")
-        XCTAssertNil(canonicalWins.priorityToken,
-                     "the winner is canonical, so there is no legacy token for the retired edit to remove")
 
         // A legacy P7 can shadow a canonical rating, because both spellings are the same one facet.
         let unratedWins = DocumentTags.parse(raw: ["Q2", "P7", "History"], labelNumber: nil)
@@ -277,7 +260,7 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertFalse(box.subjects.contains("Red"))   // color token folded, not a subject
         XCTAssertTrue(box.subjects.contains("Box"))    // literal marker word stays a subject
         XCTAssertNil(box.year)
-        XCTAssertNil(box.priority)
+        XCTAssertNil(box.quality)
 
         // Folder marker: Purple label (3) + "Purple" color token + literal "Folder" subject.
         let folder = DocumentTags.parse(raw: ["Purple", "Folder", "Unread"], labelNumber: 3)

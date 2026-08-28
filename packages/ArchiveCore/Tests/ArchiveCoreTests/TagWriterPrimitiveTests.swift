@@ -127,7 +127,7 @@ final class TagWriterPrimitiveTests: XCTestCase {
         let tags = TagReading.readTags(url)
         XCTAssertNotNil(tags)
         XCTAssertEqual(tags?.year, 1980)
-        XCTAssertEqual(tags?.priority, 9)
+        XCTAssertEqual(tags?.quality, 2)
         XCTAssertEqual(tags?.readState, .unread)
         XCTAssertEqual(tags?.color, .box)
     }

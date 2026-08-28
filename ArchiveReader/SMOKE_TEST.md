@@ -20,8 +20,9 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       **PASS** — Sep 1980 → Oct 1980 → Sep 1982 → undated Red markers (00001/00006) last.
 - [~] **C. Read-state filter** — not driven directly this pass; the filter engine is exercised by F/G
       (filename/FTS narrow the set correctly) and the Unread/Read/No-read-state/All tabs render.
-- [x] **D. Priority filter** — **PASS**. P10 verified pre-compaction; the by-name sort this pass shows
-      each row's P-value (P8/P9/P10, markers none), matching the priority chips.
+- [x] **D. Priority filter (historical; superseded by Quality)** — **PASS**. P10 verified
+      pre-compaction; the by-name sort this pass shows each row's P-value (P8/P9/P10, markers none),
+      matching the Priority chips. The current Quality replacement is recorded separately below.
 - [~] **E. Subject filter** — not driven this pass (token field; fiddly to script). `LibraryFilter`
       subject AND/Any + chip logic is unit-tested (LibrarySortFilterTests).
 - [x] **F. Filename filter** — **PASS**. Typing "00030" → "1 shown · 30 total" (exactly 00030); Clear resets.
@@ -49,7 +50,8 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       "Unread"); the mark path is symmetric with N. Not driven via the explicit Mark-Unread command.
 - [x] **Q. Tag editor (⌘I)** — **PASS**. Sheet reflects 00015's real tags (P8 + Unread highlighted,
       subject chips). Changed priority P8→P9 → disk `P9`, row's Priority column re-rendered to P9
-      (verifies the `applyEdit`→render path for a non-read-state tag); Undo restored P8.
+      (verifies the `applyEdit`→render path for a non-read-state tag); Undo restored P8. This historical
+      Priority UI was superseded by Quality; the current picker proof is recorded separately below.
 - [x] **R. Flag (⌘⇧F / Toggle Flag)** — **PASS**. ⚑ column fills orange on 00015; toggles off. App-side
       (NotesStore), never written to the corpus.
 - [~] **S. Saved search** — not driven this pass; built from proven components (LibraryFilter + FTS +
@@ -58,10 +60,20 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       toggles, doc-viewer default-split slider (66/33), navigation defaults.
 - [x] **U. Menu bar** — **PASS**. Every action this pass was driven via the menus (Mark Read, Undo,
       Toggle Flag, Copy Link(s), Edit Tags…, Sort by …, Open in Document Window) — all functioned.
-- [x] **V. Library health** — **PASS**. Stethoscope popover: Total 30, No date 4, No priority 4,
+- [x] **V. Library health (historical; superseded terminology)** — **PASS**. Stethoscope popover:
+      Total 30, No date 4, No priority 4,
       Box/folder markers 4 (the Red markers), Date Uncertain 0, **Both Read+Unread (corrupt) 0**.
 
 ## Results & notes
+
+### 2026-08-28 — W19.q3 Quality controls (VM)
+
+**PASS.** The isolated headless VM rebuilt the canonical generated GUI fixture and ran
+`NavigationUITests.testQualityControlsUseCanonicalScale`. It found the current Q1/Q2/Q3 filter controls,
+confirmed no P7 control remains, rendered the fixture's phone-wire P8 input as Q1 in the live AppKit table,
+then selected Q3 in that per-file picker. Finder-tag read-back from the guarded scratch fixture confirmed
+canonical `Q3` and no `P8`, proving the visible picker reaches `NavigationModel.applyEdit` → `TagWriter`.
+No real archive was opened or mutated.
 
 ### 2026-07-05 — mark-Read display bug: TWO compounding bugs found & fixed
 Marking a file Read left the row showing "Unread" (disk was correctly `Read`; status said "Marked 1
@@ -111,14 +123,14 @@ sheet-confirm flows (save-smart-folder, tag-rename) are `[~]` — verified by un
 
 - [x] **Sidebar folder tree + scope** — sidebar shows All Files/Batch-A/Batch-B with recursive counts;
       selecting Batch-A scopes the list to its 10 files ("10 shown · 31 total"). **PASS** (GUI).
-- [x] **Smart Folders: create from current filters** — "Save as Smart Folder" / File→Save Current
-      Search opens a dialog **pre-filled from the active filter** ("P9"); saving adds a smart folder to
+- [x] **Smart Folders: create from current filters (historical Priority UI)** — "Save as Smart Folder" /
+      File→Save Current Search opens a dialog **pre-filled from the active filter** ("P9"); saving adds a smart folder to
       the sidebar. **PASS** (GUI: prefilled dialog + smart folder appeared).
 - [~] **Smart folder rename/delete** — `SavedSearchStore.rename`/`delete` unit-tested; context menu wired.
 - [x] **Column customization** — `Table(columnCustomization:)` + per-column IDs, persisted (code + native API).
 - [x] **View-state persistence** — filter + sort persist across launch (Codable, root-guarded); tests cover Codable.
 - [x] **List font size (C3)** — Options slider (ar.listFontSize) applied to the list.
-- [x] **Active-filter summary (C4)** — status bar shows e.g. "· P9" / "· tags: …" when filtering.
+- [x] **Active-filter summary (C4, historical Priority UI)** — status bar shows e.g. "· P9" / "· tags: …" when filtering.
 - [~] **Focus shortcuts (C5)** — ⌘L focus tag filter, ⌥⌘F focus OCR search (menu commands → focus signals).
 - [~] **Tag-cloud context menu (C6)** — add/remove filter, filter-to-only, All/Any, select-files-with-tag (wired).
 - [~] **Open in Default App (C7)** — read-only `NSWorkspace.open` in the row context menu.

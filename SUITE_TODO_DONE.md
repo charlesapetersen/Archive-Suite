@@ -5751,6 +5751,15 @@ explain why not.
   later Settings choice; older retained-policy records are unsupported. No bulk corpus rewrite —
   P remains an accepted phone input until W19.q7 replaces the wire field. | Tier-2 tag path | S–M
 
+- [x] **W19.q3 — Reader: Quality replaces the Priority column/filter/editor [M].** ✅ **SHIPPED 2026-08-28**
+  — this commit, `feat(reader): replace Priority with Quality` (a self-referential SHA cannot be written
+  into its own commit). The Reader now presents exactly one Quality
+  column, Q1–Q3 filter chips, inline editor, group editor and sort command; it removes the public
+  `priority`/`priorityToken`/`commonPriority`/`.setPriority` compatibility surface and its P7 control.
+  Reader-written tags use only `TagEditOp.setQuality` (clear writes no Q0); current phone P input remains a
+  parser-only protocol concern until W19.q7. Tier-2: guarded scratch metadata proof + isolated-VM AppKit
+  picker proof, shared-Core test suite, all three app builds, and adversarial review. | Tier-2 shared-Core/tag path | M
+
 
 ## Notes test hardening (from the 2026-07-29 health-gate RED)
 

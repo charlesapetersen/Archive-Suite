@@ -5,7 +5,7 @@ were OCR'd and tagged by [**Archive Processor**](../ArchiveProcessor) (its sibli
 historians and archivists working through thousands of scanned documents.
 
 Archive Reader is the *reading & triage* companion to Archive Processor's *capture & tagging*: find
-tagged PDFs, list them in chronological order, filter by subject / priority / read-state, search the
+tagged PDFs, list them in chronological order, filter by subject / quality / read-state, search the
 OCR text, read them two-up (image + OCR text), copy text and file links, edit tags, and mark
 documents Read as you go. The two apps ship together as **Archive Suite** (this monorepo).
 
@@ -28,10 +28,10 @@ Protocol.
   Spotlight, so a stale or dead index can never hide your files. ~102k PDFs walk in ~10 s, a warm start
   paints from the local index while it revalidates, and FSEvents keeps it live.
 - **Navigation window** (Finder-Smart-Folder-like): columns for Document date · File name · File
-  type · File tags · Read/Unread; multi-level sort (chronological by default; medieval-safe);
-  separate filters for subject tags, priority (P7–P10), and read-state.
+  type · File tags · Quality · Read/Unread; multi-level sort (chronological by default; medieval-safe);
+  separate filters for subject tags, Quality (Q1–Q3), and read-state.
 - **Full-text search** across the OCR'd text.
-- **Edit tags** for one file or a group (subjects, date facets, priority, color) — safely.
+- **Edit tags** for one file or a group (subjects, date facets, Quality, color) — safely.
 - **Copy file links** (`file://` URL / path / Markdown / HTML) for single files or groups.
 - **Mark Read/Unread** in one keystroke; read files drop out of an Unread view.
 - **Document window**: two-up viewer (image left / OCR text right), independent per-pane zoom, a

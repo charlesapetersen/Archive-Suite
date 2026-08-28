@@ -21,21 +21,19 @@ enum SubjectCombine: String, Sendable, CaseIterable, Codable {
 struct LibraryFilter: Sendable, Equatable, Codable {
     var subjects: Set<String> = []
     var subjectCombine: SubjectCombine = .all
-    var priorities: Set<Int> = []     // empty = any priority
+    var qualities: Set<Int> = []      // empty = any quality
     var read: ReadFilter = .all
     /// Filename substring match (corpus-wide OCR full-text search arrives in M1.5).
     var searchText: String = ""
-    /// Scope to a folder subtree (from the sidebar file tree). `nil` = the whole root. Optional so
-    /// older persisted smart searches (which lack this key) still decode.
+    /// Scope to a folder subtree (from the sidebar file tree). `nil` = the whole root.
     var pathPrefix: String? = nil
     /// Restrict the list to files whose non-standard-PDF status `.needsAttention` (unreadable or
     /// no-text-layer). The status lives in the async content index, so this dimension is applied by
-    /// the model (like full-text search), not inside `matches`. Defaults false; older smart searches
-    /// that lack this key still decode.
+    /// the model (like full-text search), not inside `matches`.
     var needsAttentionOnly: Bool = false
 
     var isActive: Bool {
-        !subjects.isEmpty || !priorities.isEmpty || read != .all
+        !subjects.isEmpty || !qualities.isEmpty || read != .all
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
             || (pathPrefix?.isEmpty == false)
             || needsAttentionOnly
@@ -54,9 +52,9 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         case .unread: if file.readState != .unread { return false }
         case .noReadState: if file.readState != nil { return false }
         }
-        // Priority (empty set = any). Files with no priority are excluded when a level is required.
-        if !priorities.isEmpty {
-            guard let p = file.priority, priorities.contains(p) else { return false }
+        // Quality (empty set = any). Files with no quality are excluded when a level is required.
+        if !qualities.isEmpty {
+            guard let q = file.quality, qualities.contains(q) else { return false }
         }
         // Subjects
         if !subjects.isEmpty {
@@ -74,31 +72,13 @@ struct LibraryFilter: Sendable, Equatable, Codable {
 }
 
 extension LibraryFilter {
-    /// Tolerant decode: every key is optional-with-default, so a smart folder persisted by an older
-    /// build (before `pathPrefix` / `needsAttentionOnly` existed) still decodes. In an extension so the
-    /// synthesized memberwise initializer is preserved; `encode(to:)` stays synthesized.
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
-            subjects:           try c.decodeIfPresent(Set<String>.self, forKey: .subjects) ?? [],
-            subjectCombine:     try c.decodeIfPresent(SubjectCombine.self, forKey: .subjectCombine) ?? .all,
-            priorities:         try c.decodeIfPresent(Set<Int>.self, forKey: .priorities) ?? [],
-            read:               try c.decodeIfPresent(ReadFilter.self, forKey: .read) ?? .all,
-            searchText:         try c.decodeIfPresent(String.self, forKey: .searchText) ?? "",
-            pathPrefix:         try c.decodeIfPresent(String.self, forKey: .pathPrefix),
-            needsAttentionOnly: try c.decodeIfPresent(Bool.self, forKey: .needsAttentionOnly) ?? false
-        )
-    }
-}
-
-extension LibraryFilter {
     /// Fold a user filter onto a base scope for "Save Current Search" / the status summary.
     /// Per-facet: user wins when set, else inherit the base; subjects = union;
     /// pathPrefix/searchText = user's if non-empty, else base's; needsAttentionOnly = OR.
     static func effective(base: LibraryFilter, user: LibraryFilter) -> LibraryFilter {
         var r = LibraryFilter()
         r.read = user.read != .all ? user.read : base.read
-        r.priorities = user.priorities.isEmpty ? base.priorities : user.priorities
+        r.qualities = user.qualities.isEmpty ? base.qualities : user.qualities
         r.subjects = base.subjects.union(user.subjects)
         r.subjectCombine = user.subjects.isEmpty ? base.subjectCombine : user.subjectCombine
         let us = user.searchText.trimmingCharacters(in: .whitespaces)
@@ -113,7 +93,7 @@ extension LibraryFilter {
 // MARK: - Sorting
 
 enum SortField: String, Sendable, CaseIterable, Codable {
-    case date, name, priority, readState, fileType, subjects, relevance
+    case date, name, quality, readState, fileType, subjects, relevance
 }
 
 struct ARSortDescriptor: Sendable, Equatable, Codable {
@@ -128,7 +108,7 @@ enum LibrarySort {
         ARSortDescriptor(field: .name, ascending: true),
     ]
 
-    /// Multi-level, deterministic sort. Missing keys (undated, no priority, no read-state) always
+    /// Multi-level, deterministic sort. Missing keys (undated, no quality, no read-state) always
     /// sort LAST regardless of direction; a final filename/path tiebreak makes the order stable.
     static func sorted(_ files: [ArchiveFile], by descriptors: [ARSortDescriptor]) -> [ArchiveFile] {
         guard !descriptors.isEmpty else { return files }
@@ -166,8 +146,8 @@ enum LibrarySort {
         switch d.field {
         case .date:
             return nilLast(a.sortDate, b.sortDate) { dir(cmp($0, $1), d.ascending) }
-        case .priority:
-            return nilLast(a.priority, b.priority) { dir(cmp($0, $1), d.ascending) }
+        case .quality:
+            return nilLast(a.quality, b.quality) { dir(cmp($0, $1), d.ascending) }
         case .name:
             return dir(a.name.localizedStandardCompare(b.name), d.ascending)
         case .fileType:
@@ -211,4 +191,3 @@ enum LibrarySort {
         return r == .orderedAscending ? .orderedDescending : .orderedAscending
     }
 }
-

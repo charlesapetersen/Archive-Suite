@@ -241,7 +241,7 @@ struct NavigationWindowView: View {
         return "\(done) tagged of \(seen) scanned in \(model.library.scopeDescription)"
     }
 
-    /// Subject tags plus date/priority tokens, comma-joined for the "File tags" column.
+    /// Subject tags plus date/quality tokens, comma-joined for the "File tags" column.
     // MARK: Tag cloud (right margin)
 
     private var tagCloudPanel: some View {
@@ -329,16 +329,16 @@ struct NavigationWindowView: View {
             .accessibilityIdentifier("ar.filter.readState")
 
             HStack(spacing: 4) {
-                ForEach([10, 9, 8, 7], id: \.self) { p in
-                    Toggle("P\(p)", isOn: Binding(
-                        get: { model.filter.priorities.contains(p) },
+                ForEach([3, 2, 1], id: \.self) { q in
+                    Toggle("Q\(q)", isOn: Binding(
+                        get: { model.filter.qualities.contains(q) },
                         set: { on in
-                            if on { model.filter.priorities.insert(p) } else { model.filter.priorities.remove(p) }
+                            if on { model.filter.qualities.insert(q) } else { model.filter.qualities.remove(q) }
                         }))
                     .toggleStyle(.button)
                     .controlSize(.small)
-                    .help("Show only documents at priority P\(p)")
-                    .accessibilityIdentifier("ar.filter.priority.P\(p)")
+                    .help("Show only documents at quality Q\(q)")
+                    .accessibilityIdentifier("ar.filter.quality.Q\(q)")
                 }
             }
 
@@ -630,7 +630,7 @@ private struct DataQualityView: View {
             Text("Library health").font(.headline)
             row("Total files", q.total)
             row("No date", q.noDate)
-            row("No priority", q.noPriority)
+            row("No quality", q.noQuality)
             row("Date Uncertain", q.dateUncertain)
             row("Box/folder markers", q.markers)
             row("Both Read + Unread (corrupt)", q.bothReadUnread, warn: q.bothReadUnread > 0)

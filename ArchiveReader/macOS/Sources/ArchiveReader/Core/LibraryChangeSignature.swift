@@ -30,7 +30,7 @@ enum LibraryChangeSignature {
         files.reduce(0) { $0 ^ $1.url.path.hashValue }
     }
 
-    /// Signature of every facet that affects smart-folder matching (path + read-state + priority +
+    /// Signature of every facet that affects smart-folder matching (path + read-state + quality +
     /// subjects), as a per-file composite hash. Folding the unique `url.path` into each file's hash
     /// means distinct files never structurally cancel, so parity is a non-issue here.
     static func matchFacets(_ files: [ArchiveFile]) -> Int {
@@ -38,7 +38,7 @@ enum LibraryChangeSignature {
             var h = Hasher()
             h.combine(f.url.path)
             h.combine(f.readState)
-            h.combine(f.priority)
+            h.combine(f.quality)
             for s in f.subjects { h.combine(s) }
             return acc ^ h.finalize()
         }

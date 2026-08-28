@@ -263,7 +263,7 @@ final class NavigationModel: ObservableObject {
     }
 
     /// A human-readable default name for "save current filters as a smart folder", built from the
-    /// active filter facets (e.g. "Unread · P8 · Jerry Brown · Batch-A").
+    /// active filter facets (e.g. "Unread · Q1 · Jerry Brown · Batch-A").
     var suggestedSmartFolderName: String {
         let f = effectiveFilter
         var parts: [String] = []
@@ -273,8 +273,8 @@ final class NavigationModel: ObservableObject {
         case .unread: parts.append("Unread")
         case .noReadState: parts.append("No read-state")
         }
-        if !f.priorities.isEmpty {
-            parts.append(f.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
+        if !f.qualities.isEmpty {
+            parts.append(f.qualities.sorted(by: >).map { "Q\($0)" }.joined(separator: "/"))
         }
         if !f.subjects.isEmpty {
             parts.append(f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
@@ -298,8 +298,8 @@ final class NavigationModel: ObservableObject {
         case .unread: parts.append("Unread")
         case .noReadState: parts.append("No read-state")
         }
-        if !f.priorities.isEmpty {
-            parts.append(f.priorities.sorted(by: >).map { "P\($0)" }.joined(separator: "/"))
+        if !f.qualities.isEmpty {
+            parts.append(f.qualities.sorted(by: >).map { "Q\($0)" }.joined(separator: "/"))
         }
         if !f.subjects.isEmpty {
             parts.append("tags: " + f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
@@ -660,7 +660,7 @@ final class NavigationModel: ObservableObject {
     /// Tag cloud over the *currently displayed* rows: each **subject** tag with the number of visible
     /// files carrying it, alphabetical (the view scales font size by count via log). Counts each tag
     /// once per file. Built from `subjects` (not `topicalTags`) so clicking a chip is always a valid
-    /// subject filter — priority (P7–P10) and marker-color have their own dedicated controls.
+    /// subject filter — quality (Q1–Q3) and marker-color have their own dedicated controls.
     /// Date-facet-like tokens (year/month/day/decade) are excluded even if they were demoted to
     /// `subjects` during a facet collision — they clutter the cloud and have their own column.
     private var _tagCloudCache: [(tag: String, count: Int)]?
@@ -681,7 +681,7 @@ final class NavigationModel: ObservableObject {
     // MARK: Folder tree (sidebar)
 
     // Cheap change-signatures (see `LibraryChangeSignature`) so a tag edit — which never moves files and,
-    // for read-state/priority, never touches subjects — doesn't rebuild path-/subject-invariant derived
+    // for read-state/quality, never touches subjects — doesn't rebuild path-/subject-invariant derived
     // state on every library emission (or re-run it on a repeat emission from a re-walk). A false
     // "unchanged" only ever
     // yields a briefly-stale derived cache, self-healing on the next real change; never a data risk.
@@ -1235,13 +1235,13 @@ final class NavigationModel: ObservableObject {
 
     /// Library data-quality snapshot (for the health popover).
     struct DataQuality: Sendable {
-        var total = 0, noDate = 0, noPriority = 0, dateUncertain = 0, bothReadUnread = 0, markers = 0
+        var total = 0, noDate = 0, noQuality = 0, dateUncertain = 0, bothReadUnread = 0, markers = 0
     }
     var dataQuality: DataQuality {
         var q = DataQuality(); q.total = library.files.count
         for f in library.files {
             if f.tags.year == nil { q.noDate += 1 }
-            if f.tags.priority == nil { q.noPriority += 1 }
+            if f.tags.quality == nil { q.noQuality += 1 }
             if f.tags.dateUncertain { q.dateUncertain += 1 }
             if f.color != nil { q.markers += 1 }
             let hasRead = f.tags.raw.contains { $0.caseInsensitiveCompare("Read") == .orderedSame }

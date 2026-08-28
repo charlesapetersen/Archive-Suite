@@ -47,7 +47,7 @@ struct ArchiveFile: Identifiable, Sendable {
     var sortDate: Int? { tags.sortDate }
     var dateIsSpeculative: Bool { tags.dateIsSpeculative }
     var readState: ReadState? { tags.readState }
-    var priority: Int? { tags.priority }
+    var quality: Int? { tags.quality }
     var subjects: [String] { tags.subjects }
     var color: ArchiveColor? { tags.color }
 }

@@ -112,7 +112,7 @@ struct ArchiveReaderCommands: Commands {
         CommandMenu("Sort & Filter") {
             Button("Sort by Document Date") { nav?.sort = sortBy(.date) }.disabled(nav == nil)
             Button("Sort by File Name") { nav?.sort = sortBy(.name) }.disabled(nav == nil)
-            Button("Sort by Priority") { nav?.sort = sortBy(.priority) }.disabled(nav == nil)
+            Button("Sort by Quality") { nav?.sort = sortBy(.quality) }.disabled(nav == nil)
             Button("Sort by Read State") { nav?.sort = sortBy(.readState) }.disabled(nav == nil)
             Divider()
             Button("Clear Filters & Search") { nav?.clearUserFilters() }

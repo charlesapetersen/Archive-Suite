@@ -5,7 +5,7 @@ import ArchiveCore
 //  TagWriter — Reader's DELTA ADAPTER over ArchiveCore.CoordinatedTagWriter.
 //
 //  This is the Reader's write surface. Every Reader tag mutation — Read/Unread triage,
-//  subject/date/priority edits, group edits — goes through here. It translates Reader-specific
+//  subject/date/quality edits, group edits — goes through here. It translates Reader-specific
 //  delta/color semantics into a transform closure and hands it to the shared primitive.
 //  See CLAUDE.md → Safety Protocol.
 // ============================================================================================
