@@ -11,12 +11,14 @@ this file is authoritative for Notes‑specific work.
   `~/Library/Application Support/ArchiveNotes/`). The archive corpus is **read‑only** — durable‑link
   resolution and page rendering only; no tag writes, no moves, no deletes on corpus files.
 - The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors title-cased front‑matter
-  `tags` (subjects) **and the canonical Quality facet `Q1`–`Q3`** onto the note's own `.md` file via
-  `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. Front-matter remains authoritative:
-  `quality` 0/unrated writes no Q tag, and invalid values never invent one. `authors` and `date` stay
-  **front‑matter‑only** (authoritative, durable plain‑text YAML); an author facet remains a deferred
-  owner decision. This keeps the global Finder vocabulary limited to the shared subject and Quality
-  contract (overview decisions **D2/D4/D9**).
+  `tags` (subjects), the canonical Quality facet `Q1`–`Q3`, **and date into the existing
+  Year/Month/Day/Decade facets** onto the note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` —
+  never onto corpus PDFs. Front-matter remains authoritative: `quality` 0/unrated writes no Q tag,
+  invalid dates/quality values invent no tag, and a date update removes only facets recorded in the
+  item-local ledger as actually introduced by Notes. `authors` stay **front‑matter‑only** (authoritative,
+  durable plain-text YAML); an author facet
+  remains a deferred owner decision. This adds no Finder vocabulary beyond the shared subject, Quality,
+  and date contract (overview decisions **D2/D4/D9**).
 - Test/scratch output goes to `mktemp` / `TESTOUT` — **never** the real store or corpus during dev/test.
 - **Full protocol:** [`GUI_SAFETY.md`](GUI_SAFETY.md) — the scratch-corpus rules (never drive the store
   picker; confirm scratch before any tag write) + the DEBUG scratch-write guard that mechanically aborts
@@ -89,7 +91,8 @@ macOS/Sources/ArchiveNotes/
                                    (nearest-ancestor walk + dangling detection, §16.4) (W6-S6)
     FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
     BlockParser.swift              Block/SourceAnchor + HTML-comment header parser
-    NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets;
+    NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets, and
+                                   hidden per-item date-facet ownership ledgers (never authority);
                                    container-generic workers also back template storage under
                                    Templates/<uuid>/ (create/load/save/delete/allTemplates) (W6-S6);
                                    writeReservedAsset (pre-named, no re-disambiguation, never-overwrite,
@@ -165,8 +168,9 @@ macOS/Sources/ArchiveNotes/
                                    dangling-cleanup)/templates(matching:), create/duplicate/rename/delete
                                    template, newItem(kind:in:from:) instantiation (W6-S6); mutateItem
                                    write path (load→atomic .md save→one-row re-index→publish) behind
-                                   setDate/setDateUncertain/setQuality (W6-S7; Quality mirrors Q1–Q3 on
-                                   the note's own `.md`, date remains front-matter only) and
+                                   setDate/setDateUncertain/setQuality (W6-S7; Quality mirrors Q1–Q3 and
+                                   date mirrors existing Year/Month/Day/Decade facets on the note's own
+                                   `.md`) and
                                    loadBody/setBody (W7-S1a, body markdown⇄(trailingBodyRaw,blocks));
                                    openItem(id:block:)/pendingOpen/consumeOpen — the shared cross-window
                                    jump-to-source channel + resolvePassage (W7-S3); bootstrap now runs
@@ -202,8 +206,9 @@ macOS/Sources/ArchiveNotes/
                                    windowKindFilter(for:)/setWindowKindFilter per-window kind featuring (W7-S4);
                                    windowHiddenColumns(for:)/setWindowHiddenColumns per-window column visibility —
                                    Note window defaults to hiding the always-blank Sources column (W14.4d)
-    NotesTagVocabulary.swift       Managed-token vocabulary (title-cased subjects + canonical Q1–Q3;
-                                   Q0/unrated has no Finder token)
+    NotesTagVocabulary.swift       Managed-token vocabulary (title-cased subjects + canonical Q1–Q3 +
+                                   existing Year/Month/Day/Decade date facets; Q0/unrated has no Finder
+                                   token)
     NotesTagProjector.swift        THE audited Finder-tag mirror — projects front-matter onto .md files;
                                    isScratchPath + a DEBUG scratch-write guard (test/GUI-drive contexts
                                    only, off in the real app, out of Release) mechanically refuse a tag
@@ -427,6 +432,11 @@ macOS/Tests/ArchiveNotesTests/
                                    + clear, unrelated-tag/label preservation, Q-looking-subject ordering,
                                    and actor-revision Q1→Q3 / Q3→body race reconciliation for Finder tags,
                                    index, and live list
+  DateTagProjectionTests.swift     Six scratch-store date cases: decade/year/month/day transitions + clear;
+                                   date-looking subjects/external matching tags + parser precedence; date +
+                                   Quality coexist; stale body/date race; template creation; malformed and
+                                   unsupported-width dates invent no facet (W19.date); ExtractCommandTests
+                                   separately pins default-date projection when an extract is created
   NotesIndexTests.swift            16 tests: bm25 ordering, sanitizer, mtime-skip, prune, WAL,
                                    search, summaryRoundTrip, org tables exist; + W8-S3: reindex-
                                    replaces-body, prune-gate ×4 (empty-snapshot-never-wipes /

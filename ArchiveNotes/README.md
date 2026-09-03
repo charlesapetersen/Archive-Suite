@@ -16,9 +16,11 @@ words**.
 - Archive Notes writes **only its own store** (UUID-folder Markdown + assets under
   `~/Library/Application Support/ArchiveNotes/`). The archive **corpus is read-only** — durable-link
   resolution and page rendering only; never a tag write, move, rename, or delete on a corpus file.
-- The **only** Finder-tag writer is `NotesTagProjector`, which mirrors a note's front-matter subjects
-  and canonical Quality (`Q1`–`Q3`; 0/unrated has no Q tag) onto that note's **own** `.md` file via
-  `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs.
+- The **only** Finder-tag writer is `NotesTagProjector`, which mirrors a note's front-matter subjects,
+  canonical Quality (`Q1`–`Q3`; 0/unrated has no Q tag), and date into the existing
+  Year/Month/Day/Decade facets on that note's **own** `.md` file via
+  `ArchiveCore.CoordinatedTagWriter` — never onto corpus PDFs. Front matter remains authoritative, and
+  Notes records only facets it actually introduces so a matching third-party Finder tag stays untouched.
 - Never test against the real store or corpus — scratch/`mktemp`/`TESTOUT` output only. Full protocol:
   [GUI_SAFETY.md](GUI_SAFETY.md).
 

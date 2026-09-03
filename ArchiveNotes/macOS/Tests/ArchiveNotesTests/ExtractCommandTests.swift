@@ -65,6 +65,16 @@ struct ExtractCommandTests {
         #expect(onDisk.blocks.first?.source?.notePassageTarget?.block == 3)
     }
 
+    @Test("createExtract projects its default day date into existing Finder facets")
+    func createExtractProjectsDefaultDateFacets() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try #require(await env.model.createExtract(from: source("Dated extract", length: 5)))
+        let item = try await env.store.load(id)
+        let url = try await env.store.mdURL(for: id)
+        let finderTags = try url.resourceValues(forKeys: [.tagNamesKey]).tagNames ?? []
+        #expect(Set(finderTags) == Set(NotesTagVocabulary.dateFacetTokens(for: item)))
+    }
+
     @Test("createExtract into an explicit folder files it there, not in Extracts home")
     func createIntoExplicitFolder() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

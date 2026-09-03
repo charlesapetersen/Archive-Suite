@@ -29,6 +29,14 @@ import ArchiveCore
 // ============================================================================================
 
 enum NotesTagProjector {
+    /// The observed delta from one audited tag reconciliation. `newlyAdded` lets the caller retain
+    /// ownership only of date facets that this projection actually introduced; an already-present,
+    /// matching Finder tag remains third-party data and is never adopted merely because YAML agrees.
+    struct ProjectionResult: Sendable {
+        let managedTokens: Set<String>
+        let newlyAdded: Set<String>
+    }
+
     /// The former membership token is a one-way cleanup exception to the usual "remove only what
     /// this caller previously managed" rule. The owner chose the clean end state: remove every
     /// legacy exact-match stamp on the next projection, while a current front-matter subject of the
@@ -51,6 +59,8 @@ enum NotesTagProjector {
     ///     own that are now gone). Empty on first projection (add-only, safe).
     ///   - url: The note's .md file URL.
     ///   - itemDir: The item's directory URL (for the component-boundary guard).
+    ///   - orderedFacetTokens: Managed date/Quality tokens to append after subjects, in facet-precedence
+    ///     order. This keeps authoritative facets from losing to a facet-looking subject token.
     ///   - expectedIdentity: Optional identity captured immediately after the front-matter write. When
     ///     supplied, the audited writer rejects a delayed projection against a newer replacement at
     ///     the same path.
@@ -65,9 +75,28 @@ enum NotesTagProjector {
         previouslyManaged: Set<String>,
         to url: URL,
         itemDir: URL,
-        qualityToken: String? = nil,
+        orderedFacetTokens: [String] = [],
         expectedIdentity: FileIdentity? = nil
     ) throws -> Set<String> {
+        try projectWithDelta(
+            desired,
+            previouslyManaged: previouslyManaged,
+            to: url,
+            itemDir: itemDir,
+            orderedFacetTokens: orderedFacetTokens,
+            expectedIdentity: expectedIdentity
+        ).managedTokens
+    }
+
+    /// `project` plus the actual add delta for callers that persist exact token ownership.
+    static func projectWithDelta(
+        _ desired: Set<String>,
+        previouslyManaged: Set<String>,
+        to url: URL,
+        itemDir: URL,
+        orderedFacetTokens: [String] = [],
+        expectedIdentity: FileIdentity? = nil
+    ) throws -> ProjectionResult {
         // Component-boundary guard: the URL must be under the item's directory.
         // resolvingSymlinksInPath() resolves symlinks (not just lexical `..`), preventing a
         // symlink inside itemDir from escaping to an arbitrary target.
@@ -103,26 +132,23 @@ enum NotesTagProjector {
                 !toRemove.contains(token)
             }
 
-            // A user may legitimately choose a Q-looking subject such as `Q1`. ArchiveCore parses
-            // the *last* Q token as the Quality facet, so preserve every such subject but force the
-            // actual front-matter Quality token to the end of the raw tag array. Without this, set
-            // iteration (or a pre-existing order) could make a Q-looking subject override the
-            // authoritative Quality in Reader. Re-appending this one token is metadata-only and
-            // leaves the subject's spelling intact.
-            if let qualityToken {
-                precondition(desired.contains(qualityToken),
-                             "the explicit Quality token must also be a desired managed token")
-                newTags.removeAll { $0 == qualityToken }
-            }
+            // A user may legitimately choose a date- or Q-looking subject. ArchiveCore uses the
+            // last token for each facet, so preserve those subjects but append the authoritative
+            // front-matter date and Quality tokens after them. Without this, set iteration (or a
+            // pre-existing order) could make a subject override the date/Quality in Reader.
+            let facetSet = Set(orderedFacetTokens)
+            precondition(orderedFacetTokens.count == facetSet.count && facetSet.isSubset(of: desired),
+                         "ordered facet tokens must be unique desired managed tokens")
+            newTags.removeAll { facetSet.contains($0) }
 
-            // Add desired subjects in stable order (dedup — §6). Keep the explicit Quality token
-            // out of this loop: it is appended last below for ArchiveCore's last-token-wins parser.
-            for token in desired.subtracting(qualityToken.map { [$0] } ?? []).sorted()
+            // Add desired subjects in stable order (dedup — §6). Keep explicit facet tokens out
+            // of this loop: they are appended in their precedence order below.
+            for token in desired.subtracting(facetSet).sorted()
                 where !newTags.contains(token) {
                 newTags.append(token)
             }
-            if let qualityToken, !newTags.contains(qualityToken) {
-                newTags.append(qualityToken)
+            for token in orderedFacetTokens where !newTags.contains(token) {
+                newTags.append(token)
             }
 
             // No-op: if tags unchanged, skip the write.
@@ -143,16 +169,21 @@ enum NotesTagProjector {
 
         // Return the managed tokens that are actually on the file now.
         let afterSet = Set(result.after)
-        return desired.filter { afterSet.contains($0) }
+        return ProjectionResult(
+            managedTokens: desired.filter { afterSet.contains($0) },
+            newlyAdded: afterSet.subtracting(Set(result.before)))
     }
 
-    /// Recover `previouslyManaged` when the index DB is wiped (no persisted state).
-    /// Intersects the file's current tags with the recomputed candidate managed set.
-    /// Conservative: a token we never wrote is never in the result, so no accidental removal.
+    /// Recover legacy subject/Quality ownership when the index DB is wiped (no persisted state).
+    /// Date facets deliberately do **not** participate: their exact ownership is the item's sidecar
+    /// ledger, and treating an equal Finder token as recoverable would adopt a third-party date tag.
     static func recoverPreviouslyManaged(for item: Item, from url: URL) -> Set<String> {
         let readResult = TagReading.read(url)
         guard let currentTags = readResult.tagNames else { return [] }
-        let candidates = NotesTagVocabulary.managedTokens(for: item)
+        var candidates = Set(item.tags.map { NotesTagVocabulary.titleCased($0) })
+        if let quality = NotesTagVocabulary.qualityToken(for: item.quality) {
+            candidates.insert(quality)
+        }
         return candidates.intersection(currentTags)
     }
 

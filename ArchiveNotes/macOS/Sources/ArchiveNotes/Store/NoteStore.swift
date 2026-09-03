@@ -23,9 +23,12 @@ struct ItemRef: Sendable {
 }
 
 /// The outcome of one atomic item transaction (`NoteStore.withItem`/`withTemplate`): the item
-/// exactly as it was written, plus its on-disk ref. Callers index/publish `item` rather than
-/// re-reading the store, so what they show is what landed.
+/// exactly as it was written, the exact date facets that Notes has previously added to this item's
+/// Finder metadata, and its on-disk ref. Callers index/publish `item` rather than re-reading the
+/// store, so what they show is what landed; the projector never mistakes a matching third-party
+/// Finder tag for a Notes-owned facet.
 struct ItemTransaction: Sendable {
+    let ownedDateFacetTokens: Set<String>
     let item: Item
     let ref: ItemRef
 }
@@ -46,6 +49,14 @@ actor NoteStore {
     /// This actor-local token is necessary because `replaceItemAt` may preserve a filesystem object's
     /// resource identifier while replacing its YAML bytes.
     private var revisions: [UUID: UInt64] = [:]
+
+    /// Per-item, sidecar-persisted provenance for date facets the Notes projector actually introduced.
+    /// YAML is still authoritative; this is only the conservative removal ledger. A missing/corrupt
+    /// ledger is treated as empty, which can leave a stale facet but can never remove a third-party tag.
+    private struct FacetProjectionState: Codable {
+        let dateTokens: [String]
+    }
+    private static let facetProjectionStateName = ".archivenotes-finder-facets.json"
 
     enum StoreError: Error, Sendable {
         case rootUnavailable
@@ -159,9 +170,10 @@ actor NoteStore {
     private func withEntry(_ id: UUID, in dir: URL,
                            _ mutate: (inout Item) throws -> Void) throws -> ItemTransaction {
         var item = try loadEntry(id, in: dir)
+        let ownedDateFacetTokens = persistedOwnedDateFacetTokens(in: dir)
         try mutate(&item)
         let ref = recordRevision(try saveEntry(item, in: dir))
-        return ItemTransaction(item: item, ref: ref)
+        return ItemTransaction(ownedDateFacetTokens: ownedDateFacetTokens, item: item, ref: ref)
     }
 
     func allItemIDs() -> [UUID] {
@@ -183,6 +195,7 @@ actor NoteStore {
         let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)?
             .timeIntervalSinceReferenceDate ?? Date().timeIntervalSinceReferenceDate
         return ItemTransaction(
+            ownedDateFacetTokens: persistedOwnedDateFacetTokens(in: itemDir(id)),
             item: item,
             ref: ItemRef(id: id, url: url, mtime: mtime,
                          revision: revisions[id] ?? 0, identity: FileIdentity.capture(url)))
@@ -200,6 +213,26 @@ actor NoteStore {
         guard (revisions[ref.id] ?? 0) == ref.revision else { return false }
         try operation(ref)
         return true
+    }
+
+    /// The typed counterpart for a Finder facet projection. Returning `nil` is a stale-revision
+    /// refusal; a non-nil result is the exact date-facet ledger to persist for that admitted write.
+    func performFacetProjectionIfCurrent(
+        _ ref: ItemRef,
+        _ operation: @Sendable (ItemRef) throws -> Set<String>
+    ) throws -> Set<String>? {
+        guard (revisions[ref.id] ?? 0) == ref.revision else { return nil }
+        return try operation(ref)
+    }
+
+    /// Persist exactly the date facets that this successful projection itself added. A stale ref may
+    /// never overwrite newer provenance. The ledger lives beside the `.md` inside Notes' own item dir;
+    /// it never reaches a corpus file and is deliberately not front-matter authority.
+    func completeFacetProjection(_ ref: ItemRef, ownedDateFacetTokens: Set<String>) throws {
+        guard (revisions[ref.id] ?? 0) == ref.revision else { return }
+        let state = FacetProjectionState(dateTokens: ownedDateFacetTokens.sorted())
+        let data = try JSONEncoder().encode(state)
+        try data.write(to: facetProjectionStateURL(in: ref.url.deletingLastPathComponent()), options: [.atomic])
     }
 
     /// Every on-disk item as an `ItemRef` (id + `.md` URL + mtime) for a full index (re)build. Items
@@ -256,6 +289,19 @@ actor NoteStore {
         revisions[ref.id] = revision
         return ItemRef(id: ref.id, url: ref.url, mtime: ref.mtime,
                        revision: revision, identity: ref.identity)
+    }
+
+    private func facetProjectionStateURL(in dir: URL) -> URL {
+        dir.appendingPathComponent(Self.facetProjectionStateName)
+    }
+
+    /// Read only valid, exact date facets from the ledger. Any absent, unreadable, or malformed state
+    /// means no date tag is removable — lossless degradation beats guessing ownership.
+    private func persistedOwnedDateFacetTokens(in dir: URL) -> Set<String> {
+        let url = facetProjectionStateURL(in: dir)
+        guard let data = try? Data(contentsOf: url),
+              let state = try? JSONDecoder().decode(FacetProjectionState.self, from: data) else { return [] }
+        return Set(state.dateTokens.filter(DocumentTags.isDateFacetLike))
     }
 
     private func createEntry(_ item: Item, in dir: URL) throws -> ItemRef {

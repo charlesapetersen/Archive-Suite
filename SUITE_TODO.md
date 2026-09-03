@@ -867,11 +867,6 @@ Notes (front-matter), Reader (edit), Processor's interactive tagging, and the ph
 Shared-contract (Tier-2) — SPEC first, then the shared parser, then each app + companions; every code item must
 **build + test all three apps**, scratch-only. **This wave REPLACES existing priority UI/plumbing — merge, don't
 add a second control alongside.**
-- [ ] **W19.date — Notes: project front-matter date → existing Year/Month/Day/Decade tags [M].** `NotesTagProjector`
-  additionally projects the item's `date`+`datePrecision` into the existing date facets (reuse
-  `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
-  Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
-  W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 From the 2026-07-28 Daemon Report walkthrough. The headless VM lane is now shared by Reader and Notes:

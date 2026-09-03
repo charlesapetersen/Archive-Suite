@@ -5775,6 +5775,18 @@ explain why not.
   Process Files tag-warning; and tag-vocabulary tests all pass. On-device/emulator E2E remains the stated
   owner tail. | Tier-2 Capture/Net/tag path | M
 
+- [x] **W19.date — Notes: project front-matter date → existing Year/Month/Day/Decade tags [M].** ✅
+  **SHIPPED 2026-09-03** — this commit, `feat(notes): project dates into Finder facets`. Date front matter
+  remains authoritative while its exact normalized precision projects only the existing shared facets:
+  `1960s`, `1968`, `03 March`, and `Day 5`; malformed or unsupported-width input emits none. A hidden
+  per-item ledger records only date facets the projector actually introduced, so a matching external tag
+  is never adopted or removed; it also carries ownership across a date-save/body-save race. Date facets
+  append after subjects so ArchiveCore's last-token parser yields the front-matter date; Quality retains
+  the final position when both are present. Template-derived and extracted dates project on creation. No
+  SPEC or Finder-vocabulary change. Tier-2 scratch-only verification: Notes Debug build; full 1,072-test
+  unit suite (seven new date-projection integration cases across date and extract creation); and adversarial
+  review whose three P1 findings were fixed and regression-pinned. | Tier-2 tag path | M
+
 - [x] **W19.q3 — Reader: Quality replaces the Priority column/filter/editor [M].** ✅ **SHIPPED 2026-08-28**
   — this commit, `feat(reader): replace Priority with Quality` (a self-referential SHA cannot be written
   into its own commit). The Reader now presents exactly one Quality

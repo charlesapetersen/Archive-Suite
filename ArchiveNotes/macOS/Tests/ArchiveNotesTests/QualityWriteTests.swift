@@ -176,11 +176,12 @@ struct QualityWriteTests {
         // preserves the file-resource identifier, so it does not rely on a fragile inode change.
         let currentProjection = try await env.store.performIfCurrent(second.ref) { ref in
             _ = try NotesTagProjector.project(
-                NotesTagVocabulary.qualityProjectionTokens(for: second.item),
+                NotesTagVocabulary.facetProjectionTokens(for: second.item),
                 previouslyManaged: NotesTagVocabulary.qualityTokens,
                 to: url,
                 itemDir: itemDir,
-                qualityToken: NotesTagVocabulary.qualityToken(for: second.item.quality),
+                orderedFacetTokens: NotesTagVocabulary.dateFacetTokens(for: second.item)
+                    + (NotesTagVocabulary.qualityToken(for: second.item.quality).map { [$0] } ?? []),
                 expectedIdentity: ref.identity)
         }
         #expect(currentProjection)
@@ -188,11 +189,12 @@ struct QualityWriteTests {
 
         let staleProjection = try await env.store.performIfCurrent(first.ref) { ref in
             _ = try NotesTagProjector.project(
-                NotesTagVocabulary.qualityProjectionTokens(for: first.item),
+                NotesTagVocabulary.facetProjectionTokens(for: first.item),
                 previouslyManaged: NotesTagVocabulary.qualityTokens,
                 to: url,
                 itemDir: itemDir,
-                qualityToken: NotesTagVocabulary.qualityToken(for: first.item.quality),
+                orderedFacetTokens: NotesTagVocabulary.dateFacetTokens(for: first.item)
+                    + (NotesTagVocabulary.qualityToken(for: first.item.quality).map { [$0] } ?? []),
                 expectedIdentity: ref.identity)
         }
         #expect(!staleProjection, "the old revision must not enter the metadata write closure")

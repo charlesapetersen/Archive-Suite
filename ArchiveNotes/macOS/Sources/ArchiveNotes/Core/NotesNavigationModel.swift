@@ -173,8 +173,9 @@ final class NotesNavigationModel: ObservableObject {
         await model.setDateUncertain(uncertain, for: id)
     }
 
-    /// Set 0...3 Quality for `id`. The model persists front-matter and mirrors valid Q1...Q3 only onto
-    /// this note's own `.md` file; date and authors remain front-matter only.
+    /// Set 0...3 Quality for `id`. The model persists front matter and mirrors valid Q1...Q3 plus the
+    /// date's existing Year/Month/Day/Decade facets onto this note's own `.md`; authors stay front
+    /// matter only.
     func setQuality(_ quality: Int?, for id: UUID) async {
         await model.setQuality(quality, for: id)
     }
