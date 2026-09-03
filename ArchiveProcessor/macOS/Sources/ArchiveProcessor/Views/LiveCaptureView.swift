@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCore
 import AppKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
@@ -859,7 +860,7 @@ private struct LiveProcessingBox: View {
 }
 
 /// Auto-advancing tag card for one completed document segment during Live Capture. Subjects are the
-/// piece the phone doesn't capture; year/month/priority default to the phone's values and are editable.
+/// piece the phone doesn't capture; year/month/Quality default to the phone's values and are editable.
 /// Built for keyboard speed: type subjects, ↑/↓ to pick a suggestion, ⇥ to autocomplete, ⏎ to add
 /// (⏎ on an empty field saves), ⌫ on an empty field deletes the previous tag, esc clears a draft.
 private struct SegmentTagCard: View {
@@ -876,7 +877,7 @@ private struct SegmentTagCard: View {
     @State private var highlighted: Int = -1     // -1 = typed text is the candidate; ≥0 = a suggestion
     @State private var yearText: String = ""
     @State private var month: Int? = nil
-    @State private var priority: String? = nil
+    @State private var quality = 0
     /// W23.m7: Save/Skip only resolve the card once the decision is durably in the session manifest. When
     /// the write fails the session rolls its state back — the card stays up with everything typed still
     /// here — so the operator needs to be TOLD, not left tapping a button that appears to do nothing.
@@ -887,7 +888,7 @@ private struct SegmentTagCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Tag this segment").font(.title2).fontWeight(.semibold)
-            Text("\(group.photos.count) page\(group.photos.count == 1 ? "" : "s"). Subjects become archive tags; date & priority came from the phone.")
+            Text("\(group.photos.count) page\(group.photos.count == 1 ? "" : "s"). Subjects become archive tags; date & Quality came from the phone.")
                 .font(.caption).foregroundStyle(.secondary)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -917,13 +918,8 @@ private struct SegmentTagCard: View {
                         ForEach(1...12, id: \.self) { m in Text(monthNames[m - 1]).tag(Int?.some(m)) }
                     }.labelsHidden().frame(width: 90)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Priority").font(.caption).foregroundStyle(.secondary)
-                    Picker("", selection: $priority) {
-                        Text("—").tag(String?.none)
-                        ForEach(["P10", "P9", "P8", "P7"], id: \.self) { p in Text(p).tag(String?.some(p)) }
-                    }.labelsHidden().frame(width: 80)
-                }
+                QualityPicker(quality: $quality)
+                    .frame(width: 150)
                 Spacer()
             }
 
@@ -955,7 +951,7 @@ private struct SegmentTagCard: View {
             subjects = existing?.subjects ?? []
             yearText = (existing?.year ?? group.year).map(String.init) ?? ""
             month = existing?.month ?? group.month
-            priority = existing?.priority ?? group.priority
+            quality = existing?.quality ?? DocumentTags.parseQuality(group.priority ?? "") ?? 0
         }
     }
 
@@ -1082,7 +1078,7 @@ private struct SegmentTagCard: View {
     private func save() {
         persistFailure = nil
         let durable = session.applyMacTags(groupId: group.id, subjects: subjects,
-                                           priority: priority, year: Int(yearText), month: month)
+                                           quality: quality, year: Int(yearText), month: month)
         if !durable { persistFailure = CaptureSession.tagDecisionNotDurableMessage }
     }
 

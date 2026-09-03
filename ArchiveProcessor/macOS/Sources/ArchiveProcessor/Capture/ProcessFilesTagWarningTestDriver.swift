@@ -383,6 +383,37 @@ enum ProcessFilesTagWarningTestDriver {
               tagsOf(noTagPDF) == noTagBefore && labelOf(noTagPDF) == noTagLabelBefore
               && !tagsOf(noTagPDF).contains("P10"))
 
+        // W19.q6: both Process Files manual flows hand their human decision to the late Capture
+        // boundary. Without this, its imported P10 would overwrite a Q1 selection or re-add Q3
+        // after the operator explicitly chose Unrated.
+        let manualTagSource = colourDir.appendingPathComponent("IMG_7008.jpg")
+        let manualTagPDF = colourDir.appendingPathComponent("manual-tag-quality.pdf")
+        writeOnePagePDF(manualTagPDF)
+        _ = OCRProcessor.writeOutputTags(GeneratedTags(subjectTags: ["Manual"], quality: 1),
+                                         to: manualTagPDF, stampUnread: true)
+        let manualTagCapture = wiredProcessor(source: manualTagSource, output: manualTagPDF,
+                                              classification: .documentStart)
+        manualTagCapture.preGroupedPriorities = ["P10"]
+        manualTagCapture.recordManualQualityIntent(1, for: [manualTagSource])
+        manualTagCapture.applyCaptureQualityTags()
+        check("the Manual Tagging sheet's Q1 survives an imported phone P10",
+              tagsOf(manualTagPDF).contains("Q1")
+              && !tagsOf(manualTagPDF).contains(where: { $0 == "Q3" || $0.hasPrefix("P") }))
+
+        let manualSegSource = colourDir.appendingPathComponent("IMG_7009.jpg")
+        let manualSegPDF = colourDir.appendingPathComponent("manual-seg-unrated.pdf")
+        writeOnePagePDF(manualSegPDF)
+        _ = OCRProcessor.writeOutputTags(GeneratedTags(subjectTags: ["Manual"], quality: 0),
+                                         to: manualSegPDF, stampUnread: true)
+        let manualSegCapture = wiredProcessor(source: manualSegSource, output: manualSegPDF,
+                                              classification: .documentStart)
+        manualSegCapture.preGroupedPriorities = ["P10"]
+        manualSegCapture.recordManualQualityIntent(0, for: [manualSegSource])
+        manualSegCapture.applyCaptureQualityTags()
+        check("the Manual Segmentation sheet's Unrated choice clears an imported phone P10",
+              tagsOf(manualSegPDF).contains("Manual")
+              && !tagsOf(manualSegPDF).contains(where: DocumentTags.isRatingToken))
+
         // Fresh Processor re-tags do not contain a quality because OCR never emits one; retain the
         // existing user setting rather than silently dropping it as an unknown subject.
         let retagPDF = colourDir.appendingPathComponent("retag-quality.pdf")

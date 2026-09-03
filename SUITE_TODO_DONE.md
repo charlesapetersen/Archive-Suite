@@ -5751,6 +5751,18 @@ explain why not.
   later Settings choice; older retained-policy records are unsupported. No bulk corpus rewrite —
   P remains an accepted phone input until W19.q7 replaces the wire field. | Tier-2 tag path | S–M
 
+- [x] **W19.q6 — Processor: user-set Quality in the interactive tagging UIs [M].** ✅ **SHIPPED 2026-09-02**
+  — this commit, `feat(processor): add user-set Quality controls` (a self-referential SHA cannot be written
+  into its own commit). The Live Capture card and both Process Files manual flows now present one 0–3 Quality
+  selector in place of their retired Priority controls. A saved Mac card persists its choice into the Capture
+  manifest and carries Q1–Q3 (or an explicit Q0 clear) through generated tags, staged PDFs, image mirrors,
+  merge and finalize; OCR failure retains the human rating, and a later phone P10 still wins a skipped card's
+  merged artifact. Process Files records its manual selection before the late phone boundary, so imported P10
+  cannot overwrite Q1 or restore Q3 after Unrated. Tier-2 scratch proof: Processor Debug build;
+  `test-recovery.sh`, `test-manifest-persistence.sh`, and `test-processfiles-tagwarn.sh`; ArchiveCore tests;
+  Reader (401) and Notes (847) unit suites; write-surface lint; and adversarial review clean. GUI control
+  verification remains the requested owner tail. | Tier-2 shared-Core/tag path | M
+
 - [x] **W19.q3 — Reader: Quality replaces the Priority column/filter/editor [M].** ✅ **SHIPPED 2026-08-28**
   — this commit, `feat(reader): replace Priority with Quality` (a self-referential SHA cannot be written
   into its own commit). The Reader now presents exactly one Quality

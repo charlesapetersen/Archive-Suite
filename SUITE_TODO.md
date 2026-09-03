@@ -873,15 +873,6 @@ add a second control alongside.**
   `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
   Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
   W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q6 — Processor: USER-SET Quality in the interactive tagging UIs** (blocked-on: W19.q5) **[M].** The
-  user sets the 0–3 rating while capturing/processing. **Merge into the existing priority entry** (don't add a
-  second control): a 0–3 selector in **(a)** the **Live Capture per-segment tag card** (`Views/LiveCaptureView.swift`)
-  and **(b)** the **Process Files manual tagging** sheets (`Views/ManualTaggingSheet.swift`,
-  `Views/ManualSegmentTagView.swift`), carried via `SegmentTagData`/`ManualTagSegment` → a `quality` field on
-  `GeneratedTags` whose `allTags` emits `Q1`/`Q2`/`Q3` (0/unrated → **no token**) through the existing
-  `MacOSTagger` path. **Tier-2 no-undo Capture path** → adversarial review + Live Capture functional test
-  (recovery/manifest drivers), scratch-only; confirm quality survives finalize + the image-mirror. GUI verify →
-  owner tail. | ArchiveProcessor/.../Views/, Tagging/GeneratedTags.swift, Capture/ | M | med | none
 - [ ] **W19.q7 — Companions: phone priority control → Quality; emit `Q`** (blocked-on: W19.q6) **[M].** The old
   phone priority picker/per-page toggle becomes the 0–3 **quality** control on **both** companions
   (`ArchiveCapture/` Android + `ArchiveCaptureiOS/`), emitting `Q1`–`Q3` (map the 4-level `P7`–`P10` picker → 3

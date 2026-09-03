@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ArchiveCore
 
 /// Owns a live-capture session: the incoming folder, the pairing token, the received photos
 /// (grouped as the phone marked them), and the receiver server lifecycle. The `CaptureServer`
@@ -787,9 +788,10 @@ final class CaptureSession: ObservableObject {
     /// decision is durable, so the caller can surface the failure. Mirrors the roll-back pattern the
     /// sender-owned controls (`markSegmentComplete` / `completeAllOpenDocGroups`) already use.
     @discardableResult
-    func applyMacTags(groupId: String, subjects: [String], priority: String?, year: Int?, month: Int?) -> Bool {
+    func applyMacTags(groupId: String, subjects: [String], quality: Int, year: Int?, month: Int?) -> Bool {
         let previousTags = macTags[groupId]
-        macTags[groupId] = MacSegmentTags(subjects: subjects, priority: priority, year: year, month: month)
+        macTags[groupId] = MacSegmentTags(subjects: subjects, quality: (0...3).contains(quality) ? quality : 0,
+                                          year: year, month: month)
         let newlyResolved = resolvedGroupIds.insert(groupId).inserted
         // B9: persist resolve state + Mac tags so a mid-session restart doesn't re-ask.
         guard writeManifest() else {
@@ -832,8 +834,14 @@ final class CaptureSession: ObservableObject {
                 files.append(photo.url)
                 boundaries.append(i == 0)          // first photo of a group starts a segment
                 types.append(group.type)
-                // Per-page P10 (phone) wins; else the Mac operator's group priority; else phone value.
-                priorities.append(photo.priority == "P10" ? "P10" : (mac?.priority ?? photo.priority))
+                // A saved Mac card is an explicit rating decision, including 0/unrated. Encode its
+                // absence as the current wire's P7 clear until W19.q7 renames that phone field.
+                // Without a Mac decision, preserve the phone's current rating input unchanged.
+                if let mac {
+                    priorities.append(DocumentTags.qualityTag(for: mac.quality) ?? "P7")
+                } else {
+                    priorities.append(photo.priority)
+                }
                 years.append(mac?.year ?? group.year)     // Mac date override wins over the phone's
                 months.append(mac?.month ?? group.month)
                 subjects.append(mac?.subjects ?? [])       // Mac-entered subjects (empty if untagged)

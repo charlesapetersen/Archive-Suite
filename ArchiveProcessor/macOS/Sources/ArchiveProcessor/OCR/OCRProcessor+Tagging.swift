@@ -296,6 +296,26 @@ extension OCRProcessor {
         guard index >= 0, index < preGroupedMonths.count, let m = preGroupedMonths[index] else { return nil }
         return GeneratedTags.monthTag(m)
     }
+    /// Rating supplied by the current phone wire or a prior Live Capture Mac card. The field keeps its
+    /// historical `preGroupedPriorities` name until W19.q7 changes the companion protocol, but values
+    /// already may be canonical Q tokens when the Mac operator made an explicit selection.
+    private func phoneQuality(at index: Int) -> Int {
+        guard index >= 0, index < preGroupedPriorities.count,
+              let raw = preGroupedPriorities[index] else { return 0 }
+        return DocumentTags.parseQuality(raw) ?? 0
+    }
+    /// A manual Process Files decision supersedes the imported phone rating before the late Capture
+    /// boundary runs. Preserve it in the already-aligned handoff array as canonical Q or explicit P7
+    /// (for zero) so that final boundary cannot restore a phone P10 over a human Q1/Q0 choice.
+    func recordManualQualityIntent(_ quality: Int, for sourceURLs: [URL]) {
+        guard !preGroupedPriorities.isEmpty else { return }
+        let ratingIntent = DocumentTags.qualityTag(for: quality) ?? "P7"
+        for sourceURL in sourceURLs {
+            guard let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }),
+                  jobIndex < preGroupedPriorities.count else { continue }
+            preGroupedPriorities[jobIndex] = ratingIntent
+        }
+    }
     /// Live Capture: layer each page's phone-set Priority or canonical Quality rating onto
     /// whatever the tagging phase applied. `preGroupedPriorities` remains the current wire field until
     /// the phone protocol is renamed in W19.q7, but this writer emits only Q tokens. macOS tag application
@@ -519,12 +539,14 @@ extension OCRProcessor {
             let phoneFileIdx = seg.pdfURLs.first.flatMap { url in jobs.firstIndex(where: { $0.sourceURL == url }) }
             let phoneYear = phoneFileIdx.flatMap { phoneYearTag(at: $0) }
             let phoneMonth = phoneFileIdx.flatMap { phoneMonthTag(at: $0) }
+            let prefilledQuality = phoneFileIdx.map { phoneQuality(at: $0) } ?? 0
             manual.append(ManualTagSegment(
                 segmentIndex: i,
                 images: images,
                 year: phoneYear ?? "",
                 month: phoneMonth ?? "",
                 subjectTags: ["Unread"],
+                quality: prefilledQuality,
                 dateLoading: mode == .autoDate && phoneYear == nil && phoneMonth == nil
             ))
         }
@@ -565,6 +587,10 @@ extension OCRProcessor {
             tags.day = Self.normalizeDay(m.day)
             tags.dateUncertain = m.dateUncertain
             tags.subjectTags = m.subjectTags
+            tags.quality = m.quality
+            // The late Live-Capture boundary runs after this phase. Save the manual decision into
+            // its aligned handoff array so it cannot re-apply the incoming phone P value afterwards.
+            recordManualQualityIntent(m.quality, for: seg.pdfURLs)
 
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
@@ -811,13 +837,18 @@ extension OCRProcessor {
 
         for seg in segments where !seg.isBox && !seg.isFolder {
             guard let firstURL = seg.pdfURLs.first else { continue }
-            let data = tagsByFirstURL[firstURL] ?? SegmentTagData()
+            let manualData = tagsByFirstURL[firstURL]
+            let data = manualData ?? SegmentTagData()
             var gtags = GeneratedTags()
             gtags.year = data.year.isEmpty ? nil : data.year
             gtags.month = Self.normalizeMonth(data.month)
             gtags.day = Self.normalizeDay(data.day)
             gtags.dateUncertain = data.dateUncertain
             gtags.subjectTags = data.subjectTags
+            gtags.quality = data.quality
+            // Only an actually completed manual card supersedes the phone input. A defensively
+            // defaulted segment has no human quality decision and keeps the imported rating.
+            if manualData != nil { recordManualQualityIntent(data.quality, for: seg.pdfURLs) }
 
             for sourceURL in seg.pdfURLs {
                 if let outputPDF = outputURLMap[sourceURL] {
@@ -894,6 +925,7 @@ extension OCRProcessor {
         let firstFileIndex = manualSegImages[range.lowerBound].fileIndex
         if let y = phoneYearTag(at: firstFileIndex) { seed.year = y }
         if let mo = phoneMonthTag(at: firstFileIndex) { seed.month = mo }
+        seed.quality = phoneQuality(at: firstFileIndex)
         manualSegDraftTags = seed
         manualSegTaggingRange = range
     }

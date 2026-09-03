@@ -183,6 +183,11 @@ struct ManualTagSegmentView: View {
                     }
                     .padding(6)
                 }
+
+                GroupBox("Quality") {
+                    QualityPicker(quality: $segment.quality)
+                        .padding(6)
+                }
             }
             .padding()
         }
@@ -202,6 +207,21 @@ struct ManualTagSegmentView: View {
             TextField(prompt, text: text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: width)
+        }
+    }
+}
+
+/// The suite-wide human Quality control. `0` is intentionally shown as Unrated and emits no Finder
+/// token; values 1...3 become Q1...Q3 through `GeneratedTags.allTags`.
+struct QualityPicker: View {
+    @Binding var quality: Int
+
+    var body: some View {
+        Picker("Quality", selection: $quality) {
+            Text("0 — Unrated").tag(0)
+            ForEach(1...3, id: \.self) { value in
+                Text("\(value) — Q\(value)").tag(value)
+            }
         }
     }
 }

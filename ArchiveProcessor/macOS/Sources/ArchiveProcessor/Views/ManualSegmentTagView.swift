@@ -373,6 +373,8 @@ private struct ManualSegTagCard: View {
                 }
             }
 
+            QualityPicker(quality: $processor.manualSegDraftTags.quality)
+
             subjectsSection
 
             Text("↑↓ pick · ⇥ complete · ⏎ add (⏎ on empty saves) · ⌫ delete last · esc back")

@@ -24,9 +24,19 @@ struct GeneratedTagsTests {
         ])
     }
 
+    @Test func allTags_qualityUsesCanonicalTokenAndKeepsItAfterSubjects() {
+        let tags = GeneratedTags(subjectTags: ["Q1", "oral history"], quality: 3, colorTag: "Purple")
+        #expect(tags.allTags == ["Q1", "Oral History", "Q3", "Purple"])
+    }
+
+    @Test func allTags_unratedQualityEmitsNoToken() {
+        #expect(GeneratedTags(quality: 0).allTags.isEmpty)
+        #expect(GeneratedTags(quality: 4).allTags.isEmpty)
+    }
+
     @Test func allTags_ocrFailed() {
-        let tags = GeneratedTags(ocrFailed: true, colorTag: "Purple")
-        #expect(tags.allTags == ["OCR Failed", "Purple"])
+        let tags = GeneratedTags(ocrFailed: true, quality: 2, colorTag: "Purple")
+        #expect(tags.allTags == ["OCR Failed", "Q2", "Purple"])
     }
 
     @Test func allTags_ocrFailedNoColor() {
@@ -196,7 +206,7 @@ struct GeneratedTagsTests {
         let original = GeneratedTags(
             year: "1987", month: "03 March", day: "Day 15",
             dateUncertain: false, ocrFailed: false,
-            subjectTags: ["Democratic Party", "Elections"],
+            subjectTags: ["Democratic Party", "Elections"], quality: 2,
             colorTag: "Red", format: "letter",
             authorName: "John", recipientName: "Jane"
         )
@@ -204,6 +214,7 @@ struct GeneratedTagsTests {
         let decoded = try JSONDecoder().decode(GeneratedTags.self, from: data)
         #expect(decoded.allTags == original.allTags)
         #expect(decoded.machineDate == original.machineDate)
+        #expect(decoded.quality == 2)
         #expect(decoded.format == "letter")
         #expect(decoded.authorName == "John")
     }
@@ -216,6 +227,7 @@ struct GeneratedTagsTests {
         #expect(tags.month == nil)
         #expect(tags.day == nil)
         #expect(tags.dateUncertain == false)
+        #expect(tags.quality == 0)
         #expect(tags.ocrFailed == false)
         #expect(tags.subjectTags == [])
         #expect(tags.colorTag == nil)

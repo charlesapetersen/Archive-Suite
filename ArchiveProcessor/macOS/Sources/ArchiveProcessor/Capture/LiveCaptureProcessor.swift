@@ -951,10 +951,13 @@ final class LiveCaptureProcessor: ObservableObject {
         if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m) {
             tags.month = mt
         }
+        // A saved Mac tag card is the operator's explicit Quality decision, including 0/unrated.
+        // The phone's still-current P wire is only the default when the card was skipped.
+        if let mac { tags.quality = mac.quality }
 
         // Snapshot Sendable per-page work for the off-main file writes.
         let pages: [PageWork] = group.photos.enumerated().map { (i, p) in
-            let pr = (p.priority == "P10") ? "P10" : (mac?.priority ?? p.priority)
+            let pr = mac.map { DocumentTags.qualityTag(for: $0.quality) ?? "P7" } ?? p.priority
             return PageWork(sourceURL: p.url, result: results[i], priority: pr)
         }
         let gType = group.type, gOrder = group.order
@@ -1196,7 +1199,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 // No tagging means no Finder metadata write whatsoever, including the phone boundary.
                 break
             default:
-                let tagList = tagsByApplyingPhonePriority(baseTags, priority: page.priority)
+                let tagList = tagsByApplyingPhoneRating(baseTags, rating: page.priority)
                 if !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
                     untaggedOutputs.append(stagedPDF)
                 }
@@ -1211,7 +1214,7 @@ final class LiveCaptureProcessor: ObservableObject {
                     case .none:
                         break
                     default:
-                        let tagList = tagsByApplyingPhonePriority(baseTags, priority: page.priority)
+                        let tagList = tagsByApplyingPhoneRating(baseTags, rating: page.priority)
                         if !tagStagedArtifact(tagList, at: stagedImg, appColor: appColor, stampUnread: stampUnread) {
                             untaggedOutputs.append(stagedImg)
                         }
@@ -1248,7 +1251,13 @@ final class LiveCaptureProcessor: ObservableObject {
                 case .none:
                     break
                 default:
-                    let tagList = tagsByApplyingPhonePriority(baseTags, priority: pages.first?.priority)
+                    // A P10 is a page-level override, so a later page can outrank the group's
+                    // first-page default on the merged artifact. A saved Mac card has already
+                    // normalized every page to the same Q/P7, so this also preserves its decision.
+                    let mergedRating = pages.first(where: {
+                        DocumentTags.parseQuality($0.priority ?? "") == 3
+                    })?.priority ?? pages.first?.priority
+                    let tagList = tagsByApplyingPhoneRating(baseTags, rating: mergedRating)
                     if !tagStagedArtifact(tagList, at: mergedURL, appColor: appColor, stampUnread: stampUnread) {
                         untaggedOutputs.append(mergedURL)
                     }
@@ -1265,12 +1274,13 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// The phone still sends the pre-W19.q7 Priority field, but that field is not a source Finder tag:
-    /// it is a user rating intent. In enabled tagging modes, resolve it once before every
+    /// it is a user rating intent. A saved Mac card supplies its canonical Q counterpart through the
+    /// same boundary. In enabled tagging modes, resolve either spelling once before every
     /// staged-PDF/image/merge write so a copy-source-style verbatim write cannot accidentally create a
     /// fresh P tag. `TaggingMode.none` never calls this helper. Existing `baseTags` are otherwise
     /// untouched — that preserves a literal P copied from a source when there is no phone rating
     /// to replace it. P7 is the old explicit-unrated choice, so it removes any rating.
-    nonisolated private static func tagsByApplyingPhonePriority(_ baseTags: [String], priority raw: String?) -> [String] {
+    nonisolated private static func tagsByApplyingPhoneRating(_ baseTags: [String], rating raw: String?) -> [String] {
         guard let raw = raw?.trimmingCharacters(in: .whitespaces), DocumentTags.isRatingToken(raw) else {
             return baseTags
         }
@@ -2125,29 +2135,37 @@ final class LiveCaptureProcessor: ObservableObject {
     /// W3.cap-r1 extends it: the same staging run also reports which artifacts came back UNTAGGED, and the
     /// tag inputs (`type`/`baseTags`/`pagePriority`/`jsonTags`/`stampUnread`/`taggingMode`) are injectable
     /// so a test can drive colour-authority, Quality-canonicalization and no-tagging decisions. The
+    /// optional image mirror is injectable too, so the same test can prove it receives the identical tags.
     /// defaults reproduce the original W23.h5 call exactly.
     nonisolated static func _recoveryTestStageSegment(
         sources: [URL], stagingDir: URL, model: LLMModel,
         type: CaptureGroupType = .document, baseTags: [String] = [],
         pagePriority: String? = nil, jsonTags: GeneratedTags = GeneratedTags(),
-        stampUnread: Bool = false, taggingMode: TaggingMode? = nil, doMerge: Bool = false
+        stampUnread: Bool = false, taggingMode: TaggingMode? = nil, doMerge: Bool = false,
+        outputImageFile: Bool = false, pagePriorities: [String?]? = nil
     ) -> (pdfCount: Int, pagesComplete: Bool?, placeholderSources: [URL],
-          untaggedOutputs: [URL], pdfURLs: [URL]) {
-        let pages = sources.map {
-            PageWork(sourceURL: $0,
-                     result: OCRResult(text: "text", classification: nil, errorMessage: nil, errorCode: nil),
-                     priority: pagePriority)
+          untaggedOutputs: [URL], pdfURLs: [URL], imageURLs: [URL]) {
+        let pages = sources.enumerated().map { index, source in
+            let priority: String?
+            if let pagePriorities, pagePriorities.indices.contains(index) {
+                priority = pagePriorities[index]
+            } else {
+                priority = pagePriority
+            }
+            return PageWork(sourceURL: source,
+                            result: OCRResult(text: "text", classification: nil, errorMessage: nil, errorCode: nil),
+                            priority: priority)
         }
         let effectiveTaggingMode = taggingMode ?? (stampUnread ? .automatic : .copySource)
         let seg = writeSegmentFiles(groupId: "T", type: type, collectionKey: "T", order: 0,
                                     pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                     gatewayName: nil, stagingDir: stagingDir, writeJSON: false,
                                     jsonTags: jsonTags, texts: [], boxLabelText: nil,
-                                    outputImageFile: false, pdfImageMB: 0, exportedImageMB: 0,
+                                    outputImageFile: outputImageFile, pdfImageMB: 0, exportedImageMB: 0,
                                     textColumns: 1, taggingMode: effectiveTaggingMode,
                                     stampUnread: stampUnread)
         return (seg.pdfURLs.count, seg.pagesComplete, seg.placeholderSources ?? [],
-                seg.untaggedOutputs ?? [], seg.pdfURLs)
+                seg.untaggedOutputs ?? [], seg.pdfURLs, seg.imageURLs)
     }
 
     /// Test-only ($0): the production per-artifact tag step (W3.cap-r1), so a driver can prove the failure

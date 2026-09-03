@@ -461,6 +461,59 @@ enum LiveCaptureRecoveryTestDriver {
         check("Live Capture canonicalizes phone P10 to Q3 and does not write P",
               tagsOf(qualityPDF).contains("Q3") && !tagsOf(qualityPDF).contains("P10"))
 
+        // W19.q6: a Mac card's human-selected Quality travels through GeneratedTags, every live
+        // artifact writer, and the real finalize mover. The Q3 page-rating input below mirrors the
+        // `CaptureSession` handoff after the durable card decision; it is intentionally not a phone P.
+        let selectedQualityDoc = makeJPEG("selected-quality.jpg", in: tagDir)
+        let selectedQualityTags = GeneratedTags(subjectTags: ["oral history"], quality: 3)
+        let selectedQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [selectedQualityDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: selectedQualityTags.allTags, pagePriority: "Q3",
+            jsonTags: selectedQualityTags, stampUnread: true, outputImageFile: true)
+        check("W19.q6: user-selected Q3 reaches both staged PDF and image mirror without P",
+              (selectedQualitySeg.pdfURLs + selectedQualitySeg.imageURLs).count == 2
+              && (selectedQualitySeg.pdfURLs + selectedQualitySeg.imageURLs).allSatisfy {
+                  tagsOf($0).contains("Q3") && !tagsOf($0).contains(where: { $0.hasPrefix("P") })
+              })
+        let selectedQualityOut = tmp.appendingPathComponent("selected-quality-final", isDirectory: true)
+        let selectedQualityFinal = LiveCaptureProcessor._recoveryTestFinalizeMove([
+            (folder: selectedQualityOut, name: "Selected Quality", appending: false, segments: [
+                (groupId: "Q3", pdfURLs: selectedQualitySeg.pdfURLs,
+                 imageURLs: selectedQualitySeg.imageURLs, jsonURL: nil, complete: true)
+            ])
+        ])
+        let finalizedQualityArtifacts = ["00001 Selected Quality.pdf", "00001 Selected Quality.jpg"]
+            .map { selectedQualityOut.appendingPathComponent($0) }
+        check("W19.q6: Q3 survives the Live Capture finalize move on PDF and image mirror",
+              selectedQualityFinal.filedGroupIds == ["Q3"]
+              && finalizedQualityArtifacts.allSatisfy { tagsOf($0).contains("Q3") })
+
+        // OCR failure is not a Quality decision. The failure-only tag branch must retain the human
+        // choice on the staged artifact rather than returning before it appends Q.
+        let failedQualityDoc = makeJPEG("failed-quality.jpg", in: tagDir)
+        let failedQualityTags = GeneratedTags(ocrFailed: true, quality: 2)
+        let failedQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [failedQualityDoc], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: failedQualityTags.allTags, pagePriority: "Q2",
+            jsonTags: failedQualityTags, stampUnread: true)
+        check("W19.q6: OCR failure retains the user-selected Q2 on its staged PDF",
+              failedQualitySeg.pdfURLs.allSatisfy {
+                  tagsOf($0).contains("OCR Failed") && tagsOf($0).contains("Q2")
+              })
+
+        // A skipped card keeps the phone values. Per-page P10 is an explicit override of the
+        // group's first-page P8, so the one merged artifact must carry Q3 rather than Q1.
+        let mergePriorityA = makeJPEG("merge-priority-a.jpg", in: tagDir)
+        let mergePriorityB = makeJPEG("merge-priority-b.jpg", in: tagDir)
+        let mergePrioritySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [mergePriorityA, mergePriorityB], stagingDir: tagDir, model: stubModel,
+            type: .document, baseTags: ["1948"], jsonTags: GeneratedTags(),
+            stampUnread: true, doMerge: true, pagePriorities: ["P8", "P10"])
+        check("W19.q6: a later phone P10 wins over first-page P8 on the merged PDF",
+              mergePrioritySeg.pdfURLs.count == 1
+              && tagsOf(mergePrioritySeg.pdfURLs[0]).contains("Q3")
+              && !tagsOf(mergePrioritySeg.pdfURLs[0]).contains(where: { $0.hasPrefix("P") }))
+
         // This must also hold when the Writer's copy-source/no-tagging semantics would otherwise pass
         // supplied names through verbatim. P9 is a phone value, not a source tag, so stage it as Q2.
         let copyQualityDoc = makeJPEG("copy-quality.jpg", in: tagDir)

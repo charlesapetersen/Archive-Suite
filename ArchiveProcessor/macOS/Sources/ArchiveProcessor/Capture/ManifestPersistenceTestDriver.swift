@@ -570,7 +570,7 @@ enum ManifestPersistenceTestDriver {
         //         manifests still decode, to empty (back-compat). ---
         let b9File = tmp.appendingPathComponent("b9.json")
         let macTags: [String: MacSegmentTags] = [
-            "gDoc": MacSegmentTags(subjects: ["elections", "1968 campaign"], priority: "P8", year: 1968, month: 3)
+            "gDoc": MacSegmentTags(subjects: ["elections", "1968 campaign"], quality: 1, year: 1968, month: 3)
         ]
         let b9Manifest = CaptureSession.SessionManifest(photos: entries, completedDocGroups: Array(completed),
                                                         resolvedGroupIds: ["gDoc"], macTags: macTags)
@@ -578,9 +578,9 @@ enum ManifestPersistenceTestDriver {
         let b9 = (try? Data(contentsOf: b9File)).flatMap { CaptureSession.decodeManifest($0) }
         check("B9: manifest with resolved/macTags written + decodes", b9Wrote && b9 != nil)
         check("B9: resolvedGroupIds survives the round-trip", b9?.resolved == ["gDoc"])
-        check("B9: macTags survives the round-trip (subjects + date + priority)",
+        check("B9: macTags survives the round-trip (subjects + date + Quality)",
               b9?.macTags["gDoc"]?.subjects == ["elections", "1968 campaign"]
-              && b9?.macTags["gDoc"]?.year == 1968 && b9?.macTags["gDoc"]?.priority == "P8")
+              && b9?.macTags["gDoc"]?.year == 1968 && b9?.macTags["gDoc"]?.quality == 1)
         check("B9 back-compat: pre-B9 manifest (no resolved/macTags keys) decodes to empty",
               legacy?.resolved.isEmpty == true && legacy?.macTags.isEmpty == true
               && emptyDecoded?.resolved.isEmpty == true && emptyDecoded?.macTags.isEmpty == true)
@@ -674,7 +674,7 @@ enum ManifestPersistenceTestDriver {
         }
 
         let cardPhoto = session.ingest(jpeg: Data("synthetic card page".utf8), groupId: "gCard", seq: 102,
-                                       type: .document, priority: nil, year: nil, month: nil,
+                                       type: .document, priority: "P10", year: nil, month: nil,
                                        deviceName: "ManifestTest")
         check("W23.m7: a page for the tag-card group ingests", cardPhoto != nil)
         check("W23.m7: its segment completes and surfaces exactly one card",
@@ -688,11 +688,12 @@ enum ManifestPersistenceTestDriver {
             saveOfferedDecisionToDisk = offered?.resolved.contains("gCard") == true
                 && offered?.macTags["gCard"]?.subjects == ["oral history"]
                 && offered?.macTags["gCard"]?.year == 1971
+                && offered?.macTags["gCard"]?.quality == 2
             return false
         }
         session.statusMessage = "Listening"
         let refusedSave = session.applyMacTags(groupId: "gCard", subjects: ["oral history"],
-                                               priority: "P8", year: 1971, month: 4)
+                                               quality: 2, year: 1971, month: 4)
         check("W23.m7: a failed manifest write refuses the Save instead of reporting success", !refusedSave)
         check("W23.m7: the refused Save had already staged the decision into the bytes offered to disk",
               saveOfferedDecisionToDisk)
@@ -712,10 +713,15 @@ enum ManifestPersistenceTestDriver {
         // (b) Retry with the real writer: resolved, told once, and the disk already agreed at that moment.
         session.manifestWriteOverride = nil
         let retriedSave = session.applyMacTags(groupId: "gCard", subjects: ["oral history"],
-                                               priority: "P8", year: 1971, month: 4)
+                                               quality: 2, year: 1971, month: 4)
         check("W23.m7: the retry resolves the card once the write succeeds",
               retriedSave && session.pendingTagGroup == nil
-              && session.macTags["gCard"]?.subjects == ["oral history"])
+              && session.macTags["gCard"]?.subjects == ["oral history"]
+              && session.macTags["gCard"]?.quality == 2)
+        let taggedHandoff = session.orderedFilesAndGroups()
+        let cardHandoffIndex = taggedHandoff.files.firstIndex { $0.lastPathComponent == "00102-gCard.jpg" }
+        check("W19.q6: a Mac Quality choice overrides the phone's P10 before Process Files handoff",
+              cardHandoffIndex.map { taggedHandoff.priorities[$0] == "Q2" } == true)
         check("W23.m7: live processing is told exactly once, and only for the durable decision",
               notified == ["gCard"])
         check("W23.m7: at the moment live processing was told, the decision was ALREADY on disk",
@@ -750,7 +756,7 @@ enum ManifestPersistenceTestDriver {
               afterDurableDecisions.pendingTagGroup == nil
               && afterDurableDecisions.resolvedGroupIds.isSuperset(of: ["gCard", "gSkip"])
               && afterDurableDecisions.macTags["gCard"]?.year == 1971
-              && afterDurableDecisions.macTags["gCard"]?.priority == "P8"
+              && afterDurableDecisions.macTags["gCard"]?.quality == 2
               && afterDurableDecisions.macTags["gSkip"] == nil)
 
         // --- B17: LAN request admission happens from a bounded head before body accumulation. ---

@@ -52,10 +52,10 @@ struct CaptureGroup: Identifiable {
 }
 
 /// Tags the Mac operator enters for a segment during Live Capture. Subjects are the piece the phone
-/// doesn't capture; year/month/priority default to the phone's values but can be adjusted here.
+/// doesn't capture; year/month and the human 0...3 Quality rating can be adjusted here.
 struct MacSegmentTags: Equatable, Codable {
     var subjects: [String] = []
-    var priority: String? = nil
+    var quality: Int = 0
     var year: Int? = nil
     var month: Int? = nil
 }

@@ -14,6 +14,8 @@ public struct GeneratedTags: Codable, Sendable {
     public var dateUncertain: Bool
     public var ocrFailed: Bool
     public var subjectTags: [String]
+    /// Human-set 0...3 rating. Zero is deliberately represented by the absence of a Finder tag.
+    public var quality: Int
     public var colorTag: String?         // "Red" or "Purple"
 
     // Extended metadata for JSON export
@@ -31,6 +33,7 @@ public struct GeneratedTags: Codable, Sendable {
         dateUncertain: Bool = false,
         ocrFailed: Bool = false,
         subjectTags: [String] = [],
+        quality: Int = 0,
         colorTag: String? = nil,
         format: String? = nil,
         authorName: String? = nil,
@@ -45,6 +48,7 @@ public struct GeneratedTags: Codable, Sendable {
         self.dateUncertain = dateUncertain
         self.ocrFailed = ocrFailed
         self.subjectTags = subjectTags
+        self.quality = quality
         self.colorTag = colorTag
         self.format = format
         self.authorName = authorName
@@ -66,6 +70,10 @@ public struct GeneratedTags: Codable, Sendable {
         var tags: [String] = []
         if ocrFailed {
             tags.append("OCR Failed")
+            // Quality is human-set rather than inferred from OCR, so a failed OCR pass must not
+            // discard the operator's rating. Keep it before the optional Finder-colour token, as
+            // every other GeneratedTags path does.
+            if let qualityTag = DocumentTags.qualityTag(for: quality) { tags.append(qualityTag) }
             if let c = colorTag { tags.append(c) }
             return tags
         }
@@ -74,6 +82,7 @@ public struct GeneratedTags: Codable, Sendable {
         if let d = day { tags.append(d) }
         if dateUncertain { tags.append("Date Uncertain") }
         tags.append(contentsOf: subjectTags.map { Self.capitalizeFirstLetters($0) })
+        if let qualityTag = DocumentTags.qualityTag(for: quality) { tags.append(qualityTag) }
         if let c = colorTag { tags.append(c) }
         return tags
     }

@@ -229,6 +229,15 @@ Current retained records require and retain their explicit tagging mode and unre
 replay cannot adopt a later Settings choice; older retained-policy records are unsupported. There is no bulk
 corpus rewrite: P remains an accepted phone input until W19.q7 changes the wire field.
 
+**Mac Quality controls and last-writer precedence — FIXED (W19.q6, 2026-09-02; this commit).** The
+operator now sets the canonical 0–3 Quality directly in the Live Capture tag card and both Process Files
+manual tagging flows; zero means no Quality tag. The choice is durable in the Capture manifest and reaches
+both staged artifacts and the filed result. During review, three boundary holes were closed before release:
+the OCR-failed `GeneratedTags` branch no longer returns before preserving the operator's Q; a manual Q1 or
+Unrated choice replaces imported P10 before the late Capture boundary; and a skipped multi-page card still
+promotes a later per-page P10 to Q3 on its merged PDF. Scratch recovery, manifest and Process Files tag
+drivers prove each case on disposable files; the current pre-q7 P wire remains an input-only protocol boundary.
+
 **The reclassification half — also FIXED now (W23.m5-fu2, 2026-07-31, `7a0043c` + the trackers commit).**
 The sentence above says the review flows "already follow" the classification rule. They did — but only by
 *appending* "Red"/"Purple" to the array and letting detection find it, and they cleared the way first with

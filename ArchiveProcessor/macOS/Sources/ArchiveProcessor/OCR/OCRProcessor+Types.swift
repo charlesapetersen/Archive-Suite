@@ -74,6 +74,8 @@ struct SegmentTagData {
     var day: String = ""        // "Day D"
     var dateUncertain: Bool = false
     var subjectTags: [String] = []
+    /// Human-set 0...3 rating; 0 is deliberately emitted as no Finder tag.
+    var quality: Int = 0
 }
 
 /// One document segment presented for manual/human tagging (feature 6).
@@ -89,6 +91,8 @@ struct ManualTagSegment: Identifiable {
     var day: String = ""        // "Day D", e.g. "Day 15"
     var dateUncertain: Bool = false
     var subjectTags: [String] = []
+    /// Human-set 0...3 rating; 0 is deliberately emitted as no Finder tag.
+    var quality: Int = 0
     /// True while the auto-date LLM prefetch for this segment is still in flight.
     var dateLoading: Bool = false
 }
