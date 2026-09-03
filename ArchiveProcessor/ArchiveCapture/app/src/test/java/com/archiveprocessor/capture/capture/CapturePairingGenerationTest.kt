@@ -94,7 +94,7 @@ class CapturePairingGenerationTest {
 
     @Test
     fun `a segment completion acked by the old Mac stays queued for the new one`() {
-        val endedSegments = linkedMapOf("g1" to "priority=P10")
+        val endedSegments = linkedMapOf("g1" to "quality=Q3")
         val pairing = PairingGeneration()
         val token = pairing.current
 

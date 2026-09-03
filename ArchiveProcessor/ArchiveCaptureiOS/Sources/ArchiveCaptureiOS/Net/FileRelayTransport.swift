@@ -36,16 +36,16 @@ struct FileRelayTransport: SegmentTransport {
         guard let d = try? Data(contentsOf: sessionDir.appendingPathComponent(RelayObjectFormat.receiptName(group: group, seq: seq))),
               let m = RelayObjectFormat.parse(d) else { return false }
         // A1: accept ONLY a receipt acking the CURRENT metadata (fp) for THIS run (epoch) — so a stale ack
-        // (e.g. before a P10 change, or from a prior run) does not falsely confirm.
+        // (e.g. before a Q3 change, or from a prior run) does not falsely confirm.
         return m["kind"] == "receipt" && m["token"] == token && m["epoch"] == epoch
             && m["group"] == group && m["seq"] == String(seq) && m["fp"] == fp
     }
 
-    func postPhoto(jpeg: Data, group: String, seq: Int, type: String, priority: String?,
+    func postPhoto(jpeg: Data, group: String, seq: Int, type: String, quality: String?,
                    year: Int?, month: Int?, device: String, replaces: String?) async -> Bool {
         let yearS = year.map(String.init), monthS = month.map(String.init)
         let repl = (replaces?.isEmpty == false) ? replaces : nil
-        let fp = RelayObjectFormat.fingerprint(type: type, priority: priority, year: yearS, month: monthS, replaces: repl)
+        let fp = RelayObjectFormat.fingerprint(type: type, quality: quality, year: yearS, month: monthS, replaces: repl)
         try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
         let deadline = Date().addingTimeInterval(receiptWaitTimeout)
         var wroteForEpoch: String?
@@ -58,7 +58,7 @@ struct FileRelayTransport: SegmentTransport {
                 try? writeAtomic(RelayObjectFormat.jpegName(group: group, seq: seq), jpeg)  // jpeg FIRST
                 try? writeAtomic(RelayObjectFormat.sidecarName(group: group, seq: seq),     // sidecar LAST = commit marker
                             RelayObjectFormat.encodeSidecar(token: token, epoch: epoch, group: group, seq: seq,
-                                type: type, priority: priority, year: yearS, month: monthS, replaces: repl, device: device))
+                                type: type, quality: quality, year: yearS, month: monthS, replaces: repl, device: device))
                 wroteForEpoch = epoch
             }
             try? await Task.sleep(nanoseconds: UInt64(receiptPollInterval * 1_000_000_000))  // (c) poll
@@ -66,12 +66,12 @@ struct FileRelayTransport: SegmentTransport {
         return false   // timeout → item stays .failed → auto-retry re-enters at (a); local copy retained
     }
 
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
+    func segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
         guard let epoch = currentEpoch() else { return false }
         do {
             try writeAtomic(RelayObjectFormat.segmentName(group: group),
                         RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: group,
-                            priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: seqs))
+                            quality: quality, year: year.map(String.init), month: month.map(String.init), seqs: seqs))
             return true
         } catch { return false }
     }

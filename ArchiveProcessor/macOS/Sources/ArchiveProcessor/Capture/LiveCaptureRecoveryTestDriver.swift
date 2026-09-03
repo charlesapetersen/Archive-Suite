@@ -450,16 +450,16 @@ enum LiveCaptureRecoveryTestDriver {
         check("...and is NOT promoted to a Finder colour label (the app assigned no colour)",
               labelOf(redPDF) == 0)
 
-        // The Live Capture staging path still receives the pre-q7 phone field, but it must never write
-        // that P spelling back out. This drives the real PageWork.priority → staged-PDF writer.
+        // The Live Capture staging path accepts only the q7 Quality field. This drives the real
+        // PageWork.quality → staged-PDF writer.
         let qualityDoc = makeJPEG("quality.jpg", in: tagDir)
         let qualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [qualityDoc], stagingDir: tagDir, model: stubModel,
-            type: .document, baseTags: ["1948"], pagePriority: "P10",
+            type: .document, baseTags: ["1948"], pageQuality: "Q3",
             jsonTags: GeneratedTags(), stampUnread: true)
         let qualityPDF = qualitySeg.pdfURLs.first ?? tagDir
-        check("Live Capture canonicalizes phone P10 to Q3 and does not write P",
-              tagsOf(qualityPDF).contains("Q3") && !tagsOf(qualityPDF).contains("P10"))
+        check("Live Capture writes phone Q3 as Quality",
+              tagsOf(qualityPDF).contains("Q3"))
 
         // W19.q6: a Mac card's human-selected Quality travels through GeneratedTags, every live
         // artifact writer, and the real finalize mover. The Q3 page-rating input below mirrors the
@@ -468,7 +468,7 @@ enum LiveCaptureRecoveryTestDriver {
         let selectedQualityTags = GeneratedTags(subjectTags: ["oral history"], quality: 3)
         let selectedQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [selectedQualityDoc], stagingDir: tagDir, model: stubModel,
-            type: .document, baseTags: selectedQualityTags.allTags, pagePriority: "Q3",
+            type: .document, baseTags: selectedQualityTags.allTags, pageQuality: "Q3",
             jsonTags: selectedQualityTags, stampUnread: true, outputImageFile: true)
         check("W19.q6: user-selected Q3 reaches both staged PDF and image mirror without P",
               (selectedQualitySeg.pdfURLs + selectedQualitySeg.imageURLs).count == 2
@@ -494,59 +494,59 @@ enum LiveCaptureRecoveryTestDriver {
         let failedQualityTags = GeneratedTags(ocrFailed: true, quality: 2)
         let failedQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [failedQualityDoc], stagingDir: tagDir, model: stubModel,
-            type: .document, baseTags: failedQualityTags.allTags, pagePriority: "Q2",
+            type: .document, baseTags: failedQualityTags.allTags, pageQuality: "Q2",
             jsonTags: failedQualityTags, stampUnread: true)
         check("W19.q6: OCR failure retains the user-selected Q2 on its staged PDF",
               failedQualitySeg.pdfURLs.allSatisfy {
                   tagsOf($0).contains("OCR Failed") && tagsOf($0).contains("Q2")
               })
 
-        // A skipped card keeps the phone values. Per-page P10 is an explicit override of the
-        // group's first-page P8, so the one merged artifact must carry Q3 rather than Q1.
-        let mergePriorityA = makeJPEG("merge-priority-a.jpg", in: tagDir)
-        let mergePriorityB = makeJPEG("merge-priority-b.jpg", in: tagDir)
-        let mergePrioritySeg = LiveCaptureProcessor._recoveryTestStageSegment(
-            sources: [mergePriorityA, mergePriorityB], stagingDir: tagDir, model: stubModel,
+        // A skipped card keeps the phone values. Per-page Q3 is an explicit override of the
+        // group's first-page Q1, so the one merged artifact must carry Q3 rather than Q1.
+        let mergeQualityA = makeJPEG("merge-quality-a.jpg", in: tagDir)
+        let mergeQualityB = makeJPEG("merge-quality-b.jpg", in: tagDir)
+        let mergeQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [mergeQualityA, mergeQualityB], stagingDir: tagDir, model: stubModel,
             type: .document, baseTags: ["1948"], jsonTags: GeneratedTags(),
-            stampUnread: true, doMerge: true, pagePriorities: ["P8", "P10"])
-        check("W19.q6: a later phone P10 wins over first-page P8 on the merged PDF",
-              mergePrioritySeg.pdfURLs.count == 1
-              && tagsOf(mergePrioritySeg.pdfURLs[0]).contains("Q3")
-              && !tagsOf(mergePrioritySeg.pdfURLs[0]).contains(where: { $0.hasPrefix("P") }))
+            stampUnread: true, doMerge: true, pageQualities: ["Q1", "Q3"])
+        check("W19.q7: a later phone Q3 wins over first-page Q1 on the merged PDF",
+              mergeQualitySeg.pdfURLs.count == 1
+              && tagsOf(mergeQualitySeg.pdfURLs[0]).contains("Q3")
+              && !tagsOf(mergeQualitySeg.pdfURLs[0]).contains(where: { $0.hasPrefix("P") }))
 
         // This must also hold when the Writer's copy-source/no-tagging semantics would otherwise pass
-        // supplied names through verbatim. P9 is a phone value, not a source tag, so stage it as Q2.
+        // supplied names through verbatim. Q2 is a phone value, not a source tag.
         let copyQualityDoc = makeJPEG("copy-quality.jpg", in: tagDir)
         let copyQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [copyQualityDoc], stagingDir: tagDir, model: stubModel,
-            type: .document, baseTags: ["1948"], pagePriority: "P9",
+            type: .document, baseTags: ["1948"], pageQuality: "Q2",
             jsonTags: GeneratedTags(), stampUnread: false)
         let copyQualityPDF = copyQualitySeg.pdfURLs.first ?? tagDir
-        check("copy-source staging canonicalizes phone P9 to Q2 instead of writing P",
-              tagsOf(copyQualityPDF).contains("Q2") && !tagsOf(copyQualityPDF).contains("P9"))
+        check("copy-source staging applies phone Q2",
+              tagsOf(copyQualityPDF).contains("Q2"))
 
-        // The same boundary feeds the merged PDF. P7 is explicit unrated, so it clears a generated
-        // Q rather than escaping as a subject or retaining a stale rating through the merge.
+        // The same boundary feeds the merged PDF. Q0 is internal-only explicit unrated, so it clears a
+        // generated Q rather than escaping as a subject or retaining a stale rating through the merge.
         let clearQualityA = makeJPEG("clear-quality-a.jpg", in: tagDir)
         let clearQualityB = makeJPEG("clear-quality-b.jpg", in: tagDir)
         let clearQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [clearQualityA, clearQualityB], stagingDir: tagDir, model: stubModel,
-            type: .document, baseTags: ["1948", "Q2"], pagePriority: "P7",
+            type: .document, baseTags: ["1948", "Q2"], pageQuality: "Q0",
             jsonTags: GeneratedTags(), stampUnread: false, doMerge: true)
         let clearQualityPDF = clearQualitySeg.pdfURLs.first ?? tagDir
-        check("copy-source merge treats phone P7 as an explicit clear without writing P",
+        check("copy-source merge treats explicit zero quality as a clear without writing Q0",
               !tagsOf(clearQualityPDF).contains(where: DocumentTags.isRatingToken)
               && tagsOf(clearQualityPDF).contains("1948"))
 
-        // Unlike copy source, No tagging has no phone-rating boundary at all. The staged artifact is
-        // new, so an empty tag read-back proves P10 did not create Q3 or any other tag as a side effect.
+        // Unlike copy source, No tagging has no phone-quality boundary at all. The staged artifact is
+        // new, so an empty tag read-back proves Q3 did not create any tag as a side effect.
         let noTagQualityDoc = makeJPEG("no-tag-quality.jpg", in: tagDir)
         let noTagQualitySeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [noTagQualityDoc], stagingDir: tagDir, model: stubModel,
-            type: .document, pagePriority: "P10", jsonTags: GeneratedTags(),
+            type: .document, pageQuality: "Q3", jsonTags: GeneratedTags(),
             stampUnread: false, taggingMode: TaggingMode.none)
         let noTagQualityPDF = noTagQualitySeg.pdfURLs.first ?? tagDir
-        check("no-tagging staging leaves phone P10 entirely out of Finder metadata",
+        check("no-tagging staging leaves phone Q3 entirely out of Finder metadata",
               tagsOf(noTagQualityPDF).isEmpty)
 
         // (b) The app's OWN colour still lands. A box segment carries Red as an actual Finder label, exactly
@@ -754,7 +754,7 @@ enum LiveCaptureRecoveryTestDriver {
             let jpeg = Data("synthetic page bytes".utf8)
             func send(_ gid: String, _ seq: Int) -> Bool {
                 r2Session.ingest(jpeg: jpeg, groupId: gid, seq: seq, type: .document,
-                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone") != nil
+                                 quality: nil, year: nil, month: nil, deviceName: "TestPhone") != nil
             }
             func paidStarts() -> Int { LiveCaptureProcessor._recoveryTestOCRStarts.count }
 
@@ -820,7 +820,7 @@ enum LiveCaptureRecoveryTestDriver {
             let r5Bytes = Data("synthetic page bytes".utf8)
             func r5Send(_ gid: String, _ seq: Int, _ type: CaptureGroupType) {
                 r5Session.ingest(jpeg: r5Bytes, groupId: gid, seq: seq, type: type,
-                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             func r5Settle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -921,7 +921,7 @@ enum LiveCaptureRecoveryTestDriver {
             let r4Bytes = Data("synthetic page bytes".utf8)
             func r4Send(_ gid: String, _ seq: Int, _ type: CaptureGroupType) {
                 r4Session.ingest(jpeg: r4Bytes, groupId: gid, seq: seq, type: type,
-                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             func r4Settle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -1024,7 +1024,7 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRGate = { await r3Gate.wait() }
             func r3Send(_ gid: String, _ seq: Int) {
                 r3Session.ingest(jpeg: r3Bytes, groupId: gid, seq: seq, type: .document,
-                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             func r3Settle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -1238,7 +1238,7 @@ enum LiveCaptureRecoveryTestDriver {
             let fuBytes = Data("synthetic page bytes".utf8)
             func fuSend(_ gid: String, _ seq: Int) {
                 fuSession.ingest(jpeg: fuBytes, groupId: gid, seq: seq, type: .document,
-                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             func fuSettle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -1426,7 +1426,7 @@ enum LiveCaptureRecoveryTestDriver {
             let ruBytes = Data("synthetic page bytes".utf8)
             func ruSend(_ gid: String, _ seq: Int) {
                 ruSession.ingest(jpeg: ruBytes, groupId: gid, seq: seq, type: .document,
-                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             func ruSettle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -1625,7 +1625,7 @@ enum LiveCaptureRecoveryTestDriver {
             fvChmod(0o555)
             for gid in ["V1", "V2"] {
                 fvSession.ingest(jpeg: Data("synthetic page bytes".utf8), groupId: gid, seq: 1,
-                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
                 fvProc.segmentResolved(groupId: gid)
             }
             let fvFailed = await fvSettle {
@@ -1829,7 +1829,7 @@ enum LiveCaptureRecoveryTestDriver {
             // 1. PREMISE. A two-page document stages CLEANLY — the success label this section watches decay.
             for seq in [1, 2] {
                 bwSession.ingest(jpeg: bwJPEG, groupId: "B1", seq: seq,
-                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             bwProc.segmentResolved(groupId: "B1")
             let bwStagedOK = await bwSettle { bwProc.statuses.first { $0.id == "B1" }?.phase == .staged }
@@ -2058,7 +2058,7 @@ enum LiveCaptureRecoveryTestDriver {
             // 1. PREMISE. A two-page document stages cleanly, having bought exactly one call per page.
             for seq in [1, 2] {
                 rfSession.ingest(jpeg: rfJPEG, groupId: "F1", seq: seq,
-                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             rfProc.segmentResolved(groupId: "F1")
             let rfStagedOK = await rfSettle { rfProc.statuses.first { $0.id == "F1" }?.phase == .staged }
@@ -2334,7 +2334,7 @@ enum LiveCaptureRecoveryTestDriver {
             //    written — both of the things a mid-window Clear would take away.
             for seq in [1, 2] {
                 clSession.ingest(jpeg: clJPEG, groupId: "L1", seq: seq,
-                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             clProc.segmentResolved(groupId: "L1")
             let clStagedOK = await clSettle { clProc.statuses.first { $0.id == "L1" }?.phase == .staged }
@@ -2542,7 +2542,7 @@ enum LiveCaptureRecoveryTestDriver {
             // 1. PREMISE. A two-page document stages cleanly.
             for seq in [1, 2] {
                 psSession.ingest(jpeg: psJPEG, groupId: "P1", seq: seq,
-                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             psProc.segmentResolved(groupId: "P1")
             let psStagedOK = await psSettle { psProc.statuses.first { $0.id == "P1" }?.phase == .staged }
@@ -2838,7 +2838,7 @@ enum LiveCaptureRecoveryTestDriver {
             //    money terms: there is paid work outstanding at the moment the operator cancels.
             for seq in [1, 2] {
                 cfSession.ingest(jpeg: cfJPEG, groupId: "C1", seq: seq,
-                                 type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             cfProc.segmentResolved(groupId: "C1")
             let cfInOCR = await cfSettle { cfProc.processingCount == 1 }
@@ -3150,7 +3150,7 @@ enum LiveCaptureRecoveryTestDriver {
             let uwJPEG = uwBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
             func uwSend(_ gid: String, _ seq: Int) {
                 uwSession.ingest(jpeg: uwJPEG, groupId: gid, seq: seq, type: .document,
-                                 priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                                 quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             func uwEmptyThePane() { for p in uwSession.photos { uwSession.removePhoto(p) } }
             // The rotation review must be OFF so `finishSession` goes straight to `beginFinalize`: checks 4-5
@@ -3354,7 +3354,7 @@ enum LiveCaptureRecoveryTestDriver {
             // makes `writeSegmentFiles` return an empty record, so the first classifier earns `.noOutput`.
             try? fm.setAttributes([.posixPermissions: NSNumber(value: 0o555)], ofItemAtPath: rsStaging.path)
             rsSession.ingest(jpeg: Data("synthetic page bytes".utf8), groupId: "R1", seq: 1,
-                             type: .document, priority: nil, year: nil, month: nil, deviceName: "TestPhone")
+                             type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             rsWriter.segmentResolved(groupId: "R1")
             let rsFailed = await rsSettle { rsWriter.failedGroupIds == ["R1"] }
             try? fm.setAttributes([.posixPermissions: NSNumber(value: 0o755)], ofItemAtPath: rsStaging.path)

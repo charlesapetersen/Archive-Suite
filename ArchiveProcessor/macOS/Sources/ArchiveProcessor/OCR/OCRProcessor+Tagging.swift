@@ -296,53 +296,48 @@ extension OCRProcessor {
         guard index >= 0, index < preGroupedMonths.count, let m = preGroupedMonths[index] else { return nil }
         return GeneratedTags.monthTag(m)
     }
-    /// Rating supplied by the current phone wire or a prior Live Capture Mac card. The field keeps its
-    /// historical `preGroupedPriorities` name until W19.q7 changes the companion protocol, but values
-    /// already may be canonical Q tokens when the Mac operator made an explicit selection.
+    /// Rating supplied by the current phone wire or a prior Live Capture Mac card.
     private func phoneQuality(at index: Int) -> Int {
-        guard index >= 0, index < preGroupedPriorities.count,
-              let raw = preGroupedPriorities[index] else { return 0 }
+        guard index >= 0, index < preGroupedQualities.count,
+              let raw = preGroupedQualities[index] else { return 0 }
         return DocumentTags.parseQuality(raw) ?? 0
     }
     /// A manual Process Files decision supersedes the imported phone rating before the late Capture
-    /// boundary runs. Preserve it in the already-aligned handoff array as canonical Q or explicit P7
-    /// (for zero) so that final boundary cannot restore a phone P10 over a human Q1/Q0 choice.
+    /// boundary runs. Preserve it in the already-aligned handoff array as a canonical Q token (or the
+    /// internal-only `Q0` clear marker) so that the final boundary cannot restore phone Q3 over a human
+    /// Q1/Q0 choice. `Q0` never leaves the Mac or becomes a Finder tag.
     func recordManualQualityIntent(_ quality: Int, for sourceURLs: [URL]) {
-        guard !preGroupedPriorities.isEmpty else { return }
-        let ratingIntent = DocumentTags.qualityTag(for: quality) ?? "P7"
+        guard !preGroupedQualities.isEmpty else { return }
+        let ratingIntent = DocumentTags.qualityTag(for: quality) ?? "Q0"
         for sourceURL in sourceURLs {
             guard let jobIndex = jobs.firstIndex(where: { $0.sourceURL == sourceURL }),
-                  jobIndex < preGroupedPriorities.count else { continue }
-            preGroupedPriorities[jobIndex] = ratingIntent
+                  jobIndex < preGroupedQualities.count else { continue }
+            preGroupedQualities[jobIndex] = ratingIntent
         }
     }
-    /// Live Capture: layer each page's phone-set Priority or canonical Quality rating onto
-    /// whatever the tagging phase applied. `preGroupedPriorities` remains the current wire field until
-    /// the phone protocol is renamed in W19.q7, but this writer emits only Q tokens. macOS tag application
-    /// replaces, so read → replace the rating intent → re-apply; also record the canonical token in the
-    /// job's appliedTags so document merging carries it. No-op outside a pre-grouped run.
+    /// Live Capture: layer each page's phone-set Quality rating onto whatever the tagging phase applied.
+    /// macOS tag application replaces, so read → replace the rating intent → re-apply; also record the
+    /// canonical token in the job's appliedTags so document merging carries it. No-op outside a
+    /// pre-grouped run.
     func applyCaptureQualityTags(runConfig: SessionProcessingConfig? = nil) {
-        guard !preGroupedPriorities.isEmpty else { return }
+        guard !preGroupedQualities.isEmpty else { return }
         let settings = lateRunOutputSettings(for: runConfig)
         // "No tagging" means exactly that, including the post-tagging phone boundary. In particular,
-        // do not read/rewrite an output merely to translate P to Q: that would turn a no-tag run into
-        // a Quality-tagging run and could also canonicalize or strip metadata it promised to leave alone.
+        // do not read/rewrite an output merely to apply a phone quality: that would turn a no-tag run
+        // into a Quality-tagging run and could also canonicalize or strip metadata it promised to leave alone.
         guard settings.taggingMode != .none else { return }
         let stampUnread = settings.stampUnread
-        for i in jobs.indices where i < preGroupedPriorities.count {
-            guard let raw = preGroupedPriorities[i]?.trimmingCharacters(in: .whitespaces), !raw.isEmpty,
-                  DocumentTags.isRatingToken(raw),
+        for i in jobs.indices where i < preGroupedQualities.count {
+            guard let raw = preGroupedQualities[i]?.trimmingCharacters(in: .whitespaces),
+                  ["Q0", "Q1", "Q2", "Q3"].contains(raw),
                   let outputPDF = outputURLMap[jobs[i].sourceURL] else { continue }
             guard var tags = try? MacOSTagger.readTags(from: outputPDF) else { continue }
-            // Keep the raw token for a real-tagging call so MacOSTagger can distinguish P7 (explicit
-            // clear) from no rating at all. Copy-source and no-tagging are verbatim by contract, so
-            // they must receive the canonical Q directly instead — otherwise the compatibility input
-            // would escape as a fresh P write. In either mode P7 is represented by no rating token.
+            // Copy-source and no-tagging are verbatim by contract. Apply only canonical Q tokens.
             tags.removeAll { DocumentTags.isRatingToken($0) }
             if stampUnread {
+                tags.append(raw)   // Q0 is an internal clear marker consumed by MacOSTagger.
+            } else if raw != "Q0" {
                 tags.append(raw)
-            } else if let quality = DocumentTags.qualityTag(for: DocumentTags.parseQuality(raw)) {
-                tags.append(quality)
             }
             // Read-replace-rewrite of whatever the tagging phase already applied — follow the run's
             // mode so a real-tagging output keeps "Unread" last and its label intact. W23.m5-fu: the
@@ -353,8 +348,8 @@ extension OCRProcessor {
                       appColor: Self.authoritativeColor(forJob: jobs[i]),
                       colorIsAuthoritative: true, stampUnread: stampUnread)
             jobs[i].appliedTags.removeAll { DocumentTags.isRatingToken($0) }
-            if let quality = DocumentTags.qualityTag(for: DocumentTags.parseQuality(raw)) {
-                jobs[i].appliedTags.append(quality)
+            if raw != "Q0" {
+                jobs[i].appliedTags.append(raw)
             }
         }
     }

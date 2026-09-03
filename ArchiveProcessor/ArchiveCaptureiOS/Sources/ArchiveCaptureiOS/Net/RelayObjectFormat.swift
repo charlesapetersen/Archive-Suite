@@ -49,26 +49,26 @@ enum RelayObjectFormat {
     }
 
     // MARK: - Metadata fingerprint (A1) — identical function+inputs on Mac & phone → same fp
-    static func fingerprint(type: String, priority: String?, year: String?, month: String?, replaces: String?) -> String {
-        let m: [String: String?] = ["type": type, "priority": priority, "year": year, "month": month, "replaces": replaces]
+    static func fingerprint(type: String, quality: String?, year: String?, month: String?, replaces: String?) -> String {
+        let m: [String: String?] = ["type": type, "quality": quality, "year": year, "month": month, "replaces": replaces]
         let digest = SHA256.hash(data: canonicalJSON(m))
         return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: - Encode (what the phone writes)
     static func encodeSidecar(token: String, epoch: String, group: String, seq: Int, type: String,
-                              priority: String?, year: String?, month: String?, replaces: String?,
+                              quality: String?, year: String?, month: String?, replaces: String?,
                               device: String? = nil) -> Data {
-        let fp = fingerprint(type: type, priority: priority, year: year, month: month, replaces: replaces)
+        let fp = fingerprint(type: type, quality: quality, year: year, month: month, replaces: replaces)
         return canonicalJSON(["kind": "photo", "token": token, "epoch": epoch, "group": group,
-                              "seq": String(seq), "type": type, "priority": priority, "year": year,
+                              "seq": String(seq), "type": type, "quality": quality, "year": year,
                               "month": month, "replaces": replaces, "device": device, "fp": fp])
     }
 
     static func encodeSegment(token: String, epoch: String, group: String,
-                              priority: String?, year: String?, month: String?, seqs: String?) -> Data {
+                              quality: String?, year: String?, month: String?, seqs: String?) -> Data {
         canonicalJSON(["kind": "segment-complete", "token": token, "epoch": epoch, "group": group,
-                       "priority": priority, "year": year, "month": month, "seqs": seqs])
+                       "quality": quality, "year": year, "month": month, "seqs": seqs])
     }
 
     static func encodeSessionComplete(token: String, epoch: String) -> Data {

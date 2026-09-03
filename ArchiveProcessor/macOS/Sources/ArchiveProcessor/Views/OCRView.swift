@@ -78,7 +78,7 @@ struct OCRView: View {
     @State private var captureBoundaries: [Bool] = []
     @State private var captureTypes: [CaptureGroupType] = []
     /// Minimal on-phone tags from the same handoff (aligned to droppedFiles); empty otherwise.
-    @State private var capturePriorities: [String?] = []
+    @State private var captureQualities: [String?] = []
     @State private var captureYears: [Int?] = []
     @State private var captureMonths: [Int?] = []
     @State private var captureSubjects: [[String]] = []
@@ -221,7 +221,7 @@ struct OCRView: View {
             droppedFiles = staged
             captureBoundaries = processor.stagedCaptureBoundaries
             captureTypes = processor.stagedCaptureTypes
-            capturePriorities = processor.stagedCapturePriorities
+            captureQualities = processor.stagedCaptureQualities
             captureYears = processor.stagedCaptureYears
             captureMonths = processor.stagedCaptureMonths
             captureSubjects = processor.stagedCaptureSubjects
@@ -235,7 +235,7 @@ struct OCRView: View {
             droppedFiles = staged
             captureBoundaries = processor.stagedCaptureBoundaries
             captureTypes = processor.stagedCaptureTypes
-            capturePriorities = processor.stagedCapturePriorities
+            captureQualities = processor.stagedCaptureQualities
             captureYears = processor.stagedCaptureYears
             captureMonths = processor.stagedCaptureMonths
             captureSubjects = processor.stagedCaptureSubjects
@@ -578,7 +578,7 @@ struct OCRView: View {
                         .buttonStyle(.bordered)
                         .disabled(processor.isProcessing)   // don't mutate the input set mid-run
                         if !droppedFiles.isEmpty {
-                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; capturePriorities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
+                            Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
                                 .buttonStyle(.bordered)
                                 .disabled(processor.isProcessing)   // Clear mid-run would wipe processor.jobs out from under the running task (wasted paid calls, discarded output)
                         }
@@ -1043,7 +1043,7 @@ struct OCRView: View {
         if captureBoundaries.count == droppedFiles.count && !droppedFiles.isEmpty {
             processor.preGroupedBoundaries = captureBoundaries
             processor.preGroupedTypes = captureTypes
-            processor.preGroupedPriorities = capturePriorities.count == droppedFiles.count ? capturePriorities : []
+            processor.preGroupedQualities = captureQualities.count == droppedFiles.count ? captureQualities : []
             processor.preGroupedYears = captureYears.count == droppedFiles.count ? captureYears : []
             processor.preGroupedMonths = captureMonths.count == droppedFiles.count ? captureMonths : []
             processor.preGroupedSubjects = captureSubjects.count == droppedFiles.count ? captureSubjects : []
@@ -1051,7 +1051,7 @@ struct OCRView: View {
         } else {
             processor.preGroupedBoundaries = []
             processor.preGroupedTypes = []
-            processor.preGroupedPriorities = []
+            processor.preGroupedQualities = []
             processor.preGroupedYears = []
             processor.preGroupedMonths = []
             processor.preGroupedSubjects = []

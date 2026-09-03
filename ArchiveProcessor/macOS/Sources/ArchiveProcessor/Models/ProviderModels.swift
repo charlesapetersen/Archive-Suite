@@ -113,7 +113,7 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
     var enablesTagging: Bool { self != .none }
 
     /// Whether outputs from this mode get a trailing "Unread" tag. Applies to modes that generate
-    /// real tags (date/subject/priority); excludes "No tagging" and "Copy source tags".
+    /// real tags (date/subject/Quality); excludes "No tagging" and "Copy source tags".
     var stampsUnread: Bool { self != .none && self != .copySource }
 
     /// Whether the user manually tags each segment (any mode with a manual tagging UI).

@@ -53,24 +53,24 @@ object RelayObjectFormat {
 
     /** fp = SHA-256(canonicalJSON of the ingest-relevant metadata) → first 16 hex. Same fn+inputs as the
      *  Swift side → identical fp. Excludes `device` (a device-name change must not force a re-ingest, A1). */
-    fun fingerprint(type: String, priority: String?, year: String?, month: String?, replaces: String?): String {
-        val m = mapOf("type" to type, "priority" to priority, "year" to year, "month" to month, "replaces" to replaces)
+    fun fingerprint(type: String, quality: String?, year: String?, month: String?, replaces: String?): String {
+        val m = mapOf("type" to type, "quality" to quality, "year" to year, "month" to month, "replaces" to replaces)
         val digest = MessageDigest.getInstance("SHA-256").digest(canonicalJson(m))
         return digest.copyOfRange(0, 8).joinToString("") { "%02x".format(it.toInt() and 0xFF) }
     }
 
     fun encodeSidecar(token: String, epoch: String, group: String, seq: Int, type: String,
-                      priority: String?, year: String?, month: String?, replaces: String?, device: String? = null): ByteArray {
-        val fp = fingerprint(type, priority, year, month, replaces)
+                      quality: String?, year: String?, month: String?, replaces: String?, device: String? = null): ByteArray {
+        val fp = fingerprint(type, quality, year, month, replaces)
         return canonicalJson(mapOf("kind" to "photo", "token" to token, "epoch" to epoch, "group" to group,
-            "seq" to seq.toString(), "type" to type, "priority" to priority, "year" to year, "month" to month,
+            "seq" to seq.toString(), "type" to type, "quality" to quality, "year" to year, "month" to month,
             "replaces" to replaces, "device" to device, "fp" to fp))
     }
 
     fun encodeSegment(token: String, epoch: String, group: String,
-                      priority: String?, year: String?, month: String?, seqs: String?): ByteArray =
+                      quality: String?, year: String?, month: String?, seqs: String?): ByteArray =
         canonicalJson(mapOf("kind" to "segment-complete", "token" to token, "epoch" to epoch, "group" to group,
-            "priority" to priority, "year" to year, "month" to month, "seqs" to seqs))
+            "quality" to quality, "year" to year, "month" to month, "seqs" to seqs))
 
     fun encodeSessionComplete(token: String, epoch: String): ByteArray =
         canonicalJson(mapOf("kind" to "session-complete", "token" to token, "epoch" to epoch))

@@ -6,7 +6,7 @@ import Network
 /// `POST /session/complete`. All requests must carry `Authorization: Bearer <session token>`.
 /// `POST /photo` header contract (body = raw JPEG): REQUIRED `X-Group` (must pass `isSafeGroupId`) and
 /// `X-Seq` (Int ≥ 0); OPTIONAL `X-Type` (CaptureGroupType rawValue, default `document`), `X-Device`,
-/// `X-Priority`, `X-Year`/`X-Month` (Int), and `X-Replaces` (comma-joined reclassify chain of prior group ids
+/// `X-Quality` (`Q1`/`Q2`/`Q3` only; omission means Unrated), `X-Year`/`X-Month` (Int), and `X-Replaces` (comma-joined reclassify chain of prior group ids
 /// to tombstone, per SPEC A3; each id `isSafeGroupId`-checked individually).
 /// Same (group, seq) replaces idempotently. This contract is a shared hotspot — keep it in sync with the
 /// phones' `MacClient` (iOS `ArchiveCaptureiOS` + Android `ArchiveCapture`).
@@ -197,6 +197,9 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
                 case .unknownRoute:
                     timeout.cancel()
                     self.respond(conn, status: "404 Not Found", json: ["error": "unknown route"])
+                case .invalidMetadata:
+                    timeout.cancel()
+                    self.respond(conn, status: "400 Bad Request", json: ["error": "invalid X-Quality"])
                 case .tooLarge:
                     timeout.cancel()
                     self.respond(conn, status: "413 Payload Too Large", json: ["error": "request too large"])
@@ -297,7 +300,7 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
     }
 
     private enum AdmissionOutcome: String {
-        case accept, unauthorized, unknownRoute, tooLarge, overloaded
+        case accept, unauthorized, unknownRoute, invalidMetadata, tooLarge, overloaded
     }
 
     /// Parse only the HTTP head and return whatever bounded body prefix arrived in the same socket read.
@@ -359,8 +362,12 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         let bodyLimit: Int
         switch route {
         case "POST /photo":
+            guard CaptureValidation.isWireQuality(head.headers["x-quality"]) else { return .invalidMetadata }
             bodyLimit = maxPhotoBodyBytes
-        case "GET /ping", "POST /segment/complete", "POST /session/complete",
+        case "POST /segment/complete":
+            guard CaptureValidation.isWireQuality(head.headers["x-quality"]) else { return .invalidMetadata }
+            bodyLimit = maxControlBodyBytes
+        case "GET /ping", "POST /session/complete",
              "POST /phone/status", "POST /session/disconnect":
             bodyLimit = maxControlBodyBytes
         default:
@@ -508,7 +515,7 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
             let type = CaptureGroupType(rawValue: req.headers["x-type"] ?? "document") ?? .document
             let device = req.headers["x-device"]
             // Minimal on-phone tagging (all optional).
-            let priority = (req.headers["x-priority"]).flatMap { $0.isEmpty ? nil : $0 }
+            let quality = (req.headers["x-quality"]).flatMap { $0.isEmpty ? nil : $0 }
             let year = (req.headers["x-year"]).flatMap { Int($0) }
             let month = (req.headers["x-month"]).flatMap { Int($0) }
             // Optional: the reclassify chain (SPEC A3) — comma-joined prior group ids whose (group, seq)
@@ -523,7 +530,7 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
             let jpeg = req.body
             Task { @MainActor [weak self] in
                 let url = self?.session?.ingest(jpeg: jpeg, groupId: groupId, seq: seq, type: type,
-                                                priority: priority, year: year, month: month, deviceName: device)
+                                                quality: quality, year: year, month: month, deviceName: device)
                 if url != nil {
                     for rg in replacesChain where rg != groupId {
                         self?.session?.removePhotoIfSafe(groupId: rg, seq: seq)
@@ -541,13 +548,13 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
                 respond(conn, status: "400 Bad Request", json: ["error": "missing or invalid X-Group"])
                 return
             }
-            let priority = (req.headers["x-priority"]).flatMap { $0.isEmpty ? nil : $0 }
+            let quality = (req.headers["x-quality"]).flatMap { $0.isEmpty ? nil : $0 }
             let year = (req.headers["x-year"]).flatMap { Int($0) }
             let month = (req.headers["x-month"]).flatMap { Int($0) }
             Task { @MainActor [weak self] in
                 guard let self else { conn.cancel(); return }
                 let durable = self.session?.markSegmentComplete(
-                    groupId: groupId, priority: priority, year: year, month: month) ?? false
+                    groupId: groupId, quality: quality, year: year, month: month) ?? false
                 self.respond(conn, status: durable ? "200 OK" : "500 Internal Server Error",
                              json: ["ok": durable])
             }

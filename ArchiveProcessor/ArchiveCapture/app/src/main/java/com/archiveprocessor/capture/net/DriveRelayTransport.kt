@@ -60,11 +60,11 @@ class DriveRelayTransport(
         } catch (e: Exception) { false }
     }
 
-    override fun postPhoto(jpeg: ByteArray, group: String, seq: Int, type: String, priority: String?,
+    override fun postPhoto(jpeg: ByteArray, group: String, seq: Int, type: String, quality: String?,
                            year: Int?, month: Int?, device: String, replaces: String?): Boolean {
         val yearS = year?.toString(); val monthS = month?.toString()
         val repl = if (!replaces.isNullOrEmpty()) replaces else null
-        val fp = RelayObjectFormat.fingerprint(type, priority, yearS, monthS, repl)
+        val fp = RelayObjectFormat.fingerprint(type, quality, yearS, monthS, repl)
         val deadline = System.currentTimeMillis() + receiptWaitTimeoutMs
         var folder: String? = null; var wroteForEpoch: String? = null
         do {
@@ -77,7 +77,7 @@ class DriveRelayTransport(
             if (wroteForEpoch != e) {                                     // write-once per epoch (re-write if epoch changes)
                 upsert(f, RelayObjectFormat.jpegName(group, seq), jpeg, "image/jpeg")
                 upsert(f, RelayObjectFormat.sidecarName(group, seq),
-                    RelayObjectFormat.encodeSidecar(token, e, group, seq, type, priority, yearS, monthS, repl, device), "application/json")
+                    RelayObjectFormat.encodeSidecar(token, e, group, seq, type, quality, yearS, monthS, repl, device), "application/json")
                 wroteForEpoch = e
             }
             Thread.sleep(receiptPollMs)
@@ -85,10 +85,10 @@ class DriveRelayTransport(
         return false   // timeout → item stays FAILED → auto-retry re-enters (re-resolves epoch); local copy retained
     }
 
-    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?): Boolean {
+    override fun segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?): Boolean {
         val f = folderId() ?: return false; val e = epoch(f) ?: return false
         upsert(f, RelayObjectFormat.segmentName(group),
-            RelayObjectFormat.encodeSegment(token, e, group, priority, year?.toString(), month?.toString(), seqs), "application/json")
+            RelayObjectFormat.encodeSegment(token, e, group, quality, year?.toString(), month?.toString(), seqs), "application/json")
         return true
     }
 

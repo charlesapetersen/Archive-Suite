@@ -91,7 +91,7 @@ enum ProcessorTagVocabulary {
 /// a per-root filesystem harvest, from every tag the operator types, and from every tag write the app makes.
 ///
 /// **What changed for the operator.** Suggestions are now scoped to the archive rather than to every tagged
-/// file in the home folder, and they are *subjects* only (dates, priority, `Read`/`Unread` and the marker
+/// file in the home folder, and they are *subjects* only (dates, Quality, `Read`/`Unread` and the marker
 /// colour are filtered out on ingest — see `TagVocabulary`). Both are improvements for this UI, and both are
 /// honest narrowings: a tag that exists only on an unrelated personal file outside every archive root will
 /// no longer be suggested. Widening the harvest to `~/Desktop` would recover most of that, but it needs a

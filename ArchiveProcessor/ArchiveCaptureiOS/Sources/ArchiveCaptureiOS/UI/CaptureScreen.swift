@@ -80,7 +80,7 @@ struct CaptureScreen: View {
                                       selected: vm.selectedItemId == item.id && !vm.armed,
                                       armed: vm.selectedItemId == item.id && vm.armed)
                                     .onTapGesture { vm.tapItem(item.id) }
-                                    .onLongPressGesture { vm.toggleP10(item.id) }
+                                    .onLongPressGesture { vm.toggleQ3(item.id) }
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
@@ -128,7 +128,7 @@ struct CaptureScreen: View {
         .sheet(isPresented: Binding(get: { vm.pendingTagGroupId != nil },
                                     set: { if !$0 { vm.cancelTagSheet() } })) {
             SegmentTagSheet(recentYears: vm.recentYears,
-                            onApply: { p, y, m in vm.applyTagsAndContinue(priority: p, year: y, month: m) },
+                            onApply: { q, y, m in vm.applyTagsAndContinue(quality: q, year: y, month: m) },
                             onCancel: { vm.cancelTagSheet() })
                 .interactiveDismissDisabled(true)
         }
@@ -218,7 +218,7 @@ private struct Thumb: View {
     private var ring: Color {
         if armed { return .red }
         if selected { return .blue }
-        if item.priority == "P10" { return .yellow }
+        if item.quality == "Q3" { return .yellow }
         return .clear
     }
 

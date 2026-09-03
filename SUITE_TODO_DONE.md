@@ -5763,6 +5763,18 @@ explain why not.
   Reader (401) and Notes (847) unit suites; write-surface lint; and adversarial review clean. GUI control
   verification remains the requested owner tail. | Tier-2 shared-Core/tag path | M
 
+- [x] **W19.q7 — Companions: phone Quality control and Q-only protocol [M].** ✅ **SHIPPED 2026-09-03**
+  — this commit, `feat(processor): cut over companion quality protocol`. Android and iOS now offer Unrated
+  plus Q1–Q3 (with a per-page Q3 long-press); snapshots, HTTP headers, relay sidecars/segments, fingerprints,
+  CaptureSession manifests, and the Mac receiver carry `quality` rather than `priority`. The cutover is clean:
+  no P header, relay key, alias, or data migration is accepted or emitted. Unrated omits the wire field; the
+  Mac-only Q0 clear marker is consumed before Finder output. Golden relay bytes changed together for all three
+  platforms, and a Mac card's Q decision still overrides phone metadata before Process Files handoff.
+  **Tier-2 scratch verification:** Processor Debug build; Android `testDebugUnitTest`; iOS/Android relay-golden
+  byte test; file and Drive relay transport tests; file-relay integration; manifest persistence; recovery;
+  Process Files tag-warning; and tag-vocabulary tests all pass. On-device/emulator E2E remains the stated
+  owner tail. | Tier-2 Capture/Net/tag path | M
+
 - [x] **W19.q3 — Reader: Quality replaces the Priority column/filter/editor [M].** ✅ **SHIPPED 2026-08-28**
   — this commit, `feat(reader): replace Priority with Quality` (a self-referential SHA cannot be written
   into its own commit). The Reader now presents exactly one Quality

@@ -148,6 +148,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             let nameId = RelayObjectFormat.identityFromName(sidecar)
             let safe = CaptureValidation.isSafeGroupId(group) && seq >= 0
                 && chain.allSatisfy { CaptureValidation.isSafeGroupId($0) }
+                && CaptureValidation.isWireQuality(meta["quality"])
                 && (nameId == nil || (nameId!.group == group && nameId!.seq == seq))   // A10
             let mine = meta["token"] == token && meta["epoch"] == epoch
             guard mine else { continue }   // other run's epoch/token → ignore (never destroy), let sweep age it out
@@ -156,7 +157,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             }
 
             let k = key(group, seq)
-            let fp = RelayObjectFormat.fingerprint(type: type, priority: meta["priority"],
+            let fp = RelayObjectFormat.fingerprint(type: type, quality: meta["quality"],
                                                    year: meta["year"], month: meta["month"], replaces: replaces)
             if let e = processed[k], e.tombstoned {          // reclassified-away → drop the stale object
                 store.delete(sidecar); store.delete(jpg); report.sourcesDeleted.append(k); continue
@@ -171,7 +172,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             let ctype = CaptureGroupType(rawValue: type) ?? .document
             let s = session
             let url = await MainActor.run { () -> URL? in
-                s?.ingest(jpeg: jpeg, groupId: group, seq: seq, type: ctype, priority: meta["priority"],
+                s?.ingest(jpeg: jpeg, groupId: group, seq: seq, type: ctype, quality: meta["quality"],
                           year: meta["year"].flatMap { Int($0) }, month: meta["month"].flatMap { Int($0) },
                           deviceName: meta["device"])
             }
@@ -209,8 +210,10 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
         // ---- CONTROLS (after photos) ----
         for seg in segments {
             guard let data = store.readData(seg), let meta = RelayObjectFormat.parse(data),
-                  let group = meta["group"], meta["token"] == token, meta["epoch"] == epoch,
-                  CaptureValidation.isSafeGroupId(group) else { continue }
+                  let group = meta["group"], meta["token"] == token, meta["epoch"] == epoch else { continue }
+            guard CaptureValidation.isSafeGroupId(group), CaptureValidation.isWireQuality(meta["quality"]) else {
+                store.quarantine(seg); report.rejectedUnsafe.append(seg); continue
+            }
             let seqs = meta["seqs"]?.split(separator: ",").compactMap { Int($0) } ?? []
             let deferIt: Bool
             if !seqs.isEmpty {
@@ -224,7 +227,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             if deferIt { report.segmentsDeferred.append(group); continue }
             let s = session
             let durable = await MainActor.run {
-                s?.markSegmentComplete(groupId: group, priority: meta["priority"],
+                s?.markSegmentComplete(groupId: group, quality: meta["quality"],
                                        year: meta["year"].flatMap { Int($0) },
                                        month: meta["month"].flatMap { Int($0) }) ?? false
             }

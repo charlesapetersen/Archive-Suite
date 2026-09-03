@@ -29,7 +29,7 @@ class CaptureRecoverySequenceTest {
 
     private fun page(id: Long, file: File, group: String, seq: Int) = CapturedItem(
         id = id, file = file, groupId = group, seq = seq, type = GroupType.DOCUMENT,
-        priority = "P1", year = 1971, month = 4, state = UploadState.UPLOADED
+        quality = "Q1", year = 1971, month = 4, state = UploadState.UPLOADED
     )
 
     private fun save(store: SessionStore, items: List<CapturedItem>, group: String) =
@@ -77,7 +77,7 @@ class CaptureRecoverySequenceTest {
         assertTrue(restored.items.all { isSendable(it) })
 
         // 6. Review supplies the classification (what finalizeSegment stamps), and only then does it send.
-        val reviewed = adopted.single().copy(needsReview = false, priority = "P1", year = 1971, month = 4)
+        val reviewed = adopted.single().copy(needsReview = false, quality = "Q1", year = 1971, month = 4)
         assertTrue(isSendable(reviewed))
 
         // 7. The hold is durable in its own right: persisting it and reloading in yet another process keeps

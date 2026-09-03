@@ -29,18 +29,18 @@ enum FileRelayTestDriver {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         func w(_ name: String, _ data: Data) { try? data.write(to: dir.appendingPathComponent(name), options: .atomic) }
         let tok = "TESTTK", ep = "EP1"
-        // Fixed fixture: g1/7, document, P8, 1968-03, device X.
+        // Fixed fixture: g1/7, document, Q1, 1968-03, device X.
         w("g1__7.json", RelayObjectFormat.encodeSidecar(token: tok, epoch: ep, group: "g1", seq: 7, type: "document",
-            priority: "P8", year: "1968", month: "3", replaces: nil, device: "X"))
-        let fp = RelayObjectFormat.fingerprint(type: "document", priority: "P8", year: "1968", month: "3", replaces: nil)
+            quality: "Q1", year: "1968", month: "3", replaces: nil, device: "X"))
+        let fp = RelayObjectFormat.fingerprint(type: "document", quality: "Q1", year: "1968", month: "3", replaces: nil)
         w("g1__7.receipt.json", RelayObjectFormat.encodeReceipt(token: tok, epoch: ep, group: "g1", seq: 7, fp: fp))
         w("g1.segment.json", RelayObjectFormat.encodeSegment(token: tok, epoch: ep, group: "g1",
-            priority: "P8", year: "1968", month: "3", seqs: "6,7"))
+            quality: "Q1", year: "1968", month: "3", seqs: "6,7"))
         w("_session.complete.json", RelayObjectFormat.encodeSessionComplete(token: tok, epoch: ep))
         w("_epoch.json", RelayObjectFormat.encodeEpochMarker(token: tok, epoch: ep))
         // Nasty-unicode device fixture (escape check): right-single-quote + grinning-face emoji + C0 SOH.
         w("nasty__0.json", RelayObjectFormat.encodeSidecar(token: tok, epoch: ep, group: "nasty", seq: 0, type: "document",
-            priority: nil, year: nil, month: nil, replaces: nil, device: "X\u{2019}\u{1F600}\u{01}"))
+            quality: nil, year: nil, month: nil, replaces: nil, device: "X\u{2019}\u{1F600}\u{01}"))
         w("input.jpg", Data("jpeg-golden-bytes".utf8))   // trivial passthrough reference
         NSLog("FILERELAY: emitted golden fixtures to \(dir.path)")
     }
@@ -77,17 +77,17 @@ enum FileRelayTestDriver {
                                       processedURL: dir.appendingPathComponent("processed.json"), pollInterval: 999)
             r.prepareForTest(); return r
         }
-        func writePhoto(_ dir: URL, _ g: String, _ s: Int, _ type: String, priority: String? = nil,
+        func writePhoto(_ dir: URL, _ g: String, _ s: Int, _ type: String, quality: String? = nil,
                         year: String? = nil, month: String? = nil, replaces: String? = nil, ep: String? = nil) {
             // jpeg first, sidecar last (commit-marker order)
             try? Data("jpeg-\(g)-\(s)".utf8).write(to: dir.appendingPathComponent(RelayObjectFormat.jpegName(group: g, seq: s)))
             let side = RelayObjectFormat.encodeSidecar(token: token, epoch: ep ?? epoch, group: g, seq: s, type: type,
-                                                       priority: priority, year: year, month: month, replaces: replaces)
+                                                       quality: quality, year: year, month: month, replaces: replaces)
             try? side.write(to: dir.appendingPathComponent(RelayObjectFormat.sidecarName(group: g, seq: s)))
         }
         func has(_ dir: URL, _ name: String) -> Bool { fm.fileExists(atPath: dir.appendingPathComponent(name).path) }
         func photoCount(_ g: String) -> Int { session.photos.filter { $0.groupId == g }.count }
-        func priorityOf(_ g: String, _ s: Int) -> String? { session.photos.first { $0.groupId == g && $0.seq == s }?.priority }
+        func qualityOf(_ g: String, _ s: Int) -> String? { session.photos.first { $0.groupId == g && $0.seq == s }?.quality }
 
         // ── Case 1: happy path + (group,seq) idempotency ──
         do {
@@ -103,14 +103,14 @@ enum FileRelayTestDriver {
             rec("happy+idempotency", pass, "ingested=\(a.ingested.count) reSkip=\(b.skippedUnchanged) photos=\(photoCount("c1g0"))")
         }
 
-        // ── Case 2: metadata fingerprint (A1) — a P10 change re-ingests; identical does not ──
+        // ── Case 2: metadata fingerprint (A1) — a Q3 change re-ingests; identical does not ──
         do {
             let d = caseDir("c2"); let r = makeRcv(d)
             writePhoto(d, "c2g0", 0, "document"); _ = await r.scanOnce()
-            writePhoto(d, "c2g0", 0, "document", priority: "P10")              // fp differs
+            writePhoto(d, "c2g0", 0, "document", quality: "Q3")                // fp differs
             let b = await r.scanOnce()
-            let pass = b.ingested.contains("c2g0\u{1}0") && priorityOf("c2g0", 0) == "P10"
-            rec("fingerprint-metadata-change(A1)", pass, "reIngested=\(b.ingested) priority=\(priorityOf("c2g0",0) ?? "nil")")
+            let pass = b.ingested.contains("c2g0\u{1}0") && qualityOf("c2g0", 0) == "Q3"
+            rec("fingerprint-metadata-change(A1)", pass, "reIngested=\(b.ingested) quality=\(qualityOf("c2g0",0) ?? "nil")")
         }
 
         // ── Case 3: nil ingest → NO receipt, source NOT deleted (never-lose hinge) ──
@@ -172,7 +172,7 @@ enum FileRelayTestDriver {
         do {
             let d = caseDir("c7"); let r = makeRcv(d)
             writePhoto(d, "c7g2", 0, "document")
-            try? RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: "c7g2", priority: nil,
+            try? RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: "c7g2", quality: nil,
                                                  year: "1968", month: "3", seqs: "0,1")
                 .write(to: d.appendingPathComponent(RelayObjectFormat.segmentName(group: "c7g2")))
             let a = await r.scanOnce()                                          // seq 1 missing → defer
@@ -191,7 +191,7 @@ enum FileRelayTestDriver {
             // A10: filename c8ok__0 but body group c8bad (paired jpg matches the BODY group so it's "ready")
             try? Data("j".utf8).write(to: d.appendingPathComponent("c8bad__0.jpg"))
             try? RelayObjectFormat.encodeSidecar(token: token, epoch: epoch, group: "c8bad", seq: 0, type: "document",
-                                                 priority: nil, year: nil, month: nil, replaces: nil)
+                                                 quality: nil, year: nil, month: nil, replaces: nil)
                 .write(to: d.appendingPathComponent("c8ok__0.json"))
             // wrong-epoch object → ignored (never ingested, never destroyed)
             writePhoto(d, "c8ep", 0, "document", ep: "OLD-EPOCH")
@@ -208,7 +208,7 @@ enum FileRelayTestDriver {
             let d = caseDir("c9"); let r = makeRcv(d)
             writePhoto(d, "c9g0", 0, "document"); _ = await r.scanOnce()
             let marker = RelayObjectFormat.segmentName(group: "c9g0")
-            try? RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: "c9g0", priority: "P8",
+            try? RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: "c9g0", quality: "Q1",
                                                  year: "1972", month: "6", seqs: "0")
                 .write(to: d.appendingPathComponent(marker))
             session.manifestWriteOverride = { _, _ in false }
@@ -240,6 +240,37 @@ enum FileRelayTestDriver {
                 && session.completedDocGroups.contains("c10g0")
             rec("session-control-retained-until-manifest-durable(B10)", retained && recovered,
                 "retained=\(retained) recovered=\(recovered)")
+        }
+
+        // ── Case 11: the relay boundary admits only Q1...Q3; Q0 is Mac-internal and P is not an alias. ──
+        do {
+            let d = caseDir("c11"); let r = makeRcv(d)
+            writePhoto(d, "c11q0", 0, "document", quality: "Q0")
+            writePhoto(d, "c11p", 0, "document", quality: "P10")
+            let badQ0 = RelayObjectFormat.sidecarName(group: "c11q0", seq: 0)
+            let badP = RelayObjectFormat.sidecarName(group: "c11p", seq: 0)
+            let photos = await r.scanOnce()
+            let photosRejected = Set(photos.rejectedUnsafe).isSuperset(of: [badQ0, badP])
+                && !has(d, badQ0) && !has(d, badP)
+
+            writePhoto(d, "c11seg", 0, "document", quality: "Q1")
+            _ = await r.scanOnce()
+            let q0Segment = RelayObjectFormat.segmentName(group: "c11seg")
+            try? RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: "c11seg", quality: "Q0",
+                                                  year: nil, month: nil, seqs: "0")
+                .write(to: d.appendingPathComponent(q0Segment))
+            let q0 = await r.scanOnce()
+
+            let pSegment = RelayObjectFormat.segmentName(group: "c11pseg")
+            try? RelayObjectFormat.encodeSegment(token: token, epoch: epoch, group: "c11pseg", quality: "P10",
+                                                  year: nil, month: nil, seqs: nil)
+                .write(to: d.appendingPathComponent(pSegment))
+            let p = await r.scanOnce()
+            let controlsRejected = Set(q0.rejectedUnsafe + p.rejectedUnsafe).isSuperset(of: [q0Segment, pSegment])
+                && !has(d, q0Segment) && !has(d, pSegment)
+                && !session.completedDocGroups.contains("c11seg")
+            rec("quality-ingress-rejects-Q0-and-P-aliases(W19.q7)", photosRejected && controlsRejected,
+                "photos=\(photos.rejectedUnsafe) controls=\(q0.rejectedUnsafe + p.rejectedUnsafe)")
         }
 
         session.clear()   // tidy the test session folder

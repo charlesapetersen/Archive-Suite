@@ -859,12 +859,11 @@ the same three lines and landing them separately would silently revert part of t
 Owner decision from the wishlist review, refined: (a) Notes mirrors its front-matter **date** into Finder tags
 (reuse the existing Year/Month/Day/Decade facets — **no** SPEC change); (b) **no author** tags; (c) a **single
 rating facet, `Q1`/`Q2`/`Q3`**, that **MERGES WITH + REPLACES the Priority facet** — they were redundant
-("how important is this document"). Owner-locked contract: 0–3 scale, **`Q0`/unrated writes NO tag** (so the wire
-only carries `Q1`/`Q2`/`Q3`); **`Q3` = old `P10`**, mapping `P10`→`Q3` / `P9`→`Q2` / `P8`→`Q1` / `P7`→unrated.
-Priority is **retired** from public app surfaces. Until W19.q7 changes the current phone wire field, the
-companions emit `P7`–`P10` and the Mac boundary translates it (`P7`→unrated; `P8`–`P10`→`Q1`–`Q3`); no historical
-data migration is required. Human-set everywhere, never LLM-emitted: Notes (front-matter), Reader (edit),
-Processor's interactive tagging, and the phone companions.
+("how important is this document"). Owner-locked contract: 0–3 scale, **Unrated writes NO tag** (so the wire
+only carries `Q1`/`Q2`/`Q3`); `Q3` is highest. Priority is **retired** from public app surfaces and the
+phone↔Mac protocol: both companions and the Mac exchange only Q tokens, omitting the field for Unrated.
+There is no P alias, migration, or backward-compatibility path. Human-set everywhere, never LLM-emitted:
+Notes (front-matter), Reader (edit), Processor's interactive tagging, and the phone companions.
 Shared-contract (Tier-2) — SPEC first, then the shared parser, then each app + companions; every code item must
 **build + test all three apps**, scratch-only. **This wave REPLACES existing priority UI/plumbing — merge, don't
 add a second control alongside.**
@@ -873,15 +872,6 @@ add a second control alongside.**
   `ArchiveCore.DocumentTags.sortDateKey`; **no new vocabulary, no SPEC change**). Independent of the quality chain.
   Tier-2 (projector tag write) — scratch `.md` only; the DEBUG scratch-write guard applies. Related hardening:
   W15.tu3 (not a hard blocker). | ArchiveNotes/.../Core/NotesTagProjector.swift | M | med | none
-- [ ] **W19.q7 — Companions: phone priority control → Quality; emit `Q`** (blocked-on: W19.q6) **[M].** The old
-  phone priority picker/per-page toggle becomes the 0–3 **quality** control on **both** companions
-  (`ArchiveCapture/` Android + `ArchiveCaptureiOS/`), emitting `Q1`–`Q3` (map the 4-level `P7`–`P10` picker → 3
-  levels + none; `P10`→`Q3`). **Phone↔Mac protocol is a SHARED HOTSPOT — change all sides together:** the
-  companion `MacClient` + the Mac `Net/CaptureServer` route (+ `RelayObjectFormat` if the relay carries it). The
-  code change is small (a token/level swap), but it spans the wire contract. Alias-on-read (q2) means an old-build
-  phone still works mid-rollout, so no flag-day. Daemon-buildable (code + Android/iOS builds); **on-device /
-  emulator E2E (`scripts/e2e-phone-mac.sh`) = owner tail** (companions have no unit tests — the E2E is the gate).
-  | files: ArchiveProcessor/ArchiveCapture/, ArchiveProcessor/ArchiveCaptureiOS/, Net/CaptureServer.swift, Net/RelayObjectFormat.swift | M | med | owner(E2E)
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 From the 2026-07-28 Daemon Report walkthrough. The headless VM lane is now shared by Reader and Notes:

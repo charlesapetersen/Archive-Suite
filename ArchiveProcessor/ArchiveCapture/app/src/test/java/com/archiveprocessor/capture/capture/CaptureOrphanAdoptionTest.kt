@@ -45,7 +45,7 @@ class CaptureOrphanAdoptionTest {
     }
 
     @Test fun `review releases the page for sending`() {
-        val reviewed = orphan(stale = true).copy(needsReview = false, priority = "P2", year = 1971, month = 4)
+        val reviewed = orphan(stale = true).copy(needsReview = false, quality = "Q2", year = 1971, month = 4)
         assertTrue(isSendable(reviewed))
     }
 

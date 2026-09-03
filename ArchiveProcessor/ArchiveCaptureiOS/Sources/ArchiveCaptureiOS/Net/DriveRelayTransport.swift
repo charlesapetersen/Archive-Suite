@@ -43,11 +43,11 @@ struct DriveRelayTransport: SegmentTransport {
             && m["group"] == group && m["seq"] == String(seq) && m["fp"] == fp
     }
 
-    func postPhoto(jpeg: Data, group: String, seq: Int, type: String, priority: String?,
+    func postPhoto(jpeg: Data, group: String, seq: Int, type: String, quality: String?,
                    year: Int?, month: Int?, device: String, replaces: String?) async -> Bool {
         let yearS = year.map(String.init), monthS = month.map(String.init)
         let repl = (replaces?.isEmpty == false) ? replaces : nil
-        let fp = RelayObjectFormat.fingerprint(type: type, priority: priority, year: yearS, month: monthS, replaces: repl)
+        let fp = RelayObjectFormat.fingerprint(type: type, quality: quality, year: yearS, month: monthS, replaces: repl)
         let deadline = Date().addingTimeInterval(receiptWaitTimeout)
         var folder: String?, wroteForEpoch: String?
         repeat {
@@ -59,7 +59,7 @@ struct DriveRelayTransport: SegmentTransport {
                 try? upsert(f, RelayObjectFormat.jpegName(group: group, seq: seq), jpeg, "image/jpeg")
                 try? upsert(f, RelayObjectFormat.sidecarName(group: group, seq: seq),
                        RelayObjectFormat.encodeSidecar(token: token, epoch: e, group: group, seq: seq, type: type,
-                           priority: priority, year: yearS, month: monthS, replaces: repl, device: device), "application/json")
+                           quality: quality, year: yearS, month: monthS, replaces: repl, device: device), "application/json")
                 wroteForEpoch = e
             }
             try? await Task.sleep(nanoseconds: UInt64(receiptPollInterval * 1_000_000_000))
@@ -67,12 +67,12 @@ struct DriveRelayTransport: SegmentTransport {
         return false   // timeout → .failed → auto-retry re-enters (re-resolves epoch); local copy retained
     }
 
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
+    func segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
         guard let f = folderId(), let e = epoch(f) else { return false }
         do {
             try upsert(f, RelayObjectFormat.segmentName(group: group),
                    RelayObjectFormat.encodeSegment(token: token, epoch: e, group: group,
-                       priority: priority, year: year.map(String.init), month: month.map(String.init), seqs: seqs), "application/json")
+                       quality: quality, year: year.map(String.init), month: month.map(String.init), seqs: seqs), "application/json")
             return true
         } catch { return false }
     }

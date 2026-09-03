@@ -26,11 +26,11 @@ struct CapturedPhoto: Identifiable, Equatable {
     let seq: Int             // phone capture sequence (global order)
     let type: CaptureGroupType
     let receivedAt: Date
-    /// Minimal on-phone tagging. Priority is per-photo ("P10"…"P7"; a page can override its
+    /// Minimal on-phone tagging. Quality is per-photo ("Q1"…"Q3"; a page can override its
     /// group's default). Year/month are the group's date, repeated on each of its photos. Mutable:
     /// pages stream in as shot (before tagging), then `markSegmentComplete` attaches the segment's
     /// tags when the phone ends the segment.
-    var priority: String?
+    var quality: String?
     var year: Int?
     var month: Int?
 
@@ -47,8 +47,8 @@ struct CaptureGroup: Identifiable {
     /// Group date = first non-nil year/month among its photos (all should match).
     var year: Int? { photos.compactMap { $0.year }.first }
     var month: Int? { photos.compactMap { $0.month }.first }
-    /// The group's priority default (first page's; per-page P10 overrides live on the photos).
-    var priority: String? { photos.first?.priority }
+    /// The group's quality default (first page's; per-page Q3 overrides live on the photos).
+    var quality: String? { photos.first?.quality }
 }
 
 /// Tags the Mac operator enters for a segment during Live Capture. Subjects are the piece the phone

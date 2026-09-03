@@ -55,7 +55,7 @@ struct MacClient {
     /// POST one JPEG (raw body) with grouping + minimal-tag headers. Returns true on 2xx.
     /// The Mac requires a non-empty X-Group and a numeric X-Seq (else 400), so both are always sent.
     func postPhoto(jpeg: Data, group: String, seq: Int, type: String,
-                   priority: String?, year: Int?, month: Int?, device: String,
+                   quality: String?, year: Int?, month: Int?, device: String,
                    replaces: String? = nil) async -> Bool {
         guard var req = makeRequest("/photo", method: "POST") else { return false }
         req.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
@@ -65,8 +65,8 @@ struct MacClient {
         req.setValue(device, forHTTPHeaderField: "X-Device")
         // The old group this photo replaces (reclassify) — the Mac drops the orphaned old copy.
         if let replaces, !replaces.isEmpty { req.setValue(replaces, forHTTPHeaderField: "X-Replaces") }
-        if let p = priority, !p.trimmingCharacters(in: .whitespaces).isEmpty {
-            req.setValue(p, forHTTPHeaderField: "X-Priority")
+        if let q = quality, !q.trimmingCharacters(in: .whitespaces).isEmpty {
+            req.setValue(q, forHTTPHeaderField: "X-Quality")
         }
         if let y = year { req.setValue(String(y), forHTTPHeaderField: "X-Year") }
         if let m = month { req.setValue(String(m), forHTTPHeaderField: "X-Month") }
@@ -82,11 +82,11 @@ struct MacClient {
 
     /// End of a document segment: its pages already streamed in via `postPhoto`; this tells the Mac the
     /// group is complete (so its tag card can appear) and carries the segment's tags. No image bytes.
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
+    func segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?) async -> Bool {
         guard var req = makeRequest("/segment/complete", method: "POST") else { return false }
         req.setValue(group, forHTTPHeaderField: "X-Group")
-        if let p = priority, !p.trimmingCharacters(in: .whitespaces).isEmpty {
-            req.setValue(p, forHTTPHeaderField: "X-Priority")
+        if let q = quality, !q.trimmingCharacters(in: .whitespaces).isEmpty {
+            req.setValue(q, forHTTPHeaderField: "X-Quality")
         }
         if let y = year { req.setValue(String(y), forHTTPHeaderField: "X-Year") }
         if let m = month { req.setValue(String(m), forHTTPHeaderField: "X-Month") }

@@ -527,9 +527,9 @@ enum ManifestPersistenceTestDriver {
 
         typealias Entry = CaptureSession.ManifestEntry
         let entries = [
-            Entry(name: "00001-gDoc.jpg", groupId: "gDoc", seq: 1, type: "document", priority: "P8", year: 1968, month: 3),
-            Entry(name: "00002-gDoc.jpg", groupId: "gDoc", seq: 2, type: "document", priority: nil, year: 1968, month: 3),
-            Entry(name: "00003-gBox.jpg", groupId: "gBox", seq: 3, type: "box", priority: nil, year: nil, month: nil),
+            Entry(name: "00001-gDoc.jpg", groupId: "gDoc", seq: 1, type: "document", quality: "Q1", year: 1968, month: 3),
+            Entry(name: "00002-gDoc.jpg", groupId: "gDoc", seq: 2, type: "document", quality: nil, year: 1968, month: 3),
+            Entry(name: "00003-gBox.jpg", groupId: "gBox", seq: 3, type: "box", quality: nil, year: nil, month: nil),
         ]
         let completed: Set<String> = ["gDoc"]   // gDoc's segment was signalled complete; gBox is a marker
 
@@ -544,7 +544,7 @@ enum ManifestPersistenceTestDriver {
         check("photo entries survive the round-trip (count + fields)",
               roundTrip?.entries.count == 3
               && roundTrip?.entries.first?.groupId == "gDoc"
-              && roundTrip?.entries.first?.priority == "P8"
+              && roundTrip?.entries.first?.quality == "Q1"
               && roundTrip?.entries.first?.year == 1968
               && roundTrip?.entries.last?.type == "box")
 
@@ -590,28 +590,28 @@ enum ManifestPersistenceTestDriver {
         let session = CaptureSession()
         session.beginStageSessionForTest()   // never inherit live-processing defaults / launch OCR or network
         let ingested = session.ingest(jpeg: Data("synthetic page".utf8), groupId: "gDurable", seq: 99,
-                                      type: .document, priority: nil, year: nil, month: nil,
+                                      type: .document, quality: nil, year: nil, month: nil,
                                       deviceName: "ManifestTest")
         check("B10: synthetic page ingests before completion test", ingested != nil)
         session.manifestWriteOverride = { _, _ in false }
         let failedCompletion = session.markSegmentComplete(
-            groupId: "gDurable", priority: "P8", year: 1972, month: 6)
+            groupId: "gDurable", quality: "Q1", year: 1972, month: 6)
         check("B10: manifest failure refuses completion acknowledgement", !failedCompletion)
         check("B10: manifest failure rolls completion/card state back", session.pendingTagGroup == nil)
         check("B10: manifest failure rolls photo metadata back",
               session.photos.first(where: { $0.groupId == "gDurable" })?.year == nil
-              && session.photos.first(where: { $0.groupId == "gDurable" })?.priority == nil)
+              && session.photos.first(where: { $0.groupId == "gDurable" })?.quality == nil)
         session.manifestWriteOverride = nil
         let retriedCompletion = session.markSegmentComplete(
-            groupId: "gDurable", priority: "P8", year: 1972, month: 6)
+            groupId: "gDurable", quality: "Q1", year: 1972, month: 6)
         check("B10: retry acknowledges after durable manifest write", retriedCompletion)
         check("B10: successful retry exposes the completed tag card with metadata",
               session.pendingTagGroup?.id == "gDurable"
               && session.photos.first(where: { $0.groupId == "gDurable" })?.year == 1972
-              && session.photos.first(where: { $0.groupId == "gDurable" })?.priority == "P8")
+              && session.photos.first(where: { $0.groupId == "gDurable" })?.quality == "Q1")
 
         let sessionPhoto = session.ingest(jpeg: Data("synthetic final page".utf8), groupId: "gSession",
-                                          seq: 100, type: .document, priority: nil, year: nil, month: nil,
+                                          seq: 100, type: .document, quality: nil, year: nil, month: nil,
                                           deviceName: "ManifestTest")
         check("B10: final open group ingests before session-completion test", sessionPhoto != nil)
         session.manifestWriteOverride = { _, _ in false }
@@ -628,7 +628,7 @@ enum ManifestPersistenceTestDriver {
         check("B10: initial operator Finish can wait on unresolved tag cards",
               session.liveProcessor.pendingFinish)
         let latePhoto = session.ingest(jpeg: Data("synthetic late page".utf8), groupId: "gLate",
-                                       seq: 101, type: .document, priority: nil, year: nil, month: nil,
+                                       seq: 101, type: .document, quality: nil, year: nil, month: nil,
                                        deviceName: "ManifestTest")
         check("B10: late group ingests while Finish is pending", latePhoto != nil)
         session.manifestWriteOverride = { _, _ in false }
@@ -645,7 +645,7 @@ enum ManifestPersistenceTestDriver {
               restoredSession.pendingTagGroup?.id == "gDurable"
               && restoredSession.completedDocGroups.isSuperset(of: ["gSession", "gLate"])
               && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.year == 1972
-              && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.priority == "P8")
+              && restoredSession.photos.first(where: { $0.groupId == "gDurable" })?.quality == "Q1")
 
         // --- W23.m7: the Mac tag card's Apply/Skip decision is durable BEFORE anything acts on it.
         // Same synthetic temp session (no corpus, no OCR, no network, no GUI). Two halves are proven:
@@ -674,11 +674,11 @@ enum ManifestPersistenceTestDriver {
         }
 
         let cardPhoto = session.ingest(jpeg: Data("synthetic card page".utf8), groupId: "gCard", seq: 102,
-                                       type: .document, priority: "P10", year: nil, month: nil,
+                                       type: .document, quality: "Q3", year: nil, month: nil,
                                        deviceName: "ManifestTest")
         check("W23.m7: a page for the tag-card group ingests", cardPhoto != nil)
         check("W23.m7: its segment completes and surfaces exactly one card",
-              session.markSegmentComplete(groupId: "gCard", priority: nil, year: nil, month: nil)
+              session.markSegmentComplete(groupId: "gCard", quality: nil, year: nil, month: nil)
               && session.pendingTagGroup?.id == "gCard")
 
         // (a) Save against a failing write: refused, rolled back, card kept, operator told, nothing acted on.
@@ -720,8 +720,8 @@ enum ManifestPersistenceTestDriver {
               && session.macTags["gCard"]?.quality == 2)
         let taggedHandoff = session.orderedFilesAndGroups()
         let cardHandoffIndex = taggedHandoff.files.firstIndex { $0.lastPathComponent == "00102-gCard.jpg" }
-        check("W19.q6: a Mac Quality choice overrides the phone's P10 before Process Files handoff",
-              cardHandoffIndex.map { taggedHandoff.priorities[$0] == "Q2" } == true)
+        check("W19.q7: a Mac Quality choice overrides the phone's Q3 before Process Files handoff",
+              cardHandoffIndex.map { taggedHandoff.qualities[$0] == "Q2" } == true)
         check("W23.m7: live processing is told exactly once, and only for the durable decision",
               notified == ["gCard"])
         check("W23.m7: at the moment live processing was told, the decision was ALREADY on disk",
@@ -729,11 +729,11 @@ enum ManifestPersistenceTestDriver {
 
         // Skip is a decision too: same contract (a relaunch must not re-ask for an already-produced segment).
         let skipPhoto = session.ingest(jpeg: Data("synthetic skip page".utf8), groupId: "gSkip", seq: 103,
-                                       type: .document, priority: nil, year: nil, month: nil,
+                                       type: .document, quality: nil, year: nil, month: nil,
                                        deviceName: "ManifestTest")
         check("W23.m7: a page for the skip-card group ingests + completes",
               skipPhoto != nil
-              && session.markSegmentComplete(groupId: "gSkip", priority: nil, year: nil, month: nil)
+              && session.markSegmentComplete(groupId: "gSkip", quality: nil, year: nil, month: nil)
               && session.pendingTagGroup?.id == "gSkip")
         session.manifestWriteOverride = { _, _ in false }
         session.statusMessage = "Listening"
@@ -802,6 +802,16 @@ enum ManifestPersistenceTestDriver {
               CaptureServer._testAdmission(
                 requestPrefix: requestPrefix(contentLength: "4096"),
                 token: serverToken, aggregateAvailable: 4096) == "accept")
+        check("W19.q7: LAN ingress accepts only canonical Q1...Q3 Quality values",
+              CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(contentLength: "0", extraHeaders: ["X-Quality: Q3"]),
+                token: serverToken) == "accept"
+              && CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(contentLength: "0", extraHeaders: ["X-Quality: Q0"]),
+                token: serverToken) == "invalidMetadata"
+              && CaptureServer._testAdmission(
+                requestPrefix: requestPrefix(contentLength: "0", extraHeaders: ["X-Quality: P10"]),
+                token: serverToken) == "invalidMetadata")
         check("B17: duplicate Content-Length framing is rejected",
               CaptureServer._testAdmission(
                 requestPrefix: requestPrefix(

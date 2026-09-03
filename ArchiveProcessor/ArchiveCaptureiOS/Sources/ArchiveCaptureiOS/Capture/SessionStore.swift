@@ -7,10 +7,10 @@ struct SessionStore {
     /// Persisted so an app-kill between End segment and the ack can't strand the document.
     struct EndedSeg: Codable {
         var group: String
-        var priority: String?
+        var quality: String?
         var year: Int?
         var month: Int?
-        /// Comma-joined page seqs snapshotted at End-segment (SPEC A5). Optional for backward compat.
+        /// Comma-joined page seqs snapshotted at End-segment (SPEC A5).
         var seqs: String?
     }
 
@@ -22,7 +22,7 @@ struct SessionStore {
         /// Non-nil only if the app was mid-tagging a segment when it stopped — so recovery re-opens the
         /// tag card only in that case, not when the user was still shooting an unfinished segment.
         var pendingTagGroupId: String?
-        /// Ended-but-unacked segments (optional for backward compatibility with older snapshots).
+        /// Ended-but-unacked segments.
         var endedSegments: [EndedSeg]?
     }
 

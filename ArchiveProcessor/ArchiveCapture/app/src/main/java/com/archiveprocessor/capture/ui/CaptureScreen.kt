@@ -231,7 +231,7 @@ fun CaptureScreen(vm: CaptureViewModel) {
                      modifier = Modifier.fillMaxWidth())
             }
 
-            // Current segment (auto-scrolling; tap a page to toggle its P10 override). Show EVERY item the
+            // Current segment (auto-scrolling; tap a page to toggle its Q3 override). Show EVERY item the
             // model holds — including pages already UPLOADED — so the operator watches the segment grow as
             // photos are taken. Membership is decided solely by the model (`removeConfirmed` keeps
             // current-segment pages); do NOT gate visibility on upload/transfer state here.
@@ -243,7 +243,7 @@ fun CaptureScreen(vm: CaptureViewModel) {
                             isSelected = vm.selectedItemId == item.id && !vm.armed,
                             isArmed = vm.selectedItemId == item.id && vm.armed,
                             onTap = { vm.tapItem(item.id) },
-                            onLongPress = { vm.toggleP10(item.id) }
+                            onLongPress = { vm.toggleQ3(item.id) }
                         )
                     }
                 }
@@ -452,14 +452,14 @@ private fun Thumb(
         UploadState.FAILED -> Color(0xFFFF3B30)
         UploadState.PENDING -> Color.Gray
     }
-    val isP10 = item.priority == "P10"
+    val isQ3 = item.quality == "Q3"
     val ring = when {
         isArmed -> Color(0xFFFF3B30)     // red: tap again to delete
         isSelected -> Color(0xFF0A84FF)  // blue: selected
-        isP10 -> Color(0xFFFFD60A)       // gold: P10
+        isQ3 -> Color(0xFFFFD60A)        // gold: Q3
         else -> null
     }
-    // TalkBack label: type + status (+ P10 / delete-armed) so the thumbnails aren't unlabeled.
+    // TalkBack label: type + status (+ Q3 / delete-armed) so the thumbnails aren't unlabeled.
     val typeLabel = when (item.type) {
         GroupType.DOCUMENT -> "Document page"
         GroupType.BOX -> "Box marker"
@@ -474,7 +474,7 @@ private fun Thumb(
     }
     val a11yLabel = buildString {
         append(typeLabel); append(", "); append(statusLabel)
-        if (isP10) append(", priority P10")
+        if (isQ3) append(", quality Q3")
         if (isArmed) append(", tap again to delete")
     }
     Box(
@@ -498,9 +498,9 @@ private fun Thumb(
                 Text("✓", color = Color.White, style = MaterialTheme.typography.labelSmall)
             }
         }
-        if (isP10 && !isArmed) {
+        if (isQ3 && !isArmed) {
             Box(Modifier.align(Alignment.TopEnd).padding(2.dp).clip(RoundedCornerShape(3.dp)).background(Color.Red)) {
-                Text("P10", color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 2.dp))
+                Text("Q3", color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 2.dp))
             }
         }
         if (isArmed) {

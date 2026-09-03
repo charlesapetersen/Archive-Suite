@@ -16,7 +16,7 @@ enum ConnectPhase: Equatable {
 }
 
 /// Owns the capture session: the paired endpoint, the current group, captured items, minimal on-phone
-/// tagging (priority + date), and the durable upload of each item. Mirrors the Android CaptureViewModel,
+/// tagging (quality + date), and the durable upload of each item. Mirrors the Android CaptureViewModel,
 /// including the segment-transfer UX (photos leave the phone once the Mac confirms them).
 @MainActor
 final class CaptureViewModel: ObservableObject {
@@ -46,7 +46,7 @@ final class CaptureViewModel: ObservableObject {
     /// force-completes any still-open group). A group's signal is emitted only once ALL its pages are
     /// confirmed uploaded (see `trySendSegmentComplete`) so the Mac can never complete a partial segment,
     /// and is retried until acked. Mirrors Android.
-    private struct SegTags { let priority: String?; let year: Int?; let month: Int?; let seqs: String? }
+    private struct SegTags { let quality: String?; let year: Int?; let month: Int?; let seqs: String? }
     private var endedSegments: [String: SegTags] = [:]
     /// Group ids whose completion signal is being sent right now, so the auto-retry loop, the
     /// upload-success hook, and resume can't fire the same one concurrently.
@@ -213,20 +213,20 @@ final class CaptureViewModel: ObservableObject {
         flash(type == .box ? "Box → Mac" : "Folder → Mac")
     }
 
-    /// Long-press a page thumbnail to toggle a per-page P10 override.
-    func toggleP10(_ id: Int64) {
+    /// Long-press a page thumbnail to toggle a per-page Q3 override.
+    func toggleQ3(_ id: Int64) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
-        items[i].priority = (items[i].priority == "P10") ? nil : "P10"
+        items[i].quality = (items[i].quality == "Q3") ? nil : "Q3"
         persist()
-        // The page may already be on the Mac (pages stream as shot) — re-send it so the P10 override lands
-        // (idempotent group+seq replace). The segment-complete signal carries only the group's priority, so
-        // a per-page P10 must ride the photo itself. If it's still uploading, defer via needsResend so the
+        // The page may already be on the Mac (pages stream as shot) — re-send it so the Q3 override lands
+        // (idempotent group+seq replace). The segment-complete signal carries only the group's quality, so
+        // a per-page Q3 must ride the photo itself. If it's still uploading, defer via needsResend so the
         // toggle isn't dropped (the completion handler re-sends with the current value).
         resendOrEnqueue(items[i])
     }
 
     /// Re-send a just-changed item: enqueue now if it's idle, else flag it to be re-sent when its in-flight
-    /// upload settles. This is the fix for a per-page P10 toggle / reclassify racing an in-flight upload —
+    /// upload settles. This is the fix for a per-page Q3 toggle / reclassify racing an in-flight upload —
     /// the `inFlightUploads` guard would otherwise suppress the re-enqueue and silently drop the change.
     private func resendOrEnqueue(_ item: CapturedItem) {
         if inFlightUploads.contains(item.id) { markNeedsResend(item.id) } else { enqueueUpload(item) }
@@ -286,7 +286,7 @@ final class CaptureViewModel: ObservableObject {
         let oldGroupId = items[i].groupId
         items[i].type = type
         items[i].groupId = Self.newGroupId()
-        items[i].priority = nil
+        items[i].quality = nil
         items[i].state = .pending
         // Build the full reclassify chain (SPEC A3): G→H→I carries "G,H" so the Mac tombstones every
         // prior group, not just the immediate predecessor. Append the old group to any existing chain.
@@ -316,8 +316,8 @@ final class CaptureViewModel: ObservableObject {
 
     /// Tag sheet → "Apply & continue" or "Skip" (Skip passes nils): apply the optional pre-fill tags and
     /// end the current document segment.
-    func applyTagsAndContinue(priority: String?, year: Int?, month: Int?) {
-        finalizeSegment(priority: priority, year: year, month: month)
+    func applyTagsAndContinue(quality: String?, year: Int?, month: Int?) {
+        finalizeSegment(quality: quality, year: year, month: month)
     }
 
     /// Tag sheet → "Cancel — keep shooting": the operator tapped End segment by mistake. Close the sheet
@@ -331,7 +331,7 @@ final class CaptureViewModel: ObservableObject {
     /// "ended, awaiting Mac ack". The completion signal — which is what makes the Mac present this segment's
     /// tag card — is then emitted once ALL its pages are confirmed uploaded (never for a partial segment),
     /// and retried until acked.
-    private func finalizeSegment(priority: String?, year: Int?, month: Int?) {
+    private func finalizeSegment(quality: String?, year: Int?, month: Int?) {
         guard let gid = pendingTagGroupId else { return }
         pendingTagGroupId = nil            // FIRST: the sheet's dismiss-binding re-fires cancelTagSheet on nil,
                                            // so gid must be consumed before that (the guard above then no-ops it).
@@ -340,7 +340,7 @@ final class CaptureViewModel: ObservableObject {
         for i in items.indices where items[i].groupId == gid && items[i].type == .document {
             // Stamp the segment's tags so any page not yet uploaded (captured offline) carries them when it
             // uploads; already-uploaded pages get the tags via the segment-complete signal.
-            items[i].priority = items[i].priority ?? priority
+            items[i].quality = items[i].quality ?? quality
             items[i].year = year
             items[i].month = month
             if items[i].state != .uploaded { enqueueUpload(items[i]) }
@@ -349,7 +349,7 @@ final class CaptureViewModel: ObservableObject {
         // SPEC A5: snapshot page seqs at End-segment so the Mac can verify all pages arrived.
         let seqs = items.filter { $0.groupId == gid && $0.type == .document }
             .map { String($0.seq) }.joined(separator: ",")
-        endedSegments[gid] = SegTags(priority: priority, year: year, month: month, seqs: seqs.isEmpty ? nil : seqs)
+        endedSegments[gid] = SegTags(quality: quality, year: year, month: month, seqs: seqs.isEmpty ? nil : seqs)
         persist()
         // Already-uploaded pages are done (bytes on the Mac; tags via the signal) → they leave the strip now.
         for item in items.filter({ $0.groupId == gid && $0.type == .document && $0.state == .uploaded }) {
@@ -372,7 +372,7 @@ final class CaptureViewModel: ObservableObject {
             defer { inFlightSegments.remove(group) }
             var ok = false, attempt = 0
             while !ok && attempt < 3 {
-                ok = await c.segmentComplete(group: group, priority: tags.priority, year: tags.year, month: tags.month, seqs: tags.seqs)
+                ok = await c.segmentComplete(group: group, quality: tags.quality, year: tags.year, month: tags.month, seqs: tags.seqs)
                 attempt += 1
             }
             if ok { endedSegments[group] = nil; persist() }
@@ -432,7 +432,7 @@ final class CaptureViewModel: ObservableObject {
                 var attempt = 0
                 while !ok && attempt < 3 {
                     ok = await c.postPhoto(jpeg: data, group: item.groupId, seq: item.seq, type: item.type.rawValue,
-                                           priority: item.priority, year: item.year, month: item.month, device: deviceName,
+                                           quality: item.quality, year: item.year, month: item.month, device: deviceName,
                                            replaces: replaces)
                     attempt += 1
                 }
@@ -440,7 +440,7 @@ final class CaptureViewModel: ObservableObject {
             if ok {
                 sentCount += 1
                 setState(item.id, .uploaded)
-                // A field changed while this upload was in flight (per-page P10 / reclassify): the bytes just
+                // A field changed while this upload was in flight (per-page Q3 / reclassify): the bytes just
                 // sent are stale. Re-send with the CURRENT fields instead of confirming — do NOT
                 // removeConfirmed (that would drop the photo having sent only the old value). The re-enqueue
                 // is scheduled on a fresh Task so it runs after this one's `defer` releases the in-flight guard.
@@ -572,7 +572,7 @@ final class CaptureViewModel: ObservableObject {
         if let g = snap.groupId { currentGroupId = g }
         // Restore segments ended-but-not-yet-acked so their completion signal is re-sent below (each still
         // gated on all its pages being uploaded), even across an app kill.
-        for e in snap.endedSegments ?? [] { endedSegments[e.group] = SegTags(priority: e.priority, year: e.year, month: e.month, seqs: e.seqs) }
+        for e in snap.endedSegments ?? [] { endedSegments[e.group] = SegTags(quality: e.quality, year: e.year, month: e.month, seqs: e.seqs) }
         // Items confirmed on the Mac before a crash are durably safe there — drop them so the phone shows
         // only what still needs sending. EXCEPT document pages still in the current (un-ended) segment:
         // those streamed as shot but aren't tagged yet (tags apply at End segment), so keep them so the
@@ -595,7 +595,7 @@ final class CaptureViewModel: ObservableObject {
     }
 
     private func persist() {
-        let ended = endedSegments.map { SessionStore.EndedSeg(group: $0.key, priority: $0.value.priority,
+        let ended = endedSegments.map { SessionStore.EndedSeg(group: $0.key, quality: $0.value.quality,
                                                               year: $0.value.year, month: $0.value.month, seqs: $0.value.seqs) }
         store.save(.init(items: items, seq: seqCounter, nextId: nextId, groupId: currentGroupId,
                          pendingTagGroupId: pendingTagGroupId, endedSegments: ended))

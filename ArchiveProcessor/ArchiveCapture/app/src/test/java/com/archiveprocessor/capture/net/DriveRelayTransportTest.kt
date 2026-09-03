@@ -76,21 +76,21 @@ class DriveRelayTransportTest {
         val client = DriveClient(mock) { "fake" }
         val t = DriveRelayTransport(client, "TESTTK", 1500, 200)
 
-        assertFalse("no receipt -> false (never-lose)", t.postPhoto("b1".toByteArray(), "g", 1, "document", "P8", 1968, 3, "X", null))
+        assertFalse("no receipt -> false (never-lose)", t.postPhoto("b1".toByteArray(), "g", 1, "document", "Q1", 1968, 3, "X", null))
         assertTrue("sidecar+jpeg upserted to Drive", mock.hasName("g__1.json") && mock.hasName("g__1.jpg"))
 
-        val fp2 = RelayObjectFormat.fingerprint("document", "P8", "1968", "3", null)
+        val fp2 = RelayObjectFormat.fingerprint("document", "Q1", "1968", "3", null)
         mock.injectFile("g__2.receipt.json", "TESTTK", receipt("g", 2, "EP1", fp2))
-        assertTrue("matching receipt -> true", t.postPhoto("b2".toByteArray(), "g", 2, "document", "P8", 1968, 3, "X", null))
+        assertTrue("matching receipt -> true", t.postPhoto("b2".toByteArray(), "g", 2, "document", "Q1", 1968, 3, "X", null))
 
         mock.injectFile("g__3.receipt.json", "TESTTK", receipt("g", 3, "EP1", "deadbeefdeadbeef"))
-        assertFalse("wrong-fp receipt -> false (A1)", t.postPhoto("b3".toByteArray(), "g", 3, "document", "P8", 1968, 3, "X", null))
+        assertFalse("wrong-fp receipt -> false (A1)", t.postPhoto("b3".toByteArray(), "g", 3, "document", "Q1", 1968, 3, "X", null))
 
         val fp4 = RelayObjectFormat.fingerprint("document", null, null, null, null)
         mock.injectFile("g__4.receipt.json", "TESTTK", receipt("g", 4, "OLD", fp4))
         assertFalse("wrong-epoch receipt -> false (A2)", t.postPhoto("b4".toByteArray(), "g", 4, "document", null, null, null, "X", null))
 
-        assertTrue("segmentComplete -> true", t.segmentComplete("g", "P8", 1968, 3))
+        assertTrue("segmentComplete -> true", t.segmentComplete("g", "Q1", 1968, 3))
         assertTrue("segment object written", mock.hasName("g.segment.json"))
     }
 }

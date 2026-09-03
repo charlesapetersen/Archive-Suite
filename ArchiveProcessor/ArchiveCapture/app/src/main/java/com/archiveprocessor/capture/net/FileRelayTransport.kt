@@ -50,11 +50,11 @@ class FileRelayTransport(
         } catch (e: Exception) { false }
     }
 
-    override fun postPhoto(jpeg: ByteArray, group: String, seq: Int, type: String, priority: String?,
+    override fun postPhoto(jpeg: ByteArray, group: String, seq: Int, type: String, quality: String?,
                            year: Int?, month: Int?, device: String, replaces: String?): Boolean {
         val yearS = year?.toString(); val monthS = month?.toString()
         val repl = if (!replaces.isNullOrEmpty()) replaces else null
-        val fp = RelayObjectFormat.fingerprint(type, priority, yearS, monthS, repl)
+        val fp = RelayObjectFormat.fingerprint(type, quality, yearS, monthS, repl)
         sessionDir.mkdirs()
         val deadline = System.currentTimeMillis() + receiptWaitTimeoutMs
         var wroteForEpoch: String? = null
@@ -65,7 +65,7 @@ class FileRelayTransport(
             if (wroteForEpoch != epoch) {                                                 // (b) write-once per epoch
                 writeAtomic(RelayObjectFormat.jpegName(group, seq), jpeg)                 // jpeg FIRST
                 writeAtomic(RelayObjectFormat.sidecarName(group, seq),                    // sidecar LAST = commit marker
-                    RelayObjectFormat.encodeSidecar(token, epoch, group, seq, type, priority, yearS, monthS, repl, device))
+                    RelayObjectFormat.encodeSidecar(token, epoch, group, seq, type, quality, yearS, monthS, repl, device))
                 wroteForEpoch = epoch
             }
             Thread.sleep(receiptPollMs)                                                   // (c) poll
@@ -73,10 +73,10 @@ class FileRelayTransport(
         return false   // timeout → item stays FAILED → auto-retry re-enters at (a); local copy retained
     }
 
-    override fun segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?): Boolean {
+    override fun segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?): Boolean {
         val epoch = currentEpoch() ?: return false
         writeAtomic(RelayObjectFormat.segmentName(group),
-            RelayObjectFormat.encodeSegment(token, epoch, group, priority, year?.toString(), month?.toString(), seqs))
+            RelayObjectFormat.encodeSegment(token, epoch, group, quality, year?.toString(), month?.toString(), seqs))
         return true
     }
 

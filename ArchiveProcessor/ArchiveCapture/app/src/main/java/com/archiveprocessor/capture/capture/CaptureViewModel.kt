@@ -27,7 +27,7 @@ import java.io.File
 import java.util.UUID
 
 /** Owns the capture session: the paired endpoint, the current group, captured items, on-phone
- *  minimal tagging (priority + date), and the durable-ish upload of each item. */
+ *  minimal tagging (quality + date), and the durable-ish upload of each item. */
 class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
     private val sessionDir: File = File(app.filesDir, "capture").apply { mkdirs() }
@@ -104,7 +104,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  force-completes any still-open group). A group's signal is emitted only once ALL its pages are
      *  confirmed uploaded (see [trySendSegmentComplete]) so the Mac can never complete a partial segment,
      *  and is retried until acked. Insertion-ordered so completions send in the order segments ended. */
-    private data class SegTags(val priority: String?, val year: Int?, val month: Int?, val seqs: String? = null)
+    private data class SegTags(val quality: String?, val year: Int?, val month: Int?, val seqs: String? = null)
     private val endedSegments = LinkedHashMap<String, SegTags>()
     /** Group ids whose completion signal is being sent right now, so the auto-retry loop, the
      *  upload-success hook, and resume can't fire the same one concurrently. */
@@ -188,7 +188,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             r.groupId?.let { currentGroupId = it }
             // Restore segments ended-but-not-yet-acked so their completion signal is re-sent below (each
             // still gated on all its pages being uploaded), even across an app kill.
-            r.endedSegments.forEach { endedSegments[it.group] = SegTags(it.priority, it.year, it.month, it.seqs) }
+            r.endedSegments.forEach { endedSegments[it.group] = SegTags(it.quality, it.year, it.month, it.seqs) }
             // Items confirmed on the Mac before a crash are durably safe there — drop them so the phone
             // shows only what still needs sending. EXCEPT document pages still in the current (un-ended)
             // segment: those streamed as shot but aren't tagged yet (tags apply at End segment), so keep
@@ -236,7 +236,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         if (isClearing) return
         // trySend on a CONFLATED channel never blocks and always keeps the latest snapshot; the IO
         // consumer writes it near-immediately, preserving crash durability without main-thread disk I/O.
-        val ended = endedSegments.map { (g, t) -> SessionStore.EndedSeg(g, t.priority, t.year, t.month, t.seqs) }
+        val ended = endedSegments.map { (g, t) -> SessionStore.EndedSeg(g, t.quality, t.year, t.month, t.seqs) }
         storeChannel.trySend(StoreOperation.Save(
             SaveSnapshot(items.toList(), seqCounter, nextId, currentGroupId, pendingTagGroupId, ended)))
     }
@@ -412,23 +412,23 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         statusMessage = message
     }
 
-    /** Long-press a page thumbnail to toggle a per-page P10 override. */
-    fun toggleP10(itemId: Long) {
+    /** Long-press a page thumbnail to toggle a per-page Q3 override. */
+    fun toggleQ3(itemId: Long) {
         val i = items.indexOfFirst { it.id == itemId }
         if (i < 0) return
         val it = items[i]
-        val updated = it.copy(priority = if (it.priority == "P10") null else "P10")
+        val updated = it.copy(quality = if (it.quality == "Q3") null else "Q3")
         items[i] = updated
         persist()
-        // The page may already be on the Mac (pages stream as shot) — re-send it so the P10 override lands
-        // (idempotent group+seq replace). The segment-complete signal carries only the group's priority,
-        // so a per-page P10 must ride the photo itself. If it's still UPLOADING, defer via needsResend so
+        // The page may already be on the Mac (pages stream as shot) — re-send it so the Q3 override lands
+        // (idempotent group+seq replace). The segment-complete signal carries only the group's quality,
+        // so a per-page Q3 must ride the photo itself. If it's still UPLOADING, defer via needsResend so
         // the toggle isn't dropped (the completion handler re-sends with the current value).
         resendOrEnqueue(updated)
     }
 
     /** Re-send a just-changed item: enqueue now if it's idle, else flag it to be re-sent when its in-flight
-     *  upload settles. This is the fix for a per-page P10 toggle / reclassify racing an in-flight upload —
+     *  upload settles. This is the fix for a per-page Q3 toggle / reclassify racing an in-flight upload —
      *  the `inFlightUploads` guard would otherwise suppress the re-enqueue and silently drop the change. */
     private fun resendOrEnqueue(item: CapturedItem) {
         if (inFlightUploads.contains(item.id)) markNeedsResend(item.id) else enqueueUpload(item)
@@ -589,7 +589,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             // every prior group, not just the immediate predecessor. Append the old group to any
             // existing chain. Persisted on the item so retry/resume/autoRetry keep sending it.
             val chain = items[i].replacesGroupId?.let { "$it,$oldGroupId" } ?: oldGroupId
-            val updated = items[i].copy(type = type, groupId = newGroupId(), priority = null,
+            val updated = items[i].copy(type = type, groupId = newGroupId(), quality = null,
                 state = UploadState.PENDING, replacesGroupId = chain)
             items[i] = updated
             clearSelection()
@@ -624,7 +624,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Tag sheet → "Apply & continue" or "Skip" (Skip passes nulls): apply the optional pre-fill tags
      *  and end the current document segment. */
-    fun applyTagsAndContinue(priority: String?, year: Int?, month: Int?) = finalizeSegment(priority, year, month)
+    fun applyTagsAndContinue(quality: String?, year: Int?, month: Int?) = finalizeSegment(quality, year, month)
 
     /** W23.m8 — how many recovered pages are still held awaiting classification, and which segment they are
      *  in. Derived from the items rather than stored, so the hold survives a further kill exactly as the
@@ -655,7 +655,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
      *  segment as "ended, awaiting Mac ack". The completion signal — which is what makes the Mac present
      *  this segment's tag card — is then emitted once ALL its pages are confirmed uploaded (never for a
      *  partial segment), and retried until acked. */
-    private fun finalizeSegment(priority: String?, year: Int?, month: Int?) {
+    private fun finalizeSegment(quality: String?, year: Int?, month: Int?) {
         val gid = pendingTagGroupId ?: return
         pendingTagGroupId = null            // FIRST (mirrors iOS, where the sheet's dismiss-binding re-fires on nil)
         year?.let { prefs.noteYear(it) }
@@ -667,7 +667,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 // when it uploads; already-uploaded pages get the tags via the segment-complete signal.
                 // W23.m8: this is also the one place a recovery hold lifts — the operator has now said what
                 // these pages are, so they become sendable with the classification they just supplied.
-                val stamped = it.copy(priority = it.priority ?: priority, year = year, month = month,
+                val stamped = it.copy(quality = it.quality ?: quality, year = year, month = month,
                     needsReview = false)
                 items[i] = stamped
                 if (stamped.state != UploadState.UPLOADED) enqueueUpload(stamped)
@@ -681,7 +681,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
         // SPEC A5: snapshot page seqs at End-segment so the Mac can verify all pages arrived.
         val seqs = items.filter { it.groupId == gid && it.type == GroupType.DOCUMENT }
             .joinToString(",") { it.seq.toString() }.ifEmpty { null }
-        endedSegments[gid] = SegTags(priority, year, month, seqs)
+        endedSegments[gid] = SegTags(quality, year, month, seqs)
         persist()
         // Already-uploaded pages are done (bytes on the Mac; tags via the signal) → they leave the strip now.
         items.filter { it.groupId == gid && it.type == GroupType.DOCUMENT && it.state == UploadState.UPLOADED }
@@ -709,7 +709,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 var ok = false; var attempt = 0
                 while (!ok && attempt < 3) {
-                    ok = withContext(Dispatchers.IO) { c.segmentComplete(group, tags.priority, tags.year, tags.month, tags.seqs) }
+                    ok = withContext(Dispatchers.IO) { c.segmentComplete(group, tags.quality, tags.year, tags.month, tags.seqs) }
                     attempt++
                 }
                 // Same ownership rule as the photo upload (W23.m1), same predicate so they can't drift: an
@@ -780,7 +780,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                     while (!ok && attempt < 3) {
                         ok = withContext(Dispatchers.IO) {
                             c.postPhoto(bytes, item.groupId, item.seq, item.type.wire,
-                                item.priority, item.year, item.month, deviceName, replaces)
+                                item.quality, item.year, item.month, deviceName, replaces)
                         }
                         attempt++
                     }
@@ -794,7 +794,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
                 setState(item.id, if (ok) UploadState.UPLOADED else UploadState.FAILED)
                 if (ok) {
                     sentCount += 1
-                    // A field changed while this upload was in flight (per-page P10 / reclassify): the bytes
+                    // A field changed while this upload was in flight (per-page Q3 / reclassify): the bytes
                     // just sent are stale. Re-send with the CURRENT fields instead of confirming — do NOT
                     // removeConfirmed (that would drop the photo having sent only the old value). The
                     // re-enqueue runs AFTER finally releases the in-flight guard so enqueueUpload can re-add

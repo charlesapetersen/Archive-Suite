@@ -10,8 +10,8 @@ REPO="$PWD"; W=$(mktemp -d); NET="$REPO/ArchiveCaptureiOS/Sources/ArchiveCapture
 cat > "$W/main.swift" <<'SWIFT'
 import Foundation
 protocol SegmentTransport {
-    func postPhoto(jpeg: Data, group: String, seq: Int, type: String, priority: String?, year: Int?, month: Int?, device: String, replaces: String?) async -> Bool
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?) async -> Bool
+    func postPhoto(jpeg: Data, group: String, seq: Int, type: String, quality: String?, year: Int?, month: Int?, device: String, replaces: String?) async -> Bool
+    func segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?) async -> Bool
     func sessionComplete() async -> Bool
     func sessionDisconnect() async -> Bool
 }
@@ -92,21 +92,21 @@ var t = DriveRelayTransport(client: client, token: ns); t.receiptWaitTimeout = 1
 var pass = true
 func check(_ l: String, _ c: Bool) { print("  [\(c ? "PASS":"FAIL")] \(l)"); if !c { pass = false } }
 
-let r1 = await t.postPhoto(jpeg: Data("b1".utf8), group: "g", seq: 1, type: "document", priority: "P8", year: 1968, month: 3, device: "X", replaces: nil)
+let r1 = await t.postPhoto(jpeg: Data("b1".utf8), group: "g", seq: 1, type: "document", quality: "Q1", year: 1968, month: 3, device: "X", replaces: nil)
 check("no-receipt -> false (timeout, never-lose)", r1 == false)
 check("no-receipt -> sidecar+jpeg upserted to Drive", mock.hasName("g__1.json") && mock.hasName("g__1.jpg"))
-let fp2 = RelayObjectFormat.fingerprint(type: "document", priority: "P8", year: "1968", month: "3", replaces: nil)
+let fp2 = RelayObjectFormat.fingerprint(type: "document", quality: "Q1", year: "1968", month: "3", replaces: nil)
 mock.injectFile("g__2.receipt.json", token: ns, media: receipt("g", 2, ep, fp2))
-let r2 = await t.postPhoto(jpeg: Data("b2".utf8), group: "g", seq: 2, type: "document", priority: "P8", year: 1968, month: 3, device: "X", replaces: nil)
+let r2 = await t.postPhoto(jpeg: Data("b2".utf8), group: "g", seq: 2, type: "document", quality: "Q1", year: 1968, month: 3, device: "X", replaces: nil)
 check("matching receipt -> true", r2 == true)
 mock.injectFile("g__3.receipt.json", token: ns, media: receipt("g", 3, ep, "deadbeefdeadbeef"))
-let r3 = await t.postPhoto(jpeg: Data("b3".utf8), group: "g", seq: 3, type: "document", priority: "P8", year: 1968, month: 3, device: "X", replaces: nil)
+let r3 = await t.postPhoto(jpeg: Data("b3".utf8), group: "g", seq: 3, type: "document", quality: "Q1", year: 1968, month: 3, device: "X", replaces: nil)
 check("wrong-fp receipt -> false (A1/H3)", r3 == false)
-let fp4 = RelayObjectFormat.fingerprint(type: "document", priority: nil, year: nil, month: nil, replaces: nil)
+let fp4 = RelayObjectFormat.fingerprint(type: "document", quality: nil, year: nil, month: nil, replaces: nil)
 mock.injectFile("g__4.receipt.json", token: ns, media: receipt("g", 4, "OLD", fp4))
-let r4 = await t.postPhoto(jpeg: Data("b4".utf8), group: "g", seq: 4, type: "document", priority: nil, year: nil, month: nil, device: "X", replaces: nil)
+let r4 = await t.postPhoto(jpeg: Data("b4".utf8), group: "g", seq: 4, type: "document", quality: nil, year: nil, month: nil, device: "X", replaces: nil)
 check("wrong-epoch receipt -> false (A2)", r4 == false)
-let sc = await t.segmentComplete(group: "g", priority: "P8", year: 1968, month: 3)
+let sc = await t.segmentComplete(group: "g", quality: "Q1", year: 1968, month: 3, seqs: nil)
 check("segmentComplete -> true + object", sc && mock.hasName("g.segment.json"))
 print(pass ? "DRIVE TRANSPORT (mock): PASS" : "DRIVE TRANSPORT (mock): FAIL")
 exit(pass ? 0 : 1)

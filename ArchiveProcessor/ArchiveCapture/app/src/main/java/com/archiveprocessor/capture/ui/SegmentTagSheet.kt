@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 
 private val MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
-/** Minimal on-phone tagging shown when a document segment is finished: priority + date. Subjects are
+/** Minimal on-phone tagging shown when a document segment is finished: quality + date. Subjects are
  *  intentionally NOT here — the Mac handles those. [onApply] ends the segment (Skip passes nulls) and
  *  sends it to the Mac to tag; [onCancel] closes without ending it (End segment was a mistake — keep
  *  shooting the same document). Gesture-dismiss is disabled by the caller, so one of these is always chosen. */
@@ -39,10 +39,10 @@ private val MONTHS = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Au
 @Composable
 fun SegmentTagSheet(
     recentYears: List<Int>,
-    onApply: (priority: String?, year: Int?, month: Int?) -> Unit,
+    onApply: (quality: String?, year: Int?, month: Int?) -> Unit,
     onCancel: () -> Unit
 ) {
-    var priority by remember { mutableStateOf<String?>(null) }
+    var quality by remember { mutableStateOf<Int?>(null) }
     var year by remember { mutableStateOf<Int?>(null) }
     var month by remember { mutableStateOf<Int?>(null) }
     var customYear by remember { mutableStateOf("") }
@@ -53,13 +53,13 @@ fun SegmentTagSheet(
     ) {
         Text("Tag this document", style = MaterialTheme.typography.titleLarge)
 
-        Text("Priority", style = MaterialTheme.typography.labelLarge)
+        Text("Quality", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("P10", "P9", "P8", "P7").forEach { p ->
+            (0..3).forEach { q ->
                 FilterChip(
-                    selected = priority == p,
-                    onClick = { priority = if (priority == p) null else p },
-                    label = { Text(p) }
+                    selected = quality == q,
+                    onClick = { quality = if (quality == q) null else q },
+                    label = { Text(if (q == 0) "0 · Unrated" else "Q$q") }
                 )
             }
         }
@@ -100,7 +100,7 @@ fun SegmentTagSheet(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = { onApply(null, null, null) }, modifier = Modifier.weight(1f)) { Text("Skip (tag on Mac)") }
-            Button(onClick = { onApply(priority, year, month) }, modifier = Modifier.weight(1f)) { Text("Apply & continue") }
+            Button(onClick = { onApply(quality?.takeIf { it > 0 }?.let { "Q$it" }, year, month) }, modifier = Modifier.weight(1f)) { Text("Apply & continue") }
         }
         // Escape hatch for an accidental End-segment tap: keep the current document open (does NOT end it).
         TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {

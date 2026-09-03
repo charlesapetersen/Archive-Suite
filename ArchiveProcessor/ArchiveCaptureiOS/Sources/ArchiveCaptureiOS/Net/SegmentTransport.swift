@@ -15,12 +15,12 @@ import Foundation
 protocol SegmentTransport {
     /// Deliver one page's JPEG with its grouping + minimal-tag metadata. `true` = durably received.
     func postPhoto(jpeg: Data, group: String, seq: Int, type: String,
-                   priority: String?, year: Int?, month: Int?, device: String,
+                   quality: String?, year: Int?, month: Int?, device: String,
                    replaces: String?) async -> Bool
 
     /// Signal that a document segment is complete and carry its tags (no image bytes). Idempotent.
     /// `seqs` = comma-joined page sequence numbers snapshotted at End-segment (SPEC A5).
-    func segmentComplete(group: String, priority: String?, year: Int?, month: Int?, seqs: String?) async -> Bool
+    func segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?) async -> Bool
 
     /// Signal the capture session is finished (flush any still-open segment on the Mac).
     func sessionComplete() async -> Bool

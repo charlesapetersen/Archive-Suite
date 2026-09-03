@@ -209,34 +209,27 @@ so a rewrite reproduces the label the FRESH write intended. Note the fix is **no
 PDF — a dedicated neuter holds that line. Copy-source mode was never affected (verbatim names, label
 untouched). 12 of the guard checks cover this, driving both real production functions.
 
-**Quality persistence + the phone boundary — FIXED (W19.q5, 2026-08-27; the commit whose
-subject begins `feat(processor): preserve Quality`).** A normal re-tag used to treat `Q1`–`Q3` as unknown
-subjects and discard them, the Live Capture post-pass wrote its old `P7`–`P10` spellings back to Finder,
-and a merge replaced its first component with generated `appliedTags` that might not include a user-set
-Quality. The audited `MacOSTagger` transform now treats every shared rating spelling as one explicit
-intent: an incoming `Q` wins, a phone `P8`–`P10` maps to its one canonical `Q`, and `P7` explicitly
-clears the facet. With no incoming rating it preserves the current rating while re-tagging, canonicalizing
-any retained `P` on that ordinary write; it never invents a rating from OCR. No-tagging is a true
-no-op at the phone boundary. Copy-source still
-copies existing source tags verbatim, but its phone-boundary input is canonicalized before that pass-through
-can create a fresh P. The merge reads the
-retired first component's actual rating before it replaces it when generated tags supplied none, and the
-image mirror carries the PDF's `Q` unchanged. `test-processfiles-tagwarn.sh` drives fresh re-tag, P7 clear,
-merge and image-mirror cases on disk; `test-recovery.sh` drives the real phone `P10` → staged-`Q3`
-path. Live Capture canonicalizes the same boundary before individual PDFs, image mirrors and a merged PDF,
-including verbatim-mode writes; P7 clears there too, while No tagging bypasses that boundary completely.
-Current retained records require and retain their explicit tagging mode and unread policy, so a rotation
-replay cannot adopt a later Settings choice; older retained-policy records are unsupported. There is no bulk
-corpus rewrite: P remains an accepted phone input until W19.q7 changes the wire field.
+**Quality persistence + the phone boundary — FIXED (W19.q5, completed by W19.q7 on 2026-09-03).** A normal
+re-tag used to treat `Q1`–`Q3` as unknown subjects and discard them, and a merge replaced its first component
+with generated `appliedTags` that might not include a user-set Quality. The audited `MacOSTagger` transform
+now applies one explicit Q intent: `Q1`–`Q3` replaces the current rating, the internal-only `Q0` marker
+clears it without becoming a Finder tag, and no rating is invented from OCR. W19.q7 replaced the interim
+interim phone transport with a clean Q-only protocol — no P alias or migration path. No-tagging is a true
+no-op at the phone boundary. Copy-source keeps source names verbatim while applying the explicit phone Q
+decision; the merge preserves its effective Q value and the image mirror carries the PDF's Q unchanged.
+`test-processfiles-tagwarn.sh` and `test-recovery.sh` exercise fresh re-tagging, Q0 clear, merging,
+image mirrors, and the phone Q3 staging path on scratch files. Current retained records require and retain
+their explicit tagging mode and unread policy, so a rotation replay cannot adopt a later Settings choice;
+older retained-policy records are unsupported.
 
 **Mac Quality controls and last-writer precedence — FIXED (W19.q6, 2026-09-02; this commit).** The
 operator now sets the canonical 0–3 Quality directly in the Live Capture tag card and both Process Files
 manual tagging flows; zero means no Quality tag. The choice is durable in the Capture manifest and reaches
 both staged artifacts and the filed result. During review, three boundary holes were closed before release:
 the OCR-failed `GeneratedTags` branch no longer returns before preserving the operator's Q; a manual Q1 or
-Unrated choice replaces imported P10 before the late Capture boundary; and a skipped multi-page card still
-promotes a later per-page P10 to Q3 on its merged PDF. Scratch recovery, manifest and Process Files tag
-drivers prove each case on disposable files; the current pre-q7 P wire remains an input-only protocol boundary.
+Unrated choice replaces imported Q3 before the late Capture boundary; and a skipped multi-page card still
+promotes a later per-page Q3 on its merged PDF. Scratch recovery, manifest and Process Files tag drivers
+prove each case on disposable files; W19.q7 now sends Q directly over the companion protocol.
 
 **The reclassification half — also FIXED now (W23.m5-fu2, 2026-07-31, `7a0043c` + the trackers commit).**
 The sentence above says the review flows "already follow" the classification rule. They did — but only by
@@ -275,7 +268,7 @@ recorded 640/647/673 had drifted with W16.cfg\*).
    applied to the batch merge path in 2026-07 and never to the live streaming path.
 2. **The write result was discarded.** `try?` swallowed every xattr / coordination / identity / permission
    failure, and the segment was then staged, finalized and reported as tagged. A PDF could land byte-perfect,
-   count as **filed**, have its **source photo trashed**, and carry no subject/date/priority tags at all —
+  count as **filed**, have its **source photo trashed**, and carry no subject/date/Quality tags at all —
    invisible to every tag-driven search in the Reader. This was the only way the "filed" verdict could be
    silently wrong.
 
@@ -327,7 +320,7 @@ correct when `session.json` merely lagged, a fabrication when the last publish n
 stale manifest those files were tracked; what died with the write is the record of *what they are*. So a
 page shot into a classified box/folder segment came back as an untagged Document page and the auto-retry
 loop sent it to the Mac, which filed it into the archive under a classification nobody chose. Group
-boundaries, priority/date/tags, replacement provenance and segment-completion state went the same way,
+boundaries, Quality/date/tags, replacement provenance and segment-completion state went the same way,
 and pages the stale manifest *did* list came back with stale metadata.
 
 **The fix.** Three layers, because knowing in-process isn't enough when the loss lands after a restart:
@@ -926,7 +919,7 @@ Scratch config/manifest, multi-page PDF, and batch/non-batch resume regressions 
 
 **W16.cfg3 DONE 2026-07-29 (this commit):** the same snapshot now reaches every late review/output consumer:
 rotation and manual PDF regeneration, review-driven reclassification tag writes, automatic/manual tagging,
-priority layering, sized-original export, and merged-PDF tag transfer. Fresh and pre-OCRed paths inject it
+Quality layering, sized-original export, and merged-PDF tag transfer. Fresh and pre-OCRed paths inject it
 explicitly; retained post-run UI actions resolve the active snapshot; resume keeps the old nil fallback until
 cfg5. The Process Files snapshot takes its exact tagging/merge/export policy from the configured controller, preserving
 headless `.none`/`.copySource` behavior and every explicit non-stamping copy-source write. Debug build plus
@@ -1454,7 +1447,7 @@ Plain-JVM tests inject replacement failure and verify the good manifest survives
 
 **FIXED:** the phone's status heartbeat now counts every page not yet confirmed `UPLOADED`, including
 `FAILED` pages. Those pages are automatically retried every eight seconds, so excluding them could let the
-Mac finish a session before the retry arrived. Deferred P10/reclassification resends transition atomically
+Mac finish a session before the retry arrived. Deferred Q3/reclassification resends transition atomically
 back to `PENDING`, and one serialized/conflated writer prevents older heartbeat coroutines from arriving
 after newer state. Crash restore normalizes a persisted resend marker to `PENDING` before uploaded-page
 pruning. Plain-JVM queue-policy tests cover all states, deferred-resend transitions, and the between-saves
@@ -1806,10 +1799,10 @@ un-filed (straggler) page** in the backup folder + Captured pane. No page is eve
    "Finish" action that once sent it was removed — End segment is the only phone-side "done"), and whole-session
    force-completion is a Mac-side backstop. An adversarial re-read of both companion trees (2026-07-17) could not
    break the gate. **Owner device-verify tail:** `scripts/e2e-phone-mac.sh` (Gemini key + `ap_test36` emulator).
-2. **Per-page P10 toggled while a page is UPLOADING never reaches the Mac (MEDIUM).** `toggleP10` re-uploads
+2. **Per-page Q3 toggled while a page is UPLOADING never reaches the Mac (MEDIUM).** `toggleQ3` re-uploads
    only when `state == UPLOADED`. Fix: a `needsResend` flag the upload-completion handler honors. Both companions.
    **FIXED in code (B5-i — pending owner device-verify):** both companions gained a persisted `needsResend`
-   field on `CapturedItem`. `toggleP10`/`reclassifySelected` now call `resendOrEnqueue`: enqueue if idle, else
+   field on `CapturedItem`. `toggleQ3`/`reclassifySelected` now call `resendOrEnqueue`: enqueue if idle, else
    set `needsResend`. The upload-completion handler, on success, honors `needsResend` by re-sending with the
    CURRENT fields (and NOT removing the photo) instead of confirming — so a change made mid-upload is never
    dropped. (iOS `Capture/CaptureViewModel.swift`, Android `capture/CaptureViewModel.kt`.)
@@ -1942,7 +1935,7 @@ each verified against the actual code before fixing. All Tier-2 (adversarial rev
    source basename, not the dedup'd output name — moving the wrong file when output URLs were dedup'd. Fix:
    derive the JSON path from the first output PDF.
 4. **`readTags` coerced read-failure → `[]`** (`MacOSTagger.swift:23`): the read→append→rewrite callers
-   (priority tags, image tag mirroring) would WIPE existing tags on a read failure. Fix: `readTags` now
+   (Quality tags, image tag mirroring) would WIPE existing tags on a read failure. Fix: `readTags` now
    `throws`; callers bail on error instead of writing empty tags.
 5. **Raw `applyTags` promoted subject "Red"/"Purple" to Finder color** (`MacOSTagger.swift:64`): the merge
    path called the `[String]` overload without `colorIsAuthoritative`, so a subject tag "Red" was promoted to

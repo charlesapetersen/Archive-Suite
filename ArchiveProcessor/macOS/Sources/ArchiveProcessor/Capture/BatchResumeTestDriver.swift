@@ -401,7 +401,7 @@ enum BatchResumeTestDriver {
                 exportOriginals: false,
                 preGroupedBoundaries: boundaries,
                 preGroupedTypes: [.box, .document],
-                preGroupedPriorities: ["P10", nil],
+                preGroupedQualities: ["Q3", nil],
                 preGroupedYears: [1944, 1944],
                 preGroupedMonths: [6, 6],
                 preGroupedSubjects: [["Correspondence"], []],
@@ -599,7 +599,7 @@ enum BatchResumeTestDriver {
               && recaptured.mergeDocuments && !recaptured.exportOriginals
               && recaptured.tagVocabulary == ["Correspondence", "Receipts"]
               && recaptured.preGroupedBoundaries == [true, false]
-              && recaptured.preGroupedPriorities == ["P10", nil]
+              && recaptured.preGroupedQualities == ["Q3", nil]
               && recaptured.imageScale == 0.37
               && recaptured.standardImageMB == 4.5 && recaptured.ocrWorkerCount == 2
               && recaptured.pdfImageMB == 1.5 && recaptured.textColumns == 3

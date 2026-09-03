@@ -32,7 +32,7 @@ class SessionStoreTest {
         needsReview: Boolean = false
     ) = CapturedItem(
         id = id, file = File(scratch, "img_$id.jpg"), groupId = group, seq = seq,
-        type = GroupType.DOCUMENT, priority = "P2", year = 1971, month = 4,
+        type = GroupType.DOCUMENT, quality = "Q2", year = 1971, month = 4,
         state = UploadState.UPLOADED, replacesGroupId = "gOLD", needsResend = true,
         savedToPhone = true, needsReview = needsReview
     )
@@ -62,7 +62,7 @@ class SessionStoreTest {
         val s = store()
 
         assertTrue(save(s, items, group = "gBBB", pendingTag = "gBBB",
-            ended = listOf(SessionStore.EndedSeg("gAAA", "P1", 1971, 4, "1"))))
+            ended = listOf(SessionStore.EndedSeg("gAAA", "Q1", 1971, 4, "1"))))
 
         val restored = s.load()
         assertNotNull(restored)
@@ -71,7 +71,7 @@ class SessionStoreTest {
         assertEquals("gBBB", restored.pendingTagGroupId)
         assertEquals(listOf("gAAA"), restored.endedSegments.map { it.group })
         val first = restored.items.first()
-        assertEquals("P2", first.priority)
+        assertEquals("Q2", first.quality)
         assertEquals(1971, first.year)
         assertEquals("gOLD", first.replacesGroupId)
         assertTrue(first.needsResend)

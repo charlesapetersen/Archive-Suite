@@ -147,7 +147,7 @@ final class DriveObjectStore: RelayObjectStore, @unchecked Sendable {
         // Drive has NO name uniqueness: a fileId-loss re-create (phone recovery path) can leave two files
         // with the same relayName. Keep only the NEWEST per name (by monotone `rev`, then modifiedTime, then
         // fileId for determinism) and REAP the older duplicates in this one pass — so a stale-metadata version
-        // can never be re-ingested by the receiver after a newer one (the "revert P10/date tags" hazard).
+        // can never be re-ingested by the receiver after a newer one (the "revert Q3/date tags" hazard).
         var best: [String: (rev: Int, mod: Date?, id: String)] = [:]
         var reap: [String] = []
         for f in files {

@@ -70,12 +70,11 @@ paths also contain **non-breaking spaces** U+00A0).
   tag*. So these files sort by their (speculative) year like any dated file; the nav window renders
   the derived date in **italics** to signal speculation (never dumped to the end).
 - **Quality:** exactly one of `Q1 Q2 Q3` (`Q3` highest); unrated writes no Quality token. Box/folder
-  pages & some docs have none. Until W19.q7 changes the phone protocol, its current `P7`–`P10` wire
-  spelling is translated into this facet (`P7` = unrated, `P8`→`Q1`, `P9`→`Q2`, `P10`→`Q3`).
+  pages & some docs have none. The current phone protocol carries the same Q token directly.
 - **Read state:** `Read` or `Unread` (Archive Processor stamps `Unread` last on new output).
 - **Subject:** 2–6 free-form-ish strings (`Jerry Brown`, `DP chapters`, `Economics`, …). May be a
   controlled vocabulary. **Subjects can collide with other facets** (a subject literally `1984`,
-  `P7`, or `Read`) — facet classification is display-only and must never drive a destructive write.
+  `Q1`, or `Read`) — facet classification is display-only and must never drive a destructive write.
   Note Archive Processor also emits some *literal* subject tokens: `Box`/`Folder` on marker pages
   (alongside the color) and `OCR Failed` on OCR failures — Reader treats these as plain subjects.
 
@@ -314,7 +313,7 @@ writes against the real corpus — always a copy.
 - **Unicode:** normalize (NBSP→space, dash-fold, case/diacritic-fold) for search/type-ahead/sort keys
   **only**; preserve real bytes for display + link encoding.
 - **Multiple same-facet date tags** (two Years/Months): deterministic rule + flag ambiguous.
-- **Facet-looking subjects** (`1984`, `P7`, `Read`): heuristics + display-only correction; never affects writes.
+- **Facet-looking subjects** (`1984`, `Q1`, `Read`): heuristics + display-only correction; never affects writes.
 
 ## §Decisions (settled with the owner; the app ships these)
 

@@ -83,12 +83,13 @@ and byte-order is a non-issue, so `canonicalJSON` is FileRelay/CI-internal.
 ## Object bodies (SHIPPED shapes — keys shown pre-sorted; `?` = nil-omittable)
 
 - **Photo sidecar** `<group>__<seq>.json`
-  `{"device"?,"epoch","fp","group","kind":"photo","month"?,"priority"?,"replaces"?,"seq","token","type","year"?}`
+  `{"device"?,"epoch","fp","group","kind":"photo","month"?,"quality"?,"replaces"?,"seq","token","type","year"?}`
   Fields are 1:1 with the HTTP `X-*` headers: `type` ∈ `document|box|folder` (`CaptureGroupType`
-  rawValues); `seq`/`year`/`month` are stringified ints; `priority` ∈ `P7|P8|P9|P10`; `replaces` = the
-  reclassify chain (A3). `fp` = the metadata fingerprint (below).
+  rawValues); `seq`/`year`/`month` are stringified ints; `quality` ∈ `Q1|Q2|Q3`; `replaces` = the
+  reclassify chain (A3). Unrated omits `quality`; `Q0` is Mac-internal and any `P*` token is invalid at
+  the public phone→Mac boundary. `fp` = the metadata fingerprint (below).
 - **Segment-complete** `<group>.segment.json`
-  `{"epoch","group","kind":"segment-complete","month"?,"priority"?,"seqs"?,"token","year"?}`
+  `{"epoch","group","kind":"segment-complete","month"?,"quality"?,"seqs"?,"token","year"?}`
   `seqs` = comma-joined page seqs of the segment, e.g. `"6,7"` (A5: snapshotted at End-segment).
 - **Session-complete** `_session.complete.json`
   `{"epoch","kind":"session-complete","token"}`
@@ -102,16 +103,16 @@ and byte-order is a non-issue, so `canonicalJSON` is FileRelay/CI-internal.
 Golden byte examples (`ArchiveProcessor/SPEC/relay-golden/`, fixed inputs `token=TESTTK, epoch=EP1`):
 
 ```
-g1__7.json          {"device":"X","epoch":"EP1","fp":"0499653ca88947f9","group":"g1","kind":"photo","month":"3","priority":"P8","seq":"7","token":"TESTTK","type":"document","year":"1968"}
-g1__7.receipt.json  {"epoch":"EP1","fp":"0499653ca88947f9","group":"g1","kind":"receipt","received":"true","seq":"7","token":"TESTTK"}
-g1.segment.json     {"epoch":"EP1","group":"g1","kind":"segment-complete","month":"3","priority":"P8","seqs":"6,7","token":"TESTTK","year":"1968"}
+g1__7.json          {"device":"X","epoch":"EP1","fp":"1f20bc45d93d2046","group":"g1","kind":"photo","month":"3","quality":"Q1","seq":"7","token":"TESTTK","type":"document","year":"1968"}
+g1__7.receipt.json  {"epoch":"EP1","fp":"1f20bc45d93d2046","group":"g1","kind":"receipt","received":"true","seq":"7","token":"TESTTK"}
+g1.segment.json     {"epoch":"EP1","group":"g1","kind":"segment-complete","month":"3","quality":"Q1","seqs":"6,7","token":"TESTTK","year":"1968"}
 _session.complete.json  {"epoch":"EP1","kind":"session-complete","token":"TESTTK"}
 _epoch.json         {"epoch":"EP1","kind":"epoch","token":"TESTTK"}
 nasty__0.json       {"device":"X’😀",...,"fp":"3569ca955db85c80","group":"nasty","kind":"photo","seq":"0","token":"TESTTK","type":"document"}
 ```
 
 `nasty__0.json` is the A7 escaping fixture: U+2019 (`’`) and an astral emoji emit **verbatim** UTF-8;
-the C0 control U+0001 emits ``; nil `priority/year/month/replaces` are **omitted**.
+the C0 control U+0001 emits ``; nil `quality/year/month/replaces` are **omitted**.
 
 ## Metadata fingerprint `fp` (A1 / D4)
 
@@ -119,7 +120,7 @@ the C0 control U+0001 emits ``; nil `priority/year/month/replaces` are **omitte
 The fingerprint map is exactly:
 
 ```
-{"type","priority"?,"month"?,"year"?,"replaces"?}
+{"type","quality"?,"month"?,"year"?,"replaces"?}
 ```
 
 - **Includes `replaces`; excludes `device`, `seq`, `group`, `token`, `epoch`** — i.e. exactly the
@@ -127,13 +128,13 @@ The fingerprint map is exactly:
 - The **same** function + inputs on the phone and Mac yield the **same** `fp`. The sidecar carries it;
   the receipt **echoes** it.
 - **Phone:** `postPhoto`'s receipt-first short-circuit fires **only** when the receipt's `fp` matches the
-  *current* metadata; a post-upload P10/reclassify change (new `fp`) falls through, rewrites the sidecar,
+  *current* metadata; a post-upload Q3/reclassify change (new `fp`) falls through, rewrites the sidecar,
   and waits for a receipt carrying the new `fp`.
 - **Mac:** the processed-set `Entry.fp` and the receipt `fp` are the same hash — re-ingest fires **iff
   `fp` differs**. Identical re-send is skipped (no double-OCR); a real metadata change is re-ingested (no
   regression vs the HTTP path).
-- Verified: `fp` of `{month:"3",priority:"P8",type:"document",year:"1968"}` (replaces omitted) =
-  `0499653ca88947f9`, matching both the sidecar and receipt golden.
+- Verified: `fp` of `{month:"3",quality:"Q1",type:"document",year:"1968"}` (replaces omitted) =
+  `1f20bc45d93d2046`, matching both the sidecar and receipt golden.
 
 ## Epoch (D10 / A2)
 
@@ -220,7 +221,7 @@ contract. Severity in brackets.
 
 | # | Rule | Where enforced |
 |---|---|---|
-| **A1** [CRITICAL] | Sidecar + receipt carry `fp`; `postPhoto` short-circuits and the Mac skips re-ingest **only** when `fp` matches. `fp` over `{type,priority,year,month,replaces}`. | `RelayObjectFormat.fingerprint`, receipt echo, `FileRelayReceiver` |
+| **A1** [CRITICAL] | Sidecar + receipt carry `fp`; `postPhoto` short-circuits and the Mac skips re-ingest **only** when `fp` matches. `fp` over `{type,quality,year,month,replaces}`. | `RelayObjectFormat.fingerprint`, receipt echo, `FileRelayReceiver` |
 | **A2** [CRITICAL] | Epoch is **published (`_epoch.json`) and adopted**, not pairing-fixed; absent marker ⇒ `postPhoto` returns `false`. | `_epoch.json`, phone read-before-write |
 | **A3** [HIGH] | `replaces` = the **full** comma-joined reclassify chain; Mac tombstones every listed `(group,seq)`. | sidecar `replaces`, `replacedGroups` |
 | **A4** [HIGH] | Tombstones are **durability-critical**: gate the superseded-object delete on a confirmed `persistProcessed()`; never epoch-discard/prune an entry while a relay object for it may exist. | `FileRelayReceiver` |
@@ -272,8 +273,8 @@ contract. Severity in brackets.
      in **both**. This spec shows `fp`.
   2. The `_epoch.json` epoch marker (`kind":"epoch"`, A2) is shipped but is **absent from the v1 §2
      object-kinds table and classification list**. Added here.
-  3. The fingerprint field set is `{type,priority,year,month,replaces}` (5 fields, per A1) — the v1 §5
-     `scanOnce` parenthetical says `{type,priority,year,month}` (drops `replaces`). **Shipped includes
+  3. The fingerprint field set is `{type,quality,year,month,replaces}` (5 fields, per A1) — the v1 §5
+     `scanOnce` parenthetical says `{type,quality,year,month}` (drops `replaces`). **Shipped includes
      `replaces`** (verified against the golden `fp` values).
   4. Old paths were pre-merge (`~/Desktop/Claude/Archive Processor/…`, `…/Claude/SPEC/…`);
      corrected throughout to the monorepo layout above.

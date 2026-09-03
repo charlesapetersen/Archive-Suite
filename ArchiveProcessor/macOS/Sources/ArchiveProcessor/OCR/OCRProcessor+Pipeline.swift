@@ -228,7 +228,7 @@ extension OCRProcessor {
               hasGateway == (config.gatewayUpstreamProvider != nil) else { return false }
 
         let optionalParallelCounts = [
-            config.preGroupedPriorities.count,
+            config.preGroupedQualities.count,
             config.preGroupedYears.count,
             config.preGroupedMonths.count,
             config.preGroupedSubjects.count,
@@ -263,7 +263,7 @@ extension OCRProcessor {
             exportOriginals: exportOriginals,
             preGroupedBoundaries: preGroupedBoundaries,
             preGroupedTypes: preGroupedTypes,
-            preGroupedPriorities: preGroupedPriorities,
+            preGroupedQualities: preGroupedQualities,
             preGroupedYears: preGroupedYears,
             preGroupedMonths: preGroupedMonths,
             preGroupedSubjects: preGroupedSubjects,
@@ -369,7 +369,7 @@ extension OCRProcessor {
         exportOriginals = config.exportOriginals
         preGroupedBoundaries = config.preGroupedBoundaries
         preGroupedTypes = config.preGroupedTypes
-        preGroupedPriorities = config.preGroupedPriorities
+        preGroupedQualities = config.preGroupedQualities
         preGroupedYears = config.preGroupedYears
         preGroupedMonths = config.preGroupedMonths
         preGroupedSubjects = config.preGroupedSubjects
@@ -2305,7 +2305,7 @@ extension OCRProcessor {
             if preGroupedBoundaries.count != files.count {
                 preGroupedBoundaries = []
                 preGroupedTypes = []
-                preGroupedPriorities = []
+                preGroupedQualities = []
                 preGroupedYears = []
                 preGroupedMonths = []
                 preGroupedSubjects = []
@@ -2313,9 +2313,9 @@ extension OCRProcessor {
                 preGroupedTypes = files.indices.map {
                     $0 < preGroupedTypes.count ? preGroupedTypes[$0] : .document
                 }
-                if !preGroupedPriorities.isEmpty {
-                    preGroupedPriorities = files.indices.map {
-                        $0 < preGroupedPriorities.count ? preGroupedPriorities[$0] : nil
+                if !preGroupedQualities.isEmpty {
+                    preGroupedQualities = files.indices.map {
+                        $0 < preGroupedQualities.count ? preGroupedQualities[$0] : nil
                     }
                 }
                 if !preGroupedYears.isEmpty {
@@ -2645,8 +2645,8 @@ extension OCRProcessor {
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
             // Live Capture: layer per-page phone Quality on top now that box/folder Red/Purple is
-            // final, and before merge folds appliedTags into merged PDFs. The current phone Priority
-            // wire field is accepted but canonicalized to Q by this call.
+            // final, and before merge folds appliedTags into merged PDFs. The companion wire already
+            // carries only canonical Q tokens, with an omitted field for Unrated.
             applyCaptureQualityTags(runConfig: runConfig)
 
             // Live Capture dual output: write each original image next to its PDF (same base + tags),

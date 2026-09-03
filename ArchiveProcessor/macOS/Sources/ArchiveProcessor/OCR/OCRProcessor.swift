@@ -39,8 +39,8 @@ class OCRProcessor: ObservableObject {
     /// Parallel to the staged/loaded files: whether each starts a new group, and its type.
     var stagedCaptureBoundaries: [Bool] = []
     var stagedCaptureTypes: [CaptureGroupType] = []
-    /// Parallel minimal on-phone tags: per-photo priority ("P10"…"P7") and the group's year/month.
-    var stagedCapturePriorities: [String?] = []
+    /// Parallel minimal on-phone tags: per-photo quality ("Q1"…"Q3") and the group's year/month.
+    var stagedCaptureQualities: [String?] = []
     var stagedCaptureYears: [Int?] = []
     var stagedCaptureMonths: [Int?] = []
     /// Mac-operator subjects per file (from the Live Capture tag card; empty entry = untagged).
@@ -49,7 +49,7 @@ class OCRProcessor: ObservableObject {
     var preGroupedBoundaries: [Bool] = []
     var preGroupedTypes: [CaptureGroupType] = []
     /// Active pre-grouped phone tags for the current run (parallel to the loaded files; empty = none).
-    var preGroupedPriorities: [String?] = []
+    var preGroupedQualities: [String?] = []
     var preGroupedYears: [Int?] = []
     var preGroupedMonths: [Int?] = []
     var preGroupedSubjects: [[String]] = []
@@ -489,7 +489,7 @@ class OCRProcessor: ObservableObject {
         /// Live Capture handoff metadata, parallel to `PendingRun.fileURLs` when populated.
         let preGroupedBoundaries: [Bool]
         let preGroupedTypes: [CaptureGroupType]
-        let preGroupedPriorities: [String?]
+        let preGroupedQualities: [String?]
         let preGroupedYears: [Int?]
         let preGroupedMonths: [Int?]
         let preGroupedSubjects: [[String]]
@@ -631,7 +631,7 @@ class OCRProcessor: ObservableObject {
 
 
 
-    // MARK: - Live Capture phone tags (priority + date)
+    // MARK: - Live Capture phone tags (quality + date)
 
 
 

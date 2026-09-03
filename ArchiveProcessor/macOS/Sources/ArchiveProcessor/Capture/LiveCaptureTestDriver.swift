@@ -57,7 +57,7 @@ enum LiveCaptureTestDriver {
             for path in seg.paths {
                 guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { NSLog("TESTDRIVER: missing \(path)"); continue }
                 session.ingest(jpeg: data, groupId: gid, seq: seq, type: seg.type,
-                               priority: nil, year: nil, month: nil, deviceName: "TestDriver")
+                               quality: nil, year: nil, month: nil, deviceName: "TestDriver")
                 seq += 1
             }
             // Resolve the card → finalize (LLM tags). W23.m7: a resolve is now REFUSED when its manifest

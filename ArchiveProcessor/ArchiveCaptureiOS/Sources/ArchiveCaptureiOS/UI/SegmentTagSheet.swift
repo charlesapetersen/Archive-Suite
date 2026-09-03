@@ -2,15 +2,15 @@ import SwiftUI
 
 private let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-/// Minimal on-phone tagging shown when a document segment is finished: priority + date. Subjects are
+/// Minimal on-phone tagging shown when a document segment is finished: quality + date. Subjects are
 /// intentionally NOT here — the Mac handles those. Mirrors the Android SegmentTagSheet.
 struct SegmentTagSheet: View {
     let recentYears: [Int]
-    let onApply: (_ priority: String?, _ year: Int?, _ month: Int?) -> Void
+    let onApply: (_ quality: String?, _ year: Int?, _ month: Int?) -> Void
     /// End segment was a mistake — close without ending the segment (keep shooting the same document).
     let onCancel: () -> Void
 
-    @State private var priority: String?
+    @State private var quality: Int?
     @State private var year: Int?
     @State private var month: Int?
     @State private var customYear = ""
@@ -20,10 +20,12 @@ struct SegmentTagSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Tag this document").font(.title2).bold()
 
-                Text("Priority").font(.headline)
+                Text("Quality").font(.headline)
                 HStack(spacing: 8) {
-                    ForEach(["P10", "P9", "P8", "P7"], id: \.self) { p in
-                        chip(p, selected: priority == p) { priority = (priority == p) ? nil : p }
+                    ForEach(0...3, id: \.self) { q in
+                        chip(q == 0 ? "0 · Unrated" : "Q\(q)", selected: quality == q) {
+                            quality = (quality == q) ? nil : q
+                        }
                     }
                 }
 
@@ -56,7 +58,7 @@ struct SegmentTagSheet: View {
                 HStack(spacing: 12) {
                     Button("Skip (tag on Mac)") { onApply(nil, nil, nil) }
                         .buttonStyle(.bordered).frame(maxWidth: .infinity)
-                    Button("Apply & continue") { onApply(priority, year, month) }
+                    Button("Apply & continue") { onApply(quality.flatMap { $0 == 0 ? nil : "Q\($0)" }, year, month) }
                         .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
                 }
                 // Escape hatch for an accidental End-segment tap: keep the current document open (does NOT end it).

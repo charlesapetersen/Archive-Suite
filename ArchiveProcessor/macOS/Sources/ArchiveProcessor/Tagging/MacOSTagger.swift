@@ -20,7 +20,7 @@ import ArchiveCore
 struct MacOSTagger {
 
     /// What a tag array says about the one Quality facet. `clear` is distinct from `unspecified`:
-    /// a `P7` is the former (the owner-defined unrated spelling), while ordinary generated tags
+    /// the internal-only `Q0` marker is the former, while ordinary generated tags
     /// are the latter and must not erase a rating the user already set on the output.
     private enum RatingIntent {
         case unspecified
@@ -41,7 +41,7 @@ struct MacOSTagger {
     }
 
     /// Return a canonical `Q1`…`Q3` for the last rating token in `tags`, or nil for both an
-    /// unspecified rating and the explicit-unrated `P7`. Callers that need to distinguish those two
+    /// unspecified rating and the internal explicit-unrated `Q0`. Callers that need to distinguish those two
     /// use `ratingIntent(in:)` inside this adapter.
     static func canonicalQualityToken(in tags: [String]) -> String? {
         guard case let .set(token) = ratingIntent(in: tags) else { return nil }
@@ -49,11 +49,13 @@ struct MacOSTagger {
     }
 
     private static func ratingIntent(in tags: [String]) -> RatingIntent {
-        for token in tags.reversed() where DocumentTags.isRatingToken(token) {
+        for token in tags.reversed() {
+            if token == "Q0" { return .clear }
+            guard DocumentTags.isRatingToken(token) else { continue }
             if let canonical = DocumentTags.qualityTag(for: DocumentTags.parseQuality(token)) {
                 return .set(canonical)
             }
-            return .clear       // P7: the retired spelling for an intentionally unrated document.
+            return .clear
         }
         return .unspecified
     }
@@ -96,17 +98,15 @@ struct MacOSTagger {
             let incomingRating = ratingIntent(in: incoming)
             // Every real-tagging write produces at most one canonical Quality token. A rating carried
             // by this operation wins; otherwise retain the verified current rating so a re-tag, merge,
-            // or image mirror cannot silently treat it as an unknown subject and drop it. `P7` is an
-            // explicit clear, not an absence of intent. P spellings are consumed and re-emitted
-            // only as Q by this real-tagging transform; the separate copy-source branch above remains
-            // a literal source-tag pass-through.
+            // or image mirror cannot silently treat it as an unknown subject and drop it. `Q0` is an
+            // internal explicit clear, not an absence of intent; it is consumed and never written.
             let qualityToken: String?
             switch incomingRating {
             case .set(let token): qualityToken = token
             case .clear: qualityToken = nil
             case .unspecified: qualityToken = canonicalQualityToken(in: current)
             }
-            incoming.removeAll { DocumentTags.isRatingToken($0) }
+            incoming.removeAll { DocumentTags.isRatingToken($0) || $0 == "Q0" }
             let filtered = incoming.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
 
             let colorTagName: String?
@@ -146,7 +146,7 @@ struct MacOSTagger {
 
         // Feed the subject-autocomplete vocabulary from what VERIFIED on disk, not from what we intended
         // (W26.vocab). One of three ingest paths that replaced the Spotlight query; `TagVocabulary` keeps
-        // only the subject facet, so the trailing "Unread" and the date/priority/colour tokens this write
+        // only the subject facet, so the trailing "Unread" and the date/quality/colour tokens this write
         // just stamped cannot become suggestions. Read-only with respect to the file — a suggestion list is
         // never a write authority — and after the `try`, so a refused write contributes nothing.
         ProcessorTagVocabulary.recordWrittenTags(result.after, labelNumber: result.afterLabel)

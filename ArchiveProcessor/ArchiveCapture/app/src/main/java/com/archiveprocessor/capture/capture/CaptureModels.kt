@@ -150,7 +150,7 @@ data class CapturedItem(
     val groupId: String,
     val seq: Int,
     val type: GroupType,
-    val priority: String? = null,   // per-page P10 override, or the segment default at finalize
+    val quality: String? = null,    // per-page Q3 override, or the segment default at finalize
     val year: Int? = null,
     val month: Int? = null,
     val state: UploadState = UploadState.PENDING,
@@ -158,7 +158,7 @@ data class CapturedItem(
     // Mac tombstones every prior group. Stored on the item so EVERY retry/resume re-sends it until it
     // lands — not just the first attempt — otherwise a failed first upload leaves a stray old copy.
     val replacesGroupId: String? = null,
-    // A field changed (per-page P10 toggle, or a reclassify) WHILE this item's upload was in flight, so the
+    // A field changed (per-page Q3 toggle, or a reclassify) WHILE this item's upload was in flight, so the
     // bytes/headers already sent are stale. The upload-completion handler honors this by re-sending with the
     // current fields once the in-flight upload settles — otherwise the change is silently dropped (the
     // in-flight guard suppressed the re-enqueue). Persisted so the intent survives an app kill. Mirrors iOS.

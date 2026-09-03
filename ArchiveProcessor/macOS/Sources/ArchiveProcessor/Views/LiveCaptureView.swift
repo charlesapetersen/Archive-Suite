@@ -688,12 +688,12 @@ struct LiveCaptureView: View {
     }
 
     private func stageForProcessing() {
-        let (files, boundaries, types, priorities, years, months, subjects) = session.orderedFilesAndGroups()
+        let (files, boundaries, types, qualities, years, months, subjects) = session.orderedFilesAndGroups()
         guard !files.isEmpty else { return }
         processor.stagedCaptureFiles = files
         processor.stagedCaptureBoundaries = boundaries
         processor.stagedCaptureTypes = types
-        processor.stagedCapturePriorities = priorities
+        processor.stagedCaptureQualities = qualities
         processor.stagedCaptureYears = years
         processor.stagedCaptureMonths = months
         processor.stagedCaptureSubjects = subjects
@@ -951,7 +951,7 @@ private struct SegmentTagCard: View {
             subjects = existing?.subjects ?? []
             yearText = (existing?.year ?? group.year).map(String.init) ?? ""
             month = existing?.month ?? group.month
-            quality = existing?.quality ?? DocumentTags.parseQuality(group.priority ?? "") ?? 0
+            quality = existing?.quality ?? DocumentTags.parseQuality(group.quality ?? "") ?? 0
         }
     }
 

@@ -15,10 +15,10 @@ import Foundation
 let dir = CommandLine.arguments[1]
 func w(_ n: String, _ d: Data) { try! d.write(to: URL(fileURLWithPath: dir).appendingPathComponent(n)) }
 let t = "TESTTK", e = "EP1"
-w("g1__7.json", RelayObjectFormat.encodeSidecar(token: t, epoch: e, group: "g1", seq: 7, type: "document", priority: "P8", year: "1968", month: "3", replaces: nil, device: "X"))
-w("g1.segment.json", RelayObjectFormat.encodeSegment(token: t, epoch: e, group: "g1", priority: "P8", year: "1968", month: "3", seqs: "6,7"))
+w("g1__7.json", RelayObjectFormat.encodeSidecar(token: t, epoch: e, group: "g1", seq: 7, type: "document", quality: "Q1", year: "1968", month: "3", replaces: nil, device: "X"))
+w("g1.segment.json", RelayObjectFormat.encodeSegment(token: t, epoch: e, group: "g1", quality: "Q1", year: "1968", month: "3", seqs: "6,7"))
 w("_session.complete.json", RelayObjectFormat.encodeSessionComplete(token: t, epoch: e))
-w("nasty__0.json", RelayObjectFormat.encodeSidecar(token: t, epoch: e, group: "nasty", seq: 0, type: "document", priority: nil, year: nil, month: nil, replaces: nil, device: "X\u{2019}\u{1F600}\u{01}"))
+w("nasty__0.json", RelayObjectFormat.encodeSidecar(token: t, epoch: e, group: "nasty", seq: 0, type: "document", quality: nil, year: nil, month: nil, replaces: nil, device: "X\u{2019}\u{1F600}\u{01}"))
 SWIFT
 if swiftc "$REPO/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net/RelayObjectFormat.swift" "$WORK/main.swift" -o "$WORK/emit" 2>"$WORK/swiftc.err"; then
   "$WORK/emit" "$WORK/out"

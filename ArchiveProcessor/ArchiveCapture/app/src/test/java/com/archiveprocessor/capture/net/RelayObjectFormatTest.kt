@@ -25,7 +25,7 @@ class RelayObjectFormatTest {
     private fun golden(name: String): ByteArray = File(goldenDir(), name).readBytes()
 
     @Test fun sidecarMatchesGolden() {
-        val out = RelayObjectFormat.encodeSidecar("TESTTK", "EP1", "g1", 7, "document", "P8", "1968", "3", null, "X")
+        val out = RelayObjectFormat.encodeSidecar("TESTTK", "EP1", "g1", 7, "document", "Q1", "1968", "3", null, "X")
         assertArrayEquals("g1__7.json must match golden byte-for-byte", golden("g1__7.json"), out)
     }
 
@@ -37,7 +37,7 @@ class RelayObjectFormatTest {
     }
 
     @Test fun segmentMatchesGolden() {
-        val out = RelayObjectFormat.encodeSegment("TESTTK", "EP1", "g1", "P8", "1968", "3", "6,7")
+        val out = RelayObjectFormat.encodeSegment("TESTTK", "EP1", "g1", "Q1", "1968", "3", "6,7")
         assertArrayEquals("g1.segment.json must match golden byte-for-byte", golden("g1.segment.json"), out)
     }
 

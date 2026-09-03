@@ -565,7 +565,7 @@ final class CaptureSession: ObservableObject {
     /// or nil if the write failed. Uses temp→rename so any folder watcher sees a complete file.
     @discardableResult
     func ingest(jpeg: Data, groupId: String, seq: Int, type: CaptureGroupType,
-                priority: String?, year: Int?, month: Int?, deviceName: String?) -> URL? {
+                quality: String?, year: Int?, month: Int?, deviceName: String?) -> URL? {
         if testForceIngestFailure { testForceIngestFailure = false; return nil }   // test-only injection
         let name = String(format: "%05d-%@.jpg", seq, groupId)
         let finalURL = incomingFolder.appendingPathComponent(name)
@@ -579,7 +579,7 @@ final class CaptureSession: ObservableObject {
             return nil
         }
         let photo = CapturedPhoto(url: finalURL, groupId: groupId, seq: seq, type: type, receivedAt: Date(),
-                                  priority: priority, year: year, month: month)
+                                  quality: quality, year: year, month: month)
         // Idempotent re-upload (phone resume after a crash): replace an existing same-group+seq
         // photo instead of duplicating it. Otherwise keep the list ordered by seq.
         if let existing = photos.firstIndex(where: { $0.groupId == groupId && $0.seq == seq }) {
@@ -711,19 +711,19 @@ final class CaptureSession: ObservableObject {
 
     /// The phone ended a document segment (`POST /segment/complete`): attach the segment's tags to its
     /// already-streamed pages (so the tag card pre-fills), then mark it complete so the card appears.
-    /// A per-page `P10` already on a photo (streamed with it) is never downgraded. Idempotent: re-sending
+    /// A per-page `Q3` already on a photo (streamed with it) is never downgraded. Idempotent: re-sending
     /// the same signal (retry) just re-applies the same tags + is a no-op on the completed set.
     @discardableResult
-    func markSegmentComplete(groupId: String, priority: String?, year: Int?, month: Int?) -> Bool {
+    func markSegmentComplete(groupId: String, quality: String?, year: Int?, month: Int?) -> Bool {
         let previousPhotos = photos.indices.filter { photos[$0].groupId == groupId }.map {
-            (index: $0, priority: photos[$0].priority, year: photos[$0].year, month: photos[$0].month)
+            (index: $0, quality: photos[$0].quality, year: photos[$0].year, month: photos[$0].month)
         }
         let wasCompleted = completedDocGroups.contains(groupId)
         var changed = false
         for i in photos.indices where photos[i].groupId == groupId {
             if year != nil { photos[i].year = year }
             if month != nil { photos[i].month = month }
-            if photos[i].priority != "P10", let priority, !priority.isEmpty { photos[i].priority = priority }
+            if photos[i].quality != "Q3", let quality, !quality.isEmpty { photos[i].quality = quality }
             changed = true
         }
         // completedDocGroups is now persisted in the manifest (B5-ii), so a newly-completed group is a
@@ -734,7 +734,7 @@ final class CaptureSession: ObservableObject {
             // No ack without durable state. Restore memory too, so a retry is guaranteed to attempt the
             // manifest write again and the UI cannot surface a completion the phone still owns.
             for previous in previousPhotos {
-                photos[previous.index].priority = previous.priority
+                photos[previous.index].quality = previous.quality
                 photos[previous.index].year = previous.year
                 photos[previous.index].month = previous.month
             }
@@ -820,11 +820,11 @@ final class CaptureSession: ObservableObject {
 
     /// Ordered file URLs + per-group boundary/type/tag info for the OCR pre-grouped handoff.
     func orderedFilesAndGroups() -> (files: [URL], boundaries: [Bool], types: [CaptureGroupType],
-                                     priorities: [String?], years: [Int?], months: [Int?], subjects: [[String]]) {
+                                     qualities: [String?], years: [Int?], months: [Int?], subjects: [[String]]) {
         var files: [URL] = []
         var boundaries: [Bool] = []
         var types: [CaptureGroupType] = []
-        var priorities: [String?] = []
+        var qualities: [String?] = []
         var years: [Int?] = []
         var months: [Int?] = []
         var subjects: [[String]] = []
@@ -834,20 +834,20 @@ final class CaptureSession: ObservableObject {
                 files.append(photo.url)
                 boundaries.append(i == 0)          // first photo of a group starts a segment
                 types.append(group.type)
-                // A saved Mac card is an explicit rating decision, including 0/unrated. Encode its
-                // absence as the current wire's P7 clear until W19.q7 renames that phone field.
-                // Without a Mac decision, preserve the phone's current rating input unchanged.
+                // A saved Mac card is an explicit rating decision, including 0/unrated. The clean Q
+                // protocol represents zero by omitting a quality token. Without a Mac decision, preserve
+                // the phone's quality input unchanged.
                 if let mac {
-                    priorities.append(DocumentTags.qualityTag(for: mac.quality) ?? "P7")
+                    qualities.append(DocumentTags.qualityTag(for: mac.quality))
                 } else {
-                    priorities.append(photo.priority)
+                    qualities.append(photo.quality)
                 }
                 years.append(mac?.year ?? group.year)     // Mac date override wins over the phone's
                 months.append(mac?.month ?? group.month)
                 subjects.append(mac?.subjects ?? [])       // Mac-entered subjects (empty if untagged)
             }
         }
-        return (files, boundaries, types, priorities, years, months, subjects)
+        return (files, boundaries, types, qualities, years, months, subjects)
     }
 
     // MARK: - Durable manifest (crash recovery)
@@ -857,7 +857,7 @@ final class CaptureSession: ObservableObject {
         let groupId: String
         let seq: Int
         let type: String
-        let priority: String?
+        let quality: String?
         let year: Int?
         let month: Int?
     }
@@ -885,7 +885,7 @@ final class CaptureSession: ObservableObject {
     private func writeManifest() -> Bool {
         let entries = photos.map {
             ManifestEntry(name: $0.url.lastPathComponent, groupId: $0.groupId, seq: $0.seq,
-                          type: $0.type.rawValue, priority: $0.priority, year: $0.year, month: $0.month)
+                          type: $0.type.rawValue, quality: $0.quality, year: $0.year, month: $0.month)
         }
         let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedDocGroups),
                                        resolvedGroupIds: Array(resolvedGroupIds), macTags: macTags)
@@ -928,7 +928,7 @@ final class CaptureSession: ObservableObject {
                 restored.append(CapturedPhoto(
                     url: url, groupId: e.groupId, seq: e.seq,
                     type: CaptureGroupType(rawValue: e.type) ?? .document,
-                    receivedAt: Date(), priority: e.priority, year: e.year, month: e.month))
+                    receivedAt: Date(), quality: e.quality, year: e.year, month: e.month))
             }
             if !restored.isEmpty {
                 restored.sort { $0.seq < $1.seq }

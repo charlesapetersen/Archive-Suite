@@ -47,9 +47,9 @@ the backup folder, and failure/recovery. (iPhone is deferred; this is Android-on
    - ✅ Mac: registered as a **folder** → **Purple**.
 
 ### A4 · On-phone tagging (minimal)
-10. On a new capture, set **priority** (P7–P10) and the **per-page P10** control; set **year/month** if the phone exposes it.
+10. On a new capture, set **Quality** (Unrated or Q1–Q3) and the **per-page Q3** control; set **year/month** if the phone exposes it.
     - ✅ Phone: values stick on the item.
-    - ✅ Mac: the tag card / output reflects the phone-supplied priority + date.
+    - ✅ Mac: the tag card / output reflects the phone-supplied Quality + date.
 
 ### A5 · Re-pair control (the bug we fixed — must work)
 11. On the capture screen, open **Re-pair** → confirm the dialog → confirm.
@@ -129,7 +129,7 @@ Do these deliberately; each must **not** lose a captured image.
 
 ## What "pass" looks like
 - Pairing works over **Wi-Fi and USB**, and **Re-pair** always returns to the scanner and re-uploads retained items with no duplicates.
-- Every capture appears on the Mac **and** in the backup folder; markers map to Red/Folder-Purple; on-phone priority/date propagate.
+- Every capture appears on the Mac **and** in the backup folder; markers map to Red/Folder-Purple; on-phone Quality/date propagate.
 - **Process live** yields dual output (PDF + renamed image) with correct tags + `Unread` last; **Stage for later** hands a clean batch to Process Files.
 - Across **every** failure in Run C, **no captured photo is lost**, and the backup folder is only cleared after a successful finalize.
 

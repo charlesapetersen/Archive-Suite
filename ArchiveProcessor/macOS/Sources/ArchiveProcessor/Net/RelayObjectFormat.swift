@@ -93,9 +93,9 @@ enum RelayObjectFormat {
     // fp = SHA-256(canonicalJSON of the INGEST-RELEVANT metadata) → first 16 hex. Identical inputs on the
     // phone and Mac (same function, same fields) yield the same fp, so: the receipt echoes it and the phone
     // trusts a receipt only when its fp matches the current metadata (defeats the stale-ack bug, H3); the
-    // Mac re-ingests iff fp changed (identical re-send skipped, real P10/tag change re-applied).
-    static func fingerprint(type: String, priority: String?, year: String?, month: String?, replaces: String?) -> String {
-        let m: [String: String?] = ["type": type, "priority": priority, "year": year, "month": month, "replaces": replaces]
+    // Mac re-ingests iff fp changed (identical re-send skipped, real Q3/tag change re-applied).
+    static func fingerprint(type: String, quality: String?, year: String?, month: String?, replaces: String?) -> String {
+        let m: [String: String?] = ["type": type, "quality": quality, "year": year, "month": month, "replaces": replaces]
         let digest = SHA256.hash(data: canonicalJSON(m))
         return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
     }
@@ -103,13 +103,13 @@ enum RelayObjectFormat {
     // MARK: - Encode
 
     static func encodeSidecar(token: String, epoch: String, group: String, seq: Int, type: String,
-                              priority: String?, year: String?, month: String?, replaces: String?,
+                              quality: String?, year: String?, month: String?, replaces: String?,
                               device: String? = nil) -> Data {
         // fp deliberately excludes `device` (it doesn't change OCR/tags), so a device-name change never
         // forces a re-ingest — matches the A1 fingerprint contract.
-        let fp = fingerprint(type: type, priority: priority, year: year, month: month, replaces: replaces)
+        let fp = fingerprint(type: type, quality: quality, year: year, month: month, replaces: replaces)
         return canonicalJSON(["kind": "photo", "token": token, "epoch": epoch, "group": group,
-                              "seq": String(seq), "type": type, "priority": priority, "year": year,
+                              "seq": String(seq), "type": type, "quality": quality, "year": year,
                               "month": month, "replaces": replaces, "device": device, "fp": fp])
     }
 
@@ -119,9 +119,9 @@ enum RelayObjectFormat {
     }
 
     static func encodeSegment(token: String, epoch: String, group: String,
-                              priority: String?, year: String?, month: String?, seqs: String?) -> Data {
+                              quality: String?, year: String?, month: String?, seqs: String?) -> Data {
         canonicalJSON(["kind": "segment-complete", "token": token, "epoch": epoch, "group": group,
-                       "priority": priority, "year": year, "month": month, "seqs": seqs])
+                       "quality": quality, "year": year, "month": month, "seqs": seqs])
     }
 
     static func encodeSessionComplete(token: String, epoch: String) -> Data {
