@@ -87,6 +87,9 @@ import ArchiveCore
 ///  24. A staging manifest is versioned and fingerprinted (W17.stg1): a valid record resumes, while tampered,
 ///      unversioned, missing-version/fingerprint, or unknown-version records are quarantined byte-for-byte and
 ///      block normal processing without touching their staged artifacts (Test 27).
+///  25. Launch-time stranded-session detection (W17.det1) counts only session-shaped backup folders with a
+///      nonempty canonical staging array, reports the count on the existing status line, and mutates nothing
+///      in the Backup Folder (Test 28).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -3492,6 +3495,40 @@ enum LiveCaptureRecoveryTestDriver {
             let oldUnversioned = try? JSONEncoder().encode([integritySegment])
             check("an old unversioned manifest quarantines rather than resuming (W17.stg1)",
                   rejectedManifest("unversioned", oldUnversioned))
+
+            // --- Test 28 (W17.det1): detection is a pure scan, not recovery machinery. Only the two
+            // session-shaped folders with a nonempty canonical `staged` array count; empty/malformed
+            // manifests and a human-named folder do not. Creating a new session reports the same count on
+            // its existing status line, while this scratch fixture's bytes remain exactly as written.
+            let detectionRoot = CaptureSession.backupRoot
+            let beforeDetection = CaptureSession.strandedLiveSessionCount(under: detectionRoot)
+            let detectionToken = String(UUID().uuidString.prefix(8))
+            let strandedOne = detectionRoot.appendingPathComponent("2099-01-01T00-00-00Z-\(detectionToken)", isDirectory: true)
+            let strandedTwo = detectionRoot.appendingPathComponent("2099-01-02T00-00-00Z-\(detectionToken)", isDirectory: true)
+            let emptyStaging = detectionRoot.appendingPathComponent("2099-01-03T00-00-00Z-\(detectionToken)", isDirectory: true)
+            let operatorFolder = detectionRoot.appendingPathComponent("operator-notes-\(detectionToken)", isDirectory: true)
+            let stagedBody = Data("{\"staged\":[{\"groupId\":\"detect\"}]}".utf8)
+            let emptyBody = Data("{\"staged\":[]}".utf8)
+            for folder in [strandedOne, strandedTwo, emptyStaging, operatorFolder] {
+                try? fm.createDirectory(at: folder.appendingPathComponent("_processed", isDirectory: true),
+                                        withIntermediateDirectories: true)
+            }
+            let oneManifest = strandedOne.appendingPathComponent("_processed/staging-manifest.json")
+            let twoManifest = strandedTwo.appendingPathComponent("_processed/staging-manifest.json")
+            try? stagedBody.write(to: oneManifest, options: .atomic)
+            try? stagedBody.write(to: twoManifest, options: .atomic)
+            try? emptyBody.write(to: emptyStaging.appendingPathComponent("_processed/staging-manifest.json"), options: .atomic)
+            try? stagedBody.write(to: operatorFolder.appendingPathComponent("_processed/staging-manifest.json"), options: .atomic)
+            let detected = CaptureSession.strandedLiveSessionCount(under: detectionRoot)
+            let detectorSession = CaptureSession()
+            check("stranded-session detection counts only nonempty staged session folders (W17.det1)",
+                  detected == beforeDetection + 2
+                      && detectorSession.statusMessage.contains("\(detected) prior")
+                      && detectorSession.statusMessage.contains("staged output"))
+            check("stranded-session detection is read-only over staged manifests (W17.det1)",
+                  (try? Data(contentsOf: oneManifest)) == stagedBody
+                      && (try? Data(contentsOf: twoManifest)) == stagedBody
+                      && fm.fileExists(atPath: operatorFolder.path))
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []

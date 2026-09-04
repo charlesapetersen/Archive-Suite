@@ -37,6 +37,18 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   GUI, credentials, or network is used. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Capture/
   {LiveCaptureProcessor,LiveCaptureRecoveryTestDriver}.swift,Views/LiveCaptureView.swift} | M | med | done
 
+- [x] **W17.det1 — stranded-session detection logic (no UI) [S · low].**
+  **SHIPPED 2026-09-04 (this commit).** Startup now reads valid session folders beneath `backupRoot` and counts
+  only canonical `_processed/staging-manifest.json` files whose `staged` array is non-empty. It reports that
+  count through the existing status line and log, without adding SwiftUI, a banner, or a Recovery screen. The
+  detector neither writes nor reinterprets malformed and quarantined manifests: they remain the separate,
+  fail-closed W17.stg1 recovery state.
+
+  **Verification:** Processor Debug build, full headless scratch recovery suite (including its isolated
+  stranded-session detection and byte-preservation checks), and Processor write-surface lint pass. No corpus,
+  live output folder, GUI, credentials, or network is used. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/
+  {Capture/CaptureSession.swift,Capture/LiveCaptureRecoveryTestDriver.swift} | S | low | done
+
 ## W9 gap-closure — Phase A safety-net (2026-08-19)
 
 - [x] **`W9.c4` — the Notes smoke gate builds and drives the GUI target [XS].** **SHIPPED 2026-08-20**

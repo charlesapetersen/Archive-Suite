@@ -757,15 +757,6 @@ Reasons, recorded so they aren't relitigated:
    runs the *opposite* direction from what the entries assumed — nothing in RAT/IMMCAP makes any queued item
    obsolete (a transaction engine that faithfully commits the wrong destination is exactly as broken).
 
-### Promoted
-- [ ] **W17.det1 — stranded-session DETECTION logic (no UI) [S].** The one operator gap neither Finder nor the
-  Backup Folder button covers is **discovery** of a session stranded by a crash. Owner decision: build the
-  **pure-logic half only** — scan `backupRoot` for sessions with a non-empty `staged` array and surface the count
-  on the existing status line / log. **No new SwiftUI, no banner, no Recovery screen.** This costs none of the
-  owner's design-review time and settles empirically whether stranded sessions actually occur before any UI is
-  committed to. Revisit the at-launch banner only once this has been seen to fire.
-  | files: Capture/CaptureSession.swift, Capture/LiveCaptureProcessor.swift | S | low | none
-
 ### Folded into an existing item (NOT a separate task)
 The **silently-swallowed tag-write failures** (`_ = try? MacOSTagger.applyTags(...)` at
 `LiveCaptureProcessor.swift:640/647/673`) — a real finding that appeared in **neither** KNOWN_ISSUES entry — is

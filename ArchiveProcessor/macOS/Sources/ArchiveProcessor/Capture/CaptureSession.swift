@@ -437,6 +437,10 @@ final class CaptureSession: ObservableObject {
         // so the visible backup root doesn't accumulate clutter that buries the run that still has photos.
         // Runs before recovery, so it can never touch the active session (which has photos, or is fresh).
         Self.pruneEmptySessions(under: root)
+        // Detection only (W17.det1): the Backup Folder already holds the recovery material, but it did not
+        // say that a prior session still had staged output. Count it here, before choosing a session to
+        // restore, without moving, deleting, decoding into live state, or presenting a new recovery UI.
+        let strandedSessionCount = Self.strandedLiveSessionCount(under: root)
 
         // Crash recovery: reload the newest session that still has received-but-unprocessed photos (a
         // manifest + files on disk) so a Mac crash never orphans received data; else start fresh.
@@ -455,6 +459,11 @@ final class CaptureSession: ObservableObject {
             sessionId = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
             incomingFolder = root.appendingPathComponent(sessionId, isDirectory: true)
             try? FileManager.default.createDirectory(at: incomingFolder, withIntermediateDirectories: true)
+        }
+        if strandedSessionCount > 0 {
+            let noun = strandedSessionCount == 1 ? "session has" : "sessions have"
+            statusMessage = "Recovery: \(strandedSessionCount) prior \(noun) staged output in the Backup Folder."
+            NSLog("Live Capture recovery: \(strandedSessionCount) prior \(noun) staged output in the Backup Folder.")
         }
     }
 
@@ -987,6 +996,26 @@ final class CaptureSession: ObservableObject {
             reclaimed.append(folder)
         }
         return reclaimed
+    }
+
+    /// Count recovery candidates without changing them. Only recognized session folders with the canonical
+    /// Live Capture staging manifest qualify; an empty/malformed manifest, an arbitrary operator folder,
+    /// and a quarantined manifest are intentionally not reinterpreted here. This is the pure-logic half of
+    /// stranded-session discovery — Finder remains the recovery surface and there is no new alert/screen.
+    static func strandedLiveSessionCount(under root: URL) -> Int {
+        let fm = FileManager.default
+        guard let children = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return 0
+        }
+        return children.reduce(into: 0) { count, folder in
+            guard (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+                  isSessionIdName(folder.lastPathComponent) else { return }
+            let manifest = folder.appendingPathComponent("_processed/staging-manifest.json")
+            guard let data = try? Data(contentsOf: manifest),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let staged = object["staged"] as? [Any], !staged.isEmpty else { return }
+            count += 1
+        }
     }
 
     /// True iff `folder` is a spent Live Capture session safe to move to the Trash. CONSERVATIVE by
