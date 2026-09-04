@@ -4757,6 +4757,26 @@ explain why not.
   stale run can still land on a new run's jobs → filed as **`W16.bat10`**.
   | files: OCR/OCRProcessor+OCR.swift, OCR/BatchSweepClearedListContract.swift, Capture/BatchResumeTestDriver.swift | S | med |
 
+- [x] **W16.bat8 — a stale in-memory interrupted-run manifest made paid-batch results land in the wrong
+  journal, so a relaunch could re-pay for chunks already bought [S · MED · money].** DONE 2026-09-03 — this
+  commit. Found by the W16.bat7 adversarial pass; **pre-existing**. A non-batch run whose incremental
+  manifest write failed cancels its task before the ordinary cleanup clears `activePendingRun`. Dismiss then
+  removed the on-disk `pending_run.json` and banner, but left the stale in-memory snapshot. A subsequent paid
+  batch deliberately never assigns that property; the existing `activePendingRun == nil` branch in
+  `saveResultToPendingRun` therefore took the wrong run-manifest route instead of appending
+  `completedResults`/`completedOutputPaths` to `pending_batch.json`. Since `resumeBatch` trusts that latter
+  map to skip completed pages, the next relaunch could fetch and materialize paid results again.
+  The owner-selected minimal fix is exactly that: `dismissPendingRun()` now clears `activePendingRun` beside
+  the banner and disk file. The paid-batch routing predicate is intentionally unchanged, as is the durable
+  file selected for a live batch. New `BatchDismissedRunContract` (BatchResumeTestDriver section 25) seeds a
+  real redirected run manifest and paid-batch journal, drives real Dismiss, then real
+  `saveResultToPendingRun` and reads the journal back. It proves both that Dismiss clears every representation
+  of the stale run and that the next paid-batch result persists in its own journal. The suite refuses to run
+  unless both manifest paths resolve to its scratch state directory; it uses no key, network, or paid call.
+  Verified: Debug build (no new warnings); `scripts/test-batch-resume.sh` **ALL PASS** (379 checks).
+  | files: OCR/OCRProcessor+Pipeline.swift, OCR/BatchDismissedRunContract.swift,
+  Capture/BatchResumeTestDriver.swift, ArchiveProcessor/KNOWN_ISSUES.md | S | med | Tier-2
+
 - [x] **W16.bat7 — four exits in `pollBatchUntilComplete` returned a "poll completed" flag they never set,
   and the caller then DELETED the paid batch's journal [S · MED · money].** DONE 2026-08-03 — `f417301`
   (the fix) + this commit (the extraction, the measured regression, and the docs). ✅ Owner-AUTHORIZED
@@ -4790,9 +4810,9 @@ explain why not.
   ⬆️ **That limit is CLOSED as of `W16.bat7-fu` (2026-08-03, below):** all three provider-arm exits are now
   driven through a fail-closed transport seam, each with its own measured mutant, so the header — and this
   entry — no longer carry that caveat. Cite the contract for all four exits.
-  **Two findings filed from the adversarial pass, neither a defect in this change:** `W16.bat8` (a stale
-  in-memory run manifest makes a paid batch journal its results into the wrong file → duplicate charges on
-  resume; **owner-gated, money**) and `W16.bat9` (the sweep's loop can trap if `jobs` is cleared mid-write).
+  **Two findings were filed from the adversarial pass, neither a defect in this change:** `W16.bat8` (a stale
+  in-memory run manifest made a paid batch journal its results into the wrong file → duplicate charges on
+  resume; **now shipped above**) and `W16.bat9` (the sweep's loop can trap if `jobs` is cleared mid-write).
   `W16.bat8` also **withdrew a claim this item shipped with**: the sweep's persist-failure exit was filed as
   reachable only in a state "which could not be constructed from the current call graph." It can be, and the
   contract's header now traces how — so the exit is live, not merely defensive.

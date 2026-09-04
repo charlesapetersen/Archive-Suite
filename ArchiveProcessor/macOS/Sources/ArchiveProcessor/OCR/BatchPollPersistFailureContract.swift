@@ -56,8 +56,8 @@ import Foundation
 /// there when the sweep runs. `cancel()` *does* clear it (its "keep the pending run file for resume" block),
 /// which is why the chain starts from a write failure rather than a Stop. **That is a separate money bug in
 /// its own right** — in that state every paid-batch result is journaled into the stale run manifest instead of
-/// `batch.completedResults`, so a relaunch re-fetches chunks already paid for — and it is filed as
-/// `W16.bat8` rather than fixed here (this item's grant does not extend to it).
+/// `batch.completedResults`, so a relaunch re-fetches chunks already paid for. It was filed as `W16.bat8`
+/// rather than fixed here; that separate item now clears the stale state in `dismissPendingRun()`.
 ///
 /// So the exit these checks drive is live, not merely defensive. It is *also* why the owner authorized all
 /// four exits rather than the one narrow arm: the exits were safe only because something upstream happened to
@@ -430,7 +430,8 @@ enum BatchPollPersistFailureContract {
         // The shape this section exists to pin: an interrupted-run manifest held alongside the paid batch,
         // which is what routes `saveResultToPendingRun` into the branch that does not report. Reachable in
         // production via a failed non-batch manifest write and a Dismiss — see the ⚠️ note in this file's
-        // header, and `W16.bat8` for the separate bug that leaves it behind.
+        // header. `W16.bat8` clears that state in production; this fixture retains it to drive this
+        // contract's independent persist-failure exit.
         processor.activePendingRun = OCRProcessor.PendingRun(
             provider: .gemini, model: model(), thinkingLevel: nil,
             fileURLs: [source], outputDirectory: outDir, enableTagging: false, enableSegmentJSON: false,

@@ -1138,6 +1138,9 @@ extension OCRProcessor {
     /// Dismiss a pending run notification.
     func dismissPendingRun() {
         Self.deletePendingRun()
+        // The banner describes this in-memory manifest as well as its on-disk counterpart. Leaving the
+        // former live lets a later paid batch misclassify its results as part of the dismissed run.
+        activePendingRun = nil
         pendingRunInfo = nil
     }
     /// Whether the persisted incomplete run is the SAME job as the current input+output+settings —

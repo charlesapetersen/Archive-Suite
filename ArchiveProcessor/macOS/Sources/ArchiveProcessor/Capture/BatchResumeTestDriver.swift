@@ -121,6 +121,11 @@ import AppKit
 ///      file is still pruned once, and a run started mid-flight keeps its own failure entry. Writes no
 ///      manifest or journal, so it takes no redirect verdict; costs two real 10-second waits (the shipped
 ///      retry's own sleep). Like 21, a mutant here can TRAP this driver rather than print FAIL.
+///  25. **Dismissing an interrupted run cannot divert paid-batch results** (`BatchDismissedRunContract`,
+///      W16.bat8): drives the real Dismiss action with both redirected journals present, then the real
+///      `saveResultToPendingRun`. The dismissed run loses both its banner and its in-memory state, so the
+///      unchanged `activePendingRun == nil` route persists the next result to the paid-batch journal rather
+///      than a vanished run manifest. No network, no key, no cost.
 ///
 /// Writes a PASS/FAIL report to `BATCHRESUME_TEST_OUT` (or a temp file) + NSLog. Test scaffolding only.
 /// Sections 1–11 operate on explicit temp manifest URLs via the `_testWrite/_testRead` hooks and sections
@@ -818,6 +823,14 @@ enum BatchResumeTestDriver {
         // window needed a seam rather than an enqueued task. A mutant here can TRAP this process rather
         // than print FAIL.
         await RetryPruneIdentityContract.run(check: check)
+
+        // --- 25: Dismiss leaves no interrupted-run state to misroute a paid batch (W16.bat8). ---
+        // The button action is the smallest root cause: after it removes the stale run's disk snapshot,
+        // it must remove the in-memory snapshot that described the same interrupted run. This drives the
+        // real Dismiss and then the real result-persistence method. The paid-batch routing predicate stays
+        // `activePendingRun == nil`; changing it would be a different durable-file decision. Both manifests
+        // are real files only under the redirected scratch state root.
+        BatchDismissedRunContract.run(check: check, redirected: journalsAreRedirected)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

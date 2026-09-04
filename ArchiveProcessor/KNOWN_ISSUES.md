@@ -1070,6 +1070,18 @@ the first one is a safety property. That review also surfaced two **pre-existing
 **W16.bat4** (the Resume control is never surfaced after an interrupted first run). **Both are now closed —
 see below.**
 
+**W16.bat8 — CLOSED 2026-09-03 (this commit).** A different reachable path through the same review left an
+interrupted non-batch run's `activePendingRun` in memory after its manifest write failed and its task was
+cancelled. Dismiss removed the file and banner but not that state. The next paid batch has no run manifest of
+its own, and its deliberately retained `activePendingRun == nil` routing rule therefore wrote results into
+the dismissed run instead of its paid-batch journal. A relaunch could not see those completed results and
+could re-fetch/re-materialize pages already paid for. `dismissPendingRun()` now clears the in-memory snapshot
+that its banner describes. It neither changes the paid-batch routing predicate nor alters which durable file a
+live batch owns. `BatchDismissedRunContract` (BatchResumeTestDriver section 25) drives the real Dismiss action
+and result persistence with both manifests redirected to scratch, then reads the paid-batch journal back from
+disk. Its two checks prove the stale state is gone and the next result lands in that journal; no network, key,
+or provider charge is involved.
+
 **W16.bat3 — CLOSED 2026-08-02** (`53e43e2` + this commit). The first of those two, and the one that cost
 money. `cancel()` deletes the paid-batch journal **only** when every server-side cancellation was confirmed;
 otherwise it keeps it and tells the operator *"the paid-batch journal was kept for recovery."* But the poll

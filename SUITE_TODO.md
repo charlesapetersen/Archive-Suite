@@ -751,33 +751,8 @@ risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actuall
   money gate: *"we don't need my permission for spending money. The daemon only spends tiny amounts and the
   keys are capped."* The historical grants' ⛔ constraints still bind. It remains a change to what the cancel path does with the
   journal, which was historically granted item by item — treat that as a reason for care, not a gate. Do NOT
-  fold into `W16.bat5-fu` (shipped) or `W16.bat8` (different file, different trigger).
+  fold into `W16.bat5-fu` or `W16.bat8` (both shipped; different file, different trigger).
   | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | Tier-2
-- [ ] **W16.bat8 — A stale in-memory interrupted-run manifest makes a paid batch
-  journal its results into the WRONG file, so a relaunch re-fetches chunks already paid for [S · MED ·
-  money].** Found by the `W16.bat7` adversarial pass (2026-08-03); **pre-existing**, and covered by no
-  grant. `saveResultToPendingRun` (`+Pipeline.swift:724`) routes to the paid-batch journal only when
-  `activePendingRun == nil`; with a stale non-nil value it writes every batch result into the pending-**RUN**
-  manifest instead, leaving `batch.completedResults` empty. `resumeBatch` keys its skip-what-is-done logic off
-  exactly that map, so a relaunch mid-batch re-downloads and re-materializes chunks the operator has already
-  paid for and already has PDFs for — the duplicate-output/duplicate-charge hazard the comment at
-  `+Pipeline.swift:721-723` exists to prevent.
-  **The chain is reachable** (traced, not inferred): a non-batch run's incremental manifest write fails →
-  `saveResultToPendingRun:756-761` sets `isProcessing = false` and calls `processingTask?.cancel()`, leaving
-  `activePendingRun` SET → the run unwinds through `guard !Task.isCancelled else { return }` (`:2578`) and
-  never reaches the `activePendingRun = nil` two lines below → the operator presses **Dismiss** on the
-  interrupted-run banner and `dismissPendingRun()` (`:1052-1055`) deletes the file + clears the banner but
-  leaves the in-memory manifest → `startProcessing`'s recovery guard (`:2162`) reads DISK, so it now passes →
-  the batch branch never assigns `activePendingRun`, so the stale value is still there when results land.
-  `cancel()` DOES clear it (`:2125-2126`), which is why the chain starts from a write failure, not a Stop.
-  **Smallest root cause: `dismissPendingRun()` clears the banner but not the state it describes.** A second
-  candidate is making `saveResultToPendingRun` prefer a live paid batch over any run manifest — that is a
-  change to which durable file a paid result lands in, which is why this is owner-gated rather than folded in.
-  **Tier-2, money path, scratch only — workable now.** Authorized by the owner 2026-08-04 with fix direction
-  **(a)** chosen (`OWNER_AUTHORIZATIONS.md`), and the money gate itself was lifted 2026-08-13. Every change to
-  what the paid-batch journal records was historically granted item by item (bat2-fu2, bat3, bat5, bat6, bat7);
-  those grants' ⛔ constraints still bind.
-  | files: OCR/OCRProcessor+Pipeline.swift | S | med | Tier-2
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
