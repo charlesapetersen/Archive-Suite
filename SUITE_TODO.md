@@ -758,23 +758,6 @@ Reasons, recorded so they aren't relitigated:
    obsolete (a transaction engine that faithfully commits the wrong destination is exactly as broken).
 
 ### Promoted
-- [ ] **W17.stg1 — version + fingerprint + fail-closed the Live Capture staging manifest** (blocked-on: W3.cap-r4) **[M].**
-  Live Capture's durable state is the **only one of the Processor's three** that is unversioned and unverified:
-  `PendingBatch` has `lifecycleVersion` + a SHA-256 `lifecycleFingerprint` and fails closed on an unknown version
-  (`OCRProcessor.swift:289-305, :379-383`); `OutputFileSafety.relocateArtifactSet` byte-verifies with
-  `contentsEqual` before installing; `StagingManifest` (`LiveCaptureProcessor.swift:709-719`) has **neither**, and
-  `loadStagingManifest` (:190-242) **fails SILENT-OPEN** — both decodes fail, `restored` stays empty, and the
-  operator sees an empty Processing pane while `_processed/` holds orphaned output. Mirror the proven in-repo
-  `PendingBatch` pattern: add `schemaVersion` + a fingerprint, and on a corrupt/unknown-version manifest **rename
-  it to `staging-manifest.corrupt-<ts>.json` and surface a banner — never auto-delete, never silently continue.**
-  Owner decision: **manifest only** — do NOT add a per-source content hash (that was defensible as corruption
-  detection but is optional, and it is *not* collision defense given #4 above). Testable end-to-end in the
-  existing `$0` `LIVECAPTURE_RECOVERYTEST` driver. **Sequencing: after `W3.cap-r4`** — both touch `RetainedSegment`,
-  so let the fingerprint land on settled struct semantics. ✅ **That prerequisite shipped 2026-08-02 (`d719e3f`);
-  this is UNBLOCKED.** Note what it changed: `RetainedSegment` no longer carries `collectionKey` (the collection
-  is live state, read via `liveCollectionKey(for:)`, not a retained write input), so the fingerprint covers one
-  fewer field — and must not re-introduce it as "state worth pinning".
-  | files: Capture/LiveCaptureProcessor.swift, Capture/LiveCaptureRecoveryTestDriver.swift | M | med | none
 - [ ] **W17.det1 — stranded-session DETECTION logic (no UI) [S].** The one operator gap neither Finder nor the
   Backup Folder button covers is **discovery** of a session stranded by a crash. Owner decision: build the
   **pure-logic half only** — scan `backupRoot` for sessions with a non-empty `staged` array and surface the count

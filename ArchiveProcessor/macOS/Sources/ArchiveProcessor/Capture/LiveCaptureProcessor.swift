@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import ArchiveCore
+import CryptoKit
 
 /// Streams processing during Live Capture: OCRs each page **as it arrives**, and finalizes each
 /// segment (tagging + PDF + dual-output + optional merge) into a durable staging area as the operator
@@ -71,6 +72,11 @@ final class LiveCaptureProcessor: ObservableObject {
 
     @Published private(set) var statuses: [SegmentStatus] = []
     @Published private(set) var staged: [StagedSegment] = []
+    /// A failed staging-manifest verification is a recovery stop, not an empty session. This notice is
+    /// deliberately separate from `CaptureSession.statusMessage`: normal status updates may replace that
+    /// transient line, while the operator must keep seeing this recovery instruction.
+    @Published private(set) var stagingRecoveryNotice: String?
+    var stagingRecoveryBlocked: Bool { stagingManifestBlocked }
 
     /// End-of-session rotation review (opt-in) — a dedicated pass over every captured page, shown at
     /// Finish before collection naming. One editable row per staged page.
@@ -317,6 +323,8 @@ final class LiveCaptureProcessor: ObservableObject {
     private unowned let session: CaptureSession
     private var config: SessionProcessingConfig?
     private var stagingDir: URL?
+    /// A rejected manifest must not be replaced by normal resume/retry/finalize persistence.
+    private var stagingManifestBlocked = false
 
     /// Stable identity of a captured PAGE, and the key for everything that must be started exactly once
     /// per page. **Not** `CapturedPhoto.id` (W3.cap-r2): that is a fresh `UUID()` minted in the initializer,
@@ -406,6 +414,8 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Arm the coordinator for a `.live` session. Called from `CaptureSession.chooseLive`.
     func activate(config: SessionProcessingConfig) {
         self.config = config
+        stagingManifestBlocked = false
+        stagingRecoveryNotice = nil
         let fm = FileManager.default
         // Primary (Recovery Core Directive): stage inside the session's VISIBLE backup folder, so processed
         // PDFs/JPGs (with tags) are recoverable next to the raw sources if the app fails before finalize.
@@ -425,7 +435,7 @@ final class LiveCaptureProcessor: ObservableObject {
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         stagingDir = dir
         Self.pruneLegacyStaging()   // best-effort: drop orphaned staging left by older builds
-        loadStagingManifest()   // resume: reload already-staged segments so they're not re-OCR'd
+        guard loadStagingManifest() else { return }   // preserve failed recovery state; never resume as empty
         // Process photos already received (resume after a crash, or "chose live after some capture").
         for photo in session.photos { photoIngested(photo) }
         for group in session.groups where group.type == .document
@@ -435,33 +445,48 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
-    /// Resume: reload segments already staged before a crash/relaunch so they aren't re-processed.
-    private func loadStagingManifest() {
-        guard let stagingDir else { return }
+    /// Resume only a versioned, fingerprint-verified manifest. A bad record is quarantine-worthy evidence,
+    /// not an empty list that normal processing may silently replace.
+    @discardableResult
+    private func loadStagingManifest() -> Bool {
+        guard let stagingDir else { return true }
         let url = stagingDir.appendingPathComponent("staging-manifest.json")
-        guard let data = try? Data(contentsOf: url) else { return }
-        let decoder = JSONDecoder()
-        var restored: [StagedSegment] = []
-        var didMigrateLegacy = false
-        if let manifest = try? decoder.decode(StagingManifest.self, from: data) {
-            restored = manifest.staged
-            for r in manifest.retained { retained[r.groupId] = r }   // enables the rotation review after resume
-        } else if let legacy = try? decoder.decode([StagedSegment].self, from: data) {
-            // Legacy manifest (bare [StagedSegment], no `retained`): DROP each re-processable segment so the
-            // resume path below regenerates it (→ proper `retained` → a COMPLETE rotation review); KEEP any
-            // whose sources are gone (can't regenerate). See migrateLegacyManifestSegments (KNOWN_ISSUES #1).
-            didMigrateLegacy = true
-            let legacyIds = Set(legacy.map(\.groupId))
-            let presentGroupIds: Set<String> = Set(
-                session.groups
-                    .filter { legacyIds.contains($0.id) }
-                    .compactMap { g -> String? in
-                        let urls = g.photos.map(\.url)
-                        return (!urls.isEmpty && urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }) ? g.id : nil
-                    })
-            let (keep, _) = Self.migrateLegacyManifestSegments(legacy) { presentGroupIds.contains($0) }
-            restored = keep
+        let fm = FileManager.default
+        // Quarantine is durable recovery state. The canonical filename is absent by design after a rejection,
+        // so treating that absence as a fresh session on the next launch would silently resume and overwrite
+        // the evidence the previous launch deliberately preserved.
+        do {
+            if let quarantined = try existingQuarantinedManifest(in: stagingDir) {
+                blockStagingRecovery(at: url, reason: "was previously quarantined after a failed integrity check",
+                                     existingQuarantine: quarantined)
+                return false
+            }
+        } catch {
+            blockStagingRecovery(at: url, reason: "could not be inspected for a previous quarantine")
+            return false
         }
+        guard fm.fileExists(atPath: url.path) else { return true }
+        guard let data = try? Data(contentsOf: url) else {
+            blockStagingRecovery(at: url, reason: "could not be read")
+            return false
+        }
+        let decoder = JSONDecoder()
+        guard let manifest = try? decoder.decode(StagingManifest.self, from: data) else {
+            // No migration path: no app data exists to preserve, and accepting an unversioned/partial object
+            // would recreate the silent-open recovery failure this manifest is meant to prevent.
+            blockStagingRecovery(at: url, reason: "is malformed or uses an unsupported schema")
+            return false
+        }
+        guard manifest.schemaVersion == StagingManifest.currentSchemaVersion else {
+            blockStagingRecovery(at: url, reason: "uses an unknown schema version")
+            return false
+        }
+        guard manifest.hasValidFingerprint else {
+            blockStagingRecovery(at: url, reason: "did not pass its integrity check")
+            return false
+        }
+        let restored = manifest.staged
+        for r in manifest.retained { retained[r.groupId] = r }   // enables the rotation review after resume
         staged = restored
         for s in restored {
             finalizedGroups.insert(s.groupId)
@@ -484,10 +509,10 @@ final class LiveCaptureProcessor: ObservableObject {
             // action. Relabelling makes the existing bulk retry AVAILABLE; it does not run it, so relaunch
             // spends nothing until the operator explicitly asks.
             //
-            // A kept legacy bare-array record has no `RetainedSegment`, and a damaged current manifest may
-            // also lack the matching entry. Do not approximate from filenames: passing an empty result list
-            // would mislabel a complete text-bearing document as image-only. Preserve the old `.staged`
-            // fallback when the evidence is absent; recovery data stays visible and untouched either way.
+            // A verified record can still lack matching retained write inputs. Do not approximate from
+            // filenames: passing an empty result list would mislabel a complete text-bearing document as
+            // image-only. Preserve the `.staged` fallback when the evidence is absent; recovery data stays
+            // visible and untouched either way.
             if let saved {
                 labelStagedRecord(s.groupId, type: type, outcome: s, results: saved.pages.map(\.result))
             }
@@ -496,10 +521,49 @@ final class LiveCaptureProcessor: ObservableObject {
         if let lastBox = restored.filter({ $0.type == CaptureGroupType.box.rawValue }).max(by: { $0.order < $1.order }) {
             currentCollectionKey = lastBox.groupId
         }
-        // A migrated legacy manifest is rewritten in the CURRENT format so a crash before any dropped segment
-        // re-finalizes doesn't re-enter this branch (idempotent recovery); dropped segments re-process via the
-        // normal resume path in `activate()`.
-        if didMigrateLegacy { persistManifest() }
+        return true
+    }
+
+    /// Preserve the rejected bytes and leave every staged artifact alone. If the rename itself fails, the
+    /// original remains in place; this path never overwrites or deletes either version.
+    private func existingQuarantinedManifest(in directory: URL) throws -> URL? {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("staging-manifest.corrupt-") && $0.pathExtension == "json" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .first
+    }
+
+    private func blockStagingRecovery(
+        at manifestURL: URL, reason: String, existingQuarantine: URL? = nil
+    ) {
+        stagingManifestBlocked = true
+        let fm = FileManager.default
+        var quarantinedURL = existingQuarantine
+        if quarantinedURL == nil {
+            let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
+            var attempt = 0
+            while quarantinedURL == nil {
+                let suffix = attempt == 0 ? "" : "-\(attempt)"
+                let candidate = manifestURL.deletingLastPathComponent()
+                    .appendingPathComponent("staging-manifest.corrupt-\(milliseconds)\(suffix).json")
+                guard !fm.fileExists(atPath: candidate.path) else { attempt += 1; continue }
+                do {
+                    try fm.moveItem(at: manifestURL, to: candidate)
+                    quarantinedURL = candidate
+                } catch {
+                    break
+                }
+            }
+        }
+        let preservation: String
+        if let quarantinedURL {
+            preservation = "Its exact bytes were preserved as \(quarantinedURL.lastPathComponent)."
+        } else {
+            preservation = "Its original file could not be renamed and remains at staging-manifest.json."
+        }
+        let notice = "Live Capture recovery stopped: the staging manifest \(reason). \(preservation) Staged files remain untouched in the Backup Folder; recover them before starting another session."
+        stagingRecoveryNotice = notice
+        session.statusMessage = notice
     }
 
     /// Re-run OCR for a set of segments, then re-finalize them. Defaults to the full failed set (the bulk
@@ -510,7 +574,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// bookkeeping → persist the cleaned manifest BEFORE re-processing → re-ingest) is identical. A
     /// `.staged`/`.succeededNoText` segment is retryable too: old output is deleted first, so it's safe.
     func retryFailed(groupIds: Set<String>? = nil, override: OCROverride? = nil) {
-        guard session.processingMode == .live else { return }
+        guard !stagingManifestBlocked, session.processingMode == .live else { return }
         // W3.cap-r3-fu7 — refuse while a finish is regenerating, and refuse HERE rather than only in the UI.
         // `applyRotationReviewAndFinalize` sets `isFinalizing` and then writes each changed segment's files
         // from a DETACHED task, so for the length of that write the Live Capture panel is on screen with no
@@ -732,7 +796,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // on. That last part is exactly why retiring the key inside the carve-out would have been the WRONG
         // fix — it would have let a re-arrival double-buy the page finalize was about to read. A page with no
         // Task and no finalize behind it is a page whose OCR is genuinely gone, and it is free to buy one.
-        guard session.processingMode == .live, let config,
+        guard !stagingManifestBlocked, session.processingMode == .live, let config,
               pageTasks[key] == nil else { return }   // not live / this page's call is already ours → silent
         if finalizedGroups.contains(photo.groupId) {
             // A page arrived for a document already finalized on the Mac — e.g. the operator kept shooting the
@@ -841,7 +905,7 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// A document segment's Mac tag card was resolved (Save/Skip) → finalize it.
     func segmentResolved(groupId: String) {
-        guard session.processingMode == .live else { return }
+        guard !stagingManifestBlocked, session.processingMode == .live else { return }
         Task { [weak self] in await self?.finalizeSegment(groupId: groupId) }
     }
 
@@ -905,7 +969,7 @@ final class LiveCaptureProcessor: ObservableObject {
     // MARK: - Finalize one segment
 
     private func finalizeSegment(groupId: String) async {
-        guard session.processingMode == .live, let config, let stagingDir,
+        guard !stagingManifestBlocked, session.processingMode == .live, let config, let stagingDir,
               !finalizedGroups.contains(groupId),
               let group = session.groups.first(where: { $0.id == groupId }) else { return }
         finalizedGroups.insert(groupId)
@@ -1350,14 +1414,53 @@ final class LiveCaptureProcessor: ObservableObject {
     /// On-disk staging manifest: staged segments plus the per-segment write inputs needed to
     /// regenerate a segment during the end-of-session rotation review after a crash/relaunch.
     private struct StagingManifest: Codable {
+        static let currentSchemaVersion = 1
+        let schemaVersion: Int
         var staged: [StagedSegment]
         var retained: [RetainedSegment]
+        let fingerprint: String
+
+        init(staged: [StagedSegment], retained: [RetainedSegment]) {
+            self.schemaVersion = Self.currentSchemaVersion
+            self.staged = staged
+            self.retained = retained
+            // An encoding failure must leave a record that fails closed on reload, never a valid digest for
+            // placeholder bytes. The outer persist then also declines to write if those same values cannot
+            // encode, but this keeps the integrity rule total.
+            self.fingerprint = Self.fingerprint(schemaVersion: schemaVersion, staged: staged, retained: retained) ?? ""
+        }
+
+        var hasValidFingerprint: Bool {
+            guard let expected = Self.fingerprint(schemaVersion: schemaVersion, staged: staged, retained: retained) else {
+                return false
+            }
+            return fingerprint == expected
+        }
+
+        private struct FingerprintPayload: Encodable {
+            let schemaVersion: Int
+            let staged: [StagedSegment]
+            let retained: [RetainedSegment]
+        }
+
+        private static func fingerprint(
+            schemaVersion: Int, staged: [StagedSegment], retained: [RetainedSegment]
+        ) -> String? {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            let payload = FingerprintPayload(schemaVersion: schemaVersion, staged: staged, retained: retained)
+            guard let data = try? encoder.encode(payload) else { return nil }
+            return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }
     }
 
     private func persistManifest() {
-        guard let stagingDir else { return }
+        guard !stagingManifestBlocked, let stagingDir else { return }
         let url = stagingDir.appendingPathComponent("staging-manifest.json")
-        let manifest = StagingManifest(staged: staged, retained: Array(retained.values))
+        // Dictionaries do not promise a stable iteration order. The fingerprint identifies durable data,
+        // not whichever order retained records happened to be visited in this process.
+        let retainedRecords = retained.values.sorted { $0.groupId < $1.groupId }
+        let manifest = StagingManifest(staged: staged, retained: retainedRecords)
         if let data = try? JSONEncoder().encode(manifest) { try? data.write(to: url, options: .atomic) }
     }
 
@@ -1414,7 +1517,7 @@ final class LiveCaptureProcessor: ObservableObject {
     ///     pending), don't proceed yet — otherwise those segments are missing from the rotation review.
     /// Once everything is staged, `proceedToFinishIfReady` runs `finishSession`.
     func requestFinish() {
-        guard !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
+        guard !stagingManifestBlocked, !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
         guard session.completeAllOpenDocGroups() else {
             // A prior Finish may already have armed the watchdog. Cancel it too; otherwise it could later
             // advance after this re-tap rolled a newly-open group's undurable completion back.
@@ -1497,13 +1600,13 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// The phone's un-sent count changed (a `POST /phone/status` heartbeat). Re-evaluate a pending Finish
     /// so it advances the moment the phone has drained (and processing is done).
-    func phoneStatusChanged() { proceedToFinishIfReady() }
+    func phoneStatusChanged() { guard !stagingManifestBlocked else { return }; proceedToFinishIfReady() }
 
     /// Advance a pending Finish once no tag card is outstanding and nothing is still being processed.
     /// Called after each segment stages and whenever a card is resolved, so a Finish requested mid-run
     /// waits for processing to complete instead of dropping unstaged segments from the review.
     private func proceedToFinishIfReady() {
-        guard pendingFinish else { return }
+        guard !stagingManifestBlocked, pendingFinish else { return }
         // Only count segments that still EXIST — a status left at .ocr/.tagging for a group whose photos
         // were deleted (thumbnail X) or reclassified away (X-Replaces) can never resolve (no group → no tag
         // card, no finalizeSegment), so it must not block the finish forever. Finalized groups are .staged/.failed.
@@ -1542,7 +1645,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// enabling it after capture started still applies. Pages seed from each page's detected rotation
     /// (0 if detection was off), and the operator can correct any of them.
     func finishSession() {
-        guard !staged.isEmpty else { return }
+        guard !stagingManifestBlocked, !staged.isEmpty else { return }
         let wantReview = UserDefaults.standard.bool(forKey: DefaultsKeys.reviewRotation)
         guard wantReview else { beginFinalize(); return }
         var pages: [RotationReviewPage] = []
@@ -1568,6 +1671,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Apply the reviewed rotations: regenerate each changed segment's staged PDF/JPG, then proceed
     /// to collection naming. Unchanged pages are left untouched.
     func applyRotationReviewAndFinalize() {
+        guard !stagingManifestBlocked else { return }
         showRotationReview = false
         var changedGroups: Set<String> = []
         for page in rotationReviewPages {
@@ -1701,7 +1805,7 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     func beginFinalize() {
-        guard config != nil, !staged.isEmpty else { return }
+        guard !stagingManifestBlocked, config != nil, !staged.isEmpty else { return }
         let existing = Self.existingCollectionFolders(in: currentOutputDirectory)
         let byKey = Dictionary(grouping: staged, by: { $0.collectionKey })
         let orderedKeys = byKey.keys.sorted {
@@ -1720,7 +1824,7 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// Move staged outputs into their (new or existing) collection folders, continuing numbering.
     func finalize(_ decided: [CollectionDraft]) {
-        guard config != nil, let stagingDir, !isFinalizing else { return }
+        guard !stagingManifestBlocked, config != nil, let stagingDir, !isFinalizing else { return }
         isFinalizing = true
         let outputDir = currentOutputDirectory   // live output folder (matches the "Add to" list built above)
         let byKey = Dictionary(grouping: staged, by: { $0.collectionKey })
@@ -1931,7 +2035,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// (Reasoned from the code — but from Swift control flow, not from hit-testing, which is the kind of
     /// code read `W3.cap-r3-fu10` had to walk back.)
     func clearSession() {
-        guard !isFinalizing else { return }
+        guard !stagingManifestBlocked, !isFinalizing else { return }
         session.clear()
         clearSessionState()
     }

@@ -15,6 +15,28 @@ never a source of queue candidates. **Do not rename or move this file without up
 
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
+## Live Capture staging-manifest integrity — Wave 17 (2026-09-04)
+
+- [x] **W17.stg1 — version + fingerprint + fail-closed the Live Capture staging manifest [M · med].**
+  **SHIPPED 2026-09-04 (this commit).** `StagingManifest` is now schema version 1 with a SHA-256 fingerprint
+  over its canonical unsigned payload: the staged records plus deterministic `RetainedSegment` order. It does
+  not reintroduce the retired `collectionKey` copy into retained state. A malformed, missing-version,
+  unknown-version, or fingerprint-mismatched manifest is renamed without changing its bytes to
+  `staging-manifest.corrupt-<ts>.json`; staged outputs remain in the visible Backup Folder and the app shows a
+  persistent recovery banner. The quarantine filename itself is a durable stop marker, so relaunch cannot
+  mistake the missing canonical filename for a clean session or replace recovery evidence. All normal OCR,
+  retry, finish, finalize, clear, and manifest-persistence paths refuse while stopped. Per the standing
+  unshipped-app premise, old unversioned manifests deliberately quarantine rather than migrate.
+
+  **Tier-2 verification:** independent adversarial review found and closed two P1s before commit: the initial
+  in-memory-only stop did not survive relaunch, and the first version of the multi-case scratch test reused a
+  quarantined directory. `LIVECAPTURE_RECOVERYTEST` now proves a valid signed restore and exact-byte quarantine
+  for tamper, unknown version, missing version, missing fingerprint, and unversioned inputs; every case uses a
+  separate scratch directory and creates a fresh processor to prove the durable stop prevents OCR/persist.
+  Processor Debug build and the full headless scratch recovery suite pass; no corpus, live output folder,
+  GUI, credentials, or network is used. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Capture/
+  {LiveCaptureProcessor,LiveCaptureRecoveryTestDriver}.swift,Views/LiveCaptureView.swift} | M | med | done
+
 ## W9 gap-closure — Phase A safety-net (2026-08-19)
 
 - [x] **`W9.c4` — the Notes smoke gate builds and drives the GUI target [XS].** **SHIPPED 2026-08-20**

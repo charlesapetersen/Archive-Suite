@@ -257,6 +257,16 @@ struct LiveCaptureView: View {
                     .padding(6)
                 }
 
+                if let notice = liveProc.stagingRecoveryNotice {
+                    Label(notice, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(10)
+                        .background(.red.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                        .accessibilityIdentifier("live.staging-recovery-notice")
+                }
+
                 // B2: the Processing status/segment list lives in its own view that OWNS the observation of
                 // `liveProc` (and `session`). When a segment's OCR/tag phase changes while the per-segment
                 // tag card sheet is up, SwiftUI invalidates THIS child directly (it subscribed to liveProc),
@@ -268,6 +278,7 @@ struct LiveCaptureView: View {
                     liveMode: liveProcessingMode == LiveProcessingMode.live.rawValue,
                     expandedSegmentID: $expandedSegmentID,
                     onAction: performSegmentAction)
+                    .disabled(liveProc.stagingRecoveryBlocked)
 
                 // Same setting as the Process Files output folder (DefaultsKeys.outputDirectory, one source
                 // of truth for both panes). Relevant only in "Process live" mode, where segments finalize
@@ -478,7 +489,7 @@ struct LiveCaptureView: View {
     /// `W3.cap-r3-fu12-fu1` rather than decided here.
     @ViewBuilder private var clearButton: some View {
         Button("Clear") { liveProc.clearSession() }
-            .disabled(liveProc.isFinalizing)
+            .disabled(liveProc.isFinalizing || liveProc.stagingRecoveryBlocked)
             .accessibilityIdentifier("live.clear")
             .help("Abandon this session: received photos go to the Trash (recoverable) and the app forgets every processed segment. Already-processed PDFs stay in the Backup Folder's _processed subfolder — but they are no longer offered for filing.")
     }
@@ -521,7 +532,7 @@ struct LiveCaptureView: View {
             // three lines above describe. ADDED to the existing terms rather than replacing them — the
             // `statuses.isEmpty` term arguably implies it, but this is a money path and a derived-equivalence
             // argument is not worth the trade for one `||`.
-            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing || !liveProc.canFinish)
+            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing || liveProc.stagingRecoveryBlocked || !liveProc.canFinish)
             .accessibilityIdentifier("live.finish")
         }
     }
@@ -639,6 +650,7 @@ struct LiveCaptureView: View {
                 }
             }
         }
+        .disabled(liveProc.stagingRecoveryBlocked)
     }
 
     private func groupSection(index: Int, group: CaptureGroup) -> some View {

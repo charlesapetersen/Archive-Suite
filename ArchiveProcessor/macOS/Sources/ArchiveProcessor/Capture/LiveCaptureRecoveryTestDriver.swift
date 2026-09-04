@@ -84,6 +84,9 @@ import ArchiveCore
 ///  23. A current staging manifest restores the label its record actually earns (W3.cap-r3-fu8), rather than
 ///      hardcoding `.staged`: a `.noOutput` segment returns as failed and retryable, resume itself buys no OCR,
 ///      and only the operator's existing bulk retry starts the replacement call (Test 26).
+///  24. A staging manifest is versioned and fingerprinted (W17.stg1): a valid record resumes, while tampered,
+///      unversioned, missing-version/fingerprint, or unknown-version records are quarantined byte-for-byte and
+///      block normal processing without touching their staged artifacts (Test 27).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -93,6 +96,8 @@ enum LiveCaptureRecoveryTestDriver {
     /// Read-only view of the on-disk staging manifest (W3.cap-r6). The processor's own `StagingManifest` is
     /// private, and the test only needs to know WHICH segments survived a finalize.
     private struct ManifestPeek: Decodable {
+        let schemaVersion: Int
+        let fingerprint: String
         let staged: [LiveCaptureProcessor.StagedSegment]
     }
 
@@ -3389,6 +3394,104 @@ enum LiveCaptureRecoveryTestDriver {
             }
             check("the explicitly retried resumed segment re-stages through the ordinary recovery path (fu8)",
                   rsRestaged && rsResumed.statuses.first { $0.id == "R1" }?.phase == .succeededPlaceholderImage)
+
+            // --- Test 27 (W17.stg1): recovery must distinguish an absent manifest from an untrustworthy one.
+            // A current record is self-identifying (schema + canonical SHA-256 fingerprint); any rejected
+            // bytes become a Finder-visible `staging-manifest.corrupt-*.json`, and the normal persistence
+            // path stays blocked so it cannot write a new empty manifest over the evidence. All fixtures are
+            // inside `tmp`; `integrityArtifact` stands in for a processed PDF that recovery must never touch.
+            let integrityDir = tmp.appendingPathComponent("manifest-integrity", isDirectory: true)
+            try? fm.createDirectory(at: integrityDir, withIntermediateDirectories: true)
+            let integrityArtifact = integrityDir.appendingPathComponent("still-recoverable.pdf")
+            try? Data("processed artifact".utf8).write(to: integrityArtifact)
+            let integritySegment = LiveCaptureProcessor.StagedSegment(
+                groupId: "W17-integrity", type: CaptureGroupType.document.rawValue,
+                collectionKey: "__unfiled__", order: 1, pdfURLs: [integrityArtifact], imageURLs: [],
+                jsonURL: nil, boxLabelText: nil, pagesComplete: true)
+            let integrityWriter = LiveCaptureProcessor(session: rsSession)
+            integrityWriter._recoveryTestArm(stagingDir: integrityDir, config: rsConfig, staged: [integritySegment])
+            integrityWriter._recoveryTestPersistManifest()
+            let integrityManifest = integrityDir.appendingPathComponent("staging-manifest.json")
+            let currentData = try? Data(contentsOf: integrityManifest)
+            let currentPeek = currentData.flatMap { try? JSONDecoder().decode(ManifestPeek.self, from: $0) }
+            let validResume = LiveCaptureProcessor(session: rsSession)
+            validResume._recoveryTestLoadManifest(stagingDir: integrityDir, config: rsConfig)
+            check("a current staging manifest carries schema + fingerprint and resumes intact (W17.stg1)",
+                  currentPeek?.schemaVersion == 1 && !(currentPeek?.fingerprint.isEmpty ?? true)
+                      && validResume.staged.count == 1
+                      && validResume.staged.first?.groupId == integritySegment.groupId
+                      && validResume.staged.first?.pdfURLs == [integrityArtifact]
+                      && !validResume.stagingRecoveryBlocked)
+
+            func changedCurrentManifest(_ change: (inout [String: Any]) -> Void) -> Data? {
+                guard let currentData,
+                      var object = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any] else {
+                    return nil
+                }
+                change(&object)
+                return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+            }
+            func rejectedManifest(_ label: String, _ bytes: Data?) -> Bool {
+                guard let bytes else { return false }
+                // One directory per rejected body: once one case has quarantined its record, that durable
+                // marker is SUPPOSED to block every future launch in that directory. Reusing it would make
+                // the next case test the previous marker rather than this case's bytes.
+                let caseDir = tmp.appendingPathComponent("manifest-rejection-\(label)", isDirectory: true)
+                try? fm.createDirectory(at: caseDir, withIntermediateDirectories: true)
+                let caseWriter = LiveCaptureProcessor(session: rsSession)
+                caseWriter._recoveryTestArm(stagingDir: caseDir, config: rsConfig, staged: [integritySegment])
+                caseWriter._recoveryTestPersistManifest()
+                let caseManifest = caseDir.appendingPathComponent("staging-manifest.json")
+                let before = Set((try? fm.contentsOfDirectory(at: caseDir, includingPropertiesForKeys: nil))?
+                    .map(\.lastPathComponent) ?? [])
+                try? bytes.write(to: caseManifest, options: .atomic)
+                let rejected = LiveCaptureProcessor(session: rsSession)
+                rejected._recoveryTestLoadManifest(stagingDir: caseDir, config: rsConfig)
+                // This must remain a no-op after the rejected load: no clean `staging-manifest.json` may
+                // appear until an operator has recovered the quarantined evidence.
+                rejected._recoveryTestPersistManifest()
+                let after = (try? fm.contentsOfDirectory(at: caseDir, includingPropertiesForKeys: nil)) ?? []
+                guard let quarantined = after.first(where: {
+                    $0.lastPathComponent.hasPrefix("staging-manifest.corrupt-")
+                        && !before.contains($0.lastPathComponent)
+                }), let quarantinedData = try? Data(contentsOf: quarantined) else { return false }
+                // A fresh process sees the preserved quarantine marker, not an absent-manifest "new session".
+                // Its normal persistence path must stay blocked too; this is the restart boundary that the
+                // original silent-open loader had no representation for.
+                let startsBeforeRestartProbe = LiveCaptureProcessor._recoveryTestOCRStarts.count
+                let restarted = LiveCaptureProcessor(session: rsSession)
+                restarted._recoveryTestLoadManifest(stagingDir: caseDir, config: rsConfig)
+                if let photo = rsSession.photos.first { restarted.photoIngested(photo) }
+                restarted._recoveryTestPersistManifest()
+                return rejected.stagingRecoveryBlocked && rejected.staged.isEmpty
+                    && rejected.stagingRecoveryNotice != nil
+                    && restarted.stagingRecoveryBlocked && restarted.staged.isEmpty
+                    && restarted.stagingRecoveryNotice != nil
+                    && LiveCaptureProcessor._recoveryTestOCRStarts.count == startsBeforeRestartProbe
+                    && !fm.fileExists(atPath: caseManifest.path)
+                    && quarantinedData == bytes
+                    && fm.fileExists(atPath: integrityArtifact.path)
+            }
+
+            let fingerprintTamper = changedCurrentManifest { object in
+                var staged = object["staged"] as? [[String: Any]] ?? []
+                if !staged.isEmpty { staged[0]["groupId"] = "W17-tampered" }
+                object["staged"] = staged
+            }
+            check("a fingerprint mismatch quarantines exact bytes and blocks recovery (W17.stg1)",
+                  rejectedManifest("fingerprint", fingerprintTamper))
+            let unknownVersion = changedCurrentManifest { $0["schemaVersion"] = 999 }
+            check("an unknown manifest version quarantines rather than resuming (W17.stg1)",
+                  rejectedManifest("unknown-version", unknownVersion))
+            let missingVersion = changedCurrentManifest { $0.removeValue(forKey: "schemaVersion") }
+            check("a manifest missing its schema version quarantines rather than resuming (W17.stg1)",
+                  rejectedManifest("missing-version", missingVersion))
+            let missingFingerprint = changedCurrentManifest { $0.removeValue(forKey: "fingerprint") }
+            check("a manifest missing its fingerprint quarantines rather than resuming (W17.stg1)",
+                  rejectedManifest("missing-fingerprint", missingFingerprint))
+            let oldUnversioned = try? JSONEncoder().encode([integritySegment])
+            check("an old unversioned manifest quarantines rather than resuming (W17.stg1)",
+                  rejectedManifest("unversioned", oldUnversioned))
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
