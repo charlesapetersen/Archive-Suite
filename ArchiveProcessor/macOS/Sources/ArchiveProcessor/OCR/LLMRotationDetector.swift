@@ -75,6 +75,7 @@ enum LLMRotationDetector {
         case .anthropic: letter = await askAnthropic(images: images, apiKey: apiKey)
         case .mistral: letter = nil
         case .openai: letter = await askOpenAI(images: images, apiKey: apiKey)
+        case .appleVision: letter = nil
         }
         guard let ch = letter?.uppercased().first, let idx = labels.firstIndex(of: String(ch)) else { return nil }
         return order[idx]

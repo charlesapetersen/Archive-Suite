@@ -144,8 +144,9 @@ Classification: <value>        ← OPTIONAL line; absent on older/heuristic/Mist
 <body text…>                   ← or "No text returned by model." (+ error) on OCR failure
 ```
 
-- `<Provider>` is `model.provider.rawValue` (`Anthropic`/`Google Gemini`/`Mistral`) **or** a custom
-  gateway display name — treat as free-form.
+- `<Provider>` is `model.provider.rawValue` (`Anthropic`/`Google Gemini`/`Mistral`/`OpenAI`/`Apple Vision`)
+  **or** a custom gateway display name — treat as free-form. For example, the on-device backend writes
+  `Apple Vision · macOS Vision` in the header's provider/model positions.
 - **Classification — verified values (exact strings):** `Document Start`, `Continuation`, `Box`,
   `Folder`. (These are `DocumentClassification.displayName`; the enum's Codable rawValues
   `document_start`/`document_continuation`/`box_label`/`folder_label` appear only in JSON sidecars,

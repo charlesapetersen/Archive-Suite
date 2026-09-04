@@ -503,6 +503,10 @@ class OCRProcessor: ObservableObject {
         let textColumns: Int
         let exportedImageMB: Double
 
+        /// Apple Vision's local recognition choices. They affect output text, so a resumed Vision run
+        /// replays the exact language/quality/vocabulary configuration that produced its first pages.
+        var visionSettings: VisionOCRSettings = .default
+
         /// Cost-history attribution for a gateway run. It does not affect requests, but persisting it
         /// keeps the resumed run's history consistent with the estimate shown when the run began.
         let gatewayUpstreamProvider: LLMProvider?

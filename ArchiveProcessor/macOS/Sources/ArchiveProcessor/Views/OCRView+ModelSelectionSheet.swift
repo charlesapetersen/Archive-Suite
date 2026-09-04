@@ -14,7 +14,9 @@ struct ModelSelectionSheet: View {
     @State private var apiKeys: [String: String] = [:]    // provider.rawValue -> key
 
     private var allModels: [(provider: LLMProvider, model: LLMModel)] {
-        LLMProvider.allCases.flatMap { provider in
+        // This comparison tool executes paid, provider-backed test calls. Apple Vision is selected from
+        // Settings for normal Processing, but has neither an API key nor a comparable model-test request.
+        LLMProvider.allCases.filter { $0 != .appleVision }.flatMap { provider in
             provider.models.map { (provider: provider, model: $0) }
         }
     }
@@ -58,7 +60,7 @@ struct ModelSelectionSheet: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    ForEach(LLMProvider.allCases) { provider in
+                    ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { provider in
                         providerSection(provider)
                     }
                 }
@@ -90,7 +92,7 @@ struct ModelSelectionSheet: View {
         .frame(width: 500, height: 520)
         .onAppear {
             // Load saved API keys for all providers
-            for provider in LLMProvider.allCases {
+            for provider in LLMProvider.allCases where provider != .appleVision {
                 apiKeys[provider.rawValue] = KeychainHelper.load(account: provider.rawValue) ?? ""
             }
             // Restore previously saved model selections, or default to current provider's first model
@@ -146,4 +148,3 @@ struct ModelSelectionSheet: View {
         }
     }
 }
-

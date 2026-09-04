@@ -72,6 +72,11 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
         .init(key: DefaultsKeys.selectedThinking, def: .string(ThinkingLevel.low.rawValue)),
 
         .init(key: DefaultsKeys.useGateway, def: .bool(false)),
+        .init(key: DefaultsKeys.useAppleVision, def: .bool(false)),
+        .init(key: DefaultsKeys.visionLanguages, def: .string("en-US")),
+        .init(key: DefaultsKeys.visionFastRecognition, def: .bool(false)),
+        .init(key: DefaultsKeys.visionMinimumConfidence, def: .double(0)),
+        .init(key: DefaultsKeys.visionCustomVocabulary, def: .string("")),
         .init(key: DefaultsKeys.gatewayBaseURL, def: .string("")),
         .init(key: DefaultsKeys.gatewayModelID, def: .string("")),
         .init(key: DefaultsKeys.gatewayDisplayName, def: .string("")),

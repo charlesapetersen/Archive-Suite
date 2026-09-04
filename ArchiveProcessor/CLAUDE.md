@@ -39,7 +39,7 @@ above. When "bulletproof" and "recoverable" seem to conflict, ship both — err 
 ## Primary Function 1: OCR
 
 ### LLM Provider & Model Selection
-Dropdown menus for provider and model. The **built-in** models are those listed below — don't silently add others to the built-in lists. Three shipped escape hatches exist for anything not built in (see "Custom models & OpenAI-compatible gateway" below): users can add extra model IDs, point the app at an OpenAI-compatible endpoint, or drive a local subscription-authed **Local Agent CLI** (Claude Code / Gemini / Codex — no API key).
+Dropdown menus for provider and model. The **built-in** models are those listed below — don't silently add others to the built-in lists. Alongside the cloud providers, Settings offers an on-device **Apple Vision** transcription backend; users can also add extra model IDs, point at an OpenAI-compatible endpoint, or drive a local subscription-authed **Local Agent CLI** (Claude Code / Gemini / Codex — no API key).
 
 **Anthropic**
 - claude-sonnet-4-6
@@ -65,6 +65,8 @@ Dropdown menus for provider and model. The **built-in** models are those listed 
 - gpt-5.4
 - gpt-5.5
   - Note: model IDs + per-1M pricing are the current GPT-5 generation from the owner-provided SoCOCRbench source (2026-07-16), ordered cheapest→flagship; a **live-key OCR smoke** is the final ID confirmation (Daemon Report). Reasoning models (nano/mini/5.4/5.5) accept `reasoning_effort` (from the Thinking level); gpt-5.4-mini does not. No batch or LLM-rotation path in v1 (like Mistral) — local Vision handles rotation; OpenAI Batch API is a later phase.
+
+**Apple Vision (on-device)** — first-class local transcription backend (`LLMProvider.appleVision`, W13.vision-1) using `VNRecognizeTextRequest`; model `macOS Vision`. It has no API key, network request, or per-page cost. The Settings backend picker exposes language, fast-recognition, minimum-confidence, and custom-vocabulary controls; the run snapshot carries them through Process Files and Live Capture. V1 returns text only (classification is absent), skips batch and LLM rotation, and runs CPU-bound work at the Mac's performance-core count. It supports only **No tagging** and **Copy source file tags**; classification, segmentation, date extraction, and generated tags remain the later Vision + LLM hybrid.
 
 ### Custom models, OpenAI-compatible gateway & Local Agent CLI (shipped)
 - **Custom models:** users can add extra Anthropic/Gemini model IDs via **Manage custom models…** in Settings (`Views/ManageModelsView.swift`, persisted by `Models/ModelSelectionStore.swift`) — so the dropdowns are not limited to the built-in lists above.

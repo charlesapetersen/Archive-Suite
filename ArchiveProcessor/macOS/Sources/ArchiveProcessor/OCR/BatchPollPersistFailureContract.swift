@@ -348,8 +348,8 @@ enum BatchPollPersistFailureContract {
                 // never builds a download URL — which is what keeps this to the `materialized` half of the
                 // Gemini guard rather than dragging the file-download arm in.
                 body = #"{"metadata":{"state":"BATCH_STATE_SUCCEEDED"},"response":{"inlinedResponses":{"inlinedResponses":[{"metadata":{"key":"1"},"response":{"candidates":[{"content":{"parts":[{"text":"page one"}]}}]}}]}}}"#
-            case .openai:
-                // No stub is ever installed for OpenAI (it does not enter the batch path at all —
+            case .openai, .appleVision:
+                // No stub is ever installed for OpenAI or Apple Vision (neither enters the batch path —
                 // `supportsBatch == false`). Refuse rather than answer, and with a code
                 // `performWithRetry` does NOT treat as retryable, so a mistake here cannot make the suite
                 // sit through real backoff.

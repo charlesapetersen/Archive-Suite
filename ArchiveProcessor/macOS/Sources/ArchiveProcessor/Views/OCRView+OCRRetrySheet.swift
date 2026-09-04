@@ -92,7 +92,8 @@ struct OCRRetrySheet: View {
                     .font(.headline)
 
                 ModelChoiceView(provider: $selectedProvider, model: $selectedModel,
-                                thinkingLevel: $selectedThinking, apiKey: $apiKey)
+                                thinkingLevel: $selectedThinking, apiKey: $apiKey,
+                                allowsAppleVision: selectedProvider == .appleVision)
 
                 // Cost estimate
                 let retryEstimate = CostEstimator.estimate(
@@ -128,14 +129,14 @@ struct OCRRetrySheet: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(apiKey.isEmpty)
+                .disabled(selectedProvider != .appleVision && apiKey.isEmpty)
             }
             .padding()
         }
         .frame(minWidth: 550, idealWidth: 650, minHeight: 450, idealHeight: 550)
         .onAppear {
-            apiKey = KeychainHelper.load(account: selectedProvider.rawValue) ?? ""
+            apiKey = selectedProvider == .appleVision ? ""
+                : (KeychainHelper.load(account: selectedProvider.rawValue) ?? "")
         }
     }
 }
-

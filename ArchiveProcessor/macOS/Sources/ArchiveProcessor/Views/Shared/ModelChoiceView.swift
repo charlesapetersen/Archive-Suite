@@ -10,8 +10,15 @@ struct ModelChoiceView: View {
     @Binding var apiKey: String
     /// When non-nil, show a 0/90/180/270 rotation stepper (for the rotate-&-re-run action).
     var rotation: Binding<Int>? = nil
+    /// Apple Vision is normally chosen before a run in Settings because it is transcription-only. A retry
+    /// that was already using Vision may keep that free backend, but paid-provider retry pickers must not
+    /// quietly let an LLM tagging workflow switch to a transcription-only backend halfway through.
+    var allowsAppleVision = false
 
     private var currentModels: [LLMModel] { provider.models }
+    private var selectableProviders: [LLMProvider] {
+        LLMProvider.allCases.filter { $0 != .appleVision || allowsAppleVision }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -25,7 +32,7 @@ struct ModelChoiceView: View {
                     provider = newProvider
                 }
             )) {
-                ForEach(LLMProvider.allCases) { p in
+                ForEach(selectableProviders) { p in
                     Text(p.rawValue).tag(p)
                 }
             }
@@ -46,8 +53,14 @@ struct ModelChoiceView: View {
                 .pickerStyle(.segmented)
             }
 
-            SecureField("API Key", text: $apiKey)
-                .textFieldStyle(.roundedBorder)
+            if provider == .appleVision {
+                Label("Free — runs on this Mac", systemImage: "cpu")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                SecureField("API Key", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+            }
 
             if let rotation {
                 Stepper(value: rotation, in: 0...270, step: 90) {
@@ -125,7 +138,8 @@ struct ModelChoiceSheet: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 ModelChoiceView(provider: $provider, model: $model, thinkingLevel: $thinking,
-                                apiKey: $apiKey, rotation: includeRotation ? $rotation : nil)
+                                apiKey: $apiKey, rotation: includeRotation ? $rotation : nil,
+                                allowsAppleVision: provider == .appleVision)
                 if let count = fileCountForEstimate {
                     let estimate = CostEstimator.estimate(
                         fileCount: count, model: model, enableTagging: false,
@@ -148,7 +162,7 @@ struct ModelChoiceSheet: View {
                             includeRotation ? rotation : nil)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(apiKey.isEmpty)
+                .disabled(provider != .appleVision && apiKey.isEmpty)
             }
             .padding()
         }

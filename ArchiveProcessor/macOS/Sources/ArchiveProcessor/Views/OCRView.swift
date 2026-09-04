@@ -50,6 +50,8 @@ struct OCRView: View {
     // Local Agent CLI backend (persisted; mutually exclusive with the gateway)
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+    // Apple Vision is the no-key, on-device backend selected in Settings.
+    @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision: Bool = false
 
     /// The model for the current provider, read live from the shared store so a change made in the
     /// Settings window updates this window's cost estimate — and the model a run launches with —
@@ -123,8 +125,25 @@ struct OCRView: View {
 #endif
     }
 
-    private var currentGatewayConfig: GatewayConfig? { GatewayConfig.fromDefaults() }
-    private var currentLocalAgentConfig: LocalAgentConfig? { LocalAgentConfig.fromDefaults() }
+    private var currentGatewayConfig: GatewayConfig? {
+        useAppleVision ? nil : GatewayConfig.fromDefaults()
+    }
+    private var currentLocalAgentConfig: LocalAgentConfig? {
+        useAppleVision ? nil : LocalAgentConfig.fromDefaults()
+    }
+    private var effectiveProvider: LLMProvider { useAppleVision ? .appleVision : selectedProvider }
+    private var effectiveModel: LLMModel {
+        useAppleVision ? LLMModel.appleVisionModels[0] : (currentGatewayConfig?.asLLMModel() ?? selectedModel)
+    }
+    private var visionWorkflowIsSupported: Bool {
+        !useAppleVision || ((taggingMode == .none || taggingMode == .copySource)
+            && !enableCollectionSegmentation)
+    }
+
+    private func reloadAPIKey() {
+        apiKey = useAppleVision ? "" : (KeychainHelper.load(
+            account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "")
+    }
 
     /// What a retry/re-run sheet should OPEN on: the settings the run actually used, not the live Settings
     /// selection. `activeRunConfig` is the snapshot the run pinned at start; the live selection can have
@@ -149,7 +168,7 @@ struct OCRView: View {
 
     private var costEstimate: CostEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
-        let model = useGateway ? currentGatewayConfig?.asLLMModel() ?? selectedModel : selectedModel
+        let model = effectiveModel
         return CostEstimator.estimate(
             fileCount: droppedFiles.count,
             model: model,
@@ -160,7 +179,7 @@ struct OCRView: View {
             contextCharCount: Int(contextCharCount),
             imageScale: imageScale / 100.0,
             rotationMode: rotationMode,
-            useGateway: useGateway,
+            useGateway: useGateway || useAppleVision,
             imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil
         )
     }
@@ -168,12 +187,12 @@ struct OCRView: View {
     /// Processing-time estimate for the current batch (LLM/processing time only).
     private var timeEstimate: TimeEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
-        let model = useGateway ? currentGatewayConfig?.asLLMModel() ?? selectedModel : selectedModel
+        let model = effectiveModel
         return TimeEstimator.estimate(
             fileCount: droppedFiles.count, model: model, rotationMode: rotationMode,
             sequentialOCR: contextCharCount > 0, enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
-            preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount)
+            preOCRedInput: preOCRedInput, useGateway: useGateway || useAppleVision, ocrWorkers: ocrWorkerCount)
     }
 
     private var gatewayHasCosts: Bool {
@@ -191,8 +210,7 @@ struct OCRView: View {
                 .padding()
         }
         .onAppear {
-            let isGateway = UserDefaults.standard.bool(forKey: DefaultsKeys.useGateway)
-            apiKey = KeychainHelper.load(account: isGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+            reloadAPIKey()
             processor.checkForPendingBatch()
             if !keychainExplained {
                 showKeychainSheet = true
@@ -242,9 +260,10 @@ struct OCRView: View {
             processor.stagedCaptureFiles = []
         }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
-            apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+            reloadAPIKey()
         }
         .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }
+        .onChange(of: useAppleVision) { _, _ in syncForProviderChange() }
         .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
             // An applied profile may change the model for the *current* provider (no provider change), so
             // re-sync the derived model/key state explicitly (the provider onChange above covers the rest).
@@ -262,7 +281,7 @@ struct OCRView: View {
             // case this never did: Settings open *beside* this window, where a macOS `WindowGroup` sees no
             // scene-phase transition at all.)
             guard phase == .active else { return }
-            apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+            reloadAPIKey()
             if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
             }
@@ -325,6 +344,7 @@ struct OCRView: View {
             ManualSegmentTagView(processor: processor)
         }
         .onChange(of: apiKey) { _, newKey in
+            guard !useAppleVision else { return }
             let account = useGateway ? "Gateway" : selectedProvider.rawValue
             if newKey.isEmpty {
                 KeychainHelper.delete(account: account)
@@ -410,7 +430,25 @@ struct OCRView: View {
 
 
                 // Cost estimate
-                if useLocalAgent && !droppedFiles.isEmpty {
+                if useAppleVision && !droppedFiles.isEmpty {
+                    GroupBox("Cost Estimate") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: "cpu").foregroundStyle(.secondary)
+                                Text("Free — runs on this Mac.")
+                                    .accessibilityIdentifier("ap.ocr.appleVisionCost")
+                                Spacer()
+                            }
+                            Text(visionWorkflowIsSupported
+                                 ? "Apple Vision transcribes locally with no API key or network request. It uses the Mac's performance cores."
+                                 : "Apple Vision is transcription-only. Select No tagging or Copy source file tags, and turn off Collection ID, before starting.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 2)
+                        }
+                        .padding(4)
+                    }
+                } else if useLocalAgent && !droppedFiles.isEmpty {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
@@ -550,7 +588,7 @@ struct OCRView: View {
     /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
-        !droppedFiles.isEmpty && !apiKey.isEmpty && outputDirectory != nil
+        !droppedFiles.isEmpty && (useAppleVision || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
     }
@@ -560,7 +598,7 @@ struct OCRView: View {
     /// account. The model needs no hook — `selectedModel` reads the store keyed by the *current*
     /// provider, so it re-points on the same render.
     private func syncForProviderChange() {
-        apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+        reloadAPIKey()
     }
 
     private var filePanel: some View {
@@ -789,11 +827,12 @@ struct OCRView: View {
             guard let outDir = outputDirectory else { return }
             // Prevent re-entrant retries while this job is already being OCR'd.
             guard processor.jobs[jobIndex].status != .processing else { return }
+            let seed = runSeed
             Task {
                 await processor.retryOne(
-                    index: jobIndex, provider: selectedProvider, model: selectedModel,
-                    thinkingLevel: selectedModel.supportsThinking ? selectedThinking : nil,
-                    apiKey: apiKey, outputDirectory: outDir)
+                    index: jobIndex, provider: seed.provider, model: seed.model,
+                    thinkingLevel: seed.model.supportsThinking ? seed.thinking : nil,
+                    apiKey: seed.provider == .appleVision ? "" : apiKey, outputDirectory: outDir)
             }
         case .retryWithModel:
             fileModelChoiceTarget = FileModelChoiceTarget(jobIndex: jobIndex, includeRotation: false)
@@ -1064,22 +1103,21 @@ struct OCRView: View {
             .filter { !$0.isEmpty }
 
         let gateway = currentGatewayConfig
-        let effectiveModel = gateway?.asLLMModel() ?? selectedModel
 
         processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
-                provider: selectedProvider,
+                provider: effectiveProvider,
                 model: effectiveModel,
-                thinkingLevel: !useGateway && selectedModel.supportsThinking ? selectedThinking : nil,
-                apiKey: apiKey,
+                thinkingLevel: !useAppleVision && !useGateway && selectedModel.supportsThinking ? selectedThinking : nil,
+                apiKey: useAppleVision ? "" : apiKey,
                 outputDirectory: outDir,
-                batchMode: (useGateway || useLocalAgent) ? false : batchMode,
+                batchMode: (useGateway || useLocalAgent || useAppleVision) ? false : batchMode,
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
-                enableCollectionSegmentation: enableCollectionSegmentation,
-                confirmCollectionIDs: confirmCollectionIDs && enableCollectionSegmentation,
-                reviewDocumentSegmentation: reviewDocumentSegmentation && enableCollectionSegmentation,
+                enableCollectionSegmentation: useAppleVision ? false : enableCollectionSegmentation,
+                confirmCollectionIDs: !useAppleVision && confirmCollectionIDs && enableCollectionSegmentation,
+                reviewDocumentSegmentation: !useAppleVision && reviewDocumentSegmentation && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
                 skipAlreadyProcessed: skipAlreadyProcessed,
                 segmentationContext: context,

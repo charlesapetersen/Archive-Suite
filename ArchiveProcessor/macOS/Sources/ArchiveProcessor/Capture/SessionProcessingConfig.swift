@@ -36,6 +36,9 @@ struct SessionProcessingConfig: Sendable {
     /// populated from settings + preferred at the construction sites in a later checkpoint. Default
     /// nil keeps the existing `fromDefaults` memberwise-init call (which omits it) compiling unchanged.
     var localAgent: LocalAgentConfig? = nil
+    /// Snapshot of the Apple Vision controls. Vision has no API key or request body, but its local
+    /// recognition options must remain stable across an interrupted run just like PDF sizing does.
+    var visionSettings: VisionOCRSettings = .default
 
     /// The one declaration of what each sizing/concurrency setting is allowed to be.
     ///
@@ -203,7 +206,9 @@ struct SessionProcessingConfig: Sendable {
     /// whole session config here**, so this is the only clamp an out-of-range default meets on that path.
     static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         let sizing = runSizing(d)
-        let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
+        let useAppleVision = d.bool(forKey: DefaultsKeys.useAppleVision)
+        let selectedProvider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
+        let provider: LLMProvider = useAppleVision ? .appleVision : selectedProvider
         // Ask `ModelSelectionStore` for the key rather than re-spelling `selectedModelId_<provider>` here —
         // one drifted string would silently snapshot the wrong model for a whole live session. (The store
         // is `@MainActor`, but `modelKey` is `nonisolated` precisely so this nonisolated reader can use it;
@@ -215,8 +220,8 @@ struct SessionProcessingConfig: Sendable {
         let candidates = provider.models
         let model = candidates.first { $0.id == modelId } ?? candidates[0]
 
-        let useGateway = d.bool(forKey: DefaultsKeys.useGateway)
-        let gateway = GatewayConfig.fromDefaults(d)
+        let useGateway = !useAppleVision && d.bool(forKey: DefaultsKeys.useGateway)
+        let gateway = useAppleVision ? nil : GatewayConfig.fromDefaults(d)
 
         let outURL: URL = {
             if let path = d.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
@@ -231,7 +236,7 @@ struct SessionProcessingConfig: Sendable {
         // back to the LIVECAPTURE_OCRKEY env var — this lets the LIVE phone-driven pipeline OCR headlessly.
         // The key stays in the environment only (never written to disk or logged). PROD: env unset (or a
         // real Keychain key present) → the Keychain value, exactly as before.
-        let keychainKey = KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? ""
+        let keychainKey = useAppleVision ? "" : (KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? "")
         let apiKey: String = {
             if !keychainKey.isEmpty { return keychainKey }
             let env = ProcessInfo.processInfo.environment
@@ -241,12 +246,18 @@ struct SessionProcessingConfig: Sendable {
             return keychainKey
         }()
 
+        let savedTaggingMode = TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic
+        // Vision deliberately owns transcription only. Copying existing source tags remains local metadata
+        // work, but every mode that asks the selected backend to classify, date, segment, or generate tags
+        // must be turned off even when stale defaults bypass the Settings picker.
+        let taggingMode: TaggingMode = useAppleVision && savedTaggingMode != .copySource ? .none : savedTaggingMode
+
         return SessionProcessingConfig(
             provider: provider,
             model: model,
             thinkingLevel: ThinkingLevel(rawValue: d.string(forKey: DefaultsKeys.selectedThinking) ?? "") ?? .low,
             apiKey: apiKey,
-            taggingMode: TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic,
+            taggingMode: taggingMode,
             rotationMode: defaultRotationMode(d),
             mergeDocuments: d.bool(forKey: DefaultsKeys.mergeDocuments),
             outputDirectory: outURL,
@@ -266,7 +277,8 @@ struct SessionProcessingConfig: Sendable {
             pdfImageMB: sizing.pdfImageMB,
             exportedImageMB: sizing.exportedImageMB,
             textColumns: sizing.textColumns,
-            localAgent: LocalAgentConfig.fromDefaults(d)
+            localAgent: useAppleVision ? nil : LocalAgentConfig.fromDefaults(d),
+            visionSettings: VisionOCRSettings.fromDefaults(d)
         )
     }
 

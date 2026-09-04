@@ -32,12 +32,13 @@ extension OCRProcessor {
     /// call sites. `nonisolated` so the detached OCR workers can resolve it without hopping actors.
     nonisolated static func ocrCallValues(
         for runConfig: SessionProcessingConfig?
-    ) -> (rotationMode: RotationMode, standardImageMB: Double) {
+    ) -> (rotationMode: RotationMode, standardImageMB: Double, visionSettings: VisionOCRSettings) {
         guard let runConfig else {
             return (SessionProcessingConfig.defaultRotationMode(),
-                    SessionProcessingConfig.runSizing().standardImageMB)
+                    SessionProcessingConfig.runSizing().standardImageMB,
+                    VisionOCRSettings.fromDefaults())
         }
-        return (runConfig.rotationMode, runConfig.standardImageMB)
+        return (runConfig.rotationMode, runConfig.standardImageMB, runConfig.visionSettings)
     }
 
     /// Convert any PDF files in the input list to temporary JPEG images.
@@ -343,7 +344,8 @@ extension OCRProcessor {
                         previousText: pageResults.last?.text, previousImageURL: nil,
                         customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
-                        standardImageMB: ocrRun.standardImageMB
+                        standardImageMB: ocrRun.standardImageMB,
+                        visionSettings: ocrRun.visionSettings
                     )
                 }
                 pageResults.append(result)
@@ -470,6 +472,8 @@ extension OCRProcessor {
                     response = try await classifyCallMistral(prompt: prompt, apiKey: apiKey)
                 case .openai:
                     response = try await classifyCallOpenAI(prompt: prompt, model: model, apiKey: apiKey)
+                case .appleVision:
+                    throw OCRError.networkError("Apple Vision is transcription-only. Choose an LLM backend for classification.")
                 }
             }
             let (classification, _, _) = OCRPrompt.parseResponse(response)
@@ -654,6 +658,8 @@ extension OCRProcessor {
                 // `batchMode && provider.supportsBatch`). Defensive arm keeps the switch exhaustive;
                 // Phase 4 adds a real OpenAIBatchClient. The throw is caught below → jobs marked failed.
                 throw OCRError.networkError("OpenAI batch is not supported in this version")
+            case .appleVision:
+                throw OCRError.networkError("Apple Vision runs on this Mac and does not support batch submission")
             }
             // `performBatchOCR`'s FIFTH interrupted exit (W16.bat3-fu). The batch is PAID by the time
             // control reaches here and every acknowledged chunk ID is already journaled — only the
@@ -935,6 +941,11 @@ extension OCRProcessor {
                     // Unreachable: OpenAI never enters the batch path (`supportsBatch == false`, and
                     // submitBatch throws for it). Keeps the switch exhaustive; Phase 4 adds a real poll.
                     batchComplete = true
+                case .appleVision:
+                    // Vision never creates a server-side batch. Treat a malformed/programmatic call as
+                    // interrupted so its journal is preserved rather than falsely marked completed.
+                    batchPollInterrupted = true
+                    return
                 }
                 consecutiveErrors = 0   // this poll cycle completed without throwing
             } catch {
@@ -1179,7 +1190,8 @@ extension OCRProcessor {
                 imageScale: segmentationContext.imageScale,
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
-                standardImageMB: ocrRun.standardImageMB
+                standardImageMB: ocrRun.standardImageMB,
+                visionSettings: ocrRun.visionSettings
             )
 
             // If timed out, retry once without context
@@ -1197,7 +1209,8 @@ extension OCRProcessor {
                     imageScale: segmentationContext.imageScale,
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
-                    standardImageMB: ocrRun.standardImageMB
+                    standardImageMB: ocrRun.standardImageMB,
+                    visionSettings: ocrRun.visionSettings
                 )
             }
 
@@ -1227,7 +1240,9 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
-        let concurrency = Self.schedulingWorkerCount(for: runConfig)
+        let concurrency = model.provider == .appleVision
+            ? VisionClient.recommendedConcurrency
+            : Self.schedulingWorkerCount(for: runConfig)
         var completed = 0
 
         // Mark all as processing
@@ -1256,7 +1271,8 @@ extension OCRProcessor {
                         customPrompt: customPrompt, imageScale: imageScale,
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
-                        standardImageMB: ocrRun.standardImageMB
+                        standardImageMB: ocrRun.standardImageMB,
+                        visionSettings: ocrRun.visionSettings
                     )
                     return (index, jobID, result)
                 }
@@ -1292,7 +1308,8 @@ extension OCRProcessor {
                             customPrompt: customPrompt, imageScale: imageScale,
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
-                            standardImageMB: ocrRun.standardImageMB
+                            standardImageMB: ocrRun.standardImageMB,
+                            visionSettings: ocrRun.visionSettings
                         )
                         return (idx, nextJobID, result)
                     }
@@ -1466,7 +1483,8 @@ extension OCRProcessor {
         gatewayConfig: GatewayConfig? = nil,
         localAgent: LocalAgentConfig? = nil,
         rotationMode: RotationMode,
-        standardImageMB: Double
+        standardImageMB: Double,
+        visionSettings: VisionOCRSettings = .default
     ) async -> OCRResult {
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
@@ -1507,6 +1525,10 @@ extension OCRProcessor {
                 case .openai:
                     let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel)
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
+                case .appleVision:
+                    networkResult = try await VisionClient(settings: visionSettings).ocr(
+                        imageURL: imageURL, previousText: previousText,
+                        previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 }
             }
         } catch {
@@ -1536,7 +1558,7 @@ extension OCRProcessor {
         case .llmSingle, .llmMajority:
             // The Local Agent CLI backend has no multi-image comparative-rotation path (same as the
             // gateway, which LLMRotationDetector already gates out), so skip straight to local Vision.
-            if localAgent == nil,
+            if localAgent == nil, provider != .appleVision,
                let c = await LLMRotationDetector.detectCorrection(
                    imageURL: imageURL, provider: provider, apiKey: apiKey,
                    orderings: mode.orderings, gatewayConfig: gatewayConfig
@@ -1604,7 +1626,8 @@ extension OCRProcessor {
                 previousImageURL: nil,
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
-                standardImageMB: ocrRun.standardImageMB
+                standardImageMB: ocrRun.standardImageMB,
+                visionSettings: ocrRun.visionSettings
             )
 
             // W16.bat11 — there is deliberately NO `jobs[index]` read here.
@@ -1635,7 +1658,8 @@ extension OCRProcessor {
         gatewayConfig: GatewayConfig? = nil,
         localAgent: LocalAgentConfig? = nil,
         rotationMode: RotationMode,
-        standardImageMB: Double
+        standardImageMB: Double,
+        visionSettings: VisionOCRSettings = .default
     ) async -> OCRResult {
         await performOCRCall(
             imageURL: imageURL, provider: provider, model: model,
@@ -1645,7 +1669,8 @@ extension OCRProcessor {
             gatewayConfig: gatewayConfig,
             localAgent: localAgent,
             rotationMode: rotationMode,
-            standardImageMB: standardImageMB
+            standardImageMB: standardImageMB,
+            visionSettings: visionSettings
         )
     }
 }

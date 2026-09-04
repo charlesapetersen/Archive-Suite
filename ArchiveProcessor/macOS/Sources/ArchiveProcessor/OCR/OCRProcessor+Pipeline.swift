@@ -225,6 +225,7 @@ extension OCRProcessor {
               SessionProcessingConfig.Bounds.textColumns.contains(config.textColumns),
               config.exportedImageMB.isFinite,
               SessionProcessingConfig.Bounds.imageMB.contains(config.exportedImageMB),
+              config.visionSettings.isValid,
               hasGateway == (config.gatewayUpstreamProvider != nil) else { return false }
 
         let optionalParallelCounts = [
@@ -272,6 +273,7 @@ extension OCRProcessor {
             pdfImageMB: sizing.pdfImageMB,
             textColumns: sizing.textColumns,
             exportedImageMB: sizing.exportedImageMB,
+            visionSettings: runConfig?.visionSettings ?? VisionOCRSettings.fromDefaults(),
             gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults()
         )
     }
@@ -309,6 +311,7 @@ extension OCRProcessor {
             runConfig.pdfImageMB = runtime.pdfImageMB
             runConfig.exportedImageMB = runtime.exportedImageMB
             runConfig.textColumns = runtime.textColumns
+            runConfig.visionSettings = runtime.visionSettings
         } else {
             runConfig.imageScale = Self.liveImageScaleFraction(defaults)
             if let exportOriginals = pending.exportOriginals {
@@ -1807,7 +1810,8 @@ extension OCRProcessor {
                             imageScale: scale,
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
-                            standardImageMB: ocrRun.standardImageMB
+                            standardImageMB: ocrRun.standardImageMB,
+                            visionSettings: ocrRun.visionSettings
                         )
                         return (index, jobID, result)
                     }
@@ -1841,7 +1845,8 @@ extension OCRProcessor {
                                 imageScale: scale,
                                 gatewayConfig: gateway, localAgent: localAgent,
                                 rotationMode: ocrRun.rotationMode,
-                                standardImageMB: ocrRun.standardImageMB
+                                standardImageMB: ocrRun.standardImageMB,
+                                visionSettings: ocrRun.visionSettings
                             )
                             return (idx, nextJobID, result)
                         }
@@ -1874,7 +1879,8 @@ extension OCRProcessor {
                     imageScale: segmentationContext.imageScale,
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
-                    standardImageMB: ocrRun.standardImageMB
+                    standardImageMB: ocrRun.standardImageMB,
+                    visionSettings: ocrRun.visionSettings
                 )
 
                 if Self.isTimeoutError(result) {
@@ -1887,7 +1893,8 @@ extension OCRProcessor {
                         imageScale: segmentationContext.imageScale,
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
-                        standardImageMB: ocrRun.standardImageMB
+                        standardImageMB: ocrRun.standardImageMB,
+                        visionSettings: ocrRun.visionSettings
                     )
                 }
 
@@ -1960,6 +1967,9 @@ extension OCRProcessor {
             clientTypeName = String(describing: type(of: client))
         case .openai:
             cancelChunk = { _ in false }   // never called; OpenAI has no batch path in v1.
+            clientTypeName = "none"
+        case .appleVision:
+            cancelChunk = { _ in false }   // Vision has no server-side batch path.
             clientTypeName = "none"
         }
         return BatchChunkCanceller(provider: batch.provider, cancelChunk: cancelChunk,
@@ -2114,6 +2124,8 @@ extension OCRProcessor {
             confirmed = allConfirmed
         case .openai:
             confirmed = false   // OpenAI has no batch path in v1 (`supportsBatch == false`).
+        case .appleVision:
+            confirmed = false   // Apple Vision has no server-side batch path.
         }
         // Keep-on-doubt, and the doubt outranks the confirmation: an unfinished submission means the
         // chunk list above may not be the whole batch, so "all of them stopped" is not "all of it stopped".
@@ -2817,7 +2829,8 @@ extension OCRProcessor {
             imageURL: ocrURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
             apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway,
             localAgent: currentLocalAgent, rotationMode: ocrRun.rotationMode,
-            standardImageMB: ocrRun.standardImageMB)
+            standardImageMB: ocrRun.standardImageMB,
+            visionSettings: ocrRun.visionSettings)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,

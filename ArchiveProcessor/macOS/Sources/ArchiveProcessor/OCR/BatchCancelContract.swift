@@ -329,7 +329,7 @@ enum BatchCancelContract {
         switch provider {
         case .anthropic, .mistral: return chunkIds.count == 1 && everyChunkAccepted
         case .gemini: return !chunkIds.isEmpty && everyChunkAccepted
-        case .openai: return false
+        case .openai, .appleVision: return false
         }
     }
 
@@ -337,7 +337,7 @@ enum BatchCancelContract {
         switch provider {
         case .anthropic, .mistral: return chunkIds.count == 1 ? chunkIds : []
         case .gemini: return chunkIds
-        case .openai: return []
+        case .openai, .appleVision: return []
         }
     }
 

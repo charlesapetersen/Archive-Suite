@@ -4444,6 +4444,27 @@ explain why not.
   (adversarial self-review + `localagent-wiring-test.swift` 18/18 + `localagent-mechanism-test.swift` 14/14).
   Plan `execution-plans/local-agent-cli-provider.md` DELETED (shipped). **Keyed/owner tail → below.** | M | med | none
 
+- [x] **W13.vision-1 — Apple Vision as a first-class OCR backend [M · low · Tier-1].** **SHIPPED 2026-09-03
+  (this commit).** Chose the in-process `VNRecognizeTextRequest` implementation over shelling to `mac-ocr`:
+  it needs no external executable, PATH discovery, or subprocess, and macOS Vision was already linked for
+  rotation detection. `VisionClient` is a no-network, CPU-bound backend with performance-core concurrency;
+  it returns text and neutral rotation with no classification. `LLMProvider.appleVision = "Apple Vision"`
+  and `macOS Vision` give page-2 headers the free-form `Apple Vision · macOS Vision` identity; the SPEC now
+  names that example. Settings has an exclusive **Apple Vision (on this Mac)** backend, user-visible language,
+  fast-recognition, minimum-confidence, and custom-vocabulary controls, plus the pinned **“Free — runs on
+  this Mac”** pane. The settings snapshot follows both Process Files and Live Capture, including retries.
+  Vision is transcription-only: batch and LLM-rotation are skipped; Process Files and Live Capture enforce
+  No tagging or Copy source file tags, so no judgment/tagging route can call it. `CostEstimator` reports
+  exactly $0. Added `scripts/test-vision-ocr.sh`, which compiles the production client into a no-window
+  command-line host and proves two CoreGraphics-generated PNGs end-to-end (text tokens, nil classification,
+  neutral rotation, valid settings, positive concurrency): **13/13 PASS**. **Verification:** Processor Debug
+  build clean; `./test-smoke.sh processor` passes its scratch-only two-image OCR → tag → PDF flow (2/2
+  succeeded); `test-batch-resume.sh` remains green after adding the non-batch provider to exhaustive batch
+  contracts. Additive and opt-in; default backend unchanged. | files: ArchiveProcessor/macOS/Sources/
+  ArchiveProcessor/{OCR/VisionClient.swift,Models/{ProviderModels,DefaultsKeys,CostEstimator}.swift,
+  Views/SettingsView.swift}, ArchiveProcessor/scripts/{test-vision-ocr.sh,vision-ocr-headless.swift},
+  SPEC/tag-format.md, ArchiveProcessor/{README,CLAUDE}.md | M | low | done
+
 
 ## Known-issues work — Wave 14 (cross-app; owner-requested 2026-07-16)
 

@@ -39,7 +39,13 @@ enum ProviderCycler {
     @MainActor static func advance() {
         let d = UserDefaults.standard
         let current = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
-        let all = LLMProvider.allCases
+        // Vision is a local backend toggled in Settings, not an API provider with a selectable key/model.
+        // Cycling returns to the normal provider picker instead of appearing to change an inactive value.
+        if d.bool(forKey: DefaultsKeys.useAppleVision) {
+            d.set(false, forKey: DefaultsKeys.useAppleVision)
+            return
+        }
+        let all = LLMProvider.allCases.filter { $0 != .appleVision }
         guard let idx = all.firstIndex(of: current) else { return }
         d.set(all[(idx + 1) % all.count].rawValue, forKey: DefaultsKeys.selectedProvider)
     }

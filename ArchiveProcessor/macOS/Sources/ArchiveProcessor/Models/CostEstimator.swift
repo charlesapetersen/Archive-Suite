@@ -38,6 +38,7 @@ struct CostEstimator {
         case .anthropic: return 6_000
         case .mistral: return 1_000
         case .openai: return 1_500   // OpenAI bills images as tokens via tiling; ~1.5k ≈ a full-page high-detail scan. Refine if the keyed live smoke shows drift.
+        case .appleVision: return 0   // runs in-process; it has no billable image-token accounting
         }
     }
 
@@ -76,6 +77,7 @@ struct CostEstimator {
         case .anthropic: return (3.0, 15.0)     // claude-sonnet-4-6
         case .mistral: return nil               // no LLM rotation path → local Vision (free)
         case .openai: return (0.75, 4.50)       // gpt-5.4-mini (LLMRotationDetector.cheapOpenAIModel)
+        case .appleVision: return nil
         }
     }
 
@@ -92,6 +94,12 @@ struct CostEstimator {
         useGateway: Bool = false,
         imageTokenProvider: LLMProvider? = nil
     ) -> CostEstimate {
+        // Apple Vision is an in-process macOS framework. It never calls a provider and the V1 backend
+        // exposes only transcription / source-tag copying, so every estimated dollar component is $0.
+        if model.provider == .appleVision {
+            return CostEstimate(ocrCost: 0, classificationCost: 0, taggingCost: 0, collectionCost: 0,
+                                rotationCost: 0, batchOcrCost: 0, fileCount: fileCount, model: model)
+        }
         // OCR cost (zero when using pre-OCRed PDFs).
         // `imageScale` is the size-target slider fraction; for a standard-size file it equals the
         // image *area* fraction (target size ∝ area), so image tokens scale linearly with it.

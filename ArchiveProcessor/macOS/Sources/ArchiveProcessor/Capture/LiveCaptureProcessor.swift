@@ -784,7 +784,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
                 imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil,
                 localAgent: ov == nil ? config.localAgent : nil,
-                rotationMode: config.rotationMode, standardImageMB: config.standardImageMB)
+                rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
+                visionSettings: config.visionSettings)
         }
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
@@ -1327,14 +1328,16 @@ final class LiveCaptureProcessor: ObservableObject {
     nonisolated private static func ocrTask(
         imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
         apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?,
-        localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double
+        localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double,
+        visionSettings: VisionOCRSettings
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
             await OCRProcessor.performOCRCall(
                 imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
                 apiKey: apiKey, previousText: nil, previousImageURL: nil,
                 customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
-                localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB)
+                localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
+                visionSettings: visionSettings)
         }
     }
 

@@ -1,6 +1,6 @@
 # Archive Processor
 
-A native macOS application for processing historical archive photograph collections. Archive Processor performs OCR on scanned documents using multiple LLM providers, generates searchable PDFs, applies intelligent filesystem tags, and organizes files into archival collections.
+A native macOS application for processing historical archive photograph collections. Archive Processor performs OCR on scanned documents using cloud LLM providers or on-device Apple Vision, generates searchable PDFs, applies intelligent filesystem tags, and organizes files into archival collections.
 
 Built for archivists, historians, and researchers working with large digitized document collections.
 
@@ -13,9 +13,9 @@ The app has three areas, selectable at the top of the window, plus a native Sett
 
 ## Features
 
-### Multi-Provider LLM OCR
+### Cloud and on-device OCR
 
-Process scanned images through any of four LLM providers:
+Process scanned images through any of four cloud LLM providers or the free, local Apple Vision backend:
 
 | Provider | Models | Thinking Mode | Batch Processing |
 |----------|--------|---------------|------------------|
@@ -23,9 +23,11 @@ Process scanned images through any of four LLM providers:
 | **Google Gemini** | 3.1 Flash Lite (default), 3.5 Flash, 3.1 Pro, 3 Flash Preview, 2.5 Pro, 2.5 Flash, 2.5 Flash Lite | Low / High | Yes |
 | **Mistral** | Mistral OCR 3 | — | Yes |
 | **OpenAI (ChatGPT)** | GPT-5 nano (default), GPT-5 mini, GPT-5.4 mini, GPT-5.4, GPT-5.5 | Low / High (reasoning models) | — |
+| **Apple Vision** | macOS Vision | — | — |
 
 - Also supports an **OpenAI-compatible API Gateway** (custom base URL + model ID) for self-hosted or proxied endpoints, with user-supplied pricing for cost estimates — including a one-click **"Fill in OpenAI preset"** that prefills OpenAI's public endpoint, model, and pricing (a custom base URL then covers **Azure OpenAI** / proxies)
 - Or a **Local Agent CLI backend** — for an enterprise/subscription **Claude Code**, **Gemini CLI**, or **OpenAI Codex** entitlement with **no API key**: pick *Local CLI Agent* in Settings, point it at the installed CLI, and OCR runs through your existing subscription login (a guided *Set up* wizard + *Detect & Verify* check are built in). Batch mode is skipped on this path; cost shows "Included in your subscription — usage limits apply."
+- Or choose **Apple Vision (on this Mac)** in Settings for free, on-device transcription with no API key or network request. It uses the Mac's performance cores and exposes language, fast-recognition, confidence, and custom-vocabulary controls. This first version is transcription-only: use **No tagging** or **Copy source file tags**; classification, segmentation, dates, and generated tags require a cloud/CLI backend (the hybrid Vision + LLM mode is future work).
 - Switch providers and models at any time (in **Settings**)
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard and batch pricing)
@@ -220,7 +222,7 @@ Diagnostics live in the **Tools** tab (next to Process Files and Live Capture):
 
 ### Settings window (⌘,)
 
-All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / OpenAI / Gateway, each in the Keychain), input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
+All durable settings live in a native macOS Settings window: provider/model/API mode, a **separate API-key field per provider** (Anthropic / Gemini / Mistral / OpenAI / Gateway, each in the Keychain), Apple Vision's no-key local controls, input & processing (pre-OCR, batch, image resolution), rotation, tagging & segmentation options, custom models, and the Live Capture processing mode. The tagging **mode** dropdown and the output folder stay in the Process Files view for quick access.
 
 A **pinned pane on the right** recomputes live for 1,000 files (at your standard image size) as you change settings:
 
@@ -347,7 +349,7 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 │   ├── OCRProcessor+{Pipeline,OCR,Tagging,ReviewFlows}.swift  # method clusters split by concern (for concurrent work)
 │   ├── OCRProcessor+Types.swift       # top-level review/tag model types (CollectionReviewItem, ManualTagSegment, …)
 │   ├── OCRPrompt.swift                # Prompt builder and response parser
-│   ├── AnthropicClient / GeminiClient / MistralClient / OpenAICompatibleClient (gateway)
+│   ├── AnthropicClient / GeminiClient / MistralClient / VisionClient / OpenAICompatibleClient (gateway)
 │   ├── BatchOCR.swift                 # Batch clients for all three providers
 │   ├── ImageEncoding.swift            # Image downscaling / base64 encoding for API calls
 │   ├── KeyValidator.swift             # API-key format checks (guided setup)

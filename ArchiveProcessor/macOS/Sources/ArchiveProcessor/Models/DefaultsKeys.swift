@@ -35,6 +35,13 @@ enum DefaultsKeys {
     static let localAgentBinaryPath = "localAgentBinaryPath" // optional absolute path override (blank ⇒ auto-detect)
     static let localAgentModel = "localAgentModel"         // optional model override (blank ⇒ CLI default)
 
+    // Apple Vision OCR backend (on-device, no API key). Mutually exclusive with gateway / Local Agent.
+    static let useAppleVision = "useAppleVision"
+    static let visionLanguages = "visionLanguages"                 // comma-separated BCP-47 tags
+    static let visionFastRecognition = "visionFastRecognition"
+    static let visionMinimumConfidence = "visionMinimumConfidence" // 0...1
+    static let visionCustomVocabulary = "visionCustomVocabulary"   // comma/newline-separated words
+
     // Input & processing
     static let batchMode = "batchMode"
     static let preOCRedInput = "preOCRedInput"

@@ -118,7 +118,7 @@ enum BatchCancelWiringContract {
         case .anthropic: return String(describing: AnthropicBatchClient.self)
         case .mistral: return String(describing: MistralBatchClient.self)
         case .gemini: return String(describing: GeminiBatchClient.self)
-        case .openai: return "none"   // no batch path in v1, so no client to build
+        case .openai, .appleVision: return "none"   // neither backend has a batch path
         }
     }
 
@@ -647,7 +647,7 @@ enum BatchCancelWiringContract {
                     switch provider {
                     case .gemini:              willAttempt = derived
                     case .anthropic, .mistral: willAttempt = derived.count == 1 ? derived : []
-                    case .openai:              willAttempt = []      // no batch path in v1
+                    case .openai, .appleVision: willAttempt = []      // no batch path
                     }
 
                     // No refusal, then each acknowledged chunk refused in turn.

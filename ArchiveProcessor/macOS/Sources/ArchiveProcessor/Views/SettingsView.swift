@@ -50,6 +50,12 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
     @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath: String = ""
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel: String = ""
+    // Apple Vision is a local transcription backend, mutually exclusive with the other OCR backends.
+    @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision: Bool = false
+    @AppStorage(DefaultsKeys.visionLanguages) private var visionLanguages: String = "en-US"
+    @AppStorage(DefaultsKeys.visionFastRecognition) private var visionFastRecognition: Bool = false
+    @AppStorage(DefaultsKeys.visionMinimumConfidence) private var visionMinimumConfidence: Double = 0
+    @AppStorage(DefaultsKeys.visionCustomVocabulary) private var visionCustomVocabulary: String = ""
 
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
@@ -234,7 +240,9 @@ struct SettingsView: View {
             Text("~\(String(format: "%.2g", effectiveStandardImageMB)) MB each")
                 .font(.caption2).foregroundStyle(.secondary)
 
-            if useLocalAgent {
+            if useAppleVision {
+                appleVisionCostPane
+            } else if useLocalAgent {
                 localAgentCostPane
             } else if let model = useGateway ? gatewayModel : selectedModel {
                 let est = CostEstimator.estimate(
@@ -319,6 +327,26 @@ struct SettingsView: View {
             .font(.caption2).foregroundStyle(.tertiary)
     }
 
+    /// Cost/pacing summary for the in-process Vision backend. Unlike the CLI path it neither consumes a
+    /// subscription nor reaches a network service: it uses the Mac's performance cores directly.
+    @ViewBuilder private var appleVisionCostPane: some View {
+        Divider().padding(.vertical, 2)
+        Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "cpu").foregroundStyle(.secondary)
+            Text("Free — runs on this Mac.").font(.caption)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ap.settings.appleVisionCost")
+        Text("Apple Vision transcribes locally using the Mac's performance cores. It sends no image, text, or API key off this Mac.")
+            .font(.caption2).foregroundStyle(.secondary)
+        Divider().padding(.vertical, 2)
+        Text("SCOPE").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+        Text("This backend transcribes only. Use No tagging or Copy source file tags; classification, segmentation, dates, and generated tags require the later Vision + LLM mode.")
+            .font(.caption2).foregroundStyle(.secondary)
+        Spacer()
+    }
+
     private func costRow(_ label: String, _ value: String, bold: Bool = false) -> some View {
         HStack {
             Text(label).font(.caption).foregroundStyle(bold ? .primary : .secondary)
@@ -327,16 +355,26 @@ struct SettingsView: View {
         }
     }
 
-    /// The three mutually-exclusive OCR backends, surfaced as ONE picker over the two persisted flags
-    /// (`useGateway` / `useLocalAgent`). Centralizing the XOR in this Binding means no downstream code
-    /// path can ever observe both flags true (the setter always writes both).
-    private enum OCRBackendMode: Hashable { case direct, gateway, localAgent }
+    /// The four mutually-exclusive OCR backends, surfaced as ONE picker over their persisted flags.
+    /// Centralizing the XOR in this Binding means no downstream code path can observe conflicting modes.
+    private enum OCRBackendMode: Hashable { case direct, gateway, localAgent, appleVision }
     private var backendMode: Binding<OCRBackendMode> {
         Binding(
-            get: { useLocalAgent ? .localAgent : (useGateway ? .gateway : .direct) },
+            get: {
+                if useAppleVision { return .appleVision }
+                return useLocalAgent ? .localAgent : (useGateway ? .gateway : .direct)
+            },
             set: { mode in
                 useGateway = (mode == .gateway)
                 useLocalAgent = (mode == .localAgent)
+                useAppleVision = (mode == .appleVision)
+                if mode == .appleVision {
+                    batchMode = false
+                    enableCollectionSegmentation = false
+                    if taggingMode != .none && taggingMode != .copySource {
+                        taggingModeRaw = TaggingMode.none.rawValue
+                    }
+                }
             }
         )
     }
@@ -349,10 +387,11 @@ struct SettingsView: View {
                 Text("Direct API").tag(OCRBackendMode.direct)
                 Text("API Gateway").tag(OCRBackendMode.gateway)
                 Text("Local CLI Agent").tag(OCRBackendMode.localAgent)
+                Text("Apple Vision (on this Mac)").tag(OCRBackendMode.appleVision)
             } label: {
                 HStack {
                     Text("OCR backend")
-                    HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint (base URL, model ID, optional pricing) — useful for self-hosted or institutional proxies. Local CLI Agent runs OCR through a locally installed, signed-in CLI (Claude Code / Gemini / Codex) using your existing subscription — no API key and no per-token cost. Exactly one backend is active at a time.")
+                    HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint. Local CLI Agent runs OCR through a signed-in CLI using your subscription. Apple Vision transcribes locally with macOS Vision: no API key, network request, or per-page charge. Exactly one backend is active at a time.")
                 }
             }
             .accessibilityIdentifier("ap.settings.backendPicker")
@@ -372,7 +411,7 @@ struct SettingsView: View {
                 TextField("Input $/1M tokens", value: Binding(get: { gatewayInputCost >= 0 ? gatewayInputCost : nil }, set: { gatewayInputCost = $0 ?? -1 }), format: .number)
                 TextField("Output $/1M tokens", value: Binding(get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil }, set: { gatewayOutputCost = $0 ?? -1 }), format: .number)
                 Picker(selection: $gatewayUpstreamProvider) {
-                    ForEach(LLMProvider.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
                 } label: {
                     HStack {
                         Text("Cost profile")
@@ -381,11 +420,13 @@ struct SettingsView: View {
                 }
             } else if useLocalAgent {
                 localAgentControls
+            } else if useAppleVision {
+                appleVisionControls
             } else {
                 // Plain `$selectedProvider`: the model follows automatically, because `selectedModel`
                 // reads the store keyed by whatever the provider currently is.
                 Picker(selection: $selectedProvider) {
-                    ForEach(LLMProvider.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
                 } label: {
                     HStack {
                         Text("Provider")
@@ -416,6 +457,34 @@ struct SettingsView: View {
                 Button("Manage custom models…") { showManageModels = true }
             }
         }
+    }
+
+    /// Local Vision controls. The language, speed, confidence, and vocabulary knobs are intentionally
+    /// exposed here rather than hidden as constants: they materially affect what on-device OCR returns.
+    @ViewBuilder private var appleVisionControls: some View {
+        Text("Free on-device transcription with macOS Vision. It does not use an API key or send files over the network.")
+            .font(.caption).foregroundStyle(.secondary)
+        TextField("Languages (comma-separated BCP-47 tags)", text: $visionLanguages)
+            .accessibilityIdentifier("ap.settings.visionLanguages")
+        Toggle("Fast recognition", isOn: $visionFastRecognition)
+            .accessibilityIdentifier("ap.settings.visionFastRecognition")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Minimum confidence")
+                Spacer()
+                Text("\(Int((visionMinimumConfidence * 100).rounded()))%")
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: $visionMinimumConfidence, in: 0...1, step: 0.05)
+                .accessibilityIdentifier("ap.settings.visionMinimumConfidence")
+        }
+        TextEditor(text: $visionCustomVocabulary)
+            .font(.caption)
+            .frame(height: 58)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
+            .accessibilityIdentifier("ap.settings.visionCustomVocabulary")
+        Text("Custom vocabulary — one word per line or comma-separated. Vision is transcription-only in this mode; select No tagging or Copy source file tags.")
+            .font(.caption2).foregroundStyle(.secondary)
     }
 
     /// Local Agent backend controls (shown when `useLocalAgent`). Persist the config; the pipeline
@@ -540,7 +609,7 @@ struct SettingsView: View {
                     HelpButton(text: "Batch jobs are queued and returned asynchronously — results can take minutes to hours — in exchange for ~50% lower cost. Not available with an API Gateway or pre-OCRed input.\n\nGemini caveat: Gemini batch jobs occasionally get stuck in a pending state due to known Google API reliability issues. If a batch doesn't complete within a few hours, cancel and retry, or switch to non-batch mode.")
                 }
             }
-            .disabled(useGateway || preOCRedInput)
+            .disabled(useGateway || useAppleVision || preOCRedInput)
             Toggle(isOn: $skipAlreadyProcessed) {
                 HStack {
                     Text("Skip already-processed files")

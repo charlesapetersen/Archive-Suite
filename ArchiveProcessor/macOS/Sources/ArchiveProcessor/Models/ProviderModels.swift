@@ -13,6 +13,7 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     case gemini = "Gemini"
     case mistral = "Mistral"
     case openai = "OpenAI"   // append-only (persisted rawValue) — never reorder/rename existing cases
+    case appleVision = "Apple Vision" // on-device transcription backend; append-only like the API providers
 
     var id: String { rawValue }
 
@@ -23,6 +24,7 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
         case .gemini: builtIn = LLMModel.geminiModels
         case .mistral: builtIn = LLMModel.mistralModels
         case .openai: builtIn = LLMModel.openaiModels
+        case .appleVision: builtIn = LLMModel.appleVisionModels
         }
         let custom = CustomModelStore.shared.models(for: self)
         return builtIn + custom
@@ -31,7 +33,8 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     var supportsBatch: Bool {
         switch self {
         case .anthropic, .gemini, .mistral: return true
-        case .openai: return false   // OpenAI Batch API is Phase 4 — skipped in v1 (same as the gateway path)
+        case .openai, .appleVision:
+            return false   // Apple Vision is local; OpenAI Batch API is Phase 4 — neither has this path.
         }
     }
 }
@@ -191,6 +194,19 @@ struct LLMModel: Identifiable, Hashable, Codable {
     let inputCostPer1M: Double
     let outputCostPer1M: Double
     let batchDiscount: Double
+
+    static let appleVisionModels: [LLMModel] = [
+        LLMModel(
+            id: "macos-vision",
+            displayName: "macOS Vision",
+            provider: .appleVision,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 0,
+            outputCostPer1M: 0,
+            batchDiscount: 1
+        )
+    ]
 
     static let anthropicModels: [LLMModel] = [
         LLMModel(
