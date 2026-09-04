@@ -785,6 +785,8 @@ extension OCRProcessor {
                             imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
                             originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
                             gatewayDisplayName: currentGateway?.displayName,
+                            localAgentDisplayName: currentLocalAgent?.provenanceDisplayName,
+                            localAgentModelName: currentLocalAgent?.provenanceModelName,
                             pdfImageMB: outputSettings.pdfImageMB,
                             textColumns: outputSettings.textColumns
                         )

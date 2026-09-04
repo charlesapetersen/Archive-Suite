@@ -375,6 +375,8 @@ extension OCRProcessor {
                         outputURL: outputURL,
                         originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
                         gatewayDisplayName: currentGateway?.displayName,
+                        localAgentDisplayName: currentLocalAgent?.provenanceDisplayName,
+                        localAgentModelName: currentLocalAgent?.provenanceModelName,
                         pdfImageMB: pdfSettings.pdfImageMB,
                         textColumns: pdfSettings.textColumns
                     )

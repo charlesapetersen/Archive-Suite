@@ -1,9 +1,12 @@
 import Foundation
+import AppKit
+import PDFKit
 
 /// Headless, $0 self-test of the processing-history feature (cost + run log), gated by
 /// `PROCESSING_HISTORY_TEST=1` (does nothing in normal use). No OCR, no network, no cost, no GUI — it
-/// exercises `RunHistorySnapshot.makeRun`, the estimator-derived cost, and `ProcessingHistoryStore`'s
-/// record / newest-first / bounded-trim / persistence / clear behavior.
+/// exercises `RunHistorySnapshot.makeRun`, the estimator-derived cost, the Local Agent's durable
+/// PDF/run-history provenance, and `ProcessingHistoryStore`'s record / newest-first / bounded-trim /
+/// persistence / clear behavior.
 ///
 /// SAFETY: runs against a THROWAWAY `UserDefaults(suiteName:)`, never `.standard`, so it can never read
 /// or clobber the operator's real processing history. Writes a PASS/FAIL report to
@@ -35,10 +38,11 @@ enum ProcessingHistoryTestDriver {
         let model = LLMProvider.gemini.models[0]
         // Build a snapshot with the estimator's DEFAULT knobs (scale 1.0 / rotation off / no gateway) so the
         // recorded cost is directly comparable to a plain CostEstimator.estimate(...) call below.
-        func snapshot(fileCount: Int, batch: Bool = false, preOCRed: Bool = false, reOCR: Bool = false) -> RunHistorySnapshot {
+        func snapshot(fileCount: Int, batch: Bool = false, preOCRed: Bool = false, reOCR: Bool = false,
+                      localAgent: LocalAgentConfig? = nil) -> RunHistorySnapshot {
             RunHistorySnapshot(
                 startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-                provider: .gemini, gatewayConfig: nil, imageTokenProvider: nil,
+                provider: .gemini, gatewayConfig: nil, localAgent: localAgent, imageTokenProvider: nil,
                 model: model, visionTextProvider: nil, visionTextModel: nil,
                 batchMode: batch, enableTagging: true,
                 enableCollectionSegmentation: false, preOCRedInput: preOCRed,
@@ -70,12 +74,49 @@ enum ProcessingHistoryTestDriver {
         check("reOCR modeLabel", snapshot(fileCount: 2, reOCR: true).makeRun(succeeded: 2).modeLabel == "Re-OCR PDF")
         check("providerLabel is the provider (no gateway)", r.providerLabel == LLMProvider.gemini.rawValue)
 
+        // Local Agent calls do not use the selected API provider or its price. Persist the actual CLI plus
+        // its override/default marker, and generate a real scratch PDF to prove the shared header parser
+        // still strips the new free-form provenance line correctly.
+        let localAgent = LocalAgentConfig(tool: .claude, binaryPath: "/tmp/fake-claude",
+                                          modelOverride: "claude-sonnet-4-6")
+        let localRun = snapshot(fileCount: 3, localAgent: localAgent).makeRun(succeeded: 3)
+        check("Local Agent history records the CLI and $0 rather than its selected API fallback",
+              localRun.providerLabel == "Local CLI Agent (claude)"
+                  && localRun.modelName == "claude-sonnet-4-6" && localRun.cost == 0)
+        let multilineAgent = LocalAgentConfig(tool: .codex, modelOverride: "codex-main\nClassification:")
+        check("Local Agent provenance model stays a single durable-header line",
+              multilineAgent.provenanceModelName == "codex-main Classification:")
+        let provenanceDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("APProvenanceTest-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: provenanceDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: provenanceDir) }
+        let source = provenanceDir.appendingPathComponent("source.jpg")
+        let output = provenanceDir.appendingPathComponent("output.pdf")
+        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8,
+                                      bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
+                                      colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        if let bitmap { try? bitmap.representation(using: .jpeg, properties: [:])?.write(to: source) }
+        let pdfResult = try? PDFGenerator().generate(
+            imageURL: source, result: OCRResult(text: "Provenance body.", classification: nil,
+                                                 errorMessage: nil, errorCode: nil),
+            model: model, outputURL: output, originalFileName: source.lastPathComponent,
+            localAgentDisplayName: localAgent.provenanceDisplayName,
+            localAgentModelName: localAgent.provenanceModelName
+        )
+        let pdfText = PDFDocument(url: output)?.page(at: 1)?.string ?? ""
+        let extractedText = PDFTextExtractor.extract(from: output).text
+        check("Local Agent PDF provenance names the CLI and still round-trips its body",
+              pdfResult == .embedded
+                  && pdfText.contains("Local CLI Agent (claude) \u{00B7} claude-sonnet-4-6")
+                  && !pdfText.contains("\n\(model.provider.rawValue) \u{00B7}")
+                  && extractedText?.contains("Provenance body.") == true)
+
         // A Vision hybrid has free on-device image OCR and a separately billed text-only LLM. History
         // must retain that distinction rather than presenting a $0 Vision run or pricing cloud images.
         let visionModel = LLMProvider.appleVision.models[0]
         let hybridSnapshot = RunHistorySnapshot(
             startedAt: Date(timeIntervalSince1970: 1_700_000_000),
-            provider: .appleVision, gatewayConfig: nil, imageTokenProvider: nil, model: visionModel,
+            provider: .appleVision, gatewayConfig: nil, localAgent: nil, imageTokenProvider: nil, model: visionModel,
             visionTextProvider: .gemini, visionTextModel: model, batchMode: false,
             enableTagging: true, enableCollectionSegmentation: false, preOCRedInput: false,
             reOCRMultiPagePDF: false, sendPreviousImage: false, contextCharCount: 0,

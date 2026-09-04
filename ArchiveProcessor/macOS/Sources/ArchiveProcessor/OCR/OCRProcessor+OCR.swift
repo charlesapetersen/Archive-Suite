@@ -286,6 +286,8 @@ extension OCRProcessor {
         let pdfMB = pdfSettings.imageMB
         let txtCols = pdfSettings.textColumns
         let gatewayName = currentGateway?.displayName
+        let localAgentDisplayName = localAgent?.provenanceDisplayName
+        let localAgentModelName = localAgent?.provenanceModelName
 
         for (index, pdfURL) in files.enumerated() {
             guard !Task.isCancelled else { cleanupTempFiles(); return }
@@ -376,7 +378,9 @@ extension OCRProcessor {
                         let tmp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".pdf")
                         let outcome = try gen.generate(imageURL: page.image, result: page.result, model: genModel,
                                                        outputURL: tmp, originalFileName: originalName,
-                                                       gatewayDisplayName: gatewayName, pdfImageMB: pdfMB,
+                                                       gatewayDisplayName: gatewayName,
+                                                       localAgentDisplayName: localAgentDisplayName,
+                                                       localAgentModelName: localAgentModelName, pdfImageMB: pdfMB,
                                                        textColumns: txtCols)
                         if outcome.isPlaceholder { anyPlaceholder = true }
                         perPagePDFs.append(tmp)
@@ -1404,6 +1408,8 @@ extension OCRProcessor {
         // suspends at the await but is free to service UI events while the work runs on .utility.
         let originalFileName = sourceURL.lastPathComponent
         let gatewayName = currentGateway?.displayName
+        let localAgentDisplayName = currentLocalAgent?.provenanceDisplayName
+        let localAgentModelName = currentLocalAgent?.provenanceModelName
         let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
         let pdfMB = pdfSettings.imageMB
         let txtCols = pdfSettings.textColumns
@@ -1423,6 +1429,8 @@ extension OCRProcessor {
                                                     outputURL: outputURL,
                                                     originalFileName: originalFileName,
                                                     gatewayDisplayName: gatewayName,
+                                                    localAgentDisplayName: localAgentDisplayName,
+                                                    localAgentModelName: localAgentModelName,
                                                     pdfImageMB: pdfMB, textColumns: txtCols)
                 var appliedTags: [String]? = nil
                 var tagWriteOK: Bool? = nil

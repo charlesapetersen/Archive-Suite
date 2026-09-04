@@ -90,6 +90,9 @@ import ArchiveCore
 ///  25. Launch-time stranded-session detection (W17.det1) counts only session-shaped backup folders with a
 ///      nonempty canonical staging array, reports the count on the existing status line, and mutates nothing
 ///      in the Backup Folder (Test 28).
+///  26. Local Agent provenance survives a staging-manifest reload and a rotation regeneration, so every
+///      durable Live Capture PDF credits the CLI actually used rather than a gateway or direct fallback
+///      (W22.localagent-provenance; Test 29).
 ///
 /// Writes a PASS/FAIL report to `LIVECAPTURE_RECOVERYTEST_OUT` (or a temp file) + NSLog. Test scaffolding.
 @MainActor
@@ -3529,6 +3532,85 @@ enum LiveCaptureRecoveryTestDriver {
                   (try? Data(contentsOf: oneManifest)) == stagedBody
                       && (try? Data(contentsOf: twoManifest)) == stagedBody
                       && fm.fileExists(atPath: operatorFolder.path))
+
+            // --- Test 29 (W22.localagent-provenance): a Local Agent run may retain a selected direct
+            // provider for UI compatibility, but that provider and a gateway are never the backend that
+            // produced this result. Exercise both durable Live Capture writes: initial staging, then the
+            // persisted `RetainedSegment` → manifest reload → rotation regeneration replay. Supplying both
+            // a gateway and Local Agent directly is intentional test pressure; normal Settings makes them
+            // exclusive, while this proves the local CLI remains the durable record's precedence rule.
+            let p29Out = tmp.appendingPathComponent("p29out", isDirectory: true)
+            let p29Staging = tmp.appendingPathComponent(
+                "APStaging-p29-\(String(UUID().uuidString.prefix(8)))", isDirectory: true)
+            try? fm.createDirectory(at: p29Staging, withIntermediateDirectories: true)
+            let p29Agent = LocalAgentConfig(tool: .claude, binaryPath: "/tmp/fake-claude",
+                                             modelOverride: "p29-local-model")
+            let p29Gateway = GatewayConfig(baseURL: "https://invalid.test", modelID: "gateway-model",
+                                            displayName: "P29 Gateway", inputCostPer1M: 0,
+                                            outputCostPer1M: 0)
+            let p29Config = SessionProcessingConfig(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                outputDirectory: p29Out, contextCharCount: 0, sendPreviousImage: false,
+                customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                gateway: p29Gateway, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                textColumns: 1, localAgent: p29Agent)
+            let p29Session = CaptureSession()
+            LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(
+                text: "Local provenance recovery body.", classification: nil,
+                errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            p29Session._recoveryTestBeginLive(config: p29Config, stagingDir: p29Staging)
+            let p29Writer = p29Session.liveProcessor
+            func p29Settle(_ condition: () -> Bool) async -> Bool {
+                for _ in 0..<400 {
+                    if condition() { return true }
+                    try? await Task.sleep(nanoseconds: 25_000_000)
+                }
+                return condition()
+            }
+            let p29JPEG = bitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
+            p29Session.ingest(jpeg: p29JPEG, groupId: "P29", seq: 1, type: .document,
+                              quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+            p29Writer.segmentResolved(groupId: "P29")
+            let p29Staged = await p29Settle {
+                p29Writer.staged.first { $0.groupId == "P29" }?.pdfURLs.count == 1
+            }
+            let p29InitialURL = p29Writer.staged.first { $0.groupId == "P29" }?.pdfURLs.first
+            func p29HasLocalProvenance(_ url: URL?) -> Bool {
+                guard let url else { return false }
+                let header = PDFDocument(url: url)?.page(at: 1)?.string ?? ""
+                let body = PDFTextExtractor.extract(from: url).text ?? ""
+                return header.contains("Local CLI Agent (claude) \u{00B7} p29-local-model")
+                    && !header.contains("P29 Gateway")
+                    && !header.contains("\n\(stubModel.provider.rawValue) \u{00B7}")
+                    && body.contains("Local provenance recovery body.")
+            }
+            check("Live Capture's initial staged PDF credits the Local CLI, not configured fallbacks (W22)",
+                  p29Staged && p29HasLocalProvenance(p29InitialURL))
+
+            // A fresh processor is the crash/relaunch boundary. The second header check is only meaningful
+            // after a changed rotation forces the resumed retained inputs through `writeSegmentFiles` again.
+            p29Writer._recoveryTestPersistManifest()
+            let p29Resumed = LiveCaptureProcessor(session: p29Session)
+            p29Resumed._recoveryTestLoadManifest(stagingDir: p29Staging, config: p29Config)
+            let p29Source = p29Session.photos.first { $0.groupId == "P29" }?.url
+            let p29ResumedRecord = p29Resumed.staged.first { $0.groupId == "P29" }
+            if let p29Source {
+                p29Resumed.rotationReviewPages = [
+                    LiveCaptureProcessor.RotationReviewPage(groupId: "P29", pageIndex: 0, order: 1,
+                                                            sourceURL: p29Source, rotationDegrees: 90)
+                ]
+            }
+            p29Resumed.applyRotationReviewAndFinalize()
+            let p29RegenerationStarted = p29Resumed.isFinalizing
+            let p29Regenerated = await p29Settle { !p29Resumed.isFinalizing }
+            let p29RegeneratedURL = p29Resumed.staged.first { $0.groupId == "P29" }?.pdfURLs.first
+            check("manifest-resumed rotation regeneration retains Local CLI provenance and parser body (W22)",
+                  p29ResumedRecord?.pdfURLs.count == 1 && p29Source != nil
+                      && p29RegenerationStarted && p29Regenerated
+                      && p29HasLocalProvenance(p29RegeneratedURL))
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []

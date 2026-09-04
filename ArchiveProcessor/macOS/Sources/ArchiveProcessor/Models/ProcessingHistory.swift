@@ -21,9 +21,9 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     /// When the run started.
     var date: Date
-    /// Provider display label ("Anthropic" / "Google Gemini" / "Mistral", or the gateway's name).
+    /// Provider display label (a direct provider, a gateway name, or the Local Agent CLI).
     var providerLabel: String
-    /// Model display name (for a gateway run, the gateway model id).
+    /// Model display name (a gateway model id or Local Agent override when applicable).
     var modelName: String
     var fileCount: Int
     var succeeded: Int
@@ -42,6 +42,8 @@ struct RunHistorySnapshot {
     let startedAt: Date
     let provider: LLMProvider
     let gatewayConfig: GatewayConfig?
+    /// The subscription-authenticated CLI that actually produced this run, if any.
+    let localAgent: LocalAgentConfig?
     /// Upstream family for a gateway run (drives the estimator's image-token math); nil when not a gateway.
     let imageTokenProvider: LLMProvider?
     let model: LLMModel
@@ -63,6 +65,8 @@ struct RunHistorySnapshot {
     /// Cost of this run using the exact same per-model math the pre-run estimator uses (standard vs
     /// batch total picked by `batchMode`).
     var estimatedCost: Double {
+        // A Local Agent consumes the operator's CLI subscription, never this app's API budget.
+        guard localAgent == nil else { return 0 }
         let costModel = visionTextModel ?? model
         let est = CostEstimator.estimate(
             fileCount: fileCount,
@@ -82,12 +86,14 @@ struct RunHistorySnapshot {
     }
 
     var providerLabel: String {
+        if let localAgent { return localAgent.provenanceDisplayName }
         if let visionTextProvider { return "Apple Vision + \(visionTextProvider.rawValue)" }
         return gatewayConfig?.displayName ?? provider.rawValue
     }
 
     var modelName: String {
-        visionTextModel.map { "Vision + \($0.displayName)" } ?? model.displayName
+        if let localAgent { return localAgent.provenanceModelName }
+        return visionTextModel.map { "Vision + \($0.displayName)" } ?? model.displayName
     }
 
     var modeLabel: String {
@@ -126,6 +132,7 @@ extension RunHistorySnapshot {
             startedAt: run.startedAt,
             provider: run.provider,
             gatewayConfig: run.gatewayConfig,
+            localAgent: run.localAgent,
             imageTokenProvider: run.gatewayConfig != nil ? imageTokenProvider : nil,
             model: run.model,
             visionTextProvider: run.runtimeConfig?.visionTextProvider,
@@ -151,6 +158,7 @@ extension RunHistorySnapshot {
             startedAt: batch.submittedAt,
             provider: batch.provider,
             gatewayConfig: nil,
+            localAgent: nil,
             imageTokenProvider: nil,
             model: batch.model,
             visionTextProvider: nil,

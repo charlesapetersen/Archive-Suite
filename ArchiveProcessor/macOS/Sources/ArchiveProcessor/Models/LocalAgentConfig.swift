@@ -67,6 +67,19 @@ struct LocalAgentConfig: Codable, Equatable, Sendable {
     /// Concurrency clamped to the safe subscription-paced range (1…2), even if a bad value was stored.
     var effectiveConcurrencyCap: Int { min(2, max(1, concurrencyCap)) }
 
+    /// Durable-provenance labels for a result produced through this CLI. The selected direct-provider
+    /// model is only a UI fallback on this backend; it must never be credited in an output PDF or run log.
+    var provenanceDisplayName: String { "Local CLI Agent (\(tool.binaryName))" }
+    var provenanceModelName: String {
+        // This reaches the free-form PDF header. Keep it to one physical line so a Settings value cannot
+        // impersonate a later header field or classification marker in the durable text page.
+        let model = (modelOverride ?? "")
+            .components(separatedBy: .newlines)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        return model.isEmpty ? "CLI default" : model
+    }
+
     /// Build the Local Agent config from the shared app settings, or nil when the Local Agent backend is
     /// not the selected OCR backend. The single source of truth for `SessionProcessingConfig.fromDefaults`
     /// (Live Capture) and `OCRView.currentLocalAgentConfig` (Process Files), mirroring

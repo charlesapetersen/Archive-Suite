@@ -22,7 +22,10 @@ struct PDFGenerator {
     }
 
     @discardableResult
-    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL, originalFileName: String? = nil, gatewayDisplayName: String? = nil, pdfImageMB: Double = 0, textColumns: Int = 1) throws -> ImagePageOutcome {
+    func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL,
+                  originalFileName: String? = nil, gatewayDisplayName: String? = nil,
+                  localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
+                  pdfImageMB: Double = 0, textColumns: Int = 1) throws -> ImagePageOutcome {
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
 
@@ -37,7 +40,11 @@ struct PDFGenerator {
             outcome = .placeholder
         }
 
-        let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName, textColumns: textColumns)
+        let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName,
+                                    gatewayDisplayName: gatewayDisplayName,
+                                    localAgentDisplayName: localAgentDisplayName,
+                                    localAgentModelName: localAgentModelName,
+                                    textColumns: textColumns)
         pdfDocument.insert(textPage, at: pdfDocument.pageCount)
 
         guard pdfDocument.write(to: outputURL) else {
@@ -224,7 +231,9 @@ struct PDFGenerator {
 
     // MARK: - Text Page
 
-    private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil, gatewayDisplayName: String? = nil, textColumns: Int = 1) -> PDFPage {
+    private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
+                              gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
+                              localAgentModelName: String? = nil, textColumns: Int = 1) -> PDFPage {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "d MMMM yyyy"
@@ -234,7 +243,9 @@ struct PDFGenerator {
         if let fileName = originalFileName {
             headerLine += "\n\(fileName)"
         }
-        if let gwName = gatewayDisplayName {
+        if let localName = localAgentDisplayName {
+            headerLine += "\n\(localName) \u{00B7} \(localAgentModelName ?? "CLI default") \u{00B7} \(dateStr)"
+        } else if let gwName = gatewayDisplayName {
             headerLine += "\n\(gwName) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"
         } else {
             headerLine += "\n\(model.provider.rawValue) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"

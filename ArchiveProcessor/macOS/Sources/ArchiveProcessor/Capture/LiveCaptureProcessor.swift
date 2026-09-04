@@ -1030,6 +1030,8 @@ final class LiveCaptureProcessor: ObservableObject {
         let baseTags = tags.allTags
         let doMerge = config.mergeDocuments && gType == .document && pages.count > 1
         let model = config.model, gatewayName = config.gateway?.displayName
+        let localAgentDisplayName = config.localAgent?.provenanceDisplayName
+        let localAgentModelName = config.localAgent?.provenanceModelName
         let writeJSON = config.enableSegmentJSON && gType == .document
         let jsonTags = tags
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
@@ -1044,7 +1046,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var outcome = await Task.detached(priority: .userInitiated) { () -> StagedSegment in
             Self.writeSegmentFiles(groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
-                                   gatewayName: gatewayName, stagingDir: stagingDir, writeJSON: writeJSON,
+                                   gatewayName: gatewayName, localAgentDisplayName: localAgentDisplayName,
+                                   localAgentModelName: localAgentModelName, stagingDir: stagingDir, writeJSON: writeJSON,
                                    jsonTags: jsonTags, texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
@@ -1076,6 +1079,7 @@ final class LiveCaptureProcessor: ObservableObject {
         retained[groupId] = RetainedSegment(
             groupId: groupId, type: gType, order: gOrder,
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
+            localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
             writeJSON: writeJSON, jsonTags: jsonTags, texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
@@ -1192,6 +1196,8 @@ final class LiveCaptureProcessor: ObservableObject {
         let doMerge: Bool
         let model: LLMModel
         let gatewayName: String?
+        let localAgentDisplayName: String?
+        let localAgentModelName: String?
         let writeJSON: Bool
         let jsonTags: GeneratedTags
         let texts: [String]
@@ -1208,13 +1214,16 @@ final class LiveCaptureProcessor: ObservableObject {
         // Memberwise init (matches the synthesized one the callers already use).
         init(groupId: String, type: CaptureGroupType, order: Int,
              pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
+             localAgentDisplayName: String?, localAgentModelName: String?,
              writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              taggingMode: TaggingMode,
              stampUnread: Bool) {
             self.groupId = groupId; self.type = type; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
-            self.gatewayName = gatewayName; self.writeJSON = writeJSON; self.jsonTags = jsonTags
+            self.gatewayName = gatewayName
+            self.localAgentDisplayName = localAgentDisplayName; self.localAgentModelName = localAgentModelName
+            self.writeJSON = writeJSON; self.jsonTags = jsonTags
             self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
             self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
             self.taggingMode = taggingMode
@@ -1225,6 +1234,7 @@ final class LiveCaptureProcessor: ObservableObject {
     nonisolated private static func writeSegmentFiles(
         groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
+        localAgentDisplayName: String?, localAgentModelName: String?,
         stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
         taggingMode: TaggingMode,
@@ -1246,7 +1256,10 @@ final class LiveCaptureProcessor: ObservableObject {
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
             let imagePage = try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
                                                  outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
-                                                 gatewayDisplayName: gatewayName, pdfImageMB: pdfImageMB, textColumns: textColumns)
+                                                 gatewayDisplayName: gatewayName,
+                                                 localAgentDisplayName: localAgentDisplayName,
+                                                 localAgentModelName: localAgentModelName,
+                                                 pdfImageMB: pdfImageMB, textColumns: textColumns)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as
@@ -1724,6 +1737,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                            collectionKey: regenKeys[seg.groupId] ?? "__unfiled__",
                                            order: seg.order, pages: seg.pages, baseTags: seg.baseTags,
                                            doMerge: seg.doMerge, model: seg.model, gatewayName: seg.gatewayName,
+                                           localAgentDisplayName: seg.localAgentDisplayName,
+                                           localAgentModelName: seg.localAgentModelName,
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
@@ -2268,7 +2283,8 @@ final class LiveCaptureProcessor: ObservableObject {
         let effectiveTaggingMode = taggingMode ?? (stampUnread ? .automatic : .copySource)
         let seg = writeSegmentFiles(groupId: "T", type: type, collectionKey: "T", order: 0,
                                     pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
-                                    gatewayName: nil, stagingDir: stagingDir, writeJSON: false,
+                                    gatewayName: nil, localAgentDisplayName: nil, localAgentModelName: nil,
+                                    stagingDir: stagingDir, writeJSON: false,
                                     jsonTags: jsonTags, texts: [], boxLabelText: nil,
                                     outputImageFile: outputImageFile, pdfImageMB: 0, exportedImageMB: 0,
                                     textColumns: 1, taggingMode: effectiveTaggingMode,

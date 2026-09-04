@@ -1,7 +1,8 @@
 #!/bin/bash
-# Key-free ($0) self-test of the processing-history feature (cost tracking + run log): exercises
-# RunHistorySnapshot.makeRun, the estimator-derived cost, and ProcessingHistoryStore's record /
-# newest-first / bounded-trim / persistence / clear behavior. Headless (PROCESSING_HISTORY_TEST=1),
+# Key-free ($0) self-test of processing-history + Local Agent durable provenance: exercises
+# RunHistorySnapshot.makeRun, estimator-derived cost, a scratch PDF's Local Agent header/parser round-trip,
+# and ProcessingHistoryStore's record / newest-first / bounded-trim / persistence / clear behavior. Headless
+# (PROCESSING_HISTORY_TEST=1),
 # run against a THROWAWAY UserDefaults suite — never .standard, never the corpus, never the operator's
 # real history.
 set -euo pipefail

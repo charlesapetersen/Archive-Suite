@@ -1538,6 +1538,8 @@ extension OCRProcessor {
             if !toGenerate.isEmpty {
                 let model = pending.model
                 let gatewayName = currentGateway?.displayName
+                let localAgentDisplayName = currentLocalAgent?.provenanceDisplayName
+                let localAgentModelName = currentLocalAgent?.provenanceModelName
                 let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
                 let pdfMB = pdfSettings.imageMB
                 let txtCols = pdfSettings.textColumns
@@ -1552,7 +1554,10 @@ extension OCRProcessor {
                         do {
                             let outcome = try gen.generate(imageURL: g.imageURL, result: g.result, model: model,
                                               outputURL: g.outputURL, originalFileName: g.fileName,
-                                              gatewayDisplayName: gatewayName, pdfImageMB: pdfMB, textColumns: txtCols)
+                                              gatewayDisplayName: gatewayName,
+                                              localAgentDisplayName: localAgentDisplayName,
+                                              localAgentModelName: localAgentModelName,
+                                              pdfImageMB: pdfMB, textColumns: txtCols)
                             if outcome.isPlaceholder { placeholders.insert(g.outputURL) }
                         } catch {
                             failed.insert(g.outputURL)
@@ -2447,6 +2452,7 @@ extension OCRProcessor {
             startedAt: Date(),
             provider: provider,
             gatewayConfig: gatewayConfig,
+            localAgent: localAgent,
             imageTokenProvider: gatewayConfig != nil ? Self.gatewayUpstreamProviderFromDefaults() : nil,
             model: model,
             // Multi-page re-OCR is a pure image/PDF transform and deliberately skips judgement,

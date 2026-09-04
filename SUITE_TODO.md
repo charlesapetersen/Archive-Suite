@@ -974,31 +974,6 @@ launch safeguards; the gate rotates one route per run.
   gate has finally fired; on FAIL, the first question is whether it is the bearer change, the Keychain path, or
   emulator flake — the scratch driver passing means environment is the likelier of the three, not the certain one.
   | files: ArchiveProcessor/scripts/{e2e-phone-mac.sh,E2E-PHONE-MAC.md} | S | med | open
-- [ ] **W22.localagent-provenance — the Local Agent backend is invisible in every durable record [S–M].**
-  Found 2026-07-29 while verifying the owner's Local-Agent run: a run performed by the local `claude` CLI is
-  recorded everywhere as if the selected API provider did it. Three sites, one cause — the Local Agent was
-  added as a third backend but only the *gateway* was ever threaded into the provenance/reporting layer:
-  1. **The output PDF's text page — the serious one.** `OCR/PDFGenerator.swift:9/207` take only
-     `gatewayDisplayName`; with none set, line 220 falls back to `model.provider.rawValue`, so a CLI-produced
-     transcription is permanently stamped `Gemini · Gemini 2.5 Flash Lite`. In a provenance-first suite that
-     text page IS the durable record of how the text came to exist, and it is **wrong** — verified on the
-     owner's real output (`RGB — upright.pdf`, produced with `useLocalAgent = 1`). Fix: add a
-     `localAgentDisplayName` (e.g. "Local CLI Agent (claude)") alongside `gatewayDisplayName` and thread it
-     from the 4 `PDFGenerator.generate` call sites (`OCRProcessor+OCR.swift:325`, `:1092`,
-     `OCRProcessor+Pipeline.swift:1071`, `OCRProcessor+ReviewFlows.swift:378`, `OCRProcessor+Tagging.swift:457`).
-     ⚠️ **Wording is a de-facto output-format change** — check `SPEC/tag-format.md` before choosing the string,
-     and note `PDFTextExtractor` parses this page (it must keep round-tripping).
-  2. **Run history `providerLabel`** = `gatewayConfig?.displayName ?? provider.rawValue`
-     (`Models/ProcessingHistory.swift:78`) → also says "Gemini".
-  3. **Run history `cost` records a phantom charge.** `estimatedCost` (`ProcessingHistory.swift:61-73`) calls
-     `CostEstimator.estimate(… useGateway: gatewayConfig != nil …)` with **no localAgent parameter**, so a
-     subscription run that spent **$0** is logged with a real dollar figure. The owner's six runs today all
-     show non-zero Gemini cost. Fix: pass the backend through and record 0 (or nil/"subscription") for Local
-     Agent — the cost pane already knows to say "Included in your subscription".
-  **Side effect worth having:** until this is fixed there is *no way* to confirm from artifacts which backend
-  produced a given output, which is exactly why the owner's Local-Agent verification could not be closed
-  conclusively. | files: OCR/PDFGenerator.swift, Models/ProcessingHistory.swift, Models/CostEstimator.swift, OCR/OCRProcessor+{OCR,Pipeline,ReviewFlows,Tagging}.swift | S–M | med | none
-
 - [ ] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · owner
   decision needed].** Partly fixed 2026-07-29: the *silence* is closed (see `ArchiveProcessor/KNOWN_ISSUES.md`
   top entry) but the **routing still skips every non-PDF file in any run containing a multi-page PDF**.

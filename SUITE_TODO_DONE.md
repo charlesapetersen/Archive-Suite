@@ -15,6 +15,25 @@ never a source of queue candidates. **Do not rename or move this file without up
 
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
+## Local Agent provenance — Wave 22 (2026-09-04)
+
+- [x] **W22.localagent-provenance — the Local Agent backend is visible in every durable record [S–M · med].**
+  **SHIPPED 2026-09-04 (this commit).** Output PDFs now identify Local Agent results as
+  `Local CLI Agent (<tool>) · <explicit override|CLI default>` instead of attributing the work to the selected
+  direct-provider fallback. The same immutable label reaches standard OCR, multi-page re-OCR, resumed-PDF
+  regeneration, review/manual-rotation rewrites, and Live Capture (including persisted staging-record rotation
+  regeneration). Process-Files history records the actual CLI/model and $0, never a phantom API charge.
+  `SPEC/tag-format.md` now names this free-form provider line; the established parser continues to strip it.
+
+  **Tier-2 verification:** Processor Debug build; the headless processing-history suite creates a real scratch
+  PDF and proves its Local Agent header plus parser body round-trip and $0 history record; the full headless
+  Live Capture recovery suite stages a real scratch PDF, reloads its manifest in a fresh processor, forces a
+  rotation rewrite, and proves both durable PDFs retain Local CLI provenance and parser text. No real corpus,
+  live output folder, GUI, credential, network, or paid model call is used. | ArchiveProcessor/{macOS/Sources/ArchiveProcessor/
+  {Models/{LocalAgentConfig,ProcessingHistory,ProcessingHistoryTestDriver}.swift,OCR/{PDFGenerator,
+  OCRProcessor+OCR,OCRProcessor+Pipeline,OCRProcessor+ReviewFlows,OCRProcessor+Tagging}.swift,Capture/
+  LiveCaptureProcessor.swift},scripts/test-processing-history.sh,CLAUDE.md}, SPEC/tag-format.md | S–M | med | done
+
 ## Live Capture staging-manifest integrity — Wave 17 (2026-09-04)
 
 - [x] **W17.stg1 — version + fingerprint + fail-closed the Live Capture staging manifest [M · med].**
