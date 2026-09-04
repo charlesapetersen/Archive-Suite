@@ -37,6 +37,10 @@ enum DefaultsKeys {
 
     // Apple Vision OCR backend (on-device, no API key). Mutually exclusive with gateway / Local Agent.
     static let useAppleVision = "useAppleVision"
+    /// When Apple Vision is the OCR backend, opt in to a separate direct LLM for text-only
+    /// classification, segmentation, dates, and generated tags. Disabled keeps the fully-offline
+    /// transcription-only workflow.
+    static let visionUseLLMJudgment = "visionUseLLMJudgment"
     static let visionLanguages = "visionLanguages"                 // comma-separated BCP-47 tags
     static let visionFastRecognition = "visionFastRecognition"
     static let visionMinimumConfidence = "visionMinimumConfidence" // 0...1

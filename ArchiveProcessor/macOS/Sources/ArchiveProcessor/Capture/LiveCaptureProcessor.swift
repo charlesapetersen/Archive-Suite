@@ -785,7 +785,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil,
                 localAgent: ov == nil ? config.localAgent : nil,
                 rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
-                visionSettings: config.visionSettings)
+                visionSettings: config.visionSettings,
+                visionTextLLM: ov == nil ? config.visionTextLLM : nil)
         }
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
@@ -1086,15 +1087,15 @@ final class LiveCaptureProcessor: ObservableObject {
                              mac: MacSegmentTags?, config: SessionProcessingConfig) async -> GeneratedTags {
         if group.type != .document {
             // Box/Folder → color tag (TagGenerator returns Box/Red or Folder/Purple with no LLM call).
-            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.provider,
-                                                     model: config.model, thinkingLevel: nil, apiKey: config.apiKey,
-                                                     vocabulary: [], gatewayConfig: config.gateway, localAgent: config.localAgent)
+            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.textProvider,
+                                                     model: config.textModel, thinkingLevel: nil, apiKey: config.textAPIKey,
+                                                     vocabulary: [], gatewayConfig: config.textGateway, localAgent: config.textLocalAgent)
         }
         if let subs = mac?.subjects, !subs.isEmpty { return GeneratedTags(subjectTags: subs) }   // Mac-tagged → no LLM
         if config.taggingMode == .automatic {
-            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.provider,
-                                                     model: config.model, thinkingLevel: nil, apiKey: config.apiKey,
-                                                     vocabulary: config.tagVocabulary, gatewayConfig: config.gateway, localAgent: config.localAgent)
+            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.textProvider,
+                                                     model: config.textModel, thinkingLevel: nil, apiKey: config.textAPIKey,
+                                                     vocabulary: config.tagVocabulary, gatewayConfig: config.textGateway, localAgent: config.textLocalAgent)
         }
         return GeneratedTags()   // manual mode, no Mac subjects → date/quality only
     }
@@ -1329,15 +1330,18 @@ final class LiveCaptureProcessor: ObservableObject {
         imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
         apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?,
         localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double,
-        visionSettings: VisionOCRSettings
+        visionSettings: VisionOCRSettings, visionTextLLM: LLMTextConfiguration?
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
-            await OCRProcessor.performOCRCall(
+            let ocrResult = await OCRProcessor.performOCRCall(
                 imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
                 apiKey: apiKey, previousText: nil, previousImageURL: nil,
                 customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
                 localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
                 visionSettings: visionSettings)
+            return await OCRProcessor.applyingVisionTextClassification(
+                to: ocrResult, previousText: nil, customPrompt: customPrompt,
+                configuration: provider == .appleVision ? visionTextLLM : nil)
         }
     }
 

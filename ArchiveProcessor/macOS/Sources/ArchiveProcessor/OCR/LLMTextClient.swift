@@ -1,5 +1,17 @@
 import Foundation
 
+/// An explicit text-only backend attached to an Apple Vision run. Keeping it distinct from the
+/// OCR backend makes the hybrid's privacy boundary structural: the configuration has no image URL,
+/// image bytes, or image-context option to pass to a cloud client.
+struct LLMTextConfiguration: Sendable {
+    let provider: LLMProvider
+    let model: LLMModel
+    let thinkingLevel: ThinkingLevel?
+    let apiKey: String
+
+    var isUsable: Bool { provider != .appleVision && !apiKey.isEmpty }
+}
+
 /// Shared single-shot text-completion client for the tagging + collection-segmentation LLM calls.
 ///
 /// Extracted verbatim from the (byte-for-byte) duplicated `callLLM`/`callGateway`/`callAnthropic`/

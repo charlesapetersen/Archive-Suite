@@ -507,6 +507,13 @@ class OCRProcessor: ObservableObject {
         /// replays the exact language/quality/vocabulary configuration that produced its first pages.
         var visionSettings: VisionOCRSettings = .default
 
+        /// The text-only LLM selected for a Vision hybrid run. The API key stays in the Keychain and is
+        /// supplied at resume time; provider/model/thinking are in the signed runtime snapshot so a
+        /// mid-run settings change cannot silently redirect later classifications or tags.
+        var visionTextProvider: LLMProvider? = nil
+        var visionTextModel: LLMModel? = nil
+        var visionTextThinkingLevel: ThinkingLevel? = nil
+
         /// Cost-history attribution for a gateway run. It does not affect requests, but persisting it
         /// keeps the resumed run's history consistent with the estimate shown when the run began.
         let gatewayUpstreamProvider: LLMProvider?

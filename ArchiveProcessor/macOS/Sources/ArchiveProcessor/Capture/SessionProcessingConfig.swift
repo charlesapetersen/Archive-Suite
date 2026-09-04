@@ -39,6 +39,18 @@ struct SessionProcessingConfig: Sendable {
     /// Snapshot of the Apple Vision controls. Vision has no API key or request body, but its local
     /// recognition options must remain stable across an interrupted run just like PDF sizing does.
     var visionSettings: VisionOCRSettings = .default
+    /// Optional direct LLM used only after Apple Vision has produced text. The image OCR provider
+    /// remains `.appleVision`; this value is deliberately never handed to `performOCRCall`.
+    var visionTextLLM: LLMTextConfiguration? = nil
+
+    /// The backend for all post-transcription text work. For ordinary runs this is the OCR backend;
+    /// for the Vision hybrid it is the separately-selected direct LLM.
+    var textProvider: LLMProvider { visionTextLLM?.provider ?? provider }
+    var textModel: LLMModel { visionTextLLM?.model ?? model }
+    var textThinkingLevel: ThinkingLevel? { visionTextLLM?.thinkingLevel ?? thinkingLevel }
+    var textAPIKey: String { visionTextLLM?.apiKey ?? apiKey }
+    var textGateway: GatewayConfig? { visionTextLLM == nil ? gateway : nil }
+    var textLocalAgent: LocalAgentConfig? { visionTextLLM == nil ? localAgent : nil }
 
     /// The one declaration of what each sizing/concurrency setting is allowed to be.
     ///
@@ -207,6 +219,7 @@ struct SessionProcessingConfig: Sendable {
     static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         let sizing = runSizing(d)
         let useAppleVision = d.bool(forKey: DefaultsKeys.useAppleVision)
+        let useVisionLLMJudgment = useAppleVision && d.bool(forKey: DefaultsKeys.visionUseLLMJudgment)
         let selectedProvider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         let provider: LLMProvider = useAppleVision ? .appleVision : selectedProvider
         // Ask `ModelSelectionStore` for the key rather than re-spelling `selectedModelId_<provider>` here —
@@ -219,6 +232,9 @@ struct SessionProcessingConfig: Sendable {
         // a bug and would become one the moment anything counted or enumerated the array.
         let candidates = provider.models
         let model = candidates.first { $0.id == modelId } ?? candidates[0]
+        let textModelId = d.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""
+        let textCandidates = selectedProvider.models
+        let visionTextModel = textCandidates.first { $0.id == textModelId } ?? textCandidates[0]
 
         let useGateway = !useAppleVision && d.bool(forKey: DefaultsKeys.useGateway)
         let gateway = useAppleVision ? nil : GatewayConfig.fromDefaults(d)
@@ -245,12 +261,22 @@ struct SessionProcessingConfig: Sendable {
             }
             return keychainKey
         }()
+        let visionTextLLM: LLMTextConfiguration? = useVisionLLMJudgment
+            ? LLMTextConfiguration(
+                provider: selectedProvider,
+                model: visionTextModel,
+                thinkingLevel: visionTextModel.supportsThinking
+                    ? (ThinkingLevel(rawValue: d.string(forKey: DefaultsKeys.selectedThinking) ?? "") ?? .low)
+                    : nil,
+                apiKey: KeychainHelper.load(account: selectedProvider.rawValue) ?? "")
+            : nil
 
         let savedTaggingMode = TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic
         // Vision deliberately owns transcription only. Copying existing source tags remains local metadata
         // work, but every mode that asks the selected backend to classify, date, segment, or generate tags
         // must be turned off even when stale defaults bypass the Settings picker.
-        let taggingMode: TaggingMode = useAppleVision && savedTaggingMode != .copySource ? .none : savedTaggingMode
+        let taggingMode: TaggingMode = useAppleVision && !useVisionLLMJudgment && savedTaggingMode != .copySource
+            ? .none : savedTaggingMode
 
         return SessionProcessingConfig(
             provider: provider,
@@ -262,7 +288,9 @@ struct SessionProcessingConfig: Sendable {
             mergeDocuments: d.bool(forKey: DefaultsKeys.mergeDocuments),
             outputDirectory: outURL,
             contextCharCount: Int(d.object(forKey: DefaultsKeys.contextCharCount) as? Double ?? 200),
-            sendPreviousImage: d.bool(forKey: DefaultsKeys.sendPreviousImage),
+            // Vision never sends a previous image anywhere. Its optional judgment model receives text
+            // only, so this source-image context control cannot apply to either hybrid leg.
+            sendPreviousImage: useAppleVision ? false : d.bool(forKey: DefaultsKeys.sendPreviousImage),
             customOCRPrompt: d.string(forKey: DefaultsKeys.customOCRPrompt) ?? "",
             imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
             standardImageMB: sizing.standardImageMB,
@@ -278,7 +306,8 @@ struct SessionProcessingConfig: Sendable {
             exportedImageMB: sizing.exportedImageMB,
             textColumns: sizing.textColumns,
             localAgent: useAppleVision ? nil : LocalAgentConfig.fromDefaults(d),
-            visionSettings: VisionOCRSettings.fromDefaults(d)
+            visionSettings: VisionOCRSettings.fromDefaults(d),
+            visionTextLLM: visionTextLLM
         )
     }
 

@@ -110,9 +110,9 @@ enum NetworkSession {
     ///
     /// **Gated exactly like the journal redirect** (`OCRProcessor.pendingStateDirectory`) and for a stronger
     /// reason: that one decides *where* a file is written, this one decides whether the process talks to a
-    /// paid endpoint at all. Two independent conditions must BOTH hold — `BATCHRESUME_TEST` reads exactly
-    /// `"1"`, and a closure has been installed. A shipped build satisfies neither: nothing outside
-    /// `BatchPollPersistFailureContract` assigns this, and that contract only runs under the same flag.
+    /// paid endpoint at all. Two independent conditions must BOTH hold — a dedicated contract flag reads
+    /// exactly `"1"`, and a closure has been installed. A shipped build satisfies neither: the batch and
+    /// Vision-hybrid contracts are the only code that assigns this, and each runs under its own test flag.
     /// There is deliberately no other trigger — no `#if DEBUG`, no test-bundle sniffing.
     ///
     /// ⚠️ **Scope it exactly: this covers `data(for:policy:)`, not "the process cannot reach the network."**
@@ -129,6 +129,10 @@ enum NetworkSession {
     /// process spends money.
     nonisolated static func testTransportIsEnabled(flag: String?) -> Bool { flag == "1" }
 
+    /// The Vision hybrid drives the real `LLMTextClient` through this same no-wire seam. Separate from the
+    /// batch flag so running its small request-shape contract cannot accidentally run the whole batch suite.
+    nonisolated static func visionHybridTestTransportIsEnabled(flag: String?) -> Bool { flag == "1" }
+
     /// The stand-in transport for THIS process, or nil when the wire is what a request takes. Resolved in
     /// one place and read once per request, so the flag and the closure can never be judged separately.
     ///
@@ -138,8 +142,10 @@ enum NetworkSession {
     /// read first cannot weaken the gate: both must hold either way.
     nonisolated static var activeTestTransport: (@Sendable (URLRequest) async throws -> (Data, URLResponse))? {
         guard let stub = testTransport,
-              testTransportIsEnabled(
+              (testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OCRProcessor.batchResumeTestEnvKey])
+               || visionHybridTestTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment["VISIONHYBRID_TEST"]))
         else { return nil }
         return stub
     }

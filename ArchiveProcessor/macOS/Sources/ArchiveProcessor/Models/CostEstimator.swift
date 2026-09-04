@@ -92,11 +92,15 @@ struct CostEstimator {
         imageScale: Double = 1.0,
         rotationMode: RotationMode = .off,
         useGateway: Bool = false,
-        imageTokenProvider: LLMProvider? = nil
+        imageTokenProvider: LLMProvider? = nil,
+        /// Apple Vision supplied the OCR text locally; `model` prices only the following text-only
+        /// classification/tagging/collection calls. This is intentionally a separate flag rather than
+        /// treating Vision as an image-token provider, which would make it easy to bill image OCR again.
+        visionTextOnly: Bool = false
     ) -> CostEstimate {
         // Apple Vision is an in-process macOS framework. It never calls a provider and the V1 backend
         // exposes only transcription / source-tag copying, so every estimated dollar component is $0.
-        if model.provider == .appleVision {
+        if model.provider == .appleVision && !visionTextOnly {
             return CostEstimate(ocrCost: 0, classificationCost: 0, taggingCost: 0, collectionCost: 0,
                                 rotationCost: 0, batchOcrCost: 0, fileCount: fileCount, model: model)
         }
@@ -105,7 +109,7 @@ struct CostEstimator {
         // image *area* fraction (target size ∝ area), so image tokens scale linearly with it.
         var ocrCost: Double = 0
         var batchOcrCost: Double = 0
-        if !preOCRedInput {
+        if !preOCRedInput && !visionTextOnly {
             let scaleArea = max(0.01, min(1.0, imageScale))   // defensive clamp against stale/out-of-range values
             // For a gateway, model.provider is a stand-in (.anthropic); use the caller-supplied upstream
             // family so a Gemini-behind-gateway isn't under-estimated ~6.7×.
@@ -122,7 +126,7 @@ struct CostEstimator {
 
         // Text-only classification cost (only for pre-OCRed input when tagging or collection is enabled)
         var classificationCost: Double = 0
-        if preOCRedInput && (enableTagging || enableCollectionSegmentation) {
+        if (preOCRedInput || visionTextOnly) && (enableTagging || enableCollectionSegmentation) {
             let classInput = Double(fileCount) * estimatedClassificationInputTokens
             let classOutput = Double(fileCount) * estimatedClassificationOutputTokens
             classificationCost = (classInput / 1_000_000) * model.inputCostPer1M
@@ -154,7 +158,7 @@ struct CostEstimator {
         // Rotation cost (LLM modes only; free for Gateway/Mistral/local Vision/off; none for pre-OCRed).
         var rotationCost: Double = 0
         let rotCalls = rotationMode.orderings
-        if rotCalls > 0, !preOCRedInput, !useGateway,
+        if rotCalls > 0, !preOCRedInput, !visionTextOnly, !useGateway,
            let (rIn, rOut) = rotationModelCost(for: model.provider) {
             let inputPerCall = 4 * estimatedRotationCandidateTokens(for: model.provider) + estimatedRotationPromptTokens
             let calls = Double(fileCount) * Double(rotCalls)

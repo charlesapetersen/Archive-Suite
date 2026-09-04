@@ -446,6 +446,33 @@ extension OCRProcessor {
         )
     }
 
+    /// Apply the hybrid's optional judgement pass to Vision output. This function receives an
+    /// `OCRResult`, never an image URL/data, and delegates through `LLMTextClient`, so a code review
+    /// can verify the cloud boundary from this one small seam.
+    nonisolated static func applyingVisionTextClassification(
+        to result: OCRResult,
+        previousText: String?,
+        customPrompt: String?,
+        configuration: LLMTextConfiguration?
+    ) async -> OCRResult {
+        guard let configuration, configuration.isUsable,
+              let text = result.text, !text.isEmpty, result.errorMessage == nil else { return result }
+        let prompt = OCRPrompt.buildClassificationOnly(
+            text: text, previousText: previousText, customPrompt: customPrompt)
+        do {
+            let response = try await LLMTextClient.complete(
+                prompt: prompt, provider: configuration.provider, model: configuration.model,
+                thinkingLevel: configuration.thinkingLevel, apiKey: configuration.apiKey,
+                gatewayConfig: nil, maxTokens: 64, timeout: 30)
+            let (classification, _, _) = OCRPrompt.parseResponse(response)
+            return result.with(classification: classification, rotationDegrees: result.rotationDegrees)
+        } catch {
+            // OCR is still a successful local transcription if the optional judgement call fails. The
+            // operator can review/retag it rather than losing the free text or receiving an image retry.
+            return result
+        }
+    }
+
     /// Classify a document using a text-only LLM call (no image).
     private func classifyViaLLM(
         prompt: String,
@@ -1158,6 +1185,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
         var previousText: String? = nil
         var previousImageURL: URL? = nil
 
@@ -1214,6 +1242,10 @@ extension OCRProcessor {
                 )
             }
 
+            result = await Self.applyingVisionTextClassification(
+                to: result, previousText: contextText,
+                customPrompt: segmentationContext.customPrompt, configuration: visionTextLLM)
+
             guard await handleOCRResult(
                 result, index: index, jobID: jobID, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig) else { return }
@@ -1240,6 +1272,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
         let concurrency = model.provider == .appleVision
             ? VisionClient.recommendedConcurrency
             : Self.schedulingWorkerCount(for: runConfig)
@@ -1264,7 +1297,7 @@ extension OCRProcessor {
                 let prevImageURL = (sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
                 nextIndex += 1
                 group.addTask {
-                    let result = await Self.performOCRCall(
+                    let ocrResult = await Self.performOCRCall(
                         imageURL: url, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: nil, previousImageURL: prevImageURL,
@@ -1274,6 +1307,9 @@ extension OCRProcessor {
                         standardImageMB: ocrRun.standardImageMB,
                         visionSettings: ocrRun.visionSettings
                     )
+                    let result = await Self.applyingVisionTextClassification(
+                        to: ocrResult, previousText: nil, customPrompt: customPrompt,
+                        configuration: visionTextLLM)
                     return (index, jobID, result)
                 }
             }
@@ -1301,7 +1337,7 @@ extension OCRProcessor {
                     let prevImageURL = (sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
                     nextIndex += 1
                     group.addTask {
-                        let result = await Self.performOCRCall(
+                        let ocrResult = await Self.performOCRCall(
                             imageURL: nextURL, provider: provider, model: model,
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
@@ -1311,6 +1347,9 @@ extension OCRProcessor {
                             standardImageMB: ocrRun.standardImageMB,
                             visionSettings: ocrRun.visionSettings
                         )
+                        let result = await Self.applyingVisionTextClassification(
+                            to: ocrResult, previousText: nil, customPrompt: customPrompt,
+                            configuration: visionTextLLM)
                         return (idx, nextJobID, result)
                     }
                 }

@@ -52,6 +52,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel: String = ""
     // Apple Vision is a local transcription backend, mutually exclusive with the other OCR backends.
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision: Bool = false
+    @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment: Bool = false
     @AppStorage(DefaultsKeys.visionLanguages) private var visionLanguages: String = "en-US"
     @AppStorage(DefaultsKeys.visionFastRecognition) private var visionFastRecognition: Bool = false
     @AppStorage(DefaultsKeys.visionMinimumConfidence) private var visionMinimumConfidence: Double = 0
@@ -338,11 +339,15 @@ struct SettingsView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("ap.settings.appleVisionCost")
-        Text("Apple Vision transcribes locally using the Mac's performance cores. It sends no image, text, or API key off this Mac.")
+        Text(visionUseLLMJudgment
+             ? "Apple Vision transcribes locally. Only the resulting text is sent to the selected direct LLM for judgement; no image or Vision setting leaves this Mac."
+             : "Apple Vision transcribes locally using the Mac's performance cores. It sends no image, text, or API key off this Mac.")
             .font(.caption2).foregroundStyle(.secondary)
         Divider().padding(.vertical, 2)
         Text("SCOPE").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
-        Text("This backend transcribes only. Use No tagging or Copy source file tags; classification, segmentation, dates, and generated tags require the later Vision + LLM mode.")
+        Text(visionUseLLMJudgment
+             ? "Vision stays free for transcription. The selected LLM is charged only for text-only classification, segmentation, dates, and generated tags."
+             : "This backend transcribes only. Enable Vision + LLM judgement below to classify, segment, date, or generate tags.")
             .font(.caption2).foregroundStyle(.secondary)
         Spacer()
     }
@@ -370,10 +375,6 @@ struct SettingsView: View {
                 useAppleVision = (mode == .appleVision)
                 if mode == .appleVision {
                     batchMode = false
-                    enableCollectionSegmentation = false
-                    if taggingMode != .none && taggingMode != .copySource {
-                        taggingModeRaw = TaggingMode.none.rawValue
-                    }
                 }
             }
         )
@@ -462,7 +463,7 @@ struct SettingsView: View {
     /// Local Vision controls. The language, speed, confidence, and vocabulary knobs are intentionally
     /// exposed here rather than hidden as constants: they materially affect what on-device OCR returns.
     @ViewBuilder private var appleVisionControls: some View {
-        Text("Free on-device transcription with macOS Vision. It does not use an API key or send files over the network.")
+        Text("Free on-device transcription with macOS Vision. It does not use an API key or send images over the network.")
             .font(.caption).foregroundStyle(.secondary)
         TextField("Languages (comma-separated BCP-47 tags)", text: $visionLanguages)
             .accessibilityIdentifier("ap.settings.visionLanguages")
@@ -483,8 +484,32 @@ struct SettingsView: View {
             .frame(height: 58)
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
             .accessibilityIdentifier("ap.settings.visionCustomVocabulary")
-        Text("Custom vocabulary — one word per line or comma-separated. Vision is transcription-only in this mode; select No tagging or Copy source file tags.")
+        Text("Custom vocabulary — one word per line or comma-separated.")
             .font(.caption2).foregroundStyle(.secondary)
+        Toggle("Use an LLM for text-only judgement", isOn: $visionUseLLMJudgment)
+            .accessibilityIdentifier("ap.settings.visionUseLLMJudgment")
+        if visionUseLLMJudgment {
+            Picker("Judgement provider", selection: $selectedProvider) {
+                ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
+            }
+            .accessibilityIdentifier("ap.settings.visionJudgmentProviderPicker")
+            Picker("Judgement model", selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
+                ForEach(models) { model in
+                    Text(customModelStore.isCustom(model) ? "\(model.displayName) (custom)" : model.displayName).tag(model)
+                }
+            }
+            .accessibilityIdentifier("ap.settings.visionJudgmentModelPicker")
+            if selectedModel.supportsThinking {
+                Picker("Judgement thinking", selection: $selectedThinking) {
+                    ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
+                }
+            }
+            Text("Vision performs every image read locally. Only its extracted text is sent to this LLM for classification, segmentation, dates, and tags. Add this provider's API key below.")
+                .font(.caption2).foregroundStyle(.secondary)
+        } else {
+            Text("Transcription-only is fully offline and free. Use No tagging or Copy source file tags in Process Files.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
     }
 
     /// Local Agent backend controls (shown when `useLocalAgent`). Persist the config; the pipeline

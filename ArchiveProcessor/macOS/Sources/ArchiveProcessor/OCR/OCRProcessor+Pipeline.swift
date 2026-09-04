@@ -228,6 +228,18 @@ extension OCRProcessor {
               config.visionSettings.isValid,
               hasGateway == (config.gatewayUpstreamProvider != nil) else { return false }
 
+        // The three hybrid fields are an all-or-none direct provider snapshot. A Vision OCR run must
+        // never resume halfway configured and quietly fall back to sending an image through another
+        // backend; the only permitted fallback is no hybrid at all.
+        let hybridFieldsPresent = config.visionTextProvider != nil
+            || config.visionTextModel != nil || config.visionTextThinkingLevel != nil
+        if hybridFieldsPresent {
+            guard let textProvider = config.visionTextProvider,
+                  let textModel = config.visionTextModel,
+                  textProvider != .appleVision,
+                  textModel.provider == textProvider else { return false }
+        }
+
         let optionalParallelCounts = [
             config.preGroupedQualities.count,
             config.preGroupedYears.count,
@@ -274,6 +286,9 @@ extension OCRProcessor {
             textColumns: sizing.textColumns,
             exportedImageMB: sizing.exportedImageMB,
             visionSettings: runConfig?.visionSettings ?? VisionOCRSettings.fromDefaults(),
+            visionTextProvider: runConfig?.visionTextLLM?.provider,
+            visionTextModel: runConfig?.visionTextLLM?.model,
+            visionTextThinkingLevel: runConfig?.visionTextLLM?.thinkingLevel,
             gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults()
         )
     }
@@ -312,6 +327,14 @@ extension OCRProcessor {
             runConfig.exportedImageMB = runtime.exportedImageMB
             runConfig.textColumns = runtime.textColumns
             runConfig.visionSettings = runtime.visionSettings
+            if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
+                runConfig.visionTextLLM = LLMTextConfiguration(
+                    provider: provider, model: model,
+                    thinkingLevel: runtime.visionTextThinkingLevel,
+                    // Credentials never enter the pending-run manifest. Resume with the key for the
+                    // snapshotted text backend, not whichever backend happens to be selected now.
+                    apiKey: KeychainHelper.load(account: provider.rawValue) ?? apiKey)
+            }
         } else {
             runConfig.imageScale = Self.liveImageScaleFraction(defaults)
             if let exportOriginals = pending.exportOriginals {
@@ -1450,6 +1473,12 @@ extension OCRProcessor {
         }
         let resumeImageScale = runConfig.imageScale
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
+        // Resume keeps the OCR backend pinned in `pending`, while post-OCR text work remains pinned
+        // in the runtime snapshot. These never feed an image request below.
+        let textProvider = runConfig.textProvider
+        let textModel = runConfig.textModel
+        let textThinkingLevel = runConfig.textThinkingLevel
+        let textAPIKey = runConfig.textAPIKey
         removedSourceURLs = []
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         progress = 0
@@ -1571,10 +1600,10 @@ extension OCRProcessor {
                 // For pre-OCRed, run the full pipeline (it's text extraction + classification, cheap)
                 await performPreOCRedProcessing(
                     files: pending.fileURLs,
-                    provider: pending.provider,
-                    model: pending.model,
-                    thinkingLevel: pending.thinkingLevel,
-                    apiKey: apiKey,
+                    provider: textProvider,
+                    model: textModel,
+                    thinkingLevel: textThinkingLevel,
+                    apiKey: textAPIKey,
                     outputDirectory: pending.outputDirectory,
                     enableTagging: pending.enableTagging,
                     enableSegmentJSON: pending.enableSegmentJSON,
@@ -1655,23 +1684,23 @@ extension OCRProcessor {
             switch runOutputSettings.taggingMode {
             case .automatic:
                 await performAutomaticTaggingWithReview(
-                    provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
-                    apiKey: apiKey, outputDirectory: pending.outputDirectory,
+                    provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
+                    apiKey: textAPIKey, outputDirectory: pending.outputDirectory,
                     enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs,
                     runConfig: runConfig
                 )
             case .autoDate:
                 await performManualTaggingPhase(
-                    mode: runOutputSettings.taggingMode, provider: pending.provider, model: pending.model,
-                    thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
+                    mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
+                    thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
                     outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
                     runConfig: runConfig
                 )
             case .human, .autoDateManualSeg:
                 await performManualSegmentAndTag(
                     autoDate: runOutputSettings.taggingMode.autoFillsDate,
-                    provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
-                    apiKey: apiKey, outputDirectory: pending.outputDirectory,
+                    provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
+                    apiKey: textAPIKey, outputDirectory: pending.outputDirectory,
                     enableSegmentJSON: pending.enableSegmentJSON,
                     preOCRed: pending.preOCRedInput, files: pending.fileURLs,
                     runConfig: runConfig
@@ -1687,10 +1716,10 @@ extension OCRProcessor {
         if pending.enableCollectionSegmentation {
             await performCollectionSegmentation(
                 files: pending.fileURLs,
-                provider: pending.provider,
-                model: pending.model,
-                thinkingLevel: pending.thinkingLevel,
-                apiKey: apiKey,
+                provider: textProvider,
+                model: textModel,
+                thinkingLevel: textThinkingLevel,
+                apiKey: textAPIKey,
                 outputDirectory: pending.outputDirectory,
                 confirmBeforeOrganizing: pending.confirmCollectionIDs,
                 reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
@@ -1778,11 +1807,13 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
 
         if segmentationContext.previousTextCharCount == 0 {
             // Parallel: OCR only the remaining indices
             var completed = 0
-            let concurrency = Self.schedulingWorkerCount(for: runConfig)
+            let concurrency = model.provider == .appleVision
+                ? VisionClient.recommendedConcurrency : Self.schedulingWorkerCount(for: runConfig)
             for i in indices { jobs[i].status = .processing }
             // W16.bat10 — the identity of every slot this resume is for, snapshotted before the group can
             // suspend; the refill site below runs after a `handleOCRResult` that may have awaited a detached
@@ -1802,7 +1833,7 @@ extension OCRProcessor {
                     nextSlot += 1
                     let scale = segmentationContext.imageScale
                     group.addTask {
-                        let result = await Self.performOCRCall(
+                        let ocrResult = await Self.performOCRCall(
                             imageURL: url, provider: provider, model: model,
                             thinkingLevel: thinkingLevel, apiKey: apiKey,
                             previousText: nil, previousImageURL: prevImageURL,
@@ -1813,6 +1844,10 @@ extension OCRProcessor {
                             standardImageMB: ocrRun.standardImageMB,
                             visionSettings: ocrRun.visionSettings
                         )
+                        let result = await Self.applyingVisionTextClassification(
+                            to: ocrResult, previousText: nil,
+                            customPrompt: segmentationContext.customPrompt,
+                            configuration: visionTextLLM)
                         return (index, jobID, result)
                     }
                 }
@@ -1837,7 +1872,7 @@ extension OCRProcessor {
                         nextSlot += 1
                         let scale = segmentationContext.imageScale
                         group.addTask {
-                            let result = await Self.performOCRCall(
+                            let ocrResult = await Self.performOCRCall(
                                 imageURL: url, provider: provider, model: model,
                                 thinkingLevel: thinkingLevel, apiKey: apiKey,
                                 previousText: nil, previousImageURL: prevImageURL,
@@ -1848,6 +1883,10 @@ extension OCRProcessor {
                                 standardImageMB: ocrRun.standardImageMB,
                                 visionSettings: ocrRun.visionSettings
                             )
+                            let result = await Self.applyingVisionTextClassification(
+                                to: ocrResult, previousText: nil,
+                                customPrompt: segmentationContext.customPrompt,
+                                configuration: visionTextLLM)
                             return (idx, nextJobID, result)
                         }
                     }
@@ -1897,6 +1936,10 @@ extension OCRProcessor {
                         visionSettings: ocrRun.visionSettings
                     )
                 }
+
+                result = await Self.applyingVisionTextClassification(
+                    to: result, previousText: previousText,
+                    customPrompt: segmentationContext.customPrompt, configuration: visionTextLLM)
 
                 guard await handleOCRResult(
                     result, index: index, jobID: jobID, url: url, model: model,
@@ -2406,6 +2449,10 @@ extension OCRProcessor {
             gatewayConfig: gatewayConfig,
             imageTokenProvider: gatewayConfig != nil ? Self.gatewayUpstreamProviderFromDefaults() : nil,
             model: model,
+            // Multi-page re-OCR is a pure image/PDF transform and deliberately skips judgement,
+            // tagging, and segmentation. Do not attribute an unused text backend to its history row.
+            visionTextProvider: autoReOCR ? nil : runConfig.visionTextLLM?.provider,
+            visionTextModel: autoReOCR ? nil : runConfig.visionTextLLM?.model,
             batchMode: batchMode && provider.supportsBatch && gatewayConfig == nil && localAgent == nil,
             enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
@@ -2435,12 +2482,14 @@ extension OCRProcessor {
             )
         } else if preOCRedInput {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
+            // A Vision-hybrid selection has no image work on this route either. Reuse its text
+            // judgement backend rather than presenting Apple Vision as a network text provider.
             await performPreOCRedProcessing(
                 files: files,
-                provider: provider,
-                model: model,
-                thinkingLevel: thinkingLevel,
-                apiKey: apiKey,
+                provider: runConfig.textProvider,
+                model: runConfig.textModel,
+                thinkingLevel: runConfig.textThinkingLevel,
+                apiKey: runConfig.textAPIKey,
                 outputDirectory: outputDirectory,
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
@@ -2609,25 +2658,31 @@ extension OCRProcessor {
 
             // Phase 2: Tagging (mode-dependent)
             if enableTagging && !passSourceTags {
+                // This branch is reached only after OCR. `text*` resolves to the separately selected
+                // LLM in a Vision hybrid and is intentionally NOT passed to any image-OCR function.
+                let textProvider = runConfig.textProvider
+                let textModel = runConfig.textModel
+                let textThinkingLevel = runConfig.textThinkingLevel
+                let textAPIKey = runConfig.textAPIKey
                 switch runOutputSettings.taggingMode {
                 case .automatic:
                     await performAutomaticTaggingWithReview(
-                        provider: provider, model: model, thinkingLevel: thinkingLevel,
-                        apiKey: apiKey, outputDirectory: outputDirectory,
+                        provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
+                        apiKey: textAPIKey, outputDirectory: outputDirectory,
                         enableSegmentJSON: enableSegmentJSON, files: files,
                         runConfig: runConfig
                     )
                 case .autoDate:
                     await performManualTaggingPhase(
-                        mode: runOutputSettings.taggingMode, provider: provider, model: model,
-                        thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
+                        thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
                         outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
                         runConfig: runConfig
                     )
                 case .human, .autoDateManualSeg:
                     await performManualSegmentAndTag(
                         autoDate: runOutputSettings.taggingMode.autoFillsDate,
-                        provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
                         outputDirectory: outputDirectory,
                         enableSegmentJSON: enableSegmentJSON, preOCRed: false, files: files,
                         runConfig: runConfig
@@ -2642,12 +2697,13 @@ extension OCRProcessor {
 
             // Phase 3: Collection Segmentation + name review (after tagging review, last step before completion)
             if enableCollectionSegmentation {
+                // Collection identification is another text-only LLM path; keep Vision on the OCR side.
                 await performCollectionSegmentation(
                     files: files,
-                    provider: provider,
-                    model: model,
-                    thinkingLevel: thinkingLevel,
-                    apiKey: apiKey,
+                    provider: runConfig.textProvider,
+                    model: runConfig.textModel,
+                    thinkingLevel: runConfig.textThinkingLevel,
+                    apiKey: runConfig.textAPIKey,
                     outputDirectory: outputDirectory,
                     confirmBeforeOrganizing: confirmCollectionIDs,
                     reviewDocumentSegmentation: false,
@@ -2836,6 +2892,9 @@ extension OCRProcessor {
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode)
         }
+        result = await Self.applyingVisionTextClassification(
+            to: result, previousText: nil, customPrompt: effectiveRunConfig?.customOCRPrompt,
+            configuration: provider == .appleVision ? effectiveRunConfig?.visionTextLLM : nil)
         let persisted = await handleOCRResult(
             result, index: index, jobID: jobID, url: ocrURL, model: model,
             outputDirectory: outputDirectory, runConfig: effectiveRunConfig)

@@ -52,6 +52,7 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
     // Apple Vision is the no-key, on-device backend selected in Settings.
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision: Bool = false
+    @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment: Bool = false
 
     /// The model for the current provider, read live from the shared store so a change made in the
     /// Settings window updates this window's cost estimate — and the model a run launches with —
@@ -136,13 +137,15 @@ struct OCRView: View {
         useAppleVision ? LLMModel.appleVisionModels[0] : (currentGatewayConfig?.asLLMModel() ?? selectedModel)
     }
     private var visionWorkflowIsSupported: Bool {
-        !useAppleVision || ((taggingMode == .none || taggingMode == .copySource)
+        !useAppleVision || visionUseLLMJudgment || ((taggingMode == .none || taggingMode == .copySource)
             && !enableCollectionSegmentation)
     }
+    private var visionJudgementKeyIsPresent: Bool { !apiKey.isEmpty }
 
     private func reloadAPIKey() {
-        apiKey = useAppleVision ? "" : (KeychainHelper.load(
-            account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "")
+        apiKey = useAppleVision
+            ? (visionUseLLMJudgment ? (KeychainHelper.load(account: selectedProvider.rawValue) ?? "") : "")
+            : (KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "")
     }
 
     /// What a retry/re-run sheet should OPEN on: the settings the run actually used, not the live Settings
@@ -168,7 +171,7 @@ struct OCRView: View {
 
     private var costEstimate: CostEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
-        let model = effectiveModel
+        let model = useAppleVision && visionUseLLMJudgment ? selectedModel : effectiveModel
         return CostEstimator.estimate(
             fileCount: droppedFiles.count,
             model: model,
@@ -180,7 +183,8 @@ struct OCRView: View {
             imageScale: imageScale / 100.0,
             rotationMode: rotationMode,
             useGateway: useGateway || useAppleVision,
-            imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil
+            imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil,
+            visionTextOnly: useAppleVision && visionUseLLMJudgment
         )
     }
 
@@ -264,6 +268,7 @@ struct OCRView: View {
         }
         .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }
         .onChange(of: useAppleVision) { _, _ in syncForProviderChange() }
+        .onChange(of: visionUseLLMJudgment) { _, _ in syncForProviderChange() }
         .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
             // An applied profile may change the model for the *current* provider (no provider change), so
             // re-sync the derived model/key state explicitly (the provider onChange above covers the rest).
@@ -440,11 +445,40 @@ struct OCRView: View {
                                 Spacer()
                             }
                             Text(visionWorkflowIsSupported
-                                 ? "Apple Vision transcribes locally with no API key or network request. It uses the Mac's performance cores."
+                                 ? (visionUseLLMJudgment
+                                    ? "Vision transcribes locally. The selected LLM receives text only for judgement — never page images."
+                                    : "Apple Vision transcribes locally with no API key or network request. It uses the Mac's performance cores.")
                                  : "Apple Vision is transcription-only. Select No tagging or Copy source file tags, and turn off Collection ID, before starting.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 2)
+                            if visionUseLLMJudgment, let est = costEstimate {
+                                HStack {
+                                    Text("Text-only judgement:").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.classificationFormatted)
+                                }
+                                if taggingMode.llmTags {
+                                    HStack {
+                                        Text("Tags / dates:").foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(est.taggingFormatted)
+                                    }
+                                }
+                                if enableCollectionSegmentation {
+                                    HStack {
+                                        Text("Collection ID:").foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(est.collectionFormatted)
+                                    }
+                                }
+                                Divider()
+                                HStack {
+                                    Text("Total (text-only):").fontWeight(.medium)
+                                    Spacer()
+                                    Text(est.totalStandardFormatted).fontWeight(.medium)
+                                }
+                            }
                         }
                         .padding(4)
                     }
@@ -588,7 +622,7 @@ struct OCRView: View {
     /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
-        !droppedFiles.isEmpty && (useAppleVision || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
+        !droppedFiles.isEmpty && (useAppleVision ? (!visionUseLLMJudgment || visionJudgementKeyIsPresent) : !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
     }
@@ -1070,7 +1104,7 @@ struct OCRView: View {
         let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let context = SegmentationContext(
             previousTextCharCount: Int(contextCharCount),
-            sendPreviousImage: sendPreviousImage && taggingMode.llmSegments,
+            sendPreviousImage: !useAppleVision && sendPreviousImage && taggingMode.llmSegments,
             customPrompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt,
             imageScale: imageScale / 100.0
         )
@@ -1115,9 +1149,9 @@ struct OCRView: View {
                 batchMode: (useGateway || useLocalAgent || useAppleVision) ? false : batchMode,
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
-                enableCollectionSegmentation: useAppleVision ? false : enableCollectionSegmentation,
-                confirmCollectionIDs: !useAppleVision && confirmCollectionIDs && enableCollectionSegmentation,
-                reviewDocumentSegmentation: !useAppleVision && reviewDocumentSegmentation && enableCollectionSegmentation,
+                enableCollectionSegmentation: useAppleVision && !visionUseLLMJudgment ? false : enableCollectionSegmentation,
+                confirmCollectionIDs: (!useAppleVision || visionUseLLMJudgment) && confirmCollectionIDs && enableCollectionSegmentation,
+                reviewDocumentSegmentation: (!useAppleVision || visionUseLLMJudgment) && reviewDocumentSegmentation && enableCollectionSegmentation,
                 preOCRedInput: preOCRedInput,
                 skipAlreadyProcessed: skipAlreadyProcessed,
                 segmentationContext: context,

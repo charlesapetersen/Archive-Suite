@@ -39,7 +39,8 @@ enum ProcessingHistoryTestDriver {
             RunHistorySnapshot(
                 startedAt: Date(timeIntervalSince1970: 1_700_000_000),
                 provider: .gemini, gatewayConfig: nil, imageTokenProvider: nil,
-                model: model, batchMode: batch, enableTagging: true,
+                model: model, visionTextProvider: nil, visionTextModel: nil,
+                batchMode: batch, enableTagging: true,
                 enableCollectionSegmentation: false, preOCRedInput: preOCRed,
                 reOCRMultiPagePDF: reOCR, sendPreviousImage: false, contextCharCount: 0,
                 imageScale: 1.0, rotationMode: .off, fileCount: fileCount)
@@ -68,6 +69,26 @@ enum ProcessingHistoryTestDriver {
         check("preOCRed modeLabel", snapshot(fileCount: 2, preOCRed: true).makeRun(succeeded: 2).modeLabel == "Pre-OCRed")
         check("reOCR modeLabel", snapshot(fileCount: 2, reOCR: true).makeRun(succeeded: 2).modeLabel == "Re-OCR PDF")
         check("providerLabel is the provider (no gateway)", r.providerLabel == LLMProvider.gemini.rawValue)
+
+        // A Vision hybrid has free on-device image OCR and a separately billed text-only LLM. History
+        // must retain that distinction rather than presenting a $0 Vision run or pricing cloud images.
+        let visionModel = LLMProvider.appleVision.models[0]
+        let hybridSnapshot = RunHistorySnapshot(
+            startedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            provider: .appleVision, gatewayConfig: nil, imageTokenProvider: nil, model: visionModel,
+            visionTextProvider: .gemini, visionTextModel: model, batchMode: false,
+            enableTagging: true, enableCollectionSegmentation: false, preOCRedInput: false,
+            reOCRMultiPagePDF: false, sendPreviousImage: false, contextCharCount: 0,
+            imageScale: 1.0, rotationMode: .llmSingle, fileCount: 10)
+        let hybridRun = hybridSnapshot.makeRun(succeeded: 10)
+        let hybridExpected = CostEstimator.estimate(
+            fileCount: 10, model: model, enableTagging: true,
+            sendPreviousImage: false, contextCharCount: 0, rotationMode: .llmSingle,
+            visionTextOnly: true).totalStandard
+        check("Vision hybrid history prices only text work and labels both backends",
+              hybridRun.cost > 0 && abs(hybridRun.cost - hybridExpected) < 1e-9
+              && hybridRun.providerLabel == "Apple Vision + \(LLMProvider.gemini.rawValue)"
+              && hybridRun.modelName == "Vision + \(model.displayName)")
 
         // --- store: record / newest-first / totals ---
         let store = ProcessingHistoryStore(defaults: suite)

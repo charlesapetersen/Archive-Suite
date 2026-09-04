@@ -4465,6 +4465,23 @@ explain why not.
   Views/SettingsView.swift}, ArchiveProcessor/scripts/{test-vision-ocr.sh,vision-ocr-headless.swift},
   SPEC/tag-format.md, ArchiveProcessor/{README,CLAUDE}.md | M | low | done
 
+- [x] **W13.vision-2 — the hybrid: Vision transcribes, an LLM only classifies/tags [S–M · low · Tier-1]
+  (blocked-on: W13.vision-1).** **SHIPPED 2026-09-04 (this commit).** The optional **Use an LLM for
+  text-only judgement** setting preserves Vision as local image OCR and snapshots a separately selected direct
+  LLM for classification, date extraction, tagging, and collection segmentation. That `LLMTextConfiguration`
+  contains no image path or bytes; the production request-body contract proves the only remote payload is
+  Vision's extracted text plus text context. Turning the option off keeps the fully offline/free No tagging and
+  Copy source file tags paths. Hybrid state survives pending-run resume and retries without persisting a key;
+  history and the live cost pane charge text work only, never cloud-image OCR or rotation. Docs now record the
+  clean-typescript versus handwriting/heavy-skew trade-off: Vision is additive, never the default. **Verification:**
+  Processor Debug build clean; `scripts/test-vision-hybrid.sh` 11/11 PASS with its injected no-network transport;
+  `scripts/test-vision-ocr.sh` 13/13 PASS; scratch-only two-image Flash Lite smoke passed (2/2 outputs tagged).
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Capture/{LiveCaptureProcessor,SessionProcessingConfig}.swift,
+  Models/{CostEstimator,DefaultsKeys,ProcessingHistory,ProcessingHistoryTestDriver,ProcessingProfileStore}.swift,
+  OCR/{LLMTextClient,NetworkSession,OCRProcessor,OCRProcessor+OCR,OCRProcessor+Pipeline,VisionHybridTestDriver}.swift,
+  Views/{OCRView,SettingsView}.swift}, ArchiveProcessor/scripts/test-vision-hybrid.sh,
+  ArchiveProcessor/{README,CLAUDE}.md | S–M | low | done
+
 
 ## Known-issues work — Wave 14 (cross-app; owner-requested 2026-07-16)
 

@@ -592,14 +592,6 @@ progress, the argument list Vision actually accepts; `README.md`: measured throu
 performance-core count, `--fast` ≈2.6× faster for ~1.7% CER, `--pdf-dpi` barely matters on clean scans).
 **Do NOT take its output half** — that app writes a searchable-PDF text layer (`SearchableWriter`/`JBIG2`);
 this app's output format is unchanged, the 2-page image+text PDF of `SPEC/tag-format.md`.
-- [ ] **W13.vision-2 — the hybrid: Vision transcribes, an LLM only classifies/tags [S–M · low · Tier-1]
-  (blocked-on: W13.vision-1).** The point of the backend: pay for judgement, not for transcription. Route
-  Vision's text into the existing text-only paths (`OCRPrompt.buildClassificationOnly`, `TagGenerator`,
-  `LLMTextClient`) so a run does N free image calls + N cheap **text** calls instead of N image calls —
-  and make "no LLM at all" (transcribe-only, `TaggingMode.none`/`.copySource`) a supported combination,
-  which is the fully-offline, fully-free mode. Worth an accuracy note in the same item: Vision is strong on
-  clean typescript and weak on handwriting and heavy skew, where the VLMs are the opposite — so this is an
-  **added backend, never a new default**. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+OCR,OCRProcessor+Pipeline}.swift, Tagging/TagGenerator.swift | S–M | low | none
 
 ## Known-issues work — Wave 14 (cross-app; owner-requested 2026-07-16)
 Actionable open items pulled from the three `KNOWN_ISSUES.md` + the Processor streaming-residuals review, ordered

@@ -45,6 +45,10 @@ struct RunHistorySnapshot {
     /// Upstream family for a gateway run (drives the estimator's image-token math); nil when not a gateway.
     let imageTokenProvider: LLMProvider?
     let model: LLMModel
+    /// A direct LLM used only after Apple Vision transcribed the image locally. Kept separate from
+    /// `model` so history never prices the Vision leg as a cloud image request.
+    let visionTextProvider: LLMProvider?
+    let visionTextModel: LLMModel?
     let batchMode: Bool
     let enableTagging: Bool
     let enableCollectionSegmentation: Bool
@@ -59,9 +63,10 @@ struct RunHistorySnapshot {
     /// Cost of this run using the exact same per-model math the pre-run estimator uses (standard vs
     /// batch total picked by `batchMode`).
     var estimatedCost: Double {
+        let costModel = visionTextModel ?? model
         let est = CostEstimator.estimate(
             fileCount: fileCount,
-            model: model,
+            model: costModel,
             enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
@@ -70,12 +75,20 @@ struct RunHistorySnapshot {
             imageScale: imageScale,
             rotationMode: rotationMode,
             useGateway: gatewayConfig != nil,
-            imageTokenProvider: imageTokenProvider
+            imageTokenProvider: imageTokenProvider,
+            visionTextOnly: visionTextModel != nil
         )
         return batchMode ? est.totalBatch : est.totalStandard
     }
 
-    var providerLabel: String { gatewayConfig?.displayName ?? provider.rawValue }
+    var providerLabel: String {
+        if let visionTextProvider { return "Apple Vision + \(visionTextProvider.rawValue)" }
+        return gatewayConfig?.displayName ?? provider.rawValue
+    }
+
+    var modelName: String {
+        visionTextModel.map { "Vision + \($0.displayName)" } ?? model.displayName
+    }
 
     var modeLabel: String {
         if reOCRMultiPagePDF { return "Re-OCR PDF" }
@@ -90,7 +103,7 @@ struct RunHistorySnapshot {
         return ProcessingRun(
             date: startedAt,
             providerLabel: providerLabel,
-            modelName: model.displayName,
+            modelName: modelName,
             fileCount: fileCount,
             succeeded: ok,
             failed: fileCount - ok,
@@ -115,6 +128,8 @@ extension RunHistorySnapshot {
             gatewayConfig: run.gatewayConfig,
             imageTokenProvider: run.gatewayConfig != nil ? imageTokenProvider : nil,
             model: run.model,
+            visionTextProvider: run.runtimeConfig?.visionTextProvider,
+            visionTextModel: run.runtimeConfig?.visionTextModel,
             batchMode: false,
             enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: run.enableCollectionSegmentation,
@@ -138,6 +153,8 @@ extension RunHistorySnapshot {
             gatewayConfig: nil,
             imageTokenProvider: nil,
             model: batch.model,
+            visionTextProvider: nil,
+            visionTextModel: nil,
             batchMode: true,
             enableTagging: batch.taggingMode.llmTags,
             enableCollectionSegmentation: batch.enableCollectionSegmentation,
