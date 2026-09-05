@@ -4227,6 +4227,15 @@ explain why not.
   no regression. Containment still uses `standardizedFileURL` **on purpose** — W23.l1 (blocked-on this item)
   is the symlink-containment fix and stays a clean one-line change on this seam, now unblocked.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderLinkResolver.swift | S–M | med | none
+- [x] **W23.m14-fu — an unmounted Reader root reports its source as missing [XS · LOW · misleading
+  absence].** **SHIPPED 2026-09-05 (this commit; re-confirmed already fixed).** The premise no longer holds:
+  `ReaderRootStore.root(for:)` refuses to hand the resolver a saved root whose security scope cannot start
+  (the test seam models an unavailable external volume). `resolveExact` therefore returns the existing
+  `.needsRootGrant` outcome before `scanForBasename` could reach `.exhausted`/`.notFound`; the popover offers
+  access instead of saying the source is absent. A scratch `ReaderLinkResolverTests` regression locks the
+  end-to-end outcome. No real corpus, bookmark, or settings write; the test uses only scratch defaults and a
+  temporary marked root. Clean unit build/test verifies it.
+
 - [x] **W23.m15 — deleting the Inbox or Extracts system folder is permanent and creates ghost memberships
   forever [S–M · MED].** ✅ **DONE 2026-07-31** (checkpoint `cf03fe1` = the three Swift refusal layers,
   the by-id restore and 13 tests; completing commit = the SQL foreign key, its migration and the

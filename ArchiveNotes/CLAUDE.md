@@ -558,8 +558,9 @@ macOS/Tests/ArchiveNotesTests/
                                    isSourceMissing, scrollRange in/out-of-range/nil/empty, openItem token
                                    re-fire, resolvePassage, openAction (select-scroll / kind-mismatch
                                    ignore / extract target / missing-on-note-window-only)
-  ReaderLinkResolverTests.swift    16 tests: resolve/unknown-guid/missing/renamed/traversal/
-                                   grant/wrong-guid/special-chars + router + root-store
+  ReaderLinkResolverTests.swift    resolve/unknown-guid/missing/renamed/traversal/grant/wrong-guid/
+                                   special-chars + router + root-store; an unavailable saved root requests
+                                   access before any basename scan, never a false missing-source result
   ReaderLinkScanTests.swift        10 tests (W23.m14): resolveExact defers the walk (and still answers
                                    the cheap cases); the walk runs OFF the main thread even when started
                                    from it (proved structurally — the raw progress callback runs on the

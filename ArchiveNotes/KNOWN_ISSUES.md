@@ -323,8 +323,9 @@ than "not found in the archive". Two boundaries worth not re-litigating:
 - A root directory that **does not exist** still reports `.notFound`, because nothing can be under a
   directory that isn't there. That keeps the shipped W8-S9 computer-move contract (a stale root reports the
   file missing, never a wrong file) — `DurableLinkE2ETests` caught the first attempt, which reported the
-  vanished root as an incomplete search. The narrower case it still cannot distinguish — a root whose
-  *volume* is unplugged — is filed as **W23.m14-fu** (LOW).
+  vanished root as an incomplete search. **W23.m14-fu re-confirmed the narrower unplugged-volume case is
+  already handled:** `ReaderRootStore.root(for:)` returns `nil` when its scope cannot start, before any
+  basename scan, and the resolver returns `.needsRootGrant` rather than `.notFound`.
 
 Pinned by 10 scratch tests (`ReaderLinkScanTests`). The off-actor proof is structural rather than
 timing-based: the raw progress callback runs on the scanning thread, so `Thread.isMainThread` inside it

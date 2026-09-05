@@ -407,18 +407,6 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### MEDIUM
 
-- [ ] **W23.m14-fu — a Reader root on an *unmounted* volume reports its files as missing from the archive
-  [XS · LOW · misleading absence].** Residual noticed while shipping W23.m14 (2026-07-30); **not** a re-open —
-  m14's contract for a root directory that is *gone* is deliberate and load-bearing for the W8-S9
-  computer-move promise. The gap is narrower: `scanForBasename` cannot tell "this root was deleted" from
-  "this root's volume is unplugged", and both take the `.exhausted` branch, so the popover says *"Source file
-  not found in the archive"* about files that are merely offline. **Re-confirm the premise first** — it turns
-  on whether `ReaderRootStore.loadSaved` / `root(for:)` hand back a URL at all for an unmounted volume
-  (`URL(resolvingBookmarkData:)` may throw, in which case the resolver already says `needsRootGrant` and there
-  is nothing to fix). If it is reachable: distinguish the two with a volume-reachability check and report the
-  offline case as its own outcome, not as absence. Notes `Links/{ReaderLinkResolver,ReaderRootStore}`,
-  `Views/ReaderPreviewPopover`. | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderLinkResolver.swift | XS | low | none
-
 - [ ] **W23.m15-fu — ghost memberships already on disk are never swept, only out-voted [XS–S · LOW ·
   stale data].** Residual of W23.m15, filed 2026-07-31. **Not** a re-open: no new ghost can be created
   (the store guard and the FK both refuse one), and a ghost naming a *system* folder is revived by the

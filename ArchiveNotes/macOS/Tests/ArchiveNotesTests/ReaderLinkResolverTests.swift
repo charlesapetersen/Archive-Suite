@@ -778,6 +778,30 @@ struct ReaderRootStoreTests {
         }
     }
 
+    /// An unmounted archive volume reaches `root(for:)` as a bookmark whose security scope refuses to
+    /// start. That must be surfaced as a re-grant request before the resolver can scan or assert absence.
+    /// The seam is deliberate: a scratch directory is already accessible to the test host, so it cannot
+    /// reproduce the security-scope failure of an unavailable external volume by itself.
+    @Test("An unavailable saved Reader root requests access instead of reporting a missing source")
+    func unavailableSavedRootRequestsGrant() async throws {
+        let (root, marker) = try makeMarkedRoot("unmounted")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try await ScratchDefaults.with { defaults in
+            let granting = ReaderRootStore(defaults: defaults)
+            #expect(granting.grantRoot(root).refusal == nil)
+
+            let relaunched = ReaderRootStore(defaults: defaults)
+            relaunched.startScope = { _ in false }
+            let resolver = ReaderLinkResolver(rootStore: relaunched)
+
+            #expect(await resolver.resolve(rootGUID: marker.guid, relativePath: "offline.pdf")
+                    == .needsRootGrant(guid: marker.guid))
+            #expect(relaunched.knownRoots[marker.guid] == nil,
+                    "an unavailable root must not be handed to the basename scanner")
+        }
+    }
+
     /// Apple's rule, as a test: a `startAccessingSecurityScopedResource()` that returned `false` must
     /// not be balanced by a stop. Every root granted in the current session is in that state — the
     /// URL comes from the open panel and is already accessible — so pre-fix *every* `stopAccessing`
