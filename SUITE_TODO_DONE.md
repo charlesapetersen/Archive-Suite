@@ -3132,6 +3132,17 @@ explain why not.
 
 ## Owner-reported bugs (2026-08-02)
 
+- [x] **W25.retry-backend — gateway / Local Agent retry sheets were decorative, and Live Capture could silently
+  bill a direct API [M · MONEY].** **SHIPPED 2026-09-05 (this commit).** The owner chose locked-backend
+  reproduction: retry UIs no longer offer a provider/model picker or direct-API escape hatch. Process Files
+  passes its immutable `SessionProcessingConfig` through the failed-file loop and per-item retry, including
+  gateway/Local Agent routing and durable PDF provenance; gateway-only use no longer depends on a native key.
+  Live Capture always retains the session configuration, while per-item re-run offers only rotation and cannot
+  drop gateway/Local Agent routing. Tier-2: Processor Debug build; no-network `test-retry-backend.sh` covers
+  direct, gateway-only, and fake Local Agent routes with contradictory mutable settings plus PDF provenance;
+  `test-recovery.sh` ALL PASS on isolated scratch state. Independent adversarial review found and closed the
+  stale-PDF-provenance path before ship. No corpus access, provider request, credential write, or spend.
+
 - [x] **W25.modelsync [MED · money] — changing the model in Settings did not change the Process Files cost
   estimate, and the run used the OLD model. ✅ DONE 2026-08-02** (this commit; fix + adversarial-review
   fixes + trackers).

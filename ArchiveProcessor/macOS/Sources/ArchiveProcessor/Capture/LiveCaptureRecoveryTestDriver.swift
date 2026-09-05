@@ -1970,9 +1970,9 @@ enum LiveCaptureRecoveryTestDriver {
         //      question answered as a measurement rather than a preference.
         //   P3 `SegmentItem.gate` returning its input unchanged (the UI half reverted)
         //      → 1 RED, check 7. The menu offers a retry that `retryFailed` would refuse.
-        //   P4 `gate` filtering `.retry` only, leaving `.retryWithModel`/`.changeRotation`
-        //      → 1 RED, check 7. Both of those reach `retryFailed` through the model sheet, so a gate that
-        //      stops at the plain retry stops at the cheapest third of the money path.
+        //   P4 `gate` filtering `.retry` only, leaving `.changeRotation`
+        //      → 1 RED, check 7. The rotation sheet also reaches `retryFailed`, so a gate that stops at the
+        //      plain retry leaves a money path open.
         //   P5 the guard WIDENED to `requestFinish`'s triple — also refusing while `showFinalizeSheet` /
         //      `showRotationReview` is up
         //      → 1 RED, check 8. Recorded because it is the mutant that shows the section constrains the
@@ -2156,14 +2156,13 @@ enum LiveCaptureRecoveryTestDriver {
                       && !rfScrimUnderFinalizeSheet && !rfScrimUnderReviewSheet
                       && rfProc.isFinishingScrimUp)
 
-            // 4. THE FIX, money half. Both retry entries are refused: the per-item one, and the one the model
+            // 4. THE FIX, money half. Both retry entries are refused: the per-item one, and the one the rotation
             //    sheet defers (`onApply` fires whenever the operator gets round to it, so no enabled-ness
             //    computed when the button was drawn can speak for this moment — which is why the refusal has
             //    to live in `retryFailed` and not only in the view).
             rfProc.retryFailed(groupIds: ["F1"])
-            rfProc.retryFailed(groupIds: ["F1"], override: LiveCaptureProcessor.OCROverride(
-                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "", rotation: 180))
-            check("a retry mid-regeneration buys NO second OCR — neither entry, override or not",
+            rfProc.retryFailed(groupIds: ["F1"], rotation: 180)
+            check("a retry mid-regeneration buys NO second OCR — neither entry, rotation or not",
                   paidStarts() == rfPaidAfterStage)
 
             // 5. THE FIX, state half. Nothing the retry would have torn down moved: the staged record, the
@@ -2198,10 +2197,10 @@ enum LiveCaptureRecoveryTestDriver {
             let rfWithheld = rfGatedStates.allSatisfy { st in
                 let gated = SegmentItem.actions(for: st, finalizing: true)
                 let ungated = SegmentItem.actions(for: st, finalizing: false)
-                return !gated.contains(.retry) && !gated.contains(.retryWithModel)
+                return !gated.contains(.retry)
                     && !gated.contains(.changeRotation)
                     && gated.contains(.viewText) && gated.contains(.revealFiles)
-                    && ungated.contains(.retry) && ungated.contains(.retryWithModel)
+                    && ungated.contains(.retry)
             }
             check("the per-item menu withholds the retry family mid-regeneration, and only then",
                   rfWithheld
@@ -2453,7 +2452,7 @@ enum LiveCaptureRecoveryTestDriver {
         // being re-OCR'd, whose edits `applyRotationReviewAndFinalize` then drops on a nil `retained`; or a
         // model sheet revealed again inside `isFinalizing`, where `W3.cap-r3-fu7`'s refusal is silent), and
         // `proceedToFinishIfReady` refusing to start the finish while a per-item sheet is up makes the state
-        // none of them can be reached from. See `LiveCaptureProcessor.modelChoiceTarget`.
+        // none of them can be reached from. See `LiveCaptureProcessor.rotationRetryTarget`.
         //
         // WHAT THIS DRIVER CAN AND CANNOT PROVE. It proves the MODEL-layer rule and its non-vacuity: at
         // check 4 every other term of `proceedToFinishIfReady`'s guard is independently asserted false, so
@@ -2604,7 +2603,7 @@ enum LiveCaptureRecoveryTestDriver {
             //    armed is indistinguishable from one that fired and was held, and under M1 the advance is
             //    synchronous inside `updatePhonePending(0)`, so a 0.2 s wait kills it identically. The
             //    watchdog leg is NOT asserted here; nothing in this driver observes it.
-            psProc.modelChoiceTarget = .init(groupId: "P1", includeRotation: true)
+            psProc.rotationRetryTarget = .init(groupId: "P1")
             psSession.updatePhonePending(0)
             var psRaisedWhileHeld = false
             let psDeadline = Date().addingTimeInterval(0.75)
@@ -2625,9 +2624,8 @@ enum LiveCaptureRecoveryTestDriver {
             //    deferred Apply `W3.cap-r3-fu7` named: it buys the segment's OCR again (2 pages), which is
             //    correct here because no finish is in flight. Then `onApply` clears the target, exactly as
             //    the sheet does.
-            psProc.retryFailed(groupIds: ["P1"], override: LiveCaptureProcessor.OCROverride(
-                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "", rotation: nil))
-            psProc.modelChoiceTarget = nil
+            psProc.retryFailed(groupIds: ["P1"])
+            psProc.rotationRetryTarget = nil
             let psGateAfterClear = psProc.perItemSheetUp   // sampled BEFORE any await; see check 6
             let psReStaged = await psSettle { psProc.statuses.first { $0.id == "P1" }?.phase == .staged }
             check("the deferred Apply is allowed while the finish waits, and re-stages the segment",

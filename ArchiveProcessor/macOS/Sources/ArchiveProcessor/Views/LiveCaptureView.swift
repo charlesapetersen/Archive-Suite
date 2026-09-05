@@ -18,16 +18,13 @@ struct LiveCaptureView: View {
     @AppStorage(DefaultsKeys.liveProcessingMode) private var liveProcessingMode: String = LiveProcessingMode.stage.rawValue
     /// Where finalized live collections are written (shared with Process Files). Empty → Downloads.
     @AppStorage(DefaultsKeys.outputDirectory) private var outputDirPath: String = ""
-    /// Only to seed the per-segment retry sheet when there is no session config to read it from.
-    @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
-
     // A1 — shared Processing-list state: which segment is expanded.
     @State private var expandedSegmentID: String?
 
     // W3.cap-r3-fu9 — the two per-item action sheets' targets are NOT `@State` here: they live on
     // `liveProc`, because the finish flow has to be able to see that one of them is up before it raises the
     // rotation review over it. The rationale (and the three ways SwiftUI could mishandle the concurrent
-    // presentation) is at `LiveCaptureProcessor.modelChoiceTarget`. Keeping no view-local copy is the point
+    // presentation) is at `LiveCaptureProcessor.rotationRetryTarget`. Keeping no view-local copy is the point
     // — it makes the wiring compile-enforced instead of something a later edit can quietly bypass.
 
     var body: some View {
@@ -70,7 +67,7 @@ struct LiveCaptureView: View {
         //
         // The overlay is still a pointer barrier, but a scrim alone does not constrain focus or accessibility.
         // A presented sheet floats ABOVE
-        // the overlay — the predicate does not mention `modelChoiceTarget`, so the model sheet is up with the
+        // the overlay — the predicate does not mention `rotationRetryTarget`, so the rotation sheet is up with the
         // scrim uselessly behind it. Keyboard focus and accessibility activation similarly bypass hit testing.
         // `W3.cap-r3-fu10-fu1` therefore disables the real split panel for this same narrow window, preserving
         // the overlay above it. The VM test proves the throbber renders while the underlying Start control is
@@ -128,32 +125,18 @@ struct LiveCaptureView: View {
         .sheet(isPresented: $liveProc.showRotationReview) {
             LiveRotationReviewSheet(liveProc: liveProc)
         }
-        // Per-item "retry with model" / "rotate & re-run": pick provider/model (+ rotation), then re-OCR
-        // just this segment via the generalized retry path.
-        .sheet(item: $liveProc.modelChoiceTarget) { target in
-            ModelChoiceSheet(
-                title: target.includeRotation ? "Rotate & re-run" : "Retry with model",
+        // Per-item rotate-and-re-run keeps the session's locked backend and changes only rotation.
+        .sheet(item: $liveProc.rotationRetryTarget) { target in
+            RotationRetrySheet(
+                title: "Rotate & re-run",
                 subtitle: "Re-run OCR for this segment; its old staged output is replaced.",
-                includeRotation: target.includeRotation,
-                // Price this retry. Without a count `ModelChoiceSheet` renders no cost line at all, so
-                // switching provider/model here — which CAN move you onto a far dearer model — was silent.
-                fileCountForEstimate: liveProc.statuses.first { $0.id == target.groupId }?.pageCount,
-                // The SESSION's provider/model, not the app-wide selection: `activateProcessingIfNeeded`
-                // snapshots and LOCKS the config at session start precisely so a mid-session Settings
-                // change can't alter a running session, so the live selection would misreport what OCR'd
-                // this segment. The fallback is unreachable today (no session ⇒ no retry list) but keeps
-                // the expression total.
-                initialProvider: session.config?.provider ?? selectedProvider,
-                initialModel: session.config?.model ?? ModelSelectionStore.savedModel(for: selectedProvider),
-                initialThinking: session.config?.thinkingLevel ?? .low,
-                onApply: { provider, model, thinking, apiKey, rotation in
-                    let ov = LiveCaptureProcessor.OCROverride(
-                        provider: provider, model: model, thinkingLevel: thinking,
-                        apiKey: apiKey, rotation: rotation)
-                    liveProc.retryFailed(groupIds: [target.groupId], override: ov)
-                    liveProc.modelChoiceTarget = nil
+                backendDescription: session.config?.retryBackendDescription ?? "this session's backend",
+                initialRotation: 0,
+                onApply: { rotation in
+                    liveProc.retryFailed(groupIds: [target.groupId], rotation: rotation)
+                    liveProc.rotationRetryTarget = nil
                 },
-                onCancel: { liveProc.modelChoiceTarget = nil })
+                onCancel: { liveProc.rotationRetryTarget = nil })
         }
         // Per-item "view text": the retained OCR text + any error reason.
         .sheet(item: $liveProc.textViewerTarget) { target in
@@ -170,10 +153,8 @@ struct LiveCaptureView: View {
         switch action {
         case .retry:
             liveProc.retryFailed(groupIds: [id])
-        case .retryWithModel:
-            liveProc.modelChoiceTarget = .init(groupId: id, includeRotation: false)
         case .changeRotation:
-            liveProc.modelChoiceTarget = .init(groupId: id, includeRotation: true)
+            liveProc.rotationRetryTarget = .init(groupId: id)
         case .viewText:
             liveProc.textViewerTarget = .init(id: id)
         case .revealFiles:
@@ -1281,8 +1262,8 @@ struct SegmentItem: ProcessableItem {
     /// already files a complete image-only doc automatically as `succeededNoText`).
     ///
     /// `finalizing` is `W3.cap-r3-fu7`: while a finish is regenerating segments, every action that leads to
-    /// `retryFailed` is withheld — `.retry` directly, `.retryWithModel`/`.changeRotation` through the model
-    /// sheet — because pressing one in that window re-buys the segment's OCR and races the regeneration's
+    /// `retryFailed` is withheld — `.retry` directly and `.changeRotation` through its retry sheet — because
+    /// pressing one in that window re-buys the segment's OCR and races the regeneration's
     /// record replace. The bulk "Retry N failed" button is gated on the same flag and `retryFailed` refuses
     /// the call outright, which is the gate that actually holds; withholding here is so the menu does not
     /// offer it. `.viewText`/`.revealFiles` are read-only and stay. Answering the item's open question: YES,
@@ -1302,13 +1283,13 @@ struct SegmentItem: ProcessableItem {
     static func actions(for state: ItemState, finalizing: Bool) -> [ItemAction] {
         switch state {
         case .failed:
-            return gate([.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles], finalizing)
+            return gate([.retry, .changeRotation, .viewText, .revealFiles], finalizing)
         case .succeededNoText:
-            return gate([.retry, .retryWithModel, .viewText, .revealFiles], finalizing)
+            return gate([.retry, .viewText, .revealFiles], finalizing)
         case .succeededPlaceholderImage:
             // Same recovery affordances: the source photo is deliberately still in the Backup Folder, so a
             // retry (optionally after a rotate) is exactly how the operator gets the scan into the archive.
-            return gate([.retry, .retryWithModel, .changeRotation, .viewText, .revealFiles], finalizing)
+            return gate([.retry, .changeRotation, .viewText, .revealFiles], finalizing)
         case .succeeded:
             return gate([.viewText, .revealFiles], finalizing)
         default:
@@ -1325,7 +1306,7 @@ struct SegmentItem: ProcessableItem {
     /// point.
     private static func gate(_ actions: [ItemAction], _ finalizing: Bool) -> [ItemAction] {
         guard finalizing else { return actions }
-        return actions.filter { $0 != .retry && $0 != .retryWithModel && $0 != .changeRotation }
+        return actions.filter { $0 != .retry && $0 != .changeRotation }
     }
 }
 

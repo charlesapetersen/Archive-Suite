@@ -285,6 +285,10 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-segment-json.sh`** — byte-identity of the shared `SegmentJSONBuilder` output.
 
 **Process Files pipeline**
+- **`test-retry-backend.sh`** — retry backend-lock contract: the real Process Files retry seam runs against
+  an injected no-network HTTP transport and committed fake Local Agent CLI. It proves direct, gateway-only,
+  and Local Agent retries keep the immutable run snapshot despite contradictory mutable Settings, and checks
+  the generated PDF provenance too. No API key, network, corpus, or spend.
 - **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests, **and** (W16.bat1) the three paid
   batch clients' provider **response-shape contract** — every status/result body shape Anthropic, Gemini and
   Mistral are accepted in, from literal fixtures through the pure parse seams in `BatchOCR.swift`

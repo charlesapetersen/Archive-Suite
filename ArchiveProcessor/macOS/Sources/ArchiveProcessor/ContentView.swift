@@ -61,6 +61,7 @@ struct ContentView: View {
             LocalAgentTestDriver.runIfRequested()            // $0 Local Agent CLI backend + PendingRun resume self-test (env-gated)
             NetworkSessionTestDriver.runIfRequested()        // $0 injected HTTP retry/limiter safety test (env-gated)
             VisionHybridTestDriver.runIfRequested()          // $0 Vision OCR + text-only judgement request-shape contract
+            RetryBackendTestDriver.runIfRequested()          // $0 Process Files retry backend-lock contract
             maybePresentKeyOnboarding()
         }
         .sheet(isPresented: $showKeyOnboarding) {

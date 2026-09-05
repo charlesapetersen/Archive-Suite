@@ -2524,7 +2524,6 @@ extension OCRProcessor {
         runConfig.outputImageFile = exportOriginals
         runConfig.localAgent = localAgent
         activeRunConfig = runConfig
-        lastRetryChoice = nil   // a fresh run must not inherit the previous run's retry escalation
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
         currentGateway = gatewayConfig
@@ -2897,13 +2896,10 @@ extension OCRProcessor {
         }
         postCompletionNotification()
     }
-    /// Called by UI when user chooses to retry failed files with a different provider/model.
-    func retryFailedFiles(provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String) {
-        // Remember the escalation: this loop may raise the sheet again for whatever still fails, and a
-        // fresh sheet would otherwise re-seed to the run's original model (see `lastRetryChoice`).
-        lastRetryChoice = (provider: provider, model: model, thinkingLevel: thinkingLevel)
+    /// Called by UI when the operator chooses to replay the failed files on the run's locked backend.
+    func retryFailedFiles() {
         awaitingRetryDecision = false
-        retryContinuation?.resume(returning: .retry(provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey))
+        retryContinuation?.resume(returning: .retry)
         retryContinuation = nil
     }
     /// Called by UI when user chooses to continue without retrying.
@@ -2942,15 +2938,18 @@ extension OCRProcessor {
             switch action {
             case .continueWithout:
                 return
-            case .retry(let provider, let model, let thinkingLevel, let apiKey):
+            case .retry:
+                guard let retryConfig = runConfigForRetry(runConfig) else {
+                    statusMessage = "Cannot retry: the original run configuration is unavailable."
+                    return
+                }
                 let indicesToRetry = failedFileIndices
-                statusMessage = "Retrying \(indicesToRetry.count) files with \(provider.rawValue) \(model.displayName)…"
+                statusMessage = "Retrying \(indicesToRetry.count) files with \(retryConfig.retryBackendDescription)…"
 
                 for (attempt, index) in indicesToRetry.enumerated() {
                     guard !Task.isCancelled else { return }
-                    _ = await retryOne(index: index, imageURL: imageURLs[index], provider: provider,
-                                       model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
-                                       outputDirectory: outputDirectory, runConfig: runConfig)
+                    _ = await retryOne(index: index, imageURL: imageURLs[index],
+                                       outputDirectory: outputDirectory, runConfig: retryConfig)
                     progress = Double(attempt + 1) / Double(indicesToRetry.count)
                     statusMessage = "Retried \(attempt + 1)/\(indicesToRetry.count)"
                 }
@@ -2965,6 +2964,12 @@ extension OCRProcessor {
         explicit ?? activeRunConfig
     }
 
+    /// The user-visible identity of a retry's actual backend. It is computed only from the immutable run
+    /// snapshot, never from current Settings, so a retry cannot silently change route or authentication.
+    var retryBackendDescription: String {
+        activeRunConfig?.retryBackendDescription ?? "the original run configuration"
+    }
+
     /// Re-OCR a single file, then regenerate its output PDF (+ re-prune `failedFiles`). Extracted from the
     /// modal retry loop so the end-of-run modal AND per-item retry share one path — no duplicate logic.
     /// `imageURL` is the OCR input (may be a temp JPEG for pre-OCRed PDF input); it defaults to the job's
@@ -2972,22 +2977,23 @@ extension OCRProcessor {
     /// re-run). Returns whether OCR text was produced. Reuses `performOCRCall` + `handleOCRResult` verbatim
     /// (`handleOCRResult` already updates `jobs[index].status` and prunes/appends `failedFiles`).
     @discardableResult
-    func retryOne(index: Int, imageURL: URL? = nil, provider: LLMProvider, model: LLMModel,
-                  thinkingLevel: ThinkingLevel?, apiKey: String, outputDirectory: URL,
+    func retryOne(index: Int, imageURL: URL? = nil, outputDirectory: URL,
                   rotation: Int? = nil, runConfig: SessionProcessingConfig? = nil) async -> Bool {
-        guard jobs.indices.contains(index) else { return false }
+        guard jobs.indices.contains(index), let effectiveRunConfig = runConfigForRetry(runConfig) else {
+            return false
+        }
         jobs[index].status = .processing
         // W16.bat10 — the row this retry is FOR. `ocrURL` cannot stand in for it: for a pre-OCRed PDF (or a
         // rotate-and-re-run) it is a temp JPEG that is deliberately NOT the job's source, which is exactly
         // why the identity threaded into `handleOCRResult` is the job's id rather than a URL comparison.
         let jobID = jobs[index].id
         let ocrURL = imageURL ?? jobs[index].sourceURL
-        let effectiveRunConfig = runConfigForRetry(runConfig)
         let ocrRun = Self.ocrCallValues(for: effectiveRunConfig)
         var result = await Self.performOCRCall(
-            imageURL: ocrURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
-            apiKey: apiKey, previousText: nil, previousImageURL: nil, gatewayConfig: currentGateway,
-            localAgent: currentLocalAgent, rotationMode: ocrRun.rotationMode,
+            imageURL: ocrURL, provider: effectiveRunConfig.provider, model: effectiveRunConfig.model,
+            thinkingLevel: effectiveRunConfig.thinkingLevel, apiKey: effectiveRunConfig.apiKey,
+            previousText: nil, previousImageURL: nil, gatewayConfig: effectiveRunConfig.gateway,
+            localAgent: effectiveRunConfig.localAgent, rotationMode: ocrRun.rotationMode,
             standardImageMB: ocrRun.standardImageMB,
             visionSettings: ocrRun.visionSettings)
         if let rotation {
@@ -2996,10 +3002,11 @@ extension OCRProcessor {
                                errorMessage: result.errorMessage, errorCode: result.errorCode)
         }
         result = await Self.applyingVisionTextClassification(
-            to: result, previousText: nil, customPrompt: effectiveRunConfig?.customOCRPrompt,
-            configuration: provider == .appleVision ? effectiveRunConfig?.visionTextLLM : nil)
+            to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,
+            configuration: effectiveRunConfig.provider == .appleVision
+                ? effectiveRunConfig.visionTextLLM : nil)
         let persisted = await handleOCRResult(
-            result, index: index, jobID: jobID, url: ocrURL, model: model,
+            result, index: index, jobID: jobID, url: ocrURL, model: effectiveRunConfig.model,
             outputDirectory: outputDirectory, runConfig: effectiveRunConfig)
         return persisted && result.text != nil
     }

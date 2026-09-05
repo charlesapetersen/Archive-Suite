@@ -1418,9 +1418,22 @@ extension OCRProcessor {
         // Move heavy PDF generation + tag I/O off the main actor (M3 perf fix). The MainActor
         // suspends at the await but is free to service UI events while the work runs on .utility.
         let originalFileName = sourceURL.lastPathComponent
-        let gatewayName = currentGateway?.displayName
-        let localAgentDisplayName = currentLocalAgent?.provenanceDisplayName
-        let localAgentModelName = currentLocalAgent?.provenanceModelName
+        // A retry carries the immutable run snapshot through to this durable-output boundary. Its
+        // provenance must describe the backend that made this OCR result, not mutable Settings that may
+        // have changed since the run began (or the retry was requested). In particular, a direct retry
+        // must not inherit a stale gateway label merely because the snapshot's gateway is nil.
+        let gatewayName: String?
+        let localAgentDisplayName: String?
+        let localAgentModelName: String?
+        if let runConfig {
+            gatewayName = runConfig.gateway?.displayName
+            localAgentDisplayName = runConfig.localAgent?.provenanceDisplayName
+            localAgentModelName = runConfig.localAgent?.provenanceModelName
+        } else {
+            gatewayName = currentGateway?.displayName
+            localAgentDisplayName = currentLocalAgent?.provenanceDisplayName
+            localAgentModelName = currentLocalAgent?.provenanceModelName
+        }
         let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
         let pdfMB = pdfSettings.imageMB
         let txtCols = pdfSettings.textColumns

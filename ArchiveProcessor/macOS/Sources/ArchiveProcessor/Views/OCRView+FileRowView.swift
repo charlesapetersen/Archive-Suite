@@ -43,12 +43,12 @@ struct FileRowView: View {
                         availableActions: isExpanded ? Self.filesActions(for: job) : [])
     }
 
-    /// Actions a Files row offers. Retry/model/rotation only make sense for a failed OCR; every row can
+    /// Actions a Files row offers. Retry/rotation only make sense for a failed OCR; every row can
     /// view text / reclassify during review.
     static func filesActions(for job: OCRJob?) -> [ItemAction] {
         var acts: [ItemAction] = []
         if job?.status == .failed {
-            acts.append(contentsOf: [.retry, .retryWithModel, .changeRotation])
+            acts.append(contentsOf: [.retry, .changeRotation])
         }
         // viewText/reclassify only make sense when an OCR job exists for this row.
         if job != nil {

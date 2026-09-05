@@ -327,6 +327,18 @@ struct SessionProcessingConfig: Sendable {
     /// The effective model for OCR calls (gateway model when a gateway is configured).
     var effectiveModel: LLMModel { gateway?.asLLMModel() ?? model }
 
+    /// The backend name a retry may truthfully show. A Local Agent wins over a gateway for the same reason
+    /// it wins at the client construction sites; the direct provider/model is only a fallback on that path.
+    var retryBackendDescription: String {
+        if let localAgent {
+            return "\(localAgent.provenanceDisplayName) · \(localAgent.provenanceModelName)"
+        }
+        if let gateway {
+            return "\(gateway.displayName) · \(gateway.modelID)"
+        }
+        return "\(provider.rawValue) · \(model.displayName)"
+    }
+
     /// A short one-line summary for the control panel.
     var summary: String {
         "\(provider.rawValue) · \(gateway?.displayName ?? model.displayName) · \(taggingMode.displayName)"

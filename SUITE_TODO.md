@@ -136,25 +136,6 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 
 ## Owner-reported bugs (2026-08-02) — follow-ons
 
-- [ ] **W25.retry-backend — in gateway / Local Agent mode the retry sheets are decorative, and Live Capture's
-  retry silently bills a metered API [M · MONEY].** Found 2026-08-03 by the
-  adversarial review of W25.modelsync-fu; **pre-existing mechanism**, filed rather than fixed because the
-  right behaviour is an owner call. (a) Process Files: `retryOne` + the modal loop pass the run's
-  `gateway`/`localAgent`, and `performOCRCall`'s precedence is localAgent → gateway → provider, so the
-  sheet's provider/model are **never read** — in gateway mode it estimates and announces a model it never
-  calls, and re-runs the *same* gateway model that just failed. (b) Live Capture: `retryFailed` nils out
-  `gateway`/`localAgent` whenever an override is present, forcing the **direct metered API** — on a Local
-  Agent ($0/page) session a 6-page segment retry becomes 6 billed calls, and W25.modelsync-fu made that
-  branch *dearer* by seeding the session's selected model instead of the family's cheapest. (c) A
-  gateway-only operator can't retry at all: both sheets load the provider-named Keychain account, never
-  `"Gateway"`, and Retry is `.disabled(apiKey.isEmpty)`.
-  ✅ **DECIDED (owner, 2026-08-13): a retry REPRODUCES the run's backend, and the provider/model picker is
-  DROPPED.** It was a false affordance — in gateway mode it announced a model it never called — so this removes
-  a lie rather than a feature, and the safe default is that a retry costs what the run cost. A labelled escape
-  hatch to the direct API, and offering both, were each OFFERED AND NOT TAKEN. Part **(c)** — a gateway-only
-  operator cannot retry at all, because both sheets load the provider-named Keychain account and never
-  `"Gateway"` — is a straight bug and ships with it. Full write-up:
-  `ArchiveProcessor/KNOWN_ISSUES.md` → *W25.retry-backend*.
 - [ ] **W25.retry-estimate — the retry cost quotes omit rotation and image scale [XS–S · LOW].** Same review.
   Both retry estimates call `CostEstimator.estimate` without `rotationMode:`/`imageScale:` (defaulting `.off`
   / `1.0`) while `retryOne` runs `detectRotation` with the run's real rotation mode, so an LLM rotation mode

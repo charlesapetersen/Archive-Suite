@@ -524,3 +524,9 @@ Views/                         SwiftUI (+ AppKit where needed):
   DriveAuth,RelayObjectFormat}.kt`, `capture/{CaptureModels,CaptureViewModel}.kt`,
   `data/{SessionStore,PhoneBackup,Prefs}.kt`, `ui/{ConnectScreen,CaptureScreen,SegmentTagSheet}.kt`. Fully
   independent except the phone↔Mac protocol.
+
+**W25.retry-backend correction (2026-09-05).** The earlier A1 discussion of a "retry-with-model" sheet is
+superseded: all retries reproduce their immutable run/session backend, the provider/model picker is removed,
+and the only per-item retry sheet controls image rotation. Live Capture uses
+`retryFailed(groupIds:rotation:)`; its processor-held `rotationRetryTarget` remains part of the finalization
+guard, but cannot alter routing or credentials.

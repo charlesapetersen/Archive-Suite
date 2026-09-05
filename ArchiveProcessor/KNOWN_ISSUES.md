@@ -86,46 +86,31 @@ it is a one-off, and must not change what the next full run uses; both sheets ke
 changes cannot affect a running session. Don't "simplify" either sheet into reading the store directly:
 only the caller knows which notion of "current model" applies.
 
-**Still broken in every retry path — see W25.retry-backend below.** These sheets pick a *native* provider
-model and load `KeychainHelper.load(account: provider.rawValue)`, which is wrong in gateway / Local Agent
-mode. Fixing the seed did not fix that, and the seed fix makes one branch of it *cost more*.
+**Closed by W25.retry-backend (2026-09-05).** Retries now reproduce the immutable run/session backend
+instead of offering a native-provider picker. Gateway-only and Local Agent retries need no direct-provider
+key; the only per-item change available is an explicit image rotation.
 
 ---
 
-## ⚠️ OPEN (W25.retry-backend): in gateway / Local Agent mode the retry sheets are decorative, and Live Capture's retry silently bills a metered API
+## ✅ FIXED (W25.retry-backend): retries reproduce the locked backend
 
-**Found 2026-08-03** (adversarial review of W25.modelsync-fu). **Pre-existing mechanism; needs an owner
-decision, so not fixed with the seed.** Three faces of one defect — the retry UIs assume the direct
-provider path, but a run can be on a gateway or the Local Agent CLI.
+**Found 2026-08-03** (adversarial review of W25.modelsync-fu). **Fixed 2026-09-05 (this commit)** after the
+owner chose the safe, honest behaviour: a retry always reproduces the original run/session backend. The
+provider/model picker was a false affordance in gateway mode, so it is gone; an explicit direct-API escape
+hatch was offered and declined.
 
-1. **Process Files retry ignores the picker entirely.** `retryOne` and the modal retry loop pass
-   `gatewayConfig: currentGateway, localAgent: currentLocalAgent`, and `performOCRCall`'s backend
-   precedence is **localAgent → gateway → provider** (`OCR/OCRProcessor+OCR.swift`), so the chosen
-   `provider`/`model` are never read. In gateway mode the sheet seeds a native model, prints a cost
-   estimate for it, and the status line even says *"Retrying 3 files with Anthropic Claude Opus 4.6…"* —
-   while the call goes to the gateway's `modelID`, i.e. **the same model that just failed**, at the
-   gateway's price. Money spent re-running the identical failing config, with the UI naming a model that
-   is never contacted.
-2. **Live Capture retry does the opposite — it *drops* the backend.** `LiveCaptureProcessor.retryFailed`
-   passes `gateway: ov == nil ? config.gateway : nil, localAgent: ov == nil ? config.localAgent : nil`, so
-   any override forces the **direct metered API**. On a Local Agent session (subscription auth, $0/page) a
-   6-page segment retry becomes 6 real billed calls. ⚠️ **W25.modelsync-fu made this branch dearer**: the
-   sheet now seeds the session's *selected* model instead of the family's cheapest, so the same accidental
-   click costs more. That is an argument for fixing this soon, not for reverting the seed — the old
-   cheap-but-wrong default was not a safety feature.
-3. **A gateway-only operator cannot retry at all.** Both sheets load the *provider-named* Keychain account,
-   never `"Gateway"`, and Retry is `.disabled(apiKey.isEmpty)` — so with no native key the button is dead
-   and the only option is "Continue Without Retrying".
+`OCRProcessor.retryOne` and the failed-file loop now take the immutable `SessionProcessingConfig`, including
+its gateway, Local Agent, provider key, model, and settings. Its PDF provenance comes from that same snapshot,
+never mutable Settings. Process Files shows the actual locked backend and no longer needs a native-provider
+key to arm Retry. Live Capture retains its session config for every retry and accepts only an optional rotation
+override; that override cannot drop gateway/Local Agent routing and force a direct paid call.
 
-**Owner decision needed** (this is why it is filed, not fixed): should a retry (a) reproduce the run's
-backend and drop the provider/model picker to a gateway-model / CLI-model field, (b) keep the picker as a
-deliberate *escape hatch* to the direct API — in which case it must say so and show the price, since that
-is a $0 → metered jump for Local Agent — or (c) offer both, explicitly labelled? Until that is decided,
-any comment claiming the picker and the call agree is false.
+**Tier-2 verification:** an injected no-network transport and committed fake Local Agent CLI drive all three
+routes with deliberately conflicting mutable settings. `scripts/test-retry-backend.sh` proves direct, gateway-
+only, and Local Agent retries use the locked route and that each generated PDF credits that same backend. An
+independent adversarial review found the stale-PDF-provenance path before ship; the regression now covers it.
 
-**Related, same review, smaller (`W25.retry-estimate`):** both retry estimates call `CostEstimator.estimate`
-without `rotationMode:` or `imageScale:` (so `.off` / `1.0`), while `retryOne` runs `detectRotation` with the
-run's real rotation mode — an LLM rotation mode makes extra paid calls per file that the quote omits.
+**Still separate:** `W25.retry-estimate` covers the omitted rotation/image-scale cost inputs.
 
 ---
 

@@ -95,13 +95,12 @@ struct OCRView: View {
 
     // Per-item inline-disclosure (Files pane): which row is expanded + action sheet targets.
     @State private var expandedFileID: String?
-    @State private var fileModelChoiceTarget: FileModelChoiceTarget?
+    @State private var fileRotationRetryTarget: FileRotationRetryTarget?
     @State private var fileTextViewerTarget: FileTextViewerTarget?
 
-    struct FileModelChoiceTarget: Identifiable {
+    struct FileRotationRetryTarget: Identifiable {
         let jobIndex: Int
-        let includeRotation: Bool
-        var id: String { "\(jobIndex)-\(includeRotation ? "rot" : "mdl")" }
+        var id: Int { jobIndex }
     }
     struct FileTextViewerTarget: Identifiable {
         let jobIndex: Int
@@ -146,27 +145,6 @@ struct OCRView: View {
         apiKey = useAppleVision
             ? (visionUseLLMJudgment ? (KeychainHelper.load(account: selectedProvider.rawValue) ?? "") : "")
             : (KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "")
-    }
-
-    /// What a retry/re-run sheet should OPEN on: the settings the run actually used, not the live Settings
-    /// selection. `activeRunConfig` is the snapshot the run pinned at start; the live selection can have
-    /// moved since (⌘⌥P cycles the provider app-wide with no run-in-progress guard, and Settings is
-    /// editable mid-run), and seeding from it would offer to retry Mistral failures on Anthropic. Falls
-    /// back to the live selection only for a run that pinned no snapshot.
-    private var runSeed: (provider: LLMProvider, model: LLMModel, thinking: ThinkingLevel) {
-        if let cfg = processor.activeRunConfig {
-            return (cfg.provider, cfg.model, cfg.thinkingLevel)
-        }
-        return (selectedProvider, selectedModel, selectedThinking)
-    }
-
-    /// Same, but for the end-of-run modal retry loop, which can raise its sheet more than once: an
-    /// escalation the operator already made in an earlier round wins over the run's original settings.
-    private var retrySeed: (provider: LLMProvider, model: LLMModel, thinking: ThinkingLevel) {
-        if let last = processor.lastRetryChoice {
-            return (last.provider, last.model, last.thinkingLevel ?? runSeed.thinking)
-        }
-        return runSeed
     }
 
     private var costEstimate: CostEstimate? {
@@ -298,33 +276,26 @@ struct OCRView: View {
             CollectionReviewSheet(processor: processor)
         }
         .sheet(isPresented: $processor.awaitingRetryDecision) {
-            let seed = retrySeed
-            OCRRetrySheet(processor: processor, initialProvider: seed.provider,
-                          initialModel: seed.model, initialThinking: seed.thinking)
+            OCRRetrySheet(processor: processor)
         }
-        // Per-item "retry with model" / "rotate & re-run" from the Files pane inline disclosure.
-        .sheet(item: $fileModelChoiceTarget) { target in
-            ModelChoiceSheet(
-                title: target.includeRotation ? "Rotate & re-run" : "Retry with model",
+        // Per-item rotate-and-re-run uses the run's locked backend and changes only the forced rotation.
+        .sheet(item: $fileRotationRetryTarget) { target in
+            RotationRetrySheet(
+                title: "Rotate & re-run",
                 subtitle: "Re-run OCR for this file; the old output is replaced.",
-                includeRotation: target.includeRotation,
-                fileCountForEstimate: 1,
-                initialProvider: runSeed.provider,
-                initialModel: runSeed.model,
-                initialThinking: runSeed.thinking,
+                backendDescription: processor.retryBackendDescription,
                 initialRotation: processor.jobs.indices.contains(target.jobIndex)
                     ? (processor.jobs[target.jobIndex].result?.rotationDegrees ?? 0) : 0,
-                onApply: { provider, model, thinking, key, rotation in
+                onApply: { rotation in
                     Task {
                         guard let outDir = outputDirectory else { return }
                         await processor.retryOne(
-                            index: target.jobIndex, provider: provider, model: model,
-                            thinkingLevel: thinking, apiKey: key, outputDirectory: outDir,
+                            index: target.jobIndex, outputDirectory: outDir,
                             rotation: rotation)
                     }
-                    fileModelChoiceTarget = nil
+                    fileRotationRetryTarget = nil
                 },
-                onCancel: { fileModelChoiceTarget = nil })
+                onCancel: { fileRotationRetryTarget = nil })
         }
         // Per-item "view text" from the Files pane inline disclosure.
         .sheet(item: $fileTextViewerTarget) { target in
@@ -861,17 +832,12 @@ struct OCRView: View {
             guard let outDir = outputDirectory else { return }
             // Prevent re-entrant retries while this job is already being OCR'd.
             guard processor.jobs[jobIndex].status != .processing else { return }
-            let seed = runSeed
             Task {
                 await processor.retryOne(
-                    index: jobIndex, provider: seed.provider, model: seed.model,
-                    thinkingLevel: seed.model.supportsThinking ? seed.thinking : nil,
-                    apiKey: seed.provider == .appleVision ? "" : apiKey, outputDirectory: outDir)
+                    index: jobIndex, outputDirectory: outDir)
             }
-        case .retryWithModel:
-            fileModelChoiceTarget = FileModelChoiceTarget(jobIndex: jobIndex, includeRotation: false)
         case .changeRotation:
-            fileModelChoiceTarget = FileModelChoiceTarget(jobIndex: jobIndex, includeRotation: true)
+            fileRotationRetryTarget = FileRotationRetryTarget(jobIndex: jobIndex)
         case .viewText:
             fileTextViewerTarget = FileTextViewerTarget(jobIndex: jobIndex)
         case .reclassify:

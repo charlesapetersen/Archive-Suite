@@ -57,8 +57,7 @@ enum FailureKind: Equatable {
 /// Actions a pane can offer for an item. Not every action applies to every pane — each item advertises
 /// the subset it supports via `availableActions`, and each pane supplies the handler.
 enum ItemAction: Hashable {
-    case retry                          // re-run with the current/session model
-    case retryWithModel                 // open ModelChoiceView (provider/model/thinking/key)
+    case retry                          // re-run with the original run/session backend
     case viewText                       // OCR text + error viewer
     case reclassify                     // Files only (box/folder/start/continuation)
     case changeRotation                 // rotate & re-run
@@ -68,7 +67,6 @@ enum ItemAction: Hashable {
     var label: String {
         switch self {
         case .retry: return "Retry"
-        case .retryWithModel: return "Retry with model…"
         case .viewText: return "View text"
         case .reclassify: return "Reclassify"
         case .changeRotation: return "Rotate & re-run"
@@ -80,7 +78,6 @@ enum ItemAction: Hashable {
     var systemImage: String {
         switch self {
         case .retry: return "arrow.clockwise"
-        case .retryWithModel: return "slider.horizontal.3"
         case .viewText: return "doc.text.magnifyingglass"
         case .reclassify: return "tag"
         case .changeRotation: return "rotate.right"

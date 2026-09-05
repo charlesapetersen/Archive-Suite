@@ -223,16 +223,15 @@ final class LiveCaptureProcessor: ObservableObject {
 
     // MARK: Per-item sheet targets (W3.cap-r3-fu9)
 
-    /// One segment's "Retry with model" / "Rotate & re-run" sheet.
-    struct ModelChoiceTarget: Identifiable, Equatable {
+    /// One segment's rotate-and-re-run sheet. The backend is locked to the session configuration.
+    struct RotationRetryTarget: Identifiable, Equatable {
         let groupId: String
-        let includeRotation: Bool
-        var id: String { groupId + (includeRotation ? "-rot" : "-mdl") }
+        var id: String { groupId + "-rot" }
     }
     /// One segment's "View text" sheet.
     struct SegmentTextTarget: Identifiable, Equatable { let id: String }
 
-    /// The Processing list's two PER-ITEM sheets — "Retry with model" / "Rotate & re-run", and
+    /// The Processing list's two PER-ITEM sheets — "Rotate & re-run", and
     /// "View text". Owned HERE rather than in `LiveCaptureView`'s `@State` since `W3.cap-r3-fu9`, because
     /// **the finish flow has to be able to see them.**
     ///
@@ -266,7 +265,7 @@ final class LiveCaptureProcessor: ObservableObject {
     ///
     /// Writable on purpose — `.sheet(item:)` clears its binding on dismissal, and that write is exactly the
     /// signal `perItemSheetDidChange` needs.
-    @Published var modelChoiceTarget: ModelChoiceTarget? {
+    @Published var rotationRetryTarget: RotationRetryTarget? {
         didSet { perItemSheetDidChange(wasUp: oldValue != nil) }
     }
     @Published var textViewerTarget: SegmentTextTarget? {
@@ -276,7 +275,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// How long after the last per-item sheet target is cleared the finish stays held anyway.
     ///
     /// ⚠️ THE MOST DELICATE PART OF `W3.cap-r3-fu9`, and it exists because a cleared target is NOT the sheet
-    /// leaving the screen. `.sheet(item:)` — and `ModelChoiceSheet`'s own `onApply`/`onCancel` and
+    /// leaving the screen. `.sheet(item:)` — and `RotationRetrySheet`'s own `onApply`/`onCancel` and
     /// `SegmentTextViewerSheet`'s `onDismiss` — write nil while AppKit is still animating the sheet OUT,
     /// ~0.2–0.4 s. The first version of this fix advanced the finish one MainActor turn after that write
     /// (microseconds), which raised the rotation review DURING the outgoing sheet's teardown and so made the
@@ -297,7 +296,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// True while one of the two per-item sheets is on screen — or may still be, for `perItemSheetGrace`
     /// after its target was cleared. Read by `proceedToFinishIfReady`.
     var perItemSheetUp: Bool {
-        if modelChoiceTarget != nil || textViewerTarget != nil { return true }
+        if rotationRetryTarget != nil || textViewerTarget != nil { return true }
         if let t = perItemSheetClearedAt, Date().timeIntervalSince(t) < Self.perItemSheetGrace { return true }
         return false
     }
@@ -311,7 +310,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// ⚠️ The condition is the raw targets, NOT `!perItemSheetUp` — during the grace that property is
     /// deliberately still true, so testing it here would mean this never fires at all.
     private func perItemSheetDidChange(wasUp: Bool) {
-        guard wasUp, modelChoiceTarget == nil, textViewerTarget == nil else { return }
+        guard wasUp, rotationRetryTarget == nil, textViewerTarget == nil else { return }
         perItemSheetClearedAt = Date()
         guard pendingFinish else { return }
         Task { @MainActor [weak self] in
@@ -359,17 +358,9 @@ final class LiveCaptureProcessor: ObservableObject {
     /// independent of the order segments happen to finalize in.
     private var groupCollectionKey: [String: String] = [:]
 
-    /// Optional per-group OCR override from a per-item "retry with model" / "rotate & re-run". Threaded
-    /// into that group's re-OCR (provider/model) and finalize (forced rotation), then cleared once consumed
-    /// so a later normal re-finalize doesn't reuse it. Absent for the common (session-config) path.
-    struct OCROverride {
-        let provider: LLMProvider
-        let model: LLMModel
-        let thinkingLevel: ThinkingLevel?
-        let apiKey: String
-        let rotation: Int?
-    }
-    private var groupOCROverride: [String: OCROverride] = [:]
+    /// Optional per-group output-rotation override. Backend settings are intentionally absent: every retry
+    /// reuses the session's locked provider/model, gateway or Local Agent route.
+    private var groupRotationOverride: [String: Int?] = [:]
 
     init(session: CaptureSession) { self.session = session }
 
@@ -573,7 +564,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// the passed set — so the data-safety sequence (delete stale staged output → drop finalized/failed
     /// bookkeeping → persist the cleaned manifest BEFORE re-processing → re-ingest) is identical. A
     /// `.staged`/`.succeededNoText` segment is retryable too: old output is deleted first, so it's safe.
-    func retryFailed(groupIds: Set<String>? = nil, override: OCROverride? = nil) {
+    func retryFailed(groupIds: Set<String>? = nil, rotation: Int? = nil) {
         guard !stagingManifestBlocked, session.processingMode == .live else { return }
         // W3.cap-r3-fu7 — refuse while a finish is regenerating, and refuse HERE rather than only in the UI.
         // `applyRotationReviewAndFinalize` sets `isFinalizing` and then writes each changed segment's files
@@ -598,8 +589,8 @@ final class LiveCaptureProcessor: ObservableObject {
         //     on (off by default) ⇥ still reaches a control behind an overlay, and there is no
         //     `.accessibilityAddTraits(.isModal)` on the overlay to stop an AX client either. `.disabled` is
         //     what removes the control from both. (Reasoned from the code, NOT observed — see the overlay.)
-        //   • The deferred `modelChoiceTarget` sheet Apply: covered ONCE, and only HERE. A presented sheet
-        //     floats ABOVE the overlay — the scrim's predicate does not mention `modelChoiceTarget`, so that
+        //   • The deferred `rotationRetryTarget` sheet Apply: covered ONCE, and only HERE. A presented sheet
+        //     floats ABOVE the overlay — the scrim's predicate does not mention `rotationRetryTarget`, so that
         //     sheet is up with the scrim uselessly behind it — and its Apply fires whenever the operator gets
         //     round to it. This guard is the whole defence on that path (its reachability rides on
         //     `W3.cap-r3-fu9`).
@@ -617,15 +608,15 @@ final class LiveCaptureProcessor: ObservableObject {
         //
         // The model layer is the load-bearing gate, not the two `.disabled`/withheld-action edits that ship
         // with it, because this is the ONE place all three entry points converge — and one of them is
-        // deferred: `LiveCaptureView`'s `modelChoiceTarget` sheet captures a group when it opens and calls
+        // deferred: `LiveCaptureView`'s `rotationRetryTarget` sheet captures a group when it opens and calls
         // back on Apply, which can be an arbitrary time later, so no enabled-ness computed when the button
         // was drawn can speak for the moment the retry actually runs. The UI edits are there so the operator
         // is not offered something that would be refused; this is what makes the refusal true.
         //
         // The accepted limit, stated rather than hidden: that same deferred Apply is the one path where the
-        // refusal is SILENT — `onApply` calls this, gets nothing, and then clears `modelChoiceTarget`
-        // unconditionally, so the sheet closes taking the operator's provider, model, thinking level, ROTATION
-        // choice and freshly TYPED API KEY with it. (The first draft of this note said "a second press", which
+        // refusal is SILENT — `onApply` calls this, gets nothing, and then clears `rotationRetryTarget`
+        // unconditionally, so the sheet closes taking the operator's forced rotation choice with it. (The
+        // first draft of this note said "a second press", which
         // undersold it — the adversarial pass priced it properly.) It is accepted rather than fixed because the
         // alternative is a new operator-facing error channel for a path that may not be reachable at all
         // (`W3.cap-r3-fu9`); if fu9 confirms it is, the right fix is to keep the sheet OPEN on a refusal, not
@@ -635,7 +626,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // Scoped to `isFinalizing` DELIBERATELY, and not widened to `requestFinish`'s
         // `!showFinalizeSheet, !showRotationReview` triple. Those two states put a modal sheet over the
         // panel, so the panel's own retry affordances are unreachable in them — the only entry that survives
-        // a sheet is the deferred `modelChoiceTarget` Apply above, and reaching it needs a SECOND sheet to
+        // a sheet is the deferred `rotationRetryTarget` Apply above, and reaching it needs a SECOND sheet to
         // have been suppressed by the first (SwiftUI presents one sheet per view). That is a distinct claim
         // about the presentation layer with a distinct fix, filed as `W3.cap-r3-fu9`, not something to
         // absorb into a money-path refusal that no test here drives.
@@ -700,7 +691,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 pageTasks[k]?.cancel()
                 pageTasks[k] = nil
             }
-            groupOCROverride[gid] = override    // nil clears any prior override
+            groupRotationOverride[gid] = rotation
             setStatusDetail(gid, kind: nil, error: nil)   // clear the stale reason line
             setPhase(gid, .ocr)
             toReprocess.append(gid)
@@ -825,9 +816,6 @@ final class LiveCaptureProcessor: ObservableObject {
             groupCollectionKey[photo.groupId] = (photo.type == .box) ? photo.groupId : currentCollectionKey
         }
 
-        // A per-item "retry with model" override (if any) re-OCRs this group with the chosen provider/model
-        // via a direct API call (no gateway); otherwise use the session's locked config.
-        let ov = groupOCROverride[photo.groupId]
         if let stub = Self._recoveryTestOCRStub {
             // $0 recovery driver ONLY (never set in production): stand in for the PAID call and record the
             // start, so W3.cap-r2's dedup can be proven on the real ingest path without buying an OCR.
@@ -841,16 +829,14 @@ final class LiveCaptureProcessor: ObservableObject {
         } else {
             pageTasks[key] = Self.ocrTask(
                 imageURL: photo.url,
-                provider: ov?.provider ?? config.provider,
-                model: ov?.model ?? config.model,
-                thinkingLevel: ov.map { $0.thinkingLevel } ?? config.thinkingLevel,
-                apiKey: ov?.apiKey ?? config.apiKey,
+                provider: config.provider, model: config.model,
+                thinkingLevel: config.thinkingLevel, apiKey: config.apiKey,
                 customPrompt: config.customOCRPrompt.isEmpty ? nil : config.customOCRPrompt,
-                imageScale: config.imageScale, gateway: ov == nil ? config.gateway : nil,
-                localAgent: ov == nil ? config.localAgent : nil,
+                imageScale: config.imageScale, gateway: config.gateway,
+                localAgent: config.localAgent,
                 rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
                 visionSettings: config.visionSettings,
-                visionTextLLM: ov == nil ? config.visionTextLLM : nil)
+                visionTextLLM: config.visionTextLLM)
         }
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
@@ -990,7 +976,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // override forces this group's output rotation (the re-OCR itself doesn't re-detect it).
         var results: [OCRResult] = []
         var texts: [String] = []
-        let rotationOverride = groupOCROverride[groupId]?.rotation
+        let rotationOverride = groupRotationOverride[groupId] ?? nil
         for photo in group.photos {
             var r = await pageTasks[PageKey(photo)]?.value
                 ?? OCRResult(text: nil, classification: nil, errorMessage: "OCR not started", errorCode: nil)
@@ -1005,7 +991,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // B8: the per-page OCR awaits above can suspend for seconds (box-label OCR). If Clear ran in that
         // window the session was reset — bail before touching any (now-cleared) state or making the LLM call.
         guard clearGeneration == startedGeneration else { return }
-        groupOCROverride[groupId] = nil   // consumed
+        groupRotationOverride[groupId] = nil   // consumed
 
         // Tags: Mac subjects skip the LLM; automatic mode calls the LLM; box/folder → color tag.
         let mac = session.macTags[groupId]
@@ -1635,7 +1621,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // W3.cap-r3-fu9 — and wait while one of the Processing list's PER-ITEM sheets is up. Same class as
         // the `pendingTagGroup` term beside it: a modal the operator has open, which the finish must not
         // walk into. The difference is that this one is not the finish flow's own, so raising the rotation
-        // review here would put two concurrent `.sheet` presentations on one view — see `modelChoiceTarget`
+        // review here would put two concurrent `.sheet` presentations on one view — see `rotationRetryTarget`
         // for the three things SwiftUI might then do and why none of them is acceptable in a money path.
         // Refusing here rather than in `finishSession` is load-bearing: `pendingFinish` is cleared on the
         // line below, so a refusal one level in would DISCARD the finish (nothing re-arms it) instead of
@@ -2080,7 +2066,7 @@ final class LiveCaptureProcessor: ObservableObject {
         releaseAllFinalizedGroups()   // W3.cap-r3-fu5 — the pair, together; see the helper
         retained.removeAll()
         groupCollectionKey.removeAll()
-        groupOCROverride.removeAll()
+        groupRotationOverride.removeAll()
         pageTasks.removeAll()
         rotationReviewPages.removeAll()
         currentCollectionKey = "__unfiled__"
@@ -2090,7 +2076,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // left set names a group that no longer exists and would hold the NEXT session's Finish indefinitely.
         // Latent rather than live (reaching Clear needs the window-modal sheet down), and cleared here for
         // the same reason everything above it is.
-        modelChoiceTarget = nil
+        rotationRetryTarget = nil
         textViewerTarget = nil
         clearFinalizeSummary()
     }
