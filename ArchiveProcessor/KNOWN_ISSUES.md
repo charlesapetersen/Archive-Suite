@@ -110,7 +110,8 @@ routes with deliberately conflicting mutable settings. `scripts/test-retry-backe
 only, and Local Agent retries use the locked route and that each generated PDF credits that same backend. An
 independent adversarial review found the stale-PDF-provenance path before ship; the regression now covers it.
 
-**Still separate:** `W25.retry-estimate` covers the omitted rotation/image-scale cost inputs.
+**Closed alongside it:** W25.retry-backend removed the retry cost panels with the false provider/model
+picker, so no retry quote remains that could omit rotation or image-scale inputs (`W25.retry-estimate`).
 
 ---
 

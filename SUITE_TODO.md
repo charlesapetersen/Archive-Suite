@@ -136,12 +136,6 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 
 ## Owner-reported bugs (2026-08-02) — follow-ons
 
-- [ ] **W25.retry-estimate — the retry cost quotes omit rotation and image scale [XS–S · LOW].** Same review.
-  Both retry estimates call `CostEstimator.estimate` without `rotationMode:`/`imageScale:` (defaulting `.off`
-  / `1.0`) while `retryOne` runs `detectRotation` with the run's real rotation mode, so an LLM rotation mode
-  makes extra paid calls per file that the quoted figure does not include. Pass the run's values from
-  `activeRunConfig` (now the retry sheets' seed anyway).
-
 ## Wave 26 — de-Spotlight the suite (owner directive 2026-08-04) — plan DELETED (`W26.plandelete`)
 
 **Owner directive, 2026-08-04:** *"Spotlight is fundamentally unreliable on macOS."* Remove **all** reliance

@@ -3143,6 +3143,13 @@ explain why not.
   `test-recovery.sh` ALL PASS on isolated scratch state. Independent adversarial review found and closed the
   stale-PDF-provenance path before ship. No corpus access, provider request, credential write, or spend.
 
+- [x] **W25.retry-estimate — retry cost quotes omitted rotation and image scale [XS–S · LOW].** **SHIPPED
+  2026-09-05 (this commit; no code change required).** W25.retry-backend removed both retry cost panels with
+  the false provider/model picker, so there is no longer a retry cost quote that could omit those inputs.
+  `rg` confirms every remaining `CostEstimator.estimate` caller is pre-run/history/test code; the normal
+  pre-run estimate already passes its live `rotationMode` and `imageScale`. Reintroducing a retry estimate is
+  a new design decision, not a reason to preserve a misleading quote.
+
 - [x] **W25.modelsync [MED · money] — changing the model in Settings did not change the Process Files cost
   estimate, and the run used the OLD model. ✅ DONE 2026-08-02** (this commit; fix + adversarial-review
   fixes + trackers).
@@ -3263,13 +3270,13 @@ explain why not.
   against a no-conformance control that fails with `#ActorIsolatedCall`). The `nonisolated` markings on
   `modelKey` / the output-directory helpers are still right, but the stated reason was wrong; the comments now
   say why they actually hold — and `modelKey`'s is now genuinely load-bearing, since `fromDefaults` uses it.
-  **NOT fixed — filed instead, because the answer is an owner decision:** **W25.retry-backend** (in gateway /
+  **Not fixed in that commit — filed instead, because the answer was then an owner decision:** **W25.retry-backend** (in gateway /
   Local Agent mode the retry sheets are decorative — `performOCRCall`'s localAgent → gateway → provider
   precedence never reads them — while Live Capture's retry *drops* the backend for a metered call, which this
   item's seed change made dearer) and **W25.retry-estimate** (retry quotes omit rotation + image scale). Both
-  are in `SUITE_TODO.md` → *Owner-reported bugs (2026-08-02) — follow-ons*, with the full write-up in
-  `ArchiveProcessor/KNOWN_ISSUES.md`. Fixing the seed did not fix those, and the code now says so rather than
-  claiming a parity it does not have.
+  were filed in `SUITE_TODO.md` → *Owner-reported bugs (2026-08-02) — follow-ons*, with the full write-up in
+  `ArchiveProcessor/KNOWN_ISSUES.md`. Both later shipped: W25.retry-backend locks retries to the original
+  backend; W25.retry-estimate closed with it because the misleading retry cost panes were removed.
 
 
 ## ⭐ TOP PRIORITY — pre-flight for a 2-week unattended run (owner, 2026-07-16)
