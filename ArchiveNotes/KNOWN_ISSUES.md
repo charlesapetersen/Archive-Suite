@@ -3,6 +3,17 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ VERIFIED (W9.cand1) — the GUI can create a note from All Notes
+
+**2026-09-05.** The interrupted 2026-07-18 GUI sweep reported that `⌘N` and the toolbar pencil did nothing
+while All Notes was selected. The current production command is reachable there: `NotesBrowserView` binds
+`⌘N` to **New Note**, which invokes `NotesModel.newItem` using the Inbox default when no concrete folder is
+selected. Its scratch-only UI test first snapshots `items/`, sends `⌘N`, falls back to the real toolbar menu
+only if the synthesized shortcut does not arrive, and requires exactly one new item directory containing a
+Markdown file. The off-screen VM run passed that G1 check (22.908 s) and all 21 Notes UI tests (403.303 s).
+The prior observation was therefore not a product defect; no UX or creation-path follow-up was filed. The
+fixture is rebuilt inside the VM and no real Notes store, corpus, bookmark, network, or credential is used.
+
 ## ✅ FIXED (W21.hash) — Markdown styling no longer bridges `BlockKind` through a slow Objective-C hash
 
 **2026-08-20.** `BlockKind` is stored as an `NSAttributedString` attribute during Markdown styling. It was

@@ -1152,20 +1152,6 @@ these items are the *state*. Each maps 1:1 to a plan sub-item ID, so `W9.b4` is 
 surface. ⛔ Do not file A4 again. **D5** also shipped (W14.4b,
 live-verified 2026-07-17).
 
-**Two CANDIDATE findings come first.** The 2026-07-18 GUI sweep was cut short by a usage limit and left two
-unconfirmed findings. `W9.cand1` is potentially **HIGH** and gates the value of all of Phase B — confirm it
-before building anything else in Notes.
-
-- [ ] **`W9.cand1` — CONFIRM FIRST: can a note be created from the GUI at all? [S · potentially HIGH · gui].**
-  Plan addendum 2026-07-18. With the app on the scratch fixture, **⌘N created no note** (item count unchanged
-  on disk across two attempts) and the toolbar **"New" pencil created nothing**; there is **no `File` menu** at
-  all, so ⌘N appears unbound. Benign explanations that must be ruled out first: the New menu may need a real
-  folder selected (the sweep was on the "All Notes" pseudo-row), a new empty note may live in memory/index
-  until first edit, or the click may have missed the split-button. **If creation is genuinely unreachable this
-  is HIGH — a note app you cannot add a note to** — and combined with `W9.b3` (no in-app retitle) notes could
-  be neither created nor renamed. Drive it on the Notes VM lane, scratch fixture only. Outcome is either a
-  HIGH bug item or a downgrade to a UX note. | ArchiveNotes GUI | S | low | **needs:** gui
-
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 

@@ -92,6 +92,19 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase A safety-net (2026-08-19)
 
+- [x] **`W9.cand1` — CONFIRMED: notes can be created from the GUI [S · gui].** **SHIPPED 2026-09-05 (this
+  commit).** The 2026-07-18 interrupted sweep was a false candidate, not a HIGH creation-path defect. In the
+  scratch-only Notes VM lane, the production `⌘N` command or the toolbar **New Note** menu creates exactly one
+  new `items/<uuid>/<Title>.md` file even while the All Notes pseudo-row is selected. The existing end-to-end
+  G1 test reads the fixture directory before and after, waits for the write, and rejects an empty or duplicate
+  result; it is therefore stronger than an accessibility-only control check. No UX follow-up is needed.
+
+  **Verification:** `ops/gui/vm-gui-runner.sh notes xcuitest` ran off-screen against its rebuilt disposable
+  fixture; `testG1_CreateNoteWritesNewItemFile` passed in 22.908 s and the full `ArchiveNotesUITests` suite
+  passed 21/21 in 403.303 s. No real Notes store, archive corpus, bookmark, network, or credential was used.
+  | ArchiveNotes/macOS/{Sources/ArchiveNotes/Views/NotesBrowserView.swift,Tests/ArchiveNotesUITests/
+  NotesGUITests.swift}, ArchiveNotes/scripts/GUI-HARNESS.md | S | low | done
+
 - [x] **`W9.c4` — the Notes smoke gate builds and drives the GUI target [XS].** **SHIPPED 2026-08-20**
   (commit whose subject begins `test(notes,ops,trackers): W9 scope Notes smoke to units`). Notes smoke now
   uses a dedicated `ArchiveNotesUnit` scheme and always selects `ArchiveNotesTests`, even outside the daemon,
