@@ -15,6 +15,28 @@ never a source of queue candidates. **Do not rename or move this file without up
 
 Grouped under the `SUITE_TODO.md` section each item was completed in.
 
+## Paid-batch recovery — Wave 16 (2026-09-04)
+
+- [x] **W16.bat5-fu2 — post-Stop batch materialization retains its completion facts [S · low · Tier-2].**
+  **SHIPPED 2026-09-04 (this commit).** If Stop lands after a paid-batch provider response has arrived but
+  while its PDFs are materializing, the matching retained journal now appends only the already-written
+  result/output-path and consumed-chunk facts. It never reopens the in-memory journal, recreates a deleted
+  record, changes `submissionComplete`, or requests more work; Resume therefore skips those exact outputs
+  rather than re-materializing them. The focused headless contract drives the real Stop and both mutators
+  against a redirected scratch journal, checks the exact output association, Resume's remaining-index rule,
+  lifecycle self-consistency, interruption state, and retained file. During verification it also repaired the
+  two cancellation-contract sweep totals that Apple Vision had made stale: totals derive from the enumerated
+  backends, while the independently stated confirmable-provider count stays deliberately fixed for review.
+
+  **Tier-2 verification:** independent adversarial review found a fast-confirmed-cancellation deletion race;
+  the identity-bound materialization keep window and a deterministic paused-materialization regression close it.
+  Processor Debug build; full redirected,
+  key-free/no-network `scripts/test-batch-resume.sh` (`ALL PASS`); Processor write-surface lint. No real
+  corpus, output folder, credentials, provider request, or spend. | ArchiveProcessor/{macOS/Sources/
+  ArchiveProcessor/{OCR/{OCRProcessor+Pipeline,BatchClosedJournalAppendContract,BatchCancelContract,
+  BatchCancelWiringContract}.swift,Capture/BatchResumeTestDriver.swift},TESTING.md,KNOWN_ISSUES.md} |
+  S | low | done
+
 ## Local Agent provenance — Wave 22 (2026-09-04)
 
 - [x] **W22.localagent-provenance — the Local Agent backend is visible in every durable record [S–M · med].**

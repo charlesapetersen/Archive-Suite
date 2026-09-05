@@ -1069,6 +1069,17 @@ extension OCRProcessor {
         outputDirectory: URL,
         runConfig: SessionProcessingConfig? = nil
     ) async -> Bool {
+        // From the terminal provider response through the per-result journal writes, an output PDF can be
+        // on disk without its completion fact yet. Bind that window to this exact journal so Stop keeps it
+        // even when the server confirms cancellation before `handleOCRResult` gets back to the main actor.
+        // The identity (not a shared Bool) prevents a late old run from changing a newer batch's decision.
+        let materializationAddress = ClosedPaidBatchJournalAddress(activePendingBatch)
+        if let materializationAddress { batchResultMaterializationAddress = materializationAddress }
+        defer {
+            if batchResultMaterializationAddress == materializationAddress {
+                batchResultMaterializationAddress = nil
+            }
+        }
         // Parse valid entries upfront so the task group doesn't need to touch fileURLs.
         // A resumed paid batch restores these keys from disk. Skip them before output-path allocation so
         // re-fetching an incompletely acknowledged chunk cannot create duplicate "(2)" PDFs.

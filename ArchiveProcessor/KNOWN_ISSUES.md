@@ -1178,7 +1178,8 @@ the provider's per-chunk cancellation as an injectable closure and returns what 
 extraction is behaviour-preserving (same switch, same order, same message, same single delete condition).
 `BatchCancelContract` drives it with a stub canceller and a **real temp file**, so "kept" means a file that
 is still on disk: 28 checks (`scripts/test-batch-resume.sh` 161 → 189), including the invariant swept over
-all four providers × chunk counts 0–6 × no refusal / each chunk refused in turn / all refused — 132 trials
+every available backend × chunk counts 0–6 × no refusal / each chunk refused in turn / all refused — currently
+330 trials
 asserting *deleted ⟺ confirmed* in the outcome **and** on disk, confirmation matching an independently
 written statement of the providers' capabilities, no attempt a provider's rule could not act on, the
 "kept for recovery" sentence present exactly when the file survived, and delete called at most once.

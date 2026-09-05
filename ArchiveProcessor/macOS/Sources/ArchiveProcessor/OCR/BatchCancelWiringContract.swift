@@ -15,7 +15,7 @@ import Foundation
 ///
 /// The named scenarios come first, each chosen because some specific mutation survives without it;
 /// `sweepEveryShape` then presses Stop on the whole cross-product (every provider × 0–3 acknowledged
-/// chunks × journal-present × each chunk refused in turn — 80 Stops) and demands an exact outcome from
+/// chunks × journal-present × each chunk refused in turn — 30 Stops per backend) and demands an exact outcome from
 /// each, which is what covers the shapes nobody thought to name (W16.bat2-fu3).
 ///
 /// **How it stays $0 and can never touch the operator's real state.** Every `cancel()` here is driven by
@@ -586,11 +586,11 @@ enum BatchCancelWiringContract {
     /// Everything above is a NAMED shape, chosen because a specific mutation survives without it. This is
     /// the complement: press Stop on the whole cross-product — every provider × 0–3 acknowledged chunks ×
     /// journal arm (finished / mid-submit / absent) × no refusal, then each chunk refused in turn — and
-    /// demand an exact outcome from all 120. What it buys over the named cases is the shapes nobody thought
+    /// demand an exact outcome from every generated shape (30 per backend). What it buys over the named cases is the shapes nobody thought
     /// to name: a two-chunk Mistral batch, an OpenAI batch that reached the cancel path at all, a Gemini
     /// batch whose *last* chunk is the one the provider declines, a mid-submit Stop at every chunk count.
     ///
-    /// Cheap because everything it drives is already stubbed — 120 Stops, no network, no keys, no cent, and
+    /// Cheap because everything it drives is already stubbed — 30 Stops per backend, no network, no keys, no cent, and
     /// the only file any of them can delete is that trial's own temp fixture (see `stop`). Each Stop does end
     /// in a real `checkForPendingBatch()`, which decodes whatever manifests it finds and re-derives their
     /// fingerprints; before W16.bat2-fu2 those were the operator's own, so a large interrupted run was the
@@ -663,7 +663,7 @@ enum BatchCancelWiringContract {
                         let batch = context(provider, batchId: batchId)
                         let stopped = await stop(batch: batch, pendingBatch: pending, refusing: refusing)
                         trials += 1
-                        // Named so a red points at one of 120 trials instead of at a boolean.
+                        // Named so a red points at one generated trial instead of at a boolean.
                         let shape = "\(provider.rawValue)/\(count) chunk\(count == 1 ? "" : "s")/"
                             + (hasJournal ? (arm.inFlight ? "journal mid-submit" : "journal") : "no journal") + "/"
                             + (refusing.isEmpty ? "none refused" : "refusing \(refusing.sorted().joined(separator: " "))")
@@ -700,27 +700,33 @@ enum BatchCancelWiringContract {
             }
         }
 
+        // The loop produces 30 trials per backend. Deriving this makes adding a backend exercise its Stop
+        // path immediately; the switch above remains exhaustive, so its cancellation capability cannot be
+        // silently inherited from a prior backend.
+        let expectedTrials = 30 * LLMProvider.allCases.count
+        let expectedKeeps = expectedTrials - 10
         check("wiring sweep: every provider × 0–3 chunks × journal arm × refusal shape was stopped (\(trials) trials)",
-              trials == 120)
+              trials == expectedTrials)
         // Non-vacuity, MEASURED. Not because the invariants above would otherwise hold for free — each is
         // stated against `willConfirm`, which is computed independently of what was observed, so a cancel
         // path that confirmed nothing would redden them. What these literals catch is the two statements
         // degenerating TOGETHER: change the rule and the hand-written table beside it in the same way, and
-        // every "exactly when confirmed" invariant becomes "exactly when never", satisfied vacuously by 80
-        // trials that all keep. 15 of the 120 shapes are fully confirmable — Gemini with 1–3 chunks and
+        // every "exactly when confirmed" invariant becomes "exactly when never", satisfied vacuously by
+        // trials that all keep. 15 of the generated shapes are fully confirmable — Gemini with 1–3 chunks and
         // Anthropic/Mistral with exactly 1, each unrefused, once per journal arm — and both counters below
         // are incremented from what happened to a real file, not from the table. Only 10 of those 15 delete:
         // the 5 in the mid-submit arm are exactly the W16.bat5 regression, confirmed cancellations that keep
-        // the journal anyway, so the split 10/110 is itself the fix being counted.
-        // (A fifth provider would move these numbers; that is a deliberate re-read, not a false alarm.)
-        check("wiring sweep: 10 of the \(trials) shapes really deleted a real journal file, and 110 really kept one",
-              deletions == 10 && keeps == 110 && deletions + keeps == trials)
+        // the journal anyway, so the split 10/\(expectedKeeps) is itself the fix being counted. A backend
+        // without a batch endpoint adds only kept shapes; a future batch-capable backend must make this
+        // independently stated non-vacuity count red for review.
+        check("wiring sweep: 10 of the \(trials) shapes really deleted a real journal file, and \(expectedKeeps) really kept one",
+              deletions == 10 && keeps == expectedKeeps && deletions + keeps == trials)
         for invariant in [fixture, askedOnce, attemptedIds, noDecoy, deletes, keptFile, message, state, inFlight] {
-            check(invariant.label, invariant.held && trials == 120)
+            check(invariant.label, invariant.held && trials == expectedTrials)
         }
     }
 
-    /// One invariant swept across all 120 trials. Collapsing them to plain `Bool`s loses the thing that
+    /// One invariant swept across every generated trial. Collapsing them to plain `Bool`s loses the thing that
     /// makes a red actionable — WHICH shape broke — so the first failing shape rides along in the label.
     private struct Invariant {
         private let name: String

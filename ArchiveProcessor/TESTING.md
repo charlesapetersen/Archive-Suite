@@ -292,9 +292,11 @@ existing scratch, key-free, no-network execution remains unchanged.
   chunk's pages come from and whether a chunk that produced none may be marked consumed.
   Also (W16.bat2) the **cancel path's journal-retention contract** (`BatchCancelContract`): pressing Stop
   deletes the paid-batch recovery journal if and only if every chunk's server-side cancellation was
-  confirmed — driven through the real seam with a stub canceller and a real temp file, swept over all four
-  providers × chunk counts 0–6 × which chunk refused. Scope: the `cancel()` RULE, not the whole
-  Stop path — W16.bat3 is open and owner-gated.
+  confirmed — driven through the real seam with a stub canceller and a real temp file, swept over every
+  available backend × chunk counts 0–6 × which chunk refused. Scope: the `cancel()` RULE, not the whole
+  Stop path — its cancelled-poll tail is separately covered by W16.bat3.
+  W16.bat5-fu2 adds the bounded post-response materialization keep case: even a confirmed cancellation keeps
+  the matching journal until the already-written PDFs reach their result/output-path and consumed-chunk facts.
   And (W16.bat2-fu) the **cancel path's WIRING** (`BatchCancelWiringContract`) — the arguments that rule is
   fed: the real `cancel()` with both cancel-path seams stubbed, proving it cancels the journal's
   acknowledged chunk IDs (not a decoy batch ID), through a canceller that closes over the batch's *own*
@@ -303,7 +305,7 @@ existing scratch, key-free, no-network execution remains unchanged.
   banner, touches nothing when there is no live batch, and cannot cancel or re-charge the same batch twice.
   Those are named shapes; W16.bat2-fu3 adds the complement — a sweep that presses Stop on the whole
   cross-product (every provider × 0–3 acknowledged chunks × journal-present × each chunk refused in turn,
-  80 Stops) and demands an exact outcome from each, plus the two shapes the named cases missed: a
+  30 Stops per backend) and demands an exact outcome from each, plus the two shapes the named cases missed: a
   single-job provider (Anthropic/Mistral) handed SEVERAL chunks must attempt nothing and keep the journal,
   and a legacy (`lifecycleVersion == nil`) journal must be cancelled by its batch ID, never by its
   non-authoritative stored chunk list.

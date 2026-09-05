@@ -107,7 +107,11 @@ import AppKit
 ///      the ID is APPENDED to the file Resume reads, and the mutator still returns false so the submit loop
 ///      still stops spending. Its refusals (no file, another run's journal, a legacy one, a live one) and the
 ///      owner's "Stop stays instant" constraint are measured, not argued. Real journal at the shipped path,
-///      so it takes the same redirect verdict.
+///      so it takes the same redirect verdict. W16.bat5-fu2 adds an already-fetched chunk being materialized
+///      as Stop lands: its exact output association and consumed-chunk fact survive in that same journal, so
+///      the shared remaining-index rule skips it on Resume without a re-fetch or duplicate output. It drives
+///      both a refused cancellation and the reviewer-found fast-confirmed cancellation, deliberately letting
+///      the latter finish before the completion facts are written.
 ///  23. **A stopped run's result does not land on the next run's jobs** (`StaleRunResultIdentityContract`,
 ///      W16.bat10): what section 21 pins for the completion sweep, for every `handleOCRResult` caller and for
 ///      the writes *before* the detached PDF write. No race to stage — the caller already holds the stale
@@ -797,9 +801,11 @@ enum BatchResumeTestDriver {
         // This is the residual of that: the journal W16.bat5 keeps does not list the chunk created between
         // `cancel()`'s snapshot and the Stop, because `cancel()` has nil'd `activePendingBatch` before its
         // callback runs. Drives the real `cancel()` (both seams stubbed) and then the real mutator, and pins
-        // both halves — the ID is appended to the file Resume reads, and the submission still stops. Every
-        // check writes a real journal at the shipped path, so it takes the same redirect verdict; the owner's
-        // "Stop must stay instant" constraint is measured here rather than read off the source.
+        // both halves — the ID is appended to the file Resume reads, and the submission still stops. Its
+        // follow-up drives the post-Stop result + chunk-completion mutators too: they retain facts from an
+        // already-fetched response, not a new request, so Resume skips the resulting PDF rather than
+        // re-materializing it. Every check writes a real journal at the shipped path, so it takes the same
+        // redirect verdict; the owner's "Stop must stay instant" constraint is measured rather than read.
         await BatchClosedJournalAppendContract.run(check: check, redirected: journalsAreRedirected)
 
         // --- 23: a stopped run's result does not land on the next run's jobs (W16.bat10). ---

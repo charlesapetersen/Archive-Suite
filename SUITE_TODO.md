@@ -685,33 +685,6 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `submittedChunkIds` array is the source of truth. **Owner decision 2026-07-18: do NOT build the full
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
-- [ ] **W16.bat5-fu2 — The other two journal mutators still lose their fact when Stop
-  closes the journal; for `markBatchChunkConsumed` that means a Resume re-materializes a chunk whose pages
-  were already written [S · LOW].** Filed 2026-08-03 from the `W16.bat5-fu` adversarial pass; the residual
-  that item deliberately did **not** widen into (its grant is explicit: no widening of `cancel()` beyond the
-  append path). `W16.bat5-fu` gives the closed journal an append path for `recordSubmittedBatchChunk` only.
-  The sibling mutators are unchanged, and the two cases are not alike:
-  * `markBatchSubmissionComplete` failing on a closed journal is **correct** — abandoning a submission should
-    leave `submissionComplete: false`, which is exactly the "may be short" state `W16.bat5` keeps the journal
-    for. Nothing to do here; recorded so a later reader does not "fix" it.
-  * `markBatchChunkConsumed` is the open question. It is reached at `+OCR.swift` (`case .materialize` →
-    `guard materialized, markBatchChunkConsumed(singleBatchId)`) immediately after `await
-    processBatchResults(...)`, so a Stop landing during that await nils `activePendingBatch` and the consumed
-    marker is lost. The journal is kept and the poll reports itself interrupted (W16.bat3/bat7), so nothing is
-    stranded and no provider charge is repeated — a completed batch's results are free to re-fetch. The
-    residual harm is **re-materialization**: on Resume that chunk is fetched again and its pages re-written.
-  **What still needs tracing before this is actionable** (not done, deliberately — one item per session): how
-  much of it the per-file journaling already absorbs. `PendingBatch.completedResults`/`completedOutputPaths`
-  are written per file *before* the chunk is marked consumed, and `resumeBatch` skips what they list — but
-  those writes go through the same `persistPendingBatchMutation` and so fail on the same closed journal, so
-  the exposure is probably limited to files materialized *after* the Stop. If that is right this is cosmetic
-  (duplicate PDFs at fresh non-colliding paths, per the B7 rule) rather than a money bug, and may not be worth
-  building. **Tier-2** (money path, scratch only) — **workable since 2026-08-13**, when the owner lifted the per-item
-  money gate: *"we don't need my permission for spending money. The daemon only spends tiny amounts and the
-  keys are capped."* The historical grants' ⛔ constraints still bind. It remains a change to what the cancel path does with the
-  journal, which was historically granted item by item — treat that as a reason for care, not a gate. Do NOT
-  fold into `W16.bat5-fu` or `W16.bat8` (both shipped; different file, different trigger).
-  | files: OCR/OCRProcessor+Pipeline.swift, OCR/OCRProcessor+OCR.swift | S | low | Tier-2
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
 Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
 entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned

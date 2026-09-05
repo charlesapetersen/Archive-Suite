@@ -22,6 +22,10 @@ import Foundation
 ///     loop still stops creating paid jobs. A Stop that recorded the ID and then kept spending would be a
 ///     worse bug than the one being fixed.
 ///
+/// W16.bat5-fu2 extends the same closed-journal boundary to an already-fetched chunk being materialized as
+/// Stop lands. Its PDFs are not new work, but their completed-result entries and the consumed-chunk fact must
+/// reach the journal; otherwise Resume fetches the same terminal result and allocates duplicate PDFs.
+///
 /// ⚠️ **SCOPE — read before citing this file.**
 ///   * The append is driven by CALLING `recordSubmittedBatchChunk` after a real `cancel()`, not by a real
 ///     provider create. Reaching that callback for real needs a paid submission; the same honest limit
@@ -46,6 +50,7 @@ enum BatchClosedJournalAppendContract {
             return
         }
         await aLateChunkIdReachesTheJournalStopClosed(check)
+        await aPostStopMaterializationStaysComplete(check)
         await theAppendIsAdditiveAndNothingElseMoves(check)
         await itRefusesEveryJournalThatIsNotThisOne(check)
         theLiveJournalIsNotItsToWrite(check)
@@ -69,7 +74,8 @@ enum BatchClosedJournalAppendContract {
     private static func journal(chunkIds: [String] = ["batches/chunk-0"],
                                 fingerprint: String = "closed-append-fingerprint",
                                 submittedAt: Date = Date(),
-                                lifecycleVersion: Int? = OCRProcessor.PendingBatch.currentLifecycleVersion)
+                                lifecycleVersion: Int? = OCRProcessor.PendingBatch.currentLifecycleVersion,
+                                submissionComplete: Bool = false)
         -> OCRProcessor.PendingBatch {
         OCRProcessor.PendingBatch(
             batchId: chunkIds.first ?? "", provider: .gemini, model: model(), thinkingLevel: .low,
@@ -78,7 +84,7 @@ enum BatchClosedJournalAppendContract {
             enableTagging: false, sendPreviousImage: false, submittedAt: submittedAt,
             runFingerprint: fingerprint,
             lifecycleVersion: lifecycleVersion,
-            submittedChunkIds: chunkIds, submissionComplete: false)
+            submittedChunkIds: chunkIds, submissionComplete: submissionComplete)
     }
 
     /// The same journal, but with an HONEST immutable fingerprint — the one
@@ -86,14 +92,16 @@ enum BatchClosedJournalAppendContract {
     ///
     /// The fixture above carries a made-up fingerprint, which is fine for every check that reads the file
     /// back itself and wrong for the only check that asks the app's own resume guard about it.
-    private static func resumableJournal(submittedAt: Date) -> OCRProcessor.PendingBatch {
+    private static func resumableJournal(
+        submittedAt: Date, submissionComplete: Bool = false
+    ) -> OCRProcessor.PendingBatch {
         let files = [URL(fileURLWithPath: "/tmp/closed-append/scan-0.jpg")]
         let output = URL(fileURLWithPath: "/tmp/closed-append", isDirectory: true)
         return journal(
             fingerprint: OCRProcessor.runFingerprint(
                 files: files, outputDirectory: output, taggingMode: .automatic,
                 enableTagging: false, batchMode: true, preserveInputOrder: true),
-            submittedAt: submittedAt)
+            submittedAt: submittedAt, submissionComplete: submissionComplete)
     }
 
     private static func context() -> OCRProcessor.BatchContext {
@@ -115,6 +123,17 @@ enum BatchClosedJournalAppendContract {
         /// The post-Stop exit may not cancel `processingTask`: it is nil or a NEWER run's by then.
         let cancelledTheRun: Bool
         let elapsed: TimeInterval
+    }
+
+    /// What the real per-file + per-chunk progress mutators did after a real Stop. The terminal response was
+    /// already available before Stop, so this exercises no network or provider client — only the durable
+    /// facts Resume needs to avoid materializing it a second time.
+    private struct LateMaterialization {
+        let resultSaved: Bool
+        let chunkMarkedConsumed: Bool
+        let onDisk: OCRProcessor.PendingBatch?
+        let interrupted: Bool
+        let journalDeleted: Bool
     }
 
     /// Press Stop for real on a live paid batch, then deliver a chunk ID the way a late create would.
@@ -223,6 +242,95 @@ enum BatchClosedJournalAppendContract {
         check("closed-journal append: recording the same ID twice lists it once — a retried callback does "
               + "not make Resume poll the same paid job twice",
               twice.onDisk?.submittedChunkIds == ["batches/chunk-0", late])
+    }
+
+    // MARK: - 1b. Already-fetched results land as completion facts, not duplicate PDFs
+
+    /// A Stop during `processBatchResults` is after the provider response was fetched but before the last
+    /// `saveResultToPendingRun` / `markBatchChunkConsumed` writes. The real cancel path drops the in-memory
+    /// journal first. Both an unconfirmed cancellation and the fast-confirmed race are driven below: in the
+    /// latter, cancellation finishes before the pending PDF facts are written. The two real progress mutators
+    /// must update the matching file without reopening it.
+    private static func stopThenRecordMaterialization(
+        journal fixture: OCRProcessor.PendingBatch,
+        cancellationConfirmed: Bool = false
+    ) async -> LateMaterialization {
+        let fm = FileManager.default
+        let output = fixture.outputDirectory.appendingPathComponent("post-stop-materialized.pdf")
+        try? fm.createDirectory(at: fixture.outputDirectory, withIntermediateDirectories: true)
+        try? Data("real scratch PDF stand-in".utf8).write(to: output, options: .atomic)
+        OCRProcessor.savePendingBatch(fixture)
+
+        let processor = OCRProcessor()
+        var deleted = false
+        processor.makeBatchChunkCanceller = { _ in
+            OCRProcessor.BatchChunkCanceller(provider: .gemini,
+                                             cancelChunk: { _ in cancellationConfirmed },
+                                             clientTypeName: cancellationConfirmed ? "confirming stub" : "refusing stub")
+        }
+        processor.makeBatchJournalDeleter = { _ in
+            { deleted = true; OCRProcessor.deletePendingBatch() }
+        }
+        processor.activeBatch = context()
+        processor.activePendingBatch = fixture
+        processor.batchResultMaterializationAddress = OCRProcessor.ClosedPaidBatchJournalAddress(fixture)
+        processor.batchPollInterrupted = false
+        processor.isProcessing = true
+        processor.cancel()
+        // This is the reviewer-found race: the server cancellation reports success while PDF generation is
+        // still suspended. Awaiting it BEFORE the real result mutators proves the keep decision itself, not
+        // merely the easier path where a refusal happened to leave the file behind.
+        if cancellationConfirmed { await processor.batchCancellationTask?.value }
+
+        let materialized = OCRResult(text: "post-stop body", classification: nil,
+                                     errorMessage: nil, errorCode: nil)
+        let resultSaved = processor.saveResultToPendingRun(index: 0, result: materialized, outputURL: output)
+        let chunkMarkedConsumed = processor.markBatchChunkConsumed("batches/chunk-0")
+        // The production loader is intentionally private; this contract reads the redirected scratch file
+        // directly so it proves what an independent Resume process would receive without widening that API.
+        let onDisk = (try? Data(contentsOf: OCRProcessor.pendingBatchURL))
+            .flatMap { try? JSONDecoder().decode(OCRProcessor.PendingBatch.self, from: $0) }
+        let interrupted = processor.batchPollInterrupted
+        await processor.batchCancellationTask?.value
+        processor.batchResultMaterializationAddress = nil
+        try? fm.removeItem(at: OCRProcessor.pendingBatchURL)
+        try? fm.removeItem(at: output)
+        return LateMaterialization(
+            resultSaved: resultSaved, chunkMarkedConsumed: chunkMarkedConsumed, onDisk: onDisk,
+            interrupted: interrupted, journalDeleted: deleted)
+    }
+
+    private static func aPostStopMaterializationStaysComplete(_ check: (String, Bool) -> Void) async {
+        let fixture = resumableJournal(
+            submittedAt: Date(timeIntervalSince1970: 1_700_000_003), submissionComplete: true)
+        let result = await stopThenRecordMaterialization(journal: fixture)
+        let outputPath = fixture.outputDirectory.appendingPathComponent("post-stop-materialized.pdf").path
+        let completed = result.onDisk?.completedResults["0"]
+
+        check("closed-journal progress: a result materialized after Stop is recorded with its exact PDF path",
+              result.resultSaved && completed?.text == "post-stop body"
+                  && result.onDisk?.completedOutputPaths?["0"] == outputPath)
+        check("closed-journal progress: its chunk is marked consumed and Resume's shared remaining-index rule skips it",
+              result.chunkMarkedConsumed && result.onDisk?.consumedChunkIds == ["batches/chunk-0"]
+                  && OCRProcessor.remainingIndices(
+                    totalFiles: fixture.fileURLs.count,
+                    completedResults: result.onDisk?.completedResults ?? [:]
+                  ).isEmpty)
+        check("closed-journal progress: the updated journal remains self-consistent and still reports interruption",
+              result.onDisk.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } == true
+                  && result.interrupted && !result.journalDeleted)
+
+        let confirmed = await stopThenRecordMaterialization(
+            journal: fixture, cancellationConfirmed: true)
+        let confirmedCompleted = confirmed.onDisk?.completedResults["0"]
+        check("closed-journal progress: even a confirmed server cancellation cannot delete the journal before a paused materialization records its PDF",
+              confirmed.resultSaved && confirmed.chunkMarkedConsumed && !confirmed.journalDeleted
+                  && confirmedCompleted?.text == "post-stop body"
+                  && confirmed.onDisk?.completedOutputPaths?["0"] == outputPath
+                  && confirmed.onDisk?.consumedChunkIds == ["batches/chunk-0"]
+                  && confirmed.onDisk?.submissionComplete == true
+                  && confirmed.onDisk.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } == true
+                  && confirmed.interrupted)
     }
 
     // MARK: - 2. Additive only (the owner's ⛔): the journal may only ever GAIN

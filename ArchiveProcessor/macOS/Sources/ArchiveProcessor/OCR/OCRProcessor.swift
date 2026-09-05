@@ -291,6 +291,12 @@ class OCRProcessor: ObservableObject {
     /// installs a journal of its own. Consulted only while `activePendingBatch == nil`, and only after the
     /// on-disk journal is confirmed to BE this batch — see `appendChunkIdToClosedPaidBatchJournal(_:)`.
     var closedPaidBatchJournalAddress: ClosedPaidBatchJournalAddress?
+    /// The exact batch whose already-fetched results are still being turned into PDFs. A Stop in this
+    /// window must keep the journal even when server cancellation confirms: those PDFs have no durable
+    /// completion record until `handleOCRResult` returns to the main actor. This is an identity, not a
+    /// Boolean, so a late task from an older batch cannot make a newer batch's Stop retain the wrong file.
+    /// `processBatchResults` sets and clears it around the full materialization window.
+    var batchResultMaterializationAddress: ClosedPaidBatchJournalAddress?
 
     // MARK: Cancel-path seams (W16.bat2-fu — so the WIRING is testable, not just the rule)
     /// The in-flight server-side batch cancellation `cancel()` spawned, retained so a headless driver

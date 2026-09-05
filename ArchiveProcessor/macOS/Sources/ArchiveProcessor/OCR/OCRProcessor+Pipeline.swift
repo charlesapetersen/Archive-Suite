@@ -747,16 +747,38 @@ extension OCRProcessor {
         // Paid batches have their own lifecycle journal. Persist every materialized result before a
         // Gemini chunk can be marked consumed, so a relaunch can skip already-written files even if the
         // process died halfway through that chunk.
-        if activePendingRun == nil, activePendingBatch != nil {
-            return persistPendingBatchMutation(
-                failureMessage: "Could not save paid-batch progress. Processing stopped to avoid duplicate outputs or charges."
-            ) { batch in
-                let key = "\(index)"
-                batch.completedResults[key] = result
-                if let outputURL {
-                    if batch.completedOutputPaths == nil { batch.completedOutputPaths = [:] }
-                    batch.completedOutputPaths?[key] = outputURL.path
+        if activePendingRun == nil {
+            if activePendingBatch != nil {
+                return persistPendingBatchMutation(
+                    failureMessage: "Could not save paid-batch progress. Processing stopped to avoid duplicate outputs or charges."
+                ) { batch in
+                    let key = "\(index)"
+                    batch.completedResults[key] = result
+                    if let outputURL {
+                        if batch.completedOutputPaths == nil { batch.completedOutputPaths = [:] }
+                        batch.completedOutputPaths?[key] = outputURL.path
+                    }
                 }
+            }
+            // Stop can land after the provider returned this result but before its PDF and durable
+            // completion record finish writing. The PDF is already on disk by this call, and the address
+            // is the exact journal Stop retained; append this fact to that file so Resume skips the result
+            // instead of retrieving the same completed chunk and allocating a duplicate output path.
+            if closedPaidBatchJournalAddress != nil {
+                guard recordCompletedResultToClosedPaidBatchJournal(
+                    index: index, result: result, outputURL: outputURL
+                ) else {
+                    reportInterruptedPaidBatch(
+                        "Batch results were written after Stop, but their recovery record could not be saved. The batch was kept for recovery.",
+                        cancelRun: false)
+                    return false
+                }
+                // A post-Stop materialization must never fall through a terminal-status poll as a clean
+                // completion: the cancelled task may have no next loop iteration in which to observe its
+                // cancellation. The journal stays for Resume even when this was its final chunk.
+                batchPollInterrupted = true
+                isProcessing = false
+                return true
             }
         }
 
@@ -1011,6 +1033,32 @@ extension OCRProcessor {
         return Self.savePendingBatch(appended) != nil
     }
 
+    /// Record a result whose PDF was materialized after Stop had closed its in-memory journal. This is the
+    /// result-side counterpart to `appendChunkIdToClosedPaidBatchJournal`: it re-reads only the journal
+    /// identified by Stop, records an otherwise missing completed index and exact output path, and lets the
+    /// production writer recompute every lifecycle-derived field. A result already in the journal is the
+    /// desired state, so a late/retried continuation is a no-op success rather than a second output claim.
+    ///
+    /// It is intentionally narrower than `persistPendingBatchMutation`: only completed-result facts from a
+    /// write that has already happened can cross this boundary. In particular, `submissionComplete` remains
+    /// closed after Stop — a late mark would falsely claim the cancelled chunk list was exhaustive.
+    @discardableResult
+    private func recordCompletedResultToClosedPaidBatchJournal(
+        index: Int, result: OCRResult, outputURL: URL?
+    ) -> Bool {
+        guard activePendingBatch == nil, let address = closedPaidBatchJournalAddress else { return false }
+        guard var onDisk = Self.loadPendingBatch(), address.matches(onDisk),
+              onDisk.lifecycleVersion == PendingBatch.currentLifecycleVersion else { return false }
+        let key = "\(index)"
+        guard onDisk.completedResults[key] == nil else { return true }
+        onDisk.completedResults[key] = result
+        if let outputURL {
+            if onDisk.completedOutputPaths == nil { onDisk.completedOutputPaths = [:] }
+            onDisk.completedOutputPaths?[key] = outputURL.path
+        }
+        return Self.savePendingBatch(onDisk) != nil
+    }
+
     /// Shown when a job created as Stop landed was recorded in the journal `cancel()` had already closed.
     ///
     /// The submission still stops here — this is the same interruption
@@ -1060,9 +1108,29 @@ extension OCRProcessor {
     @discardableResult
     func markBatchChunkConsumed(_ chunkId: String) -> Bool {
         if activePendingBatch?.consumedChunkIds.contains(chunkId) == true { return true }
+        // `processBatchResults` has already written this chunk's PDFs when it reaches here. If Stop
+        // closed only the in-memory journal during that write, retain the completion fact in the exact
+        // on-disk journal it kept; Resume then skips the recorded pages instead of materializing them again.
+        if markClosedPaidBatchChunkConsumed(chunkId) {
+            batchPollInterrupted = true
+            isProcessing = false
+            return true
+        }
         return persistPendingBatchMutation(
             failureMessage: "Batch results were written, but chunk completion could not be saved. The batch was kept for recovery."
         ) { $0.consumedChunkIds.append(chunkId) }
+    }
+
+    /// Append a consumed-chunk fact to the matching journal Stop retained. Like the result helper above,
+    /// this has no route to a live/different/legacy/deleted journal and never reopens `activePendingBatch`.
+    @discardableResult
+    private func markClosedPaidBatchChunkConsumed(_ chunkId: String) -> Bool {
+        guard activePendingBatch == nil, let address = closedPaidBatchJournalAddress else { return false }
+        guard var onDisk = Self.loadPendingBatch(), address.matches(onDisk),
+              onDisk.lifecycleVersion == PendingBatch.currentLifecycleVersion else { return false }
+        guard !onDisk.consumedChunkIds.contains(chunkId) else { return true }
+        onDisk.consumedChunkIds.append(chunkId)
+        return Self.savePendingBatch(onDisk) != nil
     }
     /// File URLs from a pending run (for populating the file list on resume).
     var pendingRunFileURLs: [URL]? {
@@ -2086,8 +2154,9 @@ extension OCRProcessor {
         /// True iff the recovery journal was deleted (i.e. `deleteJournal` was called).
         ///
         /// ⚠️ **Not a synonym for `confirmed` any more** (W16.bat5): `confirmed && !journalDeleted` is a
-        /// real, reachable outcome — every chunk the cancellation knew about was stopped, but the
-        /// submission was still in flight, so the list may have been incomplete and the journal survives.
+        /// real, reachable outcome — every chunk the cancellation knew about was stopped, but either the
+        /// submission was still in flight or already-fetched results were still materializing, so the journal
+        /// survives.
         /// `journalDeleted` is the safety-critical one; read it, never `confirmed`, to know the file's fate.
         let journalDeleted: Bool
         /// The operator-facing message — set only when the journal was KEPT, so the text and the
@@ -2119,6 +2188,13 @@ extension OCRProcessor {
     static let batchCancellationSubmissionInFlightMessage =
         "The batch's submission was never recorded as finished, so paid jobs may exist beyond the ones that were cancelled. The paid-batch journal was kept for recovery."
 
+    /// The other confirmed-cancellation keep case: the provider result was already fetched but its PDFs
+    /// had not all reached their durable completion entries when Stop landed. This is not a claim that a
+    /// job is still running; it is the truthful reason its local journal must remain long enough for Resume
+    /// to skip the outputs already materialized (W16.bat5-fu2).
+    static let batchCancellationMaterializationInFlightMessage =
+        "Already-fetched batch results were still being materialized when Stop landed. The paid-batch journal was kept for recovery."
+
     /// Cancel a paid batch server-side and decide the fate of its recovery journal.
     ///
     /// The one shipped safety guarantee of the cancel path, extracted so it can be proven without a
@@ -2131,7 +2207,9 @@ extension OCRProcessor {
     /// when Stop landed; if the run was still creating server-side jobs at that instant, the snapshot is not
     /// the whole batch, and confirming all of it says nothing about the job created next. So the journal is
     /// kept — the operator is told a paid job may exist beyond the ones that were stopped. This is the only
-    /// case where a fully confirmed cancellation still keeps the journal.
+    /// case where a fully confirmed cancellation still keeps the journal. W16.bat5-fu2 adds one more:
+    /// already-fetched results being materialized. Those PDFs have no durable completion facts until the
+    /// main actor writes them, so confirmed cancellation must keep the journal for that bounded window too.
     ///
     /// - Parameters:
     ///   - canceller: the provider it applies plus how to cancel one chunk. `cancel()` passes the live
@@ -2139,12 +2217,16 @@ extension OCRProcessor {
     ///   - submissionInFlight: was the batch's submission still unfinished when Stop was pressed
     ///     (`batchSubmissionIsInFlight`)? Deliberately NOT defaulted: a caller that has to answer it cannot
     ///     forget it, and on this path forgetting means deleting a journal that should have survived.
+    ///   - materializationInFlight: were already-fetched results for this exact batch still becoming PDFs
+    ///     when Stop landed? This is process-local but identity-bound by `processBatchResults`; it prevents
+    ///     a confirmed cancellation from deleting the only record before those completed facts can land.
     ///   - deleteJournal: removes the recovery journal. Called at most once, and only when the cancellation
-    ///     was confirmed AND no submission was in flight.
+    ///     was confirmed and neither a submission nor result materialization was in flight.
     static func performServerBatchCancellation(
         canceller: BatchChunkCanceller,
         chunkIds: [String],
         submissionInFlight: Bool,
+        materializationInFlight: Bool,
         deleteJournal: @MainActor () -> Void
     ) async -> BatchCancellationOutcome {
         let cancelChunk = canceller.cancelChunk
@@ -2175,12 +2257,19 @@ extension OCRProcessor {
         case .appleVision:
             confirmed = false   // Apple Vision has no server-side batch path.
         }
-        // Keep-on-doubt, and the doubt outranks the confirmation: an unfinished submission means the
-        // chunk list above may not be the whole batch, so "all of them stopped" is not "all of it stopped".
+        // Keep-on-doubt, and the doubt outranks confirmation. An unfinished submission means the chunk
+        // list may be short; a materialization in flight means a just-written PDF may not yet have a
+        // durable completion record. Either loss must keep the exact journal Stop closed.
         if confirmed && submissionInFlight {
             return BatchCancellationOutcome(
                 confirmed: true, journalDeleted: false,
                 statusMessage: Self.batchCancellationSubmissionInFlightMessage,
+                attemptedChunkIds: attempted)
+        }
+        if confirmed && materializationInFlight {
+            return BatchCancellationOutcome(
+                confirmed: true, journalDeleted: false,
+                statusMessage: Self.batchCancellationMaterializationInFlightMessage,
                 attemptedChunkIds: attempted)
         }
         if confirmed {
@@ -2245,9 +2334,16 @@ extension OCRProcessor {
             // Closed, not unreachable (W16.bat5-fu). Dropping the journal is what stops the cancelled run
             // from advancing it, and it must keep doing that — but a Gemini submit loop creates one paid job
             // at a time, so a create can still be in flight right now and its ID would land nowhere. Keep the
-            // journal ADDRESSABLE (identity only, never a snapshot to write back) so that one late callback
-            // can append its ID to the file. Nothing here waits: the owner rejected quiescing in-flight
-            // submits before this line precisely because a hung provider request would stall Stop.
+            // journal ADDRESSABLE (identity only, never a snapshot to write back) so a late submit callback
+            // can append its ID, and an already-fetched result can append its completion facts, to the file.
+            // Nothing here waits: the owner rejected quiescing in-flight submits before this line precisely
+            // because a hung provider request would stall Stop.
+            let materializationInFlight: Bool
+            if let address = batchResultMaterializationAddress, let pending = activePendingBatch {
+                materializationInFlight = address.matches(pending)
+            } else {
+                materializationInFlight = false
+            }
             closedPaidBatchJournalAddress = ClosedPaidBatchJournalAddress(activePendingBatch)
             activePendingBatch = nil
             // Built synchronously (constructing a client opens no connection) so the choices are made
@@ -2257,7 +2353,8 @@ extension OCRProcessor {
             batchCancellationTask = Task {
                 let outcome = await Self.performServerBatchCancellation(
                     canceller: canceller, chunkIds: chunkIds,
-                    submissionInFlight: submissionInFlight, deleteJournal: deleteJournal)
+                    submissionInFlight: submissionInFlight,
+                    materializationInFlight: materializationInFlight, deleteJournal: deleteJournal)
                 // The cancelled run is still unwinding, and it writes `statusMessage` too: a poll whose
                 // status check was in flight when Stop landed still reports "Batch processing… n/m" or
                 // "Error checking batch… Retrying…" once that request resolves. Wait for it to finish

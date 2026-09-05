@@ -38,7 +38,7 @@ import Foundation
 ///     even attempt a multi-chunk one; Gemini needs every chunk and treats *no* chunks as a failure,
 ///     not a vacuous success; OpenAI never confirms (no batch path in v1);
 ///   * **the words match the disk** — a "journal was kept for recovery" message appears only when the file
-///     is still there, never when it was deleted, and names which of the two reasons kept it.
+///     is still there, never when it was deleted, and names which of the three reasons kept it.
 ///
 /// Run from `BatchResumeTestDriver` (section 13) under `BATCHRESUME_TEST=1`; see
 /// `scripts/test-batch-resume.sh`.
@@ -52,6 +52,7 @@ enum BatchCancelContract {
         await messageMatchesTheDisk(check)
         theInFlightFactIsReadOffTheJournal(check)
         await aSubmissionStillInFlight(check)
+        await resultsStillMaterializing(check)
         await sweepEveryShape(check)
     }
 
@@ -81,10 +82,13 @@ enum BatchCancelContract {
     /// Run the seam once. `refusing` names the chunk IDs whose server-side cancellation the provider
     /// declines — everything else is confirmed. `submissionInFlight` is the W16.bat5 dimension: was the
     /// batch still being submitted when Stop landed, i.e. is `chunkIds` possibly not the whole batch?
+    /// `materializationInFlight` is W16.bat5-fu2's separate keep case: a fetched result may have a PDF on
+    /// disk but not its completion fact in the journal yet.
     private static func trial(_ provider: LLMProvider,
                               _ chunkIds: [String],
                               refusing: Set<String> = [],
-                              submissionInFlight: Bool = false) async -> Trial {
+                              submissionInFlight: Bool = false,
+                              materializationInFlight: Bool = false) async -> Trial {
         let fm = FileManager.default
         let journal = fm.temporaryDirectory
             .appendingPathComponent("APCancelContract-\(UUID().uuidString).json")
@@ -99,6 +103,7 @@ enum BatchCancelContract {
             }, clientTypeName: "stub"),
             chunkIds: chunkIds,
             submissionInFlight: submissionInFlight,
+            materializationInFlight: materializationInFlight,
             deleteJournal: {
                 recorder.deleteCalls += 1
                 try? fm.removeItem(at: journal)
@@ -304,6 +309,19 @@ enum BatchCancelContract {
               && finished.attempted == inFlight.attempted)
     }
 
+    // MARK: - A confirmed cancellation must retain results that have not reached the journal yet
+
+    private static func resultsStillMaterializing(_ check: (String, Bool) -> Void) async {
+        let chunk = ids(1)
+        let retained = await trial(.gemini, chunk, materializationInFlight: true)
+        check("materialization: a confirmed cancellation keeps the journal while an already-fetched result is becoming a PDF",
+              retained.outcome.confirmed && !retained.outcome.journalDeleted
+                  && retained.journalExistedBefore && retained.journalSurvived && retained.deleteCalls == 0)
+        check("materialization: its retained-journal message names the durable-write window, not a still-submitting batch",
+              retained.outcome.statusMessage == OCRProcessor.batchCancellationMaterializationInFlightMessage
+                  && retained.attempted == chunk)
+    }
+
     /// A v1 paid-batch journal, for the pure checks above. Nothing here is written to disk — `trial`'s
     /// fixture is a plain temp file, because the seam under test takes chunk IDs, not a journal.
     private static func journal(chunkIds: [String]) -> OCRProcessor.PendingBatch {
@@ -379,7 +397,7 @@ enum BatchCancelContract {
                         if t.attempted != expectedAttempts(provider, chunkIds) { attemptsHeld = false }
                         if t.outcome.attemptedChunkIds != t.attempted { attemptsHeld = false }
                         if (t.outcome.statusMessage != nil) != t.journalSurvived { messageHeld = false }
-                        // …and the words name WHICH of the two reasons kept it, so the operator is not told
+                        // …and the words name WHICH of the applicable keep reasons, so the operator is not told
                         // "we could not stop it" about a batch every known chunk of which was stopped.
                         let expectedMessage: String? = shouldDelete
                             ? nil
@@ -398,16 +416,22 @@ enum BatchCancelContract {
             }
         }
 
+        // Counts come from the loop shape (66 trials per backend), not a frozen provider count: a newly
+        // added backend must run through this cancellation rule rather than making the contract red for
+        // arithmetic alone. Its capability still has to be stated independently in `expectedConfirmation`.
+        let expectedTrials = 66 * LLMProvider.allCases.count
+        let expectedInFlightTrials = expectedTrials / 2
         check("sweep: every provider × chunk-count × refusal × in-flight shape was exercised (\(trials) trials)",
-              trials == 264)
+              trials == expectedTrials)
         // Non-vacuity, measured against the file rather than the table: the in-flight invariant below is
-        // worthless if nothing in this sweep ever deletes. Only the 132 finished-submission trials can, and
+        // worthless if nothing in this sweep ever deletes. Only the calculated half of the trials
+        // (finished submission) can, and
         // 8 of them do — Gemini at 1–6 chunks unrefused (6) plus Anthropic and Mistral at exactly 1 chunk
         // unrefused (1 each). Those same 8 shapes have an in-flight twin, and each twin deleted before
         // W16.bat5 and keeps now; that pairing is the whole regression, counted rather than asserted.
         check("sweep: 8 shapes really deleted a real journal file, and every one of them had finished submitting",
               deletions == 8 && deletionsWhileInFlight == 0)
-        check("sweep: NO shape deletes the journal while a submission is in flight (132 in-flight trials)",
+        check("sweep: NO shape deletes the journal while a submission is in flight (\(expectedInFlightTrials) in-flight trials)",
               inFlightHeld)
         check("sweep: a real journal file backed every one of those \(trials) trials",
               fixtureHeld)
