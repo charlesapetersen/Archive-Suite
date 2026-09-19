@@ -63,6 +63,17 @@ final class ZoteroStatusModel: ObservableObject {
                                                      attachedLinks: attachedLinks)
     }
 
+    /// Fetch the metadata that the Auto-fill confirmation needs. Citation failure is deliberately
+    /// non-fatal: title/authors/date are still useful, and a prior durable citation must remain intact.
+    /// The style is captured at command time so the citation request observes the current Settings value.
+    func fetchAutoFillData(for ref: ZoteroRef) async throws -> (csl: ZoteroCSLItem, citation: String?) {
+        let settings = ZoteroSettingsStore.current
+        guard settings.enabled else { throw ZoteroClient.ClientError.unavailable }
+        let csl = try await client.fetchCSL(ref)
+        let citation = try? await client.fetchCitation(ref, styleID: settings.styleID)
+        return (csl, citation)
+    }
+
     /// Clear the detected clipboard link (after the user attaches or dismisses it).
     func dismissClipboardRef() {
         clipboardRef = nil

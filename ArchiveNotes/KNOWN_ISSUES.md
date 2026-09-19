@@ -3,6 +3,18 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.b1) — Zotero auto-fill is now reachable, reviewable, and race-safe
+
+**2026-09-18.** **Note ▸ Auto-fill from Zotero…** now becomes available for a note with exactly one durable
+Zotero attachment. It supports the production source-block representation immediately after **Attach Zotero
+Link…** (as well as future note-level metadata), never guesses between distinct sources, fetches CSL plus the
+configured citation style, and presents a field-by-field confirmation. Cancel is byte-for-byte no-write;
+Apply changes only accepted fields and the matching citation through an atomic transaction, preserving a body
+edit that arrives while the sheet is open. A DEBUG-only in-process transport proves the end-to-end VM route
+without a Zotero install, listener, or network. The scratch unit smoke passed 857 tests in 85 suites and the
+fresh-fixture off-screen UI suite passed 22/22 in 442.279 s. No real Notes store, archive corpus, bookmark,
+network, or credentials were used.
+
 ## ✅ VERIFIED (W9.cand1) — the GUI can create a note from All Notes
 
 **2026-09-05.** The interrupted 2026-07-18 GUI sweep reported that `⌘N` and the toolbar pencil did nothing

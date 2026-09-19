@@ -55,6 +55,38 @@ final class FormattingContext: ObservableObject {
     /// The shared model, for the extract create/append actions (W7-S2). Weak — the model is an
     /// app-lifetime `@StateObject` that outlives this per-editor context and never references back.
     weak var notesModel: NotesModel?
+    /// Shared Zotero client/status bridge. Like `notesModel`, this is app-lifetime and wired by the
+    /// hosting editor pane; commands themselves have no environment-object access.
+    weak var zoteroStatus: ZoteroStatusModel?
+    /// Flushes the live editor through its audited body-write path before auto-fill re-reads the note.
+    /// This makes an attachment added moments ago usable without asking the user to change selection.
+    var flushCurrentNote: (() async -> Void)?
+
+    @Published var zoteroAutoFillModel: ZoteroAutoFillModel?
+    @Published var zoteroAutoFillError: String?
+    @Published private(set) var isFetchingZoteroAutoFill = false
+    /// Refreshed from the persisted selected item by `NoteEditorPane`. A command stays unavailable for
+    /// an unreferenced or ambiguous note instead of pretending it can choose a citation safely.
+    @Published private(set) var zoteroAutoFillReference: ZoteroAutoFillReference?
+
+    var canAutoFillFromZotero: Bool {
+        guard let currentItemID, !isFetchingZoteroAutoFill else { return false }
+        // Selection and the editor's derived kind are published independently. Consult the shared
+        // summary here so the command cannot remain disabled in the brief interval between them.
+        return notesModel?.allItems.first(where: { $0.id == currentItemID })?.kind == .note
+            && zoteroAutoFillReference != nil
+    }
+
+    func updateZoteroAutoFillReference(from item: Item) {
+        guard item.id == currentItemID else { return }
+        if case let .available(reference) = ZoteroAutoFillReferenceResolver.resolve(in: item) {
+            zoteroAutoFillReference = reference
+        } else {
+            zoteroAutoFillReference = nil
+        }
+    }
+
+    func clearZoteroAutoFillReference() { zoteroAutoFillReference = nil }
 
     func toggleBold() {
         guard let tv = textView else { return }
@@ -172,8 +204,71 @@ final class FormattingContext: ObservableObject {
         let kind: Block.Kind = (ref.kind == .attachment) ? .zoteroAttachment : .zoteroItem
         let anchor = SourceAnchor(display: ref.citation ?? ref.itemKey,
                                   zoteroSelect: ref.selectLink)
-        coordinator?.insertBlock(kind: kind, anchor: anchor)
+        guard let coordinator else { return }
+        coordinator.insertBlock(kind: kind, anchor: anchor)
+        // The block's debounce is flushed before the command reads it. If the note already had a
+        // resolved source, avoid selecting an arbitrary one while the new block is pending.
+        if zoteroAutoFillReference == nil {
+            zoteroAutoFillReference = ZoteroAutoFillReference(
+                ref: ref,
+                target: ZoteroAutoFillReferenceTarget(selectLink: ref.selectLink,
+                                                      noteFrontMatter: false, sourceBlocks: true))
+        } else {
+            zoteroAutoFillReference = nil
+        }
     }
+
+    /// Fetch the selected note's one unambiguous attached Zotero reference and present a fill-empty
+    /// confirmation. B2 will add a note-level chip/attach affordance; source-block attachments are the
+    /// shipped durable path B1 must already support.
+    func autoFillFromZotero() {
+        guard let notesModel, let zoteroStatus, let id = currentItemID else { return }
+        guard !isFetchingZoteroAutoFill else { return }
+
+        Task { [weak self, weak notesModel, weak zoteroStatus] in
+            guard let self, let notesModel, let zoteroStatus else { return }
+            await self.flushCurrentNote?()
+            guard let item = await notesModel.itemForZoteroAutoFill(id) else { return }
+            guard item.kind == .note else {
+                self.zoteroAutoFillError = "Zotero auto-fill is available for notes, not extracts."
+                return
+            }
+            let resolution = ZoteroAutoFillReferenceResolver.resolve(in: item)
+            let reference: ZoteroAutoFillReference
+            switch resolution {
+            case let .available(found): reference = found
+            case .none:
+                notesModel.statusMessage = "This note has no attached Zotero reference to auto-fill from."
+                return
+            case .ambiguous:
+                notesModel.statusMessage = "Auto-fill requires exactly one attached Zotero reference on this note."
+                return
+            }
+
+            self.isFetchingZoteroAutoFill = true
+            defer { self.isFetchingZoteroAutoFill = false }
+            do {
+                let fetched = try await zoteroStatus.fetchAutoFillData(for: reference.ref)
+                self.zoteroAutoFillModel = ZoteroAutoFillModel(
+                    item: item,
+                    csl: fetched.csl,
+                    refSelectLink: reference.ref.selectLink,
+                    citation: fetched.citation,
+                    referenceTarget: reference.target,
+                    save: { [weak notesModel, item] resolved in
+                        guard let notesModel else { throw CancellationError() }
+                        try await notesModel.applyZoteroAutoFill(resolved, basedOn: item,
+                                                                 target: reference.target)
+                    })
+            } catch {
+                let detail = error.localizedDescription
+                self.zoteroAutoFillError = "Zotero metadata could not be fetched. \(detail)"
+                notesModel.statusMessage = "Couldn't fetch Zotero metadata — check that Zotero is running."
+            }
+        }
+    }
+
+    func dismissZoteroAutoFillError() { zoteroAutoFillError = nil }
 
     // MARK: - Extracts (W7-S2)
 
@@ -245,10 +340,21 @@ struct FormattingContextKey: FocusedValueKey {
     typealias Value = FormattingContext
 }
 
+/// Commands are rendered outside the editor's object-observation graph. Publish the availability as a
+/// value-type focus key as well, so a persisted attachment resolving after selection refreshes the menu.
+struct ZoteroAutoFillAvailabilityKey: FocusedValueKey {
+    typealias Value = Bool
+}
+
 extension FocusedValues {
     var formattingContext: FormattingContext? {
         get { self[FormattingContextKey.self] }
         set { self[FormattingContextKey.self] = newValue }
+    }
+
+    var zoteroAutoFillAvailable: Bool? {
+        get { self[ZoteroAutoFillAvailabilityKey.self] }
+        set { self[ZoteroAutoFillAvailabilityKey.self] = newValue }
     }
 }
 

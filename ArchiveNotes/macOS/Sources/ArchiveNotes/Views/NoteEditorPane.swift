@@ -73,11 +73,27 @@ struct NoteEditorPane: View {
         }
         .background(Color(nsColor: .textBackgroundColor))
         .focusedSceneValue(\.formattingContext, formatting)
+        .focusedSceneValue(\.zoteroAutoFillAvailable, formatting.canAutoFillFromZotero)
+        .sheet(item: $formatting.zoteroAutoFillModel) { model in
+            ZoteroAutoFillSheet(model: model) { formatting.zoteroAutoFillModel = nil }
+        }
+        .alert("Couldn't auto-fill from Zotero", isPresented: Binding(
+            get: { formatting.zoteroAutoFillError != nil },
+            set: { if !$0 { formatting.dismissZoteroAutoFillError() } }
+        )) {
+            Button("OK", role: .cancel) { formatting.dismissZoteroAutoFillError() }
+        } message: {
+            Text(formatting.zoteroAutoFillError ?? "")
+        }
         .onAppear {
             wireBodySeams()
             syncFormattingIdentity()
             refreshAssetStore(for: nav.selectedItemID)
-            Task { await bodyEditor.select(nav.selectedItemID) }
+            formatting.clearZoteroAutoFillReference()
+            Task {
+                await bodyEditor.select(nav.selectedItemID)
+                refreshZoteroAutoFillReference(for: nav.selectedItemID)
+            }
             refreshZotero()
             // W7-S6: register this pane's flush so app-terminate persists its pending edit (idempotent —
             // onAppear may fire more than once, and the same paneID just overwrites its own entry).
@@ -86,7 +102,11 @@ struct NoteEditorPane: View {
         .onChange(of: nav.selectedItemID) { _, newID in
             syncFormattingIdentity()
             refreshAssetStore(for: newID)
-            Task { await bodyEditor.select(newID) }
+            formatting.clearZoteroAutoFillReference()
+            Task {
+                await bodyEditor.select(newID)
+                refreshZoteroAutoFillReference(for: newID)
+            }
         }
         .onDisappear {
             // Persist the in-flight edit before the pane/window tears down (never drop a dirty buffer),
@@ -280,6 +300,8 @@ struct NoteEditorPane: View {
         bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
         // W7-S2: give the formatting context the shared model so Create/Append Extract can persist.
         formatting.notesModel = model
+        formatting.zoteroStatus = zoteroStatus
+        formatting.flushCurrentNote = { [bodyEditor] in await bodyEditor.flushPending() }
     }
 
     /// Ensure the item-scoped inline-image asset store exists (lazily, once the model's `NoteStore` has
@@ -289,6 +311,19 @@ struct NoteEditorPane: View {
     private func refreshAssetStore(for id: UUID?) {
         if assetStore == nil { assetStore = nav.model.makeAssetStore() }
         assetStore?.itemID = id
+    }
+
+    /// Auto-fill is enabled only after the selected persisted note proves it carries one unambiguous
+    /// Zotero reference. Clearing first prevents an older async read from advertising a ref on a newly
+    /// selected note; the id guard rejects the same stale completion.
+    private func refreshZoteroAutoFillReference(for id: UUID?) {
+        formatting.clearZoteroAutoFillReference()
+        guard let id else { return }
+        Task {
+            guard let item = await nav.model.itemForZoteroAutoFill(id),
+                  nav.selectedItemID == id else { return }
+            formatting.updateZoteroAutoFillReference(from: item)
+        }
     }
 
     /// Publish the selected item's identity to the formatting context so W7's Create-Extract can anchor

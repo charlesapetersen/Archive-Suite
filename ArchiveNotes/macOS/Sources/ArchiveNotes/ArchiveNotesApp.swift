@@ -15,7 +15,7 @@ struct ArchiveNotesApp: App {
     // Point the client at the configured host/port (Options ▸ Zotero, advanced). Applied at
     // launch; the enabled/clipboard-detect gates are read at point of use in the status model.
     @StateObject private var zoteroStatus = ZoteroStatusModel(
-        client: ZoteroClient(config: ZoteroSettingsStore.current.clientConfig))
+        client: ZoteroClient.appClient(config: ZoteroSettingsStore.current.clientConfig))
 
     /// Demote the process when it is only acting as a unit-test host, so `xcodebuild test
     /// -only-testing:ArchiveNotesTests` never takes the owner's screen (→ `ArchiveTestHost`).

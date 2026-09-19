@@ -13,7 +13,8 @@ struct ZoteroAutoFillTests {
         date: String? = nil,
         precision: Item.DatePrecision? = nil,
         dateUncertain: Bool = false,
-        zotero: [ZoteroRef] = []
+        zotero: [ZoteroRef] = [],
+        blocks: [Block] = []
     ) -> Item {
         Item(
             id: UUID(),
@@ -30,7 +31,7 @@ struct ZoteroAutoFillTests {
             created: Date(timeIntervalSince1970: 0),
             modified: Date(timeIntervalSince1970: 0),
             schema: 1,
-            blocks: [],
+            blocks: blocks,
             unknownFrontMatter: [],
             trailingBodyRaw: nil
         )
@@ -415,5 +416,81 @@ struct ZoteroAutoFillTests {
         #expect(stamped?.citation == "Previously fetched citation.")  // intact, not wiped
         #expect(stamped?.fetchedAt == when)                            // fetch attempt still stamped
         #expect(out.title == "Oral History")                           // the fill still applied
+    }
+
+    // MARK: - NotesModel's audited commit path (W9.b1)
+
+    @Test("auto-fill refuses to guess between distinct attached Zotero sources")
+    func attachedReferenceResolverRejectsAmbiguousNote() {
+        let first = "zotero://select/library/items/ABCD1234"
+        let second = "zotero://select/library/items/WXYZ5678"
+        let item = makeItem(blocks: [
+            Block(kind: .zoteroItem,
+                  source: SourceAnchor(display: "First", zoteroSelect: first),
+                  markdown: "", unknownHeaderFields: []),
+            Block(kind: .zoteroItem,
+                  source: SourceAnchor(display: "Second", zoteroSelect: second),
+                  markdown: "", unknownHeaderFields: []),
+        ])
+
+        #expect(ZoteroAutoFillReferenceResolver.resolve(in: item) == .ambiguous)
+    }
+
+    /// The confirmation model receives a stale snapshot by design: fetching and human review both take
+    /// time. Its production save must therefore update only accepted auto-fill fields inside `withItem`,
+    /// never assign the pre-sheet item back over a body edit that arrived while the sheet was open.
+    @Test("auto-fill confirmation uses one attached source block and keeps a concurrent body save")
+    @MainActor
+    func auditedCommitPreservesConcurrentBodyEdit() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ZoteroAutoFillCommit-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let index = NotesIndex(url: root.appendingPathComponent("index.sqlite"))
+        try await index.open()
+        let organization = OrganizationStore(index: index)
+        try await organization.load(storeRoot: root)
+        let store = NoteStore(root: root)
+        let model = NotesModel(organization: organization, index: index, noteStore: store)
+        defer {
+            Task {
+                await index.close()
+                try? FileManager.default.removeItem(at: root)
+            }
+        }
+
+        let link = "zotero://select/library/items/ABCD1234"
+        let source = SourceAnchor(display: "Prior citation", zoteroSelect: link)
+        let original = makeItem(title: "Keep title", blocks: [
+            Block(kind: .zoteroItem, source: source, markdown: "Source block", unknownHeaderFields: [])
+        ])
+        let target = ZoteroAutoFillReferenceTarget(selectLink: link,
+                                                   noteFrontMatter: false, sourceBlocks: true)
+        guard case let .available(resolvedReference) = ZoteroAutoFillReferenceResolver.resolve(in: original) else {
+            Issue.record("the one persisted Zotero block must be a usable auto-fill reference")
+            return
+        }
+        #expect(resolvedReference.ref.selectLink == link)
+        #expect(resolvedReference.target == target)
+        _ = try await store.create(original)
+        var resolved = original
+        resolved.date = "1843"
+        resolved.datePrecision = .year
+        resolved.blocks[0].source?.display = "Citation for configured-style."
+
+        // Simulate the editor flushing a body change after the sheet captured `original` but before Apply.
+        _ = try await store.withItem(original.id) { item in
+            item.trailingBodyRaw = "body saved while Zotero sheet was open"
+            item.modified = Date()
+        }
+
+        try await model.applyZoteroAutoFill(resolved, basedOn: original, target: target)
+        let saved = try await store.load(original.id)
+        #expect(saved.trailingBodyRaw?.trimmingCharacters(in: .newlines)
+                == "body saved while Zotero sheet was open",
+                "the source-block serializer may add its required separator newline, but must retain the concurrent body")
+        #expect(saved.title == "Keep title", "unselected title stays current")
+        #expect(saved.date == "1843" && saved.datePrecision == .year)
+        #expect(saved.zotero.isEmpty, "the attached source block is B1's live storage path; B2 owns note-level refs")
+        #expect(saved.blocks.first?.source?.display == "Citation for configured-style.")
     }
 }

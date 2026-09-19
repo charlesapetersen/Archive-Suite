@@ -90,6 +90,27 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   live output folder, GUI, credentials, or network is used. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/
   {Capture/CaptureSession.swift,Capture/LiveCaptureRecoveryTestDriver.swift} | S | low | done
 
+## W9 gap-closure — Phase B wire the built-but-dead features (2026-09-18)
+
+- [x] **`W9.b1` — Zotero auto-fill is reachable from the Note menu [M · Tier-2].** **SHIPPED 2026-09-18
+  (this commit).** **Note ▸ Auto-fill from Zotero…** now accepts exactly one durable Zotero reference from
+  the selected note (the shipped source-block attachment or a future note-level ref), fetches CSL metadata
+  and the configured citation style, then presents a per-field current→proposed confirmation. Empty fields
+  are selected by default; replacements are opt-in; Cancel writes nothing. Confirm applies only approved
+  metadata and the refreshed citation inside the `NoteStore.withItem` transaction, so a body save occurring
+  while the sheet is open survives. Multiple distinct references are explicitly refused rather than guessed.
+
+  **Tier-2 verification:** adversarial review caught the initial note-metadata-only resolver; it now covers
+  the production source-block representation and proves a concurrent body edit remains intact. The full
+  scratch-only Notes unit smoke passed **857 tests in 85 suites**. The rebuilt-fixture off-screen VM suite
+  passed **22/22 in 442.279 s**, including G15's production attach → auto-fill → Cancel byte-no-op → Apply
+  route with an in-process DEBUG Zotero transport. No real Notes store, corpus, bookmark, network, or
+  credential was used. | ArchiveNotes/macOS/{Sources/ArchiveNotes/{ArchiveNotesCommands,Core/NotesModel,
+  Editor/EditorFormatting,Views/NoteEditorPane,Zotero/{ZoteroAutoFillModel,ZoteroAutoFillSheet,
+  ZoteroStatusModel,ZoteroUITestTransport}}.swift,Tests/{ArchiveNotesTests/ZoteroAutoFillTests,
+  ArchiveNotesUITests/NotesGUITests}.swift}, ArchiveNotes/{CLAUDE.md,KNOWN_ISSUES.md,scripts/
+  {GUI-HARNESS.md,make-notes-fixture.sh}} | M | med | done
+
 ## W9 gap-closure — Phase A safety-net (2026-08-19)
 
 - [x] **`W9.cand1` — CONFIRMED: notes can be created from the GUI [S · gui].** **SHIPPED 2026-09-05 (this

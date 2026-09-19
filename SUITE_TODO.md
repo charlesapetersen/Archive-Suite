@@ -1182,12 +1182,6 @@ The remaining two Phase C items are heavier than C1–C4 and sit in **TIER 5**, 
 **Phase B — wire the built-but-dead features.** The high-value core: library code that shipped without a UI
 entry point. Mostly **Tier-2** (they write note front-matter or project Finder tags).
 
-- [ ] **`W9.b1` — Zotero auto-fill is unreachable from the UI [M · Tier-2].** Plan B1. `ZoteroAutoFillModel`
-  exists and nothing can invoke it. Add `Note ▸ Auto-fill from Zotero` resolving the focused `ZoteroRef` →
-  `client.fetchCSL` → `AutoFillPlan` → confirmation sheet (fill-empty policy) → save via the audited store
-  path; route citation through `fetchCitation(styleID:)` so `zoteroCSLStyleID` takes effect. Verify with a stub
-  transport as in `ZoteroLocalServerTests`; Zotero-down must degrade gracefully. | ArchiveNotes Zotero/ +
-  ArchiveNotesCommands.swift | M | med | none
 - [ ] **`W9.b2` — note-level Zotero chips are never rendered, and there is no attach-at-note-level path [M ·
   Tier-2].** Plan B2. Render `ZoteroChipView` for `selectedItem.zotero` in the inspector; add an attach path
   populating `item.zotero` via `mutateItem`; feed the clipboard-detect dedup the note's existing links (fixes

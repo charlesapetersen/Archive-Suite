@@ -154,12 +154,20 @@ tags" but **omits author** and doesn't cite the original-spec rationale, so a fu
 These are the review's headline finding: substantial, well-tested subsystems that ship in the binary but
 have **no UI entry point**, so a `[x]` overstates them. Most of the work is wiring, not new subsystems.
 
-**B1. Zotero auto-fill action — fetch + confirmation sheet + write.** — **HIGH** — `05` S3/S4/D.5.
-`ZoteroClient.fetchCSL`/`fetchCitation`, `ZoteroAutoFillModel`, `AutoFillPlan` are complete and tested but
-never called outside tests; there is no menu command and zero `.sheet(` in `Sources/`.
+**B1. Zotero auto-fill action — fetch + confirmation sheet + write.** — **SHIPPED 2026-09-18** — `05`
+S3/S4/D.5. `Note ▸ Auto-fill from Zotero…` resolves exactly one selected note reference (including the
+shipped source-block attachment), fetches CSL metadata and the configured citation style, and presents the
+mandatory fill-empty confirmation sheet. Confirm applies only selected fields and the refreshed citation via
+an atomic `NoteStore.withItem` transaction; Cancel is a no-op and multiple references are refused rather than
+guessed. The DEBUG-only VM transport is in-process and never opens a socket.
 - *Files:* `ArchiveNotes/.../ArchiveNotesCommands.swift`, `.../Editor/EditorFormatting.swift`, `.../Zotero/ZoteroAutoFillModel.swift`, a new confirmation sheet view, `.../Views/NoteEditorPane.swift`.
 - *Steps:* add `Note ▸ Auto-fill from Zotero` (and/or a chip button) that resolves the focused/attached `ZoteroRef` → `client.fetchCSL` → builds `AutoFillPlan` → presents a `ZoteroAutoFillModel`-backed confirmation sheet (fill-empty policy) → saves via the audited store path. Route citation through `fetchCitation(styleID:)` so `zoteroCSLStyleID` (D2) takes effect.
-- *Verify:* with a stub transport (as in `ZoteroLocalServerTests`), the command fetches, the sheet shows the diff, Confirm writes front-matter, Cancel is a no-op; Zotero-down degrades gracefully. **Tier-2** (writes note front-matter). *Done:* `ZoteroAutoFillModel` reachable from the UI; `zoteroCSLStyleID` observably affects output.
+- *Verification:* adversarial review required the resolver to include source-block storage and added a
+  scratch atomic-save regression for concurrent body edits. `ArchiveNotes/test-smoke.sh` passed 857 tests in
+  85 suites; the off-screen rebuilt-fixture VM suite passed 22/22, including production attach → G15
+  auto-fill → Cancel no-op → Apply with a non-default citation style. Zotero-down remains surfaced as a
+  graceful error. **Tier-2** (writes a scratch Notes store only). *Done:* `ZoteroAutoFillModel` is reachable
+  from the UI and `zoteroCSLStyleID` observably affects durable output.
 
 **B2. Note-level Zotero citation chips + an attach-at-note-level path.** — **HIGH/MED** — `05` S4/D.5.
 `ZoteroChipView` is defined and presentation-tested but never instantiated, and nothing in production writes

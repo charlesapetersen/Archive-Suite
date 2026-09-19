@@ -40,7 +40,7 @@ this file is authoritative for Notes‑specific work.
   replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
   library (scratch-only; reads tags to assert, never drives the store picker — **host-only, so unattended
-  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G14 catalog) runs **off-screen in the
+  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G15 catalog) runs **off-screen in the
   Tart VM** — it joined the VM lane on 2026-07-30, so it is part of the periodic health gate
   (`AUTONOMOUS_GUI_VM_APPS="reader notes"`) and the fixture is built inside the VM on demand.
   **README + check catalog + the owner-eye checks (G2 typing, G6/G11
@@ -383,13 +383,19 @@ macOS/Sources/ArchiveNotes/
     ZoteroCacheStore.swift         actor — disposable on-disk JSON cache for CSL metadata (§D.6)
     ZoteroAutoFill.swift           CSL→front-matter mapping (authors/date+precision/title) +
                                    AutoFillPlan (per-field diff, fill-empty default policy) (§D.4/D.5)
-    ZoteroAutoFillModel.swift      @MainActor confirmation view-model: per-field toggles, confirm
-                                   writes via injected NoteStore save + stamps citation/fetchedAt,
-                                   cancel writes nothing (§D.5)
+    ZoteroAutoFillModel.swift      @MainActor confirmation view-model + exact-one attached-reference
+                                   resolver: per-field toggles; confirm delegates to NotesModel's atomic
+                                   transaction, refreshes a source-block display or note ref citation,
+                                   cancel writes nothing (§D.5, W9.b1)
+    ZoteroAutoFillSheet.swift      SwiftUI confirmation sheet: field-by-field current→proposed diff,
+                                   Cancel/no-write and Apply/error states (W9.b1)
     ZoteroClipboardDetect.swift    Pure clipboard-detect: (pasteboard string, attached links) →
                                    fresh ZoteroRef? (canonical-dedup); no NSPasteboard dep (§D.5)
-    ZoteroStatusModel.swift        @MainActor bridge: backend availability (cancellable Task) +
-                                   frontmost-gated clipboard detection (changeCount-gated, no timer)
+    ZoteroStatusModel.swift        @MainActor bridge: backend availability (cancellable Task),
+                                   frontmost-gated clipboard detection (changeCount-gated, no timer),
+                                   and CSL + configured-style citation fetch for auto-fill (W9.b1)
+    ZoteroUITestTransport.swift    DEBUG-only in-process deterministic Zotero responses, gated by the
+                                   GUI test launch argument; never opens a socket (W9.b1)
     ZoteroChipView.swift           Reusable Zotero pill (SwiftUI) + pure ZoteroChipPresentation
                                    (label/glyph/a11y); click → NSWorkspace.open(selectLink) (§D.5)
     ZoteroSettings.swift           ZoteroSettingsKey + ZoteroSettings (validated resolve from
@@ -596,11 +602,12 @@ macOS/Tests/ArchiveNotesTests/
                                    +fetch, degrade-when-down (closed→.unavailable, never throws to caller),
                                    bounded request timeout (hang→URLSession timeout fires). Pointed at a
                                    non-default port to prove the Config base-URL seam
-  ZoteroAutoFillTests.swift        21 tests: CSL date-parts→precision (year/month/day, 3-digit year,
+  ZoteroAutoFillTests.swift        28 tests: CSL date-parts→precision (year/month/day, 3-digit year,
                                    out-of-range m/d, raw-year fallback, no-decade), author/title
                                    mapping, AutoFillPlan fill-empty/replace/no-op, apply-selected,
                                    view-model confirm/cancel (fill-empty, replace-with-confirm,
-                                   no-write-on-cancel, stamps only the matching ref)
+                                   no-write-on-cancel, stamps only the matching ref), plus scratch
+                                   atomic commit for a source-block attachment preserving a concurrent body edit (W9.b1)
 
 packages/ArchiveCore/              Shared read-side contract — see root CLAUDE.md repo map
   Tags/                            DocumentTags, GeneratedTags, TagReading, TagEditing, TagWrite

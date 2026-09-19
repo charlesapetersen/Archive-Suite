@@ -204,12 +204,6 @@ title: Lovelace paper
 authors: [Ada Lovelace]
 tags: [computing history]
 roundup: false
-zotero:
-  - selectLink: zotero://select/library/items/ABCD1234
-    itemKey: ABCD1234
-    library: library
-    kind: item
-    citation: Lovelace, 1843
 created: $CREATED
 modified: $CREATED
 ---

@@ -854,6 +854,98 @@ final class NotesModel: ObservableObject {
         return ItemAssetStore(store: noteStore, root: noteStore.rootURL)
     }
 
+    /// Read the current item before opening the Zotero auto-fill confirmation. This is intentionally a
+    /// read only; the sheet's eventual confirm goes through `applyZoteroAutoFill`, which re-reads inside
+    /// `withItem` rather than saving this snapshot back wholesale.
+    func itemForZoteroAutoFill(_ id: UUID) async -> Item? {
+        guard let noteStore else { return nil }
+        do { return try await noteStore.load(id) }
+        catch { report(error, "read the note for Zotero auto-fill"); return nil }
+    }
+
+    /// Commit just the fields the Zotero confirmation selected, plus its one refreshed Zotero reference.
+    /// `resolved` is based on a snapshot taken before the sheet opened, so assigning it as a whole would
+    /// reintroduce W23.h2's lost-update bug by discarding a body/edit that arrived while the sheet was open.
+    /// This transaction instead applies the derived field deltas to the current on-disk item.
+    func applyZoteroAutoFill(_ resolved: Item, basedOn base: Item,
+                             target: ZoteroAutoFillReferenceTarget) async throws {
+        guard let noteStore else { throw ZoteroAutoFillSaveError.storeUnavailable }
+        guard resolved.id == base.id else { throw ZoteroAutoFillSaveError.itemMismatch }
+
+        let applyTitle = resolved.title != base.title
+        let applyAuthors = resolved.authors != base.authors
+        let applyDate = resolved.date != base.date || resolved.datePrecision != base.datePrecision
+        let refreshedRef = target.noteFrontMatter
+            ? resolved.zotero.first(where: { $0.selectLink == target.selectLink })
+            : nil
+        if target.noteFrontMatter, refreshedRef == nil { throw ZoteroAutoFillSaveError.referenceMissing }
+        let baseBlockDisplays = base.blocks.compactMap { block -> String? in
+            guard block.source?.zoteroSelect == target.selectLink else { return nil }
+            return block.source?.display
+        }
+        let resolvedBlockDisplays = resolved.blocks.compactMap { block -> String? in
+            guard block.source?.zoteroSelect == target.selectLink else { return nil }
+            return block.source?.display
+        }
+        let applySourceCitation = target.sourceBlocks && resolvedBlockDisplays != baseBlockDisplays
+
+        let tx = try await noteStore.withItem(base.id) { item in
+            if target.noteFrontMatter,
+               !item.zotero.contains(where: { $0.selectLink == target.selectLink }) {
+                throw ZoteroAutoFillSaveError.referenceRemoved
+            }
+            if target.sourceBlocks,
+               !item.blocks.contains(where: { $0.source?.zoteroSelect == target.selectLink }) {
+                throw ZoteroAutoFillSaveError.referenceRemoved
+            }
+            if applyTitle { item.title = resolved.title }
+            if applyAuthors { item.authors = resolved.authors }
+            if applyDate {
+                item.date = resolved.date
+                item.datePrecision = resolved.datePrecision
+            }
+            if let refreshedRef {
+                item.zotero = item.zotero.map { existing in
+                    guard existing.selectLink == target.selectLink else { return existing }
+                    var updated = existing
+                    // A failed citation fetch is represented by the unchanged prior value in `resolved`, so
+                    // this assignment cannot erase an already-stored durable citation.
+                    updated.citation = refreshedRef.citation
+                    updated.fetchedAt = refreshedRef.fetchedAt
+                    return updated
+                }
+            }
+            if applySourceCitation {
+                let display = resolvedBlockDisplays.first
+                item.blocks = item.blocks.map { existing in
+                    guard existing.source?.zoteroSelect == target.selectLink else { return existing }
+                    var updated = existing
+                    updated.source?.display = display
+                    return updated
+                }
+            }
+            item.modified = Date()
+        }
+        let indexTx = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
+        if let index {
+            try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
+        }
+        await reloadItems()
+    }
+
+    enum ZoteroAutoFillSaveError: LocalizedError {
+        case storeUnavailable, itemMismatch, referenceMissing, referenceRemoved
+
+        var errorDescription: String? {
+            switch self {
+            case .storeUnavailable: "The Notes store is not available."
+            case .itemMismatch: "The selected note changed before auto-fill could be applied."
+            case .referenceMissing: "The selected Zotero reference is no longer available."
+            case .referenceRemoved: "That Zotero reference was removed while the confirmation was open."
+            }
+        }
+    }
+
     /// Shared atomic-transaction → single-row re-index → publish path for the field editors above. A
     /// no-op with no `noteStore` (an injected test model built without one). The on-disk `.md` is the
     /// source of truth and the index is a rebuilt-from-disk projection, so nothing here can corrupt

@@ -34,7 +34,7 @@ path. Each test subtracts a pre-test `itemDirs()` snapshot, because the runner h
 
 ## Check catalog
 
-`G0`–`G11` are the per-wave checks (08-testing §3.7). "Auto" = asserted end-to-end by XCUITest;
+`G0`–`G15` are the per-wave checks (08-testing §3.7). "Auto" = asserted end-to-end by XCUITest;
 "owner-eye" = a human must perform/observe the part XCUITest can't reach (see below).
 
 | ID  | What it proves | Status |
@@ -51,6 +51,10 @@ path. Each test subtracts a pre-test `itemDirs()` snapshot, because the runner h
 | G9  | Create Extract from a note selection (⌘⌥E) → an extract item + note-passage block | **Auto** (via DEBUG selection seam) |
 | G10 | Jump to Source from a note-passage chip → the source note is selected/loaded | **Auto** (via DEBUG jump seam); chip click is owner-eye |
 | G11 | Open a Zotero chip → dispatches `zotero://select/…` | **Auto** (URL dispatch); Zotero launch is owner-eye |
+| G12 | Sources is absent in Notes and present for extracts | **Auto** |
+| G13 | Copy/paste an inline image into an extract imports byte-identical asset bytes | **Auto** (via DEBUG copy/paste seam); ⌘C/⌘V gestures are owner-eye |
+| G14 | Create Extract and Jump to Source raise/focus the appropriate window | **Auto** (via DEBUG key-window probe) |
+| G15 | **Note ▸ Auto-fill from Zotero…** resolves one attached Zotero source block, presents a fill-empty diff, Cancel is byte-for-byte no-op, and Apply writes selected fields plus the configured-style citation | **Auto** (DEBUG-only in-process Zotero transport; no network or Zotero install) |
 
 ### Why some checks use a DEBUG seam instead of the real gesture
 
@@ -102,6 +106,6 @@ File ▸ Choose Store Folder… (it persists over the owner's real root).
   tags to assert, never drives the store picker). Calibrate its table geometry against a
   `gui_capture_window` shot before trusting row-index clicks.
 - `macOS/Tests/ArchiveNotesUITests/` — `SmokeUITest.swift` (launch) + `NotesGUITests.swift`
-  (`NotesFixtureUITestCase` base + G0–G11).
+  (`NotesFixtureUITestCase` base + G0–G15).
 - [`../GUI_SAFETY.md`](../GUI_SAFETY.md) — the authoritative test file-safety protocol + the runtime
   DEBUG scratch-write guard.

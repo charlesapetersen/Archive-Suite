@@ -104,7 +104,14 @@ class NotesFixtureUITestCase: XCTestCase {
         )
 
         app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
-        app.launchArguments += ["-ANUITestStorePath", Self.fixturePath]
+        app.launchArguments += [
+            "-ANUITestStorePath", Self.fixturePath,
+            // In-process only — `ZoteroUITestTransport` never opens a socket. The style value is
+            // deliberately non-default so G15 proves the production command forwards Settings' styleID
+            // into `fetchCitation`, rather than merely receiving a canned citation.
+            "-ANUITestZoteroStub", "YES",
+            "-notes.zotero.cslStyleID", "archive-notes-ui-test",
+        ]
         app.launch()
         app.activate()
 
@@ -1246,6 +1253,94 @@ final class NotesGUITests: NotesFixtureUITestCase {
         let url = lastOpenedURL(startingWith: "zotero://select")
         XCTAssertEqual(url, "zotero://select/library/items/ABCD1234",
                        "Open in Zotero should dispatch the item's select link; got \(url)")
+    }
+
+    /// G15 — Note ▸ Attach Zotero Link… then Auto-fill from Zotero… is the full B1 path: the production
+    /// attach command creates a real source block (not hand-seeded B2 note-level metadata), auto-fill
+    /// flushes that just-added block before fetching through the injected client, the user sees a fill-empty
+    /// confirmation, Cancel is a no-op, and Apply writes only accepted fields plus the configured-style
+    /// citation back onto the source block.
+    /// The app uses its DEBUG-only in-process transport here — no Zotero install, localhost listener, or
+    /// network request is involved — while the menu/sheet/store path is entirely production code.
+    func testG15_AutoFillFromZoteroShowsDiffCancelNoOpAndWritesAcceptedFields() throws {
+        try withFixture { try runG15_AutoFillFromZoteroShowsDiffCancelNoOpAndWritesAcceptedFields() }
+    }
+
+    private func runG15_AutoFillFromZoteroShowsDiffCancelNoOpAndWritesAcceptedFields() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
+        let uuid = Self.idPlain
+        _ = selectItem(uuid: uuid)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "the plain fixture note should load")
+        XCTAssertTrue(pollUntil(timeout: 10) {
+            ((editor.value as? String) ?? "").contains("A plain note with")
+        }, "the plain fixture note must finish loading before invoking the command")
+
+        let original = rawMarkdown(inItemDir: uuid) ?? ""
+        XCTAssertFalse(original.contains("date: 1843"), "fixture must start without the auto-filled date")
+        XCTAssertFalse(original.contains("\nzotero:\n  -"),
+                       "B1 must use the shipped source-block attachment, not B2 metadata")
+        XCTAssertFalse(original.contains("block: zotero-item"), "fixture must start with no Zotero source block")
+
+        let selectLink = "zotero://select/library/items/ABCD1234"
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(selectLink, forType: .string)
+        let noteMenu = app.menuBars.menuBarItems["Note"]
+        XCTAssertTrue(noteMenu.waitForExistence(timeout: 5), "Note menu should exist")
+        noteMenu.click()
+        let attach = app.menuItems["Attach Zotero Link…"]
+        XCTAssertTrue(attach.waitForExistence(timeout: 5), "Attach Zotero Link should be in Note menu")
+        attach.click()
+        XCTAssertTrue(pollUntil(timeout: 8) {
+            let raw = rawMarkdown(inItemDir: uuid) ?? ""
+            return raw.contains("block: zotero-item") && raw.contains(selectLink)
+        }, "Attach Zotero Link must persist a source block before Auto-fill consumes it")
+        let before = rawMarkdown(inItemDir: uuid) ?? ""
+
+        func openAutoFillSheet() {
+            XCTAssertTrue(noteMenu.waitForExistence(timeout: 5), "Note menu should exist")
+            noteMenu.click()
+            let autoFill = app.menuItems["Auto-fill from Zotero…"]
+            XCTAssertTrue(autoFill.waitForExistence(timeout: 5), "auto-fill command should be in Note menu")
+            XCTAssertTrue(pollUntil(timeout: 5) { autoFill.isEnabled },
+                          "a selected note with one durable Zotero source block should enable auto-fill")
+            autoFill.click()
+        }
+
+        let sheet = app.descendants(matching: .any)["an.zotero.autofill.sheet"].firstMatch
+        openAutoFillSheet()
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10), "Zotero metadata should open the confirmation sheet")
+        // The title owns the sheet identifier so each field control retains its own stable identifier.
+        let dateToggle = app.descendants(matching: .any)["an.zotero.autofill.field.date"].firstMatch
+        XCTAssertTrue(dateToggle.waitForExistence(timeout: 5), "the fill-empty date proposal should be visible")
+
+        let cancel = app.descendants(matching: .any)["an.zotero.autofill.cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the confirmation sheet should offer Cancel")
+        cancel.click()
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5), "Cancel should dismiss the confirmation")
+        XCTAssertEqual(rawMarkdown(inItemDir: uuid), before, "Cancel must not write front matter or citation")
+
+        openAutoFillSheet()
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the command should be repeatable after Cancel")
+        let authorsToggle = app.descendants(matching: .any)["an.zotero.autofill.field.authors"].firstMatch
+        XCTAssertTrue(authorsToggle.waitForExistence(timeout: 5), "the empty authors proposal should be reviewable")
+        authorsToggle.click()  // prove an explicit rejection leaves the existing empty field untouched
+        let apply = app.descendants(matching: .any)["an.zotero.autofill.apply"].firstMatch
+        XCTAssertTrue(apply.waitForExistence(timeout: 5), "the confirmation sheet should offer Apply")
+        apply.click()
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 10), "Apply should close after the audited store write")
+
+        var after = ""
+        XCTAssertTrue(pollUntil(timeout: 12) {
+            after = rawMarkdown(inItemDir: uuid) ?? ""
+            return after.contains("date: 1843")
+                && after.contains("date_precision: year")
+                && after.contains("display: \"Citation for archive-notes-ui-test.\"")
+        }, "Apply should write only the selected date and the citation fetched using the configured style")
+        XCTAssertTrue(after.contains("title: My First Note"),
+                      "unselected replacement title must remain untouched")
+        XCTAssertFalse(after.contains("authors: [Ada Lovelace]"),
+                       "an explicitly unselected authors proposal must remain untouched")
     }
 
     // MARK: - G12 / G13 / G14 — the W14.4 (b/d) + W14.3 checks that sat on the owner's manual list
