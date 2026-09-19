@@ -169,12 +169,14 @@ guessed. The DEBUG-only VM transport is in-process and never opens a socket.
   graceful error. **Tier-2** (writes a scratch Notes store only). *Done:* `ZoteroAutoFillModel` is reachable
   from the UI and `zoteroCSLStyleID` observably affects durable output.
 
-**B2. Note-level Zotero citation chips + an attach-at-note-level path.** — **HIGH/MED** — `05` S4/D.5.
-`ZoteroChipView` is defined and presentation-tested but never instantiated, and nothing in production writes
-`item.zotero`.
-- *Files:* `.../Zotero/ZoteroChipView.swift`, `.../Views/NoteMetadataInspector.swift` (or `LocationsInspector`), `.../Editor/EditorFormatting.swift`.
-- *Steps:* render `ZoteroChipView` for `selectedItem.zotero` in the inspector; add an "attach at note level" path (extend "Attach Zotero Link…" or a new inspector affordance) that populates `item.zotero` via `mutateItem`. Feed the clipboard-detect dedup the note's existing links (fixes the empty-`attachedLinks` banner, D-item).
-- *Verify:* attaching a ref shows a note-level chip; the chip's spinner/⚠︎ states exercise via stub. **Tier-2** (front-matter write). *Done:* S4 "chips clickable at note **and** block level" met.
+**B2. Note-level Zotero citation chips + an attach-at-note-level path — SHIPPED 2026-09-19 (this commit).**
+`NoteZoteroInspector` renders stored refs, offers **Attach to note**, and saves the link through `mutateItem`
+before fetching a citation. Loading/failed chips remain clickable, with Retry on failure; the source-block
+Attach command is unchanged. Clipboard dedup now uses the selected note's front-matter AND block refs and
+re-evaluates on selection/store changes. Independent Tier-2 review closed a stale auto-fill citation overwrite;
+scratch transactions cover concurrent edits and G16 drives the inspector with delayed/failing local stubs,
+dispatch assertions, clipboard transitions, and a rendered screenshot. Completion record: `SUITE_TODO_DONE.md`
+→ `W9.b2`. The rest of this multi-phase plan remains open.
 
 **B3. Add note retitle + tag editing.** — **MED** — overview §16.1. No `setTitle`/`setTags` exist; the
 metadata inspector edits only date/quality; the table tags column is read-only and its comment falsely

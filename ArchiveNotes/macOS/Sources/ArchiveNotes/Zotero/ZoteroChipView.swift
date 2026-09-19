@@ -47,6 +47,7 @@ struct ZoteroChipView: View {
                     .truncationMode(.tail)
                 if isFetching {
                     ProgressView().controlSize(.mini)
+                        .accessibilityHidden(true) // status belongs to the clickable chip, not a child control
                 } else if didFail {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
@@ -60,7 +61,10 @@ struct ZoteroChipView: View {
         }
         .buttonStyle(.plain)
         .help(presentation.help)
+        .accessibilityLabel(presentation.label)
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(presentation.accessibilityID)
+        .accessibilityValue(isFetching ? "Fetching citation" : didFail ? "Citation unavailable" : "")
     }
 
     @MainActor

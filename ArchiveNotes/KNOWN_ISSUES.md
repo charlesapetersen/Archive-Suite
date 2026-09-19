@@ -3,11 +3,30 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.b2) — note-level Zotero references are attachable and clickable
+
+**2026-09-19.** The metadata inspector now offers **Attach to note** and renders stored Zotero references
+as clickable citation chips. Attachment saves the canonical link before fetching, so an unavailable Zotero
+leaves a usable link with a warning and **Retry citation**. It is separate from **Note ▸ Attach Zotero Link…**,
+which still inserts a source block. Clipboard offers exclude both representations on the selected note and
+re-evaluate after attachment or selection changes, even when the clipboard bytes do not change.
+
+All writes use `NotesModel` → `mutateItem` → `NoteStore.withItem`; duplicate attachment preserves the existing
+citation, and late responses cannot replace concurrent citations, resurrect removed links, or overwrite body
+edits. Independent adversarial review found that the older auto-fill confirmation could erase an inspector
+citation fetched while its sheet was open; compare-against-base guards and a scratch regression now cover
+both failed and stale auto-fill responses. G16 covers the real inspector, loading/failure chips, click dispatch,
+per-note clipboard dedup, and body preservation, with a screenshot for pixel review. Tests use scratch only.
+
+**Verification:** Debug build + smoke: 861 Swift Testing tests in 86 suites and 218 XCTest checks; full
+off-screen GUI suite: 23/23 in 517.241 s. The exported inspector screenshot was visually reviewed. No new
+compiler warnings; the existing AppIntents metadata-extraction notices remain unrelated.
+
 ## ✅ FIXED (W9.b1) — Zotero auto-fill is now reachable, reviewable, and race-safe
 
 **2026-09-18.** **Note ▸ Auto-fill from Zotero…** now becomes available for a note with exactly one durable
 Zotero attachment. It supports the production source-block representation immediately after **Attach Zotero
-Link…** (as well as future note-level metadata), never guesses between distinct sources, fetches CSL plus the
+Link…** (as well as note-level metadata), never guesses between distinct sources, fetches CSL plus the
 configured citation style, and presents a field-by-field confirmation. Cancel is byte-for-byte no-write;
 Apply changes only accepted fields and the matching citation through an atomic transaction, preserving a body
 edit that arrives while the sheet is open. A DEBUG-only in-process transport proves the end-to-end VM route

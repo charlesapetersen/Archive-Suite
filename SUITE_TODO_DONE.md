@@ -90,7 +90,25 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   live output folder, GUI, credentials, or network is used. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/
   {Capture/CaptureSession.swift,Capture/LiveCaptureRecoveryTestDriver.swift} | S | low | done
 
-## W9 gap-closure — Phase B wire the built-but-dead features (2026-09-18)
+## W9 gap-closure — Phase B wire the built-but-dead features (2026-09-18–19)
+
+- [x] **`W9.b2` — note-level Zotero attachments and clickable citation chips [M · Tier-2].** **SHIPPED
+  2026-09-19 (this commit).** The metadata inspector's **Attach to note** saves canonical references through
+  `mutateItem`, renders `item.zotero` as clickable chips, and fetches configured-style citations with a loading
+  indicator and offline warning/Retry. The link is saved first and stays usable on fetch failure; the editor's
+  existing source-block Attach command is unchanged. Clipboard dedup combines front-matter and source-block
+  references per selected note/window, refreshing on note/store changes without requiring new clipboard bytes.
+
+  **Tier-2 verification:** independent find→refute review found and closed an auto-fill/inspector citation
+  race. Scratch transactions cover canonical duplicate attachment, concurrent body preservation, removed
+  references, and failed/stale auto-fill responses preserving newer citations. G16 drives production inspector
+  controls, loading/failure states, real chip dispatch, unchanged-clipboard selection transitions, and durable
+  front-matter/body assertions; the in-process Zotero stub never opens a socket. Debug build and full smoke
+  passed **861 Swift Testing tests / 86 suites + 218 XCTest checks**; the full off-screen UI suite passed
+  **23/23 in 517.241 s** and its exported screenshot was visually reviewed. No real Notes store, corpus,
+  bookmark, credentials, or paid calls are used. | ArchiveNotes/{macOS/{Sources/ArchiveNotes/{Core,
+  Views,Zotero},Tests/{ArchiveNotesTests/NoteZoteroAttachmentTests.swift,ArchiveNotesUITests/NotesGUITests.swift}},
+  CLAUDE.md,KNOWN_ISSUES.md,scripts/GUI-HARNESS.md} | M | med | done
 
 - [x] **`W9.b1` — Zotero auto-fill is reachable from the Note menu [M · Tier-2].** **SHIPPED 2026-09-18
   (this commit).** **Note ▸ Auto-fill from Zotero…** now accepts exactly one durable Zotero reference from

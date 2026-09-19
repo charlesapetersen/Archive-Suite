@@ -1182,16 +1182,12 @@ The remaining two Phase C items are heavier than C1–C4 and sit in **TIER 5**, 
 **Phase B — wire the built-but-dead features.** The high-value core: library code that shipped without a UI
 entry point. Mostly **Tier-2** (they write note front-matter or project Finder tags).
 
-- [ ] **`W9.b2` — note-level Zotero chips are never rendered, and there is no attach-at-note-level path [M ·
-  Tier-2].** Plan B2. Render `ZoteroChipView` for `selectedItem.zotero` in the inspector; add an attach path
-  populating `item.zotero` via `mutateItem`; feed the clipboard-detect dedup the note's existing links (fixes
-  the empty-`attachedLinks` banner). Meets S4 "chips clickable at note **and** block level". | ArchiveNotes
-  Zotero/ + NoteMetadataInspector.swift | M | med | none
-  - ⚠️ **`W9.b3` (plan B3 — note retitle + tag editing) is NOT listed here.** Its checkbox is the retagged
-    former `W22.notes-rename` entry further down this file, which already carries the owner's 2026-08-02
-    decisions (full affordance not inspector-only; renaming renames the file on disk), the correction that
-    shrank it to S–M, and the one assertion that genuinely remains. Plan B3's extra scope (`setTags` + the
-    inspector tag editor + projector sync) was folded into it. One checkbox, not two — do not re-file it here.
+⚠️ **`W9.b3` (plan B3 — note retitle + tag editing) is NOT listed here.** Its checkbox is the retagged
+former `W22.notes-rename` entry further down this file, which already carries the owner's 2026-08-02
+decisions (full affordance not inspector-only; renaming renames the file on disk), the correction that
+shrank it to S–M, and the one assertion that genuinely remains. Plan B3's extra scope (`setTags` + the
+inspector tag editor + projector sync) was folded into it. One checkbox, not two — do not re-file it here.
+
 - [ ] **`W9.b4` — page thumbnails never render end-to-end [M · Tier-2].** Plan B4. Reader passes
   `thumbnailer:nil`. ⚠️ **Verify with a headless render guard** (`RenderProbe`/`DocumentRenderGuardTests` over
   Notes' in-app `PDFThumbnailer`) — XCUITest reads the accessibility tree, not pixels, so a blank thumbnail

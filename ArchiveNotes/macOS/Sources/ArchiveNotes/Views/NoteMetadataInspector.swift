@@ -33,12 +33,14 @@ struct NoteMetadataInspector: View {
             dateSection
             Divider()
             qualitySection
+            Divider()
+            NoteZoteroInspector(model: nav.model, itemID: item.id)
+                .id(item.id)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .onAppear { seed(from: item) }
         .onChange(of: item.id) { seed(from: item) }   // re-seed only on selection change (WYSIWYG typing)
-        .accessibilityIdentifier("an.detail.metadata")
     }
 
     // MARK: Date
@@ -46,6 +48,7 @@ struct NoteMetadataInspector: View {
     @ViewBuilder private var dateSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Date").font(.subheadline.bold())
+                .accessibilityIdentifier("an.detail.metadata")
             Picker("Precision", selection: precisionBinding) {
                 Text("Decade").tag(Item.DatePrecision.decade)
                 Text("Year").tag(Item.DatePrecision.year)

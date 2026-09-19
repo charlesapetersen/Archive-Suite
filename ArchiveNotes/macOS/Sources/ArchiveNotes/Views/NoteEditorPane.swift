@@ -29,6 +29,8 @@ struct NoteEditorPane: View {
     @State private var assetStore: ItemAssetStore?
     @EnvironmentObject private var previewPopover: SourceBlockPreviewState
     @EnvironmentObject private var zoteroStatus: ZoteroStatusModel
+    @State private var zoteroItem: Item?
+    @State private var zoteroReadGeneration = 0
     /// W7-S6 — app-level registry this pane registers its flush into, so a hard ⌘Q / app terminate (which
     /// doesn't reliably fire `.onDisappear`) still persists the last keystrokes via the app delegate.
     @EnvironmentObject private var flushRegistry: EditorFlushRegistry
@@ -43,9 +45,8 @@ struct NoteEditorPane: View {
     @State private var testBox = EditorTestBox()
     @State private var testCommitInput = ""
     @State private var testSelectionInput = ""
-    /// The last external URL the app dispatched via `openExternalURL`, surfaced for the G6/G11 checks to
-    /// read back (the reveal/zotero seams fire synchronously, so the button action re-reads the spy).
-    @State private var testLastOpened = ""
+    /// Observe the real dispatch choke-point, including clicks on note-level Zotero chips.
+    @ObservedObject private var testOpenSpy = WorkspaceOpenSpy.shared
     /// Read-back of the last passage-paste outcome (W21.vmgui-g13) — the paste's own answer, which the
     /// seam used to discard. "-" keeps the element present before the first paste.
     @State private var testPasteOutcome = "-"
@@ -55,7 +56,7 @@ struct NoteEditorPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let ref = zoteroStatus.clipboardRef {
+            if let ref = clipboardReference {
                 zoteroBanner(ref)
                 Divider()
             }
@@ -121,6 +122,9 @@ struct NoteEditorPane: View {
         }
         // W7-S3 jump-to-source consume side: the window featuring the target's kind selects it + scrolls.
         .onReceive(nav.model.$pendingOpen) { handleOpen($0) }
+        .onReceive(nav.model.$itemsGeneration) { _ in
+            refreshZoteroAutoFillReference(for: nav.selectedItemID)
+        }
     }
 
     /// The Markdown editor. Extracted from `body` so the DEBUG UITest seam (W8-S7 §3.3) can be attached
@@ -209,12 +213,10 @@ struct NoteEditorPane: View {
                         .accessibilityIdentifier("an.editor.test.jump")
                     Button("reveal") {
                         testBox.revealFirstSource?()
-                        testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
                     }
                     .accessibilityIdentifier("an.editor.test.reveal")
                     Button("zotero") {
                         testBox.openFirstZotero?()
-                        testLastOpened = WorkspaceOpenSpy.shared.lastOpenedURL ?? ""
                     }
                     .accessibilityIdentifier("an.editor.test.zoteroOpen")
                     // W14.3's live copy→paste: ⌘C/⌘V go to the first responder, which XCUITest cannot
@@ -236,7 +238,7 @@ struct NoteEditorPane: View {
                     // Read-back of the last external URL dispatched (G6/G11). A visible static text (not a
                     // 1×1 hidden element — the `an.status.indexReady` probe's queryability hazard) so
                     // XCUITest resolves it; "-" keeps the element present before the first dispatch.
-                    Text(testLastOpened.isEmpty ? "-" : testLastOpened)
+                    Text(testOpenSpy.lastOpenedURL ?? "-")
                         .accessibilityIdentifier("an.editor.test.lastOpenedURL")
                 }
             }
@@ -317,13 +319,28 @@ struct NoteEditorPane: View {
     /// Zotero reference. Clearing first prevents an older async read from advertising a ref on a newly
     /// selected note; the id guard rejects the same stale completion.
     private func refreshZoteroAutoFillReference(for id: UUID?) {
+        // A prior body-selection task may finish after the user has already moved elsewhere.
+        guard id == nav.selectedItemID else { return }
         formatting.clearZoteroAutoFillReference()
+        zoteroItem = nil
+        zoteroReadGeneration &+= 1
+        let generation = zoteroReadGeneration
         guard let id else { return }
         Task {
             guard let item = await nav.model.itemForZoteroAutoFill(id),
-                  nav.selectedItemID == id else { return }
+                  nav.selectedItemID == id, generation == zoteroReadGeneration else { return }
+            zoteroItem = item
             formatting.updateZoteroAutoFillReference(from: item)
         }
+    }
+
+    /// Dedup is window/selection-local, not cached against the shared pasteboard change count. Moving
+    /// between notes with an unchanged clipboard (or attaching a reference) must re-evaluate the banner.
+    private var clipboardReference: ZoteroRef? {
+        guard let item = zoteroItem, item.id == nav.selectedItemID else { return nil }
+        let attached = Set(item.zotero.map(\.selectLink) + item.blocks.compactMap { $0.source?.zoteroSelect })
+        return ZoteroClipboardDetect.detect(pasteboardString: zoteroStatus.clipboardRef?.selectLink,
+                                            attachedLinks: attached)
     }
 
     /// Publish the selected item's identity to the formatting context so W7's Create-Extract can anchor

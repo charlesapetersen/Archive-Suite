@@ -21,6 +21,10 @@ private struct ZoteroUITestTransport: ZoteroTransport {
                 "issued": ["date-parts": [[1843]]],
             ]])
         case "bib":
+            if url.path.contains("FAIL1234") { throw URLError(.cannotConnectToHost) }
+            if url.path.contains("NOTE1234") {
+                try await Task.sleep(for: .seconds(8)) // G16 observes the real chip's loading state.
+            }
             return response(url, status: 200, object: [
                 "bib": "<div class=\"csl-entry\">Citation for \(style).</div>",
             ])

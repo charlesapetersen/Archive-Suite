@@ -854,7 +854,30 @@ final class NotesModel: ObservableObject {
         return ItemAssetStore(store: noteStore, root: noteStore.rootURL)
     }
 
-    /// Read the current item before opening the Zotero auto-fill confirmation. This is intentionally a
+    /// Attach a canonical note-level reference without replacing a concurrent body or metadata edit.
+    /// Reattaching the same link preserves its existing citation and fetch timestamp.
+    @discardableResult
+    func attachZoteroReference(_ ref: ZoteroRef, to id: UUID) async -> Bool {
+        guard let canonical = ZoteroSelectLink.parse(ref.selectLink) else { return false }
+        return await mutateItem(id, "attach the Zotero reference") { item in
+            guard !item.zotero.contains(where: { $0.selectLink == canonical.selectLink }) else { return }
+            item.zotero.append(canonical)
+        }
+    }
+
+    /// A late citation response must neither resurrect a removed link nor overwrite a newer citation.
+    @discardableResult
+    func cacheZoteroCitation(_ citation: String, for ref: ZoteroRef, in id: UUID) async -> Bool {
+        await mutateItem(id, "save the Zotero citation") { item in
+            guard let position = item.zotero.firstIndex(where: { $0.selectLink == ref.selectLink }),
+                  item.zotero[position].citation == ref.citation,
+                  item.zotero[position].fetchedAt == ref.fetchedAt else { return }
+            item.zotero[position].citation = citation
+            item.zotero[position].fetchedAt = Date()
+        }
+    }
+
+    /// Read the current item for Zotero inspectors and auto-fill. This is intentionally a
     /// read only; the sheet's eventual confirm goes through `applyZoteroAutoFill`, which re-reads inside
     /// `withItem` rather than saving this snapshot back wholesale.
     func itemForZoteroAutoFill(_ id: UUID) async -> Item? {
@@ -878,6 +901,7 @@ final class NotesModel: ObservableObject {
         let refreshedRef = target.noteFrontMatter
             ? resolved.zotero.first(where: { $0.selectLink == target.selectLink })
             : nil
+        let baseRef = base.zotero.first(where: { $0.selectLink == target.selectLink })
         if target.noteFrontMatter, refreshedRef == nil { throw ZoteroAutoFillSaveError.referenceMissing }
         let baseBlockDisplays = base.blocks.compactMap { block -> String? in
             guard block.source?.zoteroSelect == target.selectLink else { return nil }
@@ -906,10 +930,12 @@ final class NotesModel: ObservableObject {
             }
             if let refreshedRef {
                 item.zotero = item.zotero.map { existing in
-                    guard existing.selectLink == target.selectLink else { return existing }
+                    guard existing.selectLink == target.selectLink,
+                          existing.citation == baseRef?.citation,
+                          existing.fetchedAt == baseRef?.fetchedAt else { return existing }
                     var updated = existing
-                    // A failed citation fetch is represented by the unchanged prior value in `resolved`, so
-                    // this assignment cannot erase an already-stored durable citation.
+                    // Compare against the snapshot before assigning: an inspector fetch may have saved a
+                    // newer citation while this sheet was open, including when this fetch failed (nil).
                     updated.citation = refreshedRef.citation
                     updated.fetchedAt = refreshedRef.fetchedAt
                     return updated
@@ -956,9 +982,10 @@ final class NotesModel: ObservableObject {
     /// `@MainActor` but *reentrant at every `await`*, so a body autosave and a metadata edit could both
     /// load the same old item and the later save would silently drop the other's field. `mutate` must
     /// therefore stay synchronous — that is what makes the transaction atomic.
+    @discardableResult
     private func mutateItem(_ id: UUID, _ action: String,
-                            _ mutate: @Sendable (inout Item) -> Void) async {
-        guard let noteStore else { return }
+                            _ mutate: @Sendable (inout Item) -> Void) async -> Bool {
+        guard let noteStore else { return false }
         do {
             let tx = try await noteStore.withItem(id) { item in
                 mutate(&item)
@@ -969,7 +996,8 @@ final class NotesModel: ObservableObject {
                 try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
             }
             await reloadItems()
-        } catch { report(error, action) }
+            return true
+        } catch { report(error, action); return false }
     }
 
     // MARK: Tree rebuild

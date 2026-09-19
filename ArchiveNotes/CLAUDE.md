@@ -40,7 +40,7 @@ this file is authoritative for Notes‑specific work.
   replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
   library (scratch-only; reads tags to assert, never drives the store picker — **host-only, so unattended
-  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G15 catalog) runs **off-screen in the
+  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G16 catalog) runs **off-screen in the
   Tart VM** — it joined the VM lane on 2026-07-30, so it is part of the periodic health gate
   (`AUTONOMOUS_GUI_VM_APPS="reader notes"`) and the fixture is built inside the VM on demand.
   **README + check catalog + the owner-eye checks (G2 typing, G6/G11
@@ -398,6 +398,11 @@ macOS/Sources/ArchiveNotes/
                                    GUI test launch argument; never opens a socket (W9.b1)
     ZoteroChipView.swift           Reusable Zotero pill (SwiftUI) + pure ZoteroChipPresentation
                                    (label/glyph/a11y); click → NSWorkspace.open(selectLink) (§D.5)
+    NoteZoteroInspector.swift      Note-level Attach to note + persisted citation chips (W9.b2), separate
+                                   from editor source blocks; save link first, fetch citation with spinner /
+                                   offline warning + Retry. Model transactions preserve concurrent edits.
+                                   Editor clipboard dedup uses the selected note AND its source blocks,
+                                   re-evaluating on selection/store changes with unchanged clipboard bytes.
     ZoteroSettings.swift           ZoteroSettingsKey + ZoteroSettings (validated resolve from
                                    UserDefaults, defaults, clientConfig) + ZoteroSettingsStore
                                    (point-of-use accessor); gates probe/clipboard-detect (§D.8)

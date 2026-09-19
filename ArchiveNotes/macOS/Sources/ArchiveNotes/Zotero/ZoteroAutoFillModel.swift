@@ -1,8 +1,7 @@
 import Foundation
 
-/// One durable Zotero reference as it is represented on the selected note. Until B2 lands, the normal
-/// UI attachment is a source block; keeping the two storage representations together makes B1 work on
-/// that shipped path without guessing which of several citations a user meant.
+/// One durable Zotero reference as it is represented on the selected note: inspector front matter,
+/// editor source blocks, or both, without guessing which of several citations a user meant.
 struct ZoteroAutoFillReferenceTarget: Sendable, Equatable {
     let selectLink: String
     var noteFrontMatter: Bool

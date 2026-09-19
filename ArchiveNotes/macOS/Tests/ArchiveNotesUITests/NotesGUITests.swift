@@ -1343,6 +1343,63 @@ final class NotesGUITests: NotesFixtureUITestCase {
                        "an explicitly unselected authors proposal must remain untouched")
     }
 
+    /// B2: actual inspector controls, persisted front matter, per-note clipboard dedup, loading/error
+    /// chips, and actual chip dispatch. All requests use the in-process stub, all writes use scratch.
+    func testG16_NoteZoteroAttachmentChipsAndClipboardDedup() throws {
+        let link = "zotero://select/library/items/NOTE1234"
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(link, forType: .string)
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            _ = selectItem(uuid: Self.idReader)
+            let banner = app.staticTexts["Zotero link on clipboard"].firstMatch
+            XCTAssertTrue(banner.waitForExistence(timeout: 10))
+            let before = rawMarkdown(inItemDir: Self.idReader) ?? ""
+            let input = app.textFields["an.zotero.note.link"]
+            let attach = app.buttons["an.zotero.note.attach"]
+            XCTAssertTrue(input.waitForExistence(timeout: 5))
+            input.click()
+            input.typeText(link)
+            attach.click()
+            let chip = app.buttons["an.zotero.chip.NOTE1234"]
+            XCTAssertTrue(chip.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertTrue(pollUntil(timeout: 3) { chip.value as? String == "Fetching citation" },
+                          chip.debugDescription)
+            XCTAssertTrue(banner.waitForNonExistence(timeout: 8), "attachment must hide the unchanged clipboard")
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                chip.label.contains("Citation for archive-notes-ui-test.")
+            }, "the note chip should display the configured-style citation")
+            let after = rawMarkdown(inItemDir: Self.idReader) ?? ""
+            XCTAssertTrue(after.contains("  - selectLink: \(link)"),
+                          "the serializer emits this URL as an unquoted YAML scalar")
+            XCTAssertEqual(after.components(separatedBy: "\n---\n").last,
+                           before.components(separatedBy: "\n---\n").last, "attach must not rewrite the body")
+            chip.click()
+            XCTAssertEqual(lastOpenedURL(startingWith: "zotero://select"), link)
+
+            _ = selectItem(uuid: Self.idZotero)
+            XCTAssertTrue(banner.waitForExistence(timeout: 8), "same clipboard is new to the other note")
+            _ = selectItem(uuid: Self.idReader)
+            XCTAssertTrue(banner.waitForNonExistence(timeout: 8))
+            XCTAssertTrue(chip.waitForExistence(timeout: 8), "the persisted chip must survive selection changes")
+
+            input.click()
+            input.typeText("zotero://select/library/items/FAIL1234")
+            attach.click()
+            let failedChip = app.buttons["an.zotero.chip.FAIL1234"]
+            XCTAssertTrue(failedChip.waitForExistence(timeout: 8))
+            XCTAssertTrue(pollUntil(timeout: 10) { failedChip.value as? String == "Citation unavailable" })
+            XCTAssertTrue(app.buttons["an.zotero.retry.FAIL1234"].exists)
+            failedChip.click()
+            XCTAssertEqual(lastOpenedURL(startingWith: "zotero://select/library/items/FAIL"),
+                           "zotero://select/library/items/FAIL1234", "offline links must still open")
+            let shot = app.windows["Archive Notes"].screenshot()
+            let path = FileManager.default.temporaryDirectory.appendingPathComponent("notes-zotero-inspector.png")
+            try shot.pngRepresentation.write(to: path)
+            print("[shot] notes-zotero-inspector: wrote \(path.path)")
+        }
+    }
+
     // MARK: - G12 / G13 / G14 — the W14.4 (b/d) + W14.3 checks that sat on the owner's manual list
     //
     // Each of these shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour

@@ -15,8 +15,8 @@ final class ZoteroStatusModel: ObservableObject {
     /// link-only attach + chip-open are always available regardless of this value.
     @Published private(set) var backend: ZoteroClient.Backend = .unavailable
 
-    /// A recognized, not-yet-attached zotero link currently on the clipboard
-    /// (`nil` = nothing to offer).
+    /// A recognized Zotero clipboard candidate. Each editor filters this shared value against its own
+    /// selected note's attachments; caching selection-specific dedup here would mix the two windows.
     @Published private(set) var clipboardRef: ZoteroRef?
 
     private let client: ZoteroClient
@@ -47,8 +47,7 @@ final class ZoteroStatusModel: ObservableObject {
 
     /// Re-read the pasteboard and update `clipboardRef`. Cheap + synchronous; skips
     /// work when the pasteboard hasn't changed since the last read.
-    /// - Parameter attachedLinks: canonical select links already attached (deduped out).
-    func refreshClipboard(attachedLinks: Set<String> = []) {
+    func refreshClipboard() {
         // Detection off, or the whole integration disabled → never surface a banner.
         let settings = ZoteroSettingsStore.current
         guard settings.enabled, settings.clipboardDetect else {
@@ -59,8 +58,7 @@ final class ZoteroStatusModel: ObservableObject {
         if pasteboard.changeCount == lastChangeCount { return }
         lastChangeCount = pasteboard.changeCount
         let string = pasteboard.string(forType: .string)
-        clipboardRef = ZoteroClipboardDetect.detect(pasteboardString: string,
-                                                     attachedLinks: attachedLinks)
+        clipboardRef = ZoteroClipboardDetect.detect(pasteboardString: string)
     }
 
     /// Fetch the metadata that the Auto-fill confirmation needs. Citation failure is deliberately
@@ -72,6 +70,12 @@ final class ZoteroStatusModel: ObservableObject {
         let csl = try await client.fetchCSL(ref)
         let citation = try? await client.fetchCitation(ref, styleID: settings.styleID)
         return (csl, citation)
+    }
+
+    func fetchCitation(for ref: ZoteroRef) async throws -> String {
+        let settings = ZoteroSettingsStore.current
+        guard settings.enabled else { throw ZoteroClient.ClientError.unavailable }
+        return try await client.fetchCitation(ref, styleID: settings.styleID)
     }
 
     /// Clear the detected clipboard link (after the user attaches or dismisses it).

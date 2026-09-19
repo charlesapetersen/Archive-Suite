@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 /// The single choke-point through which Archive Notes dispatches an *external* URL — a Reader
 /// `archivereader://reveal?…` deep link (source-block "Reveal in Reader") or a `zotero://select/…`
@@ -29,12 +30,12 @@ func openExternalURL(_ url: URL) {
 /// UITest launch (`-ANUITestStorePath`, mirroring the `RootFolderStore` / `NoteEditorPane` gate); a
 /// normal DEBUG run leaves `isActive` false so `openExternalURL` opens for real. Compiled out of Release.
 @MainActor
-final class WorkspaceOpenSpy {
+final class WorkspaceOpenSpy: ObservableObject {
     static let shared = WorkspaceOpenSpy()
     private init() {}
 
     /// The `absoluteString` of the most recently dispatched external URL (nil until the first open).
-    private(set) var lastOpenedURL: String?
+    @Published private(set) var lastOpenedURL: String?
 
     /// True only in a UITest harness launch. Same gate as `NoteEditorPane.isUITestHarness`.
     var isActive: Bool {
