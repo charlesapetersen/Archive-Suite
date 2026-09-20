@@ -174,6 +174,19 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   corpus/store write, network, or credentials. | ArchiveNotes/test-smoke.sh, ArchiveNotes/scripts/test-smoke-unit-scope.sh,
   ops/autonomous/ | XS | low | done
 
+- [x] **`W9.c5` — the tag-projector concurrent lost-update race [LOW–MED · Tier-2]** (blocked-on: W9.b3).
+  **CLOSED 2026-09-20 (this commit) — already shipped by W15.tu3/W15.tu4.** Plan C5, documented in
+  `KNOWN_ISSUES.md` (`08` S2). Two concurrent projections of the same file could drop a subject. It was not
+  currently triggerable when filed — the projector was never driven concurrently — which is why it was gated
+  on `W9.b3`, the first feature that could enqueue concurrent projections for one item. W15.tu3 instead put
+  per-resolved-path serialization around ArchiveCore's shared `CoordinatedTagWriter` read-modify-write
+  transaction; `NotesTagProjector` exclusively uses that writer. W15.tu4 restored and strengthened
+  `concurrentProjectionsNeverCorrupt` so both racing subjects must survive. W9.b3 now computes its tag deltas
+  in the `NoteStore` transaction and has its own concurrent title/body/tag regression. Independent Tier-2
+  review confirmed no W9.b3-specific race remains; this completion reran the scratch-only Notes unit suite
+  (868 tests in 87 suites). **Done:** the `KNOWN_ISSUES.md` entry is closed. |
+  ArchiveNotes Core/NotesTagProjector.swift, packages/ArchiveCore/Tags/TagWrite.swift | S–M | med | done
+
 - [x] **`W9.c3` — the write-surface lint never scans ArchiveCore or Notes, and Core imports AppKit [S–M ·
   Tier-2].** **SHIPPED 2026-08-20** (commit whose subject begins
   `fix(core,reader,notes,trackers): W9 keep ArchiveCore UI-free`). The earlier W26 work had already

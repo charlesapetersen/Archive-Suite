@@ -286,11 +286,14 @@ cannot build or drive the GUI target; `ArchiveNotesUITests` remains an explicit 
   scheme/selector and rejects the GUI target;
   the real smoke run stays green. *Tier-1.*
 
-**C5. (Optional) Fix the tag-projector concurrent lost-update race.** — **LOW-MED (documented)** — `08` S2 /
-`KNOWN_ISSUES.md`. Two concurrent same-file projections can drop a subject; not currently triggered because
-the projector isn't driven concurrently. Only worth doing if B3 (or any future feature) can enqueue
-concurrent projections for one item.
-- *Files:* `.../Core/NotesTagProjector.swift`. *Steps:* serialize per-item projection (e.g., an item-keyed actor/queue) so the read-modify-write is atomic; restore the plan's `concurrentProjectionsNeverCorrupt` "loses nothing" assertion. *Verify:* the strengthened concurrency test passes on a scratch store. **Tier-2.** *Done:* KNOWN_ISSUES entry closed.
+**C5. Tag-projector concurrent lost-update race.** — **SHIPPED 2026-07-28 (W15.tu3/W15.tu4); reconciled
+2026-09-20 (W9.c5).** — `08` S2 / `KNOWN_ISSUES.md`. Two concurrent same-file projections could drop a
+subject. W15.tu3 closed the race at the correct shared boundary: `ArchiveCore.CoordinatedTagWriter` serializes
+the complete per-resolved-path read-modify-write transaction, and `NotesTagProjector` exclusively uses that
+writer. W15.tu4 strengthened `concurrentProjectionsNeverCorrupt` to require both racing subjects to survive.
+This covers B3/future in-process concurrent projections without a Notes-only queue; cross-process writers
+remain deliberately out of scope. *Verify:* the strengthened scratch-only concurrency test passes; W9.c5
+reran the Notes unit suite (868 tests in 87 suites). **Tier-2.** *Done:* KNOWN_ISSUES entry closed.
 
 **C6. Scale-acceptance harness — 100k notes / 2M words.** — **MED (functional)** — (spec-vs-build). The original
 spec: "operate at the scale of **100,000 notes and 2 million words** without being slow. **Build for scale from

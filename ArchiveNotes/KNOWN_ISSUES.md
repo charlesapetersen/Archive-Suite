@@ -1329,7 +1329,7 @@ overwrite the current Finder Q facet or publish a stale Quality to the index/liv
   current managed subject and an unrelated Finder tag, then verifies that only the old stamp disappears and
   the note bytes never change. No real Notes store or corpus was touched.
 
-- **FIXED — mechanism W15.tu3 (2026-07-28, `f52756d`); regression-pinned across all three callers W15.tu4.** A per-resolved-path serialization lock now lives
+- **FIXED — mechanism W15.tu3 (2026-07-28, `1ea80a7`); regression-pinned across all three callers W15.tu4.** A per-resolved-path serialization lock now lives
   inside `ArchiveCore.CoordinatedTagWriter` (Safety §10): the full read→modify→verify→write is mutually
   excluded PER FILE, so two concurrent IN-PROCESS writers to the same file can no longer both read pre-write
   state and clobber each other — the lost update is closed. Distinct paths never contend, so unrelated tag
@@ -1356,7 +1356,7 @@ overwrite the current Finder Q facet or publish a stale Quality to the index/liv
   note at a time, and the projector isn't yet wired to any concurrent path. It would only bite if a future
   design ran the projector on a background re-index *concurrently* with an interactive save of the **same**
   note. **Not fixed in S2** (S2 was the test suite); the fix — a per-path serialization lock inside the
-  shared audited writer — shipped separately as **W15.tu3** (`f52756d`, see the FIXED entry above). It does
+  shared audited writer — shipped separately as **W15.tu3** (`1ea80a7`, see the FIXED entry above). It does
   not, and cannot, cover cross-process writers.
 - **Added — DEBUG scratch-write guard on `NotesTagProjector` (belt-and-suspenders, plan §5).** Under a
   unit-test harness (`XCTestConfigurationFilePath` set) **or** the GUI-drive store override

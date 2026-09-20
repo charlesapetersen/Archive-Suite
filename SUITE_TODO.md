@@ -1101,15 +1101,8 @@ live-verified 2026-07-17).
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 
-The remaining two Phase C items are heavier than C1–C4 and sit in **TIER 5**, not with the gate work:
+The remaining Phase C item is heavier than C1–C5 and sits in **TIER 5**, not with the gate work:
 
-- [ ] **`W9.c5` — the tag-projector concurrent lost-update race [LOW–MED · Tier-2]** (blocked-on: W9.b3).
-  Plan C5, documented in `KNOWN_ISSUES.md` (`08` S2). Two concurrent projections of the same file can drop a
-  subject. **Not currently triggerable** — the projector is never driven concurrently — which is exactly why it
-  is gated on `W9.b3`: that item adds `setTags`, the first feature that could enqueue concurrent projections
-  for one item. Serialize per-item projection (item-keyed actor/queue) so the read-modify-write is atomic, and
-  restore the plan's `concurrentProjectionsNeverCorrupt` "loses nothing" assertion. Scratch store only.
-  **Done:** the `KNOWN_ISSUES.md` entry is closed. | ArchiveNotes Core/NotesTagProjector.swift | S–M | med | none
 - [ ] **`W9.c6` — nothing proves the spec's 100k-note / 2M-word scale target [M · Tier-2].** Plan C6
   (spec-vs-build). The original spec said *"operate at the scale of 100,000 notes and 2 million words without
   being slow. Build for scale from the beginning."* The architecture **is** built for it (FTS5 + bm25, WAL +
