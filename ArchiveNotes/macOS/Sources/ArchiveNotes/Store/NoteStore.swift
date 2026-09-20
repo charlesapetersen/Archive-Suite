@@ -31,6 +31,8 @@ struct ItemTransaction: Sendable {
     let ownedDateFacetTokens: Set<String>
     let item: Item
     let ref: ItemRef
+    /// YAML saved successfully, but its independent Finder-subject mirror needs a retry.
+    var subjectProjectionError: String? = nil
 }
 
 /// The single persistence layer for Archive Notes' UUID-folder store.
@@ -43,6 +45,8 @@ struct ItemTransaction: Sendable {
 /// delete-last-membership guard (00-overview section 3.6) is enforced by the caller (W6 UI),
 /// not here -- this is the low-level primitive that assumes the guard already passed.
 actor NoteStore {
+    typealias SubjectProjection = @Sendable (Item, ItemRef, Set<String>) throws -> Void
+    private static let pendingSubjectsName = ".archivenotes-pending-subjects.json"
 
     /// Each successful item/template content save advances its local revision. Finder metadata writes
     /// do not, so a projection can prove it still belongs to the exact front-matter save that queued it.
@@ -153,9 +157,9 @@ actor NoteStore {
     /// caller's stale copy) and must be synchronous, which is what makes the transaction atomic —
     /// do the async part (asset copies, parsing, clock reads) *before* the call and capture the
     /// result. A throwing `mutate` aborts the transaction and leaves the `.md` untouched.
-    func withItem(_ id: UUID,
+    func withItem(_ id: UUID, projectSubjects: SubjectProjection? = nil,
                   _ mutate: @Sendable (inout Item) throws -> Void) throws -> ItemTransaction {
-        try withEntry(id, in: itemDir(id), mutate)
+        try withEntry(id, in: itemDir(id), projectSubjects: projectSubjects, mutate)
     }
 
     /// `withItem` for a template (same atomicity, `Templates/<uuid>/` container).
@@ -168,12 +172,44 @@ actor NoteStore {
     /// to this function** — its atomicity IS the absence of a suspension point between the read and the
     /// write, so one `await` here silently re-opens W23.h2 with no test failing anywhere obvious.
     private func withEntry(_ id: UUID, in dir: URL,
+                           projectSubjects: SubjectProjection? = nil,
                            _ mutate: (inout Item) throws -> Void) throws -> ItemTransaction {
         var item = try loadEntry(id, in: dir)
-        let ownedDateFacetTokens = persistedOwnedDateFacetTokens(in: dir)
+        var ownedDateFacetTokens = persistedOwnedDateFacetTokens(in: dir)
+        var pendingSubjects = Set<String>()
+        let pendingURL = dir.appendingPathComponent(Self.pendingSubjectsName)
+        if projectSubjects != nil {
+            // Preserve removal ownership BEFORE YAML changes. A failed projection followed by an
+            // identical edit (even after relaunch) must still know the old subjects to remove.
+            if FileManager.default.fileExists(atPath: pendingURL.path) {
+                pendingSubjects = Set(try JSONDecoder().decode([String].self, from: Data(contentsOf: pendingURL)))
+            }
+            pendingSubjects.formUnion(item.tags.map { NotesTagVocabulary.titleCased($0) })
+        }
         try mutate(&item)
+        if projectSubjects != nil {
+            try JSONEncoder().encode(pendingSubjects.sorted()).write(to: pendingURL, options: [.atomic])
+            // A subject can become a date facet: once the subject is removed, its still-current date
+            // must inherit removal ownership, or clearing that date later would strand the token.
+            let removedSubjects = pendingSubjects.subtracting(item.tags.map { NotesTagVocabulary.titleCased($0) })
+            ownedDateFacetTokens.formUnion(removedSubjects.intersection(NotesTagVocabulary.dateFacetTokens(for: item)))
+        }
         let ref = recordRevision(try saveEntry(item, in: dir))
-        return ItemTransaction(ownedDateFacetTokens: ownedDateFacetTokens, item: item, ref: ref)
+        var tx = ItemTransaction(ownedDateFacetTokens: ownedDateFacetTokens, item: item, ref: ref)
+        if let projectSubjects {
+            do {
+                // Persist transferred ownership before clearing the retry journal (also on projection
+                // failure), so a subsequent date edit can remove a formerly subject-owned token.
+                try completeFacetProjection(ref, ownedDateFacetTokens: ownedDateFacetTokens)
+                // No await: title/body replacements cannot interleave between save and projection.
+                try projectSubjects(item, ref, pendingSubjects)
+                try JSONEncoder().encode([String]()).write(to: pendingURL, options: [.atomic])
+            } catch {
+                // Keep the pending ledger and publish the saved source of truth, not stale UI/index data.
+                tx.subjectProjectionError = error.localizedDescription
+            }
+        }
+        return tx
     }
 
     func allItemIDs() -> [UUID] {

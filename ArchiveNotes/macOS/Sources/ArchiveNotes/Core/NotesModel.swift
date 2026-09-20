@@ -699,6 +699,54 @@ final class NotesModel: ObservableObject {
     // atomically writes the front-matter, re-indexes that one row, and refreshes shared `allItems` so
     // both windows' lists + the detail header update live.
 
+    @discardableResult
+    func setTitle(_ title: String, to id: UUID) async -> Bool {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return false }
+        return await mutateItem(id, "rename the note") { $0.title = title }
+    }
+
+    @discardableResult
+    func renameNote(_ id: UUID, to title: String) async -> Bool {
+        await setTitle(title, to: id)
+    }
+
+    @discardableResult
+    func setTags(_ tags: [String], to id: UUID) async -> Bool {
+        let tags = NotesTagVocabulary.normalizedSubjects(tags)
+        return await mutateItem(id, "set the note's tags", projectSubjects: true) { $0.tags = tags }
+    }
+
+    /// UI operations are deltas, so two windows adding/removing different tags cannot erase each other.
+    @discardableResult
+    func addTag(_ tag: String, to id: UUID) async -> Bool {
+        guard let tag = NotesTagVocabulary.normalizedSubjects([tag]).first else { return false }
+        return await mutateItem(id, "add the note's tag", projectSubjects: true) {
+            $0.tags = NotesTagVocabulary.normalizedSubjects($0.tags + [tag])
+        }
+    }
+
+    @discardableResult
+    func removeTag(_ tag: String, from id: UUID) async -> Bool {
+        guard let token = NotesTagVocabulary.normalizedSubjects([tag]).first else { return false }
+        return await mutateItem(id, "remove the note's tag", projectSubjects: true) {
+            $0.tags = NotesTagVocabulary.normalizedSubjects($0.tags).filter { $0 != token }
+        }
+    }
+
+    nonisolated private static func projectSubjectTags(
+        item: Item, ref: ItemRef, previous: Set<String>
+    ) throws {
+        // A date/Q token can simultaneously be a subject. Removing that subject must not remove a
+        // still-current facet, nor add a date facet behind the exact ownership ledger's back.
+        let facets = Set(NotesTagVocabulary.dateFacetTokens(for: item))
+            .union(NotesTagVocabulary.qualityToken(for: item.quality).map { [$0] } ?? [])
+        _ = try NotesTagProjector.project(
+            Set(item.tags.map { NotesTagVocabulary.titleCased($0) }),
+            previouslyManaged: previous.subtracting(facets), to: ref.url,
+            itemDir: ref.url.deletingLastPathComponent(), expectedIdentity: ref.identity)
+    }
+
     /// Set the item's date + precision (a `nil`/blank date clears the date entirely). The pair is
     /// normalized (`Item.normalizedDate`) so the stored string always matches its precision, keeping
     /// `sortDate` correct — decade → `decade * 10_000`; an uncertain date still sorts by its value
@@ -983,11 +1031,12 @@ final class NotesModel: ObservableObject {
     /// load the same old item and the later save would silently drop the other's field. `mutate` must
     /// therefore stay synchronous — that is what makes the transaction atomic.
     @discardableResult
-    private func mutateItem(_ id: UUID, _ action: String,
+    private func mutateItem(_ id: UUID, _ action: String, projectSubjects: Bool = false,
                             _ mutate: @Sendable (inout Item) -> Void) async -> Bool {
         guard let noteStore else { return false }
         do {
-            let tx = try await noteStore.withItem(id) { item in
+            let projection: NoteStore.SubjectProjection? = projectSubjects ? Self.projectSubjectTags : nil
+            let tx = try await noteStore.withItem(id, projectSubjects: projection) { item in
                 mutate(&item)
                 item.modified = Date()
             }
@@ -996,6 +1045,10 @@ final class NotesModel: ObservableObject {
                 try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
             }
             await reloadItems()
+            if let failure = tx.subjectProjectionError {
+                report(NoteStore.StoreError.writeFailed(failure), "project the note's tags (retry the tag edit)")
+                return false
+            }
             return true
         } catch { report(error, action); return false }
     }

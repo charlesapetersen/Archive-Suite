@@ -3,8 +3,8 @@ import SwiftUI
 /// The detail-pane **metadata strip** for the selected note/extract (W6-S7, 06-viewers §7/§8): edit the
 /// document DATE (precision + precision-appropriate fields + a "date uncertain" toggle) and the QUALITY
 /// rating. Both use front-matter through `NotesNavigationModel` → `NotesModel` (00-overview D2/D9);
-/// the model mirrors valid Quality values as Q1...Q3 on this note's own `.md`. This view itself never
-/// touches a Finder tag / `NotesTagProjector`.
+/// the model mirrors valid Quality values as Q1...Q3 on this note's own `.md`. Its Tags subsection
+/// uses the audited model path, so front matter remains authoritative and Finder subjects stay in sync.
 ///
 /// Adapted from Reader's `InlineEditCells.DateCell` + `TagEditorView.dateSection`/`prioritySection`,
 /// retargeted from tag writes to the Notes front-matter store. Local field state is seeded from the
@@ -33,6 +33,9 @@ struct NoteMetadataInspector: View {
             dateSection
             Divider()
             qualitySection
+            Divider()
+            NoteTagsInspector(model: nav.model, item: item)
+                .id(item.id)
             Divider()
             NoteZoteroInspector(model: nav.model, itemID: item.id)
                 .id(item.id)

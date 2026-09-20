@@ -178,13 +178,15 @@ scratch transactions cover concurrent edits and G16 drives the inspector with de
 dispatch assertions, clipboard transitions, and a rendered screenshot. Completion record: `SUITE_TODO_DONE.md`
 → `W9.b2`. The rest of this multi-phase plan remains open.
 
-**B3. Add note retitle + tag editing.** — **MED** — overview §16.1. No `setTitle`/`setTags` exist; the
-metadata inspector edits only date/quality; the table tags column is read-only and its comment falsely
-claims editing lives in the inspector.
-- *Files:* `.../Core/NotesModel.swift` (+`mutateItem`), `.../Views/NoteMetadataInspector.swift`, `.../Views/NotesTableView.swift` (comment), optionally `.../Views/NotesContextMenu.swift`.
-- *Steps:* add `setTitle(_:to:)` and `setTags(_:to:)` on `NotesModel` routed through the audited `mutateItem` path; `setTitle` triggers the store's title→filename re-sync; `setTags` must run the front-matter write **and** `NotesTagProjector` so Finder tags stay in sync (Tier-2 write seam). Add a title field + a tag editor to the inspector; correct the `NotesTableView` comment.
-- *Verify:* rename persists + renames the `.md`; tag edits update front-matter *and* the projected Finder tags with all safety invariants (assert on a scratch store). **Tier-2** (tag projection + rename). *Done:* a note can be retitled and re-tagged in-app; `NotesTagProjectorSafetyTests`-style assertions extended.
-- *Live-confirmed (2026-07-17 GUI drive, scratch fixture):* the title half of this gap was verified end-to-end — there is **no in-app note-title rename path today**: the detail-pane title is a static (non-focusable) label (clicking it focuses the list table), list rows are not inline-editable (double-click and Return do nothing), and there is no Rename in the Edit menu, the Note menu, or the item-row context menu. So `setTitle` + a title editor is a real, reachable-by-users gap, not just missing library code. (The W14.4(c) reactive chip refresh was still verified by mutating the source's *year* — the same `itemsGeneration` re-style path — so only the *editing* affordance is missing, not the reactive plumbing.)
+**B3. Add note retitle + tag editing.** — **SHIPPED 2026-09-20 (W9.b3).** The table offers inline
+rename through Return, double-click, or its row menu; the existing store title projection safely renames
+the `.md` within its UUID directory. The metadata inspector has add/remove subject controls. `setTags`
+uses the audited transaction path, with a durable pending-subject record so a Finder-tag failure can retry
+the same delta after relaunch without losing removal ownership; current date/Quality facets and unrelated
+Finder tags stay intact. Scratch regressions cover rename/body/UUID/tag/label preservation, retry, facets,
+concurrency, Escape/blank/rejected titles, and G17 drives all three rename routes plus inspector add/remove
+in the off-screen VM and exports a pixel capture. **Tier-2** independent review found and closed the
+subject→date ownership transfer, failed-edit retry, whitespace normalization, and failed-rename display paths.
 
 **B4. Wire page-thumbnail rendering end-to-end.** — **MED** — `04` S2/S4/S6. `PDFThumbnailer` +
 `ThumbnailImageCache` are built/tested but never instantiated; Reader passes `thumbnailer: nil` at every

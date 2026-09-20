@@ -9,7 +9,7 @@ import AppKit
 /// `ContextMenuTableView` structure. Differences from Reader: identity is `ItemSummary.id` (UUID,
 /// front-matter) not `ArchiveFile` (path, Finder tags); the columns are the Notes set
 /// (kind/title/instances/date/quality/tags); and the tags column is **read-only** here (edited in the
-/// detail inspector, W6-S7) — so none of Reader's inline `NSTokenField` editing machinery is copied.
+/// detail inspector, W9.b3). Titles rename inline via Return, double-click, or the row context menu.
 struct NotesTableView: NSViewRepresentable {
     @ObservedObject var model: NotesNavigationModel
     @Binding var selection: Set<UUID>
@@ -65,8 +65,19 @@ struct NotesTableView: NSViewRepresentable {
         tableView.target = coordinator
         tableView.doubleAction = #selector(Coordinator.tableViewDoubleClicked(_:))
         tableView.contextMenuProvider = { [weak coordinator] selIDs in
-            coordinator?.parent.buildContextMenu(selIDs)
+            guard let coordinator else { return nil }
+            let menu = coordinator.parent.buildContextMenu(selIDs) ?? NSMenu()
+            if selIDs.count == 1, let id = selIDs.first {
+                let rename = NSMenuItem(title: "Rename…", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+                let action = NotesMenuAction { [weak coordinator] in coordinator?.beginRename(id) }
+                rename.target = action
+                rename.representedObject = action
+                menu.insertItem(.separator(), at: 0)
+                menu.insertItem(rename, at: 0)
+            }
+            return menu
         }
+        tableView.onRenameSelection = { [weak coordinator] in coordinator?.renameSelection() ?? false }
 
         let columns: [(id: String, title: String, width: CGFloat, minWidth: CGFloat, maxWidth: CGFloat, sortField: NoteSortField?)] = [
             ("kind",       "⬦",       28,  26,   34,  .kind),
@@ -118,6 +129,9 @@ struct NotesTableView: NSViewRepresentable {
         let coordinator = context.coordinator
         guard let tableView = coordinator.tableView else { return }
         coordinator.parent = self
+        // A body autosave or another window's update must not replace the field editor mid-draft.
+        // Keep the old generation until editing ends, then apply the latest model snapshot once.
+        if coordinator.editingTitle?.isRenaming == true { return }
 
         // Only rebuild the O(N) lookup + diff the snapshot when `displayed` actually changed.
         let gen = model.displayedGeneration
@@ -170,6 +184,7 @@ struct NotesTableView: NSViewRepresentable {
         var displayedByID: [UUID: ItemSummary] = [:]
         var lastDisplayedGeneration = -1
         var currentSnapshotIDs: [UUID] = []
+        weak var editingTitle: NoteTitleTextField?
 
         init(_ parent: NotesTableView) { self.parent = parent }
 
@@ -206,7 +221,8 @@ struct NotesTableView: NSViewRepresentable {
             } else {
                 cell = NSTableCellView()
                 cell.identifier = cellID
-                let tf = NSTextField(labelWithString: "")
+                let tf = colID == "title"
+                    ? NoteTitleTextField(labelWithString: "") : NSTextField(labelWithString: "")
                 tf.translatesAutoresizingMaskIntoConstraints = false
                 tf.lineBreakMode = .byTruncatingMiddle
                 tf.cell?.truncatesLastVisibleLine = true
@@ -232,6 +248,21 @@ struct NotesTableView: NSViewRepresentable {
 
             switch colID {
             case "title":
+                if let titleField = tf as? NoteTitleTextField {
+                    titleField.noteTitle = item.title
+                    titleField.itemID = item.id
+                    titleField.onBegin = { [weak self, weak titleField] in self?.editingTitle = titleField }
+                    titleField.onEnd = { [weak self] in
+                        self?.editingTitle = nil
+                        self?.parent.model.objectWillChange.send()
+                    }
+                    titleField.onCommit = { [weak self] title, completion in
+                        guard let model = self?.parent.model.model else { completion(false); return }
+                        Task { @MainActor in
+                            completion(await model.renameNote(item.id, to: title))
+                        }
+                    }
+                }
                 let displayTitle = item.title.isEmpty ? "Untitled" : item.title
                 // Replicated items (in >1 folder) get a subtle accent-colored chain glyph prefix, so a
                 // replicant reads as one at a glance (the "In" column shows the count). W6-S5, §5.
@@ -336,7 +367,25 @@ struct NotesTableView: NSViewRepresentable {
 
         @objc func tableViewDoubleClicked(_ sender: Any?) {
             guard let tableView, tableView.clickedRow >= 0 else { return }
-            parent.onDoubleClick()
+            if !renameSelection() { parent.onDoubleClick() }
+        }
+
+        func renameSelection() -> Bool {
+            guard let tableView, tableView.selectedRowIndexes.count == 1,
+                  let row = tableView.selectedRowIndexes.first,
+                  currentSnapshotIDs.indices.contains(row) else { return false }
+            beginRename(currentSnapshotIDs[row])
+            return true
+        }
+
+        func beginRename(_ id: UUID) {
+            guard let tableView, let row = currentSnapshotIDs.firstIndex(of: id),
+                  let column = tableView.tableColumns.firstIndex(where: {
+                      $0.identifier.rawValue == NotesTableView.titleColumnID
+                  }) else { return }
+            tableView.scrollRowToVisible(row)
+            let cell = tableView.view(atColumn: column, row: row, makeIfNecessary: true) as? NSTableCellView
+            (cell?.textField as? NoteTitleTextField)?.beginRename()
         }
     }
 }
@@ -460,6 +509,14 @@ final class NotesTableDataSource: NSTableViewDiffableDataSource<Int, UUID> {
 @MainActor
 final class ContextMenuTableView: NSTableView {
     var contextMenuProvider: ((Set<UUID>) -> NSMenu?)?
+    var onRenameSelection: (() -> Bool)?
+
+    override func keyDown(with event: NSEvent) {
+        if [36, 76].contains(event.keyCode),
+           event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
+           onRenameSelection?() == true { return }
+        super.keyDown(with: event)
+    }
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let point = convert(event.locationInWindow, from: nil)

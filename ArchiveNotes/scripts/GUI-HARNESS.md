@@ -34,7 +34,7 @@ path. Each test subtracts a pre-test `itemDirs()` snapshot, because the runner h
 
 ## Check catalog
 
-`G0`–`G16` are the per-wave checks (08-testing §3.7). "Auto" = asserted end-to-end by XCUITest;
+`G0`–`G17` are the per-wave checks (08-testing §3.7). "Auto" = asserted end-to-end by XCUITest;
 "owner-eye" = a human must perform/observe the part XCUITest can't reach (see below).
 
 | ID  | What it proves | Status |
@@ -56,6 +56,7 @@ path. Each test subtracts a pre-test `itemDirs()` snapshot, because the runner h
 | G14 | Create Extract and Jump to Source raise/focus the appropriate window | **Auto** (via DEBUG key-window probe) |
 | G15 | **Note ▸ Auto-fill from Zotero…** resolves one attached Zotero source block, presents a fill-empty diff, Cancel is byte-for-byte no-op, and Apply writes selected fields plus the configured-style citation | **Auto** (DEBUG-only in-process Zotero transport; no network or Zotero install) |
 | G16 | Inspector **Attach to note** persists a reference without rewriting the body; chips show loading, configured-style citation, and offline failure with Retry; actual chip clicks dispatch the correct URL; unchanged clipboard dedups per selected note | **Auto** (scratch + in-process stub; exports `notes-zotero-inspector.png` for pixel review) |
+| G17 | Inline note rename via double-click, Return, and row menu; Escape no-op; inspector subject add/remove reaches YAML + Finder tags while UUID and body stay intact | **Auto** (scratch; exports `notes-title-tags.png` for pixel review) |
 
 ### Why some checks use a DEBUG seam instead of the real gesture
 
@@ -107,6 +108,6 @@ File ▸ Choose Store Folder… (it persists over the owner's real root).
   tags to assert, never drives the store picker). Calibrate its table geometry against a
   `gui_capture_window` shot before trusting row-index clicks.
 - `macOS/Tests/ArchiveNotesUITests/` — `SmokeUITest.swift` (launch) + `NotesGUITests.swift`
-  (`NotesFixtureUITestCase` base + G0–G16).
+  (`NotesFixtureUITestCase` base + G0–G17).
 - [`../GUI_SAFETY.md`](../GUI_SAFETY.md) — the authoritative test file-safety protocol + the runtime
   DEBUG scratch-write guard.

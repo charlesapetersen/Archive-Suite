@@ -3,6 +3,26 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.b3) — note rename and subject editing were missing from the UI
+
+**2026-09-20.** A note title now edits inline in the list with Return, double-click, or **Rename…**
+from its row menu. Escape, blank text, and an unchanged title are true no-writes; an unsuccessful save
+restores the original display only if the recycled table cell still represents that same UUID. The existing
+`NoteStore.saveEntry` title projection renames the `.md` within its immutable UUID directory, so durable
+note links and body content do not move.
+
+The metadata inspector now adds/removes normalized subjects. Every delta saves authoritative front matter
+and projects Finder tags through `NotesTagProjector`, preserving third-party tags, Finder label, current
+date/Quality facets, and concurrent body/title/tag edits. If the independent Finder projection fails after
+YAML saves, an item-local pending-subject record retains removal ownership across relaunch; Retry replays
+the same idempotent add/remove instead of falsely reporting a discarded edit as successful.
+
+**Tier-2 verification:** independent adversarial review found and closed a subject-to-date ownership leak,
+a lost failed-edit retry, padded-subject normalization, and failed-rename display drift. Scratch tests cover
+those paths plus UUID/body/label preservation and concurrent edits. Unit smoke: 868 tests in 87 suites;
+off-screen G17 passed and its reviewed pixel capture shows the renamed row, tag controls, and live editor.
+No real store, corpus, bookmark, network, or credentials were used.
+
 ## ✅ FIXED (W9.b2) — note-level Zotero references are attachable and clickable
 
 **2026-09-19.** The metadata inspector now offers **Attach to note** and renders stored Zotero references
@@ -783,8 +803,8 @@ past the fixed-width detail pane and off-window — the exact failure that hid `
 **CLOSED: W14.4 (c), the cross-window chip recolour** — `W21.vmgui-c-fu` adds a DEBUG-only probe that reads
 the actual `BlockHeaderAttachment` state in the rendered Extracts text storage after its cited Note-window
 source is trashed through the production last-instance confirmation. The attachment provider remains outside
-the accessibility tree and Notes still has no in-GUI item-title rename (`W9.b3` is separate), but neither
-blocks this stronger deterministic route: `passageSourceMissing` is the chip provider's direct grey/accent
+the accessibility tree; W9.b3 now supplies the in-GUI item-title rename, but neither concern blocks this
+stronger deterministic route: `passageSourceMissing` is the chip provider's direct grey/accent
 tint input. The test first proves the live resolved label + non-missing state, then proves the inactive other
 window re-styles that same chip to the preserved snapshot label + missing state. Its mutating leg rejects an
 `AN_GUI_FIXTURE_PATH` override and requires the canonical generated Notes scratch root/marker before clicking

@@ -40,7 +40,7 @@ this file is authoritative for Notes‑specific work.
   replicated membership, embedded Reader corpus) and prints its path for the app's `#if DEBUG`
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is the sourced cliclick/osascript drive
   library (scratch-only; reads tags to assert, never drives the store picker — **host-only, so unattended
-  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G16 catalog) runs **off-screen in the
+  sessions are blocked from it**). The `ArchiveNotesUITests` XCUITest suite (G0–G17 catalog) runs **off-screen in the
   Tart VM** — it joined the VM lane on 2026-07-30, so it is part of the periodic health gate
   (`AUTONOMOUS_GUI_VM_APPS="reader notes"`) and the fixture is built inside the VM on demand.
   **README + check catalog + the owner-eye checks (G2 typing, G6/G11
@@ -92,7 +92,8 @@ macOS/Sources/ArchiveNotes/
     FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
     BlockParser.swift              Block/SourceAnchor + HTML-comment header parser
     NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets, and
-                                   hidden per-item date-facet ownership ledgers (never authority);
+                                   hidden per-item date-facet + pending-subject projection ledgers (never
+                                   authority; retry preserves exact Finder-tag removal ownership);
                                    container-generic workers also back template storage under
                                    Templates/<uuid>/ (create/load/save/delete/allTemplates) (W6-S6);
                                    writeReservedAsset (pre-named, no re-disambiguation, never-overwrite,
@@ -318,7 +319,8 @@ macOS/Sources/ArchiveNotes/
                                    Notes + Extracts windows (W6-S1); @AppStorage panel widths + tree
                                    toggle, NotesWindowAccessor window-size persistence; owns a per-window
                                    NotesNavigationModel (@StateObject seeded from window kind); item pane =
-                                   kind Picker + NotesTableView, detail = selected-item header + NoteEditorPane
+                                   kind Picker + NotesTableView, detail = selected-item header + bounded
+                                   metadata inspector + NoteEditorPane
                                    (W6-S3); .task bootstraps the store. Toolbar "New" menu (New \(kind) ⌘N
                                    from nearest-ancestor template + New from Template ▸ matching kind); item
                                    pane swaps to TemplatesManagerView in templates mode (W6-S6). Hosts the
@@ -338,10 +340,11 @@ macOS/Sources/ArchiveNotes/
                                    NSTableViewDiffableDataSource<Int, UUID> + ColumnPickerHeaderView
                                    hide/show + secondary sort + ContextMenuTableView). Columns
                                    kind/title/instances/date/quality/sources/tags; sources = distinct
-                                   source notes for extracts (blank for notes, W7-S4); tags READ-ONLY
-                                   (edited in detail, W6-S7). Adapts Reader AppKitTableView (no NSTokenField)
-                                   (W6-S3). Drag source (NotesTableDataSource pasteboardWriterForRow,
-                                   id-only) + accent-glyph replicant title styling (W6-S5)
+                                   source notes for extracts (blank for notes, W7-S4); inline title rename
+                                   via Return/double-click/context menu (identity-bound, rejected save restores
+                                   display); subjects edit in detail (W9.b3). Adapts Reader AppKitTableView
+                                   (no NSTokenField) (W6-S3). Drag source (NotesTableDataSource
+                                   pasteboardWriterForRow, id-only) + accent-glyph replicant title styling (W6-S5)
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
                                    bm25 relevance as-you-type) · quality ★1–★3 toggles · tag ALL/ANY +
                                    chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)
@@ -351,6 +354,10 @@ macOS/Sources/ArchiveNotes/
                                    month index + day text ⟹ committed string, day-Set enablement, and
                                    the note shown when a day the chosen month cannot have is dropped) —
                                    extracted so they are unit-testable without a window (W23.l4)
+    NoteTagsInspector.swift        Detail add/remove subjects, retrying the exact failed delta rather
+                                   than silently dropping it (W9.b3)
+    NoteTitleTextField.swift       AppKit inline-title field: Return/Escape/blank semantics and
+                                   identity-guarded failed-save restoration (W9.b3)
     NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
                                    Move to Folder ▸ / Remove-from-scope — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
@@ -430,7 +437,7 @@ macOS/Tests/ArchiveNotesTests/
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
                                    collision-dedup, verify-re-read, no-label, concurrent-third-party,
                                    boundary-guard, recover-managed
-  NotesTagProjectorSafetyTests.swift  11 crown-jewel safety tests (W8-S2/W19.q4, Tier-2, scratch .md +
+  NotesTagProjectorSafetyTests.swift  17 crown-jewel safety tests (W8-S2/W19.q4/W9.b3, Tier-2, scratch .md +
                                    data-fork byte-equality): §3 read-failure aborts (no []-coercion,
                                    neighbors untouched), concurrent-projections-never-corrupt (both racing
                                    subjects survive — §10 closed the lost-update race, W15.tu4), §5 unmanaged-tag
@@ -438,7 +445,14 @@ macOS/Tests/ArchiveNotesTests/
                                    §8/§9 disk-backed
                                    verify + reconcile-via-fresh-delta, §5 no-op no-mtime-churn,
                                    title-casing, Q1→Q3 / Q0-clears quality projection, §7 label-never-
-                                   written, isScratchPath predicate + scratch-guard-live-under-XCTest
+                                   written, isScratchPath predicate + scratch-guard-live-under-XCTest;
+                                   metadata-edit extension covers UUID rename, subject retry/relaunch,
+                                   facet ownership and concurrent deltas
+  NoteMetadataEditingTests.swift   Tier-2 scratch store edits: UUID-folder rename + body/label/unmanaged
+                                   tag preservation; subjects/retry/relaunch, date ownership transfer,
+                                   and concurrent body/title/tag deltas (W9.b3)
+  NoteTitleTextFieldTests.swift    Inline Return/Escape/blank/rejected-title semantics without a window
+                                   (W9.b3)
   QualityWriteTests.swift           9 scratch-store tests: 0...3 canonicalization, Q1...Q3 projection
                                    + clear, unrelated-tag/label preservation, Q-looking-subject ordering,
                                    and actor-revision Q1→Q3 / Q3→body race reconciliation for Finder tags,

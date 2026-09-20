@@ -7,6 +7,15 @@ import ArchiveCore
 /// Everything else on the file (tags added by the user in Finder, Spotlight, etc.) is
 /// untouched — the projector only ever adds/removes tokens in this set.
 enum NotesTagVocabulary {
+    /// Canonical user subjects: trim, title-case with the existing suite rule, and deduplicate stably.
+    static func normalizedSubjects(_ subjects: [String]) -> [String] {
+        var seen = Set<String>()
+        return subjects.compactMap {
+            let value = titleCased($0.trimmingCharacters(in: .whitespacesAndNewlines))
+            return !value.isEmpty && seen.insert(value).inserted ? value : nil
+        }
+    }
+
     /// The only quality spellings this app writes. `Q0` means unrated and is represented by the
     /// absence of a quality token, never by a `Q0` Finder tag.
     static let qualityTokens: Set<String> = ["Q1", "Q2", "Q3"]
@@ -75,9 +84,10 @@ enum NotesTagVocabulary {
         return "Q\(quality)"
     }
 
-    /// Title-case a subject using the shared convention (GeneratedTags.capitalizeFirstLetters):
-    /// capitalize only the first letter of each word, preserving the rest.
+    /// Canonical Finder-subject spelling: trim surrounding whitespace, then use the shared title-case
+    /// convention (GeneratedTags.capitalizeFirstLetters). Notes is unshipped, so raw legacy spellings
+    /// are deliberately normalized rather than preserved as a compatibility format.
     static func titleCased(_ subject: String) -> String {
-        GeneratedTags.capitalizeFirstLetters(subject)
+        GeneratedTags.capitalizeFirstLetters(subject.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 }

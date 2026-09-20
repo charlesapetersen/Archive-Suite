@@ -1358,6 +1358,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let input = app.textFields["an.zotero.note.link"]
             let attach = app.buttons["an.zotero.note.attach"]
             XCTAssertTrue(input.waitForExistence(timeout: 5))
+            mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -600)
             input.click()
             input.typeText(link)
             attach.click()
@@ -1383,6 +1384,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(banner.waitForNonExistence(timeout: 8))
             XCTAssertTrue(chip.waitForExistence(timeout: 8), "the persisted chip must survive selection changes")
 
+            mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -600)
             input.click()
             input.typeText("zotero://select/library/items/FAIL1234")
             attach.click()
@@ -1397,6 +1399,71 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let path = FileManager.default.temporaryDirectory.appendingPathComponent("notes-zotero-inspector.png")
             try shot.pngRepresentation.write(to: path)
             print("[shot] notes-zotero-inspector: wrote \(path.path)")
+        }
+    }
+
+    /// B3: all three rename gestures hit the actual inline field, and subject edits reach YAML and
+    /// Finder metadata on the generated scratch note. UUID provenance and body bytes stay unchanged.
+    func testG17_InlineRenameAndInspectorTagsPersist() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idZotero
+            let cell = selectItem(uuid: id)
+            let before = try XCTUnwrap(rawMarkdown(inItemDir: id))
+            let originalFiles = mdFiles(inItemDir: id)
+            cell.doubleClick()
+            app.typeText("Cancelled title")
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertEqual(rawMarkdown(inItemDir: id), before, "Escape is a byte-for-byte no-write")
+            XCTAssertEqual(mdFiles(inItemDir: id), originalFiles)
+
+            cell.click()
+            app.typeKey(.return, modifierFlags: [])
+            app.typeText("Retitled Reference")
+            app.typeKey(.return, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                self.mdFiles(inItemDir: id) == ["Retitled Reference.md"]
+                    && (self.rawMarkdown(inItemDir: id) ?? "").contains("title: Retitled Reference")
+            }, "Return should rename front matter and its existing UUID-folder filename")
+
+            let retitledCell = selectItem(uuid: id)
+            retitledCell.rightClick()
+            app.menuItems["Rename…"].click()
+            app.typeText("Metadata Test Note")
+            app.typeKey(.return, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                self.mdFiles(inItemDir: id) == ["Metadata Test Note.md"]
+            }, "context-menu Rename should use the same inline path")
+
+            let input = mainWindow.textFields["an.detail.tags.input"]
+            XCTAssertTrue(input.waitForExistence(timeout: 5))
+            mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -180)
+            input.click()
+            input.typeText("ui subject")
+            mainWindow.buttons["an.detail.tags.add"].click()
+            let noteURL = URL(fileURLWithPath: itemsDir).appendingPathComponent(id)
+                .appendingPathComponent("Metadata Test Note.md")
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let tags = (try? noteURL.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
+                return tags.contains("Ui Subject")
+                    && (self.rawMarkdown(inItemDir: id) ?? "").contains("Ui Subject")
+            })
+            let remove = mainWindow.buttons["an.detail.tags.remove.Ui Subject"]
+            XCTAssertTrue(remove.waitForExistence(timeout: 5))
+            let shot = mainWindow.screenshot()
+            let path = FileManager.default.temporaryDirectory.appendingPathComponent("notes-title-tags.png")
+            try shot.pngRepresentation.write(to: path)
+            print("[shot] notes-title-tags: wrote \(path.path)")
+            remove.click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                let tags = (try? noteURL.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
+                return !tags.contains("Ui Subject")
+                    && !(self.rawMarkdown(inItemDir: id) ?? "").contains("Ui Subject")
+            })
+            let after = try XCTUnwrap(rawMarkdown(inItemDir: id))
+            XCTAssertTrue(after.contains("id: \(id)"))
+            XCTAssertEqual(after.components(separatedBy: "\n---\n").last,
+                           before.components(separatedBy: "\n---\n").last)
         }
     }
 

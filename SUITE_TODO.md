@@ -938,60 +938,6 @@ launch safeguards; the gate rotates one route per run.
   - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | **owner**
 
-- [ ] **`W9.b3` — Archive Notes cannot retitle or re-tag a note from the UI at all [S–M · Tier-2].**
-  **⚠️ Retagged from `W22.notes-rename` on 2026-08-16 and MERGED with gap-closure plan item B3 — they were the
-  same work filed twice, once from the owner's 2026-08-02 walkthrough and once from the 2026-07-16
-  plan-vs-build review. This entry is now canonical for both;** the W9 decomposition block above cross-refers
-  here rather than repeating it. **From plan B3, in addition to the rename below:** add `setTags(_:to:)`
-  alongside `setTitle`, both routed through the audited `mutateItem` path, and a **tag editor** in the metadata
-  inspector — `setTags` must write front-matter **and** run `NotesTagProjector` so Finder tags stay in sync,
-  which is what makes the whole item Tier-2 rather than Tier-1. Extend `NotesTagProjectorSafetyTests`.
-  **R13d is complete:** it removed the `ArchiveSuite` marker outright, so assert on projected **subjects**
-  only and do not re-add a marker check.
-  Owner decision
-  2026-08-02 (daemon-report walkthrough): **this is a GAP, not a design choice.** He was offered the
-  "titles are derived from the archival source, so renaming is intentionally not offered" reading and
-  rejected it. Verified 2026-08-01 (by `W21.vmgui-c`) and re-verified 2026-08-02: `NotesModel` has
-  `renameTemplate` (`:519`) and `renameFolder` (`:872`), and `OrganizationStore` has another `renameFolder`
-  (`:257`) — **there is no rename for a note.** The list's title cell is a read-only `NSTextField` and the
-  metadata inspector edits only date and quality, so the only way to retitle a note today is to open the file
-  and edit its front matter by hand.
-  **Scope chosen by the owner: the full affordance, not the inspector-only variant** — add `renameNote` to
-  `NotesModel` plus an inline-edit affordance on the list cell, mirroring how folders and templates already
-  rename (so it is an existing interaction pattern, not a new one), rather than only adding a title field to
-  the metadata inspector.
-  ✅ **DECIDED by the owner 2026-08-02: renaming a note renames the file on disk too**, not just the
-  front-matter title. ⚠️ **This is ALREADY the store's behaviour — do not design it, and do not add a second
-  rename path.** `NoteStore.saveEntry` (`Store/NoteStore.swift:242-255`) treats the filename as *"a projection
-  of the title"* and `moveItem`s `<Title>.md` whenever the title changes, behind a component-boundary
-  `precondition` that both URLs stay inside the entry dir and an intra-dir `disambiguate` on collision. It is
-  covered today (`NoteStoreTests` rename case; `TemplateTests` rename-on-save). **So the owner's decision costs
-  nothing and adds no new risk** — a `renameNote` routed through the existing `mutateItem` path inherits it
-  automatically, exactly as `setDate`/`setQuality` do.
-  ⚠️ **The first version of this entry was WRONG about the risk, and the correction shrinks the item.** It
-  claimed the on-disk-rename question "diverges on durable links". It does not. A note's durable identity is
-  its **UUID folder** — the layout is `<root>/items/<uuid>/<Title>.md` — and the UUID never changes on rename,
-  so note-passage `SourceAnchor` provenance resolves by id, not by filename. **No link breaks. Do not budget a
-  link-migration step; there is nothing to migrate.** What is left is the model method + the UI affordance,
-  which is why this is nearer **S–M** than the **M** first filed.
-  **What genuinely remains to be checked inside the item** (one assertion, not a redesign): the store does
-  `moveItem` and *then* an atomic overwrite (`Data.write(options: [.atomic])`, `:259`), while
-  `NotesTagProjector` writes the managed Finder tags onto that same `.md`. Assert the projected subjects are
-  still on the file after a rename. ⚠️ If they are NOT, that is a **pre-existing
-  defect on every `mutateItem` path** (`setDate`/`setQuality`/`setBody` all do the same atomic overwrite) —
-  **file it separately; do NOT absorb it into this item or let it grow the diff.**
-  **Free to get right now and stops being free later:** per the 2026-08-01 STANDING PREMISE, Notes holds only
-  test material, so no migration is owed; and the DEVONthink import is ON HOLD precisely so Notes' structure
-  can settle before 7.5 GB lands in it.
-  **Also unblocks `W21.vmgui-c-fu`'s second blocker** — W14.4 (c)'s stated trigger is renaming a note, which
-  is why that check is currently untestable rather than merely un-hittable. It does NOT unblock the first
-  blocker (the chip is an `NSTextAttachmentViewProvider` subview outside the accessibility tree), so
-  `W21.vmgui-c-fu` still needs one of its own three options; note the cross-reference in both.
-  **Tier-2** — it writes to the note's durable identity and the rename has no undo (the store's own
-  `moveItem`, not a Trash round-trip). Scratch copies only, never a real store. GUI confirm goes through the
-  Notes VM lane (green 15/15 as of `7d6bb40`), not the host screen.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift, Views/NotesTableView.swift | S–M | med | none
-
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
 > ## ⏸ ON HOLD — owner directive, 2026-08-01. PLANS RETAINED IN FULL.
@@ -1182,11 +1128,9 @@ The remaining two Phase C items are heavier than C1–C4 and sit in **TIER 5**, 
 **Phase B — wire the built-but-dead features.** The high-value core: library code that shipped without a UI
 entry point. Mostly **Tier-2** (they write note front-matter or project Finder tags).
 
-⚠️ **`W9.b3` (plan B3 — note retitle + tag editing) is NOT listed here.** Its checkbox is the retagged
-former `W22.notes-rename` entry further down this file, which already carries the owner's 2026-08-02
-decisions (full affordance not inspector-only; renaming renames the file on disk), the correction that
-shrank it to S–M, and the one assertion that genuinely remains. Plan B3's extra scope (`setTags` + the
-inspector tag editor + projector sync) was folded into it. One checkbox, not two — do not re-file it here.
+✅ **`W9.b3` (plan B3 — note retitle + tag editing) shipped 2026-09-20.** Its completion record is in
+`SUITE_TODO_DONE.md`; that one work item covered the full list affordance, title→filename projection,
+inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.notes-rename` duplicate.
 
 - [ ] **`W9.b4` — page thumbnails never render end-to-end [M · Tier-2].** Plan B4. Reader passes
   `thumbnailer:nil`. ⚠️ **Verify with a headless render guard** (`RenderProbe`/`DocumentRenderGuardTests` over

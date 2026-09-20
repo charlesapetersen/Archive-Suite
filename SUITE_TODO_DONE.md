@@ -8,6 +8,26 @@ single 3,580-line file).
 reasons: the completion notes cite the commits that shipped each item, and several carry the *reasoning* for
 why a later change may or may not revisit that code.
 
+## Archive Notes — gap closure (2026-09-20)
+
+- [x] **`W9.b3` — Archive Notes cannot retitle or re-tag a note from the UI at all [S–M · Tier-2].**
+  **SHIPPED 2026-09-20 (this commit).** The list now has identity-bound inline renaming through Return,
+  double-click, and **Rename…**; the metadata inspector has normalized add/remove subject controls. Existing
+  `NoteStore.saveEntry` remains the sole title→filename path inside a UUID folder. The tag transaction saves
+  YAML first and projects subjects on the same serialized path, retaining a hidden pending-subject record if
+  projection fails so Retry replays the same idempotent edit after relaunch. It preserves unrelated Finder
+  tags, labels, current date/Quality facets, body, and durable UUID links. Independent Tier-2 review found
+  and closed subject-to-date ownership, failed-edit retry, padded-subject, and failed-rename-display cases.
+
+  **Tier-2 verification:** 868 scratch-only unit tests in 87 suites; G17 passed off-screen in the VM and
+  its visually reviewed screenshot shows the renamed row, tags, and usable editor. No real store, corpus,
+  bookmarks, network, or credentials were used. | ArchiveNotes/{macOS/Sources/ArchiveNotes/{Core/
+  {NotesModel,NotesTagVocabulary}.swift,Store/NoteStore.swift,Views/{NoteMetadataInspector,NoteTagsInspector,
+  NoteTitleTextField,NotesBrowserView,NotesTableView}.swift},macOS/Tests/{ArchiveNotesTests/
+  {NoteMetadataEditingTests,NoteTitleTextFieldTests}.swift,ArchiveNotesUITests/NotesGUITests.swift},
+  {CLAUDE,KNOWN_ISSUES}.md,scripts/GUI-HARNESS.md}, execution-plans/archive-notes/09-gap-closure.md,
+  SUITE_TODO.md | S–M | med | done
+
 ⚠️ **`ops/autonomous/next-queue-item.sh` reads this file for dependency state.** A tag it cannot find reads as
 NOT done, so an item archived here would otherwise permanently block anything declaring
 `(blocked-on: <that tag>)` — the dead end `W3.cap-r4` once created for `W17.stg1`. Scanned for state only;

@@ -271,7 +271,12 @@ private struct DetailPane: View {
             }
             if let summary = nav.selectedSummary {
                 Divider()
-                NoteMetadataInspector(nav: nav, item: summary)   // date + front-matter-backed Quality
+                // Keep the editor usable at the minimum window height, even with many references.
+                ScrollView {
+                    NoteMetadataInspector(nav: nav, item: summary)
+                }
+                .frame(maxHeight: 280)
+                .accessibilityIdentifier("an.detail.metadataScroll")
             }
             Divider()
             NoteEditorPane(nav: nav)
