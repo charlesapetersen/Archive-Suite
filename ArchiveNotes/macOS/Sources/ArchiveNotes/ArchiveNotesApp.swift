@@ -40,6 +40,15 @@ struct ArchiveNotesApp: App {
                         NSApp.activate(ignoringOtherApps: true)
                         deepLinkRouter.handle(url)
                     }
+                    // A link can arrive while this first window is still bootstrapping. Hold it until
+                    // the complete item list is available, rather than mistaking its target for a
+                    // deleted note in the empty pre-bootstrap list.
+                    .onReceive(deepLinkRouter.$pendingOpen) { _ in
+                        forwardPendingDeepLinkIfReady()
+                    }
+                    .onReceive(notesModel.$isIndexReady) { _ in
+                        forwardPendingDeepLinkIfReady()
+                    }
             }
         }
         .commands {
@@ -64,6 +73,15 @@ struct ArchiveNotesApp: App {
             }
         }
         Settings { NotesSettingsView() }
+    }
+
+    /// Bridge the parsed external URL into the same open channel used by in-app passage jumps. The
+    /// receiving `NoteEditorPane` selects the target, raises its feature window, and consumes the model
+    /// request after it has armed an optional block scroll.
+    private func forwardPendingDeepLinkIfReady() {
+        deepLinkRouter.forwardPendingOpen(whenIndexReady: notesModel.isIndexReady) { request in
+            notesModel.openItem(id: request.id, block: request.block)
+        }
     }
 }
 

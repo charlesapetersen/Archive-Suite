@@ -3,6 +3,19 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.b5) — inbound `archivenotes://open` links only activated the app
+
+**2026-09-21.** `NotesDeepLinkRouter` now holds the newest valid external request until the initial
+Notes index has settled. `ArchiveNotesApp` forwards it exactly once through `NotesModel.openItem`; the
+existing receiving pane clears filters if necessary, selects the target, raises its window, and arms its
+optional block scroll before consuming the model request. Holding rather than immediately resolving avoids
+an otherwise-valid launch link being misreported as a deleted note against the empty pre-bootstrap list.
+
+Router regressions cover the not-ready hold, one-time forwarding and clearing, and repeated identical URLs;
+the existing model regressions cover repeat-token delivery on the shared open channel. Debug build and the
+scratch-only Notes smoke suite pass (874 Swift Testing tests in 88 suites; 218 XCTest checks). No real Notes
+store, corpus, bookmarks, network, credentials, or GUI drive were used.
+
 ## ✅ FIXED (W9.b3) — note rename and subject editing were missing from the UI
 
 **2026-09-20.** A note title now edits inline in the list with Return, double-click, or **Rename…**

@@ -67,6 +67,36 @@ struct NotesDeepLinkRouterTests {
         #expect(router.pendingOpen?.id == id2)
         #expect(router.pendingOpen?.block == 5)
     }
+
+    @Test("Holds a deep link until the item index is ready, then forwards and clears it")
+    func forwardsAfterIndexReady() {
+        let router = NotesDeepLinkRouter()
+        let id = UUID()
+        router.handle(DurableLink.notesOpen(id: id, block: 7).url)
+
+        var forwarded: NotesDeepLinkRouter.PendingOpen?
+        #expect(router.forwardPendingOpen(whenIndexReady: false) { forwarded = $0 } == false)
+        #expect(forwarded == nil)
+        #expect(router.pendingOpen == .init(id: id, block: 7))
+
+        #expect(router.forwardPendingOpen(whenIndexReady: true) { forwarded = $0 })
+        #expect(forwarded == .init(id: id, block: 7))
+        #expect(router.pendingOpen == nil)
+    }
+
+    @Test("Repeated deep links forward independently")
+    func repeatedLinksForwardIndependently() {
+        let router = NotesDeepLinkRouter()
+        let id = UUID()
+        var forwarded: [NotesDeepLinkRouter.PendingOpen] = []
+
+        router.handle(DurableLink.notesOpen(id: id, block: 2).url)
+        #expect(router.forwardPendingOpen(whenIndexReady: true) { forwarded.append($0) })
+        router.handle(DurableLink.notesOpen(id: id, block: 2).url)
+        #expect(router.forwardPendingOpen(whenIndexReady: true) { forwarded.append($0) })
+
+        #expect(forwarded == [.init(id: id, block: 2), .init(id: id, block: 2)])
+    }
 }
 
 // MARK: - ReaderLinkResolver tests

@@ -135,6 +135,9 @@ macOS/Sources/ArchiveNotes/
                                    Trash (W23.h3-fu)
     OrganizationFile.swift         Atomic export/import of org graph to organization.json
   Links/
+    NotesDeepLinkRouter.swift      Parses `archivenotes://open` and retains the latest request until
+                                   `NotesModel.isIndexReady`; then hands it to the model's shared
+                                   `openItem` channel exactly once (W9.b5)
     ReaderRootStore.swift          @MainActor — GUID-keyed security-scoped bookmarks to Reader roots
                                    (grant / look-up / stop-scope); the only writer of readerRootBookmarks
     ReaderLinkResolver.swift       THE archivereader:// resolve seam, in TWO stages (W23.m14): resolveExact
@@ -590,8 +593,9 @@ macOS/Tests/ArchiveNotesTests/
                                    re-fire, resolvePassage, openAction (select-scroll / kind-mismatch
                                    ignore / extract target / missing-on-note-window-only)
   ReaderLinkResolverTests.swift    resolve/unknown-guid/missing/renamed/traversal/grant/wrong-guid/
-                                   special-chars + router + root-store; an unavailable saved root requests
-                                   access before any basename scan, never a false missing-source result
+                                   special-chars + Notes deep-link router (including pre-index hold,
+                                   one-time forward, repeat) + root-store; an unavailable saved root
+                                   requests access before any basename scan, never a false missing-source result
   ReaderLinkScanTests.swift        10 tests (W23.m14): resolveExact defers the walk (and still answers
                                    the cheap cases); the walk runs OFF the main thread even when started
                                    from it (proved structurally — the raw progress callback runs on the

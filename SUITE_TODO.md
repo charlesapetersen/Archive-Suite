@@ -1125,8 +1125,6 @@ entry point. Mostly **Tier-2** (they write note front-matter or project Finder t
 `SUITE_TODO_DONE.md`; that one work item covered the full list affordance, title→filename projection,
 inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.notes-rename` duplicate.
 
-- [ ] **`W9.b5` — `archivenotes://open` is never consumed [S].** Plan B5. The scheme is registered; nothing
-  selects/raises the note. | ArchiveNotes | S | low | none
 - [ ] **`W9.b6` — the extract command path does not embed image bytes [S–M · Tier-2].** Plan B6. | ArchiveNotes
   Editor/ | S–M | med | none
 - [ ] **`W9.b7` — guided root re-grant is not wired [S].** Plan B7. | ArchiveNotes | S | low | none

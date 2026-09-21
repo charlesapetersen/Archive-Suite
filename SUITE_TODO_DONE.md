@@ -10,6 +10,22 @@ why a later change may or may not revisit that code.
 
 ## Archive Notes — gap closure (2026-09-20)
 
+- [x] **`W9.b5` — `archivenotes://open` is never consumed [S].** **SHIPPED 2026-09-21 (this commit).**
+  `NotesDeepLinkRouter` now retains an incoming Notes link through first-launch indexing rather than looking
+  it up in the empty pre-bootstrap list and falsely reporting it as deleted. Once `isIndexReady` settles,
+  `ArchiveNotesApp` forwards it exactly once to the existing `NotesModel.openItem` channel; its receiving
+  pane clears filters if necessary, selects the UUID, raises the featured window, and arms optional block
+  scrolling before consuming the request. Repeated identical URLs remain distinct deliveries.
+
+  **Verification:** new router regressions prove the pre-index hold, forward-and-clear, and repeat paths;
+  existing model tests cover repeat-token delivery on the shared open channel. Archive Notes Debug build and
+  scratch-only unattended
+  smoke pass (874 Swift Testing tests in 88 suites; 218 XCTest checks). No real Notes store, corpus,
+  bookmarks, network, credentials, or GUI drive. | ArchiveNotes/{macOS/Sources/ArchiveNotes/{Links/
+  NotesDeepLinkRouter.swift,ArchiveNotesApp.swift},macOS/Tests/ArchiveNotesTests/
+  ReaderLinkResolverTests.swift,{CLAUDE,KNOWN_ISSUES}.md}, execution-plans/archive-notes/09-gap-closure.md,
+  SUITE_TODO.md | S | low | done
+
 - [x] **`W9.b4` — page thumbnails never render end-to-end [M · Tier-2].** **SHIPPED 2026-09-21 (this
   commit).** Reader now owns a disposable-cache `ArchiveLinkThumbnailer`: page copy and batch copy publish
   their durable links immediately, then enrich that same pasteboard payload only while it remains current.

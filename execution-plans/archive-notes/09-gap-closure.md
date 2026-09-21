@@ -204,12 +204,14 @@ provenance. `PDFThumbnailer` itself now performs the PDFKit load under its datal
   the dataless, late-clipboard, and async-caret-loss findings. *Done:* pasted page links have an end-to-end rendered
   thumbnail without widening filesystem authority.
 
-**B5. Consume `archivenotes://open` to select/raise the note.** — **MED** — `04` S5. `NotesDeepLinkRouter.pendingOpen`
-is published but nothing observes it, so an external `archivenotes://open?id=<uuid>` activates the app
-without selecting the note.
-- *Files:* `.../Links/NotesDeepLinkRouter.swift`, `.../ArchiveNotesApp.swift`, `.../Views/NotesBrowserView.swift` (or the nav model).
-- *Steps:* add a consumer that observes `pendingOpen`, selects the id in the list, raises the Notes window, then `clearPending`. Reuse the W7 `NotesModel.openItem` jump channel if convenient, but drive it from the router.
-- *Verify:* `open "archivenotes://open?id=<known-uuid>"` selects the item (fixture-based). **Tier-1** (read/navigation only). *Done:* the plan's inbound-link GUI criterion is met. **(The full Scrivener round-trip also needs B9 — the outbound Copy-Link that originates the URL; B5 alone is only the inbound half.)**
+**B5. Consume `archivenotes://open` to select/raise the note.** — ✅ **SHIPPED (W9.b5, 2026-09-21).**
+`NotesDeepLinkRouter` now retains the latest valid URL until `NotesModel.isIndexReady`; `ArchiveNotesApp`
+then forwards it exactly once through the shared `openItem` channel. The existing receiving pane clears
+filters if needed, selects, raises its window, and scrolls to an optional block. Deferring delivery prevents
+a launch-time request from being falsely reported missing against the pre-bootstrap empty list. Router tests
+cover hold/forward/clear and repeat delivery; the scratch-only Notes smoke suite passes (874 Swift Testing
+tests in 88 suites; 218 XCTest checks). **Tier-1** (read/navigation only). **(The full Scrivener round-trip
+also needs B9 — the outbound Copy-Link that originates the URL; B5 alone is only the inbound half.)**
 
 **B6. Embed image bytes on the extract command path.** — **MED** — `07` S1/S2. `EditorFormatting.makeNotePassageSource`
 passes `assetStore: nil` though `ItemAssetStore` (W7-S5) shipped, so ⌘⌥E Create-Extract / Append copy the
