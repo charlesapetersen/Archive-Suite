@@ -46,10 +46,11 @@ this file is authoritative for Notes‑specific work.
   **README + check catalog + the owner-eye checks (G2 typing, G6/G11
   external launch, chip-button clicks): [`scripts/GUI-HARNESS.md`](scripts/GUI-HARNESS.md).**
 - **Visual / render verification:** `ArchiveNotesUITests` asserts the accessibility tree, not pixels — it
-  won't catch a PDF pane / page-thumbnail that renders blank. For the running app use the live sighted loop
-  (`ops/gui/capture-window.sh` + `cliclick` → read the shot, → [`../ops/gui/README.md`](../ops/gui/README.md));
-  for headless pixel truth, a Notes-target render guard mirroring the Reader's `RenderProbe` would guard
-  `NotesPDFPaneView` / `PDFThumbnailer` rendering (not yet added — the guards live in the Reader bundle only).
+  won't catch a PDF pane / page-thumbnail that renders blank. `W9.b4` adds a scratch-only Notes renderer
+  regression for exact-root Reader-page thumbnails, while Reader's `DocumentRenderGuardTests` decodes the
+  production copied-link PNG and applies `RenderProbe` pixel assertions. For the running app use the live
+  sighted loop (`ops/gui/capture-window.sh` + `cliclick` → read the shot, →
+  [`../ops/gui/README.md`](../ops/gui/README.md)).
 - **Durable-link E2E + safety (W8-S9):** `scripts/e2e-durable-links.sh` is a build-free filesystem proof
   that a `reader-page` link survives a computer move (same GUID, new absolute path → still resolves;
   guarded teardown); `DurableLinkE2ETests` proves the resolver logic in the unit gate. Both are GUI-free.
@@ -285,7 +286,8 @@ macOS/Sources/ArchiveNotes/
                                    onJumpBlock + passageSummaries thread note-passage chip jump + live
                                    title/missing resolve into BlockHeaderAttachment (W7-S3)
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
-                                   noteImageRelPath, noteBlockSource) + MarkdownStyler (semantic→visual)
+                                   noteImageRelPath, noteBlockSource, presentation-only pending thumbnail
+                                   identity) + MarkdownStyler (semantic→visual)
     InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path,
                                    Missing/Blocked placeholder kinds); app-wide thumbnailCache keyed
                                    by cacheKey = maxPixels + the file's VERSION (size + ns mtime,
@@ -415,9 +417,13 @@ macOS/Sources/ArchiveNotes/
                                    (point-of-use accessor); gates probe/clipboard-detect (§D.8)
   Sources/
     SourceBlockPaster.swift        Pasteboard → source blocks: custom UTI + plain-text URL fallback,
-                                   thumbnail asset import, entry-count cap (100)
+                                   thumbnail asset import, entry-count cap (100); W9.b4 render fallback
+                                   keeps its durable block before asynchronously upgrading the thumbnail
     PassagePasteboard.swift        com.archivenotes.passage codec (W7-S2): write/read NotesPassagePayload
                                    (custom UTI + plain-text fallback) for copy-Notes → paste-Extract (§5)
+  Views/
+    SourceBlockThumbnailRenderer.swift  Exact-known-root Reader page resolver + scoped `PDFThumbnailer`
+                                   render for text-only pasted page links; no prompt, scan, or root mutation
 
 macOS/Tests/ArchiveNotesTests/
   SmokePlaceholderTests.swift      Trivial test for the smoke gate

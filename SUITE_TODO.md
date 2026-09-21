@@ -1125,10 +1125,6 @@ entry point. Mostly **Tier-2** (they write note front-matter or project Finder t
 `SUITE_TODO_DONE.md`; that one work item covered the full list affordance, title→filename projection,
 inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.notes-rename` duplicate.
 
-- [ ] **`W9.b4` — page thumbnails never render end-to-end [M · Tier-2].** Plan B4. Reader passes
-  `thumbnailer:nil`. ⚠️ **Verify with a headless render guard** (`RenderProbe`/`DocumentRenderGuardTests` over
-  Notes' in-app `PDFThumbnailer`) — XCUITest reads the accessibility tree, not pixels, so a blank thumbnail
-  would pass a UITest. | ArchiveNotes + ArchiveCore Thumbnails/ | M | med | none
 - [ ] **`W9.b5` — `archivenotes://open` is never consumed [S].** Plan B5. The scheme is registered; nothing
   selects/raises the note. | ArchiveNotes | S | low | none
 - [ ] **`W9.b6` — the extract command path does not embed image bytes [S–M · Tier-2].** Plan B6. | ArchiveNotes

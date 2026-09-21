@@ -102,6 +102,59 @@ struct EditorBindingTests {
         #expect(styledText.contains("bold"), "Text content must survive styled-mode switch")
     }
 
+    @Test @MainActor
+    func sourcePasteKeepsItsStableBlockWhenTheCaretMovesBeforeThumbnailRendering() async {
+        let holder = BindingHolder("Existing note text")
+        let formatting = FormattingContext()
+        formatting.currentItemID = UUID()
+        formatting.currentItemKind = .note
+        let store = ScratchAssetStore()
+        let thumbnailData = Data("scratch thumbnail".utf8)
+        let view = MarkdownEditorView(
+            markdown: Binding(get: { holder.markdown }, set: { holder.markdown = $0 }),
+            isRaw: Binding(get: { holder.isRaw }, set: { holder.isRaw = $0 }),
+            formatting: formatting,
+            assetStore: store,
+            missingThumbnailProvider: { _ in
+                try? await Task.sleep(for: .milliseconds(20))
+                return thumbnailData
+            }
+        )
+        let coordinator = view.makeCoordinator()
+        let textView = EditorTextView()
+        textView.textStorage?.setAttributedString(MarkdownBridge.parse(markdown: holder.markdown,
+                                                                        assetStore: store))
+        coordinator.textView = textView
+        coordinator.parent = view
+        coordinator.formattingContext = formatting
+        coordinator.assetStore = store
+        coordinator.missingThumbnailProvider = view.missingThumbnailProvider
+
+        let anchor = SourceAnchor(
+            link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Scan.pdf&page=5",
+            display: "Scan — p. 5", page: 5
+        )
+        #expect(coordinator.handleSourceBlockPaste([
+            .init(kind: .readerPage, anchor: anchor, thumbnailData: nil)
+        ]))
+
+        // The old implementation used this live selection after its await, silently abandoning the
+        // paste if the reader kept working. Move it and type before the provider returns.
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        textView.insertText("Edited: ", replacementRange: textView.selectedRange())
+        try? await Task.sleep(for: .milliseconds(100))
+        coordinator.flushWriteBack()
+
+        #expect(holder.markdown.contains("Edited:"))
+        #expect(holder.markdown.contains("rel=Scan.pdf&page=5"))
+        #expect(holder.markdown.contains("assets/p5-thumb.png"))
+        guard let thumbnailURL = store.resolveAsset("assets/p5-thumb.png") else {
+            Issue.record("The asynchronous renderer must import its thumbnail into the current scratch note")
+            return
+        }
+        #expect((try? Data(contentsOf: thumbnailURL)) == thumbnailData)
+    }
+
     // MARK: - Lint check (no .layoutManager in Editor/)
 
     @Test

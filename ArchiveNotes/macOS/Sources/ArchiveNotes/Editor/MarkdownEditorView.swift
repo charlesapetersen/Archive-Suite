@@ -65,6 +65,9 @@ struct MarkdownEditorView: NSViewRepresentable {
     var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
     /// Called when "Preview" is clicked on a block chip. Receives anchor + anchor view for popover.
     var onPreviewBlock: ((SourceAnchor, NSView) -> Void)?
+    /// Best-effort renderer for a Reader page paste that arrived without thumbnail data. `nil` keeps
+    /// the established text-only degradation and must never prompt or walk an archive.
+    var missingThumbnailProvider: (@MainActor @Sendable (SourceAnchor) async -> Data?)?
     /// W7-S3 — called when "Jump to Source" is clicked on a note-passage (extract) chip.
     var onJumpBlock: (@Sendable (SourceAnchor) -> Void)?
     /// W7-S3 — live item summaries used to resolve a note-passage chip's current title + missing state.
@@ -111,6 +114,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         context.coordinator.assetStore = assetStore
         context.coordinator.onRevealBlock = onRevealBlock
         context.coordinator.onPreviewBlock = onPreviewBlock
+        context.coordinator.missingThumbnailProvider = missingThumbnailProvider
         context.coordinator.onJumpBlock = onJumpBlock
         context.coordinator.passageSummaries = passageSummaries
         flushBox?.flush = { [weak coordinator = context.coordinator] in coordinator?.flushWriteBack() }
@@ -191,6 +195,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         // Keep the block-chip callbacks + live summaries current (the struct is recreated each render).
         coordinator.onRevealBlock = onRevealBlock
         coordinator.onPreviewBlock = onPreviewBlock
+        coordinator.missingThumbnailProvider = missingThumbnailProvider
         coordinator.onJumpBlock = onJumpBlock
         coordinator.passageSummaries = passageSummaries
         // Keep the asset store current — it can appear/refresh after makeNSView (W7-S5: the pane creates
@@ -283,6 +288,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         weak var assetStore: EditorAssetStore?
         var onRevealBlock: (@Sendable (SourceAnchor) -> Void)?
         var onPreviewBlock: ((SourceAnchor, NSView) -> Void)?
+        var missingThumbnailProvider: (@MainActor @Sendable (SourceAnchor) async -> Data?)?
         var onJumpBlock: (@Sendable (SourceAnchor) -> Void)?
         var passageSummaries: [ItemSummary] = []
         /// The last scroll token handled by `updateNSView`, so a jump fires once per request (W7-S3).
@@ -413,15 +419,70 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         // MARK: Source-block paste (W4-S6)
 
-        /// Handle a paste of archive-link entries as source blocks.
-        /// Imports thumbnails via assetStore and inserts each block at the caret.
+        /// Handle a paste of archive-link entries as source blocks. Payload thumbnails are imported
+        /// immediately; a page link without one gets one best-effort asynchronous exact-path render.
+        /// Returning `true` claims and inserts provenance synchronously, so an optional render can
+        /// never make a user paste disappear. A stable temporary attribute identifies each inserted
+        /// chip when its image becomes available, even if the user keeps typing or moves the caret.
         func handleSourceBlockPaste(_ entries: [SourceBlockPaster.PasteEntry]) -> Bool {
             guard let textView, !currentIsRaw, !entries.isEmpty else { return false }
             // Extracts reference NOTES only (§D7): a Reader/zotero link paste must not attach an
             // outside-document source block to an extract — decline so it degrades to plain text.
             if formattingContext?.currentItemKind == .extract { return false }
+
+            // Insertion has always capped a multi-link paste at 100. Apply that cap before dispatching
+            // asynchronous renders too: work must match what can actually become a source block.
+            let boundedEntries = Array(entries.prefix(100))
+            guard boundedEntries.contains(where: { $0.thumbnailData == nil }),
+                  let missingThumbnailProvider else {
+                insertSourceBlocks(boundedEntries, into: textView)
+                return true
+            }
+
+            // Preserve the durable source immediately. The captured store and item identity make the
+            // later optional asset write stay with this same note; a selection switch simply leaves the
+            // already-inserted block text-only rather than putting bytes in a different note.
+            let targetItemID = formattingContext?.currentItemID
+            guard let targetAssetStore = assetStore else {
+                insertSourceBlocks(boundedEntries, into: textView)
+                return true
+            }
+            let pendingThumbnailIDs = Dictionary(uniqueKeysWithValues: boundedEntries.indices.compactMap { index in
+                boundedEntries[index].thumbnailData == nil ? (index, UUID().uuidString) : nil
+            })
+            insertSourceBlocks(boundedEntries, into: textView, pendingThumbnailIDs: pendingThumbnailIDs)
+
+            Task { [weak self, weak textView] in
+                guard let self, let textView else { return }
+                for (index, pendingID) in pendingThumbnailIDs {
+                    guard let thumbnailData = await missingThumbnailProvider(boundedEntries[index].anchor),
+                          self.textView === textView,
+                          !self.currentIsRaw,
+                          self.formattingContext?.currentItemKind != .extract,
+                          self.formattingContext?.currentItemID == targetItemID,
+                          self.assetStore === targetAssetStore,
+                          self.pendingSourceBlockRange(pendingID: pendingID, in: textView) != nil,
+                          let thumbnailRef = SourceBlockPaster.importThumbnail(
+                            thumbnailData, page: boundedEntries[index].anchor.page,
+                            assetStore: targetAssetStore
+                          ) else { continue }
+                    self.hydratePendingSourceBlock(
+                        pendingID: pendingID, kind: boundedEntries[index].kind,
+                        anchor: boundedEntries[index].anchor, thumbnailRef: thumbnailRef,
+                        in: textView
+                    )
+                }
+            }
+            return true
+        }
+
+        /// The synchronous mutation half of source-block paste. Kept separate from the async fallback
+        /// preparation so both a rich Reader payload and a rendered plain-text link use the identical
+        /// asset import / markdown authoring path.
+        private func insertSourceBlocks(_ entries: [SourceBlockPaster.PasteEntry], into textView: EditorTextView,
+                                        pendingThumbnailIDs: [Int: String] = [:]) {
             textView.undoManager?.beginUndoGrouping()
-            for var entry in entries.prefix(100) {
+            for (index, var entry) in entries.enumerated() {
                 if let thumbData = entry.thumbnailData, let store = assetStore {
                     if let ref = SourceBlockPaster.importThumbnail(
                         thumbData, page: entry.anchor.page, assetStore: store
@@ -432,15 +493,51 @@ struct MarkdownEditorView: NSViewRepresentable {
                 // W3.notes-thumb-line-duplicates — the imported thumbnail's `![…](…)` line is written
                 // into the body HERE (the only place that authors it), so pass the store that just
                 // took the bytes: it resolves the ref to the very image it wrote.
-                let chipStr = MarkdownBridge.buildInsertableBlock(
+                let chipStr = NSMutableAttributedString(attributedString: MarkdownBridge.buildInsertableBlock(
                     kind: entry.kind, anchor: entry.anchor, fontSize: currentFontSize,
                     assetStore: assetStore, onReveal: onRevealBlock, onPreview: onPreviewBlock
-                )
+                ))
+                if let pendingID = pendingThumbnailIDs[index] {
+                    chipStr.addAttribute(.notePendingThumbnailID, value: pendingID,
+                                         range: NSRange(location: 0, length: chipStr.length))
+                }
                 textView.insertText(chipStr, replacementRange: textView.selectedRange())
             }
             textView.undoManager?.endUndoGrouping()
             scheduleWriteBack()
-            return true
+        }
+
+        /// Replace only the stable, already-inserted placeholder chip with its image-bearing form.
+        /// If the user deleted that chip while rendering, the marker is absent and no late mutation occurs.
+        private func hydratePendingSourceBlock(pendingID: String, kind: Block.Kind, anchor: SourceAnchor,
+                                               thumbnailRef: String, in textView: EditorTextView) {
+            guard let storage = textView.textStorage,
+                  let placeholderRange = pendingSourceBlockRange(pendingID: pendingID, in: textView) else { return }
+
+            var hydratedAnchor = anchor
+            hydratedAnchor.thumbRef = thumbnailRef
+            let replacement = MarkdownBridge.buildInsertableBlock(
+                kind: kind, anchor: hydratedAnchor, fontSize: currentFontSize, assetStore: assetStore,
+                onReveal: onRevealBlock, onPreview: onPreviewBlock
+            )
+            storage.replaceCharacters(in: placeholderRange, with: replacement)
+            scheduleWriteBack()
+        }
+
+        /// Locates a pending source block without relying on the current selection. The render task uses
+        /// this before importing its asset so deleting the block while it renders leaves neither a late
+        /// text mutation nor an orphaned thumbnail asset behind.
+        private func pendingSourceBlockRange(pendingID: String, in textView: EditorTextView) -> NSRange? {
+            guard let storage = textView.textStorage, storage.length > 0 else { return nil }
+            let fullRange = NSRange(location: 0, length: storage.length)
+            var placeholderRange: NSRange?
+            storage.enumerateAttribute(.notePendingThumbnailID, in: fullRange) { value, range, stop in
+                if value as? String == pendingID {
+                    placeholderRange = range
+                    stop.pointee = true
+                }
+            }
+            return placeholderRange
         }
 
         // MARK: Passage copy / paste (W7-S2)

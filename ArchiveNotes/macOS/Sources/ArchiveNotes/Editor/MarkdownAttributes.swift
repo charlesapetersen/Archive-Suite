@@ -11,6 +11,10 @@ extension NSAttributedString.Key {
     static let noteImageRelPath = NSAttributedString.Key("an.imageRelPath")
     /// Source anchor on a block-header chip char (SourceAnchorBox).
     static let noteBlockSource = NSAttributedString.Key("an.blockSource")
+    /// Ephemeral identity for a source block whose optional pasted-page thumbnail is still rendering.
+    /// It is deliberately presentation-only: the Markdown serializer ignores it, so it can never
+    /// become a durable note field.
+    static let notePendingThumbnailID = NSAttributedString.Key("an.pendingThumbnailID")
     /// The whitespace the Styler inserts BETWEEN two blocks (Bool). Not the operator's text: the
     /// serializer reads it to tell a paragraph break from a newline someone typed
     /// (`W3.notes-editor-blankline-collapse`).

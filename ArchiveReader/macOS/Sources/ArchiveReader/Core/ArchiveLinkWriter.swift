@@ -42,26 +42,49 @@ enum ArchiveLinkWriter {
             let urlString = link.url.absoluteString
             let display = file.url.deletingPathExtension().lastPathComponent
 
+            // A document-level link names no specific page, but its preview can still use page 1.
+            // The durable link remains document-level; this is only an optional, self-contained
+            // representation for a Notes source block. Rendering failure degrades to the same link
+            // payload rather than withholding the copy action.
+            let mtime = (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? Date()
+            // A known cloud placeholder is deliberately never opened merely for an optional preview.
+            // `PDFThumbnailer` also owns a no-materialisation guard for the local→dataless race.
+            let thumbnailData = file.isDataless ? nil : await thumbnailer?.png(
+                fileURL: file.url, page: 1, linkKey: urlString, mtime: mtime
+            )
+
             plainURLs.append(urlString)
             entries.append(ArchiveLinkPayload.Entry(
                 link: urlString,
                 display: display,
                 page: nil,
-                thumbPNGBase64: nil
+                thumbPNGBase64: thumbnailData?.base64EncodedString()
             ))
         }
 
-        let item = NSPasteboardItem()
-        // Rep 1: plain text (newline-joined URLs)
-        item.setString(plainURLs.joined(separator: "\n"), forType: .string)
+        return pasteboardItem(entries: entries, plainURLs: plainURLs)
+    }
 
-        // Rep 2: custom UTI JSON
-        let payload = ArchiveLinkPayload(entries: entries)
-        if let jsonData = try? JSONEncoder().encode(payload) {
-            item.setData(jsonData, forType: NSPasteboard.PasteboardType(ArchiveLinkUTI.type))
+    /// Immediate text-first representation for a copy command while optional thumbnail rendering runs.
+    /// It has the same durable links and rich UTI as the final item, just no preview bytes yet.
+    static func pasteboardItemWithoutThumbnails(
+        for files: [ArchiveFile], rootPath: String, marker: RootMarker
+    ) -> NSPasteboardItem {
+        var entries: [ArchiveLinkPayload.Entry] = []
+        var plainURLs: [String] = []
+        for file in files {
+            let relativePath = file.url.path.hasPrefix(rootPath + "/")
+                ? String(file.url.path.dropFirst(rootPath.count + 1))
+                : file.url.lastPathComponent
+            let link = DurableLink.readerReveal(rootGUID: marker.guid, relativePath: relativePath, page: nil)
+            let urlString = link.url.absoluteString
+            plainURLs.append(urlString)
+            entries.append(ArchiveLinkPayload.Entry(
+                link: urlString, display: file.url.deletingPathExtension().lastPathComponent, page: nil
+            ))
         }
-
-        return item
+        return pasteboardItem(entries: entries, plainURLs: plainURLs)
     }
 
     /// Build a pasteboard item for a single page-level link from the document viewer.
@@ -73,21 +96,7 @@ enum ArchiveLinkWriter {
         marker: RootMarker,
         thumbnailer: PDFThumbnailer?
     ) async -> NSPasteboardItem {
-        let filePath = fileURL.path
-        let relativePath: String
-        if filePath.hasPrefix(rootPath + "/") {
-            relativePath = String(filePath.dropFirst(rootPath.count + 1))
-        } else {
-            relativePath = fileURL.lastPathComponent
-        }
-
-        let link = DurableLink.readerReveal(
-            rootGUID: marker.guid,
-            relativePath: relativePath,
-            page: page
-        )
-        let urlString = link.url.absoluteString
-        let display = "\(fileURL.deletingPathExtension().lastPathComponent) \u{2014} p.\(page)"
+        let base = pagePayload(fileURL: fileURL, page: page, rootPath: rootPath, marker: marker)
 
         // Render thumbnail if possible
         var thumbBase64: String?
@@ -95,25 +104,62 @@ enum ArchiveLinkWriter {
             let mtime = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date()
             if let pngData = await thumbnailer.png(
                 fileURL: fileURL, page: page,
-                linkKey: urlString, mtime: mtime
+                linkKey: base.urlString, mtime: mtime
             ) {
                 thumbBase64 = pngData.base64EncodedString()
             }
         }
 
         let entry = ArchiveLinkPayload.Entry(
-            link: urlString,
-            display: display,
+            link: base.urlString,
+            display: base.display,
             page: page,
             thumbPNGBase64: thumbBase64
         )
-        let payload = ArchiveLinkPayload(entries: [entry])
+        return pasteboardItem(entries: [entry], plainURLs: [base.urlString])
+    }
 
+    /// Text-first page link used immediately by the command while its optional image renders.
+    static func pageLinkWithoutThumbnail(
+        fileURL: URL, page: Int, rootPath: String, marker: RootMarker
+    ) -> NSPasteboardItem {
+        let base = pagePayload(fileURL: fileURL, page: page, rootPath: rootPath, marker: marker)
+        let entry = ArchiveLinkPayload.Entry(link: base.urlString, display: base.display, page: page)
+        return pasteboardItem(entries: [entry], plainURLs: [base.urlString])
+    }
+
+    private static func pagePayload(
+        fileURL: URL, page: Int, rootPath: String, marker: RootMarker
+    ) -> (urlString: String, display: String) {
+        let relativePath = fileURL.path.hasPrefix(rootPath + "/")
+            ? String(fileURL.path.dropFirst(rootPath.count + 1))
+            : fileURL.lastPathComponent
+        let link = DurableLink.readerReveal(rootGUID: marker.guid, relativePath: relativePath, page: page)
+        return (link.url.absoluteString, "\(fileURL.deletingPathExtension().lastPathComponent) \u{2014} p.\(page)")
+    }
+
+    private static func pasteboardItem(
+        entries: [ArchiveLinkPayload.Entry], plainURLs: [String]
+    ) -> NSPasteboardItem {
         let item = NSPasteboardItem()
-        item.setString(urlString, forType: .string)
-        if let jsonData = try? JSONEncoder().encode(payload) {
+        item.setString(plainURLs.joined(separator: "\n"), forType: .string)
+        if let jsonData = try? JSONEncoder().encode(ArchiveLinkPayload(entries: entries)) {
             item.setData(jsonData, forType: NSPasteboard.PasteboardType(ArchiveLinkUTI.type))
         }
         return item
     }
+}
+
+/// The production renderer shared by Reader's page and batch copy paths. Its cache is app-owned and
+/// disposable: it is never derived from, or written into, the archive root.
+enum ArchiveLinkThumbnailer {
+    static let shared = PDFThumbnailer(cacheDirectory: cacheDirectory)
+
+    private static let cacheDirectory: URL = {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base
+            .appendingPathComponent("ArchiveReader", isDirectory: true)
+            .appendingPathComponent("Thumbnails", isDirectory: true)
+    }()
 }

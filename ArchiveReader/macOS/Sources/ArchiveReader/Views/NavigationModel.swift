@@ -22,6 +22,11 @@ final class NavigationModel: ObservableObject {
     let library: ArchiveLibrary
     let rootStore: RootFolderStore
     let indexer: ContentIndexer
+    /// App-owned thumbnail renderer used when the batch Copy Archive Link(s) path vends rich payloads.
+    private let thumbnailer: PDFThumbnailer?
+    /// Monotonic lease for an async archive-copy enrichment. A later copy command must always win over
+    /// an older thumbnail task, even when both began against the same pasteboard change count.
+    private var archiveCopyGeneration = 0
     let notes = NotesStore()
     let savedSearches = SavedSearchStore()
     let excludedFolders: ExcludedFoldersStore
@@ -125,9 +130,11 @@ final class NavigationModel: ObservableObject {
     /// passing a throwaway `defaults` gets its own instance on that domain instead — nothing else
     /// observes it, and nothing it persists reaches the owner's `ar.excludedFolders`.
     init(defaults: UserDefaults = .standard, excludedFolders: ExcludedFoldersStore? = nil,
-         indexer: ContentIndexer = ContentIndexer()) {
+         indexer: ContentIndexer = ContentIndexer(),
+         thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         self.defaults = defaults
         self.indexer = indexer
+        self.thumbnailer = thumbnailer
         self.library = ArchiveLibrary(defaults: defaults)
         self.rootStore = RootFolderStore(defaults: defaults)
         self.excludedFolders = excludedFolders
@@ -1291,13 +1298,25 @@ final class NavigationModel: ObservableObject {
             statusMessage = rootStore.markerState.degradation?.message ?? "Choose an archive folder first."
             return
         }
+        // Durable links are the primary copy result. Put them on the clipboard before optional page
+        // previews render, then replace this item only if we still own the clipboard.
+        let immediateItem = ArchiveLinkWriter.pasteboardItemWithoutThumbnails(
+            for: files, rootPath: rootPath, marker: marker
+        )
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([immediateItem])
+        let expectedChangeCount = NSPasteboard.general.changeCount
+        archiveCopyGeneration &+= 1
+        let generation = archiveCopyGeneration
+        statusMessage = "Copied \(files.count) archive link\(files.count == 1 ? "" : "s")."
         Task {
             let item = await ArchiveLinkWriter.pasteboardItem(
-                for: files, rootPath: rootPath, marker: marker, thumbnailer: nil
+                for: files, rootPath: rootPath, marker: marker, thumbnailer: thumbnailer
             )
+            guard archiveCopyGeneration == generation,
+                  NSPasteboard.general.changeCount == expectedChangeCount else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.writeObjects([item])
-            statusMessage = "Copied \(files.count) archive link\(files.count == 1 ? "" : "s")."
         }
     }
 

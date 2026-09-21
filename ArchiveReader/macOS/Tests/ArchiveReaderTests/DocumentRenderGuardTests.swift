@@ -16,8 +16,40 @@ import PDFKit
 import AppKit
 import CoreGraphics
 import ArchiveCore
+@testable import ArchiveReader
 
 final class DocumentRenderGuardTests: XCTestCase {
+
+    // MARK: copied Reader page links carry pixels end to end
+
+    @MainActor
+    func testDocumentViewerPageLinkEmbedsANonBlankThumbnail() async throws {
+        let pdf = try makeTwoPagePDF()
+        let root = pdf.deletingLastPathComponent()
+        let model = DocumentViewerModel(
+            persists: false,
+            thumbnailer: PDFThumbnailer(cacheDirectory: makeTempDir("page-link-thumbs"))
+        )
+        model.load(DocumentSelection(filePaths: [pdf.path]))
+        let target = ArchiveLinkTarget(
+            rootPath: root.path,
+            marker: RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date())
+        )
+
+        let generatedItem = await model.archivePageLink(target: target)
+        let item = try XCTUnwrap(generatedItem)
+        let payloadData = try XCTUnwrap(item.data(forType: NSPasteboard.PasteboardType(ArchiveLinkUTI.type)))
+        let payload = try JSONDecoder().decode(ArchiveLinkPayload.self, from: payloadData)
+        let base64 = try XCTUnwrap(payload.entries.first?.thumbPNGBase64,
+                                   "the production document-viewer link lost its thumbnail")
+        let png = try XCTUnwrap(Data(base64Encoded: base64), "thumbnail base64 did not decode")
+        writeRenderArtifact(png, named: "w9-b4-document-page-link.png")
+
+        let cg = try XCTUnwrap(RenderProbe.cgImage(fromPNG: png))
+        let stats = try XCTUnwrap(assertRendersNonBlank(cg, "document-viewer page-link thumbnail"))
+        XCTAssertGreaterThan(stats.nonWhiteFraction, 0.10,
+                             "the rich page-link thumbnail is blank despite an inky source page")
+    }
 
     // MARK: page-0 image page renders (the core SPEC guard)
 

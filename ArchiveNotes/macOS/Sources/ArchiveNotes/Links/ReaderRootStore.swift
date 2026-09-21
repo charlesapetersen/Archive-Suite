@@ -148,6 +148,16 @@ final class ReaderRootStore: ObservableObject {
         loadSaved()
     }
 
+    /// Returns a granted root without changing this store's live-scope ownership.
+    ///
+    /// Most callers should use `root(for:)`: they need the store to retain the access scope until
+    /// their visible preview is dismissed. A short, self-contained reader instead uses this lookup
+    /// and balances its own `startAccessingSecurityScopedResource()` call. That distinction keeps a
+    /// background thumbnail from releasing the scope a visible preview already owns.
+    func knownRoot(for guid: UUID) -> URL? {
+        knownRoots[guid]
+    }
+
     /// Look up a Reader root by its marker GUID.
     /// Starts the security scope if not already active; returns `nil` on miss.
     ///

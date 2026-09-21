@@ -456,7 +456,8 @@ Build: `xcodegen generate && xcodebuild -scheme ArchiveReader … build/test`.
 **Visual-render guards (the pixels XCUITest can't see).** `RenderProbe.swift` renders a SwiftUI view
 (`ImageRenderer`) or a PDF page (ArchiveCore `PDFThumbnailer`) to real pixels and asserts on them
 (`assertRendersNonBlank`, `nonWhiteFraction`, `meanLuminance`); `DocumentRenderGuardTests.swift` guards the
-2-page PDF SPEC (page 0 scan / page 1 OCR) headlessly — no app launch, no TCC prompt, health-gate-safe.
+2-page PDF SPEC (page 0 scan / page 1 OCR) headlessly and, for W9.b4, decodes a copied Reader page-link's
+PNG to prove it is nonblank — no app launch, no TCC prompt, health-gate-safe.
 Reference-image diffs: `SnapshotTests.swift` (swift-snapshot-testing SPM dep; refs in `__Snapshots__/`).
 The Tart VM is its reference renderer: it compares there and deliberately skips on the host; see
 `ops/gui/README.md` for the guarded guest-only re-recording flow.

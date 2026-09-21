@@ -371,6 +371,9 @@ private struct PreviewMessageView: View {
 final class SourceBlockPreviewState: ObservableObject {
     private let rootStore: ReaderRootStore
     private let preview: ReaderPreviewPopover
+    /// Thumbnail generation owns and balances its own short security scope, so it cannot release the
+    /// visible popover resolver's scope before that preview is dismissed.
+    private let thumbnailRenderer: SourceBlockThumbnailRenderer
     /// Also driven from the File menu (`ArchiveNotesCommands.swift`), with no anchor and no link in
     /// hand — the other of the two entry points `ReaderRootChooser` exists for (W26.notesabsence-fu2).
     private let chooser: ReaderRootChooser
@@ -382,6 +385,10 @@ final class SourceBlockPreviewState: ObservableObject {
         let chooser = ReaderRootChooser(rootStore: store, resolver: resolver)
         self.chooser = chooser
         self.preview = ReaderPreviewPopover(resolver: resolver, chooser: chooser)
+        self.thumbnailRenderer = SourceBlockThumbnailRenderer(
+            rootStore: store,
+            thumbnailer: PDFThumbnailer(cacheDirectory: Self.thumbnailCacheDirectory)
+        )
     }
 
     func show(for anchor: SourceAnchor, relativeTo view: NSView) {
@@ -392,8 +399,22 @@ final class SourceBlockPreviewState: ObservableObject {
         preview.dismiss()
     }
 
+    /// Best-effort image for a pasted page link whose Reader payload had no embedded thumbnail.
+    /// Failure stays text-only; a paste never waits for a user grant or an archive-wide search.
+    func thumbnail(for anchor: SourceAnchor) async -> Data? {
+        await thumbnailRenderer.png(for: anchor)
+    }
+
     /// File ▸ Choose Archive Folder… — grant a Reader root with no link in hand.
     func chooseArchiveFolder() {
         chooser.chooseRoot()
     }
+
+    private static let thumbnailCacheDirectory: URL = {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base
+            .appendingPathComponent("ArchiveNotes", isDirectory: true)
+            .appendingPathComponent("Thumbnails", isDirectory: true)
+    }()
 }

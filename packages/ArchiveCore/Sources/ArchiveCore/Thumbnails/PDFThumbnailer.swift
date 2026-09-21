@@ -81,8 +81,17 @@ public actor PDFThumbnailer {
 
     // MARK: - Rendering
 
-    /// Renders a single page to PNG data. Pure computation, no disk I/O.
+    /// Renders a single page to PNG data. The policy is thread-scoped, so it must wrap the synchronous
+    /// `PDFDocument(url:)` open itself: a file can become dataless after the caller's last inspection,
+    /// and a thumbnail is never permission to download a cloud placeholder.
     private func renderPage(fileURL: URL, page: Int, spec: Spec) -> Data? {
+        CorpusWalker.withDatalessMaterializationDisabled {
+            renderPageWithoutMaterializingDatalessFiles(fileURL: fileURL, page: page, spec: spec)
+        }
+    }
+
+    /// Renders the already-policy-guarded PDF page to a private bitmap. No source file is modified.
+    private func renderPageWithoutMaterializingDatalessFiles(fileURL: URL, page: Int, spec: Spec) -> Data? {
         guard page >= 1,
               let doc = PDFDocument(url: fileURL),
               let sourcePage = doc.page(at: page - 1) else {

@@ -147,6 +147,10 @@ struct NoteEditorPane: View {
             onPreviewBlock: { [weak previewPopover] anchor, anchorView in
                 previewPopover?.show(for: anchor, relativeTo: anchorView)
             },
+            missingThumbnailProvider: { [weak previewPopover] anchor in
+                guard let previewPopover else { return nil }
+                return await previewPopover.thumbnail(for: anchor)
+            },
             onJumpBlock: { [model = nav.model] anchor in
                 // W7-S3: extract provenance chip → in-app navigation to the source note + block.
                 // The chip's action fires on the main thread; assumeIsolated satisfies the

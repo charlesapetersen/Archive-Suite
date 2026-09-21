@@ -1196,11 +1196,13 @@ by `W23.notes-uitest-warn`; none were in the G5 additions). File-safe: the block
 fixture's `idZotero` note; the real Store is absent and `notesStoreRootBookmark` was not persisted.
 
 - **Uses the plain-text fallback** (`SourceBlockPaster.scanURLs`), not the custom UTI, so no `ArchiveLinkPayload`
-  encode is needed and there is no thumbnail render (the pasted `.readerPage` block has `thumbnailData == nil`)
-  — G5 deliberately avoids the reader-page-chip thumbnail path (that render idle-check rides G6). Target is
-  `idZotero`, not the plain note, so G5 doesn't perturb the note G3/G9 depend on; the Zotero chip has no
-  thumbnail either. `handleSourceBlockPaste` requires `!currentIsRaw` (paste only in styled mode) and declines a
-  Reader link pasted into an *extract* (§D7) — both honored by the target/mode choice.
+  encode is needed. Since `W9.b4`, a missing page thumbnail attempts one exact-path render only when the root
+  is already known and granted; this fixture deliberately has neither, so G5 remains a text-only provenance
+  check rather than borrowing or prompting for a corpus. The scratch-only renderer regression covers the live
+  thumbnail path separately. Target is `idZotero`, not the plain note, so G5 doesn't perturb the note G3/G9
+  depend on; the Zotero chip has no thumbnail either. `handleSourceBlockPaste` requires `!currentIsRaw` (paste
+  only in styled mode) and declines a Reader link pasted into an *extract* (§D7) — both honored by the
+  target/mode choice.
 - **BLOCKER for G7/G8 (folder replicate / delete-last-instance) — the INDEX-DB caveat, now fully traced.** The
   folder tree loads **DB-first**: `OrganizationStore.load(storeRoot:)` reads folders from the sqlite index
   (`NotesIndex.allFolders()`) and consults the store's `organization.json` **only when that DB has zero

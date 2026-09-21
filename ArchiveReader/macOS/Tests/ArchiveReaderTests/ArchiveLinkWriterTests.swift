@@ -13,15 +13,24 @@ final class ArchiveLinkWriterTests: XCTestCase {
         createdAt: Date()
     )
 
-    private func makeFile(_ path: String) -> ArchiveFile {
+    private func makeFile(_ path: String, isDataless: Bool = false) -> ArchiveFile {
         let url = URL(fileURLWithPath: path)
         return ArchiveFile(
             url: url,
             name: url.lastPathComponent,
             fileType: "PDF",
             tags: DocumentTags.parse(raw: [], labelNumber: nil),
-            contentModified: nil
+            contentModified: nil,
+            isDataless: isDataless
         )
+    }
+
+    private func makeScratchDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ArchiveLinkWriterTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        return directory
     }
 
     // MARK: - pasteboardItem
@@ -98,7 +107,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
         XCTAssertEqual(payload.entries[0].display, "MEMO-1962")
     }
 
-    func testDocLevelLinksHaveNoThumb() async throws {
+    func testDocLevelLinksHaveNoThumbWithoutARenderer() async throws {
         let root = URL(fileURLWithPath: "/tmp/TestArchive")
         let files = [
             makeFile("/tmp/TestArchive/doc.pdf"),
@@ -112,6 +121,49 @@ final class ArchiveLinkWriterTests: XCTestCase {
         let payload = try JSONDecoder().decode(ArchiveLinkPayload.self, from: jsonData)
         XCTAssertNil(payload.entries[0].thumbPNGBase64, "Doc-level link should have no thumbnail")
         XCTAssertNil(payload.entries[0].page, "Doc-level link should have no page")
+    }
+
+    /// A document link still has no cited page; its first-page image is only an optional source-block
+    /// preview. The batch path must nevertheless use its injected renderer rather than dropping it.
+    func testBatchLinksEmbedFirstPageThumbnailWhenRendererAvailable() async throws {
+        let root = try makeScratchDirectory()
+        let pdf = root.appendingPathComponent("batch.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["dense thumbnail fixture"], to: pdf))
+        let thumbnailer = PDFThumbnailer(cacheDirectory: root.appendingPathComponent("thumb-cache"))
+
+        let item = await ArchiveLinkWriter.pasteboardItem(
+            for: [makeFile(pdf.path)], rootPath: root.path, marker: testMarker, thumbnailer: thumbnailer
+        )
+        let customType = NSPasteboard.PasteboardType(ArchiveLinkUTI.type)
+        let payload = try JSONDecoder().decode(
+            ArchiveLinkPayload.self, from: try XCTUnwrap(item.data(forType: customType))
+        )
+
+        XCTAssertNil(payload.entries[0].page, "the durable batch link remains document-level")
+        let encoded = try XCTUnwrap(payload.entries[0].thumbPNGBase64)
+        XCTAssertGreaterThan(try XCTUnwrap(Data(base64Encoded: encoded)).count, 100,
+                             "the rich payload must carry actual rendered PNG bytes")
+    }
+
+    /// Optional link previews must not open a known cloud placeholder. The fixture is deliberately a
+    /// valid local PDF: without the `isDataless` gate it would render successfully, so `nil` proves
+    /// the batch path skipped the open rather than merely degrading on unreadable input.
+    func testBatchLinksSkipKnownDatalessFiles() async throws {
+        let root = try makeScratchDirectory()
+        let pdf = root.appendingPathComponent("placeholder.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["must not be opened"], to: pdf))
+        let thumbnailer = PDFThumbnailer(cacheDirectory: root.appendingPathComponent("thumb-cache"))
+
+        let item = await ArchiveLinkWriter.pasteboardItem(
+            for: [makeFile(pdf.path, isDataless: true)], rootPath: root.path,
+            marker: testMarker, thumbnailer: thumbnailer
+        )
+        let customType = NSPasteboard.PasteboardType(ArchiveLinkUTI.type)
+        let payload = try JSONDecoder().decode(
+            ArchiveLinkPayload.self, from: try XCTUnwrap(item.data(forType: customType))
+        )
+        XCTAssertNil(payload.entries[0].thumbPNGBase64,
+                     "a known dataless file must keep its durable link but never open for a preview")
     }
 
     // MARK: - pageLink

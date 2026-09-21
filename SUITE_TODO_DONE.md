@@ -10,6 +10,30 @@ why a later change may or may not revisit that code.
 
 ## Archive Notes — gap closure (2026-09-20)
 
+- [x] **`W9.b4` — page thumbnails never render end-to-end [M · Tier-2].** **SHIPPED 2026-09-21 (this
+  commit).** Reader now owns a disposable-cache `ArchiveLinkThumbnailer`: page copy and batch copy publish
+  their durable links immediately, then enrich that same pasteboard payload only while it remains current.
+  Known-dataless files are never materialized. Notes now resolves an unthumbnailed pasted Reader page only
+  inside its exact, already-granted root, renders through the shared `PDFThumbnailer`, and upgrades its stable
+  source block in place; moving the caret, typing, switching notes, or deleting the block cannot redirect or
+  silently discard provenance. The renderer balances its own security-scope lease and uses only app-owned
+  thumbnail caches.
+
+  **Tier-2 verification:** independent review found and closed the late clipboard overwrite, dataless
+  materialization, and async-caret-loss paths. Scratch-only Reader and Notes unit suites pass (Reader: 404
+  tests; Notes: 872 tests in 88 suites); `ArchiveCore`'s full package tests pass; all three macOS apps build; the Reader/ArchiveCore
+  write-surface lint passes. `DocumentRenderGuardTests` decodes the copied page-link PNG and proves its pixels
+  nonblank; Notes proves exact-root render and renamed-path refusal, and the editor regression moves the caret
+  before rendering then proves the original block and its local thumbnail asset survive. No real corpus,
+  Notes store, persistent grants, GUI drive, network, credentials, or spend were used. | ArchiveReader/{macOS/
+  Sources/ArchiveReader/{Core/ArchiveLinkWriter.swift,Views/{DocumentViewerModel,NavigationModel}.swift},
+  Tests/ArchiveReaderTests/{ArchiveLinkWriterTests,DocumentRenderGuardTests}.swift}, ArchiveNotes/{macOS/
+  Sources/ArchiveNotes/{Editor/{MarkdownAttributes,MarkdownEditorView}.swift,Links/ReaderRootStore.swift,
+  Views/{NoteEditorPane,ReaderPreviewPopover,SourceBlockThumbnailRenderer}.swift},Tests/ArchiveNotesTests/
+  {EditorBindingTests,SourceBlockThumbnailRendererTests}.swift},{CLAUDE,KNOWN_ISSUES}.md}, packages/
+  ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift, execution-plans/archive-notes/
+  09-gap-closure.md, SUITE_TODO.md | M | med | done
+
 - [x] **`W9.b3` — Archive Notes cannot retitle or re-tag a note from the UI at all [S–M · Tier-2].**
   **SHIPPED 2026-09-20 (this commit).** The list now has identity-bound inline renaming through Return,
   double-click, and **Rename…**; the metadata inspector has normalized add/remove subject controls. Existing

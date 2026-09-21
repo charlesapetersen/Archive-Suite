@@ -188,12 +188,21 @@ concurrency, Escape/blank/rejected titles, and G17 drives all three rename route
 in the off-screen VM and exports a pixel capture. **Tier-2** independent review found and closed the
 subject→date ownership transfer, failed-edit retry, whitespace normalization, and failed-rename display paths.
 
-**B4. Wire page-thumbnail rendering end-to-end.** — **MED** — `04` S2/S4/S6. `PDFThumbnailer` +
-`ThumbnailImageCache` are built/tested but never instantiated; Reader passes `thumbnailer: nil` at every
-`ArchiveLinkWriter` site, and Notes has no render-on-demand fallback on paste.
-- *Files (Reader):* `ArchiveReader/.../Core/ArchiveLinkWriter.swift`, `.../Views/NavigationModel.swift:~1028`, `.../Views/DocumentViewerModel.swift:~220`. *Files (Notes):* `.../Editor/MarkdownEditorView.swift` (`handleSourceBlockPaste`), `.../Views/ThumbnailImageCache.swift`.
-- *Steps:* instantiate a shared `PDFThumbnailer` in Reader and pass it to `ArchiveLinkWriter.pageLink` (populate `thumbPNGBase64`) — including the batch "Copy Archive Link(s)" path, which currently hardcodes `nil`. In Notes, when a pasted page-entry has `thumbnailData == nil`, resolve within granted scope and render via `PDFThumbnailer`, else skip (as planned).
-- *Verify:* the W8 acceptance "paste from Reader → source block with a live thumbnail" passes; cache LRU/eviction exercised. Add a headless render guard (the `RenderProbe`/`DocumentRenderGuardTests` pattern over `PDFThumbnailer`) so a **blank** thumbnail fails a test, not just the eye. **Tier-2** (spans both apps + the Reader copy path). *Done:* pasted page-links show a rendered thumbnail; `PDFThumbnailer` has a production caller.
+**B4. Wire page-thumbnail rendering end-to-end.** — **SHIPPED 2026-09-21 (`W9.b4`).** — `04` S2/S4/S6.
+Reader's shared `ArchiveLinkThumbnailer` now supplies `PDFThumbnailer` to page and batch copy; it publishes
+the durable link first, then enriches the pasteboard only if it still owns it. It intentionally never
+materializes known-dataless files. Notes' `SourceBlockThumbnailRenderer` resolves only an exact path beneath
+an already-known root, holds and balances its own security scope, and renders an unthumbnailed pasted page
+into its app-owned cache. The editor immediately keeps the text-only source block and later replaces its
+stable placeholder in place, so a changed caret, typing, selection switch, or deletion cannot lose or misroute
+provenance. `PDFThumbnailer` itself now performs the PDFKit load under its dataless-materialization guard.
+
+- *Verification:* scratch-only Reader and Notes units pass; `ArchiveCore` package tests, all three macOS
+  builds, and Reader/ArchiveCore write-surface lint pass. `DocumentRenderGuardTests` decodes a copied
+  page-link payload and asserts nonblank pixels. Notes verifies exact-root rendering, renamed-path refusal,
+  and caret movement before hydration; ArchiveCore covers cache eviction. Independent Tier-2 review closed
+  the dataless, late-clipboard, and async-caret-loss findings. *Done:* pasted page links have an end-to-end rendered
+  thumbnail without widening filesystem authority.
 
 **B5. Consume `archivenotes://open` to select/raise the note.** — **MED** — `04` S5. `NotesDeepLinkRouter.pendingOpen`
 is published but nothing observes it, so an external `archivenotes://open?id=<uuid>` activates the app

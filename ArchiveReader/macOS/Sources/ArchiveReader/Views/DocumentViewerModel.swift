@@ -42,13 +42,20 @@ final class DocumentViewerModel: ObservableObject {
     /// "does not write zoom to defaults" and "has no find bar" are different facts about a viewer; a future
     /// non-persisting viewer that DOES render a find bar would silently inherit the wrong answer.
     let supportsFind: Bool
+    /// Shared renderer for the page-link payload. `nil` is an explicit degradation seam for tests;
+    /// production uses the app-owned cache actor below.
+    private let thumbnailer: PDFThumbnailer?
+    /// Makes an older thumbnail task unable to replace the clipboard after a newer archive-page copy.
+    private var archivePageLinkCopyGeneration = 0
 
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
     /// `supportsFind: false` → the view renders no find bar, so the find commands stay disabled.
-    init(persists: Bool = true, supportsFind: Bool = true) {
+    init(persists: Bool = true, supportsFind: Bool = true,
+         thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         leftController = PDFPaneController(key: "left", persists: persists)
         rightController = PDFPaneController(key: "right", persists: persists)
         self.supportsFind = supportsFind
+        self.thumbnailer = thumbnailer
     }
 
     /// Which pane keyboard focus / zoom acts on. ⌘↑/⌘↓ zoom this pane; ⌘⌥←/→ switch it.
@@ -324,7 +331,7 @@ final class DocumentViewerModel: ObservableObject {
         guard urls.indices.contains(index) else { return nil }
         return await ArchiveLinkWriter.pageLink(
             fileURL: urls[index], page: focusedPageNumber,
-            rootPath: target.rootPath, marker: target.marker, thumbnailer: nil
+            rootPath: target.rootPath, marker: target.marker, thumbnailer: thumbnailer
         )
     }
 
@@ -332,8 +339,26 @@ final class DocumentViewerModel: ObservableObject {
     /// `ArchiveLinkTarget` focused value rather than a `NavigationModel`, so the command is available in
     /// the document window too (W23.m4 defect 1).
     func copyArchivePageLink(target: ArchiveLinkTarget) {
+        guard urls.indices.contains(index) else { return }
+        // Snapshot the page at command time. Rendering is asynchronous, but a later document/page change
+        // must not silently turn the user's copied citation into whatever happens to be visible later.
+        let fileURL = urls[index]
+        let page = focusedPageNumber
+        let immediateItem = ArchiveLinkWriter.pageLinkWithoutThumbnail(
+            fileURL: fileURL, page: page, rootPath: target.rootPath, marker: target.marker
+        )
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.writeObjects([immediateItem])
+        let expectedChangeCount = NSPasteboard.general.changeCount
+        archivePageLinkCopyGeneration &+= 1
+        let generation = archivePageLinkCopyGeneration
         Task {
-            guard let item = await archivePageLink(target: target) else { return }
+            let item = await ArchiveLinkWriter.pageLink(
+                fileURL: fileURL, page: page, rootPath: target.rootPath, marker: target.marker,
+                thumbnailer: thumbnailer
+            )
+            guard archivePageLinkCopyGeneration == generation,
+                  NSPasteboard.general.changeCount == expectedChangeCount else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.writeObjects([item])
         }
