@@ -94,13 +94,11 @@ MAXRUN="${AUTONOMOUS_MAXRUN:-10800}"      # OUTER wall-clock backstop (3 h). The
                                           # 2026-07-12 so healthy long sessions (Notes waves ran 30–78 min)
                                           # stop getting guillotined by the clock alone.
 BUDGET="${AUTONOMOUS_BUDGET:-30}"         # --max-budget-usd per resume session
-EFFORT="${AUTONOMOUS_EFFORT:-xhigh}"      # reasoning effort for every resume session (low|medium|high|xhigh|max).
-                                          # xhigh, not max, since 2026-07-31 (owner decision): xhigh is the
-                                          # documented sweet spot for coding/agentic work and Claude Code's own
-                                          # default, while max tends to overthink for diminishing returns and
-                                          # burns the usage window faster — on this laptop that costs COMPLETED
-                                          # ITEMS per window, not quality. `xhigh` was missing from the old
-                                          # low|medium|high|max list above; `claude --help` accepts all five.
+EFFORT="${AUTONOMOUS_EFFORT:-medium}"     # reasoning effort for every resume session (low|medium|high|xhigh|max).
+                                          # medium since 2026-09-24 (owner decision), replacing xhigh
+                                          # (2026-07-31), which had replaced max. Raise it for one hard run
+                                          # with AUTONOMOUS_EFFORT=high|xhigh; subagent effort is still the
+                                          # session's per-task choice (resume prompt, Efficiency block).
                                           # NOTE both this and --model are resolved BEFORE the session picks its
                                           # item (resume prompt STEP 2), so per-ITEM model/effort is not
                                           # expressible here — it would require moving item selection out of the

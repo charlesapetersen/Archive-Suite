@@ -638,8 +638,8 @@ release work for the owner* — is the primary control.
 
 ## Model & effort — one fixed choice, plus per-task subagent sizing (2026-07-31)
 
-Every resume session launches as **`--model opus --fallback-model sonnet --effort xhigh`**
-(`EFFORT` = `AUTONOMOUS_EFFORT`, default `xhigh`; the CLI accepts `low|medium|high|xhigh|max`).
+Every resume session launches as **`--model opus --fallback-model sonnet --effort medium`**
+(`EFFORT` = `AUTONOMOUS_EFFORT`, default `medium` since 2026-09-24; the CLI accepts `low|medium|high|xhigh|max`).
 
 **Why the session's own model/effort is FIXED, not chosen per queue item.** Both flags are resolved when the
 process launches — *before* the session picks its item, which happens inside the session at resume-prompt
@@ -652,7 +652,12 @@ file-writing tag paths, the tag/PDF SPEC, actor isolation and shared `ArchiveCor
 decides what's enough — not a cost heuristic. `sonnet` stays what it already was: the *overload* fallback, the
 one model switch worth automating.
 
-**Why `xhigh` and not `max`.** `xhigh` is the documented sweet spot for coding/agentic work and Claude Code's
+**Why `medium` (owner, 2026-09-24).** The owner set the default to Opus at medium effort. The paragraph below
+is the earlier reasoning for `xhigh` over `max` (2026-07-31), kept as the record; it applies with more force
+now, since effort is paid in completed items per usage window. Raise it for a single hard run with
+`AUTONOMOUS_EFFORT=high` or `xhigh`.
+
+*Historical — why `xhigh` and not `max` (2026-07-31).* `xhigh` is the documented sweet spot for coding/agentic work and Claude Code's
 own default; `max` tends to overthink for diminishing returns *and* reaches the usage cap sooner. On this
 laptop the cost of `max` was therefore paid in **completed items per usage window**, not collected in quality.
 (`xhigh` was also missing from this file's and the script's old `low|medium|high|max` lists — it postdates
@@ -686,7 +691,7 @@ autonomous run for a different repo:
    adjust the repo path + any per-item notes.
 4. **Tune** `AUTONOMOUS_INTERVAL` / `STALE` / `MAXRUN` / `BUDGET` / `EFFORT` and the `ALLOW`/`DENY` tool lists
    for the project's risk surface (keep the destructive denylist; deny always wins over allow). `EFFORT`
-   defaults to **`xhigh`** — see *Model & effort* below for why that, and why the model is fixed.
+   defaults to **`medium`** — see *Model & effort* below for why that, and why the model is fixed.
 5. **Start** it detached (the standard way — `( nohup … & )`, under the launching session's grant); the
    per-project `.plist` (`Label` = `com.<LABEL>.autonomous`) is an optional reboot-durable extra, not required.
 

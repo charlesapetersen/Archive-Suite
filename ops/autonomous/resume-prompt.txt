@@ -256,8 +256,8 @@ ITEM-SPECIFIC NOTES:
 EFFICIENCY + SUBAGENT SIZING: right-size subagents, read narrowly, keep this session lean — the goal is one
   solid committed increment, not maximal output. Don't spawn an agent for a single known-location lookup, and
   never re-run a search you already delegated.
-  YOUR OWN model and effort are fixed before you start (opus, at the effort the daemon passed — default `xhigh`
-  since 2026-07-31; you cannot change either mid-session). Each SUBAGENT's is YOURS TO CHOOSE, per task, and the
+  YOUR OWN model and effort are fixed before you start (opus, at the effort the daemon passed — default `medium`
+  since 2026-09-24; you cannot change either mid-session). Each SUBAGENT's is YOURS TO CHOOSE, per task, and the
   owner wants you to choose it deliberately. Optimize for the BEST OUTCOME on this item, not the cheapest run:
   `--max-budget-usd` already bounds the cost, so under-powering a verification agent buys you nothing you're
   allowed to want and can let a bug through into a path with no undo.
