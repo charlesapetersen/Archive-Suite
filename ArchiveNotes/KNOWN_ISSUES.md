@@ -568,6 +568,12 @@ the cache-hit guards, which is what shows those guards are not vacuous. All reve
 and `grep NEUTER` empty before shipping. **738/738** `ArchiveNotesTests` green (was 733), clean build, no
 new warnings.
 
+**Test hardening (W23.m11-flake, 2026-09-25):** two post-render assertions also required the stale sentinel
+to remain in `NSCache`. That retention is outside the behavior under test and can vary under memory pressure.
+Both tests keep their pre-render live-entry guard, then judge only the rendered image's identity and pixels.
+Three consecutive full Notes unit-suite runs passed (874 tests in 88 suites each); no cache verdict depends on
+post-render retention.
+
 ## ✅ FIXED (W23.m10) — a failed `organization.json` write was reported as a saved organization change
 **2026-07-30.** `organization.json` is the **durable mirror** the folder graph is rebuilt from after a DB
 wipe or a move to another Mac (§4/§11). `OrganizationFile.export` swallowed both its encode and its atomic

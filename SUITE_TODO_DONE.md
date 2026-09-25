@@ -4261,6 +4261,13 @@ explain why not.
   the app's back → nothing for the VM lane to see. Write-up: `ArchiveNotes/KNOWN_ISSUES.md` (folded into the
   m11 entry, whose now-false "no disk I/O on the hit path" cost claim is corrected there).
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/InlineImageAttachment.swift | Tier-1 | XS | LOW
+- [x] **W23.m11-flake — two `InlineImageCacheKeyTests` assertions depend on `NSCache` not evicting [XS · MED · gate].**
+  **SHIPPED 2026-09-25 (this commit).** Removed the two post-render checks that depended on an old thumbnail
+  remaining in the app-wide cache. Each test still proves its sentinel was present before the render, then
+  checks the rendered image identity and pixels to prove the old key was ignored or the new bytes were read.
+  **Verification:** clean Notes Debug build; three full Notes unit smoke runs passed, each running all 874
+  tests in 88 suites. The checks no longer depend on memory-pressure eviction timing.
+  | files: ArchiveNotes/macOS/Tests/ArchiveNotesTests/InlineImageCacheKeyTests.swift, ArchiveNotes/KNOWN_ISSUES.md, SUITE_TODO.md | XS | med | done
 - [x] **W23.m12 — a FAILED move-to-Trash still removes the surviving note from the index [S · MED · note
   disappears].** `Core/NotesModel.swift` → `trashItems`. It **logged** each `NoteStore.delete` failure but then
   deleted **every requested ID** from `NotesIndex` and reloaded the list. A note whose directory is still on

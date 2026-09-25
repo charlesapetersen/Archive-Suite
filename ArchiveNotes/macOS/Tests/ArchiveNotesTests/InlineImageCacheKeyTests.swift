@@ -207,8 +207,8 @@ struct InlineImageCacheKeyTests {
         let rendered = renderedImage("![](\(reference))", fx.assetStore(for: fx.itemA))
         #expect(rendered !== sentinel, "the reference-keyed entry must not be consulted")
         #expect(dominantChannel(of: rendered) == "B", "the item's own blue bytes must be decoded")
-        // The foreign entry is left exactly as it was — the new key writes elsewhere.
-        #expect(InlineImageAttachment.thumbnailCache.object(forKey: reference as NSString) === sentinel)
+        // The render result proves the old key was not consulted. Do not assert that NSCache retains
+        // the unrelated sentinel after rendering: retention is allowed to vary under memory pressure.
     }
 
     @Test("Different thumbnail sizes of one file do not alias onto each other")
@@ -371,11 +371,8 @@ struct InlineImageCacheKeyTests {
                 "the editor must show the bytes now on disk, not the thumbnail it decoded earlier")
         #expect(after !== before)
 
-        // Non-vacuity: the old thumbnail is still a live, retrievable entry — the fix is that its key
-        // no longer describes this file, not that anything purged it. Pre-fix, the key was the path
-        // alone, so this same entry is exactly what the render above would have been handed.
-        #expect(InlineImageAttachment.thumbnailCache.object(forKey: staleKey) === before,
-                "the stale entry must be keyed past, not evicted")
+        // The blue result and identity check above prove the stale thumbnail was not served. NSCache
+        // may evict the old entry at any time, so its post-render retention is not part of the verdict.
     }
 
     @Test("The replacement's thumbnail is filed under the new identity, so it caches too")

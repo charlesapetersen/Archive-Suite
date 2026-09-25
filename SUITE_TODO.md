@@ -349,17 +349,6 @@ owner's irreplaceable corpus as missing files). The rest sit in TIER 6: real, ch
 them. ⛔ Do NOT restore a "drains first" marker here without a fresh owner decision — the argument that Wave 23
 is drained has already been made to him and he kept the review pause anyway.
 
-- [ ] **W23.m11-flake — two `InlineImageCacheKeyTests` assertions depend on `NSCache` not evicting [XS · MED · gate].**
-  Filed 2026-09-24. The health gate at `26928f2` went RED on `notes` with exactly two failures:
-  `theOldReferenceShapedKeyNoLongerHits` (line 211) and `anExternallyReplacedAssetRendersItsNewBytes` (line 377).
-  Both fail on a *retention* check made after a render: that the planted entry is still in the app-wide
-  `InlineImageAttachment.thumbnailCache`. The same command then passed 3/3 as a whole suite (874 tests), and
-  the suite alone passed 3/3. The likely cause is `NSCache` evicting under memory pressure (the machine had
-  about 400 MB free during the run). That is inferred, not reproduced. The risk is concrete: the daemon parks
-  on two consecutive REDs. Fix: drop or restate the two retention checks so no verdict depends on eviction
-  timing (for example, assert only that the render did not return the planted object), keeping each test
-  non-vacuous. Run the full Notes unit suite several times to confirm.
-
 **Source.** An owner-commissioned static full-suite review by Codex, 2026-07-29, against remote `main`
 `bfcb38e`. Read-only: nothing was fixed, built, or run. Scope = Processor (macOS + Android; iOS only for severe
 parity), Reader, Notes, `packages/ArchiveCore`, suite scripts/release tooling. 24 findings survived its own
