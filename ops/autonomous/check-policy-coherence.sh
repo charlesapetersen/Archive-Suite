@@ -48,7 +48,7 @@ TARGETS=(
   ArchiveProcessor/CLAUDE.md ArchiveProcessor/AGENTS.md ArchiveProcessor/KNOWN_ISSUES.md
   ArchiveReader/CLAUDE.md ArchiveReader/AGENTS.md ArchiveReader/KNOWN_ISSUES.md
   ArchiveNotes/CLAUDE.md ArchiveNotes/AGENTS.md ArchiveNotes/KNOWN_ISSUES.md
-  ops/autonomous/README.md ops/autonomous/resume-prompt.txt
+  ops/autonomous/README.md ops/autonomous/resume-prompt.txt ops/autonomous/CODEX_RUNBOOK.md
   ArchiveProcessor/scripts/E2E-PHONE-MAC.md
 )
 # Absolute, because it never lives in a worktree.

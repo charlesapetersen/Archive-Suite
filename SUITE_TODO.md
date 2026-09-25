@@ -968,7 +968,20 @@ launch safeguards; the gate rotates one route per run.
   `~/Desktop/Google Drive/Archival Photos/`, a copy of the `.dtBase2`, a fresh output store; resolve §9 open
   decisions. Next step = **DTI-0 spike & ground-truth** on a DB copy. | HIGH risk · Tier-2 · **needs:** owner
   + corpus-safety
-- [ ] **W24.jpeg1 — Reader/Notes: PDF + JPEG dual image reference** (blocked-on: W26.walk2, W26.verify)
+- [ ] **W24.jpeg1a — the JPEG partner index, in ArchiveCore [M · Tier-2 · scratch trees only].** First slice of
+  `W24.jpeg1` (split 2026-09-24 so each session has a completion point; the design is the parent entry below,
+  read it first). Settle the storage sub-decision (parent design §2, last bullet) and record the choice in this
+  entry's DONE write-up. Build the walk-built `stem → [path]` index with collection context over a JPEGS
+  subtree, the three-step resolution (mirrored subpath → indexed stem → refuse when ambiguous), and the
+  clean-pass rule (partner *unknown* on an incomplete walk, never "none"). Unit tests on generated scratch trees
+  that reproduce the relocated, mirrored, none and ambiguous cases. No Reader UI, no `DurableLink` change.
+- [ ] **W24.jpeg1b — `DurableLink` pins the resolved JPEG path [S-M · Tier-2 · shared ArchiveCore]**
+  (blocked-on: W24.jpeg1a). Second slice of `W24.jpeg1`; parent design §3. The JPEG field is optional because
+  9.3% of PDFs have no partner, not for compatibility: no parser for older link shapes (no production
+  material). Rebuild all three apps' test bundles; run `ArchiveReader/scripts/lint-write-surface.sh`.
+- [ ] **W24.jpeg1 — Reader/Notes: PDF + JPEG dual image reference** (blocked-on: W24.jpeg1a, W24.jpeg1b)
+  **Since the 2026-09-24 split this entry is the design record plus the last slice:** raising Reader's root
+  (§1), the viewer switch and its per-document preference (§4), and the render-guard and VM verification.
   (owner, 2026-07-17; **design decided + premise corrected by a full corpus audit 2026-07-29**; tagged
   `W24.jpeg1` on 2026-08-06 by `W26.reinfect` — it had no tag, so `W26.reinfect` and the despotlight plan both
   had to cite it by a line number that had already gone stale by 336 lines).
@@ -1034,7 +1047,8 @@ launch safeguards; the gate rotates one route per run.
      re-derivable, so a citation must pin what was actually cited. ⚠️ This changes `DurableLink`
      (`packages/ArchiveCore/Sources/ArchiveCore/Links/DurableLink.swift`) — a shared ArchiveCore type + cross-app
      URL contract → **Tier-2** (de-gated 2026-08-13), and it must rebuild all three app test bundles.
-     Old links without the JPEG field must keep parsing (additive/optional).
+     No compatibility parsing for links without the JPEG field (the no-production-material premise, 2026-08-01,
+     which the owner has since restated to Codex). The field is optional only because some PDFs have no partner.
   4. **Switch UI:** View-menu item + keyboard shortcut, **no** toolbar button; the choice is **sticky per
      document** (needs a small persisted per-file preference store).
   Also handle: PDFs with no partner (9.3%) → hide the switch entirely; case-insensitive extension matching.
@@ -1205,6 +1219,9 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
   dropped from BOTH guards before either could compare it. It was the 28th item invisible to the daemon and
   neither guard could ever have said so — see `W31.handoff-fp2`. **Scope it before working it:** its only
   surviving sub-bullet is DROPPED (below), so what "unified storage path" now means is undecided.
+  **Moved to the plan's HOLD QUEUE 2026-09-24.** It had reached the head of the WORK QUEUE, where every daemon
+  session would have spent its item guessing a scope that only the owner can set. The owner either defines it
+  or closes it.
   - ~~Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**~~ — **DROPPED
     (owner 2026-07-16; R13d shipped the removal).** Nothing consumes or emits the old marker, so there is
     nothing to hide, back-fill, or stamp. This also removes the only reason for a corpus-wide tag back-fill —

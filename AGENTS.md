@@ -20,8 +20,8 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
   **Only ever touch worktrees you created** — another agent's uncommitted WIP is not yours to clean up.
   *Superseded 2026-07-29:* the long-standing "never touch the Codex worktree
   `~/Documents/GPT/archive-suite-processor-fixes`" instruction is **retired** — the owner asked for it to be
-  removed and it is gone (its work was preserved first; see §"Working the to-do list as an external agent" →
-  *Preserved work*). Don't go looking for it. The standing rule is unchanged and matters more than the
+  removed and it is gone (its work was preserved first; see §"Working the to-do list as an external agent",
+  rule 6). Don't go looking for it. The standing rule is unchanged and matters more than the
   exception: if you find a stray worktree carrying uncommitted work, **preserve it before removing anything**,
   and **never `--force` past a git refusal**.
 - **After any pull/switch, `xcodegen generate`** (or the app's `bootstrap.sh`) — the `.xcodeproj` is gitignored.
@@ -37,91 +37,35 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 
 ## Working the to-do list as an external agent (Codex et al.) — finish the handoff
 
-The owner sometimes turns the autonomous daemon **off** and hands a batch of `SUITE_TODO.md` items to an
-external agent (Codex) instead. If that's you: the coding conventions above all apply unchanged, **and** there
-is a handoff you must complete, because this repo has state the daemon depends on that a normal
-`commit && push` does not touch. Every item below is a real problem that actually happened on the 2026-07-29
-handoff and had to be repaired by hand afterwards. **None of it is optional, and none of it is inferable from
-the tracked files alone.**
+The owner sometimes stops the daemon and has an external agent (Codex) work the queue instead. **If that is
+you, follow [`ops/autonomous/CODEX_RUNBOOK.md`](ops/autonomous/CODEX_RUNBOOK.md)**: it is the whole loop in
+order (pick, isolate, verify, ship, record, hand off, next), with a starting prompt for the owner. The
+conventions above apply unchanged. The daemon also depends on state that a normal `commit && push` does not
+touch, so these rules are not optional. Each one repairs something that actually went wrong:
 
-**1. `git push` is not "done". Advance the PRIMARY checkout too.**
-You will be working in your own worktree (correctly). But the daemon reads `.maintenance/AUTONOMOUS_PLAN.md`
-**from the primary checkout** and measures code-review deltas against **the primary checkout's `HEAD`**. Pushing
-leaves `origin/main` ahead of it. So after your final push:
-```bash
-# Resolve the PRIMARY checkout from wherever you are — a worktree's common dir points at it. Do NOT write
-# a bare `cd "$REPO"`: with REPO unset that is `cd ""`, which bash and zsh treat as a silent no-op (rc 0),
-# so the merge would "succeed" in your worktree and leave the primary checkout exactly as stale as before.
-primary="$(dirname "$(git rev-parse --git-common-dir)")"
-git -C "$primary" merge --ff-only origin/main
-```
-*(2026-07-29: `origin/main` was at `62a10d1` while the primary checkout still sat at `cb948c6`. Also note
-`ops/autonomous/daemon.sh` installs the daemon scripts from **that working tree**, not from `origin/main` — so a
-lagging primary checkout silently re-installs stale daemon scripts when the owner restarts it.)*
-
-**2. Tick the daemon's plan, not just `SUITE_TODO.md`.**
-`.maintenance/` is **gitignored**, so it is invisible to a normal diff and easy to miss — but
-`ops/autonomous/next-queue-item.sh` walks the **plan's** `## WORK QUEUE`, and applies "a `[ ]` anywhere wins".
-For every item you finish, set its plan checkbox to `[x]` + the sha as well. Consequences of skipping it:
-- the daemon **re-does finished work** (it happened three times: `W15.tu1`, `W15.tu4`, `W16.lan2`), and
-- every downstream `(blocked-on: <that tag>)` item is **falsely reported blocked**, stalling the whole chain.
-
-**3. A new wave in `SUITE_TODO.md` is INVISIBLE to the daemon until it's mirrored into the plan's queue.**
-Adding items to `SUITE_TODO.md` alone does **not** put them in the daemon's queue — it walks the plan. Wave 22
-sat unreachable this way and would have been skipped entirely, with no error. Mirror new items into the plan's
-`## WORK QUEUE` as one-liners ("full spec in `SUITE_TODO.md` §… — read that first"), keeping the **tags
-byte-identical** so `blocked-on` resolves.
-
-**4. Irreversible-path findings are gated by TIER-2, not by an owner signature — see §*Gating baseline*.**
-The old rule here required a per-item entry in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md) for
-anything touching `Capture/`·`Net/`, finalize/manifest, file-writing tag/output or `SPEC/tag-format.md`. **That
-requirement was lifted by the owner on 2026-08-13.** Do not re-impose it, and do not leave such an item for
-the owner on those grounds. The full replacement policy, and the two things that ARE still owner-gated, are in
-§*Gating baseline* below. Existing grants in `OWNER_AUTHORIZATIONS.md` remain a permanent record and their ⛔
-constraints still bind the items they name.
-
-**5. Filing a review: queue it, don't just write a report.**
-A review report on its own is not tracked work. Turn each confirmed finding into a `[ ]` item in
-`SUITE_TODO.md` (steps 3 and 4 then apply), and archive the report itself under the gitignored `old/` with a
-note saying it was transcribed. Include the **baseline sha** you reviewed — line numbers go stale fast, so also
-name the **function/symbol** for every cite. *(The 2026-07-29 report's line numbers were already wrong on
-arrival: `W16.cfg*` had rewritten the same files.)*
-
-**6. Checkpoint, and don't leave a divergent worktree behind.**
-If you may run out of credits/context mid-task, **commit and push at each green checkpoint** — only the final
-commit flips a checkbox. Then **remove your worktree**. A worktree left with uncommitted work is very close to
-lost work: the one removed on 2026-07-29 held **~2,900 uncommitted lines on top of 8 unpushed commits**, sat
-untouched for 12 days, and had fallen **76 commits** behind `main`.
-
-**Preserved work (for reference, not for merging).** That worktree's content was preserved before removal, and
-one piece is **live prior art**: a `PDFGenerator.generateRequiringEmbeddedImage()` + `PDFError
-.imageEmbeddingFailed` pair that keeps the deliberate placeholder page for Process Files while making the Live
-Capture path *throw*, so finalize can't retire a raw source against a placeholder-only PDF. That is the fix now
-queued as **`W23.h5`**. Two copies, both outside `main`:
-- branch **`wt/codex-processor-bugfixes-20260712`** (9 commits, work dated 2026-07-17), and
-- a patch series in gitignored **`old/codex-processor-fixes-20260717/`**.
-
-Re-derive against current `main` — do not merge it. Everything else in it is probably superseded (the
-run-config work was re-implemented as `W16.cfg1`–`cfg5`), but "probably" is why it was kept.
-
-**7. Run the gate, don't re-read the list — `ops/autonomous/check-handoff.sh`.**
-Items 1–6 are a prose checklist, and a checklist is not a gate. One command checks all of it, fetches remote
-refs, edits no worktree, and prints what the daemon would take next. **A clean run is the definition of "handed
-off".** Not yet a
-`health-gate.sh` step — that is `W31.handoff-gate`.
-
-**⚠️ The mirroring failure is NOT an external-agent problem.** On 2026-08-13, 27 open `SUITE_TODO` items had
-no checkbox line anywhere in the plan — invisible to `next-queue-item.sh`. Attribution (`git log -S<tag> --
-SUITE_TODO.md`) put **every one in a commit in this project's own convention**, three from `c0be2cc` alone. The
-pattern is a session closing a parent item, filing the `-fu` it just found, and not mirroring it — filing is
-exactly when the omission happens, because the item you just wrote feels handled. **So: whenever you FILE an
-item, mirror it in the same commit** — daemon, interactive session or external agent alike.
-
-**What the 2026-08-13 Codex cycle actually got wrong, for calibration:** one thing, and not the trackers. It
-left `W19.q2` as **107 lines of green, passing, uncommitted work with zero commits**. A *stray* worktree is
-tolerable and the owner has said so; an **uncommitted** one is one power cut from lost work, and it collided
-with the daemon, which would have picked the same item off the queue and redone it. Checkpoint-commit at every
-green point — that is the whole lesson.
+1. **`git push` is not "done". Advance the PRIMARY checkout too** (`git -C "$primary" merge --ff-only
+   origin/main`, with `primary="$(dirname "$(git rev-parse --git-common-dir)")"`; never a bare `cd "$REPO"`,
+   which is a silent no-op when the variable is unset). The daemon reads the plan from the primary checkout and
+   `daemon.sh` installs its scripts from that working tree, so a lagging primary re-installs stale scripts.
+2. **Tick the daemon's plan, not just `SUITE_TODO.md`.** `.maintenance/` is gitignored, and
+   `next-queue-item.sh` walks the plan's `## WORK QUEUE` with "a `[ ]` anywhere wins". Unticked, the daemon
+   redoes finished work (`W15.tu1`, `W15.tu4`, `W16.lan2`) and every dependent reads as blocked.
+3. **An item in `SUITE_TODO.md` is invisible to the daemon until it is mirrored into the plan's queue**, as a
+   one-liner with the tag byte-identical. On 2026-08-13, 27 open items had no plan line, and attribution put
+   every one in a commit in this project's own convention, not an external agent's. The omission happens at
+   filing time, so **whenever you FILE an item, mirror it in the same commit**, whoever you are.
+4. **Irreversible-path findings are gated by TIER-2, not by an owner signature** (lifted 2026-08-13; see
+   §*Gating baseline*). Do not re-impose the old per-item rule. Existing grants in
+   [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md) stay a record and their ⛔ constraints still bind.
+5. **A review is queued, not just reported.** Each confirmed finding becomes a `[ ]` item (rule 3 applies);
+   cite the baseline sha and the function/symbol, since line numbers go stale; archive the report under `old/`.
+6. **Checkpoint-commit at every green point, and remove your worktree.** Uncommitted work is the one thing
+   actually lost here: a worktree removed on 2026-07-29 held ~2,900 uncommitted lines, and on 2026-08-13
+   `W19.q2` sat as 107 passing, uncommitted lines that collided with the daemon. (That 2026-07-29 work is kept
+   on branch `wt/codex-processor-bugfixes-20260712` and in `old/codex-processor-fixes-20260717/`; its live
+   piece shipped as `W23.h5`. Do not merge it.)
+7. **`ops/autonomous/check-handoff.sh` is the definition of "handed off".** It checks rules 1–3 and 6 and
+   prints what the daemon would take next; it is also wired into `health-gate.sh` (`W31.handoff-gate`).
 
 ## Gating baseline — TIER-2 IS THE GATE (owner, 2026-08-13)
 
