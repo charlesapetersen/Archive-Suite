@@ -8072,8 +8072,23 @@ explain why not.
   status. M1's 0 RED is the same priced view→model gap fu9/fu9-fu1 recorded: nothing headless reads a `View`, so
   `live.clear` / `live.finish` identifiers were added for `W21.vmgui-d` to press.
   Two residuals were filed rather than guessed at: **`W3.cap-r3-fu12-fu1`** (Clear's label/confirmation gap,
-  resolved in `950e639`) and **`W3.cap-r3-fu12-fu2`** (stale staging recovery after Clear; implementation is
-  in progress, with required Tier-2 E2E still pending). | Capture/Views | Tier-2
+  resolved in `950e639`) and **`W3.cap-r3-fu12-fu2`** (stale staging recovery after Clear, resolved in this
+  commit after the Tier-2 E2E and scratch recovery checks passed). | Capture/Views | Tier-2
+
+- [x] **W3.cap-r3-fu12-fu2 — ✅ SHIPPED 2026-09-26 (this commit).** Clear now keeps source filenames in its
+  committed capture-manifest journal until their recoverable move to Trash completes. Launch selects a committed
+  journal even with no filed-group ledger and finishes cleanup before Live vs. Stage-for-later processing is
+  chosen. Tier-2 verification: Processor Debug build succeeded; `test-recovery.sh` passed all checks, including
+  a committed Clear with no filed groups; the three-fixture headless phone↔Mac E2E passed token and year
+  assertions. The earlier off-screen Processor UI suite passed 6 tests. Independent review of baseline `31afea2`
+  found the journal gap; it is fixed and independently re-reviewed. | Capture | Tier-2
+
+- [x] **W3.cap-r3-fu12-fu2.review-committed-clear — ✅ SHIPPED 2026-09-26 (this commit).** Archived the
+  independently confirmed P2 crash-recovery finding, then fixed it in `CaptureSession.commitPreparedClear`,
+  `latestUnprocessedSession`, and launch cleanup. The regression creates a committed/no-filed-groups manifest,
+  proves launch selects that exact session, and verifies its source leaves the Captured roster and journal.
+  Re-review found no remaining blocker under the successful atomic staging-write ordering; power-loss storage
+  rollback across the two manifests was not simulated. | Capture | Tier-2
 
 - [x] **W3.cap-r3-fu12-fu1 — ✅ SHIPPED 2026-09-26 (this commit).** After the emptied-pane arm made Clear
   reachable beside the free "Cancel finish" action, its label still sounded harmless and one click discarded

@@ -2453,7 +2453,7 @@ enum LiveCaptureRecoveryTestDriver {
                     let stageData = try? Data(contentsOf: stageURL)
                     let stageObject = stageData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
                     let stagedRows = stageObject?["staged"] as? [Any]
-                    committedClearBeforeTrash = (decoded?.entries.isEmpty == true)
+                    committedClearBeforeTrash = (Set(decoded?.entries.map(\.name) ?? []) == Set(clSources.map(\.lastPathComponent)))
                         && decoded?.filed.contains("already-filed") == true
                         && stagedRows?.isEmpty == true
                         && (stageObject?["clearToken"] as? String) == decoded?.clearToken
@@ -2486,7 +2486,7 @@ enum LiveCaptureRecoveryTestDriver {
                     let stageData = try? Data(contentsOf: stageURL)
                     let stageObject = stageData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
                     let stagedRows = stageObject?["staged"] as? [Any]
-                    committedClearBeforeTrash = (decoded?.entries.isEmpty == true)
+                    committedClearBeforeTrash = (Set(decoded?.entries.map(\.name) ?? []) == Set(clSources.map(\.lastPathComponent)))
                         && decoded?.filed.contains("already-filed") == true
                         && stagedRows?.isEmpty == true
                         && (stageObject?["clearToken"] as? String) == decoded?.clearToken
@@ -3432,6 +3432,43 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // --- W3.cap-r3-fu12-fu2 review regression: a crash after the committed capture-manifest write but
+        // before finishPreparedClear must leave enough durable state for launch to complete source cleanup.
+        // No filed groups are present, matching the adversarial case that used to make the session invisible.
+        if isolatedBackup {
+            let journalFolder = CaptureSession.backupRoot
+                .appendingPathComponent("9999-12-31T23-59-59Z", isDirectory: true)
+            try? fm.createDirectory(at: journalFolder, withIntermediateDirectories: true)
+            let source = journalFolder.appendingPathComponent("00001-CLEAR-CRASH.jpg")
+            let manifestURL = journalFolder.appendingPathComponent("manifest.json")
+            let token = "recovery-test-clear-token"
+            let entry = CaptureSession.ManifestEntry(name: source.lastPathComponent, groupId: "CLEAR-CRASH",
+                                                     seq: 1, type: CaptureGroupType.document.rawValue,
+                                                     quality: nil, year: nil, month: nil)
+            let committed = CaptureSession.SessionManifest(photos: [entry], completedDocGroups: [],
+                                                           clearPhase: "committed", clearToken: token)
+            do {
+                try Data("synthetic committed-clear source".utf8).write(to: source, options: .atomic)
+                try JSONEncoder().encode(committed).write(to: manifestURL, options: .atomic)
+            } catch {
+                check("committed Clear crash fixture is writable", false)
+            }
+            let selected = CaptureSession.latestUnprocessedSession(under: CaptureSession.backupRoot)
+            check("a committed Clear without filed groups is selected with its source cleanup journal",
+                  selected?.folder.standardizedFileURL == journalFolder.standardizedFileURL
+                      && selected?.photos.count == 1 && selected?.filed.isEmpty == true
+                      && selected?.clearPhase == "committed")
+
+            let resumed = CaptureSession()
+            let afterData = try? Data(contentsOf: manifestURL)
+            let after = afterData.flatMap { CaptureSession.decodeManifest($0) }
+            check("launch completes committed Clear and removes the source from the Captured roster",
+                  resumed.incomingFolder.standardizedFileURL == journalFolder.standardizedFileURL
+                      && resumed.photos.isEmpty && resumed.clearPhase == nil
+                      && !fm.fileExists(atPath: source.path) && after?.clearPhase == nil
+                      && after?.entries.isEmpty == true)
         }
 
         // --- Test 26 (W3.cap-r3-fu8): the CURRENT manifest-resume path is the third writer of a status row.

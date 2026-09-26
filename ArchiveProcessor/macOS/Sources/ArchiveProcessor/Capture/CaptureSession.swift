@@ -481,6 +481,9 @@ final class CaptureSession: ObservableObject {
             statusMessage = "Recovery: \(strandedSessionCount) prior \(noun) staged output in the Backup Folder."
             NSLog("Live Capture recovery: \(strandedSessionCount) prior \(noun) staged output in the Backup Folder.")
         }
+        // A committed Clear means staging is already durably empty. Finish moving its journaled source photos
+        // to recoverable Trash on launch, including in Stage-for-later mode where no Live processor loads it.
+        if clearPhase == "committed" { finishPreparedClear() }
     }
 
     // MARK: - Server lifecycle
@@ -713,12 +716,13 @@ final class CaptureSession: ObservableObject {
         return didWrite
     }
 
-    /// Commit only after the live staging manifest is durably empty. Keep the filed-group ledger so a late
-    /// phone retry remains rejected even if the app crashes during source cleanup.
+    /// Commit only after the live staging manifest is durably empty. Keep the source photo entries as a
+    /// cleanup journal until they have been moved to Trash; a relaunch can then finish the requested Clear.
+    /// Keep the filed-group ledger too, so a late phone retry remains rejected during cleanup.
     @discardableResult
     func commitPreparedClear(token: String) -> Bool {
         guard clearPhase == "prepared", clearToken == token else { return false }
-        let didWrite = writeManifest(photos: [], completed: [], resolved: [], macTags: [:],
+        let didWrite = writeManifest(completed: [], resolved: [], macTags: [:],
                                      clearPhase: "committed", clearToken: token)
         if didWrite { clearPhase = "committed" }
         return didWrite
@@ -1075,7 +1079,8 @@ final class CaptureSession: ObservableObject {
             }
             // With no surviving sources, the durable ledger still marks this as the active session. Restore
             // its epoch so a late phone retry is checked against the same set after relaunch.
-            if !restored.isEmpty || !decoded.filed.isEmpty || decoded.clearPhase == "prepared" {
+            if !restored.isEmpty || !decoded.filed.isEmpty
+                || decoded.clearPhase == "prepared" || decoded.clearPhase == "committed" {
                 restored.sort { $0.seq < $1.seq }
                 return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags,
                         decoded.filed, decoded.clearPhase, decoded.clearToken)

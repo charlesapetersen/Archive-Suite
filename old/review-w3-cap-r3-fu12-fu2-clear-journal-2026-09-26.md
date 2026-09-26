@@ -16,3 +16,13 @@ Baseline: `31afea2` (`fix(processor): W3.cap-r3-fu12-fu2 — coordinate Clear re
 ## Review scope and result
 
 Reviewed the W3.cap-r3-fu12-fu2 Clear transaction, `CaptureSession.commitPreparedClear`, `CaptureSession.finishPreparedClear`, `CaptureSession.latestUnprocessedSession`, and `LiveCaptureProcessor.loadStagingManifest`. The staging-token match, rollback path, failed/unverified-manifest preservation, retry refusal, and `_processed` retention were sound. No permanent data loss was found; the gap left originals Finder-visible but stranded. The regression test should cover launch-time selection and cleanup with no filed groups.
+
+## Resolution
+
+The fix retains the original photo entries in the committed capture manifest until recoverable cleanup is
+complete, includes committed journals in `latestUnprocessedSession`, and calls `finishPreparedClear` on launch
+before Live/Stage-for-later mode selection. The scratch regression verifies a committed journal with no filed
+groups is selected and that launch retires its source and clears the manifest. Processor Debug build,
+`test-recovery.sh`, and the three-fixture phone↔Mac E2E all passed after the fix. An independent re-review found
+no remaining blocker under the successful atomic staging-manifest write ordering; power-loss rollback across
+the separate manifests was not simulated.

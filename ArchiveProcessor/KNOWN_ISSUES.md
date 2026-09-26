@@ -1721,19 +1721,22 @@ not the `LiveCaptureProcessor`'s staged/segment list that drives the Processing 
 (or reconcile) the processor's segment state so both panes clear as one. `Views/LiveCaptureView.swift`,
 `Capture/LiveCaptureProcessor.swift`, `Capture/CaptureSession.swift`.
 
-**Fix implemented locally; Tier-2 verification pending (2026-09-26).** Clear first writes a `prepared` capture-manifest phase while retaining
-the original photos. After the staging manifest is atomically emptied, it commits an empty capture roster while
-keeping filed-group IDs, then moves photos to recoverable Trash and clears the Captured and Processing panes.
-Recovery rolls back a pre-commit interruption to the original session and preserves the session ID/late-retry
-ledger after commit. Already-staged `_processed` output stays in the visible backup folder for Finder
-recovery. If a manifest write fails, Clear refuses before moving sources and attempts to restore both rosters.
+**FIXED in code and Tier-2 verified (2026-09-26; publication pending).** Clear writes a `prepared` capture
+manifest while retaining source entries, atomically empties the matching staging manifest, then commits the
+capture manifest with the source filenames retained as a cleanup journal. It moves those sources to recoverable
+Trash and clears the captured/processing rosters. On launch, a `committed` capture journal is selected even when
+no filed groups exist and launch resumes source cleanup before choosing Live or Stage-for-later processing.
+Partial cleanup is idempotent: already-moved files are skipped, remaining files are retried, and the journal is
+removed only after the empty capture manifest is written. Already-staged `_processed` output remains in the
+visible backup folder for Finder recovery. Failed staging validation or manifest writes preserve the recovery
+state and refuse new Stage-for-later ingestion until Clear is retried or Live recovery is chosen.
 
-**Verification so far:** the Processor Debug build, `test-recovery.sh`, and off-screen Processor VM UI suite
-(6 tests) pass. The scratch recovery suite exercises a failed commit followed by Stage-for-later upload refusal
-and successful retry, a removed staging directory after successful Finish, Clear with no active Live staging
-directory, unverified-manifest preservation, and relaunch with Review Rotation on. The required three-fixture
-phone↔Mac E2E is still pending: Gemini Keychain lookup hangs before emulator startup, and no runtime OCR key
-is available, so no emulator or OCR request began.
+**Verification:** Processor Debug build succeeded; `test-recovery.sh` passed all checks, including the
+committed/no-filed-groups launch regression; the off-screen Processor VM UI suite passed 6 tests; and the
+headless phone↔Mac E2E passed with the three checked-in synthetic documents (all OCR tokens and years asserted).
+The independent Tier-2 review of baseline `31afea2` found the committed-journal gap; it was fixed and
+re-reviewed. The re-review assumes the successful atomic staging-manifest write remains durable before the
+capture-manifest commit; cross-file power-loss rollback ordering was not simulated.
 
 **Superseded shape (`W3.cap-r3-fu11`, 2026-08-04, `fb833ea`/`c903bb8`).** The fix originally landed as two
 calls in the button's action — `session.clear(); liveProc.clearSessionState()` — which is a pair that a
