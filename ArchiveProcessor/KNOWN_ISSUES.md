@@ -1721,10 +1721,19 @@ not the `LiveCaptureProcessor`'s staged/segment list that drives the Processing 
 (or reconcile) the processor's segment state so both panes clear as one. `Views/LiveCaptureView.swift`,
 `Capture/LiveCaptureProcessor.swift`, `Capture/CaptureSession.swift`.
 
-**FIXED in code (pending owner GUI-verification).** The Clear button resets the Processing pane's in-memory
-segment/staged state together with the Captured pane. It is a **pure in-memory/UI reset** —
-no on-disk deletion beyond what `session.clear()` already did (received photos → Trash); any already-staged
-`_processed` output stays recoverable in the backup folder, so the Recovery Core Directive is unchanged.
+**Fix implemented locally; Tier-2 verification pending (2026-09-26).** Clear first writes a `prepared` capture-manifest phase while retaining
+the original photos. After the staging manifest is atomically emptied, it commits an empty capture roster while
+keeping filed-group IDs, then moves photos to recoverable Trash and clears the Captured and Processing panes.
+Recovery rolls back a pre-commit interruption to the original session and preserves the session ID/late-retry
+ledger after commit. Already-staged `_processed` output stays in the visible backup folder for Finder
+recovery. If a manifest write fails, Clear refuses before moving sources and attempts to restore both rosters.
+
+**Verification so far:** the Processor Debug build, `test-recovery.sh`, and off-screen Processor VM UI suite
+(6 tests) pass. The scratch recovery suite exercises a failed commit followed by Stage-for-later upload refusal
+and successful retry, a removed staging directory after successful Finish, Clear with no active Live staging
+directory, unverified-manifest preservation, and relaunch with Review Rotation on. The required three-fixture
+phone↔Mac E2E is still pending: Gemini Keychain lookup hangs before emulator startup, and no runtime OCR key
+is available, so no emulator or OCR request began.
 
 **Superseded shape (`W3.cap-r3-fu11`, 2026-08-04, `fb833ea`/`c903bb8`).** The fix originally landed as two
 calls in the button's action — `session.clear(); liveProc.clearSessionState()` — which is a pair that a

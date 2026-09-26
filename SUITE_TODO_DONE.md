@@ -8071,11 +8071,9 @@ explain why not.
   kept only so this gate cannot delete fu9-fu1's escape — "belt-and-braces, unmeasured, argued" is its honest
   status. M1's 0 RED is the same priced view→model gap fu9/fu9-fu1 recorded: nothing headless reads a `View`, so
   `live.clear` / `live.finish` identifiers were added for `W21.vmgui-d` to press.
-  Two residuals filed rather than guessed at: **`W3.cap-r3-fu12-fu1`** (Clear here has no count and no
-  confirmation, and wipes `finalizeSummary` — the only record of what a partly-failed finish did not file) and
-  **`W3.cap-r3-fu12-fu2`** (with Review rotation ON, Finish from a ✕-emptied pane reviews pages whose sources
-  are in the Trash and discards every correction silently; pre-existing, promoted from two-step to one tap by
-  this arm). | Capture/Views | Tier-2
+  Two residuals were filed rather than guessed at: **`W3.cap-r3-fu12-fu1`** (Clear's label/confirmation gap,
+  resolved in `950e639`) and **`W3.cap-r3-fu12-fu2`** (stale staging recovery after Clear; implementation is
+  in progress, with required Tier-2 E2E still pending). | Capture/Views | Tier-2
 
 - [x] **W3.cap-r3-fu12-fu1 — ✅ SHIPPED 2026-09-26 (this commit).** After the emptied-pane arm made Clear
   reachable beside the free "Cancel finish" action, its label still sounded harmless and one click discarded

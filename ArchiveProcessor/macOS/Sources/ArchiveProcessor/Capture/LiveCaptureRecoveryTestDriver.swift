@@ -2316,16 +2316,14 @@ enum LiveCaptureRecoveryTestDriver {
                 }
             }
             let clOut = tmp.appendingPathComponent("fu11out", isDirectory: true)
-            let clStaging = tmp.appendingPathComponent("APStaging-fu11-\(String(UUID().uuidString.prefix(8)))",
-                                                       isDirectory: true)
-            try? fm.createDirectory(at: clStaging, withIntermediateDirectories: true)
             let clSession = CaptureSession()
+            let clStaging = clSession.incomingFolder.appendingPathComponent("_processed", isDirectory: true)
+            try? fm.createDirectory(at: clStaging, withIntermediateDirectories: true)
             LiveCaptureProcessor._recoveryTestOCRStub =
                 OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
-            clSession._recoveryTestBeginLive(
-                config: SessionProcessingConfig(
+            let clConfig = SessionProcessingConfig(
                     provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                     // `.human` — no document reaches the LLM, so this runs for real, for $0, no network.
                     taggingMode: .human, rotationMode: .off,
@@ -2335,8 +2333,8 @@ enum LiveCaptureRecoveryTestDriver {
                     outputDirectory: clOut, contextCharCount: 0, sendPreviousImage: false,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
-                    textColumns: 1),
-                stagingDir: clStaging)
+                    textColumns: 1)
+            clSession._recoveryTestBeginLive(config: clConfig, stagingDir: clStaging)
             let clProc = clSession.liveProcessor
             func clSettle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -2432,11 +2430,81 @@ enum LiveCaptureRecoveryTestDriver {
             //    sheet is left up over a now-empty session, which is unreachable in production for the same
             //    modality reason and is not asserted either way. Deliberately LAST, because it is
             //    destructive.
-            clProc.clearSession()
-            check("after the window closes the same Clear empties both panes — a window, not a ban",
-                  clSession.photos.isEmpty && clProc.staged.isEmpty && clProc.statuses.isEmpty
-                      && !clProc.isFinalized("L1")
+            // Model a partial prior finalize: the filed-ID ledger makes an otherwise empty Capture session
+            // eligible for restoration, so this exercises the exact inter-manifest crash boundary.
+            let filedLedgerReady = clSession.recordFiledGroups(["already-filed"])
+            let clearToken = UUID().uuidString
+            let clearPrepared = clSession.prepareClear(token: clearToken)
+            let stagingEmptied = clearPrepared && clProc._recoveryTestPersistClearManifest(token: clearToken)
+            let paidStartsBeforeRecovery = LiveCaptureProcessor._recoveryTestOCRStarts.count
+            let resumedClearSession = CaptureSession()   // simulate relaunch at the prepared + empty-staging boundary
+            var committedClearBeforeTrash = false
+            var failFirstCommit = true
+            resumedClearSession.manifestWriteOverride = { data, url in
+                let decoded = CaptureSession.decodeManifest(data)
+                if decoded?.clearPhase == "committed" && failFirstCommit {
+                    failFirstCommit = false
+                    return false
+                }
+                do { try data.write(to: url, options: .atomic) }
+                catch { return false }
+                if decoded?.clearPhase == "committed" {
+                    let stageURL = clStaging.appendingPathComponent("staging-manifest.json")
+                    let stageData = try? Data(contentsOf: stageURL)
+                    let stageObject = stageData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                    let stagedRows = stageObject?["staged"] as? [Any]
+                    committedClearBeforeTrash = (decoded?.entries.isEmpty == true)
+                        && decoded?.filed.contains("already-filed") == true
+                        && stagedRows?.isEmpty == true
+                        && (stageObject?["clearToken"] as? String) == decoded?.clearToken
+                        && clSources.allSatisfy { fm.fileExists(atPath: $0.path) }
+                }
+                return true
+            }
+            resumedClearSession.beginLiveSession(config: clConfig)
+            resumedClearSession._recoveryTestForceStageForLater()
+            let refusedStageLaterIngest = resumedClearSession.ingest(
+                jpeg: Data([0xFF, 0xD8, 0xFF, 0xD9]), groupId: "after-clear", seq: 99,
+                type: .document, quality: nil, year: nil, month: nil, deviceName: nil)
+            let captureManifestAfterRefusal = try? Data(contentsOf: clSession.incomingFolder.appendingPathComponent("manifest.json"))
+            let captureAfterRefusal = captureManifestAfterRefusal.flatMap { CaptureSession.decodeManifest($0) }
+            let preservedJournal = fm.fileExists(atPath: clStaging.appendingPathComponent("staging-manifest.json").path)
+                && ((try? fm.contentsOfDirectory(atPath: clStaging.path)) ?? []).allSatisfy {
+                    !$0.hasPrefix("staging-manifest.corrupt-")
+                }
+            let stageLaterRefused = refusedStageLaterIngest == nil
+                && captureAfterRefusal?.clearPhase == "prepared"
+                && !fm.fileExists(atPath: clSession.incomingFolder.appendingPathComponent("00099-after-clear.jpg").path)
+            resumedClearSession.manifestWriteOverride = nil
+            let retryClearSession = CaptureSession()   // the next launch retries the still-prepared transaction
+            retryClearSession.manifestWriteOverride = { data, url in
+                do { try data.write(to: url, options: .atomic) }
+                catch { return false }
+                let decoded = CaptureSession.decodeManifest(data)
+                if decoded?.clearPhase == "committed" {
+                    let stageURL = clStaging.appendingPathComponent("staging-manifest.json")
+                    let stageData = try? Data(contentsOf: stageURL)
+                    let stageObject = stageData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                    let stagedRows = stageObject?["staged"] as? [Any]
+                    committedClearBeforeTrash = (decoded?.entries.isEmpty == true)
+                        && decoded?.filed.contains("already-filed") == true
+                        && stagedRows?.isEmpty == true
+                        && (stageObject?["clearToken"] as? String) == decoded?.clearToken
+                        && clSources.allSatisfy { fm.fileExists(atPath: $0.path) }
+                }
+                return true
+            }
+            retryClearSession.beginLiveSession(config: clConfig)
+            let resumedClearProc = retryClearSession.liveProcessor
+            check("relaunch completes the matching Clear transaction without re-OCR or restoring staging (fu12-fu2)",
+                  filedLedgerReady && clearPrepared && stagingEmptied && committedClearBeforeTrash
+                      && preservedJournal && stageLaterRefused && !failFirstCommit
+                      && retryClearSession.photos.isEmpty && retryClearSession.filedGroupIds.contains("already-filed")
+                      && resumedClearProc.staged.isEmpty && resumedClearProc.rotationReviewPages.isEmpty
+                      && LiveCaptureProcessor._recoveryTestOCRStarts.count == paidStartsBeforeRecovery
+                      && clPDFsBefore.allSatisfy { fm.fileExists(atPath: $0.path) }
                       && clSources.allSatisfy { !fm.fileExists(atPath: $0.path) })
+            retryClearSession.manifestWriteOverride = nil
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
@@ -3034,11 +3102,10 @@ enum LiveCaptureRecoveryTestDriver {
         //     button appears: `requestFinish` runs `session.completeAllOpenDocGroups()` over a session with no
         //     groups left, and had that returned false the finish would have died in its error branch and the
         //     whole decision would have been unimplementable. Driven end to end, to files on disk.
-        //   • CLEAR ABANDONS FROM THERE WITHOUT DESTROYING THE OUTPUT (check 6) — the other half of the same
-        //     choice, and the reason it is safe to offer: `clearSessionState` is an in-memory reset, so the
-        //     `_processed` PDFs are still on disk afterwards. Note what Clear costs from THIS state compared
-        //     with the one Test 22 drives: `session.clear()` Trashes `photos`, which is empty here, so it
-        //     Trashes nothing at all.
+        //   • CLEAR ABANDONS FROM THERE WITHOUT DESTROYING THE OUTPUT (check 6) — it empties the durable
+        //     staging roster before clearing the Captured pane, while the `_processed` PDFs stay on disk.
+        //     Note what Clear costs from THIS state compared with Test 22: `session.clear()` Trashes `photos`,
+        //     which is empty here, so it Trashes nothing at all.
         //   • the new arm cannot draw a spinner that never stops (check 7) — the `processingCount` half of the
         //     fix. `session.groups` is derived from `session.photos`, so an emptied pane orphans every
         //     `.ocr`/`.tagging` row; unfiltered, "Processing…" would draw forever in exactly the state this
@@ -3127,12 +3194,11 @@ enum LiveCaptureRecoveryTestDriver {
             }
             let uwOut = tmp.appendingPathComponent("fu12out", isDirectory: true)
             let uwFiled = tmp.appendingPathComponent("fu12filed", isDirectory: true)
-            let uwStaging = tmp.appendingPathComponent("APStaging-fu12-\(String(UUID().uuidString.prefix(8)))",
-                                                       isDirectory: true)
-            try? fm.createDirectory(at: uwStaging, withIntermediateDirectories: true)
-            try? fm.createDirectory(at: uwFiled, withIntermediateDirectories: true)
             let uwGate = TestGate()
             var uwSession = CaptureSession()
+            let uwStaging = LiveCaptureProcessor.stagingDir(for: uwSession)
+            try? fm.createDirectory(at: uwStaging, withIntermediateDirectories: true)
+            try? fm.createDirectory(at: uwFiled, withIntermediateDirectories: true)
             LiveCaptureProcessor._recoveryTestOCRStub =
                 OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
             LiveCaptureProcessor._recoveryTestOCRStarts = []
@@ -3250,12 +3316,24 @@ enum LiveCaptureRecoveryTestDriver {
                   u1Filed && !filedPDFs.isEmpty && uwProc.statuses.isEmpty
                       && uwProc.finalizeSummary != nil && !uwProc.hasUnfiledWork)
 
-            // 6. THE DECISION, second half: Clear abandons from the emptied pane, and the abandoned output is
-            //    still on disk afterwards — which is why it is safe to offer here. `clearSessionState` is a
-            //    pure in-memory reset (Recovery Core Directive), so the `_processed` PDFs survive in the
-            //    visible backup folder; what Clear drops is the app's memory of them. Note what it costs from
-            //    THIS state versus the Clear Test 22 drives: `session.clear()` Trashes `photos`, and `photos`
-            //    is empty, so it Trashes nothing whatsoever.
+            // A successful finalize reclaims _processed. Clear still has to be able to write its empty roster
+            // from that normal post-finish state, rather than treating the remembered but absent path as ready.
+            let stagingWasReclaimedAfterFinish = !fm.fileExists(atPath: uwStaging.path)
+            check("a successful Finish reclaimed its _processed folder before the next Clear (fu12-fu2)",
+                  stagingWasReclaimedAfterFinish)
+            uwProc.clearSession()
+            let postFinishClearData = try? Data(contentsOf: uwStaging.appendingPathComponent("staging-manifest.json"))
+            let postFinishClear = postFinishClearData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            check("Clear recreates the reclaimed staging folder after a successful Finish (fu12-fu2)",
+                  (postFinishClear?["staged"] as? [Any])?.isEmpty == true
+                      && (postFinishClear?["clearToken"] as? String) != nil)
+
+            // 6. THE DECISION, second half: Clear abandons from the emptied pane and leaves the processed
+            //    output in the visible backup folder. It must also durably invalidate the staging roster before
+            //    a relaunch can offer those segments again — particularly because this recovered fixture's
+            //    retained source URLs are already missing. Note what Clear costs from THIS state versus the
+            //    Clear Test 22 drives: `session.clear()` Trashes `photos`, and `photos` is empty, so it
+            //    Trashes nothing whatsoever.
             //
             //    Finish reclaimed the spent staging dir along with the batch (`W3.cap-r6`), so put it back
             //    before staging U2 — same handling as Test 17's re-finalize.
@@ -3267,11 +3345,36 @@ enum LiveCaptureRecoveryTestDriver {
             uwRecoverWithMissingSources()
             let u2Stranded = u2Staged && uwSession.photos.isEmpty && uwProc.hasUnfiledWork
                 && !u2PDFs.isEmpty && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) }
+            // Stage-for-later does not activate LiveCaptureProcessor. Drop its selected path to model that
+            // relaunch shape while leaving U2's real canonical staging manifest in place.
+            uwProc._recoveryTestDisarmForStageLaterClear()
             uwProc.clearSession()
+            let clearedStageData = try? Data(contentsOf: uwStaging.appendingPathComponent("staging-manifest.json"))
+            let clearedStageObject = clearedStageData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            let clearedStageRows = clearedStageObject?["staged"] as? [Any]
             check("Clear abandons an emptied pane's unfiled work — and leaves every processed file on disk (fu12)",
                   u2Stranded && uwProc.staged.isEmpty && uwProc.statuses.isEmpty
                       && !uwProc.hasUnfiledWork && !uwProc.pendingFinish
+                      && clearedStageRows?.isEmpty == true
+                      && (clearedStageObject?["clearToken"] as? String) != nil
                       && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            // Clear used to be only an in-memory reset, leaving U2's verified manifest to restore it on launch.
+            // With Review Rotation enabled, that made the removed source pages appear in the review, and Apply
+            // silently skipped regeneration when it found their paths missing. Reload the same scratch
+            // manifest through the real loader, then assert Clear closed that recovery path without deleting
+            // the `_processed` PDFs.
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.reviewRotation)
+            uwSession = CaptureSession()
+            uwSession._recoveryTestBeginLive(config: uwConfig, stagingDir: uwStaging)
+            uwProc = uwSession.liveProcessor
+            uwProc._recoveryTestLoadManifest(stagingDir: uwStaging, config: uwConfig)
+            uwProc.finishSession()
+            check("Clear stays cleared after relaunch and does not review missing source pages (fu12-fu2)",
+                  uwProc.staged.isEmpty && uwProc.rotationReviewPages.isEmpty
+                      && !uwProc.showRotationReview && !uwProc.hasUnfiledWork
+                      && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+            UserDefaults.standard.set(false, forKey: DefaultsKeys.reviewRotation)
 
             // 7. THE `processingCount` HALF OF THE FIX: the new arm must not be able to draw a "Processing…"
             //    spinner that can never stop. A page parked mid-OCR whose photo is then deleted leaves a
@@ -3771,6 +3874,31 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // Last by design: this synthetic session may be the newest recoverable one in the shared scratch
+        // backup root, so do not let it influence any preceding restart fixture.
+        if isolatedBackup {
+            let corruptStageSession = CaptureSession()
+            corruptStageSession.beginStageSessionForTest()
+            let corruptStagePhoto = corruptStageSession.ingest(
+                jpeg: Data([0xFF, 0xD8, 0xFF, 0xD9]), groupId: "corrupt-stage", seq: 1,
+                type: .document, quality: nil, year: nil, month: nil, deviceName: nil)
+            let corruptStageDir = LiveCaptureProcessor.stagingDir(for: corruptStageSession)
+            try? fm.createDirectory(at: corruptStageDir, withIntermediateDirectories: true)
+            let corruptBytes = Data("untrusted staging recovery bytes".utf8)
+            try? corruptBytes.write(to: corruptStageDir.appendingPathComponent("staging-manifest.json"), options: .atomic)
+            let corruptStageProcessor = corruptStageSession.liveProcessor
+            corruptStageProcessor.clearSession()
+            let quarantinedName = ((try? fm.contentsOfDirectory(atPath: corruptStageDir.path)) ?? [])
+                .first { $0.hasPrefix("staging-manifest.corrupt-") }
+            let preservedCorruptBytes = quarantinedName.flatMap {
+                try? Data(contentsOf: corruptStageDir.appendingPathComponent($0))
+            }
+            check("Stage-for-later Clear preserves an unverified manifest and leaves its source in place (fu12-fu2)",
+                  corruptStageProcessor.stagingRecoveryBlocked
+                      && corruptStagePhoto.map { fm.fileExists(atPath: $0.path) } == true
+                      && preservedCorruptBytes == corruptBytes)
         }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }

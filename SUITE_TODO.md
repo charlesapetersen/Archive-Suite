@@ -1159,20 +1159,12 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
 > fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
 > except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu12-fu2 [LOW]** `LiveCaptureProcessor.finishSession` page seeding — **with "Review rotation"
-  ON, a Finish from a ✕-emptied pane shows a review of pages that cannot load and then discards every
-  correction silently.** `finishSession` seeds `rotationReviewPages` from `retained.values`, whose `sourceURL`s
-  the ✕ has sent to the Trash; the operator corrects rotations, taps Apply, and
-  `applyRotationReviewAndFinalize`'s `segsToRegen` filter (`allSatisfy { fm.fileExists(atPath:) }`) drops every
-  segment, so `guard !segsToRegen.isEmpty` falls through to `beginFinalize()` and the PDFs file unrotated with
-  no message. **Pre-existing** — and note that filter's own comment justifies itself with "e.g. the operator
-  hit Clear before Finish", which is UNREACHABLE, since Clear also empties `staged`; the ✕-emptied pane is the
-  reachable instance. `W3.cap-r3-fu12` promoted it from a two-step recovery to one tap by giving that state a
-  Finish button. Mitigating: `reviewRotation` defaults **off** (`SettingsView.swift:66`,
-  `ProcessingProfileStore.swift:99`), so it is opt-in. Likely fix is one line at the seeding site — filter
-  `pages` to sources that still exist, letting the EXISTING `guard !pages.isEmpty else { beginFinalize() }`
-  skip the bogus review entirely — but that is the finalize path and wants its own Tier-2 gate rather than
-  riding along. Found 2026-08-04 by `W3.cap-r3-fu12`'s adversarial pass. | Capture | Tier-2
+- [ ] **W3.cap-r3-fu12-fu2 [LOW]** Capture Clear can Trash source photos while leaving its prior staging manifest.
+  On relaunch, Live Capture can restore paid segments whose source photos are gone; Review Rotation then shows
+  missing pages and Apply silently skips regeneration. Implemented in the isolated worktree with a tokenized
+  capture/staging transaction, recovery retry, and Stage-for-later protection. Processor build, recovery suite,
+  and VM UI suite pass; the required phone↔Mac Tier-2 E2E is pending because its Gemini Keychain lookup hangs
+  before emulator startup. | Capture | Tier-2
 - [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
   ✅ **DECIDED by the owner 2026-08-13: REFUSE THE DELETE, and say why.** Give `removePhoto` the same
   `isFinalized` guard `removePhotoIfSafe` already carries two lines below it, and tell the operator the segment

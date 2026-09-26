@@ -267,6 +267,7 @@ final class CaptureSession: ObservableObject {
     /// Test-only: force stage-for-later so `ingest` never triggers OCR (no API key, $0). Used by the
     /// FileRelay offline invariant driver.
     func beginStageSessionForTest() { if processingMode == .undecided { processingMode = .stageForLater } }
+    func _recoveryTestForceStageForLater() { processingMode = .stageForLater }
 
     /// Test-only ($0, W3.cap-r2): put the session in `.live` and arm its OWN `liveProcessor` against a
     /// scratch staging dir, so a headless driver can drive the REAL `ingest` → `photoIngested` path.
@@ -343,6 +344,8 @@ final class CaptureSession: ObservableObject {
     /// Groups whose outputs reached their destination during this capture session. Keep the IDs after their
     /// source pages leave the Captured pane so a late phone retry cannot silently open a second document.
     private(set) var filedGroupIds: Set<String> = []
+    private(set) var clearPhase: String?
+    private(set) var clearToken: String?
     /// The subset known to be on disk. An in-memory-only ID still refuses late pages, but source retirement
     /// must wait until a manifest write confirms that ID is durable.
     private var durableFiledGroupIds: Set<String> = []
@@ -459,6 +462,8 @@ final class CaptureSession: ObservableObject {
             photos = restored.photos
             filedGroupIds = restored.filed
             durableFiledGroupIds = restored.filed
+            clearPhase = restored.clearPhase
+            clearToken = restored.clearToken
             // Restore which document groups the phone had signalled complete (B5-ii). Without this a
             // mid-session Mac restart showed NO tag card until Finish — the phone won't re-send the
             // segment-complete signal for a group it already got acked. A legacy (pre-B5) manifest has no
@@ -587,6 +592,16 @@ final class CaptureSession: ObservableObject {
     func ingest(jpeg: Data, groupId: String, seq: Int, type: CaptureGroupType,
                 quality: String?, year: Int?, month: Int?, deviceName: String?) -> URL? {
         if testForceIngestFailure { testForceIngestFailure = false; return nil }   // test-only injection
+        if clearPhase != nil {
+            // A prepared/committed Clear is a durable transaction journal. Live mode gets one chance to
+            // reconcile it before accepting a new page; Stage-for-later has no staging loader, so it must
+            // leave the session untouched and ask the operator to retry Clear or choose Live mode.
+            activateProcessingIfNeeded()
+            guard clearPhase == nil else {
+                statusMessage = "A previous Clear is still being recovered. Restart Archive Processor with Live processing enabled, or Clear this session again before receiving more photos."
+                return nil
+            }
+        }
         let name = String(format: "%05d-%@.jpg", seq, groupId)
         let finalURL = incomingFolder.appendingPathComponent(name)
         let tempURL = incomingFolder.appendingPathComponent("." + name + ".part")
@@ -681,13 +696,53 @@ final class CaptureSession: ObservableObject {
         writeManifest()
     }
 
-    func clear() {
+    /// Mark the beginning of a coordinated Clear without changing recoverable state. If staging invalidation
+    /// fails or the app crashes before commit, recovery restores the original photos and staging as usual.
+    @discardableResult
+    func prepareClear(token: String) -> Bool {
+        let didWrite = writeManifest(clearPhase: "prepared", clearToken: token)
+        if didWrite { clearPhase = "prepared"; clearToken = token }
+        return didWrite
+    }
+
+    /// Roll back the preparatory capture-manifest write if the coordinated staging-manifest write fails.
+    @discardableResult
+    func restoreManifestAfterClearFailure() -> Bool {
+        let didWrite = writeManifest(preserveClearMarker: false)
+        if didWrite { clearPhase = nil; clearToken = nil }
+        return didWrite
+    }
+
+    /// Commit only after the live staging manifest is durably empty. Keep the filed-group ledger so a late
+    /// phone retry remains rejected even if the app crashes during source cleanup.
+    @discardableResult
+    func commitPreparedClear(token: String) -> Bool {
+        guard clearPhase == "prepared", clearToken == token else { return false }
+        let didWrite = writeManifest(photos: [], completed: [], resolved: [], macTags: [:],
+                                     clearPhase: "committed", clearToken: token)
+        if didWrite { clearPhase = "committed" }
+        return didWrite
+    }
+
+    /// Finish a Clear after the capture and staging recovery rosters were committed.
+    func finishPreparedClear() {
         for p in photos { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = []
         completedDocGroups.removeAll()
         resolvedGroupIds.removeAll(); macTags.removeAll()   // B9: keep the persisted resolve state in sync
-        writeManifest()
+        if writeManifest(preserveClearMarker: false) { clearPhase = nil; clearToken = nil }
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
+    }
+
+    /// Stage-for-later and File Relay callers use the same crash-safe ordering even without a live staging
+    /// manifest to coordinate.
+    func clear() {
+        let token = UUID().uuidString
+        guard prepareClear(token: token), commitPreparedClear(token: token) else {
+            statusMessage = "Could not save the cleared capture list, so nothing was cleared. Check the Backup Folder and try again."
+            return
+        }
+        finishPreparedClear()
     }
 
     /// Finalize cleanup: delete ONLY the source photos that were actually filed into output (their URLs
@@ -948,6 +1003,8 @@ final class CaptureSession: ObservableObject {
         // W3.cap-r3-fu4: a filed group stays remembered after its source photos leave the Backup Folder.
         // Optional so pre-fu4 manifests continue to decode.
         var filedGroupIds: [String]? = nil
+        var clearPhase: String? = nil
+        var clearToken: String? = nil
     }
 
     private var manifestURL: URL { incomingFolder.appendingPathComponent("manifest.json") }
@@ -956,14 +1013,24 @@ final class CaptureSession: ObservableObject {
     /// completion (the JPEGs don't carry it). Returns whether the write succeeded, so `ingest` can withhold
     /// the success ack until the grouping metadata is durably on disk (the ingest durability contract).
     @discardableResult
-    private func writeManifest() -> Bool {
-        let entries = photos.map {
+    private func writeManifest(photos photoOverride: [CapturedPhoto]? = nil,
+                               completed completedOverride: Set<String>? = nil,
+                               resolved resolvedOverride: Set<String>? = nil,
+                               macTags macTagsOverride: [String: MacSegmentTags]? = nil,
+                               clearPhase: String? = nil,
+                               clearToken: String? = nil,
+                               preserveClearMarker: Bool = true) -> Bool {
+        let entries = (photoOverride ?? photos).map {
             ManifestEntry(name: $0.url.lastPathComponent, groupId: $0.groupId, seq: $0.seq,
                           type: $0.type.rawValue, quality: $0.quality, year: $0.year, month: $0.month)
         }
-        let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedDocGroups),
-                                       resolvedGroupIds: Array(resolvedGroupIds), macTags: macTags,
-                                       filedGroupIds: filedGroupIds.sorted())
+        let markerPhase = preserveClearMarker ? (clearPhase ?? self.clearPhase) : clearPhase
+        let markerToken = preserveClearMarker ? (clearToken ?? self.clearToken) : clearToken
+        let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedOverride ?? completedDocGroups),
+                                       resolvedGroupIds: Array(resolvedOverride ?? resolvedGroupIds),
+                                       macTags: macTagsOverride ?? macTags,
+                                       filedGroupIds: filedGroupIds.sorted(), clearPhase: markerPhase,
+                                       clearToken: markerToken)
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
         if let manifestWriteOverride { return manifestWriteOverride(data, manifestURL) }
         do { try data.write(to: manifestURL, options: .atomic); return true }
@@ -975,18 +1042,18 @@ final class CaptureSession: ObservableObject {
     /// no persisted completion set → empty (its tag cards still surface at Finish, exactly as before).
     nonisolated static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>,
                                                              resolved: Set<String>, macTags: [String: MacSegmentTags],
-                                                             filed: Set<String>)? {
+                                                             filed: Set<String>, clearPhase: String?, clearToken: String?)? {
         let d = JSONDecoder()
         if let m = try? d.decode(SessionManifest.self, from: data) {
             return (m.photos, Set(m.completedDocGroups), Set(m.resolvedGroupIds ?? []), m.macTags ?? [:],
-                    Set(m.filedGroupIds ?? []))
+                    Set(m.filedGroupIds ?? []), m.clearPhase, m.clearToken)
         }
-        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], []) }
+        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], [], nil, nil) }
         return nil
     }
 
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
-    private static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>)? {
+    static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>, clearPhase: String?, clearToken: String?)? {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
         // ISO-8601 folder names sort lexically = chronologically; check newest first.
@@ -1008,9 +1075,10 @@ final class CaptureSession: ObservableObject {
             }
             // With no surviving sources, the durable ledger still marks this as the active session. Restore
             // its epoch so a late phone retry is checked against the same set after relaunch.
-            if !restored.isEmpty || !decoded.filed.isEmpty {
+            if !restored.isEmpty || !decoded.filed.isEmpty || decoded.clearPhase == "prepared" {
                 restored.sort { $0.seq < $1.seq }
-                return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags, decoded.filed)
+                return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags,
+                        decoded.filed, decoded.clearPhase, decoded.clearToken)
             }
         }
         return nil

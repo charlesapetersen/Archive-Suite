@@ -396,6 +396,61 @@ final class LiveCaptureProcessor: ObservableObject {
         session.incomingFolder.appendingPathComponent("_processed", isDirectory: true)
     }
 
+    /// A Clear can be requested before Live Capture was activated (Stage-for-later mode). Resolve the same
+    /// durable manifest location `activate` would resume, so an old Live roster cannot survive that Clear
+    /// and reappear if the session is later reopened in Live mode.
+    private func prepareStagingDirectoryForClear() -> Bool {
+        let fm = FileManager.default
+        let primary = Self.stagingDir(for: session)
+        let legacyAppSupport = Self.legacyStagingRoot.appendingPathComponent(session.sessionId, isDirectory: true)
+        let savedOutputPath = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory)
+        let outputDirectory = config?.outputDirectory
+            ?? (savedOutputPath.flatMap { fm.fileExists(atPath: $0) ? URL(fileURLWithPath: $0) : nil })
+            ?? fm.urls(for: .downloadsDirectory, in: .userDomainMask).first
+            ?? fm.homeDirectoryForCurrentUser
+        let legacyOutput = outputDirectory
+            .appendingPathComponent(".ArchiveProcessor-LiveStaging", isDirectory: true)
+            .appendingPathComponent(session.sessionId, isDirectory: true)
+        func hasManifest(_ directory: URL) -> Bool {
+            fm.fileExists(atPath: directory.appendingPathComponent("staging-manifest.json").path)
+        }
+        let directory: URL
+        if let stagingDir {
+            directory = stagingDir
+        } else if hasManifest(primary) {
+            directory = primary
+        } else if hasManifest(legacyAppSupport) {
+            directory = legacyAppSupport
+        } else if hasManifest(legacyOutput) {
+            directory = legacyOutput
+        } else {
+            directory = primary
+        }
+        do {
+            try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+            if let quarantined = try existingQuarantinedManifest(in: directory) {
+                blockStagingRecovery(at: directory.appendingPathComponent("staging-manifest.json"),
+                                     reason: "was previously quarantined before Clear",
+                                     existingQuarantine: quarantined)
+                return false
+            }
+            let manifestURL = directory.appendingPathComponent("staging-manifest.json")
+            if fm.fileExists(atPath: manifestURL.path) {
+                guard let data = try? Data(contentsOf: manifestURL),
+                      let manifest = try? JSONDecoder().decode(StagingManifest.self, from: data),
+                      manifest.schemaVersion == StagingManifest.currentSchemaVersion,
+                      manifest.hasValidFingerprint else {
+                    blockStagingRecovery(at: manifestURL, reason: "could not be verified before Clear")
+                    return false
+                }
+            }
+            stagingDir = directory
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Read verified staged records before a Stage-for-later handoff. A prior finalize can move its outputs
     /// successfully but fail to save `filedGroupIds`; the durable staging record then remains the recovery
     /// evidence that those groups already have output. `nil` means the record exists but cannot be trusted,
@@ -495,7 +550,18 @@ final class LiveCaptureProcessor: ObservableObject {
             blockStagingRecovery(at: url, reason: "could not be inspected for a previous quarantine")
             return false
         }
-        guard fm.fileExists(atPath: url.path) else { return true }
+        guard fm.fileExists(atPath: url.path) else {
+            if session.clearPhase == "prepared" {
+                guard session.restoreManifestAfterClearFailure() else {
+                    blockStagingRecovery(at: url, reason: "could not roll back an interrupted Clear")
+                    return false
+                }
+            } else if session.clearPhase == "committed" {
+                blockStagingRecovery(at: url, reason: "is missing after Clear was committed")
+                return false
+            }
+            return true
+        }
         guard let data = try? Data(contentsOf: url) else {
             blockStagingRecovery(at: url, reason: "could not be read")
             return false
@@ -514,6 +580,40 @@ final class LiveCaptureProcessor: ObservableObject {
         guard manifest.hasValidFingerprint else {
             blockStagingRecovery(at: url, reason: "did not pass its integrity check")
             return false
+        }
+        if session.clearPhase == "prepared" {
+            if let token = session.clearToken, manifest.clearToken == token,
+               manifest.staged.isEmpty, manifest.retained.isEmpty {
+                // The app stopped after the staging roster was atomically emptied but before it could commit
+                // the capture roster. The matching token proves both halves of Clear reached disk; finish
+                // that operator-requested Clear now instead of re-OCRing the still-present source photos.
+                guard session.commitPreparedClear(token: token) else {
+                    // This is a valid, matching Clear journal. The failure is the capture-manifest write,
+                    // not staging corruption; keep the token in place so a later launch can retry commit.
+                    let notice = "Live Capture recovery paused: the interrupted Clear could not be committed. Its matching staging journal remains in place for retry; staged files remain untouched in the Backup Folder."
+                    stagingManifestBlocked = true
+                    stagingRecoveryNotice = notice
+                    session.statusMessage = notice
+                    return false
+                }
+                session.finishPreparedClear()
+                return true
+            }
+            // No matching empty staging roster means Clear had not reached its commit point. Restore the
+            // original Capture manifest and continue normal staging recovery.
+            guard session.restoreManifestAfterClearFailure() else {
+                blockStagingRecovery(at: url, reason: "could not roll back an interrupted Clear")
+                return false
+            }
+        } else if session.clearPhase == "committed" {
+            guard let token = session.clearToken, manifest.clearToken == token,
+                  manifest.staged.isEmpty, manifest.retained.isEmpty else {
+                blockStagingRecovery(at: url, reason: "does not match the committed Clear record")
+                return false
+            }
+            // Preserve the filed-group/session ledger, but retire the transaction marker after recovery.
+            session.finishPreparedClear()
+            return true
         }
         let restored = manifest.staged
         for r in manifest.retained { retained[r.groupId] = r }   // enables the rotation review after resume
@@ -1458,20 +1558,24 @@ final class LiveCaptureProcessor: ObservableObject {
         let schemaVersion: Int
         var staged: [StagedSegment]
         var retained: [RetainedSegment]
+        var clearToken: String? = nil
         let fingerprint: String
 
-        init(staged: [StagedSegment], retained: [RetainedSegment]) {
+        init(staged: [StagedSegment], retained: [RetainedSegment], clearToken: String? = nil) {
             self.schemaVersion = Self.currentSchemaVersion
             self.staged = staged
             self.retained = retained
+            self.clearToken = clearToken
             // An encoding failure must leave a record that fails closed on reload, never a valid digest for
             // placeholder bytes. The outer persist then also declines to write if those same values cannot
             // encode, but this keeps the integrity rule total.
-            self.fingerprint = Self.fingerprint(schemaVersion: schemaVersion, staged: staged, retained: retained) ?? ""
+            self.fingerprint = Self.fingerprint(schemaVersion: schemaVersion, staged: staged,
+                                                retained: retained, clearToken: clearToken) ?? ""
         }
 
         var hasValidFingerprint: Bool {
-            guard let expected = Self.fingerprint(schemaVersion: schemaVersion, staged: staged, retained: retained) else {
+            guard let expected = Self.fingerprint(schemaVersion: schemaVersion, staged: staged,
+                                                  retained: retained, clearToken: clearToken) else {
                 return false
             }
             return fingerprint == expected
@@ -1481,27 +1585,43 @@ final class LiveCaptureProcessor: ObservableObject {
             let schemaVersion: Int
             let staged: [StagedSegment]
             let retained: [RetainedSegment]
+            let clearToken: String?
         }
 
         private static func fingerprint(
-            schemaVersion: Int, staged: [StagedSegment], retained: [RetainedSegment]
+            schemaVersion: Int, staged: [StagedSegment], retained: [RetainedSegment], clearToken: String?
         ) -> String? {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-            let payload = FingerprintPayload(schemaVersion: schemaVersion, staged: staged, retained: retained)
+            let payload = FingerprintPayload(schemaVersion: schemaVersion, staged: staged,
+                                             retained: retained, clearToken: clearToken)
             guard let data = try? encoder.encode(payload) else { return nil }
             return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         }
     }
 
-    private func persistManifest() {
-        guard !stagingManifestBlocked, let stagingDir else { return }
+    @discardableResult
+    private func persistManifest(
+        staged stagedOverride: [StagedSegment]? = nil,
+        retained retainedOverride: [String: RetainedSegment]? = nil,
+        clearToken: String? = nil
+    ) -> Bool {
+        guard !stagingManifestBlocked else { return false }
+        let records = stagedOverride ?? staged
+        let retainedValues = retainedOverride.map { Array($0.values) } ?? Array(retained.values)
+        guard let stagingDir else { return records.isEmpty && retainedValues.isEmpty }
         let url = stagingDir.appendingPathComponent("staging-manifest.json")
         // Dictionaries do not promise a stable iteration order. The fingerprint identifies durable data,
         // not whichever order retained records happened to be visited in this process.
-        let retainedRecords = retained.values.sorted { $0.groupId < $1.groupId }
-        let manifest = StagingManifest(staged: staged, retained: retainedRecords)
-        if let data = try? JSONEncoder().encode(manifest) { try? data.write(to: url, options: .atomic) }
+        let retainedRecords = retainedValues.sorted { $0.groupId < $1.groupId }
+        let manifest = StagingManifest(staged: records, retained: retainedRecords, clearToken: clearToken)
+        do {
+            let data = try JSONEncoder().encode(manifest)
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func upsertStatus(groupId: String, type: CaptureGroupType, pageCount: Int, phase: SegmentStatus.Phase) {
@@ -2088,8 +2208,40 @@ final class LiveCaptureProcessor: ObservableObject {
     /// (Reasoned from the code — but from Swift control flow, not from hit-testing, which is the kind of
     /// code read `W3.cap-r3-fu10` had to walk back.)
     func clearSession() {
-        guard !stagingManifestBlocked, !isFinalizing else { return }
-        session.clear()
+        guard !stagingManifestBlocked, !isFinalizing, prepareStagingDirectoryForClear() else {
+            if !stagingManifestBlocked {
+                session.statusMessage = "Could not locate the staging recovery folder, so nothing was cleared. Check the Backup Folder and try again."
+            }
+            return
+        }
+        // Coordinate the two recovery rosters before moving sources. A prepared capture manifest keeps the
+        // original photos recoverable if the staging write fails. The shared transaction token lets recovery
+        // distinguish an untouched old staging roster from an atomically emptied one if a crash lands before
+        // the capture-manifest commit. Keep processed PDFs in _processed.
+        let clearToken = UUID().uuidString
+        guard session.prepareClear(token: clearToken) else {
+            session.statusMessage = "Could not save the cleared capture list, so nothing was cleared. Check the Backup Folder and try again."
+            return
+        }
+        guard persistManifest(staged: [], retained: [:], clearToken: clearToken) else {
+            if !session.restoreManifestAfterClearFailure() {
+                session.statusMessage = "Could not save the cleared staging list. Captured photos remain in the Backup Folder, but recovery metadata needs attention."
+            } else {
+                session.statusMessage = "Could not save the cleared staging list, so nothing was cleared. Check the Backup Folder and try again."
+            }
+            return
+        }
+        guard session.commitPreparedClear(token: clearToken) else {
+            let captureRestored = session.restoreManifestAfterClearFailure()
+            let stagingRestored = persistManifest()
+            if !captureRestored || !stagingRestored {
+                session.statusMessage = "Could not commit Clear. Captured photos remain in the Backup Folder, but recovery metadata needs attention."
+            } else {
+                session.statusMessage = "Could not commit Clear, so nothing was cleared. Check the Backup Folder and try again."
+            }
+            return
+        }
+        session.finishPreparedClear()
         clearSessionState()
     }
 
@@ -2100,12 +2252,11 @@ final class LiveCaptureProcessor: ObservableObject {
     /// `private` since `W3.cap-r3-fu11`: its ONLY caller is `clearSession()` above, which is where the
     /// `isFinalizing` refusal lives. Do not add a second caller — call `clearSession()`, or move the guard.
     ///
-    /// DATA SAFETY (Recovery Core Directive, unchanged): this is a **pure in-memory/UI reset** — it performs
-    /// **no** on-disk deletion. Any already-staged processed output stays exactly where it was, in the
-    /// visible backup folder's `_processed/` subfolder (recoverable in Finder), and the staging manifest is
-    /// left untouched on disk. So Clear never hard-deletes a staged/un-filed page: it only forgets the
-    /// segments in memory so the pane agrees with the (now-cleared) Captured pane. In-flight OCR `pageTasks`
-    /// are dropped (their results are simply discarded); a fresh capture after Clear starts a new segment.
+    /// DATA SAFETY (Recovery Core Directive, unchanged): this resets the in-memory/UI state but does not
+    /// delete processed output. Those files stay in the visible backup folder's `_processed/` subfolder
+    /// (recoverable in Finder); `clearSession()` atomically emptied the staging manifest first, so a later
+    /// launch cannot offer abandoned segments for filing again. In-flight OCR `pageTasks` are dropped (their
+    /// results are simply discarded); a fresh capture after Clear starts a new segment.
     private func clearSessionState() {
         // B8: advance the generation so any in-flight `finalizeSegment` that suspended at an await before this
         // Clear bails at its next post-await guard instead of repopulating the just-cleared pane / writing a
@@ -2356,6 +2507,16 @@ final class LiveCaptureProcessor: ObservableObject {
     /// deliberately unwritable; this second write creates the crash/relaunch input without fabricating the
     /// processor's private `RetainedSegment` representation in the test.
     func _recoveryTestPersistManifest() { persistManifest() }
+    func _recoveryTestPersistClearManifest(token: String) -> Bool {
+        persistManifest(staged: [], retained: [:], clearToken: token)
+    }
+
+    /// Model a session reopened in Stage-for-later mode: there is no active Live staging directory, but an
+    /// earlier Live run may still have durable staging state that Clear must locate and invalidate.
+    func _recoveryTestDisarmForStageLaterClear() {
+        stagingDir = nil
+        config = nil
+    }
 
     /// Test-only ($0, W3.cap-r3-fu8): enter the REAL manifest loader without `activate`'s legacy-root prune.
     /// A recovery test redirects `CaptureSession.backupRoot`, so the production prune would misclassify any
