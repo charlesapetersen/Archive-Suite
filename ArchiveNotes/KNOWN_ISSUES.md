@@ -3,6 +3,15 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ⚠️ OPEN (W9.d2.review-folder-graph) — folder graph edits can cross deletion
+
+**Confirmed 2026-09-26, baseline `74627e1`.** `OrganizationStore.renameFolder` and `moveFolder` retain an
+array index across an awaited `NotesIndex.updateFolder`; a concurrent `deleteFolder` can remove or shift
+that row before they resume. `createFolder(parent:)` can also insert under a parent after deletion has
+snapshotted its children, leaving a dangling parent ID. Independent reviewers confirmed these
+interleavings during W9.d2 review. The full finding is archived under
+`old/review-folder-graph-delete-race-2026-09-26.md`; the fix is queued in `SUITE_TODO.md`.
+
 ## ✅ VERIFIED (W23.l4-fu) — Notes date precision warning is covered by the off-screen UI harness
 
 **2026-09-25.** The scratch-fixture Notes UI test selects Day precision, enters 2026-02-31 through the

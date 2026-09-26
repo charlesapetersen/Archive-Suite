@@ -892,13 +892,16 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d2` — the item-row context menu is a stub [S].** Plan D2. Open / Reveal in Finder / New from
-  Template / Set Quality ▸ / Delete…. | Views/NotesContextMenu.swift | S | low | none
+- [ ] **`W9.d2.review-folder-graph` — folder mutations can cross folder deletion [M, Tier-2].** Baseline
+  `74627e1`; `OrganizationStore.renameFolder`, `moveFolder`, `createFolder`, `deleteFolder`. Concurrent
+  rename/move can resume after deletion using a stale array index; child creation can commit under a parent
+  after delete snapshots its children. Independently confirmed during W9.d2 review; report archived under
+  `old/`. | ArchiveNotes/macOS/Sources/ArchiveNotes/Index/OrganizationStore.swift | M | low | none
 - [ ] **`W9.d3` — template body editing is not routed in-app [M].** Plan D3. | Views/TemplatesManagerView.swift
   | M | low | none
-- [ ] **`W9.d4` — no quality quick-edit [S].** Plan D4. Inline borderless quality `Menu` (None + 1–3) in the
-  list/detail cell plus a context-menu "Set Quality ▸". ⚠️ Coordinate with `W19.q3`/`W19.q4`, which redefine
-  Quality across the Suite — do this AFTER them or build it against the post-W19 vocabulary. |
+- [ ] **`W9.d4` — no inline quality quick-edit [S].** Plan D4. Add a borderless quality `Menu` (None + 1–3)
+  in the list/detail cell. The context-menu "Set Quality ▸" shipped with W9.d2; retain the post-W19
+  Quality vocabulary. |
   Views/QualityControl.swift, NotesTableView.swift | S | low | none
 - [ ] **`W9.d6` — the `roundup` date field has no UI and is always false: add it or remove it [S–M].** Plan D6.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its

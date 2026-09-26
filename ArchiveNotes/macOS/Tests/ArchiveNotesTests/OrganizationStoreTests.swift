@@ -223,6 +223,90 @@ struct OrganizationStoreTests {
         #expect(await index.allMemberships().isEmpty)                 // and it left the DB
     }
 
+    /// A replicate admitted before Delete opens must finish publishing before the whole-item unlink
+    /// starts. This pauses precisely after SQLite insert and before the in-memory/mirror update.
+    @Test func wholeItemDeleteDrainsAnInFlightMembershipWrite() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        let folder = try await store.createFolder(name: "Placement")
+        let itemId = UUID()
+        var reachedPause: CheckedContinuation<Void, Never>?
+        var releaseWriter: CheckedContinuation<Void, Never>?
+        let writerPaused = Task {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                reachedPause = continuation
+            }
+        }
+        store.membershipWriteAfterIndexHookForTesting = { _ in
+            reachedPause?.resume()
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                releaseWriter = continuation
+            }
+        }
+        let add = Task { try await store.addMembership(item: itemId, folder: folder.id) }
+        await writerPaused.value
+
+        store.beginHardDelete([itemId])
+        defer { store.endHardDelete([itemId]) }
+        var deletionFinished = false
+        let deletion = Task {
+            try await store.removeAllMembershipsForConfirmedDelete(item: itemId)
+            deletionFinished = true
+        }
+        await Task.yield()
+        #expect(!deletionFinished)  // it waits for the pre-admitted writer to publish first
+
+        releaseWriter?.resume()
+        try await add.value
+        try await deletion.value
+
+        store.membershipWriteAfterIndexHookForTesting = nil
+        #expect(store.membershipCount(item: itemId) == 0)
+        #expect(await index.allMemberships().allSatisfy { $0.itemId != itemId })
+    }
+
+    /// A placement aimed at a folder cannot publish a dangling edge after that folder is deleted.
+    @Test func folderDeleteDrainsAnInFlightMembershipWrite() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+
+        let folder = try await store.createFolder(name: "Soon Deleted")
+        let itemId = UUID()
+        var reachedPause: CheckedContinuation<Void, Never>?
+        var releaseWriter: CheckedContinuation<Void, Never>?
+        let writerPaused = Task {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                reachedPause = continuation
+            }
+        }
+        store.membershipWriteAfterIndexHookForTesting = { _ in
+            reachedPause?.resume()
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                releaseWriter = continuation
+            }
+        }
+        let add = Task { try await store.addMembership(item: itemId, folder: folder.id) }
+        await writerPaused.value
+
+        var deleteFinished = false
+        let deletion = Task {
+            _ = try await store.deleteFolder(folder.id)
+            deleteFinished = true
+        }
+        await Task.yield()
+        #expect(!deleteFinished)  // deletion waits for the admitted writer's memory/mirror publish
+
+        releaseWriter?.resume()
+        try await add.value
+        try await deletion.value
+
+        store.membershipWriteAfterIndexHookForTesting = nil
+        #expect(!store.folders.contains { $0.id == folder.id })
+        #expect(store.memberships.allSatisfy { $0.folderId != folder.id })
+        #expect(await index.allMemberships().allSatisfy { $0.folderId != folder.id })
+    }
+
     /// The pair existed but another membership appeared in between: unlink only, never trash.
     @Test func removeConfirmedLastMembershipUnlinksWhenNotActuallyLast() async throws {
         let (store, index, root) = try await makeTempEnv()

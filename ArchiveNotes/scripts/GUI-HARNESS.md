@@ -57,6 +57,8 @@ path. Each test subtracts a pre-test `itemDirs()` snapshot, because the runner h
 | G15 | **Note ▸ Auto-fill from Zotero…** resolves one attached Zotero source block, presents a fill-empty diff, Cancel is byte-for-byte no-op, and Apply writes selected fields plus the configured-style citation | **Auto** (DEBUG-only in-process Zotero transport; no network or Zotero install) |
 | G16 | Inspector **Attach to note** persists a reference without rewriting the body; chips show loading, configured-style citation, and offline failure with Retry; actual chip clicks dispatch the correct URL; unchanged clipboard dedups per selected note | **Auto** (scratch + in-process stub; exports `notes-zotero-inspector.png` for pixel review) |
 | G17 | Inline note rename via double-click, Return, and row menu; Escape no-op; inspector subject add/remove reaches YAML + Finder tags while UUID and body stay intact | **Auto** (scratch; exports `notes-title-tags.png` for pixel review) |
+| G18 | Drag a folder onto another and persist the new parent in the scratch organization graph | **Auto** |
+| G19 | Row-menu Delete confirms before removing every replicated placement and moving the note to Trash; Cancel is a no-op | **Auto** (scratch) |
 
 ### Why some checks use a DEBUG seam instead of the real gesture
 

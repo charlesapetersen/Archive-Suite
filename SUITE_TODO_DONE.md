@@ -199,6 +199,20 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   | Files: ArchiveNotes/macOS/{Sources/ArchiveNotes/Views/NotesFolderTreeView.swift,Tests/ArchiveNotesUITests/
   NotesGUITests.swift}, ArchiveNotes/CLAUDE.md, SUITE_TODO.md | M | low | done
 
+- [x] **`W9.d2` — complete the item-row context menu [S · Tier-2].** **SHIPPED 2026-09-26
+  (this commit).** The row now offers Open, Reveal in Finder, New from Template, Set Quality, and
+  confirmed Delete. Whole-item Delete removes all folder placements under a hard-delete guard, waits
+  for admitted membership writes, then moves the note to Trash; Cancel changes nothing. Existing
+  Add/Move/Remove-from-folder actions remain. The original checkpoint (`4e339ab`) added the code,
+  scratch store and GUI tests, and the archived review report; this integration brings it onto current
+  main. Fresh Notes Debug build and unit smoke passed (218 XCTest checks). The checkpoint's focused
+  off-screen Tart G19 passed 1/1 with a replicated note, confirmation, and Cancel; two independent
+  Tier-2 reviews found no introduced blocker. The pre-existing folder graph race they confirmed is
+  queued separately as `W9.d2.review-folder-graph`. No real Notes store or corpus was used.
+  | Files: ArchiveNotes/macOS/{Sources/ArchiveNotes/{Core,Index,Views},Tests/{ArchiveNotesTests,
+  ArchiveNotesUITests}}, ArchiveNotes/{CLAUDE.md,scripts/GUI-HARNESS.md}, old/review-folder-graph-delete-race-
+  2026-09-26.md, SUITE_TODO.md | S | low | done
+
 ## W9 gap-closure — Phase B wire the built-but-dead features (2026-09-18–19)
 
 - [x] **`W9.b2` — note-level Zotero attachments and clickable citation chips [M · Tier-2].** **SHIPPED

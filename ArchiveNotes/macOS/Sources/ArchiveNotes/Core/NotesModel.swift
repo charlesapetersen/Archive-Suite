@@ -103,6 +103,16 @@ final class NotesModel: ObservableObject {
         pendingOpen = OpenRequest(id: id, block: block, token: openToken)
     }
 
+    /// Reveal a note's own Markdown file in Finder. The path is derived from NoteStore, and Finder
+    /// only selects the file; all note-store writes remain behind NoteStore.
+    func revealInFinder(_ id: UUID) async {
+        guard let noteStore else { return }
+        do {
+            let url = try await noteStore.mdURL(for: id)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch { statusMessage = "Couldn't reveal the note in Finder." }
+    }
+
     /// Copy a path-independent link that opens this note or extract. The single-link action writes
     /// plain text so external writing tools receive a clickable `archivenotes://open` URL.
     @discardableResult
@@ -1261,6 +1271,16 @@ final class NotesModel: ObservableObject {
         // arrive after the caller had already shown a modal naming the notes it was about to delete —
         // and this method's whole job is to delete notes, so the refusal has to come first (W23.m15).
         guard !refuseSystemFolder(folderId) else { return }
+        // Hold the user-confirmed candidate set before deleting the folder, and drain adds/moves that
+        // already passed their guard. A placement admitted while the alert was open can rescue an item;
+        // the fresh orphan set returned below then keeps that item out of Trash.
+        let guarded = Array(Set(stranded))
+        organization.beginHardDelete(guarded)
+        defer { organization.endHardDelete(guarded) }
+        do {
+            for id in guarded { try await organization.drainMembershipWritesForConfirmedDelete(item: id) }
+        } catch { report(error, "prepare to delete the stranded notes"); return }
+
         let orphaned: [UUID]
         do {
             orphaned = try await organization.deleteFolder(folderId)   // removes memberships, reparents children
@@ -1271,12 +1291,6 @@ final class NotesModel: ObservableObject {
         // modal and this confirm rescues its item from deletion (it keeps its other membership).
         let confirmed = Set(stranded)
         let toTrash = orphaned.filter { confirmed.contains($0) }
-        // The orphan verdict must stay true until the files are gone, so the hard-delete window opens
-        // here rather than inside `trashItems` alone (W23.h3-fu) — `deleteFolder` already suspended on
-        // the DB, and the trash suspends again. Nested with the primitive's own window; the refcount
-        // composes, and `defer` balances it on every exit path.
-        organization.beginHardDelete(toTrash)
-        defer { organization.endHardDelete(toTrash) }
         // Trashes, drops the rows of the ones that really went, reloads, and says so when the disk
         // refused one — that refusal is what makes this method's "still discoverable" promise real.
         await trashItems(toTrash)

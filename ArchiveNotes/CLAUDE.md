@@ -365,7 +365,8 @@ macOS/Sources/ArchiveNotes/
     NoteTitleTextField.swift       AppKit inline-title field: Return/Escape/blank semantics and
                                    identity-guarded failed-save restoration (W9.b3)
     NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
-                                   Move to Folder ▸ / Remove-from-scope — the a11y/keyboard drag path (W6-S5)
+                                   Open / Reveal / New from Template / Set Quality + confirmed whole-item Delete
+                                   (W9.d2); Add/Move folder and scoped Remove — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
     NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView,

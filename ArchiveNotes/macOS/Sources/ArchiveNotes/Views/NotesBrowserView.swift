@@ -75,9 +75,8 @@ struct NotesBrowserView: View {
                 )
             }
         }
-        // The mandatory delete-last-instance confirmation (§3.6, W6-S5). Set by a guarded membership
-        // removal (Remove-from-folder / MOVE source-removal); no note is deleted until the user
-        // confirms here. "Permanently" is the spec wording — the note actually moves to the Trash.
+        // The mandatory delete confirmation (§3.6, W6-S5). Set by a guarded membership removal or
+        // the whole-item context action; no note is deleted until the user confirms.
         .alert("Delete “\(nav.pendingDeletion?.title ?? "")”?",
                isPresented: Binding(get: { nav.pendingDeletion != nil },
                                     set: { if !$0 { nav.pendingDeletion = nil } }),
@@ -89,7 +88,11 @@ struct NotesBrowserView: View {
             Button("Cancel", role: .cancel) { }
                 .accessibilityIdentifier("an.dialog.deleteLastInstance.cancel")
         } message: { pending in
-            Text("This is the only remaining instance of “\(pending.title)” — deleting it removes the note permanently.")
+            if pending.allInstances {
+                Text("This removes every folder placement for “\(pending.title)” and moves the note to the Trash.")
+            } else {
+                Text("This is the only remaining instance of “\(pending.title)” — deleting it moves the note to the Trash.")
+            }
         }
     }
 
