@@ -76,6 +76,9 @@ public struct CorpusFingerprintEntry: Sendable, Equatable {
 /// What a fingerprint-only walk established. It deliberately has the same honest absence gate as
 /// `CorpusScanResult`: a cancelled/denied/partial walk cannot turn missing cache rows into deletions.
 public struct CorpusFingerprintScanResult: Sendable {
+    /// The walker-resolved root spelling, for comparison against discovered entry paths only. This is
+    /// not a persisted path or a security-scoped URL; callers must not reopen it as authority.
+    public let rootPath: String?
     public let entries: [CorpusFingerprintEntry]
     public let unreadable: [CorpusReadFailure]
     public let directoryErrors: [CorpusReadFailure]
@@ -89,9 +92,10 @@ public struct CorpusFingerprintScanResult: Sendable {
     public var completed: Bool { !rootUnreadable && !cancelled }
     public var isClean: Bool { completed && unreadable.isEmpty && directoryErrors.isEmpty }
 
-    public init(entries: [CorpusFingerprintEntry], unreadable: [CorpusReadFailure],
+    public init(rootPath: String? = nil, entries: [CorpusFingerprintEntry], unreadable: [CorpusReadFailure],
                 directoryErrors: [CorpusReadFailure], filesSeen: Int, vanishedMidScan: Int,
                 rootUnreadable: Bool, cancelled: Bool) {
+        self.rootPath = rootPath
         self.entries = entries
         self.unreadable = unreadable
         self.directoryErrors = directoryErrors
@@ -613,7 +617,7 @@ public enum CorpusWalker {
             // SAME way `scan` does, or a warm root would revalidate as zero files against rows the full
             // walk had just written — every one of them "deleted".
             guard let enumerationRoot = canonicalRoot(root) else {
-                return CorpusFingerprintScanResult(entries: [], unreadable: [], directoryErrors: [],
+                return CorpusFingerprintScanResult(rootPath: nil, entries: [], unreadable: [], directoryErrors: [],
                                                    filesSeen: 0, vanishedMidScan: 0,
                                                    rootUnreadable: true, cancelled: false)
             }
@@ -635,7 +639,7 @@ public enum CorpusWalker {
                     return true
                 }
             ) else {
-                return CorpusFingerprintScanResult(entries: [], unreadable: [], directoryErrors: [],
+                return CorpusFingerprintScanResult(rootPath: nil, entries: [], unreadable: [], directoryErrors: [],
                                                    filesSeen: 0, vanishedMidScan: 0,
                                                    rootUnreadable: true, cancelled: false)
             }
@@ -658,7 +662,9 @@ public enum CorpusWalker {
 
             if !filesSeen.isMultiple(of: options.batchSize) { onProgress?(filesSeen) }
 
-            return CorpusFingerprintScanResult(entries: entries,
+            return CorpusFingerprintScanResult(rootPath: discoveredPathPrefix(for: root) ??
+                                               enumerationRoot.path,
+                                               entries: entries,
                                                unreadable: unreadable,
                                                directoryErrors: errorSink.drain(),
                                                filesSeen: filesSeen,

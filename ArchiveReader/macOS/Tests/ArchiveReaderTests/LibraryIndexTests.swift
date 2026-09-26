@@ -196,6 +196,67 @@ final class LibraryIndexTests: XCTestCase {
         await index.close()
     }
 
+    func testJPEGPartnerTableWarmStartsAndIncompleteWalkRevokesAbsence() async throws {
+        let identity = root()
+        let jpegRoot = scratch.appendingPathComponent("JPEGS", isDirectory: true)
+        let jpeg = jpegRoot.appendingPathComponent("Relocated Collection/scan.HEIC")
+        try FileManager.default.createDirectory(at: jpeg.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try Data("scratch image".utf8).write(to: jpeg)
+
+        let freshScan = CorpusWalker.scanFingerprints(root: jpegRoot)
+        let freshIndex = JPEGPartnerIndex(jpegRoot: jpegRoot, scan: freshScan)
+        XCTAssertTrue(freshIndex.isClean)
+        let dbURL = scratch.appendingPathComponent("jpeg-library-index.sqlite3")
+        let index = LibraryIndex(url: dbURL)
+        let loaded = try await index.revalidatedJPEGPartnerIndex(
+            for: identity, jpegRoot: jpegRoot, scan: freshScan)
+
+        XCTAssertEqual(loaded.candidates.count, 1)
+        XCTAssertEqual(loaded.candidates.first?.path, freshIndex.candidates.first?.path)
+        XCTAssertEqual(loaded.candidates.first?.collectionContext, "Relocated Collection")
+        let pdf = scratch.appendingPathComponent("MAIN/Old Collection/scan.pdf")
+        XCTAssertEqual(loaded.resolve(pdfURL: pdf, mainRoot: scratch.appendingPathComponent("MAIN")),
+                       .match(URL(fileURLWithPath: try XCTUnwrap(freshIndex.candidates.first?.path))))
+
+        await index.close()
+        let warm = LibraryIndex(url: dbURL)
+        let warmIndex = try await warm.revalidatedJPEGPartnerIndex(
+            for: identity, jpegRoot: jpegRoot, scan: freshScan)
+        XCTAssertEqual(warmIndex.candidates, loaded.candidates,
+                       "the stem/path/context/fingerprint table survives a fresh LibraryIndex")
+
+        try Data("replacement bytes changed size".utf8).write(to: jpeg)
+        let changedScan = CorpusWalker.scanFingerprints(root: jpegRoot)
+        let refreshed = try await warm.revalidatedJPEGPartnerIndex(
+            for: identity, jpegRoot: jpegRoot, scan: changedScan)
+        XCTAssertNotEqual(refreshed.candidates.first?.fingerprint, loaded.candidates.first?.fingerprint,
+                          "a changed file fingerprint replaces the warm stem row")
+
+        let incompleteScan = CorpusFingerprintScanResult(
+            entries: changedScan.entries,
+            unreadable: [],
+            directoryErrors: [CorpusReadFailure(url: jpegRoot, reason: "scratch denial")],
+            filesSeen: changedScan.filesSeen,
+            vanishedMidScan: changedScan.vanishedMidScan,
+            rootUnreadable: false,
+            cancelled: false
+        )
+        let afterPartial = try await warm.revalidatedJPEGPartnerIndex(
+            for: identity, jpegRoot: jpegRoot, scan: incompleteScan)
+        XCTAssertEqual(afterPartial.resolve(pdfURL: pdf,
+                                             mainRoot: scratch.appendingPathComponent("MAIN")), .unknown,
+                       "a partial pass is unknown even though prior clean rows remain cached")
+
+        let afterRepair = try await warm.revalidatedJPEGPartnerIndex(
+            for: identity, jpegRoot: jpegRoot, scan: changedScan)
+        XCTAssertEqual(afterRepair.resolve(pdfURL: pdf,
+                                            mainRoot: scratch.appendingPathComponent("MAIN")),
+                       .match(try XCTUnwrap(changedScan.entries.first?.url)),
+                       "the next clean pass restores the authoritative index")
+        await warm.close()
+    }
+
     func testByteExactContainmentRejectsSiblingsAndTraversal() {
         let root = LibraryIndexPath("/archive/root")
         XCTAssertTrue(LibraryIndexPath("/archive/root/report.pdf").isContained(in: root))

@@ -906,13 +906,6 @@ launch safeguards; the gate rotates one route per run.
   `~/Desktop/Google Drive/Archival Photos/`, a copy of the `.dtBase2`, a fresh output store; resolve §9 open
   decisions. Next step = **DTI-0 spike & ground-truth** on a DB copy. | HIGH risk · Tier-2 · **needs:** owner
   + corpus-safety
-- [ ] **W24.jpeg1a — the JPEG partner index, in ArchiveCore [M · Tier-2 · scratch trees only].** First slice of
-  `W24.jpeg1` (split 2026-09-24 so each session has a completion point; the design is the parent entry below,
-  read it first). Settle the storage sub-decision (parent design §2, last bullet) and record the choice in this
-  entry's DONE write-up. Build the walk-built `stem → [path]` index with collection context over a JPEGS
-  subtree, the three-step resolution (mirrored subpath → indexed stem → refuse when ambiguous), and the
-  clean-pass rule (partner *unknown* on an incomplete walk, never "none"). Unit tests on generated scratch trees
-  that reproduce the relocated, mirrored, none and ambiguous cases. No Reader UI, no `DurableLink` change.
 - [ ] **W24.jpeg1b — `DurableLink` pins the resolved JPEG path [S-M · Tier-2 · shared ArchiveCore]**
   (blocked-on: W24.jpeg1a). Second slice of `W24.jpeg1`; parent design §3. The JPEG field is optional because
   9.3% of PDFs have no partner, not for compatibility: no parser for older link shapes (no production

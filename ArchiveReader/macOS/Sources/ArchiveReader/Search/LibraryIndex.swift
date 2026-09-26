@@ -179,6 +179,32 @@ actor LibraryIndex {
                 );
                 """)
             try exec("CREATE INDEX IF NOT EXISTS entry_root_tracked ON entry(root_id, tracked);")
+            try exec("""
+                CREATE TABLE IF NOT EXISTS jpeg_partner_scan (
+                  root_id      INTEGER NOT NULL REFERENCES root(id),
+                  subtree_path TEXT COLLATE BINARY NOT NULL,
+                  scanned_at   REAL NOT NULL,
+                  files_seen   INTEGER NOT NULL,
+                  clean        INTEGER NOT NULL,
+                  PRIMARY KEY(root_id, subtree_path)
+                );
+                """)
+            try exec("""
+                CREATE TABLE IF NOT EXISTS jpeg_partner (
+                  root_id           INTEGER NOT NULL REFERENCES root(id),
+                  subtree_path      TEXT COLLATE BINARY NOT NULL,
+                  stem              TEXT COLLATE BINARY NOT NULL,
+                  path              TEXT COLLATE BINARY NOT NULL,
+                  collection_context TEXT COLLATE BINARY NOT NULL,
+                  mtime             REAL NOT NULL,
+                  ctime             REAL NOT NULL,
+                  size              INTEGER NOT NULL,
+                  ino               INTEGER NOT NULL,
+                  is_dataless       INTEGER NOT NULL,
+                  PRIMARY KEY(root_id, subtree_path, path)
+                );
+                """)
+            try exec("CREATE INDEX IF NOT EXISTS jpeg_partner_stem ON jpeg_partner(root_id, subtree_path, stem);")
         } catch {
             discardHandle()
             throw error
@@ -186,6 +212,135 @@ actor LibraryIndex {
     }
 
     func close() { discardHandle() }
+
+    /// Revalidate the persisted JPEG stem table against a fresh fingerprint walk, then warm-start from
+    /// SQLite when every candidate path and fingerprint still matches. A partial/denied pass revokes the
+    /// clean marker and preserves prior rows, but always returns an index whose lookups are `unknown`.
+    func revalidatedJPEGPartnerIndex(for root: LibraryIndexRoot, jpegRoot: URL,
+                                     scan: CorpusFingerprintScanResult,
+                                     scannedAt: Date = Date()) throws -> JPEGPartnerIndex {
+        let fresh = JPEGPartnerIndex(jpegRoot: jpegRoot, scan: scan)
+        guard fresh.isClean else {
+            try storeJPEGPartnerIndex(fresh, for: root, scannedAt: scannedAt)
+            return fresh
+        }
+        if let cached = try cachedJPEGPartnerIndex(for: root, jpegRoot: jpegRoot),
+           cached.candidates == fresh.candidates {
+            return cached
+        }
+        try storeJPEGPartnerIndex(fresh, for: root, scannedAt: scannedAt)
+        return fresh
+    }
+
+    /// Persist the JPEG stem index in the same disposable DB as the Reader's discovery cache. A partial
+    /// or denied walk revokes the clean marker but preserves old rows for a later revalidation pass.
+    private func storeJPEGPartnerIndex(_ partnerIndex: JPEGPartnerIndex, for root: LibraryIndexRoot,
+                                       scannedAt: Date) throws {
+        try open()
+        guard let rootID = try rootID(for: root, create: true) else {
+            throw IndexError.sql("could not create LibraryIndex root for JPEG partner scan")
+        }
+        let subtreePath = LibraryIndexPath(partnerIndex.jpegRootPath).value
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            if partnerIndex.isClean {
+                try run("DELETE FROM jpeg_partner WHERE root_id = ? AND subtree_path = ?;") {
+                    sqlite3_bind_int64($0, 1, rootID)
+                    bindText($0, 2, subtreePath)
+                }
+                for candidate in partnerIndex.candidates {
+                    try run("""
+                        INSERT INTO jpeg_partner(
+                          root_id, subtree_path, stem, path, collection_context,
+                          mtime, ctime, size, ino, is_dataless
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?);
+                        """) { stmt in
+                        sqlite3_bind_int64(stmt, 1, rootID)
+                        bindText(stmt, 2, subtreePath)
+                        bindText(stmt, 3, candidate.stem)
+                        bindText(stmt, 4, LibraryIndexPath(candidate.path).value)
+                        bindText(stmt, 5, candidate.collectionContext)
+                        sqlite3_bind_double(stmt, 6, candidate.fingerprint.mtime)
+                        sqlite3_bind_double(stmt, 7, candidate.fingerprint.ctime)
+                        sqlite3_bind_int64(stmt, 8, candidate.fingerprint.size)
+                        sqlite3_bind_int64(stmt, 9, Int64(bitPattern: candidate.fingerprint.inode))
+                        sqlite3_bind_int(stmt, 10, candidate.fingerprint.isDataless ? 1 : 0)
+                    }
+                }
+            }
+            try run("""
+                INSERT INTO jpeg_partner_scan(root_id,subtree_path,scanned_at,files_seen,clean)
+                VALUES(?,?,?,?,?)
+                ON CONFLICT(root_id,subtree_path) DO UPDATE SET
+                  scanned_at=excluded.scanned_at, files_seen=excluded.files_seen, clean=excluded.clean;
+                """) {
+                sqlite3_bind_int64($0, 1, rootID)
+                bindText($0, 2, subtreePath)
+                sqlite3_bind_double($0, 3, scannedAt.timeIntervalSince1970)
+                sqlite3_bind_int64($0, 4, Int64(partnerIndex.filesSeen))
+                sqlite3_bind_int($0, 5, partnerIndex.isClean ? 1 : 0)
+            }
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// Load only a stem table established by a clean fingerprint walk. Nil means the partner state is
+    /// unknown (no walk yet, or the latest walk was incomplete), not that a PDF has no partner.
+    private func cachedJPEGPartnerIndex(for root: LibraryIndexRoot,
+                                        jpegRoot: URL) throws -> JPEGPartnerIndex? {
+        try open()
+        guard let rootID = try rootID(for: root, create: false) else { return nil }
+        let subtreePath = LibraryIndexPath(jpegRoot).value
+        var filesSeen = 0
+        guard let scan = prepare("""
+            SELECT files_seen, clean FROM jpeg_partner_scan WHERE root_id = ? AND subtree_path = ?;
+            """) else { throw IndexError.sql(lastMessage) }
+        sqlite3_bind_int64(scan, 1, rootID)
+        bindText(scan, 2, subtreePath)
+        let scanResult = sqlite3_step(scan)
+        if scanResult == SQLITE_ROW {
+            filesSeen = Int(sqlite3_column_int64(scan, 0))
+            guard sqlite3_column_int(scan, 1) != 0 else {
+                sqlite3_finalize(scan)
+                return nil
+            }
+        } else {
+            sqlite3_finalize(scan)
+            if scanResult != SQLITE_DONE { throw IndexError.sql(lastMessage) }
+            return nil
+        }
+        sqlite3_finalize(scan)
+
+        guard let stmt = prepare("""
+            SELECT stem,path,collection_context,mtime,ctime,size,ino,is_dataless
+            FROM jpeg_partner WHERE root_id = ? AND subtree_path = ?;
+            """) else { throw IndexError.sql(lastMessage) }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, rootID)
+        bindText(stmt, 2, subtreePath)
+        var candidates: [JPEGPartnerCandidate] = []
+        while true {
+            let result = sqlite3_step(stmt)
+            if result == SQLITE_DONE { break }
+            guard result == SQLITE_ROW else { throw IndexError.sql(lastMessage) }
+            guard let stem = text(stmt, 0), let path = text(stmt, 1),
+                  let context = text(stmt, 2) else {
+                throw IndexError.sql("malformed JPEG partner row")
+            }
+            candidates.append(JPEGPartnerCandidate(
+                stem: stem, path: path, collectionContext: context,
+                fingerprint: CorpusFileFingerprint(
+                    mtime: sqlite3_column_double(stmt, 3), ctime: sqlite3_column_double(stmt, 4),
+                    size: sqlite3_column_int64(stmt, 5),
+                    inode: UInt64(bitPattern: sqlite3_column_int64(stmt, 6)),
+                    isDataless: sqlite3_column_int(stmt, 7) != 0)))
+        }
+        return JPEGPartnerIndex(jpegRootPath: subtreePath, candidates: candidates,
+                                isClean: true, filesSeen: filesSeen)
+    }
 
     /// Load a root's complete cache in one query. A partial/crashed newest scan still returns rows,
     /// but with `asOf == nil`; callers must render them as cache/unverified and stay non-settled.
