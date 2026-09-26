@@ -99,8 +99,8 @@ warn_unmarked_keychain_provider() {
   missing="$(keychain_unmarked_present_provider_accounts "$STATE/keychain-partition-fixed" "$login_keychain")"
   [ -n "$missing" ] || return 0
   missing="$(printf '%s\n' "$missing" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
-  echo "WARNING: Keychain partition repair predates present provider key(s): $missing"
-  echo "  Run ./ops/autonomous/fix-keychain-access.sh before unattended OCR; it needs one login-password entry."
+  echo "WARNING: provider Keychain item(s) changed since partition repair; re-verify CLI access: $missing"
+  echo "  An in-app Always Allow can also change item metadata. If /usr/bin/security prompts, run ./ops/autonomous/fix-keychain-access.sh before unattended OCR."
 }
 
 # Optional `--dry-run` as the FIRST arg: preview the resolved launch mode + exit BEFORE any install/launch.

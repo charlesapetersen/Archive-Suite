@@ -753,32 +753,6 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W21.seed-fu2 — the stale-marker Keychain warning compares NAMES, so it misses the case that actually breaks the CLI [S · MED · ops].**
-  `W21.seed-fu` (`2c4ff4e`) warns at start when a present provider account is absent from the partition-repair
-  marker's name list. Wrong axis. Measured 2026-08-24: Gemini **is** named in the marker, yet the CLI could not
-  read it, and running the proven helper by hand returns `Gateway`, never Gemini — silent exactly where the owner
-  needed it. That silence is what let the `W21.e2e-fu2` E2E rerun stall for two minutes on 2026-08-19.
-  ⚠️ **Root cause corrected 2026-08-24 — it is NOT key rotation.** The first reading of Gemini's 2026-08-13 `mdat`
-  was inferred as a rotated key. Reproduced live instead: repair at 15:40:31 left Gemini CLI-readable in 0s; an
-  in-app **Always Allow** click at 15:44:29 bumped its `mdat` and the CLI blocked again, while untouched Anthropic
-  and Mistral kept their 2026-07-17 `mdat` and stayed readable. So an item's partition list is evicted by the APP,
-  and 2026-08-13 was the same click, not a re-add.
-  Fix: warn when a present provider item's `mdat` is newer than the marker timestamp, keeping the name check for a
-  wholly unlisted account. ⛔ Note the false-positive mode before designing it: any in-app Always Allow bumps `mdat`
-  without necessarily breaking the CLI, so a bare newer-than test will cry wolf — record per-item `mdat` at repair
-  time and compare per item, or state plainly that the warning means "re-verify", not "broken".
-  ⛔ **Normalise the clocks.** Keychain `mdat` is UTC (trailing `Z`); the marker's first field is written by
-  `date '+%F %T'`, i.e. LOCAL. Comparing them as strings or as same-zone timestamps is wrong by the UTC offset —
-  done accidentally on 2026-08-24, which reported a correctly-covered Gemini as `NEWER than repair`. On a
-  US/Pacific machine that is a 7-8 hour window in which a broken item reads as fine, or a fine one as broken.
-  Convert both to epoch seconds before comparing, and pin it with a fixture whose `mdat` sits inside that offset.
-  **Folded in (owner, 2026-08-24): `Gateway` does not belong in `KEYCHAIN_PROVIDER_ACCOUNTS`.** Nothing reads it
-  through the CLI — a repo-wide sweep of `find-generic-password` finds only Gemini plus the two variable-driven
-  call sites (the attribute probe and the repair itself). It is an app-owned item, the same category as
-  `DriveClientSecret`, which that same file deliberately excludes for that exact reason. Its presence is why the
-  helper reports it, and reading it prompts. Drop it, or say in the file why it stays.
-  Extend the hermetic fake-Keychain proof with a modified-after-marker fixture; it must fail before the fix. No key,
-  no network, no GUI. | files: ops/autonomous/{keychain-provider-accounts.sh,daemon.sh,tests/prove-keychain-partition.sh} | S | med | open
 - [ ] **W21.seed-fu3 — `fix-keychain-access.sh`'s closing instructions undo the repair they just performed [S · MED · ops · docs].**
   Its final block tells the owner to run the repair, then launch the app and click **Always Allow** on each provider
   prompt. Measured 2026-08-24: that click is precisely what evicts `apple-tool:,apple:` from the item's partition

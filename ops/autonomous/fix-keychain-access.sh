@@ -24,8 +24,8 @@ SVC="$KEYCHAIN_PROVIDER_SERVICE"
 LOGIN_KC="$HOME/Library/Keychains/login.keychain-db"
 # All LLM-provider key accounts the app stores under $SVC (the ones a smoke/E2E run reads via /usr/bin/
 # security). MUST include Mistral — scripts/test-smoke.sh reads it via the CLI, so omitting it would leave a
-# live prompt while this script reports success. Non-provider items (Drive secrets, gateway config) are left
-# alone: the CLI never reads them, so touching their partition lists would risk an app re-prompt for no gain.
+# live prompt while this script reports success. App-owned items (Drive secrets and Gateway) are left alone:
+# the CLI never reads them, so touching their partition lists would risk an app re-prompt for no gain.
 CANDIDATES=("${KEYCHAIN_PROVIDER_ACCOUNTS[@]}")
 
 echo "== fix-keychain-access =="
@@ -59,6 +59,7 @@ if ! security unlock-keychain -p "$PW" "$LOGIN_KC" 2>/dev/null; then
 fi
 
 rc=0
+mdat_records=()
 for a in "${present[@]}"; do
   # -S apple-tool:,apple: — REPLACES the partition list with Apple's code partitions, which is what a
   # command-line tool needs. This is the standard, documented recipe for the "security wants to use your
@@ -72,12 +73,37 @@ for a in "${present[@]}"; do
 done
 PW=""   # drop it from this shell's memory promptly
 
-# Durable marker so `daemon.sh status` can stop nagging (reading the partition list itself would need auth).
-# Records WHICH accounts were fixed, so daemon.sh can warn if a NEW key (e.g. an OpenAI key added later) is
-# present but not yet covered — the exact "added a provider after running this" gap.
+# Capture each item's post-repair modification date. Keychain emits UTC with a trailing Z. The marker keeps
+# the human-readable local repair timestamp for compatibility and adds per-item UTC baselines so a later
+# Always Allow edit can be detected without flagging unrelated account updates.
+if [ "$rc" -eq 0 ]; then
+  for a in "${present[@]}"; do
+    mdat="$(keychain_provider_item_mdat "$a" "$LOGIN_KC")"
+    if [[ "$mdat" =~ ^[0-9]{14}Z$ ]]; then
+      mdat_records+=("mdat|$a|$mdat")
+    else
+      echo "  ✗ $a — could not read its modification date; marker not advanced"
+      rc=1
+    fi
+  done
+fi
+
+# Durable marker so `daemon.sh` can check for newly added or changed items without reading the partition list
+# (which would need auth). Alongside the readable repair time and account list, record each item's UTC mdat.
 STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"
 if [ "$rc" -eq 0 ]; then
-  mkdir -p "$STATE" 2>/dev/null && printf '%s | %s\n' "$(date '+%F %T')" "${present[*]}" > "$STATE/keychain-partition-fixed" 2>/dev/null || true
+  marker="$STATE/keychain-partition-fixed"
+  marker_tmp="$STATE/.keychain-partition-fixed.$$"
+  if mkdir -p "$STATE" 2>/dev/null && {
+    printf '%s | %s\n' "$(date '+%F %T')" "${present[*]}"
+    printf '%s\n' "${mdat_records[@]}"
+  } > "$marker_tmp" 2>/dev/null && mv -f "$marker_tmp" "$marker" 2>/dev/null; then
+    :
+  else
+    rm -f "$marker_tmp" 2>/dev/null || true
+    echo "✗ Could not write the durable repair marker; the partition repair is not recorded."
+    rc=1
+  fi
 fi
 
 echo

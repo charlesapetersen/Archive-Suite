@@ -6503,6 +6503,14 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **W21.seed-fu2 — ✅ SHIPPED 2026-09-26 (this commit).** Daemon startup now compares each present
+  provider item's Keychain `mdat` with its recorded post-repair baseline, using epoch seconds to handle UTC
+  versus local timestamps. Legacy markers remain supported; app-owned `Gateway` is removed from the CLI-read
+  provider list. Warnings ask for access re-verification because metadata changes do not prove access broke.
+  Repair marker writes are atomic and fail visibly if they cannot be recorded. The fake-Keychain proof passed
+  18/18, including the Pacific offset, prior name-only blind spot, and marker-write failure. No real Keychain or
+  key was accessed. | ops/autonomous | S | med | done
+
 - [x] **W21.verify — recheck the three release `// VERIFY` desk checks against current vendor documentation.**
   **SHIPPED 2026-09-26 (this commit).** OpenAI's live model page still lists GPT-5.4 mini at $0.75 input / $4.50 output
   per million tokens and identifies it as reasoning-capable with `none` effort by default. The built-in model
