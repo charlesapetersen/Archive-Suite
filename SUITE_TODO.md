@@ -753,9 +753,11 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · owner
-  decision needed].** Partly fixed 2026-07-29: the *silence* is closed (see `ArchiveProcessor/KNOWN_ISSUES.md`
-  top entry) but the **routing still skips every non-PDF file in any run containing a multi-page PDF**.
+- [ ] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · Tier-2].**
+  Owner reconfirmed 2026-09-26: process the PDF and image subsets in one run; the image-only tagging
+  choice recorded below still binds. Partly fixed 2026-07-29: the *silence* is closed (see
+  `ArchiveProcessor/KNOWN_ISSUES.md` top entry) but the **routing still skips every non-PDF file in any run
+  containing a multi-page PDF**.
   - **The fix:** partition at `OCRProcessor+Pipeline.swift:1607` — `reOCRSet = files.filter(isMultiPagePDF)`,
     `imageSet = rest` — and run the re-OCR transform over `reOCRSet` then the standard path over `imageSet`
     in one run, instead of handing the unfiltered array to `performMultiPagePDFReOCR` (line 1634).
@@ -779,7 +781,7 @@ launch safeguards; the gate rotates one route per run.
     `imageExts` filter excludes `.pdf` so the driver **cannot form a mixed drop today**; add a functional case
     (mixed drop → the image writes its 2-page PDF **and** the PDF writes its 2N-page rebuild).
   - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
-  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | **owner**
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | none
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
@@ -921,20 +923,22 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
   W9.e2, W9.e3). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
   convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
 
-- [ ] **W33.storage — unified suite storage path** [needs scoping · Tier-2, separately gated]. Behaviour/data
-  follow-on; W0 already unified the *code*. **Given a real tag 2026-08-16** — it was filed as `**(later)**`,
-  and the tag grammar shared by `check-handoff.sh`'s `items()` and `check-tracker-sync.sh` matches
-  `^[A-Za-z0-9][A-Za-z0-9._-]*` after stripping bold, so a leading `(` made `match()` fail and the item was
-  dropped from BOTH guards before either could compare it. It was the 28th item invisible to the daemon and
-  neither guard could ever have said so — see `W31.handoff-fp2`. **Scope it before working it:** its only
-  surviving sub-bullet is DROPPED (below), so what "unified storage path" now means is undecided.
-  **Moved to the plan's HOLD QUEUE 2026-09-24.** It had reached the head of the WORK QUEUE, where every daemon
-  session would have spent its item guessing a scope that only the owner can set. The owner either defines it
-  or closes it.
-  - ~~Reader parses/**hides** `ArchiveSuite` in-UI; corpus **back-fill** + Processor **stamping**~~ — **DROPPED
-    (owner 2026-07-16; R13d shipped the removal).** Nothing consumes or emits the old marker, so there is
-    nothing to hide, back-fill, or stamp. This also removes the only reason for a corpus-wide tag back-fill —
-    the Suite's single highest-risk operation. Do not re-propose it.
+## Cross-app date display — owner-promoted 2026-09-26
+
+- [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.**
+  Owner direction (2026-07-31 Daemon Report, in response to the W23.l4 `Calendar` deviation); owner promoted
+  it from the deferred ideas list into the active work queue 2026-09-26. Two halves:
+  (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
+  does, and it must stay the canonical on-disk form, so this item does not change storage; (b) the
+  **rendering** calendar becomes a user choice **per note and per document**, defaulting **off** in
+  Settings — with it enabled (a medievalist's mode), each item offers a choice of calendar systems
+  (Julian, Julian-with-1752-English-cutover, French Republican, Hebrew, Islamic, …) for display and for
+  the date-entry validator's "N days in that month" rule. Supersedes the narrower fix of hard-coding the
+  Anglo-American 1752 cutover: `GregorianDay` fixes the switchover at **1582**, so a genuine English or
+  colonial `1700-02-29` is rejected today — under this design that becomes a *display/validation profile*
+  rather than a global constant. Not urgent: the working corpus begins 1789, after every candidate
+  cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
+  Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | L | none
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -1098,17 +1102,3 @@ Design-level ideas the owner wants recorded but explicitly de-prioritised. An au
   headless JVM coverage of the logic — which is what `./gradlew --offline testDebugUnitTest` already gives —
   state plainly in the commit that the pixels are unverified, and do NOT open a new Daemon Report entry
   about the missing lane.** One line in the Session Log is enough. Revisit only if the owner asks.
-
-- [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.**
-  Owner direction (2026-07-31 Daemon Report, in response to the W23.l4 `Calendar` deviation). Two halves:
-  (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
-  does, and it must stay the canonical on-disk form, so this item does not change storage; (b) the
-  **rendering** calendar becomes a user choice **per note and per document**, defaulting **off** in
-  Settings — with it enabled (a medievalist's mode), each item offers a choice of calendar systems
-  (Julian, Julian-with-1752-English-cutover, French Republican, Hebrew, Islamic, …) for display and for
-  the date-entry validator's "N days in that month" rule. Supersedes the narrower fix of hard-coding the
-  Anglo-American 1752 cutover: `GregorianDay` fixes the switchover at **1582**, so a genuine English or
-  colonial `1700-02-29` is rejected today — under this design that becomes a *display/validation profile*
-  rather than a global constant. Not urgent: the working corpus begins 1789, after every candidate
-  cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
-  Settings; Reader display parity to be scoped with it. | Notes | Tier-2 | L | **deferred — owner-scoped**

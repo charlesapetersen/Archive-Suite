@@ -8,6 +8,15 @@ single 3,580-line file).
 reasons: the completion notes cite the commits that shipped each item, and several carry the *reasoning* for
 why a later change may or may not revisit that code.
 
+## Owner queue decisions — 2026-09-26
+
+- [x] **W33.storage — unified suite storage path.** **CLOSED 2026-09-26 (this commit) by owner decision.**
+  W0 already unified the code, and the only proposed storage behavior was the `ArchiveSuite` marker with
+  Reader hiding, Processor stamping, and a corpus backfill. The owner dropped that proposal 2026-07-16;
+  R13d removed the marker. With no remaining defined behavior, the owner chose to close W33 rather than
+  keep an undefined item in the hold queue. This closure makes no storage or corpus change. The item had
+  been hidden from tracker parsers under the old `(later)` tag until W31.handoff-fp2 exposed it.
+
 ## Processor de-duplication — Wave 12
 
 - [x] **De-dup sweep from the 2026-07-04 maintainability audit — REMAINDER ONLY.** **SHIPPED 2026-09-26 (this commit).** The five earlier genuine remainders shipped as rotation sharing (`af8cf66`), transient OCR messages and Gemini batch-cancel URL sharing (`6c52dd4`), `OCRResult.with` copies (`94d4ef6`), and segment-JSON sidecar sharing (`cf4f509`, `6d9a877`). This final change centralizes `ThinkingLevel.budgetTokens(for:)` and the Anthropic OCR `max_tokens` bump. It preserves the separate Low/High budgets for document OCR (1024/8000), text completion (1024/4000), and classification (512/2000), as well as the original Anthropic OCR output allowance. The six-value key-free table and two ceiling checks pass; the Processor Debug build and the real Mac + headless Android synthetic phone-to-Mac OCR round trip pass (three PDFs, expected tokens and years, phone screenshots). The earlier owner/keyed note is satisfied by the owner's authorization for these checked-in synthetic fixture documents and the prompt-free Gemini key; no real corpus was touched. An unrelated, pre-existing Anthropic collection-name ceiling mismatch is queued as `W12.dedup-fu1`.
@@ -2672,7 +2681,7 @@ explain why not.
   **The item had no tag, and that was the actual reason it kept going stale.** Both `W26.reinfect` and
   `despotlight.md` §Site 7 cite it as `SUITE_TODO.md:1048`; it was at line 1384 by the time this ran — 336
   lines out. It is now **`W24.jpeg1`** (the `W24.*` namespace already holds owner-decided items that are
-  not for the daemon queue, e.g. `W24.cal1`).
+  not for the daemon queue at the time; `W24.cal1` was later promoted on 2026-09-26).
 
   **The original queue exclusion was historical and is superseded.** At the time this note was written,
   `W24.jpeg1` was kept out of the plan queue because §3 changes `DurableLink`, a cross-app contract then
