@@ -93,6 +93,10 @@ grep -q 'fixture-password' "$SECURITY_LOG" && bad "fixture password leaked into 
 grep -qx 'mdat|Gemini|20260819000000Z' "$MARKER" \
   && grep -qx 'mdat|OpenAI|20260819000000Z' "$MARKER" \
   && ok "marker captures each repaired item's UTC modification date" || bad "per-item UTC baselines missing: $(cat "$MARKER" 2>/dev/null)"
+case "$OUT" in
+  *"launch.sh processor"*|*"Always Allow"*) bad "repair output still asks for app confirmation" ;;
+  *) ok "repair output stays on the CLI path" ;;
+esac
 
 echo "[2] a partial repair never advances the durable marker"
 rm -f "$MARKER"; : > "$SECURITY_LOG"
@@ -138,6 +142,13 @@ OLD_AXIS="$(PATH="$T/bin:$PATH" KEYCHAIN_PRESENT=Gemini bash -c '
 UNCHANGED="$(PATH="$T/bin:$PATH" KEYCHAIN_PRESENT=Gemini KEYCHAIN_MDAT_Gemini=20260819000000Z TZ="$TZ" \
   bash -c '. "$1"; keychain_unmarked_present_provider_accounts "$2" "$3"' _ "$LIB" "$MARKER" "$LOGIN")"
 [ -z "$UNCHANGED" ] && ok "an unchanged per-item mdat stays quiet" || bad "unchanged item was flagged: $UNCHANGED"
+
+echo "[6] operator docs no longer prescribe app confirmation"
+if grep -q 'Then launch the app once' "$HERE/../README.md" || grep -q 'ONE more step to be safe' "$FIX"; then
+  bad "an app confirmation instruction remains"
+else
+  ok "script and guide leave app access alone"
+fi
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="

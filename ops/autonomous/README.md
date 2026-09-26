@@ -404,15 +404,16 @@ productive session and wakes you.
 
 **Fix — run once (needs your login password, so it can't be in the daemon):**
 ```bash
-./ops/autonomous/fix-keychain-access.sh    # adds apple:,apple-tool: to each key item's partition list
+./ops/autonomous/fix-keychain-access.sh    # sets CLI-read items to apple-tool:,apple:
 ```
-Then launch the app once (`./launch.sh processor`) and click **Always Allow** for each provider item it prompts
-for; Settings reads credentials eagerly, so a fully unseeded machine can show about six prompts. This confirms
-the app still has access under the new partition list. **Re-run after rotating/re-adding any API key** (a
-re-created item gets a fresh, empty partition list). `daemon.sh status --details` shows whether the fix is
-applied, and if it is *not*, the default view says so under **Needs you** without the flag. Before a start,
-`daemon.sh` also warns if a provider key exists but was added after the marker's recorded account list.
-(Owner chose this over env-key injection to keep keys in the Keychain — no plaintext key file.)
+This repairs CLI access only. Leave the app alone; do not launch Processor or click **Always Allow** as a
+confirmation step, since an in-app grant can change the item's partition access again. **Re-run after
+rotating/re-adding any API key** (a re-created item gets a fresh, empty partition list). `daemon.sh status --details`
+shows whether the repair marker exists, and if it does not, the default view says so under **Needs you**
+without the flag. Before a start, `daemon.sh` warns for a present provider absent from the marker or
+whose `mdat` changed since repair; re-verify CLI access because an in-app grant can also change metadata
+without breaking CLI access. (Owner chose this over env-key injection to keep keys in the Keychain — no
+plaintext key file.)
 
 ## Reading `daemon.log` when the run is down (exit reasons, added 2026-07-29)
 

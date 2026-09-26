@@ -14,6 +14,15 @@ fail the repair visibly if they cannot be persisted. The fake-Keychain proof pas
 pair spanning the Pacific UTC offset, the former name-only blind spot, and a blocked marker-write case. No real
 Keychain was read or changed.
 
+## ✅ FIXED (W21.seed-fu3): app confirmation could re-break CLI Keychain access
+
+The repair helper used to direct the owner to launch Processor and click **Always Allow** after setting
+`apple-tool:,apple:`. That app confirmation could change the same item's partition access and make the CLI
+prompt again; the guide repeated the instruction. The owner chose to keep this repair CLI-only and leave app
+access alone. The helper and operator guide now state that boundary, and the hermetic fake-Keychain proof
+asserts that the repair output contains no app launch or **Always Allow** step and the guide does not prescribe
+one. The hermetic proof passes 20/20. No app, real Keychain, or GUI was opened.
+
 ---
 
 ## ✅ FIXED (W28.cert-fu2): a normal Processor Debug build could not launch under the suite's self-signed certificate

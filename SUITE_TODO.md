@@ -753,20 +753,6 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W21.seed-fu3 — `fix-keychain-access.sh`'s closing instructions undo the repair they just performed [S · MED · ops · docs].**
-  Its final block tells the owner to run the repair, then launch the app and click **Always Allow** on each provider
-  prompt. Measured 2026-08-24: that click is precisely what evicts `apple-tool:,apple:` from the item's partition
-  list and re-breaks `/usr/bin/security`, so the documented last step reverses the fix for every item the app
-  prompts on. The header already half-knows this — it warns that `-S` REPLACES the list and that the app's own
-  grant "can also live in that list" — but then prescribes the sequence anyway and calls the confirm step "NOT
-  optional". [I] It is also unbounded rather than one-time: the Processor is self-signed with no Team ID
-  (`d03413c`), so its partition entry is a per-build `cdhash:` and it will re-prompt after every rebuild.
-  Decide and then say ONE thing: either set a union partition list that carries the app's own partition alongside
-  the Apple ones, or tell the owner to click plain **Allow** rather than Always Allow, or drop the app-confirm step
-  as stale — `ops/gui/README.md` §3 already says GUI verification runs off-screen in the Tart VM and the host grant
-  no longer matters, which is the likeliest answer. Owner's standing call 2026-08-24 was the third: repair the CLI
-  path and leave the app alone. Docs-only unless the union route is chosen. No key, no network, no GUI.
-  | files: ops/autonomous/fix-keychain-access.sh, ops/autonomous/README.md | S | med | open
 - [ ] **W21.e2e-verify — `W21.e2e-fu2` is ticked DONE but its round-trip was never run on real hardware [S · MED · MONEY · daemon-runnable].**
   `3767702` changed how the test-only LAN READY line publishes the bearer CaptureServer authenticates, and it is
   ticked in `SUITE_TODO_DONE.md`. Its evidence is a fresh Debug build, the scratch-only Recovery driver at ALL PASS

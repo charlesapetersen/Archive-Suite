@@ -11,9 +11,9 @@
 # keeps prompting no matter how many times you click it. This sets each item's partition list to Apple's code
 # partitions (apple:, apple-tool:), which is what lets /usr/bin/security read them without prompting.
 #
-# CAVEAT: `-S` REPLACES the partition list (there is no append). On modern macOS the app's own "Always Allow"
-# can also live in that list, so replacing it may make the APP re-prompt ONCE — hence the "confirm the app"
-# step printed at the end is NOT optional. Recoverable (one click), never a lockout.
+# CAVEAT: `-S` REPLACES the partition list (there is no append). This helper deliberately repairs the CLI
+# identity only; app access is separate. Do not launch the Processor or grant app access as a confirmation
+# step here.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -109,14 +109,8 @@ fi
 echo
 if [ "$rc" -eq 0 ]; then
   cat <<EOF
-Done. /usr/bin/security can now read those items without prompting, so the daemon's test-smoke gate won't
-wake you again for them.
-
-ONE more step to be safe — confirm the APP still has access under the new partition list:
-  ./launch.sh processor
-If the Processor prompts for a key, click **Always Allow** for that provider item — Settings reads providers
-eagerly, so a fully unseeded machine can show about six prompts. Do this now, while you're here, so an
-unattended GUI-verify session never hangs on one later.
+Done. This repairs `/usr/bin/security` access for the listed provider items. App access is separate; do not
+launch the Processor or grant app access as part of this CLI repair.
 
 Re-run this script after you rotate or re-add any API key.
 EOF

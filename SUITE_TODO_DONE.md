@@ -6511,6 +6511,12 @@ explain why not.
   18/18, including the Pacific offset, prior name-only blind spot, and marker-write failure. No real Keychain or
   key was accessed. | ops/autonomous | S | med | done
 
+- [x] **W21.seed-fu3 — ✅ SHIPPED 2026-09-26 (this commit).** The Keychain repair now stays on the CLI lane:
+  it sets Apple's CLI partition list and gives no instruction to launch Processor or grant app access. The
+  operator guide states the same boundary and explains that `mdat` changes call for CLI re-verification, not an
+  assumed access failure. The fake-Keychain proof checks both the emitted repair guidance and operator docs;
+  all 20 checks passed. No app, real Keychain, or GUI was opened. | ops/autonomous | S | med | done
+
 - [x] **W21.verify — recheck the three release `// VERIFY` desk checks against current vendor documentation.**
   **SHIPPED 2026-09-26 (this commit).** OpenAI's live model page still lists GPT-5.4 mini at $0.75 input / $4.50 output
   per million tokens and identifies it as reasoning-capable with `none` effort by default. The built-in model
