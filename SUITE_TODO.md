@@ -753,31 +753,6 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W21.e2e-verify — `W21.e2e-fu2` is ticked DONE but its round-trip was never run on real hardware [S · MED · MONEY · daemon-runnable].**
-  `3767702` changed how the test-only LAN READY line publishes the bearer CaptureServer authenticates, and it is
-  ticked in `SUITE_TODO_DONE.md`. Its evidence is a fresh Debug build, the scratch-only Recovery driver at ALL PASS
-  across all three formats, and an independent adversarial review that caught a real stderr leak and a stale guide.
-  What it does NOT have is a single run of the thing it changed: `scripts/e2e-phone-mac.sh`, the only test that
-  composes both real apps — emulator running the identical Android build, injecting known fixtures through the real
-  capture path, to a headless Mac doing real Gemini OCR — was attempted on 2026-08-19 and never started, because the
-  Keychain Gemini lookup blocked before any app, emulator, OCR request or output.
-  ⚠️ **Why this is filed at all (2026-08-24):** that fact lived only in the 2026-08-19 Daemon Report entry, and the
-  walkthrough that day closed that entry under a `### ✅` anchor — in a gitignored file. So a shipped-and-ticked item
-  with an unrun verification had no representation in either tracker. Ticking a box on a scratch proof while the
-  composed gate never fires is the vacuous-pass shape this repo keeps re-learning; the point of this item is that the
-  gap is now visible to `next-queue-item.sh`.
-  ✅ **The blocker is cleared.** The partition-list repair was re-run 2026-08-24 15:52:13 and Gemini reads prompt-free
-  from `/usr/bin/security`, so `OCR_KEY` can stay unset and the Keychain fallback is itself part of what gets proved.
-  Run `caffeinate -di scripts/e2e-phone-mac.sh` from `ArchiveProcessor` and let `KEEP_EMU` default to `onfail` so a
-  failure leaves the emulator inspectable. Prereqs verified present 2026-08-24: AVD `ap_test36`, adb, emulator,
-  xcodegen, and all three fixtures plus `ground_truth.json`.
-  ⛔ If the Processor prompts for a provider key mid-run, click plain **Allow**, never **Always Allow** — the latter
-  evicts `apple-tool:,apple:` from the partition list and breaks the CLI underneath the running test (see
-  `W21.seed-fu3`). Cost is a few cents: 3 fixtures through `gemini-2.5-flash-lite`, isolated output under
-  `/tmp/ap-e2e-*` at umask 077, never the real corpus. On PASS, say so in the Session Log and note that the composed
-  gate has finally fired; on FAIL, the first question is whether it is the bearer change, the Keychain path, or
-  emulator flake — the scratch driver passing means environment is the likelier of the three, not the certain one.
-  | files: ArchiveProcessor/scripts/{e2e-phone-mac.sh,E2E-PHONE-MAC.md} | S | med | open
 - [ ] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · owner
   decision needed].** Partly fixed 2026-07-29: the *silence* is closed (see `ArchiveProcessor/KNOWN_ISSUES.md`
   top entry) but the **routing still skips every non-PDF file in any run containing a multi-page PDF**.

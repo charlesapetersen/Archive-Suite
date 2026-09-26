@@ -6680,6 +6680,18 @@ explain why not.
   LiveCaptureRecoveryTestDriver.swift, scripts/{e2e-phone-mac,android-ui-drive}.sh,
   scripts/E2E-PHONE-MAC.md | XS | med | Tier-2
 
+- [x] **W21.e2e-verify — run the composed W21.e2e-fu2 phone↔Mac gate [S · MED · MONEY].**
+  **VERIFIED 2026-09-26 (this commit).** `scripts/e2e-phone-mac.sh` completed on the real Mac and
+  headless Android emulator with the checked-in synthetic fixtures and real Gemini OCR. The fallback
+  Gemini Keychain lookup succeeded without `OCR_KEY` or a prompt. The app published the high-entropy
+  LAN bearer in its READY line; pairing, capture, OCR, and finalize completed. Three PDFs were filed,
+  and `assert_mac.py` found each expected token and year; all required phone screenshots were present.
+  The run exited 0 with `RESULT: PASS` and retained its report under
+  `/tmp/ap-e2e-w3-cap-r3-fu3-20260926-04/REPORT.txt`. This closes the verification gap left when
+  W21.e2e-fu2 shipped after a preflight Keychain block. Output and backups stayed in that private `/tmp`
+  run directory; no real corpus was used. The owner authorized the synthetic fixture transfer to Gemini.
+  | Files: SUITE_TODO.md, ArchiveProcessor/KNOWN_ISSUES.md | S | med | done
+
 - [x] **W21.smoke — fix stale de-nesting paths in `ArchiveProcessor/scripts/test-smoke.sh` [S].** **SHIPPED
   2026-08-19** (**this commit**). The script starts at `ArchiveProcessor/`, but its app selector still named the
   old nested directory removed by de-nesting `7706368`, so both its build command and launch path were wrong.

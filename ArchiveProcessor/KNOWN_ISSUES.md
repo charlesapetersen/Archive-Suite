@@ -64,25 +64,20 @@ neither debugger entitlement.
 only while it is visible, and waits for it to disappear; the old `KEYCODE_ESCAPE` path was mutation-proven
 to leave Gboard over `Connect`.
 
-The first complete pairing attempt exposed W16.lan2's stale READY credential (tracked separately below).
-Until that source seam is corrected (`W21.e2e-fu2`, Tier-2 — not owner-gated since 2026-08-13), the harness reads the persisted high-entropy LAN token used
-by `CaptureServer`, never logs or screenshots it, redacts the stale relay code from READY/Mac-log artifacts,
-and makes the entire run directory owner-private. Both raw backup and finalized output now stay under the
-per-run `/tmp` root. The exact current harness completed all three emulator→Mac fixtures through OCR and
-finalize, with every unique token + year and every required phone screenshot present.
+The first complete pairing attempt exposed W16.lan2's stale READY credential, later corrected by
+`W21.e2e-fu2`. The harness keeps the LAN bearer out of logs and screenshots and retains raw backup and
+finalized output under a private `/tmp` run directory. The composed gate passed on 2026-09-26 with all
+three emulator→Mac fixtures, OCR tokens, years, and required phone screenshots present.
 
-## ⚠️ OPEN (W21.e2e-fu2): the test-only LAN READY line publishes the cloud-relay credential
+## ✅ FIXED AND VERIFIED (W21.e2e-fu2, W21.e2e-verify): LAN READY publishes the authenticated bearer
 
-**Found 2026-08-13 while running W21.e2e-fu1.** W16.lan2 correctly split the six-character Drive relay
-`token` from the 32-character `lanToken` authenticated by `CaptureServer`, but
-`CaptureSession.serverDidStart` still writes `token` in its `LIVECAPTURE_READY` line. A phone that pairs
-with that advertised value reaches the Mac and gets HTTP 401; the E2E screenshot and UI diagnostic both
-confirmed the mismatch before any photo or paid OCR call.
-
-The scripts-only W21.e2e-fu1 workaround reads the persisted `LiveCaptureLANToken` used by the running
-server. The source seam should still be corrected so its LAN READY contract is truthful, while
-`relayReceiverDidStart` keeps publishing the relay token. That change lives in `Capture/` and is therefore
-parked for a named owner authorization; do not fold it into an unrelated harness edit.
+The test-only `LIVECAPTURE_READY` line once published the six-character Drive relay token, while LAN
+`CaptureServer` authenticated a separate high-entropy `lanToken`; pairing with READY then returned HTTP
+401. `W21.e2e-fu2` (`3767702`) made the LAN line publish the actual bearer, kept the relay line on its
+separate token, and redacted bearer-bearing artifacts. Its first composed test attempt stopped at the
+Gemini Keychain preflight. On 2026-09-26, the full synthetic phone↔Mac run passed with prompt-free
+Keychain fallback, pairing, real OCR, three finalized PDFs, all expected tokens and years, and the
+required phone screenshots. The output was isolated under `/tmp/ap-e2e-w3-cap-r3-fu3-20260926-04`.
 
 ## ✅ FIXED (W3.cap-r3-fu8): manifest resume no longer disguises a failed segment as staged
 
