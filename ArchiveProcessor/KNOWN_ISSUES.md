@@ -15,6 +15,17 @@ misses the changed, already-listed item. No real Keychain was read or changed.
 
 The implementation is checkpointed locally; publication and the daemon plan tick are pending.
 
+## ✅ FIXED LOCALLY (W21.seed-fu3): app confirmation could re-break CLI Keychain access
+
+The repair helper used to direct the owner to launch Processor and click **Always Allow** after setting
+`apple-tool:,apple:`. That app confirmation could change the same item's partition access and make the CLI
+prompt again; the guide repeated the instruction. The owner chose to keep this repair CLI-only and leave app
+access alone. The helper and operator guide now state that boundary, and the hermetic fake-Keychain proof
+asserts that the repair output contains no app launch or **Always Allow** step and the guide does not prescribe
+one. The hermetic proof passes 17/17. No app, real Keychain, or GUI was opened.
+
+The implementation is checkpointed locally; publication and the daemon plan tick are pending.
+
 ---
 
 ## ✅ FIXED (W28.cert-fu2): a normal Processor Debug build could not launch under the suite's self-signed certificate

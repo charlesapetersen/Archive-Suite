@@ -794,8 +794,10 @@ launch safeguards; the gate rotates one route per run.
   the Apple ones, or tell the owner to click plain **Allow** rather than Always Allow, or drop the app-confirm step
   as stale — `ops/gui/README.md` §3 already says GUI verification runs off-screen in the Tart VM and the host grant
   no longer matters, which is the likeliest answer. Owner's standing call 2026-08-24 was the third: repair the CLI
-  path and leave the app alone. Docs-only unless the union route is chosen. No key, no network, no GUI.
-  | files: ops/autonomous/fix-keychain-access.sh, ops/autonomous/README.md | S | med | open
+  path and leave the app alone. Local checkpoint removes the app-confirmation step, makes the repair CLI-only
+  in the script and operator guide, and adds proof assertions that neither asks to launch the app or click
+  **Always Allow**. Remains open until publication and daemon-plan recording. No key, network, or GUI.
+  | files: ops/autonomous/fix-keychain-access.sh, ops/autonomous/README.md, ops/autonomous/tests/prove-keychain-partition.sh | S | med | open
 - [ ] **W21.e2e-verify — `W21.e2e-fu2` is ticked DONE but its round-trip was never run on real hardware [S · MED · MONEY · daemon-runnable].**
   `3767702` changed how the test-only LAN READY line publishes the bearer CaptureServer authenticates, and it is
   ticked in `SUITE_TODO_DONE.md`. Its evidence is a fresh Debug build, the scratch-only Recovery driver at ALL PASS
