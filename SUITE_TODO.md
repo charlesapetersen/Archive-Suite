@@ -1104,29 +1104,6 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
 > fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
 > except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu4 [LOW · behaviour decision]** `LiveCaptureProcessor.swift:1215` — after Finish the app
-  ✅ **DECIDED by the owner 2026-08-13: REMEMBER FILED GROUPS; refuse the join and message the operator.**
-  Add a durable "filed this session" set so a late page for an already-filed group gets the same honest "kept in
-  the Backup Folder, start a NEW segment" message it would have received two seconds earlier, instead of
-  silently opening a second one-page document. **Keeping `finalizedGroups` populated was OFFERED AND NOT
-  TAKEN**, on the ground the item itself records: `isFinalized` also gates `CaptureSession.removePhotoIfSafe`,
-  which would then refuse to remove pages of a group whose sources are already retired — so the durable set is
-  the cleaner of the two and does not inherit that side effect. Accepting the second document with a warning was
-  also offered and not taken. Tier-2 (Capture), scratch only.
-  forgets that a groupId was ever filed, so a late re-upload silently opens a SECOND document for it instead
-  of being told it cannot join. `finalize` drops each filed group from `finalizedGroups`, which is the only
-  record that it finalized — so the "a late page arrived … kept in the Backup Folder, start a NEW segment"
-  message the app shows for that same re-upload two seconds EARLIER (while the segment is staged) stops
-  applying the moment the batch files, and the page is treated as belonging to a brand-new group. Post-`fu1`
-  it at least buys its OCR and the second document carries text (pre-`fu1` that document was filed with none,
-  which is why `fu1` ranked above this); either way the operator ends up with an extra one-page document they
-  did not ask for, and no message. Found by `fu1`'s adversarial pass, which deliberately left it: closing it
-  needs a durable "filed this session" set, or keeping `finalizedGroups` populated and fixing what else reads
-  it (`isFinalized` gates `CaptureSession.removePhotoIfSafe`, which would then refuse to remove pages of a
-  group whose sources are already retired). That is a behaviour decision like `-fu3`'s, not a bug fix. ⚠️ Do
-  NOT "fix" it by re-arming a started-once guard over a page with no call — that is exactly the `fu1` bug.
-  Pre-existing. | Capture | Tier-2
-
 ## Processor/Net — WS11 paced re-review findings (2026-07-18, autonomous)
 Lean **delta** re-review of the **LAN/USB surface** of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/`
 (owner carve-out, REVIEW.md L63–67: review CaptureServer/CaptureReceiver/CaptureValidation/USBBridge/

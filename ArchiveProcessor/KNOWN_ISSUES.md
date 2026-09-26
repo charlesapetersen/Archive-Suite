@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED (W3.cap-r3-fu4): a late page could create a second filed document
+
+After Finish, Live Capture now retains filed group IDs through cleanup and relaunch. A late page for one
+of those groups stays in the Backup Folder with an instruction to start a new segment, instead of silently
+opening another one-page document. The fix shipped in `92671c8`; independent Tier-2 review, scratch
+recovery and manifest-persistence checks, and the synthetic phone↔Mac round trip passed by 2026-09-26.
+
 ## ✅ FIXED (W3.cap-r3-fu3): deleting a staged Live Capture page degraded its PDF
 
 `CaptureSession.removePhoto` now refuses ✕ when the live segment is staged or mid-finalize and tells the

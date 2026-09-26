@@ -8539,6 +8539,20 @@ explain why not.
   it makes real Gemini/Mistral OCR calls and this change touches no request shape, matching how `-fu1`/`-fu2`
   were verified. No migration written because there is nothing to migrate. Leaves `-fu3`, `-fu4`, `-fu6` open.
 
+- [x] **W3.cap-r3-fu4 [LOW] — remember filed Live Capture groups — ✅ SHIPPED 2026-09-26**
+  (`92671c8` code; this commit, trackers). The owner chose a durable "filed this session" set. A late
+  page or retry for a group already filed stays in the Backup Folder and prompts the operator to start a
+  new segment; it cannot silently buy another OCR call and open a second document. The filed IDs survive
+  session cleanup and relaunch. The code also preserves staged recovery data if the ledger cannot be
+  committed after an output move, and checks that staging manifest before Stage-for-later handoff.
+  Keeping `finalizedGroups` populated was declined because `isFinalized` also guards
+  `CaptureSession.removePhotoIfSafe`; a separate durable set avoids changing that behavior.
+  Independent Tier-2 find/refute review, Processor Debug build, scratch recovery and manifest-persistence
+  suites passed at the checkpoint. The current scratch recovery suite passed again on 2026-09-26,
+  including late-page, relaunch, and ledger-failure checks. The synthetic phone↔Mac E2E passed on the
+  same Capture/Net source revision: all three expected document tokens and years reached output PDFs in
+  `/tmp/ap-e2e-w3-cap-r3-fu3-20260926-04`. No real corpus was used.
+
 - [x] **W3.cap-r3-fu3 [LOW] — refuse removal of a staged page — ✅ SHIPPED 2026-09-26**
   (`d8f1c08` code; this commit, trackers). The owner chose to refuse ✕ once a segment is staged or
   staging and explain that retry/re-stage is required before removing a page. `CaptureSession.removePhoto`
