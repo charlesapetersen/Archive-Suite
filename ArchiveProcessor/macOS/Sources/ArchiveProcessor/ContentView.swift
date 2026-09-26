@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var mode: Mode = (
         ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1"
         || ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim
+        || ProcessorUITestConfiguration.showsLiveCaptureEmptyPaneClear
     ) ? .live : .files
 #else
     @State private var mode: Mode =
@@ -43,6 +44,9 @@ struct ContentView: View {
             // flag: no receiver, OCR, Keychain, network, source, or output directory is touched.
             if ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim {
                 capture.liveProcessor._uiTestShowFinishingScrim()
+            }
+            if ProcessorUITestConfiguration.showsLiveCaptureEmptyPaneClear {
+                capture.liveProcessor._uiTestShowEmptyPaneClear()
             }
 #endif
             LiveCaptureTestDriver.runIfRequested(session: capture)

@@ -8077,6 +8077,16 @@ explain why not.
   are in the Trash and discards every correction silently; pre-existing, promoted from two-step to one tap by
   this arm). | Capture/Views | Tier-2
 
+- [x] **W3.cap-r3-fu12-fu1 — ✅ SHIPPED 2026-09-26 (this commit).** After the emptied-pane arm made Clear
+  reachable beside the free "Cancel finish" action, its label still sounded harmless and one click discarded
+  paid staged work plus the only on-screen record of which segments a partial finish did not file. Per the
+  owner's decision, the label now counts processed documents (and separately names staged Box/Folder markers)
+  and opens a destructive confirmation. Its copy states that the finish summary is cleared, received photos go
+  to the recoverable Trash, and processed PDFs remain in the backup folder but are no longer offered for filing.
+  The photos-present arm keeps its existing Clear behavior. Tier-2 fixture uses in-memory staged records and an
+  app-owned temporary backup path; Processor Debug build and all 6 off-screen VM UI tests passed, including
+  Cancel and Discard. | Capture/Views | Tier-2
+
 - [x] **W3.cap-r3-fu9-fu1 [LOW · ops/UX] — ✅ DONE 2026-08-04** (`124652f` the button + the guard; `f311f75`
   Test 24 + round-1 mutants; `483dc8a` the adversarial pass and the fix it forced; this commit, trackers).
   `LiveCaptureProcessor.cancelPendingFinish()` was correct code with **no caller in the shipped UI** — its only

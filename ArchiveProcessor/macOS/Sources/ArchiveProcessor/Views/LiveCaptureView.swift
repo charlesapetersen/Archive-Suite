@@ -20,6 +20,7 @@ struct LiveCaptureView: View {
     @AppStorage(DefaultsKeys.outputDirectory) private var outputDirPath: String = ""
     // A1 — shared Processing-list state: which segment is expanded.
     @State private var expandedSegmentID: String?
+    @State private var confirmingEmptyPaneClear = false
 
     // W3.cap-r3-fu9 — the two per-item action sheets' targets are NOT `@State` here: they live on
     // `liveProc`, because the finish flow has to be able to see that one of them is up before it raises the
@@ -464,15 +465,54 @@ struct LiveCaptureView: View {
     /// photos-present arm ("throw away the photos you can see") is exactly the meaning that is ABSENT in the
     /// second arm, where `photos` is already empty and what Clear discards is the app's memory of processed,
     /// paid-for segments. It sits immediately beside "Cancel finish", which costs nothing. So the tooltip says
-    /// what is dropped and what survives, in both arms. ⚠️ It does NOT make the label self-describing, and
-    /// there is still no count and no confirmation — that, plus the fact that Clear also wipes
-    /// `finalizeSummary` (the only on-screen record of what a PARTLY-failed finish did not file), is filed as
-    /// `W3.cap-r3-fu12-fu1` rather than decided here.
+    /// what is dropped and what survives in the photos-present arm. In the emptied-pane arm, the button names
+    /// the staged-document count and confirms the action; that confirmation explicitly says the finish summary
+    /// is cleared too.
     @ViewBuilder private var clearButton: some View {
-        Button("Clear") { liveProc.clearSession() }
+        Button(clearButtonTitle) {
+            if session.photos.isEmpty {
+                confirmingEmptyPaneClear = true
+            } else {
+                liveProc.clearSession()
+            }
+        }
             .disabled(liveProc.isFinalizing || liveProc.stagingRecoveryBlocked)
             .accessibilityIdentifier("live.clear")
             .help("Abandon this session: received photos go to the Trash (recoverable) and the app forgets every processed segment. Already-processed PDFs stay in the Backup Folder's _processed subfolder — but they are no longer offered for filing.")
+            .confirmationDialog(emptyPaneClearTitle, isPresented: $confirmingEmptyPaneClear,
+                                titleVisibility: .visible) {
+                Button("Discard", role: .destructive) { liveProc.clearSession() }
+                    .accessibilityIdentifier("live.clear-confirm")
+                Button("Cancel", role: .cancel) {}
+                    .accessibilityIdentifier("live.clear-cancel")
+            } message: {
+                Text(emptyPaneClearMessage)
+            }
+    }
+
+    private var clearButtonTitle: String {
+        guard session.photos.isEmpty else { return "Clear" }
+        let documents = stagedDocumentCount
+        let markers = liveProc.staged.count - documents
+        if documents == 0 && markers == 0 { return "Discard session" }
+        if markers == 0 { return "Discard \(documents) processed document\(documents == 1 ? "" : "s")" }
+        return "Discard \(documents) processed document\(documents == 1 ? "" : "s") + \(markers) Box/Folder marker\(markers == 1 ? "" : "s")"
+    }
+
+    private var emptyPaneClearTitle: String {
+        let documents = stagedDocumentCount
+        let markers = liveProc.staged.count - documents
+        if documents == 0 && markers == 0 { return "Discard this session?" }
+        if markers == 0 { return "Discard \(documents) processed document\(documents == 1 ? "" : "s")?" }
+        return "Discard \(documents) processed document\(documents == 1 ? "" : "s") and \(markers) Box/Folder marker\(markers == 1 ? "" : "s")?"
+    }
+
+    private var stagedDocumentCount: Int {
+        liveProc.staged.filter { $0.type == CaptureGroupType.document.rawValue }.count
+    }
+
+    private var emptyPaneClearMessage: String {
+        "This clears the current session, including processed Box/Folder markers and any in-progress status. Any received photos go to the Trash (recoverable). The finish summary, including which segments did not file, is cleared too. Processed PDFs remain in the Backup Folder's _processed folder, but are no longer offered for filing."
     }
 
     /// Live mode, session active. Always show Finish so the user sees where the session ends — grayed with a
@@ -568,12 +608,10 @@ struct LiveCaptureView: View {
                     // sources, so a pane emptied of the rest showed the green "Session complete" summary with
                     // no way to re-Finish or discard what did not make it.
                     //
-                    // ⚠️ TWO COSTS THIS ARM CARRIES, both found by the item's adversarial pass and neither
-                    // papered over. (i) In that same partial-finalize case, **Clear** wipes `finalizeSummary`
-                    // — the only on-screen record of what did not file — along with the roster, so the arm's
-                    // best justification and its most destructive affordance are the same two lines of code.
-                    // Labelled via `clearButton`'s new `.help`; a count and/or a confirmation is
-                    // `W3.cap-r3-fu12-fu1`, deliberately left as a decision rather than guessed at here.
+                    // ⚠️ TWO COSTS THIS ARM CARRIES, both found by the item's adversarial pass. (i) In that
+                    // same partial-finalize case, **Clear** wipes `finalizeSummary` — the only on-screen record
+                    // of what did not file — along with the roster. `W3.cap-r3-fu12-fu1` addressed that with a
+                    // count in the button label and a confirmation that says the summary is cleared too.
                     // (ii) With "Review rotation" ON (default OFF), Finish from a ✕-emptied pane raises a
                     // review over pages whose sources are all in the Trash, and
                     // `applyRotationReviewAndFinalize`'s `allSatisfy { fileExists }` filter then discards every

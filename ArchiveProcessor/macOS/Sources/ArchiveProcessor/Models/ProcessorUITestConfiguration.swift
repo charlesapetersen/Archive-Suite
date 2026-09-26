@@ -13,10 +13,25 @@ enum ProcessorUITestConfiguration {
 
     static var inputDirectory: URL? { urlValue(after: "-APUITestInputDirectory") }
     static var outputDirectory: URL? { urlValue(after: "-APUITestOutputDirectory") }
+    /// Every UI-test launch gets an app-owned scratch backup, including Live Capture paths. The test runner
+    /// cannot create this inside the app sandbox, so derive it from this process's temporary directory.
+    static var backupDirectory: URL? {
+        guard isActive else { return nil }
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("archive-processor-uitest-backup-\(ProcessInfo.processInfo.processIdentifier)",
+                                    isDirectory: true)
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+    }
     /// Opens the real Live Capture view with only its non-writing finishing-scrim state armed. This lets the
     /// VM UI test inspect the focus/AX barrier without starting a receiver, OCR, or a finalize operation.
     static var showsLiveCaptureFinishingScrim: Bool {
         isActive && arguments.contains("-APUITestLiveCaptureFinishingScrim")
+    }
+    /// Opens the emptied Captured pane with three synthetic staged documents and a partial-finish summary.
+    /// The UI test can verify the count, confirmation copy, Cancel, and Clear without OCR or disk output.
+    static var showsLiveCaptureEmptyPaneClear: Bool {
+        isActive && arguments.contains("-APUITestLiveCaptureEmptyPaneClear")
     }
     static var droppedPDF: URL? {
         if let path = urlValue(after: "-APUITestDroppedPDFPath") { return path }

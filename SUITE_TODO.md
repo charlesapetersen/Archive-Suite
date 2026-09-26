@@ -1159,27 +1159,6 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
 > fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
 > except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu12-fu1 [LOW · behaviour decision]** `LiveCaptureView.clearButton` — **in the emptied-pane
-  ✅ **DECIDED by the owner 2026-08-13: PUT THE COUNT IN THE LABEL, AND CONFIRM.** The button reads what it
-  does — "Discard 3 processed documents" — and asks before doing it. Both halves of the finding are in scope:
-  it stops reading as harmless beside "Cancel finish" (documented as costing nothing), and abandoning paid work
-  stops being one unconfirmed click. **Also preserve `finalizeSummary`, or state explicitly in the confirmation
-  that the record of what the finish did not file goes with it** — that record was the second half of the
-  complaint and must not be dropped silently. Confirmation-only and hide-when-empty were both offered and not
-  taken (the latter partly reverses `W3.cap-r3-fu12`, which drew that header cluster precisely so stranded
-  staged work stayed reachable). Tier-2 (Capture), scratch only.
-  arm, Clear is an unlabelled, uncounted, unconfirmed "abandon paid work" button, and it wipes the one record
-  of what a partly-failed finish did not file.** `W3.cap-r3-fu12` put it beside "Cancel finish" — which is
-  documented as costing nothing — in a pane whose body reads "Waiting for photos…". It now carries a `.help`
-  saying what is dropped and what survives, but the *label* still says "Clear", not "Discard 3 processed
-  documents", and there is no confirmation; the one honest meaning of "Clear" in the photos-present arm
-  ("throw away the photos you can see") is exactly the meaning that is absent once `photos` is already empty.
-  Worst in the case fu12's own comment cites as a win: after a PARTIAL finalize, `finalizeSummary` is the only
-  on-screen record of which segments did not file, and `clearSessionState` wipes it along with the roster
-  (`clearFinalizeSummary()`). Decide: a count in the label, a confirmation, preserving `finalizeSummary` across
-  a Clear, or that the `.help` is enough. ⚠️ A headless driver can speak to none of the first three (no label,
-  no confirmation, no tooltip); summary-preservation is the only testable piece. Found 2026-08-04 by
-  `W3.cap-r3-fu12`'s adversarial pass. | Capture/Views | Tier-2
 - [ ] **W3.cap-r3-fu12-fu2 [LOW]** `LiveCaptureProcessor.finishSession` page seeding — **with "Review rotation"
   ON, a Finish from a ✕-emptied pane shows a review of pages that cannot load and then discards every
   correction silently.** `finishSession` seeds `rotationReviewPages` from `retained.values`, whose `sourceURL`s

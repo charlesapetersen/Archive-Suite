@@ -127,6 +127,40 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-live-capture-finishing-scrim")
     }
 
+    func testEmptyPaneClearNamesCountAndConfirmsSummaryLoss() throws {
+        relaunch(extra: ["-APUITestLiveCaptureEmptyPaneClear"])
+
+        let clear = element("live.clear")
+        XCTAssertTrue(clear.waitForExistence(timeout: 10), "the emptied pane must offer its abandonment action")
+        XCTAssertEqual(clear.label, "Discard 3 processed documents + 1 Box/Folder marker",
+                       "the button must count documents separately from the staged Box marker")
+
+        clear.click()
+        let confirmation = app.sheets.firstMatch
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5), "Clear must ask before dropping processed work")
+        let message = confirmation.staticTexts.element(boundBy: 1)
+        XCTAssertTrue(message.exists, "the confirmation must include explanatory copy")
+        let copy = renderedText(of: message)
+        XCTAssertTrue(copy.contains("finish summary") && copy.contains("which segments did not file"),
+                      "the confirmation must say that the partial-finish record goes with Clear")
+        XCTAssertTrue(copy.contains("Processed PDFs remain") && copy.contains("no longer offered for filing"),
+                      "the confirmation must explain which recoverable output survives")
+        attachScreenshot("processor-live-clear-confirmation")
+
+        let cancel = element("live.clear-cancel")
+        XCTAssertTrue(cancel.exists, "the confirmation must offer a clear Cancel action")
+        cancel.click()
+        XCTAssertTrue(clear.exists, "Cancel must leave the processed work and its label in place")
+
+        clear.click()
+        let discard = element("live.clear-confirm")
+        XCTAssertTrue(discard.waitForExistence(timeout: 5))
+        discard.click()
+        let cleared = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: clear)
+        XCTAssertEqual(XCTWaiter.wait(for: [cleared], timeout: 5), .completed,
+                       "confirming must clear the session roster")
+    }
+
     private func relaunch(extra: [String] = []) {
         app.terminate()
         app.launchArguments = UITestLaunch.arguments([

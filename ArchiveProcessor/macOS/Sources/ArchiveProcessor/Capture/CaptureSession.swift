@@ -355,6 +355,9 @@ final class CaptureSession: ObservableObject {
         if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"] {
             return URL(fileURLWithPath: testRoot, isDirectory: true)
         }
+#if DEBUG
+        if let uiTestRoot = ProcessorUITestConfiguration.backupDirectory { return uiTestRoot }
+#endif
         let base = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
             ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return base.appendingPathComponent("Archive Processor Live Capture", isDirectory: true)

@@ -216,6 +216,24 @@ final class LiveCaptureProcessor: ObservableObject {
         showFinalizeSheet = false
         showRotationReview = false
     }
+
+    /// DEBUG-only UI fixture for the emptied-pane Clear confirmation. It creates three in-memory staged
+    /// document rows, one Box marker, and the summary of a partial finish without writing outputs, receiving
+    /// photos, or OCR. The marker catches a count that calls every staged segment a document.
+    func _uiTestShowEmptyPaneClear() {
+        let groupIds = ["ui-clear-1", "ui-clear-2", "ui-clear-3", "ui-clear-box"]
+        let types: [CaptureGroupType] = [.document, .document, .document, .box]
+        statuses = groupIds.enumerated().map { index, id in
+            SegmentStatus(id: id, index: index + 1, type: types[index], pageCount: 1, phase: .staged)
+        }
+        staged = groupIds.enumerated().map { index, id in
+            StagedSegment(groupId: id, type: types[index].rawValue,
+                          collectionKey: "__unfiled__", order: index + 1,
+                          pdfURLs: [], imageURLs: [], jsonURL: nil, boxLabelText: nil,
+                          pagesComplete: true, placeholderSources: nil, untaggedOutputs: nil)
+        }
+        finalizeSummary = "⚠️ 1 segment could NOT be filed — its original photo and processed file are kept in the Backup Folder."
+    }
 #endif
     @Published private(set) var finalizeSummary: String?
     /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
