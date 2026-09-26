@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED (W3.cap-r3-fu3): deleting a staged Live Capture page degraded its PDF
+
+`CaptureSession.removePhoto` now refuses ✕ when the live segment is staged or mid-finalize and tells the
+operator to retry/re-stage before removing the page. Previously it trashed the source, so the staged PDF
+could carry a placeholder instead of the scan. The fix shipped in `d8f1c08`; independent Tier-2 review,
+the scratch recovery suite, and the synthetic phone↔Mac round trip passed on 2026-09-26.
+
 ## ✅ FIXED (W21.seed-fu2): daemon Keychain warning missed changed provider items
 
 The old marker comparison only checked account names. An in-app **Always Allow** edit can bump a provider

@@ -8512,6 +8512,19 @@ explain why not.
   it makes real Gemini/Mistral OCR calls and this change touches no request shape, matching how `-fu1`/`-fu2`
   were verified. No migration written because there is nothing to migrate. Leaves `-fu3`, `-fu4`, `-fu6` open.
 
+- [x] **W3.cap-r3-fu3 [LOW] — refuse removal of a staged page — ✅ SHIPPED 2026-09-26**
+  (`d8f1c08` code; this commit, trackers). The owner chose to refuse ✕ once a segment is staged or
+  staging and explain that retry/re-stage is required before removing a page. `CaptureSession.removePhoto`
+  now checks `liveProcessor.isFinalized` before cancelling OCR, trashing the source, or changing the manifest.
+  This keeps a staged PDF from acquiring a placeholder page after its source was removed. The sibling
+  `removePhotoIfSafe` guard remains consistent. Exclude-and-re-stage and an extra affordance were considered
+  and declined by the owner on 2026-08-13. Tier-2 independent review passed at the code checkpoint.
+  Verification in the isolated worktree: Processor Debug build succeeded; headless scratch recovery suite
+  ALL PASS, including the staged-page removal check; synthetic phone↔Mac E2E PASS with all three expected
+  document tokens and years present in the output PDFs, in `/tmp/ap-e2e-w3-cap-r3-fu3-20260926-04`.
+  The original finding was that ✕ could trash a staged page's source, leaving a visible placeholder in a
+  document the operator had meant to remove the page from; W23.h5 retained that source recoverably in Trash.
+
 - [x] **W3.cap-r3-fu2 [LOW · latent] — ✅ DONE 2026-08-03** (`3fdeb00` fix; `71cc4e6` test; this commit,
   mutants + trackers). `retryFailed` dropped every page's `pageTasks` entry without cancelling it — the exact
   mutant (M2) `cap-r3` was measured against, sitting in production 130 lines above that fix. **Shipped as the

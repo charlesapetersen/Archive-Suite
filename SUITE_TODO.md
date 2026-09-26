@@ -1103,23 +1103,6 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
 > as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
 > fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
 > except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-- [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
-  ✅ **DECIDED by the owner 2026-08-13: REFUSE THE DELETE, and say why.** Give `removePhoto` the same
-  `isFinalized` guard `removePhotoIfSafe` already carries two lines below it, and tell the operator the segment
-  is already staged so retry/re-stage is the route. Rationale on record: it is consistent with the sibling
-  function, adds no machinery, and never silently degrades a document — the operator learns immediately instead
-  of finding a placeholder page later. **Exclude-and-re-stage was OFFERED AND NOT TAKEN** (it re-does work
-  already paid for on a live-processing session, and makes ✕ far heavier than it looks), as was the
-  refuse-plus-explicit-re-stage-affordance variant. So the intended behaviour is now settled — do NOT
-  re-litigate it; implement the guard. Tier-2 (Capture), scratch only.
-  `removePhotoIfSafe:606`. An operator ✕ on a page whose segment is already staged (or mid-finalize) trashes
-  the source anyway, so `PDFGenerator.generate` can't embed it and writes a visible PLACEHOLDER image page
-  (`.placeholder` → `.succeededPlaceholderImage` + the finish warning; the source is retained by W23.h5 and
-  the file is recoverable from the Trash). Degraded-but-warned rather than lossy, which is why it is LOW —
-  but it is also the opposite of what the operator asked for: they wanted the page GONE and the staged
-  document now carries a placeholder page for it. Decide the intended behaviour (refuse the delete for a
-  staged segment, as `removePhotoIfSafe` does, vs. exclude the page and re-stage) rather than leaving it
-  incidental. Pre-existing. | Capture | Tier-2
 - [ ] **W3.cap-r3-fu4 [LOW · behaviour decision]** `LiveCaptureProcessor.swift:1215` — after Finish the app
   ✅ **DECIDED by the owner 2026-08-13: REMEMBER FILED GROUPS; refuse the join and message the operator.**
   Add a durable "filed this session" set so a late page for an already-filed group gets the same honest "kept in
