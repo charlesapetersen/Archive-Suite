@@ -628,6 +628,10 @@ final class CaptureSession: ObservableObject {
     /// present is a no-op (nothing trashed either — that stale-value trash was the pre-existing half).
     func removePhoto(_ photo: CapturedPhoto) {
         guard let idx = photos.firstIndex(where: { $0.groupId == photo.groupId && $0.seq == photo.seq }) else { return }
+        if processingMode == .live && liveProcessor.isFinalized(photo.groupId) {
+            statusMessage = "This segment is already staged or being staged. Retry/re-stage it before removing a page."
+            return
+        }
         // W3.cap-r3 — stop this page's paid OCR BEFORE its source goes to the Trash: the page is leaving the
         // session, so nobody will ever read the result. (No-op unless live, and while its segment is
         // mid-finalize — see `photoRemoved`.)

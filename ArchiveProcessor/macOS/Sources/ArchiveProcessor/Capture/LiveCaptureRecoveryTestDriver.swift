@@ -1194,6 +1194,28 @@ enum LiveCaptureRecoveryTestDriver {
                 gate6.open()   // release R6's parked pages; nothing after this ingests
             }
 
+            // 7. W3.cap-r3-fu3: operator deletion must refuse a page whose segment is staged (or staging).
+            // Keep this in the same isolated session so both the JPEG and staging output stay under `tmp`.
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+            r3Send("R7", 1)
+            let stagedPhoto = photo("R7", 1)
+            r3Proc.segmentResolved(groupId: "R7")
+            let staged = await r3Settle { r3Proc.staged.contains { $0.groupId == "R7" } }
+            check("the refusal fixture has a fully staged segment", staged && stagedPhoto != nil)
+            if let stagedPhoto {
+                let sourceBefore = try? Data(contentsOf: stagedPhoto.url)
+                r3Session.removePhoto(stagedPhoto)
+                check("✕ refuses to remove a page from its staged segment",
+                      photo("R7", 1) != nil && r3Proc.isFinalized("R7"))
+                check("...and preserves the source photo on disk",
+                      sourceBefore != nil && (try? Data(contentsOf: stagedPhoto.url)) == sourceBefore)
+                check("...and tells the operator to retry/re-stage before removing a page",
+                      r3Session.statusMessage.localizedCaseInsensitiveContains("already staged")
+                          && r3Session.statusMessage.localizedCaseInsensitiveContains("retry/re-stage"))
+            }
+
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
@@ -2691,8 +2713,8 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
-        // --- Test 24 (W3.cap-r3-fu9-fu1): CANCELLING a pending Finish — the escape that does not cost the
-        // session its source photos.
+        // --- Test 24 (W3.cap-r3-fu9-fu1): CANCELLING a pending Finish from an empty pane after scratch recovery
+        // restores staged output whose source photos are unavailable.
         //
         // WHAT WAS ACTUALLY BROKEN, since it is unusual: `cancelPendingFinish()` was correct code with no
         // caller. Nothing in the shipped UI reached it, so while a Finish was pending the operator's only exit
@@ -2814,15 +2836,14 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
             LiveCaptureProcessor._recoveryTestOCRGate = { await cfGate.wait() }
-            cfSession._recoveryTestBeginLive(
-                config: SessionProcessingConfig(
-                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
-                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: cfOut, contextCharCount: 0, sendPreviousImage: false,
-                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
-                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
-                    textColumns: 1),
-                stagingDir: cfStaging)
+            let cfConfig = SessionProcessingConfig(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                outputDirectory: cfOut, contextCharCount: 0, sendPreviousImage: false,
+                customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                textColumns: 1)
+            cfSession._recoveryTestBeginLive(config: cfConfig, stagingDir: cfStaging)
             let cfProc = cfSession.liveProcessor
             func cfSettle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -2956,39 +2977,37 @@ enum LiveCaptureRecoveryTestDriver {
 
             cfProc.cancelRotationReview()
 
-            // 7. THE PREMISE OF THE SECOND RENDERER, measured rather than argued. `LiveCaptureView` now draws
-            //    the pending-finish row in TWO places, because everything in the Captured pane's header —
-            //    Clear, Finish, the waiting message, and the new Cancel — is gated on `!session.photos.isEmpty`
-            //    while `pendingFinish` is not. This check is the claim that those two can come apart: arm a
-            //    finish held by a still-heartbeating phone, then delete every received page with the
-            //    per-thumbnail ✕, and the flag is STILL set with the pane empty. That is the state in which
-            //    an escape hatch nested inside the photo gate would have closed nothing — the whole reason
-            //    this item's adversarial pass sent the fix back.
+            // 7. THE PREMISE OF THE SECOND RENDERER, measured rather than argued. A prior staged segment can
+            //    be restored even when its original capture photo is missing, leaving no Captured rows while
+            //    staging output remains. The operator can press Finish during a live phone hold in this
+            //    recovered state, so the cancel row must still render outside the photo gate.
             //
             //    Non-vacuity is in the last two terms: `staged` is non-empty (the session still holds unfiled
-            //    work, so this is not a session that has simply ended) and the phone hold is LIVE, so the 5 s
-            //    watchdog re-evaluates and re-holds rather than healing it. Without them the state could be
-            //    dismissed as transient.
+            //    work) and the phone hold is LIVE, so the watchdog re-evaluates and re-holds rather than
+            //    healing it.
             //
-            //    ⚠️ COST, named because it is the section's only side effect outside its temp dir: the ✕ is
-            //    `CaptureSession.removePhoto`, which sends each source to the **Trash** (recoverable, by
-            //    design). Two 64×64 stub JPEGs per run. Driving the operator's real gesture is worth that;
-            //    calling `photoRemoved` directly would prove only half the property.
-            cfSession.updatePhonePending(1)
-            cfProc.requestFinish()
-            let cfArmedBeforeEmptying = cfProc.pendingFinish
-            for p in cfSession.photos { cfSession.removePhoto(p) }
+            //    The missing-source recovery fixture is scratch-only: remove the two stub photos from the
+            //    temporary backup folder, then reload the staged manifest into a fresh empty session.
+            for photo in cfSession.photos { try? fm.removeItem(at: photo.url) }
+            let cfRecoveredSession = CaptureSession()
+            cfRecoveredSession._recoveryTestBeginLive(config: cfConfig, stagingDir: cfStaging)
+            let cfRecoveredProc = cfRecoveredSession.liveProcessor
+            cfRecoveredProc._recoveryTestLoadManifest(stagingDir: cfStaging, config: cfConfig)
+            cfRecoveredSession.updatePhonePending(1)
+            cfRecoveredProc.requestFinish()
+            let cfArmedWithEmptyPane = cfRecoveredProc.pendingFinish
             check("a pending Finish outlives an emptied Captured pane — the state the second renderer exists for (fu9-fu1)",
-                  cfArmedBeforeEmptying && cfSession.photos.isEmpty && cfProc.pendingFinish
-                      && !cfProc.staged.isEmpty && cfSession.phonePendingActive)
+                  cfArmedWithEmptyPane && cfRecoveredSession.photos.isEmpty && cfRecoveredProc.pendingFinish
+                      && cfRecoveredProc.staged.contains { $0.groupId == "C1" }
+                      && cfRecoveredSession.phonePendingActive)
 
             // 8. …and the escape works from THERE, which is the point of rendering it there. Same model call,
             //    a state the view previously drew nothing in at all.
-            cfProc.cancelPendingFinish()
+            cfRecoveredProc.cancelPendingFinish()
             check("the escape works from the emptied pane, and still costs the session nothing (fu9-fu1)",
-                  !cfProc.pendingFinish && cfProc.staged.count == 1
-                      && cfProc.staged.first?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true
-                      && cfSession.statusMessage.contains("Finish cancelled"))
+                  !cfRecoveredProc.pendingFinish && cfRecoveredProc.staged.count == 1
+                      && cfRecoveredProc.staged.first?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true
+                      && cfRecoveredSession.statusMessage.contains("Finish cancelled"))
 
             if let cfPriorReview {
                 UserDefaults.standard.set(cfPriorReview, forKey: DefaultsKeys.reviewRotation)
@@ -3001,14 +3020,13 @@ enum LiveCaptureRecoveryTestDriver {
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
         }
 
-        // --- Test 25 (W3.cap-r3-fu12): what an EMPTIED Captured pane offers while the session still holds
-        // unfiled staged segments — and whether the two things it now offers actually WORK from there.
+        // --- Test 25 (W3.cap-r3-fu12): what an empty Captured pane offers while recovery restores unfiled
+        // staged segments whose source photos are missing — and whether those controls work from there.
         //
         // THE ITEM WAS FILED AS A DECISION, NOT A BUG, so what this section is for needs saying first. The
         // header's whole control cluster is gated on `!session.photos.isEmpty`, while the session's unfiled
-        // work is not: delete every received page with the per-thumbnail ✕ and the segments already OCR'd,
-        // tagged and written to `_processed/` are still there — with no Finish to file them and no Clear to
-        // abandon them. The pane said "Waiting for photos…". The decision taken was to offer the SAME two
+        // work is not: source photos may be missing on recovery while OCR'd, tagged segments in `_processed/`
+        // still await filing. The pane said "Waiting for photos…". The decision taken was to offer the SAME two
         // controls, gated on `LiveCaptureProcessor.hasUnfiledWork`; this section is what makes that decision
         // falsifiable instead of a paragraph in a commit message.
         //
@@ -3023,8 +3041,7 @@ enum LiveCaptureRecoveryTestDriver {
         // GUI lane (`W21.vmgui-d`). `live.clear` / `live.finish` identifiers were added for that lane.
         //
         // WHAT IT DOES PROVE, and each is a property a plausible version of this decision gets wrong:
-        //   • the stranded state is real and the paid work survives reaching it (checks 1-2). Everything else
-        //     is worthless if the segment does not actually outlive the ✕.
+        //   • the recovered empty state is real and the staged work survives reaching it (checks 1-2).
         //   • FINISH FILES FROM THERE (checks 4-5) — the substance of the decision. It is not enough that a
         //     button appears: `requestFinish` runs `session.completeAllOpenDocGroups()` over a session with no
         //     groups left, and had that returned false the finish would have died in its error branch and the
@@ -3089,9 +3106,8 @@ enum LiveCaptureRecoveryTestDriver {
         //      check 8**. The one mutant that is a re-creation of a defect that really existed in this diff.
         //
         // COST (`W21.recovery-timeout`): no wall-clock waits — only settles, and one gate the section opens
-        // itself. Side effects outside its temp dir: three stub JPEGs to the Trash (the ✕ is
-        // `CaptureSession.removePhoto`, recoverable by design — driving the operator's real gesture is worth
-        // that).
+        // itself. Recovery fixtures remove only synthetic JPEGs under the redirected temporary backup root;
+        // no real Trash or corpus paths are involved.
         //
         // ⚠️ FILE SAFETY — STATED CORRECTLY, because the first version of this paragraph was FALSE and an
         // adversarial pass caught it. It claimed "every finalize destination is an explicit `chosenExisting`
@@ -3128,23 +3144,31 @@ enum LiveCaptureRecoveryTestDriver {
             try? fm.createDirectory(at: uwStaging, withIntermediateDirectories: true)
             try? fm.createDirectory(at: uwFiled, withIntermediateDirectories: true)
             let uwGate = TestGate()
-            let uwSession = CaptureSession()
+            var uwSession = CaptureSession()
             LiveCaptureProcessor._recoveryTestOCRStub =
                 OCRResult(text: "stub page text", classification: nil, errorMessage: nil, errorCode: nil)
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]
-            uwSession._recoveryTestBeginLive(
-                config: SessionProcessingConfig(
-                    provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
-                    // `.human` — a document only reaches the LLM in `.automatic`, so every finalize below runs
-                    // for real, for $0, with no network.
-                    taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: uwOut, contextCharCount: 0, sendPreviousImage: false,
-                    customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
-                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
-                    textColumns: 1),
-                stagingDir: uwStaging)
-            let uwProc = uwSession.liveProcessor
+            let uwConfig = SessionProcessingConfig(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                // `.human` — a document only reaches the LLM in `.automatic`, so every finalize below runs
+                // for real, for $0, with no network.
+                taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                outputDirectory: uwOut, contextCharCount: 0, sendPreviousImage: false,
+                customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
+                textColumns: 1)
+            uwSession._recoveryTestBeginLive(config: uwConfig, stagingDir: uwStaging)
+            var uwProc = uwSession.liveProcessor
+            func uwRecoverWithMissingSources() {
+                // Model an interrupted session whose source photos vanished but whose independent staging
+                // manifest and PDFs survived. Everything lives under the test's redirected /tmp roots.
+                for photo in uwSession.photos { try? fm.removeItem(at: photo.url) }
+                uwSession = CaptureSession()
+                uwSession._recoveryTestBeginLive(config: uwConfig, stagingDir: uwStaging)
+                uwProc = uwSession.liveProcessor
+                uwProc._recoveryTestLoadManifest(stagingDir: uwStaging, config: uwConfig)
+            }
             func uwSettle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
                 return cond()
@@ -3181,13 +3205,11 @@ enum LiveCaptureRecoveryTestDriver {
                       && uwProc.statuses.first { $0.id == "U1" }?.phase == .staged
                       && !uwProc.pendingFinish && uwProc.failedGroupIds.isEmpty)
 
-            // 2. PREMISE — THE STRANDED STATE, reached by the operator's real gesture. The ✕ on the last page
-            //    empties both `photos` and the derived `groups`, and the staged segment does not care: its PDF
-            //    is still on disk and still unfiled. Every term after the first two is what makes this the
-            //    photoless-but-live state rather than a session that simply ended — and `!pendingFinish` is
-            //    what makes it a DIFFERENT state from the one fu9-fu1's second renderer already covered.
-            uwEmptyThePane()
-            check("emptying the pane with the ✕ strands a staged segment: no photos, no groups, work outstanding (fu12)",
+            // 2. PREMISE — THE RECOVERED EMPTY STATE. The source photo is missing, but the independent staging
+            //    manifest and PDF survived. This retains Finish/Clear coverage without implying that an ✕ can
+            //    remove a page whose segment is already staged.
+            uwRecoverWithMissingSources()
+            check("recovery keeps staged work available when its source photo is missing (fu12)",
                   uwSession.photos.isEmpty && uwSession.groups.isEmpty
                       && uwProc.staged.count == 1
                       && u1PDFs.allSatisfy { fm.fileExists(atPath: $0.path) }
@@ -3254,7 +3276,7 @@ enum LiveCaptureRecoveryTestDriver {
             uwProc.segmentResolved(groupId: "U2")
             let u2Staged = await uwSettle { uwProc.staged.contains { $0.groupId == "U2" } }
             let u2PDFs = uwProc.staged.first { $0.groupId == "U2" }?.pdfURLs ?? []
-            uwEmptyThePane()
+            uwRecoverWithMissingSources()
             let u2Stranded = u2Staged && uwSession.photos.isEmpty && uwProc.hasUnfiledWork
                 && !u2PDFs.isEmpty && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) }
             uwProc.clearSession()
