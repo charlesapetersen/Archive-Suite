@@ -1636,6 +1636,62 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// G19 — The row's whole-item Delete action confirms before removing every replicated placement,
+    /// then moves the note to Trash. Cancel is a no-op; confirmation is verified against the scratch
+    /// fixture's item directory and canonical organization.json.
+    func testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation() throws {
+        try withFixture { try runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation() }
+    }
+
+    private func runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
+        let id = Self.idPlain
+        let readingPair = [Self.folderReading, id]
+        let ideasPair = [Self.folderIdeas, id]
+        XCTAssertTrue(itemDirs().contains(id), "fixture note should exist before the delete flow")
+        XCTAssertTrue((organizationMemberships() ?? []).contains(readingPair),
+                      "fixture note should start in Reading")
+
+        let row = selectItem(uuid: id)
+
+        // Give the target two placements so the whole-item action proves it clears every instance.
+        row.rightClick()
+        let add = app.menuItems["Add to Folder"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5), "row menu should offer Add to Folder")
+        add.hover()
+        var ideas = add.menuItems["Ideas"]
+        if !ideas.waitForExistence(timeout: 3) { ideas = app.menuItems["Ideas"] }
+        XCTAssertTrue(ideas.waitForExistence(timeout: 5), "Add to Folder should offer Ideas")
+        ideas.click()
+        XCTAssertTrue(pollUntil(timeout: 8) { (organizationMemberships() ?? []).contains(ideasPair) },
+                      "the test note should have two placements before Delete")
+
+        func requestDelete() -> XCUIElement {
+            app.activate()
+            _ = pollUntil(timeout: 8) { app.activate(); return row.isHittable }
+            row.rightClick()
+            let delete = app.menuItems["Delete…"]
+            if delete.waitForExistence(timeout: 4) { delete.click() }
+            return app.descendants(matching: .any)["an.dialog.deleteLastInstance.confirm"]
+        }
+
+        let cancelDialog = requestDelete()
+        XCTAssertTrue(cancelDialog.waitForExistence(timeout: 8), "Delete… should request confirmation")
+        app.descendants(matching: .any)["an.dialog.deleteLastInstance.cancel"].click()
+        _ = pollUntil(timeout: 3) { !cancelDialog.exists }
+        XCTAssertTrue(itemDirs().contains(id), "Cancel must leave the note on disk")
+        XCTAssertTrue((organizationMemberships() ?? []).contains(readingPair), "Cancel must keep Reading")
+        XCTAssertTrue((organizationMemberships() ?? []).contains(ideasPair), "Cancel must keep Ideas")
+
+        let confirmDialog = requestDelete()
+        XCTAssertTrue(confirmDialog.waitForExistence(timeout: 8), "Delete… should request confirmation again")
+        confirmDialog.click()
+        XCTAssertTrue(pollUntil(timeout: 15) { !itemDirs().contains(id) },
+                      "confirmed Delete should move the note out of items/ and into Trash")
+        XCTAssertFalse((organizationMemberships() ?? []).contains { $0[1] == id },
+                       "confirmed Delete should remove every folder placement")
+    }
+
     // MARK: - G12 / G13 / G14 — the W14.4 (b/d) + W14.3 checks that sat on the owner's manual list
     //
     // Each of these shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour

@@ -10,10 +10,9 @@ final class NotesMenuAction: NSObject {
     @objc func fire() { run() }
 }
 
-/// Builds the item-row context menu for the Notes table (06-viewers §5, W6-S5): **Add to Folder ▸**
-/// (replicate) and **Move to Folder ▸** over the normal-folder list, plus, when the list is scoped to
-/// a normal folder, **Remove from “<folder>”** (delete-last-instance guarded). This is the reliable,
-/// keyboard/accessibility path for the same operations drag offers.
+/// Builds the item-row context menu for the Notes table: item actions plus **Add to Folder ▸**
+/// (replicate) and **Move to Folder ▸** over the normal-folder list, and a guarded folder removal when
+/// the list is scoped to a normal folder.
 enum NotesItemContextMenu {
 
     @MainActor
@@ -28,11 +27,75 @@ enum NotesItemContextMenu {
         let menu = NSMenu()
 
         if selection.count == 1, let id = selection.first {
+            let summary = model.allItems.first { $0.id == id }
+            let open = NSMenuItem(title: "Open", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+            let openAction = NotesMenuAction { nav.select(id) }
+            open.target = openAction
+            open.representedObject = openAction
+            menu.addItem(open)
+
+            let reveal = NSMenuItem(title: "Reveal in Finder", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+            let revealAction = NotesMenuAction { Task { await model.revealInFinder(id) } }
+            reveal.target = revealAction
+            reveal.representedObject = revealAction
+            menu.addItem(reveal)
+
             let copyLink = NSMenuItem(title: "Copy Link", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
             let action = NotesMenuAction { _ = model.copyOpenLink(for: id) }
             copyLink.target = action
             copyLink.representedObject = action
             menu.addItem(copyLink)
+
+            if let summary {
+                let offered = model.templates(matching: summary.kind)
+                let templateMenu = NSMenu()
+                func addNewFromTemplate(_ title: String, templateId: UUID?) {
+                    let item = NSMenuItem(title: title, action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+                    let trampoline = NotesMenuAction {
+                        Task {
+                            if let newID = await model.newItem(kind: summary.kind,
+                                                               in: model.selectedFolderId,
+                                                               from: templateId) {
+                                nav.showingTemplates = false
+                                nav.select(newID)
+                            }
+                        }
+                    }
+                    item.target = trampoline
+                    item.representedObject = trampoline
+                    templateMenu.addItem(item)
+                }
+                addNewFromTemplate("Blank", templateId: nil)
+                if !offered.isEmpty { templateMenu.addItem(.separator()) }
+                for template in offered {
+                    addNewFromTemplate(template.name, templateId: template.id)
+                }
+                let fromTemplate = NSMenuItem(title: "New from Template", action: nil, keyEquivalent: "")
+                fromTemplate.submenu = templateMenu
+                menu.addItem(fromTemplate)
+
+                let qualityMenu = NSMenu()
+                for (title, value) in [("None", Optional<Int>.none), ("Quality 1", 1),
+                                       ("Quality 2", 2), ("Quality 3", 3)] {
+                    let item = NSMenuItem(title: title, action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+                    item.state = summary.quality == value ? .on : .off
+                    let trampoline = NotesMenuAction { Task { await nav.setQuality(value, for: id) } }
+                    item.target = trampoline
+                    item.representedObject = trampoline
+                    qualityMenu.addItem(item)
+                }
+                let setQuality = NSMenuItem(title: "Set Quality", action: nil, keyEquivalent: "")
+                setQuality.submenu = qualityMenu
+                menu.addItem(setQuality)
+            }
+
+            menu.addItem(.separator())
+
+            let delete = NSMenuItem(title: "Delete…", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+            let deleteAction = NotesMenuAction { nav.requestDeleteItem(id) }
+            delete.target = deleteAction
+            delete.representedObject = deleteAction
+            menu.addItem(delete)
             menu.addItem(.separator())
         }
 

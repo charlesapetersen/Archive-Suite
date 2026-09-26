@@ -559,7 +559,14 @@ actor NotesIndex {
     }
 
     func deleteMembershipsForItem(_ itemId: UUID) throws {
-        try run("DELETE FROM memberships WHERE item_id = ?;") { self.bindText($0, 1, itemId.uuidString) }
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            try run("DELETE FROM memberships WHERE item_id = ?;") { self.bindText($0, 1, itemId.uuidString) }
+            try exec("COMMIT;")
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
     }
 
     /// Remove legacy memberships whose folder row is genuinely gone, once per store. The caller must

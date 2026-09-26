@@ -65,6 +65,8 @@ enum OrganizationError: Error, LocalizedError, Equatable {
     /// A membership aimed at an item whose **confirmed** hard delete is already in flight. Granting it
     /// would leave a live membership row pointing at a note that is on its way to the Trash (W23.h3-fu).
     case itemBeingDeleted(UUID)
+    case confirmedDeleteRequired(UUID)
+    case folderBeingDeleted(UUID)
 
     var errorDescription: String? {
         switch self {
@@ -74,6 +76,10 @@ enum OrganizationError: Error, LocalizedError, Equatable {
             return "That folder no longer exists (\(id.uuidString))."
         case .itemBeingDeleted:
             return "That note is being deleted — it can't be filed into a folder."
+        case .confirmedDeleteRequired:
+            return "The note's delete must be confirmed before its folder placements are removed."
+        case .folderBeingDeleted:
+            return "That folder is being deleted — the note can't be filed into it."
         }
     }
 }
@@ -299,6 +305,10 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     @discardableResult
     func deleteFolder(_ id: UUID) async throws -> [UUID] {
         try refuseSystemFolder(id)
+        guard folders.contains(where: { $0.id == id }) else { return [] }
+        try beginFolderDeletion(id)
+        defer { endFolderDeletion(id) }
+        await waitForFolderMembershipWrites(id)
         let deletedParent = folders.first(where: { $0.id == id })?.parentId
 
         // Reparent children to the deleted folder's parent (or root) — as COPIES. Nothing in `folders`
@@ -348,11 +358,15 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// **Refuses an item whose confirmed hard delete is in flight (W23.h3-fu)** — see the hard-delete
     /// guard below.
     func addMembership(item: UUID, folder: UUID) async throws {
-        try requireNotHardDeleting(item)
         try requireFolderExists(folder)
         guard !memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else { return }
+        try beginMembershipWrite(item, into: folder)
+        defer { endMembershipWrite(item, into: folder) }
         let m = Membership(itemId: item, folderId: folder, addedAt: Date())
         try await index.insertMembership(m)
+        #if DEBUG
+        if let hook = membershipWriteAfterIndexHookForTesting { await hook(item) }
+        #endif
         memberships.append(m)
         exportOrganization()
     }
@@ -397,6 +411,24 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         return membershipCount(item: item) == 0 ? .deletedLastInstance : .unlinkedNotLast
     }
 
+    /// Remove every folder placement for a user-confirmed whole-item delete. The caller opens the
+    /// hard-delete window first, so a concurrent replicate or move cannot add a placement while this
+    /// transaction runs or while the note is being sent to Trash. Database first, memory after commit.
+    func removeAllMembershipsForConfirmedDelete(item: UUID) async throws {
+        try await drainMembershipWritesForConfirmedDelete(item: item)
+        try await index.deleteMembershipsForItem(item)
+        memberships.removeAll { $0.itemId == item }
+        exportOrganization()
+    }
+
+    /// Freeze new placements and wait for already-admitted add/move writes before making a confirmed
+    /// delete-last-instance decision. The caller must keep the hard-delete window open through the
+    /// subsequent membership verdict and, when deleted, through the Trash move.
+    func drainMembershipWritesForConfirmedDelete(item: UUID) async throws {
+        guard isHardDeleting(item) else { throw OrganizationError.confirmedDeleteRequired(item) }
+        await waitForMembershipWrites(item)
+    }
+
     /// **Move** one item's membership from `source` to `target` as a single durable unit (W23.m13):
     /// either it ends up in `target` and out of `source`, or nothing at all changed.
     ///
@@ -414,14 +446,18 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// store just proved has zero memberships, so there is no `source` row to move.
     func moveMembership(item: UUID, from source: UUID, to target: UUID) async throws {
         guard source != target else { return try await addMembership(item: item, folder: target) }
-        try requireNotHardDeleting(item)
         try requireFolderExists(target)
         let inSource = memberships.contains { $0.itemId == item && $0.folderId == source }
         let inTarget = memberships.contains { $0.itemId == item && $0.folderId == target }
         guard inSource || !inTarget else { return }
+        try beginMembershipWrite(item, into: target)
+        defer { endMembershipWrite(item, into: target) }
 
         let m = Membership(itemId: item, folderId: target, addedAt: Date())
         try await index.moveMembership(item: item, from: source, to: target, addedAt: m.addedAt)
+        #if DEBUG
+        if let hook = membershipWriteAfterIndexHookForTesting { await hook(item) }
+        #endif
 
         if !inTarget { memberships.append(m) }
         memberships.removeAll { $0.itemId == item && $0.folderId == source }
@@ -435,6 +471,19 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// wider window). A `Bool` would let the inner `end` unguard the item while the outer window is
     /// still open — exactly the gap this closes.
     private var hardDeleting: [UUID: Int] = [:]
+    /// Placement writes that passed their hard-delete guard but have not finished publishing their
+    /// SQLite + in-memory + JSON updates yet. Confirmed whole-item deletion drains these before unlinking.
+    private var inFlightMembershipWrites: [UUID: Int] = [:]
+    private var membershipWriteWaiters: [UUID: [CheckedContinuation<Void, Never>]] = [:]
+    /// Folder deletions close admission to new writes for that destination and wait for admitted writes.
+    private var deletingFolders: Set<UUID> = []
+    private var inFlightFolderMembershipWrites: [UUID: Int] = [:]
+    private var folderMembershipWriteWaiters: [UUID: [CheckedContinuation<Void, Never>]] = [:]
+
+    #if DEBUG
+    /// Deterministically holds a placement writer after SQLite commits but before memory/mirror publish.
+    var membershipWriteAfterIndexHookForTesting: (@MainActor (UUID) async -> Void)?
+    #endif
 
     /// Open a hard-delete window over `ids`: `addMembership` / `moveMembership` refuse them until it
     /// closes, so no replicate or move can slip a live membership onto a note on its way to the Trash.
@@ -465,6 +514,54 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
 
     private func requireNotHardDeleting(_ id: UUID) throws {
         guard !isHardDeleting(id) else { throw OrganizationError.itemBeingDeleted(id) }
+    }
+
+    /// Register before the first suspension point. A folder delete sees every admitted destination write.
+    private func beginMembershipWrite(_ item: UUID, into folder: UUID) throws {
+        try requireNotHardDeleting(item)
+        guard !deletingFolders.contains(folder) else { throw OrganizationError.folderBeingDeleted(folder) }
+        inFlightMembershipWrites[item, default: 0] += 1
+        inFlightFolderMembershipWrites[folder, default: 0] += 1
+    }
+
+    private func endMembershipWrite(_ item: UUID, into folder: UUID) {
+        finishMembershipWriteCounter(item, counts: &inFlightMembershipWrites, waiters: &membershipWriteWaiters)
+        finishMembershipWriteCounter(folder, counts: &inFlightFolderMembershipWrites,
+                                     waiters: &folderMembershipWriteWaiters)
+    }
+
+    private func finishMembershipWriteCounter(_ id: UUID, counts: inout [UUID: Int],
+                                              waiters: inout [UUID: [CheckedContinuation<Void, Never>]]) {
+        guard let count = counts[id] else { return }
+        if count > 1 {
+            counts[id] = count - 1
+            return
+        }
+        counts.removeValue(forKey: id)
+        let pending = waiters.removeValue(forKey: id) ?? []
+        for waiter in pending { waiter.resume() }
+    }
+
+    private func waitForMembershipWrites(_ item: UUID) async {
+        guard inFlightMembershipWrites[item, default: 0] > 0 else { return }
+        await withCheckedContinuation { continuation in
+            membershipWriteWaiters[item, default: []].append(continuation)
+        }
+    }
+
+    private func beginFolderDeletion(_ id: UUID) throws {
+        guard deletingFolders.insert(id).inserted else { throw OrganizationError.folderBeingDeleted(id) }
+    }
+
+    private func endFolderDeletion(_ id: UUID) {
+        deletingFolders.remove(id)
+    }
+
+    private func waitForFolderMembershipWrites(_ folder: UUID) async {
+        guard inFlightFolderMembershipWrites[folder, default: 0] > 0 else { return }
+        await withCheckedContinuation { continuation in
+            folderMembershipWriteWaiters[folder, default: []].append(continuation)
+        }
     }
 
     func foldersContaining(item: UUID) -> [UUID] {

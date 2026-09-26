@@ -110,8 +110,16 @@ final class NotesNavigationModel: ObservableObject {
     struct PendingDeletion: Identifiable, Equatable {
         let id = UUID()
         let itemId: UUID
-        let folderId: UUID
+        let folderId: UUID?
         let title: String
+        let allInstances: Bool
+
+        init(itemId: UUID, folderId: UUID?, title: String, allInstances: Bool = false) {
+            self.itemId = itemId
+            self.folderId = folderId
+            self.title = title
+            self.allInstances = allInstances
+        }
     }
 
     // MARK: FTS state (keyword search)
@@ -290,6 +298,14 @@ final class NotesNavigationModel: ObservableObject {
         } catch { model.statusMessage = "Couldn't remove the note from the folder." }
     }
 
+    /// Stage a whole-item delete from the row context menu. Nothing is changed until the user confirms.
+    func requestDeleteItem(_ itemId: UUID) {
+        let title = model.allItems.first { $0.id == itemId }?.title ?? ""
+        pendingDeletion = PendingDeletion(itemId: itemId, folderId: nil,
+                                          title: title.isEmpty ? "Untitled" : title,
+                                          allInstances: true)
+    }
+
     /// Confirm the currently-pending delete-last-instance (test/programmatic entry point). Reads
     /// `pendingDeletion`, clears it, and performs the delete. The VIEW instead calls
     /// `confirmDeletion(_:)` with the value captured when the alert was shown, because SwiftUI clears
@@ -311,12 +327,29 @@ final class NotesNavigationModel: ObservableObject {
     ///
     /// W23.h3-fu: the verdict is only worth as much as its shelf life. `.deletedLastInstance` means
     /// "zero memberships **now**", and the trash below is a suspension point on a reentrant actor — so
-    /// the hard-delete window opens the instant the verdict lands and stays open until the note is gone,
-    /// which is what keeps a replicate arriving in that gap from re-filing a note into the Trash.
+    /// the hard-delete window opens before the fresh verdict, drains any add/move already in flight,
+    /// and stays open until the note is gone. Later adds and moves are refused throughout that window.
     func confirmDeletion(_ pending: PendingDeletion) async {
+        let ids = [pending.itemId]
+        model.organization.beginHardDelete(ids)
+        defer { model.organization.endHardDelete(ids) }
+        if pending.allInstances {
+            do { try await model.organization.removeAllMembershipsForConfirmedDelete(item: pending.itemId) }
+            catch {
+                model.statusMessage = "Couldn't remove the note from its folders. The note is still on disk."
+                model.rebuild(); recompute(); model.adoptMirrorFailure()
+                return
+            }
+            await model.trashItems(ids)
+            recompute()
+            model.adoptMirrorFailure()
+            return
+        }
+        guard let folderId = pending.folderId else { return }
         do {
+            try await model.organization.drainMembershipWritesForConfirmedDelete(item: pending.itemId)
             switch try await model.organization.removeConfirmedLastMembership(
-                item: pending.itemId, folder: pending.folderId) {
+                item: pending.itemId, folder: folderId) {
             case .unlinkedNotLast:
                 // A replica appeared between the modal and this confirm — just unlink; do NOT delete.
                 model.rebuild(); recompute(); model.adoptMirrorFailure(); return

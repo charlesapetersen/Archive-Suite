@@ -943,7 +943,17 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
   the scratch-only Notes VM drag UI test passes 1/1 and its screenshot was inspected. Remains open until published
   and recorded in the daemon plan. | ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesFolderTreeView.swift, ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift, ArchiveNotes/CLAUDE.md | M | low | none
 - [ ] **`W9.d2` — the item-row context menu is a stub [S].** Plan D2. Open / Reveal in Finder / New from
-  Template / Set Quality ▸ / Delete…. | Views/NotesContextMenu.swift | S | low | none
+  Template / Set Quality ▸ / Delete…. Local checkpoint adds those actions; whole-item Delete asks first,
+  atomically unlinks all folder placements under the hard-delete guard, then sends the note to Trash.
+  Scratch G19 passes Cancel and a replicated-item confirmation. Notes build + 218-test smoke pass, and
+  the focused off-screen VM test passes 1/1. Remains open until published and recorded
+  in the daemon plan. | ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesContextMenu.swift,
+  ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift | S | low | none
+- [ ] **`W9.d2.review-folder-graph` — folder mutations can cross folder deletion [M, Tier-2].** Baseline
+  `74627e1`; `OrganizationStore.renameFolder`, `moveFolder`, `createFolder`, `deleteFolder`. Concurrent
+  rename/move can resume after deletion using a stale array index; child creation can commit under a parent
+  after delete snapshots its children. Independently confirmed during W9.d2 review; report archived under
+  `old/`. | ArchiveNotes/macOS/Sources/ArchiveNotes/Index/OrganizationStore.swift | M | low | none
 - [ ] **`W9.d3` — template body editing is not routed in-app [M].** Plan D3. | Views/TemplatesManagerView.swift
   | M | low | none
 - [ ] **`W9.d4` — no quality quick-edit [S].** Plan D4. Inline borderless quality `Menu` (None + 1–3) in the
