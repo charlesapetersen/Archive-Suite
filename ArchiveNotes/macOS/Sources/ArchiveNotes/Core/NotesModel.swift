@@ -103,6 +103,17 @@ final class NotesModel: ObservableObject {
         pendingOpen = OpenRequest(id: id, block: block, token: openToken)
     }
 
+    /// Copy a path-independent link that opens this note or extract. The single-link action writes
+    /// plain text so external writing tools receive a clickable `archivenotes://open` URL.
+    @discardableResult
+    func copyOpenLink(for id: UUID, to pasteboard: NSPasteboard = .general) -> Bool {
+        let link = DurableLink.notesOpen(id: id, block: nil).url.absoluteString
+        pasteboard.clearContents()
+        guard pasteboard.setString(link, forType: .string) else { return false }
+        statusMessage = "Copied Notes link."
+        return true
+    }
+
     /// Clear the pending open request once a window has handled it.
     func consumeOpen() {
         pendingOpen = nil

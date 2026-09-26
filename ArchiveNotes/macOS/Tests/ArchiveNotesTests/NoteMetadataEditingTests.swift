@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import AppKit
 import ArchiveCore
 @testable import ArchiveNotes
 
@@ -143,6 +144,38 @@ extension NotesTagProjectorSafetyTests {
             #expect(await env.model.setAuthors(["  ", "\n"], for: extract.id))
             #expect(try await env.store.load(extract.id).authors.isEmpty)
             #expect(await env.index.search("ExtractAuthorMarker").isEmpty)
+        }
+    }
+
+    @Test("Copy Link writes the selected note or extract as a plain-text deep link")
+    func copyOpenLinkWritesPlainTextURL() async throws {
+        try await withMetadataScratch { env in
+            let pasteboard = NSPasteboard(name: .init("notes-link-test-\(UUID().uuidString)"))
+            #expect(pasteboard.setString("old clipboard value", forType: .string))
+
+            #expect(env.model.copyOpenLink(for: env.id, to: pasteboard))
+            let raw = try #require(pasteboard.string(forType: .string))
+            let url = try #require(URL(string: raw))
+            #expect(DurableLink(url: url) == .notesOpen(id: env.id, block: nil))
+            #expect(pasteboard.string(forType: .string) == raw)
+            #expect(env.model.statusMessage == "Copied Notes link.")
+
+            let router = NotesDeepLinkRouter()
+            router.handle(url)
+            #expect(router.forwardPendingOpen(whenIndexReady: true) { request in
+                env.model.openItem(id: request.id, block: request.block)
+            })
+            #expect(env.model.pendingOpen?.id == env.id && env.model.pendingOpen?.block == nil)
+
+            var extract = try await env.store.load(env.id)
+            extract.id = UUID()
+            extract.kind = .extract
+            extract.title = "Extract link target"
+            _ = try await env.store.create(extract)
+            #expect(env.model.copyOpenLink(for: extract.id, to: pasteboard))
+            let extractRaw = try #require(pasteboard.string(forType: .string))
+            let extractURL = try #require(URL(string: extractRaw))
+            #expect(DurableLink(url: extractURL) == .notesOpen(id: extract.id, block: nil))
         }
     }
 

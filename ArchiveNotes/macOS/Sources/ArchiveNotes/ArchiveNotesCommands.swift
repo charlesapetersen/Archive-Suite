@@ -86,6 +86,9 @@ struct ZoteroCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Note") {
+            Button("Copy Link") { formatting?.copyCurrentItemLink() }
+                .disabled(formatting?.canCopyCurrentItemLink != true)
+            Divider()
             Button("Attach Zotero Link\u{2026}") { formatting?.attachZoteroLink() }
                 .disabled(formatting == nil)
             Button("Auto-fill from Zotero\u{2026}") { formatting?.autoFillFromZotero() }

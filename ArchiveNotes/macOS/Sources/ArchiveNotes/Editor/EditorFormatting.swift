@@ -52,6 +52,10 @@ final class FormattingContext: ObservableObject {
     /// (an extract is loaded) Create-Extract no-ops with a status hint.
     var currentItemKind: Item.Kind?
 
+    var canCopyCurrentItemLink: Bool {
+        currentItemID != nil && currentItemKind != nil && notesModel != nil
+    }
+
     /// The shared model, for the extract create/append actions (W7-S2). Weak — the model is an
     /// app-lifetime `@StateObject` that outlives this per-editor context and never references back.
     weak var notesModel: NotesModel?
@@ -90,6 +94,11 @@ final class FormattingContext: ObservableObject {
     }
 
     func clearZoteroAutoFillReference() { zoteroAutoFillReference = nil }
+
+    func copyCurrentItemLink() {
+        guard canCopyCurrentItemLink, let currentItemID else { return }
+        _ = notesModel?.copyOpenLink(for: currentItemID)
+    }
 
     func toggleBold() {
         guard let tv = textView else { return }

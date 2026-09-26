@@ -210,8 +210,8 @@ then forwards it exactly once through the shared `openItem` channel. The existin
 filters if needed, selects, raises its window, and scrolls to an optional block. Deferring delivery prevents
 a launch-time request from being falsely reported missing against the pre-bootstrap empty list. Router tests
 cover hold/forward/clear and repeat delivery; the scratch-only Notes smoke suite passes (874 Swift Testing
-tests in 88 suites; 218 XCTest checks). **Tier-1** (read/navigation only). **(The full Scrivener round-trip
-also needs B9 — the outbound Copy-Link that originates the URL; B5 alone is only the inbound half.)**
+tests in 88 suites; 218 XCTest checks). **Tier-1** (read/navigation only). W9.b9 supplies the outbound link,
+so the full Scrivener round-trip is reachable by combining B5's inbound path with B9's Copy Link.
 
 **B6. Embed image bytes on the extract command path.** — **MED** — `07` S1/S2. `EditorFormatting.makeNotePassageSource`
 passes `assetStore: nil` though `ItemAssetStore` (W7-S5) shipped, so ⌘⌥E Create-Extract / Append copy the
@@ -266,6 +266,7 @@ note's own `archivenotes://` link — a different feature; grep confirms no such
 - *Verify:* Copy Link on a fixture item puts the correct `archivenotes://open?id=<uuid>` URL on the pasteboard;
   pasting it back and opening it selects/raises that item (round-trips with **B5**). **Tier-1** (read/pasteboard
   only). *Done:* the outbound half of the Scrivener round-trip exists; update **B5**'s Done to require B9.
+  ✅ **DONE W9.b9 (2026-09-25).** Item-row context menu and Note menu write plain-text deep links. Scratch pasteboard tests cover note and extract URLs and forward the note URL through B5's router to the open request. Notes smoke: 877 Swift Testing tests / 88 suites + 218 XCTest checks.
 
 ---
 

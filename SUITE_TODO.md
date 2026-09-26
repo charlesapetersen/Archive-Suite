@@ -1139,10 +1139,6 @@ entry point. Mostly **Tier-2** (they write note front-matter or project Finder t
 `SUITE_TODO_DONE.md`; that one work item covered the full list affordance, title→filename projection,
 inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.notes-rename` duplicate.
 
-- [ ] **`W9.b9` — no outbound "Copy Link to Note/Extract" [S–M].** Plan B9 (spec-vs-build). This is the
-  **originator of the Scrivener round-trip** — without it the durable-link story only works inbound. |
-  ArchiveNotes | S–M | low | none
-
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 

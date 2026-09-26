@@ -27,6 +27,15 @@ enum NotesItemContextMenu {
 
         let menu = NSMenu()
 
+        if selection.count == 1, let id = selection.first {
+            let copyLink = NSMenuItem(title: "Copy Link", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+            let action = NotesMenuAction { _ = model.copyOpenLink(for: id) }
+            copyLink.target = action
+            copyLink.representedObject = action
+            menu.addItem(copyLink)
+            menu.addItem(.separator())
+        }
+
         func folderSubmenu(_ action: @escaping (UUID) -> Void) -> NSMenu {
             let sub = NSMenu()
             if normals.isEmpty {
