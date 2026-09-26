@@ -227,6 +227,7 @@ tells the user to open Reader.
 - *Files:* `.../Views/ReaderPreviewPopover.swift`, `.../Links/ReaderLinkResolver.swift`, `.../Links/ReaderRootStore.swift`.
 - *Steps:* on `needsRootGrant`/`renamedCandidate`, offer an in-app folder-picker that calls `grantAndResolve` (GUID-verified), persists the security-scoped bookmark, and retries resolution.
 - *Verify:* moving a fixture root then choosing it re-resolves the link; wrong-folder is rejected. **Tier-2** (security-scoped bookmark grant). *Done:* a moved source can be re-granted without leaving Notes.
+  ✅ **DONE W9.b7 (implemented in `493cb42`, reconciled 2026-09-25).** `ReaderPreviewPopover` already wires the in-context folder picker to `grantAndResolve`; scratch chooser tests prove the right root resolves and a wrong root is reported. Notes smoke: 875 Swift Testing tests / 88 suites + 218 XCTest checks.
 
 **B8. Manual author editing (notes *and* extracts).** — **MED** — (spec-vs-build). The original spec lists
 author as a first-class field on both a note ("a single file with an **author**, title, and date") and an
