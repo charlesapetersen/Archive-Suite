@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The detail-pane **metadata strip** for the selected note/extract (W6-S7, 06-viewers §7/§8): edit the
-/// document DATE (precision + precision-appropriate fields + a "date uncertain" toggle) and the QUALITY
-/// rating. Both use front-matter through `NotesNavigationModel` → `NotesModel` (00-overview D2/D9);
-/// the model mirrors valid Quality values as Q1...Q3 on this note's own `.md`. Its Tags subsection
+/// The detail-pane **metadata strip** for the selected note/extract: edit authors, document DATE
+/// (precision + precision-appropriate fields + a "date uncertain" toggle), and QUALITY. These fields
+/// use front matter through `NotesNavigationModel` → `NotesModel`; authors remain front-matter only,
+/// while the model mirrors valid Quality values as Q1...Q3 on this note's own `.md`. Its Tags subsection
 /// uses the audited model path, so front matter remains authoritative and Finder subjects stay in sync.
 ///
 /// Adapted from Reader's `InlineEditCells.DateCell` + `TagEditorView.dateSection`/`prioritySection`,
@@ -25,11 +25,14 @@ struct NoteMetadataInspector: View {
     @State private var yearText = ""
     @State private var month = 0          // 0 = none
     @State private var dayText = ""
+    @State private var authorsText = ""
 
     private static let monthNames = DateFieldEntry.monthNames
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            authorsSection
+            Divider()
             dateSection
             Divider()
             qualitySection
@@ -44,6 +47,28 @@ struct NoteMetadataInspector: View {
         .padding(.vertical, 8)
         .onAppear { seed(from: item) }
         .onChange(of: item.id) { seed(from: item) }   // re-seed only on selection change (WYSIWYG typing)
+    }
+
+    // MARK: Authors
+
+    @ViewBuilder private var authorsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Authors").font(.subheadline.bold())
+                .accessibilityIdentifier("an.detail.authors.heading")
+            TextField("One author per line", text: $authorsText, axis: .vertical)
+                .lineLimit(2...4)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("an.detail.authors")
+            HStack {
+                Button("Set") { commitAuthors() }
+                    .disabled(composedAuthors == item.authors)
+                Button("Clear") {
+                    authorsText = ""
+                    commitAuthors([])
+                }
+                .disabled(item.authors.isEmpty && composedAuthors.isEmpty)
+            }
+        }
     }
 
     // MARK: Date
@@ -123,8 +148,9 @@ struct NoteMetadataInspector: View {
 
     // MARK: State ⇄ store
 
-    /// Seed the local fields from the selected item's stored date (no write — see the type doc).
+    /// Seed local fields from the selected item's stored authors and date (no write — see the type doc).
     private func seed(from item: ItemSummary) {
+        authorsText = item.authors.joined(separator: "\n")
         precision = item.datePrecision ?? .year
         let parts = (item.date ?? "").split(separator: "-").map(String.init)
         yearText = parts.first ?? ""
@@ -152,6 +178,18 @@ struct NoteMetadataInspector: View {
         let p = precision
         let id = item.id
         Task { await nav.setDate(date, precision: p, for: id) }
+    }
+
+    private var composedAuthors: [String] {
+        authorsText.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func commitAuthors(_ authors: [String]? = nil) {
+        let value = authors ?? composedAuthors
+        let id = item.id
+        Task { await nav.setAuthors(value, for: id) }
     }
 
     // Bindings whose setters fire ONLY on user interaction (not on the programmatic `seed`), so

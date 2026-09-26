@@ -764,6 +764,15 @@ final class NotesModel: ObservableObject {
         await mutateItem(id, "set date uncertainty") { $0.dateUncertain = uncertain }
     }
 
+    /// Set manually entered authors in front matter only. Empty/whitespace-only entries are omitted;
+    /// order and duplicate names are preserved. Authors are not projected to Finder tags.
+    @discardableResult
+    func setAuthors(_ authors: [String], for id: UUID) async -> Bool {
+        let canonical = authors.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return await mutateItem(id, "set the authors") { $0.authors = canonical }
+    }
+
     /// Set the quality rating on the canonical 0...3 scale. `nil`, 0, and invalid inputs are unrated;
     /// the front-matter therefore has no quality key and the Finder mirror has no Q token. A valid
     /// 1...3 value is durable front-matter plus exactly its matching Q1/Q2/Q3 tag on this note's own

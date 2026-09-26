@@ -243,8 +243,9 @@ but no `setAuthors`. Neither B1 (Zotero auto-fill) nor B3 (retitle + tags) cover
   inspector alongside date/quality. Authors stay **front-matter only** (not projected to Finder tags unless
   A11's owner decision says otherwise). Works for both windows (notes and extracts share the `Item` model).
 - *Verify:* setting/clearing authors persists to front-matter and updates the FTS `authors` column (assert on a
-  scratch store); an extract's author edit never mutates its source note. **Tier-1** (front-matter only; no new
-  Finder-tag write surface). *Done:* a note **and** an extract can have their author set in-app without Zotero.
+  scratch store); an extract's author edit never mutates its source note. **Tier-2** (atomic NoteStore write;
+  authors do not add a Finder-tag projection). *Done:* a note **and** an extract can have their author set in-app without Zotero.
+  ✅ **DONE W9.b8 (2026-09-25).** The shared inspector edits one author per line with Set/Clear; `setAuthors` uses the atomic item mutation and re-index path. Scratch tests prove persistence, FTS update/removal, no Finder-tag writes, note/extract independence, and safety during a concurrent body save. Independent review; Notes smoke: 876 Swift Testing tests / 88 suites + 218 XCTest checks.
 
 **B9. Outbound "Copy Link to Note/Extract" — the Scrivener round-trip originator.** — **HIGH (for interop)** —
 (spec-vs-build). The original spec's word-processor interop requires the user to "insert hyperlinks in the word

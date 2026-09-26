@@ -10,6 +10,9 @@ why a later change may or may not revisit that code.
 
 ## Archive Notes — gap closure (2026-09-20)
 
+- [x] **W9.b8 — no manual author editing, for notes or extracts [S–M · Tier-2].** **SHIPPED 2026-09-25 (this commit).** The shared Notes/extract metadata inspector now edits authors as one name per line with explicit Set and Clear actions. `NotesModel.setAuthors` trims entries and routes through `mutateItem` for an atomic front-matter save, FTS re-index, and publish; authors remain front-matter only with no Finder-tag projection. Scratch tests cover trimming, persistence, FTS update/removal, clearing, note/extract independence, and concurrent body edits. Independent review found no remaining issue. Notes Debug build; 876 Swift Testing tests in 88 suites + 218 XCTest checks. No real store or corpus writes.
+  | Files: ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift, Core/NotesNavigationModel.swift, Views/NoteMetadataInspector.swift; ArchiveNotes/macOS/Tests/ArchiveNotesTests/NoteMetadataEditingTests.swift | S–M | med | done
+
 - [x] **W9.b7 — guided root re-grant is not wired [S].** **SHIPPED 2026-09-25 (this commit; implementation in `493cb42`).** The source preview now offers a folder picker that grants the chosen Reader root to Notes and re-resolves the waiting link. The chooser reports a wrong-archive result instead of silently asking again. Existing scratch tests cover correct-root resolution and wrong-root rejection; Notes Debug build and smoke passed (875 Swift Testing tests / 88 suites + 218 XCTest checks).
   | Files in implementation commit: ArchiveNotes/macOS/Sources/ArchiveNotes/Views/ReaderPreviewPopover.swift, Links/ReaderRootChooser.swift, Links/ReaderLinkResolver.swift, Links/ReaderRootStore.swift; ArchiveNotes/macOS/Tests/ArchiveNotesTests/ReaderRootChooserTests.swift | S | low | done
 
