@@ -1165,6 +1165,7 @@ finder-level candidates (only #1's premise manually confirmed). Report: `.mainte
   capture/staging transaction, recovery retry, and Stage-for-later protection. Processor build, recovery suite,
   and VM UI suite pass; the required phone↔Mac Tier-2 E2E is pending because its Gemini Keychain lookup hangs
   before emulator startup. | Capture | Tier-2
+- [ ] **W3.cap-r3-fu12-fu2.review-committed-clear [LOW, Tier-2]** — a crash after the committed Clear manifest could leave source photos stranded in the backup folder. Baseline `31afea2`; `CaptureSession.commitPreparedClear`, `finishPreparedClear`, `latestUnprocessedSession`, `init`, and `LiveCaptureProcessor.loadStagingManifest`. Independently confirmed in `old/review-w3-cap-r3-fu12-fu2-clear-journal-2026-09-26.md`. | Capture | Tier-2
 - [ ] **W3.cap-r3-fu3 [LOW]** `CaptureSession.swift:592` — `removePhoto` has no `isFinalized` guard, unlike
   ✅ **DECIDED by the owner 2026-08-13: REFUSE THE DELETE, and say why.** Give `removePhoto` the same
   `isFinalized` guard `removePhotoIfSafe` already carries two lines below it, and tell the operator the segment
