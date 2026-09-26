@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import AppKit
 import ArchiveCore
 @testable import ArchiveNotes
 
@@ -40,6 +41,69 @@ struct ExtractCommandTests {
                             fullText: text,
                             selectedRanges: [NSRange(location: 0, length: length)],
                             blockRanges: [(ordinal, NSRange(location: 0, length: (text as NSString).length))])
+    }
+
+    private func solidPNG(_ color: NSColor) throws -> Data {
+        let image = NSImage(size: NSSize(width: 1, height: 1))
+        image.lockFocus()
+        color.setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 1, height: 1)).fill()
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation,
+              let representation = NSBitmapImageRep(data: tiff),
+              let png = representation.representation(using: .png, properties: [:]) else {
+            throw NSError(domain: "ExtractCommandTests", code: 1)
+        }
+        return png
+    }
+
+    @Test("Create Extract snapshots image bytes from its source item after a selection switch")
+    func createExtractMenuActionKeepsTheSourceItemAssetBoundary() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let sourceID = UUID()
+        let nextSelectionID = UUID()
+        let sourcePNG = try solidPNG(.red)
+        let otherPNG = try solidPNG(.blue)
+        try await env.store.writeReservedAsset(sourcePNG, name: "photo.png", into: sourceID)
+        try await env.store.writeReservedAsset(otherPNG, name: "photo.png", into: nextSelectionID)
+
+        let assetStore = ItemAssetStore(store: env.store, root: env.root, itemID: sourceID)
+        let rendered = MarkdownBridge.parse(markdown: "Selected ![photo](assets/photo.png)",
+                                            assetStore: assetStore)
+        let textView = EditorTextView()
+        textView.textStorage?.setAttributedString(rendered)
+        textView.setSelectedRange(NSRange(location: 0, length: rendered.length))
+
+        let formatting = FormattingContext()
+        formatting.textView = textView
+        formatting.currentItemID = sourceID
+        formatting.currentItemKind = .note
+        formatting.currentItemTitle = "Source note"
+        formatting.currentItemDateDisplay = "1970"
+        formatting.notesModel = env.model
+        formatting.assetStore = assetStore
+
+        // This is the action invoked by ExtractCommands' Create Extract menu item. Selection changes
+        // before its async model task starts; the passage must keep the original item boundary.
+        formatting.createExtract()
+        assetStore.itemID = nextSelectionID
+
+        var extractID: UUID?
+        for _ in 0..<100 {
+            extractID = env.model.allItems.first(where: { $0.kind == .extract })?.id
+            if extractID != nil { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let createdID = try #require(extractID)
+        let extract = try await env.store.load(createdID)
+        let copied = try Data(contentsOf: NoteStore.assetsDir(root: env.root, id: createdID)
+            .appendingPathComponent("photo.png"))
+        let sourceOnDisk = try Data(contentsOf: NoteStore.assetsDir(root: env.root, id: sourceID)
+            .appendingPathComponent("photo.png"))
+        #expect(extract.blocks.first?.markdown.contains("assets/photo.png") == true)
+        #expect(copied == sourcePNG)
+        #expect(sourceOnDisk == sourcePNG)
+        #expect(otherPNG != sourcePNG)
     }
 
     @Test("createExtract persists a note-passage extract, files it in Extracts, and lists it")

@@ -341,6 +341,12 @@ final class ItemAssetStore: EditorAssetStore {
         self.itemID = itemID
     }
 
+    /// Freeze the item boundary for a passage snapshot. The editor's live store is retargeted when
+    /// selection changes; a queued extract command must keep reading from the note it captured.
+    func reader(for itemID: UUID) -> ItemAssetStore {
+        ItemAssetStore(store: store, root: root, itemID: itemID)
+    }
+
     func addAsset(_ data: Data, preferredName: String) throws -> String {
         guard let id = itemID else { throw ItemAssetStoreError.noTargetItem }
         let dir = NoteStore.assetsDir(root: root, id: id)

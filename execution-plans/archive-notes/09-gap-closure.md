@@ -219,6 +219,7 @@ passes `assetStore: nil` though `ItemAssetStore` (W7-S5) shipped, so ⌘⌥E Cre
 - *Files:* `.../Editor/EditorFormatting.swift` (`FormattingContext`, `makeNotePassageSource`), `.../Views/NoteEditorPane.swift:~249` (has the store).
 - *Steps:* thread the source note's `ItemAssetStore` into `FormattingContext` and on into `makeNotePassageSource` so the builder's byte-copy runs (the copy→paste path already does this correctly).
 - *Verify:* a menu-created extract from a passage with an inline image has its own `assets/` copy (snapshot-independent, D7); source never mutated. **Tier-1** (uses audited store; no new write surface). *Done:* image passages via the menu embed bytes.
+  ✅ **DONE W9.b6 (2026-09-25).** `FormattingContext` now passes an item-pinned reader to the passage snapshot; the scratch command regression switches to a second note with a different same-named image before the async create runs, then proves the extract contains the source bytes and the source remains unchanged. Notes smoke: 875 Swift Testing tests / 88 suites + 218 XCTest checks.
 
 **B7. Wire guided root re-grant.** — **MED** — overview G1. `ReaderLinkResolver.grantAndResolve` is
 code-complete and tested but only tests call it; when a source's root has moved, the preview popover only

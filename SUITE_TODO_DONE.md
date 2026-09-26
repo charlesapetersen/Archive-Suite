@@ -10,6 +10,9 @@ why a later change may or may not revisit that code.
 
 ## Archive Notes — gap closure (2026-09-20)
 
+- [x] **W9.b6 — the extract command path does not embed image bytes [S–M · Tier-2].** **SHIPPED 2026-09-25 (this commit).** Plan B6: Create/Append extract commands now snapshot image bytes through a reader pinned to the selected source item, so an async selection change cannot redirect a same-named asset. Scratch regression invokes the Create Extract handler, switches to a second item with different bytes at the same path, then verifies the extract contains the original bytes and the source remains unchanged. Independent review found no remaining safety or concurrency defect. Notes Debug build; 875 Swift Testing tests in 88 suites + 218 XCTest checks. Scratch store only; no real store or corpus writes.
+  | Files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift, InlineImageAttachment.swift; ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteEditorPane.swift; ArchiveNotes/macOS/Tests/ArchiveNotesTests/ExtractCommandTests.swift; ArchiveNotes/KNOWN_ISSUES.md; execution-plans/archive-notes/09-gap-closure.md | S–M | med | done
+
 - [x] **`W9.b5` — `archivenotes://open` is never consumed [S].** **SHIPPED 2026-09-21 (this commit).**
   `NotesDeepLinkRouter` now retains an incoming Notes link through first-launch indexing rather than looking
   it up in the empty pre-bootstrap list and falsely reporting it as deleted. Once `isIndexReady` settles,

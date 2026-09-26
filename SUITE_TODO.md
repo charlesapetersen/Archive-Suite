@@ -1139,8 +1139,6 @@ entry point. Mostly **Tier-2** (they write note front-matter or project Finder t
 `SUITE_TODO_DONE.md`; that one work item covered the full list affordance, title→filename projection,
 inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.notes-rename` duplicate.
 
-- [ ] **`W9.b6` — the extract command path does not embed image bytes [S–M · Tier-2].** Plan B6. | ArchiveNotes
-  Editor/ | S–M | med | none
 - [ ] **`W9.b7` — guided root re-grant is not wired [S].** Plan B7. | ArchiveNotes | S | low | none
 - [ ] **`W9.b8` — no manual author editing, for notes or extracts [S–M · Tier-2].** Plan B8 (spec-vs-build,
   2026-07-17 addendum — spec intent that never entered a wave plan). Writes front-matter. | ArchiveNotes | S–M

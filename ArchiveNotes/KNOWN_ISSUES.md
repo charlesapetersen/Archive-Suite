@@ -1465,12 +1465,15 @@ W7-S2 shipped the live Create-Extract (⌘⌥E) / Append-to-Extract… commands 
 paste-into-Extract round-trip (`Extract` menu; `com.archivenotes.passage` on ⌘C in a note editor;
 paste in an extract editor → note-passage blocks). Model + codec paths are unit-tested; conscious gaps:
 
-- **Inline-image BYTES: copy + Create/Append + extract-paste all import them now (W7-S5 + W14.3, FIXED).**
+- **Inline-image BYTES: copy + Create/Append + extract-paste all import them now (W7-S5 + W14.3 + W9.b6, FIXED).**
   With W7-S5's `ItemAssetStore` wired into `NoteEditorPane`, the **copy** path
   (`copyPassageIfNote` → `EditorPassageSource(assetStore:)`) resolves + snapshots the passage's inline-image
   *bytes* (not just the `assets/<name>` refs) into the `com.archivenotes.passage` payload, and the
-  Create/Append *commands* persist those bytes into the new extract's `assets/` (proven by `ExtractBuilder`
-  create/append asset tests). **W14.3 closes the last gap** — the live extract-editor *paste* handler
+  Create/Append commands now pass the current item-scoped store into the source snapshot, then persist those
+  bytes into the new extract's `assets/`. The source reader pins the selected note's ID, so a selection switch
+  before the async command runs cannot redirect a same-named image to another note. `ExtractCommandTests`
+  proves the menu action copies the original bytes into a scratch extract while leaving the source unchanged.
+  **W14.3 closes the paste gap** — the live extract-editor *paste* handler
   (`MarkdownEditorView.handlePassagePaste`) now copies the payload's bytes into the extract's own `assets/`
   too: a new `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` overload imports each segment's
   bytes via `ItemAssetStore.addAsset` (reserve→write, no-overwrite guard) and rewrites the `](assets/…)` refs

@@ -317,6 +317,7 @@ struct NoteEditorPane: View {
     private func refreshAssetStore(for id: UUID?) {
         if assetStore == nil { assetStore = nav.model.makeAssetStore() }
         assetStore?.itemID = id
+        formatting.assetStore = assetStore
     }
 
     /// Auto-fill is enabled only after the selected persisted note proves it carries one unambiguous

@@ -55,6 +55,9 @@ final class FormattingContext: ObservableObject {
     /// The shared model, for the extract create/append actions (W7-S2). Weak — the model is an
     /// app-lifetime `@StateObject` that outlives this per-editor context and never references back.
     weak var notesModel: NotesModel?
+    /// Item-scoped asset reader for the note currently loaded in the editor. Create/Append Extract
+    /// use it to snapshot image bytes alongside the selected Markdown.
+    var assetStore: EditorAssetStore?
     /// Shared Zotero client/status bridge. Like `notesModel`, this is app-lifetime and wired by the
     /// hosting editor pane; commands themselves have no environment-object access.
     weak var zoteroStatus: ZoteroStatusModel?
@@ -273,16 +276,23 @@ final class FormattingContext: ObservableObject {
     // MARK: - Extracts (W7-S2)
 
     /// Build a passage-selection source over the LIVE editor for the current note, or nil when no note
-    /// is loaded / there is no non-empty selection. Snapshots the text by value (D7 independence). The
-    /// asset store is nil until the item-scoped asset store lands (W7-S5): image *references* are
-    /// preserved in the snapshot markdown, but inline-image bytes aren't embedded yet.
+    /// is loaded / there is no non-empty selection. Snapshots the text by value (D7 independence) and
+    /// resolves referenced image bytes through the current note's item-scoped asset store.
     func makeNotePassageSource() -> EditorPassageSource? {
         guard let tv = textView, currentItemKind == .note, let id = currentItemID else { return nil }
+        // NoteEditorPane retargets its live store as selection changes. The passage is consumed by an
+        // async command task, so pin production reads to this source item before returning the snapshot.
+        let sourceAssetStore: EditorAssetStore?
+        if let itemAssetStore = assetStore as? ItemAssetStore {
+            sourceAssetStore = itemAssetStore.reader(for: id)
+        } else {
+            sourceAssetStore = assetStore
+        }
         let source = EditorPassageSource(textView: tv,
                                          sourceNoteId: id,
                                          sourceTitle: currentItemTitle,
                                          sourceDateDisplay: currentItemDateDisplay,
-                                         assetStore: nil)
+                                         assetStore: sourceAssetStore)
         guard source.selectedRanges.contains(where: { $0.length > 0 }) else { return nil }
         return source
     }
