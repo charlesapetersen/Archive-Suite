@@ -369,6 +369,18 @@ class NotesFixtureUITestCase: XCTestCase {
         return pairs
     }
 
+    /// Read the durable parent id for a folder from the scratch organization graph.
+    func organizationFolderParent(for folderID: String) -> String? {
+        let path = Self.fixturePath + "/organization.json"
+        guard let data = FileManager.default.contents(atPath: path),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let folders = obj["folders"] as? [[String: Any]],
+              let folder = folders.first(where: {
+                  ($0["id"] as? String)?.caseInsensitiveCompare(folderID) == .orderedSame
+              }) else { return nil }
+        return (folder["parentId"] as? String)?.lowercased()
+    }
+
     /// The `assets/<name>` file names inside a given `items/<uuid>` directory (G4 asserts the pasted
     /// image lands here). Missing `assets/` → empty.
     func assetFiles(inItemDir dir: String) -> [String] {
@@ -1594,6 +1606,33 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(after.contains("id: \(id)"))
             XCTAssertEqual(after.components(separatedBy: "\n---\n").last,
                            before.components(separatedBy: "\n---\n").last)
+        }
+    }
+
+    /// W9.d1 — dragging one folder onto another reparents the folder in the scratch organization graph.
+    func testG18_DragFolderOntoFolderReparentsIt() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let folderRows = mainWindow.descendants(matching: .any)
+                .matching(identifier: "an.sidebar.folder")
+            let reading = folderRows.matching(NSPredicate(format: "value ==[c] %@", "Reading")).firstMatch
+            let ideas = folderRows.matching(NSPredicate(format: "value ==[c] %@", "Ideas")).firstMatch
+            XCTAssertTrue(reading.waitForExistence(timeout: 10), "the Reading folder should be visible")
+            XCTAssertTrue(ideas.waitForExistence(timeout: 10), "the Ideas folder should be visible")
+            XCTAssertNil(organizationFolderParent(for: Self.folderReading), "Reading starts at the root")
+
+            reading.press(forDuration: 1.0, thenDragTo: ideas)
+
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                self.organizationFolderParent(for: Self.folderReading) == Self.folderIdeas.lowercased()
+            }, "dropping Reading on Ideas should persist Ideas as its parent")
+
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = "W9.d1-folder-reparented"
+            attachment.lifetime = .keepAlways
+            XCTContext.runActivity(named: "Capture the scratch folder tree after reparenting") { activity in
+                activity.add(attachment)
+            }
         }
     }
 

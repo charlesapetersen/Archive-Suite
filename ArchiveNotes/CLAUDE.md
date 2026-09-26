@@ -333,12 +333,13 @@ macOS/Sources/ArchiveNotes/
     TemplatesManagerView.swift     Per-window templates manager (shown in the item pane in templates mode):
                                    list all templates + New/Duplicate/Rename/Delete via NotesModel; body
                                    editing rides the (deferred) note-editor wiring (W6-S6)
-    NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (OutlineGroup + two-way
-                                   @State selection sync, Smart Folders / Folders sections, All Notes
-                                   pseudo-row, context-menu create/rename/delete) (W6-S2). Adapts
-                                   Reader SidebarView. Folder-row drop target (plain=MOVE / ⌥=REPLICATE
-                                   via NSEvent.modifierFlags) + batched delete-last-instance guard
-                                   (fresh stranded read → §5 confirm) (W6-S5); drag-reparent → future.
+    NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (recursive ForEach / per-level
+                                   DisclosureGroup + two-way @State selection sync, Smart Folders / Folders
+                                   sections, All Notes pseudo-row, context-menu create/rename/delete) (W6-S2).
+                                   Sibling reorder persists sortOrder; dragging a folder onto another reparents
+                                   through NotesModel.moveFolder with cycle refusal (W9.d1). Folder-row note
+                                   drop (plain=MOVE / ⌥=REPLICATE via NSEvent.modifierFlags) + batched
+                                   delete-last-instance guard (fresh stranded read → §5 confirm) (W6-S5).
                                    Templates anchor row + folder "Template ▸" assignment submenu
                                    (None / each template / Manage…) → NotesModel.assignTemplate (W6-S6)
     NotesTableView.swift           Center pane — virtualized item table (NSViewRepresentable +

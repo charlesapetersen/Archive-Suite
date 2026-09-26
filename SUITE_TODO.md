@@ -938,7 +938,10 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
 - [ ] **`W9.d1` — folder move/reorder & drag-to-reparent UI [M].** Plan D1. Wire `.onMove` + folder-onto-folder
-  drop → `model.moveFolder` (the cycle-guard already exists). | Views/NotesFolderTreeView.swift | M | low | none
+  drop → `model.moveFolder` (the cycle-guard already exists). Local checkpoint adds per-level sibling reorder and
+  UUID folder drags while preserving note-row move/Option-replicate drops. Notes build + 218-test smoke pass;
+  the scratch-only Notes VM drag UI test passes 1/1 and its screenshot was inspected. Remains open until published
+  and recorded in the daemon plan. | ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesFolderTreeView.swift, ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift, ArchiveNotes/CLAUDE.md | M | low | none
 - [ ] **`W9.d2` — the item-row context menu is a stub [S].** Plan D2. Open / Reveal in Finder / New from
   Template / Set Quality ▸ / Delete…. | Views/NotesContextMenu.swift | S | low | none
 - [ ] **`W9.d3` — template body editing is not routed in-app [M].** Plan D3. | Views/TemplatesManagerView.swift
