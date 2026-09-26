@@ -4412,6 +4412,7 @@ explain why not.
   (defence in depth); (b) reseed a missing system folder at startup by **ID**, not only on an empty table;
   (c) make `addMembership` reject a nonexistent folder, and add the FK/constraint.
   | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Views/NotesFolderTreeView,Index/OrganizationStore,Core/NotesModel,Index/NotesIndex}.swift | S–M | med | none
+- [x] **W23.m15-fu — ghost memberships already on disk are never swept, only out-voted [XS–S · LOW · stale data].** SHIPPED 2026-09-25 (this commit). `OrganizationStore.load` restores fixed-ID system folders first, then runs a stamped one-time anti-join sweep for memberships whose folders are still missing. It logs the number found and reloads the graph so stale rows no longer inflate `membershipCount(item:)`. Scratch regression verifies a deleted user-folder edge is swept while a deleted Inbox edge is revived. No template assignments are changed. | `ArchiveNotes/macOS/Sources/ArchiveNotes/Index/{OrganizationStore,NotesIndex}.swift` | XS–S | low | none
 - [x] **W23.l1 — the Notes Reader-link containment check is bypassable through a symlink [S · LOW · scope
   bypass] (blocked-on: W23.m14).** ✅ **DONE 2026-07-31** (checkpoint `2f13d25` = the exact-path stage + 8
   tests; completing commit = the basename walk, its 2 tests and the trackers). Premise re-confirmed on a

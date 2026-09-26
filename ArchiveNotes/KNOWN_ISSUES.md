@@ -379,11 +379,10 @@ timeouts (⌘N never landed), and **G7 and G9 — the two tests that actually wr
 not have done if the new folder-existence guard were rejecting the app's own writes. Worth watching: G1
 had not been seen flaking before.
 
-**Residual (`W23.m15-fu`, LOW):** a ghost naming a **user** folder that is genuinely gone (only
-reachable via the pre-fix race between a folder delete and a concurrent replicate) is never swept. It is
-invisible, but it inflates `membershipCount(item:)`, so the §3.6 last-instance guard treats such a note
-as filed elsewhere and won't offer to trash it when its last real folder goes — conservative, but
-silent. A one-shot reporting sweep at load is the fix.
+**Residual (`W23.m15-fu`, LOW) — fixed 2026-09-25.** Once per index DB, `OrganizationStore.load` now
+restores fixed-ID system folders first, then counts and removes memberships whose folders are still
+missing, and logs the count. A stamp prevents repeat scans. A scratch regression verifies a deleted
+user-folder membership is removed while a deleted Inbox membership is revived before the sweep.
 
 ## ✅ FIXED (W23.m14) — one broken source link froze the whole app for an archive walk
 

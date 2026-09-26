@@ -221,6 +221,45 @@ struct SystemFolderIntegrityTests {
         #expect(reloaded.items(in: OrganizationStore.inboxFolderId) == [item])
     }
 
+    @Test("first load reports and sweeps deleted user-folder ghosts after restoring system folders")
+    func firstLoadSweepsOnlyUnrecoverableMemberships() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("notes-w23m15fu-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let index = NotesIndex(url: root.appendingPathComponent("index.db"))
+        try await index.open()
+        defer {
+            Task {
+                await index.close()
+                try? FileManager.default.removeItem(at: root)
+            }
+        }
+
+        // Seed the pre-load database directly so the one-shot stamp has not yet been written.
+        let research = VFolder(id: UUID(), name: "Research", parentId: nil,
+                               sortOrder: 3, kind: .normal, queryJSON: nil)
+        for folder in OrganizationStore.systemFolderSeeds + [research] {
+            try await index.insertFolder(folder)
+        }
+        let strandedItem = UUID()
+        let inboxItem = UUID()
+        try await index.insertMembership(Membership(itemId: strandedItem, folderId: research.id, addedAt: Date()))
+        try await index.insertMembership(Membership(itemId: inboxItem, folderId: OrganizationStore.inboxFolderId, addedAt: Date()))
+        try await deleteFolderRowDirectly(research.id, in: index)
+        try await deleteFolderRowDirectly(OrganizationStore.inboxFolderId, in: index)
+
+        let org = OrganizationStore(index: index)
+        try await org.load(storeRoot: root)
+
+        #expect(org.folders.contains { $0.id == OrganizationStore.inboxFolderId })
+        #expect(org.membershipCount(item: strandedItem) == 0)
+        #expect(org.membershipCount(item: inboxItem) == 1)
+        #expect(org.items(in: OrganizationStore.inboxFolderId) == [inboxItem])
+        await index.close()
+        try await index.open()
+        #expect(try await index.sweepGhostMembershipsOnce() == nil)
+    }
+
     @Test("a fresh store still seeds all three system folders")
     func freshStoreSeedsSystemFolders() async throws {
         let env = try await makeEnv()

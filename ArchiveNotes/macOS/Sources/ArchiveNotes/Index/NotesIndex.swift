@@ -121,6 +121,13 @@ actor NotesIndex {
                 template_id TEXT
             );
             """)
+        try exec("""
+            CREATE TABLE IF NOT EXISTS organization_maintenance(
+                key TEXT PRIMARY KEY,
+                completed_at REAL NOT NULL,
+                finding_count INTEGER NOT NULL
+            );
+            """)
 
         // Enforcement is per-connection and OFF by default, which is why every statement above — the
         // membership rebuild included — ran unconstrained. Last, so the migration could copy a legacy
@@ -536,6 +543,42 @@ actor NotesIndex {
         try run("DELETE FROM memberships WHERE item_id = ?;") { self.bindText($0, 1, itemId.uuidString) }
     }
 
+    /// Remove legacy memberships whose folder row is genuinely gone, once per store. The caller must
+    /// restore the fixed-ID system folders first: their older ghost memberships are recoverable data.
+    /// Returns the number found on the first run, including zero; returns nil after the sweep is stamped.
+    func sweepGhostMembershipsOnce() throws -> Int? {
+        let key = "w23-m15-ghost-memberships-v1"
+        if try organizationMaintenanceCompleted(key) { return nil }
+
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            // Another connection may have completed the sweep between the fast check and our lock.
+            if try organizationMaintenanceCompleted(key) {
+                try exec("COMMIT;")
+                return nil
+            }
+            let count = try scalarInt("""
+                SELECT COUNT(*) FROM memberships AS m
+                LEFT JOIN folders AS f ON f.id = m.folder_id
+                WHERE f.id IS NULL;
+                """)
+            try exec("""
+                DELETE FROM memberships
+                WHERE NOT EXISTS (SELECT 1 FROM folders WHERE folders.id = memberships.folder_id);
+                """)
+            try run("INSERT INTO organization_maintenance(key, completed_at, finding_count) VALUES(?, ?, ?);") { stmt in
+                self.bindText(stmt, 1, key)
+                sqlite3_bind_double(stmt, 2, Date().timeIntervalSince1970)
+                sqlite3_bind_int64(stmt, 3, Int64(count))
+            }
+            try exec("COMMIT;")
+            return count
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
     // MARK: - Template assignment CRUD
 
     func allTemplateAssignments() -> [TemplateAssignment] {
@@ -726,6 +769,26 @@ actor NotesIndex {
     private func prepare(_ sql: String) -> OpaquePointer? {
         var stmt: OpaquePointer?
         return sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK ? stmt : nil
+    }
+
+    private func organizationMaintenanceCompleted(_ key: String) throws -> Bool {
+        guard let stmt = prepare("SELECT 1 FROM organization_maintenance WHERE key = ? LIMIT 1;") else {
+            throw IndexError.sql(lastMessage)
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, key)
+        let rc = sqlite3_step(stmt)
+        if rc == SQLITE_ROW { return true }
+        if rc == SQLITE_DONE { return false }
+        throw IndexError.sql(lastMessage)
+    }
+
+    private func scalarInt(_ sql: String) throws -> Int {
+        guard let stmt = prepare(sql) else { throw IndexError.sql(lastMessage) }
+        defer { sqlite3_finalize(stmt) }
+        let rc = sqlite3_step(stmt)
+        guard rc == SQLITE_ROW else { throw IndexError.sql(lastMessage) }
+        return Int(sqlite3_column_int64(stmt, 0))
     }
 
     /// Whether the `items` table already has `column` — the additive-migration guard (W7-S4). Uses

@@ -407,24 +407,6 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### MEDIUM
 
-- [ ] **W23.m15-fu — ghost memberships already on disk are never swept, only out-voted [XS–S · LOW ·
-  stale data].** Residual of W23.m15, filed 2026-07-31. **Not** a re-open: no new ghost can be created
-  (the store guard and the FK both refuse one), and a ghost naming a *system* folder is revived by the
-  by-id restore, which is the common case by far. The gap is the leftover naming a **user** folder that
-  is genuinely gone — only reachable via the pre-fix race between a folder delete and a concurrent
-  replicate. Those rows survive the FK migration on purpose (SQLite checks foreign keys as rows are
-  written, so pre-existing violations are tolerated, and dropping them would delete durable organization
-  data), and the DB load path deliberately does not purge them either. They are invisible, but they do
-  inflate `membershipCount(item:)`, which makes the §3.6 last-instance guard treat such a note as filed
-  elsewhere: deleting its last *real* folder then won't offer to trash it, and the note ends up
-  reachable only under All Notes with nothing said. Conservative — it never deletes a note it shouldn't
-  — but silent. **Fix:** a one-shot sweep at load (`PRAGMA foreign_key_check` / an anti-join against
-  `folders`) that reports what it found rather than deleting quietly, run once and stamped so it isn't a
-  per-launch cost. Deliberately out of scope with it: `template_assignments.folder_id` stays
-  unconstrained (a stale assignment is inert and `clearDanglingAssignments` already tidies it, so a
-  second table rebuild would risk durable data for nothing).
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Index/{OrganizationStore,NotesIndex}.swift | XS–S | low | none
-
 ### LOW
 
 ### Follow-ups discovered while fixing Wave 23

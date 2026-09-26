@@ -194,6 +194,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         self.storeRoot = storeRoot
 
         let dbFolders = await index.allFolders()
+        var shouldExportOrganization = false
         if dbFolders.isEmpty {
             if let file = OrganizationFile.load(from: storeRoot) {
                 let restored = missingSystemFolders(in: file.folders)
@@ -213,11 +214,9 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
                 }
                 try await index.replaceOrganization(
                     folders: folders, memberships: memberships, assignments: assignments)
-                // Only when the import ADDED something (a restored system folder). A dropped edge
-                // leaves the mirror alone on purpose: the DB is the live truth from here, the next
-                // mutation re-exports the whole graph anyway, and a read path should not be the thing
-                // that rewrites the user's durable file.
-                if !restored.isEmpty { exportOrganization() }
+                // Defer a needed mirror refresh until after the common legacy-membership sweep and
+                // reload below, so the file reflects the graph that actually survived cleanup.
+                shouldExportOrganization = !restored.isEmpty
             } else {
                 folders = Self.systemFolderSeeds
                 for f in folders { try await index.insertFolder(f) }
@@ -231,11 +230,19 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
             if !restored.isEmpty {
                 for f in restored { try await index.insertFolder(f) }
                 folders.append(contentsOf: restored)
-                // Bring the mirror back in line with the restored graph immediately, rather than
-                // waiting for the user's next folder mutation.
-                exportOrganization()
+                shouldExportOrganization = true
             }
         }
+
+        // Fixed-ID folders are now present on every load path. Preserve memberships that can revive
+        // against those folders, and report then remove only the remaining legacy ghosts.
+        if let swept = try await index.sweepGhostMembershipsOnce() {
+            if swept > 0 {
+                NSLog("OrganizationStore: swept %d membership(s) for folders no longer in the organization", swept)
+            }
+            memberships = await index.allMemberships()
+        }
+        if shouldExportOrganization { exportOrganization() }
 
         didLoadGraph = true
     }
