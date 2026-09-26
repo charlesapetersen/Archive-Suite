@@ -94,11 +94,11 @@ struct AnthropicBatchClient: Sendable {
             ]
 
             if let thinking = thinkingLevel {
-                let budget = thinking == .low ? 1024 : 8000
+                let budget = thinking.budgetTokens(for: .documentOCR)
                 params["thinking"] = ["type": "enabled", "budget_tokens": budget]
                 // Anthropic counts thinking tokens against max_tokens; raise the ceiling by the
                 // budget so the transcription isn't silently truncated to the remainder.
-                params["max_tokens"] = 8192 + budget
+                params["max_tokens"] = thinking.anthropicOCRMaxTokens(baseOutputTokens: 8192)
             }
 
             let requestObj: [String: Any] = [
@@ -312,7 +312,7 @@ struct GeminiBatchClient: Sendable {
             ]
 
             if let thinking = thinkingLevel {
-                let budget = thinking == .low ? 1024 : 8000
+                let budget = thinking.budgetTokens(for: .documentOCR)
                 requestBody["generationConfig"] = ["thinkingConfig": ["thinkingBudget": budget]]
             }
 

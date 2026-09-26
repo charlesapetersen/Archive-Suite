@@ -42,12 +42,12 @@ struct AnthropicClient {
         ]
 
         if let thinking = thinkingLevel {
-            let budget = thinking == .low ? 1024 : 8000
+            let budget = thinking.budgetTokens(for: .documentOCR)
             body["thinking"] = ["type": "enabled", "budget_tokens": budget]
             // Anthropic counts thinking tokens against max_tokens, so the ceiling must exceed
             // the budget or the visible transcription is silently truncated to the remainder.
             // Raise it by the budget to preserve the full output allowance.
-            body["max_tokens"] = 8192 + budget
+            body["max_tokens"] = thinking.anthropicOCRMaxTokens(baseOutputTokens: 8192)
         }
 
         var request = URLRequest(url: endpoint, timeoutInterval: 120)

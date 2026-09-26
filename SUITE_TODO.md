@@ -958,35 +958,7 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 (cross-app + SPEC). Legend as above (S/M/L · risk · needs).
 
 ### Archive Processor
-- [ ] **De-dup sweep from the 2026-07-04 maintainability audit — REMAINDER ONLY** _(promoted 2026-07-15;
-  re-scoped 2026-07-16 after finding suite-v1.2.0 already did most of it)_. **`f1d2263` (suite-v1.2.0) ALREADY
-  SHIPPED 5 of the listed consolidations — do NOT redo:** `highestLeadingNumber` (→ `Capture/CollectionNumbering.swift`),
-  `monthTag`/`englishMonthNames` (→ `GeneratedTags`), `acceptedImageExtensions` (→ `ImageEncoding`),
-  `GatewayConfig.fromDefaults()`, `liveProcessingMode` **enum**. **GENUINE REMAINDER (~6, verified still duplicated
-  in-tree 2026-07-16):** a shared transient-status friendly-message helper (4 OCR clients); a segment-JSON schema
-  builder (2 sites); `OCRResult.with(...)` copy helpers; `LLMRotationDetector.rotate` → `ImageEncoding.rotate`
-  (`LLMRotationDetector.swift:150` still a private copy — its own comment says "mirrors ImageEncoding.rotate");
-  `ThinkingLevel.budgetTokens` + the Anthropic max_tokens bump (4 clients — `thinkingBudget` is 1024/4000,
-  512/2000, and two `budget` vars, i.e. budgets differ **by call type**, so KEEP that difference — this one is
-  request-body-affecting if mis-merged); Gemini `cancelBatch` via the shared URL builder.
-  ⚠️ **VERIFICATION CONSTRAINT:** the Processor has **no unit-test target** and its only functional test needs an
-  OCR API key (deleted W4.0.a) — so "prove equivalence" here = build-green + byte-identical diff inspection; the
-  `budgetTokens` sub-item (request-body-affecting) should be done in a keyed/owner session, not guessed unattended.
-  **Tier-1** (touches no write path). | files: OCR/*, Capture/LiveCaptureProcessor.swift, Views/* | M | low | none
-  — **W12-dedup progress 2026-07-16 — 5 of 6 shipped** (byte-identical, build-clean, no new warnings):
-  (1) `LLMRotationDetector.rotate` → shared `ImageEncoding.rotate` `af8cf66`; (2) shared
-  `OCRErrorMessages.transientStatusMessage(_:)` across all 4 clients' `parseErrorResponse` + (3) Gemini
-  `cancelBatch` via `makeBatchURL` `6c52dd4`; (4) `OCRResult.with(classification:rotationDegrees:)` copy helper —
-  7 review/retry re-creations, preserves errorCode (the W9.1 footgun) `94d4ef6`; (5) **segment-JSON sidecar
-  builder** — Tier-2 (file-WRITE format): new pure `OCR/SegmentJSONBuilder.swift` (`cf4f509`) that both
-  `OCRProcessor.writeSegmentJSON` + `LiveCaptureProcessor.writeSegmentJSON` now delegate to — disk-write surface
-  (sidecar-URL + atomic write) left unchanged; the OCRProcessor-only `box_label`/`folder_label` divergence is a
-  `formatOverride:` param via `SegmentJSONBuilder.labelFormatOverride`. Proven byte-identical to BOTH originals
-  by a $0 key-free 12-case / 30-assert driver (`SEGMENT_JSON_TEST=1` + `scripts/test-segment-json.sh`,
-  `6d9a877`; call sites wired in the flip commit) — ALL PASS. **⏸️ 1 REMAINING is OWNER/KEYED — Wave-12 SKIP
-  (do NOT attempt unattended):** (6) **`ThinkingLevel.budgetTokens`** — request-body-affecting (512/2000 vs
-  1024/4000 differ by call type) → keyed/owner session per the VERIFICATION CONSTRAINT above (Processor has no
-  unit target + its only functional test needs the deleted OCR key). See Daemon Report.
+- [ ] **W12.dedup-fu1 — Anthropic collection-name requests exceed their output ceiling [S, Tier-1].** Baseline `07c0c1c`; `LLMTextClient.callAnthropic` and `CollectionSegmenter.segment`. With direct Anthropic and Low/High thinking selected, collection-name extraction or clustering sends `max_tokens: 256` alongside `budget_tokens: 1024/4000`; Anthropic requires the latter to be smaller. Preserve the 256-token visible-answer allowance by raising the total ceiling when thinking is enabled, or explicitly omit thinking for these short calls. Verify both request shapes with a key-free request-body check and a scratch collection run before closing. Tag/date paths already pass `nil` thinking in their main flow; keep them unchanged. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMTextClient.swift,Tagging/CollectionSegmenter.swift} | S | low | none
 ### Capture companions (Android + iOS) — owner decisions 2026-07-15
 ### Archive Reader — layout & panels
 ### Archive Reader — tag cloud & filters

@@ -63,7 +63,7 @@ enum LLMTextClient {
             "messages": [["role": "user", "content": prompt]]
         ]
         if let thinking = thinkingLevel {
-            body["thinking"] = ["type": "enabled", "budget_tokens": thinking == .low ? 1024 : 4000]
+            body["thinking"] = ["type": "enabled", "budget_tokens": thinking.budgetTokens(for: .textCompletion)]
         }
         var request = URLRequest(url: endpoint, timeoutInterval: timeout)
         request.httpMethod = "POST"
@@ -82,7 +82,7 @@ enum LLMTextClient {
         guard let url = URL(string: urlString) else { throw OCRError.networkError("Bad URL") }
         var body: [String: Any] = ["contents": [["parts": [["text": prompt]]]]]
         if let thinking = thinkingLevel {
-            body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking == .low ? 1024 : 4000]]
+            body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking.budgetTokens(for: .textCompletion)]]
         }
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "POST"

@@ -26,7 +26,7 @@ struct GeminiClient {
 
         var generationConfig: [String: Any] = [:]
         if let thinking = thinkingLevel {
-            let budget = thinking == .low ? 1024 : 8000
+            let budget = thinking.budgetTokens(for: .documentOCR)
             generationConfig["thinkingConfig"] = ["thinkingBudget": budget]
         }
 

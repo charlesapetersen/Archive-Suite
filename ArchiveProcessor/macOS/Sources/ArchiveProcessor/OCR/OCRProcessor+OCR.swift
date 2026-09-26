@@ -547,7 +547,7 @@ extension OCRProcessor {
         guard let url = URL(string: urlString) else { return "" }
         var body: [String: Any] = ["contents": [["parts": [["text": prompt]]]]]
         if let thinking = thinkingLevel {
-            body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking == .low ? 512 : 2000]]
+            body["generationConfig"] = ["thinkingConfig": ["thinkingBudget": thinking.budgetTokens(for: .classification)]]
         }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"

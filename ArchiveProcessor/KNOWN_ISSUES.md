@@ -2,6 +2,10 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## OPEN (W12.dedup-fu1): Anthropic collection-name thinking exceeds `max_tokens`
+
+At baseline `07c0c1c`, `LLMTextClient.callAnthropic` sends `max_tokens: 256` for `CollectionSegmenter` calls while also sending `budget_tokens: 1024` (Low) or `4000` (High). Direct Anthropic collection-name extraction and clustering with thinking enabled therefore violate the provider's requirement that a manual thinking budget be below `max_tokens`. The main tag/date paths omit thinking; the collection path forwards the chosen level. This predates the Wave-12 budget refactor, which deliberately preserves the request. Follow-up: `W12.dedup-fu1` in `SUITE_TODO.md`.
+
 ## ✅ FIXED (W3.cap-r3-fu4): a late page could create a second filed document
 
 After Finish, Live Capture now retains filed group IDs through cleanup and relaunch. A late page for one
