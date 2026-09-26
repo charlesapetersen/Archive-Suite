@@ -3,14 +3,9 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
-## ⚠️ OPEN (W9.d2.review-folder-graph) — folder graph edits can cross deletion
+## ✅ FIXED (W9.d2.review-folder-graph) — folder graph edits crossed deletion
 
-**Confirmed 2026-09-26, baseline `74627e1`.** `OrganizationStore.renameFolder` and `moveFolder` retain an
-array index across an awaited `NotesIndex.updateFolder`; a concurrent `deleteFolder` can remove or shift
-that row before they resume. `createFolder(parent:)` can also insert under a parent after deletion has
-snapshotted its children, leaving a dangling parent ID. Independent reviewers confirmed these
-interleavings during W9.d2 review. The full finding is archived under
-`old/review-folder-graph-delete-race-2026-09-26.md`; the fix is queued in `SUITE_TODO.md`.
+**Fixed 2026-09-26.** `OrganizationStore` now holds one serialized graph-write admission through each SQLite write and matching memory/mirror publish. Folder create/move and template assignment validate their parent or target after waiting, so a completed deletion cannot be followed by a dangling edge. Deterministic scratch regressions force the rename, move, child-create, and template-assign races. Notes Debug build and full unit smoke passed; independent Tier-2 find→refute review found no remaining concrete graph race. No real Notes store or corpus was touched. Original finding: `old/review-folder-graph-delete-race-2026-09-26.md`.
 
 ## ✅ VERIFIED (W23.l4-fu) — Notes date precision warning is covered by the off-screen UI harness
 

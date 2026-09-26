@@ -255,36 +255,86 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
 
     // MARK: - Folder operations
 
+    // MainActor is reentrant at each index await. Serialize folder-graph mutations through their
+    // SQLite commit and memory/mirror publish, so delete cannot overtake a stale folder snapshot.
+    // The released lock is handed directly to the first waiter; no other caller can cut in.
+    private var folderGraphWriteActive = false
+    private var folderGraphWriteWaiters: [CheckedContinuation<Void, Never>] = []
+
+    private func beginFolderGraphWrite() async {
+        if folderGraphWriteActive {
+            await withCheckedContinuation { continuation in
+                folderGraphWriteWaiters.append(continuation)
+                #if DEBUG
+                folderGraphWaiterEnqueuedHookForTesting?()
+                #endif
+            }
+        } else {
+            folderGraphWriteActive = true
+        }
+    }
+
+    private func endFolderGraphWrite() {
+        if folderGraphWriteWaiters.isEmpty {
+            folderGraphWriteActive = false
+        } else {
+            folderGraphWriteWaiters.removeFirst().resume()
+        }
+    }
+
+    #if DEBUG
+    /// Pauses a graph write after SQLite commits, before the in-memory graph and mirror publish.
+    var folderGraphAfterIndexHookForTesting: (@MainActor (UUID) async -> Void)?
+    var folderGraphWaiterEnqueuedHookForTesting: (@MainActor () -> Void)?
+    #endif
+
     @discardableResult
     func createFolder(name: String, parent: UUID? = nil, kind: VFolder.Kind = .normal,
                       queryJSON: String? = nil) async throws -> VFolder {
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
+        if let parent { try requireFolderExists(parent) }
         let folder = VFolder(
             id: UUID(), name: name, parentId: parent,
             sortOrder: nextSortOrder(under: parent), kind: kind, queryJSON: queryJSON)
         try await index.insertFolder(folder)
+        #if DEBUG
+        if let hook = folderGraphAfterIndexHookForTesting { await hook(folder.id) }
+        #endif
         folders.append(folder)
         exportOrganization()
         return folder
     }
 
     func renameFolder(_ id: UUID, to name: String) async throws {
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
         try refuseSystemFolder(id)
         guard let i = folders.firstIndex(where: { $0.id == id }) else { return }
         var updated = folders[i]
         updated.name = name
         try await index.updateFolder(updated)
+        #if DEBUG
+        if let hook = folderGraphAfterIndexHookForTesting { await hook(id) }
+        #endif
         folders[i] = updated
         exportOrganization()
     }
 
     /// Move a folder to a new parent. Refuses (no-op) if the move would create a cycle.
     func moveFolder(_ id: UUID, newParent: UUID?, sortOrder: Int) async throws {
-        guard !wouldCreateCycle(moving: id, to: newParent) else { return }
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
         guard let i = folders.firstIndex(where: { $0.id == id }) else { return }
+        if let newParent { try requireFolderExists(newParent) }
+        guard !wouldCreateCycle(moving: id, to: newParent) else { return }
         var updated = folders[i]
         updated.parentId = newParent
         updated.sortOrder = sortOrder
         try await index.updateFolder(updated)
+        #if DEBUG
+        if let hook = folderGraphAfterIndexHookForTesting { await hook(id) }
+        #endif
         folders[i] = updated
         exportOrganization()
     }
@@ -304,6 +354,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// entirely empty — so deleting one was permanent while the app went on writing memberships to it.
     @discardableResult
     func deleteFolder(_ id: UUID) async throws -> [UUID] {
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
         try refuseSystemFolder(id)
         guard folders.contains(where: { $0.id == id }) else { return [] }
         try beginFolderDeletion(id)
@@ -321,6 +373,9 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         }
 
         try await index.deleteFolderGraph(id: id, reparentedChildren: reparented)
+        #if DEBUG
+        if let hook = folderGraphAfterIndexHookForTesting { await hook(id) }
+        #endif
 
         // Committed. Now — and only now — move memory to match. `affectedMemberships` is read here
         // rather than before the await so it reflects the same set the `DELETE … WHERE folder_id = ?`
@@ -599,6 +654,9 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     // MARK: - Templates
 
     func assignTemplate(_ template: UUID, to folder: UUID) async throws {
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
+        try requireFolderExists(folder)
         let a = TemplateAssignment(folderId: folder, templateId: template)
         try await index.insertTemplateAssignment(a)
         if let i = assignments.firstIndex(where: { $0.folderId == folder }) {
@@ -610,6 +668,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     }
 
     func removeTemplateAssignment(folder: UUID) async throws {
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
         try await index.deleteTemplateAssignment(folder: folder)
         assignments.removeAll { $0.folderId == folder }
         exportOrganization()
@@ -620,6 +680,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// pointing at the template and others not.
     func removeTemplateAssignments(folders folderIds: [UUID]) async throws {
         guard !folderIds.isEmpty else { return }
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
         try await index.deleteTemplateAssignments(folders: folderIds)
         let cleared = Set(folderIds)
         assignments.removeAll { cleared.contains($0.folderId) }

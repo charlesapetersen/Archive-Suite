@@ -342,6 +342,164 @@ struct OrganizationStoreTests {
         #expect(store.foldersContaining(item: itemId) == [b.id])      // the live membership survives
     }
 
+    /// A rename paused after its DB write must publish before delete snapshots the graph.
+    @Test func folderDeleteWaitsForRenamePublish() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+        let target = try await store.createFolder(name: "Target")
+        let sibling = try await store.createFolder(name: "Sibling")
+        var reachedPause: AsyncStream<Void>.Continuation!
+        let paused = AsyncStream<Void> { reachedPause = $0 }
+        var pauseEvents = paused.makeAsyncIterator()
+        var waiterEnqueued: AsyncStream<Void>.Continuation!
+        let queued = AsyncStream<Void> { waiterEnqueued = $0 }
+        var queueEvents = queued.makeAsyncIterator()
+        store.folderGraphWaiterEnqueuedHookForTesting = { _ = waiterEnqueued.yield(()) }
+        var releaseWriter: CheckedContinuation<Void, Never>?
+        var shouldPause = true
+        store.folderGraphAfterIndexHookForTesting = { id in
+            guard id == target.id && shouldPause else { return }
+            shouldPause = false
+            _ = reachedPause.yield(())
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                releaseWriter = continuation
+            }
+        }
+        let rename = Task { try await store.renameFolder(target.id, to: "Renamed") }
+        _ = await pauseEvents.next()
+        var deletionFinished = false
+        let deletion = Task {
+            _ = try await store.deleteFolder(target.id)
+            deletionFinished = true
+        }
+        _ = await queueEvents.next()
+        #expect(!deletionFinished)
+        releaseWriter?.resume()
+        try await rename.value
+        try await deletion.value
+        store.folderGraphAfterIndexHookForTesting = nil
+        store.folderGraphWaiterEnqueuedHookForTesting = nil
+        #expect(store.folders.contains { $0.id == sibling.id && $0.name == "Sibling" })
+        #expect(!store.folders.contains { $0.id == target.id })
+        #expect((await index.allFolders()).contains { $0.id == sibling.id })
+        #expect(!(await index.allFolders()).contains { $0.id == target.id })
+    }
+
+    /// A move paused after its DB write must finish before the target can be deleted.
+    @Test func folderDeleteWaitsForMovePublish() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+        let parent = try await store.createFolder(name: "Parent")
+        let target = try await store.createFolder(name: "Target")
+        let sibling = try await store.createFolder(name: "Sibling")
+        var reachedPause: AsyncStream<Void>.Continuation!
+        let paused = AsyncStream<Void> { reachedPause = $0 }
+        var pauseEvents = paused.makeAsyncIterator()
+        var waiterEnqueued: AsyncStream<Void>.Continuation!
+        let queued = AsyncStream<Void> { waiterEnqueued = $0 }
+        var queueEvents = queued.makeAsyncIterator()
+        store.folderGraphWaiterEnqueuedHookForTesting = { _ = waiterEnqueued.yield(()) }
+        var releaseWriter: CheckedContinuation<Void, Never>?
+        var shouldPause = true
+        store.folderGraphAfterIndexHookForTesting = { id in
+            guard id == target.id && shouldPause else { return }
+            shouldPause = false
+            _ = reachedPause.yield(())
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                releaseWriter = continuation
+            }
+        }
+        let move = Task { try await store.moveFolder(target.id, newParent: parent.id, sortOrder: 0) }
+        _ = await pauseEvents.next()
+        let deletion = Task { try await store.deleteFolder(target.id) }
+        _ = await queueEvents.next()
+        #expect(store.folders.contains { $0.id == target.id && $0.parentId == nil })
+        releaseWriter?.resume()
+        try await move.value
+        _ = try await deletion.value
+        store.folderGraphAfterIndexHookForTesting = nil
+        store.folderGraphWaiterEnqueuedHookForTesting = nil
+        #expect(store.folders.contains { $0.id == sibling.id })
+        #expect(!store.folders.contains { $0.id == target.id })
+        #expect(!(await index.allFolders()).contains { $0.id == target.id })
+    }
+
+    /// A child creation queued behind deletion must recheck its parent after the lock handoff.
+    @Test func createFolderRefusesParentDeletedDuringWait() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+        let parent = try await store.createFolder(name: "Parent")
+        var reachedPause: AsyncStream<Void>.Continuation!
+        let paused = AsyncStream<Void> { reachedPause = $0 }
+        var pauseEvents = paused.makeAsyncIterator()
+        var waiterEnqueued: AsyncStream<Void>.Continuation!
+        let queued = AsyncStream<Void> { waiterEnqueued = $0 }
+        var queueEvents = queued.makeAsyncIterator()
+        store.folderGraphWaiterEnqueuedHookForTesting = { _ = waiterEnqueued.yield(()) }
+        var releaseDelete: CheckedContinuation<Void, Never>?
+        store.folderGraphAfterIndexHookForTesting = { id in
+            guard id == parent.id else { return }
+            _ = reachedPause.yield(())
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                releaseDelete = continuation
+            }
+        }
+        let deletion = Task { try await store.deleteFolder(parent.id) }
+        _ = await pauseEvents.next()
+        let create = Task { try await store.createFolder(name: "Late Child", parent: parent.id) }
+        _ = await queueEvents.next()
+        releaseDelete?.resume()
+        _ = try await deletion.value
+        do {
+            _ = try await create.value
+            Issue.record("child creation accepted a deleted parent")
+        } catch OrganizationError.unknownFolder(let id) {
+            #expect(id == parent.id)
+        }
+        store.folderGraphAfterIndexHookForTesting = nil
+        store.folderGraphWaiterEnqueuedHookForTesting = nil
+        #expect(!store.folders.contains { $0.name == "Late Child" })
+        #expect(!(await index.allFolders()).contains { $0.name == "Late Child" })
+    }
+
+    /// A template assignment queued behind deletion cannot resurrect a stale graph edge.
+    @Test func assignTemplateRefusesFolderDeletedDuringWait() async throws {
+        let (store, index, root) = try await makeTempEnv()
+        defer { Task { await cleanup(root, index) } }
+        let folder = try await store.createFolder(name: "Soon Deleted")
+        var reachedPause: AsyncStream<Void>.Continuation!
+        let paused = AsyncStream<Void> { reachedPause = $0 }
+        var pauseEvents = paused.makeAsyncIterator()
+        var waiterEnqueued: AsyncStream<Void>.Continuation!
+        let queued = AsyncStream<Void> { waiterEnqueued = $0 }
+        var queueEvents = queued.makeAsyncIterator()
+        store.folderGraphWaiterEnqueuedHookForTesting = { _ = waiterEnqueued.yield(()) }
+        var releaseDelete: CheckedContinuation<Void, Never>?
+        store.folderGraphAfterIndexHookForTesting = { id in
+            guard id == folder.id else { return }
+            _ = reachedPause.yield(())
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                releaseDelete = continuation
+            }
+        }
+        let deletion = Task { try await store.deleteFolder(folder.id) }
+        _ = await pauseEvents.next()
+        let assignment = Task { try await store.assignTemplate(UUID(), to: folder.id) }
+        _ = await queueEvents.next()
+        releaseDelete?.resume()
+        _ = try await deletion.value
+        do {
+            try await assignment.value
+            Issue.record("template assignment accepted a deleted folder")
+        } catch OrganizationError.unknownFolder(let id) {
+            #expect(id == folder.id)
+        }
+        store.folderGraphAfterIndexHookForTesting = nil
+        store.folderGraphWaiterEnqueuedHookForTesting = nil
+        #expect(store.assignments.allSatisfy { $0.folderId != folder.id })
+        #expect((await index.allTemplateAssignments()).allSatisfy { $0.folderId != folder.id })
+    }
+
     // MARK: - Templates
 
     @Test func assignTemplateAndInheritance() async throws {

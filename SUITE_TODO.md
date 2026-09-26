@@ -867,11 +867,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d2.review-folder-graph` — folder mutations can cross folder deletion [M, Tier-2].** Baseline
-  `74627e1`; `OrganizationStore.renameFolder`, `moveFolder`, `createFolder`, `deleteFolder`. Concurrent
-  rename/move can resume after deletion using a stale array index; child creation can commit under a parent
-  after delete snapshots its children. Independently confirmed during W9.d2 review; report archived under
-  `old/`. | ArchiveNotes/macOS/Sources/ArchiveNotes/Index/OrganizationStore.swift | M | low | none
 - [ ] **`W9.d3` — template body editing is not routed in-app [M].** Plan D3. | Views/TemplatesManagerView.swift
   | M | low | none
 - [ ] **`W9.d4` — no inline quality quick-edit [S].** Plan D4. Add a borderless quality `Menu` (None + 1–3)
