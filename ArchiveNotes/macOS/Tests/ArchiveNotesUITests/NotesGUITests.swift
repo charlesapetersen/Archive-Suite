@@ -601,6 +601,65 @@ class NotesFixtureUITestCase: XCTestCase {
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
+    /// W23.l4-fu — the metadata date row renders the impossible-day warning and persists the
+    /// coarser month, while an actual month end remains day precision.
+    func testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let uuid = Self.idPlain
+            _ = selectItem(uuid: uuid)
+
+            let precision = mainWindow.radioGroups["an.detail.date.precision"]
+            XCTAssertTrue(precision.waitForExistence(timeout: 8), "date precision control should be visible")
+            let dayPrecision = precision.radioButtons["Day"]
+            XCTAssertTrue(dayPrecision.waitForExistence(timeout: 5), "Day precision should be selectable")
+            dayPrecision.click()
+
+            let year = mainWindow.textFields["an.detail.date.year"]
+            XCTAssertTrue(year.waitForExistence(timeout: 5), "the date year field should be visible")
+            year.click()
+            year.typeKey("a", modifierFlags: .command)
+            year.typeText("2026")
+
+            let day = mainWindow.textFields["an.detail.date.day"]
+            XCTAssertTrue(day.waitForExistence(timeout: 5), "the day field should be visible at day precision")
+            day.click()
+            day.typeKey("a", modifierFlags: .command)
+            day.typeText("31")
+
+            let month = mainWindow.descendants(matching: .any)["an.detail.date.month"]
+            XCTAssertTrue(month.waitForExistence(timeout: 5), "the month picker should be visible")
+            month.click()
+            let february = app.menuItems["February"]
+            XCTAssertTrue(february.waitForExistence(timeout: 5), "February should be available in the month menu")
+            february.click()
+
+            let warning = mainWindow.staticTexts["an.detail.date.dayWarning"]
+            XCTAssertTrue(warning.waitForExistence(timeout: 5), "choosing February with day 31 should render a warning")
+            let warningText = (warning.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? warning.label
+            XCTAssertEqual(warningText, "February 2026 has 28 days — the day is ignored.")
+            XCTAssertTrue(pollUntil(timeout: 12) {
+                let markdown = self.rawMarkdown(inItemDir: uuid) ?? ""
+                return markdown.contains("date: 2026-02") && markdown.contains("date_precision: month")
+            }, "the impossible day should be dropped and saved at month precision")
+            let februarySaved = try XCTUnwrap(rawMarkdown(inItemDir: uuid))
+            XCTAssertFalse(februarySaved.contains("2026-02-31"), "the impossible day must not be persisted")
+
+            // The same typed day is valid for January. The picker commits on selection, so this
+            // also proves that the month binding does not silently discard a legitimate day.
+            month.click()
+            let january = app.menuItems["January"]
+            XCTAssertTrue(january.waitForExistence(timeout: 5), "January should be available in the month menu")
+            january.click()
+
+            XCTAssertFalse(warning.exists, "a valid month end should clear the warning")
+            XCTAssertTrue(pollUntil(timeout: 12) {
+                let markdown = self.rawMarkdown(inItemDir: uuid) ?? ""
+                return markdown.contains("date: 2026-01-31") && markdown.contains("date_precision: day")
+            }, "January 31 should persist at day precision")
+        }
+    }
+
     /// W23.m9-fu3 — render the warning, repair the scratch cache, and prove live recovery in the VM.
     func testCorruptIndexWarningRetractsAfterScratchRepairAndReindex() throws {
         try withFixture {

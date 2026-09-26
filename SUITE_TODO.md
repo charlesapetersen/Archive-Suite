@@ -429,21 +429,6 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   Needs the registry, so it is its own item and not a tweak.
   | files: ArchiveReader/macOS/Sources/ArchiveReader/ (document window open path) | Tier-1 | S | **owner judgement**
 
-- [ ] **W23.l4-fu — no UITest drives the Notes metadata strip, so the date warning row is unverified
-  pixels [XS–S].** Owner decision, 2026-07-31 Daemon Report: close this with a **test**, not a recurring
-  manual check. W23.l4's logic is fully pinned by `DateFieldEntryTests`, but nothing in any UITest touches
-  the Date row, so the inline warning (`an.detail.date.dayWarning`) and the dead Set button have never been
-  seen by a harness — the standing ask was a 10-second owner eyeball, which does not scale to the next
-  change that touches date entry. **Do:** add a Notes UITest that selects a note, types `31` into Day,
-  chooses **February** from the month menu, and asserts (a) the day is dropped, (b)
-  `an.detail.date.dayWarning` exists and reads *"February <year> has 28 days — the day is ignored."*, and
-  (c) the note is saved at month precision; plus the negative case (a real month-end such as `2026-01-31`
-  commits at day precision with no warning). Run it off-screen via `ops/gui/vm-gui-runner.sh notes` — the
-  Notes VM lane is green, and the known-failure list to compare against is G3/G6/G8/G11 (see
-  `ArchiveNotes/KNOWN_ISSUES.md`), plus the G1 `⌘N` delivery flake first seen 2026-07-31.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteMetadataInspector.swift (identifiers only),
-  ArchiveNotes/macOS/Tests/ArchiveNotesUITests/ | Tier-1 | XS–S
-
 - [ ] **W23.h2-fu — concurrent edits can leave the Notes FTS index row transiently stale [S · LOW].**
   Found 2026-07-30 while fixing W23.h2 (adversarial self-review of the fix, not a new review). The `.md` on
   disk is now always correct — `NoteStore.withItem` is atomic — but `NotesModel.mutateItem` does its
