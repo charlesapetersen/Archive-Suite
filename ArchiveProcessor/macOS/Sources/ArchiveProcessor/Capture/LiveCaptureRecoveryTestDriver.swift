@@ -1300,10 +1300,9 @@ enum LiveCaptureRecoveryTestDriver {
             check("...and buys nothing — it cannot join a document that is already written",
                   paidStarts() == 1)
 
-            // 2. THE HARM. The operator hits Finish, the document files, and `finalize` drops it from
-            //    `finalizedGroups` — so the late-page branch above no longer covers its pages, and the stale
-            //    key was the only thing left in front of them. Pre-fix a page re-sent NOW bought nothing and
-            //    the document it landed in carried no text for it.
+            // 2. W3.cap-r3-fu4: once Finish confirms the output in its destination, the group stays closed
+            //    after `finalize` releases its transient staged marker. A dropped-ack retry and a genuinely
+            //    new page both remain visible in the Backup Folder without starting a second document.
             let f1Key = fuProc.staged.first { $0.groupId == "F1" }?.collectionKey ?? "__unfiled__"
             fuProc.finalize([LiveCaptureProcessor.CollectionDraft(
                 id: f1Key, finalName: fuOut.lastPathComponent, existingFolders: [], suggestedFolders: [],
@@ -1311,28 +1310,14 @@ enum LiveCaptureRecoveryTestDriver {
             let filed = await fuSettle { !fuProc.isFinalizing && fuProc.staged.isEmpty }
             check("the document really filed, so what follows is the post-filing state and not a partial",
                   filed && !fuProc.isFinalized("F1"))
-            // Finish reclaimed the spent staging dir along with the batch (W3.cap-r6). Put it back, so the
-            // re-finalize below writes its output for the same reason a live session's would and the checks
-            // read the OCR rather than a missing directory.
-            try? fm.createDirectory(at: fuStaging, withIntermediateDirectories: true)
+            let filedGroupRecorded = fuSession.filedGroupIds.contains("F1")
             fuSend("F1", 1)   // the phone's dropped-ack re-upload, arriving after Finish
-            check("a page re-sent after its document was FILED buys the OCR call it needs", paidStarts() == 2)
-            fuSend("F1", 2)   // …and a genuinely new page of the same document, which always bought one
-            check("...and a genuinely new page still buys its own (the guard is not just disabled)",
-                  paidStarts() == 3)
-            fuProc.segmentResolved(groupId: "F1")
-            let refiled = await fuSettle { fuProc.retainedText(for: "F1") != nil }
-            // The consequence, measured on the record finalize wrote rather than on the guard: pre-fix the
-            // re-sent page is read as "OCR not started" and contributes an empty string, so the document goes
-            // out with ONE page of text where the operator captured two.
-            check("...so the document is filed with BOTH pages' text, not \"OCR not started\" for one of them",
-                  refiled && textPages("F1") == 2)
-            // …and this is why it had to be fixed at ingest: the sibling's text means no status ever says a
-            // page came out empty. `succeededNoText` (the one warning about missing text) needs the WHOLE
-            // segment to be text-less, so it never fires for the mixed case the phone actually produces.
-            check("...which nothing would have warned about: with a text-bearing sibling the segment is not "
-                  + "reported text-less",
-                  fuProc.statuses.first { $0.id == "F1" }?.phase != .succeededNoText)
+            let filedRetryRefused = paidStarts() == 1 && lateWarned()
+                && fuPhoto("F1", 1) != nil && fuProc.staged.isEmpty
+            fuSend("F1", 2)   // a new page still cannot reopen a group filed earlier this session
+            check("W3.cap-r3-fu4: a filed group's retry and new page stay backed up with no second OCR/doc",
+                  filedGroupRecorded && filedRetryRefused && paidStarts() == 1
+                      && lateWarned() && fuPhoto("F1", 2) != nil && fuProc.staged.isEmpty)
 
             // 3. The trap this fix had to avoid, and the reason it is keyed on the Task rather than retired in
             //    the carve-out: a page removed MID-FINALIZE keeps the Task finalize is suspended on, so it
@@ -1341,6 +1326,9 @@ enum LiveCaptureRecoveryTestDriver {
             //    would tell the operator a "late page arrived" for a page that IS being included. Both guards
             //    now cover the window (no Task is free, and the group is in `finalizedGroups`); these checks
             //    pin the OUTCOME, which is what a future edit to either one must not change.
+            // W3.cap-r6 reclaimed F1's now-spent staging folder; restore the scratch folder so the unrelated
+            // F2/F3 in-flight cases below can stage normally.
+            try? fm.createDirectory(at: fuStaging, withIntermediateDirectories: true)
             let fuGate = TestGate()
             LiveCaptureProcessor._recoveryTestOCRGate = { await fuGate.wait() }
             fuSend("F2", 1)
@@ -1350,12 +1338,12 @@ enum LiveCaptureRecoveryTestDriver {
             fuProc.segmentResolved(groupId: "F2")
             let parked = await fuSettle { fuProc.isFinalized("F2") }
             check("a two-page segment is mid-finalize, parked on its FIRST page",
-                  parked && f2p2 != nil && paidStarts() == 5 && fuProc.retainedText(for: "F2") == nil)
+                  parked && f2p2 != nil && paidStarts() == 3 && fuProc.retainedText(for: "F2") == nil)
             if let f2p2 {
                 fuSession.removePhoto(f2p2)   // carve-out: not cancelled, its Task kept for finalize to read
                 fuSend("F2", 2)               // the phone re-sends it INSIDE that window
                 check("a page re-sent while finalize is suspended on its group buys NO second call",
-                      paidStarts() == 5)
+                      paidStarts() == 3)
                 check("...and is not mislabelled a late arrival — its call is the one being read",
                       !lateWarned())
                 fuGate.open()
@@ -1380,11 +1368,11 @@ enum LiveCaptureRecoveryTestDriver {
                 chosenExisting: fuOut, segmentCount: 1, photoCount: 1)])
             let reclaimed = await fuSettle { !fuProc.isFinalizing && fuProc.staged.isEmpty }
             check("a clean batch reclaims while a page of an unplanned group is still mid-OCR",
-                  reclaimed && paidStarts() == 6
+                  reclaimed && paidStarts() == 4
                       && fuPhoto("F3", 1).map { fuProc._recoveryTestHasPageTask(for: $0) } == true)
             fuSend("F3", 1)
             check("...and that page's re-upload still buys NO second call after the reclaim",
-                  paidStarts() == 6)
+                  paidStarts() == 4)
             fuGate4.open()
 
             LiveCaptureProcessor._recoveryTestOCRStub = nil
@@ -3632,6 +3620,154 @@ enum LiveCaptureRecoveryTestDriver {
                       && p29RegenerationStarted && p29Regenerated
                       && p29HasLocalProvenance(p29RegeneratedURL))
 
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        }
+
+        // --- W3.cap-r3-fu4: a filed group remains closed to late phone pages after relaunch. ---
+        // Exercise CaptureSession.clearFiled (the production path after executePlans confirms destination
+        // files), its on-disk manifest, launch-time empty-session preservation, and the real ingest callback.
+        let backupOverride = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"]
+        let backupPath = backupOverride.map { URL(fileURLWithPath: $0, isDirectory: true).standardizedFileURL.path } ?? ""
+        let tempRoots = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
+        if let backupOverride, tempRoots.contains(where: { backupPath == $0 || backupPath.hasPrefix($0 + "/") }) {
+            let backupRoot = URL(fileURLWithPath: backupOverride, isDirectory: true)
+            let priorSessions = (try? fm.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)) ?? []
+            for folder in priorSessions where CaptureSession.isSessionIdName(folder.lastPathComponent) {
+                try? fm.removeItem(at: folder)
+            }
+
+            let fu4Group = "fu4-filed-group"
+            let fu4Bytes = Data("synthetic filed page".utf8)
+            let fu4First = CaptureSession()
+            fu4First.beginStageSessionForTest()
+            let fu4Original = fu4First.ingest(jpeg: fu4Bytes, groupId: fu4Group, seq: 1, type: .document,
+                                               quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+            fu4First.manifestWriteOverride = { _, _ in false }
+            let fu4WriteRefused = fu4Original.map { !fu4First.clearFiled([$0], groupIds: [fu4Group]) } ?? false
+            let fu4OriginalKept = fu4Original.map { original in
+                fm.fileExists(atPath: original.path) && fu4First.photos.contains(where: { $0.url == original })
+            } ?? false
+            fu4First.manifestWriteOverride = nil
+            let fu4Recorded = fu4Original.map { fu4First.clearFiled([$0], groupIds: [fu4Group]) } ?? false
+            let fu4ManifestURL = fu4First.incomingFolder.appendingPathComponent("manifest.json")
+            let fu4Persisted = (try? Data(contentsOf: fu4ManifestURL))
+                .flatMap { CaptureSession.decodeManifest($0) }?.filed.contains(fu4Group) == true
+            let fu4Preserved = !CaptureSession.isReclaimableEmptySession(fu4First.incomingFolder,
+                                                                          relayBases: [])
+
+            // A new CaptureSession simulates app relaunch after every original was retired. It must recover
+            // the same epoch from the ledger-only manifest, otherwise the next page would get a fresh set.
+            let fu4Resumed = CaptureSession()
+            let fu4Restored = fu4Resumed.sessionId == fu4First.sessionId && fu4Resumed.photos.isEmpty
+                && fu4Resumed.filedGroupIds.contains(fu4Group)
+            let fu4Output = tmp.appendingPathComponent("fu4-out", isDirectory: true)
+            let fu4Staging = tmp.appendingPathComponent("fu4-staging", isDirectory: true)
+            try? fm.createDirectory(at: fu4Staging, withIntermediateDirectories: true)
+            let fu4Config = SessionProcessingConfig(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                outputDirectory: fu4Output, contextCharCount: 0, sendPreviousImage: false,
+                customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "should not run", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            fu4Resumed.beginStageSessionForTest()
+            let fu4Late = fu4Resumed.ingest(jpeg: fu4Bytes, groupId: fu4Group, seq: 2, type: .document,
+                                             quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+            let fu4StagedExcluded = fu4Resumed.orderedFilesAndGroups().files.isEmpty
+            let fu4LateSegmentAck = fu4Resumed.markSegmentComplete(groupId: fu4Group, quality: "Q2",
+                                                                    year: 2026, month: 9)
+            let fu4LateFinishAck = fu4Resumed.completeAllOpenDocGroups()
+            let fu4NoLateTagCard = fu4Resumed.pendingTagGroup == nil
+                && !fu4Resumed.completedDocGroups.contains(fu4Group)
+            fu4Resumed._recoveryTestBeginLive(config: fu4Config, stagingDir: fu4Staging)
+            if let latePhoto = fu4Resumed.photos.first(where: { $0.groupId == fu4Group && $0.seq == 2 }) {
+                fu4Resumed.liveProcessor.photoIngested(latePhoto)
+            }
+            let fu4Refused = fu4Late != nil && fu4Resumed.photos.contains { $0.groupId == fu4Group && $0.seq == 2 }
+                && fu4Resumed.statusMessage.contains("already-finished document")
+                && fu4Resumed.statusMessage.contains("Backup Folder")
+                && fu4Resumed.statusMessage.contains("NEW segment")
+                && LiveCaptureProcessor._recoveryTestOCRStarts.isEmpty
+            check("W3.cap-r3-fu4: ledger-write failure keeps originals; filed IDs survive relaunch and block late OCR",
+                  fu4Original != nil && fu4WriteRefused && fu4OriginalKept && fu4Recorded
+                      && fu4Persisted && fu4Preserved && fu4Restored && fu4StagedExcluded
+                      && fu4LateSegmentAck && fu4LateFinishAck && fu4NoLateTagCard && fu4Refused)
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+        } else {
+            check("W3.cap-r3-fu4: recovery backup-root override resolves inside a temp directory", false)
+        }
+
+        // --- W3.cap-r3-fu4: if the ledger cannot be committed after destination moves, keep recovery state. ---
+        if let backupOverride, tempRoots.contains(where: { backupPath == $0 || backupPath.hasPrefix($0 + "/") }) {
+            let backupRoot = URL(fileURLWithPath: backupOverride, isDirectory: true)
+            let priorSessions = (try? fm.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)) ?? []
+            for folder in priorSessions where CaptureSession.isSessionIdName(folder.lastPathComponent) {
+                try? fm.removeItem(at: folder)
+            }
+            let failOut = tmp.appendingPathComponent("fu4-ledger-fail-out", isDirectory: true)
+            let failSession = CaptureSession()
+            let failStaging = LiveCaptureProcessor.stagingDir(for: failSession)
+            try? fm.createDirectory(at: failStaging, withIntermediateDirectories: true)
+            failSession._recoveryTestBeginLive(config: SessionProcessingConfig(
+                provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
+                taggingMode: .human, rotationMode: .off, mergeDocuments: false,
+                outputDirectory: failOut, contextCharCount: 0, sendPreviousImage: false,
+                customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+                gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1),
+                stagingDir: failStaging)
+            LiveCaptureProcessor._recoveryTestOCRStub =
+                OCRResult(text: "ledger failure page", classification: nil, errorMessage: nil, errorCode: nil)
+            LiveCaptureProcessor._recoveryTestOCRStarts = []
+            LiveCaptureProcessor._recoveryTestOCRTasks = [:]
+            let failGroup = "fu4-ledger-failure"
+            let failSource = failSession.ingest(jpeg: Data("scratch original".utf8), groupId: failGroup, seq: 1,
+                                                 type: .document, quality: nil, year: nil, month: nil,
+                                                 deviceName: "TestPhone")
+            failSession.liveProcessor.segmentResolved(groupId: failGroup)
+            var failStaged = false
+            for _ in 0..<400 {
+                if failSession.liveProcessor.staged.contains(where: { $0.groupId == failGroup }) {
+                    failStaged = true; break
+                }
+                try? await Task.sleep(nanoseconds: 25_000_000)
+            }
+            let failKey = failSession.liveProcessor.staged.first { $0.groupId == failGroup }?.collectionKey ?? "__unfiled__"
+            failSession.manifestWriteOverride = { _, _ in false }
+            failSession.liveProcessor.finalize([LiveCaptureProcessor.CollectionDraft(
+                id: failKey, finalName: failOut.lastPathComponent, existingFolders: [], suggestedFolders: [],
+                chosenExisting: failOut, segmentCount: 1, photoCount: 1)])
+            var failFinalizeStopped = false
+            for _ in 0..<400 {
+                if !failSession.liveProcessor.isFinalizing { failFinalizeStopped = true; break }
+                try? await Task.sleep(nanoseconds: 25_000_000)
+            }
+            let failManifest = failStaging.appendingPathComponent("staging-manifest.json")
+            let failRecoveryKept = failSource.map { fm.fileExists(atPath: $0.path) } == true
+                && failSession.photos.contains { $0.groupId == failGroup }
+                && failSession.liveProcessor.staged.contains { $0.groupId == failGroup }
+                && fm.fileExists(atPath: failManifest.path)
+                && failSession.liveProcessor.finalizeSummary?.contains("ledger could not be saved") == true
+            check("W3.cap-r3-fu4: failed post-move ledger write keeps originals and staged recovery data",
+                  failStaged && failFinalizeStopped && failRecoveryKept)
+            failSession.manifestWriteOverride = nil
+            let failResumed = CaptureSession()
+            failResumed.beginStageSessionForTest()
+            let failRecoveredGroups = failResumed.liveProcessor.recoveredStagedGroupIds()
+            check("W3.cap-r3-fu4: relaunch restores the source while ledger is absent",
+                  failResumed.sessionId == failSession.sessionId && failResumed.filedGroupIds.isEmpty
+                      && failResumed.photos.contains { $0.groupId == failGroup })
+            check("W3.cap-r3-fu4: verified staging manifest identifies output after ledger-write failure",
+                  failRecoveredGroups?.contains(failGroup) == true)
+            let failHandoff = failResumed.orderedFilesAndGroups()
+            check("W3.cap-r3-fu4: verified staged output blocks duplicate stage-for-later handoff after relaunch",
+                  failHandoff.files.isEmpty)
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             LiveCaptureProcessor._recoveryTestOCRStarts = []
             LiveCaptureProcessor._recoveryTestOCRTasks = [:]

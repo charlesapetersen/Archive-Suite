@@ -378,6 +378,26 @@ final class LiveCaptureProcessor: ObservableObject {
         session.incomingFolder.appendingPathComponent("_processed", isDirectory: true)
     }
 
+    /// Read verified staged records before a Stage-for-later handoff. A prior finalize can move its outputs
+    /// successfully but fail to save `filedGroupIds`; the durable staging record then remains the recovery
+    /// evidence that those groups already have output. `nil` means the record exists but cannot be trusted,
+    /// so callers must fail closed instead of handing the original pages out again.
+    func recoveredStagedGroupIds() -> Set<String>? {
+        let dir = Self.stagingDir(for: session)
+        let url = dir.appendingPathComponent("staging-manifest.json")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: dir.path) else { return [] }
+        do {
+            if try existingQuarantinedManifest(in: dir) != nil { return nil }
+        } catch { return nil }
+        guard fm.fileExists(atPath: url.path) else { return [] }
+        guard let data = try? Data(contentsOf: url),
+              let manifest = try? JSONDecoder().decode(StagingManifest.self, from: data),
+              manifest.schemaVersion == StagingManifest.currentSchemaVersion,
+              manifest.hasValidFingerprint else { return nil }
+        return Set(manifest.staged.map(\.groupId))
+    }
+
     /// Legacy flat staging parent used by pre-2026-07 builds (`Application Support/ArchiveProcessor/
     /// LiveStaging/<session>`). Retained ONLY so a session staged by an older build can still resume from
     /// there, and so orphaned leftovers can be cleaned up. New sessions always stage under the visible
@@ -430,7 +450,8 @@ final class LiveCaptureProcessor: ObservableObject {
         // Process photos already received (resume after a crash, or "chose live after some capture").
         for photo in session.photos { photoIngested(photo) }
         for group in session.groups where group.type == .document
-            && session.resolvedGroupIds.contains(group.id) && !finalizedGroups.contains(group.id) {
+            && session.resolvedGroupIds.contains(group.id) && !session.filedGroupIds.contains(group.id)
+            && !finalizedGroups.contains(group.id) {
             let gid = group.id
             Task { [weak self] in await self?.finalizeSegment(groupId: gid) }
         }
@@ -789,11 +810,12 @@ final class LiveCaptureProcessor: ObservableObject {
         // Task and no finalize behind it is a page whose OCR is genuinely gone, and it is free to buy one.
         guard !stagingManifestBlocked, session.processingMode == .live, let config,
               pageTasks[key] == nil else { return }   // not live / this page's call is already ours → silent
+        if session.rejectPageForFiledGroup(photo.groupId) { return }
         if finalizedGroups.contains(photo.groupId) {
-            // A page arrived for a document already finalized on the Mac — e.g. the operator kept shooting the
-            // SAME document after it was force-completed at Finish, instead of starting a new segment. It can't
-            // join that finished collection; it stays in the backup folder. Surface it (don't drop silently).
-            session.statusMessage = "A late page arrived for an already-finished document — kept in the Backup Folder, not this collection. Tap Box or End segment to start a NEW segment."
+            // A page arrived for a segment being staged, already staged, or filed earlier this session. The
+            // last case survives `releaseFinalizedGroup` and app relaunch via CaptureSession's manifest, so
+            // it cannot silently reopen the filed document as a second one-page segment.
+            session.statusMessage = CaptureSession.filedGroupLatePageMessage
             return
         }
 
@@ -955,7 +977,8 @@ final class LiveCaptureProcessor: ObservableObject {
     // MARK: - Finalize one segment
 
     private func finalizeSegment(groupId: String) async {
-        guard !stagingManifestBlocked, session.processingMode == .live, let config, let stagingDir,
+        guard !session.rejectPageForFiledGroup(groupId), !stagingManifestBlocked,
+              session.processingMode == .live, let config, let stagingDir,
               !finalizedGroups.contains(groupId),
               let group = session.groups.first(where: { $0.id == groupId }) else { return }
         finalizedGroups.insert(groupId)
@@ -1856,6 +1879,14 @@ final class LiveCaptureProcessor: ObservableObject {
             // page that embedded fine is still retired normally). Computed BEFORE the `staged` cleanup below,
             // which drops exactly these segments.
             let filedGroups = outcome.filedGroupIds
+            // Commit the duplicate-rejection ledger before removing staged records or reclaiming
+            // `_processed`. If this write fails, the staging manifest still blocks late pages after relaunch,
+            // and the originals remain available for recovery; nothing below may clean up.
+            guard self.session.recordFiledGroups(filedGroups) else {
+                self.finalizeSummary = outcome.summary
+                    + " ⚠️ The filed-group ledger could not be saved. Original photos and staged recovery data remain in the Backup Folder; check disk space or permissions before finishing again."
+                return
+            }
             let placeholderByGroup = Dictionary(
                 self.staged.compactMap { seg -> (String, [URL])? in
                     guard let held = seg.placeholderSources, !held.isEmpty else { return nil }
@@ -1972,7 +2003,10 @@ final class LiveCaptureProcessor: ObservableObject {
             }
             // Clear ONLY the confirmed-filed source photos (to the Trash); every unfiled or straggler page
             // stays in the backup folder + Captured pane, recoverable.
-            self.session.clearFiled(filedSources)
+            if !self.session.clearFiled(filedSources, groupIds: filedGroups) {
+                self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
+                    + " ⚠️ The filed group IDs could not be saved, so original photos remain in the Backup Folder. Check disk space or permissions before continuing."
+            }
         }
     }
 

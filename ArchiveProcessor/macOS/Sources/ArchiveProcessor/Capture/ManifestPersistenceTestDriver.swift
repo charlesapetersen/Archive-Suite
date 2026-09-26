@@ -585,6 +585,15 @@ enum ManifestPersistenceTestDriver {
               legacy?.resolved.isEmpty == true && legacy?.macTags.isEmpty == true
               && emptyDecoded?.resolved.isEmpty == true && emptyDecoded?.macTags.isEmpty == true)
 
+        // --- W3.cap-r3-fu4: filed group IDs outlive the source photos; older manifests default empty. ---
+        let fu4Manifest = CaptureSession.SessionManifest(photos: [], completedDocGroups: [],
+                                                         filedGroupIds: ["gFiled"])
+        let fu4 = (try? JSONEncoder().encode(fu4Manifest)).flatMap { CaptureSession.decodeManifest($0) }
+        check("W3.cap-r3-fu4: filed group IDs survive an empty-photo manifest round-trip",
+              fu4?.entries.isEmpty == true && fu4?.filed == ["gFiled"])
+        check("W3.cap-r3-fu4: old object and legacy-array manifests decode with no filed IDs",
+              emptyDecoded?.filed.isEmpty == true && legacy?.filed.isEmpty == true)
+
         // --- B10: segment completion is acknowledged only after the real session manifest write succeeds.
         // Inject a write failure, prove memory rolls back, then retry and prove the card becomes durable.
         let session = CaptureSession()

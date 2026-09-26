@@ -340,6 +340,12 @@ final class CaptureSession: ObservableObject {
     /// user-visible backup so the originals can be recovered even if the app fails catastrophically.
     let sessionId: String
     let incomingFolder: URL
+    /// Groups whose outputs reached their destination during this capture session. Keep the IDs after their
+    /// source pages leave the Captured pane so a late phone retry cannot silently open a second document.
+    private(set) var filedGroupIds: Set<String> = []
+    /// The subset known to be on disk. An in-memory-only ID still refuses late pages, but source retirement
+    /// must wait until a manifest write confirms that ID is durable.
+    private var durableFiledGroupIds: Set<String> = []
 
     /// Durable, user-VISIBLE parent for all Live Capture session folders: `~/Pictures/Archive Processor
     /// Live Capture/`. Kept in Pictures (not the hidden Application Support container) so the operator can
@@ -448,6 +454,8 @@ final class CaptureSession: ObservableObject {
             sessionId = restored.folder.lastPathComponent
             incomingFolder = restored.folder
             photos = restored.photos
+            filedGroupIds = restored.filed
+            durableFiledGroupIds = restored.filed
             // Restore which document groups the phone had signalled complete (B5-ii). Without this a
             // mid-session Mac restart showed NO tag card until Finish — the phone won't re-send the
             // segment-complete signal for a group it already got acked. A legacy (pre-B5) manifest has no
@@ -610,9 +618,22 @@ final class CaptureSession: ObservableObject {
         // on disk and idempotent replace makes the retry safe; live processing waits until durable.
         guard writeManifest() else { return nil }
         activateProcessingIfNeeded()   // fix mode from Settings on first photo
+        if rejectPageForFiledGroup(groupId) { return finalURL }
         if processingMode == .live { liveProcessor.photoIngested(photo) }   // start OCR on arrival
         return finalURL
     }
+
+    /// Refuse a late page for a group whose output was filed earlier in this session. The page remains
+    /// durably backed up, but it cannot start a second document in either Live or Stage-for-later mode.
+    @discardableResult
+    func rejectPageForFiledGroup(_ groupId: String) -> Bool {
+        guard filedGroupIds.contains(groupId) else { return false }
+        statusMessage = Self.filedGroupLatePageMessage
+        return true
+    }
+
+    static let filedGroupLatePageMessage =
+        "A late page arrived for an already-finished document — kept in the Backup Folder, not this collection. Tap Box or End segment to start a NEW segment."
 
     /// The operator deleted a page in the Captured pane.
     ///
@@ -671,13 +692,36 @@ final class CaptureSession: ObservableObject {
     /// segment had already been staged (a straggler) — is KEPT: deleting it would permanently lose an
     /// irreplaceable photo. Kept pages stay in the backup folder + the Captured pane so the operator can
     /// re-Process them. (Data-safety guard for per-capture streaming.)
-    func clearFiled(_ filed: Set<URL>) {
+    @discardableResult
+    func recordFiledGroups(_ groupIds: Set<String>) -> Bool {
+        guard !groupIds.isEmpty else { return true }
+        filedGroupIds.formUnion(groupIds)
+        guard !filedGroupIds.isSubset(of: durableFiledGroupIds) else { return true }
+        // Keep the in-memory guard armed on failure, but do not retire source pages until this succeeds.
+        guard writeManifest() else {
+            statusMessage = "Filed output is safe, but its group IDs could not be saved. Originals remain in the Backup Folder; check disk space or permissions."
+            return false
+        }
+        durableFiledGroupIds.formUnion(filedGroupIds)
+        return true
+    }
+
+    @discardableResult
+    func clearFiled(_ filed: Set<URL>, groupIds: Set<String> = []) -> Bool {
         let removed = photos.filter { filed.contains($0.url) }
+        let idsToRecord = groupIds.union(removed.map(\.groupId))
+        // The output's caller must save this ledger before reclaiming staging. Keep originals if its write
+        // fails, including direct/test callers that have not recorded it yet.
+        guard recordFiledGroups(idsToRecord) else { return false }
         for p in removed { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = photos.filter { !filed.contains($0.url) }
         if photos.isEmpty { completedDocGroups.removeAll(); resolvedGroupIds.removeAll(); macTags.removeAll() }
-        writeManifest()
+        let refreshed = writeManifest()
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
+        if !refreshed {
+            statusMessage = "Filed group IDs were saved, but the session manifest could not be refreshed after cleanup. Check the Backup Folder before continuing."
+        }
+        return true
     }
 
     /// Reveal this session's backup folder in Finder. Every photo the phone sends is stored there until
@@ -719,7 +763,10 @@ final class CaptureSession: ObservableObject {
     /// exists mid-segment — gating on `completedDocGroups` keeps the card from popping before the
     /// segment is finished. Box/folder markers need no card (finalized on arrival).
     var pendingTagGroup: CaptureGroup? {
-        groups.first { $0.type == .document && completedDocGroups.contains($0.id) && !resolvedGroupIds.contains($0.id) }
+        groups.first {
+            $0.type == .document && completedDocGroups.contains($0.id)
+                && !resolvedGroupIds.contains($0.id) && !filedGroupIds.contains($0.id)
+        }
     }
 
     /// The phone ended a document segment (`POST /segment/complete`): attach the segment's tags to its
@@ -728,6 +775,9 @@ final class CaptureSession: ObservableObject {
     /// the same signal (retry) just re-applies the same tags + is a no-op on the completed set.
     @discardableResult
     func markSegmentComplete(groupId: String, quality: String?, year: Int?, month: Int?) -> Bool {
+        // A delayed phone retry can arrive after this group was filed. Acknowledge it without reviving tag
+        // state or creating a second document; `ingest` already surfaces the operator message.
+        if filedGroupIds.contains(groupId) { return true }
         let previousPhotos = photos.indices.filter { photos[$0].groupId == groupId }.map {
             (index: $0, quality: photos[$0].quality, year: photos[$0].year, month: photos[$0].month)
         }
@@ -763,7 +813,8 @@ final class CaptureSession: ObservableObject {
     @discardableResult
     func completeAllOpenDocGroups() -> Bool {
         var newlyCompleted: [String] = []
-        for g in groups where g.type == .document && !resolvedGroupIds.contains(g.id) {
+        for g in groups where g.type == .document && !resolvedGroupIds.contains(g.id)
+            && !filedGroupIds.contains(g.id) {
             if completedDocGroups.insert(g.id).inserted { newlyCompleted.append(g.id) }
         }
         if !newlyCompleted.isEmpty, !writeManifest() {
@@ -834,6 +885,10 @@ final class CaptureSession: ObservableObject {
     /// Ordered file URLs + per-group boundary/type/tag info for the OCR pre-grouped handoff.
     func orderedFilesAndGroups() -> (files: [URL], boundaries: [Bool], types: [CaptureGroupType],
                                      qualities: [String?], years: [Int?], months: [Int?], subjects: [[String]]) {
+        guard let recoveredStaged = liveProcessor.recoveredStagedGroupIds() else {
+            statusMessage = "A saved processing record in the Backup Folder could not be verified. Files were not handed off; inspect that folder before retrying."
+            return ([], [], [], [], [], [], [])
+        }
         var files: [URL] = []
         var boundaries: [Bool] = []
         var types: [CaptureGroupType] = []
@@ -841,7 +896,7 @@ final class CaptureSession: ObservableObject {
         var years: [Int?] = []
         var months: [Int?] = []
         var subjects: [[String]] = []
-        for group in groups {
+        for group in groups where !filedGroupIds.contains(group.id) && !recoveredStaged.contains(group.id) {
             let mac = macTags[group.id]
             for (i, photo) in group.photos.enumerated() {
                 files.append(photo.url)
@@ -887,6 +942,9 @@ final class CaptureSession: ObservableObject {
         // already-staged output). Optional so pre-B9 manifests ({photos, completedDocGroups}) still decode.
         var resolvedGroupIds: [String]? = nil
         var macTags: [String: MacSegmentTags]? = nil
+        // W3.cap-r3-fu4: a filed group stays remembered after its source photos leave the Backup Folder.
+        // Optional so pre-fu4 manifests continue to decode.
+        var filedGroupIds: [String]? = nil
     }
 
     private var manifestURL: URL { incomingFolder.appendingPathComponent("manifest.json") }
@@ -901,7 +959,8 @@ final class CaptureSession: ObservableObject {
                           type: $0.type.rawValue, quality: $0.quality, year: $0.year, month: $0.month)
         }
         let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedDocGroups),
-                                       resolvedGroupIds: Array(resolvedGroupIds), macTags: macTags)
+                                       resolvedGroupIds: Array(resolvedGroupIds), macTags: macTags,
+                                       filedGroupIds: filedGroupIds.sorted())
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
         if let manifestWriteOverride { return manifestWriteOverride(data, manifestURL) }
         do { try data.write(to: manifestURL, options: .atomic); return true }
@@ -911,26 +970,27 @@ final class CaptureSession: ObservableObject {
     /// Decode a session manifest, accepting BOTH the current object form ({photos, completedDocGroups})
     /// and the legacy bare-array form (pre-B5 builds wrote just `[ManifestEntry]`). A legacy manifest has
     /// no persisted completion set → empty (its tag cards still surface at Finish, exactly as before).
-    static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>,
-                                                 resolved: Set<String>, macTags: [String: MacSegmentTags])? {
+    nonisolated static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>,
+                                                             resolved: Set<String>, macTags: [String: MacSegmentTags],
+                                                             filed: Set<String>)? {
         let d = JSONDecoder()
         if let m = try? d.decode(SessionManifest.self, from: data) {
-            return (m.photos, Set(m.completedDocGroups), Set(m.resolvedGroupIds ?? []), m.macTags ?? [:])
+            return (m.photos, Set(m.completedDocGroups), Set(m.resolvedGroupIds ?? []), m.macTags ?? [:],
+                    Set(m.filedGroupIds ?? []))
         }
-        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:]) }
+        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], []) }
         return nil
     }
 
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
-    private static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags])? {
+    private static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>)? {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
         // ISO-8601 folder names sort lexically = chronologically; check newest first.
         for folder in subdirs.sorted(by: { $0.lastPathComponent > $1.lastPathComponent }) {
             let manifest = folder.appendingPathComponent("manifest.json")
             guard let data = try? Data(contentsOf: manifest),
-                  let decoded = decodeManifest(data),
-                  !decoded.entries.isEmpty else { continue }
+                  let decoded = decodeManifest(data) else { continue }
             var restored: [CapturedPhoto] = []
             for e in decoded.entries {
                 // Defense-in-depth: never resolve a manifest name that could escape the folder
@@ -943,9 +1003,11 @@ final class CaptureSession: ObservableObject {
                     type: CaptureGroupType(rawValue: e.type) ?? .document,
                     receivedAt: Date(), quality: e.quality, year: e.year, month: e.month))
             }
-            if !restored.isEmpty {
+            // With no surviving sources, the durable ledger still marks this as the active session. Restore
+            // its epoch so a late phone retry is checked against the same set after relaunch.
+            if !restored.isEmpty || !decoded.filed.isEmpty {
                 restored.sort { $0.seq < $1.seq }
-                return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags)
+                return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags, decoded.filed)
             }
         }
         return nil
@@ -1040,6 +1102,11 @@ final class CaptureSession: ObservableObject {
         if name.hasPrefix("_") || name.hasPrefix(".") { return false }        // (a) reserved / hidden sibling
         if relayBases.contains(folder.standardizedFileURL.path) { return false } // (b)
         guard isSessionIdName(name) else { return false }                     // (a) positive identification
+
+        // An empty Captured pane does not mean the session ended: keep its filed-ID ledger so a late retry
+        // remains detectable after relaunch.
+        if let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")),
+           let manifest = decodeManifest(data), !manifest.filed.isEmpty { return false }
 
         let sourceImageExts: Set<String> = ["jpg", "jpeg", "png", "tif", "tiff", "heic", "heif"]
         let knownMetadata: Set<String> = ["manifest.json", "_epoch.json",
