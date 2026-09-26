@@ -87,8 +87,12 @@ final class NoteBodyEditorModel: ObservableObject {
     /// write). Called on selection switch and when the editor disappears (pane teardown / window close)
     /// so no dirty buffer is dropped.
     func flush() async {
-        saveTask?.cancel()
+        let pending = saveTask
+        pending?.cancel()
         saveTask = nil
+        // Cancellation cannot undo a store write already in progress. Wait for it so an older
+        // debounced save cannot finish after this forced save and replace the newer body.
+        await pending?.value
         guard dirty, let id = loadedID else { return }
         let body = markdown
         await save(id, body)
@@ -124,10 +128,14 @@ final class NoteBodyEditorModel: ObservableObject {
     /// (Re)schedule the debounced idle save, capturing the target id + body at schedule time so a later
     /// selection switch cannot redirect this write to a different item.
     private func scheduleSave() {
-        saveTask?.cancel()
+        let previous = saveTask
+        previous?.cancel()
         let id = loadedID
         let body = markdown
         saveTask = Task { @MainActor [weak self] in
+            // A previous task may already be inside the store despite cancellation. Preserve
+            // edit order even when typing resumes while that write is still in flight.
+            await previous?.value
             try? await Task.sleep(for: self?.saveDebounce ?? .milliseconds(600))
             guard !Task.isCancelled, let self, let id else { return }
             await self.save(id, body)

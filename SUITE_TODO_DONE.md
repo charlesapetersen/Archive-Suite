@@ -196,6 +196,19 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d3 — template body editing is not routed in-app [M].** **SHIPPED 2026-09-26
+  (this commit).** Selecting a template now opens its Markdown body in the detail pane, with styled/raw
+  editing, formatting controls, autosave, and a one-window editing lease. Saving reloads the template
+  before mutation, so a concurrent rename survives. Selection changes, duplication, deletion, and new
+  items from a template flush pending edits; failed reads prevent editing, and failed saves retain an
+  in-session draft for retry. Image paste is refused in template mode because its asset-copy path belongs
+  to a created note. Scratch-store regressions cover body persistence, rename, lease, read/save failure,
+  and save ordering. Notes Debug build and full smoke passed (895 Swift Testing checks in 89 suites,
+  218 XCTest checks); independent Tier-2 find/refute review found no remaining concrete blocker.
+  The focused off-screen template UI test passed 1/1, including create, edit, save, exit, and reload.
+  No real Notes store or corpus was used. | ArchiveNotes/macOS/{Sources/ArchiveNotes/{Core,Editor,Views},
+  Tests/{ArchiveNotesTests,ArchiveNotesUITests}} | M | low | done
+
 - [x] **`W9.d1` — folder move/reorder and drag-to-reparent UI [M].** **SHIPPED 2026-09-26 (this
   commit).** The folder sidebar renders sibling lists at each tree level and persists `.onMove` order
   through `NotesModel.moveFolder`. Dragging a folder UUID onto another folder reparents it through the

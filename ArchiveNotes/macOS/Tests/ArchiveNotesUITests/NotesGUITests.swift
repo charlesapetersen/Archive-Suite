@@ -613,6 +613,68 @@ class NotesFixtureUITestCase: XCTestCase {
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
 
+    /// W9.d3 — selection routes a template into the real Markdown editor and persists a body
+    /// in the generated scratch store. Re-entering Templates reloads that saved body.
+    func testTemplateBodyEditPersistsAndReloads() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let templates = mainWindow.staticTexts
+                .matching(identifier: "an.sidebar.templates").firstMatch
+            XCTAssertTrue(templates.waitForExistence(timeout: 10))
+            templates.click()
+            let newButton = mainWindow.descendants(matching: .any)["an.template.new"]
+            XCTAssertTrue(newButton.waitForExistence(timeout: 10), mainWindow.debugDescription)
+            newButton.click()
+            let alert = mainWindow.sheets.firstMatch
+            XCTAssertTrue(alert.waitForExistence(timeout: 10), "New Template sheet should open")
+            let name = alert.textFields.firstMatch
+            name.click()
+            name.typeKey("a", modifierFlags: .command)
+            name.typeText("Body Edit Fixture")
+            alert.buttons["Create"].click()
+
+            let templateRoot = URL(fileURLWithPath: Self.canonicalFixturePath)
+                .appendingPathComponent("Templates", isDirectory: true)
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                let dirs = (try? FileManager.default.contentsOfDirectory(
+                    at: templateRoot, includingPropertiesForKeys: nil)) ?? []
+                return dirs.count == 1
+            })
+            let dir = try XCTUnwrap(try FileManager.default.contentsOfDirectory(
+                at: templateRoot, includingPropertiesForKeys: nil).first)
+            let id = try XCTUnwrap(UUID(uuidString: dir.lastPathComponent))
+            let row = mainWindow.staticTexts
+                .matching(identifier: "an.template.row.\(id.uuidString)").firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.click()
+
+            let input = mainWindow.textFields["an.template.editor.test.input"]
+            let commit = mainWindow.buttons["an.template.editor.test.commit"]
+            XCTAssertTrue(commit.waitForExistence(timeout: 10))
+            input.click()
+            input.typeText("W9 D3 template body")
+            commit.click()
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                let files = (try? FileManager.default.contentsOfDirectory(
+                    at: dir, includingPropertiesForKeys: nil)) ?? []
+                return files.contains { url in
+                    url.pathExtension == "md"
+                    && ((try? String(contentsOf: url, encoding: .utf8)) ?? "")
+                        .contains("W9 D3 template body")
+                }
+            }, "the selected template body should save in its own scratch Markdown file")
+
+            mainWindow.staticTexts.matching(identifier: "an.sidebar.allNotes").firstMatch.click()
+            templates.click()
+            row.click()
+            let current = mainWindow.staticTexts["an.template.editor.test.current"]
+            XCTAssertTrue(current.waitForExistence(timeout: 10))
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                ((current.value as? String) ?? current.label).contains("W9 D3 template body")
+            }, "reselecting the template should load its saved body into the editor: \(current.debugDescription)")
+        }
+    }
+
     /// W23.l4-fu — the metadata date row renders the impossible-day warning and persists the
     /// coarser month, while an actual month end remains day precision.
     func testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd() throws {

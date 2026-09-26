@@ -410,3 +410,148 @@ struct NoteEditorPane: View {
         .background(.bar)
     }
 }
+
+// MARK: - Template body editor (W9.d3)
+
+/// The template pane uses the same Markdown editor and save-on-switch model as notes, with
+/// Template/<uuid> load/save seams. A model-owned lease keeps its independent buffer exclusive
+/// across the Notes and Extracts windows.
+struct TemplateBodyEditorPane: View {
+    @ObservedObject var model: NotesModel
+    let templateID: UUID?
+
+    @StateObject private var bodyEditor = NoteBodyEditorModel()
+    @StateObject private var formatting = FormattingContext()
+    @State private var isRaw = false
+    @State private var flushBox = EditorFlushBox()
+    @State private var paneID = UUID()
+    @State private var ownedID: UUID?
+    @State private var canEdit = false
+    @State private var selectionGeneration = 0
+    @State private var transition: Task<Void, Never>?
+    @State private var teardown: Task<Void, Never>?
+    @EnvironmentObject private var flushRegistry: EditorFlushRegistry
+#if DEBUG
+    @State private var testBox = EditorTestBox()
+    @State private var testCommitInput = ""
+#endif
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if !isRaw {
+                FormattingToolbar(context: formatting)
+                    .disabled(!canEdit)
+                Divider()
+            }
+            HStack {
+                Text("Template body").font(.caption).foregroundStyle(.secondary)
+                    .help("Edit Markdown here. Add images after creating a note from this template.")
+                Spacer()
+                Button { isRaw.toggle() } label: {
+                    Image(systemName: isRaw ? "doc.plaintext" : "doc.richtext")
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canEdit)
+                .help(isRaw ? "Switch to styled mode" : "Switch to raw Markdown (⌘/)")
+                .keyboardShortcut("/", modifiers: .command)
+                .accessibilityIdentifier("an.template.editor.rawToggle")
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(.bar)
+            if let templateID, !canEdit {
+                HStack {
+                    Text(model.hasFailedTemplateBodyLoad(templateID)
+                         ? "This template couldn't be opened. Its existing body is safe."
+                         : model.isTemplateEditedElsewhere(templateID, pane: paneID)
+                           ? "This template is open for editing in another window."
+                           : "Opening template…")
+                    Spacer()
+                    Button("Retry") { switchToTemplate(templateID) }
+                }
+                .font(.caption)
+                .padding(8)
+            }
+            templateEditorView
+                .disabled(!canEdit)
+                .accessibilityIdentifier("an.template.editor")
+#if DEBUG
+            if UserDefaults.standard.string(forKey: "ANUITestStorePath") != nil {
+                HStack {
+                    TextField("Template body test input", text: $testCommitInput)
+                        .accessibilityIdentifier("an.template.editor.test.input")
+                    Button("commit") { testBox.replaceMarkdown?(testCommitInput) }
+                        .disabled(!canEdit)
+                        .accessibilityIdentifier("an.template.editor.test.commit")
+                    Text(String(bodyEditor.markdown.prefix(80)))
+                        .accessibilityIdentifier("an.template.editor.test.current")
+                }
+                .frame(height: 36)
+            }
+#endif
+        }
+        .focusedSceneValue(\.formattingContext, formatting)
+        .onAppear {
+            bodyEditor.load = { [model] id in await model.loadTemplateBody(for: id) }
+            bodyEditor.save = { [model] id, markdown in await model.setTemplateBody(markdown, for: id) }
+            bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
+            flushRegistry.register(paneID) {
+                await transition?.value
+                await teardown?.value
+                await bodyEditor.flushPending()
+            }
+            switchToTemplate(templateID)
+        }
+        .onChange(of: templateID) { _, id in switchToTemplate(id) }
+        .onDisappear {
+            selectionGeneration &+= 1  // invalidate any in-flight load before teardown
+            let closingGeneration = selectionGeneration
+            let previous = transition
+            let previousTeardown = teardown
+            canEdit = false
+            teardown = Task { @MainActor in
+                await previousTeardown?.value
+                await previous?.value
+                await bodyEditor.flushPending()
+                if let ownedID { model.releaseTemplateEdit(ownedID, pane: paneID) }
+                ownedID = nil
+                if selectionGeneration == closingGeneration {
+                    flushRegistry.deregister(paneID)
+                }
+            }
+        }
+    }
+
+    private var templateEditorView: MarkdownEditorView {
+        var view = MarkdownEditorView(markdown: $bodyEditor.markdown, isRaw: $isRaw,
+                                      formatting: formatting, rejectImagePaste: true,
+                                      flushBox: flushBox)
+#if DEBUG
+        view.testBox = testBox
+#endif
+        return view
+    }
+
+    private func switchToTemplate(_ id: UUID?) {
+        selectionGeneration &+= 1
+        let generation = selectionGeneration
+        let previous = transition
+        let closing = teardown
+        canEdit = false
+        transition = Task { @MainActor in
+            await closing?.value
+            await previous?.value
+            guard generation == selectionGeneration else { return }
+            await bodyEditor.select(nil)       // flush outgoing body before releasing its lease
+            if let ownedID { model.releaseTemplateEdit(ownedID, pane: paneID) }
+            ownedID = nil
+            guard generation == selectionGeneration, let id,
+                  model.claimTemplateEdit(id, pane: paneID) else { return }
+            ownedID = id
+            await bodyEditor.select(id)
+            canEdit = generation == selectionGeneration
+                   && !model.hasFailedTemplateBodyLoad(id)
+                   && bodyEditor.loadedID == id
+        }
+    }
+}

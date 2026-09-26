@@ -4,14 +4,14 @@ import SwiftUI
 /// "Templates" row (or a folder's "Template ▸ Manage…") is active. Lists every template (both kinds,
 /// with a kind glyph) and offers New / Duplicate / Rename / Delete via `NotesModel`'s template actions.
 ///
-/// Editing a template's *body* in the detail editor rides the same note-editor load/save path that is
-/// itself not yet wired (deferred to Daemon Report with the note editor); the name + assignment +
-/// new-from-template flows are complete now.
+/// Selecting a template opens its body in the detail editor. Selection is owned by the window so
+/// the list and detail pane stay bound to the same template.
 struct TemplatesManagerView: View {
     @ObservedObject var model: NotesModel
     @ObservedObject var nav: NotesNavigationModel
 
-    @State private var selected: UUID?
+    @Binding var selected: UUID?
+    @EnvironmentObject private var flushRegistry: EditorFlushRegistry
     @State private var showNew = false
     @State private var newName = ""
     @State private var renameID: UUID?
@@ -33,6 +33,7 @@ struct TemplatesManagerView: View {
                             .font(.caption).foregroundStyle(.tertiary)
                     }
                     .tag(t.id)
+                    .accessibilityIdentifier("an.template.row.\(t.id.uuidString)")
                     .contextMenu { rowMenu(t) }
                 }
             }
@@ -41,7 +42,9 @@ struct TemplatesManagerView: View {
             bottomBar
         }
         .background(Color(nsColor: .textBackgroundColor))
-        .accessibilityIdentifier("an.templates.pane")
+        .onChange(of: model.templates.map(\.id)) { _, ids in
+            if let selected, !ids.contains(selected) { self.selected = nil }
+        }
         .alert("New Template", isPresented: $showNew) {
             TextField("Name", text: $newName)
             Button("Create") {
@@ -59,7 +62,13 @@ struct TemplatesManagerView: View {
         }
         .confirmationDialog("Delete this template?", isPresented: boolBinding($deleteID),
                             presenting: deleteID) { id in
-            Button("Delete Template", role: .destructive) { Task { await model.deleteTemplate(id) } }
+            Button("Delete Template", role: .destructive) {
+                Task {
+                    await flushRegistry.flushAll()
+                    guard !model.hasFailedTemplateBodySave(id) else { return }
+                    await model.deleteTemplate(id)
+                }
+            }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
             Text("Folders assigned to it fall back to their inherited or Blank template.")
@@ -73,12 +82,19 @@ struct TemplatesManagerView: View {
             Spacer()
             Button { beginNew() } label: { Image(systemName: "plus") }
                 .buttonStyle(.borderless).help("New Template")
+                .accessibilityIdentifier("an.template.new")
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
     }
 
     @ViewBuilder private func rowMenu(_ t: Template) -> some View {
-        Button("Duplicate") { Task { await model.duplicateTemplate(t.id) } }
+        Button("Duplicate") {
+            Task {
+                await flushRegistry.flushAll()
+                guard !model.hasFailedTemplateBodySave(t.id) else { return }
+                if let id = await model.duplicateTemplate(t.id) { selected = id }
+            }
+        }
         Button("Rename…") { renameText = t.name; renameID = t.id }
         Divider()
         Button("Delete", role: .destructive) { deleteID = t.id }
@@ -88,7 +104,13 @@ struct TemplatesManagerView: View {
         HStack(spacing: 8) {
             Button { beginNew() } label: { Image(systemName: "plus") }.help("New Template")
             Button {
-                if let id = selected { Task { await model.duplicateTemplate(id) } }
+                if let id = selected {
+                    Task {
+                        await flushRegistry.flushAll()
+                        guard !model.hasFailedTemplateBodySave(id) else { return }
+                        if let copy = await model.duplicateTemplate(id) { selected = copy }
+                    }
+                }
             } label: { Image(systemName: "plus.square.on.square") }
                 .help("Duplicate").disabled(selected == nil)
             Button {
@@ -99,7 +121,7 @@ struct TemplatesManagerView: View {
             Button { if let id = selected { deleteID = id } } label: { Image(systemName: "trash") }
                 .help("Delete").disabled(selected == nil)
             Spacer()
-            Text("Editing a template's contents arrives with the note editor.")
+            Text(selected == nil ? "Select a template to edit its body." : "Body edits save automatically.")
                 .font(.caption).foregroundStyle(.tertiary)
         }
         .buttonStyle(.borderless)

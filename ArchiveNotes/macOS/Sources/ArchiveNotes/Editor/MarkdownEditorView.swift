@@ -58,6 +58,7 @@ struct MarkdownEditorView: NSViewRepresentable {
     var fontSize: CGFloat = 14
     var formatting: FormattingContext?
     var assetStore: EditorAssetStore?
+    var rejectImagePaste = false
     /// Optional flush handle: populated by the coordinator so the host can force a synchronous
     /// write-back of pending edits (W7-S1a autosave flush-on-switch).
     var flushBox: EditorFlushBox?
@@ -111,6 +112,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             context.coordinator.formattingContext = fmt
         }
         textView.assetStore = assetStore
+        textView.rejectImagePaste = rejectImagePaste
         context.coordinator.assetStore = assetStore
         context.coordinator.onRevealBlock = onRevealBlock
         context.coordinator.onPreviewBlock = onPreviewBlock
@@ -204,6 +206,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             coordinator.assetStore = assetStore
             textView.assetStore = assetStore
         }
+        textView.rejectImagePaste = rejectImagePaste
 
         // Font / raw-mode change
         let wantRaw = isRaw

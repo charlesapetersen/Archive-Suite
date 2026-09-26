@@ -215,6 +215,66 @@ struct NotesModelTemplateTests {
         #expect(env.model.templates(matching: .extract).map(\.name) == ["Extract Tpl"])
     }
 
+    @Test("editing a template body survives rename and appears in new notes")
+    func editTemplateBodyThenInstantiate() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try #require(await env.model.createTemplate(name: "Draft", kind: .note))
+        await env.model.setTemplateBody("Template alpha\n\nSecond line", for: id)
+        #expect((await env.model.loadTemplateBody(for: id))?.contains("Second line") == true)
+        await env.model.renameTemplate(id, to: "Renamed")
+        let stored = try await env.store.loadTemplate(id)
+        #expect(stored.title == "Renamed")
+        #expect(stored.trailingBodyRaw?.contains("Template alpha") == true)
+        let newID = try #require(await env.model.newItem(kind: .note, in: nil, from: id))
+        let created = try await env.store.load(newID)
+        #expect(created.title == "Renamed")
+        #expect(created.trailingBodyRaw?.contains("Second line") == true)
+    }
+
+    @Test("a failed template body read stays distinct from an empty body")
+    func failedTemplateBodyReadCanRetry() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = UUID()
+        #expect(await env.model.loadTemplateBody(for: id) == nil)
+        #expect(env.model.hasFailedTemplateBodyLoad(id))
+        var item = templateItem("Recovered")
+        item.id = id
+        _ = try await env.store.createTemplate(item)
+        await env.model.reloadTemplates()
+        #expect(await env.model.loadTemplateBody(for: id) != nil)
+        #expect(!env.model.hasFailedTemplateBodyLoad(id))
+    }
+
+    @Test("a failed template body save blocks copying until a successful retry")
+    func failedTemplateBodySaveCanRetry() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = UUID()
+        #expect(!(await env.model.setTemplateBody("draft", for: id)))
+        #expect(env.model.hasFailedTemplateBodySave(id))
+        #expect(await env.model.loadTemplateBody(for: id) == nil) // missing backing template
+        var item = templateItem("Recovered")
+        item.id = id
+        _ = try await env.store.createTemplate(item)
+        await env.model.reloadTemplates()
+        #expect(await env.model.loadTemplateBody(for: id) == "draft")
+        #expect(await env.model.setTemplateBody("saved", for: id))
+        #expect(!env.model.hasFailedTemplateBodySave(id))
+    }
+
+    @Test("only one window can own a template body editor")
+    func templateBodyEditLease() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try #require(await env.model.createTemplate(name: "Shared", kind: .note))
+        let first = UUID(), second = UUID()
+        #expect(env.model.claimTemplateEdit(id, pane: first))
+        #expect(!env.model.claimTemplateEdit(id, pane: second))
+        #expect(env.model.isTemplateEditedElsewhere(id, pane: second))
+        env.model.releaseTemplateEdit(id, pane: second) // wrong pane cannot release
+        #expect(!env.model.claimTemplateEdit(id, pane: second))
+        env.model.releaseTemplateEdit(id, pane: first)
+        #expect(env.model.claimTemplateEdit(id, pane: second))
+    }
+
     @Test("assign + effectiveTemplate resolves through the nearest ancestor")
     func assignResolve() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

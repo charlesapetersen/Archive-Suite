@@ -495,6 +495,39 @@ final class NotesModel: ObservableObject {
 
     // MARK: Templates (W6-S6 — §3.7, §6, §16.4)
 
+    /// One active editor per template across the Notes and Extracts windows. Each window has an
+    /// independent body buffer; admitting two would let the later save overwrite the first.
+    private var templateEditOwners: [UUID: UUID] = [:]
+    private var failedTemplateBodySaves: Set<UUID> = []
+    private var failedTemplateBodyLoads: Set<UUID> = []
+    /// Keep the unsaved body in the shared model if its editor pane disappears after a write error.
+    /// Returning to that template reloads this draft rather than the stale on-disk body.
+    private var failedTemplateBodyDrafts: [UUID: String] = [:]
+
+    func hasFailedTemplateBodyLoad(_ id: UUID) -> Bool {
+        failedTemplateBodyLoads.contains(id)
+    }
+
+    func hasFailedTemplateBodySave(_ id: UUID) -> Bool {
+        failedTemplateBodySaves.contains(id)
+    }
+
+    func claimTemplateEdit(_ id: UUID, pane: UUID) -> Bool {
+        guard templates.contains(where: { $0.id == id }) else { return false }
+        if let owner = templateEditOwners[id], owner != pane { return false }
+        templateEditOwners[id] = pane
+        return true
+    }
+
+    func releaseTemplateEdit(_ id: UUID, pane: UUID) {
+        if templateEditOwners[id] == pane { templateEditOwners[id] = nil }
+    }
+
+    func isTemplateEditedElsewhere(_ id: UUID, pane: UUID) -> Bool {
+        if let owner = templateEditOwners[id] { return owner != pane }
+        return false
+    }
+
     /// Reload the template list from the store. A no-op with no `noteStore` (an injected test store
     /// built without one); template tests inject a scratch `noteStore`.
     func reloadTemplates() async {
@@ -550,6 +583,47 @@ final class NotesModel: ObservableObject {
         } catch { report(error, "create the template"); return nil }
     }
 
+    /// Read the full Markdown body of a template for the detail editor.
+    func loadTemplateBody(for id: UUID) async -> String? {
+        guard let noteStore else {
+            failedTemplateBodyLoads.insert(id)
+            return nil
+        }
+        do {
+            let item = try await noteStore.loadTemplate(id)
+            failedTemplateBodyLoads.remove(id)
+            if let draft = failedTemplateBodyDrafts[id] { return draft }
+            return BlockParser.serialize(leadingText: item.trailingBodyRaw, blocks: item.blocks)
+        } catch {
+            failedTemplateBodyLoads.insert(id)
+            report(error, "load the template body")
+            return nil
+        }
+    }
+
+    /// Save body edits against a freshly loaded template so a concurrent rename or metadata edit
+    /// survives. The template remains under its own store directory; this never writes the corpus.
+    @discardableResult
+    func setTemplateBody(_ markdown: String, for id: UUID) async -> Bool {
+        guard let noteStore else { return false }
+        let parsed = BlockParser.parse(markdown)
+        do {
+            _ = try await noteStore.withTemplate(id) { item in
+                item.trailingBodyRaw = parsed.leadingText
+                item.blocks = parsed.blocks
+                item.modified = Date()
+            }
+            failedTemplateBodySaves.remove(id)
+            failedTemplateBodyDrafts[id] = nil
+            return true
+        } catch {
+            failedTemplateBodySaves.insert(id)
+            failedTemplateBodyDrafts[id] = markdown
+            report(error, "save the template body")
+            return false
+        }
+    }
+
     /// Duplicate a template (fresh id + " copy" name), preserving kind + front-matter defaults + body.
     @discardableResult
     func duplicateTemplate(_ id: UUID) async -> UUID? {
@@ -603,6 +677,8 @@ final class NotesModel: ObservableObject {
         let referencing = organization.assignments.filter { $0.templateId == id }.map(\.folderId)
         do { try await organization.removeTemplateAssignments(folders: referencing) }
         catch { report(error, "clear the deleted template's folder assignments") }
+        failedTemplateBodySaves.remove(id)
+        failedTemplateBodyDrafts[id] = nil
         await reloadTemplates()
         rebuild()
         adoptMirrorFailure()

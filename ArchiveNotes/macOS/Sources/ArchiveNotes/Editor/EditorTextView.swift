@@ -232,8 +232,21 @@ final class EditorTextView: NSTextView {
         super.copy(sender)
     }
 
+    /// Template bodies have no asset-copy route into newly instantiated notes. Refuse an image
+    /// before AppKit can insert an unsaved attachment that would disappear on the next reload.
+    var rejectImagePaste = false
+
+    private func isUnsupportedImage(_ pb: NSPasteboard) -> Bool {
+        guard rejectImagePaste else { return false }
+        if let types = pb.types, !Self.imageTypes.isDisjoint(with: types) { return true }
+        if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL],
+           let url = urls.first, Self.isImageURL(url) { return true }
+        return false
+    }
+
     override func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
+        if isUnsupportedImage(pb) { NSSound.beep(); return }
         if tryPasteImage(from: pb) { return }
         // W7-S2: in an extract editor, a passage payload pastes as note-passage block(s) (provenance
         // preserved). The handler declines outside an extract editor / without a passage payload.
@@ -244,6 +257,10 @@ final class EditorTextView: NSTextView {
             insertPlainText(str)
             return
         }
+        // Template mode has no asset destination. An attachment-only RTFD or other rich
+        // payload must never reach AppKit's fallback: it could appear in the editor and vanish
+        // on Markdown serialization. Text was already handled above.
+        if rejectImagePaste { NSSound.beep(); return }
         super.paste(sender)
     }
 
@@ -266,6 +283,12 @@ final class EditorTextView: NSTextView {
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let pb = sender.draggingPasteboard
+        if rejectImagePaste {
+            if isUnsupportedImage(pb) { return false }
+            guard let text = pb.string(forType: .string), !text.isEmpty else { return false }
+            insertPlainText(text)
+            return true
+        }
         if tryPasteImage(from: pb) { return true }
         return super.performDragOperation(sender)
     }

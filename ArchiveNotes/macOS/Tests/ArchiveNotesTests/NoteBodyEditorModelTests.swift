@@ -42,6 +42,37 @@ private func makeModel(_ rec: Recorder, debounce: Duration = .milliseconds(40)) 
 @MainActor
 struct NoteBodyEditorModelTests {
 
+    @Test("an in-flight autosave finishes before a newer forced save")
+    func forcedSaveWaitsForOlderAutosave() async {
+        let id = UUID()
+        let model = NoteBodyEditorModel()
+        model.load = { _ in "" }
+        model.saveDebounce = .milliseconds(1)
+        var began: AsyncStream<Void>.Continuation!
+        let started = AsyncStream<Void> { began = $0 }
+        var events = started.makeAsyncIterator()
+        var releaseOld: CheckedContinuation<Void, Never>?
+        var writes: [String] = []
+        model.save = { _, body in
+            if body == "older" {
+                _ = began.yield(())
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    releaseOld = continuation
+                }
+            }
+            writes.append(body)
+        }
+        await model.select(id)
+        model.markdown = "older"
+        _ = await events.next()
+        model.markdown = "newer"
+        let forced = Task { await model.flushPending() }
+        await Task.yield()
+        releaseOld?.resume()
+        await forced.value
+        #expect(writes == ["older", "newer"])
+    }
+
     @Test("selecting an item loads its body; a pure select writes nothing")
     func loadOnSelectNoSave() async {
         let a = UUID(), b = UUID()

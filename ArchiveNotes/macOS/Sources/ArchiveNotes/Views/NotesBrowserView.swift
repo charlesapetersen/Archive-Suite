@@ -27,6 +27,8 @@ struct NotesBrowserView: View {
 
     @State private var window: NSWindow?
     @State private var didConfigureWindow = false
+    @State private var selectedTemplateID: UUID?
+    @EnvironmentObject private var flushRegistry: EditorFlushRegistry
 
     init(kind: ItemKindShell, model: NotesModel) {
         self.kind = kind
@@ -45,11 +47,11 @@ struct NotesBrowserView: View {
                 PanelDivider(width: $treeWidth, panelOnLeft: true,
                              range: NotesLayoutSettings.treeWidthRange, id: "an.divider.tree")
             }
-            ItemListPane(model: model, nav: nav)
+            ItemListPane(model: model, nav: nav, selectedTemplateID: $selectedTemplateID)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             PanelDivider(width: $detailWidth, panelOnLeft: false,
                          range: NotesLayoutSettings.detailWidthRange, id: "an.divider.detail")
-            DetailPane(nav: nav)
+            DetailPane(nav: nav, selectedTemplateID: $selectedTemplateID)
                 .frame(width: detailWidth)
         }
         // NO `minWidth:` ON PURPOSE — the shell's minimum width is whatever its three panes need
@@ -193,6 +195,10 @@ struct NotesBrowserView: View {
     /// `templateId` when given, then select it (leaving templates mode if active).
     private func newItem(from templateId: UUID?) {
         Task {
+            if let templateId {
+                await flushRegistry.flushAll()
+                guard !model.hasFailedTemplateBodySave(templateId) else { return }
+            }
             if let id = await model.newItem(kind: nav.windowKind, in: model.selectedFolderId, from: templateId) {
                 nav.showingTemplates = false
                 nav.selection = [id]
@@ -231,11 +237,12 @@ struct NotesBrowserView: View {
 private struct ItemListPane: View {
     @ObservedObject var model: NotesModel
     @ObservedObject var nav: NotesNavigationModel
+    @Binding var selectedTemplateID: UUID?
 
     var body: some View {
         Group {
             if nav.showingTemplates {
-                TemplatesManagerView(model: model, nav: nav)
+                TemplatesManagerView(model: model, nav: nav, selected: $selectedTemplateID)
             } else {
                 VStack(spacing: 0) {
                     NotesFilterBar(nav: nav)
@@ -262,8 +269,35 @@ private struct ItemListPane: View {
 /// item's body and autosaves through `NoteStore` (W7-S1a — `NoteEditorPane` + `NoteBodyEditorModel`).
 private struct DetailPane: View {
     @ObservedObject var nav: NotesNavigationModel
+    @Binding var selectedTemplateID: UUID?
 
     var body: some View {
+        Group {
+            if nav.showingTemplates {
+                VStack(spacing: 0) {
+                    if let template = nav.model.templates.first(where: { $0.id == selectedTemplateID }) {
+                        HStack {
+                            Image(systemName: template.kind == .extract ? "quote.opening" : "doc.text")
+                            Text(template.name).font(.headline).lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                    } else {
+                        Text("No template selected")
+                            .font(.caption).foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                    }
+                    Divider()
+                    TemplateBodyEditorPane(model: nav.model, templateID: selectedTemplateID)
+                }
+            } else {
+                noteDetail
+            }
+        }
+    }
+
+    private var noteDetail: some View {
         VStack(spacing: 0) {
             selectedHeader
             if let id = nav.selectedItemID {

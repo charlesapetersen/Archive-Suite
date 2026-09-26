@@ -3,6 +3,16 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d3) — template body editing was not reachable in the app
+
+**2026-09-26.** Selecting a template now opens its Markdown body in the detail editor. Edits save to the
+template's own scratch-tested store record and survive rename and later instantiation. The editor flushes
+before template copy, deletion, or use; only one window can edit a template at a time. Failed loads disable
+editing, while failed saves keep a same-session draft for retry. Template image paste is explicitly blocked
+until an item exists with an asset directory. Notes Debug build, full unit smoke, and independent Tier-2
+find/refute review passed; the focused off-screen create/edit/reload UI test passed 1/1. No real Notes store
+or corpus was touched.
+
 ## ✅ FIXED (W9.d2.review-folder-graph) — folder graph edits crossed deletion
 
 **Fixed 2026-09-26.** `OrganizationStore` now holds one serialized graph-write admission through each SQLite write and matching memory/mirror publish. Folder create/move and template assignment validate their parent or target after waiting, so a completed deletion cannot be followed by a dangling edge. Deterministic scratch regressions force the rename, move, child-create, and template-assign races. Notes Debug build and full unit smoke passed; independent Tier-2 find→refute review found no remaining concrete graph race. No real Notes store or corpus was touched. Original finding: `old/review-folder-graph-delete-race-2026-09-26.md`.
