@@ -236,7 +236,8 @@ section. Distinguish from extracts (which carry `note-passage` provenance, not "
 ### 3c. Provenance blocks (existing, reused)
 - Extract provenance → `note-passage` block (`SourceAnchor.notePassage`, `SourceAnchor+NotePassage.swift`).
 - Archival PDF provenance → `reader-page`/`reader-doc` block with `SourceAnchor.link` = durable
-  `archivereader://reveal?root=<GUID>&rel=<pct-path>[&page=n]` (`DurableLink.readerReveal`).
+  `archivereader://reveal?root=<GUID>&rel=<pct-path>&jpeg=<pct-partner-path-or-empty>[&page=n]`
+  (`DurableLink.readerReveal`).
 - Zotero → `zoteroItem`/`zoteroAttachment` block / `Item.zotero` (`ZoteroRef`) with `SourceAnchor.zoteroSelect`.
 
 ### 3d. Rating — switch 5★→3★, and map quality control-tags (owner, 2026-07-17)
@@ -308,7 +309,7 @@ Database) but its **filename never changes**. So the importer:
    picked** (§7.11 probes identity, not just existence).
 2. **Resolves every archival link by that key** — file:// (any prefix), `/Volumes/…`, processing-folder paths,
    and Photo Database cross-DB links all collapse to "find this filename in the root."
-3. **Emits a durable `archivereader://reveal?root=<GUID>&rel=<current-relative-path>[&page=n]`** to the
+3. **Emits a durable `archivereader://reveal?root=<GUID>&rel=<current-relative-path>&jpeg=<partner-or-empty>[&page=n]`** to the
    resolved file. Keyed on the **root GUID + current relative path**, so a later **root rename/move is safe**
    (§8 root-rename): Reader re-establishes the root at the new location under the same `RootMarker` GUID.
 4. **JPEG partner (tracked to-do):** the matching `.jpg` sits at the mirror path under `Archival Photos JPEGS/`

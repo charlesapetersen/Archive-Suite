@@ -20,7 +20,7 @@ final class SourceBlockThumbnailRenderer {
     func png(for anchor: SourceAnchor) async -> Data? {
         guard let linkString = anchor.link,
               let linkURL = URL(string: linkString),
-              case .readerReveal(let rootGUID, let relativePath, let linkPage) = DurableLink(url: linkURL),
+              case .readerReveal(let rootGUID, let relativePath, let linkPage, _) = DurableLink(url: linkURL),
               let page = linkPage, page > 0,
               anchor.page == page else {
             return nil

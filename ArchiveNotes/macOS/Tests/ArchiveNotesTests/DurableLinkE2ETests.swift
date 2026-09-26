@@ -79,13 +79,14 @@ struct DurableLinkE2ETests {
 
             // (0) The stored durable link round-trips to the resolver's inputs.
             let link = DurableLink.readerReveal(rootGUID: guid, relativePath: "sample.pdf", page: 1)
-            guard case let .readerReveal(pGUID, pRel, pPage)? = DurableLink(url: link.url) else {
+            guard case let .readerReveal(pGUID, pRel, pPage, pJPEG)? = DurableLink(url: link.url) else {
                 Issue.record("durable link did not round-trip through DurableLink(url:)")
                 return
             }
             #expect(pGUID == guid)
             #expect(pRel == "sample.pdf")
             #expect(pPage == 1)
+            #expect(pJPEG == nil)
 
             let store = ReaderRootStore()
             let resolver = ReaderLinkResolver(rootStore: store)

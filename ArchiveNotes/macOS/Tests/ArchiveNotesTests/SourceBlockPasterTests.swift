@@ -9,7 +9,7 @@ final class SourceBlockPasterTests: XCTestCase {
     func testPayloadWithPageEntry() {
         let payload = ArchiveLinkPayload(entries: [
             .init(
-                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Letters/Moore.pdf&page=41",
+                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Letters/Moore.pdf&jpeg=&page=41",
                 display: "Gordon E. Moore Oral History \u{2014} p. 41",
                 page: 41,
                 thumbPNGBase64: pngBase64Stub
@@ -30,7 +30,7 @@ final class SourceBlockPasterTests: XCTestCase {
     func testPayloadWithDocEntry() {
         let payload = ArchiveLinkPayload(entries: [
             .init(
-                link: "archivereader://reveal?root=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&rel=Reports/Annual.pdf",
+                link: "archivereader://reveal?root=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&rel=Reports/Annual.pdf&jpeg=",
                 display: "Annual Report"
             )
         ])
@@ -46,7 +46,7 @@ final class SourceBlockPasterTests: XCTestCase {
         let payload = ArchiveLinkPayload(entries: [
             .init(link: "https://example.com", display: "Not an archive link"),
             .init(
-                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=ok.pdf",
+                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=ok.pdf&jpeg=",
                 display: "Valid"
             )
         ])
@@ -60,7 +60,7 @@ final class SourceBlockPasterTests: XCTestCase {
         let oversized = String(repeating: "A", count: 6_000_000)
         let payload = ArchiveLinkPayload(entries: [
             .init(
-                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=x.pdf&page=1",
+                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=x.pdf&jpeg=&page=1",
                 display: "Huge",
                 page: 1,
                 thumbPNGBase64: oversized
@@ -75,11 +75,11 @@ final class SourceBlockPasterTests: XCTestCase {
     func testPayloadMultipleEntries() {
         let payload = ArchiveLinkPayload(entries: [
             .init(
-                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=a.pdf&page=1",
+                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=a.pdf&jpeg=&page=1",
                 display: "Doc A \u{2014} p. 1", page: 1
             ),
             .init(
-                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=b.pdf",
+                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=b.pdf&jpeg=",
                 display: "Doc B"
             )
         ])
@@ -93,7 +93,7 @@ final class SourceBlockPasterTests: XCTestCase {
     // MARK: - scanURLs (plain-text fallback)
 
     func testScanURLsSinglePage() {
-        let text = "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Letters/Moore.pdf&page=41\n"
+        let text = "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Letters/Moore.pdf&jpeg=&page=41\n"
         let entries = SourceBlockPaster.scanURLs(in: text)
         XCTAssertEqual(entries.count, 1)
         XCTAssertEqual(entries[0].kind, .readerPage)
@@ -103,7 +103,7 @@ final class SourceBlockPasterTests: XCTestCase {
     }
 
     func testScanURLsDocLevel() {
-        let text = "archivereader://reveal?root=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&rel=Report.pdf\n"
+        let text = "archivereader://reveal?root=AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE&rel=Report.pdf&jpeg=\n"
         let entries = SourceBlockPaster.scanURLs(in: text)
         XCTAssertEqual(entries.count, 1)
         XCTAssertEqual(entries[0].kind, .readerDoc)
@@ -113,8 +113,8 @@ final class SourceBlockPasterTests: XCTestCase {
 
     func testScanURLsMultipleLines() {
         let text = """
-        archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=a.pdf&page=1
-        archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=b.pdf
+        archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=a.pdf&jpeg=&page=1
+        archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=b.pdf&jpeg=
         """
         let entries = SourceBlockPaster.scanURLs(in: text)
         XCTAssertEqual(entries.count, 2)
@@ -123,7 +123,7 @@ final class SourceBlockPasterTests: XCTestCase {
     func testScanURLsIgnoresNonArchiveLines() {
         let text = """
         https://example.com
-        archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=ok.pdf&page=1
+        archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=ok.pdf&jpeg=&page=1
         some random text
         """
         let entries = SourceBlockPaster.scanURLs(in: text)
@@ -136,7 +136,7 @@ final class SourceBlockPasterTests: XCTestCase {
     }
 
     func testScanURLsNonPDFExtension() {
-        let text = "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Photos/scan.jpg\n"
+        let text = "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Photos/scan.jpg&jpeg=\n"
         let entries = SourceBlockPaster.scanURLs(in: text)
         XCTAssertEqual(entries.count, 1)
         // Non-PDF basename preserved as-is
@@ -150,14 +150,14 @@ final class SourceBlockPasterTests: XCTestCase {
     private func relativePath(of entry: SourceBlockPaster.PasteEntry) -> String? {
         guard let link = entry.anchor.link,
               let url = URL(string: link),
-              case .readerReveal(_, let rel, _) = DurableLink(url: url) else { return nil }
+              case .readerReveal(_, let rel, _, _) = DurableLink(url: url) else { return nil }
         return rel
     }
 
     private static let scanRoot = "7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567"
 
     private func scanLink(_ rel: String, page: Int? = nil) -> String {
-        var s = "archivereader://reveal?root=\(Self.scanRoot)&rel=\(rel)"
+        var s = "archivereader://reveal?root=\(Self.scanRoot)&rel=\(rel)&jpeg="
         if let page { s += "&page=\(page)" }
         return s
     }
@@ -320,7 +320,7 @@ final class SourceBlockPasterTests: XCTestCase {
         let item = NSPasteboardItem()
         let payload = ArchiveLinkPayload(entries: [
             .init(
-                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=x.pdf",
+                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=x.pdf&jpeg=",
                 display: "X"
             )
         ])
@@ -358,7 +358,7 @@ final class SourceBlockPasterTests: XCTestCase {
         let item = NSPasteboardItem()
         let payload = ArchiveLinkPayload(entries: [
             .init(
-                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Doc.pdf&page=3",
+                link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Doc.pdf&jpeg=&page=3",
                 display: "Doc \u{2014} p. 3",
                 page: 3,
                 thumbPNGBase64: pngBase64Stub
@@ -379,7 +379,7 @@ final class SourceBlockPasterTests: XCTestCase {
         let pb = NSPasteboard(name: .init("test-read-text-\(UUID().uuidString)"))
         pb.clearContents()
         pb.setString(
-            "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Note.pdf&page=2",
+            "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Note.pdf&jpeg=&page=2",
             forType: .string
         )
 
@@ -403,7 +403,7 @@ final class SourceBlockPasterTests: XCTestCase {
     func testSerializedBlockHeaderMatchesSpec() {
         // Verify that a block built from paste entries serializes to the §6 format
         let anchor = SourceAnchor(
-            link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=SV/Business/Moore.pdf&page=41",
+            link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=SV/Business/Moore.pdf&jpeg=&page=41",
             display: "Gordon E. Moore Oral History \u{2014} p. 41",
             page: 41,
             thumbRef: "assets/p41-thumb.png"

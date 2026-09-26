@@ -6,7 +6,7 @@
 # SHIPPED `make-notes-fixture.sh` builder. It is the shell counterpart to the
 # in-code `DurableLinkE2ETests` (which proves the resolver LOGIC): this script
 # proves the durable-link DATA path — a note's `reader-page` block link
-# (archivereader://reveal?root=<GUID>&rel=<path>) resolves to a real file under
+# (archivereader://reveal?root=<GUID>&rel=<path>&jpeg=<path-or-empty>) resolves to a real file under
 # a root whose RootMarker carries that GUID, and that this SURVIVES a computer
 # move (same GUID, different absolute path → still resolves; no re-index, no
 # path rewrite). An unknown GUID would require a one-time re-grant — never a
@@ -83,8 +83,8 @@ check "notes RootMarker present, kind=notes"          "[ \"\$(marker_field \"$FI
 check "notes RootMarker GUID matches"                 "[ \"\$(marker_field \"$FIXTURE\" guid)\" = $NOTES_ROOT_GUID ]"
 check "corpus RootMarker present, kind=reader"        "[ \"\$(marker_field \"$CORPUS\" kind)\" = reader ]"
 check "corpus RootMarker GUID matches"                "[ \"\$(marker_field \"$CORPUS\" guid)\" = $CORPUS_ROOT_GUID ]"
-check "reader-page block links the corpus GUID + rel" \
-  "grep -qF 'archivereader://reveal?root=$CORPUS_ROOT_GUID&rel=sample.pdf' \"$FIXTURE/items/22222222-2222-2222-2222-222222222222/Moore on Intel culture.md\""
+check "reader-page block links the corpus GUID + rel + explicit optional JPEG field" \
+  "grep -qF 'archivereader://reveal?root=$CORPUS_ROOT_GUID&rel=sample.pdf&jpeg=&page=1' \"$FIXTURE/items/22222222-2222-2222-2222-222222222222/Moore on Intel culture.md\""
 check "link target exists under the corpus root"      "[ -f \"$CORPUS/sample.pdf\" ]"
 check "organization.json is valid JSON"               "jq -e . \"$FIXTURE/organization.json\" >/dev/null 2>&1"
 check "one item is replicated (member of >1 folder)"  \

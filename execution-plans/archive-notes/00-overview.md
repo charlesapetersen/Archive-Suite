@@ -203,7 +203,7 @@ modified: 2026-07-10T21:05:00Z
 ---
 
 <!-- block: reader-page
-     link: archivereader://reveal?root=7F3A…&rel=SV/Business/Moore.pdf&page=41
+     link: archivereader://reveal?root=7F3A…&rel=SV/Business/Moore.pdf&jpeg=&page=41
      display: "Gordon E. Moore Oral History — p. 41"
      thumb: assets/p41-thumb.png -->
 ![Gordon E. Moore Oral History — p. 41](assets/p41-thumb.png)
@@ -273,7 +273,8 @@ On first grant of a Reader archive root **or** the Notes store, drop `.archive-s
 
 ### 8.2 Link forms
 - **Reader document/page** (Notes → Reader): `archivereader://reveal?root=<GUID>&rel=<url-encoded relative
-  path under the root>&page=<optional int>`.
+  path under the root>&jpeg=<url-encoded partner path or empty>&page=<optional int>`. The `jpeg` query key is
+  required; empty explicitly means no partner.
 - **Notes item** (Scrivener/Reader/Notes → Notes): `archivenotes://open?id=<UUID>` (opens/reveals the note
   or extract in Notes; `#block-<n>` fragment optional for a passage).
 
@@ -477,7 +478,8 @@ durable architecture into `ArchiveNotes/CLAUDE.md`.
 ### 16.2 Durable links & root marker (live in ArchiveCore)
 ```swift
 enum DurableLink: Equatable {
-  case readerReveal(rootGUID: UUID, relativePath: String, page: Int?)   // archivereader://reveal?root=&rel=&page=
+  case readerReveal(rootGUID: UUID, relativePath: String, page: Int?, jpegRelativePath: String?)
+                                                                      // archivereader://reveal?root=&rel=&jpeg=&page=
   case notesOpen(id: UUID, block: Int?)                                 // archivenotes://open?id=#block-<n>
 }
 struct RootMarker: Codable {          // .archive-suite-root.json (dropped at a granted root)

@@ -48,7 +48,7 @@ final class ReaderPreviewPopover {
 
         guard let linkStr = anchor.link,
               let url = URL(string: linkStr),
-              case .readerReveal(let guid, let rel, let page) = DurableLink(url: url) else {
+              case .readerReveal(let guid, let rel, let page, _) = DurableLink(url: url) else {
             currentLink = nil
             showMessage("No valid archive link.", relativeTo: view)
             return

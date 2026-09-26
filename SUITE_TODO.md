@@ -906,10 +906,6 @@ launch safeguards; the gate rotates one route per run.
   `~/Desktop/Google Drive/Archival Photos/`, a copy of the `.dtBase2`, a fresh output store; resolve §9 open
   decisions. Next step = **DTI-0 spike & ground-truth** on a DB copy. | HIGH risk · Tier-2 · **needs:** owner
   + corpus-safety
-- [ ] **W24.jpeg1b — `DurableLink` pins the resolved JPEG path [S-M · Tier-2 · shared ArchiveCore]**
-  (blocked-on: W24.jpeg1a). Second slice of `W24.jpeg1`; parent design §3. The JPEG field is optional because
-  9.3% of PDFs have no partner, not for compatibility: no parser for older link shapes (no production
-  material). Rebuild all three apps' test bundles; run `ArchiveReader/scripts/lint-write-surface.sh`.
 - [ ] **W24.jpeg1 — Reader/Notes: PDF + JPEG dual image reference** (blocked-on: W24.jpeg1a, W24.jpeg1b)
   **Since the 2026-09-24 split this entry is the design record plus the last slice:** raising Reader's root
   (§1), the viewer switch and its per-document preference (§4), and the render-guard and VM verification.
@@ -968,12 +964,9 @@ launch safeguards; the gate rotates one route per run.
        the switch** (see the tail of this item), so the switch may only be hidden on a **clean** pass; an
        incomplete or denied JPEGS walk means *partner unknown* and must never render as "this PDF has no JPEG".
        This is `W26.deny`'s distinction applied to a second consumer — the same class of bug, one subsystem over.
-     - **Storage is an open sub-decision — settle it before writing code.** Either a stem table inside the
-       existing `LibraryIndex` SQLite DB (which already carries untracked rows — `entry.tracked` +
-       `entry_root_tracked` — keyed by root marker GUID + byte-exact path, and already has the warm-start and
-       revalidation machinery this index would otherwise duplicate), or a separate disposable index. Reusing
-       `LibraryIndex` inherits its byte-exact path contract and therefore `W26.symroot`'s open question; a
-       separate index duplicates fingerprinting and revalidation.
+     - **Storage decision (owner, 2026-09-25): option A, a stem table in `LibraryIndex`'s existing SQLite DB.**
+       Shipped by W24.jpeg1a (`SUITE_TODO_DONE.md`); `JPEGPartnerIndex` uses the existing root GUID + relative
+       path key and warm-start/revalidation machinery.
   3. **Durable link:** encode the PDF path **and** the resolved JPEG path explicitly — the partner is not
      re-derivable, so a citation must pin what was actually cited. ⚠️ This changes `DurableLink`
      (`packages/ArchiveCore/Sources/ArchiveCore/Links/DurableLink.swift`) — a shared ArchiveCore type + cross-app

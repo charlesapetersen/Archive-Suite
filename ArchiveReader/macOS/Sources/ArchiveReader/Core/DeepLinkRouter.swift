@@ -11,7 +11,7 @@ final class DeepLinkRouter: ObservableObject {
     weak var nav: NavigationModel?
 
     func handle(_ url: URL) {
-        guard case .readerReveal(let guid, let rel, let page) = DurableLink(url: url) else {
+        guard case .readerReveal(let guid, let rel, let page, _) = DurableLink(url: url) else {
             return
         }
         nav?.revealAndSelect(rootGUID: guid, relativePath: rel, page: page)

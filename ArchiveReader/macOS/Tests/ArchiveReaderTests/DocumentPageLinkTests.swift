@@ -118,12 +118,13 @@ final class DocumentPageLinkTests: XCTestCase {
         let item = await model.archivePageLink(target: t)
         let text = try XCTUnwrap(item?.string(forType: .string))
         let parsed = DurableLink(url: try XCTUnwrap(URL(string: text)))
-        guard case .readerReveal(let guid, let rel, let page) = parsed else {
+        guard case .readerReveal(let guid, let rel, let page, let jpegRel) = parsed else {
             return XCTFail("expected a readerReveal link, got \(String(describing: parsed))")
         }
         XCTAssertEqual(guid, t.marker.guid, "the link carries the root marker's GUID")
         XCTAssertEqual(rel, "cite-me.pdf", "root-relative path")
         XCTAssertEqual(page, 6, "the link cites the OCR text page being read, not the scan")
+        XCTAssertNil(jpegRel)
     }
 
     func testPageLinkNeedsNoNavigationModel() async throws {
@@ -194,7 +195,7 @@ final class DocumentPageLinkTests: XCTestCase {
 
         let item = await source.archivePageLink(target: target(root: root))
         let text = try XCTUnwrap(item?.string(forType: .string))
-        guard case .readerReveal(_, _, let page) = DurableLink(url: try XCTUnwrap(URL(string: text))),
+        guard case .readerReveal(_, _, let page, _) = DurableLink(url: try XCTUnwrap(URL(string: text))),
               let citedPage = page else {
             return XCTFail("the copied link carried no page")
         }

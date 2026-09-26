@@ -60,7 +60,7 @@ struct SourceBlockPaster {
             // filed as provenance that never resolves — the same rule `scanURLs` applies, because a
             // percent-encoded terminator reaches this path too (W3.notes-paste-url-line-split).
             guard let url = URL(string: entry.link),
-                  case .readerReveal(_, let rel, _) = DurableLink(url: url),
+                  case .readerReveal(_, let rel, _, _) = DurableLink(url: url),
                   !BlockParser.containsLineTerminator(rel) else { return nil }
 
             let kind: Block.Kind = entry.page != nil ? .readerPage : .readerDoc
@@ -107,7 +107,7 @@ struct SourceBlockPaster {
         for line in BlockParser.splitLines(normalizedPastedText(text)) {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let url = URL(string: trimmed),
-                  case .readerReveal(_, let rel, let page) = DurableLink(url: url),
+                  case .readerReveal(_, let rel, let page, _) = DurableLink(url: url),
                   !BlockParser.containsLineTerminator(rel) else {
                 continue
             }

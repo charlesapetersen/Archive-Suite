@@ -83,10 +83,11 @@ final class ArchiveLinkWriterTests: XCTestCase {
         // Parse and verify the link round-trips
         let parsed = DurableLink(url: URL(string: entry.link)!)
         XCTAssertNotNil(parsed)
-        if case .readerReveal(let guid, let rel, let page) = parsed {
+        if case .readerReveal(let guid, let rel, let page, let jpegRel) = parsed {
             XCTAssertEqual(guid, testGUID)
             XCTAssertEqual(rel, "Sub Dir/file.pdf")
             XCTAssertNil(page, "Doc-level link should have no page")
+            XCTAssertNil(jpegRel)
         } else {
             XCTFail("Expected readerReveal, got \(String(describing: parsed))")
         }
@@ -202,10 +203,11 @@ final class ArchiveLinkWriterTests: XCTestCase {
 
         let text = item.string(forType: .string)!
         let parsed = DurableLink(url: URL(string: text)!)
-        if case .readerReveal(let guid, let rel, let page) = parsed {
+        if case .readerReveal(let guid, let rel, let page, let jpegRel) = parsed {
             XCTAssertEqual(guid, testGUID)
             XCTAssertEqual(rel, "Box/doc.pdf")
             XCTAssertEqual(page, 3)
+            XCTAssertNil(jpegRel)
         } else {
             XCTFail("Expected readerReveal")
         }
@@ -224,7 +226,7 @@ final class ArchiveLinkWriterTests: XCTestCase {
 
         let text = item.string(forType: .string)!
         let parsed = DurableLink(url: URL(string: text)!)
-        if case .readerReveal(_, let rel, _) = parsed {
+        if case .readerReveal(_, let rel, _, _) = parsed {
             XCTAssertEqual(rel, "Box \u{2014} Special/file name.pdf",
                            "Em-dash and spaces should survive the URL round-trip")
         } else {

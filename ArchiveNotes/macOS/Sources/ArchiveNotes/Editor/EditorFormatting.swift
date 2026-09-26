@@ -171,7 +171,7 @@ final class FormattingContext: ObservableObject {
     /// Insert a test source-block chip at the caret (Debug menu).
     func insertTestBlock() {
         let anchor = SourceAnchor(
-            link: "archivereader://reveal?root=TEST&rel=test.pdf&page=1",
+            link: "archivereader://reveal?root=TEST&rel=test.pdf&jpeg=&page=1",
             display: "Test Document - p. 1",
             page: 1
         )

@@ -916,7 +916,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         // The durable link to paste — resolves under the embedded scratch Reader corpus. `page` present
         // → the paster classifies it as a `.readerPage` block.
-        let link = "archivereader://reveal?root=\(Self.corpusRootGUID)&rel=sample.pdf&page=2"
+        let link = "archivereader://reveal?root=\(Self.corpusRootGUID)&rel=sample.pdf&jpeg=&page=2"
 
         func blockOnDisk() -> Bool { (rawMarkdown(inItemDir: uuid) ?? "").contains("block: reader-page") }
 

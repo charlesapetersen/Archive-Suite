@@ -5,12 +5,12 @@ import Foundation
 
 /// A typed deep link between Archive Suite apps.
 ///
-/// - `readerReveal`: asks Archive Reader to reveal a document.
-///   URL: `archivereader://reveal?root=<lowercased-UUID>&rel=<percent-encoded-path>[&page=<n>]`
+/// - `readerReveal`: asks Archive Reader to reveal a document and optionally pins its JPEG partner.
+///   URL: `archivereader://reveal?root=<lowercased-UUID>&rel=<percent-encoded-path>&jpeg=<path-or-empty>[&page=<n>]`
 /// - `notesOpen`: asks Archive Notes to open a note.
 ///   URL: `archivenotes://open?id=<lowercased-UUID>[#block-<n>]`
 public enum DurableLink: Equatable, Sendable {
-    case readerReveal(rootGUID: UUID, relativePath: String, page: Int?)
+    case readerReveal(rootGUID: UUID, relativePath: String, page: Int?, jpegRelativePath: String? = nil)
     case notesOpen(id: UUID, block: Int?)
 
     // MARK: - URL schemes
@@ -22,13 +22,16 @@ public enum DurableLink: Equatable, Sendable {
 
     public var url: URL {
         switch self {
-        case .readerReveal(let rootGUID, let relativePath, let page):
+        case .readerReveal(let rootGUID, let relativePath, let page, let jpegRelativePath):
             var components = URLComponents()
             components.scheme = Self.readerScheme
             components.host = "reveal"
             var items = [
                 URLQueryItem(name: "root", value: rootGUID.uuidString.lowercased()),
                 URLQueryItem(name: "rel", value: relativePath),
+                // This required key distinguishes the current shape from the pre-JPEG link contract.
+                // An empty value explicitly means this PDF has no partner.
+                URLQueryItem(name: "jpeg", value: jpegRelativePath ?? ""),
             ]
             if let page {
                 items.append(URLQueryItem(name: "page", value: String(page)))
@@ -66,8 +69,11 @@ public enum DurableLink: Equatable, Sendable {
             guard let items = components.queryItems,
                   let rootStr = items.first(where: { $0.name == "root" })?.value,
                   let rootGUID = UUID(uuidString: rootStr),
-                  let rel = items.first(where: { $0.name == "rel" })?.value
+                  let rel = items.first(where: { $0.name == "rel" })?.value,
+                  let jpegValue = items.first(where: { $0.name == "jpeg" })?.value
             else { return nil }
+
+            let jpegRelativePath = jpegValue.isEmpty ? nil : jpegValue
 
             let page: Int?
             if let pageStr = items.first(where: { $0.name == "page" })?.value {
@@ -76,7 +82,8 @@ public enum DurableLink: Equatable, Sendable {
             } else {
                 page = nil
             }
-            self = .readerReveal(rootGUID: rootGUID, relativePath: rel, page: page)
+            self = .readerReveal(rootGUID: rootGUID, relativePath: rel, page: page,
+                                 jpegRelativePath: jpegRelativePath)
 
         case (Self.notesScheme, "open"):
             guard let items = components.queryItems,

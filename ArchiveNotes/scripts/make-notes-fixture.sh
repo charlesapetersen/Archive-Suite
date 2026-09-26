@@ -186,7 +186,7 @@ created: $CREATED
 modified: $CREATED
 ---
 <!-- block: reader-page
-     link: archivereader://reveal?root=$CORPUS_ROOT_GUID&rel=sample.pdf&page=1
+     link: archivereader://reveal?root=$CORPUS_ROOT_GUID&rel=sample.pdf&jpeg=&page=1
      display: "sample.pdf — p. 1"
      page: 1
      thumb: assets/p1-thumb.png -->

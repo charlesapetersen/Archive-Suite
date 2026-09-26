@@ -38,6 +38,28 @@ struct DurableLinkTests {
         #expect(parsed == link)
     }
 
+    @Test func readerRevealPinsOptionalJPEGRelativePath() {
+        let jpegPath = "Michael Young Archive/box 17.HEIC"
+        let link = DurableLink.readerReveal(
+            rootGUID: sampleUUID,
+            relativePath: "Young, Michael/box-17.pdf",
+            page: 2,
+            jpegRelativePath: jpegPath
+        )
+        let url = link.url
+        #expect(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "jpeg" })?.value == jpegPath)
+        #expect(DurableLink(url: url) == link)
+    }
+
+    @Test func readerRevealNoPartnerUsesAnExplicitEmptyJPEGField() {
+        let link = DurableLink.readerReveal(rootGUID: sampleUUID, relativePath: "memo.pdf", page: nil)
+        let url = link.url
+        #expect(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .contains(where: { $0.name == "jpeg" && $0.value == "" }) == true)
+        #expect(DurableLink(url: url) == link)
+    }
+
     @Test func readerRevealWithSpacesInPath() {
         let link = DurableLink.readerReveal(
             rootGUID: sampleUUID,
@@ -59,11 +81,12 @@ struct DurableLinkTests {
         #expect(!url.absoluteString.contains("%2F"))
         #expect(url.absoluteString.contains("Box%201/Folder%202/old%20scan.pdf"))
 
-        guard case let .readerReveal(_, parsedRel, parsedPage)? = DurableLink(url: url) else {
+        guard case let .readerReveal(_, parsedRel, parsedPage, parsedJPEG)? = DurableLink(url: url) else {
             Issue.record("expected a readerReveal link"); return
         }
         #expect(parsedRel == rel)
         #expect(parsedPage == 4)
+        #expect(parsedJPEG == nil)
     }
 
     // MARK: - notesOpen
@@ -97,17 +120,22 @@ struct DurableLinkTests {
     }
 
     @Test func parseRejectsReaderMissingRoot() {
-        let url = URL(string: "archivereader://reveal?rel=foo.pdf")!
+        let url = URL(string: "archivereader://reveal?rel=foo.pdf&jpeg=")!
         #expect(DurableLink(url: url) == nil)
     }
 
     @Test func parseRejectsReaderMissingRel() {
-        let url = URL(string: "archivereader://reveal?root=7f3a9c21-4b5e-4a8c-9d3f-1e2a6b7c8d9e")!
+        let url = URL(string: "archivereader://reveal?root=7f3a9c21-4b5e-4a8c-9d3f-1e2a6b7c8d9e&jpeg=")!
+        #expect(DurableLink(url: url) == nil)
+    }
+
+    @Test func parseRejectsPreJPEGReaderLinkShape() {
+        let url = URL(string: "archivereader://reveal?root=7f3a9c21-4b5e-4a8c-9d3f-1e2a6b7c8d9e&rel=old.pdf&page=1")!
         #expect(DurableLink(url: url) == nil)
     }
 
     @Test func parseRejectsReaderInvalidPage() {
-        let url = URL(string: "archivereader://reveal?root=7f3a9c21-4b5e-4a8c-9d3f-1e2a6b7c8d9e&rel=a.pdf&page=abc")!
+        let url = URL(string: "archivereader://reveal?root=7f3a9c21-4b5e-4a8c-9d3f-1e2a6b7c8d9e&rel=a.pdf&jpeg=&page=abc")!
         #expect(DurableLink(url: url) == nil)
     }
 
@@ -159,7 +187,7 @@ struct DurableLinkTests {
     // MARK: - Tolerant parsing (unknown query items ignored)
 
     @Test func parseIgnoresUnknownQueryItems() {
-        let url = URL(string: "archivereader://reveal?root=7f3a9c21-4b5e-4a8c-9d3f-1e2a6b7c8d9e&rel=a.pdf&future=yes&page=3")!
+        let url = URL(string: "archivereader://reveal?root=7f3a9c21-4b5e-4a8c-9d3f-1e2a6b7c8d9e&rel=a.pdf&jpeg=&future=yes&page=3")!
         let parsed = DurableLink(url: url)
         let expected = DurableLink.readerReveal(
             rootGUID: sampleUUID,
