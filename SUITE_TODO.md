@@ -892,8 +892,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d1` — folder move/reorder & drag-to-reparent UI [M].** Plan D1. Wire `.onMove` + folder-onto-folder
-  drop → `model.moveFolder` (the cycle-guard already exists). | Views/NotesFolderTreeView.swift | M | low | none
 - [ ] **`W9.d2` — the item-row context menu is a stub [S].** Plan D2. Open / Reveal in Finder / New from
   Template / Set Quality ▸ / Delete…. | Views/NotesContextMenu.swift | S | low | none
 - [ ] **`W9.d3` — template body editing is not routed in-app [M].** Plan D3. | Views/TemplatesManagerView.swift

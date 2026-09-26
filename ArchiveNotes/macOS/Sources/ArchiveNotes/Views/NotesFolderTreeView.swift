@@ -9,9 +9,8 @@ import ArchiveCore
 /// **user-authored + mutable** (create / rename / move / delete), routed through `NotesModel` →
 /// `OrganizationStore`'s atomic writes.
 ///
-/// Drag-to-reparent and the batched sole-instance delete confirmation are W6-S5 (replication + delete
-/// path, Tier-2); a "Templates" anchor row is W6-S6. This pane ships create / rename / delete +
-/// selection now.
+/// Item drops and the batched sole-instance delete confirmation are W6-S5 (replication + delete path,
+/// Tier-2); folder reorder / reparent is W9.d1. A "Templates" anchor row is W6-S6.
 struct NotesFolderTreeView: View {
     @ObservedObject var model: NotesModel
     /// This window's item-list model — drops route through its `move`/`replicate` so the acting window
@@ -32,6 +31,7 @@ struct NotesFolderTreeView: View {
     @State private var deleteName = ""
     // Sole-instance items (fresh read at delete-tap time) that deleting the folder would delete (§5).
     @State private var deleteStranded: [UUID] = []
+    @State private var expandedFolders: Set<UUID> = []
 
     private static let allNotesTag = "\u{0}ALL"
     private static let templatesTag = "\u{0}TEMPLATES"
@@ -39,34 +39,9 @@ struct NotesFolderTreeView: View {
 
     var body: some View {
         List(selection: $selection) {
-            if !model.smartFolders.isEmpty {
-                Section("Smart Folders") {
-                    ForEach(model.smartFolders) { node in
-                        row(name: node.name, systemImage: "line.3.horizontal.decrease.circle", count: nil)
-                            .tag(Self.smartPrefix + node.id.uuidString)
-                            .accessibilityIdentifier("an.sidebar.smart")
-                    }
-                }
-            }
-            Section("Folders") {
-                row(name: "All Notes", systemImage: "tray.full", count: model.allNotesCount)
-                    .tag(Self.allNotesTag)
-                    .accessibilityIdentifier("an.sidebar.allNotes")
-                OutlineGroup(model.normalTree, children: \.childrenOrNil) { node in
-                    row(name: node.name, systemImage: "folder", count: node.itemCount)
-                        .tag(node.id.uuidString)
-                        .accessibilityIdentifier("an.sidebar.folder")
-                        .contextMenu { folderMenu(node) }
-                        .dropDestination(for: String.self) { items, _ in
-                            handleItemDrop(items, onto: node.id)
-                        }
-                }
-            }
-            Section {
-                row(name: "Templates", systemImage: "square.on.square", count: model.templates.count)
-                    .tag(Self.templatesTag)
-                    .accessibilityIdentifier("an.sidebar.templates")
-            }
+            smartFolderSection
+            normalFolderSection
+            templatesSection
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) { bottomBar }
@@ -113,6 +88,36 @@ struct NotesFolderTreeView: View {
         } message: { _ in Text(deleteMessage) }
     }
 
+    @ViewBuilder
+    private var smartFolderSection: some View {
+        if !model.smartFolders.isEmpty {
+            Section("Smart Folders") {
+                ForEach(model.smartFolders) { node in
+                    row(name: node.name, systemImage: "line.3.horizontal.decrease.circle", count: nil)
+                        .tag(Self.smartPrefix + node.id.uuidString)
+                        .accessibilityIdentifier("an.sidebar.smart")
+                }
+            }
+        }
+    }
+
+    private var normalFolderSection: some View {
+        Section("Folders") {
+            row(name: "All Notes", systemImage: "tray.full", count: model.allNotesCount)
+                .tag(Self.allNotesTag)
+                .accessibilityIdentifier("an.sidebar.allNotes")
+            folderTreeLevel(model.normalTree, parentID: nil)
+        }
+    }
+
+    private var templatesSection: some View {
+        Section {
+            row(name: "Templates", systemImage: "square.on.square", count: model.templates.count)
+                .tag(Self.templatesTag)
+                .accessibilityIdentifier("an.sidebar.templates")
+        }
+    }
+
     /// The delete button's label — names the note-deletion count when the folder strands sole instances.
     private var deleteConfirmLabel: String {
         guard !deleteStranded.isEmpty else { return "Delete Folder" }
@@ -147,6 +152,33 @@ struct NotesFolderTreeView: View {
         return true
     }
 
+    /// Handle a folder drag as a reparent into the target. Item drags remain JSON UUID arrays and keep
+    /// their existing move/Option-replicate behavior. `moveFolder` owns cycle refusal and its explanation.
+    private func handleDrop(_ payloads: [String], onto folderId: UUID) -> Bool {
+        if payloads.count == 1, let draggedFolder = UUID(uuidString: payloads[0]),
+           model.organization.folders.contains(where: { $0.id == draggedFolder }) {
+            let siblingOrders = model.organization.folders.filter {
+                $0.kind == .normal && $0.parentId == folderId
+            }.map(\.sortOrder)
+            let nextIndex = (siblingOrders.max() ?? -1) + 1
+            Task { await model.moveFolder(draggedFolder, newParent: folderId, at: nextIndex) }
+            return true
+        }
+        return handleItemDrop(payloads, onto: folderId)
+    }
+
+    /// Renumber the moved sibling level in its existing parent; descendant membership and parent links stay put.
+    private func reorderFolders(_ siblings: [NotesFolderNode], parentID: UUID?,
+                                fromOffsets: IndexSet, toOffset: Int) {
+        var reordered = siblings
+        reordered.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        Task {
+            for (index, folder) in reordered.enumerated() {
+                await model.moveFolder(folder.id, newParent: parentID, at: index)
+            }
+        }
+    }
+
     // MARK: Rows & chrome
 
     private func row(name: String, systemImage: String, count: Int?) -> some View {
@@ -158,6 +190,46 @@ struct NotesFolderTreeView: View {
             }
         }
         .help(name)
+    }
+
+    private func folderRow(_ node: NotesFolderNode) -> some View {
+        row(name: node.name, systemImage: "folder", count: node.itemCount)
+            .tag(node.id.uuidString)
+            .accessibilityIdentifier("an.sidebar.folder")
+            .contextMenu { folderMenu(node) }
+            .draggable(node.id.uuidString)
+            .dropDestination(for: String.self) { items, _ in handleDrop(items, onto: node.id) }
+    }
+
+    /// Build each level with its own `ForEach.onMove`, retaining nested disclosure rows while giving reorder
+    /// gestures the exact sibling list and parent id they must update.
+    private func folderTreeLevel(_ nodes: [NotesFolderNode], parentID: UUID?) -> AnyView {
+        AnyView(
+            ForEach(nodes) { node in
+                if node.children.isEmpty {
+                    folderRow(node)
+                } else {
+                    DisclosureGroup(isExpanded: expandedBinding(for: node.id)) {
+                        folderTreeLevel(node.children, parentID: node.id)
+                    } label: {
+                        folderRow(node)
+                    }
+                    .tag(node.id.uuidString)
+                }
+            }
+            .onMove { offsets, destination in
+                reorderFolders(nodes, parentID: parentID, fromOffsets: offsets, toOffset: destination)
+            }
+        )
+    }
+
+    private func expandedBinding(for folderID: UUID) -> Binding<Bool> {
+        Binding(
+            get: { expandedFolders.contains(folderID) },
+            set: { isExpanded in
+                if isExpanded { expandedFolders.insert(folderID) }
+                else { expandedFolders.remove(folderID) }
+            })
     }
 
     /// The per-folder context menu. Rename and Delete are **disabled** on the fixed-ID system folders

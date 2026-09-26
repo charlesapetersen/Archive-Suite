@@ -186,6 +186,19 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   live output folder, GUI, credentials, or network is used. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/
   {Capture/CaptureSession.swift,Capture/LiveCaptureRecoveryTestDriver.swift} | S | low | done
 
+## W9 gap-closure — Phase D secondary UI (2026-09-26)
+
+- [x] **`W9.d1` — folder move/reorder and drag-to-reparent UI [M].** **SHIPPED 2026-09-26 (this
+  commit).** The folder sidebar renders sibling lists at each tree level and persists `.onMove` order
+  through `NotesModel.moveFolder`. Dragging a folder UUID onto another folder reparents it through the
+  existing cycle guard. Note-row drops still move or Option-replicate notes. The original checkpoint
+  (`74627e1`) added the code, app guide, and scratch UI test; this integration brings those changes onto
+  current main. Archive Notes Debug build and fresh unit smoke pass (218 XCTest checks); the checkpoint's
+  focused off-screen Tart UI test passed 1/1, persisted the new parent in the scratch organization graph,
+  and its sidebar screenshot was inspected. No real Notes store or corpus was used.
+  | Files: ArchiveNotes/macOS/{Sources/ArchiveNotes/Views/NotesFolderTreeView.swift,Tests/ArchiveNotesUITests/
+  NotesGUITests.swift}, ArchiveNotes/CLAUDE.md, SUITE_TODO.md | M | low | done
+
 ## W9 gap-closure — Phase B wire the built-but-dead features (2026-09-18–19)
 
 - [x] **`W9.b2` — note-level Zotero attachments and clickable citation chips [M · Tier-2].** **SHIPPED
