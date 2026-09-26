@@ -777,8 +777,11 @@ launch safeguards; the gate rotates one route per run.
   call sites (the attribute probe and the repair itself). It is an app-owned item, the same category as
   `DriveClientSecret`, which that same file deliberately excludes for that exact reason. Its presence is why the
   helper reports it, and reading it prompts. Drop it, or say in the file why it stays.
-  Extend the hermetic fake-Keychain proof with a modified-after-marker fixture; it must fail before the fix. No key,
-  no network, no GUI. | files: ops/autonomous/{keychain-provider-accounts.sh,daemon.sh,tests/prove-keychain-partition.sh} | S | med | open
+  Local checkpoint implements per-item UTC `mdat` baselines, epoch-normalized comparisons (including legacy
+  markers), updates daemon warning copy, and removes app-owned `Gateway` from the CLI provider list. The
+  fake-Keychain proof now pins the local/UTC offset case and proves the old name-only comparison misses it.
+  It passes 15/15. This queue entry remains open until the checkpoint is published and
+  recorded in the daemon plan. No real Keychain, key, network, or GUI used. | files: ops/autonomous/{fix-keychain-access.sh,keychain-provider-accounts.sh,daemon.sh,tests/prove-keychain-partition.sh} | S | med | open
 - [ ] **W21.seed-fu3 — `fix-keychain-access.sh`'s closing instructions undo the repair they just performed [S · MED · ops · docs].**
   Its final block tells the owner to run the repair, then launch the app and click **Always Allow** on each provider
   prompt. Measured 2026-08-24: that click is precisely what evicts `apple-tool:,apple:` from the item's partition

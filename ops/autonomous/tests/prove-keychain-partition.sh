@@ -52,7 +52,14 @@ printf '%s\n' \
   'done' \
   'case "$cmd" in' \
   '  find-generic-password)' \
-  '    case " ${KEYCHAIN_PRESENT:-} " in *" $account "*) exit 0 ;; *) exit 44 ;; esac ;;' \
+  '    case " ${KEYCHAIN_PRESENT:-} " in *" $account "*)' \
+  '      case "$account" in' \
+  '        Gemini) mdat="${KEYCHAIN_MDAT_Gemini:-20260819000000Z}" ;;' \
+  '        OpenAI) mdat="${KEYCHAIN_MDAT_OpenAI:-20260819000000Z}" ;;' \
+  '        Anthropic) mdat="${KEYCHAIN_MDAT_Anthropic:-20260819000000Z}" ;;' \
+  '        Mistral) mdat="${KEYCHAIN_MDAT_Mistral:-20260819000000Z}" ;;' \
+  '      esac' \
+  '      printf "    \\\"mdat\\\"<timedate>=\\\"%s\\\"\\n" "$mdat"; exit 0 ;; *) exit 44 ;; esac ;;' \
   '  unlock-keychain) printf "unlock\n" >> "$SECURITY_LOG"; exit 0 ;;' \
   '  set-generic-password-partition-list)' \
   '    printf "set:%s:%s:%s\n" "$service" "$account" "$partitions" >> "$SECURITY_LOG"' \
@@ -64,12 +71,13 @@ chmod +x "$T/bin/security"
 run_fix() {
   printf 'fixture-password\n' | \
     PATH="$T/bin:$PATH" SECURITY_LOG="$SECURITY_LOG" AUTONOMOUS_STATE="$T/state" \
+    KEYCHAIN_MDAT_Gemini=20260819000000Z KEYCHAIN_MDAT_OpenAI=20260819000000Z \
     KEYCHAIN_PRESENT="$1" KEYCHAIN_FAIL_ACCOUNT="${2:-}" bash "$FIX" 2>&1
 }
 
 echo "[0] repair and warning share the complete provider account list"
 ACCOUNTS="$(bash -c '. "$1"; printf "%s " "${KEYCHAIN_PROVIDER_ACCOUNTS[@]}"' _ "$LIB")"
-[ "$ACCOUNTS" = 'Gemini Anthropic Mistral OpenAI Gateway ' ] \
+[ "$ACCOUNTS" = 'Gemini Anthropic Mistral OpenAI ' ] \
   && ok "shared list names every CLI-read provider, never DriveClientSecret" || bad "shared provider list drifted: $ACCOUNTS"
 
 echo "[1] repair records only the present provider accounts"
@@ -82,6 +90,9 @@ grep -qx 'set:com.archiveprocessor.app:Gemini:apple-tool:,apple:' "$SECURITY_LOG
   && ok "repair uses the intended partition list for every present provider" || bad "unexpected security calls: $(tr '\n' '|' < "$SECURITY_LOG")"
 grep -q 'DriveClientSecret' "$SECURITY_LOG" && bad "non-provider Drive secret entered the repair" || ok "DriveClientSecret stays app-owned and untouched"
 grep -q 'fixture-password' "$SECURITY_LOG" && bad "fixture password leaked into the log" || ok "password is not logged"
+grep -qx 'mdat|Gemini|20260819000000Z' "$MARKER" \
+  && grep -qx 'mdat|OpenAI|20260819000000Z' "$MARKER" \
+  && ok "marker captures each repaired item's UTC modification date" || bad "per-item UTC baselines missing: $(cat "$MARKER" 2>/dev/null)"
 
 echo "[2] a partial repair never advances the durable marker"
 rm -f "$MARKER"; : > "$SECURITY_LOG"
@@ -96,6 +107,29 @@ MISSING="$(PATH="$T/bin:$PATH" KEYCHAIN_PRESENT='Gemini OpenAI DriveClientSecret
 rg -q 'warn_unmarked_keychain_provider' "$HERE/../daemon.sh" \
   && rg -q 'keychain_unmarked_present_provider_accounts' "$HERE/../daemon.sh" \
   && ok "daemon start calls the proven marker comparison" || bad "daemon is not wired to the marker comparison"
+
+echo "[4] per-item UTC modification checks survive the local UTC offset"
+TZ=America/Los_Angeles
+printf '2026-08-18 17:00:00 | Gemini\nmdat|Gemini|20260819000000Z\n' > "$MARKER"
+LOCAL_EPOCH="$(TZ="$TZ" bash -c '. "$1"; keychain_local_timestamp_epoch "2026-08-18 17:00:00"' _ "$LIB")"
+UTC_EPOCH="$(TZ="$TZ" bash -c '. "$1"; keychain_mdat_epoch 20260819000000Z' _ "$LIB")"
+[ "$LOCAL_EPOCH" = "$UTC_EPOCH" ] \
+  && ok "local marker timestamp and UTC mdat resolve to the same instant" || bad "timezone conversion differs: local=$LOCAL_EPOCH UTC=$UTC_EPOCH"
+CHANGED="$(PATH="$T/bin:$PATH" KEYCHAIN_PRESENT=Gemini KEYCHAIN_MDAT_Gemini=20260819030000Z TZ="$TZ" \
+  bash -c '. "$1"; keychain_unmarked_present_provider_accounts "$2" "$3"' _ "$LIB" "$MARKER" "$LOGIN")"
+[ "$CHANGED" = Gemini ] && ok "a later mdat inside the local UTC-offset window is flagged" || bad "modified item not flagged: ${CHANGED:-<empty>}"
+OLD_AXIS="$(PATH="$T/bin:$PATH" KEYCHAIN_PRESENT=Gemini bash -c '
+  . "$1"
+  covered="$(sed -n "1s/^[^|]*|[[:space:]]*//p" "$2")"
+  for account in "${KEYCHAIN_PROVIDER_ACCOUNTS[@]}"; do
+    security find-generic-password -s "$KEYCHAIN_PROVIDER_SERVICE" -a "$account" "$3" >/dev/null 2>&1 || continue
+    case " $covered " in *" $account "*) ;; *) printf "%s\\n" "$account" ;; esac
+  done
+' _ "$LIB" "$MARKER" "$LOGIN")"
+[ -z "$OLD_AXIS" ] && ok "the former name-only comparison misses this changed, already-listed item" || bad "fixture does not reproduce the old gap: $OLD_AXIS"
+UNCHANGED="$(PATH="$T/bin:$PATH" KEYCHAIN_PRESENT=Gemini KEYCHAIN_MDAT_Gemini=20260819000000Z TZ="$TZ" \
+  bash -c '. "$1"; keychain_unmarked_present_provider_accounts "$2" "$3"' _ "$LIB" "$MARKER" "$LOGIN")"
+[ -z "$UNCHANGED" ] && ok "an unchanged per-item mdat stays quiet" || bad "unchanged item was flagged: $UNCHANGED"
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="

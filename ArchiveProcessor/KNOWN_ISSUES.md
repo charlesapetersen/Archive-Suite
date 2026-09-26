@@ -2,6 +2,19 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED LOCALLY (W21.seed-fu2): daemon Keychain warning missed changed provider items
+
+The old marker comparison only checked account names. An in-app **Always Allow** edit can bump a provider
+item's `mdat` and evict `/usr/bin/security`'s partition access while the account remains named in the marker.
+The repair now records each item's UTC `mdat`; daemon startup converts both the recorded and live dates to
+epoch seconds and warns when the item changed. Legacy markers fall back to comparing live `mdat` with the
+local repair timestamp, also converted to epoch seconds. The warning says to re-verify CLI access because an
+`mdat` bump can be harmless. `Gateway` is excluded because no CLI path reads it. The fake-Keychain proof passes
+15/15, including a timestamp pair spanning the Pacific UTC offset and a proof that the former name-only check
+misses the changed, already-listed item. No real Keychain was read or changed.
+
+The implementation is checkpointed locally; publication and the daemon plan tick are pending.
+
 ---
 
 ## ✅ FIXED (W28.cert-fu2): a normal Processor Debug build could not launch under the suite's self-signed certificate
