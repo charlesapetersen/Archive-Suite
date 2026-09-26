@@ -10,6 +10,9 @@ why a later change may or may not revisit that code.
 
 ## Archive Notes — gap closure (2026-09-20)
 
+- [x] **W23.h2-fu — concurrent edits could leave a Notes FTS row transiently stale [S · LOW].** **SHIPPED 2026-09-25 (this commit).** `NotesIndex.upsertRow` skips a strictly older file-mtime projection inside the same SQLite transaction, so a delayed edit or disk-scan row cannot replace the newer FTS/items state when timestamps differ. Extract append now indexes the exact `ItemTransaction.ref.mtime`, matching the NoteStore reference-date convention; an upsert regression also repairs legacy append rows that used Unix-epoch mtimes. Scratch tests cover reverse projection order and legacy repair; the final Notes run passed 883 Swift Testing checks in 89 suites and 218 XCTest checks. Independent Tier-2 reviews caught the legacy timestamp issue, which was fixed. Equal mtimes cannot prove ordering and remain a documented limitation in `ArchiveNotes/KNOWN_ISSUES.md`; no real Notes store or corpus used.
+  | Files: ArchiveNotes/macOS/{Sources/ArchiveNotes/{Core/NotesModel,Core/ExtractBuilder,Index/NotesIndex}.swift,Tests/ArchiveNotesTests/{NotesIndexTests,NotesItemTransactionTests}.swift}, ArchiveNotes/KNOWN_ISSUES.md, SUITE_TODO.md | S | low | done
+
 - [x] **W23.l4-fu — the Notes date warning had no UI coverage [XS–S].** **SHIPPED 2026-09-25 (this commit).** The off-screen Notes UI test drives the metadata strip against the marked scratch fixture: 2026-02-31 renders “February 2026 has 28 days — the day is ignored.” and saves at month precision; 2026-01-31 saves at day precision and clears the warning. Notes smoke passed 880 Swift Testing checks in 89 suites and 218 XCTest checks; the focused Tart VM test passed 1/1. No real Notes store or archive corpus used.
   | Files: ArchiveNotes/macOS/Tests/ArchiveNotesUITests/NotesGUITests.swift, ArchiveNotes/KNOWN_ISSUES.md, SUITE_TODO.md | XS–S | low | done
 

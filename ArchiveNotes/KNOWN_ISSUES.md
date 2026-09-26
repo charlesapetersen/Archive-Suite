@@ -1014,12 +1014,23 @@ leave a phantom `items/<uuid>/assets/` with no `.md`. Also adopted: a determinis
 spells the old two-load/two-save interleaving out by hand and asserts the loss on purpose, so routing any edit
 path back through a `load` + `save` pair fails loudly.
 
-**Two residuals, recorded honestly (neither is data loss — the `.md` on disk is now always correct):**
-1. **The FTS index row can go transiently stale** (LOW). Two concurrent `mutateItem`s commit their disk
-   transactions in one order but their `index.upsertBatch` calls in the other, so the row for that item
-   can lack the second edit until the next edit or rebuild. The index is a documented
-   rebuilt-from-disk projection, so this self-heals; queued as **W23.h2-fu** in `SUITE_TODO.md`.
-2. **Two windows editing the SAME note's body still last-writer-wins on the body text itself** (inherent).
+**The transient FTS-row residual is mitigated by W23.h2-fu.** `NotesIndex.upsertRow` compares the incoming
+file mtime with the indexed row inside the same SQLite write transaction and leaves a strictly newer
+projection untouched when an older `mutateItem` finishes late. Extract append returns its exact
+`ItemTransaction`, so new rows use the same reference-date file-mtime convention as every other production
+`NoteIndexRow`; a current file row also repairs existing extracts indexed with the old Unix-epoch value.
+Scratch regressions force reverse projection order and cover that legacy repair. The final Notes run passed
+883 Swift Testing checks in 89 suites and 218 XCTest checks.
+
+**Ordering limitation:** filesystem mtime cannot distinguish two revisions with the same timestamp. The
+guard is therefore a best-effort protection when timestamps differ; an equal-mtime stale projection can
+still replace the newer row. The tested local APFS replacement path advances mtime, but a coarse-resolution
+or metadata-preserving volume could tie. Full protection would need a durable ordering token or a serialized
+disk-write/index pipeline. The legacy repair also assumes current file mtimes are not deliberately stamped
+more than one day into the future in reference-date seconds.
+
+**One residual remains (not data loss — the `.md` on disk is now always correct):**
+1. **Two windows editing the SAME note's body still last-writer-wins on the body text itself** (inherent).
    A transaction cannot merge two divergent whole-buffer editor snapshots. What is fixed is that such an
    edit no longer destroys *other* fields or source blocks as collateral. Do not read "W23.h2 fixed" as
    "two-window body co-editing merges".

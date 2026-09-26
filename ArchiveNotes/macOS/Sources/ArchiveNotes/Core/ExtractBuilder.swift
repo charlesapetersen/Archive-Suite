@@ -328,7 +328,7 @@ struct ExtractBuilder {
     /// whichever whole-item save landed second. The asset copies stay *outside* the transaction — they
     /// write into `assets/`, never the `.md`, and don't depend on the item's current state.
     @discardableResult
-    func append(toExtract id: UUID, passages: [ExtractPassageBlock]) async throws -> Item {
+    func append(toExtract id: UUID, passages: [ExtractPassageBlock]) async throws -> ItemTransaction {
         // Pre-flight existence probe: `persist` creates `<item>/assets/` on demand, so appending to a
         // missing extract would otherwise leave a phantom item dir with no `.md`. `mdURL` only locates
         // the `.md` (no read, no parse) — it is purely an early-out that keeps the old fail-fast
@@ -340,12 +340,12 @@ struct ExtractBuilder {
         return try await store.withItem(id) { item in
             item.blocks.append(contentsOf: blocks)
             item.modified = when
-        }.item
+        }
     }
 
     /// Convenience: snapshot the selection and append it to an existing extract.
     @discardableResult
-    func append(toExtract id: UUID, fromSelectionIn source: PassageSelectionSource) async throws -> Item {
+    func append(toExtract id: UUID, fromSelectionIn source: PassageSelectionSource) async throws -> ItemTransaction {
         try await append(toExtract: id, passages: Self.passageBlocks(fromSelectionIn: source))
     }
 

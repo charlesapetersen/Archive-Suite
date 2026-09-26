@@ -230,11 +230,30 @@ actor NotesIndex {
     private func upsertRow(_ row: NoteIndexRow) throws {
         let idStr = row.id.uuidString
         var rowid: Int64? = nil
+        var storedMtime: Double? = nil
 
-        if let sel = prepare("SELECT rowid FROM items WHERE id = ?;") {
+        if let sel = prepare("SELECT rowid, mtime FROM items WHERE id = ?;") {
             bindText(sel, 1, idStr)
-            if sqlite3_step(sel) == SQLITE_ROW { rowid = sqlite3_column_int64(sel, 0) }
+            if sqlite3_step(sel) == SQLITE_ROW {
+                rowid = sqlite3_column_int64(sel, 0)
+                storedMtime = sqlite3_column_double(sel, 1)
+            }
             sqlite3_finalize(sel)
+        }
+
+        // A NotesStore transaction writes the Markdown first and sends its captured file mtime here
+        // afterwards. Two callers can reach this actor in the opposite order from those writes; an
+        // older row must not replace a newer FTS/items projection. Keep this compare and the update
+        // inside the same SQLite transaction and actor turn. Old ExtractBuilder.append rows stored
+        // `Date.timeIntervalSince1970` here, though, so let a current reference-date file mtime repair
+        // an unmistakably Unix-epoch cache value. The index is disposable and the disk row is the
+        // source of truth. The one-day allowance avoids treating a plausible near-future ref-date
+        // mtime as legacy data.
+        let referenceDateCeiling = Date().timeIntervalSinceReferenceDate + 86_400
+        let storedLooksLikeLegacyUnixEpoch = (storedMtime ?? 0) > referenceDateCeiling
+        if let storedMtime, storedMtime > row.mtime,
+           !(storedLooksLikeLegacyUnixEpoch && row.mtime.isFinite && row.mtime <= referenceDateCeiling) {
+            return
         }
 
         if let rowid {

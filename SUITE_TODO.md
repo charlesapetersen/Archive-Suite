@@ -429,20 +429,6 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   Needs the registry, so it is its own item and not a tweak.
   | files: ArchiveReader/macOS/Sources/ArchiveReader/ (document window open path) | Tier-1 | S | **owner judgement**
 
-- [ ] **W23.h2-fu — concurrent edits can leave the Notes FTS index row transiently stale [S · LOW].**
-  Found 2026-07-30 while fixing W23.h2 (adversarial self-review of the fix, not a new review). The `.md` on
-  disk is now always correct — `NoteStore.withItem` is atomic — but `NotesModel.mutateItem` does its
-  `index.upsertBatch` **after** the transaction returns, and two concurrent `mutateItem`s can commit their disk
-  transactions in one order and their index upserts in the **other**. The row for that item then lacks the
-  second edit until the next edit or an index rebuild, so the list/FTS can show a stale field while disk is
-  right. **Not data loss** (the index is a documented rebuilt-from-disk projection) — hence LOW, not a
-  re-open of W23.h2. **Fix options:** carry `ItemTransaction.ref.mtime` into the upsert and have
-  `NotesIndex.upsertBatch` skip a row whose stored mtime is newer (a compare-and-set on the projection), or
-  fold the upsert into a per-item serialized step so index writes inherit the transaction order. Prefer the
-  mtime guard — it also hardens the indexer against W23.m9's failure modes. Test: two concurrent
-  `mutateItem`s on one item, then assert the index row matches disk without a rebuild.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/{Core/NotesModel,Index/NotesIndex}.swift | S | low | W23.h2
-
 - [ ] **W23.l3-fu — Notes has its own root-marker writer, and it is uncoordinated [XS–S · LOW · SHARED CORE
   DRIFT].** Found 2026-07-30 while fixing W23.m6/W23.l3 (audit of the sibling call sites, not a new review).
   `ArchiveNotes/.../Store/RootMarkerStore.ensureMarker` duplicates `RootMarker.ensure` instead of calling it.

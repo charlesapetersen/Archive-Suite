@@ -20,6 +20,36 @@ import Foundation
 @Suite("W23.h2 — same-item edit transactions never lose an update")
 struct NotesItemTransactionTests {
 
+    private actor FirstIndexProjectionGate {
+        private var didPause = false
+        private var olderMtime: Double?
+        private var newerMtime: Double?
+        private var reachedWaiter: CheckedContinuation<Void, Never>?
+        private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+        func pauseFirstOnly(mtime: Double) async {
+            guard !didPause else { return }
+            didPause = true
+            olderMtime = mtime
+            reachedWaiter?.resume()
+            await withCheckedContinuation { releaseWaiter = $0 }
+        }
+
+        func recordNewer(mtime: Double) { newerMtime = mtime }
+
+        func waitUntilFirstReached() async {
+            if didPause { return }
+            await withCheckedContinuation { reachedWaiter = $0 }
+        }
+
+        func releaseFirst() {
+            releaseWaiter?.resume()
+            releaseWaiter = nil
+        }
+
+        func timestamps() -> (older: Double?, newer: Double?) { (olderMtime, newerMtime) }
+    }
+
     // MARK: - Scratch fixtures
 
     private static func scratchRoot() throws -> URL {
@@ -115,6 +145,53 @@ struct NotesItemTransactionTests {
         #expect(r.datePrecision == .year)
         #expect(r.dateUncertain)
         #expect(r.trailingBodyRaw == "body")
+    }
+
+    @Test("a stale concurrent mutation cannot replace the newer FTS row")
+    @MainActor
+    func staleMutationProjectionCannotReplaceNewerIndexRow() async throws {
+        let env = try await Self.makeEnv()
+        defer { Task { await Self.tearDown(env) } }
+        let id = UUID()
+        _ = try await env.store.create(Self.blankItem(id: id, body: "initial body"))
+
+        let gate = FirstIndexProjectionGate()
+        env.model.indexProjectionTestHook = { row in
+            if row.body.contains("olderdelayedtoken") {
+                await gate.pauseFirstOnly(mtime: row.mtime)
+            } else if row.body.contains("newerwinnerbodytoken") {
+                await gate.recordNewer(mtime: row.mtime)
+            }
+        }
+        defer { env.model.indexProjectionTestHook = nil }
+
+        let olderEdit = Task { @MainActor in
+            await env.model.setBody("olderdelayedtoken", for: id)
+        }
+        await gate.waitUntilFirstReached()
+
+        // Let a newer file revision and its FTS row land before releasing the older upsert.
+        await env.model.setBody("newerwinnerbodytoken", for: id)
+        #expect(await env.index.search("newerwinnerbodytoken") == [id])
+        #expect((await env.index.search("olderdelayedtoken")).isEmpty)
+        let timestamps = await gate.timestamps()
+        #expect(timestamps.older != nil && timestamps.newer != nil)
+        if let olderMtime = timestamps.older, let newerMtime = timestamps.newer {
+            #expect(newerMtime > olderMtime,
+                    "this filesystem must advance item mtime for the strict ordering case")
+        }
+
+        await gate.releaseFirst()
+        await olderEdit.value
+
+        let onDisk = try await env.store.load(id)
+        let currentRef = try await env.store.currentItemTransaction(id).ref
+        #expect(onDisk.trailingBodyRaw == "newerwinnerbodytoken")
+        #expect(await env.index.search("newerwinnerbodytoken") == [id])
+        #expect((await env.index.search("olderdelayedtoken")).isEmpty,
+                "the delayed older projection must not replace the current FTS content")
+        #expect(await env.index.summary(for: id)?.mtime == currentRef.mtime,
+                "the index must match the current file mtime without a rebuild")
     }
 
     // MARK: - The primitive: what it returns, and how it fails
@@ -274,7 +351,7 @@ struct NotesItemTransactionTests {
         let passage = ExtractPassageBlock(
             block: Block(kind: .freeform, source: nil, markdown: "two", unknownHeaderFields: []))
 
-        async let appendEdit: Item = try builder.append(toExtract: id, passages: [passage])
+        async let appendEdit: ItemTransaction = try builder.append(toExtract: id, passages: [passage])
         async let qualityEdit: Void = env.model.setQuality(3, for: id)
         _ = try await (appendEdit, qualityEdit)
 

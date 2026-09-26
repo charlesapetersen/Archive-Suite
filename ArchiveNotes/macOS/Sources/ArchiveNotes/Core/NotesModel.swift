@@ -142,6 +142,9 @@ final class NotesModel: ObservableObject {
     /// Test-only scheduling seam for actor-revision reconciliation. Production builds contain no
     /// hook; the test pauses the first quality edit after its atomic save to force the stale order.
     var qualityProjectionTestHook: (@Sendable (ItemTransaction) async -> Void)?
+    /// Test-only seam to force index projections to arrive in the opposite order from their writes.
+    /// Production builds contain no hook.
+    var indexProjectionTestHook: (@Sendable (NoteIndexRow) async -> Void)?
     #endif
 
     /// Where the app-lifecycle triggers for the stale-mirror retry come from (W23.m10-fu) — `.default`
@@ -700,11 +703,10 @@ final class NotesModel: ObservableObject {
         do {
             // W23.h2: `append` is one atomic transaction and hands back the extract exactly as
             // written, so the index row reflects what landed (no second read to race with).
-            let updated = try await ExtractBuilder(store: noteStore).append(toExtract: id,
-                                                                           passages: passages)
+            let tx = try await ExtractBuilder(store: noteStore).append(toExtract: id,
+                                                                       passages: passages)
             if let index {
-                try await index.upsertBatch([NoteIndexRow(item: updated,
-                                                          mtime: updated.modified.timeIntervalSince1970)])
+                try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)])
             }
             await reloadItems()
             rebuild()
@@ -1082,7 +1084,11 @@ final class NotesModel: ObservableObject {
             }
             let indexTx = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
             if let index {
-                try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
+                let row = NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)
+                #if DEBUG
+                if let indexProjectionTestHook { await indexProjectionTestHook(row) }
+                #endif
+                try await index.upsertBatch([row])
             }
             await reloadItems()
             if let failure = tx.subjectProjectionError {

@@ -143,6 +143,47 @@ import Foundation
         #expect(oldResults.isEmpty, "Old title should no longer match after update")
     }
 
+    @Test("an older upsert arriving late cannot replace the current FTS row")
+    func staleUpsertCannotReplaceNewerRow() async throws {
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+
+        let id = UUID()
+        let older = makeRow(id: id, mtime: 1_000, title: "Older title", body: "olderprojectiontoken")
+        let newer = makeRow(id: id, mtime: 2_000, title: "Newer title", body: "newerprojectiontoken")
+
+        // This is the out-of-order completion: the newer file revision is indexed first, then an
+        // older transaction finally submits its row. Both the items projection and its FTS row must
+        // remain at the newer revision without a disk re-index.
+        try await index.upsertBatch([newer])
+        try await index.upsertBatch([older])
+
+        #expect(await index.summary(for: id)?.title == "Newer title")
+        #expect(await index.summary(for: id)?.mtime == newer.mtime)
+        #expect(await index.search("newerprojectiontoken") == [id])
+        #expect((await index.search("olderprojectiontoken")).isEmpty)
+    }
+
+    @Test("a current file row repairs an extract cached with the legacy Unix epoch mtime")
+    func validMtimeRepairsLegacyUnixEpochRow() async throws {
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+
+        let id = UUID()
+        let legacy = makeRow(id: id, mtime: Date().timeIntervalSince1970,
+                             title: "Legacy title", body: "legacyextracttoken")
+        let current = makeRow(id: id, mtime: Date().timeIntervalSinceReferenceDate,
+                              title: "Current title", body: "currentextracttoken")
+
+        try await index.upsertBatch([legacy])
+        try await index.upsertBatch([current])
+
+        #expect(await index.summary(for: id)?.title == "Current title")
+        #expect(await index.summary(for: id)?.mtime == current.mtime)
+        #expect(await index.search("currentextracttoken") == [id])
+        #expect((await index.search("legacyextracttoken")).isEmpty)
+    }
+
     // MARK: - Prune two-emission gate
 
     @Test func pruneRequiresTwoEmissions() async throws {
