@@ -1209,15 +1209,7 @@ auth-before-disclosure, acks gated on durable returns). **1 finding, LOW, no HIG
 the owner HOLD queue. Report: `.maintenance/review/Processor-Net.md`. ⚠️ The `lean-review` Opus/max fan-out
 was budget-stopped before it emitted a single finding (~$4.5/min while still only reading — same failure as
 the Capture re-pass); this unit was verified **INLINE** by the main-loop model. See the report.
-- [ ] **W3.net-r1 [LOW · defense-in-depth]** `Net/CaptureValidation.swift:9-12` — the shared `isSafeGroupId("")`
-  returns true (empty string passes the charset check vacuously; count 0 ≤ 128; no `..`), yet the "one shared
-  predicate so the receivers can't drift" is relied on inconsistently: both LAN routes guard `!groupId.isEmpty`
-  separately (`CaptureServer.swift:409/446`) while `FileRelayReceiver`'s photo branch (`FileRelayReceiver.swift:141`)
-  does not → an empty `"group"` field in a same-token/same-epoch relay sidecar passes `safe` and reaches
-  `CaptureSession.ingest(groupId:"")` (stages as `00005-.jpg`). **Not reachable via the phones** (they never emit
-  an empty group) and benign if reached (filename suffix, not a path component → no traversal; `(group,seq)`
-  keying stays idempotent), so LOW/hardening — but the shared predicate should reject empty to match its own
-  docstring. Fix: add `!s.isEmpty` to `isSafeGroupId` (keep both receivers' explicit guards too). | Net | Tier-2
+
 
 ## Owner ideas — deferred, NOT for the daemon queue (do not start unprompted)
 Design-level ideas the owner wants recorded but explicitly de-prioritised. An autonomous session must

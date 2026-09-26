@@ -1286,9 +1286,10 @@ entropy + the full throttle schedule) plus the committed `ManifestPersistenceTes
 **Stale sub-item corrected:** verification-plan item 4's *"Bonjour discovery"* is moot. The Mac advertises
 `_archivecap._tcp` (`CaptureServer.swift:68`) but **neither companion browses for it** — pairing is QR-only.
 
-**Already shipped (don't rebuild):** unauthenticated resource exhaustion is closed (header-first admission,
+**Already established (don't rebuild):** unauthenticated resource exhaustion is closed (header-first admission,
 8-connection cap, 96 MB aggregate budget, 30 s idle timeout); `constantTimeEquals` is timing-safe; auth precedes
-route disclosure; `CaptureValidation.isSafeGroupId` gates every phone-supplied id. The **Drive relay already has
+route disclosure; `CaptureValidation.isSafeGroupId` gates every phone-supplied id. W3.net-r1 adds empty-ID rejection;
+its FileRelay regression quarantines both relay objects instead of ingesting them. The **Drive relay already has
 the epoch binding** this entry wanted for LAN (`FileRelayReceiver.swift:152-153, :212, :242`) — if replay
 protection is ever revisited, copy that reviewed design rather than inventing one. `CaptureServer._testAdmission`
 makes all of this headlessly testable without a phone. Original analysis below.

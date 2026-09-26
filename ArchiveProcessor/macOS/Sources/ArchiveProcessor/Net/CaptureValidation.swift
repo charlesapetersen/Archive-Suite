@@ -7,7 +7,7 @@ import Foundation
 /// its own. One shared predicate means the two receivers can't drift.
 enum CaptureValidation {
     static func isSafeGroupId(_ s: String) -> Bool {
-        guard s.count <= 128, !s.contains("..") else { return false }
+        guard !s.isEmpty, s.count <= 128, !s.contains("..") else { return false }
         return s.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
     }
 

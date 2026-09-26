@@ -161,7 +161,36 @@ final class ProcessorUITests: XCTestCase {
                        "confirming must clear the session roster")
     }
 
-    private func relaunch(extra: [String] = []) {
+    func testFileRelayQuarantinesEmptyGroupInVM() throws {
+        let relayRoot = scratchRoot.appendingPathComponent("relay", isDirectory: true)
+        let relayOut = scratchRoot.appendingPathComponent("relay-out", isDirectory: true)
+        let done = relayOut.appendingPathComponent("DONE.txt")
+        try FileManager.default.createDirectory(at: relayOut, withIntermediateDirectories: true)
+
+        relaunch(environment: [
+            "FILERELAY_TESTMODE": "1",
+            "FILERELAY_RELAYROOT": relayRoot.path,
+            "FILERELAY_TESTOUT": relayOut.path,
+            "FILERELAY_TESTDONE": done.path
+        ])
+
+        let deadline = Date().addingTimeInterval(30)
+        while !FileManager.default.fileExists(atPath: done.path), Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: done.path),
+                      "the offline FileRelay driver must finish in the VM")
+
+        let resultsURL = relayOut.appendingPathComponent("results.json")
+        let data = try Data(contentsOf: resultsURL)
+        let results = try JSONDecoder().decode(FileRelayResults.self, from: data)
+        XCTAssertTrue(results.allPass, "all FileRelay invariant cases must pass: \(results.cases)")
+        XCTAssertTrue(results.cases.contains {
+            $0.name == "empty-group-rejected-and-quarantined(W3.net-r1)" && $0.pass
+        }, "the real relay receiver must quarantine both files for an empty group ID")
+    }
+
+    private func relaunch(extra: [String] = [], environment: [String: String] = [:]) {
         app.terminate()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
@@ -169,6 +198,7 @@ final class ProcessorUITests: XCTestCase {
             "-APUITestOutputDirectory", outputDirectory.path
         ] + extra)
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"
+        environment.forEach { app.launchEnvironment[$0.key] = $0.value }
         app.launch()
         app.activate()
         guard app.windows.firstMatch.waitForExistence(timeout: 10) else {
@@ -215,6 +245,17 @@ final class ProcessorUITests: XCTestCase {
             XCTFail("could not write UI-test screenshot: \(error)")
         }
     }
+}
+
+private struct FileRelayResults: Decodable {
+    struct Case: Decodable {
+        let name: String
+        let pass: Bool
+        let detail: String
+    }
+
+    let allPass: Bool
+    let cases: [Case]
 }
 
 enum UITestLaunch {

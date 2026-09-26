@@ -273,6 +273,23 @@ enum FileRelayTestDriver {
                 "photos=\(photos.rejectedUnsafe) controls=\(q0.rejectedUnsafe + p.rejectedUnsafe)")
         }
 
+        // ── Case 12 (W3.net-r1): the shared group predicate rejects the empty ID at the relay boundary. ──
+        do {
+            let d = caseDir("c12"); let r = makeRcv(d)
+            writePhoto(d, "", 0, "document")
+            let sidecar = RelayObjectFormat.sidecarName(group: "", seq: 0)
+            let jpeg = RelayObjectFormat.jpegName(group: "", seq: 0)
+            let report = await r.scanOnce()
+            let rejectedDir = d.appendingPathComponent(".rejected", isDirectory: true)
+            let rejected = ((try? fm.contentsOfDirectory(atPath: rejectedDir.path)) ?? [])
+            let pass = !CaptureValidation.isSafeGroupId("")
+                && report.rejectedUnsafe.contains(sidecar) && report.ingested.isEmpty && photoCount("") == 0
+                && !has(d, sidecar) && !has(d, jpeg)
+                && rejected.contains(sidecar) && rejected.contains(jpeg)
+            rec("empty-group-rejected-and-quarantined(W3.net-r1)", pass,
+                "rejected=\(report.rejectedUnsafe) emptyGroupPhotos=\(photoCount(""))")
+        }
+
         session.clear()   // tidy the test session folder
 
         let allPass = results.allSatisfy { $0.pass }
