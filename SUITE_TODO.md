@@ -429,20 +429,6 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
   Needs the registry, so it is its own item and not a tweak.
   | files: ArchiveReader/macOS/Sources/ArchiveReader/ (document window open path) | Tier-1 | S | **owner judgement**
 
-- [ ] **W23.l3-fu — Notes has its own root-marker writer, and it is uncoordinated [XS–S · LOW · SHARED CORE
-  DRIFT].** Found 2026-07-30 while fixing W23.m6/W23.l3 (audit of the sibling call sites, not a new review).
-  `ArchiveNotes/.../Store/RootMarkerStore.ensureMarker` duplicates `RootMarker.ensure` instead of calling it.
-  It does **not** share the m6 defects — it throws `corruptRootMarker` when an existing file won't read or
-  decode, and propagates its write failure, so it never returns an unpersisted GUID — but it uses plain
-  `FileManager`/`Data.write` with **no `NSFileCoordinator`**, so the W23.l3 check-then-write race applies to it
-  and it is invisible to the coordination `RootMarker.ensure` now takes (a Notes first-time create can race a
-  Reader/Notes one at the same root). Only reachable when two processes first-touch the same root, hence LOW.
-  **Fix:** delete `writeFresh` and call `RootMarker.ensure(at:kind:name:)`, mapping `.malformed`/`.unreadable`/
-  `.readOnly` onto the existing `MarkerError` surface (`NoteStore.corruptRootMarker` already exists) — the
-  duplicate also means the m6 hardening must otherwise be maintained twice. Shared-Core rule: build+test all
-  three apps.
-  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Store/RootMarkerStore.swift | XS–S | low | W23.m6
-
 ## Provider expansion — Wave 13 (Processor; daemon-buildable) — queued 2026-07-16
 The two proposed provider plans, now **elaborated with a "Daemon build plan"** each so a fresh autonomous session
 can build them: each sub-task below is **unattended, $0, no key, no GUI** (build clean + fake-CLI/unit tests +

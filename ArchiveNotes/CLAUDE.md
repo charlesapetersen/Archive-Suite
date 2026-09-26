@@ -442,7 +442,7 @@ macOS/Tests/ArchiveNotesTests/
   NotesItemDragTests.swift         6 tests: id-codec round-trip, malformed/foreign→[], ⌥/plain op (W6-S5)
   NoteStoreTests.swift             20 tests: create/load/rename/delete/allItemIDs/assets/sanitize/mdURL;
                                    repeated-save body/header/thumb fixed points on scratch stores
-  RootMarkerStoreTests.swift       5 tests: fresh/idempotent/corrupt-guard/empty/JSON-round-trip
+  RootMarkerStoreTests.swift       6 tests: fresh/idempotent/corrupt-guard/empty-preserved/concurrent-first-touch/JSON-round-trip
   NotesTagProjectorTests.swift     9 adversarial tests: unreadable-abort, lossless, remove-only-managed,
                                    collision-dedup, verify-re-read, no-label, concurrent-third-party,
                                    boundary-guard, recover-managed

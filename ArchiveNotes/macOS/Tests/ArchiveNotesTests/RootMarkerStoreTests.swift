@@ -56,16 +56,39 @@ struct RootMarkerStoreTests {
         }
     }
 
-    @Test("ensureMarker writes fresh marker over empty file")
-    func emptyFileWritesFresh() throws {
+    @Test("ensureMarker refuses to replace an empty malformed marker")
+    func emptyMalformedMarkerIsPreserved() throws {
         let tmp = try makeScratchDir()
         defer { cleanup(tmp) }
 
         let markerURL = tmp.appendingPathComponent(RootMarker.filename)
         try Data().write(to: markerURL)
 
-        let marker = try RootMarkerStore.ensureMarker(at: tmp, kind: .notes)
-        #expect(marker.kind == .notes)
+        #expect(throws: RootMarkerStore.MarkerError.self) {
+            _ = try RootMarkerStore.ensureMarker(at: tmp, kind: .notes)
+        }
+        #expect(try Data(contentsOf: markerURL).isEmpty,
+                "a malformed existing identity is preserved instead of replaced")
+    }
+
+    @Test("concurrent first touches through Notes share the coordinated durable GUID")
+    func concurrentFirstTouchesShareOneGUID() async throws {
+        let tmp = try makeScratchDir()
+        defer { cleanup(tmp) }
+
+        let markers = try await withThrowingTaskGroup(of: RootMarker.self) { group in
+            for _ in 0..<8 {
+                group.addTask {
+                    try RootMarkerStore.ensureMarker(at: tmp, kind: .notes)
+                }
+            }
+            var markers: [RootMarker] = []
+            for try await marker in group { markers.append(marker) }
+            return markers
+        }
+
+        #expect(Set(markers.map(\.guid)).count == 1)
+        #expect(try RootMarker.read(at: tmp)?.guid == markers.first?.guid)
     }
 
     @Test("ensureMarker round-trips through JSON correctly")

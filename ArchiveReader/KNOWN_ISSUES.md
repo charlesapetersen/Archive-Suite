@@ -658,11 +658,11 @@ open; an incoming link used to be blamed for pointing at a different archive.
 Gotcha: `ensure` needs an **uncoordinated** `decode` helper for the in-claim re-check — calling `read` there
 would nest a second `NSFileCoordinator` inside an accessor block and deadlock.
 
-Audited while here: Notes does **not** share the defect. `ArchiveNotes/Store/RootMarkerStore.ensureMarker` is a
-separate (duplicated) implementation that throws `corruptRootMarker` when an existing file won't read or decode
-and propagates its write failure — it never hands back an unpersisted GUID. It is uncoordinated, though, so the
-W23.l3 race would apply to it if two Notes instances ever raced a first-time root; folding it onto
-`RootMarker.ensure` is the obvious future cleanup.
+Notes' duplicate `RootMarkerStore.ensureMarker` writer was removed in W23.l3-fu. It now delegates to
+`RootMarker.ensure`, so Notes first-touch creation shares ArchiveCore's coordinated re-check, write and disk
+confirmation. The existing `MarkerError.corruptRootMarker` surface preserves the Notes caller contract for
+malformed, unreadable and failed-write markers. Its scratch-backed concurrency test verifies simultaneous
+Notes first touches all return the single durable GUID.
 
 ## Reactive/eventual-consistency bugs found by adversarial review (fixed 2026-07-05)
 A multi-agent hunt for this bug class (the willSet + clobber category) confirmed four more:
