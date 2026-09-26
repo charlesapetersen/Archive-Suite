@@ -6503,6 +6503,20 @@ explain why not.
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
 
+- [x] **W21.verify — recheck the three release `// VERIFY` desk checks against current vendor documentation.**
+  **SHIPPED 2026-09-26 (this commit).** OpenAI's live model page still lists GPT-5.4 mini at $0.75 input / $4.50 output
+  per million tokens and identifies it as reasoning-capable with `none` effort by default. The built-in model
+  entry now reflects that capability; the rotation call pins `reasoning_effort: none`, uses
+  `max_completion_tokens: 8`, and keeps `temperature: 0`. Anthropic's old Console and Privacy Center URLs
+  redirected to the current `platform.claude.com` / `privacy.claude.com` pages; the key and billing pages
+  follow Settings → API keys and Billing. Current pricing docs say new accounts may receive limited test
+  credits, so the wizard copy now distinguishes test credits from ongoing usage billing. Gemini CLI's
+  install/docs links resolve and the official setup doc was last updated 2026-09-24. Its runtime flags,
+  JSON envelope, and entitlement claims remain explicitly unverified until the relevant CLIs/accounts are
+  installed, as the original item required. Processor Debug build succeeded; no API request or GUI session
+  was launched.
+  | ArchiveProcessor/macOS/Sources/ArchiveProcessor/{Models/ProviderModels,Models/CostEstimator,Models/ProviderKeySpec,Models/LocalAgentSpec,OCR/LLMRotationDetector,OCR/OpenAICompatibleClient}.swift | S | low | done
+
 - [x] **W21.warn — 2 pre-existing non-Sendable `DispatchWorkItem` warnings in `Net/CaptureServer.swift`
   [S · LOW].** **CLOSED 2026-08-20 — unreproducible on current main; no source change.** A fresh, clean
   Processor Debug build compiled `CaptureServer.swift` and emitted neither the claimed
