@@ -528,6 +528,20 @@ struct NavigationWindowView: View {
             }
             Text("\(model.displayed.count) shown · \(model.library.files.count) total in \(model.library.scopeDescription)")
                 .foregroundStyle(.secondary)
+            if model.library.jpegPartnerScanStatus == .scanning {
+                ProgressView().controlSize(.small)
+                Text("Checking JPEG partners…")
+                    .accessibilityIdentifier("ar.status.jpegScanning")
+            } else if model.library.jpegPartnerScanStatus == .needsCommonParentGrant {
+                Label("Choose the common folder to enable JPEG partners", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange).lineLimit(1).truncationMode(.tail)
+                    .help("Choose the parent folder containing both Archival Photos and Archival Photos JPEGS.")
+                    .accessibilityIdentifier("ar.status.jpegNeedsCommonRoot")
+            } else if model.library.jpegPartnerScanStatus == .incomplete {
+                Label("JPEG partner status is unknown; rescan to retry", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange).lineLimit(1).truncationMode(.tail)
+                    .accessibilityIdentifier("ar.status.jpegIndexIncomplete")
+            }
             // Degraded discovery says so here rather than leaving a confident-looking count over a list
             // that is missing whatever the pass could not read (the same treatment as a degraded
             // content index below, W23.m9).

@@ -2,6 +2,15 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ⚠️ LIMITATION (W24.jpeg1, 2026-09-26) — duplicate JPEG stems need a known collection mapping
+
+Reader resolves exact mirrored paths and unique stems across relocated folders. If the same stem occurs in
+multiple JPEGS collections and the PDF's collection has a different folder name, Reader has no verified
+cross-tree mapping to identify which candidate belongs to that PDF. It leaves the partner unresolved and
+hides the switch rather than infer from a shared prefix or similar-looking folder name. The Core resolver
+can use an explicit candidate-relative collection context when a caller has one; do not add a folder-name
+heuristic here, because a wrong match would display another collection's archival scan.
+
 ## ✅ CLOSED (2026-08-10) — the VM XCUITest lane went BLIND for a day: TWO faults, neither in the app
 
 **Both apps' entire UITest bundles failed as *"Main window should appear"*, and the apps were drawing

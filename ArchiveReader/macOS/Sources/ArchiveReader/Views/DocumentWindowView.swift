@@ -1,6 +1,7 @@
 import SwiftUI
 import PDFKit
 import AppKit
+import Combine
 
 /// The document-view window: a two-up viewer — image page (left) / OCR text page (right) — with an
 /// independent zoom per pane, a draggable splitter defaulting to ⅔ : ⅓ (reset per document), page
@@ -35,6 +36,9 @@ struct DocumentWindowView: View {
         // W23.m4: publish the link target here too, so "Copy Archive Link to This Page" is ENABLED in
         // the document window — it used to require a focused NavigationModel this scene never has.
         .focusedSceneValue(\.archiveLinkTarget, linkContext.target)
+        .onReceive(linkContext.$target.combineLatest(linkContext.$jpegPartnerIndex)) { target, index in
+            model.updateArchiveContext(target: target, index: index)
+        }
         .onAppear {
             fraction = defaultFraction
             if let selection { model.load(selection) }
@@ -65,7 +69,7 @@ struct DocumentWindowView: View {
                     // selection after the document is swapped). Zoom persists via the controller. The
                     // identity covers the page PAIR, not just the file, so stepping within an interleaved
                     // multi-page document rebuilds the panes too.
-                    PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.doc.imagePane")
+                    PDFPaneView(page: model.displayedImagePage, controller: model.leftController, id: "ar.doc.imagePane")
                         .id(model.pageIdentity)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))

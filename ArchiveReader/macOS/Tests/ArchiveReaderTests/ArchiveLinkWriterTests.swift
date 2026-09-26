@@ -213,6 +213,49 @@ final class ArchiveLinkWriterTests: XCTestCase {
         }
     }
 
+    func testPageLinkCarriesOnlyTheCleanlyResolvedJPEGPartner() throws {
+        let root = try makeScratchDirectory()
+        let main = root.appendingPathComponent(ReaderArchiveLayout.mainDirectoryName, isDirectory: true)
+        let jpegs = root.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName, isDirectory: true)
+        try FileManager.default.createDirectory(at: main, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: jpegs, withIntermediateDirectories: true)
+        let pdf = main.appendingPathComponent("Box/letter.pdf")
+        let jpeg = jpegs.appendingPathComponent("Box/letter.jpg")
+        try FileManager.default.createDirectory(at: pdf.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: jpeg.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("scratch".utf8).write(to: jpeg)
+        let candidate = JPEGPartnerCandidate(
+            stem: "letter", path: jpeg.path, collectionContext: "Box",
+            fingerprint: CorpusFileFingerprint(mtime: 1, ctime: 1, size: 7, inode: 1, isDataless: false)
+        )
+        let clean = JPEGPartnerIndex(jpegRootPath: jpegs.path, candidates: [candidate],
+                                     isClean: true, filesSeen: 1)
+        let item = ArchiveLinkWriter.pageLinkWithoutThumbnail(
+            fileURL: pdf, page: 1, rootPath: root.path, marker: testMarker,
+            mainRootPath: main.path, jpegPartnerIndex: clean
+        )
+        let parsed = try XCTUnwrap(item.string(forType: .string).flatMap(URL.init(string:)).flatMap(DurableLink.init(url:)))
+        guard case let .readerReveal(_, relativePath, page, jpegRelativePath) = parsed else {
+            return XCTFail("Expected a reader reveal link")
+        }
+        XCTAssertEqual(relativePath, "Archival Photos/Box/letter.pdf")
+        XCTAssertEqual(page, 1)
+        XCTAssertEqual(jpegRelativePath, "Archival Photos JPEGS/Box/letter.jpg")
+
+        let incomplete = JPEGPartnerIndex(jpegRootPath: jpegs.path, candidates: [candidate],
+                                          isClean: false, filesSeen: 1)
+        let unknownItem = ArchiveLinkWriter.pageLinkWithoutThumbnail(
+            fileURL: pdf, page: 1, rootPath: root.path, marker: testMarker,
+            mainRootPath: main.path, jpegPartnerIndex: incomplete
+        )
+        let unknownParsed = try XCTUnwrap(unknownItem.string(forType: .string)
+            .flatMap(URL.init(string:)).flatMap(DurableLink.init(url:)))
+        guard case let .readerReveal(_, _, _, unknownJPEGPath) = unknownParsed else {
+            return XCTFail("Expected a reader reveal link")
+        }
+        XCTAssertNil(unknownJPEGPath, "partial scans cannot claim a partner or verified absence")
+    }
+
     // MARK: - Special characters in paths
 
     func testEmDashAndSpacesInPath() async throws {

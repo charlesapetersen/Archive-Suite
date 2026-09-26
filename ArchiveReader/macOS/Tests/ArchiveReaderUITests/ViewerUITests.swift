@@ -183,6 +183,51 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
+    // MARK: - Linked JPEG viewer switch (W24.jpeg1)
+
+    func testJPEGImageSwitchIsAvailableAndSticky() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        let filterField = app.textFields["ar.filter.name"]
+        XCTAssertTrue(filterField.waitForExistence(timeout: 5))
+        filterField.click()
+        filterField.typeText("00001 IMG")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertEqual(rowCount, 1, "the scratch GUI fixture has one PDF with a JPEG partner")
+
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2)
+
+        // The durable preference may already be JPEG from a previous invocation. Ensure JPEG is
+        // selected in either starting state, then reopen to prove the choice survives the window.
+        var switchItem = viewMenuItem("Show JPEG Image")
+        if switchItem.exists && switchItem.isEnabled {
+            switchItem.click()
+        } else {
+            closeMenu()
+        }
+        settle(0.5)
+        pressKey("w", modifiers: .command)
+        settle(0.5)
+
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        switchItem = viewMenuItem("Show PDF Image")
+        XCTAssertTrue(switchItem.waitForExistence(timeout: 5),
+                      "after selecting JPEG, the command should offer PDF and preserve JPEG on reopen")
+        XCTAssertTrue(switchItem.isEnabled)
+        switchItem.click()
+        settle(0.5)
+        pressKey("w", modifiers: .command)
+        settle(0.5)
+
+        filterField.click()
+        pressKey("a", modifiers: .command)
+        app.typeKey(.delete, modifierFlags: [])
+    }
+
     // MARK: - ⌘0 (Fit Page) reaches the PREVIEW sheet (W26.docs-fu1)
 
     /// The preview-sheet half of "⌘0 = fit full page everywhere zoom applies", which shipped with only
@@ -419,6 +464,16 @@ final class ViewerUITests: FixtureUITestCase {
         let document = bar.menuBarItems["Document"]
         XCTAssertTrue(document.waitForExistence(timeout: 5), "the Document menu should exist")
         document.click()
+        let item = bar.menuItems[title]
+        _ = item.waitForExistence(timeout: 5)
+        return item
+    }
+
+    private func viewMenuItem(_ title: String) -> XCUIElement {
+        let bar = app.menuBars.element(boundBy: 0)
+        let view = bar.menuBarItems["View"]
+        XCTAssertTrue(view.waitForExistence(timeout: 5), "the View menu should exist")
+        view.click()
         let item = bar.menuItems[title]
         _ = item.waitForExistence(timeout: 5)
         return item

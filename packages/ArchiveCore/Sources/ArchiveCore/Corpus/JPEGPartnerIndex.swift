@@ -32,7 +32,7 @@ public enum JPEGPartnerResolution: Sendable, Equatable {
 /// The index only reads names and syscall fingerprints. It never opens image bytes, reads tags, or guesses
 /// between duplicate stems. An incomplete walk remains `unknown`; its partial rows cannot establish that a
 /// partner is absent.
-public struct JPEGPartnerIndex: Sendable {
+public struct JPEGPartnerIndex: Sendable, Equatable {
     private struct FileSystemKey: Hashable, Sendable {
         let bytes: [UInt8]
         init(_ value: String) { bytes = Array(value.utf8) }
@@ -97,10 +97,10 @@ public struct JPEGPartnerIndex: Sendable {
             } ?? false
         }
         if exactMatches.count == 1, let exact = exactMatches.first {
-            return .match(URL(fileURLWithPath: exact.path))
+            return .match(Self.exactFileURL(exact.path))
         }
         if exactMatches.count > 1 {
-            return .ambiguous(exactMatches.map { URL(fileURLWithPath: $0.path) })
+            return .ambiguous(exactMatches.map { Self.exactFileURL($0.path) })
         }
 
         let stem = (pdfStem as NSString).lastPathComponent
@@ -112,17 +112,17 @@ public struct JPEGPartnerIndex: Sendable {
                 FileSystemKey($0.collectionContext) == FileSystemKey(collectionContext)
             }
             if scoped.count == 1, let candidate = scoped.first {
-                return .match(URL(fileURLWithPath: candidate.path))
+                return .match(Self.exactFileURL(candidate.path))
             }
             if scoped.count > 1 {
-                return .ambiguous(scoped.map { URL(fileURLWithPath: $0.path) })
+                return .ambiguous(scoped.map { Self.exactFileURL($0.path) })
             }
         }
 
         if matches.count == 1, let candidate = matches.first {
-            return .match(URL(fileURLWithPath: candidate.path))
+            return .match(Self.exactFileURL(candidate.path))
         }
-        return .ambiguous(matches.map { URL(fileURLWithPath: $0.path) })
+        return .ambiguous(matches.map { Self.exactFileURL($0.path) })
     }
 
     public static func isSupportedImageExtension(_ pathExtension: String) -> Bool {
@@ -134,6 +134,12 @@ public struct JPEGPartnerIndex: Sendable {
 
     private static func filesystemPath(_ url: URL) -> String {
         url.withUnsafeFileSystemRepresentation { raw in raw.map(String.init(cString:)) ?? url.path }
+    }
+
+    private static func exactFileURL(_ path: String) -> URL {
+        path.withCString {
+            URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: nil)
+        }
     }
 
     private static func comparisonRootPath(_ url: URL) -> String {

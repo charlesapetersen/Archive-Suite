@@ -67,7 +67,8 @@ final class DocumentPageLinkTests: XCTestCase {
 
     private func target(root: URL) -> ArchiveLinkTarget {
         ArchiveLinkTarget(rootPath: root.path,
-                          marker: RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date()))
+                          marker: RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date()),
+                          mainRootPath: root.path)
     }
 
     // MARK: - Defect 2 — the page a link cites is the page you are reading
@@ -257,6 +258,37 @@ final class DocumentPageLinkTests: XCTestCase {
         XCTAssertEqual(model.openViewerRequest, 0, "but opens no window — that is not what it asked for")
     }
 
+    func testTagWritesStayInsideMainWhenTheGrantedRootContainsSiblingJPEGs() throws {
+        let root = try scratchDir().appendingPathComponent("dual-root-\(UUID().uuidString)", isDirectory: true)
+        let main = root.appendingPathComponent(ReaderArchiveLayout.mainDirectoryName, isDirectory: true)
+        let jpegs = root.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName, isDirectory: true)
+        try FileManager.default.createDirectory(at: main, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: jpegs, withIntermediateDirectories: true)
+        let jpegPDF = jpegs.appendingPathComponent("partner-document.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["scratch partner PDF"], to: jpegPDF))
+        try (jpegPDF as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+        let model = navModel(root: root)
+        let file = ArchiveFile(url: jpegPDF, name: jpegPDF.lastPathComponent, fileType: "PDF",
+                               tags: DocumentTags.parse(raw: ["Unread"], labelNumber: nil),
+                               contentModified: nil)
+
+        model.setReadStateInline(.read, for: file)
+
+        guard case let .success(tags, _) = TagReading.read(jpegPDF) else {
+            return XCTFail("the scratch partner PDF should remain readable")
+        }
+        XCTAssertEqual(tags, ["Unread"],
+                       "the common-parent grant must not extend Reader's tag-write lane into JPEGS")
+
+        let jpegRootModel = navModel(root: jpegs)
+        jpegRootModel.setReadStateInline(.read, for: file)
+        guard case let .success(tagsAfterJPEGRootSelection, _) = TagReading.read(jpegPDF) else {
+            return XCTFail("the scratch partner PDF should remain readable")
+        }
+        XCTAssertEqual(tagsAfterJPEGRootSelection, ["Unread"],
+                       "selecting JPEGS directly must still leave its files outside MAIN's write lane")
+    }
+
     func testRevealForTheWrongArchiveRequestsNothing() throws {
         let (root, _, _) = try makeScratchRoot()
         let model = navModel(root: root)
@@ -296,17 +328,25 @@ final class DocumentPageLinkTests: XCTestCase {
 
         let root = URL(fileURLWithPath: "/tmp/W23m4-context", isDirectory: true)
         let marker = RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date())
-        context.update(rootPath: root.path, marker: marker)
-        XCTAssertEqual(context.target, ArchiveLinkTarget(rootPath: root.path, marker: marker))
+        let jpegRoot = root.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName, isDirectory: true)
+        let cleanIndex = JPEGPartnerIndex(jpegRootPath: jpegRoot.path, candidates: [], isClean: true, filesSeen: 0)
+        context.update(rootPath: root.path, marker: marker, mainRootPath: root.path,
+                       jpegRootPath: jpegRoot.path, jpegPartnerIndex: cleanIndex)
+        XCTAssertEqual(context.target, ArchiveLinkTarget(rootPath: root.path, marker: marker,
+                                                          mainRootPath: root.path))
 
         // A root whose marker could not be read is not linkable — clear rather than go stale.
-        context.update(rootPath: root.path, marker: nil)
+        context.update(rootPath: root.path, marker: nil, mainRootPath: root.path,
+                       jpegRootPath: jpegRoot.path, jpegPartnerIndex: cleanIndex)
         XCTAssertNil(context.target)
 
         // A root switch replaces the target (never leaves a document window citing the old archive).
         let other = URL(fileURLWithPath: "/tmp/W23m4-other", isDirectory: true)
         let otherMarker = RootMarker(guid: UUID(), name: "other", kind: .reader, createdAt: Date())
-        context.update(rootPath: other.path, marker: otherMarker)
+        let otherJPEGRoot = other.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName, isDirectory: true)
+        let otherIndex = JPEGPartnerIndex(jpegRootPath: otherJPEGRoot.path, candidates: [], isClean: true, filesSeen: 0)
+        context.update(rootPath: other.path, marker: otherMarker, mainRootPath: other.path,
+                       jpegRootPath: otherJPEGRoot.path, jpegPartnerIndex: otherIndex)
         XCTAssertEqual(context.target?.rootPath, other.path)
         XCTAssertEqual(context.target?.marker.guid, otherMarker.guid)
     }
@@ -316,6 +356,10 @@ final class DocumentPageLinkTests: XCTestCase {
         let model = navModel(root: root)
         let context = ArchiveLinkContext()
         model.attach(linkContext: context)
+        let deadline = Date().addingTimeInterval(5)
+        while context.target == nil, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
         // The store's DISCOVERED spelling, not `root.path`: the target exists to be stripped off
         // discovered file paths, so publishing the caller's spelling made every link under an aliased
         // or symlinked root degrade to a bare filename. (`W26.symroot-fu1`.)

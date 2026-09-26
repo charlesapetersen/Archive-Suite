@@ -185,6 +185,8 @@ sys.stdout.buffer.write(chunk(b'IDAT', zlib.compress(raw)))
 sys.stdout.buffer.write(chunk(b'IEND', b''))
 " > "$TMPPNG"
 sips -s format jpeg "$TMPPNG" --out "$DST/IMG_PHOTO — Fixture.jpg" >/dev/null 2>&1
+mkdir -p "$DST/Archival Photos JPEGS"
+sips -s format jpeg "$TMPPNG" --out "$DST/Archival Photos JPEGS/00001 IMG — Brown.jpg" >/dev/null 2>&1
 rm -f "$TMPPNG"
 
 # --- strip ALL inherited Finder tags from every file ---

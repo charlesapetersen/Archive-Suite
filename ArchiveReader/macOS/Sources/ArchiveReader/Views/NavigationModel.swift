@@ -109,6 +109,7 @@ final class NavigationModel: ObservableObject {
     // Deep-link reveal: stashed until the target is visible in library.files (gather deferral).
     private var pendingReveal: String?
     private var pendingRevealPage: Int?
+    private var pendingRevealJPEGRelativePath: String?
     private var pendingRevealSettledMisses = 0
 
     /// W23.m4: app-level carrier so a DOCUMENT window can write page links. This model is the single
@@ -219,6 +220,14 @@ final class NavigationModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.publishLinkTarget() } }
             .store(in: &cancellables)
+        library.$jpegPartnerIndex
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.publishLinkTarget() } }
+            .store(in: &cancellables)
+        library.$jpegPartnerScanStatus
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
+            .store(in: &cancellables)
         if let root = rootStore.root {
             library.start(scope: root, markerGUID: rootStore.rootMarker?.guid)
         }
@@ -246,7 +255,12 @@ final class NavigationModel: ObservableObject {
     /// Mirror the granted root + marker into the app-level context, so any window can build a durable
     /// link. Clears it when either is missing — a link with no marker GUID isn't portable.
     private func publishLinkTarget() {
-        linkContext?.update(rootPath: rootStore.discoveredPathPrefix, marker: rootStore.rootMarker)
+        let layout = rootStore.root.map { ReaderArchiveLayout(grantedRoot: $0) }
+        linkContext?.update(rootPath: rootStore.discoveredPathPrefix,
+                            marker: rootStore.rootMarker,
+                            mainRootPath: layout?.mainRoot.path,
+                            jpegRootPath: layout?.jpegRoot.path,
+                            jpegPartnerIndex: library.jpegPartnerIndex)
     }
 
     // MARK: Saved searches / scope
@@ -750,7 +764,7 @@ final class NavigationModel: ObservableObject {
     /// Reveal and select a file identified by a deep link. Exits any active scope/filter so the
     /// target is visible, then selects and scrolls to it. If the library is still gathering, the
     /// reveal is deferred until the target appears (or settled-absence gives up).
-    func revealAndSelect(rootGUID: UUID, relativePath: String, page: Int?) {
+    func revealAndSelect(rootGUID: UUID, relativePath: String, page: Int?, jpegRelativePath: String? = nil) {
         guard let rootPath = rootStore.discoveredPathPrefix else {
             statusMessage = "No archive folder is open. Choose one in File ▸ Choose Archive Folder…"
             return
@@ -777,6 +791,7 @@ final class NavigationModel: ObservableObject {
         let targetPath = rootPath + "/" + relativePath
         pendingReveal = targetPath
         pendingRevealPage = page
+        pendingRevealJPEGRelativePath = jpegRelativePath
         pendingRevealSettledMisses = 0
         // Exit any narrowing so the target is visible.
         clearUserFilters(recompute: false)
@@ -800,10 +815,13 @@ final class NavigationModel: ObservableObject {
             // `execution-plans/archive-notes/00-overview.md` §8.3 requires it be passed on). Ask the
             // window to open the viewer there; a link with no page keeps the plain select-and-scroll.
             if let page = pendingRevealPage {
-                requestOpenViewer(DocumentSelection(filePaths: [file.url.path], initialPage: page))
+                requestOpenViewer(DocumentSelection(filePaths: [file.url.path], initialPage: page,
+                                                     jpegRelativePath: pendingRevealJPEGRelativePath,
+                                                     pinsJPEGPartner: true))
             }
             pendingReveal = nil
             pendingRevealPage = nil
+            pendingRevealJPEGRelativePath = nil
             pendingRevealSettledMisses = 0
             return
         }
@@ -818,6 +836,7 @@ final class NavigationModel: ObservableObject {
             statusMessage = "Document not found in the current archive."
             pendingReveal = nil
             pendingRevealPage = nil
+            pendingRevealJPEGRelativePath = nil
             pendingRevealSettledMisses = 0
         }
     }
@@ -873,8 +892,8 @@ final class NavigationModel: ObservableObject {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "Choose Archive Root"
-        panel.message = "Choose the folder that contains your tagged archive PDFs."
+        panel.prompt = "Choose Common Archive Folder"
+        panel.message = "Choose the folder that contains both “\(ReaderArchiveLayout.mainDirectoryName)” and “\(ReaderArchiveLayout.jpegDirectoryName)”."
         if panel.runModal() == .OK, let url = panel.url {
             // A refused pick used to be an `NSLog` and nothing else — no root, no scan, and a window
             // that looked exactly as it had before the panel opened. Say why, and leave the previous
@@ -943,6 +962,13 @@ final class NavigationModel: ObservableObject {
         var verified: [ArchiveFile] = []
         var rejected = 0
         for file in files {
+            // The granted root now covers the sibling JPEGS tree as well. Reader may discover rows
+            // there, but tag mutations stay inside MAIN, whose ownership contract predates the wider
+            // bookmark. Apply this before provenance handling so fresh and cached rows share the gate.
+            guard isInsideMainArchive(file.url) else {
+                rejected += 1
+                continue
+            }
             guard file.provenance.isCache else { verified.append(file); continue }
             // Against `LibraryIndexPath(root)` this rejected every cache row under any root whose
             // spelling differs from the one the walker reports — a bulk tag write would have dropped
@@ -973,6 +999,14 @@ final class NavigationModel: ObservableObject {
             return nil
         }
         return verified
+    }
+
+    private func isInsideMainArchive(_ url: URL) -> Bool {
+        guard let root = rootStore.root else { return false }
+        let layout = ReaderArchiveLayout(grantedRoot: root)
+        guard !layout.needsCommonParentGrant else { return false }
+        let mainRoot = layout.mainRoot
+        return ReaderArchiveLayout.isContained(url, inRootPath: mainRoot.path)
     }
 
     func mark(_ target: ReadState) {
@@ -1018,6 +1052,7 @@ final class NavigationModel: ObservableObject {
             // Display the inverse-apply's own verified `.after`, not the stale stored `.before`.
             // §6: re-verify against the identity captured at the ORIGINAL edit so undo never re-tags a
             // file swapped under this path since then (a mismatch throws → try? skips just that file).
+            guard isInsideMainArchive(entry.result.url) else { continue }
             if let rr = try? TagWriter.applyOccurrence(entry.result.occurrenceInverse, to: entry.result.url, expecting: entry.identity) {
                 verified.append(rr)
             }
@@ -1135,7 +1170,7 @@ final class NavigationModel: ObservableObject {
 
     /// Number of files carrying `tag` (for the rename sheet's "affects N files").
     func affectedFileCount(forTag tag: String) -> Int {
-        library.files.filter { $0.subjects.contains(tag) }.count
+        library.files.filter { isInsideMainArchive($0.url) && $0.subjects.contains(tag) }.count
     }
 
     /// Open the rename-tag sheet from a menu — seed with the active tag filter, else the top visible tag.
@@ -1298,10 +1333,19 @@ final class NavigationModel: ObservableObject {
             statusMessage = rootStore.markerState.degradation?.message ?? "Choose an archive folder first."
             return
         }
+        guard library.jpegPartnerScanStatus == .ready,
+              let jpegPartnerIndex = library.jpegPartnerIndex,
+              let root = rootStore.root else {
+            statusMessage = jpegPartnerUnavailableMessage
+            announce(statusMessage)
+            return
+        }
+        let mainRootPath = ReaderArchiveLayout(grantedRoot: root).mainRoot.path
         // Durable links are the primary copy result. Put them on the clipboard before optional page
         // previews render, then replace this item only if we still own the clipboard.
         let immediateItem = ArchiveLinkWriter.pasteboardItemWithoutThumbnails(
-            for: files, rootPath: rootPath, marker: marker
+            for: files, rootPath: rootPath, marker: marker, mainRootPath: mainRootPath,
+            jpegPartnerIndex: jpegPartnerIndex
         )
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([immediateItem])
@@ -1311,12 +1355,26 @@ final class NavigationModel: ObservableObject {
         statusMessage = "Copied \(files.count) archive link\(files.count == 1 ? "" : "s")."
         Task {
             let item = await ArchiveLinkWriter.pasteboardItem(
-                for: files, rootPath: rootPath, marker: marker, thumbnailer: thumbnailer
+                for: files, rootPath: rootPath, marker: marker, thumbnailer: thumbnailer,
+                mainRootPath: mainRootPath, jpegPartnerIndex: jpegPartnerIndex
             )
             guard archiveCopyGeneration == generation,
                   NSPasteboard.general.changeCount == expectedChangeCount else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.writeObjects([item])
+        }
+    }
+
+    private var jpegPartnerUnavailableMessage: String {
+        switch library.jpegPartnerScanStatus {
+        case .needsCommonParentGrant:
+            return "Choose the common folder containing both “\(ReaderArchiveLayout.mainDirectoryName)” and “\(ReaderArchiveLayout.jpegDirectoryName)” to use JPEG partners."
+        case .scanning:
+            return "JPEG partner scan is still running. Try copying the link again when it finishes."
+        case .incomplete:
+            return "Reader could not verify the JPEG partner index. Rescan the archive before copying a durable link."
+        case .notConfigured, .ready:
+            return "Choose an archive folder before copying a durable link."
         }
     }
 

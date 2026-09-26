@@ -17,7 +17,9 @@ enum ArchiveLinkWriter {
         for files: [ArchiveFile],
         rootPath: String,
         marker: RootMarker,
-        thumbnailer: PDFThumbnailer?
+        thumbnailer: PDFThumbnailer?,
+        mainRootPath: String? = nil,
+        jpegPartnerIndex: JPEGPartnerIndex? = nil
     ) async -> NSPasteboardItem {
         let rootGUID = marker.guid
 
@@ -37,7 +39,10 @@ enum ArchiveLinkWriter {
             let link = DurableLink.readerReveal(
                 rootGUID: rootGUID,
                 relativePath: relativePath,
-                page: nil
+                page: nil,
+                jpegRelativePath: partnerRelativePath(for: file.url, rootPath: rootPath,
+                                                       mainRootPath: mainRootPath,
+                                                       index: jpegPartnerIndex)
             )
             let urlString = link.url.absoluteString
             let display = file.url.deletingPathExtension().lastPathComponent
@@ -69,7 +74,8 @@ enum ArchiveLinkWriter {
     /// Immediate text-first representation for a copy command while optional thumbnail rendering runs.
     /// It has the same durable links and rich UTI as the final item, just no preview bytes yet.
     static func pasteboardItemWithoutThumbnails(
-        for files: [ArchiveFile], rootPath: String, marker: RootMarker
+        for files: [ArchiveFile], rootPath: String, marker: RootMarker,
+        mainRootPath: String? = nil, jpegPartnerIndex: JPEGPartnerIndex? = nil
     ) -> NSPasteboardItem {
         var entries: [ArchiveLinkPayload.Entry] = []
         var plainURLs: [String] = []
@@ -77,7 +83,12 @@ enum ArchiveLinkWriter {
             let relativePath = file.url.path.hasPrefix(rootPath + "/")
                 ? String(file.url.path.dropFirst(rootPath.count + 1))
                 : file.url.lastPathComponent
-            let link = DurableLink.readerReveal(rootGUID: marker.guid, relativePath: relativePath, page: nil)
+            let link = DurableLink.readerReveal(
+                rootGUID: marker.guid, relativePath: relativePath, page: nil,
+                jpegRelativePath: partnerRelativePath(for: file.url, rootPath: rootPath,
+                                                       mainRootPath: mainRootPath,
+                                                       index: jpegPartnerIndex)
+            )
             let urlString = link.url.absoluteString
             plainURLs.append(urlString)
             entries.append(ArchiveLinkPayload.Entry(
@@ -94,9 +105,12 @@ enum ArchiveLinkWriter {
         page: Int,
         rootPath: String,
         marker: RootMarker,
-        thumbnailer: PDFThumbnailer?
+        thumbnailer: PDFThumbnailer?,
+        mainRootPath: String? = nil,
+        jpegPartnerIndex: JPEGPartnerIndex? = nil
     ) async -> NSPasteboardItem {
-        let base = pagePayload(fileURL: fileURL, page: page, rootPath: rootPath, marker: marker)
+        let base = pagePayload(fileURL: fileURL, page: page, rootPath: rootPath, marker: marker,
+                               mainRootPath: mainRootPath, jpegPartnerIndex: jpegPartnerIndex)
 
         // Render thumbnail if possible
         var thumbBase64: String?
@@ -121,21 +135,42 @@ enum ArchiveLinkWriter {
 
     /// Text-first page link used immediately by the command while its optional image renders.
     static func pageLinkWithoutThumbnail(
-        fileURL: URL, page: Int, rootPath: String, marker: RootMarker
+        fileURL: URL, page: Int, rootPath: String, marker: RootMarker,
+        mainRootPath: String? = nil, jpegPartnerIndex: JPEGPartnerIndex? = nil
     ) -> NSPasteboardItem {
-        let base = pagePayload(fileURL: fileURL, page: page, rootPath: rootPath, marker: marker)
+        let base = pagePayload(fileURL: fileURL, page: page, rootPath: rootPath, marker: marker,
+                               mainRootPath: mainRootPath, jpegPartnerIndex: jpegPartnerIndex)
         let entry = ArchiveLinkPayload.Entry(link: base.urlString, display: base.display, page: page)
         return pasteboardItem(entries: [entry], plainURLs: [base.urlString])
     }
 
     private static func pagePayload(
-        fileURL: URL, page: Int, rootPath: String, marker: RootMarker
+        fileURL: URL, page: Int, rootPath: String, marker: RootMarker,
+        mainRootPath: String?, jpegPartnerIndex: JPEGPartnerIndex?
     ) -> (urlString: String, display: String) {
         let relativePath = fileURL.path.hasPrefix(rootPath + "/")
             ? String(fileURL.path.dropFirst(rootPath.count + 1))
             : fileURL.lastPathComponent
-        let link = DurableLink.readerReveal(rootGUID: marker.guid, relativePath: relativePath, page: page)
+        let link = DurableLink.readerReveal(
+            rootGUID: marker.guid, relativePath: relativePath, page: page,
+            jpegRelativePath: partnerRelativePath(for: fileURL, rootPath: rootPath,
+                                                   mainRootPath: mainRootPath,
+                                                   index: jpegPartnerIndex)
+        )
         return (link.url.absoluteString, "\(fileURL.deletingPathExtension().lastPathComponent) \u{2014} p.\(page)")
+    }
+
+    private static func partnerRelativePath(for pdfURL: URL, rootPath: String,
+                                            mainRootPath: String?,
+                                            index: JPEGPartnerIndex?) -> String? {
+        guard let mainRootPath, let index,
+              case let .match(partnerURL) = index.resolve(
+                pdfURL: pdfURL, mainRoot: URL(fileURLWithPath: mainRootPath, isDirectory: true)
+              ) else { return nil }
+        let path = partnerURL.withUnsafeFileSystemRepresentation { raw in raw.map(String.init(cString:)) ?? partnerURL.path }
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard path.hasPrefix(prefix) else { return nil }
+        return String(path.dropFirst(prefix.count))
     }
 
     private static func pasteboardItem(

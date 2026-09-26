@@ -39,6 +39,12 @@ struct ArchiveReaderCommands: Commands {
                 showingTagCloud.toggle()
             }
             .keyboardShortcut("t", modifiers: [.command, .option])
+            if doc?.hasJPEGPartner == true {
+                Button(doc?.isShowingJPEG == true ? "Show PDF Image" : "Show JPEG Image") {
+                    doc?.toggleImageSource()
+                }
+                .keyboardShortcut("j", modifiers: [.command, .option])
+            }
         }
 
         // File

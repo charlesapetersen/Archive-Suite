@@ -82,4 +82,28 @@ struct DocumentSelection: Codable, Hashable {
     /// opens on it (W23.m4 defect 3). `nil` for an ordinary open, and **additive**: it decodes as `nil`
     /// from any window value persisted before this field existed, so scene restoration is unaffected.
     var initialPage: Int? = nil
+    /// A deep link may pin the exact partner it cited; empty is a pinned no-partner result.
+    var jpegRelativePath: String? = nil
+    var pinsJPEGPartner: Bool = false
+
+    private enum CodingKeys: String, CodingKey {
+        case filePaths, initialPage, jpegRelativePath, pinsJPEGPartner
+    }
+
+    init(filePaths: [String], initialPage: Int? = nil, jpegRelativePath: String? = nil,
+         pinsJPEGPartner: Bool = false) {
+        self.filePaths = filePaths
+        self.initialPage = initialPage
+        self.jpegRelativePath = jpegRelativePath
+        self.pinsJPEGPartner = pinsJPEGPartner
+    }
+
+    /// Keep scene-restoration payloads written before JPEG links readable.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        filePaths = try values.decode([String].self, forKey: .filePaths)
+        initialPage = try values.decodeIfPresent(Int.self, forKey: .initialPage)
+        jpegRelativePath = try values.decodeIfPresent(String.self, forKey: .jpegRelativePath)
+        pinsJPEGPartner = try values.decodeIfPresent(Bool.self, forKey: .pinsJPEGPartner) ?? false
+    }
 }

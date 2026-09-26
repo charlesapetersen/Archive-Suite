@@ -10,6 +10,10 @@ why a later change may or may not revisit that code.
 
 ## ArchiveCore — JPEG partner indexing
 
+- [x] **W24.jpeg1 — Reader/Notes: PDF + JPEG dual image reference [M–L · Tier-2].** **SHIPPED 2026-09-26 (this commit).** Reader now requests the common parent grant for the PDF and JPEGS sibling trees, keeps all tag mutations confined to MAIN, builds a clean-pass-gated JPEG index in the existing LibraryIndex database, and pins the resolved JPEG path in durable page links. The document View menu and ⌘⌥J switch between PDF and JPEG; the preference persists per archive and PDF. Unknown scans never claim “no partner,” and unresolved duplicate stems remain refused when no reliable collection-context mapping is available. Headless scratch render guards cover both image sources and the pinned-link path; the Reader VM UI check covers the in-viewer switch and persistence. Tier-2 find→refute review caught and fixed direct-JPEGS-root write exposure, symlink-root refusal, and canonically equivalent path-prefix admission; final refute found no remaining issue. Verification: ArchiveCore full suite; Reader 412 tests (3 skipped); Reader VM 32 UI tests (1 skipped); Notes 883 Swift Testing checks / 218 XCTest; Processor VM 5 UI tests; Reader write-surface lint clean. No real corpus or host GUI used.
+  | Files: ArchiveReader/macOS/{Sources/ArchiveReader/{ArchiveReaderApp.swift,ArchiveReaderCommands.swift,Core/{ArchiveLinkTarget,ArchiveLinkWriter,DeepLinkRouter}.swift,Search/{ArchiveLibrary,ReaderArchiveLayout}.swift,Views/{DocumentImageSourcePreferences,DocumentViewerModel,DocumentWindowView,NavigationModel,NavigationWindowView}.swift},Tests/ArchiveReaderTests/{ArchiveLinkWriterTests,DocumentImageSourceTests,DocumentPageLinkTests,DocumentRenderGuardTests,RenderProbe,SymlinkedRootTests}.swift,Tests/ArchiveReaderUITests/ViewerUITests.swift}, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveReader/KNOWN_ISSUES.md, SUITE_TODO.md | M–L | med | done
+
+
 - [x] **W24.jpeg1a — the JPEG partner index, in ArchiveCore [M · Tier-2 · scratch trees only].** **SHIPPED 2026-09-25 (this commit).** The owner chose option A: a stem/path/context/fingerprint table in `LibraryIndex`'s existing SQLite DB, revalidated from a clean `CorpusWalker` pass. `JPEGPartnerIndex` resolves an exact mirrored relative path first, then a unique stem across relocated folders; duplicates remain ambiguous unless collection context selects one. An incomplete or wrong-subtree scan returns unknown, never absence. SQLite rows are atomically refreshed only after a clean pass, and warm rows are accepted only when current candidates and fingerprints match. Generated scratch tests cover mirror priority, relocation, clean-none vs incomplete-unknown, wrong-root refusal, duplicate ambiguity/context, warm start, fingerprint refresh, and partial-pass recovery. Tier-2 find→refute review found no confirmed issue. ArchiveCore: 107 tests passed (scale-only cases skipped without `ARCHIVE_SCALE_ROOT`); Reader: 405 unit tests; Notes: 218 unit tests; Processor Debug build and 5 off-screen UI tests; Reader write-surface lint clean. No real corpus or GUI on the host.
   | Files: packages/ArchiveCore/Sources/ArchiveCore/Corpus/{CorpusWalker,JPEGPartnerIndex}.swift, packages/ArchiveCore/Tests/ArchiveCoreTests/JPEGPartnerIndexTests.swift, ArchiveReader/macOS/{Sources/ArchiveReader/Search/LibraryIndex.swift,Tests/ArchiveReaderTests/LibraryIndexTests.swift}, SUITE_TODO.md | M | med | done
 
@@ -2619,13 +2623,10 @@ explain why not.
   lines out. It is now **`W24.jpeg1`** (the `W24.*` namespace already holds owner-decided items that are
   not for the daemon queue, e.g. `W24.cal1`).
 
-  **The `(blocked-on:)` clause is documentation and deliberately cannot be more than that.**
-  `next-queue-item.sh` draws its *candidates* from the plan's `## WORK QUEUE` region only — it reads
-  `SUITE_TODO` just to resolve tag state — and `W24.jpeg1` is kept out of that region on purpose, because
-  §3 changes `DurableLink`, a cross-app contract, making it owner-gated. Mirroring the line into the plan
-  to "make the edge live" would make the item **daemon-pickable**, i.e. the exact opposite of the intent.
-  What keeps the daemon off it is its absence from the plan queue; the tag and edge are for the human who
-  eventually picks it up.
+  **The original queue exclusion was historical and is superseded.** At the time this note was written,
+  `W24.jpeg1` was kept out of the plan queue because §3 changes `DurableLink`, a cross-app contract then
+  treated as owner-gated. The 2026-08-13 TIER-2 policy change removed that extra gate; the item was later
+  mirrored into the WORK QUEUE, picked up, and shipped as recorded above.
 
   **Gate, and the one honest deviation from it.** The item's test was *"`grep -n "NSMetadataQuery"
   SUITE_TODO.md` returns nothing outside Wave 26's historical notes"*. It now returns **one** hit outside

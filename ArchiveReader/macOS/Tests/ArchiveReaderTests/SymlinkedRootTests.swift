@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 import ArchiveCore
 @testable import ArchiveReader
 
@@ -118,6 +119,12 @@ final class SymlinkedRootTests: XCTestCase {
         // spelling is chosen.
         let context = ArchiveLinkContext()
         model.attach(linkContext: context)
+        if context.target == nil {
+            let targetReady = expectation(description: "clean sibling JPEG scan enables archive links")
+            let subscription = context.$target.sink { if $0 != nil { targetReady.fulfill() } }
+            await fulfillment(of: [targetReady], timeout: 5)
+            withExtendedLifetime(subscription) {}
+        }
         let target = try XCTUnwrap(context.target, "a root with a readable marker publishes a target")
 
         let item = await ArchiveLinkWriter.pasteboardItem(for: [file], rootPath: target.rootPath,

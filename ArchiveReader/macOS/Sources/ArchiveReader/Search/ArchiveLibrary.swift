@@ -7,6 +7,14 @@ struct ResolvedLibraryRoot: Sendable {
     let markerGUID: UUID?
 }
 
+enum JPEGPartnerScanStatus: Equatable {
+    case notConfigured
+    case needsCommonParentGrant
+    case scanning
+    case ready
+    case incomplete
+}
+
 /// Injectable only so the warm-start contract can be tested without a timing race. Production uses
 /// the same dedicated thread as before; a test can hold this request after cache rows are published,
 /// inspect that intermediate state, then run and deliver the real revalidation pass.
@@ -49,6 +57,10 @@ final class ArchiveLibrary: ObservableObject {
     /// quietly stale. The fallback is explicit rescan + stale window-activation revalidation.
     @Published private(set) var liveUpdateFailure: DiscoveryFailure?
     var discoveryFailure: DiscoveryFailure? { phase.failure ?? liveUpdateFailure }
+    /// `nil` is unknown while scanning or after an incomplete walk. A clean empty index is verified
+    /// absence; callers must not collapse those states.
+    @Published private(set) var jpegPartnerIndex: JPEGPartnerIndex?
+    @Published private(set) var jpegPartnerScanStatus: JPEGPartnerScanStatus = .notConfigured
 
     /// The root being walked, so `rescan()` needs no argument.
     private var root: URL?
@@ -74,6 +86,8 @@ final class ArchiveLibrary: ObservableObject {
     private let watcherStartTimeout: TimeInterval
     private let scanStallTimeout: TimeInterval
     private var watcher: (any CorpusWatching)?
+    private var jpegScanCancellation: CorpusWatchCancellation?
+    private var jpegScanGeneration: UInt64 = 0
 
     /// The walk's own stall reporting (`W26.fsev-fu2`). `filesSeenInCurrentPass` is the discriminator:
     /// a walk that has examined even one file is demonstrably past the root probe, whatever else is
@@ -233,6 +247,11 @@ final class ArchiveLibrary: ObservableObject {
     /// only a Spotlight index could have served, and walking the whole Mac is not something this app
     /// should ever do.
     func start(scope: URL?, markerGUID: UUID? = nil) {
+        jpegScanCancellation?.cancel()
+        jpegScanCancellation = nil
+        jpegScanGeneration &+= 1
+        jpegPartnerIndex = nil
+        jpegPartnerScanStatus = .notConfigured
         watchCancellation?.cancel()
         watchCancellation = nil
         indexPreparation?.cancel(); indexPreparation = nil
@@ -274,6 +293,7 @@ final class ArchiveLibrary: ObservableObject {
             scopeDescription = "No folder selected"
             return
         }
+        refreshJPEGPartnerIndex(scope: scope)
         scopeDescription = scope.lastPathComponent
         phase = .firstScan(done: 0, seen: 0)
         // Off the main thread, and the walk below waits behind it rather than the main thread waiting
@@ -336,6 +356,7 @@ final class ArchiveLibrary: ObservableObject {
     /// recovery control for a journal-less volume and the operator's way to demand a full proof now.
     func rescan() {
         guard let root else { return }
+        refreshJPEGPartnerIndex(scope: root)
         retryWatcherIfNeeded(root: root)
         requestRootRescan(urgent: true)
     }
@@ -351,7 +372,116 @@ final class ArchiveLibrary: ObservableObject {
         // left here is the volume that stays journal-less: re-walk only once the snapshot is stale.
         retryWatcherIfNeeded(root: root)
         guard let lastSettled, now.timeIntervalSince(lastSettled) >= staleAfter else { return }
+        refreshJPEGPartnerIndex(scope: root)
         requestRootRescan(urgent: true)
+    }
+
+    /// Build the sibling JPEG index without tags or image reads. A scope that is still the old MAIN
+    /// folder cannot reach the sibling, so it is reported as needing a common-parent re-grant instead
+    /// of being mistaken for a clean no-partner result.
+    private func refreshJPEGPartnerIndex(scope: URL) {
+        jpegScanCancellation?.cancel()
+        let cancellation = CorpusWatchCancellation()
+        jpegScanCancellation = cancellation
+        jpegScanGeneration &+= 1
+        let generation = jpegScanGeneration
+        let rootGeneration = self.rootGeneration
+        let layout = ReaderArchiveLayout(grantedRoot: scope)
+        jpegPartnerIndex = nil
+        guard !layout.needsCommonParentGrant else {
+            jpegPartnerScanStatus = .needsCommonParentGrant
+            return
+        }
+        jpegPartnerScanStatus = .scanning
+        let jpegRoot = layout.jpegRoot
+        let mayUsePersistedIndex: Bool
+#if DEBUG
+        mayUsePersistedIndex = !isFixtureRoot || fixtureIndexOverride
+#else
+        mayUsePersistedIndex = true
+#endif
+        let indexRoot = mayUsePersistedIndex ? self.indexRoot : nil
+        let libraryIndex = mayUsePersistedIndex ? self.libraryIndex : nil
+        let thread = Thread { [weak self] in
+            let holdsScope = scope.startAccessingSecurityScopedResource()
+            defer { if holdsScope { scope.stopAccessingSecurityScopedResource() } }
+            let siblings: [String]
+            do {
+                siblings = try FileManager.default.contentsOfDirectory(atPath: scope.path)
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        self?.finishJPEGPartnerScan(nil, status: .incomplete,
+                                                    generation: generation, rootGeneration: rootGeneration)
+                    }
+                }
+                return
+            }
+            guard siblings.contains(ReaderArchiveLayout.jpegDirectoryName) else {
+                let empty = JPEGPartnerIndex(jpegRootPath: jpegRoot.path, candidates: [],
+                                             isClean: true, filesSeen: 0)
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        self?.persistAndPublishJPEGPartnerIndex(empty, jpegRoot: jpegRoot,
+                                                                scan: nil, indexRoot: indexRoot,
+                                                                libraryIndex: libraryIndex,
+                                                                generation: generation,
+                                                                rootGeneration: rootGeneration)
+                    }
+                }
+                return
+            }
+            let scan = CorpusWalker.scanFingerprints(root: jpegRoot,
+                                                       isCancelled: { cancellation.isCancelled })
+            let fresh = JPEGPartnerIndex(jpegRoot: jpegRoot, scan: scan)
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.persistAndPublishJPEGPartnerIndex(fresh, jpegRoot: jpegRoot,
+                                                            scan: scan, indexRoot: indexRoot,
+                                                            libraryIndex: libraryIndex,
+                                                            generation: generation,
+                                                            rootGeneration: rootGeneration)
+                }
+            }
+        }
+        thread.name = "ArchiveReader.JPEGPartnerIndex"
+        thread.qualityOfService = .utility
+        thread.start()
+    }
+
+    private func persistAndPublishJPEGPartnerIndex(_ fresh: JPEGPartnerIndex, jpegRoot: URL,
+                                                   scan: CorpusFingerprintScanResult?,
+                                                   indexRoot: LibraryIndexRoot?, libraryIndex: LibraryIndex?,
+                                                   generation: UInt64, rootGeneration: UInt64) {
+        guard generation == jpegScanGeneration, rootGeneration == self.rootGeneration else {
+            return
+        }
+        guard let scan, let indexRoot, let libraryIndex else {
+            finishJPEGPartnerScan(fresh, status: fresh.isClean ? .ready : .incomplete,
+                                  generation: generation, rootGeneration: rootGeneration)
+            return
+        }
+        Task {
+            let result: JPEGPartnerIndex
+            do {
+                result = try await libraryIndex.revalidatedJPEGPartnerIndex(
+                    for: indexRoot, jpegRoot: jpegRoot, scan: scan
+                )
+            } catch {
+                NSLog("LibraryIndex: could not persist JPEG partner index: \(error)")
+                result = fresh
+            }
+            finishJPEGPartnerScan(result, status: result.isClean ? .ready : .incomplete,
+                                  generation: generation, rootGeneration: rootGeneration)
+        }
+    }
+
+    private func finishJPEGPartnerScan(_ result: JPEGPartnerIndex?, status: JPEGPartnerScanStatus,
+                                       generation: UInt64, rootGeneration: UInt64) {
+        guard generation == jpegScanGeneration, rootGeneration == self.rootGeneration else { return }
+        jpegPartnerIndex = result
+        jpegPartnerScanStatus = status
+        jpegScanCancellation = nil
     }
 
     private func prepareInitialIndexedScan(root: URL, indexRoot: LibraryIndexRoot,
@@ -885,6 +1015,9 @@ final class ArchiveLibrary: ObservableObject {
             else { requestRootRescan(urgent: true) }   // standalone/test library: safest fallback
             return
         }
+        if let root, requestTouchesJPEGPartnerTree(request, root: root) {
+            refreshJPEGPartnerIndex(scope: root)
+        }
         if request.fullRescan {
             pendingWatchRequest = CorpusWatchRequest()
             requestRootRescan(urgent: false)
@@ -892,6 +1025,13 @@ final class ArchiveLibrary: ObservableObject {
         }
         pendingWatchRequest.merge(request)
         drainWatchWork()
+    }
+
+    private func requestTouchesJPEGPartnerTree(_ request: CorpusWatchRequest, root: URL) -> Bool {
+        if request.fullRescan { return true }
+        let jpegRoot = ReaderArchiveLayout(grantedRoot: root).jpegRoot.path
+        return request.paths.contains { CorpusWatchRequest.contains($0, under: jpegRoot) }
+            || request.subtrees.contains { CorpusWatchRequest.contains($0, under: jpegRoot) }
     }
 
     /// At most one full re-walk is active and at most one is queued. Further callbacks merely keep

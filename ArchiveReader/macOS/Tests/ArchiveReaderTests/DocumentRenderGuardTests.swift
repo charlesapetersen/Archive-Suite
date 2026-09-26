@@ -33,7 +33,8 @@ final class DocumentRenderGuardTests: XCTestCase {
         model.load(DocumentSelection(filePaths: [pdf.path]))
         let target = ArchiveLinkTarget(
             rootPath: root.path,
-            marker: RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date())
+            marker: RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date()),
+            mainRootPath: root.path
         )
 
         let generatedItem = await model.archivePageLink(target: target)
@@ -90,6 +91,80 @@ final class DocumentRenderGuardTests: XCTestCase {
         // headless AppleFontSmoothing=0 gate) can't spuriously flip the guard.
         XCTAssertGreaterThan(stats.nonWhiteFraction, 0.03,
                              "OCR text page has too little ink (\(stats.nonWhiteFraction)) — fixture or render regressed")
+    }
+
+    // MARK: linked JPEG partner renders and the selected source sticks per document
+
+    @MainActor
+    func testLinkedJPEGPartnerRendersAndPreferenceRestores() throws {
+        let parent = makeTempDir("jpeg-partner")
+        let mainRoot = parent.appendingPathComponent(ReaderArchiveLayout.mainDirectoryName, isDirectory: true)
+        let jpegRoot = parent.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName, isDirectory: true)
+        try FileManager.default.createDirectory(at: mainRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: jpegRoot, withIntermediateDirectories: true)
+        let sourcePDF = try makeTwoPagePDF()
+        let pdf = mainRoot.appendingPathComponent("two-page.pdf")
+        try FileManager.default.copyItem(at: sourcePDF, to: pdf)
+        let jpeg = jpegRoot.appendingPathComponent("two-page.jpg")
+        let jpegData = try XCTUnwrap(RenderProbe.jpegData(from: solidCGImage(gray: 0.35, topHalfGray: 0.05)))
+        try jpegData.write(to: jpeg)
+
+        let marker = RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date())
+        let fingerprint = CorpusFileFingerprint(mtime: 1, ctime: 1, size: Int64(jpegData.count),
+                                                inode: 1, isDataless: false)
+        let candidate = JPEGPartnerCandidate(stem: "two-page", path: jpeg.path,
+                                             collectionContext: "", fingerprint: fingerprint)
+        let index = JPEGPartnerIndex(jpegRootPath: jpegRoot.path, candidates: [candidate],
+                                     isClean: true, filesSeen: 1)
+        let target = ArchiveLinkTarget(rootPath: parent.path, marker: marker, mainRootPath: mainRoot.path)
+        let suiteName = "JPEGViewer-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = DocumentImageSourcePreferences(defaults: defaults)
+
+        let model = DocumentViewerModel(persists: true, imageSourcePreferences: preferences, thumbnailer: nil)
+        model.updateArchiveContext(target: target, index: index)
+        model.load(DocumentSelection(filePaths: [pdf.path]))
+        XCTAssertTrue(model.hasJPEGPartner)
+        XCTAssertFalse(model.isShowingJPEG)
+        model.toggleImageSource()
+        XCTAssertTrue(model.isShowingJPEG)
+        let page = try XCTUnwrap(model.displayedImagePage)
+        let image = page.thumbnail(of: CGSize(width: 240, height: 320), for: .mediaBox)
+        var proposed = CGRect(origin: .zero, size: image.size)
+        let cgImage = try XCTUnwrap(image.cgImage(forProposedRect: &proposed, context: nil, hints: nil))
+        let png = try XCTUnwrap(RenderProbe.pngData(from: cgImage))
+        writeRenderArtifact(png, named: "jpeg-partner-viewer.png")
+        let pixels = try XCTUnwrap(RenderProbe.cgImage(fromPNG: png))
+        let stats = try XCTUnwrap(assertRendersNonBlank(pixels, "linked JPEG image page"))
+        XCTAssertGreaterThan(stats.nonWhiteFraction, 0.1)
+
+        let reopened = DocumentViewerModel(persists: true, imageSourcePreferences: preferences, thumbnailer: nil)
+        reopened.updateArchiveContext(target: target, index: index)
+        reopened.load(DocumentSelection(filePaths: [pdf.path]))
+        XCTAssertTrue(reopened.isShowingJPEG, "the per-document JPEG preference should be restored")
+
+        // A page link's pinned path remains authoritative even when a later scan sees duplicate stems.
+        let collectionA = jpegRoot.appendingPathComponent("Collection A/two-page.jpg")
+        let collectionB = jpegRoot.appendingPathComponent("Collection B/two-page.jpg")
+        try FileManager.default.createDirectory(at: collectionA.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: collectionB.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try jpegData.write(to: collectionA)
+        try jpegData.write(to: collectionB)
+        let duplicateCandidates = [collectionA, collectionB].map { url in
+            JPEGPartnerCandidate(stem: "two-page", path: url.path,
+                                 collectionContext: url.deletingLastPathComponent().lastPathComponent,
+                                 fingerprint: fingerprint)
+        }
+        let duplicateIndex = JPEGPartnerIndex(jpegRootPath: jpegRoot.path,
+                                              candidates: duplicateCandidates, isClean: true, filesSeen: 2)
+        let pinned = DocumentViewerModel(persists: false, thumbnailer: nil)
+        pinned.updateArchiveContext(target: target, index: duplicateIndex)
+        pinned.load(DocumentSelection(filePaths: [pdf.path],
+                                      jpegRelativePath: "Archival Photos JPEGS/Collection B/two-page.jpg",
+                                      pinsJPEGPartner: true))
+        XCTAssertTrue(pinned.hasJPEGPartner,
+                      "an exact partner in the durable link must survive a globally ambiguous stem")
     }
 
     // MARK: the guard actually discriminates (a guard that never fails is worthless)

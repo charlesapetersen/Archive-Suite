@@ -18,6 +18,9 @@ final class DocumentViewerModel: ObservableObject {
     @Published private(set) var pair = 0
     @Published private(set) var current: PDFDocument?
     @Published private(set) var loadError: String?
+    @Published private(set) var jpegPartnerPage: PDFPage?
+    @Published private(set) var jpegPartnerRelativePath: String?
+    @Published private(set) var imageSource: DocumentImageSource = .pdf
     @Published var showingFind = false   // driven by the toolbar and the Document menu
     @Published var findQuery = ""        // the find-bar text (bound to the field)
     @Published private(set) var findOrdinal: Int?     // 1-based position of the current match ("3 of 12")
@@ -47,14 +50,23 @@ final class DocumentViewerModel: ObservableObject {
     private let thumbnailer: PDFThumbnailer?
     /// Makes an older thumbnail task unable to replace the clipboard after a newer archive-page copy.
     private var archivePageLinkCopyGeneration = 0
+    private var archiveLinkTarget: ArchiveLinkTarget?
+    private var jpegPartnerIndex: JPEGPartnerIndex?
+    private let imageSourcePreferences: DocumentImageSourcePreferences
+    private let persistsImageSource: Bool
+    private var pinsJPEGPartnerFromLink = false
+    private var linkedJPEGRelativePath: String?
 
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
     /// `supportsFind: false` → the view renders no find bar, so the find commands stay disabled.
     init(persists: Bool = true, supportsFind: Bool = true,
+         imageSourcePreferences: DocumentImageSourcePreferences = DocumentImageSourcePreferences(),
          thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         leftController = PDFPaneController(key: "left", persists: persists)
         rightController = PDFPaneController(key: "right", persists: persists)
         self.supportsFind = supportsFind
+        self.imageSourcePreferences = imageSourcePreferences
+        self.persistsImageSource = persists
         self.thumbnailer = thumbnailer
     }
 
@@ -64,6 +76,8 @@ final class DocumentViewerModel: ObservableObject {
 
     func load(_ selection: DocumentSelection) {
         urls = selection.filePaths.map { URL(fileURLWithPath: $0) }
+        pinsJPEGPartnerFromLink = selection.pinsJPEGPartner
+        linkedJPEGRelativePath = selection.jpegRelativePath
         index = 0
         focusedPane = .left
         loadCurrent()
@@ -135,10 +149,30 @@ final class DocumentViewerModel: ObservableObject {
 
     /// Left pane = the current pair's image page. Present for any non-empty PDF.
     var imagePage: PDFPage? { page(at: DocumentPagePairs.imagePageIndex(pair: pair)) }
+    /// The left pane switches to the linked full-resolution image while the PDF remains loaded for its
+    /// OCR text pages, navigation, and page-level citations.
+    var displayedImagePage: PDFPage? { imageSource == .jpeg ? jpegPartnerPage : imagePage }
+    var hasJPEGPartner: Bool { jpegPartnerPage != nil }
+    var isShowingJPEG: Bool { imageSource == .jpeg }
     /// Right pane = the current pair's OCR text page, when the pair has one (a trailing odd image page
     /// has none).
     var textPage: PDFPage? { page(at: DocumentPagePairs.textPageIndex(pair: pair)) }
     var hasTextPage: Bool { textPage != nil }
+
+    func updateArchiveContext(target: ArchiveLinkTarget?, index: JPEGPartnerIndex?) {
+        archiveLinkTarget = target
+        jpegPartnerIndex = index
+        refreshJPEGPartner()
+    }
+
+    func toggleImageSource() {
+        guard hasJPEGPartner else { return }
+        imageSource = imageSource == .pdf ? .jpeg : .pdf
+        guard persistsImageSource,
+              let target = archiveLinkTarget,
+              let relativePath = relativePDFPath(for: currentURL, rootPath: target.rootPath) else { return }
+        imageSourcePreferences.set(imageSource, rootGUID: target.marker.guid, relativePath: relativePath)
+    }
 
     /// Bounds-checked page lookup — `pair` can outrun a freshly-loaded shorter document for one
     /// publish cycle, and PDFKit is happier not being asked for a page it doesn't have.
@@ -331,7 +365,8 @@ final class DocumentViewerModel: ObservableObject {
         guard urls.indices.contains(index) else { return nil }
         return await ArchiveLinkWriter.pageLink(
             fileURL: urls[index], page: focusedPageNumber,
-            rootPath: target.rootPath, marker: target.marker, thumbnailer: thumbnailer
+            rootPath: target.rootPath, marker: target.marker, thumbnailer: thumbnailer,
+            mainRootPath: target.mainRootPath, jpegPartnerIndex: jpegPartnerIndex
         )
     }
 
@@ -345,7 +380,8 @@ final class DocumentViewerModel: ObservableObject {
         let fileURL = urls[index]
         let page = focusedPageNumber
         let immediateItem = ArchiveLinkWriter.pageLinkWithoutThumbnail(
-            fileURL: fileURL, page: page, rootPath: target.rootPath, marker: target.marker
+            fileURL: fileURL, page: page, rootPath: target.rootPath, marker: target.marker,
+            mainRootPath: target.mainRootPath, jpegPartnerIndex: jpegPartnerIndex
         )
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([immediateItem])
@@ -355,7 +391,8 @@ final class DocumentViewerModel: ObservableObject {
         Task {
             let item = await ArchiveLinkWriter.pageLink(
                 fileURL: fileURL, page: page, rootPath: target.rootPath, marker: target.marker,
-                thumbnailer: thumbnailer
+                thumbnailer: thumbnailer, mainRootPath: target.mainRootPath,
+                jpegPartnerIndex: jpegPartnerIndex
             )
             guard archivePageLinkCopyGeneration == generation,
                   NSPasteboard.general.changeCount == expectedChangeCount else { return }
@@ -370,6 +407,9 @@ final class DocumentViewerModel: ObservableObject {
 
     private func loadCurrent() {
         pair = 0   // a newly loaded document always opens on its first page pair
+        jpegPartnerPage = nil
+        jpegPartnerRelativePath = nil
+        imageSource = .pdf
         guard urls.indices.contains(index) else { current = nil; loadError = nil; return }
         let url = urls[index]
         if let doc = PDFDocument(url: url) {
@@ -386,5 +426,69 @@ final class DocumentViewerModel: ObservableObject {
             current = nil
             loadError = "Could not open “\(url.lastPathComponent)” (missing, corrupt, or unsupported format)."
         }
+        refreshJPEGPartner()
+    }
+
+    private var currentURL: URL? { urls.indices.contains(index) ? urls[index] : nil }
+
+    private func refreshJPEGPartner() {
+        jpegPartnerPage = nil
+        jpegPartnerRelativePath = nil
+        imageSource = .pdf
+        guard let pdfURL = currentURL,
+              let target = archiveLinkTarget,
+              let index = jpegPartnerIndex, index.isClean,
+              let partnerURL = resolvedJPEGPartner(pdfURL: pdfURL, target: target, index: index),
+              ReaderArchiveLayout.isContained(partnerURL, inRootPath: target.rootPath),
+              ReaderArchiveLayout.isSupportedImage(partnerURL.pathExtension),
+              index.candidates.first(where: { filesystemPath(partnerURL) == $0.path })?.fingerprint.isDataless != true,
+              let image = NSImage(contentsOf: partnerURL),
+              let page = PDFPage(image: image) else { return }
+        let partnerRelativePath = relativePDFPath(for: partnerURL, rootPath: target.rootPath)
+        if pinsJPEGPartnerFromLink, linkedJPEGRelativePath != partnerRelativePath { return }
+        jpegPartnerPage = page
+        jpegPartnerRelativePath = partnerRelativePath
+        guard let relativePath = relativePDFPath(for: pdfURL, rootPath: target.rootPath) else { return }
+        if persistsImageSource {
+            imageSource = imageSourcePreferences.source(rootGUID: target.marker.guid,
+                                                        relativePath: relativePath)
+            if imageSource == .jpeg, jpegPartnerPage == nil { imageSource = .pdf }
+        }
+    }
+
+    private func relativePDFPath(for url: URL?, rootPath: String) -> String? {
+        guard let url else { return nil }
+        let path = url.withUnsafeFileSystemRepresentation { raw in raw.map(String.init(cString:)) ?? url.path }
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard path.hasPrefix(prefix) else { return nil }
+        return String(path.dropFirst(prefix.count))
+    }
+
+    private func resolvedJPEGPartner(pdfURL: URL, target: ArchiveLinkTarget,
+                                     index: JPEGPartnerIndex) -> URL? {
+        if pinsJPEGPartnerFromLink {
+            guard let relative = linkedJPEGRelativePath, !relative.isEmpty,
+                  !relative.hasPrefix("/"),
+                  !relative.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
+                return nil
+            }
+            let prefix = target.rootPath.hasSuffix("/") ? target.rootPath : target.rootPath + "/"
+            let expected = Array((prefix + relative).utf8)
+            guard let candidate = index.candidates.first(where: { Array($0.path.utf8) == expected }) else {
+                return nil
+            }
+            return candidate.path.withCString {
+                URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: nil)
+            }
+        }
+        guard case let .match(partnerURL) = index.resolve(
+            pdfURL: pdfURL,
+            mainRoot: URL(fileURLWithPath: target.mainRootPath, isDirectory: true)
+        ) else { return nil }
+        return partnerURL
+    }
+
+    private func filesystemPath(_ url: URL) -> String {
+        url.withUnsafeFileSystemRepresentation { raw in raw.map(String.init(cString:)) ?? url.path }
     }
 }

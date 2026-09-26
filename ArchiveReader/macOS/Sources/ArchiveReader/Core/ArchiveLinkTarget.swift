@@ -21,6 +21,8 @@ struct ArchiveLinkTarget: Equatable, Sendable {
     /// security scope and must never be opened. (`W26.symroot-fu1`.)
     let rootPath: String
     let marker: RootMarker
+    /// The scanned MAIN subtree used to resolve a partner by the same relative path/stem context.
+    let mainRootPath: String
 }
 
 /// App-level carrier for the current `ArchiveLinkTarget`, injected into both scenes so a document
@@ -31,13 +33,23 @@ struct ArchiveLinkTarget: Equatable, Sendable {
 @MainActor
 final class ArchiveLinkContext: ObservableObject {
     @Published private(set) var target: ArchiveLinkTarget?
+    @Published private(set) var jpegPartnerIndex: JPEGPartnerIndex?
 
     /// Mirror the navigation window's root store. A missing root or unreadable marker clears the
     /// target (the command then disables) rather than leaving a stale one behind.
-    func update(rootPath: String?, marker: RootMarker?) {
-        let new = (rootPath != nil && marker != nil)
-            ? ArchiveLinkTarget(rootPath: rootPath!, marker: marker!) : nil
+    func update(rootPath: String?, marker: RootMarker?, mainRootPath: String?, jpegRootPath: String?,
+                jpegPartnerIndex: JPEGPartnerIndex?) {
+        let new: ArchiveLinkTarget?
+        if let rootPath, let marker, let mainRootPath, let jpegRootPath,
+           let jpegPartnerIndex, jpegPartnerIndex.isClean,
+           jpegPartnerIndex.jpegRootPath == jpegRootPath {
+            new = ArchiveLinkTarget(rootPath: rootPath, marker: marker,
+                                    mainRootPath: mainRootPath)
+        } else {
+            new = nil
+        }
         if new != target { target = new }   // guard the publish: called from view updates
+        self.jpegPartnerIndex = jpegPartnerIndex?.isClean == true ? jpegPartnerIndex : nil
     }
 }
 

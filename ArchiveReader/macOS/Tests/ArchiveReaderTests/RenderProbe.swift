@@ -136,6 +136,17 @@ enum RenderProbe {
         return out as Data
     }
 
+    /// Encode a synthetic image as JPEG for the dual-image viewer fixtures.
+    static func jpegData(from cgImage: CGImage) -> Data? {
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(dest, cgImage, [kCGImageDestinationLossyCompressionQuality: 0.92] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return out as Data
+    }
+
     /// Decode PNG (or any ImageIO-readable) data to a `CGImage`.
     static func cgImage(fromPNG data: Data) -> CGImage? {
         guard let src = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
