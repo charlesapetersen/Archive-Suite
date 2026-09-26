@@ -13,10 +13,9 @@ enum LLMRotationDetector {
 
     /// Cheap, fast Gemini model used for rotation regardless of the OCR model.
     static let cheapGeminiModel = "gemini-2.5-flash-lite"
-    /// Cheap, **non-reasoning** OpenAI model used for rotation regardless of the OCR model. Must stay a
-    /// non-reasoning model: this path sends `temperature: 0` + `max_tokens`, and a reasoning model would
-    /// reject `temperature` and could spend the tiny `max_tokens` budget on hidden reasoning, returning no
-    /// letter. gpt-5.4-mini is benchmarked non-reasoning (`LLMModel.openaiModels`). // VERIFY at build time.
+    /// Cheap OpenAI model used for rotation regardless of the OCR model. GPT-5.4 mini supports reasoning,
+    /// but defaults to `none`; this path pins that effort and bounds total completion tokens. Verified
+    /// against OpenAI's live model docs 2026-09-26: https://developers.openai.com/api/docs/models/gpt-5.4-mini
     static let cheapOpenAIModel = "gpt-5.4-mini"
     /// Long edge of the downscaled candidate images (orientation is obvious at low res).
     private static let candidatePixels = 800
@@ -139,11 +138,12 @@ enum LLMRotationDetector {
             content.append(["type": "text", "text": "\nImage \(img.label):"])
             content.append(["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(img.base64)"]])
         }
-        // gpt-5.4-mini is non-reasoning → plain `max_tokens` + deterministic `temperature: 0`, mirroring the
-        // Gemini path (a reasoning model would need `max_completion_tokens` and reject `temperature`).
+        // Keep rotation cheap and deterministic: effort `none`, an eight-token total completion ceiling,
+        // and temperature zero. OpenAI's current API accepts temperature at effort `none`.
         let body: [String: Any] = [
             "model": cheapOpenAIModel,
-            "max_tokens": 8,
+            "max_completion_tokens": 8,
+            "reasoning_effort": "none",
             "temperature": 0,
             "messages": [["role": "user", "content": content]]
         ]

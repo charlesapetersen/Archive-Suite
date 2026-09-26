@@ -6,8 +6,8 @@ import Foundation
 /// **Detect + Verify** that drives `LocalAgentValidator`. Holds **no key** — auth lives entirely in the
 /// CLI's own subscription login.
 ///
-/// Install links + on-screen steps mirror the live 2026 setup flows — re-verify wording/URLs (and
-/// capture screenshots) in the keyed/owner tail before shipping, exactly like `ProviderKeySpec`.
+/// The install and setup links were checked 2026-09-26. Gemini/Codex CLI flags, JSON envelope, and
+/// Gemini entitlement wording remain deliberately unverified until those CLIs and accounts are installed.
 /// Codex is intentionally NOT in the guided wizard (it stays available via the Settings tool picker),
 /// mirroring how Anthropic is reachable via manual key entry but omitted from the key wizard.
 struct LocalAgentSpec: Identifiable, Sendable {

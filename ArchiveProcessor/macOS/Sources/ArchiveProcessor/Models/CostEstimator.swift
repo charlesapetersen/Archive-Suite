@@ -76,7 +76,7 @@ struct CostEstimator {
         case .gemini: return (0.0375, 0.15)     // gemini-2.5-flash-lite
         case .anthropic: return (3.0, 15.0)     // claude-sonnet-4-6
         case .mistral: return nil               // no LLM rotation path → local Vision (free)
-        case .openai: return (0.75, 4.50)       // gpt-5.4-mini (LLMRotationDetector.cheapOpenAIModel)
+        case .openai: return (0.75, 4.50)       // gpt-5.4-mini; verified 2026-09-26 against OpenAI's model page.
         case .appleVision: return nil
         }
     }

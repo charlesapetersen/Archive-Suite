@@ -47,7 +47,7 @@ enum ThinkingLevel: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
 
     /// OpenAI `reasoning_effort` value for this level (o-series / GPT-5 reasoning models). The app's
-    /// two-level Low/High control maps to OpenAI's low/high; OpenAI's own "medium" default is used when
+    /// two-level Low/High control maps to OpenAI's low/high; the selected model's default is used when
     /// no level is chosen (nil). Sent ONLY on reasoning-capable models — the
     /// `OpenAICompatibleClient.openAI(model:apiKey:thinkingLevel:)` factory gates this on
     /// `model.supportsThinking`, since non-reasoning OpenAI models reject `reasoning_effort`.
@@ -317,19 +317,19 @@ struct LLMModel: Identifiable, Hashable, Codable {
         ),
     ]
 
-    // ⚠️ W13.oai-1 PLACEHOLDERS — model IDs AND per-1M pricing are NOT yet verified against OpenAI's
-    // live pricing. A wrong price is a silent cost-estimator bug, so these are re-verified in the
-    // keyed/owner tail (Daemon Report) before the live OCR test; do not treat as authoritative.
+    // ⚠️ W13.oai-1 PLACEHOLDERS — model IDs AND per-1M pricing remain unverified for the other entries;
+    // W21.verify checked gpt-5.4-mini against OpenAI's live model page on 2026-09-26. A wrong price is a
+    // silent cost-estimator bug, so confirm the remaining entries before the live OCR smoke; do not treat
+    // those prices as authoritative.
     // `supportsThinking: true` marks the reasoning families (o-series / GPT-5) that require
     // `max_completion_tokens` — see `OpenAICompatibleClient.openAI(model:apiKey:)`. First entry is the
     // default OCR model (cheapest capable vision model, analogous to Gemini Flash-Lite).
     // Model IDs + per-1M prices are the current GPT-5 generation, priced per the owner-provided source
     // (SoCOCRbench — https://noahdasanaike.github.io/posts/sococrbench.html, captured 2026-07-16), ordered
-    // cheapest→flagship. `supportsThinking` follows that benchmark's reasoning column: the models it ran WITH
-    // reasoning are reasoning-capable; the "no reason." variants are marked false so the adapter never sends
-    // `reasoning_effort` to a model that would reject it. IDs follow OpenAI's lowercase-hyphen convention;
-    // live model-ID + param confirmation remains the keyed OCR smoke (Daemon Report) — a wrong ID surfaces
-    // there, not silently in the estimator.
+    // cheapest→flagship. `supportsThinking` follows current API capability, not the reasoning mode selected
+    // by a benchmark run; GPT-5.4 mini supports `reasoning_effort` and defaults to `none`. IDs follow OpenAI's
+    // lowercase-hyphen convention; live request confirmation for the remaining unverified entries remains
+    // the keyed OCR smoke — a wrong ID surfaces there, not silently in the estimator.
     static let openaiModels: [LLMModel] = [
         LLMModel(
             id: "gpt-5-nano",
@@ -355,7 +355,7 @@ struct LLMModel: Identifiable, Hashable, Codable {
             id: "gpt-5.4-mini",
             displayName: "GPT-5.4 mini",
             provider: .openai,
-            supportsThinking: false,           // benchmarked "no reason." — don't send reasoning_effort
+            supportsThinking: true,            // OpenAI lists reasoning-effort support; default is `none`.
             returnsMd: false,
             inputCostPer1M: 0.75,
             outputCostPer1M: 4.50,

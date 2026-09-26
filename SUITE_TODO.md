@@ -753,22 +753,6 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W21.verify — verify the three release `// VERIFY` desk checks against live vendor docs [S].** These sat
-  on the owner's manual list but are **not GUI checks** — no app launch, no VM, no key. They are "does this
-  hard-coded fact still match the vendor's live model list / console flow", which a session can do with web
-  access. Confirm each, then either flip the `// VERIFY` comment to a dated confirmation or file a correction:
-  1. **OpenAI rotation model + price** — `cheapOpenAIModel = "gpt-5.4-mini"` (`OCR/LLMRotationDetector.swift`)
-     and the rotation cost pair `(0.75, 4.50)` (`Models/CostEstimator.swift`) still match OpenAI's live model
-     list and pricing. ⚠️ If pricing moved, the cost ESTIMATE misleads the owner before a paid run — treat a
-     mismatch as a real bug, not a doc nit.
-  2. **Anthropic wizard deep links + wording** (`Models/ProviderKeySpec.swift`) — `console.anthropic.com/settings/keys`,
-     `…/settings/billing`, `privacy.anthropic.com` still resolve and still describe the 2026 Console flow.
-  3. **Local-Agent install links + step wording** (`Models/LocalAgentSpec.swift`). Note the `gemini`/`codex`
-     flags, JSON envelope and entitlement wording stay deliberately unvalidated placeholders until those CLIs
-     are installed — do NOT invent confirmations for them; say they remain unverified.
-  Docs-only unless a fact is wrong; then it becomes a small code fix in the same commit. No corpus, no keys,
-  no GUI. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMRotationDetector,Models/CostEstimator,Models/ProviderKeySpec,Models/LocalAgentSpec}.swift | S | low | none
-
 - [ ] **W21.seed-fu2 — the stale-marker Keychain warning compares NAMES, so it misses the case that actually breaks the CLI [S · MED · ops].**
   `W21.seed-fu` (`2c4ff4e`) warns at start when a present provider account is absent from the partition-repair
   marker's name list. Wrong axis. Measured 2026-08-24: Gemini **is** named in the marker, yet the CLI could not

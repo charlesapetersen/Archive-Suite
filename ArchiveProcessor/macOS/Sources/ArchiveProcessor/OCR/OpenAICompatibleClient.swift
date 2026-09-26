@@ -6,10 +6,9 @@ struct OpenAICompatibleClient {
     let apiKey: String
     let modelID: String
 
-    /// Token-limit parameter name. OpenAI **reasoning** models (o-series / GPT-5 family) require
-    /// `max_completion_tokens` and reject the legacy `max_tokens`; every other model — and every
-    /// OpenAI-compatible gateway — still takes `max_tokens`. Defaults to `max_tokens`, so the existing
-    /// gateway callers build a byte-identical request. // VERIFY families when finalizing the OpenAI list.
+    /// Token-limit parameter name. Native OpenAI reasoning models use `max_completion_tokens`, which
+    /// bounds visible and reasoning tokens; OpenAI-compatible gateways retain `max_tokens`. Defaults to
+    /// `max_tokens`, so existing gateway callers build a byte-identical request.
     var maxTokensParam: String = "max_tokens"
     /// Optional OpenAI `reasoning_effort` ("low"/"medium"/"high"), sent only when non-nil (reasoning
     /// models only). Set by the `openAI(model:apiKey:thinkingLevel:)` factory from the caller's
@@ -127,14 +126,12 @@ extension OpenAICompatibleClient {
     static let openAIBaseURL = "https://api.openai.com/v1"
 
     /// Build a client for the first-class `.openai` provider, applying the model-family param adapter
-    /// (OpenAI plan, Design decision 3): OpenAI **reasoning** models (o-series / GPT-5 family) require
-    /// `max_completion_tokens` instead of `max_tokens` (and reject `temperature`, which this client never
-    /// sends). Keyed off `model.supportsThinking`, which the built-in `openaiModels` list sets `true`
-    /// only for those reasoning families.
+    /// (OpenAI plan, Design decision 3): `max_completion_tokens` is used for reasoning-capable models.
+    /// Keyed off `model.supportsThinking`, which the built-in `openaiModels` list tracks per model.
     ///
-    /// `reasoning_effort` (W13.oai-2) is likewise gated on `supportsThinking`: it is sent ONLY for
-    /// reasoning models — non-reasoning models (e.g. gpt-5.4-mini) reject the parameter — and only when the
-    /// caller passes a `thinkingLevel` (otherwise OpenAI's own "medium" default applies). The
+    /// `reasoning_effort` (W13.oai-2) is likewise gated on `supportsThinking`: it is sent only for
+    /// reasoning-capable models and only when the caller passes a `thinkingLevel` (otherwise that model's
+    /// default applies). The
     /// `ThinkingLevel → reasoning_effort` string mapping lives on `ThinkingLevel.openAIReasoningEffort`.
     static func openAI(model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel? = nil) -> OpenAICompatibleClient {
         OpenAICompatibleClient(
