@@ -432,6 +432,18 @@ the bundle temp dir; the `ArchiveFile` paths need not exist (an unreadable file 
 mechanisms proven non-vacuous by neutering. The same fix shipped in Notes the same day — see
 `../ArchiveNotes/KNOWN_ISSUES.md`.
 
+## ✅ FIXED (W23.m9-fu3) — the Reader index warning and live recovery had never been rendered
+
+**2026-09-25.** The amber `ar.status.indexFailure` line was only covered by headless tests. The GUI fixture
+builder now has an opt-in mode that seeds its generated scratch tree with exactly 1 KiB of invalid SQLite
+bytes. `ContentIndexer` accepts a DEBUG index-path override only when the path is the fixture's expected
+cache and the root is a non-symlink directory with the exact generated Reader marker. The UI test renders the
+warning, truncates that disposable cache, invokes File ▸ Rescan Archive Folder in the same process, and
+asserts both that the warning retracts and that California OCR search results return.
+
+The off-screen Tart VM test passed. Reader's 404 unit tests, the 36 fixture-script checks, and the write-surface
+lint passed. The fixture is scratch-only; no archive corpus was read or written.
+
 ## ✅ FIXED (`W20.deeplink-isolation`) — the no-root deep-link test could read the owner's saved root
 The app-hosted unit bundle shares `com.archivereader.app` defaults, so a bare `NavigationModel()` could resolve
 the owner's persisted `archiveRootBookmark`; the no-root assertion then failed or spent time discovering a root

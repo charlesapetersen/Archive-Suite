@@ -411,21 +411,6 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### Follow-ups discovered while fixing Wave 23
 
-- [ ] **W23.m9-fu3 — the index-failure UI in Reader and Notes has never been rendered; give the GUI fixture
-  a corrupt index so it can be [S].** Owner decision, 2026-07-31 Daemon Report. W23.m9 shipped two warning
-  surfaces — Reader's amber status-bar line (`ar.status.indexFailure`) and Notes' reused sidebar banner —
-  each shown only when the search index cannot be opened or was not fully written. **Neither has ever been
-  drawn by anything.** This is NOT a skipped VM run: no fixture produces a corrupt index, so there is no path
-  to the state to drive. The state machine behind them is covered by 23 headless tests; only the drawing is
-  unproven. **Do:** teach the GUI fixture builders (`ArchiveReader/scripts/make-gui-fixture.sh` and `ArchiveNotes/scripts/make-notes-fixture.sh` — they live under each app's `scripts/`, NOT under `ops/gui/`, which the first draft of this line implied)
-  an opt-in mode that overwrites the scratch fixture's `content-index-v2.sqlite3` / `notes-index-v1.sqlite3`
-  with a kilobyte of junk, then add a UITest per app asserting the warning appears — **and, more importantly,
-  that the next attempt recovers on its own once the bad file is replaced**, which is the actual point of the
-  fix. Safe by construction: both files are rebuildable caches inside a scratch fixture, never the owner's
-  real store. Closes the two macOS surfaces; the Processor's equivalent red row (W23.m7) stays blocked on
-  `W21.vmgui-d`, and the Android ones are declined below.
-  | files: ops/gui/*, ArchiveReader UITests, ArchiveNotes UITests | Tier-1 | S
-
 - [ ] **W23.m4-fu — a page-specific reveal opens a NEW window per page instead of navigating an open one
   [S · LOW · UX] — ⛔ DO NOT IMPLEMENT UNPROMPTED: the owner chose to KEEP the current behaviour.**
   ⚠️ **This item is filed as the REVERSAL of a decision, not as work.** It is contingent on a judgement only the

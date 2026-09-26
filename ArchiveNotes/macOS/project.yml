@@ -74,6 +74,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.archivenotes.uitests
         TEST_TARGET_NAME: ArchiveNotes
+        # The UI runner may replace only the generated Tart fixture cache during live recovery.
+        CODE_SIGN_ENTITLEMENTS: Sources/ArchiveNotes/ArchiveNotesUITests.entitlements
         # ENABLE_HARDENED_RUNTIME: NO is RETAINED. It was found necessary under ad-hoc signing
         # (CODE_SIGN_IDENTITY "-") or the Runner couldn't load the xctest plugin — library validation
         # rejected mismatched CDHashes — the key finding from the Reader harness (W7.1). Signing moved

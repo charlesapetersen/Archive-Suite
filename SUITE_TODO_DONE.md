@@ -4127,6 +4127,16 @@ explain why not.
   own item rather than riding along on a LOW visibility fix. Same shape as **W23.m10-fu** (a recovered
   volume doesn't re-mirror until the next organization mutation), and worth doing with it. Notes
   `Core/NotesModel.swift`, `Index/NotesIndexer.swift`. | Tier-1 | XS–S | LOW
+- [x] **W23.m9-fu3 — the Reader and Notes index-failure warnings had never been rendered [S · LOW].**
+  Owner decision, 2026-07-31. Both GUI fixture builders now have an opt-in mode that seeds only their
+  generated scratch cache with 1 KiB of invalid SQLite bytes. Marker-checked DEBUG index overrides keep
+  writes inside those fixture roots; test-runner entitlements grant access only to the two Tart fixture
+  directories. Each focused UI test renders the warning, repairs the cache while the app remains open, and
+  verifies warning retraction plus repopulated search results (Reader via the normal rescan command; Notes
+  via its recovery-triggering query). Tier-2 find/refute completed. Verified: Reader 404 unit tests, Notes 218
+  unit tests, fixture scripts 36/36, Reader write-surface lint, both Debug builds, and both focused off-screen
+  Tart UI tests (1/1 each). Scratch fixtures only; no real corpus/store touched. **SHIPPED 2026-09-25 (this
+  commit).** | files: Reader, Notes, ops/gui
 - [x] **W23.m10 — `organization.json` export failure is reported as a successful organization change
   [S · MED · durable-mirror rot].** `Index/OrganizationFile.swift`, `Index/OrganizationStore.swift`.
   `organization.json` is documented as **the authoritative durable mirror** that survives DB wipes and

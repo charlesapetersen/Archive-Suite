@@ -727,6 +727,17 @@ state-triggered neuter reddened only "a healthy index is never rebuilt", an inli
 only the off-the-critical-path half, and scheduling before checking that the open SUCCEEDED reddened only "a
 read over a still-dead index schedules no rebuild"). Notes suite 724/724.
 
+## ✅ FIXED (W23.m9-fu3) — the Notes index warning and live recovery had never been rendered
+
+**2026-09-25.** The `an.sidebar.status` index warning was covered in model tests but not rendered in the GUI.
+The Notes fixture builder now has an opt-in mode that seeds its generated scratch store with exactly 1 KiB of
+invalid SQLite bytes. The DEBUG index override requires the expected fixture index path and a non-symlink
+root with the generated Notes marker. In the off-screen UI test, the warning appears, the test replaces only
+the scratch cache, and a search reopens it, retracts the warning, and starts the existing recovery rebuild.
+
+The targeted Tart VM test passed. Notes' 218 unit tests passed; no real Notes store or archive corpus was
+read or written.
+
 ## ✅ FIXED (W21.vmgui-c): 4/12 `ArchiveNotesUITests` failed in the headless VM — ONE geometry cause, not four bugs
 
 **Found 2026-07-30, root-caused + fixed 2026-08-01.** The suite is now **12/12 in the VM**

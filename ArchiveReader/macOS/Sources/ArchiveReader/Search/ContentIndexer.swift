@@ -91,13 +91,43 @@ final class ContentIndexer: ObservableObject {
     convenience init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ArchiveReader", isDirectory: true)
+        var indexURL = dir.appendingPathComponent("content-index-v2.sqlite3")
+#if DEBUG
+        // Fixture UITests may point the rebuildable cache into their verified scratch root so they
+        // can corrupt and repair it without touching the app's own content index.
+        let defaults = UserDefaults.standard
+        if let fixturePath = defaults.string(forKey: "ARUITestRootPath"), !fixturePath.isEmpty,
+           let indexPath = defaults.string(forKey: "ARUITestContentIndexPath"), !indexPath.isEmpty {
+            let root = URL(fileURLWithPath: fixturePath).standardizedFileURL
+            let expected = root.appendingPathComponent("content-index-v2.sqlite3").standardizedFileURL
+            let requested = URL(fileURLWithPath: indexPath).standardizedFileURL
+            if requested == expected, Self.isGeneratedReaderFixture(root) {
+                indexURL = requested
+            }
+        }
+#endif
         // v2: the schema gained non-standard-PDF columns (page_count/has_text/readable). Because
         // unchanged files won't re-index into an old DB, bumping the *filename* makes the new schema a
         // clean full re-index — safe, since the index is an explicitly disposable/rebuildable cache.
         // (The stale content-index.sqlite3 is left in place: the write-surface lint bans file-delete
         // APIs app-wide, and the orphan is a rebuildable cache the user can clear.)
-        self.init(url: dir.appendingPathComponent("content-index-v2.sqlite3"))
+        self.init(url: indexURL)
     }
+
+#if DEBUG
+    /// The only test root allowed to redirect the index write path is the generated scratch fixture.
+    /// Keep the DEBUG launch override fail-closed so a malformed test invocation cannot write beside
+    /// an arbitrary archive selected with `ARUITestRootPath`.
+    private static func isGeneratedReaderFixture(_ root: URL) -> Bool {
+        guard let values = try? root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              values.isDirectory == true, values.isSymbolicLink != true,
+              let marker = try? Data(contentsOf: root.appendingPathComponent(".archive-suite-root.json")) else {
+            return false
+        }
+        let expected = Data((#"{"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}"# + "\n").utf8)
+        return marker == expected
+    }
+#endif
 
     /// Incrementally index the given files (skips unchanged content via `existingMTimes`).
     ///

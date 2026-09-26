@@ -57,6 +57,10 @@ class FixtureUITestCase: XCTestCase {
 
         app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launchArguments += ["-ARUITestRootPath", Self.fixturePath]
+        if Self.fixturePath == Self.canonicalFixturePath {
+            app.launchArguments += ["-ARUITestContentIndexPath",
+                                   Self.canonicalFixturePath + "/content-index-v2.sqlite3"]
+        }
         app.launch()
         app.activate()   // bring to front so row/header clicks are hittable even if another app had focus
 
@@ -138,6 +142,23 @@ class FixtureUITestCase: XCTestCase {
         let expected = Data((#"{"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}"# + "\n").utf8)
         guard marker == expected else {
             throw FixtureSafetyError("refusing tag writes: the canonical GUI fixture marker is missing or altered")
+        }
+    }
+
+    /// Index-failure UI checks must use the generated, marker-checked fixture and its disposable cache.
+    func requireGeneratedScratchFixtureForIndexTests() throws {
+        guard Self.fixturePath == Self.canonicalFixturePath else {
+            throw FixtureSafetyError("refusing index tests outside the generated AR-GUI-Fixture root")
+        }
+        let root = URL(fileURLWithPath: Self.canonicalFixturePath, isDirectory: true)
+        let values = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isDirectory == true, values.isSymbolicLink != true else {
+            throw FixtureSafetyError("refusing index tests: the canonical fixture root is not a real directory")
+        }
+        let marker = try Data(contentsOf: root.appendingPathComponent(".archive-suite-root.json"))
+        let expected = Data((#"{"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}"# + "\n").utf8)
+        guard marker == expected else {
+            throw FixtureSafetyError("refusing index tests: the generated Reader fixture marker is missing or altered")
         }
     }
 

@@ -53,6 +53,18 @@ argument is optional, so the old `vm-gui-runner.sh xcuitest` form still means "r
 `~/.tart-mirror/vm-artifacts/<app>/` — `Read` the PNGs to eyeball renders. Drive the VM with
 `tart exec <vm> …` (no SSH — Cirrus images ship the guest agent).
 
+**Index warning / recovery check (W23.m9-fu3):** the opt-in `CORRUPT_INDEX_FIXTURE=1` mode seeds only the
+generated Reader or Notes fixture with 1 KiB of invalid SQLite bytes. Run the focused check per app:
+
+```sh
+CORRUPT_INDEX_FIXTURE=1 ops/gui/vm-gui-runner.sh reader xcuitest
+CORRUPT_INDEX_FIXTURE=1 ops/gui/vm-gui-runner.sh notes xcuitest
+```
+
+Each check asserts that the warning appears, repairs only the marker-checked scratch cache, and confirms the
+same app session clears the warning and repopulates search results. The ordinary fixture builders stay healthy
+by default.
+
 **Screenshots a UITest takes** land in `vm-artifacts/<app>/shots/` as `uitest-<name>.png`. A test **cannot**
 write there itself — the XCUITest runner is **sandboxed**, so the `--dir=out:` share is not writable from
 inside it (measured 2026-08-09, `W26.docs-fu1`). `FixtureUITestCase.captureScreenshot` therefore writes to the

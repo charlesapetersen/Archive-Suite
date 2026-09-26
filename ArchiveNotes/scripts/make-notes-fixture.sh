@@ -44,6 +44,7 @@
 #
 # Usage:  ./ArchiveNotes/scripts/make-notes-fixture.sh
 #         NOTES_FIXTURE_CORPUS=/path/to/pdfs ./ArchiveNotes/scripts/make-notes-fixture.sh
+#         AN_GUI_CORRUPT_INDEX=1 …/make-notes-fixture.sh  # opt in to the W23.m9-fu3 1 KiB junk cache
 # =============================================================================
 set -euo pipefail
 
@@ -300,6 +301,18 @@ if [ -x "$TAG" ]; then
   echo "make-notes-fixture: applied initial Finder-tag projection to 3 notes" >&2
 else
   echo "make-notes-fixture: WARNING — tag CLI not found at $TAG; skipped initial tag projection." >&2
+fi
+
+# Opt-in W23.m9-fu3 fixture: the app's DEBUG UI-test index override can open this disposable cache
+# directly. Its corruption is deliberate and scoped to AN-GUI-Fixture; ordinary fixture builds remain
+# healthy and the real app-container index is never touched.
+if [ "${AN_GUI_CORRUPT_INDEX:-0}" = "1" ]; then
+  python3 - "$DST/notes-index-v1.sqlite3" <<'PY'
+import sys
+with open(sys.argv[1], "wb") as handle:
+    handle.write(b"Z" * 1024)
+PY
+  echo "make-notes-fixture: wrote 1 KiB corrupt Notes index (opt-in UI failure fixture)" >&2
 fi
 
 echo "make-notes-fixture: ready ($DST)" >&2

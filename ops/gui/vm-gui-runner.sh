@@ -17,7 +17,8 @@
 # USAGE:  ops/gui/vm-gui-runner.sh [reader|notes|processor] [xcuitest|sighted|both] (default: reader both)
 #         The app argument is optional, so the old call form still works: a bare
 #         `vm-gui-runner.sh xcuitest` still means "reader, xcuitest".
-# ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, AGENT_WAIT.
+# ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, AGENT_WAIT,
+#                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
@@ -67,7 +68,24 @@ SCHEME="$(archive_app_field "$APP" scheme)";        GUEST_DD="$(archive_app_fiel
 GUEST_APP="$(archive_app_field "$APP" appbundle)"   # procname is read by tart_kill_app, not needed here
 GUEST_FIXTURE="$(archive_app_field "$APP" fixture)"; MKFIXTURE="$(archive_app_field "$APP" mkfixture)"
 LAUNCHCMD="$(archive_app_field "$APP" launchcmd)";  PRERUN="$(archive_app_field "$APP" prerun)"
-ONLY_TESTING="${ONLY_TESTING:-$(archive_app_field "$APP" tests)}"
+CORRUPT_TEST_SELECTOR=""
+if [ "${CORRUPT_INDEX_FIXTURE:-0}" = "1" ]; then
+  case "$APP" in
+    reader)
+      MKFIXTURE="AR_GUI_CORRUPT_INDEX=1 $MKFIXTURE"
+      CORRUPT_TEST_SELECTOR="ArchiveReaderUITests/ContentIndexFailureUITests/testCorruptIndexWarningRetractsAfterScratchRepairAndReindex"
+      ;;
+    notes)
+      MKFIXTURE="AN_GUI_CORRUPT_INDEX=1 $MKFIXTURE"
+      CORRUPT_TEST_SELECTOR="ArchiveNotesUITests/NotesGUITests/testCorruptIndexWarningRetractsAfterScratchRepairAndReindex"
+      ;;
+    *) die "CORRUPT_INDEX_FIXTURE is supported only for reader and notes." ;;
+  esac
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
+    die "corrupt-index fixtures require ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+  fi
+fi
+ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
   || die "invalid VM test selector list '$ONLY_TESTING' (comma-separated Xcode test identifiers only)"
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""

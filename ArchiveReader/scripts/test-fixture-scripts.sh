@@ -151,6 +151,16 @@ n_tagged="$(count_read_state "$GDST")"
 if [ "$n_tagged" -eq 11 ]; then ok "11 of 12 carry Read/Unread on disk"
 else bad "expected 11 files with a read state, got $n_tagged"; fi
 
+echo "── 2b. opt-in corrupt Reader content-index fixture ─────────────────────────"
+CORRUPT_GDST="$SCRATCH/AR-GUI-Fixture-Corrupt-Index"
+run_shimmed "AR_FIXTURE_SRC=" "AR_FIXTURE_DST=$CORRUPT_GDST" "AR_GUI_CORRUPT_INDEX=1" -- "$GUI_FIXTURE"
+corrupt_reader_size=$(wc -c < "$CORRUPT_GDST/content-index-v2.sqlite3" 2>/dev/null | tr -d ' ')
+if [ "$RC" -eq 0 ] && [ "$corrupt_reader_size" -eq 1024 ]; then
+  ok "opt-in mode writes exactly 1 KiB of junk into the scratch content index"
+else
+  bad "Reader corrupt-index fixture mode failed" "$OUT (bytes: ${corrupt_reader_size:-missing})"
+fi
+
 t9=$(/opt/homebrew/bin/tag -lN "$GDST/00009 IMG — Brown.pdf" 2>/dev/null || true)
 case ",$t9," in
   *,Read,*|*,Unread,*) bad "file 9 must have NEITHER read state (tri-state bucket)" "tags: $t9" ;;
@@ -206,6 +216,14 @@ run_shimmed "HOME=$NOTES_HOME" "NOTES_FIXTURE_CORPUS=" -- "$NOTES_FIXTURE"
 NDST="$NOTES_HOME/Library/Application Support/ArchiveNotes/AN-GUI-Fixture"
 if [ "$RC" -eq 0 ]; then ok "Notes fixture builds with no source corpus"
 else bad "Notes fixture exited rc=$RC without a source corpus" "$OUT"; fi
+
+run_shimmed "HOME=$NOTES_HOME" "NOTES_FIXTURE_CORPUS=" "AN_GUI_CORRUPT_INDEX=1" -- "$NOTES_FIXTURE"
+notes_corrupt_size=$(wc -c < "$NDST/notes-index-v1.sqlite3" 2>/dev/null | tr -d ' ')
+if [ "$RC" -eq 0 ] && [ "$notes_corrupt_size" -eq 1024 ]; then
+  ok "opt-in mode writes exactly 1 KiB of junk into the scratch Notes index"
+else
+  bad "Notes corrupt-index fixture mode failed" "$OUT (bytes: ${notes_corrupt_size:-missing})"
+fi
 
 last="$(printf '%s' "$OUT" | tail -1)"
 if [ "$last" = "$NDST" ]; then ok "Notes fixture emits its scratch path on stdout"

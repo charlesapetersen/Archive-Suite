@@ -26,6 +26,7 @@
 #         AR_FIXTURE_DST — where to build (default: the Application Support path above).
 #                          Overriding it is how the test harness builds a throwaway
 #                          fixture on an unindexed volume without clobbering the real one.
+#         AR_GUI_CORRUPT_INDEX=1 — opt in to a 1 KiB non-SQLite content cache for W23.m9-fu3 UI tests.
 # Deps:   /opt/homebrew/bin/tag, sips
 set -euo pipefail
 
@@ -252,6 +253,18 @@ cat > "$DST/.archive-suite-root.json" <<'JSON'
 {"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}
 JSON
 
+# Opt-in W23.m9-fu3 fixture: make the content index unambiguously non-SQLite so the UI can exercise
+# the warning and recovery path. This cache lives inside the disposable fixture root, never in app
+# support and never beside a real corpus. The normal fixture remains healthy unless explicitly opted in.
+if [ "${AR_GUI_CORRUPT_INDEX:-0}" = "1" ]; then
+  python3 - "$DST/content-index-v2.sqlite3" <<'PY'
+import sys
+with open(sys.argv[1], "wb") as handle:
+    handle.write(b"Z" * 1024)
+PY
+  echo "make-gui-fixture: wrote 1 KiB corrupt content index (opt-in UI failure fixture)" >&2
+fi
+
 # --- verify the tags are ON DISK (W26.scripts: no mdimport, no mdfind poll) ---
 # `tag -s` writes com.apple.metadata:_kMDItemUserTags with setxattr(2) and returns only once the
 # xattr is set, so there is nothing to wait for — read it straight back. The old code force-indexed
@@ -289,6 +302,7 @@ tagged=0
 problems=""
 for f in "$DST"/*; do
   [ -f "$f" ] || continue
+  [ "$(basename "$f")" = "content-index-v2.sqlite3" ] && continue
   total=$((total + 1))
   base=$(basename "$f")
   if has_read_state "$f"; then

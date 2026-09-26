@@ -211,6 +211,15 @@ final class NotesModel: ObservableObject {
     private static func indexDatabaseURL(inAppSupport appSupport: URL) -> URL {
 #if DEBUG
         if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
+            let fixtureRoot = URL(fileURLWithPath: path).standardizedFileURL
+            let fixtureIndex = fixtureRoot.appendingPathComponent("notes-index-v1.sqlite3").standardizedFileURL
+            if let requested = UserDefaults.standard.string(forKey: "ANUITestIndexPath"), !requested.isEmpty,
+               URL(fileURLWithPath: requested).standardizedFileURL == fixtureIndex,
+               isGeneratedNotesFixture(fixtureRoot) {
+                // W23.m9-fu3: an explicit, marker-checked scratch fixture cache lets the GUI lane
+                // exercise corruption and repair without opening or replacing the app-container DB.
+                return fixtureIndex
+            }
             let uitestURL = appSupport.appendingPathComponent("notes-index-uitest.sqlite3")
             resetUITestIndexDatabase(at: uitestURL)
             return uitestURL
@@ -220,6 +229,17 @@ final class NotesModel: ObservableObject {
     }
 
 #if DEBUG
+    private static func isGeneratedNotesFixture(_ root: URL) -> Bool {
+        guard let values = try? root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              values.isDirectory == true, values.isSymbolicLink != true else { return false }
+        let marker = root.appendingPathComponent(".archive-suite-root.json")
+        guard let data = try? Data(contentsOf: marker),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        return object["guid"] as? String == "a11ce5e7-1000-4000-8000-000000000001"
+            && object["name"] as? String == "AN-GUI-Fixture"
+            && object["kind"] as? String == "notes"
+    }
+
     /// Delete the UITest index DB (plus its `-wal`/`-shm` sidecars) and ensure its parent directory
     /// exists, so each XCUITest launch opens a fresh, empty index. Only ever touches the
     /// `notes-index-uitest.sqlite3` triple — never the real `notes-index-v1.sqlite3`, never the store,

@@ -90,6 +90,26 @@ class NotesFixtureUITestCase: XCTestCase {
         }
     }
 
+    /// Index-failure UI checks can replace only the generated Notes fixture cache.
+    func requireCanonicalScratchFixtureForIndexTests() throws {
+        guard Self.fixturePath == Self.canonicalFixturePath else {
+            throw FixtureWriteSafetyError("AN_GUI_FIXTURE_PATH is not permitted for index tests")
+        }
+        let root = URL(fileURLWithPath: Self.canonicalFixturePath)
+        let values = try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values.isDirectory == true, values.isSymbolicLink != true else {
+            throw FixtureWriteSafetyError("canonical Notes fixture must be a non-symlink directory")
+        }
+        let marker = root.appendingPathComponent(".archive-suite-root.json")
+        guard let data = FileManager.default.contents(atPath: marker.path),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["guid"] as? String == "a11ce5e7-1000-4000-8000-000000000001",
+              object["name"] as? String == "AN-GUI-Fixture",
+              object["kind"] as? String == "notes" else {
+            throw FixtureWriteSafetyError("canonical Notes fixture marker is missing or altered")
+        }
+    }
+
     private struct FixtureWriteSafetyError: LocalizedError {
         let message: String
         init(_ message: String) { self.message = message }
@@ -580,6 +600,57 @@ class NotesFixtureUITestCase: XCTestCase {
 /// external launch, chip-button clicks) are documented in `ArchiveNotes/scripts/GUI-HARNESS.md`.
 @MainActor
 final class NotesGUITests: NotesFixtureUITestCase {
+
+    /// W23.m9-fu3 — render the warning, repair the scratch cache, and prove live recovery in the VM.
+    func testCorruptIndexWarningRetractsAfterScratchRepairAndReindex() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForIndexTests()
+            let indexURL = URL(fileURLWithPath: Self.canonicalFixturePath)
+                .appendingPathComponent("notes-index-v1.sqlite3")
+            try XCTSkipUnless(FileManager.default.fileExists(atPath: indexURL.path),
+                              "Run the fixture builder with AN_GUI_CORRUPT_INDEX=1")
+            let junk = try Data(contentsOf: indexURL)
+            try XCTSkipUnless(junk == Data(repeating: 0x5A, count: 1024),
+                              "Run the fixture builder with AN_GUI_CORRUPT_INDEX=1")
+
+            app.terminate()
+            app = .archiveUITestApp()
+            app.launchArguments += [
+                "-ANUITestStorePath", Self.canonicalFixturePath,
+                "-ANUITestIndexPath", indexURL.path,
+            ]
+            app.launch()
+            app.activate()
+
+            let window = mainWindow
+            XCTAssertTrue(window.waitForExistence(timeout: 15))
+            let warning = window.staticTexts["an.sidebar.status"]
+            XCTAssertTrue(warning.waitForExistence(timeout: 30),
+                          "the sidebar should report a failed Notes index instead of looking ready")
+            XCTAssertTrue((warning.label + " " + (warning.value as? String ?? ""))
+                              .contains("Search index unavailable"),
+                          "the status line should name the failed index")
+            // Replace the failed-open DB in the marker-checked scratch fixture. The next FTS query
+            // must reopen it, retract the warning and schedule a full rebuild without relaunching.
+            try Data().write(to: indexURL, options: .atomic)
+            let search = window.textFields["an.filter.search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            search.click()
+            search.typeText("Budget")
+            let deadline = Date().addingTimeInterval(30)
+            while warning.exists && Date() < deadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            }
+            XCTAssertFalse(warning.exists, "the replacement index must stay healthy")
+
+            let clear = window.buttons["an.filter.searchClear"]
+            XCTAssertTrue(clear.waitForExistence(timeout: 5))
+            clear.click()
+            let recovered = window.descendants(matching: .any)["an.cell.title.11111111-1111-1111-1111-111111111111"]
+            XCTAssertTrue(recovered.waitForExistence(timeout: 45),
+                          "the same-session recovery pass must repopulate the fixture's note list from disk")
+        }
+    }
 
     /// G0 — The `an.status.indexReady` probe is XCUITest-queryable and publishes the settled
     /// completion token (W8-S8b). Was a 1×1 `Color.clear` that never resolved — its value stayed empty

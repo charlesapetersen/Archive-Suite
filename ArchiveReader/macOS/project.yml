@@ -83,6 +83,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.uitests
         TEST_TARGET_NAME: ArchiveReader
+        # The UI runner may replace only the generated Tart fixture cache during live recovery.
+        CODE_SIGN_ENTITLEMENTS: Sources/ArchiveReader/ArchiveReaderUITests.entitlements
         # ENABLE_HARDENED_RUNTIME: NO is RETAINED deliberately. It was found necessary under ad-hoc
         # signing (W7.1) — the Runner couldn't load the xctest plugin because library validation
         # rejected mismatched CDHashes. Certificate signing plausibly makes it unnecessary (runner and
