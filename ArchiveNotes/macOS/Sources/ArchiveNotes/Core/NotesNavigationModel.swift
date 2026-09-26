@@ -16,6 +16,25 @@
 import Foundation
 import Combine
 
+/// Cancellation shared with a detached corpus-scale recompute. NSLock keeps the flag Sendable without
+/// holding a lock across filtering or sorting work.
+private final class NotesRecomputeCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+}
+
 @MainActor
 final class NotesNavigationModel: ObservableObject {
     /// Shared source of items + org graph + scope (one instance for both windows). Strong ref is safe:
@@ -71,6 +90,10 @@ final class NotesNavigationModel: ObservableObject {
     /// the shared org graph each pass; membership mutation UI is W6-S5.
     @Published private(set) var instanceCounts: [UUID: Int] = [:]
 
+    /// Last synchronous scheduling and state-application costs, used by the opt-in corpus-scale gate.
+    private(set) var lastRecomputeSchedulingSeconds: TimeInterval = 0
+    private(set) var lastRecomputeApplySeconds: TimeInterval = 0
+
     /// Rows selected in the table. A single-row selection loads that item into the detail pane.
     @Published var selection: Set<UUID> = []
 
@@ -99,6 +122,10 @@ final class NotesNavigationModel: ObservableObject {
     private var ftsRank: [UUID: Int] = [:]
     /// Monotonic token so a slower older search can't overwrite a newer one's result.
     private var ftsGeneration = 0
+    /// Invalidates an older filter/sort pass when inputs change while a large pass is off-main.
+    private var recomputeGeneration = 0
+    private var pendingRecompute: Task<Void, Never>?
+    private var pendingRecomputeCancellation: NotesRecomputeCancellation?
 
     /// Mirror of `model.scope` (the shared folder/smart-folder selection). Kept in sync from the
     /// publisher's DELIVERED value rather than read back from `model.scope`, because `@Published`
@@ -418,39 +445,196 @@ final class NotesNavigationModel: ObservableObject {
     /// Rebuild `displayed` from the shared item source: shared scope → per-window user filter → live
     /// keyword (FTS) intersection → order (bm25 relevance while a query is active, else `NotesSort`).
     func recompute(items: [ItemSummary]? = nil) {
+        let schedulingStart = CFAbsoluteTimeGetCurrent()
         let source = items ?? model.allItems
-        var base = source
-
-        // 1. Shared scope (folder / smart-folder selection from the tree, mirrored in `scope`). A smart
-        //    folder carries a full NotesFilter (title-substring + facets); a normal folder just folderId.
-        if let scope {
-            let scopeSet = scope.folderId.map { model.organization.subtreeItemIDs(of: $0) }
-            base = base.filter { scope.matches($0, folderItemIDs: scopeSet) }
+        recomputeGeneration &+= 1
+        let generation = recomputeGeneration
+        pendingRecompute?.cancel()
+        pendingRecomputeCancellation?.cancel()
+        pendingRecompute = nil
+        pendingRecomputeCancellation = nil
+        let snapshot = makeRecomputeSnapshot(source)
+        if source.count < 2_000 {
+            if let result = Self.compute(snapshot, cancellation: NotesRecomputeCancellation()) {
+                applyRecompute(result, generation: generation)
+            }
+            lastRecomputeSchedulingSeconds = CFAbsoluteTimeGetCurrent() - schedulingStart
+            return
         }
 
-        // 2. Per-window user filter (kind + tags + quality + date; searchText stays empty here).
-        let userSet = filter.folderId.map { model.organization.subtreeItemIDs(of: $0) }
-        base = base.filter { filter.matches($0, folderItemIDs: userSet) }
+        // Sorting 100k rows took 1.7 seconds on the main actor. Keep normal-sized updates synchronous
+        // for immediate UI/test semantics, but move corpus-scale filtering, sorting, and membership
+        // counting to a detached task. The worker returns Sendable IDs and summaries; published state
+        // remains owned by this main-actor model. Its cancellation token stops superseded scans/sorts.
+        let cancellation = NotesRecomputeCancellation()
+        pendingRecomputeCancellation = cancellation
+        pendingRecompute = Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                Self.compute(snapshot, cancellation: cancellation)
+            }.value
+            guard let self, let result, !cancellation.isCancelled else { return }
+            self.applyRecompute(result, generation: generation)
+        }
+        lastRecomputeSchedulingSeconds = CFAbsoluteTimeGetCurrent() - schedulingStart
+    }
 
-        // 3. Live keyword: intersect the bm25 FTS result (nil = no active query).
-        if let ftsIDs { base = base.filter { ftsIDs.contains($0.id) } }
+    /// Await a pending corpus-scale pass. Production views need not call this; the opt-in acceptance
+    /// harness uses it to include the off-main work in its timing.
+    func waitForPendingRecompute() async {
+        await pendingRecompute?.value
+    }
 
-        // 4. Order: bm25 rank while a relevance query is live, else the multi-level NotesSort.
+    private struct RecomputeSnapshot: Sendable {
+        let source: [ItemSummary]
+        let scope: NotesFilter?
+        let scopeItemIDs: Set<UUID>?
+        let filter: NotesFilter
+        let filterItemIDs: Set<UUID>?
+        let ftsIDs: Set<UUID>?
+        let ftsRank: [UUID: Int]
+        let sort: [NoteSortDescriptor]
+        let membershipItemIDs: [UUID]
+    }
+
+    private struct RecomputeResult: Sendable {
+        let orderedIDs: [UUID]
+        let orderedSummaries: [ItemSummary]
+        let visibleIDs: Set<UUID>
+        let instanceCounts: [UUID: Int]
+    }
+
+    deinit {
+        pendingRecomputeCancellation?.cancel()
+        pendingRecompute?.cancel()
+    }
+
+    private func makeRecomputeSnapshot(_ source: [ItemSummary]) -> RecomputeSnapshot {
+        let scopeItemIDs = scope?.folderId.map { model.organization.subtreeItemIDs(of: $0) }
+        let filterItemIDs = filter.folderId.map { model.organization.subtreeItemIDs(of: $0) }
+        return RecomputeSnapshot(
+            source: source,
+            scope: scope,
+            scopeItemIDs: scopeItemIDs,
+            filter: filter,
+            filterItemIDs: filterItemIDs,
+            ftsIDs: ftsIDs,
+            ftsRank: ftsRank,
+            sort: sort,
+            membershipItemIDs: model.organization.memberships.map(\.itemId)
+        )
+    }
+
+    nonisolated private static func compute(
+        _ snapshot: RecomputeSnapshot,
+        cancellation: NotesRecomputeCancellation
+    ) -> RecomputeResult? {
+        var base: [ItemSummary] = []
+        base.reserveCapacity(snapshot.source.count)
+        for (index, item) in snapshot.source.enumerated() {
+            if index.isMultiple(of: 256), cancellation.isCancelled { return nil }
+            if let scope = snapshot.scope, !scope.matches(item, folderItemIDs: snapshot.scopeItemIDs) { continue }
+            if !snapshot.filter.matches(item, folderItemIDs: snapshot.filterItemIDs) { continue }
+            if let ftsIDs = snapshot.ftsIDs, !ftsIDs.contains(item.id) { continue }
+            base.append(item)
+        }
+        guard !cancellation.isCancelled else { return nil }
         let ordered: [ItemSummary]
-        if !ftsRank.isEmpty, sort.first?.field == .relevance {
-            ordered = base.sorted { (ftsRank[$0.id] ?? .max) < (ftsRank[$1.id] ?? .max) }
+        if !snapshot.ftsRank.isEmpty, snapshot.sort.first?.field == .relevance {
+            guard let sorted = cancellableSorted(base, cancellation: cancellation, by: {
+                return (snapshot.ftsRank[$0.id] ?? .max) < (snapshot.ftsRank[$1.id] ?? .max)
+            }) else { return nil }
+            ordered = sorted
+        } else if snapshot.sort.isEmpty {
+            ordered = base
         } else {
-            ordered = NotesSort.sorted(base, by: sort)
+            guard let sorted = cancellableSorted(base, cancellation: cancellation, by: { a, b in
+                for descriptor in snapshot.sort {
+                    switch NotesSort.rank(a, b, descriptor) {
+                    case .orderedAscending: return true
+                    case .orderedDescending: return false
+                    case .orderedSame: continue
+                    }
+                }
+                let titleOrder = a.title.localizedStandardCompare(b.title)
+                if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
+                return a.id.uuidString < b.id.uuidString
+            }) else { return nil }
+            ordered = sorted
         }
+        guard !cancellation.isCancelled else { return nil }
+        var counts: [UUID: Int] = [:]
+        for (index, id) in snapshot.membershipItemIDs.enumerated() {
+            if index.isMultiple(of: 256), cancellation.isCancelled { return nil }
+            counts[id, default: 0] += 1
+        }
+        let orderedIDs = ordered.map(\.id)
+        guard !cancellation.isCancelled else { return nil }
+        return RecomputeResult(orderedIDs: orderedIDs, orderedSummaries: ordered,
+                              visibleIDs: Set(orderedIDs), instanceCounts: counts)
+    }
 
-        // Drop selections that no longer exist in the visible set (e.g. after a refresh / filter).
-        let visibleIDs = Set(ordered.map(\.id))
-        let prunedSelection = selection.intersection(visibleIDs)
+    /// Bottom-up merge sort checks cancellation between comparisons while keeping its ordering
+    /// predicate stable for the entire pass. Array.sorted's comparator cannot safely abort midway.
+    nonisolated private static func cancellableSorted(
+        _ items: [ItemSummary],
+        cancellation: NotesRecomputeCancellation,
+        by areInIncreasingOrder: (ItemSummary, ItemSummary) -> Bool
+    ) -> [ItemSummary]? {
+        guard items.count > 1 else { return items }
+        var source = items
+        var destination: [ItemSummary] = []
+        destination.reserveCapacity(items.count)
+        var width = 1
+        var workSinceCancellationCheck = 0
+
+        while width < source.count {
+            if cancellation.isCancelled { return nil }
+            destination.removeAll(keepingCapacity: true)
+            var start = 0
+            while start < source.count {
+                let middle = min(start + width, source.count)
+                let end = min(start + width * 2, source.count)
+                var left = start
+                var right = middle
+                while left < middle && right < end {
+                    workSinceCancellationCheck += 1
+                    if workSinceCancellationCheck.isMultiple(of: 256), cancellation.isCancelled { return nil }
+                    if areInIncreasingOrder(source[right], source[left]) {
+                        destination.append(source[right])
+                        right += 1
+                    } else {
+                        destination.append(source[left])
+                        left += 1
+                    }
+                }
+                while left < middle {
+                    workSinceCancellationCheck += 1
+                    if workSinceCancellationCheck.isMultiple(of: 256), cancellation.isCancelled { return nil }
+                    destination.append(source[left])
+                    left += 1
+                }
+                while right < end {
+                    workSinceCancellationCheck += 1
+                    if workSinceCancellationCheck.isMultiple(of: 256), cancellation.isCancelled { return nil }
+                    destination.append(source[right])
+                    right += 1
+                }
+                start = end
+            }
+            swap(&source, &destination)
+            width = width > source.count / 2 ? source.count : width * 2
+        }
+        return cancellation.isCancelled ? nil : source
+    }
+
+    private func applyRecompute(_ result: RecomputeResult, generation: Int) {
+        let applyStart = CFAbsoluteTimeGetCurrent()
+        guard generation == recomputeGeneration else { return }
+        let prunedSelection = selection.intersection(result.visibleIDs)
         if prunedSelection != selection { selection = prunedSelection }
-
-        instanceCounts = Dictionary(grouping: model.organization.memberships, by: \.itemId)
-            .mapValues(\.count)
-        displayed = ordered
+        instanceCounts = result.instanceCounts
+        displayed = result.orderedSummaries
         displayedGeneration &+= 1
+        lastRecomputeApplySeconds = CFAbsoluteTimeGetCurrent() - applyStart
     }
 }

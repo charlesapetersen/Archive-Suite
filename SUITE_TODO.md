@@ -1115,22 +1115,8 @@ live-verified 2026-07-17).
 **Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
 than with Notes features.
 
-The remaining Phase C item is heavier than C1–C5 and sits in **TIER 5**, not with the gate work:
+✅ **Phase C is complete.** W9.c6's scale-test result is recorded in `SUITE_TODO_DONE.md`.
 
-- [ ] **`W9.c6` — nothing proves the spec's 100k-note / 2M-word scale target [M · Tier-2].** Plan C6
-  (spec-vs-build). The original spec said *"operate at the scale of 100,000 notes and 2 million words without
-  being slow. Build for scale from the beginning."* The architecture **is** built for it (FTS5 + bm25, WAL +
-  `synchronous=NORMAL` + `busy_timeout`, DB-backed org-graph, virtualized `NSTableView`, 150 ms-debounced +
-  generation-coalesced search, incremental off-main indexing with mtime-skip) — but the only perf test,
-  `EditorPerfTests`, stresses a single ~50k-word *document*, not a 100k-note *corpus*. Generate a **scratch**
-  store (mktemp/`TESTOUT` — ⛔ never the real Notes store, per the Reader Prime Directive and the
-  never-mutate-live-app-root rule) of ~100k UUID-folder notes totalling ~2M words, then assert bounded
-  wall-times for (a) a full `buildIndexFromDisk` incremental build, (b) an FTS search round-trip, (c)
-  `allSummaries()` + one `NotesNavigationModel.recompute()`/sort. Env-gate it so ordinary `swift test` is not
-  slowed, and assert the scratch-path guard holds. **Conditional follow-up:** if `recompute()`'s in-memory
-  `NotesFilter.matches` scan + sort exceeds a frame budget at 100k on `@MainActor`, move it off-main (return a
-  `Sendable [UUID]`) — the one scale claim the current in-memory-filter design leaves unproven. |
-  ArchiveNotes/macOS/Tests/ + ArchiveNotes/scripts/ | M | med | none
 
 **Phase B — wire the built-but-dead features.** The high-value core: library code that shipped without a UI
 entry point. Mostly **Tier-2** (they write note front-matter or project Finder tags).

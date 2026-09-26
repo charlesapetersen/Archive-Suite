@@ -3,6 +3,19 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.c6) — 100k-note navigation sorting blocked the main actor
+
+**2026-09-25.** The new 100k-note / 2M-word scratch acceptance run measured `NotesNavigationModel.recompute()`
+at 1.713 seconds on the main actor. Corpus-scale filtering, sorting, and membership counting now use a
+Sendable snapshot and a detached worker; only the ordered summaries and IDs cross back for a short main-actor
+publish. New updates cooperatively cancel an older worker, and a generation check prevents stale results
+from replacing the newest filter state.
+
+The final scratch run measured the full navigation pass at 1.293 seconds, with 0.004 ms scheduling and
+0.035 ms main-actor application. Full 100k fixture acceptance passed alongside 879 Swift Testing tests in
+89 suites and 218 XCTest checks. The
+fixture is created in the test host's own temporary container; no real Notes store or archive corpus was used.
+
 ## ✅ FIXED (W9.b5) — inbound `archivenotes://open` links only activated the app
 
 **2026-09-21.** `NotesDeepLinkRouter` now holds the newest valid external request until the initial

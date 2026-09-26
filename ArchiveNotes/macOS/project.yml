@@ -96,6 +96,8 @@ schemes:
       config: Debug
       targets:
         - ArchiveNotesTests
+      environmentVariables:
+        ARCHIVE_NOTES_SCALE_ACCEPTANCE: "${ARCHIVE_NOTES_SCALE_ACCEPTANCE}"
 
   ArchiveNotes:
     build:

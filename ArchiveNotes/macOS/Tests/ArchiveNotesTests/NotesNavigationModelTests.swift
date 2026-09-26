@@ -146,6 +146,22 @@ struct NotesNavigationModelTests {
         #expect(nav.displayed.map(\.title) == ["late"])   // Combine sink recomputed
     }
 
+    @Test func supersedingLargeRecomputeKeepsOnlyNewestFilterResult() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+        let notes = (0..<2_500).map { sum(String(format: "Note %04d", $0), kind: .note) }
+        let extracts = (0..<3).map { sum("Extract \($0)", kind: .extract) }
+        model.replaceItems(notes + extracts)
+
+        let nav = NotesNavigationModel(model: model, defaultKind: .note)
+        nav.kindFilter = .both
+        nav.kindFilter = .extracts
+        await nav.waitForPendingRecompute()
+
+        #expect(nav.displayed.count == extracts.count)
+        #expect(nav.displayed.allSatisfy { $0.kind == .extract })
+    }
+
     @Test func instanceCountsFromMemberships() async throws {
         let (model, index, root) = try await makeModel()
         defer { Task { await cleanup(root, index) } }

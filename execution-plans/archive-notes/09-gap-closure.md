@@ -310,24 +310,20 @@ This covers B3/future in-process concurrent projections without a Notes-only que
 remain deliberately out of scope. *Verify:* the strengthened scratch-only concurrency test passes; W9.c5
 reran the Notes unit suite (868 tests in 87 suites). **Tier-2.** *Done:* KNOWN_ISSUES entry closed.
 
-**C6. Scale-acceptance harness — 100k notes / 2M words.** — **MED (functional)** — (spec-vs-build). The original
+**C6. Scale-acceptance harness — 100k notes / 2M words.** — **SHIPPED 2026-09-25 (W9.c6).** The original
 spec: "operate at the scale of **100,000 notes and 2 million words** without being slow. **Build for scale from
 the beginning.**" The architecture *is* built for scale (FTS5 + bm25, WAL/`synchronous=NORMAL`/`busy_timeout`,
 DB-backed org-graph, virtualized `NSTableView`, 150ms-debounced + generation-coalesced search, incremental
-off-main indexing with mtime-skip) — but **nothing proves the target**: the only perf test, `EditorPerfTests`,
-stresses a single ~50k-word *document*, not a 100k-note *corpus*; there are no `measure`/scale tests.
-- *Files:* NEW `ArchiveNotes/macOS/Tests/ArchiveNotesTests/NotesScalePerfTests.swift` + a fixture generator in `ArchiveNotes/scripts/`.
-- *Steps:* generate a **scratch** store (mktemp/`TESTOUT` — **never the real Notes store**, per the Reader Prime
-  Directive + the never-mutate-live-app-root rule) of ~100k UUID-folder `.md` notes totalling ~2M words, then
-  assert bounded wall-times for (a) `buildIndexFromDisk` full incremental index build, (b) an FTS search
-  round-trip, (c) `allSummaries()` load + one `NotesNavigationModel.recompute()`/sort. Env-gate it (opt-in flag)
-  so `swift test` / CI aren't slowed. **Follow-up (conditional):** if `recompute()`'s in-memory
-  `NotesFilter.matches` scan + sort exceeds a frame budget at 100k on `@MainActor`, move it off-main (return a
-  `Sendable [UUID]`) — the one scale item the current in-memory-filter design leaves unproven.
-- *Verify:* the harness runs on the scratch corpus and the assertions hold (or reveal the first bottleneck); it
-  **never** touches the real store (assert the scratch-path guard). **Tier-2** (generates a large scratch
-  corpus; must honor the scratch-only guard). *Done:* the spec's 100k/2M scale target has a repeatable
-  acceptance test.
+off-main indexing with mtime-skip) — but the only perf test, `EditorPerfTests`, stressed one ~50k-word
+*document*, not a 100k-note *corpus*. The opt-in `NotesScalePerfTests` now creates 100,000 UUID-folder Markdown
+notes / 2M words inside the test host's scratch temp container and measures full indexing, FTS, summaries,
+and navigation. Baseline `@MainActor` recompute took 1.713s, so the conditional follow-up moved corpus-scale
+filtering/sorting off-main with cooperative cancellation and latest-generation publication.
+*Verify:* Notes scale acceptance + unit smoke passed; final timings were 28.750s index, <1ms search, 0.272s
+summaries, 1.293s full navigation, 0.004ms scheduling, and 0.035ms main-actor apply. The path guard held;
+no live Notes store or archive corpus was accessed. Independent Tier-2 review found and closed a detached-task
+cancellation gap. The final smoke passed 879 Swift Testing tests in 89 suites and 218 XCTest checks.
+*Done:* repeatable 100k/2M acceptance test and main-actor frame-budget check.
 
 ---
 
