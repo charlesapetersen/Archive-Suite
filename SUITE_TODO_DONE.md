@@ -257,6 +257,16 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d10 — extract inspector provenance summary [S].** **SHIPPED 2026-09-27
+  (this commit).** The extract detail inspector groups passage blocks by source note, showing each
+  note's current title and passage count. Missing notes retain their saved source label and are
+  marked missing. The read is from the Notes store only. Verification: Notes Debug build and
+  headless unit smoke, including grouping and malformed-anchor coverage; focused off-screen
+  scratch UI check. | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/{Core/NotesModel.swift,
+  Store/SourceAnchor+NotePassage.swift,Views/NoteMetadataInspector.swift},Tests/{ArchiveNotesTests/
+  KindFilterQueryTests.swift,ArchiveNotesUITests/NotesGUITests.swift}}, ArchiveNotes/{CLAUDE,
+  KNOWN_ISSUES}.md, execution-plans/archive-notes/09-gap-closure.md | S | low | done
+
 - [x] **W9.d9 — live smart-folder match-count badge [S].** **SHIPPED 2026-09-27
   (this commit).** The sidebar shows each valid saved query's match count, including zero. The
   shared Notes model uses the same predicate and folder subtree membership as navigation; a

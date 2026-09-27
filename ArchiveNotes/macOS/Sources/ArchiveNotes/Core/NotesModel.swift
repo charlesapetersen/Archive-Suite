@@ -1017,6 +1017,16 @@ final class NotesModel: ObservableObject {
         } catch { report(error, "load the note body"); return nil }
     }
 
+    /// Read-only extract provenance for the detail inspector. Loading the stored blocks preserves
+    /// their saved source labels and never touches a source note or the archive corpus.
+    func loadExtractSources(for id: UUID) async -> [ExtractSourceUsage]? {
+        guard let noteStore else { return nil }
+        do {
+            let item = try await noteStore.load(id)
+            return item.kind == .extract ? item.blocks.notePassageSourceUsage : []
+        } catch { report(error, "read extract sources"); return nil }
+    }
+
     /// Parse edited body markdown back into `(leadingText, blocks)` and persist it atomically through
     /// `mutateItem`, so it shares the date/quality write path's guarantees (fresh load → atomic save →
     /// single-row re-index → publish). A failed write surfaces via `statusMessage` and leaves the

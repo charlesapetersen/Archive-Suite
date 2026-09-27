@@ -1902,6 +1902,30 @@ final class NotesGUITests: NotesFixtureUITestCase {
         closeExtractsWindow(extractWin)
     }
 
+    /// W9.d10 — the extract inspector resolves the live source title and summarizes passage count.
+    /// The fixture holds one extract passage from the Moore note; this test only reads scratch data.
+    func testW9_ExtractInspectorShowsSourceSummary() throws {
+        try withFixture {
+            let extractWin = try openExtractsWindow()
+            defer { closeExtractsWindow(extractWin) }
+            frontWindow(named: "Extracts")
+            let extractCell = extractWin.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+            XCTAssertTrue(extractCell.waitForExistence(timeout: 10))
+            XCTAssertTrue(pollUntil(timeout: 10) { extractCell.isHittable })
+            extractCell.click()
+
+            let heading = extractWin.staticTexts["an.detail.sources.heading"]
+            XCTAssertTrue(heading.waitForExistence(timeout: 10))
+            let title = extractWin.staticTexts["an.detail.sources.note.\(Self.idReader.uppercased()).title"]
+            let count = extractWin.staticTexts["an.detail.sources.note.\(Self.idReader.uppercased()).count"]
+            XCTAssertTrue(title.waitForExistence(timeout: 10))
+            XCTAssertTrue(((title.value as? String) ?? title.label).contains("Moore on Intel"),
+                          "source title should resolve from the current note")
+            XCTAssertTrue(count.waitForExistence(timeout: 10))
+            XCTAssertEqual((count.value as? String) ?? count.label, "1 passage")
+        }
+    }
+
     /// G13 — a live copy→paste carries inline-image BYTES into the extract's own `assets/` (W14.3). The
     /// shipped fix made `MarkdownEditorView.handlePassagePaste` import the `com.archivenotes.passage`
     /// payload's bytes via `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` instead of

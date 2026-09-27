@@ -104,7 +104,8 @@ macOS/Sources/ArchiveNotes/
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
     SourceAnchor+NotePassage.swift note-passage provenance anchor factory + notePassageTarget parser
                                    (reuses ArchiveCore.DurableLink §8.2 URL) (W7-S1);
-                                   [Block].distinctSourceNoteCount for the extract Sources column (W7-S4)
+                                   [Block].distinctSourceNoteCount for the extract Sources column (W7-S4);
+                                   notePassageSourceUsage groups inspector provenance by source (W9.d10)
     NotesPassagePayload.swift      Copy-in-Notes → paste-into-Extract pasteboard payload
                                    (com.archivenotes.passage; snapshot bytes per segment) (W7-S1)
   Index/

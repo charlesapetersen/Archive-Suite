@@ -3,6 +3,13 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d10) — extract inspector lacked source details
+
+**2026-09-27.** The extract inspector now lists distinct source notes and their passage counts.
+It resolves current titles from the Notes index and uses each passage's saved label when a source
+note is missing. The list reads the extract's stored blocks and does not write to Notes or the
+archive corpus. Notes build, headless smoke, and a focused off-screen scratch UI check passed.
+
 ## ✅ FIXED (W9.d9) — smart folders had no result-count badge
 
 **2026-09-27.** Smart-folder rows now show the count of items matching their saved query,

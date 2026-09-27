@@ -102,6 +102,24 @@ import Foundation
         #expect(blocks.distinctSourceNoteCount == 1)
     }
 
+    @Test("extract provenance groups passages in first-seen order and keeps saved labels")
+    func sourceUsage() {
+        let first = UUID()
+        let second = UUID()
+        let irrelevant = Block(kind: .freeform, source: nil, markdown: "plain", unknownHeaderFields: [])
+        let malformed = Block(kind: .notePassage,
+                              source: SourceAnchor(link: nil, display: nil, page: nil, thumbRef: nil,
+                                                   zoteroSelect: nil, noteRef: "broken"),
+                              markdown: "orphan", unknownHeaderFields: [])
+        let blocks = [passageBlock(from: first, block: 0), irrelevant,
+                      passageBlock(from: second, block: 1), passageBlock(from: first, block: 2), malformed]
+
+        #expect(blocks.notePassageSourceUsage == [
+            ExtractSourceUsage(id: first, passageCount: 2, snapshotLabel: "Src"),
+            ExtractSourceUsage(id: second, passageCount: 1, snapshotLabel: "Src")
+        ])
+    }
+
     // MARK: - Index projection + display
 
     @Test("NoteIndexRow projects the distinct-source count from an item's blocks")

@@ -26,11 +26,22 @@ struct NoteMetadataInspector: View {
     @State private var month = 0          // 0 = none
     @State private var dayText = ""
     @State private var authorsText = ""
+    @State private var extractSources: [ExtractSourceUsage]?
+    @State private var extractSourcesFailed = false
+
+    private struct SourceLoadKey: Equatable {
+        let id: UUID
+        let mtime: Double
+    }
 
     private static let monthNames = DateFieldEntry.monthNames
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if item.kind == .extract {
+                extractSourcesSection
+                Divider()
+            }
             authorsSection
             Divider()
             dateSection
@@ -47,6 +58,67 @@ struct NoteMetadataInspector: View {
         .padding(.vertical, 8)
         .onAppear { seed(from: item) }
         .onChange(of: item.id) { seed(from: item) }   // re-seed only on selection change (WYSIWYG typing)
+        .task(id: SourceLoadKey(id: item.id, mtime: item.mtime)) {
+            extractSources = nil
+            extractSourcesFailed = false
+            guard item.kind == .extract else { return }
+            let loaded = await nav.model.loadExtractSources(for: item.id)
+            guard !Task.isCancelled else { return }
+            extractSources = loaded
+            extractSourcesFailed = loaded == nil
+        }
+    }
+
+    // MARK: Extract provenance
+
+    private var extractSourcesSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Sources").font(.subheadline.bold())
+                    .accessibilityIdentifier("an.detail.sources.heading")
+                Spacer()
+                if let extractSources {
+                    Text("\(extractSources.count) note\(extractSources.count == 1 ? "" : "s")")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let extractSources {
+                if extractSources.isEmpty {
+                    Text("No note passages yet.").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(extractSources) { source in
+                    let resolved = sourceDisplay(source)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(resolved.title)
+                                .lineLimit(2)
+                                .accessibilityLabel(resolved.title)
+                                .accessibilityIdentifier("an.detail.sources.note.\(source.id.uuidString).title")
+                            if resolved.missing {
+                                Text("Source note missing")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer(minLength: 4)
+                        Text("\(source.passageCount) passage\(source.passageCount == 1 ? "" : "s")")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize()
+                            .accessibilityIdentifier("an.detail.sources.note.\(source.id.uuidString).count")
+                    }
+                }
+            } else if extractSourcesFailed {
+                Text("Sources could not be loaded.").font(.caption).foregroundStyle(.secondary)
+            } else {
+                ProgressView("Loading sources…").controlSize(.small)
+            }
+        }
+    }
+
+    private func sourceDisplay(_ source: ExtractSourceUsage) -> (title: String, missing: Bool) {
+        if let live = nav.model.allItems.first(where: { $0.id == source.id && $0.kind == .note }) {
+            return (live.title.isEmpty ? "Untitled note" : live.title, false)
+        }
+        return (source.snapshotLabel ?? "Unknown source note", true)
     }
 
     // MARK: Authors

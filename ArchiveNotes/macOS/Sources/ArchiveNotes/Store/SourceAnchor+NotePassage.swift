@@ -56,6 +56,24 @@ extension SourceAnchor {
 }
 
 extension Sequence where Element == Block {
+    /// One source note represented by one or more note-passage blocks in an extract. The saved
+    /// display label remains available if the source note is later deleted or no longer indexed.
+    var notePassageSourceUsage: [ExtractSourceUsage] {
+        var order: [UUID] = []
+        var counts: [UUID: Int] = [:]
+        var labels: [UUID: String] = [:]
+        for block in self where block.kind == .notePassage {
+            guard let id = block.source?.notePassageTarget?.id else { continue }
+            if counts[id] == nil { order.append(id) }
+            counts[id, default: 0] += 1
+            if labels[id] == nil, let display = block.source?.display, !display.isEmpty {
+                labels[id] = display
+            }
+        }
+        return order.map { ExtractSourceUsage(id: $0, passageCount: counts[$0, default: 0],
+                                              snapshotLabel: labels[$0]) }
+    }
+
     /// Distinct source-note count for the extract "Sources" column (W7-S4, 07-extracts §4): the number
     /// of **unique source-note UUIDs** among this item's `.notePassage` blocks — a segmented extract
     /// appended from two different notes reports 2, one appended twice from the same note reports 1.
@@ -69,4 +87,10 @@ extension Sequence where Element == Block {
         }
         return ids.count
     }
+}
+
+struct ExtractSourceUsage: Identifiable, Sendable, Equatable {
+    let id: UUID
+    let passageCount: Int
+    let snapshotLabel: String?
 }
