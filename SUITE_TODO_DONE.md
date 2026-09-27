@@ -46,6 +46,20 @@ why a later change may or may not revisit that code.
   - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
   | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | none
 
+- [x] **W22.mixed-batch-fu1 — journal mixed PDF work before its first paid OCR call [M · Tier-2].**
+  **SHIPPED 2026-09-27 (this commit).** Mixed Process Files runs now save an integrity-checked PDF-stage
+  journal before the first paid page, save each returned page result before the next request, and record
+  each completed PDF with its exact output path and digest. A relaunched run reuses saved pages and PDFs;
+  a request whose billing status is unknown, a changed source or output, or an occupied reserved path is
+  held visibly for review instead of being resent or overwritten. The stage hands off to the existing
+  image-run journal before retiring itself; a crash between those two writes is reconciled on launch.
+  Stop holds Resume and Dismiss until the cancelled task has finished unwinding. Independent Tier-2 review
+  caught and prompted fixes for the Stop/Dismiss races, provider-key selection, and changed-output check.
+  Verification: clean Processor Debug build; key-free synthetic PDF interruption/relaunch check, including
+  a cached first page, exact path, changed output, and uncertain in-flight page; Processor scratch-only
+  smoke with two successful images. No real corpus was touched.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+MixedPDFRecovery,OCRProcessor+Pipeline,OCRProcessor+OCR,OCRProcessor}.swift, Views/OCRView.swift, Capture/MultiPageReOCRTestDriver.swift, ArchiveProcessor/KNOWN_ISSUES.md | M | med | done
+
 ## Owner queue decisions — 2026-09-26
 
 - [x] **W33.storage — unified suite storage path.** **CLOSED 2026-09-26 (this commit) by owner decision.**

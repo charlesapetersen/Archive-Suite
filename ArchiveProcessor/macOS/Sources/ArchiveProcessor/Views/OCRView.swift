@@ -388,6 +388,24 @@ struct OCRView: View {
                     }
                 }
 
+                if let info = processor.pendingMixedPDFInfo {
+                    GroupBox("Interrupted Mixed PDF Run") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(info).font(.caption)
+                            Text("Enter the API key above to resume saved PDF pages. If a page may have been billed without a saved result, review it before dismissing this record.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                            HStack {
+                                Button("Resume PDFs") { resumePendingMixedPDF() }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(processor.isProcessing || !processor.canResumePendingMixedPDF)
+                                Button("Dismiss") { processor.dismissPendingMixedPDF() }
+                                    .buttonStyle(.bordered)
+                                    .disabled(processor.isProcessing || processor.mixedPDFCancellationUnwinding)
+                            }
+                        }.padding(4)
+                    }
+                }
+
                 // Tagging mode stays in the main UI; other settings are in the Settings window (⌘,).
                 GroupBox("Tagging") {
                     VStack(alignment: .leading, spacing: 4) {
@@ -602,6 +620,7 @@ struct OCRView: View {
         !droppedFiles.isEmpty && (useAppleVision ? (!visionUseLLMJudgment || visionJudgementKeyIsPresent) : !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
+            && processor.pendingMixedPDFInfo == nil
     }
 
     /// Re-point the API-key field after `selectedProvider` changes from anywhere (the ⌘⌥P cycle
@@ -1083,6 +1102,13 @@ struct OCRView: View {
             .filter { !$0.isEmpty }
         processor.processingTask = Task {
             await processor.resumeRun(apiKey: apiKey)
+        }
+    }
+
+    private func resumePendingMixedPDF() {
+        if let urls = processor.pendingMixedPDFFileURLs { droppedFiles = urls }
+        processor.processingTask = Task {
+            await processor.resumeMixedPDF(apiKey: apiKey, keyProvider: effectiveProvider)
         }
     }
 

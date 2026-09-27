@@ -8,6 +8,7 @@ import PDFKit
 /// fake per-page OCR result (no network), then asserts that the rebuilt output PDF alternates
 /// image / OCR-text pages in page order, that the text lands on the right pages, and — the file-safety
 /// invariant — that the input PDF is never overwritten even when the output directory coincides with it.
+/// Also simulates a mixed-run interruption and fresh-instance recovery of a paid page and output identity.
 /// It never opens or modifies the archive corpus or any Finder metadata.
 @MainActor
 enum MultiPageReOCRTestDriver {
@@ -24,6 +25,7 @@ enum MultiPageReOCRTestDriver {
     private actor PageIndexer {
         private var i = 0
         func next() -> Int { defer { i += 1 }; return i }
+        func count() -> Int { i }
     }
 
     static func run() async {
@@ -211,6 +213,115 @@ enum MultiPageReOCRTestDriver {
         check("filtered PDF leaves image job pending for the standard route", mapped.jobs[0].status == .pending)
         check("filtered PDF output maps to PDF source only",
               mapped.outputURLMap[mixPDF] != nil && mapped.outputURLMap[mixIMG] == nil)
+
+        // ── 5. Crash/relaunch: a saved paid page is reused, and the exact PDF path survives. ──
+        // The production journal override is doubly gated. Set it only after all other headless
+        // drivers have passed their launch gates, and prove its resolved URL is inside this scratch dir
+        // before writing or deleting any journal.
+        let stateRoot = root.appendingPathComponent("recovery-state", isDirectory: true)
+        setenv("BATCHRESUME_TEST", "1", 1)
+        setenv("ARCHIVEPROC_TEST_STATE_ROOT", stateRoot.path, 1)
+        defer {
+            unsetenv("BATCHRESUME_TEST")
+            unsetenv("ARCHIVEPROC_TEST_STATE_ROOT")
+        }
+        let stateIsScratch = OCRProcessor.pendingMixedPDFURL.deletingLastPathComponent().standardizedFileURL
+            == stateRoot.standardizedFileURL
+        check("recovery journal is redirected into scratch", stateIsScratch)
+        if stateIsScratch {
+            let recoveryOut = root.appendingPathComponent("recovery-out", isDirectory: true)
+            try? fm.createDirectory(at: recoveryOut, withIntermediateDirectories: true)
+            let recoveryPDF = root.appendingPathComponent("recovery.pdf")
+            _ = writeMultiPagePDF(recoveryPDF, pages: 2)
+            let recoveryImage = PDFToImageConverter.imageURL(for: singlePage)
+            let recoveryFiles = [recoveryImage, recoveryPDF]
+            let recoveryConfig = SessionProcessingConfig.fromProcessFilesRunStart()
+            let context = SegmentationContext(previousTextCharCount: 0,
+                                              sendPreviousImage: false, customPrompt: nil,
+                                              imageScale: 1)
+            let first = OCRProcessor()
+            first.taggingMode = .none
+            let started = first.beginMixedPDFJournal(
+                originalFiles: recoveryFiles, pdfIndices: [1], outputDirectory: recoveryOut,
+                provider: .gemini, model: model, thinkingLevel: nil,
+                batchMode: false, enableTagging: false, enableSegmentJSON: true,
+                enableCollectionSegmentation: false, confirmCollectionIDs: false,
+                reviewDocumentSegmentation: false, segmentationContext: context,
+                gatewayConfig: nil, localAgent: nil, runConfig: recoveryConfig)
+            check("mixed journal exists before the first paid page", started && fm.fileExists(
+                atPath: OCRProcessor.pendingMixedPDFURL.path))
+            if started {
+                let cached = OCRResult(text: "CACHED_PAGE_0", classification: nil,
+                                       errorMessage: nil, errorCode: nil)
+                let saved = first.persistMixedPDFMutation {
+                    $0.pageResults[OCRProcessor.mixedPDFPageKey(index: 1, page: 0)] = cached
+                }
+                check("returned page result is durable before relaunch", saved)
+                let relaunch = OCRProcessor()
+                relaunch.jobs = recoveryFiles.map { OCRJob(sourceURL: $0) }
+                relaunch.activePendingMixedPDF = OCRProcessor.loadPendingMixedPDF()
+                let calls = PageIndexer()
+                await relaunch.performMultiPagePDFReOCR(
+                    files: [(jobIndex: 1, url: recoveryPDF)], provider: .gemini,
+                    model: model, thinkingLevel: nil, apiKey: "", outputDirectory: recoveryOut,
+                    runConfig: recoveryConfig, ocrOverride: { _ in
+                        _ = await calls.next()
+                        return OCRResult(text: "NEW_PAGE_1", classification: nil,
+                                         errorMessage: nil, errorCode: nil)
+                    })
+                let output = relaunch.outputURLMap[recoveryPDF]
+                let document = output.flatMap(PDFDocument.init(url:))
+                check("relaunch sends only the unsaved page", await calls.count() == 1)
+                check("relaunch combines cached and new page text in order",
+                      document?.page(at: 1)?.string?.contains("CACHED_PAGE_0") == true
+                      && document?.page(at: 3)?.string?.contains("NEW_PAGE_1") == true)
+                let completed = OCRProcessor.loadPendingMixedPDF()
+                check("completed PDF path and digest persist",
+                      completed?.completedOutcomes.first?.outputURL == output
+                      && completed?.outputDigests["1"] != nil)
+                let secondRelaunch = OCRProcessor()
+                secondRelaunch.jobs = recoveryFiles.map { OCRJob(sourceURL: $0) }
+                secondRelaunch.activePendingMixedPDF = completed
+                let repeatedCalls = PageIndexer()
+                await secondRelaunch.performMultiPagePDFReOCR(
+                    files: [(jobIndex: 1, url: recoveryPDF)], provider: .gemini,
+                    model: model, thinkingLevel: nil, apiKey: "", outputDirectory: recoveryOut,
+                    runConfig: recoveryConfig, ocrOverride: { _ in
+                        _ = await repeatedCalls.next()
+                        return OCRResult(text: "MUST_NOT_RUN", classification: nil,
+                                         errorMessage: nil, errorCode: nil)
+                    })
+                check("second relaunch reuses completed output without a paid call",
+                      await repeatedCalls.count() == 0 && secondRelaunch.outputURLMap[recoveryPDF] == output)
+                if let output, let completed {
+                    try? Data("replaced output".utf8).write(to: output)
+                    check("replaced output fails recovery identity check",
+                          !OCRProcessor.mixedPDFOutputsMatchJournal(completed))
+                }
+                first.dismissPendingMixedPDF()
+                check("dismiss removes only the scratch recovery journal",
+                      !fm.fileExists(atPath: OCRProcessor.pendingMixedPDFURL.path))
+                let uncertain = OCRProcessor()
+                uncertain.taggingMode = .none
+                let uncertainStarted = uncertain.beginMixedPDFJournal(
+                    originalFiles: recoveryFiles, pdfIndices: [1], outputDirectory: recoveryOut,
+                    provider: .gemini, model: model, thinkingLevel: nil,
+                    batchMode: false, enableTagging: false, enableSegmentJSON: true,
+                    enableCollectionSegmentation: false, confirmCollectionIDs: false,
+                    reviewDocumentSegmentation: false, segmentationContext: context,
+                    gatewayConfig: nil, localAgent: nil, runConfig: recoveryConfig)
+                let marked = uncertainStarted && uncertain.persistMixedPDFMutation {
+                    $0.inFlightPage = OCRProcessor.mixedPDFPageKey(index: 1, page: 0)
+                }
+                let uncertainRelaunch = OCRProcessor()
+                uncertainRelaunch.checkForPendingBatch()
+                check("unresolved paid page is visibly held on relaunch",
+                      marked && uncertainRelaunch.pendingMixedPDFInfo?.contains("may have been billed") == true
+                      && !uncertainRelaunch.canResumePendingMixedPDF)
+                uncertain.dismissPendingMixedPDF()
+            }
+            try? fm.removeItem(at: recoveryImage)
+        }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

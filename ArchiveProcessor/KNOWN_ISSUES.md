@@ -2,6 +2,15 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED (W22.mixed-batch-fu1): mixed PDF OCR lacked crash recovery before the image phase
+
+A mixed run previously saved PDF outcomes only when all PDF work had finished and the image journal
+started. A crash could resend paid pages or choose a suffixed output on rerun. The PDF stage now journals
+before its first paid call, saves returned page results and exact output identities, and resumes only work
+whose status is known. An unresolved in-flight page or uncertain output is shown for review rather than
+automatically retried. The synthetic scratch interruption/relaunch check and Processor smoke passed on
+2026-09-27; no real corpus was touched.
+
 ## OPEN (W12.dedup-fu1): Anthropic collection-name thinking exceeds `max_tokens`
 
 At baseline `07c0c1c`, `LLMTextClient.callAnthropic` sends `max_tokens: 256` for `CollectionSegmenter` calls while also sending `budget_tokens: 1024` (Low) or `4000` (High). Direct Anthropic collection-name extraction and clustering with thinking enabled therefore violate the provider's requirement that a manual thinking budget be below `max_tokens`. The main tag/date paths omit thinking; the collection path forwards the chosen level. This predates the Wave-12 budget refactor, which deliberately preserves the request. Follow-up: `W12.dedup-fu1` in `SUITE_TODO.md`.

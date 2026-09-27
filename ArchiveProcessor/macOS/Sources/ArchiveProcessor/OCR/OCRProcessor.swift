@@ -12,6 +12,9 @@ class OCRProcessor: ObservableObject {
     var progressRange: (start: Double, span: Double)?
     /// Sources rebuilt by the pure multi-page route must never enter the standard per-item tag/retry path.
     var reOCRSourceURLs: Set<URL> = []
+    var _activePendingMixedPDF: PendingMixedPDF?
+    @Published var pendingMixedPDFInfo: String?
+    @Published var mixedPDFCancellationUnwinding = false
     var progress: Double {
         get { displayedProgress }
         set {

@@ -302,12 +302,34 @@ extension OCRProcessor {
             guard !Task.isCancelled else { cleanupTempFiles(); return }
             let index = input.jobIndex
             let pdfURL = input.url
+            if let pending = activePendingMixedPDF,
+               Self.mixedPDFSourceDigest(pdfURL) != pending.sourceDigests[String(index)] {
+                statusMessage = "The source PDF changed during this run. Processing stopped before another paid request."
+                cleanupTempFiles(); return
+            }
+            if let saved = activePendingMixedPDF?.completedOutcomes.first(where: { $0.originalIndex == index }) {
+                jobs[index].result = saved.result
+                jobs[index].classification = saved.result.classification
+                jobs[index].status = saved.succeeded ? .succeeded : .failed
+                if let output = saved.outputURL {
+                    outputURLMap[pdfURL] = output
+                    _takenOutputPaths.insert(OutputFileSafety.pathKey(output))
+                } else if !failedFiles.contains(pdfURL.lastPathComponent) {
+                    failedFiles.append(pdfURL.lastPathComponent)
+                }
+                progress = Double(ordinal + 1) / Double(total)
+                continue
+            }
             jobs[index].status = .processing
             statusMessage = "Rendering \(pdfURL.lastPathComponent)…"
 
             // 1. Render every page to a temp JPEG. nil = render failure; renderAllPages fails loud
             //    (no partial set) so we never silently drop an archival page.
             guard let pageImages = PDFToImageConverter.renderAllPages(of: pdfURL), !pageImages.isEmpty else {
+                if activePendingMixedPDF?.pageResults.keys.contains(where: { $0.hasPrefix("\(index):") }) == true {
+                    statusMessage = "A PDF with saved paid page results could not be rendered. The recovery record was kept for review."
+                    cleanupTempFiles(); return
+                }
                 // Keep a precise reason if a future caller sends a non-PDF here. W22 normally filters
                 // those inputs into the standard path; a direct misuse must still fail visibly.
                 let isPDF = pdfURL.pathExtension.lowercased() == "pdf"
@@ -325,6 +347,14 @@ extension OCRProcessor {
                     ? "Could not render \(pdfURL.lastPathComponent)."
                     : "Skipped \(pdfURL.lastPathComponent) — not a PDF (multi-page re-OCR run)."
                 progress = Double(ordinal + 1) / Double(total)
+                if activePendingMixedPDF != nil,
+                   let result = jobs[index].result,
+                   !persistMixedPDFMutation({ $0.completedOutcomes.append(
+                       MixedPDFOutcome(originalIndex: index, sourceURL: pdfURL,
+                                       result: result, succeeded: false, outputURL: nil)) }) {
+                    jobs[index].status = .processing
+                    cleanupTempFiles(); return
+                }
                 continue
             }
 
@@ -340,9 +370,18 @@ extension OCRProcessor {
                 }
                 statusMessage = "OCR \(pdfURL.lastPathComponent) — page \(p + 1)/\(pageImages.count)…"
                 let result: OCRResult
-                if let ocrOverride {
-                    result = await ocrOverride(img)
+                let pageKey = Self.mixedPDFPageKey(index: index, page: p)
+                if let saved = activePendingMixedPDF?.pageResults[pageKey] {
+                    result = saved
                 } else {
+                    if activePendingMixedPDF != nil &&
+                       !persistMixedPDFMutation({ $0.inFlightPage = pageKey }) {
+                        for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                        cleanupTempFiles(); return
+                    }
+                    if let ocrOverride {
+                    result = await ocrOverride(img)
+                    } else {
                     result = await Self.performOCRCall(
                         imageURL: img, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
@@ -352,9 +391,27 @@ extension OCRProcessor {
                         standardImageMB: ocrRun.standardImageMB,
                         visionSettings: ocrRun.visionSettings
                     )
+                    }
+                    if activePendingMixedPDF != nil &&
+                       !persistMixedPDFMutation({ pending in
+                           pending.pageResults[pageKey] = result
+                           pending.inFlightPage = nil
+                       }) {
+                        for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                        cleanupTempFiles(); return
+                    }
+                    if Task.isCancelled {
+                        for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                        cleanupTempFiles(); return
+                    }
                 }
                 pageResults.append(result)
                 progress = (Double(ordinal) + Double(p + 1) / Double(pageImages.count)) / Double(total)
+            }
+
+            if Task.isCancelled {
+                for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                cleanupTempFiles(); return
             }
 
             // 3+4. Build a per-page (image + text) PDF for each page, then merge them into ONE
@@ -363,7 +420,28 @@ extension OCRProcessor {
             //    result is image1, text1, image2, text2, …. uniqueOutputURL guards against clobbering
             //    the input PDF or another output from this run.
             let baseName = pdfURL.deletingPathExtension().lastPathComponent
-            let outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: pdfURL)
+            let outputURL: URL
+            if let reserved = activePendingMixedPDF?.reservedOutputPaths[String(index)] {
+                outputURL = URL(fileURLWithPath: reserved)
+                _takenOutputPaths.insert(OutputFileSafety.pathKey(outputURL))
+                if FileManager.default.fileExists(atPath: outputURL.path) {
+                    statusMessage = "A PDF output exists at the reserved path, but its completion was not recorded. Review it before resuming."
+                    for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                    cleanupTempFiles(); return
+                }
+            } else {
+                outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: pdfURL)
+                if activePendingMixedPDF != nil &&
+                   !persistMixedPDFMutation({ $0.reservedOutputPaths[String(index)] = outputURL.path }) {
+                    for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                    cleanupTempFiles(); return
+                }
+            }
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                statusMessage = "The reserved PDF destination is now occupied. The saved page results were kept; review the path before resuming."
+                for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                cleanupTempFiles(); return
+            }
             let originalName = pdfURL.lastPathComponent
             let pageWork: [(image: URL, result: OCRResult)] = Array(zip(pageImages, pageResults))
             let genModel = model
@@ -427,6 +505,23 @@ extension OCRProcessor {
                     errorCode: "pdf_write_failed")
                 jobs[index].status = .failed
                 if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
+            }
+            if activePendingMixedPDF != nil, let result = jobs[index].result {
+                let outputDigest = ok ? Self.mixedPDFSourceDigest(outputURL) : nil
+                if ok && outputDigest == nil {
+                    jobs[index].status = .processing
+                    statusMessage = "The rebuilt PDF could not be verified. The recovery record was kept for review."
+                    cleanupTempFiles(); return
+                }
+                if !persistMixedPDFMutation({ pending in
+                    if let outputDigest { pending.outputDigests[String(index)] = outputDigest }
+                    pending.completedOutcomes.append(
+                        MixedPDFOutcome(originalIndex: index, sourceURL: pdfURL,
+                                        result: result, succeeded: ok, outputURL: ok ? outputURL : nil))
+                }) {
+                    jobs[index].status = .processing
+                    cleanupTempFiles(); return
+                }
             }
             progress = Double(ordinal + 1) / Double(total)
             statusMessage = "Processed \(ordinal + 1)/\(total) PDF\(total == 1 ? "" : "s")…"
@@ -653,6 +748,11 @@ extension OCRProcessor {
             return
         }
         activePendingBatch = persistedInitialBatch
+        if activePendingMixedPDF != nil {
+            Self.deletePendingMixedPDF()
+            activePendingMixedPDF = nil
+            pendingMixedPDFInfo = nil
+        }
         // This submission owns the journal now, so no previous Stop's address may be consulted again
         // (W16.bat5-fu). The identity check would refuse a stale one anyway; clearing it here means the
         // property never outlives the batch it names.

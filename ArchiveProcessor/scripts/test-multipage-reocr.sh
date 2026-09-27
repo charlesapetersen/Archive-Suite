@@ -1,7 +1,8 @@
 #!/bin/bash
 # Key-free ($0) synthetic regression for the multi-page-PDF re-OCR mode: renders synthetic
 # multi-page PDFs, injects a fake per-page OCR result (no network), and asserts the rebuilt output
-# PDF alternates image/OCR-text pages in order and never overwrites the input. Headless self-test
+# PDF alternates image/OCR-text pages in order, never overwrites the input, and recovers a
+# saved paid page and exact output path after a simulated relaunch. Headless self-test
 # (MULTIPAGE_REOCR_TEST=1), scratch-isolated to a mktemp dir — never the corpus.
 set -euo pipefail
 cd "$(dirname "$0")/.."

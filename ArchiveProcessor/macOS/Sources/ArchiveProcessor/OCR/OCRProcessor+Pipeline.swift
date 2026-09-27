@@ -1294,6 +1294,42 @@ extension OCRProcessor {
         } else {
             pendingRunInfo = nil
         }
+        // A crash between saving the image journal and retiring the PDF journal leaves both.
+        // Prefer the validated image journal once it contains this exact completed PDF set.
+        if let mixed = Self.loadPendingMixedPDF(), Self.pendingMixedPDFIsSelfConsistent(mixed),
+           mixed.completedOutcomes.count == mixed.pdfIndices.count {
+            let transferred: [MixedPDFOutcome]?
+            let images = mixed.originalFiles.indices
+                .filter { !Set(mixed.pdfIndices).contains($0) }
+                .map { mixed.originalFiles[$0] }
+            if let run = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(run),
+               run.fileURLs == images {
+                transferred = run.mixedPDFOutcomes
+            } else if let batch = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(batch),
+                      batch.fileURLs == images {
+                transferred = batch.mixedPDFOutcomes
+            } else {
+                transferred = nil
+            }
+            if let transferred,
+               let expected = try? JSONEncoder().encode(mixed.completedOutcomes),
+               let actual = try? JSONEncoder().encode(transferred), expected == actual {
+                Self.deletePendingMixedPDF()
+                activePendingMixedPDF = nil
+            }
+        }
+        if FileManager.default.fileExists(atPath: Self.pendingMixedPDFURL.path) {
+            if let pending = Self.loadPendingMixedPDF(), Self.pendingMixedPDFIsSelfConsistent(pending) {
+                let completed = pending.completedOutcomes.count
+                let total = pending.pdfIndices.count
+                pendingMixedPDFInfo = mixedPDFResumeBlockReason(pending)
+                    ?? "Interrupted mixed run: \(completed)/\(total) PDFs recorded; saved page results will be reused."
+            } else {
+                pendingMixedPDFInfo = "A mixed PDF recovery record could not be verified. It was kept for review; automatic resume is unavailable."
+            }
+        } else {
+            pendingMixedPDFInfo = nil
+        }
     }
     /// The tail every transiently-interrupted paid batch must run before its run ends (W16.bat4).
     ///
@@ -2435,6 +2471,14 @@ extension OCRProcessor {
         let interruptedRun = processingTask
         processingTask?.cancel()
         processingTask = nil
+        if activePendingMixedPDF != nil, interruptedRun != nil {
+            mixedPDFCancellationUnwinding = true
+            Task {
+                await interruptedRun?.value
+                mixedPDFCancellationUnwinding = false
+                checkForPendingBatch()
+            }
+        }
         isProcessing = false
         awaitingFinalReview = false
         awaitingDocumentReview = false
@@ -2562,16 +2606,39 @@ extension OCRProcessor {
         skipAlreadyProcessed: Bool = false,
         segmentationContext: SegmentationContext,
         gatewayConfig: GatewayConfig? = nil,
-        localAgent: LocalAgentConfig? = nil
+        localAgent: LocalAgentConfig? = nil,
+        resumingMixedPDF: PendingMixedPDF? = nil
     ) async {
         guard !files.isEmpty else { return }
         // Never overwrite recovery state from a different interrupted run. The UI surfaces explicit
         // Resume/Dismiss controls, but keep the invariant here as well for shortcuts and programmatic
         // callers. A paid batch may still exist even when its manifest is malformed or has no received ID.
-        if Self.loadPendingBatch() != nil || Self.loadPendingRun() != nil {
+        if Self.loadPendingBatch() != nil || Self.loadPendingRun() != nil ||
+           (FileManager.default.fileExists(atPath: Self.pendingMixedPDFURL.path)
+            && resumingMixedPDF == nil) {
             checkForPendingBatch()
             statusMessage = "An interrupted run is still preserved. Resume it or explicitly dismiss its recovery record before starting another run."
             return
+        }
+        if let resumingMixedPDF {
+            guard !mixedPDFCancellationUnwinding else {
+                statusMessage = "The cancelled PDF request is still finishing. Resume will be available once it stops."
+                return
+            }
+            guard let onDisk = Self.loadPendingMixedPDF(),
+                  Self.pendingMixedPDFIsSelfConsistent(onDisk),
+                  onDisk.integrity == resumingMixedPDF.integrity,
+                  onDisk.inFlightPage == nil,
+                  onDisk.originalFiles == files,
+                  onDisk.outputDirectory == outputDirectory,
+                  onDisk.pdfIndices.allSatisfy({ index in
+                      Self.mixedPDFSourceDigest(files[index]) == onDisk.sourceDigests[String(index)]
+                  }),
+                  Self.mixedPDFOutputsMatchJournal(onDisk) else {
+                checkForPendingBatch()
+                statusMessage = "The PDF recovery record or its sources changed. Review it before resuming; no paid request was sent."
+                return
+            }
         }
         // Normalize programmatic/profile inputs to the same bounds as the UI before either the live run
         // or its immutable resume snapshot observes them.
@@ -2589,7 +2656,7 @@ extension OCRProcessor {
         // re-run can never silently miss a file that needed output.
         var files = files
         var incrementalSkipped = 0
-        if skipAlreadyProcessed && preGroupedBoundaries.isEmpty
+        if resumingMixedPDF == nil && skipAlreadyProcessed && preGroupedBoundaries.isEmpty
             && !enableCollectionSegmentation && !mergeDocuments {
             let decision = IncrementalSkip.partition(inputs: files, outputDirectory: outputDirectory)
             incrementalSkipped = decision.skipped.count
@@ -2669,6 +2736,10 @@ extension OCRProcessor {
         runConfig.gateway = gatewayConfig
         runConfig.outputImageFile = exportOriginals
         runConfig.localAgent = localAgent
+        if let resumingMixedPDF {
+            applyMixedPDFRuntimeConfig(resumingMixedPDF.runtimeConfig, to: &runConfig, apiKey: apiKey)
+            activePendingMixedPDF = resumingMixedPDF
+        }
         activeRunConfig = runConfig
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
@@ -2686,6 +2757,28 @@ extension OCRProcessor {
         let imageIndices = files.indices.filter { !pdfIndexSet.contains($0) }
         let autoReOCR = !pdfIndices.isEmpty
         let mixedReOCR = autoReOCR && !imageIndices.isEmpty
+        if let resumingMixedPDF {
+            guard mixedReOCR && pdfIndices == resumingMixedPDF.pdfIndices else {
+                isProcessing = false
+                statusMessage = "The PDF inputs changed since the recovery record was saved. No paid request was sent."
+                checkForPendingBatch()
+                return
+            }
+        } else if mixedReOCR {
+            guard beginMixedPDFJournal(
+                originalFiles: files, pdfIndices: pdfIndices, outputDirectory: outputDirectory,
+                provider: provider, model: model, thinkingLevel: thinkingLevel,
+                batchMode: batchMode, enableTagging: enableTagging,
+                enableSegmentJSON: enableSegmentJSON,
+                enableCollectionSegmentation: enableCollectionSegmentation,
+                confirmCollectionIDs: confirmCollectionIDs,
+                reviewDocumentSegmentation: reviewDocumentSegmentation,
+                segmentationContext: segmentationContext, gatewayConfig: gatewayConfig,
+                localAgent: localAgent, runConfig: runConfig) else {
+                isProcessing = false
+                return
+            }
+        }
         reOCRSourceURLs = Set(pdfIndices.map { files[$0] })
         var mixedPDFOutcomes: [MixedPDFOutcome]?
         var fullJobsAfterPDF: [OCRJob]?
@@ -2748,13 +2841,21 @@ extension OCRProcessor {
                 runConfig: runConfig
             )
             guard !Task.isCancelled else { cleanupTempFiles(); return }
-            guard pdfIndices.allSatisfy({ jobs[$0].status != .pending }) else {
+            guard pdfIndices.allSatisfy({ jobs[$0].status == .succeeded || jobs[$0].status == .failed }) else {
                 activeRunHistory = nil
                 isProcessing = false
-                statusMessage = "The PDF inputs could not be matched to their jobs. No images were processed."
+                checkForPendingBatch()
                 return
             }
             if mixedReOCR {
+                guard let pending = activePendingMixedPDF,
+                      Self.mixedPDFOutputsMatchJournal(pending) else {
+                    activeRunHistory = nil
+                    isProcessing = false
+                    statusMessage = "A rebuilt PDF changed before image processing. The recovery record was kept for review."
+                    checkForPendingBatch()
+                    return
+                }
                 guard let outcomes = captureMixedPDFOutcomes(indices: pdfIndices) else {
                     activeRunHistory = nil
                     isProcessing = false
@@ -2888,6 +2989,11 @@ extension OCRProcessor {
                     isProcessing = false
                     statusMessage = "Could not save the resume snapshot. No OCR requests were sent."
                     return
+                }
+                if activePendingMixedPDF != nil {
+                    Self.deletePendingMixedPDF()
+                    activePendingMixedPDF = nil
+                    pendingMixedPDFInfo = nil
                 }
 
                 await performOCRPhase(
