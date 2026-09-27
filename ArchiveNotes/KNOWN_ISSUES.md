@@ -3,6 +3,13 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d9) — smart folders had no result-count badge
+
+**2026-09-27.** Smart-folder rows now show the count of items matching their saved query,
+including zero. Counts refresh when items or folder memberships change. The scan runs off the
+main screen thread, cancels stale work, and omits unreadable queries. Notes build, headless
+smoke, and a focused off-screen scratch UI check passed; no real store or corpus was used.
+
 ## ✅ FIXED (W9.d8) — empty Notes lists gave no explanation
 
 **2026-09-27.** The list now explains an empty library, a truly empty normal folder, or no

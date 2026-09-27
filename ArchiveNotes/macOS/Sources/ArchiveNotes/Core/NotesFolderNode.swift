@@ -84,8 +84,8 @@ extension NotesFolderNode {
     /// The flat list of smart folders for the "Smart Folders" section — every `.smart` folder except
     /// those in `excluding` (the seeded All-Notes root, which the view renders as its own row). Sorted
     /// by `sortOrder` then localized name. `itemCount` is left 0 here: a smart folder's badge is a
-    /// *live* query match count, which is served by the index in W6-S4 (search); the view omits the
-    /// badge for smart folders until then.
+    /// *live* saved-query match count, published separately by NotesModel after an off-main pass;
+    /// a pending or unreadable query has no badge.
     static func smartFolderNodes(folders: [VFolder],
                                  excluding: Set<UUID>) -> [NotesFolderNode] {
         folders

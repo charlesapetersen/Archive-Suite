@@ -93,7 +93,8 @@ struct NotesFolderTreeView: View {
         if !model.smartFolders.isEmpty {
             Section("Smart Folders") {
                 ForEach(model.smartFolders) { node in
-                    row(name: node.name, systemImage: "line.3.horizontal.decrease.circle", count: nil)
+                    row(name: node.name, systemImage: "line.3.horizontal.decrease.circle",
+                        count: model.smartFolderCounts[node.id], showZero: true)
                         .tag(Self.smartPrefix + node.id.uuidString)
                         .accessibilityIdentifier("an.sidebar.smart")
                 }
@@ -181,11 +182,11 @@ struct NotesFolderTreeView: View {
 
     // MARK: Rows & chrome
 
-    private func row(name: String, systemImage: String, count: Int?) -> some View {
+    private func row(name: String, systemImage: String, count: Int?, showZero: Bool = false) -> some View {
         HStack(spacing: 6) {
             Label(name, systemImage: systemImage).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 4)
-            if let count, count > 0 {
+            if let count, count > 0 || showZero {
                 Text("\(count)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
         }

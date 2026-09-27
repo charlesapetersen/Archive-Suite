@@ -257,6 +257,14 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d9 — live smart-folder match-count badge [S].** **SHIPPED 2026-09-27
+  (this commit).** The sidebar shows each valid saved query's match count, including zero. The
+  shared Notes model uses the same predicate and folder subtree membership as navigation; a
+  cancellable off-main scan refreshes counts after item or organization changes. Unreadable queries
+  show no badge. Verification: Notes Debug build and headless unit smoke, with a scratch regression
+  for kind/title/folder scope and item/membership updates; focused off-screen scratch UI check.
+  | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/{Core/{NotesModel,NotesFolderNode}.swift,Views/NotesFolderTreeView.swift},Tests/{ArchiveNotesTests/NotesNavigationModelTests.swift,ArchiveNotesUITests/NotesGUITests.swift}}, ArchiveNotes/{CLAUDE,KNOWN_ISSUES}.md, execution-plans/archive-notes/09-gap-closure.md | S | low | done
+
 - [x] **W9.d8 — empty Notes list and folder guidance [S].** **SHIPPED 2026-09-27
   (this commit).** Once indexing settles, an empty list explains whether the library has no items,
   the selected normal folder has no members, or the current scope/filter/search has no matches.

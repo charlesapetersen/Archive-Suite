@@ -159,7 +159,8 @@ macOS/Sources/ArchiveNotes/
                                    async create/rename/move/delete folders + selection scope (W6-S2);
                                    shared item source (allItems + reloadItems/replaceItems) for the
                                    per-window list VMs (W6-S3); itemsGeneration counter (bumped in replaceItems)
-                                   drives the editor's reactive provenance-chip title refresh + create/append
+                                   drives the editor's reactive provenance-chip title refresh;
+                                   cancellable off-main smart-folder saved-query counts (W9.d9); create/append
                                    route the extract through openItem for select+raise (W14.4 b/c);
                                    search(_:) FTS façade + createSmartFolder
                                    (W6-S4); NoteStore-backed delete path — strandedByDeletingFolder
@@ -339,6 +340,7 @@ macOS/Sources/ArchiveNotes/
     NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (recursive ForEach / per-level
                                    DisclosureGroup + two-way @State selection sync, Smart Folders / Folders
                                    sections, All Notes pseudo-row, context-menu create/rename/delete) (W6-S2).
+                                   Smart rows show live saved-query match counts, including zero (W9.d9).
                                    Sibling reorder persists sortOrder; dragging a folder onto another reparents
                                    through NotesModel.moveFolder with cycle refusal (W9.d1). Folder-row note
                                    drop (plain=MOVE / ⌥=REPLICATE via NSEvent.modifierFlags) + batched

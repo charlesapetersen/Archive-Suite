@@ -24,6 +24,12 @@ final class NotesModel: ObservableObject {
     @Published private(set) var normalTree: [NotesFolderNode] = []
     /// Flat list of user smart folders (the "Smart Folders" section), excluding the All-Notes root.
     @Published private(set) var smartFolders: [NotesFolderNode] = []
+    /// Saved-query matches for each valid smart folder, independent of either window's current
+    /// user filters. Missing keys mean the count is still computing or the query is unreadable.
+    @Published private(set) var smartFolderCounts: [UUID: Int] = [:]
+    private var smartCountGeneration = 0
+    private var smartCountWorker: Task<[UUID: Int]?, Never>?
+    private var smartCountApply: Task<Void, Never>?
     /// Distinct items across the whole store — the badge on the "All Notes" pseudo-row. (Membership-
     /// based here; the exact index-served count arrives with the item list in W6-S4.)
     @Published private(set) var allNotesCount: Int = 0
@@ -320,6 +326,7 @@ final class NotesModel: ObservableObject {
     func replaceItems(_ items: [ItemSummary]) {
         allItems = items
         itemsGeneration &+= 1
+        refreshSmartFolderCounts()
     }
 
     // MARK: Initial index build + ready signal (§3.4)
@@ -1196,7 +1203,84 @@ final class NotesModel: ObservableObject {
         smartFolders = NotesFolderNode.smartFolderNodes(
             folders: folders, excluding: [OrganizationStore.allNotesFolderId])
         allNotesCount = Set(memberships.map(\.itemId)).count
+        refreshSmartFolderCounts()
     }
+
+    private struct SmartCountQuery: Sendable {
+        let id: UUID
+        let filter: NotesFilter
+    }
+
+    /// Reuse the durable predicate used by smart-folder navigation. Capture value snapshots on the
+    /// main actor; resolve subtree membership and scan items off-main. A newer update cancels the
+    /// old scan, and only the current generation may publish counts.
+    private func refreshSmartFolderCounts() {
+        smartCountGeneration &+= 1
+        let generation = smartCountGeneration
+        smartCountWorker?.cancel()
+        smartCountApply?.cancel()
+        smartFolderCounts = [:]
+
+        let queries: [SmartCountQuery] = smartFolders.compactMap { node in
+            guard let json = node.queryJSON, let data = json.data(using: .utf8),
+                  let filter = try? JSONDecoder().decode(NotesFilter.self, from: data) else { return nil }
+            return SmartCountQuery(id: node.id, filter: filter)
+        }
+        guard !queries.isEmpty else { return }
+        let items = allItems
+        let folders = organization.folders
+        let memberships = organization.memberships
+        let worker = Task.detached(priority: .utility) { () -> [UUID: Int]? in
+            // Build the graph index once per pass. Resolving each folder-scoped smart query via
+            // OrganizationStore.subtreeItemIDs on the main actor would rescan all memberships per
+            // query, freezing large libraries with many saved searches.
+            var childrenOf: [UUID: [UUID]] = [:]
+            for (index, folder) in folders.enumerated() {
+                if index.isMultiple(of: 256), Task.isCancelled { return nil }
+                if let parent = folder.parentId { childrenOf[parent, default: []].append(folder.id) }
+            }
+            var itemsByFolder: [UUID: Set<UUID>] = [:]
+            for (index, membership) in memberships.enumerated() {
+                if index.isMultiple(of: 256), Task.isCancelled { return nil }
+                itemsByFolder[membership.folderId, default: []].insert(membership.itemId)
+            }
+            var scopeItems: [UUID: Set<UUID>] = [:]
+            for root in Set(queries.compactMap(\.filter.folderId)) {
+                var visited: Set<UUID> = []
+                var stack = [root]
+                var ids: Set<UUID> = []
+                while let folderID = stack.popLast() {
+                    if Task.isCancelled { return nil }
+                    guard visited.insert(folderID).inserted else { continue }
+                    ids.formUnion(itemsByFolder[folderID] ?? [])
+                    stack.append(contentsOf: childrenOf[folderID] ?? [])
+                }
+                scopeItems[root] = ids
+            }
+            var counts = Dictionary(uniqueKeysWithValues: queries.map { ($0.id, 0) })
+            for (index, item) in items.enumerated() {
+                if index.isMultiple(of: 256), Task.isCancelled { return nil }
+                for query in queries {
+                    if Task.isCancelled { return nil }
+                    let folderItemIDs = query.filter.folderId.flatMap { scopeItems[$0] }
+                    if query.filter.matches(item, folderItemIDs: folderItemIDs) {
+                        counts[query.id, default: 0] += 1
+                    }
+                }
+            }
+            return Task.isCancelled ? nil : counts
+        }
+        smartCountWorker = worker
+        smartCountApply = Task { [weak self] in
+            let counts = await worker.value
+            guard !Task.isCancelled, let self, self.smartCountGeneration == generation,
+                  let counts else { return }
+            self.smartFolderCounts = counts
+        }
+    }
+
+    /// Deterministic completion seam for headless smart-folder count regression checks.
+    func waitForSmartFolderCounts() async { await smartCountApply?.value }
 
     // MARK: Scope selection
 

@@ -213,6 +213,42 @@ struct NotesNavigationModelTests {
         #expect(nav.displayed.count == 3)
     }
 
+    @Test func smartFolderBadgeCountsSavedQueryAndRefreshesOnItemsAndMembership() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+        let inside = sum("Budget inside", kind: .note)
+        let outside = sum("Budget outside", kind: .note)
+        let extract = sum("Budget extract", kind: .extract)
+        let folder = try await model.organization.createFolder(name: "Projects", kind: .normal)
+        let child = try await model.organization.createFolder(
+            name: "Child", parent: folder.id, kind: .normal)
+        try await model.organization.addMembership(item: inside.id, folder: child.id)
+        try await model.organization.addMembership(item: inside.id, folder: folder.id)
+        try await model.organization.addMembership(item: extract.id, folder: folder.id)
+
+        let query = NotesFilter(searchText: "budget", kind: .notes, folderId: folder.id)
+        let json = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
+        let smart = try await model.organization.createFolder(
+            name: "Project budgets", kind: .smart, queryJSON: json)
+        let unreadable = try await model.organization.createFolder(
+            name: "Broken query", kind: .smart, queryJSON: "{")
+
+        model.rebuild()
+        model.replaceItems([inside, outside, extract])
+        await model.waitForSmartFolderCounts()
+        #expect(model.smartFolderCounts[smart.id] == 1)
+        #expect(model.smartFolderCounts[unreadable.id] == nil)
+
+        model.replaceItems([outside, extract])
+        await model.waitForSmartFolderCounts()
+        #expect(model.smartFolderCounts[smart.id] == 0, "zero is a real badge count")
+
+        try await model.organization.addMembership(item: outside.id, folder: folder.id)
+        model.rebuild()
+        await model.waitForSmartFolderCounts()
+        #expect(model.smartFolderCounts[smart.id] == 1)
+    }
+
     // MARK: - W6-S4: facet filters (quality / date)
 
     @Test func qualityAndDateFacetsNarrowDisplayed() async throws {

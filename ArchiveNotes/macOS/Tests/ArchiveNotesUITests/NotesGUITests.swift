@@ -839,6 +839,38 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W9.d9 — the saved Notes-kind query matches the fixture's three notes (not its extract)
+    /// and publishes that live count beside the newly created smart folder.
+    func testW9D9_SmartFolderShowsSavedQueryCount() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            XCTAssertTrue(waitForIndexReady(timeout: 30))
+            let window = mainWindow
+            let save = window.buttons["an.filter.save"]
+            XCTAssertTrue(save.waitForExistence(timeout: 5))
+            save.click()
+
+            let sheet = window.sheets.firstMatch
+            XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            let name = sheet.textFields.firstMatch
+            XCTAssertTrue(name.exists)
+            name.click()
+            name.typeText("Fixture notes")
+            sheet.buttons["Save"].click()
+
+            let smartRows = window.descendants(matching: .any).matching(identifier: "an.sidebar.smart")
+            XCTAssertTrue(smartRows.matching(NSPredicate(format: "value == %@", "Fixture notes"))
+                .firstMatch.waitForExistence(timeout: 10))
+            XCTAssertTrue(smartRows.matching(NSPredicate(format: "value == %@", "3"))
+                .firstMatch.waitForExistence(timeout: 15), "the badge should count notes in the saved query")
+
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = "W9.d9-smart-folder-count"
+            attachment.lifetime = .keepAlways
+            XCTContext.runActivity(named: "Capture the smart-folder count") { $0.add(attachment) }
+        }
+    }
+
     /// G1 — Create a note (⌘N / the New menu) → a new `items/<uuid>/<Title>.md` appears on disk.
     func testG1_CreateNoteWritesNewItemFile() throws {
         try withFixture { try runG1_CreateNoteWritesNewItemFile() }

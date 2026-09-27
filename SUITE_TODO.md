@@ -845,8 +845,6 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
   codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,
   FrontMatterCodec.swift | S–M | low | none
-- [ ] **`W9.d9` — smart folders have no live match-count badge [S].** Plan D9. | Core/NotesFolderNode.swift | S
-  | low | none
 - [ ] **`W9.d10` — the extract inspector has no provenance summary [S].** Plan D10. Distinct source notes +
   counts (the aggregate column already exists). | NoteMetadataInspector.swift | S | low | none
 - [ ] **`W9.d11` — large-paste parse runs on the main actor despite the header claim [S–M · perf].** Plan D11.
