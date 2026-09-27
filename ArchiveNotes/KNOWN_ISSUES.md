@@ -3,6 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d11) — large-paste comments claimed an off-main parse
+
+**2026-09-27.** Styled large-paste conversion was already on the main actor; the detached
+task did no parsing before calling back to it. The no-op background hop is removed and comments
+now state the actual behavior. Conversion may still pause the UI for a very large paste. A
+future off-main AST would be needed to change that. Notes build, headless smoke, scratch
+functional check, and independent actor-isolation review passed.
+
 ## ✅ FIXED (W9.d10) — extract inspector lacked source details
 
 **2026-09-27.** The extract inspector now lists distinct source notes and their passage counts.

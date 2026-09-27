@@ -257,6 +257,16 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d11 — correct the large-paste thread contract [S–M · perf].** **SHIPPED
+  2026-09-27 (this commit).** Styled large-paste conversion still creates AppKit attributed text
+  on the main actor. The unused detached hop is removed and the editor/bridge comments now
+  describe the actual scheduling and possible UI pause. An off-main parser remains future
+  performance work. Verification: Notes Debug build and headless smoke; scratch large-paste
+  functional check; independent find/refute actor-isolation review. | files: ArchiveNotes/macOS/
+  {Sources/ArchiveNotes/Editor/{MarkdownBridge,EditorTextView}.swift,Tests/ArchiveNotesTests/
+  EditorPerfTests.swift}, ArchiveNotes/{CLAUDE,
+  KNOWN_ISSUES}.md, execution-plans/archive-notes/09-gap-closure.md | S–M | low | done
+
 - [x] **W9.d10 — extract inspector provenance summary [S].** **SHIPPED 2026-09-27
   (this commit).** The extract detail inspector groups passage blocks by source note, showing each
   note's current title and passage count. Missing notes retain their saved source label and are

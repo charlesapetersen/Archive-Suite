@@ -1,6 +1,7 @@
 import AppKit
 
-/// Pure (nonisolated) bridge between Markdown strings and styled `NSAttributedString`.
+/// Main-actor bridge between Markdown strings and styled `NSAttributedString`.
+/// Parsing creates AppKit attributes and attachments, so it runs on the main actor.
 ///
 /// - `parse(markdown:)` — Markdown → styled `NSAttributedString` (read path)
 /// - `serialize(_:)` — styled `NSAttributedString` → CommonMark (write path, NET-NEW)

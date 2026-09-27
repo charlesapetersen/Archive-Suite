@@ -265,7 +265,8 @@ macOS/Sources/ArchiveNotes/
   Editor/
     EditorTextView.swift           NSTextView subclass (TextKit 2 enforced, undo/find, rich text,
                                    list keyboard: Tab/Shift-Tab indent, Return continue,
-                                   Backspace-at-start outdent, paste/drag image + text); copy(_:) +
+                                   Backspace-at-start outdent, paste/drag image + text); large
+                                   styled paste defers main-actor conversion one turn (W9.d11); copy(_:) +
                                    passageCopyHandler / passagePasteHandler seams (W7-S2 copy/paste)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
@@ -287,7 +288,8 @@ macOS/Sources/ArchiveNotes/
                                    OR timeout, whichever first). Backs NotesAppDelegate's terminate flush
                                    so a force-quit within the autosave debounce can't lose an edit (W7-S6)
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
-                                   CommonMark); block-header chips (<!-- block: --> → chip attachments);
+                                   CommonMark), both main-actor-bound by AppKit styling and attachments
+                                   (W9.d11); block-header chips (<!-- block: --> → chip attachments);
                                    parseWithStatus reports hard failure for raw→styled switch (W9.d7);
                                    inline images (![alt](path)); buildInsertableBlock seam; idempotent;
                                    onJumpBlock + passageSummaries thread note-passage chip jump + live

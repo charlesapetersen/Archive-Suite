@@ -212,6 +212,22 @@ struct EditorPerfTests {
                 "Large paste threshold should be 10k characters")
     }
 
+    @Test @MainActor
+    func largeStyledPasteInsertsAfterDeferredMainActorConversion() async {
+        let tv = EditorTextView()
+        let markdown = "**bold** " + String(repeating: "word ", count: 2_100)
+        #expect(markdown.count > EditorTextView.largePasteThreshold)
+
+        tv.insertPlainText(markdown)
+        for _ in 0..<100 where tv.string.isEmpty {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(tv.string.hasPrefix("bold word "))
+        #expect(!tv.string.contains("**bold**"))
+        #expect(tv.string.hasSuffix("word"))
+    }
+
     // MARK: - EditorTextView TextKit 2 under load
 
     @Test @MainActor

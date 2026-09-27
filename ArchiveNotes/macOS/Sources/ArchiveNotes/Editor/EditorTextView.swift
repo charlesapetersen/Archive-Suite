@@ -348,12 +348,13 @@ final class EditorTextView: NSTextView {
         }
     }
 
-    /// Threshold (in characters) above which pasted text is parsed off-main.
+    /// Threshold (in characters) above which a styled paste uses deferred Markdown conversion.
     static let largePasteThreshold = 10_000
 
     /// Insert plain text at the caret, stripping any rich formatting.
-    /// For large pastes in styled mode, parses off-main to avoid blocking the UI.
-    private func insertPlainText(_ text: String) {
+    /// For large pastes in styled mode, schedules Markdown conversion after the paste callback.
+    /// The conversion still runs on the main actor and may pause the UI for a very large paste.
+    func insertPlainText(_ text: String) {
         if isRichText, text.count > Self.largePasteThreshold {
             insertLargeTextAsync(text)
             return
@@ -374,21 +375,16 @@ final class EditorTextView: NSTextView {
         undoManager?.endUndoGrouping()
     }
 
-    /// Parse a large text paste off-main, then apply the result on @MainActor.
+    /// Defer a large paste's parse and insertion to a later main-actor turn.
     private func insertLargeTextAsync(_ text: String) {
         let fontSize = configuredFontSize
         let range = selectedRange()
-        Task.detached(priority: .userInitiated) {
-            // Pure parse on background — produces Sendable String→String mapping
-            let markdown = text
-            // Build attributed string on main (NSAttributedString is not Sendable)
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                let parsed = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize)
-                self.undoManager?.beginUndoGrouping()
-                self.insertText(parsed, replacementRange: range)
-                self.undoManager?.endUndoGrouping()
-            }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let parsed = MarkdownBridge.parse(markdown: text, fontSize: fontSize)
+            self.undoManager?.beginUndoGrouping()
+            self.insertText(parsed, replacementRange: range)
+            self.undoManager?.endUndoGrouping()
         }
     }
 

@@ -845,10 +845,6 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
   codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,
   FrontMatterCodec.swift | S–M | low | none
-- [ ] **`W9.d11` — large-paste parse runs on the main actor despite the header claim [S–M · perf].** Plan D11.
-  `MarkdownBridge` is `@MainActor` and `insertLargeTextAsync` parses inside `MainActor.run`. Either produce a
-  Sendable AST off-main as designed, **or** drop the "pure nonisolated" header claim and the stale comment —
-  the doc lying is the part that must not survive. | Editor/MarkdownBridge.swift | S–M | low | none
 - [ ] **`W9.d12` — the small-correctness batch (~11 items) [M].** Plan D12, kept as one item because every
   member is XS: block-header chip thumbnail render · ordered-list renumber-from-first · focus-on-appear token ·
   drop-cursor + AppKit drop reliability · `NSFileCoordinator` around Trash delete · extract paste degradation
