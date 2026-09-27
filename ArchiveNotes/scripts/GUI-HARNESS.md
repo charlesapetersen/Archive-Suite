@@ -59,6 +59,7 @@ path. Each test subtracts a pre-test `itemDirs()` snapshot, because the runner h
 | G17 | Inline note rename via double-click, Return, and row menu; Escape no-op; inspector subject add/remove reaches YAML + Finder tags while UUID and body stay intact | **Auto** (scratch; exports `notes-title-tags.png` for pixel review) |
 | G18 | Drag a folder onto another and persist the new parent in the scratch organization graph | **Auto** |
 | G19 | Row-menu Delete confirms before removing every replicated placement and moving the note to Trash; Cancel is a no-op | **Auto** (scratch) |
+| W9.d4 | The inline list Quality menu sets Quality 2 in front matter, then clears it with None | **Auto** (scratch) |
 
 ### Why some checks use a DEBUG seam instead of the real gesture
 

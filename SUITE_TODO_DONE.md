@@ -257,6 +257,15 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d4 — inline quality quick-edit [S].** **SHIPPED 2026-09-27 (this commit).** The
+  virtualized Notes list's Quality cell now hosts a compact borderless menu with None and Quality 1–3.
+  It calls the existing `NotesNavigationModel.setQuality` path and refreshes from each row's current
+  summary on reuse; selecting or scrolling a row never writes front matter. The inspector facet row
+  and context-menu Set Quality remain available. Verification: Notes Debug build and headless unit
+  smoke (218 XCTest checks); focused off-screen scratch UI check sets Quality 2 then clears it through
+  the new cell. No real Notes store or corpus was touched.
+  | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/Views/{QualityControl,NotesTableView}.swift,Tests/ArchiveNotesUITests/NotesGUITests.swift}, ArchiveNotes/{CLAUDE,KNOWN_ISSUES}.md, execution-plans/archive-notes/09-gap-closure.md | S | low | done
+
 - [x] **W9.d3 — template body editing is not routed in-app [M].** **SHIPPED 2026-09-26
   (this commit).** Selecting a template now opens its Markdown body in the detail pane, with styled/raw
   editing, formatting controls, autosave, and a one-window editing lease. Saving reloads the template

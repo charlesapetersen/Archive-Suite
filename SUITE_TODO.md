@@ -841,10 +841,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d4` — no inline quality quick-edit [S].** Plan D4. Add a borderless quality `Menu` (None + 1–3)
-  in the list/detail cell. The context-menu "Set Quality ▸" shipped with W9.d2; retain the post-W19
-  Quality vocabulary. |
-  Views/QualityControl.swift, NotesTableView.swift | S | low | none
 - [ ] **`W9.d6` — the `roundup` date field has no UI and is always false: add it or remove it [S–M].** Plan D6.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
   codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,

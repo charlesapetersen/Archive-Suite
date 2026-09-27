@@ -1671,6 +1671,35 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W9.d4: the Quality list cell itself edits the selected note through the existing model path.
+    /// The fixture is scratch-only; clear the value at the end so other checks see its original state.
+    func testW9D4_InlineQualityMenuPersistsAndClears() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            let cellID = "an.cell.quality.\(id)"
+            let cell = mainWindow.descendants(matching: .any)[cellID]
+            XCTAssertTrue(cell.waitForExistence(timeout: 15), "the inline Quality menu should be visible")
+            cell.click()
+            let two = app.menuItems["Quality 2"]
+            XCTAssertTrue(two.waitForExistence(timeout: 5), "the inline menu should offer Quality 2")
+            two.click()
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                rawMarkdown(inItemDir: id)?.contains("\nquality: 2\n") == true
+            }, "Quality 2 should persist to the scratch note")
+
+            let updated = mainWindow.descendants(matching: .any)[cellID]
+            XCTAssertTrue(updated.waitForExistence(timeout: 10))
+            updated.click()
+            let none = app.menuItems["None"]
+            XCTAssertTrue(none.waitForExistence(timeout: 5), "the inline menu should offer None")
+            none.click()
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                rawMarkdown(inItemDir: id)?.contains("\nquality:") == false
+            }, "None should clear the scratch note's quality field")
+        }
+    }
+
     /// W9.d1 — dragging one folder onto another reparents the folder in the scratch organization graph.
     func testG18_DragFolderOntoFolderReparentsIt() throws {
         try withFixture {

@@ -348,9 +348,12 @@ macOS/Sources/ArchiveNotes/
                                    kind/title/instances/date/quality/sources/tags; sources = distinct
                                    source notes for extracts (blank for notes, W7-S4); inline title rename
                                    via Return/double-click/context menu (identity-bound, rejected save restores
-                                   display); subjects edit in detail (W9.b3). Adapts Reader AppKitTableView
+                                   display); inline Quality menu (None/1–3, W9.d4); subjects edit in detail
+                                   (W9.b3). Adapts Reader AppKitTableView
                                    (no NSTokenField) (W6-S3). Drag source (NotesTableDataSource
                                    pasteboardWriterForRow, id-only) + accent-glyph replicant title styling (W6-S5)
+    QualityControl.swift           Inspector facet buttons plus compact borderless list menu; both call
+                                   the existing quality setter (W9.d4)
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
                                    bm25 relevance as-you-type) · quality ★1–★3 toggles · tag ALL/ANY +
                                    chips · year date range · Save-as-Smart-Folder / Clear (W6-S4)

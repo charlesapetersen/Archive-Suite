@@ -9,7 +9,8 @@ import AppKit
 /// `ContextMenuTableView` structure. Differences from Reader: identity is `ItemSummary.id` (UUID,
 /// front-matter) not `ArchiveFile` (path, Finder tags); the columns are the Notes set
 /// (kind/title/instances/date/quality/tags); and the tags column is **read-only** here (edited in the
-/// detail inspector, W9.b3). Titles rename inline via Return, double-click, or the row context menu.
+/// detail inspector, W9.b3). Quality has an inline borderless menu; titles rename inline via Return,
+/// double-click, or the row context menu.
 struct NotesTableView: NSViewRepresentable {
     @ObservedObject var model: NotesNavigationModel
     @Binding var selection: Set<UUID>
@@ -213,6 +214,7 @@ struct NotesTableView: NSViewRepresentable {
             let item = displayedByID[itemID]
 
             if colID == "kind" { return makeKindCell(tableView: tableView, item: item) }
+            if colID == "quality" { return makeQualityCell(tableView: tableView, item: item) }
 
             let cellID = NSUserInterfaceItemIdentifier("cell.\(colID)")
             let cell: NSTableCellView
@@ -294,11 +296,6 @@ struct NotesTableView: NSViewRepresentable {
                 }
                 tf.setAccessibilityIdentifier("an.cell.date.\(item.id.uuidString)")
 
-            case "quality":
-                tf.stringValue = item.qualityStars
-                tf.textColor = item.quality == nil ? .secondaryLabelColor : .systemYellow
-                tf.setAccessibilityIdentifier("an.cell.quality.\(item.id.uuidString)")
-
             case "sources":
                 // Distinct source notes for a segmented extract; blank for notes / source-less
                 // extracts. The Extracts window features this; a notes list shows it empty (W7-S4, §4).
@@ -315,6 +312,25 @@ struct NotesTableView: NSViewRepresentable {
                 tf.stringValue = ""
             }
             return cell
+        }
+
+        private func makeQualityCell(tableView: NSTableView, item: ItemSummary?) -> NSView {
+            guard let item else { return NSTextField(labelWithString: "") }
+            let cellID = NSUserInterfaceItemIdentifier("cell.quality")
+            let menu = QualityInlineMenu(itemID: item.id, quality: item.quality) { [weak self] value in
+                guard let nav = self?.parent.model else { return }
+                Task { @MainActor in await nav.setQuality(value, for: item.id) }
+            }
+            let hosting: NSHostingView<QualityInlineMenu>
+            if let reused = tableView.makeView(withIdentifier: cellID, owner: nil)
+                as? NSHostingView<QualityInlineMenu> {
+                hosting = reused
+                hosting.rootView = menu
+            } else {
+                hosting = NSHostingView(rootView: menu)
+                hosting.identifier = cellID
+            }
+            return hosting
         }
 
         private func makeKindCell(tableView: NSTableView, item: ItemSummary?) -> NSView {

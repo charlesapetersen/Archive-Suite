@@ -3,6 +3,13 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d4) — Quality could not be changed from the item list
+
+**2026-09-27.** The Quality column now has a borderless inline menu for None and Quality 1–3.
+It uses the existing quality setter, which saves the note's front matter and mirrors its Q facet
+only onto that note's own `.md` file. The Notes build and unit smoke passed; a focused off-screen
+scratch UI check sets and clears quality from the list. No real Notes store or corpus was touched.
+
 ## ✅ FIXED (W9.d3) — template body editing was not reachable in the app
 
 **2026-09-26.** Selecting a template now opens its Markdown body in the detail editor. Edits save to the
