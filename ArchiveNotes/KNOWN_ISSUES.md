@@ -3,6 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d12) — dead editor types and a tautological durable-link check
+
+**2026-09-27.** The unused `NoteBody`/`NoteBlock` wrapper is gone. The scratch durable-link
+scenario now reads the actual root markers in both the original and moved fixture when checking
+that an unknown GUID cannot silently match; the previous check compared the fake GUID only to
+hardcoded constants. `SearchGeneration` was already absent. The rest of D12 remains queued as
+W9.d12a–d. Notes build, headless smoke, and the 12-check scratch scenario passed.
+
 ## ✅ FIXED (W9.d11) — large-paste comments claimed an off-main parse
 
 **2026-09-27.** Styled large-paste conversion was already on the main actor; the detached

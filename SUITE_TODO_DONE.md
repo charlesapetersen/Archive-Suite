@@ -257,6 +257,16 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d12 — remove dead editor types and strengthen durable-link parity [S].** **SHIPPED
+  2026-09-27 (this commit).** Removed unused `NoteBody`/`NoteBlock` types. The scratch durable-link
+  script now checks the fabricated GUID against the actual original and moved root markers; its old
+  comparison against constants could pass without reading a marker. `SearchGeneration` was already
+  absent. The remaining D12 work was split into W9.d12a–d in the same tracker change.
+  Verification: Notes Debug build and headless smoke; scratch durable-link scenario (12 checks).
+  | files: ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/NoteBlock.swift,
+  ArchiveNotes/scripts/e2e-durable-links.sh, ArchiveNotes/{CLAUDE,KNOWN_ISSUES}.md,
+  execution-plans/archive-notes/09-gap-closure.md | S | low | done
+
 - [x] **W9.d11 — correct the large-paste thread contract [S–M · perf].** **SHIPPED
   2026-09-27 (this commit).** Styled large-paste conversion still creates AppKit attributed text
   on the main actor. The unused detached hop is removed and the editor/bridge comments now

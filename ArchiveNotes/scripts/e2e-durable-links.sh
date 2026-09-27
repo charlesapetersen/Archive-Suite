@@ -41,6 +41,11 @@ FIXTURE_NAME="AN-GUI-Fixture"
 PASS=0 ; FAIL=0
 check()  { if eval "$2"; then PASS=$((PASS+1)); echo "  ok   — $1"; else FAIL=$((FAIL+1)); echo "  FAIL — $1"; fi; }
 marker_field() { jq -r ".$2 // \"\"" "$1/.archive-suite-root.json" 2>/dev/null || echo ""; }
+no_marker_with_guid() {
+  jq -s -e --arg guid "$1" 'all(.[]; .guid != $guid)' \
+    "$FIXTURE/.archive-suite-root.json" "$CORPUS/.archive-suite-root.json" \
+    "$MOVED/.archive-suite-root.json" "$MOVED/reader-corpus/.archive-suite-root.json" >/dev/null
+}
 
 # HARD SAFETY GUARD — only ever rm-rf the scratch fixture or a /tmp mktemp dir.
 safe_rm() {
@@ -101,8 +106,8 @@ check "link target resolves under the MOVED root"     "[ -f \"$MOVED/reader-corp
 # --- 4) Negative: an unknown GUID is not silently satisfied ------------------
 echo "[4] negative (unknown GUID needs a re-grant, never a silent match) …"
 FAKE_GUID="deadbeef-0000-4000-8000-000000000000"
-check "a fabricated GUID matches NO fixture marker"   \
-  "[ \"$FAKE_GUID\" != \"$CORPUS_ROOT_GUID\" ] && [ \"$FAKE_GUID\" != \"$NOTES_ROOT_GUID\" ]"
+check "a fabricated GUID matches NO original or moved root marker" \
+  "no_marker_with_guid '$FAKE_GUID'"
 
 # --- 5) Result ---------------------------------------------------------------
 echo "== durable-link E2E: $PASS passed, $FAIL failed =="

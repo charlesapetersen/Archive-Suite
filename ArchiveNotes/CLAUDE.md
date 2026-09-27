@@ -53,7 +53,8 @@ this file is authoritative for Notes‑specific work.
   [`../ops/gui/README.md`](../ops/gui/README.md)).
 - **Durable-link E2E + safety (W8-S9):** `scripts/e2e-durable-links.sh` is a build-free filesystem proof
   that a `reader-page` link survives a computer move (same GUID, new absolute path → still resolves;
-  guarded teardown); `DurableLinkE2ETests` proves the resolver logic in the unit gate. Both are GUI-free.
+  guarded teardown) and an unknown GUID matches no actual original or moved marker (W9.d12);
+  `DurableLinkE2ETests` proves the resolver logic in the unit gate. Both are GUI-free.
   [`GUI_SAFETY.md`](GUI_SAFETY.md) is the authoritative test file-safety protocol.
 - **Bundle ID:** `com.archivenotes.app`. Signed with the suite's local self‑signed cert
   (`CODE_SIGN_IDENTITY: "Archive Suite Dev"`), not ad‑hoc and not notarized — rationale, the
@@ -312,7 +313,6 @@ macOS/Sources/ArchiveNotes/
                                    (resolvingSymlinksInPath + component-wise ancestry, so a symlink
                                    inside assets/ can't escape). Typed AssetResolution; `resolved`
                                    carries the canonical URL (W23.m3)
-    NoteBlock.swift                NoteBody / NoteBlock value types (editor's block model, Sendable)
     BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
                                    (SourceAnchorBox ref wrapper, non-editable chip with Reveal button,
                                    TextKit 2 view provider); W4 seam: onRevealBlock callback; W7-S3:

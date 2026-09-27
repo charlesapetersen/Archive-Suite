@@ -845,21 +845,28 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
   codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,
   FrontMatterCodec.swift | S–M | low | none
-- [ ] **`W9.d12` — the small-correctness batch (~11 items) [M].** Plan D12, kept as one item because every
-  member is XS: block-header chip thumbnail render · ordered-list renumber-from-first · focus-on-appear token ·
-  drop-cursor + AppKit drop reliability · `NSFileCoordinator` around Trash delete · extract paste degradation
-  string · `e2e-durable-links.sh` step-5 negative parity · delete vestigial `NoteBody`/`NoteBlock` ·
-  `nestedListMixed` + debounce/snapshot tests · retire-or-extract `SearchGeneration` · filename↔front-matter
-  divergence log line · **provenance-chip initial visibility** (the compact editor can render scrolled past
-  block 0, hiding the chip that is the whole point of an extract, until a manual scroll-to-top). ⚠️ If a
-  session cannot land the whole bag, split it rather than leaving it unflippable. | ArchiveNotes | M | low | none
+- [ ] **`W9.d12a` — editor chip visibility and thumbnail polish [S–M].** Plan D12 split. Render the
+  block-header chip thumbnail, use a focus-on-appear token, and scroll the detail editor to block 0 on
+  item load and raw⇄styled toggle so the extract's provenance chip is initially visible. | ArchiveNotes/
+  macOS/Sources/ArchiveNotes/Editor/, Views/NoteEditorPane.swift | S–M | low | **needs:** gui
+- [ ] **`W9.d12b` — ordered-list and editor coverage details [S–M].** Plan D12 split. Renumber an ordered
+  list from its first value; add `nestedListMixed` and debounce/snapshot checks; surface a clear status
+  string when extract paste degrades to plain text. | ArchiveNotes/macOS/{Sources/ArchiveNotes/Editor/,
+  Tests/ArchiveNotesTests/} | S–M | low | none
+- [ ] **`W9.d12c` — drag feedback and coordinated Trash handling [S–M].** Plan D12 split. Correct the
+  move-vs-copy cursor and AppKit drop reliability, and wrap Notes Trash deletion in `NSFileCoordinator`.
+  Use scratch store and off-screen GUI checks. | ArchiveNotes/macOS/Sources/ArchiveNotes/ | S–M | low |
+  **needs:** gui
+- [ ] **`W9.d12d` — log filename/front-matter divergence [XS].** Plan D12 split. When the note filename
+  and front-matter title disagree, log the divergence without rewriting either. | ArchiveNotes/macOS/
+  Sources/ArchiveNotes/Index/ | XS | low | none
 - [ ] **`W9.cand2` — CONFIRM: a freshly pasted note-passage provenance block renders as raw HTML comment
   [S].** Plan addendum 2026-07-18, CANDIDATE. After a W14.3 copy-passage→paste-into-extract, the chip showed as
   the literal `<!-- block: note-passage … -->` in the **styled** editor and persisted across reselect/reload,
   while pre-existing chips render correctly — so it may be specific to the freshly pasted block not being
   re-styled. Bytes import correctly (W14.3), so this is rendering, not data. Confirm on a clean paste; if real,
   either the paste path must re-run chip styling or the pasted block's on-disk form differs from what
-  `MarkdownBridge` chip-parses. Folds into `W9.d12` if confirmed trivial. | Editor/ | S | low | **needs:** gui
+  `MarkdownBridge` chip-parses. Folds into `W9.d12a` if confirmed trivial. | Editor/ | S | low | **needs:** gui
 
 **Phase E — verification review. Do LAST; it gates deleting the plan.** This phase exists because the W0–W8
 checkboxes overstated completion once already; do not repeat that on the fixes. Use the paced method in
