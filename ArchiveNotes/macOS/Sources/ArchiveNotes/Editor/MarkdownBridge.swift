@@ -13,6 +13,11 @@ import AppKit
 /// in styled mode and serialized back verbatim. Raw mode shows them as plain text.
 enum MarkdownBridge {
 
+    struct ParseOutcome {
+        let attributed: NSAttributedString
+        let failed: Bool
+    }
+
     // MARK: - Image regex
 
     /// Matches `![alt](path)` inline image references in Markdown text. The grammar — pattern,
@@ -45,8 +50,22 @@ enum MarkdownBridge {
                        onPreviewBlock: ((SourceAnchor, NSView) -> Void)? = nil,
                        onJumpBlock: (@Sendable (SourceAnchor) -> Void)? = nil,
                        passageSummaries: [ItemSummary] = []) -> NSAttributedString {
+        parseWithStatus(markdown: markdown, fontSize: fontSize, assetStore: assetStore,
+                        onRevealBlock: onRevealBlock, onPreviewBlock: onPreviewBlock,
+                        onJumpBlock: onJumpBlock, passageSummaries: passageSummaries).attributed
+    }
+
+    /// The raw→styled switch needs the hard-failure bit. Other render paths retain the
+    /// longstanding plain-text fallback through `parse(markdown:)`.
+    @MainActor
+    static func parseWithStatus(markdown: String, fontSize: CGFloat = 14,
+                                assetStore: EditorAssetStore? = nil,
+                                onRevealBlock: (@Sendable (SourceAnchor) -> Void)? = nil,
+                                onPreviewBlock: ((SourceAnchor, NSView) -> Void)? = nil,
+                                onJumpBlock: (@Sendable (SourceAnchor) -> Void)? = nil,
+                                passageSummaries: [ItemSummary] = []) -> ParseOutcome {
         if markdown.isEmpty {
-            return NSAttributedString(string: "")
+            return ParseOutcome(attributed: NSAttributedString(string: ""), failed: false)
         }
 
         // Split into blocks using the storage-layer BlockParser
@@ -54,15 +73,17 @@ enum MarkdownBridge {
 
         // If no block headers, parse the whole thing as a single body
         if blocks.isEmpty {
-            return parseSingleBody(markdown, fontSize: fontSize, assetStore: assetStore)
+            return parseSingleBodyWithStatus(markdown, fontSize: fontSize, assetStore: assetStore)
         }
 
         let result = NSMutableAttributedString()
+        var failed = false
 
         // Leading text before the first block header
         if let leading = leadingText, !leading.isEmpty {
-            let parsed = parseSingleBody(leading, fontSize: fontSize, assetStore: assetStore)
-            result.append(parsed)
+            let parsed = parseSingleBodyWithStatus(leading, fontSize: fontSize, assetStore: assetStore)
+            result.append(parsed.attributed)
+            failed = failed || parsed.failed
         }
 
         // Each block: chip attachment + body
@@ -75,14 +96,15 @@ enum MarkdownBridge {
 
             // Parse the block body (the markdown after the header)
             if !block.markdown.isEmpty {
-                let bodyParsed = parseSingleBody(
+                let bodyParsed = parseSingleBodyWithStatus(
                     block.markdown, fontSize: fontSize, assetStore: assetStore
                 )
-                result.append(bodyParsed)
+                result.append(bodyParsed.attributed)
+                failed = failed || bodyParsed.failed
             }
         }
 
-        return result
+        return ParseOutcome(attributed: result, failed: failed)
     }
 
     /// Build an `NSAttributedString` containing a single chip attachment character
@@ -135,8 +157,14 @@ enum MarkdownBridge {
     @MainActor
     private static func parseSingleBody(_ markdown: String, fontSize: CGFloat = 14,
                                          assetStore: EditorAssetStore? = nil) -> NSAttributedString {
+        parseSingleBodyWithStatus(markdown, fontSize: fontSize, assetStore: assetStore).attributed
+    }
+
+    @MainActor
+    private static func parseSingleBodyWithStatus(_ markdown: String, fontSize: CGFloat = 14,
+                                                   assetStore: EditorAssetStore? = nil) -> ParseOutcome {
         if markdown.isEmpty {
-            return NSAttributedString(string: "")
+            return ParseOutcome(attributed: NSAttributedString(string: ""), failed: false)
         }
 
         // Pre-extract image references so Apple's parser doesn't strip them.
@@ -153,11 +181,11 @@ enum MarkdownBridge {
         if let parsed = try? AttributedString(markdown: cleaned, options: options) {
             semantic = parsed
         } else {
-            return NSAttributedString(string: markdown, attributes: [
+            return ParseOutcome(attributed: NSAttributedString(string: markdown, attributes: [
                 .font: NSFont.systemFont(ofSize: fontSize),
                 .foregroundColor: NSColor.textColor,
                 .noteBlockKind: BlockKind.plain
-            ])
+            ]), failed: true)
         }
 
         let styled = MarkdownStyler.style(semantic, fontSize: fontSize)
@@ -166,7 +194,7 @@ enum MarkdownBridge {
             restoreImageAttachments(in: styled, refs: imageRefs, assetStore: assetStore)
         }
 
-        return styled
+        return ParseOutcome(attributed: styled, failed: false)
     }
 
     // MARK: - Insert block (seam for W4)

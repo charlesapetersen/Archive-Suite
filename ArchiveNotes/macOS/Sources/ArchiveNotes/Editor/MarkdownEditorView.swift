@@ -59,6 +59,9 @@ struct MarkdownEditorView: NSViewRepresentable {
     var formatting: FormattingContext?
     var assetStore: EditorAssetStore?
     var rejectImagePaste = false
+    /// Reports a hard raw→styled parse failure (or nil after a successful switch). The host
+    /// displays a banner; this representable keeps the raw buffer and mode unchanged.
+    var onParseFailure: ((String?) -> Void)?
     /// Optional flush handle: populated by the coordinator so the host can force a synchronous
     /// write-back of pending edits (W7-S1a autosave flush-on-switch).
     var flushBox: EditorFlushBox?
@@ -209,13 +212,19 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.rejectImagePaste = rejectImagePaste
 
         // Font / raw-mode change
-        let wantRaw = isRaw
+        var wantRaw = isRaw
+        var rejectedStyledSwitch = false
         if coordinator.currentIsRaw != wantRaw {
-            coordinator.switchMode(to: wantRaw)
-            // switchMode already re-rendered the content in the new representation; record it so the
-            // apply guard below doesn't redundantly re-render (which could restart the update loop).
-            coordinator.lastAppliedMarkdown = markdown
-            coordinator.lastPassageGeneration = passageGeneration
+            if coordinator.switchMode(to: wantRaw) {
+                // switchMode already re-rendered the content in the new representation; record it so the
+                // apply guard below doesn't redundantly re-render (which could restart the update loop).
+                coordinator.lastAppliedMarkdown = markdown
+                coordinator.lastPassageGeneration = passageGeneration
+            } else {
+                wantRaw = coordinator.currentIsRaw
+                rejectedStyledSwitch = true
+                coordinator.lastAppliedMarkdown = coordinator.parent.markdown
+            }
         }
         if coordinator.currentFontSize != fontSize {
             coordinator.currentFontSize = fontSize
@@ -231,7 +240,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         // mutation re-invalidated the view, pinning the main thread at 100% while an unfocused styled
         // note was shown — W8-S8 spindump). Gating on the source makes updateNSView idempotent.
         let isEditing = textView.window?.firstResponder === textView
-        let markdownChanged = coordinator.lastAppliedMarkdown != markdown
+        let markdownChanged = !rejectedStyledSwitch && coordinator.lastAppliedMarkdown != markdown
         // W14.4(c): a rename/delete of a *referenced source note* changes provenance-chip live titles
         // without touching THIS note's Markdown, so the markdown guard above never fires. Re-style
         // (styled mode only) when the shared item set changed so chips show current titles — cheap-
@@ -307,6 +316,11 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// change re-styles a chip-bearing document exactly once (W14.4 c).
         var lastPassageGeneration: Int = 0
         private var serializeDebounce: Task<Void, Never>?
+#if DEBUG
+        /// Forces the hard-failure branch without relying on a malformed Markdown string that
+        /// Apple's parser may legitimately accept as plain text.
+        var forceStyledParseFailureForTesting = false
+#endif
 
         init(_ parent: MarkdownEditorView) {
             self.parent = parent
@@ -369,31 +383,47 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         // MARK: Raw-mode toggle
 
-        func switchMode(to raw: Bool) {
-            guard let textView else { return }
+        @discardableResult
+        func switchMode(to raw: Bool) -> Bool {
+            guard let textView else { return false }
             // Flush any pending write-back so we don't lose edits.
             flushWriteBack()
 
-            currentIsRaw = raw
-            textView.applyRawMode(raw, fontSize: currentFontSize)
-
-            // Swap the storage contents between raw Markdown and styled
-            if raw {
-                // Entering raw: show the plain Markdown string
-                textView.string = parent.markdown
-            } else {
-                // Leaving raw: parse and style the Markdown
-                let styled = MarkdownBridge.parse(markdown: parent.markdown,
-                                                   fontSize: currentFontSize,
-                                                   assetStore: assetStore,
-                                                   onRevealBlock: onRevealBlock,
-                                                   onPreviewBlock: onPreviewBlock,
-                                                   onJumpBlock: onJumpBlock,
-                                                   passageSummaries: passageSummaries)
-                textView.textStorage?.setAttributedString(styled)
+            if !raw {
+                // Probe before changing display mode. The parser's plain-text fallback preserves
+                // characters but would lose Markdown structure on the next styled edit/save.
+                let parsed = MarkdownBridge.parseWithStatus(markdown: parent.markdown,
+                                                            fontSize: currentFontSize,
+                                                            assetStore: assetStore,
+                                                            onRevealBlock: onRevealBlock,
+                                                            onPreviewBlock: onPreviewBlock,
+                                                            onJumpBlock: onJumpBlock,
+                                                            passageSummaries: passageSummaries)
+#if DEBUG
+                let failed = parsed.failed || forceStyledParseFailureForTesting
+#else
+                let failed = parsed.failed
+#endif
+                if failed {
+                    parent.onParseFailure?("This Markdown could not be shown in styled mode. Your raw text is unchanged; edit it and try again.")
+                    // updateNSView is still running. Restore the source binding after this pass,
+                    // while retaining currentIsRaw and the raw text storage right now.
+                    DispatchQueue.main.async { [weak self] in self?.parent.isRaw = true }
+                    return false
+                }
+                currentIsRaw = false
+                textView.applyRawMode(false, fontSize: currentFontSize)
+                textView.textStorage?.setAttributedString(parsed.attributed)
 #if DEBUG
                 textView.refreshUITestPassageChipStateSnapshot()
 #endif
+                parent.onParseFailure?(nil)
+            } else {
+                currentIsRaw = raw
+                textView.applyRawMode(raw, fontSize: currentFontSize)
+                // Entering raw: show the plain Markdown string
+                textView.string = parent.markdown
+                parent.onParseFailure?(nil)
             }
 
             // Clear undo across the toggle — intentional design decision (plan §6).
@@ -403,6 +433,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             if parent.isRaw != raw {
                 parent.isRaw = raw
             }
+            return true
         }
 
         // MARK: Insert block (W4 seam)

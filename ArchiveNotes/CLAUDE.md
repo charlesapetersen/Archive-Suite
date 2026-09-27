@@ -267,6 +267,7 @@ macOS/Sources/ArchiveNotes/
                                    passageCopyHandler / passagePasteHandler seams (W7-S2 copy/paste)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
+                                   hard-parse-failure stays raw + reports banner (W9.d7),
                                    EditorAssetStore plumbing, onRevealBlock seam, insertBlock method;
                                    EditorFlushBox handle → force a synchronous write-back (W7-S1a);
                                    onJumpBlock + passageSummaries (chip live-title resolve) +
@@ -285,6 +286,7 @@ macOS/Sources/ArchiveNotes/
                                    so a force-quit within the autosave debounce can't lose an edit (W7-S6)
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
                                    CommonMark); block-header chips (<!-- block: --> → chip attachments);
+                                   parseWithStatus reports hard failure for raw→styled switch (W9.d7);
                                    inline images (![alt](path)); buildInsertableBlock seam; idempotent;
                                    onJumpBlock + passageSummaries thread note-passage chip jump + live
                                    title/missing resolve into BlockHeaderAttachment (W7-S3)

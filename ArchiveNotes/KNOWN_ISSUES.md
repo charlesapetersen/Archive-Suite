@@ -3,6 +3,13 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d7) — hard Markdown parse failure silently entered styled mode
+
+**2026-09-27.** The raw-to-styled switch now checks the parser's hard-failure result before
+changing the editor mode. If parsing fails, the raw buffer and toggle stay in place and the note
+or template pane explains why. A successful retry clears the banner. The headless Notes smoke
+includes a forced failure and retry regression check; it uses no real store or corpus.
+
 ## ✅ FIXED (W9.d4) — Quality could not be changed from the item list
 
 **2026-09-27.** The Quality column now has a borderless inline menu for None and Quality 1–3.

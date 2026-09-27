@@ -257,6 +257,13 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d7 — raw→styled parse failure stays in raw mode [S].** **SHIPPED 2026-09-27
+  (this commit).** The shared Markdown parser reports a hard failure to the mode switch. On failure,
+  the editor keeps its raw buffer and restores the raw toggle, while the note or template pane shows
+  a reason banner. A successful retry clears the banner. Verification: Notes Debug build and headless
+  unit smoke, including a forced hard-failure/retry regression check. No real store or corpus was used.
+  | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/{Editor/{MarkdownBridge,MarkdownEditorView}.swift,Views/NoteEditorPane.swift},Tests/ArchiveNotesTests/EditorBindingTests.swift}, ArchiveNotes/{CLAUDE,KNOWN_ISSUES}.md, execution-plans/archive-notes/09-gap-closure.md | S | low | done
+
 - [x] **W9.d4 — inline quality quick-edit [S].** **SHIPPED 2026-09-27 (this commit).** The
   virtualized Notes list's Quality cell now hosts a compact borderless menu with None and Quality 1–3.
   It calls the existing `NotesNavigationModel.setQuality` path and refreshes from each row's current

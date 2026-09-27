@@ -16,6 +16,7 @@ struct NoteEditorPane: View {
 
     @StateObject private var bodyEditor = NoteBodyEditorModel()
     @State private var isRaw = false
+    @State private var parseFailureMessage: String?
     /// W7-S3 — a pending jump-to-source request this window should honor (select the note + scroll to
     /// its block). Set by `handleOpen`; the scroll fires once `bodyEditor.loadedID` reaches the target.
     @State private var jumpTarget: NotesModel.OpenRequest?
@@ -66,6 +67,14 @@ struct NoteEditorPane: View {
             }
             rawToggleBar
             Divider()
+            if let parseFailureMessage {
+                Label(parseFailureMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .accessibilityIdentifier("an.editor.parseFailure")
+            }
             bodyEditorView
                 .disabled(nav.selectedItemID == nil)   // nothing single-selected → no editable target
 #if DEBUG
@@ -101,6 +110,7 @@ struct NoteEditorPane: View {
             flushRegistry.register(paneID) { [bodyEditor] in await bodyEditor.flushPending() }
         }
         .onChange(of: nav.selectedItemID) { _, newID in
+            parseFailureMessage = nil
             syncFormattingIdentity()
             refreshAssetStore(for: newID)
             formatting.clearZoteroAutoFillReference()
@@ -136,6 +146,9 @@ struct NoteEditorPane: View {
             isRaw: $isRaw,
             formatting: formatting,
             assetStore: assetStore,
+            onParseFailure: { message in
+                DispatchQueue.main.async { parseFailureMessage = message }
+            },
             flushBox: flushBox,
             onRevealBlock: { anchor in
                 guard let link = anchor.link, let url = URL(string: link) else { return }
@@ -423,6 +436,7 @@ struct TemplateBodyEditorPane: View {
     @StateObject private var bodyEditor = NoteBodyEditorModel()
     @StateObject private var formatting = FormattingContext()
     @State private var isRaw = false
+    @State private var parseFailureMessage: String?
     @State private var flushBox = EditorFlushBox()
     @State private var paneID = UUID()
     @State private var ownedID: UUID?
@@ -459,6 +473,14 @@ struct TemplateBodyEditorPane: View {
             .padding(.horizontal, 8)
             .frame(height: 28)
             .background(.bar)
+            if let parseFailureMessage {
+                Label(parseFailureMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .accessibilityIdentifier("an.template.editor.parseFailure")
+            }
             if let templateID, !canEdit {
                 HStack {
                     Text(model.hasFailedTemplateBodyLoad(templateID)
@@ -526,6 +548,9 @@ struct TemplateBodyEditorPane: View {
         var view = MarkdownEditorView(markdown: $bodyEditor.markdown, isRaw: $isRaw,
                                       formatting: formatting, rejectImagePaste: true,
                                       flushBox: flushBox)
+        view.onParseFailure = { message in
+            DispatchQueue.main.async { parseFailureMessage = message }
+        }
 #if DEBUG
         view.testBox = testBox
 #endif
@@ -533,6 +558,7 @@ struct TemplateBodyEditorPane: View {
     }
 
     private func switchToTemplate(_ id: UUID?) {
+        parseFailureMessage = nil
         selectionGeneration &+= 1
         let generation = selectionGeneration
         let previous = transition

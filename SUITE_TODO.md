@@ -845,8 +845,6 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
   codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,
   FrontMatterCodec.swift | S–M | low | none
-- [ ] **`W9.d7` — a raw→styled parse failure degrades silently [S].** Plan D7. Detect a genuine failure in
-  `switchMode` and surface the non-destructive banner. | Editor/MarkdownEditorView.swift | S | low | none
 - [ ] **`W9.d8` — no empty-state UI [S].** Plan D8. Empty note list / empty folder. | Views/NotesBrowserView.swift
   | S | low | none
 - [ ] **`W9.d9` — smart folders have no live match-count badge [S].** Plan D9. | Core/NotesFolderNode.swift | S

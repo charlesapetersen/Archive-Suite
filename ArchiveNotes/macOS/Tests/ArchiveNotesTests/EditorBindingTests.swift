@@ -103,6 +103,34 @@ struct EditorBindingTests {
     }
 
     @Test @MainActor
+    func hardStyledParseFailureKeepsRawSourceAndShowsReason() async {
+        let source = "# Original\n\n**Keep this Markdown**"
+        let holder = BindingHolder(source)
+        var failureMessage: String?
+        let coordinator = makeCoordinator(holder: holder) { failureMessage = $0 }
+        #expect(coordinator.switchMode(to: true))
+        let rawBefore = coordinator.textView?.string
+        let markdownBefore = holder.markdown
+        #expect(rawBefore?.contains("Keep this Markdown") == true)
+        holder.isRaw = false  // the button requested styled mode
+        coordinator.forceStyledParseFailureForTesting = true
+
+        #expect(!coordinator.switchMode(to: false))
+        #expect(coordinator.currentIsRaw)
+        #expect(coordinator.textView?.string == rawBefore)
+        #expect(holder.markdown == markdownBefore)
+        #expect(failureMessage?.contains("raw text is unchanged") == true)
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(holder.isRaw, "a failed switch restores the raw-mode binding")
+
+        coordinator.forceStyledParseFailureForTesting = false
+        holder.isRaw = false
+        #expect(coordinator.switchMode(to: false))
+        #expect(!coordinator.currentIsRaw)
+        #expect(failureMessage == nil, "a successful retry clears the banner")
+    }
+
+    @Test @MainActor
     func sourcePasteKeepsItsStableBlockWhenTheCaretMovesBeforeThumbnailRendering() async {
         let holder = BindingHolder("Existing note text")
         let formatting = FormattingContext()
@@ -186,11 +214,13 @@ struct EditorBindingTests {
     }
 
     @MainActor
-    private func makeCoordinator(holder: BindingHolder) -> MarkdownEditorView.Coordinator {
-        let view = MarkdownEditorView(
+    private func makeCoordinator(holder: BindingHolder,
+                                 onParseFailure: ((String?) -> Void)? = nil) -> MarkdownEditorView.Coordinator {
+        var view = MarkdownEditorView(
             markdown: Binding(get: { holder.markdown }, set: { holder.markdown = $0 }),
             isRaw: Binding(get: { holder.isRaw }, set: { holder.isRaw = $0 })
         )
+        view.onParseFailure = onParseFailure
         let coordinator = view.makeCoordinator()
         let textView = EditorTextView()
         textView.string = holder.markdown
