@@ -49,6 +49,7 @@ if [ -d "$TF" ]; then
   # macOS bash 3.2 — no mapfile; build the array with a read loop.
   while IFS= read -r f; do imgs+=("$f"); done < <(find "$TF" \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) -type f 2>/dev/null | sort | head -2)
 fi
+
 if [ "${#imgs[@]}" -ge 2 ]; then
   n=0; for f in "${imgs[@]}"; do n=$((n+1)); ext="${f##*.}"; cp "$f" "$IN/input$n.$ext" || fail "could not copy test image"; done
   echo "  inputs: 2 images copied from Test Files"
@@ -110,6 +111,17 @@ Sincerely, the Smoke Script." \
   echo "  inputs: 2 synthetic text images generated (Test Files not present in this checkout)"
 fi
 
+# Optional W22 functional case: one two-page PDF alongside the two image inputs. All sources
+# and outputs remain inside this run's scratch tree.
+if [ "${PROCESSFILES_TEST_MIXED:-0}" = "1" ]; then
+  first_image=$(find "$IN" -type f | sort | head -1)
+  sips -s format pdf "$first_image" --out "$WORK/page.pdf" >/dev/null 2>&1 \
+    || fail "could not make a synthetic PDF page"
+  pdfunite "$WORK/page.pdf" "$WORK/page.pdf" "$IN/mixed.pdf" \
+    || fail "could not make the two-page test PDF"
+  echo "  inputs: two images plus one synthetic two-page PDF"
+fi
+
 # ---------- 3. Build (Debug) ----------
 echo "  building (Debug)…"
 ( cd "$PROJ" && xcodegen generate >/dev/null 2>&1 \
@@ -125,7 +137,8 @@ DONE="$OUT/TEST_DONE.txt"
 PROCESSFILES_TESTMODE=1 \
 PROCESSFILES_TESTKEY="$KEY" \
 PROCESSFILES_MODEL="gemini-2.5-flash-lite" \
-PROCESSFILES_MAXIMAGES=2 \
+PROCESSFILES_MAXIMAGES="$([ "${PROCESSFILES_TEST_MIXED:-0}" = "1" ] && echo 3 || echo 2)" \
+PROCESSFILES_TEST_MIXED="${PROCESSFILES_TEST_MIXED:-0}" \
 PROCESSFILES_TESTIN="$IN" \
 PROCESSFILES_TESTOUT="$OUT" \
 PROCESSFILES_TESTDONE="$DONE" \
@@ -147,6 +160,26 @@ marker=$(cat "$DONE" 2>/dev/null || echo "")
 case "$marker" in ERROR:*) fail "driver reported: $marker" "$APPLOG";; esac
 pdfcount=$(find "$OUT" -type f -iname '*.pdf' 2>/dev/null | wc -l | tr -d ' ')
 [ "${pdfcount:-0}" -ge 1 ] || fail "driver finished but produced 0 output PDFs" "$APPLOG"
+
+if [ "${PROCESSFILES_TEST_MIXED:-0}" = "1" ]; then
+  [ "$pdfcount" -eq 3 ] || fail "mixed run produced $pdfcount PDFs; expected three" "$APPLOG"
+  mixed_out=$(find "$OUT" -type f -name 'mixed.pdf' -print -quit)
+  [ -n "$mixed_out" ] || fail "mixed run did not produce the rebuilt PDF" "$APPLOG"
+  pages=$(pdfinfo "$mixed_out" | awk '/^Pages:/ {print $2}')
+  [ "$pages" = 4 ] || fail "rebuilt two-page PDF has $pages pages; expected four" "$APPLOG"
+  if xattr -p 'com.apple.metadata:_kMDItemUserTags' "$mixed_out" >/dev/null 2>&1; then
+    fail "rebuilt multi-page PDF was tagged; tagging applies to images only" "$APPLOG"
+  fi
+  image_pdfs=0
+  while IFS= read -r -d '' image_pdf; do
+    pages=$(pdfinfo "$image_pdf" | awk '/^Pages:/ {print $2}')
+    [ "$pages" = 2 ] || fail "image output $image_pdf has $pages pages; expected two" "$APPLOG"
+    xattr -p 'com.apple.metadata:_kMDItemUserTags' "$image_pdf" >/dev/null 2>&1 \
+      || fail "image output $image_pdf has no Finder tags" "$APPLOG"
+    image_pdfs=$((image_pdfs + 1))
+  done < <(find "$OUT" -type f -name 'input*.pdf' -print0)
+  [ "$image_pdfs" -eq 2 ] || fail "mixed run produced $image_pdfs image PDFs; expected two" "$APPLOG"
+fi
 
 echo "SMOKE (processor): PASS — marker='$marker', ${pdfcount} output PDF(s) in scratch"
 echo "  run log: $APPLOG"

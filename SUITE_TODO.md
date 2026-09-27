@@ -753,35 +753,9 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · Tier-2].**
-  Owner reconfirmed 2026-09-26: process the PDF and image subsets in one run; the image-only tagging
-  choice recorded below still binds. Partly fixed 2026-07-29: the *silence* is closed (see
-  `ArchiveProcessor/KNOWN_ISSUES.md` top entry) but the **routing still skips every non-PDF file in any run
-  containing a multi-page PDF**.
-  - **The fix:** partition at `OCRProcessor+Pipeline.swift:1607` — `reOCRSet = files.filter(isMultiPagePDF)`,
-    `imageSet = rest` — and run the re-OCR transform over `reOCRSet` then the standard path over `imageSet`
-    in one run, instead of handing the unfiltered array to `performMultiPagePDFReOCR` (line 1634).
-  - ⚠️ **Index hazard (the reason this isn't a one-liner):** `performMultiPagePDFReOCR` writes `jobs[index]`
-    using `files.enumerated()`, which is only correct because `jobs = files.map { OCRJob(sourceURL: $0) }`
-    (`Pipeline.swift:1597`) makes them positionally identical. Passing a **filtered subset** silently aliases
-    the wrong job — it would mark an innocent file failed. Change the signature to take
-    `[(jobIndex: Int, url: URL)]` (or resolve via `jobs.firstIndex(where:)`), and compute `progress` over the
-    whole run, not the subset.
-  - ✅ **OWNER DECIDED 2026-07-29 — option (a): re-enable the tagging picker, relabelled "applies to images
-    only".** Tagging is currently disabled whenever a multi-page PDF is present (`Views/OCRView.swift:30`,
-    `:375` `.disabled(isMultiPagePDFReOCR)`) because the re-OCR route is a pure transform that never tags. In a
-    partitioned run the picker must be **live again**, with its label/help making clear it applies to the
-    **image subset only** — multi-page PDFs in the same run are still never tagged. Do NOT force `.none` for the
-    image subset (that was option (b), rejected). The re-OCR'd PDFs must stay untagged even with tagging ON for
-    the run, so the functional check should assert exactly that asymmetry in ONE run: image outputs carry
-    `com.apple.metadata:_kMDItemUserTags`, re-OCR'd PDF outputs do not. (That xattr asymmetry is what proved
-    which route the owner's 13:25 run took, so it is a known-good discriminator.)
-  - **Tests to update:** invert `Capture/MultiPageReOCRTestDriver.swift:107-108` (it currently *pins* the
-    whole-run routing) and keep §4's reason checks; widen `Capture/ProcessFilesTestDriver.swift:102`, whose
-    `imageExts` filter excludes `.pdf` so the driver **cannot form a mixed drop today**; add a functional case
-    (mixed drop → the image writes its 2-page PDF **and** the PDF writes its 2N-page rebuild).
-  - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
-  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | none
+- [ ] **W22.mixed-batch-fu1 — journal mixed PDF work before its first paid OCR call [M · Tier-2].** A mixed run currently persists PDF outcomes only when the entire PDF subset finishes and the image-run journal is created. A crash during PDF re-OCR, or before that journal is saved, leaves no Resume record and a rerun can repeat paid OCR and create a suffixed output. Persist the mixed route before PDF work and advance it after each completed PDF; on relaunch, keep each paid result and exact output association, and visibly report any page-level work that cannot safely resume. Prove interruption/relaunch on synthetic scratch PDFs without touching the corpus. Found in W22.mixed-batch Tier-2 review (2026-09-26), `startProcessing` / `performMultiPagePDFReOCR`. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR,OCRProcessor}.swift, Capture/BatchResumeTestDriver.swift | M | med | none
+
+- [ ] **W22.mixed-batch-fu2 — price direct PDF pages separately in mixed batch estimates [S-M].** In a mixed Batch run, `performMultiPagePDFReOCR` calls the model directly once per PDF page, while `RunHistorySnapshot.estimatedCost` applies discounted batch pricing to the full file count; the pre-run pane also lacks PDF page accounting. Show the image-subset batch estimate plus direct PDF-page estimate consistently before the run and in history. Found in W22.mixed-batch Tier-2 review (2026-09-26), `RunHistorySnapshot.estimatedCost` / `performMultiPagePDFReOCR`. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProcessingHistory.swift, Views/OCRView.swift | S-M | low | none
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 

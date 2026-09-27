@@ -488,6 +488,48 @@ enum BatchResumeTestDriver {
         check("non-finite/out-of-range runtime values fail closed",
               !OCRProcessor.pendingRunIsSelfConsistent(badScale))
 
+        // W22: a mixed run journals completed PDF work outside the image-indexed OCR array.
+        let mixedPDF = inDir.appendingPathComponent("mixed.pdf")
+        let mixedOutput = outDir.appendingPathComponent("mixed.pdf")
+        try? Data("scratch PDF output".utf8).write(to: mixedOutput)
+        let pdfOutcome = OCRProcessor.MixedPDFOutcome(
+            originalIndex: 1, sourceURL: mixedPDF, result: done,
+            succeeded: true, outputURL: mixedOutput)
+        var mixedRun = v2
+        mixedRun.mixedPDFOutcomes = [pdfOutcome]
+        mixedRun.runFingerprint = OCRProcessor.pendingRunFingerprintV2(mixedRun)
+        let mixedRunURL = tmp.appendingPathComponent("pending_run_mixed.json")
+        _ = OCRProcessor._testWritePendingRun(mixedRun, to: mixedRunURL)
+        let loadedMixedRun = OCRProcessor._testReadPendingRun(from: mixedRunURL)
+        check("mixed run journal restores original PDF/image ordering and validates",
+              loadedMixedRun.map { OCRProcessor.pendingRunIsSelfConsistent($0) } ?? false
+              && OCRProcessor.mixedInputURLs(images: files, pdfs: loadedMixedRun?.mixedPDFOutcomes)
+                   == [files[0], mixedPDF, files[1]])
+        var tamperedMixedRun = mixedRun
+        tamperedMixedRun.mixedPDFOutcomes = nil
+        check("mixed PDF outcomes are covered by the run fingerprint",
+              !OCRProcessor.pendingRunIsSelfConsistent(tamperedMixedRun))
+        var aliasedMixedRun = mixedRun
+        aliasedMixedRun.completedResults["0"] = done
+        aliasedMixedRun.completedOutputPaths = ["0": outDir.appendingPathComponent("tmp/../mixed.pdf").path]
+        aliasedMixedRun.runFingerprint = OCRProcessor.pendingRunFingerprintV2(aliasedMixedRun)
+        check("mixed journal rejects an image output path that aliases the PDF after normalization",
+              !OCRProcessor.pendingRunIsSelfConsistent(aliasedMixedRun))
+        let restoredMixed = OCRProcessor()
+        restoredMixed.jobs = files.map { OCRJob(sourceURL: $0) }
+        restoredMixed.restoreMixedPDFAssociations([pdfOutcome])
+        restoredMixed.restoreMixedPDFJobs([pdfOutcome])
+        check("mixed resume restores PDF row and exact output without tagging image jobs",
+              restoredMixed.jobs.map(\.sourceURL) == [files[0], mixedPDF, files[1]]
+              && restoredMixed.jobs[1].status == .succeeded
+              && restoredMixed.outputURLMap[mixedPDF] == mixedOutput
+              && restoredMixed.reOCRSourceURLs.contains(mixedPDF))
+        restoredMixed.updateClassification(at: 1, to: .boxLabel)
+        check("rebuilt PDF refuses per-item reclassification and tagging",
+              restoredMixed.jobs[1].classification == nil
+              && restoredMixed.jobs[1].appliedTags.isEmpty
+              && FileRowView.filesActions(for: restoredMixed.jobs[1], isReOCRSource: true) == [.viewText])
+
         // W16.cfg5: resume constructs the same SessionProcessingConfig every downstream seam consumes.
         // Modern manifests overlay the persisted runtime snapshot; legacy run/batch records deliberately
         // use current defaults for fields their old schemas never captured.
@@ -644,6 +686,19 @@ enum BatchResumeTestDriver {
               && loadedLifecycle?.completedOutputPaths?["0"] == out0.path)
         check("round-tripped paid-batch lifecycle passes full evolving-state validation",
               loadedLifecycle.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false)
+        var mixedBatch = lifecycleBatch
+        mixedBatch.mixedPDFOutcomes = [pdfOutcome]
+        let mixedBatchURL = tmp.appendingPathComponent("pending_batch_mixed.json")
+        let signedMixedBatch = OCRProcessor._testWritePendingBatch(mixedBatch, to: mixedBatchURL)
+        check("mixed batch journal preserves PDF outcome with its lifecycle fingerprint",
+              signedMixedBatch.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false)
+        if var tamperedMixedBatch = signedMixedBatch {
+            tamperedMixedBatch.mixedPDFOutcomes = nil
+            check("mixed PDF outcomes are covered by the batch lifecycle fingerprint",
+                  !OCRProcessor.pendingBatchIsSelfConsistent(tamperedMixedBatch))
+        } else {
+            check("mixed batch journal was writable", false)
+        }
         if let loadedLifecycle {
             let reopened = OCRProcessor.batchByReopeningMissingOutputs(
                 loadedLifecycle, fileExists: { $0 != out0.path })

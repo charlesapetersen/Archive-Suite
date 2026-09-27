@@ -8,6 +8,44 @@ single 3,580-line file).
 reasons: the completion notes cite the commits that shipped each item, and several carry the *reasoning* for
 why a later change may or may not revisit that code.
 
+## Processor mixed drop — W22
+
+- [x] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · Tier-2].**
+  **SHIPPED 2026-09-26 (this commit).** Original acceptance scope follows. Owner reconfirmed 2026-09-26: process the PDF and image subsets in one run; the image-only tagging
+  choice recorded below still binds. At filing, the 2026-07-29 change had closed the *silence* (see
+  `ArchiveProcessor/KNOWN_ISSUES.md` top entry), while the routing still skipped every non-PDF file in a
+  run containing a multi-page PDF.
+  The run now routes multi-page PDFs and images separately, preserves original job order and progress,
+  and keeps tagging and per-item editing on the image subset. Both non-batch and paid-batch image-resume
+  records preserve completed PDF outcomes and exact output paths. Verification: clean Processor Debug build;
+  key-free PDF and crash-resume suites; full synthetic mixed run (three outputs, expected 2/2/4 pages,
+  Finder tags on the two image PDFs only); independent Tier-2 find/refute review. The PDF-stage crash
+  window and mixed-batch estimate were filed as W22.mixed-batch-fu1 and -fu2. No real corpus was touched.
+  - **The fix:** partition at `OCRProcessor+Pipeline.swift:1607` — `reOCRSet = files.filter(isMultiPagePDF)`,
+    `imageSet = rest` — and run the re-OCR transform over `reOCRSet` then the standard path over `imageSet`
+    in one run, instead of handing the unfiltered array to `performMultiPagePDFReOCR` (line 1634).
+  - ⚠️ **Index hazard (the reason this isn't a one-liner):** `performMultiPagePDFReOCR` writes `jobs[index]`
+    using `files.enumerated()`, which is only correct because `jobs = files.map { OCRJob(sourceURL: $0) }`
+    (`Pipeline.swift:1597`) makes them positionally identical. Passing a **filtered subset** silently aliases
+    the wrong job — it would mark an innocent file failed. Change the signature to take
+    `[(jobIndex: Int, url: URL)]` (or resolve via `jobs.firstIndex(where:)`), and compute `progress` over the
+    whole run, not the subset.
+  - ✅ **OWNER DECIDED 2026-07-29 — option (a): re-enable the tagging picker, relabelled "applies to images
+    only".** Tagging is currently disabled whenever a multi-page PDF is present (`Views/OCRView.swift:30`,
+    `:375` `.disabled(isMultiPagePDFReOCR)`) because the re-OCR route is a pure transform that never tags. In a
+    partitioned run the picker must be **live again**, with its label/help making clear it applies to the
+    **image subset only** — multi-page PDFs in the same run are still never tagged. Do NOT force `.none` for the
+    image subset (that was option (b), rejected). The re-OCR'd PDFs must stay untagged even with tagging ON for
+    the run, so the functional check should assert exactly that asymmetry in ONE run: image outputs carry
+    `com.apple.metadata:_kMDItemUserTags`, re-OCR'd PDF outputs do not. (That xattr asymmetry is what proved
+    which route the owner's 13:25 run took, so it is a known-good discriminator.)
+  - **Tests to update:** invert `Capture/MultiPageReOCRTestDriver.swift:107-108` (it currently *pins* the
+    whole-run routing) and keep §4's reason checks; widen `Capture/ProcessFilesTestDriver.swift:102`, whose
+    `imageExts` filter excludes `.pdf` so the driver **cannot form a mixed drop today**; add a functional case
+    (mixed drop → the image writes its 2-page PDF **and** the PDF writes its 2N-page rebuild).
+  - **Tier-2** (file-writing output path, no undo): adversarial review + functional test on scratch dirs.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/{OCRProcessor+Pipeline,OCRProcessor+OCR}.swift, Views/OCRView.swift, Capture/{MultiPageReOCRTestDriver,ProcessFilesTestDriver}.swift | M | med | none
+
 ## Owner queue decisions — 2026-09-26
 
 - [x] **W33.storage — unified suite storage path.** **CLOSED 2026-09-26 (this commit) by owner decision.**

@@ -294,7 +294,8 @@ extension OCRProcessor {
         to newClassification: DocumentClassification,
         runConfig: SessionProcessingConfig? = nil
     ) {
-        guard index < jobs.count else { return }
+        guard jobs.indices.contains(index),
+              !reOCRSourceURLs.contains(jobs[index].sourceURL) else { return }
         let oldClassification = Self.taggedClassification(of: jobs[index])
         jobs[index].classification = newClassification
         if let existingResult = jobs[index].result {

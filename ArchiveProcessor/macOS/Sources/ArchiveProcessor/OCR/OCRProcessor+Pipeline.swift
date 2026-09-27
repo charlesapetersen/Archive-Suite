@@ -57,6 +57,7 @@ extension OCRProcessor {
         let runtimeConfig: PendingRunRuntimeConfig
         let completedResults: [String: OCRResult]
         let completedOutputPaths: [String: String]?
+        let mixedPDFOutcomes: [MixedPDFOutcome]?
 
         init(run: PendingRun, runtimeConfig: PendingRunRuntimeConfig) {
             provider = run.provider
@@ -80,6 +81,7 @@ extension OCRProcessor {
             self.runtimeConfig = runtimeConfig
             completedResults = run.completedResults
             completedOutputPaths = run.completedOutputPaths
+            mixedPDFOutcomes = run.mixedPDFOutcomes
         }
     }
 
@@ -124,6 +126,7 @@ extension OCRProcessor {
         let submissionComplete: Bool
         let completedResults: [String: OCRResult]
         let completedOutputPaths: [String: String]?
+        let mixedPDFOutcomes: [MixedPDFOutcome]?
 
         init(batch: PendingBatch) {
             batchId = batch.batchId
@@ -149,6 +152,7 @@ extension OCRProcessor {
             submissionComplete = batch.submissionComplete
             completedResults = batch.completedResults
             completedOutputPaths = batch.completedOutputPaths
+            mixedPDFOutcomes = batch.mixedPDFOutcomes
         }
     }
 
@@ -448,11 +452,105 @@ extension OCRProcessor {
         return resolved
     }
 
-    /// Recompute a manifest's fingerprint from its OWN persisted fields and compare to the stored one.
-    /// A mismatch means the file is torn/tampered/internally inconsistent (still-valid JSON but not a
-    /// coherent run) → callers ignore it rather than misapply it. A v2 manifest must carry a complete,
-    /// structurally valid runtime snapshot and matching v2 fingerprint; only legacy manifests may omit
-    /// the fingerprint for backward compatibility.
+    /// The image list remains contiguous for OCR; these indices reconstruct the original mixed drop.
+    nonisolated static func mixedInputURLs(
+        images: [URL], pdfs: [MixedPDFOutcome]?
+    ) -> [URL]? {
+        guard let pdfs, !pdfs.isEmpty else { return images }
+        let total = images.count + pdfs.count
+        guard Set(pdfs.map(\.originalIndex)).count == pdfs.count,
+              pdfs.allSatisfy({ (0..<total).contains($0.originalIndex) }),
+              Set(images.map { $0.standardizedFileURL.path }).count == images.count,
+              Set(pdfs.map { $0.sourceURL.standardizedFileURL.path }).count == pdfs.count,
+              Set(images.map { $0.standardizedFileURL.path }).isDisjoint(
+                with: Set(pdfs.map { $0.sourceURL.standardizedFileURL.path })) else { return nil }
+        var ordered = [URL?](repeating: nil, count: total)
+        for pdf in pdfs { ordered[pdf.originalIndex] = pdf.sourceURL }
+        var imageIterator = images.makeIterator()
+        for index in ordered.indices where ordered[index] == nil { ordered[index] = imageIterator.next() }
+        return ordered.compactMap { $0 }.count == total ? ordered.compactMap { $0 } : nil
+    }
+
+    nonisolated static func mixedPDFOutcomesAreValid(
+        _ pdfs: [MixedPDFOutcome]?, images: [URL], outputDirectory: URL,
+        imageOutputPaths: [String]
+    ) -> Bool {
+        guard let pdfs else { return true }
+        guard !pdfs.isEmpty, mixedInputURLs(images: images, pdfs: pdfs) != nil else { return false }
+        let outputRoot = outputDirectory.standardizedFileURL.path
+        let pdfOutputPaths = pdfs.compactMap { $0.outputURL.map(OutputFileSafety.pathKey) }
+        let normalizedImagePaths = imageOutputPaths.map {
+            OutputFileSafety.pathKey(URL(fileURLWithPath: $0))
+        }
+        guard Set(pdfOutputPaths).count == pdfOutputPaths.count,
+              Set(pdfOutputPaths).isDisjoint(with: Set(normalizedImagePaths)) else { return false }
+        return pdfs.allSatisfy { pdf in
+            guard pdf.sourceURL.pathExtension.lowercased() == "pdf",
+                  pdf.succeeded == (pdf.outputURL != nil) else { return false }
+            guard let output = pdf.outputURL else { return true }
+            let url = output.standardizedFileURL
+            return url.pathExtension.lowercased() == "pdf"
+                && url.deletingLastPathComponent().path == outputRoot
+                && url.path != pdf.sourceURL.standardizedFileURL.path
+        }
+    }
+
+    func captureMixedPDFOutcomes(indices: [Int]) -> [MixedPDFOutcome]? {
+        var outcomes: [MixedPDFOutcome] = []
+        for index in indices {
+            guard jobs.indices.contains(index), let result = jobs[index].result else { return nil }
+            let source = jobs[index].sourceURL
+            let succeeded = jobs[index].status == .succeeded
+            let output = outputURLMap[source]
+            guard succeeded == (output != nil) else { return nil }
+            outcomes.append(MixedPDFOutcome(originalIndex: index, sourceURL: source,
+                                            result: result, succeeded: succeeded, outputURL: output))
+        }
+        return outcomes
+    }
+
+    /// Reserve the PDF paths before an image resume can create a same-stem output. A missing PDF stays
+    /// failed and visible; its paid OCR cannot be safely rebuilt by the single-image PDF writer.
+    func restoreMixedPDFAssociations(_ outcomes: [MixedPDFOutcome]?) {
+        reOCRSourceURLs = Set((outcomes ?? []).map(\.sourceURL))
+        for pdf in outcomes ?? [] {
+            if let output = pdf.outputURL {
+                _takenOutputPaths.insert(OutputFileSafety.pathKey(output))
+                if FileManager.default.fileExists(atPath: output.path) {
+                    outputURLMap[pdf.sourceURL] = output
+                } else if !failedFiles.contains(pdf.sourceURL.lastPathComponent) {
+                    failedFiles.append(pdf.sourceURL.lastPathComponent)
+                }
+            } else if !failedFiles.contains(pdf.sourceURL.lastPathComponent) {
+                failedFiles.append(pdf.sourceURL.lastPathComponent)
+            }
+        }
+    }
+
+    func restoreMixedPDFJobs(_ outcomes: [MixedPDFOutcome]?) {
+        guard let outcomes, !outcomes.isEmpty else { return }
+        let total = jobs.count + outcomes.count
+        var ordered = [OCRJob?](repeating: nil, count: total)
+        for pdf in outcomes {
+            var job = OCRJob(sourceURL: pdf.sourceURL)
+            if pdf.succeeded && outputURLMap[pdf.sourceURL] == nil {
+                job.result = OCRResult(text: nil, classification: nil,
+                    errorMessage: "The rebuilt PDF output is missing. Re-run this source PDF to recover it.",
+                    errorCode: "pdf_output_missing")
+                job.status = .failed
+            } else {
+                job.result = pdf.result
+                job.classification = pdf.result.classification
+                job.status = pdf.succeeded ? .succeeded : .failed
+            }
+            ordered[pdf.originalIndex] = job
+        }
+        var imageIterator = jobs.makeIterator()
+        for index in ordered.indices where ordered[index] == nil { ordered[index] = imageIterator.next() }
+        jobs = ordered.compactMap { $0 }
+    }
+
+    /// Recompute a manifest's fingerprint from its own persisted fields before resuming work.
     nonisolated static func pendingRunIsSelfConsistent(_ run: PendingRun) -> Bool {
         if let config = run.runtimeConfig {
             let validResultKeys = run.completedResults.keys.allSatisfy { key in
@@ -478,10 +576,14 @@ extension OCRProcessor {
                   run.enableCollectionSegmentation
                     || (!run.confirmCollectionIDs && !run.reviewDocumentSegmentation),
                   validResultKeys, validOutputPaths,
+                  mixedPDFOutcomesAreValid(run.mixedPDFOutcomes, images: run.fileURLs,
+                                           outputDirectory: run.outputDirectory,
+                                           imageOutputPaths: Array(outputPaths.values)),
                   let stored = run.runFingerprint,
                   let computed = pendingRunFingerprintV2(run) else { return false }
             return stored == computed
         }
+        guard run.mixedPDFOutcomes == nil else { return false } // new carrier requires the v2 fingerprint
         guard let stored = run.runFingerprint else { return true }
         return stored == runFingerprint(
             files: run.fileURLs, outputDirectory: run.outputDirectory,
@@ -512,7 +614,7 @@ extension OCRProcessor {
 
         // A nil lifecycle version is the old submit-once manifest. Preserve its paid job exactly as the
         // compatibility path above did; only v1 journals are held to the stronger evolving-state contract.
-        guard let lifecycleVersion = batch.lifecycleVersion else { return true }
+        guard let lifecycleVersion = batch.lifecycleVersion else { return batch.mixedPDFOutcomes == nil }
         guard lifecycleVersion == PendingBatch.currentLifecycleVersion,
               !batch.fileURLs.isEmpty,
               batch.batchId == batch.submittedChunkIds.joined(separator: ","),
@@ -538,6 +640,9 @@ extension OCRProcessor {
                         == batch.outputDirectory.standardizedFileURL.path
             }
         guard resultKeysAreValid, outputPathsAreValid,
+              mixedPDFOutcomesAreValid(batch.mixedPDFOutcomes, images: batch.fileURLs,
+                                       outputDirectory: batch.outputDirectory,
+                                       imageOutputPaths: Array(outputPaths.values)),
               let stored = batch.lifecycleFingerprint,
               let computed = pendingBatchLifecycleFingerprint(batch) else { return false }
         return stored == computed
@@ -680,7 +785,10 @@ extension OCRProcessor {
     }
     /// File URLs from a pending batch (for populating the file list on resume).
     var pendingBatchFileURLs: [URL]? {
-        Self.loadPendingBatch()?.fileURLs
+        guard let pending = Self.loadPendingBatch() else { return nil }
+        guard pending.mixedPDFOutcomes != nil else { return pending.fileURLs }
+        guard Self.pendingBatchIsSelfConsistent(pending) else { return nil }
+        return Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes)
     }
     /// The interrupted-run manifest's file name. Named for the same reason as its batch sibling, and
     /// pinned as a DIFFERENT file: cancelling a paid batch must never take this one with it.
@@ -1134,7 +1242,10 @@ extension OCRProcessor {
     }
     /// File URLs from a pending run (for populating the file list on resume).
     var pendingRunFileURLs: [URL]? {
-        Self.loadPendingRun()?.fileURLs
+        guard let pending = Self.loadPendingRun() else { return nil }
+        guard pending.mixedPDFOutcomes != nil else { return pending.fileURLs }
+        guard Self.pendingRunIsSelfConsistent(pending) else { return nil }
+        return Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes)
     }
     /// Check for persisted pending batch or run on launch.
     func checkForPendingBatch() {
@@ -1246,7 +1357,8 @@ extension OCRProcessor {
               let fp = pending.runFingerprint else { return false }
         if pending.runtimeConfig != nil {
             let selectedPaths = files.map { $0.standardizedFileURL.path }
-            let persistedPaths = pending.fileURLs.map { $0.standardizedFileURL.path }
+            let persistedPaths = Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes)?
+                .map { $0.standardizedFileURL.path }
             return selectedPaths == persistedPaths
                 && outputDirectory.standardizedFileURL.path == pending.outputDirectory.standardizedFileURL.path
         }
@@ -1258,6 +1370,13 @@ extension OCRProcessor {
     func pendingBatchMatches(files: [URL], outputDirectory: URL) -> Bool {
         guard let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending),
               let fp = pending.runFingerprint else { return false }
+        if pending.mixedPDFOutcomes != nil {
+            let selected = files.map { $0.standardizedFileURL.path }
+            let persisted = Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes)?
+                .map { $0.standardizedFileURL.path }
+            return selected == persisted
+                && outputDirectory.standardizedFileURL.path == pending.outputDirectory.standardizedFileURL.path
+        }
         let preserveOrder = pending.fingerprintVersion == 2
         return fp == Self.runFingerprint(
             files: files, outputDirectory: outputDirectory,
@@ -1310,6 +1429,16 @@ extension OCRProcessor {
         // persisted temp JPEGs are long gone, so regenerate them from the originals — exactly like
         // resumeRun — and feed the temp images (not the .pdf) to the result/PDF-embed + retry paths.
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
+        restoreMixedPDFAssociations(pending.mixedPDFOutcomes)
+        var restoredFullJobs = false
+        defer {
+            if !restoredFullJobs { restoreMixedPDFJobs(pending.mixedPDFOutcomes) }
+            progressRange = nil
+        }
+        if let pdfs = pending.mixedPDFOutcomes {
+            progressRange = (start: Double(pdfs.count) / Double(pending.fileURLs.count + pdfs.count),
+                             span: Double(pending.fileURLs.count) / Double(pending.fileURLs.count + pdfs.count))
+        } else { progressRange = nil }
         let imageURLs = convertPDFInputs(pending.fileURLs)
         for i in jobs.indices { jobs[i].status = .processing }
 
@@ -1319,7 +1448,8 @@ extension OCRProcessor {
             completedResults: pending.completedResults,
             completedOutputPaths: pending.completedOutputPaths,
             sourceURLs: pending.fileURLs,
-            outputDirectory: pending.outputDirectory)
+            outputDirectory: pending.outputDirectory,
+            alreadyTaken: _takenOutputPaths)
         for (key, result) in pending.completedResults {
             guard let index = Int(key), jobs.indices.contains(index) else { continue }
             jobs[index].result = result
@@ -1483,6 +1613,9 @@ extension OCRProcessor {
         cleanupTempFiles()
 
         guard !Task.isCancelled else { return }
+        restoreMixedPDFJobs(pending.mixedPDFOutcomes)
+        restoredFullJobs = true
+        progressRange = nil
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
         progress = 1.0
@@ -1549,6 +1682,16 @@ extension OCRProcessor {
         let textAPIKey = runConfig.textAPIKey
         removedSourceURLs = []
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
+        restoreMixedPDFAssociations(pending.mixedPDFOutcomes)
+        var restoredFullJobs = false
+        defer {
+            if !restoredFullJobs { restoreMixedPDFJobs(pending.mixedPDFOutcomes) }
+            progressRange = nil
+        }
+        if let pdfs = pending.mixedPDFOutcomes {
+            progressRange = (start: Double(pdfs.count) / Double(pending.fileURLs.count + pdfs.count),
+                             span: Double(pending.fileURLs.count) / Double(pending.fileURLs.count + pdfs.count))
+        } else { progressRange = nil }
         progress = 0
 
         // Restore the pending run tracker for incremental saves
@@ -1590,7 +1733,7 @@ extension OCRProcessor {
                 completedOutputPaths: pending.completedOutputPaths,
                 sourceURLs: jobs.map { $0.sourceURL },
                 outputDirectory: pending.outputDirectory,
-                alreadyTaken: Set(outputURLMap.values.map { $0.standardizedFileURL.path.lowercased() }))
+                alreadyTaken: _takenOutputPaths)
             for (key, result) in pending.completedResults.sorted(by: { (Int($0.key) ?? 0) < (Int($1.key) ?? 0) }) {
                 guard let index = Int(key), index < jobs.count, index < imageURLs.count,
                       let outputURL = resolvedOutputs[index] else { continue }
@@ -1841,6 +1984,9 @@ extension OCRProcessor {
         Self.deletePendingRun()
         pendingRunInfo = nil
 
+        restoreMixedPDFJobs(pending.mixedPDFOutcomes)
+        restoredFullJobs = true
+        progressRange = nil
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
         progress = 1.0
@@ -2529,16 +2675,32 @@ extension OCRProcessor {
         currentGateway = gatewayConfig
         currentLocalAgent = localAgent
         jobs = files.map { OCRJob(sourceURL: $0) }
+        progressRange = nil
         progress = 0
 
-        // Auto-route a dropped multi-page PDF to the re-OCR transform (render each page → OCR → one
-        // interleaved image/OCR-text PDF): it is an assembled document, not a page stream to segment
-        // and tag, so it never goes through the tagging pipeline. `preOCRedInput` stays the deliberate
-        // opt-in for that pipeline and wins when set. Presence-based (not all-inputs-are-PDF) so a
-        // multi-page PDF is NEVER silently truncated to its first page by the image path; a non-PDF
-        // sibling in the same run fails render loudly (this path only WRITES output — it never moves
-        // or deletes a source — so file-safety holds regardless).
-        let autoReOCR = !preOCRedInput && files.contains(where: PDFToImageConverter.isMultiPagePDF)
+        // Route each multi-page PDF to the pure re-OCR transform, and every other input through
+        // the standard image path. A filtered PDF keeps its original job index; the image path's
+        // older positional code sees only its own contiguous job subset until both paths finish.
+        let pdfIndices = preOCRedInput ? [] : files.indices.filter { PDFToImageConverter.isMultiPagePDF(files[$0]) }
+        let pdfIndexSet = Set(pdfIndices)
+        let imageIndices = files.indices.filter { !pdfIndexSet.contains($0) }
+        let autoReOCR = !pdfIndices.isEmpty
+        let mixedReOCR = autoReOCR && !imageIndices.isEmpty
+        reOCRSourceURLs = Set(pdfIndices.map { files[$0] })
+        var mixedPDFOutcomes: [MixedPDFOutcome]?
+        var fullJobsAfterPDF: [OCRJob]?
+        var editingImageSubset = false
+        defer {
+            // Also restore original row order after an early return or cancellation in the image path.
+            if editingImageSubset, let fullJobsAfterPDF {
+                var restored = fullJobsAfterPDF
+                for (subsetIndex, originalIndex) in imageIndices.enumerated() where subsetIndex < jobs.count {
+                    restored[originalIndex] = jobs[subsetIndex]
+                }
+                jobs = restored
+            }
+            progressRange = nil
+        }
 
         // Snapshot this run's parameters for the processing-history log. Captured here (not at the tail)
         // because several completion paths clear other run state first; `enableTagging`/`sendPreviousImage`
@@ -2553,13 +2715,14 @@ extension OCRProcessor {
             model: model,
             // Multi-page re-OCR is a pure image/PDF transform and deliberately skips judgement,
             // tagging, and segmentation. Do not attribute an unused text backend to its history row.
-            visionTextProvider: autoReOCR ? nil : runConfig.visionTextLLM?.provider,
-            visionTextModel: autoReOCR ? nil : runConfig.visionTextLLM?.model,
+            visionTextProvider: autoReOCR && !mixedReOCR ? nil : runConfig.visionTextLLM?.provider,
+            visionTextModel: autoReOCR && !mixedReOCR ? nil : runConfig.visionTextLLM?.model,
             batchMode: batchMode && provider.supportsBatch && gatewayConfig == nil && localAgent == nil,
             enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
             reOCRMultiPagePDF: autoReOCR,
+            mixedReOCR: mixedReOCR,
             sendPreviousImage: segmentationContext.sendPreviousImage,
             contextCharCount: segmentationContext.previousTextCharCount,
             imageScale: segmentationContext.imageScale,
@@ -2568,10 +2731,12 @@ extension OCRProcessor {
         )
 
         if autoReOCR {
-            // --- Multi-page PDF re-OCR path: render every page → OCR each page image → rebuild ONE
-            //     output PDF alternating image/OCR-text. A pure transform (no tagging/segmentation). ---
+            // --- PDF subset: pure render/OCR/rebuild, with no tagging or segmentation. ---
+            if mixedReOCR {
+                progressRange = (start: 0, span: Double(pdfIndices.count) / Double(files.count))
+            }
             await performMultiPagePDFReOCR(
-                files: files,
+                files: pdfIndices.map { (jobIndex: $0, url: files[$0]) },
                 provider: provider,
                 model: model,
                 thinkingLevel: thinkingLevel,
@@ -2582,7 +2747,37 @@ extension OCRProcessor {
                 localAgent: localAgent,
                 runConfig: runConfig
             )
-        } else if preOCRedInput {
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            guard pdfIndices.allSatisfy({ jobs[$0].status != .pending }) else {
+                activeRunHistory = nil
+                isProcessing = false
+                statusMessage = "The PDF inputs could not be matched to their jobs. No images were processed."
+                return
+            }
+            if mixedReOCR {
+                guard let outcomes = captureMixedPDFOutcomes(indices: pdfIndices) else {
+                    activeRunHistory = nil
+                    isProcessing = false
+                    statusMessage = "The rebuilt PDF results could not be recorded safely. No images were processed."
+                    return
+                }
+                mixedPDFOutcomes = outcomes
+                fullJobsAfterPDF = jobs
+                jobs = imageIndices.map { jobs[$0] }
+                editingImageSubset = true
+                progressRange = (start: Double(pdfIndices.count) / Double(files.count),
+                                 span: Double(imageIndices.count) / Double(files.count))
+                if !preGroupedBoundaries.isEmpty {
+                    preGroupedBoundaries = imageIndices.map { preGroupedBoundaries[$0] }
+                    preGroupedTypes = imageIndices.map { preGroupedTypes[$0] }
+                    if !preGroupedQualities.isEmpty { preGroupedQualities = imageIndices.map { preGroupedQualities[$0] } }
+                    if !preGroupedYears.isEmpty { preGroupedYears = imageIndices.map { preGroupedYears[$0] } }
+                    if !preGroupedMonths.isEmpty { preGroupedMonths = imageIndices.map { preGroupedMonths[$0] } }
+                    if !preGroupedSubjects.isEmpty { preGroupedSubjects = imageIndices.map { preGroupedSubjects[$0] } }
+                }
+            }
+        }
+        if preOCRedInput {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
             // A Vision-hybrid selection has no image work on this route either. Reuse its text
             // judgement backend rather than presenting Apple Vision as a network text provider.
@@ -2601,8 +2796,9 @@ extension OCRProcessor {
                 customPrompt: segmentationContext.customPrompt,
                 runConfig: runConfig
             )
-        } else {
-            // --- Standard image OCR path ---
+        } else if !autoReOCR || mixedReOCR {
+            // --- Standard path: all inputs except the multi-page PDFs already rebuilt above. ---
+            let files = mixedReOCR ? imageIndices.map { files[$0] } : files
             statusMessage = "Starting OCR…"
 
             // Convert any PDF inputs to temporary JPEG images
@@ -2626,7 +2822,8 @@ extension OCRProcessor {
                     reviewDocumentSegmentation: reviewDocumentSegmentation,
                     customPrompt: segmentationContext.customPrompt,
                     imageScale: segmentationContext.imageScale,
-                    runConfig: runConfig
+                    runConfig: runConfig,
+                    mixedPDFOutcomes: mixedPDFOutcomes
                 )
                 // Transient interruption during batch polling: the batch is preserved (resumable) and
                 // no file was falsely failed. Stop cleanly rather than tagging/finalizing partial results.
@@ -2667,6 +2864,7 @@ extension OCRProcessor {
                     localAgent: localAgent,
                     runtimeConfig: runtimeConfig
                 )
+                pendingRun.mixedPDFOutcomes = mixedPDFOutcomes
                 guard let fingerprint = Self.pendingRunFingerprintV2(pendingRun) else {
                     cleanupTempFiles()
                     activeRunHistory = nil
@@ -2855,6 +3053,16 @@ extension OCRProcessor {
 
         guard !Task.isCancelled else { return }
 
+        if editingImageSubset, let fullJobsAfterPDF {
+            var restored = fullJobsAfterPDF
+            for (subsetIndex, originalIndex) in imageIndices.enumerated() {
+                restored[originalIndex] = jobs[subsetIndex]
+            }
+            jobs = restored
+            editingImageSubset = false
+            progressRange = nil
+        }
+
         // Clear pending run on successful completion
         activePendingRun = nil
         Self.deletePendingRun()
@@ -2870,18 +3078,6 @@ extension OCRProcessor {
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
-        // Make the multi-page-re-OCR routing skip UNMISSABLE. "N failed" alone reads as an OCR/model problem,
-        // and the per-row reason requires inspecting a row — so an operator whose images were skipped for a
-        // pure ROUTING reason had no way to know. (2026-07-29: an owner dropped two .jpg files alongside one
-        // 3-page PDF; both images were silently discarded and reported as "No OCR text".) The batch log would
-        // also have said so, but `writeLogFile` is opt-in and defaults to OFF, so the status line is the only
-        // channel guaranteed to be seen.
-        let skippedNotPDF = jobs.filter { $0.result?.errorCode == "not_a_pdf_in_reocr_run" }.count
-        if skippedNotPDF > 0 {
-            statusMessage += " ⚠️ \(skippedNotPDF) non-PDF file\(skippedNotPDF == 1 ? "" : "s") NOT processed:"
-                          + " this run contained a multi-page PDF, which routes the whole run through the"
-                          + " PDF-only re-OCR transform. Re-run the images on their own."
-        }
         if incrementalSkipped > 0 {
             statusMessage += " \(incrementalSkipped) already-processed skipped."
         }
@@ -2980,6 +3176,10 @@ extension OCRProcessor {
     func retryOne(index: Int, imageURL: URL? = nil, outputDirectory: URL,
                   rotation: Int? = nil, runConfig: SessionProcessingConfig? = nil) async -> Bool {
         guard jobs.indices.contains(index), let effectiveRunConfig = runConfigForRetry(runConfig) else {
+            return false
+        }
+        guard !reOCRSourceURLs.contains(jobs[index].sourceURL) else {
+            statusMessage = "This rebuilt PDF must be re-OCR'd as a multi-page document in a new run."
             return false
         }
         jobs[index].status = .processing

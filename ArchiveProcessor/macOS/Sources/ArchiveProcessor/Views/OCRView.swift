@@ -25,9 +25,13 @@ struct OCRView: View {
     /// Derived for compatibility with existing pipeline flags.
     private var enableTagging: Bool { taggingMode.enablesTagging }
     private var passSourceTags: Bool { taggingMode == .copySource }
-    /// The dropped input will auto-route to the multi-page-PDF re-OCR transform (a pure document
-    /// rebuild), so tagging/segmentation don't apply. Mirrors the pipeline's `autoReOCR` decision.
-    private var isMultiPagePDFReOCR: Bool { droppedHasMultiPagePDF && !preOCRedInput }
+    /// Only a PDF-only drop disables tagging. A mixed drop also runs the standard image path,
+    /// so the picker remains active for images while rebuilt PDFs stay untagged.
+    private var hasMixedReOCR: Bool {
+        droppedHasMultiPagePDF && !preOCRedInput
+            && droppedFiles.contains { !PDFToImageConverter.isMultiPagePDF($0) }
+    }
+    private var isPDFOnlyReOCR: Bool { droppedHasMultiPagePDF && !preOCRedInput && !hasMixedReOCR }
     @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
@@ -387,22 +391,24 @@ struct OCRView: View {
                 // Tagging mode stays in the main UI; other settings are in the Settings window (⌘,).
                 GroupBox("Tagging") {
                     VStack(alignment: .leading, spacing: 4) {
-                        Picker("Tagging", selection: $taggingModeRaw) {
+                        Picker(hasMixedReOCR ? "Tagging (images only)" : "Tagging", selection: $taggingModeRaw) {
                             ForEach(TaggingMode.allCases) { mode in
                                 Text(mode.displayName).tag(mode.rawValue)
                             }
                         }
                         .accessibilityIdentifier("ap.ocr.taggingPicker")
-                        Text(isMultiPagePDFReOCR
-                             ? "Not applied to a multi-page PDF — it is re-OCR'd into one alternating image/OCR-text PDF (a pure document rebuild, no tagging)."
-                             : taggingMode.detail)
+                        Text(hasMixedReOCR
+                             ? "Applies to images only. Multi-page PDFs are rebuilt without tags."
+                             : isPDFOnlyReOCR
+                               ? "Not applied to a multi-page PDF — it is re-OCR'd into one alternating image/OCR-text PDF (a pure document rebuild, no tagging)."
+                               : taggingMode.detail)
                             .font(.caption2).foregroundStyle(.tertiary)
                             .accessibilityIdentifier("ap.ocr.reOCRExplanation")
                     }
                     .padding(4)
                 }
                 .accessibilityIdentifier("ap.ocr.taggingPanel")
-                .disabled(isMultiPagePDFReOCR)
+                .disabled(isPDFOnlyReOCR)
 
 
                 // Cost estimate
@@ -733,6 +739,13 @@ struct OCRView: View {
         }
     }
 
+    /// Review shortcuts index the visible drop, while the running standard route holds only image jobs.
+    private func reviewJobIndex(for rowIndex: Int) -> Int? {
+        guard droppedFiles.indices.contains(rowIndex),
+              !processor.reOCRSourceURLs.contains(droppedFiles[rowIndex]) else { return nil }
+        return processor.jobs.firstIndex { $0.sourceURL == droppedFiles[rowIndex] }
+    }
+
     private var fileList: some View {
         let jobsBySource = Dictionary(processor.jobs.map { ($0.sourceURL, $0) }, uniquingKeysWith: { _, last in last })
         return ZStack {
@@ -746,6 +759,7 @@ struct OCRView: View {
                             job: job,
                             showTags: processor.awaitingFinalReview,
                             isFocused: isInReviewMode && index == reviewFocusedIndex,
+                            isReOCRSource: processor.reOCRSourceURLs.contains(url),
                             actions: ItemActionHandler { action, id in performFileAction(action, on: id) },
                             isExpanded: expandedFileID == itemID,
                             presetClassification: capturePreGroupedClassification(at: index)
@@ -753,8 +767,8 @@ struct OCRView: View {
                         .contentShape(Rectangle())
                         .id(index)
                         .onTapGesture(count: 2) {
-                            if isInReviewMode, index < processor.jobs.count {
-                                editingFileIndex = index
+                            if isInReviewMode, let jobIndex = reviewJobIndex(for: index) {
+                                editingFileIndex = jobIndex
                             }
                         }
                         .onTapGesture(count: 1) {
@@ -776,7 +790,11 @@ struct OCRView: View {
                     // Reset review focus each time a review begins — otherwise a smaller second run leaves
                     // reviewFocusedIndex out of range, so no row shows the focus ring and the 1–4
                     // classification keys silently do nothing. Covers all entry paths (run/batch/resume).
-                    if entering { reviewFocusedIndex = 0 }
+                    if entering {
+                        reviewFocusedIndex = droppedFiles.indices.first {
+                            reviewJobIndex(for: $0) != nil
+                        } ?? 0
+                    }
                 }
             }
             if !isInReviewMode {
@@ -797,28 +815,28 @@ struct OCRView: View {
             return .handled
         }
         .onKeyPress(.return) {
-            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
-            editingFileIndex = reviewFocusedIndex
+            guard isInReviewMode, let jobIndex = reviewJobIndex(for: reviewFocusedIndex) else { return .ignored }
+            editingFileIndex = jobIndex
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "1")) { _ in
-            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
-            processor.updateClassification(at: reviewFocusedIndex, to: .documentStart)
+            guard isInReviewMode, let jobIndex = reviewJobIndex(for: reviewFocusedIndex) else { return .ignored }
+            processor.updateClassification(at: jobIndex, to: .documentStart)
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "2")) { _ in
-            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
-            processor.updateClassification(at: reviewFocusedIndex, to: .documentContinuation)
+            guard isInReviewMode, let jobIndex = reviewJobIndex(for: reviewFocusedIndex) else { return .ignored }
+            processor.updateClassification(at: jobIndex, to: .documentContinuation)
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "3")) { _ in
-            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
-            processor.updateClassification(at: reviewFocusedIndex, to: .boxLabel)
+            guard isInReviewMode, let jobIndex = reviewJobIndex(for: reviewFocusedIndex) else { return .ignored }
+            processor.updateClassification(at: jobIndex, to: .boxLabel)
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "4")) { _ in
-            guard isInReviewMode, reviewFocusedIndex < processor.jobs.count else { return .ignored }
-            processor.updateClassification(at: reviewFocusedIndex, to: .folderLabel)
+            guard isInReviewMode, let jobIndex = reviewJobIndex(for: reviewFocusedIndex) else { return .ignored }
+            processor.updateClassification(at: jobIndex, to: .folderLabel)
             return .handled
         }
     }
@@ -827,6 +845,9 @@ struct OCRView: View {
 
     private func performFileAction(_ action: ItemAction, on itemID: String) {
         guard let jobIndex = processor.jobs.firstIndex(where: { $0.id.uuidString == itemID }) else { return }
+        if processor.reOCRSourceURLs.contains(processor.jobs[jobIndex].sourceURL) {
+            guard action == .viewText else { return }
+        }
         switch action {
         case .retry:
             guard let outDir = outputDirectory else { return }

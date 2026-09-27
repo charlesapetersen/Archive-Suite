@@ -46,7 +46,8 @@ enum ProcessingHistoryTestDriver {
                 model: model, visionTextProvider: nil, visionTextModel: nil,
                 batchMode: batch, enableTagging: true,
                 enableCollectionSegmentation: false, preOCRedInput: preOCRed,
-                reOCRMultiPagePDF: reOCR, sendPreviousImage: false, contextCharCount: 0,
+                reOCRMultiPagePDF: reOCR, mixedReOCR: false,
+                sendPreviousImage: false, contextCharCount: 0,
                 imageScale: 1.0, rotationMode: .off, fileCount: fileCount)
         }
 
@@ -119,7 +120,8 @@ enum ProcessingHistoryTestDriver {
             provider: .appleVision, gatewayConfig: nil, localAgent: nil, imageTokenProvider: nil, model: visionModel,
             visionTextProvider: .gemini, visionTextModel: model, batchMode: false,
             enableTagging: true, enableCollectionSegmentation: false, preOCRedInput: false,
-            reOCRMultiPagePDF: false, sendPreviousImage: false, contextCharCount: 0,
+            reOCRMultiPagePDF: false, mixedReOCR: false,
+            sendPreviousImage: false, contextCharCount: 0,
             imageScale: 1.0, rotationMode: .llmSingle, fileCount: 10)
         let hybridRun = hybridSnapshot.makeRun(succeeded: 10)
         let hybridExpected = CostEstimator.estimate(

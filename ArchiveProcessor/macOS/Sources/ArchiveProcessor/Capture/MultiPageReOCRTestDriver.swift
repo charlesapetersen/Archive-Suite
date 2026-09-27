@@ -91,10 +91,7 @@ enum MultiPageReOCRTestDriver {
         check("renderAllPages returns nil for a non-PDF", PDFToImageConverter.renderAllPages(of: bogus) == nil)
         for u in rendered ?? [] { try? fm.removeItem(at: u) }
 
-        // ── 1b. Auto-route detection: a MULTI-page PDF drops to re-OCR; a single-page PDF, an image,
-        //        and (unreadable) non-PDFs do not. `preOCRedInput` (the tagging pipeline) wins when on.
-        //        This mirrors the pipeline's `autoReOCR = !preOCRedInput && files.contains(isMultiPagePDF)`
-        //        so the routing is asserted at $0 without a live OCR run. ─────────────────────────────
+        // ── 1b. Per-file route detection: only multi-page PDFs take re-OCR. ───────────────────────
         let singlePage = renderDir.appendingPathComponent("one.pdf")
         _ = writeMultiPagePDF(singlePage, pages: 1)
         let imageInput = PDFToImageConverter.imageURL(for: singlePage)   // a real .jpg temp
@@ -102,15 +99,15 @@ enum MultiPageReOCRTestDriver {
         check("isMultiPagePDF: false for a 1-page PDF", !PDFToImageConverter.isMultiPagePDF(singlePage))
         check("isMultiPagePDF: false for an image file", !PDFToImageConverter.isMultiPagePDF(imageInput))
         check("isMultiPagePDF: false for an unreadable .pdf", !PDFToImageConverter.isMultiPagePDF(bogus))
-        func autoReOCR(_ files: [URL], preOCRed: Bool) -> Bool {
-            !preOCRed && files.contains(where: PDFToImageConverter.isMultiPagePDF)
+        func reOCRIndices(_ files: [URL], preOCRed: Bool) -> [Int] {
+            preOCRed ? [] : files.indices.filter { PDFToImageConverter.isMultiPagePDF(files[$0]) }
         }
-        check("auto-route: multi-page PDF → re-OCR", autoReOCR([threePage], preOCRed: false))
-        check("auto-route: single-page PDF → standard (not re-OCR)", !autoReOCR([singlePage], preOCRed: false))
-        check("auto-route: image → standard (not re-OCR)", !autoReOCR([imageInput], preOCRed: false))
-        check("auto-route: preOCRedInput wins over a multi-page PDF", !autoReOCR([threePage], preOCRed: true))
-        check("auto-route: a multi-page PDF anywhere in a mixed drop still routes to re-OCR",
-              autoReOCR([imageInput, threePage], preOCRed: false))
+        check("auto-route: multi-page PDF → re-OCR", reOCRIndices([threePage], preOCRed: false) == [0])
+        check("auto-route: single-page PDF → standard", reOCRIndices([singlePage], preOCRed: false).isEmpty)
+        check("auto-route: image → standard", reOCRIndices([imageInput], preOCRed: false).isEmpty)
+        check("auto-route: preOCRedInput wins over a multi-page PDF", reOCRIndices([threePage], preOCRed: true).isEmpty)
+        check("auto-route: mixed drop selects only its PDF, retaining original index",
+              reOCRIndices([imageInput, threePage], preOCRed: false) == [1])
         try? fm.removeItem(at: imageInput)
 
         // ── 2. Full pipeline: 3-page PDF → 6-page alternating image/OCR-text PDF, text on odd pages. ─
@@ -125,7 +122,7 @@ enum MultiPageReOCRTestDriver {
         processor.jobs = [OCRJob(sourceURL: src)]
         let model = LLMModel.geminiModels[0]   // only feeds the text-page subheader; OCR is injected
         await processor.performMultiPagePDFReOCR(
-            files: [src], provider: .gemini, model: model, thinkingLevel: nil,
+            files: [(jobIndex: 0, url: src)], provider: .gemini, model: model, thinkingLevel: nil,
             apiKey: "", outputDirectory: outDir, runConfig: runConfig,
             ocrOverride: makeInjectedOCR())
 
@@ -149,7 +146,7 @@ enum MultiPageReOCRTestDriver {
         let inplaceProc = OCRProcessor()
         inplaceProc.jobs = [OCRJob(sourceURL: inplace)]
         await inplaceProc.performMultiPagePDFReOCR(
-            files: [inplace], provider: .gemini, model: model, thinkingLevel: nil,
+            files: [(jobIndex: 0, url: inplace)], provider: .gemini, model: model, thinkingLevel: nil,
             apiKey: "", outputDirectory: sameDir, runConfig: runConfig,
             ocrOverride: makeInjectedOCR())
         let inplaceOut = inplaceProc.outputURLMap[inplace]
@@ -160,15 +157,9 @@ enum MultiPageReOCRTestDriver {
         check("re-OCR output is the 4-page alternating rebuild (2 pages × 2)",
               inplaceOut.flatMap { PDFDocument(url: $0)?.pageCount } == 4)
 
-        // ── 4. MIXED DROP: a non-PDF sibling must fail *loudly*, not silently. ──────────────────────
-        // Regression for the 2026-07-29 bug: an owner dropped two .jpg files alongside one 3-page PDF.
-        // Because `autoReOCR` is presence-based (section 1, checks at 107-108), the whole run took this
-        // PDF-only route, `renderAllPages` returned nil for each JPEG, and the guard marked them .failed
-        // WITHOUT setting `result` — so the UI rendered "No OCR text" (blaming the model) and no output was
-        // written. The route's own comment claimed such a sibling "fails render loudly"; it did not.
-        // These checks pin the reason being attached. NOTE: the ROUTING itself is unchanged and still skips
-        // non-PDFs — the per-file partition is a separate, owner-gated follow-up (it changes tagging
-        // semantics for a mixed run). What is fixed here is that the skip can no longer be silent.
+        // ── 4. Direct-call misuse stays loud; a filtered PDF keeps its ORIGINAL job index. ───────────
+        // startProcessing never passes an image to this method. A caller that does must still get a
+        // precise failure, while a PDF at index 1 must update only that original job.
         let mixDir = root.appendingPathComponent("mixed", isDirectory: true)
         let mixOut = root.appendingPathComponent("mixedout", isDirectory: true)
         try? fm.createDirectory(at: mixDir, withIntermediateDirectories: true)
@@ -186,7 +177,8 @@ enum MultiPageReOCRTestDriver {
         // files array) would show up as the wrong job being marked.
         mixProc.jobs = [OCRJob(sourceURL: mixIMG), OCRJob(sourceURL: mixPDF)]
         await mixProc.performMultiPagePDFReOCR(
-            files: [mixIMG, mixPDF], provider: .gemini, model: model, thinkingLevel: nil,
+            files: [(jobIndex: 0, url: mixIMG), (jobIndex: 1, url: mixPDF)],
+            provider: .gemini, model: model, thinkingLevel: nil,
             apiKey: "", outputDirectory: mixOut, runConfig: runConfig,
             ocrOverride: makeInjectedOCR())
 
@@ -197,7 +189,7 @@ enum MultiPageReOCRTestDriver {
               imgJob?.result?.errorMessage?.isEmpty == false)
         check("mixed: its errorCode identifies the ROUTING skip, not an OCR/model fault",
               imgJob?.result?.errorCode == "not_a_pdf_in_reocr_run")
-        check("mixed: the reason names the actual cause (multi-page PDF routed the run)",
+        check("mixed: the reason names the incorrect multi-page transform call",
               imgJob?.result?.errorMessage?.contains("multi-page") == true)
         check("mixed: the non-PDF sibling produced NO output (unchanged, but now explained)",
               mixProc.outputURLMap[mixIMG] == nil)
@@ -208,6 +200,17 @@ enum MultiPageReOCRTestDriver {
               mixProc.outputURLMap[mixPDF].flatMap { PDFDocument(url: $0)?.pageCount } == 4)
         check("mixed: the source image is untouched on disk (route only writes output)",
               fm.fileExists(atPath: mixIMG.path))
+
+        let mapped = OCRProcessor()
+        mapped.jobs = [OCRJob(sourceURL: mixIMG), OCRJob(sourceURL: mixPDF)]
+        await mapped.performMultiPagePDFReOCR(
+            files: [(jobIndex: 1, url: mixPDF)], provider: .gemini, model: model, thinkingLevel: nil,
+            apiKey: "", outputDirectory: mixOut, runConfig: runConfig,
+            ocrOverride: makeInjectedOCR())
+        check("filtered PDF updates its original job slot", mapped.jobs[1].status == .succeeded)
+        check("filtered PDF leaves image job pending for the standard route", mapped.jobs[0].status == .pending)
+        check("filtered PDF output maps to PDF source only",
+              mapped.outputURLMap[mixPDF] != nil && mapped.outputURLMap[mixIMG] == nil)
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"

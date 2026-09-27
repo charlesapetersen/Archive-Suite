@@ -13,6 +13,7 @@ struct FileRowView: View {
     let job: OCRJob?
     var showTags: Bool = false
     var isFocused: Bool = false
+    var isReOCRSource: Bool = false
     /// Per-item actions (populated for the Files disclosure); empty by default so the row stays compact.
     var actions: ProcessableItemActions = ItemActionHandler { _, _ in }
     var isExpanded: Bool = false
@@ -40,12 +41,13 @@ struct FileRowView: View {
         let cls = job?.classification ?? presetClassification
         let shownClass = (cls != nil && shows(cls!)) ? cls : nil
         return FileItem(url: url, job: job, shownClassification: shownClass,
-                        availableActions: isExpanded ? Self.filesActions(for: job) : [])
+                        availableActions: isExpanded ? Self.filesActions(for: job, isReOCRSource: isReOCRSource) : [])
     }
 
     /// Actions a Files row offers. Retry/rotation only make sense for a failed OCR; every row can
     /// view text / reclassify during review.
-    static func filesActions(for job: OCRJob?) -> [ItemAction] {
+    static func filesActions(for job: OCRJob?, isReOCRSource: Bool = false) -> [ItemAction] {
+        if isReOCRSource { return job?.result?.text != nil ? [.viewText] : [] }
         var acts: [ItemAction] = []
         if job?.status == .failed {
             acts.append(contentsOf: [.retry, .changeRotation])
@@ -106,7 +108,7 @@ struct FileItem: ProcessableItem {
             guard let r = job.result else { return .failed(.noOutput) }   // never even reached OCR
             guard let _ = r.errorMessage else { return .failed(.ocrEmpty) }   // a result, but no text
             switch r.errorCode {
-            case "not_a_pdf_in_reocr_run", "pdf_render_failed", "pdf_write_failed":
+            case "not_a_pdf_in_reocr_run", "pdf_render_failed", "pdf_write_failed", "pdf_output_missing":
                 return .failed(.noOutput)      // OCR was fine (or never ran) — no file was produced
             default:
                 return .failed(.provider)      // a genuine provider/transport error

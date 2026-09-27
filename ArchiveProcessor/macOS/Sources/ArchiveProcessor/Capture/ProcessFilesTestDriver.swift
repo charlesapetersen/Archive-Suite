@@ -102,15 +102,17 @@ enum ProcessFilesTestDriver {
         } catch {
             return fail("cannot create run dir: \(error.localizedDescription)", marker: donePath)
         }
-        // --- inputs: top-level images, natural-sorted, capped ---
+        // --- inputs: top-level images, plus PDFs only for the mixed-route regression ---
         let cap = max(1, Int(env["PROCESSFILES_MAXIMAGES"] ?? "") ?? 8)
+        let mixedRoute = env["PROCESSFILES_TEST_MIXED"] == "1"
         let all = (try? FileManager.default.contentsOfDirectory(at: inDir, includingPropertiesForKeys: nil)) ?? []
         let inputs = all
-            .filter { imageExts.contains($0.pathExtension.lowercased()) }
+            .filter { imageExts.contains($0.pathExtension.lowercased())
+                || (mixedRoute && $0.pathExtension.lowercased() == "pdf") }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
             .prefix(cap)
             .map { $0 }
-        guard !inputs.isEmpty else { return fail("no input images in \(inDir.path)", marker: donePath) }
+        guard !inputs.isEmpty else { return fail("no accepted inputs in \(inDir.path)", marker: donePath) }
 
         // --- config (rejecting modes that need real human input) ---
         let provider = LLMProvider(rawValue: env["PROCESSFILES_PROVIDER"] ?? "Gemini") ?? .gemini

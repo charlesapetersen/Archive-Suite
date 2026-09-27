@@ -6,7 +6,22 @@ import UserNotifications
 class OCRProcessor: ObservableObject {
     @Published var jobs: [OCRJob] = []
     @Published var isProcessing = false
-    @Published var progress: Double = 0
+    @Published private var displayedProgress: Double = 0
+    /// A mixed Process Files run has two sequential routes. Each route continues reporting its own
+    /// 0…1 progress; map that fraction into its share of the one run's progress bar.
+    var progressRange: (start: Double, span: Double)?
+    /// Sources rebuilt by the pure multi-page route must never enter the standard per-item tag/retry path.
+    var reOCRSourceURLs: Set<URL> = []
+    var progress: Double {
+        get { displayedProgress }
+        set {
+            if let progressRange {
+                displayedProgress = progressRange.start + newValue * progressRange.span
+            } else {
+                displayedProgress = newValue
+            }
+        }
+    }
     @Published var statusMessage = ""
     @Published var failedFiles: [String] = []
     @Published var segments: [DocumentSegment] = []
@@ -370,6 +385,8 @@ class OCRProcessor: ObservableObject {
         /// SHA-256 over the complete v1 journal (excluding this field). It protects the evolving
         /// ID/result/output associations in addition to the legacy immutable run fingerprint.
         var lifecycleFingerprint: String?
+        /// PDF work completed before the image batch was submitted. Image indices remain contiguous.
+        var mixedPDFOutcomes: [MixedPDFOutcome]?
 
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
@@ -385,7 +402,8 @@ class OCRProcessor: ObservableObject {
              submissionComplete: Bool = true,
              completedResults: [String: OCRResult] = [:],
              completedOutputPaths: [String: String]? = nil,
-             lifecycleFingerprint: String? = nil) {
+             lifecycleFingerprint: String? = nil,
+             mixedPDFOutcomes: [MixedPDFOutcome]? = nil) {
             self.batchId = batchId; self.provider = provider; self.model = model
             self.thinkingLevel = thinkingLevel; self.fileURLs = fileURLs
             self.outputDirectory = outputDirectory; self.enableTagging = enableTagging
@@ -406,6 +424,7 @@ class OCRProcessor: ObservableObject {
             self.completedResults = completedResults
             self.completedOutputPaths = completedOutputPaths
             self.lifecycleFingerprint = lifecycleFingerprint
+            self.mixedPDFOutcomes = mixedPDFOutcomes
         }
 
         init(from decoder: Decoder) throws {
@@ -436,6 +455,7 @@ class OCRProcessor: ObservableObject {
             completedResults = try c.decodeIfPresent([String: OCRResult].self, forKey: .completedResults) ?? [:]
             completedOutputPaths = try c.decodeIfPresent([String: String].self, forKey: .completedOutputPaths)
             lifecycleFingerprint = try c.decodeIfPresent(String.self, forKey: .lifecycleFingerprint)
+            mixedPDFOutcomes = try c.decodeIfPresent([MixedPDFOutcome].self, forKey: .mixedPDFOutcomes)
         }
 
         static func parseChunkIDs(_ value: String) -> [String] {
@@ -457,6 +477,16 @@ class OCRProcessor: ObservableObject {
 
 
     // MARK: - Non-Batch Run Persistence
+
+    /// Durable outcome of a multi-page PDF processed before the image subset. The exact output URL
+    /// and original position let resume restore the full run without sending that PDF to image OCR.
+    struct MixedPDFOutcome: Codable {
+        let originalIndex: Int
+        let sourceURL: URL
+        let result: OCRResult
+        let succeeded: Bool
+        let outputURL: URL?
+    }
 
     /// Versioned, immutable snapshot of every mutable/runtime knob that the standard Process Files
     /// pipeline reads after its `startProcessing` arguments have been captured. A resumed v2 run applies
@@ -565,6 +595,7 @@ class OCRProcessor: ObservableObject {
         /// intentionally retain the historical live-setting fallback because the original values were
         /// never recorded and cannot be reconstructed.
         var runtimeConfig: PendingRunRuntimeConfig? = nil
+        var mixedPDFOutcomes: [MixedPDFOutcome]? = nil
     }
 
 

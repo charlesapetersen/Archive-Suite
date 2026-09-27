@@ -56,6 +56,7 @@ struct RunHistorySnapshot {
     let enableCollectionSegmentation: Bool
     let preOCRedInput: Bool
     let reOCRMultiPagePDF: Bool
+    let mixedReOCR: Bool
     let sendPreviousImage: Bool
     let contextCharCount: Int
     let imageScale: Double
@@ -97,6 +98,7 @@ struct RunHistorySnapshot {
     }
 
     var modeLabel: String {
+        if mixedReOCR { return "Mixed PDF + images" }
         if reOCRMultiPagePDF { return "Re-OCR PDF" }
         if preOCRedInput { return "Pre-OCRed" }
         return batchMode ? "Batch" : "Standard"
@@ -142,11 +144,12 @@ extension RunHistorySnapshot {
             enableCollectionSegmentation: run.enableCollectionSegmentation,
             preOCRedInput: run.preOCRedInput,
             reOCRMultiPagePDF: false,
+            mixedReOCR: run.mixedPDFOutcomes != nil,
             sendPreviousImage: run.sendPreviousImage,
             contextCharCount: run.previousTextCharCount,
             imageScale: imageScale,
             rotationMode: rotationMode,
-            fileCount: run.fileURLs.count
+            fileCount: run.fileURLs.count + (run.mixedPDFOutcomes?.count ?? 0)
         )
     }
 
@@ -168,11 +171,12 @@ extension RunHistorySnapshot {
             enableCollectionSegmentation: batch.enableCollectionSegmentation,
             preOCRedInput: false,
             reOCRMultiPagePDF: false,
+            mixedReOCR: batch.mixedPDFOutcomes != nil,
             sendPreviousImage: batch.sendPreviousImage,
             contextCharCount: 0,
             imageScale: imageScale,
             rotationMode: rotationMode,
-            fileCount: batch.fileURLs.count
+            fileCount: batch.fileURLs.count + (batch.mixedPDFOutcomes?.count ?? 0)
         )
     }
 }

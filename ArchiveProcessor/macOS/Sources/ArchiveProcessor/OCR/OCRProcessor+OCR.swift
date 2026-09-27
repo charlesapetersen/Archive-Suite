@@ -267,7 +267,7 @@ extension OCRProcessor {
     /// when set, it supplies each page's `OCRResult` in place of the live network call, so the whole
     /// render→generate→merge assembly is covered headlessly. Production passes nil.
     func performMultiPagePDFReOCR(
-        files: [URL],
+        files: [(jobIndex: Int, url: URL)],
         provider: LLMProvider,
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
@@ -281,6 +281,15 @@ extension OCRProcessor {
     ) async {
         let total = files.count
         guard total > 0 else { return }
+        // Validate the entire mapping before a PDF is written. A filtered subset's enumerated
+        // position is not its slot in `jobs`; using it would report or overwrite the wrong file.
+        let indices = files.map(\.jobIndex)
+        guard Set(indices).count == total,
+              files.allSatisfy({ jobs.indices.contains($0.jobIndex)
+                  && jobs[$0.jobIndex].sourceURL == $0.url }) else {
+            statusMessage = "The PDF inputs no longer match their jobs. Nothing was re-OCR'd."
+            return
+        }
         let ocrRun = Self.ocrCallValues(for: runConfig)
         let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
         let pdfMB = pdfSettings.imageMB
@@ -289,30 +298,24 @@ extension OCRProcessor {
         let localAgentDisplayName = localAgent?.provenanceDisplayName
         let localAgentModelName = localAgent?.provenanceModelName
 
-        for (index, pdfURL) in files.enumerated() {
+        for (ordinal, input) in files.enumerated() {
             guard !Task.isCancelled else { cleanupTempFiles(); return }
+            let index = input.jobIndex
+            let pdfURL = input.url
             jobs[index].status = .processing
             statusMessage = "Rendering \(pdfURL.lastPathComponent)…"
 
             // 1. Render every page to a temp JPEG. nil = render failure; renderAllPages fails loud
             //    (no partial set) so we never silently drop an archival page.
             guard let pageImages = PDFToImageConverter.renderAllPages(of: pdfURL), !pageImages.isEmpty else {
-                // WHY THIS SETS AN errorMessage (2026-07-29 bug fix). This route is chosen when the run
-                // contains ANY multi-page PDF (`OCRProcessor+Pipeline.swift` `autoReOCR`), so a non-PDF
-                // sibling — an ordinary .jpg — lands here too and `renderAllPages` returns nil for it
-                // (`PDFDocument(url:)` is nil for a JPEG). The route's comment says such a sibling "fails
-                // render loudly", but it did NOT: leaving `result.errorMessage` nil makes the UI render
-                // `ItemState.ocrEmpty` -> **"No OCR text"** (`OCRView+FileRowView.swift:99`), which blames
-                // the model for what is actually a routing skip, and no output file is written. An owner hit
-                // exactly this: two .jpg files dropped alongside one 3-page PDF vanished with "No OCR text".
-                // Setting a precise, actionable reason is what makes the documented "loudly" true.
+                // Keep a precise reason if a future caller sends a non-PDF here. W22 normally filters
+                // those inputs into the standard path; a direct misuse must still fail visibly.
                 let isPDF = pdfURL.pathExtension.lowercased() == "pdf"
                 let reason = isPDF
                     ? "This PDF could not be rendered, so it was not re-OCR'd. The file may be corrupt, "
                       + "encrypted, or password-protected."
-                    : "Skipped: not a PDF. This run also contained a multi-page PDF, which routes the whole "
-                      + "run through the multi-page re-OCR transform — a path that can only process PDFs. "
-                      + "Process images in a separate run (or remove the multi-page PDF from this one)."
+                    : "Skipped: not a PDF. This input reached the multi-page PDF re-OCR transform, which "
+                      + "accepts only PDFs. The standard image path must process it."
                 jobs[index].result = OCRResult(text: nil, classification: nil,
                                                errorMessage: reason,
                                                errorCode: isPDF ? "pdf_render_failed" : "not_a_pdf_in_reocr_run")
@@ -321,7 +324,7 @@ extension OCRProcessor {
                 statusMessage = isPDF
                     ? "Could not render \(pdfURL.lastPathComponent)."
                     : "Skipped \(pdfURL.lastPathComponent) — not a PDF (multi-page re-OCR run)."
-                progress = Double(index + 1) / Double(total)
+                progress = Double(ordinal + 1) / Double(total)
                 continue
             }
 
@@ -351,7 +354,7 @@ extension OCRProcessor {
                     )
                 }
                 pageResults.append(result)
-                progress = (Double(index) + Double(p + 1) / Double(pageImages.count)) / Double(total)
+                progress = (Double(ordinal) + Double(p + 1) / Double(pageImages.count)) / Double(total)
             }
 
             // 3+4. Build a per-page (image + text) PDF for each page, then merge them into ONE
@@ -425,8 +428,8 @@ extension OCRProcessor {
                 jobs[index].status = .failed
                 if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
             }
-            progress = Double(index + 1) / Double(total)
-            statusMessage = "Processed \(index + 1)/\(total) PDF\(total == 1 ? "" : "s")…"
+            progress = Double(ordinal + 1) / Double(total)
+            statusMessage = "Processed \(ordinal + 1)/\(total) PDF\(total == 1 ? "" : "s")…"
         }
         cleanupTempFiles()
     }
@@ -599,7 +602,8 @@ extension OCRProcessor {
         reviewDocumentSegmentation: Bool = false,
         customPrompt: String? = nil,
         imageScale: Double = 1.0,
-        runConfig: SessionProcessingConfig? = nil
+        runConfig: SessionProcessingConfig? = nil,
+        mixedPDFOutcomes: [MixedPDFOutcome]? = nil
     ) async {
         let total = fileURLs.count
 
@@ -639,7 +643,8 @@ extension OCRProcessor {
             exportOriginals: exportOriginals,
             lifecycleVersion: PendingBatch.currentLifecycleVersion,
             submittedChunkIds: [], consumedChunkIds: [],
-            submissionComplete: false, completedResults: [:], completedOutputPaths: [:]
+            submissionComplete: false, completedResults: [:], completedOutputPaths: [:],
+            mixedPDFOutcomes: mixedPDFOutcomes
         )
         guard let persistedInitialBatch = Self.savePendingBatch(initialPendingBatch) else {
             statusMessage = "Could not create a safe paid-batch journal. No batch requests were sent."
