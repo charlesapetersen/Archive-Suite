@@ -327,7 +327,8 @@ macOS/Sources/ArchiveNotes/
                                    toggle, NotesWindowAccessor window-size persistence; owns a per-window
                                    NotesNavigationModel (@StateObject seeded from window kind); item pane =
                                    kind Picker + NotesTableView, detail = selected-item header + bounded
-                                   metadata inspector + NoteEditorPane
+                                   metadata inspector + NoteEditorPane; settled empty-library, empty-folder,
+                                   and no-match guidance over the list (W9.d8)
                                    (W6-S3); .task bootstraps the store. Toolbar "New" menu (New \(kind) ⌘N
                                    from nearest-ancestor template + New from Template ▸ matching kind); item
                                    pane swaps to TemplatesManagerView in templates mode (W6-S6). Hosts the

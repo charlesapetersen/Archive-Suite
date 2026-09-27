@@ -801,6 +801,44 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "the probe should publish the completion token once the initial index build settles")
     }
 
+    /// W9.d8 — An actually empty folder gets a different explanation from an empty filtered
+    /// result, and neither overlays a populated list. Inbox is empty in the generated fixture.
+    func testW9D8_EmptyFolderAndNoMatchesExplainTheResult() throws {
+        try withFixture {
+            XCTAssertTrue(waitForIndexReady(timeout: 30))
+            let window = mainWindow
+            let folders = window.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
+            let inbox = folders.matching(NSPredicate(format: "value ==[c] %@", "Inbox")).firstMatch
+            XCTAssertTrue(inbox.waitForExistence(timeout: 10), "the fixture's empty Inbox should be visible")
+            inbox.click()
+
+            let emptyFolder = window.descendants(matching: .any)["an.list.empty.folder"]
+            XCTAssertTrue(emptyFolder.waitForExistence(timeout: 10), "the empty folder should explain itself")
+            XCTAssertFalse(window.descendants(matching: .any)["an.list.empty.matches"].exists)
+
+            let allNotes = window.descendants(matching: .any)
+                .matching(identifier: "an.sidebar.allNotes")
+                .matching(NSPredicate(format: "value ==[c] %@", "All Notes")).firstMatch
+            XCTAssertTrue(allNotes.waitForExistence(timeout: 5))
+            allNotes.click()
+            let seeded = window.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"]
+            XCTAssertTrue(seeded.waitForExistence(timeout: 10))
+            XCTAssertFalse(emptyFolder.exists, "populated lists should show the table without an overlay")
+
+            let search = window.textFields["an.filter.search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 5))
+            search.click()
+            search.typeText("unlikelyw9d8searchterm")
+            let noMatches = window.descendants(matching: .any)["an.list.empty.matches"]
+            XCTAssertTrue(noMatches.waitForExistence(timeout: 15), "zero search results need a distinct message")
+
+            let attachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = "W9.d8-no-matches"
+            attachment.lifetime = .keepAlways
+            XCTContext.runActivity(named: "Capture the empty result view") { $0.add(attachment) }
+        }
+    }
+
     /// G1 — Create a note (⌘N / the New menu) → a new `items/<uuid>/<Title>.md` appears on disk.
     func testG1_CreateNoteWritesNewItemFile() throws {
         try withFixture { try runG1_CreateNoteWritesNewItemFile() }

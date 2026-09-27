@@ -254,10 +254,51 @@ private struct ItemListPane: View {
                         buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) }  // W6-S5
                     )
                     .accessibilityIdentifier("an.list.table")
+                    .overlay {
+                        // Wait for the first index pass so an empty table during startup does not
+                        // announce an empty library. The table stays mounted for stable selection
+                        // and column state when the result set changes.
+                        if model.isIndexReady && model.indexFailure == nil && nav.displayed.isEmpty {
+                            emptyState
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color(nsColor: .textBackgroundColor))
+                        }
+                    }
                 }
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    @ViewBuilder private var emptyState: some View {
+        if model.allItems.isEmpty {
+            ContentUnavailableView("No notes or extracts yet", systemImage: "note.text",
+                                   description: Text("Use New in the toolbar to create one."))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("an.list.empty.library")
+        } else if let folder = selectedNormalFolder, folder.itemCount == 0 {
+            ContentUnavailableView("Nothing in this folder", systemImage: "folder",
+                                   description: Text("Create an item here or move one into this folder."))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("an.list.empty.folder")
+        } else {
+            ContentUnavailableView("No matches", systemImage: "line.3.horizontal.decrease.circle",
+                                   description: Text("Change the folder, kind, filters, or search to see more items."))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("an.list.empty.matches")
+        }
+    }
+
+    private var selectedNormalFolder: NotesFolderNode? {
+        guard let id = model.selectedFolderId else { return nil }
+        func find(_ nodes: [NotesFolderNode]) -> NotesFolderNode? {
+            for node in nodes {
+                if node.id == id { return node }
+                if let child = find(node.children) { return child }
+            }
+            return nil
+        }
+        return find(model.normalTree)
     }
 }
 

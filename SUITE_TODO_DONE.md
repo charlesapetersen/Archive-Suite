@@ -257,6 +257,14 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d8 — empty Notes list and folder guidance [S].** **SHIPPED 2026-09-27
+  (this commit).** Once indexing settles, an empty list explains whether the library has no items,
+  the selected normal folder has no members, or the current scope/filter/search has no matches.
+  A failed index does not masquerade as an empty library. The table stays mounted so selection and
+  column state survive a transition back to results. Verification: Notes Debug build and headless
+  unit smoke; focused off-screen scratch UI check for empty Inbox and zero search results.
+  | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/Views/NotesBrowserView.swift,Tests/ArchiveNotesUITests/NotesGUITests.swift}, ArchiveNotes/{CLAUDE,KNOWN_ISSUES}.md, execution-plans/archive-notes/09-gap-closure.md | S | low | done
+
 - [x] **W9.d7 — raw→styled parse failure stays in raw mode [S].** **SHIPPED 2026-09-27
   (this commit).** The shared Markdown parser reports a hard failure to the mode switch. On failure,
   the editor keeps its raw buffer and restores the raw toggle, while the note or template pane shows

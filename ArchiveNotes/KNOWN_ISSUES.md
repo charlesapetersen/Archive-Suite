@@ -3,6 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d8) — empty Notes lists gave no explanation
+
+**2026-09-27.** The list now explains an empty library, a truly empty normal folder, or no
+results for the current scope and filters. It waits for the initial index pass and suppresses
+the empty-library message if the index failed. The existing table remains mounted. Notes build,
+headless smoke, and a focused off-screen scratch check cover the empty Inbox and zero search
+results; no real store or corpus was used.
+
 ## ✅ FIXED (W9.d7) — hard Markdown parse failure silently entered styled mode
 
 **2026-09-27.** The raw-to-styled switch now checks the parser's hard-failure result before
