@@ -651,6 +651,47 @@ reinforces the soft rule: the daemon's `--disallowedTools` blocks the **direct**
 process like `bash release/build-suite-dmg.sh` could still reach `hdiutil`), so the prompt rule — *leave
 release work for the owner* — is the primary control.
 
+## Paced review session (moved out of the resume prompt 2026-09-28)
+
+Paced reviews are paused, so every session skips this. It is the procedure a session follows when
+`next-review-unit.sh` prints `UNIT=… PATHS=…`, kept here verbatim from the resume prompt's old STEP 2.0 so the
+prompt does not carry ~3 KB of dead text into every session:
+
+```
+STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `ops/autonomous/next-review-unit.sh`.
+  ⏸ PAUSED (owner directive 2026-07-29): paced code reviews are DISABLED at the source — the script's master
+  switch makes it ALWAYS report `none due` / exit 3, so in practice this step is a no-op and you go straight to
+  STEP 2. Reason: the 2026-07-29 Codex full-suite review already filed 24 confirmed findings as SUITE_TODO
+  **Wave 23**; the daemon's job now is DRAINING those, not discovering more. Keep running the script anyway
+  (one cheap call, and the switch can be flipped back without editing this prompt) — but do NOT try to "help"
+  by running the `lean-review` / `review-sweep` skills or any ad-hoc review fan-out on your own initiative
+  while this is paused. If you think a review is genuinely needed, say so in Daemon Report and move on. The
+  rest of this step is the still-correct procedure for when it is re-enabled.
+  * `none due …` (exit 3) → skip this step; go to STEP 2. (Currently ALWAYS this — see the pause above.)
+  * `UNIT=… PATHS=… …` → a paced re-review is DUE, and THAT is your ONE item this session (do NOT also pick a
+    queue item). It is a normal item: it flows through the SAME steps as anything else — STEP 3 makes your
+    fresh WORKTREE, STEP 4 commits **and pushes**, STEP 5/6 record + stop. Do NOT edit or commit in the
+    primary checkout. Its item-specific actions:
+      - In your worktree, run the `lean-review` skill on that ONE unit (unit + PATHS; dimensions per REVIEW.md).
+        REVIEW.md's method: ONE unit, ~6 finders + refute-verify. NEVER a whole-project fan-out (blows a window).
+      - READ-ONLY: a review FILES findings, it does NOT fix them. For each CONFIRMED (refute-verified) finding,
+        append a `[ ]` fix item to SUITE_TODO.md / KNOWN_ISSUES.md (the `W3.f1…` pattern) — these tracked edits
+        are your STEP-4 commit+push. A HIGH finding on an irreversible path (Capture/Net/finalize,
+        TagWriter/file-safety, the tag/PDF SPEC) is filed as an ORDINARY `[ ]` work item — **do NOT route it to
+        the HOLD queue** (owner, 2026-08-13: TIER-2 IS THE GATE, `AGENTS.md` §*Gating baseline*; that routing is
+        what left five items parked for weeks). Only a real-corpus write, a Tier-3 release, or something only
+        the owner can do still goes to HOLD. Note it is Tier-2 in the item so whoever fixes it knows.
+        Still true either way: no code fixes in a review session.
+      - The report file + the cadence stamp are gitignored state in the PRIMARY checkout — write them by
+        ABSOLUTE path (like the plan), NOT in your worktree: report → `<REPO>/.maintenance/review/<unit>.md`;
+        then in STEP 5 run `ops/autonomous/next-review-unit.sh --record "<unit>"` so the cadence advances.
+  WS4 interaction (accurate): a review session commits fix-ITEMS (new `[ ]`), not a completion (`[x]`), so the
+  WS4 attempt-cap counts it as ONE no-completion session. It's cadence-gated (≤ ~1 per AUTONOMOUS_REVIEW_EVERY
+  commits) and feature work between reviews resets the streak, so a review can't trip the cap on its own — but
+  if the run is ALREADY near the cap on a genuinely stuck item, a review could be the session that trips the
+  (correct) park; that's acceptable.
+```
+
 ## Model & effort — one fixed choice, plus per-task subagent sizing (2026-07-31)
 
 Every resume session launches as **`--model opus --fallback-model sonnet --effort medium`**

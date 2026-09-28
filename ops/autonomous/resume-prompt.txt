@@ -57,41 +57,14 @@ STEP 1.5 — DOC BUDGET FIX (only when the daemon has asked for one — it PREEM
   a usage cutoff, a watchdog — costs nothing and does not push the run toward a park).
   Verify before you delete it (instant, pure shell):  ./ops/autonomous/context-budget.sh
 
-STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `ops/autonomous/next-review-unit.sh`.
-  ⏸ PAUSED (owner directive 2026-07-29): paced code reviews are DISABLED at the source — the script's master
-  switch makes it ALWAYS report `none due` / exit 3, so in practice this step is a no-op and you go straight to
-  STEP 2. Reason: the 2026-07-29 Codex full-suite review already filed 24 confirmed findings as SUITE_TODO
-  **Wave 23**; the daemon's job now is DRAINING those, not discovering more. Keep running the script anyway
-  (one cheap call, and the switch can be flipped back without editing this prompt) — but do NOT try to "help"
-  by running the `lean-review` / `review-sweep` skills or any ad-hoc review fan-out on your own initiative
-  while this is paused. If you think a review is genuinely needed, say so in Daemon Report and move on. The
-  rest of this step is the still-correct procedure for when it is re-enabled.
-  * `none due …` (exit 3) → skip this step; go to STEP 2. (Currently ALWAYS this — see the pause above.)
-  * `UNIT=… PATHS=… …` → a paced re-review is DUE, and THAT is your ONE item this session (do NOT also pick a
-    queue item). It is a normal item: it flows through the SAME steps as anything else — STEP 3 makes your
-    fresh WORKTREE, STEP 4 commits **and pushes**, STEP 5/6 record + stop. Do NOT edit or commit in the
-    primary checkout. Its item-specific actions:
-      - In your worktree, run the `lean-review` skill on that ONE unit (unit + PATHS; dimensions per REVIEW.md).
-        REVIEW.md's method: ONE unit, ~6 finders + refute-verify. NEVER a whole-project fan-out (blows a window).
-      - READ-ONLY: a review FILES findings, it does NOT fix them. For each CONFIRMED (refute-verified) finding,
-        append a `[ ]` fix item to SUITE_TODO.md / KNOWN_ISSUES.md (the `W3.f1…` pattern) — these tracked edits
-        are your STEP-4 commit+push. A HIGH finding on an irreversible path (Capture/Net/finalize,
-        TagWriter/file-safety, the tag/PDF SPEC) is filed as an ORDINARY `[ ]` work item — **do NOT route it to
-        the HOLD queue** (owner, 2026-08-13: TIER-2 IS THE GATE, `AGENTS.md` §*Gating baseline*; that routing is
-        what left five items parked for weeks). Only a real-corpus write, a Tier-3 release, or something only
-        the owner can do still goes to HOLD. Note it is Tier-2 in the item so whoever fixes it knows.
-        Still true either way: no code fixes in a review session.
-      - The report file + the cadence stamp are gitignored state in the PRIMARY checkout — write them by
-        ABSOLUTE path (like the plan), NOT in your worktree: report → `<REPO>/.maintenance/review/<unit>.md`;
-        then in STEP 5 run `ops/autonomous/next-review-unit.sh --record "<unit>"` so the cadence advances.
-  WS4 interaction (accurate): a review session commits fix-ITEMS (new `[ ]`), not a completion (`[x]`), so the
-  WS4 attempt-cap counts it as ONE no-completion session. It's cadence-gated (≤ ~1 per AUTONOMOUS_REVIEW_EVERY
-  commits) and feature work between reviews resets the streak, so a review can't trip the cap on its own — but
-  if the run is ALREADY near the cap on a genuinely stuck item, a review could be the session that trips the
-  (correct) park; that's acceptable.
+STEP 2.0 — REVIEW CADENCE: run `ops/autonomous/next-review-unit.sh`. Paced reviews are PAUSED (owner,
+  2026-07-29, re-confirmed 2026-08-01), so it prints `none due` and exits 3: go to STEP 2. Do not run the
+  `lean-review` / `review-sweep` skills or any review fan-out on your own initiative; if a review seems needed,
+  say so in Daemon Report. If it ever prints `UNIT=… PATHS=…`, the review is your ONE item: follow
+  ops/autonomous/README.md §"Paced review session" and REVIEW.md.
 
 STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to bottom. If it's a multi-pass
-  loop (Wave 1 E2E; Wave 3 review), do ONE pass / ONE unit, not the whole loop.
+  loop, do ONE pass / ONE unit, not the whole loop.
   DEPENDENCY GATING (WS9): an item may name a prerequisite as `(blocked-on: <tag>[, <tag>…])` in its line —
   do NOT pick it until EVERY listed prerequisite item is `[x]`. Run `ops/autonomous/next-queue-item.sh`: it
   prints each "[ ]" WORK QUEUE item in priority order as `ok<TAB><tag><TAB>text` or
@@ -133,10 +106,12 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   there is nothing autonomously actionable — STOP (the idle backoff/park handles it). (A hard
   backstop also blocks the most dangerous outward actions — `hdiutil`, `gh release` — at the tool layer, so a
   misread can't publish a release; but the point is to LEAVE the work for the owner, not to lean on the deny.)
-  GUI items that RUN UITests (e.g. Reader **W7.6**, Notes **W8-S8**) are NOT gated — verify them OFF the owner's
-  screen in the Tart VM (STEP 3.5), so pick them like any other item. Live-Capture **Wave 1 E2E** likewise runs
-  on the Android emulator (the harness is "emulator only, never a physical phone" — unattended), so it needs no
-  flag or owner either. The VM + emulator make all GUI/capture work screen-free; there is no "GUI off" case left.
+  OWNER-PENDING ITEM: if the item you picked needs an owner decision before it can go on (an "X or Y?" the
+  owner must answer), do not leave it bare `[ ]` — the resolver would offer it to every later session. Add
+  `(blocked-on: <TAG>-owner-ok)` to its line in the plan's WORK QUEUE (that is what the resolver reads; mirror it
+  into SUITE_TODO.md in your next commit) and a `- [ ] **<TAG>-owner-ok — OWNER GATE for
+  <TAG>: <the question>**` line under the plan's `## HOLD QUEUE` (the W16 pattern; the owner ticks it on
+  answering), write the question in Daemon Report, and go back to STEP 2 in this session.
   CONTINUE, don't restart: before starting, `git log --oneline --grep='<item-tag>' -20` (items carry stable
   tags — W4-S7, W5.d1, …) for prior commits on THIS item. First rule out ALREADY-DONE: if SUITE_TODO's box for
   it is "[x]", or a FINAL (non-"checkpoint") commit for it is already on origin/main, a prior session finished
@@ -203,8 +178,10 @@ STEP 3.5 — GUI-VERIFY — OFF the owner's screen, no flag (GUI is unattended n
   suites are screen-free — do not "fix" that by reintroducing a window.
 
 STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --rebase origin main`, then
-  commit + push. This completing commit MUST also flip the shipped SUITE_TODO.md checkbox (cite the sha)
-  and/or update the relevant KNOWN_ISSUES.md IN THE SAME COMMIT (a Stop hook blocks the turn otherwise).
+  commit + push. This completing commit MUST also MOVE the item's whole entry from SUITE_TODO.md to
+  SUITE_TODO_DONE.md under the matching heading, as `- [x] **<TAG> — <title>** … SHIPPED <date>` (tag bare, no
+  backticks; a `[x]` left in SUITE_TODO.md fails check-todo-stubs.sh), and/or update the relevant
+  KNOWN_ISSUES.md, IN THE SAME COMMIT (a Stop hook blocks the turn otherwise).
   Edge cases (the ack file is read from the PRIMARY checkout — use its absolute path, NOT a worktree-relative
   one): a change that ships no tracked item at all (infra) →
   `touch "__REPO__/.docsync-ok"`. If you must stop with the item only PARTIALLY
@@ -243,15 +220,9 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
 STEP 6 — STOP — after COMPLETING the item (or if genuinely interrupted/blocked). Never stop voluntarily
   mid-item, and never pick up a second item.
 
-ITEM-SPECIFIC NOTES:
-  * Wave 1 E2E: run `caffeinate -di "__REPO__/ArchiveProcessor/scripts/e2e-phone-mac.sh"`.
-    The OCR key is exported as $OCR_KEY (from ~/.local/state/archive-autonomous/ocr-key.env); if that's empty,
-    the harness falls back to the Keychain. Artifacts land in /tmp/ap-e2e-*. Copy REPORT.txt + the tail of
-    mac.log into the plan's "E2E findings" section and turn each failure into a W1.x fix item. Fixing E2E bugs
-    in Capture/·Net/ is Tier-2.
-  * Wave 3 review: run the paced method in REVIEW.md — ONE unit via
-    Workflow({name:'lean-review', args:{unit, paths}}), write .maintenance/review/<unit>.md, triage confirmed
-    findings, mark the unit done in .maintenance/REVIEW_PROGRESS.md. Never run the retired 15-finder monolith.
+ITEM-SPECIFIC NOTE — Live-Capture E2E: `caffeinate -di "__REPO__/ArchiveProcessor/scripts/e2e-phone-mac.sh"`
+  (Android emulator only; the OCR key is $OCR_KEY, else the Keychain; artifacts land in /tmp/ap-e2e-*). Copy
+  REPORT.txt + the tail of mac.log into the plan's "E2E findings" and turn each failure into a W1.x fix item (Tier-2 if in Capture/·Net/).
 
 SUBAGENTS (owner, 2026-09-28, as in vision-ocr: use more of them). Beyond the Tier-2 adversarial review, hand a
   subagent any piece of the item that can run on its own and would otherwise cost a long stretch of your own
@@ -280,8 +251,8 @@ USAGE WINDOW (owner, 2026-09-28). The account's five-hour usage window is shared
 
 EFFICIENCY + SUBAGENT SIZING: right-size subagents and read narrowly. Don't spawn an agent for a single
   known-location lookup, and never re-run a search you already delegated.
-  YOUR OWN model and effort are fixed before you start (opus, at the effort the daemon passed — default `medium`
-  since 2026-09-24; you cannot change either mid-session). Each SUBAGENT's is YOURS TO CHOOSE, per task, and the
+  YOUR OWN model and effort are fixed before you start (opus, at the effort the daemon passed; you cannot
+  change either mid-session). Each SUBAGENT's is YOURS TO CHOOSE, per task, and the
   owner wants you to choose it deliberately. Optimize for the BEST OUTCOME on this item, not the cheapest run:
   `--max-budget-usd` already bounds the cost, so under-powering a verification agent buys you nothing you're
   allowed to want and can let a bug through into a path with no undo.

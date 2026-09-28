@@ -38,6 +38,11 @@ mkwt e-unpushed    wt/feature-unpushed                               # clean but
 ( cd "$REPO/../e-unpushed" && echo n > n.txt && git add -A && git commit -qm wip )
 mkwt f-auto-dirty  wt/autonomous-x2                                   # untracked non-ignored -> kept
 echo untracked > "$REPO/../f-auto-dirty/new.txt"
+# codex/* (2026-09-28): Codex works the queue with the daemon stopped and names its branches codex/<slug>-<stamp>.
+mkwt g-codex       codex/w9-d1-x                                      # merged+clean codex    -> removed
+mkwt h-codex-dirty codex/w9-d12a-x                                    # merged+dirty codex    -> kept
+echo mod >> "$REPO/../h-codex-dirty/.gitignore"
+mkwt i-other       feature/keep-me                                    # other namespace       -> kept
 
 # extract & source the actual function; stub the daemon logger
 awk '/^housekeeping\(\) \{/{f=1} f{print} /^\}/{if(f)exit}' "$SRC" > "$ROOT/hk.fn"
@@ -55,6 +60,13 @@ gone c-buildonly "improvised slug, merged, only gitignored build/"
 kept d-dirty     "merged but dirty tracked file"
 kept e-unpushed  "clean but unpushed (merged gate)"
 kept f-auto-dirty "untracked non-ignored file"
+gone g-codex     "codex/* slug, merged+clean"
+kept h-codex-dirty "codex/* slug, merged but dirty (Codex's work in progress)"
+kept i-other     "a branch outside wt/* and codex/* is never touched"
+git -C "$REPO" rev-parse --verify --quiet refs/heads/codex/w9-d1-x >/dev/null \
+  && { echo "FAIL: merged codex/* branch not deleted"; fail=1; } || echo "PASS: merged codex/* branch deleted"
+git -C "$REPO" rev-parse --verify --quiet refs/heads/feature/keep-me >/dev/null \
+  && echo "PASS: feature/* branch kept" || { echo "FAIL: feature/* branch deleted"; fail=1; }
 [ -e "$REPO/.git" ] && echo "PASS: primary checkout untouched" || { echo "FAIL: primary checkout gone"; fail=1; }
 echo; [ $fail -eq 0 ] && echo "prove-housekeeping: ALL PASSED" || echo "prove-housekeeping: FAILURES"
 exit $fail

@@ -246,21 +246,22 @@ DENY=(
 # (`mkdir -p "$STATE"` moved below the SOURCE GUARD — W32.source-guard. Nothing above the guard writes to
 # $STATE: every function here is defined, not called, and log() only runs inside the loop.)
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
-# usage_row KIND START END EFFORT RC FIRST PEAKS CUT — append to $USAGE_LOG, header first. Ported from vision-ocr.
+# usage_row KIND START END EFFORT RC FIRST PEAKS CUT [COST TURNS END] — append to $USAGE_LOG, header first.
+# Ported from vision-ocr; the last three columns (from the session's result event) are this copy's addition.
 # FIRST is the first window reading "PCT RESET". PEAKS is the highest reading of each window the session saw,
 # "PCT RESET" pairs separated by ";" (a session that spans a reset saw two). A `wait` row passes the reading
 # that caused the wait as FIRST and no PEAKS. A session with no readings leaves both blank.
 usage_row() {
-  local k="$1" t0="$2" t1="$3" eff="$4" rc="$5" f="$6" pk="$7" cut="$8" fp fr peaks=""
+  local k="$1" t0="$2" t1="$3" eff="$4" rc="$5" f="$6" pk="$7" cut="$8" cost="${9:-}" turns="${10:-}" ended="${11:-}" fp fr peaks=""
   read -r fp fr <<< "$f"
   if [ -n "$pk" ]; then
     peaks="$(printf '%s\n' "$pk" | tr ';' '\n' | while read -r p r; do
       [ -n "$r" ] && printf '%s%% (resets %s), ' "$p" "$(date -r "$r" '+%H:%M')"; done)"; peaks="${peaks%, }"
   fi
-  [ -s "$USAGE_LOG" ] || printf 'kind\tstart\tend\tminutes\teffort\trc\tfirst_pct\tfirst_reset\twindow_peaks\tcut\n' > "$USAGE_LOG"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$(date -r "$t0" '+%F %H:%M')" "$(date -r "$t1" '+%F %H:%M')" \
+  [ -s "$USAGE_LOG" ] || printf 'kind\tstart\tend\tminutes\teffort\trc\tfirst_pct\tfirst_reset\twindow_peaks\tcut\tcost_usd\tturns\tended\n' > "$USAGE_LOG"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$(date -r "$t0" '+%F %H:%M')" "$(date -r "$t1" '+%F %H:%M')" \
     "$(( (t1 - t0 + 30) / 60 ))" "$eff" "$rc" "${fp:-}" "${fr:+$(date -r "$fr" '+%H:%M')}" \
-    "$peaks" "$cut" >> "$USAGE_LOG" 2>/dev/null || true
+    "$peaks" "$cut" "$cost" "$turns" "$ended" >> "$USAGE_LOG" 2>/dev/null || true
 }
 
 # WS5 — regenerate the one-screen $STATE/STATUS.md digest. Cheap (greps + git log + df), read-only, never
@@ -1023,16 +1024,16 @@ housekeeping() {
   cd "$REPO" 2>/dev/null || return 0
   git rev-parse --verify --quiet origin/main >/dev/null 2>&1 || return 0   # no ref yet -> nothing to compare
   git worktree prune 2>/dev/null || true                                   # drop admin entries for gone dirs
-  local dir ref br removed=0 skipped=0 delbr=0
+  local dir ref br removed=0 skipped=0 delbr=0 left=""
   # Phase 1: remove SPENT worktrees with a PLAIN remove (never --force) — git refuses if there is any
   # uncommitted/untracked content, which is exactly the safety we want. Must precede branch deletion (git
   # won't delete a branch still checked out in a worktree).
   while IFS=$'\t' read -r dir ref; do
     [ -n "$dir" ] || continue
     [ "$dir" = "$REPO" ] && continue                                       # never the primary checkout
-    case "$ref" in refs/heads/wt/*) ;; *) continue ;; esac                  # all wt/* slugs (see SCOPE above)
+    case "$ref" in refs/heads/wt/*|refs/heads/codex/*) ;; *) continue ;; esac  # wt/* and codex/* (see SCOPE)
     git merge-base --is-ancestor "$ref" origin/main 2>/dev/null || continue # only provably-pushed work
-    if git worktree remove "$dir" 2>/dev/null; then removed=$((removed+1)); else skipped=$((skipped+1)); fi
+    if git worktree remove "$dir" 2>/dev/null; then removed=$((removed+1)); else skipped=$((skipped+1)); left="$left $dir"; fi
   done < <(git worktree list --porcelain \
              | awk '/^worktree /{w=substr($0,10)} /^branch /{print w"\t"substr($0,8)}')
   git worktree prune 2>/dev/null || true
@@ -1042,12 +1043,20 @@ housekeeping() {
   # drops no unpushed commit (plain -d would refuse these because local main lags origin/main).
   while read -r br; do
     [ -n "$br" ] || continue
-    case "$br" in wt/*) ;; *) continue ;; esac
+    case "$br" in wt/*|codex/*) ;; *) continue ;; esac
     git merge-base --is-ancestor "$br" origin/main 2>/dev/null || continue
     git branch -D "$br" 2>/dev/null && delbr=$((delbr+1))
-  done < <(git for-each-ref --format='%(refname:short)' refs/heads/wt/ 2>/dev/null)
+  done < <(git for-each-ref --format='%(refname:short)' refs/heads/wt/ refs/heads/codex/ 2>/dev/null)
   [ $((removed + delbr)) -gt 0 ] && log "housekeeping: GC'd $removed spent worktree(s), $delbr merged branch(es)"
-  [ "$skipped" -gt 0 ] && log "housekeeping: left $skipped merged-but-dirty/in-use worktree(s) for manual review"
+  # Logged only when the SET of refused worktrees changes (2026-09-28): the same line was 1,341 of daemon.log's
+  # lines (21%) between 8 Jul and 13 Aug, repeating an unchanged list every cycle. Keyed on the list, not the
+  # count, so a new dirty worktree replacing an old one is still reported.
+  local hk_last="${STATE:+$STATE/housekeeping.skipped}" prev=""
+  [ -n "$hk_last" ] && prev="$(cat "$hk_last" 2>/dev/null)"
+  if [ "$left" != "$prev" ]; then
+    [ "$skipped" -gt 0 ] && log "housekeeping: left $skipped merged-but-dirty/in-use worktree(s) for manual review:$left"
+    [ -n "$hk_last" ] && printf '%s' "$left" > "$hk_last" 2>/dev/null
+  fi
   return 0
 }
 
@@ -1426,10 +1435,19 @@ tick() {
   kill "$wpid" "$cwpid" 2>/dev/null; wait "$wpid" "$cwpid" 2>/dev/null
   log "resume session exited rc=$rc"
   # Best-effort readable mirror of the final result for Daemon Report (jq present -> extract; else skip).
+  # Cost, turns and how the session ended, from the stream-json result event (2026-09-28). August's log could
+  # not say what any session cost, nor whether a long rc=1 session hit --max-budget-usd or the usage window.
+  local s_cost="" s_turns="" s_end=""
   if command -v jq >/dev/null 2>&1; then
     jq -rc 'select(.type=="result") | (.result // .error // empty)' "$SLOG" 2>/dev/null \
       | tail -1 > "$STATE/last-session.txt" 2>/dev/null || true
+    # `ended` is subtype/terminal_reason[/error]: a usage-limited session reports subtype "success" with
+    # terminal_reason "api_error" and is_error true (13 Aug log), so subtype alone would call it a success.
+    read -r s_cost s_turns s_end < <(jq -rR 'fromjson? | select(.type=="result")
+      | "\(.total_cost_usd // "-") \(.num_turns // "-") \(.subtype // "-")/\(.terminal_reason // "-")\(if .is_error then "/error" else "" end)"' \
+      "$SLOG" 2>/dev/null | tail -1) || true
   fi
+  log "session cost \$${s_cost:--}, ${s_turns:--} turns, ended ${s_end:-without a result event}"
 
   # Progress verdict — DERIVED, not self-reported (see the idle-backoff block above): progress is the
   # decision surface actually MOVING, independent of exit code. Deliberately NOT gated on rc==0: a session
@@ -1463,7 +1481,7 @@ tick() {
     "$(printf '%s\n' "$u_all" | head -1)" \
     "$(printf '%s\n' "$u_all" | awk 'NF==2{if(!($2 in m)){o[++n]=$2; m[$2]=$1} else if($1>m[$2]) m[$2]=$1}
                                     END{for(i=1;i<=n;i++) printf "%s%s %s", (i>1?";":""), m[o[i]], o[i]}')" \
-    "$( [ "$w_cutoff" = 1 ] && echo cut)"
+    "$( [ "$w_cutoff" = 1 ] && echo cut)" "${s_cost:-}" "${s_turns:-}" "${s_end:-}"
   if [ -n "$fp_after" ] && [ "$fp_after" != "$fp_before" ]; then
     note_progress               # work happened -> fast cadence (independent of WS4)
     # WS4: work happened, but did an ITEM complete, or is this the Nth checkpoint on a stuck item? A session the

@@ -33,10 +33,13 @@ trap 'rm -f "$LOG"' EXIT
 # The owner-facing park note and ARCHIVE-SUITE-RUN-PARKED.txt are built from this text, so the one artifact
 # naming the failure showed a step that had passed. Same family as the `step_skippable` bug below: a gate
 # that misreports what it did is worse than a gate that says less.
+# Per-step wall time (2026-09-28): the gate grew from 13 to 38 min over August and nothing said which step
+# grew. Each step prints a `⏱ <name> <s>s` line after its verdict, and the run ends with the total.
+_gate_t0=$SECONDS
 step() {
   local name="$1"; shift
   printf '── %s ──\n' "$name"
-  local out; out="$(mktemp)"
+  local out _t=$SECONDS; out="$(mktemp)"
   if "$@" >"$out" 2>&1; then
     echo "  ✓ $name"
   else
@@ -44,6 +47,7 @@ step() {
     echo "  ✗ $name (rc=$rc)"; fails="$fails $name"
     { printf '\n===== %s (rc=%s) =====\n' "$name" "$rc"; tail -40 "$out"; } >>"$LOG"
   fi
+  echo "  ⏱ $name $(( SECONDS - _t ))s"   # inline, not a helper: harnesses extract step()/step_skippable() alone
   rm -f "$out"
 }
 
@@ -63,7 +67,7 @@ step_skippable() {
   # anywhere in the file — including one left by an earlier step — as this step's reason. ($LOG is now
   # failures-only for the same class of reason; see step() above. Only the `*)` arm contributes to it —
   # a skip and a known-failure are both reported inline, and neither is what RED is asking about.)
-  local out; out="$(mktemp)"
+  local out _t=$SECONDS; out="$(mktemp)"
   "$@" >"$out" 2>&1; local rc=$?
   case "$rc" in
     0) echo "  ✓ $name" ;;
@@ -79,6 +83,7 @@ step_skippable() {
     *) echo "  ✗ $name (rc=$rc)"; fails="$fails $name"
        { printf '\n===== %s (rc=%s) =====\n' "$name" "$rc"; tail -40 "$out"; } >>"$LOG" ;;
   esac
+  echo "  ⏱ $name $(( SECONDS - _t ))s"   # inline, not a helper: harnesses extract step()/step_skippable() alone
   rm -f "$out"
 }
 
@@ -329,6 +334,7 @@ step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.
 # GATE-UNWATCHED-BY-DESIGN: prove-daemon.sh prove-keepalive.sh
 
 echo
+echo "gate wall time: $(( SECONDS - _gate_t0 ))s"
 if [ -n "$fails" ]; then
   echo "HEALTH GATE: RED —$fails"
   # Every FAILING step's own tail, each under its own banner — not the tail of a shared transcript, which

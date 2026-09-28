@@ -726,7 +726,7 @@ grep -q 'attempt streak' "$L" && bad "a cut-off session was counted toward the n
 grep -q 'PARKED' "$L" && bad "parked on sessions the window cut off" || ok "did not park"
 grep -q 'last session was cut off by it — waiting until' "$L" && ok "the next launch waited for the reset" || bad "launched into the window without waiting"
 [ "$(grep -c 'launching fresh' "$L")" -le 3 ] && ok "no spawn loop while waiting ($(grep -c 'launching fresh' "$L") launches in 11 s)" || bad "kept launching while waiting ($(grep -c 'launching fresh' "$L"))"
-grep -q $'^session\t.*\t92\t.*\tcut$' "$STATE/usage-window.tsv" && ok "ledger row records the reading and the cut" || bad "ledger row missing: $(cat "$STATE/usage-window.tsv" 2>/dev/null | tr '\t\n' '|/')"
+grep -qE $'^session\t.*\t92\t.*\tcut(\t|$)' "$STATE/usage-window.tsv" && ok "ledger row records the reading and the cut" || bad "ledger row missing: $(cat "$STATE/usage-window.tsv" 2>/dev/null | tr '\t\n' '|/')"
 grep -q $'^wait\t' "$STATE/usage-window.tsv" && ok "ledger records the wait" || bad "no wait row in the ledger"
 
 echo "[29b] usage window — the same checkpoint at 50% with rc=0 still counts, and nothing waits"

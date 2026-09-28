@@ -19,9 +19,13 @@ After that, "Continue" is enough to resume after an interruption.
 1. Confirm the daemon is stopped: `./ops/autonomous/daemon.sh status` must say "Not running". If it is
    running, stop here and tell the owner. Two workers on one queue take the same item. Only the owner starts
    the daemon; do not start or stop it yourself.
-2. Run `./ops/autonomous/check-handoff.sh` from the primary checkout. It must end `HANDOFF: CLEAN`. If it does
+2. Run `./ops/autonomous/tidy.sh` from the primary checkout. It does the daemon's between-cycle upkeep, which
+   does not happen while the daemon is stopped: it compacts the plan (every session reads it whole) and removes
+   worktrees whose branch is merged and whose tree is clean. From 2026-08-13 to 2026-09-28 nobody ran it; the
+   plan passed its budget and nine finished worktrees (3.7 GB) piled up in `~/Claude`.
+3. Run `./ops/autonomous/check-handoff.sh` from the primary checkout. It must end `HANDOFF: CLEAN`. If it does
    not, fix what it names before taking new work; a leftover from the last session comes first.
-3. Set up the shell the way the daemon does, so nothing you run can draw on the owner's screen. Claude's hooks
+4. Set up the shell the way the daemon does, so nothing you run can draw on the owner's screen. Claude's hooks
    do not run under Codex, so these two lines are the only guard you have:
    ```bash
    export ARCHIVE_UNATTENDED=1
@@ -73,6 +77,7 @@ After that, "Continue" is enough to resume after an interruption.
    "$primary/ops/autonomous/check-handoff.sh"
    git -C "$primary" worktree remove "../suite-wt-<slug>-$stamp"
    git -C "$primary" branch -d "codex/<slug>-$stamp"
+   "$primary/ops/autonomous/tidy.sh"
    ```
    Then go back to step 1 without asking.
 
@@ -94,8 +99,12 @@ Stop and report to the owner only when:
 - the item needs something only the owner can supply: a write to the real corpus, a release (DMG,
   `gh release`, version tag), a key, an account, a device, or a matter of taste.
 
-For that last case, append a short entry to the plan's `## Daemon Report` saying what is needed, leave the
-item `[ ]`, and continue with the next `ok` item. Stop only when nothing actionable is left. A genuine "X or
+For that last case, append a short entry to the plan's `## Daemon Report` saying what is needed, and take the
+item out of the automatic pick: add `(blocked-on: <TAG>-owner-ok)` to its line in the plan's `## WORK QUEUE`
+(the resolver reads only that; mirror it into `SUITE_TODO.md` in your next commit), and a
+`- [ ] **<TAG>-owner-ok — OWNER GATE for <TAG>: <the question>**` line under the plan's `## HOLD QUEUE`. The owner
+ticks that line on answering. Left bare `[ ]`, the item is offered to every later session (W9.d6 was, on
+2026-09-27). Then continue with the next `ok` item. Stop only when nothing actionable is left. A genuine "X or
 Y?" behaviour question is handled the same way.
 
 Being low on context or budget is not a stop reason in itself: push a checkpoint, record the remaining steps in

@@ -841,7 +841,7 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d6` — the `roundup` date field has no UI and is always false: add it or remove it [S–M].** Plan D6.
+- [ ] **`W9.d6` — the `roundup` date field has no UI and is always false: add it or remove it [S–M].** (blocked-on: W9.d6-owner-ok) Waiting on the owner: a "Round-up note" toggle or removal (asked 2026-09-27). Plan D6.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
   codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,
   FrontMatterCodec.swift | S–M | low | none

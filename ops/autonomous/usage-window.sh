@@ -11,7 +11,8 @@
 #
 # USAGE:  usage-window.sh [--raw] [LOG]    LOG defaults to $STATE/last-session.log
 # OUTPUT: "five-hour window 73% used, resets 18:10 (in 67 min)"; with --raw, "73 1790555400".
-# EXIT:   0 known · 3 no rate_limit_event in the log yet
+# EXIT:   0 known · 3 no rate_limit_event in the log yet, or (without --raw) the latest is from a window that
+#         has since reset
 set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
@@ -37,10 +38,14 @@ if [ "$raw" = 1 ]; then
   echo "$pct $reset"
 else
   label="five-hour window"; [ "$kind" = five_hour ] || label="$kind limit"
-  mins=$(( (reset - $(date +%s)) / 60 ))
-  if [ "$mins" -ge 0 ]; then
+  secs=$(( reset - $(date +%s) )); mins=$(( secs / 60 ))
+  if [ "$secs" -gt 0 ]; then
     echo "$label ${pct}% used, resets $(date -r "$reset" '+%H:%M') (in ${mins} min)"
   else
-    echo "$label ${pct}% used as of the last event; that window reset at $(date -r "$reset" '+%H:%M')"
+    # A reading from a window that has since reset says nothing about the current one. Run outside a daemon
+    # session on 2026-09-28, this printed a six-week-old "100% used", which the resume prompt would read as
+    # "no subagents". Say unknown instead, with the date, and exit 3 like a log with no event.
+    echo "$label: unknown (the last reading, ${pct}%, is from a window that reset $(date -r "$reset" '+%F %H:%M'))"
+    exit 3
   fi
 fi

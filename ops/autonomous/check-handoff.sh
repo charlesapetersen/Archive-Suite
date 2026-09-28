@@ -110,7 +110,12 @@ while IFS= read -r wt; do
       fail "worktree has $unpushed commit(s) NOT on origin/main: $wt"
       dirty_wt=1
     else
-      warn "stray worktree, clean (fine — housekeeping will GC it once merged): $wt"
+      # housekeeping (the daemon's, or tidy.sh's when the daemon is stopped) GCs only wt/* and codex/* branches.
+      case "$(git -C "$wt" symbolic-ref -q HEAD 2>/dev/null)" in
+        refs/heads/wt/*|refs/heads/codex/*)
+          warn "stray worktree, clean and merged — ops/autonomous/tidy.sh or the daemon's housekeeping removes it: $wt" ;;
+        *) warn "stray worktree, clean and merged, outside wt/* and codex/* — nothing removes it automatically: $wt" ;;
+      esac
     fi
   fi
 done < <(git -C "$ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
