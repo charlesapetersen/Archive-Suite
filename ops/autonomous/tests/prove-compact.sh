@@ -357,6 +357,31 @@ AUTONOMOUS_PLAN="$np" AUTONOMOUS_SESSION_ARCHIVE="$SANDBOX/slog-arch3.md" AUTONO
   bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/outN2.txt" 2>&1
 chk "N silent when the ceiling fits"             "! grep -q 'CEILING' '$SANDBOX/outN2.txt'"
 
+# ---------- Case P: Pass 3 — a tracker tag written in backticks (**`W.x`**) still vouches for the item ----------
+# 61 lines in SUITE_TODO_DONE.md write the tag as **`W9.b1`**. The SAFE extractor did not strip the backtick
+# (check-tracker-sync.sh does), so those shipped items were never archivable and sat in the plan forever. The
+# plan side gets the same rule, so a backticked plan line vouched for by a plain tracker line also moves. An
+# item the trackers do NOT record must still stay, backticked or not.
+op="$SANDBOX/plan.md"; rm -f "$op" "$op.bak" "$SANDBOX/wq-archP.md"
+{ printf '# P\n\nRUN STATUS: IN_PROGRESS\n\n## PRIME DIRECTIVES\n- x\n\n## RESUME PROTOCOL\n1. y\n\n## WORK QUEUE\n'
+  for i in $(seq 1 12); do printf -- '- [x] **WB.%d — shipped, tracker tag backticked.** %s\n' "$i" "$(head -c 200 /dev/zero | tr '\0' 'p')"; done
+  printf -- '- [x] **`WB.plan` — shipped, PLAN tag backticked.** %s\n' "$(head -c 200 /dev/zero | tr '\0' 'p')"
+  printf -- '- [x] **`WB.orphan` — shipped, recorded NOWHERE else.**\n'
+  printf -- '- [ ] **WBOPEN — still open.**\n'
+  printf '\n## Session Log\n- SLOG entry 1\n\n## Daemon Report\n\n(preamble)\n'
+} > "$op"
+printf '## Wave\n' > "$SANDBOX/SUITE_TODO.md"
+for i in $(seq 1 12); do printf -- '- [x] **`WB.%d`** — shipped item %d.\n' "$i" "$i" >> "$SANDBOX/SUITE_TODO.md"; done
+printf -- '- [x] **WB.plan** — shipped.\n' >> "$SANDBOX/SUITE_TODO.md"
+AUTONOMOUS_PLAN="$op" AUTONOMOUS_SESSION_ARCHIVE="$SANDBOX/slog-archP.md" AUTONOMOUS_DR_ARCHIVE="$SANDBOX/mr-archP.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$SANDBOX/wq-archP.md" WQ_MAX_BYTES=2000 \
+  bash "$SCRIPT" "$SANDBOX" >"$SANDBOX/outP.txt" 2>&1
+chk "P backticked tracker tags vouch: all 12 WB.n archived"  "[ \"\$(grep -c 'tracker tag backticked' '$SANDBOX/wq-archP.md' 2>/dev/null)\" = 12 ] && ! grep -q 'tracker tag backticked' '$op'"
+chk "P backticked PLAN tag matched a plain tracker tag"      "grep -q 'WB.plan' '$SANDBOX/wq-archP.md' 2>/dev/null && ! grep -q 'WB.plan' '$op'"
+chk "P an unrecorded backticked item stayed in the plan"     "grep -q 'WB.orphan' '$op'"
+chk "P the OPEN item stayed inline"                          "grep -q 'WBOPEN' '$op'"
+chk "P no conservation failure"                              "! grep -qi 'conservation FAIL' '$SANDBOX/outP.txt'"
+
 echo ""
 echo "=================== $PASS passed, $FAIL failed ==================="
 [ "$FAIL" = 0 ]

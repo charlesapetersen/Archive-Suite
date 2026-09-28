@@ -8,7 +8,8 @@
 # whose dependency isn't satisfied. It is DETERMINISTIC (parses checkbox state) rather than trusting the model
 # to grep — the same philosophy as the idle-backoff fingerprint and next-review-unit.sh.
 #
-# HOW an item's TAG is read: the first `[A-Za-z0-9._-]` token after the checkbox (leading `**` stripped) — e.g.
+# HOW an item's TAG is read: the first `[A-Za-z0-9._-]` token after the checkbox (leading `**` and then one
+# leading backtick stripped, the same rule as check-tracker-sync.sh, so a backticked **`W9.b1`** reads as W9.b1) — e.g.
 # `- [x] **W3.f1 [HIGH] …**` → `W3.f1`. A prerequisite `T` is DONE iff some checkbox line's tag is `T` with
 # `[x]` AND no `[ ]` line has tag `T`, scanning the plan + SUITE_TODO.md + SUITE_TODO_DONE.md. A missing `T` is treated
 # as NOT done (blocked + surfaced) — an unresolved prerequisite should stall the item, not run out of order.
@@ -50,6 +51,7 @@ STATES=$(awk '
     st = ($0 ~ /^[[:space:]]*[-*][[:space:]]+\[[xX]\]/) ? "x" : " "   # anchored checkbox, not a substring
     rest = substr($0, RLENGTH+1)               # text after the checkbox
     sub(/^\*+[[:space:]]*/, "", rest)          # strip a leading bold marker
+    sub(/^`/, "", rest)                        # ...and an optional leading backtick (**`W9.b1`**), as check-tracker-sync.sh does
     if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) print substr(rest, 1, RLENGTH) "\t" st
   }
 ' "$TODO" "$DONEFILE" "$PLAN" 2>/dev/null)
@@ -100,7 +102,7 @@ ITEMS=$(awk '
     flush()
     if ($0 ~ /^[[:space:]]*[-*][[:space:]]+\[ \]/) {      # only [ ] items become queue candidates
       match($0, /^[[:space:]]*[-*][[:space:]]+\[ \][[:space:]]*/)
-      curtext = substr($0, RLENGTH+1); t = curtext; sub(/^\*+[[:space:]]*/, "", t)
+      curtext = substr($0, RLENGTH+1); t = curtext; sub(/^\*+[[:space:]]*/, "", t); sub(/^`/, "", t)
       curtag = "?"; if (match(t, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) curtag = substr(t, 1, RLENGTH)
       curbody = $0
     }
@@ -138,7 +140,8 @@ while IFS=$'\t' read -r tag dep text; do
     # split the CSV on commas; trim spaces; check each prerequisite
     old_ifs="$IFS"; IFS=','
     for pr in $dep; do
-      pr="$(printf '%s' "$pr" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+      # trim spaces, and drop backticks: `(blocked-on: `W9.b1`)` names the tag W9.b1 (a tag never contains one)
+      pr="$(printf '%s' "$pr" | sed 's/`//g; s/^[[:space:]]*//; s/[[:space:]]*$//')"
       [ -n "$pr" ] || continue
       tag_done "$pr" || unmet="${unmet:+$unmet,}$pr"
     done

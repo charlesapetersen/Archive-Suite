@@ -194,6 +194,27 @@ run
 chk "T archive: absent SUITE_TODO_DONE is a no-op" "verdict ok W.solo"
 donefile
 
+# ---------- U: a BACKTICKED tag (**`W9.b1`**) is the same tag as **W9.b1** ----------
+# 61 lines in SUITE_TODO_DONE.md write the tag inside backticks. check-tracker-sync.sh and check-handoff.sh
+# strip one leading backtick; this resolver did not, so an archived `[x] **`W.bt`**` never entered the done-set
+# and its dependent read as blocked. W9.e1/W9.e3 were resolving only through the plan's own [x] twins of their
+# prerequisites, one compaction away from flipping to blocked.
+donefile "- [x] **\`W.bt\`** — shipped, archived with a backticked tag."
+plan "- [ ] **W.btdep — needs it** (blocked-on: W.bt) — must be actionable."
+run
+chk "U backticked [x] tag in the archive satisfies the dependency" "verdict ok W.btdep"
+# ...the [ ]-wins rule must see a backticked OPEN twin too, or re-opened work runs early.
+todo "- [ ] **\`W.bt\`** — re-opened, backticked."
+run
+chk "U backticked [ ] tag still blocks (pend-wins)"               "verdict blocked:W.bt W.btdep"
+todo
+# ...a backticked queue item gets its real tag rather than '?', and a backticked prerequisite resolves.
+donefile "- [x] **W.bt2** — shipped."
+plan "- [ ] **\`W.btq\`** — backticked queue item (blocked-on: \`W.bt2\`) — prereq named in backticks."
+run
+chk "U backticked queue item's tag is parsed, backticked prereq resolves" "verdict ok W.btq"
+donefile
+
 echo ""
 echo "=================== $PASS passed, $FAIL failed ==================="
 [ "$FAIL" = 0 ]

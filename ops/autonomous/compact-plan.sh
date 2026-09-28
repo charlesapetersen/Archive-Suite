@@ -74,10 +74,11 @@ TRIGGER="${TRIGGER:-10}"    # only compact when the log exceeds this many entrie
 #   SL_MAX_BYTES          20,000   ~5 recent Session Log entries at the measured 3.7 KB each
 #   DR_MAX_BYTES          24,000   the 8 entries DR_KEEP ALREADY allows, measured at 23,723 B — so this stops
 #                                  being a second, looser cap that silently overrides the count one
-#   WQ_MAX_BYTES          44,000   the measured 35,060 B floor + ~9 KB of queue growth between firings
+#   WQ_MAX_BYTES           8,000   (was 44,000; lowered 2026-09-28) the measured 5,920 B floor + ~2 KB headroom
 #   ----------------------------
-#   CEILING              133,000 = 89% of the 150,000 allowance, i.e. under context-budget.sh's ACT_PCT (93%),
-#                                  so even a fully saturated plan never costs a trim session.
+#   CEILING               97,000 = 65% of the 150,000 allowance, i.e. under context-budget.sh's ACT_PCT (93%),
+#                                  so even a fully saturated plan never costs a trim session. (133,000 / 89%
+#                                  under the old 44,000.)
 # Today's SETTLED size is far under the ceiling: 39,887 + 19,294 + 23,723 + 35,060 = 117,964 B (79%).
 # ⚠️ IF YOU CHANGE THE PLAN'S BUDGET IN context-budget.sh, RE-DO THIS SUM. Both halves are now guarded:
 # prove-compact.sh asserts the CONSTANTS fit the allowance (health-gate step `compact-proof`), and the CEILING
@@ -497,7 +498,13 @@ QUEUE_ARCHIVE="${AUTONOMOUS_QUEUE_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_WORK_QU
 # no-op'd on every cycle while the plan reached 96% of budget. 44000 is the measured floor (35,060 B with
 # today's tracker state) plus ~9 KB of growth headroom, and it fires now. That the SAME latent shape recurred
 # within two days is why the ceiling is now ASSERTED (prove-compact.sh) rather than re-derived by hand.
-WQ_MAX_BYTES="${WQ_MAX_BYTES:-44000}"
+# ⚠️ 2026-09-28 — 44000 HAD BECOME UNREACHABLE THE OTHER WAY: the region now sits BELOW it. Measured on a
+# scratch copy of the live plan: the WORK QUEUE region was 30,216 B, so Pass 3 no-op'd every cycle
+# ("30216B <= budget 44000B") while holding 89 lines of shipped `[x]` items the trackers vouch for. Archiving
+# them settles the region at 5,920 B of open items, headings and prose, so 8000 sits just above that floor: it
+# fires once ~2 KB of shipped items accumulate and is a cheap no-op otherwise. A threshold far above the floor
+# is the same bug as one far above the reachable size — the pass looks switched off.
+WQ_MAX_BYTES="${WQ_MAX_BYTES:-8000}"
 
 (
 [ "$WQ_MAX_BYTES" -gt 0 ] || { echo "compact-plan: WQ pass disabled (WQ_MAX_BYTES=0)"; exit 0; }
@@ -530,6 +537,7 @@ QREGB=$(awk -v h="$QH" -v sec="$SEC_HEADER_RE" '
 SAFE=$(awk '
   match($0, /^[-*][[:space:]]+\[[xX]\][[:space:]]*/) {
     rest = substr($0, RLENGTH+1); sub(/^\*+[[:space:]]*/, "", rest)
+    sub(/^`/, "", rest)          # **`W9.b1`** is W9.b1 — one leading backtick, the check-tracker-sync.sh rule
     if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) {
       tag = substr(rest, 1, RLENGTH)
       if (tag ~ /\./) print tag
@@ -576,7 +584,7 @@ awk -v h="$QH" -v drop="$QDROP" -v safef="$SAFEF" '
         flush(0); dropping = 0
         if ($0 ~ /^[[:space:]]*[-*][[:space:]]+\[[xX]\]/) {
           rest = $0; sub(/^[[:space:]]*[-*][[:space:]]+\[[xX]\][[:space:]]*/, "", rest)
-          sub(/^\*+[[:space:]]*/, "", rest)
+          sub(/^\*+[[:space:]]*/, "", rest); sub(/^`/, "", rest)   # same tag rule as SAFE above
           if (match(rest, /^[A-Za-z0-9][A-Za-z0-9._-]*/)) {
             tag = substr(rest, 1, RLENGTH)
             if (tag ~ /\./ && (tag in safe)) dropping = 1
