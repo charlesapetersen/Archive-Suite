@@ -93,7 +93,24 @@ MAXRUN="${AUTONOMOUS_MAXRUN:-10800}"      # OUTER wall-clock backstop (3 h). The
                                           # a session is productive-but-endless. Was 4500/75min — raised
                                           # 2026-07-12 so healthy long sessions (Notes waves ran 30–78 min)
                                           # stop getting guillotined by the clock alone.
-BUDGET="${AUTONOMOUS_BUDGET:-30}"         # --max-budget-usd per resume session
+BUDGET="${AUTONOMOUS_BUDGET:-60}"         # --max-budget-usd per resume session. Doubled 30 -> 60 on 2026-09-28,
+                                          # with the same change in vision-ocr (owner): sessions now use more
+                                          # subagents (resume prompt, SUBAGENTS), which spend from the same cap.
+WINDOW_WAIT_AT="${AUTONOMOUS_WINDOW_WAIT_AT:-95}" # usage window (owner, 2026-09-28, from vision-ocr): sessions
+                                          # work up to 100%, so launch whenever the five-hour window is under
+                                          # this; at or over it, or after a session the window cut off, wait
+                                          # for the reset instead of probing it with sessions that fail in 3 s.
+WINDOW_CUT_AT="${AUTONOMOUS_WINDOW_CUT_AT:-90}"   # a session that exits nonzero with its own log's last reading
+                                          # at or over this (a rejection reads 100) was cut off by the window:
+                                          # it does not add to the no-completion streak.
+WINDOW_POLL="${AUTONOMOUS_WINDOW_POLL:-30}"       # seconds between clock checks while waiting for a reset
+                                          # (30, like backoff_sleep: a TERM is handled when the sleep returns)
+WINDOW_SLACK="${AUTONOMOUS_WINDOW_SLACK:-120}"    # seconds past resetsAt before the next launch
+WINDOW_LAST="$STATE/usage-window.last"    # "<pct> <resetsAt> [cut]" from the latest session that reported one
+KILLED="$STATE/session-killed"            # a watchdog touches this when it kills the session: not a window cut
+USAGE_LOG="$STATE/usage-window.tsv"       # one row per session and per reset wait: how much of each five-hour
+                                          # window the run spent, so unused headroom shows. usage-window.last
+                                          # keeps only the latest reading, and session logs are overwritten.
 EFFORT="${AUTONOMOUS_EFFORT:-medium}"     # reasoning effort for every resume session (low|medium|high|xhigh|max).
                                           # medium since 2026-09-24 (owner decision), replacing xhigh
                                           # (2026-07-31), which had replaced max. Raise it for one hard run
@@ -127,9 +144,10 @@ MINFREE_MB="${AUTONOMOUS_MINFREE_MB:-10240}" # park below this much free space o
 # consecutive sessions that committed work but completed NO item (no new `[x]` in EITHER tracker — plan WORK
 # QUEUE or SUITE_TODO.md; see completed_items). After $MAX_NOCOMPLETE such sessions it parks + alerts with the
 # recent commits so the owner sees which item.
-# Default 6 tolerates a legitimately multi-checkpoint item (e.g. W13.cli-1 was 4) while still catching a
-# genuine days-long loop. Completing ANY item resets it. 0 disables.
-MAX_NOCOMPLETE="${AUTONOMOUS_MAX_NOCOMPLETE:-6}"
+# Default 12 tolerates a legitimately multi-checkpoint item (e.g. W13.cli-1 was 4) while still catching a
+# genuine days-long loop. Completing ANY item resets it. 0 disables. A session the usage window cut off is not
+# counted (see WINDOW_CUT_AT).
+MAX_NOCOMPLETE="${AUTONOMOUS_MAX_NOCOMPLETE:-12}"  # 6 -> 12 on 2026-09-28, matching vision-ocr's doubling (owner)
 
 # Health gate (WS7) — per-change review catches per-change bugs, but a compounding regression can hide across
 # dozens of unreviewed commits over a 2-week run. Every $GATE_EVERY commits, the daemon runs a FULL gate
@@ -175,6 +193,7 @@ DOCFIX_MAX="${AUTONOMOUS_DOCFIX_MAX:-3}"
 # ONE renderer (ops/autonomous/status-digest.sh), shared with `daemon.sh status`; it suppresses colour when
 # stdout is not a terminal, so the file written here stays clean text. Overridable (harness stub).
 STATUS_CMD="${AUTONOMOUS_STATUS_CMD:-$REPO/ops/autonomous/status-digest.sh}"
+USAGE_CMD="${AUTONOMOUS_USAGE_CMD:-$REPO/ops/autonomous/usage-window.sh}"   # reads the window from a session log
 
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
@@ -223,6 +242,22 @@ DENY=(
 # (`mkdir -p "$STATE"` moved below the SOURCE GUARD — W32.source-guard. Nothing above the guard writes to
 # $STATE: every function here is defined, not called, and log() only runs inside the loop.)
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+# usage_row KIND START END EFFORT RC FIRST PEAKS CUT — append to $USAGE_LOG, header first. Ported from vision-ocr.
+# FIRST is the first window reading "PCT RESET". PEAKS is the highest reading of each window the session saw,
+# "PCT RESET" pairs separated by ";" (a session that spans a reset saw two). A `wait` row passes the reading
+# that caused the wait as FIRST and no PEAKS. A session with no readings leaves both blank.
+usage_row() {
+  local k="$1" t0="$2" t1="$3" eff="$4" rc="$5" f="$6" pk="$7" cut="$8" fp fr peaks=""
+  read -r fp fr <<< "$f"
+  if [ -n "$pk" ]; then
+    peaks="$(printf '%s\n' "$pk" | tr ';' '\n' | while read -r p r; do
+      [ -n "$r" ] && printf '%s%% (resets %s), ' "$p" "$(date -r "$r" '+%H:%M')"; done)"; peaks="${peaks%, }"
+  fi
+  [ -s "$USAGE_LOG" ] || printf 'kind\tstart\tend\tminutes\teffort\trc\tfirst_pct\tfirst_reset\twindow_peaks\tcut\n' > "$USAGE_LOG"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$(date -r "$t0" '+%F %H:%M')" "$(date -r "$t1" '+%F %H:%M')" \
+    "$(( (t1 - t0 + 30) / 60 ))" "$eff" "$rc" "${fp:-}" "${fr:+$(date -r "$fr" '+%H:%M')}" \
+    "$peaks" "$cut" >> "$USAGE_LOG" 2>/dev/null || true
+}
 
 # WS5 — regenerate the one-screen $STATE/STATUS.md digest. Cheap (greps + git log + df), read-only, never
 # fatal. Called at each cycle's tail and on park (so a parked STATUS reflects the park). Written to a temp
@@ -1203,7 +1238,7 @@ health_watchdog() {
       [ "$quiet" -lt "$HB_HARD" ] && continue                               # legit long build/test -> spare
       printf '%s  %s\n' "$(date '+%F %T')" \
         "watchdog: CPU-busy but no events ${quiet}s (>= HB_HARD ${HB_HARD}s), no subagent — runaway build/loop, killing tree of pid $cpid" >> "$LOG"
-      _terminate_tree "$cpid"; return 0
+      : > "$KILLED"; _terminate_tree "$cpid"; return 0
     fi
     # Idle tree, no subagent. Require HB_IDLE_N consecutive idle polls so a brief low-CPU dip (linking, I/O
     # wait) inside a real tool doesn't false-kill.
@@ -1211,7 +1246,7 @@ health_watchdog() {
     [ "$idle_streak" -lt "$HB_IDLE_N" ] && continue
     printf '%s  %s\n' "$(date '+%F %T')" \
       "watchdog: session wedged (${quiet}s no events, tree idle ${busy}% CPU, ${idle_streak} idle polls) — killing tree of pid $cpid" >> "$LOG"
-    _terminate_tree "$cpid"; return 0
+    : > "$KILLED"; _terminate_tree "$cpid"; return 0
   done
   return 0
 }
@@ -1274,6 +1309,22 @@ tick() {
     if [ "$hg" = 10 ]; then note_progress; return 0; fi
   fi
 
+  # 3b-w. Usage window (owner, 2026-09-28, from vision-ocr). If the last session left the five-hour window at or
+  #       over $WINDOW_WAIT_AT%, or was cut off by it, wait for the reset rather than launching into it. The wait
+  #       is in $WINDOW_POLL steps so `daemon.sh stop` is held up no longer than a backoff sleep, and never longer than 5 h 10 min (a weekly
+  #       rejection's reset can be days out; the next session re-reads it). After the gate, which spends no
+  #       usage, and before the snapshot below, so nothing that lands during the wait reads as this session's.
+  local w_pct w_reset w_cut w_now
+  { read -r w_pct w_reset w_cut < "$WINDOW_LAST"; } 2>/dev/null || true
+  w_now=$(date +%s)
+  if [ -n "${w_reset:-}" ] && [ "$w_reset" -gt "$w_now" ] 2>/dev/null \
+     && { [ "${w_pct:-0}" -ge "$WINDOW_WAIT_AT" ] 2>/dev/null || [ "${w_cut:-}" = cut ]; }; then
+    local w_until=$(( w_reset + WINDOW_SLACK )); [ "$w_until" -gt $(( w_now + 18600 )) ] && w_until=$(( w_now + 18600 ))
+    log "usage window ${w_pct}% used$( [ "${w_cut:-}" = cut ] && echo ', and the last session was cut off by it') — waiting until $(date -r "$w_until" '+%H:%M') for the reset."
+    while [ "$(date +%s)" -lt "$w_until" ]; do sleep "$WINDOW_POLL"; done
+    usage_row wait "$w_now" "$(date +%s)" - - "${w_pct:-} ${w_reset:-}" "" "${w_cut:-}"
+  fi
+
   # 3c. Snapshot the decision surface BEFORE the session so we can tell afterwards whether the session
   #     actually advanced the run (see the idle-backoff block above). Cheap: one rev-parse + one hash.
   #     Also snapshot the completed-item count (WS4) to tell a checkpoint from a genuine item completion.
@@ -1301,6 +1352,8 @@ tick() {
   # operator edit to that file can't accidentally unset it. The owner's own interactive sessions never
   # set it, so host GUI work stays available to a human who is actually watching the screen.
   export ARCHIVE_UNATTENDED=1
+  # usage-window.sh, run by the session with no argument, reads $AUTONOMOUS_STATE/last-session.log.
+  export AUTONOMOUS_STATE="$STATE"
   # …and put the GUI SHIMS (xcodebuild, open, osascript, cliclick, emulator) ahead of the real tools on
   # the child's PATH. The hook above matches the Bash
   # tool's command STRING, which a wrapper script defeats: on 2026-07-30 a session ran
@@ -1323,6 +1376,7 @@ tick() {
   # fresh file also gives the heartbeat + usage watchdogs a clean zero baseline.
   local SLOG="$STATE/last-session.log"
   [ -f "$SLOG" ] && mv -f "$SLOG" "$SLOG.prev" 2>/dev/null; : > "$SLOG"
+  rm -f "$KILLED" 2>/dev/null || true
   # Run claude in the background so watchdogs can TERM/KILL it (macOS has no `timeout`). $cpid is claude's own
   # pid. --output-format stream-json --include-partial-messages makes $SLOG grow with a JSON event per
   # message/tool AND per token-delta during generation, IN REAL TIME — the health watchdog (Watchdog C) uses
@@ -1354,7 +1408,7 @@ tick() {
       kill -0 "$cpid" 2>/dev/null || exit 0
       sleep "$HB_POLL"; waited=$(( waited + HB_POLL ))
     done
-    _terminate_tree "$cpid" ) &
+    : > "$KILLED"; _terminate_tree "$cpid" ) &
   local wpid=$!
   # (No separate usage-limit watchdog: CLI 2.1.207 fast-fails an exhausted limit on its own — rc=1 in ~2s,
   # observed — and a rate-limit WAIT is caught by Watchdog C, whose heartbeat filters rate_limit_event bytes.
@@ -1381,11 +1435,40 @@ tick() {
   # the fingerprint, so it falls through to no-progress on its own. Evaluated HERE — before housekeeping +
   # compact-plan — so neither the worktree GC nor a Session-Log compaction is mistaken for the run advancing.
   local fp_after cc_after; fp_after="$(work_fingerprint)"; cc_after="$(completed_items)"
-  local verdict=0
+  # Usage window (from vision-ocr, 2026-09-28). Record this session's last reading, and decide whether the window
+  # cut the session off: it exited nonzero, its OWN log's last reading is at $WINDOW_CUT_AT% or more (a
+  # rejection reads 100), and it did not end another way the daemon can see — a watchdog kill ($KILLED) or the
+  # --max-budget-usd cap (result subtype error_max_budget_usd). Without those two exclusions a stuck item whose
+  # sessions each run into the budget late in a window would never advance the no-completion streak. Unlike
+  # vision-ocr, a fast exit with no reading is NOT assumed to be the window — that guess is the W32.usage-guess
+  # misreport below; the CLI logs a rejection when there is one.
+  local verdict=0 w_line w_p w_r w_cutoff=0
+  w_line="$("$USAGE_CMD" --raw "$SLOG" 2>/dev/null)" || w_line=""
+  read -r w_p w_r <<< "${w_line:-0 0}"
+  if [ "$rc" -ne 0 ] && [ "${w_p:-0}" -ge "$WINDOW_CUT_AT" ] 2>/dev/null && [ ! -f "$KILLED" ] \
+     && ! grep -q '"subtype":"error_max_budget_usd"' "$SLOG" 2>/dev/null; then
+    w_cutoff=1
+  fi
+  [ -n "$w_line" ] && echo "$w_line$( [ "$w_cutoff" = 1 ] && echo ' cut')" > "$WINDOW_LAST"
+  # Usage ledger row: the session's first window reading, and the peak of each window it saw.
+  local u_all u_end; u_end=$(date +%s)
+  u_all="$(grep -o '"five_hour":{"utilization":[0-9.]*,"resetsAt":[0-9]*' "$SLOG" 2>/dev/null \
+    | sed -E 's/.*"utilization":([0-9.]*),"resetsAt":([0-9]*)/\1 \2/' \
+    | awk '{printf "%d %s\n", $1*100 + 0.5, $2}')"
+  usage_row session "$(( u_end - (SECONDS - _t0) ))" "$u_end" "$EFFORT" "$rc" \
+    "$(printf '%s\n' "$u_all" | head -1)" \
+    "$(printf '%s\n' "$u_all" | awk 'NF==2{if(!($2 in m)){o[++n]=$2; m[$2]=$1} else if($1>m[$2]) m[$2]=$1}
+                                    END{for(i=1;i<=n;i++) printf "%s%s %s", (i>1?";":""), m[o[i]], o[i]}')" \
+    "$( [ "$w_cutoff" = 1 ] && echo cut)"
   if [ -n "$fp_after" ] && [ "$fp_after" != "$fp_before" ]; then
     note_progress               # work happened -> fast cadence (independent of WS4)
-    # WS4: work happened, but did an ITEM complete, or is this the Nth checkpoint on a stuck item?
-    note_committed "$cc_before" "$cc_after" || verdict=9
+    # WS4: work happened, but did an ITEM complete, or is this the Nth checkpoint on a stuck item? A session the
+    # window cut off is neither: it stopped because the window ran out, not because the item is stuck.
+    if [ "$w_cutoff" = 1 ]; then
+      log "session cut off by the usage window (${w_p:-?}%) — not counted toward the no-completion streak."
+    else
+      note_committed "$cc_before" "$cc_after" || verdict=9
+    fi
   else
     # Name the cause. A usage-limit fast-fail is NOT an empty queue: the CLI exits nonzero in ~2-3s when the
     # window is exhausted (see the Watchdog note above) and cannot move the fingerprint, so it lands here

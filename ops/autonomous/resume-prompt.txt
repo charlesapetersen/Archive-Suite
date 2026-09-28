@@ -253,9 +253,33 @@ ITEM-SPECIFIC NOTES:
     Workflow({name:'lean-review', args:{unit, paths}}), write .maintenance/review/<unit>.md, triage confirmed
     findings, mark the unit done in .maintenance/REVIEW_PROGRESS.md. Never run the retired 15-finder monolith.
 
-EFFICIENCY + SUBAGENT SIZING: right-size subagents, read narrowly, keep this session lean — the goal is one
-  solid committed increment, not maximal output. Don't spawn an agent for a single known-location lookup, and
-  never re-run a search you already delegated.
+SUBAGENTS (owner, 2026-09-28, as in vision-ocr: use more of them). Beyond the Tier-2 adversarial review, hand a
+  subagent any piece of the item that can run on its own and would otherwise cost a long stretch of your own
+  context, and run independent ones at the same time. Good uses: surveying call sites or every file an item
+  names; trying two candidate fixes side by side, each in its own worktree (`git worktree add` from your
+  branch's HEAD); reproducing a reported bug; reading large material (the plan, a KNOWN_ISSUES, a log).
+  Rules for every subagent:
+  * Tell it not to build, run tests or the smoke test, commit, push, or edit the plan or trackers. You alone do
+    those, one build or test run at a time.
+  * One writer per worktree. A subagent that edits gets its own worktree; you bring back only what you keep.
+  * Give it exact paths, the question and the form of the answer, and have it say what it measured and what it
+    reasoned about. Check a surprising result before building on it.
+  * It spends from your --max-budget-usd. Brief tightly; don't delegate what one quick command answers.
+
+USAGE WINDOW (owner, 2026-09-28). The account's five-hour usage window is shared by you, your subagents and
+  anything else the owner runs. You may use all of it. When it runs out your session stops mid-step; the daemon
+  waits for the reset and does not count the session against the no-completion cap. What is lost is your
+  context and anything not pushed, since the next session starts a fresh worktree from origin/main.
+  `ops/autonomous/usage-window.sh` prints how much is spent and when it resets. Run it at the start, before
+  handing out subagents, and before any long step.
+  * Under 85%: work normally, subagents included.
+  * At 85% or more: start no new subagents and let running ones finish. At once, write the item's Session Log
+    note (done, half done and where, last checkpoint sha, next step), and push a checkpoint at each green point
+    from here on. Then keep working alone, one step at a time, to the end of the item or of the window.
+  * Never wait for the reset inside the session.
+
+EFFICIENCY + SUBAGENT SIZING: right-size subagents and read narrowly. Don't spawn an agent for a single
+  known-location lookup, and never re-run a search you already delegated.
   YOUR OWN model and effort are fixed before you start (opus, at the effort the daemon passed — default `medium`
   since 2026-09-24; you cannot change either mid-session). Each SUBAGENT's is YOURS TO CHOOSE, per task, and the
   owner wants you to choose it deliberately. Optimize for the BEST OUTCOME on this item, not the cheapest run:

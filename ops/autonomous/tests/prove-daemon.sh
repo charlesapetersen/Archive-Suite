@@ -105,6 +105,8 @@ STATE="$T/state"; mkdir -p "$STATE"
 # start without one (W32.preflight-gap: a missing/empty prompt otherwise means a silent `claude -p ""`, which
 # then reads as a usage-limit fast-fail for 72 h). The stub `claude` ignores the text; only presence matters.
 printf 'autonomous maintenance session for the Archive Suite (prove-daemon fixture prompt)\n' > "$STATE/resume-prompt.txt"
+ENDCTL="$T/endctl"; : > "$ENDCTL"             # how the stub session ends (empty = normally)
+RLECTL="$T/rlectl"; : > "$RLECTL"             # usage-window event the stub emits (empty = none)
 CTRL="$T/ctrl"; echo "1:no" > "$CTRL"          # stub claude behaviour: "<rc>:<commit?>[:<complete-item?>]"
 
 CHILDENV="$T/childenv.log"
@@ -112,6 +114,23 @@ cat > "$T/claude" <<STUB
 #!/usr/bin/env bash
 env > "$CHILDENV"          # WS6: prove what the session actually inherits
 IFS=: read -r rc docommit complete < "$CTRL"
+# Usage window: \$RLECTL holds "<pct> <reset-offset-s>" or "rejected <reset-offset-s>"; the stub prints the
+# matching stream-json rate_limit_event (the shapes the real CLI emits) to stdout, which the daemon logs to \$SLOG.
+if [ -s "$RLECTL" ]; then
+  read -r rp ro < "$RLECTL"; rr=\$(( \$(date +%s) + ro ))
+  if [ "\$rp" = rejected ]; then
+    echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":'"\$rr"',"rateLimitType":"five_hour"}}'
+  else
+    echo '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","unifiedWindows":{"five_hour":{"utilization":0.'"\$rp"',"resetsAt":'"\$rr"'}}}}'
+  fi
+fi
+# \$ENDCTL: "budget" prints the result event the CLI writes when --max-budget-usd stops a session; "sleep <s>"
+# holds the session open so a watchdog (AUTONOMOUS_MAXRUN) can kill it.
+if [ -s "$ENDCTL" ]; then
+  read -r ek ev < "$ENDCTL"
+  [ "\$ek" = budget ] && echo '{"type":"result","subtype":"error_max_budget_usd","is_error":true}'
+  [ "\$ek" = sleep ] && sleep "\$ev"
+fi
 # Simulate a session appending its reasoning to the Session Log — pure churn, must not read as progress.
 printf '\n### session note %s\n' "\$(date +%s%N)" >> "$PLAN"
 # docommit=yes -> a CHECKPOINT commit (HEAD moves; the fingerprint moves via HEAD).
@@ -141,10 +160,11 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_BUDGET_CMD="${BUDGET_CMD:-$T/no-such-budget}" \
   AUTONOMOUS_DOCFIX_MAX="${DOCFIX_MAX:-3}" \
   AUTONOMOUS_HB_POLL=1 \
+  AUTONOMOUS_USAGE_CMD="$HERE/../usage-window.sh" AUTONOMOUS_WINDOW_POLL=1 AUTONOMOUS_WINDOW_SLACK=0 \
     bash "$DAEMON" >/dev/null 2>&1 &
   local pid=$!; echo "$pid" >> "$T/daemon.pids"; echo "$pid"   # record for the leak-proof EXIT reaper
 }
-reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md" "$STATE/doc-budget-fix" "$STATE/doc-budget-tries" "$STATE/doc-budget-head"; }
+reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md" "$STATE/doc-budget-fix" "$STATE/doc-budget-tries" "$STATE/doc-budget-head" "$STATE/usage-window.last" "$STATE/usage-window.tsv" "$STATE/session-killed"; : > "$RLECTL"; : > "$ENDCTL"; }
 stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; }   # (dropped no-op `pkill -f provetest`; label is env, not argv)
 run_daemon() { reset_state; local p; p=$(launch "$1"); sleep "$2"; stop "$p"; echo "$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
@@ -695,6 +715,60 @@ echo "0:yes" > "$CTRL"; write_plan; dfset 999999
 L=$(GATE_EVERY=0 DOC_PREGATE=0 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 6)
 grep -q 'doc pre-gate' "$L" && bad "the pre-gate ran with AUTONOMOUS_DOC_PREGATE=0" || ok "AUTONOMOUS_DOC_PREGATE=0 disables it completely"
 [ -f "$DOCFIX" ] && bad "wrote a fix request while disabled" || ok "writes nothing while disabled"
+
+# ================= usage window (2026-09-28, ported from vision-ocr) =================
+echo "[29a] usage window — a session cut off at 92% is NOT a no-completion, and the next launch waits for the reset"
+echo "1:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+echo "92 6" > "$RLECTL"; : > "$STATE/session-killed"   # a stale kill marker must be cleared at launch
+P=$(MAXNC=2 launch 0); sleep 5; : > "$RLECTL"; echo "0:no" > "$CTRL"; sleep 6; stop "$P"; L="$STATE/daemon.log"
+grep -q 'cut off by the usage window (92%)' "$L" && ok "a nonzero exit at 92% is logged as cut off" || bad "cut-off not detected"
+grep -q 'attempt streak' "$L" && bad "a cut-off session was counted toward the no-completion streak" || ok "not counted toward the streak"
+grep -q 'PARKED' "$L" && bad "parked on sessions the window cut off" || ok "did not park"
+grep -q 'last session was cut off by it — waiting until' "$L" && ok "the next launch waited for the reset" || bad "launched into the window without waiting"
+[ "$(grep -c 'launching fresh' "$L")" -le 3 ] && ok "no spawn loop while waiting ($(grep -c 'launching fresh' "$L") launches in 11 s)" || bad "kept launching while waiting ($(grep -c 'launching fresh' "$L"))"
+grep -q $'^session\t.*\t92\t.*\tcut$' "$STATE/usage-window.tsv" && ok "ledger row records the reading and the cut" || bad "ledger row missing: $(cat "$STATE/usage-window.tsv" 2>/dev/null | tr '\t\n' '|/')"
+grep -q $'^wait\t' "$STATE/usage-window.tsv" && ok "ledger records the wait" || bad "no wait row in the ledger"
+
+echo "[29b] usage window — the same checkpoint at 50% with rc=0 still counts, and nothing waits"
+echo "0:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+echo "50 600" > "$RLECTL"
+L=$(MAXNC=3 run_daemon 0 8)
+grep -q 'attempt streak 1/3' "$L" && ok "an ordinary checkpoint still counts toward the streak" || bad "streak not counted"
+grep -q 'cut off' "$L" && bad "an rc=0 session at 50% read as cut off" || ok "not read as cut off"
+grep -q 'waiting until' "$L" && bad "waited at 50%" || ok "no wait under WINDOW_WAIT_AT"
+
+echo "[29c] usage window — a REJECTED fast-fail is cut off and waits; a fast exit with NO event is not"
+echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+echo "rejected 5" > "$RLECTL"                 # (run_daemon's reset_state would clear it, so launch by hand)
+P=$(launch 0); sleep 6; stop "$P"; L="$STATE/daemon.log"
+grep -q 'USAGE LIMIT (rate_limit_event: rejected' "$L" && ok "the rejection is still named in the log" || bad "rejection not named"
+grep -q 'usage window 100% used, and the last session was cut off by it — waiting' "$L" && ok "a rejection reads 100% and waits for its reset" || bad "no wait after a rejection"
+echo "1:no" > "$CTRL"; write_plan; reset_state
+W92="92 $(( $(date +%s) + 600 ))"; echo "$W92" > "$STATE/usage-window.last"   # a live high reading, not cut
+P=$(launch 0); sleep 5; stop "$P"; L="$STATE/daemon.log"
+grep -q 'waiting until' "$L" && bad "waited on a 92% reading below WINDOW_WAIT_AT" || ok "a 92% reading alone does not wait"
+[ "$(cat "$STATE/usage-window.last")" = "$W92" ] && ok "a session with no reading leaves the last reading alone (not marked cut)" || bad "usage-window.last rewritten to '$(cat "$STATE/usage-window.last")'"
+
+echo "[29d] usage window — an rc=0 session that leaves the window at 96% makes the next launch wait"
+echo "0:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+echo "96 5" > "$RLECTL"
+P=$(launch 0); sleep 3; : > "$RLECTL"; sleep 5; stop "$P"; L="$STATE/daemon.log"
+grep -q 'usage window 96% used — waiting until' "$L" && ok "waits at or over WINDOW_WAIT_AT" || bad "did not wait at 96%"
+grep -q 'cut off' "$L" && bad "an rc=0 session read as cut off" || ok "rc=0 is never cut off"
+
+echo "[29e] usage window — a session that hit --max-budget-usd, or that a watchdog killed, is NOT cut off"
+# Both end nonzero, and at a high reading they would otherwise read as the window: a stuck item whose sessions
+# each spend their budget late in a window would then never advance the no-completion streak.
+echo "1:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
+echo "93 600" > "$RLECTL"; echo "budget" > "$ENDCTL"
+P=$(MAXNC=5 launch 0); sleep 4; stop "$P"; L="$STATE/daemon.log"
+grep -q 'cut off' "$L" && bad "a budget-capped session read as cut off by the window" || ok "the budget cap is not a window cut"
+grep -q 'attempt streak 1/5' "$L" && ok "the budget-capped checkpoint counts toward the streak" || bad "streak not counted"
+echo "1:yes:no" > "$CTRL"; write_plan; reset_state
+echo "93 600" > "$RLECTL"; echo "sleep 30" > "$ENDCTL"
+P=$(AUTONOMOUS_MAXRUN=2 MAXNC=5 launch 0); sleep 12; stop "$P"; L="$STATE/daemon.log"
+grep -q 'resume session exited rc=[1-9]' "$L" && ok "the MAXRUN backstop killed the session (nonzero rc)" || bad "the session was not killed: $(grep 'exited rc' "$L" | head -1)"
+grep -q 'cut off' "$L" && bad "a watchdog-killed session read as cut off by the window" || ok "a watchdog kill is not a window cut"
 
 echo
 echo "=================== $PASS passed, $FAIL failed ==================="

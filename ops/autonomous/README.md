@@ -154,12 +154,26 @@ Tier-2: proven by `ops/autonomous/tests/prove-daemon.sh` (below) + an adversaria
 **Attempt cap (WS4, 2026-07-17) — the one waste the backoff can't catch.** Backoff keys off the fingerprint
 *moving*; a mis-sized or stuck item that commits a **checkpoint** each session keeps it moving, so it reads
 as progress and loops for days burning budget. So a second guard counts **consecutive sessions that committed
-work but completed no queue item**, and parks + alerts at `AUTONOMOUS_MAX_NOCOMPLETE` (default 6; 0 disables).
+work but completed no queue item**, and parks + alerts at `AUTONOMOUS_MAX_NOCOMPLETE` (default 12, 6 until 2026-09-28; 0 disables). A session the usage
+window cut off is not counted (next paragraph).
 "An item completed" = the count of **top-level `[x]` checkbox items** in the plan's `## WORK QUEUE` went up
 (prose mentions of `[x]` are excluded so a session can't fake a completion by writing about one); completing
 any item resets the streak. The counter (`$STATE/nocomplete.count`) is cleared at startup alongside
 `idle.since`, for the same reason (a restart must never park on cycle 1 off a stale count). The park message
 lists the recent commits so you can see which item is stuck.
+
+**Usage window (2026-09-28, ported from vision-ocr).** `usage-window.sh` reads the latest `rate_limit_event`
+from a session's stream-json log: the five-hour window's utilization and reset while the session is allowed,
+or 100% and the reset time when a limit rejected it. Sessions run it themselves (resume prompt, USAGE WINDOW:
+subagents only under 85%, then a Session Log note and serial work to the end of the window). After each session
+the daemon writes the reading to `$STATE/usage-window.last` and a row to `$STATE/usage-window.tsv` (first
+reading, peak per window, cut). A session that exits nonzero with its own last reading at
+`AUTONOMOUS_WINDOW_CUT_AT` (90) or more is **cut**, unless a watchdog killed it or it hit `--max-budget-usd`:
+it does not add to the no-completion streak. Before the
+next launch the daemon waits for the reset if the last reading was cut or at `AUTONOMOUS_WINDOW_WAIT_AT` (95)
+or more, in 30 s steps and never more than 5 h 10 min. Unlike vision-ocr, a fast exit with no reading is not
+assumed to be the window (W32.usage-guess). The same change doubled `AUTONOMOUS_BUDGET` to $60 and told
+sessions to use more subagents (resume prompt, SUBAGENTS). Proven by `prove-daemon.sh` [29a]-[29d].
 
 **Periodic health gate (WS7, 2026-07-17).** Per-change review catches per-change bugs; a *compounding*
 regression can still hide across dozens of unreviewed commits. So every `AUTONOMOUS_GATE_EVERY` commits
