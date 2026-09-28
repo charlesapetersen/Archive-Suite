@@ -20,6 +20,10 @@ struct NoteEditorPane: View {
     /// W7-S3 — a pending jump-to-source request this window should honor (select the note + scroll to
     /// its block). Set by `handleOpen`; the scroll fires once `bodyEditor.loadedID` reaches the target.
     @State private var jumpTarget: NotesModel.OpenRequest?
+    @State private var initialEditorFocusRequested = false
+    @State private var initialEditorFocusCompleted = false
+    @State private var editorFocusToken = 0
+    @State private var extractEditorGeneration = 0
     @StateObject private var formatting = FormattingContext()
     /// Stable across re-renders (populated once in `MarkdownEditorView.makeNSView`) so flush-on-switch
     /// keeps working after the parent re-renders.
@@ -76,6 +80,7 @@ struct NoteEditorPane: View {
                     .accessibilityIdentifier("an.editor.parseFailure")
             }
             bodyEditorView
+                .id(extractEditorGeneration)
                 .disabled(nav.selectedItemID == nil)   // nothing single-selected → no editable target
 #if DEBUG
             uiTestControlStrip
@@ -103,6 +108,7 @@ struct NoteEditorPane: View {
             Task {
                 await bodyEditor.select(nav.selectedItemID)
                 refreshZoteroAutoFillReference(for: nav.selectedItemID)
+                requestInitialEditorFocusIfReady()
             }
             refreshZotero()
             // W7-S6: register this pane's flush so app-terminate persists its pending edit (idempotent —
@@ -117,6 +123,7 @@ struct NoteEditorPane: View {
             Task {
                 await bodyEditor.select(newID)
                 refreshZoteroAutoFillReference(for: newID)
+                requestInitialEditorFocusIfReady()
             }
         }
         .onDisappear {
@@ -134,6 +141,9 @@ struct NoteEditorPane: View {
         .onReceive(nav.model.$pendingOpen) { handleOpen($0) }
         .onReceive(nav.model.$itemsGeneration) { _ in
             refreshZoteroAutoFillReference(for: nav.selectedItemID)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            if initialEditorFocusRequested && !initialEditorFocusCompleted { editorFocusToken &+= 1 }
         }
     }
 
@@ -173,6 +183,13 @@ struct NoteEditorPane: View {
             },
             passageSummaries: nav.model.allItems,   // resolve chip live titles / missing state
             passageGeneration: nav.model.itemsGeneration,   // reactive chip-title refresh (W14.4 c)
+            contentID: bodyEditor.loadedID,
+            revealFirstBlockOnModeSwitch: nav.selectedSummary?.kind == .extract,
+            onStyledSwitchApplied: { extractEditorGeneration &+= 1 },
+            focusRequestToken: initialEditorFocusRequested ? editorFocusToken : nil,
+            onFocusApplied: {
+                DispatchQueue.main.async { initialEditorFocusCompleted = true }
+            },
             scrollRequest: scrollRequest,
             onScrollOutcome: { hitExact in
                 // Runs inside updateNSView — defer state mutation out of the view-update pass.
@@ -279,6 +296,15 @@ struct NoteEditorPane: View {
     private var scrollRequest: EditorScrollRequest? {
         guard let t = jumpTarget, bodyEditor.loadedID == t.id else { return nil }
         return EditorScrollRequest(token: t.token, block: t.block)
+    }
+
+    private func requestInitialEditorFocusIfReady() {
+        guard let id = nav.selectedItemID, bodyEditor.loadedID == id else { return }
+        if initialEditorFocusCompleted { return }
+        initialEditorFocusRequested = true
+        // Selection may change while a previous deferred makeFirstResponder is in flight. Its
+        // content-identity guard will reject it; issue a fresh token now that the new body is loaded.
+        editorFocusToken &+= 1
     }
 
     /// Handle an in-app open request (jump-to-source or an `archivenotes://open`). Only the window that

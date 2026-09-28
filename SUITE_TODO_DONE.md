@@ -257,6 +257,17 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d12a — extract editor focus and initial provenance-chip visibility [S–M].** **SHIPPED
+  2026-09-28 (this commit).** The selected body's identity now forces the editor to load the right
+  text before a jump scroll, and a focus token is retried once a newly selected body has loaded. Extracts
+  return to the top on selection and after raw→styled mode changes; recreating the styled editor restores
+  TextKit's chip view. The chip's thumbnail remains an inline body image adjacent to the chip by design;
+  embedding it in the pill would duplicate the existing body image. Verification: Notes headless smoke;
+  focused scratch VM interface check with screenshots inspected; independent code review.
+  | files: ArchiveNotes/macOS/{Sources/ArchiveNotes/Editor/MarkdownEditorView.swift,
+  Sources/ArchiveNotes/Views/NoteEditorPane.swift,Tests/ArchiveNotesUITests/NotesGUITests.swift},
+  ArchiveNotes/{CLAUDE,KNOWN_ISSUES}.md,execution-plans/archive-notes/09-gap-closure.md | S–M | low | done
+
 - [x] **W9.d12 — remove dead editor types and strengthen durable-link parity [S].** **SHIPPED
   2026-09-27 (this commit).** Removed unused `NoteBody`/`NoteBlock` types. The scratch durable-link
   script now checks the fabricated GUID against the actual original and moved root markers; its old

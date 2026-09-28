@@ -1926,6 +1926,58 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W9.d12a — selecting the first extract focuses its editor, and its first provenance block
+    /// stays visible after a raw/styled round trip. This writes only to the rebuilt scratch fixture.
+    func testW9_ExtractEditorFocusAndInitialChipVisibility() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let extractWin = try openExtractsWindow()
+            defer { closeExtractsWindow(extractWin) }
+            frontWindow(named: "Extracts")
+            let cell = extractWin.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+            XCTAssertTrue(cell.waitForExistence(timeout: 10))
+            XCTAssertTrue(pollUntil(timeout: 10) { cell.isHittable })
+            cell.click()
+
+            let editor = extractWin.textViews["an.editor.text"]
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                ((editor.value as? String) ?? "").contains("Moore says he and Noyce")
+            })
+            let before = (editor.value as? String) ?? ""
+            app.typeText("Z")
+            XCTAssertTrue(pollUntil(timeout: 10) { ((editor.value as? String) ?? "") != before },
+                          "the first selected extract should focus its editor for typing")
+            XCTAssertTrue(passageChipStates(in: extractWin)?.contains {
+                ($0["id"] as? String) == Self.idReader
+            } == true, "the initial styled text storage should contain the provenance attachment")
+
+            let first = XCTAttachment(screenshot: extractWin.screenshot())
+            first.name = "W9.d12a extract initial chip"
+            first.lifetime = .keepAlways
+            add(first)
+
+            let toggle = extractWin.descendants(matching: .any)["an.editor.rawToggle"]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+            toggle.click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                ((editor.value as? String) ?? "").contains("<!-- block: note-passage")
+            })
+            toggle.click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                !((editor.value as? String) ?? "").contains("<!-- block: note-passage")
+            })
+            XCTAssertTrue(passageChipStates(in: extractWin)?.contains {
+                ($0["id"] as? String) == Self.idReader
+            } == true, "the raw-to-styled switch should restore the provenance attachment")
+            Thread.sleep(forTimeInterval: 2)
+
+            let styled = XCTAttachment(screenshot: extractWin.screenshot())
+            styled.name = "W9.d12a extract chip after styled switch"
+            styled.lifetime = .keepAlways
+            add(styled)
+        }
+    }
+
     /// G13 — a live copy→paste carries inline-image BYTES into the extract's own `assets/` (W14.3). The
     /// shipped fix made `MarkdownEditorView.handlePassagePaste` import the `com.archivenotes.passage`
     /// payload's bytes via `ExtractBuilder.pastedExtractMarkdown(from:importingAssetsVia:)` instead of

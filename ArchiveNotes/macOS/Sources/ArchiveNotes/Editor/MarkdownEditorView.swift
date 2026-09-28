@@ -80,6 +80,17 @@ struct MarkdownEditorView: NSViewRepresentable {
     /// document that carries note-passage chips is re-styled so the chips pick up renamed/deleted
     /// source titles reactively (not only on the next open/select/raw-toggle/paste).
     var passageGeneration: Int = 0
+    /// Identity of the body currently loaded in `markdown`. A new item starts at its first block;
+    /// ordinary same-item edits and live chip-label refreshes keep their scroll position.
+    var contentID: UUID?
+    /// Extracts reveal their first provenance chip again after a raw/styled mode change.
+    var revealFirstBlockOnModeSwitch = false
+    /// TextKit can keep the attachment character but drop its view after raw→styled. The host
+    /// recreates the extract editor after a successful switch so the chip gets a fresh view provider.
+    var onStyledSwitchApplied: (() -> Void)?
+    /// One-shot request to focus the text view when the host's first item finishes loading.
+    var focusRequestToken: Int?
+    var onFocusApplied: (() -> Void)?
     /// W7-S3 — a pending jump-to-source scroll (nil = none). When its token changes, the editor scrolls
     /// the current content to the block's range (or the top when the ordinal is stale / absent).
     var scrollRequest: EditorScrollRequest?
@@ -189,6 +200,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                                    height: CGFloat.greatestFiniteMagnitude)
 
         context.coordinator.textView = textView
+        context.coordinator.lastContentID = contentID
         return scrollView
     }
 
@@ -220,6 +232,10 @@ struct MarkdownEditorView: NSViewRepresentable {
                 // apply guard below doesn't redundantly re-render (which could restart the update loop).
                 coordinator.lastAppliedMarkdown = markdown
                 coordinator.lastPassageGeneration = passageGeneration
+                if revealFirstBlockOnModeSwitch { scrollToTop(scrollView) }
+                if !wantRaw && revealFirstBlockOnModeSwitch {
+                    DispatchQueue.main.async { onStyledSwitchApplied?() }
+                }
             } else {
                 wantRaw = coordinator.currentIsRaw
                 rejectedStyledSwitch = true
@@ -240,6 +256,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         // mutation re-invalidated the view, pinning the main thread at 100% while an unfocused styled
         // note was shown — W8-S8 spindump). Gating on the source makes updateNSView idempotent.
         let isEditing = textView.window?.firstResponder === textView
+        let contentChanged = coordinator.lastContentID != contentID
         let markdownChanged = !rejectedStyledSwitch && coordinator.lastAppliedMarkdown != markdown
         // W14.4(c): a rename/delete of a *referenced source note* changes provenance-chip live titles
         // without touching THIS note's Markdown, so the markdown guard above never fires. Re-style
@@ -249,7 +266,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         let passageChanged = !wantRaw && !markdownChanged
             && coordinator.lastPassageGeneration != passageGeneration
             && markdown.contains(Self.notePassageMarker)
-        if !isEditing, markdownChanged || passageChanged {
+        // Selection changes must install the newly loaded item even if the old editor still has
+        // focus. Distinct items may have identical Markdown but different assets or provenance.
+        if (!isEditing || contentChanged), markdownChanged || passageChanged || contentChanged {
             coordinator.isApplyingProgrammaticChange = true
             if wantRaw {
                 textView.string = markdown
@@ -277,10 +296,16 @@ struct MarkdownEditorView: NSViewRepresentable {
             coordinator.lastPassageGeneration = passageGeneration
         }
 
+        if contentChanged, coordinator.lastAppliedMarkdown == markdown {
+            coordinator.lastContentID = contentID
+            if contentID != nil { scrollToTop(scrollView) }
+        }
+
         // W7-S3 jump-to-source: scroll to the requested block once (per token). The content above has
         // just been (re)applied when the loaded item changed, so the block-ordinal map is current; the
         // host only sets `scrollRequest` once the target item's body is loaded (gated on `loadedID`).
-        if !wantRaw, let req = scrollRequest, coordinator.lastScrollToken != req.token {
+        if !wantRaw, let req = scrollRequest, coordinator.lastScrollToken != req.token,
+           coordinator.lastContentID == contentID, coordinator.lastAppliedMarkdown == markdown {
             coordinator.lastScrollToken = req.token
             let rendered = textView.textStorage ?? NSAttributedString()
             let range = NotePassageResolve.scrollRange(forBlock: req.block, in: rendered)
@@ -288,6 +313,29 @@ struct MarkdownEditorView: NSViewRepresentable {
             textView.scrollRangeToVisible(range ?? NSRange(location: 0, length: 0))
             onScrollOutcome?(hitExact)
         }
+        if let token = focusRequestToken, coordinator.lastFocusToken != token,
+           coordinator.pendingFocusToken != token, let contentID,
+           let window = textView.window, window.isKeyWindow {
+            coordinator.pendingFocusToken = token
+            DispatchQueue.main.async { [weak textView, weak coordinator] in
+                guard let coordinator else { return }
+                defer {
+                    if coordinator.pendingFocusToken == token { coordinator.pendingFocusToken = nil }
+                }
+                guard let textView, coordinator.parent.contentID == contentID,
+                      coordinator.parent.focusRequestToken == token,
+                      let window = textView.window, window.isKeyWindow,
+                      window.makeFirstResponder(textView) else { return }
+                coordinator.lastFocusToken = token
+                coordinator.parent.onFocusApplied?()
+            }
+        }
+    }
+
+    @MainActor
+    private func scrollToTop(_ scrollView: NSScrollView) {
+        scrollView.contentView.scroll(to: .zero)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
     // MARK: - Coordinator
@@ -315,6 +363,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// The `passageGeneration` at the last (re)style. Compared in updateNSView so a shared-item-set
         /// change re-styles a chip-bearing document exactly once (W14.4 c).
         var lastPassageGeneration: Int = 0
+        var lastContentID: UUID?
+        var lastFocusToken: Int?
+        var pendingFocusToken: Int?
         private var serializeDebounce: Task<Void, Never>?
 #if DEBUG
         /// Forces the hard-failure branch without relying on a malformed Markdown string that

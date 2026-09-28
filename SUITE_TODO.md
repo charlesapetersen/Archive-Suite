@@ -845,10 +845,6 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
   It persists and round-trips. Either add the "round to year / circa" affordance or delete the field and its
   codec handling. A decision, then a small change. | NoteMetadataInspector.swift, Store/Item.swift,
   FrontMatterCodec.swift | S–M | low | none
-- [ ] **`W9.d12a` — editor chip visibility and thumbnail polish [S–M].** Plan D12 split. Render the
-  block-header chip thumbnail, use a focus-on-appear token, and scroll the detail editor to block 0 on
-  item load and raw⇄styled toggle so the extract's provenance chip is initially visible. | ArchiveNotes/
-  macOS/Sources/ArchiveNotes/Editor/, Views/NoteEditorPane.swift | S–M | low | **needs:** gui
 - [ ] **`W9.d12b` — ordered-list and editor coverage details [S–M].** Plan D12 split. Renumber an ordered
   list from its first value; add `nestedListMixed` and debounce/snapshot checks; surface a clear status
   string when extract paste degrades to plain text. | ArchiveNotes/macOS/{Sources/ArchiveNotes/Editor/,

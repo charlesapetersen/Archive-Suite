@@ -271,6 +271,10 @@ macOS/Sources/ArchiveNotes/
                                    passageCopyHandler / passagePasteHandler seams (W7-S2 copy/paste)
     MarkdownEditorView.swift       NSViewRepresentable: two-way binding, debounced write-back,
                                    freeze-during-edit, raw-toggle (⌘/), bridge-backed styled mode,
+                                   selected body identity reloads before jump scroll; initial focus token
+                                   retries after load; extracts reveal block 0 on load + mode switch;
+                                   rebuild styled editor after raw→styled so TextKit restores chip views
+                                   (W9.d12a; block thumbnails stay inline in the body by design),
                                    hard-parse-failure stays raw + reports banner (W9.d7),
                                    EditorAssetStore plumbing, onRevealBlock seam, insertBlock method;
                                    EditorFlushBox handle → force a synchronous write-back (W7-S1a);

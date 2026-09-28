@@ -3,6 +3,17 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d12a) — extract editor could hide its first provenance chip
+
+**2026-09-28.** Selecting an item now replaces the editor body by item identity, even if the previous
+item's text view still has focus, and jump scrolling waits until that body's text is applied. An initial
+focus token is retried after a fast item switch. Extracts scroll to the first block when selected and
+after raw→styled mode changes; the styled editor is recreated after a successful switch so TextKit builds
+a fresh attachment view. The block thumbnail remains the inline image in the body beside the chip. It is
+not part of the pill: `MarkdownBridge.buildInsertableBlock` puts the image line in the body, and duplicating
+it in the chip would create two rendered copies. Notes smoke and a focused scratch VM interface check
+passed; both initial-load and post-toggle screenshots show the chip.
+
 ## ✅ FIXED (W9.d12) — dead editor types and a tautological durable-link check
 
 **2026-09-27.** The unused `NoteBody`/`NoteBlock` wrapper is gone. The scratch durable-link
