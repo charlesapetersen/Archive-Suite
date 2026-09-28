@@ -35,9 +35,10 @@ sed_repl() { printf '%s' "$1" | sed -e 's/[\\&]/\\&/g'; }
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"          # this script's checkout = where the daemon works
 # One slug, derived the same way the daemon derives it (W32.label-state) so the two can never disagree about
-# which state dir / launchd job they mean. Same literal values as before for LABEL=archivesuite.
+# which state dir / launchd job they mean. LABEL=archivesuite keeps its old `archive-autonomous` directory.
 LABEL="${AUTONOMOUS_LABEL:-archivesuite}"
-STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${LABEL}-autonomous}"
+STATE_SLUG="$LABEL"; [ "$LABEL" = archivesuite ] && STATE_SLUG=archive
+STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${STATE_SLUG}-autonomous}"
 BIN="$HOME/.local/bin"
 CLAUDE="$BIN/claude"
 DAEMON_SRC="$REPO/ops/autonomous/archive-suite-autonomous.sh"

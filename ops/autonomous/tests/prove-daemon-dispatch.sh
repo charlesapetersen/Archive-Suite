@@ -44,6 +44,20 @@ case "$out" in
   *)                                                   no "dry-run output unexpected: $out" ;;
 esac
 
+# The state directory. The plist, status-digest.sh, run-state-lib.sh, the resume prompt and the owner's env
+# files all name ~/.local/state/archive-autonomous; both daemon.sh and the daemon must resolve the same one.
+# daemon.sh shows it in `--dry-run stop` (its $LOCK); the daemon's config loads when sourced (W32.source-guard).
+T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT; mkdir -p "$T/repo/.git"
+out="$(env -u AUTONOMOUS_STATE -u AUTONOMOUS_LABEL HOME="$T" bash "$DAEMON" --dry-run stop 2>&1)"
+case "$out" in *"$T/.local/state/archive-autonomous/engine.lock"*) ok "daemon.sh uses ~/.local/state/archive-autonomous" ;;
+  *) no "daemon.sh state dir is not archive-autonomous (got: $out)" ;; esac
+st="$(env -u AUTONOMOUS_STATE -u AUTONOMOUS_LABEL HOME="$T" AUTONOMOUS_REPO="$T/repo" \
+      bash -c '. "$1" >/dev/null 2>&1; echo "$STATE"' _ "$HERE/../archive-suite-autonomous.sh")"
+[ "$st" = "$T/.local/state/archive-autonomous" ] && ok "the daemon uses the same directory" || no "daemon state dir is '$st'"
+st="$(env -u AUTONOMOUS_STATE HOME="$T" AUTONOMOUS_LABEL=otherproj AUTONOMOUS_REPO="$T/repo" \
+      bash -c '. "$1" >/dev/null 2>&1; echo "$STATE"' _ "$HERE/../archive-suite-autonomous.sh")"
+[ "$st" = "$T/.local/state/otherproj-autonomous" ] && ok "another label still gets its own directory (W32.label-state)" || no "other-label state dir is '$st'"
+
 echo ""
 echo "=================== $PASS passed, $FAIL failed ==================="
 [ "$FAIL" = 0 ]

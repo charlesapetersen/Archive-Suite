@@ -62,9 +62,13 @@ PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"     # L0 durabl
 # `archive-autonomous`, so reusing the template per its own stated contract (just set AUTONOMOUS_LABEL) gave
 # two daemons correctly-distinct launchd jobs that SHARED one engine.lock, daemon.log and resume-prompt.txt —
 # each seeing the other's heartbeat as "engine busy", and a lock takeover feeding the WRONG project's prompt
-# to `claude -p`. The default below is byte-identical to the old literal for LABEL=archivesuite, so this
-# instance's state dir does not move. `daemon.sh` derives the same path the same way.
-STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${LABEL}-autonomous}"  # runtime state (logs, lock, resume prompt)
+# to `claude -p`. `daemon.sh` derives the same path the same way.
+# This instance keeps its old directory: the plain `${LABEL}-autonomous` gave `archivesuite-autonomous`, not the
+# `archive-autonomous` that the plist, status-digest.sh, run-state-lib.sh, the resume prompt and the owner's
+# env/ocr-key.env files all use, although this comment said the two were identical (found 2026-09-28, before
+# the daemon had started under the W32 code).
+STATE_SLUG="$LABEL"; [ "$LABEL" = archivesuite ] && STATE_SLUG=archive
+STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${STATE_SLUG}-autonomous}"  # runtime state (logs, lock, resume prompt)
 CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
 # =======================================================================================================
 LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"

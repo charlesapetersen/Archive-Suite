@@ -16,7 +16,7 @@ set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 raw=0; [ "${1:-}" = "--raw" ] && { raw=1; shift; }
-STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${AUTONOMOUS_LABEL:-archivesuite}-autonomous}"   # as the daemon derives it
+STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"   # the daemon exports AUTONOMOUS_STATE to sessions
 LOG="${1:-$STATE/last-session.log}"
 
 # One "<pct> <resetsAt> <type>" per rate_limit_event, in log order; the last one wins.
