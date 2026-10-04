@@ -159,6 +159,7 @@ struct NoteEditorPane: View {
             onParseFailure: { message in
                 DispatchQueue.main.async { parseFailureMessage = message }
             },
+            onPasteDegraded: { message in nav.model.statusMessage = message },
             flushBox: flushBox,
             onRevealBlock: { anchor in
                 guard let link = anchor.link, let url = URL(string: link) else { return }

@@ -3,6 +3,15 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d12b) — ordered-list numbering and silent extract paste fallback
+
+**2026-10-04.** Serialization renumbers each ordered-list level from its first ordinal, retaining
+independent nested numbering and restarting after a list/type boundary. It uses existing semantic item
+runs; a newline inside an item is not a new item. Mixed nested lists, continuation text, scratch store
+reopen, coordinator debounce/flush snapshots, and plain-paste fallback have regression coverage.
+An extract paste that declines a rich provenance payload and inserts its plain text now reports that
+provenance was not imported; ordinary text does not produce this message.
+
 ## ✅ FIXED (W9.d6) — round-up metadata had no inspector or filter
 
 **2026-10-04.** Ordinary notes now have a Round-up note toggle, a live filter, and the same saved

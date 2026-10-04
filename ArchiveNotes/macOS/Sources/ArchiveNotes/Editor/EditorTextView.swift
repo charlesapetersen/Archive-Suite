@@ -217,6 +217,7 @@ final class EditorTextView: NSTextView {
     /// W7-S2: paste a `com.archivenotes.passage` payload as note-passage block(s) (extract editor only).
     /// Set by the coordinator; returns true when it inserted the passage.
     var passagePasteHandler: (() -> Bool)?
+    var plainPasteFallbackHandler: (() -> Void)?
 
     /// Image UTIs we accept on the pasteboard.
     private static let imageTypes: Set<NSPasteboard.PasteboardType> = [
@@ -255,6 +256,9 @@ final class EditorTextView: NSTextView {
         // For text: prefer plain string to avoid importing unmodeled rich styling
         if let str = pb.string(forType: .string), !str.isEmpty {
             insertPlainText(str)
+            if PassagePasteboard.hasPassage(pb) || !SourceBlockPaster.readPasteboard(from: pb).isEmpty {
+                plainPasteFallbackHandler?()
+            }
             return
         }
         // Template mode has no asset destination. An attachment-only RTFD or other rich

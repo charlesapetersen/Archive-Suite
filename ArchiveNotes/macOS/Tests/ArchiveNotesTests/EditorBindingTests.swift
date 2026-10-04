@@ -206,6 +206,28 @@ struct EditorBindingTests {
 
     // MARK: - Helpers
 
+    @Test @MainActor
+    func serializationDebouncePublishesLatestSnapshot() async throws {
+        let holder = BindingHolder("initial")
+        let coordinator = makeCoordinator(holder: holder)
+        let tv = coordinator.textView!
+        tv.string = "first edit"
+        coordinator.textDidChange(Notification(name: NSText.didChangeNotification, object: tv))
+        tv.string = "latest edit"
+        coordinator.textDidChange(Notification(name: NSText.didChangeNotification, object: tv))
+        #expect(holder.markdown == "initial", "write-back waits for the debounce")
+        try await Task.sleep(for: .milliseconds(650))
+        #expect(holder.markdown == "latest edit")
+        let snapshot = holder.markdown
+        tv.string = "pending third edit"
+        coordinator.textDidChange(Notification(name: NSText.didChangeNotification, object: tv))
+        coordinator.flushWriteBack()
+        #expect(holder.markdown == "pending third edit")
+        #expect(snapshot == "latest edit", "a captured serialized value cannot change with the editor")
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(holder.markdown == "pending third edit", "cancelled debounce cannot restore the older snapshot")
+    }
+
     @MainActor
     final class BindingHolder {
         var markdown: String

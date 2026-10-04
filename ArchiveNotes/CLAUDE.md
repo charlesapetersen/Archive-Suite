@@ -297,6 +297,7 @@ macOS/Sources/ArchiveNotes/
                                    (W9.d11); block-header chips (<!-- block: --> → chip attachments);
                                    parseWithStatus reports hard failure for raw→styled switch (W9.d7);
                                    inline images (![alt](path)); buildInsertableBlock seam; idempotent;
+                                   ordered lists renumber from each level's first ordinal (W9.d12b);
                                    onJumpBlock + passageSummaries thread note-passage chip jump + live
                                    title/missing resolve into BlockHeaderAttachment (W7-S3)
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
@@ -542,7 +543,8 @@ macOS/Tests/ArchiveNotesTests/
                                    blank-defaults-Inbox+Extracts/kind-filter
   EditorBindingTests.swift         9 tests: TextKit 2, undo/find bar, raw-mode font, write-back
                                    flush, programmatic suppress, mode-switch undo-clear/text-preserve,
-                                   lint (no .layoutManager in Editor/)
+                                   lint (no .layoutManager in Editor/); serialization debounce/flush
+                                   preserves the latest snapshot (W9.d12b)
   MarkdownBridgeTests.swift        31 tests: per-construct idempotency (h1–h6, bold, italic,
                                    bold+italic, inline code, link, ul, ol, blockquote, code block,
                                    code block+lang), mixed doc, second-round-trip no-op,

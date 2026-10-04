@@ -841,10 +841,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d12b` — ordered-list and editor coverage details [S–M].** Plan D12 split. Renumber an ordered
-  list from its first value; add `nestedListMixed` and debounce/snapshot checks; surface a clear status
-  string when extract paste degrades to plain text. | ArchiveNotes/macOS/{Sources/ArchiveNotes/Editor/,
-  Tests/ArchiveNotesTests/} | S–M | low | none
 - [ ] **`W9.d12c` — drag feedback and coordinated Trash handling [S–M].** Plan D12 split. Correct the
   move-vs-copy cursor and AppKit drop reliability, and wrap Notes Trash deletion in `NSFileCoordinator`.
   Use scratch store and off-screen GUI checks. | ArchiveNotes/macOS/Sources/ArchiveNotes/ | S–M | low |

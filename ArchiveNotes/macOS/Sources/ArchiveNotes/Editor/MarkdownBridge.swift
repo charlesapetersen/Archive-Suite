@@ -417,10 +417,26 @@ enum MarkdownBridge {
 
         let paragraphs = collectParagraphs(sub)
         var lines: [String] = []
+        var listState: [Int: (ordered: Bool, ordinal: Int)] = [:]
 
         for para in paragraphs {
-            let line = serializeParagraph(sub, range: para.range, kind: para.kind)
+            var kind = para.kind
+            if case .listItem(let ordered, let depth, let ordinal) = kind {
+                // Nested lists have independent numbering. Returning to a parent drops deeper state;
+                // changing marker type starts a new list at that level. Preserve the first ordinal.
+                listState = listState.filter { $0.key <= depth }
+                let previous = listState[depth]
+                let next = ordered && previous?.ordered == true ? (previous!.ordinal + 1) : ordinal
+                listState[depth] = (ordered, next)
+                kind = .listItem(ordered: ordered, depth: depth, ordinal: next)
+            } else {
+                listState.removeAll()
+            }
+            let line = serializeParagraph(sub, range: para.range, kind: kind)
             lines.append(line)
+            if let separator = trailingSeparatorRange(sub, in: para.range), separator.length > 1 {
+                listState.removeAll()
+            }
         }
 
         return lines.joined(separator: "\n")

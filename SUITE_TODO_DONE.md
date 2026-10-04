@@ -257,6 +257,14 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d12b — ordered-list and editor coverage details [S–M].** **SHIPPED 2026-10-04 (this commit).** Plan D12 split. Renumber an ordered
+  list from its first value; add `nestedListMixed` and debounce/snapshot checks; surface a clear status
+  string when extract paste degrades to plain text. | ArchiveNotes/macOS/{Sources/ArchiveNotes/Editor/,
+  Tests/ArchiveNotesTests/} | S–M | low | none
+  Verification: Notes headless Debug build/smoke (218 XCTest + 907 Swift Testing checks);
+  nested mixed-list and continuation regressions, scratch store reopen, coordinator debounce snapshots,
+  plain-paste status checks, and independent find→refute review passed.
+
 - [x] **W9.d6 — round-up notes: an inspector toggle, a one-year date offer, and a search/smart-folder criterion [M].** **SHIPPED 2026-10-04 (this commit).** Plan D6.
   Owner decision 2026-09-28: keep the `roundup` field (it persists and round-trips but has no UI, so it is always
   false) and build it out per `execution-plans/archive-notes/00-overview.md` §3.5: (1) a "Round-up note" toggle in

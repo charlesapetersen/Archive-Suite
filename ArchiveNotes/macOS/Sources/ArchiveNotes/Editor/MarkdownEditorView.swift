@@ -62,6 +62,8 @@ struct MarkdownEditorView: NSViewRepresentable {
     /// Reports a hard raw→styled parse failure (or nil after a successful switch). The host
     /// displays a banner; this representable keeps the raw buffer and mode unchanged.
     var onParseFailure: ((String?) -> Void)?
+    /// Extract provenance cannot be imported from every rich payload; explain a plain-text fallback.
+    var onPasteDegraded: ((String) -> Void)?
     /// Optional flush handle: populated by the coordinator so the host can force a synchronous
     /// write-back of pending edits (W7-S1a autosave flush-on-switch).
     var flushBox: EditorFlushBox?
@@ -171,6 +173,10 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         textView.passagePasteHandler = { [weak coordinator = context.coordinator] in
             coordinator?.handlePassagePaste() ?? false
+        }
+        textView.plainPasteFallbackHandler = { [weak coordinator = context.coordinator] in
+            guard coordinator?.formattingContext?.currentItemKind == .extract else { return }
+            coordinator?.parent.onPasteDegraded?("Pasted as plain text; source provenance was not imported.")
         }
         if isRaw {
             textView.string = markdown

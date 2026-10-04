@@ -122,6 +122,46 @@ struct MarkdownBridgeTests {
     }
 
     @Test @MainActor
+    func orderedListRenumbersFromFirst() async throws {
+        let edited = NSMutableAttributedString(string: "First\nSecond\nThird")
+        for (range, ordinal) in [(NSRange(location: 0, length: 6), 5),
+                                 (NSRange(location: 6, length: 7), 9),
+                                 (NSRange(location: 13, length: 5), 3)] {
+            edited.addAttribute(.noteBlockKind, value: BlockKind.listItem(ordered: true, depth: 0, ordinal: ordinal),
+                                range: range)
+        }
+        let serialized = MarkdownBridge.serialize(edited)
+        #expect(serialized == "5. First\n6. Second\n7. Third")
+        assertNormalized(serialized, expected: serialized)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("list-scratch-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = NoteStore(root: root)
+        let item = try FrontMatterCodec.decode("---\nid: \(UUID())\ntitle: List scratch\n---\n\(serialized)")
+        _ = try await store.create(item)
+        let loaded = try await store.load(item.id)
+        #expect(loaded.trailingBodyRaw?.trimmingCharacters(in: .whitespacesAndNewlines) == serialized)
+        #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: loaded.trailingBodyRaw ?? "")) == serialized)
+    }
+
+    @Test @MainActor
+    func nestedListMixed() {
+        let markdown = "5. Parent\n    - Child bullet\n        1. Deep one\n        9. Deep two\n6. Next parent\n    1. Child one\n    7. Child two\n\nAfter list.\n\n8. Separate"
+        let expected = "5. Parent\n    - Child bullet\n        1. Deep one\n        2. Deep two\n6. Next parent\n    1. Child one\n    2. Child two\n\nAfter list.\n\n8. Separate"
+        assertNormalized(markdown, expected: expected)
+    }
+
+    @Test @MainActor
+    func listContinuationIsNotAnotherItem() {
+        for markdown in ["1. First  \n   continuation\n2. Second", "1. First\n\n   continuation\n2. Second"] {
+            let serialized = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: markdown))
+            #expect(serialized.contains("continuation"))
+            #expect(serialized.contains("2. Second"))
+            #expect(!serialized.contains("2. continuation") && !serialized.contains("3. Second"))
+        }
+    }
+
+    @Test @MainActor
     func blockquote() {
         assertNormalized("> A quoted line", expected: "> A quoted line")
     }

@@ -15,6 +15,26 @@ struct EditorTestSeamTests {
     // MARK: - Selection clamping (pure)
 
     @Test
+    func declinedSourcePasteReportsPlainFallback() {
+        let pasteboard = NSPasteboard.general
+        defer { pasteboard.clearContents() }
+        pasteboard.clearContents()
+        let link = "archivereader://reveal?root=11111111-1111-1111-1111-111111111111&rel=sample.pdf&jpeg="
+        pasteboard.setString(link, forType: .string)
+        let tv = EditorTextView()
+        var fallbackCount = 0
+        tv.sourceBlockPasteHandler = { _ in false }
+        tv.plainPasteFallbackHandler = { fallbackCount += 1 }
+        tv.paste(nil)
+        #expect(tv.string == link)
+        #expect(fallbackCount == 1)
+        pasteboard.clearContents()
+        pasteboard.setString("ordinary text", forType: .string)
+        tv.paste(nil)
+        #expect(fallbackCount == 1, "ordinary plain text needs no degradation warning")
+    }
+
+    @Test
     func clampsLocationBeyondEnd() {
         let tv = EditorTextView()
         tv.uiTestReplace(with: NSAttributedString(string: "Hello"))   // length 5
