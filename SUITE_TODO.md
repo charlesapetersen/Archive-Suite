@@ -841,10 +841,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d12c` — drag feedback and coordinated Trash handling [S–M].** Plan D12 split. Correct the
-  move-vs-copy cursor and AppKit drop reliability, and wrap Notes Trash deletion in `NSFileCoordinator`.
-  Use scratch store and off-screen GUI checks. | ArchiveNotes/macOS/Sources/ArchiveNotes/ | S–M | low |
-  **needs:** gui
 - [ ] **`W9.d12d` — log filename/front-matter divergence [XS].** Plan D12 split. When the note filename
   and front-matter title disagree, log the divergence without rewriting either. | ArchiveNotes/macOS/
   Sources/ArchiveNotes/Index/ | XS | low | none
@@ -868,6 +864,9 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
   filters, folder create/rename/delete + move/reorder + replicate, templates, context menu, Zotero
   attach/auto-fill, source-block paste, Copy Link, deep-link, smart folders, empty state. Headless render
   guards for pixel truth; the Notes VM lane for the rest. | ops/gui/ + ArchiveNotes | M | low | **needs:** gui
+  Verification note 2026-10-04 (baseline `1ed3e5e`): `NotesGUITests.runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`
+  removes the Reader fixture note that `setUpOnMainActor` requires on every launch. Run destructive checks
+  last or against a separately rebuilt fixture; prove the remaining UI checks actually execute.
 - [ ] **`W9.e3` — prove the safety net actually bites on a planted violation [S]** (blocked-on: W9.c2, W9.c3).
   Plan E3. A lint that has never failed is not a guard — same class as `W26.oracle-fu1`. | scripts/ | S | low | none
 - [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (blocked-on: W9.e1,

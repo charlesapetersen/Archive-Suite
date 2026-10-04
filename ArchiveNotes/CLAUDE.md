@@ -93,7 +93,8 @@ macOS/Sources/ArchiveNotes/
                                    (nearest-ancestor walk + dangling detection, §16.4) (W6-S6)
     FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
     BlockParser.swift              Block/SourceAnchor + HTML-comment header parser
-    NoteStore.swift                actor — UUID-folder CRUD, atomic writes, Trash delete, assets, and
+    NoteStore.swift                actor — UUID-folder CRUD, atomic writes, coordinated Trash delete
+                                   (file-presenter refusal preserves the note, W9.d12c), assets, and
                                    hidden per-item date-facet + pending-subject projection ledgers (never
                                    authority; retry preserves exact Finder-tag removal ownership);
                                    container-generic workers also back template storage under
@@ -197,7 +198,8 @@ macOS/Sources/ArchiveNotes/
                                    at confirm), move/replicate, locations(of:) (W6-S5); windowKind +
                                    showingTemplates (templates-manager mode) (W6-S6)
     NotesItemDrag.swift            Pure id-only pasteboard codec (JSON [uuidString], custom UTI +
-                                   .string) + ⌥=replicate/plain=move resolution; foreign→[] (W6-S5)
+                                   .string) + ⌥=replicate/plain=move resolution; foreign→[] (W6-S5);
+                                   folder providers carry a distinct type and always propose move (W9.d12c)
     NotesSort.swift                NoteSortField (title/date/kind/quality/relevance) + NoteSortDescriptor
                                    + deterministic nil-last multi-level sort over ItemSummary (W6-S3;
                                    adapts Reader LibrarySort)
@@ -351,7 +353,8 @@ macOS/Sources/ArchiveNotes/
                                    Smart rows show live saved-query match counts, including zero (W9.d9).
                                    Sibling reorder persists sortOrder; dragging a folder onto another reparents
                                    through NotesModel.moveFolder with cycle refusal (W9.d1). Folder-row note
-                                   drop (plain=MOVE / ⌥=REPLICATE via NSEvent.modifierFlags) + batched
+                                   drop delegate reads AppKit bytes/NSString, proposes plain=MOVE / ⌥=REPLICATE,
+                                   captures drop-time source/modifiers before provider callbacks (W9.d12c) + batched
                                    delete-last-instance guard (fresh stranded read → §5 confirm) (W6-S5).
                                    Templates anchor row + folder "Template ▸" assignment submenu
                                    (None / each template / Manage…) → NotesModel.assignTemplate (W6-S6)

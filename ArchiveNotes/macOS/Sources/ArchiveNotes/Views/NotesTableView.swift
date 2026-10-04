@@ -502,8 +502,8 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
 
 /// `NSTableViewDiffableDataSource` subclass that makes rows draggable, carrying the row's item id
 /// (06-viewers §5, W6-S5). The payload is **ids only** — the custom `com.archivenotes.item-ids` type
-/// plus the same JSON as `.string` (so the SwiftUI `dropDestination(for: String.self)` on folder rows
-/// can read it without a declared `UTType`). No file bytes ever cross the pasteboard.
+/// plus the same JSON as `.string` (the folder drop delegate accepts both representations).
+/// No file bytes ever cross the pasteboard.
 @MainActor
 final class NotesTableDataSource: NSTableViewDiffableDataSource<Int, UUID> {
     // Optional NSTableViewDataSource method (not declared on the diffable superclass, so no `override`);

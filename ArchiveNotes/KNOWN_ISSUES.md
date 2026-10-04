@@ -3,6 +3,20 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d12c) — drop feedback and coordinated Trash
+
+**2026-10-04.** Folder rows use an explicit drop delegate for AppKit byte payloads and SwiftUI
+folder providers. Item drops propose move by default and copy with Option; folder reparents propose
+move. Drop-time modifiers and source folder are captured before asynchronous provider decoding so
+the committed operation agrees with the proposal. A retained delegate resolves the current source
+scope through a getter at drop time; folder-row selection is explicit and the full row is a drop target.
+Notes and templates coordinate deletion with
+`NSFileCoordinator` using `.forDeleting` before their audited Trash call, propagating both coordination
+and Trash failures to the existing disk-ground-truth recovery path.
+The same-item concurrency fixture now starts with a valid date: uncertainty without a date is
+intentionally omitted by the codec, so the old blank fixture made its supposed independent edits
+order-dependent. The test still requires the new date, quality, and uncertainty to compose.
+
 ## ✅ FIXED (W9.d12b) — ordered-list numbering and silent extract paste fallback
 
 **2026-10-04.** Serialization renumbers each ordered-list level from its first ordinal, retaining

@@ -485,6 +485,26 @@ struct NoteStoreTests {
 
     // MARK: - Delete (goes to Trash)
 
+    @Test("a file presenter's refusal prevents Trash and preserves the scratch note")
+    func coordinatedDeletionHonorsPresenterRefusal() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+        let item = makeItem()
+        _ = try await store.create(item)
+        let dir = await store.itemDir(item.id)
+        let presenter = RefusingDeletionPresenter(url: dir)
+        NSFileCoordinator.addFilePresenter(presenter)
+        defer { NSFileCoordinator.removeFilePresenter(presenter) }
+        do {
+            try await store.delete(item.id)
+            Issue.record("coordination refusal must stop the Trash accessor")
+        } catch {
+            #expect((error as NSError).domain == "ArchiveNotesScratchDeletionVeto")
+        }
+        #expect(await store.itemExists(item.id))
+        #expect(try await store.load(item.id).title == item.title)
+    }
+
     @Test("delete moves item dir to Trash, not removeItem")
     func deleteGoesToTrash() async throws {
         let (store, tmp) = try makeScratchStore()
@@ -608,5 +628,18 @@ struct NoteStoreTests {
         } catch is NoteStore.StoreError {
             // expected
         }
+    }
+}
+
+private final class RefusingDeletionPresenter: NSObject, NSFilePresenter, @unchecked Sendable {
+    let presentedItemURL: URL?
+    let presentedItemOperationQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        return queue
+    }()
+    init(url: URL) { presentedItemURL = url; super.init() }
+    func accommodatePresentedItemDeletion(completionHandler: @escaping (Error?) -> Void) {
+        completionHandler(NSError(domain: "ArchiveNotesScratchDeletionVeto", code: 1))
     }
 }

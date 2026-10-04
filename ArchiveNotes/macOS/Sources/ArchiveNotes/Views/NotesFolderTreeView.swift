@@ -1,5 +1,6 @@
 import SwiftUI
 import ArchiveCore
+import UniformTypeIdentifiers
 
 /// The Notes browser's left pane — the **mutable, id-keyed virtual folder tree** (06-viewers §2,
 /// W6-S2). Adapts Reader's `SidebarView` (`ArchiveReader/.../Views/SidebarView.swift`): a
@@ -142,20 +143,24 @@ struct NotesFolderTreeView: View {
     /// Handle a table→folder drop: plain = MOVE (from the current scope), ⌥ = REPLICATE. Reads the
     /// modifier at drop time (`NSEvent.modifierFlags`); the ids-only payload decodes to `[]` for a
     /// foreign/stray drop (an inert no-op). `move`/`replicate` refuse a non-normal target (§5).
-    private func handleItemDrop(_ payloads: [String], onto folderId: UUID) -> Bool {
+    private func handleItemDrop(_ payloads: [String], onto folderId: UUID, replicate: Bool, source: UUID?) -> Bool {
         let ids = payloads.flatMap { NotesItemDrag.decode(string: $0) }
         guard !ids.isEmpty else { return false }
-        let replicate = NSEvent.modifierFlags.contains(.option)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-ANUITestStorePath") {
+            model.statusMessage = "Drop \(replicate ? "copy" : "move") from \(source?.uuidString ?? "all") to \(folderId.uuidString)"
+        }
+        #endif
         Task {
             if replicate { await nav.replicate(ids, to: folderId) }
-            else { await nav.move(ids, to: folderId, from: model.selectedFolderId) }
+            else { await nav.move(ids, to: folderId, from: source) }
         }
         return true
     }
 
     /// Handle a folder drag as a reparent into the target. Item drags remain JSON UUID arrays and keep
     /// their existing move/Option-replicate behavior. `moveFolder` owns cycle refusal and its explanation.
-    private func handleDrop(_ payloads: [String], onto folderId: UUID) -> Bool {
+    private func handleDrop(_ payloads: [String], onto folderId: UUID, replicate: Bool, source: UUID?) -> Bool {
         if payloads.count == 1, let draggedFolder = UUID(uuidString: payloads[0]),
            model.organization.folders.contains(where: { $0.id == draggedFolder }) {
             let siblingOrders = model.organization.folders.filter {
@@ -165,7 +170,7 @@ struct NotesFolderTreeView: View {
             Task { await model.moveFolder(draggedFolder, newParent: folderId, at: nextIndex) }
             return true
         }
-        return handleItemDrop(payloads, onto: folderId)
+        return handleItemDrop(payloads, onto: folderId, replicate: replicate, source: source)
     }
 
     /// Renumber the moved sibling level in its existing parent; descendant membership and parent links stay put.
@@ -195,11 +200,20 @@ struct NotesFolderTreeView: View {
 
     private func folderRow(_ node: NotesFolderNode) -> some View {
         row(name: node.name, systemImage: "folder", count: node.itemCount)
+            .contentShape(Rectangle())
             .tag(node.id.uuidString)
             .accessibilityIdentifier("an.sidebar.folder")
             .contextMenu { folderMenu(node) }
-            .draggable(node.id.uuidString)
-            .dropDestination(for: String.self) { items, _ in handleDrop(items, onto: node.id) }
+            .onTapGesture {
+                nav.showingTemplates = false
+                model.setFolderScope(node.id)
+            }
+            .onDrag { NotesItemDrag.folderProvider(node.id) }
+            .onDrop(of: NotesFolderDropDelegate.types, delegate: NotesFolderDropDelegate(
+                sourceFolder: { model.selectedFolderId },
+                accept: { payload, replicate, source in
+                    _ = handleDrop([payload], onto: node.id, replicate: replicate, source: source)
+                }))
     }
 
     /// Build each level with its own `ForEach.onMove`, retaining nested disclosure rows while giving reorder
@@ -355,5 +369,45 @@ struct NotesFolderTreeView: View {
     /// false clears it). Keeps the alert/dialog `isPresented` in sync with the target id.
     private func boolBinding(_ id: Binding<UUID?>) -> Binding<Bool> {
         Binding(get: { id.wrappedValue != nil }, set: { if !$0 { id.wrappedValue = nil } })
+    }
+}
+
+/// The AppKit table writes pasteboard bytes, while SwiftUI folder drags carry NSString. Read both
+/// explicitly rather than relying on Transferable String decoding. Capture modifiers and source
+/// scope at drop time; asynchronous provider loading cannot change the promised move/copy operation.
+private struct NotesFolderDropDelegate: DropDelegate {
+    static let types = [NotesItemDrag.folderTypeIdentifier, NotesItemDrag.pasteboardType.rawValue,
+                        UTType.utf8PlainText.identifier, UTType.plainText.identifier]
+    // SwiftUI may retain the delegate across selection updates. Resolve the current scope at the
+    // drop boundary, then capture the value before any provider callback can run.
+    let sourceFolder: @MainActor @Sendable () -> UUID?
+    let accept: @MainActor @Sendable (String, Bool, UUID?) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: Self.types) }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let isFolder = info.hasItemsConforming(to: [NotesItemDrag.folderTypeIdentifier])
+        let operation = NotesItemDrag.operation(isFolder: isFolder, optionHeld: NSEvent.modifierFlags.contains(.option))
+        return DropProposal(operation: operation == .copy ? .copy : .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let providers = info.itemProviders(for: Self.types)
+        guard !providers.isEmpty else { return false }
+        let replicate = NSEvent.modifierFlags.contains(.option)
+        let source = MainActor.assumeIsolated { sourceFolder() }
+        let accept = accept
+        for provider in providers {
+            guard let type = Self.types.first(where: { provider.hasItemConformingToTypeIdentifier($0) }) else { continue }
+            provider.loadItem(forTypeIdentifier: type, options: nil) { item, error in
+                guard error == nil else { return }
+                let payload: String?
+                if let data = item as? Data { payload = String(data: data, encoding: .utf8) }
+                else { payload = item as? String }
+                guard let payload else { return }
+                Task { @MainActor in accept(payload, replicate, source) }
+            }
+        }
+        return true
     }
 }

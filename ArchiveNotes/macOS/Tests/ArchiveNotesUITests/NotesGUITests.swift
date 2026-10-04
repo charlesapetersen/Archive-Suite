@@ -1770,6 +1770,40 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W9.d12c — actual AppKit table payloads replicate with Option and move without it.
+    func testW9_TableDragOptionReplicatesAndPlainMoves() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let folderRows = mainWindow.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
+            let reading = folderRows.matching(NSPredicate(format: "value ==[c] %@", "Reading")).firstMatch
+            let ideas = folderRows.matching(NSPredicate(format: "value ==[c] %@", "Ideas")).firstMatch
+            reading.click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                !self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idZotero)"].exists
+            }, "Reading must be the actual source scope before dragging")
+            let row = selectItem(uuid: Self.idPlain)
+            XCUIElement.perform(withKeyModifiers: [.option]) {
+                row.press(forDuration: 1.0, thenDragTo: ideas)
+            }
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                let memberships = self.organizationMemberships() ?? []
+                return memberships.contains([Self.folderIdeas, Self.idPlain])
+                    && memberships.contains([Self.folderReading, Self.idPlain])
+            }, "Option-drop adds a placement and keeps the source; \(mainWindow.descendants(matching: .any)["an.sidebar.status"].debugDescription)")
+            ideas.click()
+            selectItem(uuid: Self.idPlain).press(forDuration: 1.0, thenDragTo: reading)
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                let memberships = self.organizationMemberships() ?? []
+                return !memberships.contains([Self.folderIdeas, Self.idPlain])
+                    && memberships.contains([Self.folderReading, Self.idPlain])
+            }, "plain drop removes only the captured source placement; \(mainWindow.descendants(matching: .any)["an.sidebar.status"].debugDescription)")
+            let attachment = XCTAttachment(screenshot: mainWindow.screenshot())
+            attachment.name = "W9.d12c-table-drag"
+            attachment.lifetime = .keepAlways
+            XCTContext.runActivity(named: "Capture table drag result") { $0.add(attachment) }
+        }
+    }
+
     /// W9.d1 — dragging one folder onto another reparents the folder in the scratch organization graph.
     func testG18_DragFolderOntoFolderReparentsIt() throws {
         try withFixture {

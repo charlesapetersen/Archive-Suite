@@ -416,8 +416,17 @@ actor NoteStore {
         guard FileManager.default.fileExists(atPath: dir.path) else {
             throw StoreError.notFound(id)
         }
-        var resultURL: NSURL?
-        try FileManager.default.trashItem(at: dir, resultingItemURL: &resultURL)
+        var coordinationError: NSError?
+        var trashError: Error?
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: dir, options: .forDeleting,
+                                                       error: &coordinationError) { coordinatedURL in
+            do {
+                var resultURL: NSURL?
+                try FileManager.default.trashItem(at: coordinatedURL, resultingItemURL: &resultURL)
+            } catch { trashError = error }
+        }
+        if let coordinationError { throw coordinationError }
+        if let trashError { throw trashError }
     }
 
     private func mdURL(for id: UUID, in dir: URL) throws -> URL {

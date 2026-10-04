@@ -257,6 +257,14 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d12c — drag feedback and coordinated Trash handling [S–M].** **SHIPPED 2026-10-04 (this commit).** Plan D12 split. Correct the
+  move-vs-copy cursor and AppKit drop reliability, and wrap Notes Trash deletion in `NSFileCoordinator`.
+  Use scratch store and off-screen GUI checks. | ArchiveNotes/macOS/Sources/ArchiveNotes/ | S–M | low |
+  **needs:** gui
+  Verification: Notes headless Debug build/smoke (218 XCTest + 909 Swift Testing checks),
+  scratch file-presenter veto/preservation, independent find→refute review, and off-screen AppKit
+  table Option-copy/plain-move, folder reparent, and confirmed Trash UI checks.
+
 - [x] **W9.d12b — ordered-list and editor coverage details [S–M].** **SHIPPED 2026-10-04 (this commit).** Plan D12 split. Renumber an ordered
   list from its first value; add `nestedListMixed` and debounce/snapshot checks; surface a clear status
   string when extract paste degrades to plain text. | ArchiveNotes/macOS/{Sources/ArchiveNotes/Editor/,

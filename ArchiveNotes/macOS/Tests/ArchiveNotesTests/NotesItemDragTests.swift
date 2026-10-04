@@ -39,4 +39,11 @@ struct NotesItemDragTests {
         #expect(NotesItemDrag.operation(optionHeld: true) == .copy)   // ⌥ = replicate
         #expect(NotesItemDrag.operation(optionHeld: false) == .move)  // plain = move
     }
+
+    @Test func folderDragAlwaysMoves() {
+        #expect(NotesItemDrag.operation(isFolder: true, optionHeld: true) == .move)
+        #expect(NotesItemDrag.operation(isFolder: true, optionHeld: false) == .move)
+        #expect(NotesItemDrag.operation(isFolder: false, optionHeld: true) == .copy)
+        #expect(NotesItemDrag.operation(isFolder: false, optionHeld: false) == .move)
+    }
 }

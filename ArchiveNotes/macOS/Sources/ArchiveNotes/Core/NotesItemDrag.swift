@@ -6,9 +6,10 @@ import AppKit
 /// bytes don't decode to UUIDs yields `[]`, so a stray drop is a safe no-op.
 ///
 /// The canonical representation is the custom pasteboard type `com.archivenotes.item-ids`; the drag
-/// source also writes the same JSON as `.string` so the SwiftUI `dropDestination(for: String.self)`
-/// on folder rows can read it without a declared `UTType` (see `NotesFolderTreeView`).
+/// source also writes the same JSON as `.string`; folder rows explicitly decode either bytes or text
+/// through their drop delegate (see `NotesFolderTreeView`).
 enum NotesItemDrag {
+    static let folderTypeIdentifier = "com.archivenotes.folder-id"
     /// Custom pasteboard type carrying the id list (matches the app's other `com.archivenotes.*` UTIs).
     static let pasteboardType = NSPasteboard.PasteboardType("com.archivenotes.item-ids")
 
@@ -39,5 +40,21 @@ enum NotesItemDrag {
     /// Kept pure so the MOVE-vs-REPLICATE decision is unit-testable without a live drag session.
     static func operation(optionHeld: Bool) -> NSDragOperation {
         optionHeld ? .copy : .move
+    }
+
+    /// Folder reparents always move; only item placements can replicate with Option.
+    static func operation(isFolder: Bool, optionHeld: Bool) -> NSDragOperation {
+        isFolder ? .move : operation(optionHeld: optionHeld)
+    }
+
+    @MainActor
+    static func folderProvider(_ id: UUID) -> NSItemProvider {
+        let provider = NSItemProvider(object: id.uuidString as NSString)
+        let bytes = Data(id.uuidString.utf8)
+        provider.registerDataRepresentation(forTypeIdentifier: folderTypeIdentifier, visibility: .ownProcess) { completion in
+            completion(bytes, nil)
+            return nil
+        }
+        return provider
     }
 }

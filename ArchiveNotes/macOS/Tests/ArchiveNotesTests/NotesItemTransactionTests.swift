@@ -132,7 +132,12 @@ struct NotesItemTransactionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = NoteStore(root: root)
         let id = UUID()
-        _ = try await store.create(Self.blankItem(id: id, body: "body"))
+        // Uncertainty is only durable when a date exists. Seed that prerequisite so c-before-b is
+        // an independent edit, rather than a legitimate omission by FrontMatterCodec.encode.
+        var seed = Self.blankItem(id: id, body: "body")
+        seed.date = "1967"
+        seed.datePrecision = .year
+        _ = try await store.create(seed)
 
         async let a: ItemTransaction? = try? store.withItem(id) { $0.quality = 3 }
         async let b: ItemTransaction? = try? store.withItem(id) { $0.date = "1968"; $0.datePrecision = .year }
