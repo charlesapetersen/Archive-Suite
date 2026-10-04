@@ -1902,6 +1902,50 @@ final class NotesGUITests: NotesFixtureUITestCase {
         closeExtractsWindow(extractWin)
     }
 
+    /// W9.d6 — the actual inspector toggle persists without changing the date, and filters the list.
+    func testW9_RoundupInspectorAndFilter() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            selectItem(uuid: Self.idReader)
+            let before = try XCTUnwrap(rawMarkdown(inItemDir: Self.idReader))
+            let dateLines = before.split(separator: "\n").filter { $0.hasPrefix("date") }
+            let toggle = mainWindow.descendants(matching: .any)["an.detail.roundup"].firstMatch
+            XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            toggle.click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                self.rawMarkdown(inItemDir: Self.idReader)?.contains("roundup: true") == true
+            })
+            let after = try XCTUnwrap(rawMarkdown(inItemDir: Self.idReader))
+            XCTAssertEqual(after.split(separator: "\n").filter { $0.hasPrefix("date") }, dateLines)
+            let attachment = XCTAttachment(screenshot: mainWindow.screenshot())
+            attachment.name = "W9.d6-roundup-inspector"
+            attachment.lifetime = .keepAlways
+            XCTContext.runActivity(named: "Capture the round-up inspector") { $0.add(attachment) }
+
+            let picker = mainWindow.descendants(matching: .any)["an.filter.roundup"].firstMatch
+            XCTAssertTrue(picker.waitForExistence(timeout: 5))
+            picker.click()
+            app.menuItems["Round-up notes"].click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idReader)"].exists
+                    && !self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"].exists
+            })
+            picker.click()
+            app.menuItems["Other items"].click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                !self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idReader)"].exists
+                    && self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"].exists
+            })
+            picker.click()
+            app.menuItems["Any"].click()
+            selectItem(uuid: Self.idReader)
+            toggle.click()
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                self.rawMarkdown(inItemDir: Self.idReader)?.contains("roundup: true") == false
+            })
+        }
+    }
+
     /// W9.d10 — the extract inspector resolves the live source title and summarizes passage count.
     /// The fixture holds one extract passage from the Moore note; this test only reads scratch data.
     func testW9_ExtractInspectorShowsSourceSummary() throws {

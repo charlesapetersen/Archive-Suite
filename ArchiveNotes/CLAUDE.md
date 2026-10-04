@@ -76,7 +76,7 @@ macOS/Sources/ArchiveNotes/
                                    Extract ⌘⌥E / Append to Extract…, W7-S2), DebugBlockCommands
   Models/
     NotesFilter.swift              Filter type (§16.3) + matches(_:folderItemIDs:) (kind/quality/
-                                   date-range/tags ALL|ANY/title-substring/graph folder-membership),
+                                   date-range/tags ALL|ANY/title-substring/graph folder-membership/round-up),
                                    effective(base:user:) merge, tolerant init(from:) (W6-S4)
   Store/
     Item.swift                     Item/ZoteroRef/UnknownKey domain models; normalizedDate is THE
@@ -402,7 +402,10 @@ macOS/Sources/ArchiveNotes/
                                    needed, a live "N items checked" state it cancels on dismiss/re-show
                                    (PreviewSearchModel, generation-scoped so a finished search's straggler
                                    ticks can't inflate the next one's count) (W23.m14).
-                                   SourceBlockPreviewState (ObservableObject bridge for @EnvironmentObject)
+                                   SourceBlockPreviewState (ObservableObject bridge for @EnvironmentObject;
+                                   archive grant revisions refresh round-up year suggestions)
+    RoundupYearSuggestion.swift    Exact linked-PDF year reads in already-granted roots; own short scopes,
+                                   marker/containment checks, cancellation, no scans or automatic writes
   Zotero/
     ZoteroRef.swift                ZoteroRef/ZoteroLibrary/ZoteroRefKind value types (§D.1)
     ZoteroSelectLink.swift         Pure total parser for zotero://select/… links (§D.2)

@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import PDFKit
 import ArchiveCore
+import Combine
 
 /// Shows an NSPopover with a lightweight PDF preview for a source block's
 /// archivereader:// link. Resolves the link via `ReaderLinkResolver`, then
@@ -369,6 +370,8 @@ private struct PreviewMessageView: View {
 /// so `NoteEditorPane` can wire the preview callback without directly depending on the resolver.
 @MainActor
 final class SourceBlockPreviewState: ObservableObject {
+    @Published private(set) var archiveAccessRevision: UInt = 0
+    private var archiveAccessChanges: AnyCancellable?
     private let rootStore: ReaderRootStore
     private let preview: ReaderPreviewPopover
     /// Thumbnail generation owns and balances its own short security scope, so it cannot release the
@@ -389,6 +392,9 @@ final class SourceBlockPreviewState: ObservableObject {
             rootStore: store,
             thumbnailer: PDFThumbnailer(cacheDirectory: Self.thumbnailCacheDirectory)
         )
+        archiveAccessChanges = store.$knownRoots.dropFirst().sink { [weak self] _ in
+            self?.archiveAccessRevision &+= 1
+        }
     }
 
     func show(for anchor: SourceAnchor, relativeTo view: NSView) {
@@ -403,6 +409,10 @@ final class SourceBlockPreviewState: ObservableObject {
     /// Failure stays text-only; a paste never waits for a user grant or an archive-wide search.
     func thumbnail(for anchor: SourceAnchor) async -> Data? {
         await thumbnailRenderer.png(for: anchor)
+    }
+
+    func roundupYear(for links: [String]) async -> Int? {
+        await RoundupYearSuggestion.commonYear(links: links, roots: rootStore.knownRoots)
     }
 
     /// File ▸ Choose Archive Folder… — grant a Reader root with no link in hand.

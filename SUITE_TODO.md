@@ -841,13 +841,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **W9.d6 — round-up notes: an inspector toggle, a one-year date offer, and a search/smart-folder criterion [M].** (blocked-on: W9.d6-owner-ok) Plan D6.
-  Owner decision 2026-09-28: keep the `roundup` field (it persists and round-trips but has no UI, so it is always
-  false) and build it out per `execution-plans/archive-notes/00-overview.md` §3.5: (1) a "Round-up note" toggle in
-  the note inspector; (2) when it is on and the note's linked PDFs all fall in one year, offer to set the note's
-  date to that year (a soft suggestion, never enforced); (3) round-up as a criterion in search and in smart
-  folders' saved queries. | NoteMetadataInspector.swift, Store/Item.swift, FrontMatterCodec.swift, smart-folder
-  query + search | M | low | none
 - [ ] **`W9.d12b` — ordered-list and editor coverage details [S–M].** Plan D12 split. Renumber an ordered
   list from its first value; add `nestedListMixed` and debounce/snapshot checks; surface a clear status
   string when extract paste degrades to plain text. | ArchiveNotes/macOS/{Sources/ArchiveNotes/Editor/,

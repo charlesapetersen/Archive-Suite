@@ -20,6 +20,7 @@ import SwiftUI
 struct NoteMetadataInspector: View {
     @ObservedObject var nav: NotesNavigationModel
     let item: ItemSummary
+    @EnvironmentObject private var sourcePreview: SourceBlockPreviewState
 
     @State private var precision: Item.DatePrecision = .year
     @State private var yearText = ""
@@ -28,10 +29,16 @@ struct NoteMetadataInspector: View {
     @State private var authorsText = ""
     @State private var extractSources: [ExtractSourceUsage]?
     @State private var extractSourcesFailed = false
+    @State private var roundupYear: Int?
 
     private struct SourceLoadKey: Equatable {
         let id: UUID
         let mtime: Double
+    }
+
+    private struct RoundupLoadKey: Equatable {
+        let source: SourceLoadKey
+        let archiveAccessRevision: UInt
     }
 
     private static let monthNames = DateFieldEntry.monthNames
@@ -40,6 +47,9 @@ struct NoteMetadataInspector: View {
         VStack(alignment: .leading, spacing: 10) {
             if item.kind == .extract {
                 extractSourcesSection
+                Divider()
+            } else {
+                roundupSection
                 Divider()
             }
             authorsSection
@@ -66,6 +76,38 @@ struct NoteMetadataInspector: View {
             guard !Task.isCancelled else { return }
             extractSources = loaded
             extractSourcesFailed = loaded == nil
+        }
+        .task(id: RoundupLoadKey(source: SourceLoadKey(id: item.id, mtime: item.mtime),
+                                archiveAccessRevision: sourcePreview.archiveAccessRevision)) {
+            roundupYear = nil
+            guard item.kind == .note, item.roundup,
+                  let links = await nav.model.loadRoundupSourceLinks(for: item.id) else { return }
+            let year = await sourcePreview.roundupYear(for: links)
+            guard !Task.isCancelled else { return }
+            roundupYear = year
+        }
+    }
+
+    private var roundupSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Round-up note", isOn: Binding(get: { item.roundup }, set: { value in
+                let id = item.id
+                Task { await nav.setRoundup(value, for: id) }
+            }))
+            .accessibilityIdentifier("an.detail.roundup")
+            if item.roundup, let year = roundupYear,
+               item.date != String(year) || item.datePrecision != .year {
+                Text("Linked PDFs share the year \(String(year)).")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Use \(String(year)) as note date") {
+                    precision = .year
+                    yearText = String(year)
+                    month = 0
+                    dayText = ""
+                    commit()
+                }
+                .accessibilityIdentifier("an.detail.roundup.useYear")
+            }
         }
     }
 

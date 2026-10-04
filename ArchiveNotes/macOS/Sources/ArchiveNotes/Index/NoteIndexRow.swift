@@ -22,6 +22,7 @@ struct NoteIndexRow: Sendable {
     /// Distinct source-note count (extract provenance) — the "Sources" column (W7-S4). 0 for notes
     /// and source-less extracts. Projected into `items.source_count` so the list never reads `.md`.
     let sourceCount: Int
+    var roundup: Bool = false
 }
 
 extension NoteIndexRow {
@@ -52,7 +53,8 @@ extension NoteIndexRow {
             created: item.created,
             modified: item.modified,
             managedTags: tagsJSON,
-            sourceCount: item.blocks.distinctSourceNoteCount
+            sourceCount: item.blocks.distinctSourceNoteCount,
+            roundup: item.roundup
         )
     }
 }
@@ -77,4 +79,5 @@ struct ItemSummary: Sendable, Identifiable {
     /// existing `ItemSummary(...)` call sites (tests, older projections) keep compiling; the index
     /// projection (`NotesIndex.readSummaryRow`) supplies the real value from `items.source_count`.
     var sourceNoteCount: Int = 0
+    var roundup: Bool = false
 }

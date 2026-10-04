@@ -208,6 +208,11 @@ final class NotesNavigationModel: ObservableObject {
         await model.setDateUncertain(uncertain, for: id)
     }
 
+    @discardableResult
+    func setRoundup(_ roundup: Bool, for id: UUID) async -> Bool {
+        await model.setRoundup(roundup, for: id)
+    }
+
     /// Set manually entered authors; they remain front-matter only.
     @discardableResult
     func setAuthors(_ authors: [String], for id: UUID) async -> Bool {

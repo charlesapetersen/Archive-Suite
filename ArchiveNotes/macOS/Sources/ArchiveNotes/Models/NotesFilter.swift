@@ -32,6 +32,10 @@ struct NotesFilter: Codable, Equatable, Sendable {
     var dateTo: Int? = nil
     /// Scope to a specific folder (smart-folder-as-root).
     var folderId: UUID? = nil
+    /// nil = any; true = round-up notes; false = other items.
+    var roundup: Bool? = nil
+    /// Persist an empty intersection when a smart scope and live round-up facet conflict.
+    var matchesNothing: Bool = false
 
     /// Whether this filter is effectively empty (matches everything).
     var isEmpty: Bool {
@@ -42,6 +46,8 @@ struct NotesFilter: Codable, Equatable, Sendable {
             && dateFrom == nil
             && dateTo == nil
             && folderId == nil
+            && roundup == nil
+            && !matchesNothing
     }
 
     /// Whether this filter narrows anything (the inverse of `isEmpty`).
@@ -56,6 +62,8 @@ struct NotesFilter: Codable, Equatable, Sendable {
     /// persisted smart-folder query. `searchText` is a **title substring** here — the durable keyword
     /// predicate; live keyword search runs through FTS in the navigation model instead (06-viewers §4).
     func matches(_ item: ItemSummary, folderItemIDs: Set<UUID>?) -> Bool {
+        if matchesNothing { return false }
+        if let roundup, item.roundup != roundup { return false }
         // Folder scope — membership in the folder's subtree (graph, not path prefix).
         if folderId != nil {
             guard let folderItemIDs, folderItemIDs.contains(item.id) else { return false }
@@ -109,13 +117,16 @@ extension NotesFilter {
             qualities:   try c.decodeIfPresent(Set<Int>.self,    forKey: .qualities)   ?? [],
             dateFrom:    try c.decodeIfPresent(Int.self,         forKey: .dateFrom),
             dateTo:      try c.decodeIfPresent(Int.self,         forKey: .dateTo),
-            folderId:    try c.decodeIfPresent(UUID.self,        forKey: .folderId)
+            folderId:    try c.decodeIfPresent(UUID.self,        forKey: .folderId),
+            roundup:     try c.decodeIfPresent(Bool.self,        forKey: .roundup),
+            matchesNothing: try c.decodeIfPresent(Bool.self,     forKey: .matchesNothing) ?? false
         )
     }
 
     /// Fold a per-window `user` filter onto a `base` scope (a smart folder / folder selection) for
     /// "Save as Smart Folder". Per-facet: user wins when set, else inherit base; tags = union.
     /// Mirrors `LibraryFilter.effective(base:user:)` (`Core/LibraryFilter.swift:98-110`).
+    /// Round-up predicates intersect, matching the live scope; an impossible pair stays empty on save.
     static func effective(base: NotesFilter, user: NotesFilter) -> NotesFilter {
         var r = NotesFilter()
         r.kind = user.kind != .both ? user.kind : base.kind
@@ -127,6 +138,9 @@ extension NotesFilter {
         r.dateFrom = user.dateFrom ?? base.dateFrom
         r.dateTo = user.dateTo ?? base.dateTo
         r.folderId = user.folderId ?? base.folderId
+        r.roundup = user.roundup ?? base.roundup
+        r.matchesNothing = base.matchesNothing || user.matchesNothing
+            || (base.roundup != nil && user.roundup != nil && base.roundup != user.roundup)
         return r
     }
 }

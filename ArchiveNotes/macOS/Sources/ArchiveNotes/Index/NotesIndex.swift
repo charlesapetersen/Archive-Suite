@@ -70,7 +70,8 @@ actor NotesIndex {
                 created REAL,
                 modified REAL,
                 managed_tags TEXT,
-                source_count INTEGER DEFAULT 0
+                source_count INTEGER DEFAULT 0,
+                roundup INTEGER NOT NULL DEFAULT 0
             );
             """)
 
@@ -81,6 +82,11 @@ actor NotesIndex {
         // doesn't hit a duplicate-column error.
         if !itemsHasColumn("source_count") {
             try exec("ALTER TABLE items ADD COLUMN source_count INTEGER DEFAULT 0;")
+        }
+        // NULL marks legacy rows that need a fresh disk projection even when their mtime is unchanged.
+        // Keep the durable folders/memberships tables and the existing FTS rows intact during migration.
+        if !itemsHasColumn("roundup") {
+            try exec("ALTER TABLE items ADD COLUMN roundup INTEGER;")
         }
 
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).
@@ -198,7 +204,7 @@ actor NotesIndex {
     /// All stored (uuid-string, mtime) pairs in one query — the indexer pulls this once to
     /// partition items into work (mtime differs) vs skipped.
     func existingMTimes() -> [String: Double] {
-        guard let stmt = prepare("SELECT id, mtime FROM items;") else { return [:] }
+        guard let stmt = prepare("SELECT id, mtime FROM items WHERE roundup IS NOT NULL;") else { return [:] }
         defer { sqlite3_finalize(stmt) }
         var map: [String: Double] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -262,10 +268,10 @@ actor NotesIndex {
             try run("""
                 UPDATE items SET mtime=?, title=?, kind=?, date=?, date_precision=?,
                     date_uncertain=?, authors=?, sort_date=?, quality=?, created=?,
-                    modified=?, managed_tags=?, source_count=? WHERE rowid=?;
+                    modified=?, managed_tags=?, source_count=?, roundup=? WHERE rowid=?;
                 """) { stmt in
                 self.bindItemColumns(stmt, row, startIndex: 1)
-                sqlite3_bind_int64(stmt, 14, rowid)
+                sqlite3_bind_int64(stmt, 15, rowid)
             }
             try insertFTS(rowid: rowid, row: row)
         } else {
@@ -273,8 +279,8 @@ actor NotesIndex {
             try run("""
                 INSERT INTO items(id, mtime, title, kind, date, date_precision,
                     date_uncertain, authors, sort_date, quality, created, modified, managed_tags,
-                    source_count)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    source_count, roundup)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """) { stmt in
                 self.bindText(stmt, 1, idStr)
                 self.bindItemColumns(stmt, row, startIndex: 2)
@@ -298,6 +304,7 @@ actor NotesIndex {
         sqlite3_bind_double(stmt, s + 10, row.modified.timeIntervalSince1970)
         bindText(stmt, s + 11, row.managedTags)
         sqlite3_bind_int(stmt, s + 12, Int32(row.sourceCount))
+        sqlite3_bind_int(stmt, s + 13, row.roundup ? 1 : 0)
     }
 
     private func insertFTS(rowid: Int64, row: NoteIndexRow) throws {
@@ -341,7 +348,7 @@ actor NotesIndex {
     func summary(for id: UUID) -> ItemSummary? {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
-                   sort_date, quality, created, modified, mtime, managed_tags, source_count
+                   sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup
             FROM items WHERE id = ?;
             """) else { return nil }
         defer { sqlite3_finalize(stmt) }
@@ -356,7 +363,7 @@ actor NotesIndex {
     func allSummaries() -> [ItemSummary] {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
-                   sort_date, quality, created, modified, mtime, managed_tags, source_count
+                   sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup
             FROM items;
             """) else { return [] }
         defer { sqlite3_finalize(stmt) }
@@ -772,7 +779,8 @@ actor NotesIndex {
                            datePrecision: datePrecision, dateUncertain: dateUncertain,
                            authors: authors, sortDate: sortDate, quality: quality,
                            created: created, modified: modified, mtime: mtime,
-                           managedTags: managedTags, sourceNoteCount: sourceCount)
+                           managedTags: managedTags, sourceNoteCount: sourceCount,
+                           roundup: sqlite3_column_int(stmt, 14) != 0)
     }
 
     private func exec(_ sql: String) throws {

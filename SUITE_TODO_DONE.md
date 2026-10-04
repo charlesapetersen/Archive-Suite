@@ -257,6 +257,17 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d6 — round-up notes: an inspector toggle, a one-year date offer, and a search/smart-folder criterion [M].** **SHIPPED 2026-10-04 (this commit).** Plan D6.
+  Owner decision 2026-09-28: keep the `roundup` field (it persists and round-trips but has no UI, so it is always
+  false) and build it out per `execution-plans/archive-notes/00-overview.md` §3.5: (1) a "Round-up note" toggle in
+  the note inspector; (2) when it is on and the note's linked PDFs all fall in one year, offer to set the note's
+  date to that year (a soft suggestion, never enforced); (3) round-up as a criterion in search and in smart
+  folders' saved queries. | NoteMetadataInspector.swift, Store/Item.swift, FrontMatterCodec.swift, smart-folder
+  query + search | M | low | none
+  **Verification:** Notes Debug build/headless smoke (218 XCTest + 902 Swift Testing checks),
+  independent find→refute review, scratch store/index/year tests, and focused off-screen inspector/filter check.
+  Legacy index rows reproject without losing organization; old smart queries remain readable.
+
 - [x] **W9.d12a — extract editor focus and initial provenance-chip visibility [S–M].** **SHIPPED
   2026-09-28 (this commit).** The selected body's identity now forces the editor to load the right
   text before a jump scroll, and a focus token is retried once a newly selected body has loaded. Extracts

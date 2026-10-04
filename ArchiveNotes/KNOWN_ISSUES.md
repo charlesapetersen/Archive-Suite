@@ -3,6 +3,16 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d6) — round-up metadata had no inspector or filter
+
+**2026-10-04.** Ordinary notes now have a Round-up note toggle, a live filter, and the same saved
+smart-folder criterion. The index migrates without dropping organization data and reprojects legacy
+rows even when their files have not changed. Conflicting round-up scope/filter predicates remain empty
+when saved. A date offer appears only when all exact linked PDFs under granted Reader roots have the
+same year; missing, undated, mixed-year, renamed, or escaping sources suppress it. Granting archive
+access refreshes the offer. Only accepting the button changes the note's date; toggling preserves its
+body, other metadata, and date. Tier-2 find→refute review and scratch functional checks passed.
+
 ## ✅ FIXED (W9.d12a) — extract editor could hide its first provenance chip
 
 **2026-09-28.** Selecting an item now replaces the editor body by item identity, even if the previous

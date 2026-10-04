@@ -890,6 +890,16 @@ final class NotesModel: ObservableObject {
         await mutateItem(id, "set date uncertainty") { $0.dateUncertain = uncertain }
     }
 
+    /// Round-up is ordinary-note metadata, persisted through the same fresh-load transaction as authors.
+    @discardableResult
+    func setRoundup(_ roundup: Bool, for id: UUID) async -> Bool {
+        guard let noteStore else { return false }
+        do {
+            guard try await noteStore.load(id).kind == .note else { return false }
+            return await mutateItem(id, "set round-up status") { $0.roundup = roundup }
+        } catch { report(error, "set round-up status"); return false }
+    }
+
     /// Set manually entered authors in front matter only. Empty/whitespace-only entries are omitted;
     /// order and duplicate names are preserved. Authors are not projected to Finder tags.
     @discardableResult
@@ -1025,6 +1035,24 @@ final class NotesModel: ObservableObject {
             let item = try await noteStore.load(id)
             return item.kind == .extract ? item.blocks.notePassageSourceUsage : []
         } catch { report(error, "read extract sources"); return nil }
+    }
+
+    /// Read every Reader source from the current round-up body. A malformed/missing source must not
+    /// be skipped when deciding whether ALL linked PDFs share a year.
+    func loadRoundupSourceLinks(for id: UUID) async -> [String]? {
+        guard let noteStore else { return nil }
+        do {
+            let item = try await noteStore.load(id)
+            guard item.kind == .note, item.roundup else { return nil }
+            let sources = item.blocks.filter { $0.kind == .readerDoc || $0.kind == .readerPage }
+            guard !sources.isEmpty else { return nil }
+            var links: [String] = []
+            for source in sources {
+                guard let link = source.source?.link else { return nil }
+                links.append(link)
+            }
+            return links
+        } catch { report(error, "read round-up sources"); return nil }
     }
 
     /// Parse edited body markdown back into `(leadingText, blocks)` and persist it atomically through

@@ -7,7 +7,7 @@ import AppKit
 /// range, and Save-as-Smart-Folder / Clear. The shared folder/smart-folder SCOPE comes from the tree
 /// (`NotesModel.scope`) and is merged with this window's filter at `recompute()`.
 ///
-/// Adapted from Reader's `NavigationWindowView.filterBar`; layout is two compact rows so all facets
+/// Adapted from Reader's `NavigationWindowView.filterBar`; layout is three compact rows so all facets
 /// stay visible at the browser's minimum width.
 struct NotesFilterBar: View {
     @ObservedObject var nav: NotesNavigationModel
@@ -20,6 +20,17 @@ struct NotesFilterBar: View {
         VStack(spacing: 6) {
             topRow
             facetRow
+            HStack {
+                Picker("Round-up", selection: $nav.filter.roundup) {
+                    Text("Any").tag(Optional<Bool>.none)
+                    Text("Round-up notes").tag(Optional(true))
+                    Text("Other items").tag(Optional(false))
+                }
+                .pickerStyle(.menu)
+                .fixedSize()
+                .accessibilityIdentifier("an.filter.roundup")
+                Spacer(minLength: 0)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -198,6 +209,7 @@ struct NotesFilterBar: View {
             || nav.filter.dateFrom != nil
             || nav.filter.dateTo != nil
             || !nav.searchText.trimmingCharacters(in: .whitespaces).isEmpty
+            || nav.filter.roundup != nil
     }
 
     /// Year ⇆ sortDate int, derived straight from the filter (so Clear resets the field). The lower
