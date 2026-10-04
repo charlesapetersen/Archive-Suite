@@ -3,6 +3,13 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.d12d) — filename/title disagreement was invisible
+
+**2026-10-04.** Indexing logs a note filename that differs from the sanitized front-matter title
+projection. An unchanged-mtime rename is checked against the cached title; newly extracted rows use
+fresh front matter. The diagnostic does not rename files or rewrite titles or bodies, and legitimate
+filename sanitization does not warn. Scratch checks cover both paths and preserve the original bytes.
+
 ## ✅ FIXED (W9.d12c) — drop feedback and coordinated Trash
 
 **2026-10-04.** Folder rows use an explicit drop delegate for AppKit byte payloads and SwiftUI
@@ -52,7 +59,7 @@ passed; both initial-load and post-toggle screenshots show the chip.
 **2026-09-27.** The unused `NoteBody`/`NoteBlock` wrapper is gone. The scratch durable-link
 scenario now reads the actual root markers in both the original and moved fixture when checking
 that an unknown GUID cannot silently match; the previous check compared the fake GUID only to
-hardcoded constants. `SearchGeneration` was already absent. The rest of D12 remains queued as
+hardcoded constants. `SearchGeneration` was already absent. The remaining D12 work shipped as
 W9.d12a–d. Notes build, headless smoke, and the 12-check scratch scenario passed.
 
 ## ✅ FIXED (W9.d11) — large-paste comments claimed an off-main parse

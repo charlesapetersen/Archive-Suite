@@ -7,6 +7,49 @@ import Foundation
 /// All file-touching tests use a `mktemp -d` scratch store; none touches the real corpus.
 @Suite struct NotesIndexTests {
 
+    private final class DiagnosticLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [String] = []
+        func append(_ value: String) { lock.lock(); defer { lock.unlock() }; values.append(value) }
+        var lines: [String] { lock.lock(); defer { lock.unlock() }; return values }
+    }
+
+    @Test @MainActor
+    func filenameDivergenceLogsWithoutChangingTheNote() async throws {
+        let (index, root) = try await makeScratchIndex()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = NoteStore(root: root)
+        let item = try FrontMatterCodec.decode("---\nid: \(UUID())\ntitle: Title/with: punctuation\n---\nKeep this body.")
+        let ref = try await store.create(item)
+        let bytes = try Data(contentsOf: ref.url)
+        let log = DiagnosticLog()
+        let indexer = NotesIndexer(index: index, diagnosticLog: { log.append($0) })
+        indexer.startIndexing([ref])
+        await indexer.awaitSettled()
+        #expect(log.lines.isEmpty, "sanitized title projection is not a divergence")
+        let renamedURL = ref.url.deletingLastPathComponent().appendingPathComponent("Manual name.md")
+        try FileManager.default.moveItem(at: ref.url, to: renamedURL)
+        let actualMtime = try #require(FileManager.default.attributesOfItem(atPath: renamedURL.path)[.modificationDate] as? Date)
+        #expect(actualMtime.timeIntervalSinceReferenceDate == ref.mtime)
+        let renamed = ItemRef(id: item.id, url: renamedURL, mtime: ref.mtime)
+        indexer.startIndexing([renamed])
+        await indexer.awaitSettled()
+        #expect(log.lines.count == 1, "an unchanged cache row must still report a manual rename")
+        #expect(log.lines.first?.contains("Manual name.md") == true)
+        #expect(log.lines.first?.contains(item.title) == true)
+        #expect(try Data(contentsOf: renamedURL) == bytes)
+        #expect(!FileManager.default.fileExists(atPath: ref.url.path))
+        #expect(try await store.load(item.id).title == item.title)
+        #expect(await index.summary(for: item.id)?.title == item.title)
+        // Force a new projection without altering file bytes; the fresh front-matter path also logs.
+        indexer.startIndexing([ItemRef(id: item.id, url: renamedURL, mtime: ref.mtime + 1)])
+        await indexer.awaitSettled()
+        #expect(log.lines.count == 2)
+        #expect(try Data(contentsOf: renamedURL) == bytes)
+        #expect(FileManager.default.fileExists(atPath: renamedURL.path))
+        await index.close()
+    }
+
     /// Helper: create a fresh NotesIndex in a temporary directory.
     private func makeScratchIndex() async throws -> (NotesIndex, URL) {
         let tmp = FileManager.default.temporaryDirectory

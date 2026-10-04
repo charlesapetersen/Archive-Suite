@@ -257,6 +257,13 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.d12d — log filename/front-matter divergence [XS].** **SHIPPED 2026-10-04 (this commit).** Plan D12 split. When the note filename
+  and front-matter title disagree, log the divergence without rewriting either. | ArchiveNotes/macOS/
+  Sources/ArchiveNotes/Index/ | XS | low | none
+  Verification: Notes headless Debug build/smoke (218 XCTest + 910 Swift Testing checks),
+  scratch unchanged-mtime rename and fresh-decode checks preserve filename/title/body;
+  sanitized title projection stays quiet; independent find→refute review passed.
+
 - [x] **W9.d12c — drag feedback and coordinated Trash handling [S–M].** **SHIPPED 2026-10-04 (this commit).** Plan D12 split. Correct the
   move-vs-copy cursor and AppKit drop reliability, and wrap Notes Trash deletion in `NSFileCoordinator`.
   Use scratch store and off-screen GUI checks. | ArchiveNotes/macOS/Sources/ArchiveNotes/ | S–M | low |

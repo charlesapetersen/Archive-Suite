@@ -57,6 +57,7 @@ final class NotesIndexer: ObservableObject {
     @Published private(set) var failure: Failure?
 
     private let index: NotesIndex
+    private let diagnosticLog: @Sendable (String) -> Void
     private var task: Task<Void, Never>?
     private var pending: [ItemRef]?
     private var generation = 0
@@ -65,7 +66,10 @@ final class NotesIndexer: ObservableObject {
 
     /// Inject the shared `NotesIndex` (app path) so this driver and `NotesModel` use **one** sqlite
     /// handle to the same file rather than two independent connections.
-    init(index: NotesIndex) { self.index = index }
+    init(index: NotesIndex, diagnosticLog: @escaping @Sendable (String) -> Void = { NSLog("%@", $0) }) {
+        self.index = index
+        self.diagnosticLog = diagnosticLog
+    }
 
     /// Standalone convenience — owns its own default-location index. Retained for isolated use.
     convenience init() {
@@ -93,6 +97,7 @@ final class NotesIndexer: ObservableObject {
         generation += 1
         let gen = generation
         let idx = index
+        let log = diagnosticLog
         let workers = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
         task = Task.detached(priority: .utility) { [weak self] in
             do {
@@ -105,6 +110,14 @@ final class NotesIndexer: ObservableObject {
                 return
             }
             let existing = await idx.existingMTimes()
+            // A manual rename need not change mtime. Skipped rows use their cached front-matter title;
+            // changed rows use fresh front matter in extractRow. Neither path writes to the note.
+            let titles = Dictionary(uniqueKeysWithValues: await idx.allSummaries().map { ($0.id.uuidString, $0.title) })
+            for ref in refs where existing[ref.id.uuidString] == ref.mtime {
+                if let title = titles[ref.id.uuidString], let message = Self.filenameDivergence(title: title, url: ref.url) {
+                    log(message)
+                }
+            }
             let work = refs.filter { ref in
                 guard let stored = existing[ref.id.uuidString] else { return true }
                 return stored != ref.mtime
@@ -133,7 +146,7 @@ final class NotesIndexer: ObservableObject {
                     let capturedRef = ref
                     group.addTask(priority: .utility) {
                         guard !Task.isCancelled else { return nil }
-                        return Self.extractRow(from: capturedRef)
+                        return Self.extractRow(from: capturedRef, diagnosticLog: log)
                     }
                     queued += 1
                 }
@@ -159,7 +172,7 @@ final class NotesIndexer: ObservableObject {
                         let capturedRef = ref
                         group.addTask(priority: .utility) {
                             guard !Task.isCancelled else { return nil }
-                            return Self.extractRow(from: capturedRef)
+                            return Self.extractRow(from: capturedRef, diagnosticLog: log)
                         }
                     }
                 }
@@ -352,12 +365,19 @@ final class NotesIndexer: ObservableObject {
     // MARK: - Extraction
 
     /// Read a .md file and extract an index row. Runs off the main actor (Sendable inputs only).
-    private nonisolated static func extractRow(from ref: ItemRef) -> NoteIndexRow? {
+    private nonisolated static func extractRow(from ref: ItemRef, diagnosticLog: @Sendable (String) -> Void) -> NoteIndexRow? {
         guard let data = try? Data(contentsOf: ref.url),
               let text = String(data: data, encoding: .utf8),
               let item = try? FrontMatterCodec.decode(text) else { return nil }
+        if let message = filenameDivergence(title: item.title, url: ref.url) { diagnosticLog(message) }
         // The Item→row mapping lives on NoteIndexRow so the edit-path re-index (W6-S7) matches exactly.
         return NoteIndexRow(item: item, mtime: ref.mtime)
+    }
+
+    nonisolated static func filenameDivergence(title: String, url: URL) -> String? {
+        let expected = NoteStore.sanitizedTitle(title) + ".md"
+        guard url.lastPathComponent != expected else { return nil }
+        return "NotesIndexer: filename/title divergence at \(url.path): filename=\(url.lastPathComponent), title=\(title), expected=\(expected). Neither value was rewritten."
     }
 
     // MARK: - Internal

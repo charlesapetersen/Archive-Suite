@@ -121,6 +121,7 @@ macOS/Sources/ArchiveNotes/
                                    deleteTemplateAssignments — whole methods, NOT an exposed BEGIN/COMMIT
                                    (invariant: no suspension between BEGIN and COMMIT) (W23.m13)
     NotesIndexer.swift             @MainActor driver — incremental build, parallel extraction, search;
+                                   read-only filename/title diagnostic, including unchanged-mtime renames (W9.d12d);
                                    prune via pure `pruneDecision` two-emission gate (empty-snapshot-safe,
                                    W8-S3) — refuses to prune on an empty/unsettled snapshot; init(index:)
                                    DI (one shared sqlite handle) + indexGeneration/isIndexReady completion

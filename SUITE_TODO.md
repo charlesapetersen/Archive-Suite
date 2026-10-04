@@ -841,9 +841,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.d12d` — log filename/front-matter divergence [XS].** Plan D12 split. When the note filename
-  and front-matter title disagree, log the divergence without rewriting either. | ArchiveNotes/macOS/
-  Sources/ArchiveNotes/Index/ | XS | low | none
 - [ ] **`W9.cand2` — CONFIRM: a freshly pasted note-passage provenance block renders as raw HTML comment
   [S].** Plan addendum 2026-07-18, CANDIDATE. After a W14.3 copy-passage→paste-into-extract, the chip showed as
   the literal `<!-- block: note-passage … -->` in the **styled** editor and persisted across reselect/reload,
