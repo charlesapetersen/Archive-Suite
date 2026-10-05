@@ -9663,3 +9663,34 @@ none of this was fixed by starting it.
   launches nothing (0 new crash reports); unsandboxed it passes (ALL PASS); the shim refuses a sandboxed test
   action and passes a sandboxed build and an unsandboxed test; `prove-no-host-gui.sh` 28/0; every script parses.
 
+## Processor — intermittent Clear failures in the recovery test (found 2026-10-05, parks the gate)
+
+- [x] **W34.recov-flake — three Clear checks in Test 25 of `LiveCaptureRecoveryTestDriver` fail about one run in six
+  [S-M · Tier-2 · do FIRST].** Found 2026-10-05: the `processor-launch` gate step (`scripts/test-recovery.sh`) failed
+  twice in a row at 09:35 and parked the daemon, though it passed in both gates two hours earlier and no Processor
+  code changed between. Re-run by hand against the same build (gate-DD, built 08:18): 1 of 6 runs failed, on the same
+  three checks every time — "Clear abandons an emptied pane's unfiled work — and leaves every processed file on disk
+  (fu12)", "Clear stays cleared after relaunch and does not review missing source pages (fu12-fu2)" and "...and
+  Finish is NOT offered there" (fu12) — and the other 186 passed. The section is `Capture/LiveCaptureRecoveryTestDriver.swift`
+  around `:3330-3420`, after `uwSend("U2", 1)`, `uwSettle { staged contains U2 }`, `uwRecoverWithMissingSources()`,
+  `_recoveryTestDisarmForStageLaterClear()` and `clearSession()`. Each check is one large `&&`, so the report cannot
+  say which term failed: first split them so a failure names its term, run the script in a loop (30+ runs, also
+  under load) to catch the failing term, then decide whether the race is in the TEST (a missing settle) or in the
+  APP — Clear writes the staging manifest synchronously (`LiveCaptureProcessor.swift:2210-2245`), but an in-flight
+  `finalizeSegment` or the recovery path may repopulate `staged` after it, which would be a data-safety bug: a
+  cleared session offered again for filing. Fix with a test that fails without the fix; Tier-2 review.
+  | ArchiveProcessor/Capture | S-M | med | none
+
+  **SHIPPED 2026-10-05 (this commit; code `c8c78f0`).** The test created a new capture epoch after
+  deleting U1's only source, but explicitly reused the old staging directory. Crossing a clock-second boundary made
+  Stage-for-later Clear target the new epoch while relaunch reloaded the old one.
+  the MainActor staged/persist/label tail has no intervening await, and Clear's generation guards remain.
+  A fixed historical epoch with an unrelated prior filed ledger keeps capture and staging canonical;
+  identity checks catch a mismatched fixture, and the three broad checks now name every term.
+  Diagnostic baseline: 28/30 pass under CPU load; both failures show the same one-second path mismatch
+  and nine failed terms. Ledger-removal negative proof deterministically fails 12 checks (three identity
+  plus the original nine), then is fully restored. Final build succeeds with no new warnings; 30 loaded
+  and five normal recovery runs all pass (253 checks each, 8,855 total). Two-image Processor smoke passes.
+  Independent adversarial review found no blocking defect. All test files are scratch-only; app recovery,
+  Clear, finalization and their file-safety gates are unchanged.
+

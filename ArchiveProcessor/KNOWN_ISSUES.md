@@ -12,6 +12,9 @@ Term-level diagnostics reproduced that mismatch under CPU load on 2026-10-05. Th
 fixed historical epoch with an unrelated prior filed-group ledger and checks capture/staging identity.
 Clear durability, processed-file preservation, relaunch and Finish assertions remain and name each term.
 Production capture selection, Clear and finalization are unchanged. Verification uses disposable roots.
+Debug build and independent adversarial review passed. Final recovery proof: 30 CPU-loaded and five normal
+runs, all 253 checks passing per run. Removing the scratch ledger deterministically fails 12 checks;
+restoring it passes. The two-image Processor smoke also passed. No real corpus was touched.
 
 ## ✅ FIXED (W22.mixed-batch-fu1): mixed PDF OCR lacked crash recovery before the image phase
 
