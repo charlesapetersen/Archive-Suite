@@ -118,7 +118,10 @@ run parks with a note saying so; a session that commits nothing (killed, cut off
 The proof observes event and file witnesses in scratch state; its RED-to-GREEN transition stays in the same
 fixture daemon. Each fixture owns a process group that is reaped before resetting state, including on TERM/INT.
 `GATEFIX_FIXTURE_DELAY=8 bash ops/autonomous/tests/prove-gate-fix.sh` keeps the fake session in flight to
-exercise scheduling without changing the gate or its assertions.
+exercise scheduling without changing the gate or its assertions. The committed-attempt case observes each
+successful scratch commit before waiting for the final park; every step keeps the same bounded deadline.
+`GATEFIX_FIXTURE_ATTEMPT_DELAY=8` stresses those two sessions. Failures retain the failing case’s fixture log at the
+printed `ARTIFACT` path.
 
 ### Sharing the Mac with Vision OCR: `yield-check.sh` (owner, 2026-10-04/05)
 

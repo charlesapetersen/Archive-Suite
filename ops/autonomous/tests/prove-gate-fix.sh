@@ -58,7 +58,17 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 PASS=0; FAIL=0
 ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
-bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
+bad() {
+  printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1))
+  # Preserve THIS case before a later reset replaces its log. Artifacts are diagnostics, never witnesses.
+  local artifact
+  if [ -f "${L:-}" ] && artifact="$(mktemp -d)"; then
+    cp "$L" "$artifact/daemon.log"
+    cp "$T/daemon.out" "$artifact/daemon.out"
+    echo "ARTIFACT gate-fix failure: $artifact" >&2
+  fi
+  return 0
+}
 
 FIXTURE_HOME="$T/home"; mkdir -p "$FIXTURE_HOME/Desktop" "$FIXTURE_HOME/.local/bin"
 BIN="$T/bin"; mkdir -p "$BIN"
@@ -172,8 +182,17 @@ grep -q 'gate fix: the gate is GREEN — the fix request is retired' "$L" && ok 
 [ ! -f "$STATE/gate-fix" ] && [ ! -f "$STATE/gate-fix-tries" ] && [ ! -f "$STATE/gate-fix-head" ] && ok "request and count removed" || bad "request or count left behind"
 
 echo "[3] committed fixes that leave it red count, and the run parks after GATEFIX_MAX of them"
-reset; echo red > "$GATECTL"; echo commit > "$SESSCTL"; GFMAX=2 launch
-await_event 'fix sessions committed changes and the gate is still red' "$FIXTURE_HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" || true
+reset; echo red > "$GATECTL"; echo commit > "$SESSCTL"; GFMAX=2 launch "${GATEFIX_FIXTURE_ATTEMPT_DELAY:-0}"
+# This case crosses THREE gate cycles (six real gate invocations) and two committing sessions. Observe each
+# successful scratch commit before awaiting the park, retaining the same deadline for every progress step.
+# A missing step fails immediately; repeated log chatter cannot renew a deadline.
+if ! await_event saw-request "$SEEN"; then
+  bad "first committing fix session did not finish its scratch commit"
+elif ! await_condition two_sessions; then
+  bad "second committing fix session did not finish its scratch commit"
+elif ! await_event 'fix sessions committed changes and the gate is still red' "$FIXTURE_HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt"; then
+  bad "the next red gate did not park after the second committed fix"
+fi
 stop "$P" || exit 1
 grep -q 'attempt 1/2' "$L" && grep -q 'attempt 2/2' "$L" && ok "two attempts handed over" || bad "attempts: $(grep -o 'attempt [0-9]/[0-9]' "$L" | tr '\n' ' ')"
 grep -q 'PARKED' "$L" && ok "parked after the attempts were spent" || bad "never parked: $(grep -E 'gate fix|PARK' "$L" | tail -3)"
