@@ -904,7 +904,18 @@ on the owner's five ground-truth boxes, scored by the share of pages that land i
 the owner's decision, then a build only if the result is usable. `W40.a1` waits on `W36.seg-decision`. Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-second` — an independent second frontier model as a voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-window2` — the window method again, with the owner's domain cues in the prompt [S-M · Claude window]**
+  (blocked-on: W36.seg-window). Owner, 2026-10-05: "Should we try the segmentation test again given what we've
+  learned?" Same route, model, windows and bench as W36.seg-window (`method_window.py`, `claude -p`), with the
+  prompt revised to state the cues from the owner's answers (`02-truth-check.md`, last sections; the plan's
+  "owner's domain cues"): ignore text showing through from the sheet beneath (a page number read through onion
+  skin is not a continuation cue); a small item laid on a full sheet means the sheet underneath is the next
+  document; a byline, a wire credit or a section heading starts a clipping, a newspaper page number at the top is
+  where it began; a full magazine is one document; never reorder; runs of empty folder and box photos are normal.
+  A new PROMPT_VERSION so nothing is reused from the old cache. Development boxes only. Report against window v1
+  (90.3% on the final labels; 34 reviews to 98%) and say which errors the cues removed. USAGE GUARD: stop calls at
+  70% of the Claude five-hour window (Vision OCR has priority on it). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-second` — an independent second frontier model as a voter [S · paid]** (blocked-on: W36.seg-window2). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
   - 2026-10-05, checkpoint 1 of 2 (commit "feat(segmentation): W36.seg-features (checkpoint 1/2)"): a numpy logistic regression on 26 per-boundary features (OCR rule cues, TF-IDF cosine, length, blank, paper colour, ink, aspect/orientation, and the capture-time gap as one feature) in `scripts/segbench/features.py` + `method_features.py`, leave-one-collection-out on Dean/Deaver/Herrnstein, methods `features-lr` and `features-lr-notime`, tests in `test_features.py`. Dev pooled pages in an exact document 59.3% with the time gap, 52.5% without; Dean and Herrnstein 72-83%, Deaver (clippings) 0-10% because the letter cues it learns do not occur there. Detail: `segbench-results/features-lr-report.md`. Remaining for checkpoint 2: embedding features (a SigLIP/CLIP image embedding and a small text embedder, through MLX), then re-run.
@@ -925,6 +936,21 @@ OWNER sit in the plan's HOLD QUEUE.
   `daemon.sh`'s running check match only the installed copy (`$BIN/archive-suite-autonomous.sh`) or the launchd
   job, with a test. The gate-fix proof’s lifecycle portion shipped as W34.gate-fix-fu1 (2026-10-05, `c359978`/`6036756`);
   the other harnesses and real-daemon running guard remain open. | ops/autonomous | S | low | none
+
+## Two dates on one document — enclosures (owner, 2026-10-05; before the W40 freeze)
+
+- [ ] **`W37.dual-date` — an enclosure with its own date carries two dates: its own and the covering letter's
+  [M-L · Tier-2 · SPEC change, all three apps].** Owner, 2026-10-05, approving the segmentation document rules:
+  "when enclosures have their own dates, they should be dated twice, both with the letter that sent them and with
+  their own dates", and "Queue before the feature freeze." Today `SPEC/tag-format.md` allows 0–1 Year, Month and
+  Day per file, and the Reader sorts and filters by that one date. Design first (one short session, recorded in the
+  SPEC): a second, labelled date family on the same file (e.g. a "sent with" date carried beside the item's own),
+  which date sorts and which filters match (the recommendation to put to the owner: the item's own date sorts;
+  both dates match a date filter), how a merged PDF's page 2 shows both, and how the Processor knows a document is
+  an enclosure (the segmentation pass, a manual mark, or both). Then build it in ArchiveCore, the Processor's
+  tagger and manual tag sheet, the Reader's display, sort and filters, and Notes (its planned primary-plus-
+  additional dates model from the DEVONthink plan), all three together per the shared-contract rule, Tier-2, with
+  scratch-copy tests. No migration: there is no production material. | SPEC + all apps | M-L | med | none
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
@@ -949,7 +975,7 @@ Order lives in the plan's `### TIER 7` block. The owner approved it on 2026-10-0
 never auto-picked; an `-owner-ok` line ticked `DECLINED` sends its dependant to the fallback in rule 11 of the
 daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>` with a severity (rule 8).
 
-- [ ] **`W40.a1` — health gate green at HEAD, and run at hand-off [M]** (blocked-on: W40-owner-ok, W9.cand2, W9.e4, W12.dedup-fu1, W22.mixed-batch-fu2, W24.cal1, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.a1` — health gate green at HEAD, and run at hand-off [M]** (blocked-on: W40-owner-ok, W9.cand2, W9.e4, W12.dedup-fu1, W22.mixed-batch-fu2, W24.cal1, W36.seg-decision, W37.dual-date). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a2` — the gate runs ArchiveCore's tests [S]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a3` — every lane green in full, in any order [M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a4` — remove tests that cannot fail [S]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
