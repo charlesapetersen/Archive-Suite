@@ -3195,7 +3195,25 @@ enum LiveCaptureRecoveryTestDriver {
             let uwOut = tmp.appendingPathComponent("fu12out", isDirectory: true)
             let uwFiled = tmp.appendingPathComponent("fu12filed", isDirectory: true)
             let uwGate = TestGate()
+            // Missing-source recovery still needs a durable capture epoch. Without a filed ledger,
+            // CaptureSession correctly starts fresh and an explicit old staging override can accidentally
+            // attach a different session's output to it. A historical ledger keeps this fixture canonical;
+            // the fixed old date proves recovery never succeeds by coinciding within the same clock second.
+            let uwEpoch = "2001-01-01T00-00-00Z"
+            let uwEpochFolder = CaptureSession.backupRoot.appendingPathComponent(uwEpoch, isDirectory: true)
+            do {
+                try fm.createDirectory(at: uwEpochFolder, withIntermediateDirectories: true)
+                let history = CaptureSession.SessionManifest(photos: [], completedDocGroups: [],
+                    filedGroupIds: ["previously-filed-fixture-group"])
+                try JSONEncoder().encode(history).write(
+                    to: uwEpochFolder.appendingPathComponent("manifest.json"), options: .atomic)
+                check("missing-source fixture's historical capture ledger is durable (W34.recov-flake)", true)
+            } catch {
+                check("missing-source fixture's historical capture ledger is durable (W34.recov-flake)", false)
+            }
             var uwSession = CaptureSession()
+            check("missing-source fixture recovers its fixed historical epoch (W34.recov-flake)",
+                  uwSession.sessionId == uwEpoch)
             let uwStaging = LiveCaptureProcessor.stagingDir(for: uwSession)
             try? fm.createDirectory(at: uwStaging, withIntermediateDirectories: true)
             try? fm.createDirectory(at: uwFiled, withIntermediateDirectories: true)
@@ -3222,6 +3240,12 @@ enum LiveCaptureRecoveryTestDriver {
                 uwSession._recoveryTestBeginLive(config: uwConfig, stagingDir: uwStaging)
                 uwProc = uwSession.liveProcessor
                 uwProc._recoveryTestLoadManifest(stagingDir: uwStaging, config: uwConfig)
+                check("missing-source recovery keeps the capture and staging epoch together (W34.recov-flake)",
+                      uwSession.sessionId == uwEpoch
+                          && LiveCaptureProcessor.stagingDir(for: uwSession) == uwStaging)
+            }
+            func uwCheck(_ name: String, _ terms: [(String, Bool)]) {
+                for (term, ok) in terms { check("\(name): \(term)", ok) }
             }
             func uwSettle(_ cond: () -> Bool) async -> Bool {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
@@ -3343,21 +3367,31 @@ enum LiveCaptureRecoveryTestDriver {
             let u2Staged = await uwSettle { uwProc.staged.contains { $0.groupId == "U2" } }
             let u2PDFs = uwProc.staged.first { $0.groupId == "U2" }?.pdfURLs ?? []
             uwRecoverWithMissingSources()
-            let u2Stranded = u2Staged && uwSession.photos.isEmpty && uwProc.hasUnfiledWork
-                && !u2PDFs.isEmpty && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) }
+            uwCheck("recovered Clear fixture (fu12)", [
+                ("U2 reached staging", u2Staged),
+                ("source roster empty", uwSession.photos.isEmpty),
+                ("unfiled work offered", uwProc.hasUnfiledWork),
+                ("processed PDFs nonempty", !u2PDFs.isEmpty),
+                ("processed PDFs present", u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+            ])
             // Stage-for-later does not activate LiveCaptureProcessor. Drop its selected path to model that
             // relaunch shape while leaving U2's real canonical staging manifest in place.
+            check("Stage-for-later Clear targets the recovered session's canonical staging folder (W34.recov-flake)",
+                  LiveCaptureProcessor.stagingDir(for: uwSession) == uwStaging)
             uwProc._recoveryTestDisarmForStageLaterClear()
             uwProc.clearSession()
             let clearedStageData = try? Data(contentsOf: uwStaging.appendingPathComponent("staging-manifest.json"))
             let clearedStageObject = clearedStageData.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             let clearedStageRows = clearedStageObject?["staged"] as? [Any]
-            check("Clear abandons an emptied pane's unfiled work — and leaves every processed file on disk (fu12)",
-                  u2Stranded && uwProc.staged.isEmpty && uwProc.statuses.isEmpty
-                      && !uwProc.hasUnfiledWork && !uwProc.pendingFinish
-                      && clearedStageRows?.isEmpty == true
-                      && (clearedStageObject?["clearToken"] as? String) != nil
-                      && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+            uwCheck("Clear abandons an emptied pane's unfiled work (fu12)", [
+                ("staged roster empty", uwProc.staged.isEmpty),
+                ("status roster empty", uwProc.statuses.isEmpty),
+                ("unfiled gate closed", !uwProc.hasUnfiledWork),
+                ("no pending finish", !uwProc.pendingFinish),
+                ("durable staging roster empty", clearedStageRows?.isEmpty == true),
+                ("durable clear token present", (clearedStageObject?["clearToken"] as? String) != nil),
+                ("every processed PDF preserved", u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+            ])
 
             // Clear used to be only an in-memory reset, leaving U2's verified manifest to restore it on launch.
             // With Review Rotation enabled, that made the removed source pages appear in the review, and Apply
@@ -3370,10 +3404,13 @@ enum LiveCaptureRecoveryTestDriver {
             uwProc = uwSession.liveProcessor
             uwProc._recoveryTestLoadManifest(stagingDir: uwStaging, config: uwConfig)
             uwProc.finishSession()
-            check("Clear stays cleared after relaunch and does not review missing source pages (fu12-fu2)",
-                  uwProc.staged.isEmpty && uwProc.rotationReviewPages.isEmpty
-                      && !uwProc.showRotationReview && !uwProc.hasUnfiledWork
-                      && u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+            uwCheck("Clear stays cleared after relaunch (fu12-fu2)", [
+                ("staged roster empty", uwProc.staged.isEmpty),
+                ("review pages empty", uwProc.rotationReviewPages.isEmpty),
+                ("review not shown", !uwProc.showRotationReview),
+                ("unfiled gate closed", !uwProc.hasUnfiledWork),
+                ("every processed PDF preserved", u2PDFs.allSatisfy { fm.fileExists(atPath: $0.path) })
+            ])
             UserDefaults.standard.set(false, forKey: DefaultsKeys.reviewRotation)
 
             // 7. THE `processingCount` HALF OF THE FIX: the new arm must not be able to draw a "Processing…"
@@ -3416,11 +3453,16 @@ enum LiveCaptureRecoveryTestDriver {
             let u8SummaryBefore = uwProc.finalizeSummary
             uwProc.requestFinish()
             let u8Settled = await uwSettle { !uwProc.pendingFinish }
-            check("...and Finish is NOT offered there — nothing to file, and pressing it anyway changes nothing (fu12)",
-                  uwProc.hasUnfiledWork && !uwProc.canFinish
-                      && u8Settled && !uwProc.showRotationReview && !uwProc.showFinalizeSheet
-                      && !uwProc.isFinalizing && uwProc.staged.isEmpty
-                      && uwProc.finalizeSummary == u8SummaryBefore)
+            uwCheck("Finish is not offered for the orphaned row (fu12)", [
+                ("Clear still offered", uwProc.hasUnfiledWork),
+                ("Finish predicate closed", !uwProc.canFinish),
+                ("pending finish settled", u8Settled),
+                ("rotation review not shown", !uwProc.showRotationReview),
+                ("finalize sheet not shown", !uwProc.showFinalizeSheet),
+                ("not finalizing", !uwProc.isFinalizing),
+                ("staged roster empty", uwProc.staged.isEmpty),
+                ("summary unchanged", uwProc.finalizeSummary == u8SummaryBefore)
+            ])
 
             uwGate.open()
             if let uwPriorReview {

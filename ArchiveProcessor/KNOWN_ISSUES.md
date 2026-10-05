@@ -2,6 +2,17 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED (W34.recov-flake): recovery Test 25 could clear a different session's staging folder
+
+The missing-source fixture deleted U1's source before reopening its capture session. Without surviving
+sources or a filed ledger, reopening selected a fresh timestamp epoch, while the test explicitly loaded
+staging from the previous epoch. When the clock crossed a second, Stage-for-later Clear correctly targeted
+the new session's canonical folder; the test then reloaded the old journal and reported three failures.
+Term-level diagnostics reproduced that mismatch under CPU load on 2026-10-05. The fixture now seeds a
+fixed historical epoch with an unrelated prior filed-group ledger and checks capture/staging identity.
+Clear durability, processed-file preservation, relaunch and Finish assertions remain and name each term.
+Production capture selection, Clear and finalization are unchanged. Verification uses disposable roots.
+
 ## ✅ FIXED (W22.mixed-batch-fu1): mixed PDF OCR lacked crash recovery before the image phase
 
 A mixed run previously saved PDF outcomes only when all PDF work had finished and the image journal
