@@ -9625,3 +9625,11 @@ none of this was fixed by starting it.
   `prove-daemon.sh` 156/0 with the old park-at-once pinned by `AUTONOMOUS_GATEFIX_MAX=0`; `prove-exit-logging`
   12/0; `prove-gate-report` 31/0; `prove-codex-agent` 42/0.
 
+## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
+
+- [x] **W36.seg-truth — prepare the owner's ground-truth check and document rules** — SHIPPED 2026-10-05 (this commit).
+  A review pack outside git (`~/Library/Caches/ArchiveSuiteRehearsal/seg-truth/index.html`, 42 cases with
+  thumbnails, neighbours, the saved spring OCR text and one question each, plus `rules.html`), the same cases and
+  nine draft document rules as text in `execution-plans/segmentation/02-truth-check.md`, and the generator
+  `ArchiveProcessor/scripts/segbench/make-truth-pack.py` (stdlib + `sips`, read-only on `Test Files/`). Found 33
+  page-number-first New pages, not the plan's 38 (the looser count included filing codes and model notes).

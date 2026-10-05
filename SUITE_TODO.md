@@ -904,8 +904,7 @@ on the owner's five ground-truth boxes, scored by the share of pages that land i
 the owner's decision, then a build only if the result is usable. `W40.a1` waits on `W36.seg-decision`. Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-truth` — prepare the owner's ground-truth check and document rules [S]**. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
-- [ ] **`W36.seg-truth-owner-ok` — owner checks the suspected label errors and approves the document rules**. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-truth-owner-ok` — owner checks the suspected label errors and approves the document rules**. Detail: `execution-plans/segmentation/00-plan.md` Part 2; the cases, the draft rules and how to open the review pack: `execution-plans/segmentation/02-truth-check.md`.
 - [ ] **`W36.seg-bench` — segmentation test bench under ArchiveProcessor/scripts/segbench/ [M]**. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-base` — baselines: all-New, no boundaries, the shipped prompt, rule cues [S]** (blocked-on: W36.seg-bench). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-window` — frontier model over overlapping page windows [M · paid]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
