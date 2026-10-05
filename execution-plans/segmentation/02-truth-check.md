@@ -142,3 +142,72 @@ Herrnstein 19–25 may be shifted by one row in the CSV: 19 is labelled a contin
 20 is labelled Folder but is a letter, and 21 is labelled New but is that letter's page 2. Not yet in the review
 pack (rebuild it with `make-truth-pack.py` after adding the case); the CSV is unchanged.
 
+## The owner's answers (2026-10-05) and what was done with them
+
+**Applied to the CSVs** (with the owner's approval; the originals are backed up outside git at
+`~/Library/Caches/ArchiveSuiteRehearsal/seg-truth/csv-backup-20261005/`): Dean 13 New→Cont, Dean 15 New→Cont,
+Dean 23 Cont→New, Herrnstein 21 New→Cont, Herrnstein 22 Cont→New, Herrnstein 25 Cont→New, RG 165 4 Cont→New. Every
+other case is kept as labelled; case 3 (Dean 111–112) is the owner's own correct segmentation (see note).
+**Still open:** Herrnstein 19 and 20 from the suspected one-row shift were not in the pack and are not answered.
+**Not yet approved:** the document rules (`rules.html`).
+
+**What the owner's notes teach every method** (these are domain facts; prompts and features should use them):
+- **Show-through ("onion skin").** Thin paper shows the page beneath, and OCR reads that text: a "-2-" or "Page 2"
+  read on a new document is often the NEXT sheet's page number seen through the paper (cases 5, 6, 20–29). A page
+  number is only a continuation cue if it is printed on this sheet; OCR text from underneath must be ignored.
+- **A small item photographed on top of a full page.** A telegram or a small cover letter lying on a full sheet: the
+  sheet underneath is visible in the photo but is the NEXT document's first page (case 3, Dean 110–111).
+- **Newspaper clippings start with a byline, a wire credit ("(AP)", "(UPI)") or a section heading ("Opinion").**
+  Continuation pages of an article rarely carry a byline; a wire service is credited on the first page only. A
+  newspaper page number ("Page A8") at the top is where the clipping began, not a continuation cue (cases 7–18, 30–33).
+- **A full magazine is one document**, not a set of clippings (case 38).
+- **Never change the order of photographs.** Empty folders and empty boxes are common: a run of box or folder
+  photos means the box or folder was examined and nothing was worth photographing (cases 39–42).
+
+The owner's answers, as pasted:
+
+```
+Case 1 (Dean 13): Change 13 to Cont (page 2 of the letter on page 12)
+Case 2 (Dean 15): Change 15 to Cont (page 2 of the letter on page 14)
+Case 3 (Dean 111–112): NOT ANSWERED | note: Page 110 shows a telegram at the bottom of the page. The top of page 111 is visible at the top of Page 110. This leads to the mistake. My segmentation here was correct. We need to look out for cases where the entirety of a page is visible but a smaller main object is in front, in this case a telegram, in other cases a small cover letter.
+Case 4 (Dean 87): Keep as is (starts a new document) | note: No "-5-" appears on this page. There is a new date and a new title. It is clearly a different document.
+Case 5 (Dean 105): Keep as is (starts a new document) | note: There is no "- 2 -" on this page. Instead, the OCR is picking up on the text of the page below this page, which does include a "- 2 -." The letter is likely onion skin. We need to prevent OCR of text below a page.
+Case 6 (Dean 177): Keep as is (starts a new document) | note: Same problem with transparent onion skin paper.
+Case 7 (Deaver 12): Keep as is (a new clipping) | note: It is a clipping that began on page 14 of the newspaper. Note the byline, which signals this is a new clipping. Bylines typically do not appear on continuation pages.
+Case 8 (Deaver 29): Keep as is (a new clipping) | note: It is a clipping that begins on page A8. Note the byline, which signals this is a new clipping.
+Case 9 (Deaver 60): Keep as is (a new clipping) | note: Note the byline.
+Case 10 (Deaver 62): Keep as is (a new clipping) | note: Note the (AP) source. A wire service will typically only be credited on the first page of an article.
+Case 11 (Deaver 66): Keep as is (a new clipping) | note: Note the byline.
+Case 12 (Deaver 71): Keep as is (a new clipping) | note: Note the "Opinion" section, signaling this is the start of the Opinion section.
+Case 13 (Deaver 79): Keep as is (a new clipping) | note: Note the byline
+Case 14 (Deaver 82): Keep as is (a new clipping) | note: Note the byline
+Case 15 (Deaver 119): Keep as is (a new clipping) | note: Note the (UPI) credit.
+Case 16 (Deaver 121): Keep as is (starts a new document) | note: Note the (UPI) credit.
+Case 17 (Deaver 144): Keep as is (a new clipping) | note: Note the byline
+Case 18 (Deaver 146): Keep as is (a new clipping)
+Case 19 (Herrnstein 21): Change to Cont (part of the document before)
+Case 20 (Herrnstein 60): Keep as is (starts a new document) | note: Onion skin problem.
+Case 21 (Herrnstein 72): Keep as is (starts a new document) | note: Onion skin problem
+Case 22 (Herrnstein 113): Keep as is (starts a new document) | note: Onion skin problem
+Case 23 (Herrnstein 127): Keep as is (starts a new document) | note: Onion skin problem
+Case 24 (Herrnstein 136): Keep as is (starts a new document) | note: Onion skin problem
+Case 25 (Herrnstein 159): Keep as is (starts a new document) | note: Onion skin problem
+Case 26 (Herrnstein 175): Keep as is (starts a new document) | note: Onion skin problem
+Case 27 (Herrnstein 192): Keep as is (starts a new document) | note: Onion skin problem
+Case 28 (RG 165 51): Keep as is (starts a new document) | note: The "-2-" is from a page underneath the main page in this photo.
+Case 29 (RG 165 106): Keep as is (starts a new document) | note: Onion skin problem
+Case 30 (Stanton 121): Keep as is (a new clipping) | note: Not the (AP) credit.
+Case 31 (Stanton 131): Keep as is (a new clipping) | note: Note the byline
+Case 32 (Stanton 230): Keep as is (a new clipping) | note: Note the byline
+Case 33 (Stanton 232): Keep as is (a new clipping) | note: Note the byline
+Case 34 (Dean 23): Change to New (a new document)
+Case 35 (Herrnstein 22): Change to New (a new document)
+Case 36 (Herrnstein 25): Change to New (a new document)
+Case 37 (RG 165 4): Change to New (a new document)
+Case 38 (Stanton 102): Keep as is (part of the document before) | note: This is a scan of a full magazine (note the cover) that should not be treated as a clipping, I believe.
+Case 39 (Herrnstein 64–65): Keep as is (64 is an empty folder at the end of the previous box) | note: Absolutely never change the order of photographs. Frequently there will be empty folders or empty boxes.
+Case 40 (RG 165 41–42): Keep as is (two folder labels; 41 is an empty folder or a second photo of a label)
+Case 41 (RG 165 91–93): Keep as is (91, 92 and 93 are all box labels)
+Case 42 (RG 165 107–113): Keep as is (seven box labels) | note: Empty box photos signal that the box was examined but nothing was deemd worthwhile to photograph.
+```
+

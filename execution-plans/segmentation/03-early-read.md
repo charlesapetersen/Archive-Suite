@@ -61,3 +61,23 @@ this one more trustworthy. Whether to go on or stop here is your decision.
 
 Detail: `ArchiveProcessor/segbench-results/window-claude-report.md`; summary table:
 `ArchiveProcessor/segbench-results/SUMMARY.md`.
+
+## Addendum, 2026-10-05 afternoon — re-scored on the owner's corrected labels
+
+The owner answered the ground-truth check and approved seven label changes (`02-truth-check.md`). Re-scored from
+the saved answers, with no new calls, on the development boxes:
+
+| method | pages in an exact document | false splits | false merges |
+|---|---:|---:|---:|
+| window-claude | 90.0% | 6 | 6 |
+| spring-v1 (shipped) | 86.1% | 21 | 6 |
+| features-lr | 63.9% | 13 | 62 |
+| rule-cues | 57.7% | 96 | 15 |
+
+The review load to reach 98% for window-claude is still 388 boundaries (about 70 per 100 pages): three of its twelve
+remaining errors are rated 0.95 or higher. The decisive open question is Herrnstein 19 and 20, the two rows of
+the suspected shift the owner has not yet seen: with them corrected as suspected, the same method needs only
+**29 boundaries reviewed (about 5 per 100 pages) to reach 98%**, and 1 high-confidence error remains. None of the
+methods yet uses the owner's domain cues (show-through, bylines and wire credits, items on top of a page); the
+next prompt revision should, which this measurement does not reflect.
+

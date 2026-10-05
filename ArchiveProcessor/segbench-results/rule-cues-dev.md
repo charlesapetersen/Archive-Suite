@@ -7,10 +7,10 @@ The spring 2026 prompts (improved_v1, shipped) were developed while looking at a
 
 | collection | pages | docs | pages in exact doc | docs exact | false splits | false merges | boundary F1 | Pk | WindowDiff | folders perfect | edits/100 pages | photo accuracy |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Dean | 202 | 122 | 61.2% | 80.3% | 22 | 5 | 0.892 | 0.134 | 0.134 | 20.0% | 13.4 | 100.0% |
+| Dean | 202 | 121 | 63.8% | 83.5% | 21 | 3 | 0.904 | 0.119 | 0.119 | 20.0% | 11.9 | 100.0% |
 | Deaver | 149 | 87 | 39.0% | 52.9% | 33 | 11 | 0.763 | 0.297 | 0.297 | 20.0% | 29.5 | 100.0% |
-| Herrnstein | 200 | 106 | 63.0% | 82.1% | 44 | 1 | 0.802 | 0.226 | 0.226 | 42.9% | 22.5 | 100.0% |
-| POOLED Dean+Deaver+Herrnstein | 551 | 315 | 55.8% | 73.3% | 99 | 17 | 0.825 | 0.212 | 0.212 | 33.3% | 21.1 | 100.0% |
+| Herrnstein | 200 | 108 | 65.7% | 84.3% | 42 | 1 | 0.812 | 0.216 | 0.216 | 42.9% | 21.5 | 100.0% |
+| POOLED Dean+Deaver+Herrnstein | 551 | 316 | 57.7% | 75.3% | 96 | 15 | 0.833 | 0.203 | 0.203 | 33.3% | 20.1 | 100.0% |
 
 Fitted parameters per held-out collection (fitted on the other two):
 
@@ -22,13 +22,13 @@ Deciding rule over document gaps, held-out predictions pooled (hits = gaps the r
 
 | rule | decides | hits | correct | precision |
 |---|---|---:|---:|---:|
-| page-number | Cont | 77 | 67 | 87.0% |
+| page-number | Cont | 77 | 69 | 89.6% |
 | bare-number | Cont | 18 | 14 | 77.8% |
 | jump-from | Cont | 14 | 14 | 100.0% |
-| opening | New | 18 | 17 | 94.4% |
-| date-line | New | 106 | 95 | 89.6% |
+| opening | New | 18 | 18 | 100.0% |
+| date-line | New | 106 | 96 | 90.6% |
 | prev-jump | Cont | 4 | 3 | 75.0% |
-| prev-closing | New | 39 | 36 | 92.3% |
+| prev-closing | New | 39 | 37 | 94.9% |
 | flows-on | Cont | 8 | 6 | 75.0% |
 | default | default | 210 | 126 | 60.0% |
 

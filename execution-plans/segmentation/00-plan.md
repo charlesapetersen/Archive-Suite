@@ -198,6 +198,16 @@ spring prompts saw all five.
   path running the pass after the batch returns; the manual modes kept; the bench wired as a regression test on the
   development set; verified on the owner's fresh box if there is one.
 
+### The owner's domain cues (2026-10-05) — every method must use them
+
+From the owner's answers to the ground-truth check (`02-truth-check.md`, last section): ignore OCR text that shows
+through from the sheet beneath (onion skin) — a page number read through the paper is not a continuation cue; a
+small item (telegram, cover letter) photographed on top of a full sheet means the sheet underneath is the next
+document; a byline, a wire credit ("(AP)", "(UPI)") or a section heading starts a newspaper clipping, and a newspaper
+page number at the top is where it began; a full magazine is one document; photographs are never reordered, and
+runs of empty folder or box photos are normal. Prompts (approaches A–C, E) state these; the feature model (D)
+needs a show-through filter for its page-number cue and a byline/credit feature.
+
 ### Rules for every W36 item
 
 - Never write into `Test Files/` (gitignored, and the owner's ground truth); results and caches go elsewhere.

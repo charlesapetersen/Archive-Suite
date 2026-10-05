@@ -7,9 +7,9 @@ The spring 2026 prompts (improved_v1, shipped) were developed while looking at a
 
 | collection | pages | docs | pages in exact doc | docs exact | false splits | false merges | boundary F1 | Pk | WindowDiff | folders perfect | edits/100 pages | photo accuracy |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Dean | 202 | 122 | 82.7% | 88.5% | 3 | 6 | 0.961 | 0.045 | 0.045 | 40.0% | 4.5 | 100.0% |
+| Dean | 202 | 121 | 85.2% | 91.7% | 2 | 4 | 0.974 | 0.030 | 0.030 | 40.0% | 3.0 | 100.0% |
 | Deaver | 149 | 87 | 96.5% | 98.9% | 1 | 0 | 0.994 | 0.007 | 0.007 | 80.0% | 0.7 | 100.0% |
-| Herrnstein | 200 | 106 | 89.5% | 95.3% | 5 | 2 | 0.963 | 0.035 | 0.035 | 78.6% | 3.5 | 100.0% |
-| POOLED Dean+Deaver+Herrnstein | 551 | 315 | 88.8% | 93.7% | 9 | 8 | 0.971 | 0.031 | 0.031 | 70.8% | 3.1 | 100.0% |
+| Herrnstein | 200 | 108 | 90.6% | 95.4% | 3 | 2 | 0.974 | 0.025 | 0.025 | 78.6% | 2.5 | 100.0% |
+| POOLED Dean+Deaver+Herrnstein | 551 | 316 | 90.2% | 94.9% | 6 | 6 | 0.979 | 0.022 | 0.022 | 70.8% | 2.2 | 100.0% |
 
 Definitions: ArchiveProcessor/scripts/segbench/score.py (module docstring). Pooled rows sum the counts, so they are page- or item-weighted.
