@@ -917,6 +917,24 @@ OWNER sit in the plan's HOLD QUEUE.
 - [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (blocked-on: W36.seg-ensemble). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 
+## Processor — intermittent Clear failures in the recovery test (found 2026-10-05, parks the gate)
+
+- [ ] **W34.recov-flake — three Clear checks in Test 25 of `LiveCaptureRecoveryTestDriver` fail about one run in six
+  [S-M · Tier-2 · do FIRST].** Found 2026-10-05: the `processor-launch` gate step (`scripts/test-recovery.sh`) failed
+  twice in a row at 09:35 and parked the daemon, though it passed in both gates two hours earlier and no Processor
+  code changed between. Re-run by hand against the same build (gate-DD, built 08:18): 1 of 6 runs failed, on the same
+  three checks every time — "Clear abandons an emptied pane's unfiled work — and leaves every processed file on disk
+  (fu12)", "Clear stays cleared after relaunch and does not review missing source pages (fu12-fu2)" and "...and
+  Finish is NOT offered there" (fu12) — and the other 186 passed. The section is `Capture/LiveCaptureRecoveryTestDriver.swift`
+  around `:3330-3420`, after `uwSend("U2", 1)`, `uwSettle { staged contains U2 }`, `uwRecoverWithMissingSources()`,
+  `_recoveryTestDisarmForStageLaterClear()` and `clearSession()`. Each check is one large `&&`, so the report cannot
+  say which term failed: first split them so a failure names its term, run the script in a loop (30+ runs, also
+  under load) to catch the failing term, then decide whether the race is in the TEST (a missing settle) or in the
+  APP — Clear writes the staging manifest synchronously (`LiveCaptureProcessor.swift:2210-2245`), but an in-flight
+  `finalizeSegment` or the recovery path may repopulate `staged` after it, which would be a data-safety bug: a
+  cleared session offered again for filing. Fix with a test that fails without the fix; Tier-2 review.
+  | ArchiveProcessor/Capture | S-M | med | none
+
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
 Owner, 2026-10-05: one session at a time leaves the Claude five-hour window unused, because sessions spend most
