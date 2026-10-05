@@ -4,6 +4,7 @@
 # PDF alternates image/OCR-text pages in order, never overwrites the input, and recovers a
 # saved paid page and exact output path after a simulated relaunch. Headless self-test
 # (MULTIPAGE_REOCR_TEST=1), scratch-isolated to a mktemp dir — never the corpus.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

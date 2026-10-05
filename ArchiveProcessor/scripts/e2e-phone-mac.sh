@@ -20,6 +20,7 @@
 #         (if OCR_KEY unset, falls back to the Keychain Gemini key)
 #   caffeinate -di scripts/e2e-phone-mac.sh     # keep the Mac awake for the run
 # ============================================================================
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"                 # …/ArchiveProcessor/scripts

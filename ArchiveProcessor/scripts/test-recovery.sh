@@ -6,6 +6,7 @@
 # points the app's own launch-time prune at a throwaway dir so it can NEVER touch the real corpus, and
 # LIVECAPTURE_TESTOUT does the same for `currentOutputDirectory` (whose fallback is the operator's real
 # Settings output folder) — belt and braces for W3.cap-r6, which drives the real `finalize`.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source "$PWD/scripts/test-report-wait.sh"

@@ -9649,3 +9649,17 @@ none of this was fixed by starting it.
   (14/0), TERM/INT group cleanup, spaced script/repo paths (14/0), three behavior mutants rejected, failure
   snapshot inspected, clean shell syntax/ShellCheck, independent adversarial review. W34.harness-leak’s other
   harnesses and running-check work remain open.
+
+## Autonomous daemon — Codex sandbox and app launches (2026-10-05)
+
+- [x] **W34.codex-sandbox-apps — no app launch inside the Codex sandbox** — SHIPPED 2026-10-05 (this commit). Owner: "I keep
+  getting 'ArchiveProcessor quit unexpectedly'." A Codex session on W34.recov-flake looped `test-recovery.sh`
+  inside Codex's seatbelt sandbox, where the app cannot register with the window server: it aborted in
+  `NSApplication init` (`_RegisterApplication`, SIGABRT) and macOS showed a crash dialog per run — 25 reports between
+  14:26:06 and 14:26:36. Measured with real `codex exec` calls: CODEX_SANDBOX=seatbelt is set inside the sandbox and
+  absent in an approved escalation. Now `ArchiveProcessor/scripts/require-unsandboxed.sh`, sourced first by all 17
+  scripts that launch the Processor, and the `xcodebuild` shim for any test action, refuse with exit 3 ("escalate")
+  inside the sandbox; the Codex preamble's rule 4b says so. Verified: sandboxed `test-recovery.sh` exits 3 and
+  launches nothing (0 new crash reports); unsandboxed it passes (ALL PASS); the shim refuses a sandboxed test
+  action and passes a sandboxed build and an unsandboxed test; `prove-no-host-gui.sh` 28/0; every script parses.
+

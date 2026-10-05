@@ -1,5 +1,6 @@
 #!/bin/bash
 # Key-free synthetic test for collision-safe collection organization.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

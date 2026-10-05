@@ -4,6 +4,7 @@
 # (OCRProcessor.writeSegmentJSON + LiveCaptureProcessor.writeSegmentJSON) byte-for-byte across an
 # input matrix. Pure in-memory JSON comparison — no network, no files, no corpus. Headless self-test
 # (SEGMENT_JSON_TEST=1). Build the Debug app first (documented build), then run this.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

@@ -7,6 +7,7 @@
 # NOTE: this LAUNCHES the app binary (headless placeholder window), so it is deferred out of GUI-off
 # autonomous sessions. For a no-launch proof of the subprocess plumbing + Codable semantics, run
 # instead:  swift macOS/../scripts/localagent-mechanism-test.swift  (see scripts/localagent-mechanism-test.swift).
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

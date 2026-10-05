@@ -5,6 +5,7 @@
 # (PROCESSING_HISTORY_TEST=1),
 # run against a THROWAWAY UserDefaults suite — never .standard, never the corpus, never the operator's
 # real history.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

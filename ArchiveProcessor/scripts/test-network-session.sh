@@ -1,5 +1,6 @@
 #!/bin/bash
 # Injected, no-network regression for paid-POST retry safety and limiter cancellation accounting.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

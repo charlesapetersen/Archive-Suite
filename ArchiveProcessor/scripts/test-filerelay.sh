@@ -5,6 +5,7 @@
 # FileRelayReceiver.scanOnce() through the never-lose-a-photo invariants + the v2 amendments (A1–A11)
 # against a temp relay dir — no OCR, no API key, no network. Waits for the driver's DONE.txt, then asserts
 # results.json with relay_assert.py. Outputs under .maintenance/test-results/ (gitignored).
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"

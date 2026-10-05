@@ -1,6 +1,7 @@
 #!/bin/bash
 # Key-free, no-network contract for the Vision + LLM hybrid. It runs the production app headlessly,
 # injects one literal text response, and verifies that the real request body contains no image payload.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source "$PWD/scripts/test-report-wait.sh"

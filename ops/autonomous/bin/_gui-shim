@@ -70,6 +70,15 @@ case "$TOOL" in
         -only-testing|-only-testing:*) has_only=1 ;;
       esac
     done
+    # Any test action inside the Codex sandbox (owner, 2026-10-05): the app-hosted bundles launch the real
+    # app, which cannot register with the window server there — it aborts and macOS shows the owner a
+    # "quit unexpectedly" dialog. Codex sets CODEX_SANDBOX inside its sandbox and not in an approved
+    # escalation, so the cure is to run the same command outside the sandbox.
+    if [ "$has_test" = 1 ] && [ -n "${CODEX_SANDBOX:-}" ]; then
+      echo "xcodebuild: a test action launches the app, which cannot start inside the Codex sandbox (it aborts and" >&2
+      echo "  macOS shows the owner a crash dialog). Run this command OUTSIDE the sandbox: request an escalation." >&2
+      exit 3
+    fi
     if [ "$has_test" = 1 ] && [ "$has_only" = 0 ]; then
       deny "A bare \`xcodebuild test\` runs the scheme's ENTIRE test action, including the UITest bundle —
 that drives the real app on the owner's display for minutes and raises the \"Automation Running\" banner." \

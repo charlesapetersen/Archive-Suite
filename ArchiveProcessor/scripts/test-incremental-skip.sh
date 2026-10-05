@@ -5,6 +5,7 @@
 # newer/older/equal mtime, base-name collision, candidate == source, directory-named output,
 # nonexistent source, mixed-case, re-OCR cross-dir, mixed set, all-skipped). Headless self-test
 # (INCREMENTAL_SKIP_TEST=1), scratch-isolated to a mktemp dir — never the corpus.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

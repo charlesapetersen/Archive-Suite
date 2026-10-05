@@ -29,6 +29,12 @@ two disagree:
    reason and accept the reviewer's answer. Never try to get around the sandbox. If a step cannot be done
    inside it, checkpoint, append the blocker to the plan's Daemon Report, and stop.
 
+4b. APPS DO NOT START INSIDE THE SANDBOX. Any command that launches an app — the Processor's
+   `ArchiveProcessor/scripts/test-*.sh` and `e2e-phone-mac.sh`, `xcodebuild test`, any `test-smoke.sh` — must run
+   OUTSIDE the sandbox (ask for the escalation). Inside it the app aborts at launch and macOS shows the owner a
+   "quit unexpectedly" dialog for every run (25 of them on 2026-10-05). Those scripts and the xcodebuild shim
+   refuse with exit 3 inside the sandbox; exit 3 means "escalate", not "the test failed".
+
 5. CLAUDE-ONLY TOOLS. Where the prompt names the `Agent` or `Task` tool, `Workflow`, a skill such as
    `lean-review`, or a per-subagent model or effort setting, use codex's own equivalent if you have one, or
    do the work yourself. The Tier-2 rule still holds: an adversarial review of your own diff, done as a

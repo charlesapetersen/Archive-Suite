@@ -11,6 +11,7 @@
 # Cost: cheap models + small image caps => a few cents total.
 #
 # Usage: ./scripts/test-tier2.sh            (runs the representative set)
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"

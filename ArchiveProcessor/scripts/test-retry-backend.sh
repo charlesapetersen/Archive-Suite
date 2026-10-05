@@ -1,6 +1,7 @@
 #!/bin/bash
 # Key-free, no-network contract test for Process Files retry backend locking. Uses the committed fake
 # Local Agent CLI plus an injected HTTP transport; every output is in one temporary directory.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source "$PWD/scripts/test-report-wait.sh"

@@ -5,6 +5,7 @@
 # the bookkeeping to the file that survives it, and the end-of-run summary names the affected files.
 # Runs ProcessFilesTagWarningTestDriver headless ($0, no OCR, no network, no GUI) on synthetic files in
 # a temp dir — it never opens or modifies the archive corpus.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox (2026-10-05)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
