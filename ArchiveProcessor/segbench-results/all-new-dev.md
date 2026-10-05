@@ -9,7 +9,7 @@ The spring 2026 prompts (improved_v1, shipped) were developed while looking at a
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Dean | 202 | 121 | 43.9% | 71.1% | 75 | 0 | 0.756 | 0.373 | 0.373 | 0.0% | 37.1 | 100.0% |
 | Deaver | 149 | 87 | 34.8% | 56.3% | 54 | 0 | 0.752 | 0.365 | 0.365 | 0.0% | 36.2 | 100.0% |
-| Herrnstein | 200 | 108 | 37.6% | 63.0% | 73 | 0 | 0.720 | 0.367 | 0.367 | 28.6% | 36.5 | 100.0% |
-| POOLED Dean+Deaver+Herrnstein | 551 | 316 | 39.2% | 64.2% | 202 | 0 | 0.743 | 0.369 | 0.369 | 16.7% | 36.7 | 100.0% |
+| Herrnstein | 200 | 108 | 37.0% | 62.0% | 73 | 0 | 0.720 | 0.367 | 0.367 | 28.6% | 36.5 | 100.0% |
+| POOLED Dean+Deaver+Herrnstein | 551 | 316 | 39.0% | 63.9% | 202 | 0 | 0.743 | 0.369 | 0.369 | 16.7% | 36.7 | 100.0% |
 
 Definitions: ArchiveProcessor/scripts/segbench/score.py (module docstring). Pooled rows sum the counts, so they are page- or item-weighted.

@@ -112,7 +112,14 @@ The pack numbers the cases the same way. "What to check" names the cue only; the
 | 41 | RG 165 | 91–93 | 91: Box, 92: Box, 93: Box | three box labels in a row; one reading of 91 matched page 90 |
 | 42 | RG 165 | 107–113 | all Box | seven box labels in a row at the end of the box, no documents after |
 
-## Draft document rules (for the owner to approve)
+## Document rules — APPROVED by the owner 2026-10-05, with two changes
+
+The owner approved the nine rules below ("The rules look good"), changed rule 1 so that an enclosure with a date of
+its own is dated twice — its own date and the date of the letter that sent it — and added a tenth: a full magazine is
+one document. Two dates on one file is not possible in the current tag format (one Year/Month/Day per file,
+`SPEC/tag-format.md`); whether to build it is the owner's decision. The pack's `rules.html` is rebuilt from `make-truth-pack.py`.
+
+### The rules as first drafted
 
 Each rule has a recommended default and the reason. Box and folder labels keep their own marks and are
 never part of a document. Rules 1 and 2 split the "enclosure or attachment" question by whether the item has
@@ -210,4 +217,7 @@ Case 40 (RG 165 41–42): Keep as is (two folder labels; 41 is an empty folder o
 Case 41 (RG 165 91–93): Keep as is (91, 92 and 93 are all box labels)
 Case 42 (RG 165 107–113): Keep as is (seven box labels) | note: Empty box photos signal that the box was examined but nothing was deemd worthwhile to photograph.
 ```
+
+**Herrnstein 19–20 (owner, 2026-10-05):** "Herrnstein file 19 is a folder. Herrnstein File 20 is the start of a
+letter." Applied: 19 Cont→Folder, 20 Folder→New (same backup folder). The ground-truth check is complete.
 

@@ -9,8 +9,8 @@ The spring 2026 prompts (improved_v1, shipped) were developed while looking at a
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Dean | 202 | 121 | 63.8% | 83.5% | 21 | 3 | 0.904 | 0.119 | 0.119 | 20.0% | 11.9 | 100.0% |
 | Deaver | 149 | 87 | 39.0% | 52.9% | 33 | 11 | 0.763 | 0.297 | 0.297 | 20.0% | 29.5 | 100.0% |
-| Herrnstein | 200 | 108 | 65.7% | 84.3% | 42 | 1 | 0.812 | 0.216 | 0.216 | 42.9% | 21.5 | 100.0% |
-| POOLED Dean+Deaver+Herrnstein | 551 | 316 | 57.7% | 75.3% | 96 | 15 | 0.833 | 0.203 | 0.203 | 33.3% | 20.1 | 100.0% |
+| Herrnstein | 200 | 108 | 66.3% | 84.3% | 41 | 1 | 0.816 | 0.211 | 0.211 | 42.9% | 21.0 | 100.0% |
+| POOLED Dean+Deaver+Herrnstein | 551 | 316 | 57.9% | 75.3% | 95 | 15 | 0.834 | 0.201 | 0.201 | 33.3% | 20.0 | 100.0% |
 
 Fitted parameters per held-out collection (fitted on the other two):
 
@@ -22,7 +22,7 @@ Deciding rule over document gaps, held-out predictions pooled (hits = gaps the r
 
 | rule | decides | hits | correct | precision |
 |---|---|---:|---:|---:|
-| page-number | Cont | 77 | 69 | 89.6% |
+| page-number | Cont | 78 | 70 | 89.7% |
 | bare-number | Cont | 18 | 14 | 77.8% |
 | jump-from | Cont | 14 | 14 | 100.0% |
 | opening | New | 18 | 18 | 100.0% |
@@ -30,6 +30,6 @@ Deciding rule over document gaps, held-out predictions pooled (hits = gaps the r
 | prev-jump | Cont | 4 | 3 | 75.0% |
 | prev-closing | New | 39 | 37 | 94.9% |
 | flows-on | Cont | 8 | 6 | 75.0% |
-| default | default | 210 | 126 | 60.0% |
+| default | default | 209 | 126 | 60.3% |
 
 Definitions: ArchiveProcessor/scripts/segbench/score.py (module docstring). Pooled rows sum the counts, so they are page- or item-weighted.

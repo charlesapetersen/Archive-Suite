@@ -8,8 +8,8 @@ Run 2026-10-05 on Dean, Deaver and Herrnstein (551 pages) only; the test collect
 |---|---:|---:|---:|---:|---:|
 | Dean | 191 | 191 | 3 | 2.7% (5/188) | 33.3% (1/3) |
 | Deaver | 136 | 136 | 1 | 0.7% (1/135) | 0.0% (0/1) |
-| Herrnstein | 167 | 167 | 0 | 3.0% (5/167) | — (0/0) |
-| pooled | 494 | 494 | 4 | 2.2% (11/490) | 25.0% (1/4) |
+| Herrnstein | 167 | 167 | 0 | 2.4% (4/167) | — (0/0) |
+| pooled | 494 | 494 | 4 | 2.0% (10/490) | 25.0% (1/4) |
 
 ## Risk–coverage, photo labels from the truth
 
@@ -17,22 +17,22 @@ Document gaps (both pages are document pages in the truth), pooled over the thre
 
 | signal | threshold | coverage | accepted | errors among accepted | error rate | gaps left to review per 100 pages |
 |---|---:|---:|---:|---:|---:|---:|
-| confidence | 0.00 | 100.0% | 494 | 12 | 2.4% | 0.0 |
-| confidence | 0.80 | 96.8% | 478 | 8 | 1.7% | 2.9 |
-| confidence | 0.90 | 90.7% | 448 | 4 | 0.9% | 8.3 |
-| confidence | 0.93 | 82.0% | 405 | 4 | 1.0% | 16.2 |
-| confidence | 0.95 | 66.0% | 326 | 3 | 0.9% | 30.5 |
-| confidence | 0.96 | 50.4% | 249 | 3 | 1.2% | 44.5 |
-| confidence | 0.97 | 21.7% | 107 | 1 | 0.9% | 70.2 |
-| confidence | 0.98 | 1.0% | 5 | 1 | 20.0% | 88.7 |
-| agreement, then confidence | 0.00 | 99.2% | 490 | 11 | 2.2% | 0.7 |
-| agreement, then confidence | 0.80 | 96.8% | 478 | 8 | 1.7% | 2.9 |
-| agreement, then confidence | 0.90 | 90.7% | 448 | 4 | 0.9% | 8.3 |
-| agreement, then confidence | 0.93 | 82.0% | 405 | 4 | 1.0% | 16.2 |
-| agreement, then confidence | 0.95 | 66.0% | 326 | 3 | 0.9% | 30.5 |
-| agreement, then confidence | 0.96 | 50.4% | 249 | 3 | 1.2% | 44.5 |
-| agreement, then confidence | 0.97 | 21.7% | 107 | 1 | 0.9% | 70.2 |
-| agreement, then confidence | 0.98 | 1.0% | 5 | 1 | 20.0% | 88.7 |
+| confidence | 0.00 | 100.0% | 494 | 11 | 2.2% | 0.0 |
+| confidence | 0.80 | 96.8% | 478 | 7 | 1.5% | 2.9 |
+| confidence | 0.90 | 90.7% | 448 | 3 | 0.7% | 8.3 |
+| confidence | 0.93 | 82.0% | 405 | 3 | 0.7% | 16.2 |
+| confidence | 0.95 | 66.0% | 326 | 2 | 0.6% | 30.5 |
+| confidence | 0.96 | 50.4% | 249 | 2 | 0.8% | 44.5 |
+| confidence | 0.97 | 21.5% | 106 | 0 | 0.0% | 70.4 |
+| confidence | 0.98 | 0.8% | 4 | 0 | 0.0% | 88.9 |
+| agreement, then confidence | 0.00 | 99.2% | 490 | 10 | 2.0% | 0.7 |
+| agreement, then confidence | 0.80 | 96.8% | 478 | 7 | 1.5% | 2.9 |
+| agreement, then confidence | 0.90 | 90.7% | 448 | 3 | 0.7% | 8.3 |
+| agreement, then confidence | 0.93 | 82.0% | 405 | 3 | 0.7% | 16.2 |
+| agreement, then confidence | 0.95 | 66.0% | 326 | 2 | 0.6% | 30.5 |
+| agreement, then confidence | 0.96 | 50.4% | 249 | 2 | 0.8% | 44.5 |
+| agreement, then confidence | 0.97 | 21.5% | 106 | 0 | 0.0% | 70.4 |
+| agreement, then confidence | 0.98 | 0.8% | 4 | 0 | 0.0% | 88.9 |
 
 ### Review load to reach 98% pages in an exact document, photo labels from the truth
 
@@ -40,14 +40,14 @@ Simulated review: the owner checks the least-trusted boundaries in one order acr
 
 | signal | boundaries reviewed | per 100 pages | pooled | Dean | Deaver | Herrnstein |
 |---|---:|---:|---:|---:|---:|---:|
-| confidence (no review) | 0 | 0.0 | 90.2% | 85.2% | 96.5% | 90.6% |
-| confidence | 16 | 2.9 | 95.2% | 96.4% | 96.5% | 92.8% |
-| confidence | 387 | 70.2 | 98.1% | 100.0% | 100.0% | 94.5% |
-| confidence (98% in every collection) | 494 | 89.7 | 100.0% | 100.0% | 100.0% | 100.0% |
-| agreement, then confidence (no review) | 0 | 0.0 | 90.2% | 85.2% | 96.5% | 90.6% |
-| agreement, then confidence | 16 | 2.9 | 95.2% | 96.4% | 96.5% | 92.8% |
-| agreement, then confidence | 387 | 70.2 | 98.1% | 100.0% | 100.0% | 94.5% |
-| agreement, then confidence (98% in every collection) | 494 | 89.7 | 100.0% | 100.0% | 100.0% | 100.0% |
+| confidence (no review) | 0 | 0.0 | 90.3% | 85.2% | 96.5% | 91.2% |
+| confidence | 16 | 2.9 | 95.4% | 96.4% | 96.5% | 93.4% |
+| confidence | 34 | 6.2 | 98.1% | 99.0% | 96.5% | 98.3% |
+| confidence (98% in every collection) | 147 | 26.7 | 99.0% | 99.0% | 100.0% | 98.3% |
+| agreement, then confidence (no review) | 0 | 0.0 | 90.3% | 85.2% | 96.5% | 91.2% |
+| agreement, then confidence | 16 | 2.9 | 95.4% | 96.4% | 96.5% | 93.4% |
+| agreement, then confidence | 34 | 6.2 | 98.1% | 99.0% | 96.5% | 98.3% |
+| agreement, then confidence (98% in every collection) | 147 | 26.7 | 99.0% | 99.0% | 100.0% | 98.3% |
 
 ## Risk–coverage, the model's own photo labels
 
@@ -55,22 +55,22 @@ Document gaps (both pages are document pages in the truth), pooled over the thre
 
 | signal | threshold | coverage | accepted | errors among accepted | error rate | gaps left to review per 100 pages |
 |---|---:|---:|---:|---:|---:|---:|
-| confidence | 0.00 | 100.0% | 494 | 12 | 2.4% | 0.0 |
-| confidence | 0.80 | 96.8% | 478 | 8 | 1.7% | 2.9 |
-| confidence | 0.90 | 90.7% | 448 | 4 | 0.9% | 8.3 |
-| confidence | 0.93 | 82.0% | 405 | 4 | 1.0% | 16.2 |
-| confidence | 0.95 | 66.0% | 326 | 3 | 0.9% | 30.5 |
-| confidence | 0.96 | 50.4% | 249 | 3 | 1.2% | 44.5 |
-| confidence | 0.97 | 21.7% | 107 | 1 | 0.9% | 70.2 |
-| confidence | 0.98 | 1.0% | 5 | 1 | 20.0% | 88.7 |
-| agreement, then confidence | 0.00 | 99.2% | 490 | 11 | 2.2% | 0.7 |
-| agreement, then confidence | 0.80 | 96.8% | 478 | 8 | 1.7% | 2.9 |
-| agreement, then confidence | 0.90 | 90.7% | 448 | 4 | 0.9% | 8.3 |
-| agreement, then confidence | 0.93 | 82.0% | 405 | 4 | 1.0% | 16.2 |
-| agreement, then confidence | 0.95 | 66.0% | 326 | 3 | 0.9% | 30.5 |
-| agreement, then confidence | 0.96 | 50.4% | 249 | 3 | 1.2% | 44.5 |
-| agreement, then confidence | 0.97 | 21.7% | 107 | 1 | 0.9% | 70.2 |
-| agreement, then confidence | 0.98 | 1.0% | 5 | 1 | 20.0% | 88.7 |
+| confidence | 0.00 | 100.0% | 494 | 11 | 2.2% | 0.0 |
+| confidence | 0.80 | 96.8% | 478 | 7 | 1.5% | 2.9 |
+| confidence | 0.90 | 90.7% | 448 | 3 | 0.7% | 8.3 |
+| confidence | 0.93 | 82.0% | 405 | 3 | 0.7% | 16.2 |
+| confidence | 0.95 | 66.0% | 326 | 2 | 0.6% | 30.5 |
+| confidence | 0.96 | 50.4% | 249 | 2 | 0.8% | 44.5 |
+| confidence | 0.97 | 21.5% | 106 | 0 | 0.0% | 70.4 |
+| confidence | 0.98 | 0.8% | 4 | 0 | 0.0% | 88.9 |
+| agreement, then confidence | 0.00 | 99.2% | 490 | 10 | 2.0% | 0.7 |
+| agreement, then confidence | 0.80 | 96.8% | 478 | 7 | 1.5% | 2.9 |
+| agreement, then confidence | 0.90 | 90.7% | 448 | 3 | 0.7% | 8.3 |
+| agreement, then confidence | 0.93 | 82.0% | 405 | 3 | 0.7% | 16.2 |
+| agreement, then confidence | 0.95 | 66.0% | 326 | 2 | 0.6% | 30.5 |
+| agreement, then confidence | 0.96 | 50.4% | 249 | 2 | 0.8% | 44.5 |
+| agreement, then confidence | 0.97 | 21.5% | 106 | 0 | 0.0% | 70.4 |
+| agreement, then confidence | 0.98 | 0.8% | 4 | 0 | 0.0% | 88.9 |
 
 ### Review load to reach 98% pages in an exact document, the model's own photo labels
 
@@ -78,16 +78,14 @@ Simulated review: the owner checks the least-trusted boundaries in one order acr
 
 | signal | boundaries reviewed | per 100 pages | pooled | Dean | Deaver | Herrnstein |
 |---|---:|---:|---:|---:|---:|---:|
-| confidence (no review) | 0 | 0.0 | 90.0% | 85.2% | 96.5% | 90.1% |
-| confidence | 3 | 0.5 | 90.3% | 86.2% | 96.5% | 90.1% |
-| confidence | 23 | 4.2 | 95.6% | 98.0% | 96.5% | 92.3% |
-| confidence | 388 | 70.4 | 98.1% | 100.0% | 100.0% | 94.5% |
-| confidence (98% in every collection) | 548 | 99.5 | 100.0% | 100.0% | 100.0% | 100.0% |
-| agreement, then confidence (no review) | 0 | 0.0 | 90.0% | 85.2% | 96.5% | 90.1% |
-| agreement, then confidence | 3 | 0.5 | 90.3% | 86.2% | 96.5% | 90.1% |
-| agreement, then confidence | 23 | 4.2 | 95.6% | 98.0% | 96.5% | 92.3% |
-| agreement, then confidence | 388 | 70.4 | 98.1% | 100.0% | 100.0% | 94.5% |
-| agreement, then confidence (98% in every collection) | 548 | 99.5 | 100.0% | 100.0% | 100.0% | 100.0% |
+| confidence (no review) | 0 | 0.0 | 90.3% | 85.2% | 96.5% | 91.2% |
+| confidence | 16 | 2.9 | 95.4% | 96.4% | 96.5% | 93.4% |
+| confidence | 34 | 6.2 | 98.1% | 99.0% | 96.5% | 98.3% |
+| confidence (98% in every collection) | 147 | 26.7 | 99.0% | 99.0% | 100.0% | 98.3% |
+| agreement, then confidence (no review) | 0 | 0.0 | 90.3% | 85.2% | 96.5% | 91.2% |
+| agreement, then confidence | 16 | 2.9 | 95.4% | 96.4% | 96.5% | 93.4% |
+| agreement, then confidence | 34 | 6.2 | 98.1% | 99.0% | 96.5% | 98.3% |
+| agreement, then confidence (98% in every collection) | 147 | 26.7 | 99.0% | 99.0% | 100.0% | 98.3% |
 
 ## Sensitivity: the suspected label errors corrected
 
@@ -95,7 +93,7 @@ The truth-check (02-truth-check.md) suspects Dean 13 and 15 ("-2-" pages labelle
 
 | truth | pooled | Dean | Deaver | Herrnstein | doc-gap errors | of them at confidence >= 0.95 | boundaries reviewed to 98% pooled | per 100 pages |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| as labelled | 90.0% | 85.2% | 96.5% | 90.1% | 12 | 3 | 388 | 70.4 |
+| as labelled | 90.3% | 85.2% | 96.5% | 91.2% | 11 | 2 | 34 | 6.2 |
 | suspected errors corrected | 90.9% | 85.2% | 96.5% | 92.8% | 10 | 1 | 29 | 5.3 |
 
 ## Calls

@@ -904,7 +904,6 @@ on the owner's five ground-truth boxes, scored by the share of pages that land i
 the owner's decision, then a build only if the result is usable. `W40.a1` waits on `W36.seg-decision`. Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-truth-owner-ok` — owner checks the suspected label errors and approves the document rules**. Detail: `execution-plans/segmentation/00-plan.md` Part 2; the cases, the draft rules and how to open the review pack: `execution-plans/segmentation/02-truth-check.md`.
 - [ ] **`W36.seg-second` — an independent second frontier model as a voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.

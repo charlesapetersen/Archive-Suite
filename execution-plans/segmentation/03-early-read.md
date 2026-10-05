@@ -81,3 +81,12 @@ the suspected shift the owner has not yet seen: with them corrected as suspected
 methods yet uses the owner's domain cues (show-through, bylines and wire credits, items on top of a page); the
 next prompt revision should, which this measurement does not reflect.
 
+## Addendum 2 — the ground truth is now final (Herrnstein 19–20 answered)
+
+With every owner correction applied: window-claude **90.3%** of pages in an exact document on dev (5 false splits, 6
+false merges), spring-v1 86.5%, features-lr 64.1%, rule-cues 57.9%. **Reviewing the 34 least-confident boundaries
+(about 6 per 100 pages) brings window-claude to 98.1% pooled** (Dean 99.0%, Herrnstein 98.3%, Deaver 96.5%); 98%
+in every collection separately takes 147 (about 27 per 100 pages), because Deaver's last errors are high-confidence.
+So: close to the owner's bar with a review load worth having, before any use of the owner's domain cues — on the
+development boxes only, with a prompt written after reading them. The test boxes (Stanton, RG 165) are still unseen.
+

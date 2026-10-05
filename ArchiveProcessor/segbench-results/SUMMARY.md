@@ -8,18 +8,18 @@ Photos: "truth" means the method was given the box/folder photo labels from the 
 
 | method | split | pages | pages in exact doc | docs exact | false splits | false merges | boundary F1 | edits/100 pages | photos | held out |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
-| all-new | dev | 551 | 39.2% | 64.2% | 202 | 0 | 0.743 | 36.7 | truth | no parameters |
-| features-lr | dev | 551 | 63.9% | 68.4% | 13 | 62 | 0.860 | 13.6 | truth | yes, leave-one-collection-out on the development set |
+| all-new | dev | 551 | 39.0% | 63.9% | 202 | 0 | 0.743 | 36.7 | truth | no parameters |
+| features-lr | dev | 551 | 64.1% | 67.7% | 9 | 62 | 0.866 | 12.9 | truth | yes, leave-one-collection-out on the development set |
 | features-lr-notime | dev | 551 | 52.5% | 58.7% | 36 | 92 | 0.757 | 23.2 | truth | yes, leave-one-collection-out on the development set |
 | no-boundaries | dev | 551 | 0.6% | 1.0% | 0 | 291 | — | 52.8 | truth | no parameters |
-| rule-cues | dev | 551 | 57.7% | 75.3% | 96 | 15 | 0.833 | 20.1 | truth | yes, leave-one-collection-out (the rule list itself was written after reading dev pages) |
+| rule-cues | dev | 551 | 57.9% | 75.3% | 95 | 15 | 0.834 | 20.0 | truth | yes, leave-one-collection-out (the rule list itself was written after reading dev pages) |
 | rule-cues-sketch | dev | 551 | 55.6% | 74.9% | 137 | 3 | 0.804 | 25.4 | truth | untuned sketch, written after reading dev pages |
 | spring-baseline | dev | 551 | 73.2% | 77.8% | 8 | 33 | 0.926 | 9.1 | own | NO: the prompts were tuned on all five collections |
-| spring-v1 | dev | 551 | 86.1% | 91.8% | 21 | 6 | 0.955 | 7.1 | own | NO: the prompts were tuned on all five collections |
+| spring-v1 | dev | 551 | 86.5% | 92.1% | 20 | 6 | 0.957 | 6.5 | own | NO: the prompts were tuned on all five collections |
 | spring-v1-oracle-photos | dev | 551 | 85.7% | 91.4% | 24 | 8 | 0.946 | 5.8 | truth | NO: the prompts were tuned on all five collections |
 | spring-v2 | dev | 551 | 80.9% | 86.3% | 16 | 17 | 0.943 | 7.4 | own | NO: the prompts were tuned on all five collections |
-| window-claude | dev | 551 | 90.0% | 94.6% | 6 | 6 | 0.979 | 2.5 | own | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
-| window-claude-truth-photos | dev | 551 | 90.2% | 94.9% | 6 | 6 | 0.979 | 2.2 | truth | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
+| window-claude | dev | 551 | 90.3% | 94.9% | 5 | 6 | 0.981 | 2.0 | own | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
+| window-claude-truth-photos | dev | 551 | 90.3% | 94.9% | 5 | 6 | 0.981 | 2.0 | truth | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
 
 ## W36.seg-features checkpoint 1 — on-device feature model (development set, leave-one-collection-out)
 
@@ -48,15 +48,15 @@ Claude Sonnet 5.5 via `claude -p`, 7-page windows, stride 3, every gap judged tw
 |---|---|---:|---:|---:|---:|---:|
 | window-claude | Dean | 85.2% | 91.7% | 2 | 4 | 0.974 |
 | window-claude | Deaver | 96.5% | 98.9% | 1 | 0 | 0.994 |
-| window-claude | Herrnstein | 90.1% | 94.4% | 3 | 2 | 0.974 |
-| window-claude | pooled | 90.0% | 94.6% | 6 | 6 | 0.979 |
+| window-claude | Herrnstein | 91.2% | 95.4% | 2 | 2 | 0.979 |
+| window-claude | pooled | 90.3% | 94.9% | 5 | 6 | 0.981 |
 | window-claude-truth-photos | Dean | 85.2% | 91.7% | 2 | 4 | 0.974 |
 | window-claude-truth-photos | Deaver | 96.5% | 98.9% | 1 | 0 | 0.994 |
-| window-claude-truth-photos | Herrnstein | 90.6% | 95.4% | 3 | 2 | 0.974 |
-| window-claude-truth-photos | pooled | 90.2% | 94.9% | 6 | 6 | 0.979 |
+| window-claude-truth-photos | Herrnstein | 91.2% | 95.4% | 2 | 2 | 0.979 |
+| window-claude-truth-photos | pooled | 90.3% | 94.9% | 5 | 6 | 0.981 |
 | spring-v1 (for comparison) | Dean | 87.2% | 90.9% | 6 | 4 | 0.957 |
 | spring-v1 (for comparison) | Deaver | 84.4% | 93.1% | 7 | 0 | 0.959 |
-| spring-v1 (for comparison) | Herrnstein | 86.2% | 91.7% | 8 | 2 | 0.948 |
-| spring-v1 (for comparison) | pooled | 86.1% | 91.8% | 21 | 6 | 0.955 |
+| spring-v1 (for comparison) | Herrnstein | 87.3% | 92.6% | 7 | 2 | 0.953 |
+| spring-v1 (for comparison) | pooled | 86.5% | 92.1% | 20 | 6 | 0.957 |
 
-Against spring-v1 (the shipped per-page prompt, 86.1% pooled; tuned on all five collections), the window method scores 90.0% pooled, +3.9 points, with its own photo labels. Review load to 98% pages in an exact document, pooled, by a single confidence threshold: 388 boundaries (70 per 100 pages) with its own photo labels, 387 (70 per 100) with the truth's. Two-window agreement adds nothing: the windows disagreed on 4 of 494 document gaps, and those already had the lowest confidence. Most of the high-confidence errors sit at the truth-check's suspected label errors; with those corrected as suggested (not yet the owner's ruling) the figures change a good deal, see the sensitivity section of window-claude-report.md.
+Against spring-v1 (the shipped per-page prompt, 86.5% pooled; tuned on all five collections), the window method scores 90.3% pooled, +3.9 points, with its own photo labels. Review load to 98% pages in an exact document, pooled, by a single confidence threshold: 34 boundaries (6 per 100 pages) with its own photo labels, 34 (6 per 100) with the truth's. Two-window agreement adds nothing: the windows disagreed on 4 of 494 document gaps, and those already had the lowest confidence. Most of the high-confidence errors sit at the truth-check's suspected label errors; with those corrected as suggested (not yet the owner's ruling) the figures change a good deal, see the sensitivity section of window-claude-report.md.

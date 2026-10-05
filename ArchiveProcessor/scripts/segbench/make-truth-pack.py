@@ -257,9 +257,11 @@ KIND_TITLES = {
 
 RULES = [
     ("An enclosure — a complete item sent with a letter (a report, a pamphlet, someone else’s letter)",
-     "Its own document: mark its first page New.",
-     "It has its own author, date and subject. Joined to the cover letter it would take the letter’s date and "
-     "tags. It stays next to the letter in the box, so the link is not lost."),
+     "Its own document: mark its first page New. When it has a date of its own, it is dated TWICE: with its "
+     "own date and with the date of the letter that sent it (owner, 2026-10-05).",
+     "It has its own author, date and subject, and when it travelled matters too. Joined to the cover letter it "
+     "would take only the letter’s date and tags. It stays next to the letter in the box, so the link is not "
+     "lost. (Two dates on one file is not yet possible: see 02-truth-check.md.)"),
     ("An attachment — something made to go with this letter or memo (“Attachment A”, a list, a table, a "
      "budget) with no date or heading of its own",
      "Part of the letter: mark its pages Cont.",
@@ -286,6 +288,9 @@ RULES = [
     ("A photograph (a print in the folder)",
      "Its own document. A photo of its back (caption, stamp) is Cont.",
      "A print is an item in its own right; the back belongs to the same print."),
+    ("A magazine (the whole issue, cover included)",
+     "One document: the cover's page is New and every later page Cont. Not a set of clippings.",
+     "The owner, 2026-10-05: a full magazine is one item; its articles are not separate clippings."),
     ("A blank page or the blank back of a sheet",
      "Cont, as part of the document it belongs to.",
      "It carries nothing of its own and should not start a document."),
@@ -439,7 +444,7 @@ def write_html(cases, out):
     with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(parts))
 
-    r = [f"<!doctype html><meta charset='utf-8'><title>Draft document rules</title><style>{CSS}</style>",
+    r = [f"<!doctype html><meta charset='utf-8'><title>Document rules (approved 2026-10-05)</title><style>{CSS}</style>",
          "<h1>Draft rules: what counts as one document</h1>",
          "<p>The test boxes and the app need one answer to “where does a document start?” for the awkward "
          "cases. Each rule below has a recommended default and the reason. Approve it, or say what you want "
