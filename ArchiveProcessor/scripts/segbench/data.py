@@ -221,6 +221,44 @@ def gemini_snippets(name: str) -> dict[int, str]:
     return {r["file_num"]: r.get("ocr_snippet") or "" for r in json.loads(f.read_text())}
 
 
+# --- the spring 2026 Gemini runs, from their saved outputs (W36.seg-base) ------------------
+#
+# segmentation_test.py (baseline), run_improved.py (improved_v1, the prompt the app ships) and
+# run_improved_v2.py each saved, per collection, the label Gemini gave every page. All three sent
+# the previous page's image and the last 200 characters of its text with each page
+# (segmentation_test.py run_test), with gemini-3.1-flash-lite-preview. ``predicted`` is null when
+# the call failed or the reply carried no tag; the app treats a missing classification as a
+# document start (DocumentSegmenter: ``case .documentStart, .none``), so the bench does too and
+# counts the page as the run's own failure.
+
+SPRING_RUNS = {"baseline": "", "v1": "improved_v1", "v2": "improved_v2"}
+_SPRING_LABEL = {"box_label": "Box", "folder_label": "Folder",
+                 "document_start": "New", "document_continuation": "Cont"}
+
+
+def spring_path(name: str, run: str) -> Path:
+    return DATA_DIR / "test_results" / SPRING_RUNS[run] / _GEMINI_FILES[name]
+
+
+def read_spring(path: Path, n_pages: int) -> tuple[list[str], list[int]]:
+    """(labels, failed file numbers) from one saved spring result file. A failed or unparsed
+    page gets ``New`` — what the app does with no classification — never the truth's label."""
+    rows = json.loads(Path(path).read_text())
+    by_num: dict[int, str | None] = {}
+    for r in rows:
+        n = int(r["file_num"])
+        if n in by_num:
+            raise ValueError(f"{path}: file {n} twice")
+        p = r.get("predicted")
+        if p is not None and p not in _SPRING_LABEL:
+            raise ValueError(f"{path}: file {n}: unknown label {p!r}")
+        by_num[n] = _SPRING_LABEL.get(p) if p is not None else None
+    if sorted(by_num) != list(range(1, n_pages + 1)):
+        raise ValueError(f"{path}: file numbers do not cover 1..{n_pages}")
+    failed = [n for n in sorted(by_num) if by_num[n] is None]
+    return [by_num[n] or "New" for n in range(1, n_pages + 1)], failed
+
+
 def thumbnail(name: str, page: Page, max_px: int = 768) -> Path | None:
     """A downscaled JPEG of the page (``sips -Z``), made on first use under the cache, outside git."""
     out = CACHE_DIR / "thumbs" / str(max_px) / name / f"{page.n}.jpg"

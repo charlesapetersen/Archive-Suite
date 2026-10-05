@@ -135,3 +135,10 @@ session that records `W36.seg-truth-owner-ok`; the bench reads the CSVs as they 
 leaves a photo out of the test: record it in a list the bench reads, rather than deleting the CSV row, so the
 owner's file stays a full list of the photos (the bench item decides the form). Approved rules apply to the fresh box if the owner labels
 one, and become the definition the bench scores against.
+
+## Added 2026-10-05 by W36.seg-base — a possible one-row shift
+
+Herrnstein 19–25 may be shifted by one row in the CSV: 19 is labelled a continuation but reads as a folder label,
+20 is labelled Folder but is a letter, and 21 is labelled New but is that letter's page 2. Not yet in the review
+pack (rebuild it with `make-truth-pack.py` after adding the case); the CSV is unchanged.
+

@@ -1,0 +1,5 @@
+collections	pages	doc_pages	docs	pages_in_exact_doc	docs_exact	folders	folders_perfect	false_splits	false_merges	boundary_precision	boundary_recall	boundary_f1	pk	windowdiff	edits_per_100_pages	photos	photo_accuracy	photo_type_swaps	photos_missed	false_photos	has_confidence
+Dean	202	196	122	0.632653	0.688525	5	0.000000	3	20	0.970000	0.829060	0.894009	0.119403	0.119403	11.881188	6	0.833333	0	1	0	False
+Deaver	149	141	87	0.808511	0.850575	5	0.200000	2	4	0.975000	0.951220	0.962963	0.067568	0.067568	6.711409	8	0.625000	0	3	0	False
+Herrnstein	200	181	106	0.779006	0.820755	14	0.500000	3	9	0.965116	0.902174	0.932584	0.075377	0.075377	8.000000	19	0.842105	0	3	1	False
+POOLED Dean+Deaver+Herrnstein	551	518	315	0.731660	0.777778	24	0.333333	8	33	0.969925	0.886598	0.926391	0.089416	0.089416	9.074410	33	0.787879	0	7	1	False

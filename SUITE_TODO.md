@@ -905,7 +905,6 @@ the owner's decision, then a build only if the result is usable. `W40.a1` waits 
 OWNER sit in the plan's HOLD QUEUE.
 
 - [ ] **`W36.seg-truth-owner-ok` — owner checks the suspected label errors and approves the document rules**. Detail: `execution-plans/segmentation/00-plan.md` Part 2; the cases, the draft rules and how to open the review pack: `execution-plans/segmentation/02-truth-check.md`.
-- [ ] **`W36.seg-base` — baselines: all-New, no boundaries, the shipped prompt, rule cues [S]** (blocked-on: W36.seg-bench). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-window` — frontier model over overlapping page windows [M · paid]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-second` — an independent second frontier model as a voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.

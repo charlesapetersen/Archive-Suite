@@ -4,13 +4,20 @@ One line per method and split (the pooled row, or the only collection). Pages in
 
 The spring 2026 prompts (improved_v1, shipped) were developed while looking at all five collections, so no collection is fully unseen by the shipped prompt.
 
-| method | split | pages | pages in exact doc | docs exact | false splits | false merges | boundary F1 | edits/100 pages |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| all-new | dev | 551 | 39.2% | 64.4% | 203 | 0 | 0.741 | 36.8 |
-| features-lr | dev | 551 | 59.3% | 63.5% | 18 | 79 | 0.814 | 17.6 |
-| features-lr-notime | dev | 551 | 52.5% | 58.7% | 36 | 92 | 0.757 | 23.2 |
-| no-boundaries | dev | 551 | 0.6% | 1.0% | 0 | 291 | — | 52.8 |
-| rule-cues-sketch | dev | 551 | 55.6% | 74.9% | 137 | 3 | 0.804 | 25.4 |
+Photos: "truth" means the method was given the box/folder photo labels from the ground truth, so its figures isolate boundary finding; "own" means it labelled the photos itself and its photo errors count. Held out: whether the development numbers were measured on collections the method was not tuned on.
+
+| method | split | pages | pages in exact doc | docs exact | false splits | false merges | boundary F1 | edits/100 pages | photos | held out |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
+| all-new | dev | 551 | 39.2% | 64.4% | 203 | 0 | 0.741 | 36.8 | truth | no parameters |
+| features-lr | dev | 551 | 59.3% | 63.5% | 18 | 79 | 0.814 | 17.6 | truth | yes, leave-one-collection-out on the development set |
+| features-lr-notime | dev | 551 | 52.5% | 58.7% | 36 | 92 | 0.757 | 23.2 | truth | yes, leave-one-collection-out on the development set |
+| no-boundaries | dev | 551 | 0.6% | 1.0% | 0 | 291 | — | 52.8 | truth | no parameters |
+| rule-cues | dev | 551 | 55.8% | 73.3% | 99 | 17 | 0.825 | 21.1 | truth | yes, leave-one-collection-out (the rule list itself was written after reading dev pages) |
+| rule-cues-sketch | dev | 551 | 55.6% | 74.9% | 137 | 3 | 0.804 | 25.4 | truth | untuned sketch, written after reading dev pages |
+| spring-baseline | dev | 551 | 73.2% | 77.8% | 8 | 33 | 0.926 | 9.1 | own | NO: the prompts were tuned on all five collections |
+| spring-v1 | dev | 551 | 84.9% | 90.8% | 24 | 8 | 0.946 | 8.0 | own | NO: the prompts were tuned on all five collections |
+| spring-v1-oracle-photos | dev | 551 | 85.7% | 91.4% | 24 | 8 | 0.946 | 5.8 | truth | NO: the prompts were tuned on all five collections |
+| spring-v2 | dev | 551 | 80.9% | 86.3% | 16 | 17 | 0.943 | 7.4 | own | NO: the prompts were tuned on all five collections |
 
 ## W36.seg-features checkpoint 1 — on-device feature model (development set, leave-one-collection-out)
 

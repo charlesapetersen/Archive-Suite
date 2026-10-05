@@ -1,10 +1,13 @@
 """Prove the scorer on hand-made toy streams whose answers are worked out by hand.
 Run: python test_score.py   (no data, no OCR, no network)."""
 import unittest
+from pathlib import Path
 
 from score import (Counts, TestSetGuard, boundaries_from_labels, canonical, check_prediction,
                    derived, guard, risk_coverage, score_labels, segment_ids)
-from methods import AllNew, NoBoundaries, Prediction, RuleCuesSketch, from_labels
+from methods import AllNew, NoBoundaries, Prediction, RuleCues, RuleCuesSketch, SpringRun, from_labels
+import data
+import rules
 
 B, F, N, C = "Box", "Folder", "New", "Cont"
 
@@ -168,6 +171,153 @@ class Guard(unittest.TestCase):
             name = "m"
         with self.assertRaises(TestSetGuard):
             guard(M(), ["Stanton"], final=True)
+
+
+class Spring(unittest.TestCase):
+    """The loader for the March 2026 saved Gemini outputs (data.read_spring, methods.SpringRun)."""
+
+    def _write(self, rows):
+        import json, tempfile
+        f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump(rows, f)
+        f.close()
+        self.addCleanup(lambda: __import__("os").unlink(f.name))
+        return Path(f.name)
+
+    ROWS = [{"file_num": "1", "predicted": "box_label"}, {"file_num": "2", "predicted": "folder_label"},
+            {"file_num": "3", "predicted": "document_start"}, {"file_num": "4", "predicted": None},
+            {"file_num": "5", "predicted": "document_continuation"},
+            {"file_num": "6", "predicted": "folder_label"}]
+
+    def test_failed_page_is_new_and_counted_not_the_truth(self):
+        labels, failed = data.read_spring(self._write(self.ROWS), 6)
+        self.assertEqual(labels, [B, F, N, N, C, F])
+        self.assertEqual(failed, [4])
+
+    def test_rejects_gaps_duplicates_and_unknown_labels(self):
+        with self.assertRaises(ValueError):
+            data.read_spring(self._write(self.ROWS[:5]), 6)
+        with self.assertRaises(ValueError):
+            data.read_spring(self._write(self.ROWS + [{"file_num": "6", "predicted": None}]), 6)
+        with self.assertRaises(ValueError):
+            data.read_spring(self._write([{"file_num": "1", "predicted": "maybe"}]), 1)
+
+    def test_method_scores_failure_against_the_run_and_oracle_variant(self):
+        path = self._write(self.ROWS)
+        old = data.spring_path
+        data.spring_path = lambda name, run: path
+        self.addCleanup(lambda: setattr(data, "spring_path", old))
+
+        class Col:
+            name = "Dean"
+            labels = [B, F, N, C, C, N]
+            pages = [type("P", (), {"n": i + 1})() for i in range(6)]
+
+        m = SpringRun("s", "v1", "toy")
+        p = m.predict(Col())
+        check_prediction(p)
+        self.assertEqual(p.labels, [B, F, N, N, C, F])
+        self.assertEqual(m.failed, {"Dean": [4]})
+        self.assertTrue(p.boundaries[2]["cue"].startswith("run failed"))   # gap 3-4 is page 4's
+        self.assertIn("1 (Dean 1)", m.notes()[0])
+        # Page 4 (truth Cont) failed -> New: a false split; page 6 called a folder photo.
+        r = d(Col.labels, p.labels)
+        self.assertEqual((r["false_splits"], r["false_photos"]), (1, 1))
+        o = SpringRun("o", "v1", "toy", oracle_photos=True).predict(Col())
+        self.assertEqual(o.labels, [B, F, N, N, C, N])   # a document page called a photo becomes New
+        self.assertFalse(SpringRun("s", "v1", "toy").tuning)
+
+
+class RuleCueRules(unittest.TestCase):
+    def names(self, text, prev=None, top=5, end=3, blank=0):
+        return [r for r, _ in rules.fires(rules.lines_of(text), None if prev is None else rules.lines_of(prev),
+                                          top, end, blank)]
+
+    def test_each_rule_fires_on_its_cue(self):
+        self.assertIn("page-number", self.names("Mr. T. O. Yntema\n- 2 -\nMarch 30, 1960\ntext"))
+        self.assertIn("page-number", self.names("Page 3 of 4\nmore"))
+        self.assertIn("page-number", self.names("68B P.4\nbody"))
+        self.assertIn("page-one", self.names("Page 1 of 3\nbody"))
+        self.assertNotIn("page-number", self.names("Page 1 of 3\nbody"))
+        self.assertIn("bare-number", self.names("14\nbody"))
+        self.assertNotIn("bare-number", self.names("1960\nbody"))
+        self.assertIn("jump-from", self.names("BROWN VIEWS\nContinued from First Page\nbody"))
+        self.assertIn("opening", self.names("Gentlemen:\nWe write"))
+        self.assertIn("opening", self.names("MEMORANDUM\nTO: Mr. Welch"))
+        self.assertIn("date-line", self.names("March 7, 1960\nMr. Theodore O. Yntema"))
+        self.assertIn("date-line", self.names("5-18-60\nbody"))
+        self.assertIn("prev-closing", self.names("Body", prev="text\nVery truly yours,\nJoel Dean\nJD/ne"))
+        self.assertIn("prev-closing", self.names("Body", prev="text\nRJH: afa"))
+        self.assertIn("prev-jump", self.names("Body", prev="text\n(Continued on next page)"))
+        self.assertIn("flows-on", self.names("and so the argument goes\non"))
+        self.assertEqual(self.names("", blank=20), ["blank"])
+        self.assertEqual(self.names("SOME HEADLINE\nBody text."), [])
+
+    def test_end_lines_window(self):
+        prev = "Sincerely,\nA. Writer\nline\nline\nline"
+        self.assertNotIn("prev-closing", self.names("Body", prev=prev, end=3))
+        self.assertIn("prev-closing", self.names("Body", prev=prev, end=6))
+
+    def test_first_enabled_rule_decides(self):
+        fired = [("page-number", "Cont"), ("date-line", "New")]
+        all_on = rules.Params(5, 3, 0, "New", rules.RULES)
+        self.assertEqual(rules.decide(fired, all_on), ("Cont", "page-number"))
+        off = rules.Params(5, 3, 0, "New", tuple(r for r in rules.RULES if r != "page-number"))
+        self.assertEqual(rules.decide(fired, off), ("New", "date-line"))
+        self.assertEqual(rules.decide([], rules.Params(5, 3, 0, "Cont", ())), ("Cont", "default"))
+
+    def test_a_photo_is_not_the_previous_page(self):
+        class Col:
+            labels = [N, F, N]
+
+            def text(self, i):
+                return ["letter\nSincerely,", "FOLDER\ncc: x", "Body"][i]
+        feats = rules._features(Col(), 5, 3, 0)
+        self.assertIsNone(feats[1][1])
+        self.assertEqual(feats[2][1], [])   # the folder photo's text cannot fire prev-closing
+
+    def test_rule_stats_count_document_gaps_only(self):
+        truth = [F, N, C, N, F, N]
+        pred = [F, N, C, C, F, N]
+        deciders = ["photo (oracle)", "date-line", "page-number", "default", "photo (oracle)", "date-line"]
+        st = rules.rule_stats([(truth, pred, deciders)])
+        # Gaps 1-2 (page-number, right) and 2-3 (default, wrong); page 1 and page 5 follow a photo.
+        self.assertEqual(st, {"page-number": [1, 1], "default": [1, 0]})
+
+
+class RuleCuesLOCO(unittest.TestCase):
+    """The rule-cue method fits on the OTHER development collections only."""
+
+    class Col:
+        def __init__(self, name, labels, texts):
+            self.name, self.labels, self._t = name, labels, texts
+            self.pages = list(range(len(labels)))
+
+        def text(self, i):
+            return self._t[i]
+
+    def cols(self):
+        t = ["BOX", "FOLDER", "March 1, 1960\nDear Sir,", "- 2 -\nmore", "April 2, 1960\nbody",
+             "Page 2\nbody", "HEADLINE"]
+        lab = [B, F, N, C, N, C, N]
+        return {n: self.Col(n, list(lab), list(t)) for n in data.DEV}
+
+    def test_folds_exclude_the_held_out_collection(self):
+        cols = self.cols()
+        loaded = []
+        m = RuleCues(train_loader=lambda n: loaded.append(n) or cols[n])
+        for name in data.DEV:
+            p = m.predict(cols[name])
+            check_prediction(p)
+            self.assertEqual(p.labels, cols[name].labels)
+            self.assertNotIn(name, m.folds[name][2])
+            self.assertEqual(sorted(m.folds[name][2]), sorted(n for n in data.DEV if n != name))
+        self.assertTrue(all(0 < b["confidence"] <= 1 for b in p.boundaries))
+        self.assertTrue(any("fitted on" in line for line in m.notes()))
+
+    def test_marked_tuning_so_the_guard_refuses_the_test_set(self):
+        with self.assertRaises(TestSetGuard):
+            guard(RuleCues(), ["Stanton"], final=True)
 
 
 if __name__ == "__main__":

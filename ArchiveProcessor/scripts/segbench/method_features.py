@@ -130,6 +130,7 @@ def labels_from_probs(truth_labels: list[str], p_new: np.ndarray, threshold: flo
 
 class FeatureModel(Method):
     tuning = True
+    held_out = "yes, leave-one-collection-out on the development set"
     oracle_photos = True
 
     def __init__(self, with_time: bool):
