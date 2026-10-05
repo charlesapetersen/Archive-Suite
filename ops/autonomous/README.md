@@ -115,6 +115,10 @@ session takes it as its ONE item (resume prompt STEP 1.6). The request is retire
 remains the backstop: after `AUTONOMOUS_GATEFIX_MAX` (3) fix sessions that committed and left the gate red, the
 run parks with a note saying so; a session that commits nothing (killed, cut off) does not use up an attempt.
 `AUTONOMOUS_GATEFIX_MAX=0` restores the old park-at-once. Proof: `tests/prove-gate-fix.sh` (a gate step).
+The proof observes event and file witnesses in scratch state; its RED-to-GREEN transition stays in the same
+fixture daemon. Each fixture owns a process group that is reaped before resetting state, including on TERM/INT.
+`GATEFIX_FIXTURE_DELAY=8 bash ops/autonomous/tests/prove-gate-fix.sh` keeps the fake session in flight to
+exercise scheduling without changing the gate or its assertions.
 
 ### Sharing the Mac with Vision OCR: `yield-check.sh` (owner, 2026-10-04/05)
 
