@@ -943,7 +943,8 @@ OWNER sit in the plan's HOLD QUEUE.
   `pgrep -f archive-suite-autonomous.sh`, which matches ANY copy. Fix both halves: find and close the leak (each
   harness must reap every daemon it starts, on every exit path, as prove-daemon's reaper does), and make
   `daemon.sh`'s running check match only the installed copy (`$BIN/archive-suite-autonomous.sh`) or the launchd
-  job, with a test. | ops/autonomous | S | low | none
+  job, with a test. The gate-fix proof’s lifecycle portion shipped as W34.gate-fix-fu1 (2026-10-05, `c359978`/`6036756`);
+  the other harnesses and real-daemon running guard remain open. | ops/autonomous | S | low | none
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
