@@ -142,13 +142,16 @@ grep -q 'turns, ended completed' "$L" && ok "session outcome logged from the cod
 grep -q '^40 ' "$STATE/usage-window.last" 2>/dev/null && ok "window reading taken from the rollout file (40%)" || bad "usage-window.last is '$(cat "$STATE/usage-window.last" 2>/dev/null)'"
 
 echo "[2] a window at 97% makes the next cycle wait for the reset"
-reset; echo "1:97:4:no" > "$CTRL"; P=$(launch codex); sleep 9; stop "$P"
+# The reset is 60 s out, not 4: on a busy machine (the health gate runs this beside a VM) a 4 s window had already
+# reset before the next cycle looked, so nothing waited and the check failed (2026-10-05 gate). Stopping the
+# daemon mid-wait is fine: the wait polls every second.
+reset; echo "1:97:60:no" > "$CTRL"; P=$(launch codex); sleep 9; stop "$P"
 grep -q 'usage window 97% used.*waiting until' "$L" && ok "waits for the reset" || bad "no wait: $(grep -E 'usage|session' "$L" | tail -4)"
 [ "$(grep -c 'launching fresh' "$L")" -le 3 ] && ok "does not hammer the window ($(grep -c 'launching fresh' "$L") launches in 9 s)" || bad "too many launches"
 
 echo "[2b] the owner's own Codex use counts: a newer rollout from another session at 98% also makes it wait"
 reset; echo "0:30:3600:no" > "$CTRL"
-echo '{"rate_limits":{"limit_id":"codex","limit_name":null,"primary":{"used_percent":98.0,"window_minutes":300,"resets_at":'"$(( $(date +%s) + 5 ))"'},"secondary":{"used_percent":5.0,"window_minutes":10080,"resets_at":'"$(( $(date +%s) + 99999 ))"'}}}' \
+echo '{"rate_limits":{"limit_id":"codex","limit_name":null,"primary":{"used_percent":98.0,"window_minutes":300,"resets_at":'"$(( $(date +%s) + 60 ))"'},"secondary":{"used_percent":5.0,"window_minutes":10080,"resets_at":'"$(( $(date +%s) + 99999 ))"'}}}' \
   > "$CODEX_HOME/sessions/2026/10/04/rollout-owner-interactive.jsonl"
 touch -t "$(date -v+1H '+%Y%m%d%H%M.%S')" "$CODEX_HOME/sessions/2026/10/04/rollout-owner-interactive.jsonl"   # newest of all
 P=$(launch codex); sleep 6; stop "$P"

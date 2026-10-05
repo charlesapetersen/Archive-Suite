@@ -9604,4 +9604,9 @@ none of this was fixed by starting it.
   `yield-check.sh` matched any guarded model run; it now matches only the bake-off (its driver, or a guarded read
   labelled `bakeoff.*`). Checked against stand-in processes: a fit test does not yield, a bake-off read and the
   driver do, nothing running does not; `prove-status.sh` 50/0.
+- [x] **W34.gate-fu1 — the first gate since 2026-09-24 parked the run on two tests, both fixed** — SHIPPED 2026-10-05
+  (this commit). `fixture-scripts` had been red since W24.jpeg1 (`7788db5`, 2026-09-26) added the
+  `Archival Photos JPEGS/` partner folder to the Reader GUI fixture: its `ls` count read the folder as a 13th file.
+  It now counts files and checks the folder's one JPEG (37/37). `prove-codex-agent.sh` §[2] gave its usage window a
+  4 s reset, which had passed on the busy gate machine before the next cycle looked; it now uses 60 s (41/0).
 

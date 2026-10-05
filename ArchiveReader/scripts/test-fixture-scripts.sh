@@ -112,9 +112,15 @@ last="$(printf '%s' "$OUT" | tail -1)"
 if [ "$last" = "$GDST" ]; then ok "emits the fixture path on stdout"
 else bad "stdout is not the fixture path" "got: $last"; fi
 
-n_files=$(ls "$GDST" 2>/dev/null | wc -l | tr -d ' ')
+# Count FILES: W24.jpeg1 (7788db5, 2026-09-26) added the `Archival Photos JPEGS/` partner folder beside the 12,
+# and a plain `ls` count read it as a 13th file. The gate did not run between that commit and 2026-10-05, so the
+# check sat red unseen. The folder is checked on its own just below.
+n_files=$(find "$GDST" -maxdepth 1 -type f ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$n_files" -eq 12 ]; then ok "12 fixture files"
 else bad "expected 12 fixture files, got $n_files"; fi
+n_jpeg=$(find "$GDST/Archival Photos JPEGS" -maxdepth 1 -type f -name '*.jpg' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$n_jpeg" -eq 1 ]; then ok "the JPEG partner folder holds its one JPEG (W24.jpeg1)"
+else bad "expected 1 JPEG in 'Archival Photos JPEGS', got $n_jpeg"; fi
 
 if [ -f "$GDST/.archive-suite-root.json" ]; then ok "root marker written (W23.m4 — durable links)"
 else bad "root marker .archive-suite-root.json missing"; fi
