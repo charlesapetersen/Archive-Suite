@@ -141,7 +141,7 @@ elif [ "$running" = 1 ] && [ -s "$STATE/yield.reason" ]; then
   # on 2026-10-04 while it was doing nothing but waiting.
   STATE_ICON="${AMB}◐${OFF}"
   STATE_LINE="Waiting — $(sed 's/ (.*//' "$STATE/yield.reason" | head -1)"
-  STATE_HINT="It does not run during a Vision OCR model job, by your rule. It starts again by itself when the job ends."
+  STATE_HINT="It does not run during Vision OCR's model bake-off, by your rule. It starts again by itself when that ends."
 elif [ "$running" = 1 ]; then
   if checkpoint="$(active_session_checkpoint)"; then
     IFS=$'\t' read -r checkpoint_item checkpoint_count checkpoint_age <<< "$checkpoint"

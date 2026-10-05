@@ -9598,4 +9598,10 @@ none of this was fixed by starting it.
   running a model job", and the log compares reasons without the bracketed detail. Verified: `prove-status.sh`
   50/0 and `prove-codex-agent.sh` 41/0; against the previous code the new checks fail (2 and 1 RED). The status
   fix is live at once (the digest is read from the repo); the log fix needs the next `daemon.sh start`.
+- [x] **W34.yield-fu2 — only the model bake-off makes Archive Suite wait** — SHIPPED 2026-10-05 (this commit). Owner:
+  "all tasks except this specific model bakeoff should run at any time. I don't want to set a standard precedent
+  that the daemon holds work for when the computer is free. The model bakeoff is a very exceptional task."
+  `yield-check.sh` matched any guarded model run; it now matches only the bake-off (its driver, or a guarded read
+  labelled `bakeoff.*`). Checked against stand-in processes: a fit test does not yield, a bake-off read and the
+  driver do, nothing running does not; `prove-status.sh` 50/0.
 
