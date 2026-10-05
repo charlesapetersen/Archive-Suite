@@ -221,3 +221,6 @@ METHODS = {m.name: m for m in (
 
 # W36.seg-features: the on-device feature model lives in its own module, which adds itself to METHODS.
 import method_features  # noqa: E402,F401
+
+# W36.seg-window: approach A, Claude over overlapping page windows; adds itself to METHODS.
+import method_window  # noqa: E402,F401
