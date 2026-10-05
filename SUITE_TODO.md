@@ -74,6 +74,9 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
+- `segmentation/` — **PLANNED 2026-10-05 (W36, Archive Processor)**: a bake-off of automatic segmentation methods
+  (frontier models over page windows, a second model as voter, on-device feature and vision models, agreement plus
+  review) on the owner's ground truth, the owner's decision, then a build only if usable. `00-plan.md`.
 - `verification-phase/` — **APPROVED 2026-10-04 (W40, all three apps + both companions)**: the phase after the
   build queue — honest gates, the iPhone companion revived, feature ledgers that replace checkboxes as the
   measure of done, end-to-end rehearsals on copies of real material, tool-based bug finders, the owner's guided
@@ -891,6 +894,27 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
   cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
   Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | L | none
 
+## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
+
+The owner's original goal for the project, last tried in spring 2026 with a per-page method that "never got near
+usability". Plan: `execution-plans/segmentation/00-plan.md` (Part 1 for the owner, Part 2 the detail). A bake-off
+on the owner's five ground-truth boxes, scored by the share of pages that land in an exactly right document, then
+the owner's decision, then a build only if the result is usable. `W40.a1` waits on `W36.seg-decision`. Items marked
+OWNER sit in the plan's HOLD QUEUE.
+
+- [ ] **`W36.seg-truth` — prepare the owner's ground-truth check and document rules [S]**. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-truth-owner-ok` — owner checks the suspected label errors and approves the document rules**. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-bench` — segmentation test bench under ArchiveProcessor/scripts/segbench/ [M]**. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-base` — baselines: all-New, no boundaries, the shipped prompt, rule cues [S]** (blocked-on: W36.seg-bench). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-window` — frontier model over overlapping page windows [M · paid]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-second` — an independent second frontier model as a voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-localvlm` — on-device vision model, zero-shot [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-ensemble` — agreement plus review: risk-coverage, then the test collections once [S-M]** (blocked-on: W36.seg-window, W36.seg-second, W36.seg-whole, W36.seg-features, W36.seg-localvlm, W36.seg-truth-owner-ok). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (blocked-on: W36.seg-ensemble). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
 - [ ] **W35.lanes — let the daemons lend a subscription across projects, then run two workers on one queue
@@ -920,7 +944,7 @@ Order lives in the plan's `### TIER 7` block. The owner approved it on 2026-10-0
 never auto-picked; an `-owner-ok` line ticked `DECLINED` sends its dependant to the fallback in rule 11 of the
 daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>` with a severity (rule 8).
 
-- [ ] **`W40.a1` — health gate green at HEAD, and run at hand-off [M]** (blocked-on: W40-owner-ok, W9.cand2, W9.e4, W12.dedup-fu1, W22.mixed-batch-fu2, W24.cal1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.a1` — health gate green at HEAD, and run at hand-off [M]** (blocked-on: W40-owner-ok, W9.cand2, W9.e4, W12.dedup-fu1, W22.mixed-batch-fu2, W24.cal1, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a2` — the gate runs ArchiveCore's tests [S]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a3` — every lane green in full, in any order [M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a4` — remove tests that cannot fail [S]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
