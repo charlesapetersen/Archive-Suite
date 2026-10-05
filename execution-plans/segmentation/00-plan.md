@@ -131,6 +131,10 @@ experiment are TOOLS: they do not change the app until `W36.seg-build*`. The W40
   documents exact; folders perfectly segmented (STP); edits per 100 pages; box/folder photo accuracy apart.
 - **For a method that flags uncertainty: the risk–coverage curve** — share of boundaries auto-accepted against the
   error rate among those accepted, and review load in boundaries per 100 pages.
+- The owner's bar (2026-10-05): "close to maybe 98 percent". Two readings, both reported: fully automatic (no review),
+  and after review of flagged boundaries with the review load stated. The published evidence makes the first
+  unlikely today — the best results on real collections leave about 5% of boundaries wrong, and 98% of pages in an
+  exact document needs nearer 1% — and the second plausible.
 - Proposed usability bar, for the owner to confirm at the decision: after review of flagged boundaries, at least 98%
   of pages in an exact document in EVERY test collection, with no more than about 1 unflagged error per 500 pages.
 
@@ -160,7 +164,11 @@ spring prompts saw all five.
 - **`W36.seg-window` [M · paid]** — approach A: a frontier model judging boundaries in overlapping windows of 6–8
   pages, images at medium resolution plus OCR text, structured JSON per boundary with the cue it saw and a confidence;
   every boundary judged in two windows. Variants: text only versus image plus text; window 4/6/8. Start with Gemini
-  3.x Flash (batch). State the cost first.
+  3.x Flash (batch). State the cost first. EARLY READ (owner, 2026-10-05: not worth building unless it gets "close to
+  maybe 98 percent"): when this item ships, append a Daemon Report entry with its development-set numbers — pages in
+  an exact document, and the review load needed to reach 98% — so the owner can stop the bake-off here. As a guide,
+  if the best variant alone is under about 90% pages in an exact document, the combination is unlikely to reach 98%
+  at a review load worth having; say so plainly.
 - **`W36.seg-second` [S · paid]** — approach B: the same framing with an independent model (Claude Sonnet 5.5 or
   Gemini 3.1 Pro), as a second voter.
 - **`W36.seg-whole` [S · paid]** — approach C: one long-context call per folder as a third voter; expect it to
