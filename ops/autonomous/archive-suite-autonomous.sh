@@ -209,6 +209,16 @@ GATE_MAX_TIMEOUTS="${AUTONOMOUS_GATE_MAX_TIMEOUTS:-2}"   # consecutive timeouts 
 # 1 = a DOCUMENT-only RED (context-budget/tracker-sync/coherence) runs $COMPACTOR and re-gates once before
 # parking; 0 = park immediately as before. CODE and MIXED reds are never self-repaired regardless.
 GATE_SELFHEAL="${AUTONOMOUS_GATE_SELFHEAL:-1}"
+# GATE FIX (owner, 2026-10-05: "Daemon parked again. Set this up so I don't need to tell you this."). A CODE red
+# used to park at once, and every park that week was a test the daemon could have repaired — a fixture count, a
+# flaky recovery check, an order-dependent GUI suite — while parked, it could repair nothing. Now a red that
+# survives the retry is handed to the next SESSION as its ONE item through $GATEFIX (the same shape as
+# $DOCFIX): the failing steps, the command for each, and the tail of the log. Parking stays the backstop: the
+# run parks only after $GATEFIX_MAX fix sessions that COMMITTED (HEAD moved) still leave the gate red. The
+# "don't pile commits on a broken tree" reason for parking still holds: while $GATEFIX exists the session does
+# the fix and nothing else.
+GATEFIX="$STATE/gate-fix"; GATEFIX_TRIES="$STATE/gate-fix-tries"; GATEFIX_HEAD="$STATE/gate-fix-head"
+GATEFIX_MAX="${AUTONOMOUS_GATEFIX_MAX:-3}"
 
 # DOC PRE-GATE (WS13, 2026-08-12) — the document budgets are checked BEFORE the expensive gate, and repaired
 # per-file. 1 = on. See doc_pregate() for the full rationale; the short version is that the gate's own
@@ -906,6 +916,46 @@ Then restart it:  ./ops/autonomous/daemon.sh start"
 # Health gate (WS7). Returns: 9 = RED/park (caller stops the loop); 10 = ran GREEN (this cycle's work);
 # 0 = not due OR inconclusive-timeout-skip (caller continues to a normal session). last-gate persists across
 # restarts; a missing/invalid sha fails OPEN (due now). Must be called only when no other engine is active.
+# A GREEN gate retires any pending gate-fix request and its attempt count.
+_gatefix_clear() {
+  if [ -f "$GATEFIX" ] || [ -f "$GATEFIX_TRIES" ]; then
+    log "gate fix: the gate is GREEN — the fix request is retired."
+    rm -f "$GATEFIX" "$GATEFIX_TRIES" "$GATEFIX_HEAD" 2>/dev/null || true
+  fi
+}
+
+# Hand a code RED to the next session (see $GATEFIX above). Returns 11 when handed over, 1 when the attempts are
+# spent (the caller parks). Counts an attempt only when HEAD moved since the last count, as the doc pre-gate does:
+# a session killed by a lid close or the usage window has not had its chance.
+_gatefix_handoff() {
+  [ "$GATEFIX_MAX" -gt 0 ] || return 1
+  local head_now head_last n st cmd
+  head_now="$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown)"
+  head_last="$(cat "$GATEFIX_HEAD" 2>/dev/null || true)"
+  n="$(cat "$GATEFIX_TRIES" 2>/dev/null)"; case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  if [ -z "$head_last" ] || [ "$head_last" != "$head_now" ]; then
+    n=$(( n + 1 )); echo "$n" > "$GATEFIX_TRIES" 2>/dev/null || true
+    echo "$head_now" > "$GATEFIX_HEAD" 2>/dev/null || true
+  else
+    log "gate fix: no commit since the last fix attempt — not counting it. Still at $n/$GATEFIX_MAX."
+  fi
+  if [ "$n" -gt "$GATEFIX_MAX" ]; then return 1; fi
+  {
+    echo "GATE FIX — written by the daemon at $(date '+%F %T'). The health gate failed twice in a row."
+    echo "ATTEMPT: $n of $GATEFIX_MAX (the run parks if a committed fix still leaves the gate red after the last)."
+    echo "FAILED STEPS:${steps:- (unknown — read the log)}"
+    for st in $steps; do
+      cmd="$(grep -E "^step(_skippable)? $st " "$GATE_CMD" 2>/dev/null | head -1)"
+      echo "  $st: ${cmd:-(command not found in $GATE_CMD)}"
+    done
+    echo "FULL LOG: $glog"
+    echo "---- the log's tail ----"
+    tail -60 "$glog" 2>/dev/null
+  } > "$GATEFIX.tmp" 2>/dev/null && mv -f "$GATEFIX.tmp" "$GATEFIX" 2>/dev/null || { rm -f "$GATEFIX.tmp"; return 1; }
+  log "gate fix: handed the failing gate step(s) ($steps) to the next session as its ONE item (attempt $n/$GATEFIX_MAX) — not parking."
+  return 11
+}
+
 health_gate() {
   [ "$GATE_EVERY" -gt 0 ] || return 0
   local last cnt cnt_h cnt_o
@@ -953,6 +1003,7 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   if [ "$GATE_RC" -eq 0 ]; then
     git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
     log "health gate GREEN @ $(git -C "$REPO" rev-parse --short "$(_gate_tip)" 2>/dev/null)."
+    _gatefix_clear
     return 10
   fi
 
@@ -964,6 +1015,7 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   if [ "$GATE_RC" -eq 0 ]; then
     git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
     log "health gate GREEN on retry — the first failure was transient (not parking)."
+    _gatefix_clear
     return 10
   fi
   if [ "$GATE_RC" -eq 2 ]; then
@@ -1002,6 +1054,7 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
       if [ "$GATE_RC" -eq 0 ]; then
         git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
         log "health gate GREEN after SELF-REPAIR — a document was over budget and the daemon fixed it itself (not parking)."
+        _gatefix_clear
         return 10
       fi
       if [ "$GATE_RC" -eq 2 ]; then
@@ -1016,6 +1069,14 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
     else
       log "health gate RED on DOCUMENT step(s) only ($doc_list), but no compactor at $COMPACTOR — cannot self-repair; parking."
     fi
+  fi
+
+  # A CODE red (or one whose step is unknown) goes to a fix session before it may park (GATEFIX, above).
+  if [ "$has_code" = 1 ] || [ -z "$doc_list" ]; then
+    _gatefix_handoff; local gf=$?
+    [ "$gf" = 11 ] && return 11
+    healed="${healed} ($GATEFIX_MAX fix sessions committed changes and the gate is still red)"
+    rm -f "$GATEFIX" "$GATEFIX_TRIES" "$GATEFIX_HEAD" 2>/dev/null || true
   fi
 
   if [ "$has_code" = 1 ]; then
@@ -1151,7 +1212,7 @@ mkdir -p "$STATE"
 # can persist for weeks across restarts) made the next run park on its FIRST timeout instead of its second,
 # and a doc-budget count of 3 parked a restarted run as soon as HEAD moved. An owner restart buys a full
 # window for ALL of them or the invariant is not an invariant.
-rm -f "$IDLE_SINCE" "$NOCOMPLETE" "$GATE_TO" "$DOCFIX_TRIES" "$DOCFIX_HEAD" 2>/dev/null || true
+rm -f "$IDLE_SINCE" "$NOCOMPLETE" "$GATE_TO" "$DOCFIX_TRIES" "$DOCFIX_HEAD" "$GATEFIX_TRIES" "$GATEFIX_HEAD" 2>/dev/null || true
 
 # ---- WHY the daemon used to vanish without a trace (added 2026-07-29) --------------------------------
 # Only the NORMAL loop exit logged "=== daemon down ===" (bottom of file). `trap 'exit 0' TERM INT` exited
@@ -1407,6 +1468,7 @@ tick() {
     health_gate; local hg=$?
     [ "$hg" = 9 ] && return 9
     if [ "$hg" = 10 ]; then note_progress; return 0; fi
+    # 11 = a red was handed to a fix session ($GATEFIX): fall through and launch it now.
   fi
 
   # 3b-w. Usage window (owner, 2026-09-28, from vision-ocr). If the last session left the five-hour window at or

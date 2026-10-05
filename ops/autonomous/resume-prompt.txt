@@ -57,6 +57,24 @@ STEP 1.5 — DOC BUDGET FIX (only when the daemon has asked for one — it PREEM
   a usage cutoff, a watchdog — costs nothing and does not push the run toward a park).
   Verify before you delete it (instant, pure shell):  ./ops/autonomous/context-budget.sh
 
+STEP 1.6 — GATE FIX (only when the daemon has asked for one — it PREEMPTS the work queue, after STEP 1.5):
+  Look for `~/.local/state/archive-autonomous/gate-fix`. Absent is the normal case: skip to STEP 2.0.
+  If it EXISTS, the health gate failed twice in a row and making it pass is your ONE item this session — do NOT
+  also pick a queue item (the daemon stopped parking on a red gate on 2026-10-05 so that a session could fix it;
+  parking stays its backstop after three committed attempts). The file names the failing steps, the command the
+  gate runs for each, and the log's tail. Then:
+    * Reproduce each failing step ALONE with its command (never the whole 20-minute gate), in your worktree.
+    * Find the cause. A flaky or order-dependent test is a real defect: make it deterministic, or find the race
+      it exposes in the APP and fix that. If the failure is already a queue item (e.g. W34.recov-flake, W40.a3),
+      do that item's fix here and ship it under that item's tag.
+    * NEVER make the gate pass by weakening, skipping, deleting or loosening a check, raising a timeout to hide a
+      race, or removing a step from the gate. That is a park-worthy defect, not a fix.
+    * Re-run the step until it passes repeatedly (a flake needs many runs, not one), commit and push with the
+      tests that prove it, and STOP. Do NOT delete the request file: the daemon retires it when the next gate
+      run is GREEN, and counts another attempt if it is not.
+    * If the cause needs the owner (an account, a device, taste) or is outside this repo, append it to Daemon
+      Report and stop.
+
 STEP 2.0 — REVIEW CADENCE: run `ops/autonomous/next-review-unit.sh`. Paced reviews are PAUSED (owner,
   2026-07-29, re-confirmed 2026-08-01), so it prints `none due` and exits 3: go to STEP 2. Do not run the
   `lean-review` / `review-sweep` skills or any review fan-out on your own initiative; if a review seems needed,

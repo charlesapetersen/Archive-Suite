@@ -105,6 +105,17 @@ Proof: `tests/prove-codex-agent.sh` (a gate step) runs the real daemon against a
 a usage limit (no rollout on this machine recorded one), and how its reviewer treats `git push` and builds.
 Watch the first real codex run's `daemon.log` and `last-session.log` for both.
 
+### A red health gate goes to a fix session first (owner, 2026-10-05)
+
+"Daemon parked again. Set this up so I don't need to tell you this." Every park that week was a test the daemon
+could have repaired (a fixture count, a flaky Processor recovery check, Notes' order-dependent VM suite), and a
+parked daemon repairs nothing. So a code red that survives the gate's own retry no longer parks: the daemon
+writes `$STATE/gate-fix` — the failing steps, the command the gate runs for each, the log's tail — and the next
+session takes it as its ONE item (resume prompt STEP 1.6). The request is retired when a gate run is GREEN. Parking
+remains the backstop: after `AUTONOMOUS_GATEFIX_MAX` (3) fix sessions that committed and left the gate red, the
+run parks with a note saying so; a session that commits nothing (killed, cut off) does not use up an attempt.
+`AUTONOMOUS_GATEFIX_MAX=0` restores the old park-at-once. Proof: `tests/prove-gate-fix.sh` (a gate step).
+
 ### Sharing the Mac with Vision OCR: `yield-check.sh` (owner, 2026-10-04/05)
 
 Vision OCR has priority; Archive Suite takes the spare capacity. In practice the two run on different

@@ -4,7 +4,7 @@ preamble and was written for Claude Code. It binds you in full, with these diffe
 two disagree:
 
 1. ONE ITEM, THEN STOP. Do exactly one item (or the one doc-budget fix the prompt's STEP 1.5 describes) and
-   end the session. `ops/autonomous/CODEX_RUNBOOK.md` is the right reference for HOW to work an item under
+   end the session. The prompt's STEP 1.6 GATE FIX outranks the queue in the same way. `ops/autonomous/CODEX_RUNBOOK.md` is the right reference for HOW to work an item under
    Codex — its Pick, Read, Isolate, Do and verify, Checkpoint, Ship, Record and Hand off steps, its commit
    subject format and its rule on tags without backticks — but NOT for how many: its "go back to step 1
    without asking" does not apply here, because the daemon is the loop and starts a fresh session for the

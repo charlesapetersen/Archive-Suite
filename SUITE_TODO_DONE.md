@@ -9615,4 +9615,13 @@ none of this was fixed by starting it.
   `~/.codex/config.toml`; `AUTONOMOUS_CODEX_MODEL` / `AUTONOMOUS_CODEX_EFFORT` override; Claude keeps
   `AUTONOMOUS_EFFORT` (medium). Removes the `max`→`xhigh` mapping, which was wrong: Codex's model list shows `max`
   supported. `prove-codex-agent.sh` 42/0, and both new checks fail against a daemon with the old defaults.
+- [x] **W34.gate-fix — a red health gate goes to a fix session before it may park** — SHIPPED 2026-10-05 (this commit).
+  Owner: "Daemon parked again. Set this up so I don't need to tell you this." Three parks that morning (a fixture
+  count, a flaky Processor recovery check, Notes' order-dependent VM suite) were all repairable by a session. A code
+  red that survives the retry now writes `$STATE/gate-fix` (steps, each step's gate command, the log's tail); the
+  next session's ONE item is the fix (resume prompt STEP 1.6, never by weakening a check); a GREEN gate retires it;
+  the run parks only after `AUTONOMOUS_GATEFIX_MAX` (3) committed fixes leave it red, and an empty session does not
+  count. Verified: new gate step `prove-gate-fix.sh` 12/0, three mutants each RED (3, 2 and 2 checks);
+  `prove-daemon.sh` 156/0 with the old park-at-once pinned by `AUTONOMOUS_GATEFIX_MAX=0`; `prove-exit-logging`
+  12/0; `prove-gate-report` 31/0; `prove-codex-agent` 42/0.
 

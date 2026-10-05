@@ -266,6 +266,8 @@ step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
 # prove-codex-agent.sh (~35 s) — the `--agent codex` lane: the flags codex exec runs with, the closed stdin
 # and scrubbed env, the rollout-file usage window and its wait, and the refusals. A stub codex; no network.
 step codex-agent-proof bash "$ROOT/ops/autonomous/tests/prove-codex-agent.sh"
+# prove-gate-fix.sh (~75 s) — a red gate goes to a fix session before it may park (owner, 2026-10-05).
+step gate-fix-proof bash "$ROOT/ops/autonomous/tests/prove-gate-fix.sh"
 # step_skippable, not step: this harness greps with `rg`, which is a brew prereq rather than a repo file,
 # so a machine without ripgrep must report ⊘ NOT VERIFIED — not park the run. See the harness header.
 step_skippable keychain-partition-proof bash "$ROOT/ops/autonomous/tests/prove-keychain-partition.sh"
