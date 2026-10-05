@@ -106,6 +106,24 @@ class Combine(unittest.TestCase):
         self.assertEqual(W.review(col, comb, True, set()), ["New", "New", "New"])
         self.assertEqual(W.review(col, comb, True, {0}), ["New", "Cont", "New"])
 
+    def test_review_curve_steps_whole_tie_groups(self):
+        col = toy(["New", "Cont", "New", "Cont", "New"])
+        # gaps 0 and 2 tie at 0.9 (both wrong), gaps 1 and 3 at 0.95 (right)
+        self.fake({0: [("new", 0.9)], 1: [("new", 0.95)], 2: [("new", 0.9)], 3: [("new", 0.95)]})
+        curve = W.review_curve([col], True, "confidence")
+        self.assertEqual([k for k, _, _ in curve], [0, 2, 4])   # no point inside a tie
+        self.assertEqual(curve[1][1], 1.0)
+
+    def test_only_truth_photo_gaps_are_unreviewable(self):
+        col = toy(["Folder", "New", "Cont", "New"])
+        # gap 1 judged at confidence 1.0 (wrongly): it must still be reviewable
+        self.fake({0: [("new", 1.0)], 1: [("new", 1.0)], 2: [("new", 0.7)]}, kinds={0: "folder"})
+        comb = W.combine(col)
+        truth = W.assemble(col, comb, truth_photos=True)
+        self.assertEqual(W.order(truth, "confidence"), [2, 1])        # gap 0 is beside a truth photo
+        own = W.assemble(col, comb, truth_photos=False)
+        self.assertEqual(sorted(W.order(own, "agree")), [0, 1, 2])   # the model's own photo call is reviewable
+
 
 class Guard(unittest.TestCase):
     def test_refuses_test_collections(self):

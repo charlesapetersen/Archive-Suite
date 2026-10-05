@@ -432,10 +432,10 @@ def assemble(col, comb, truth_photos: bool) -> Prediction:
                         shares.append(sum(x != "document" for x in v) / len(v))
                 conf = min(shares)
             bounds.append({"decision": d, "confidence": conf, "cue": "beside a label photo",
-                           "agree": True})
+                           "agree": True, "fixed": truth_photos})
         else:
             bounds.append({"decision": d, "confidence": g["confidence"], "cue": g["cue"],
-                           "agree": g["agree"]})
+                           "agree": g["agree"], "fixed": False})
     return Prediction(labels, bounds)
 
 
@@ -496,9 +496,10 @@ def review(col, comb, truth_photos: bool, reviewed: set[int]) -> list[str]:
 
 
 def order(pred, signal: str) -> list[int]:
-    """Gaps in review order (least trusted first). Gaps beside a truth photo (confidence 1 in the
-    truth-photo variant) are never reviewed."""
-    idx = [i for i, b in enumerate(pred.boundaries) if b["confidence"] < 1.0]
+    """Gaps in review order (least trusted first). Only gaps beside a TRUTH photo (the truth-photo
+    variant) are never reviewed; a gap the model judged at confidence 1.0, or one beside a photo the
+    model called unanimously, is still reviewable, last."""
+    idx = [i for i, b in enumerate(pred.boundaries) if not b.get("fixed")]
     if signal == "confidence":
         return sorted(idx, key=lambda i: pred.boundaries[i]["confidence"])
     # agreement first: every disagreement, then the agreed gaps by confidence
@@ -506,15 +507,20 @@ def order(pred, signal: str) -> list[int]:
 
 
 def review_curve(cols, truth_photos: bool, signal: str):
-    """Pooled: review the k least-trusted gaps across the collections (one global order by the
-    signal), for every k; returns [(k, pooled headline, {name: headline})]."""
+    """Pooled: review the least-trusted gaps across the collections (one global order by the
+    signal); returns [(k, pooled headline, {name: headline})] at k = 0 and at the end of each TIE
+    GROUP. The model's confidences are coarse (0.97 alone covers 81 of 494 document gaps), so within
+    a tie the order is arbitrary and any point inside a group would depend on it (a stable sort
+    reviews Dean before Herrnstein). A threshold cannot split a tie either, so the curve steps a whole
+    group at a time: the review load it reports is the one a confidence threshold would give."""
     preds = {c.name: (c, combine(c)) for c in cols}
     items = []
     for name, (c, comb) in preds.items():
         pred = assemble(c, comb, truth_photos)
         for rank_i in order(pred, signal):
             b = pred.boundaries[rank_i]
-            key = ((b["agree"], b["confidence"]) if signal != "confidence" else (b["confidence"],))
+            conf = round(b["confidence"], 6)
+            key = ((b["agree"], conf) if signal != "confidence" else (conf,))
             items.append((key, name, rank_i))
     items.sort(key=lambda t: t[0])
     reviewed = {n: set() for n in preds}
@@ -531,9 +537,10 @@ def review_curve(cols, truth_photos: bool, signal: str):
         return (k, ex / dp, per)
 
     curve.append(point(0))
-    for k, (_, name, i) in enumerate(items, 1):
+    for k, (key, name, i) in enumerate(items, 1):
         reviewed[name].add(i)
-        curve.append(point(k))
+        if k == len(items) or items[k][0] != key:
+            curve.append(point(k))
     return curve
 
 
@@ -552,6 +559,22 @@ def rc_table(cols, truth_photos: bool, signal: str):
             rows.append((key, wrong))
     rows.sort(key=lambda r: r[0], reverse=True)
     return rows
+
+
+# The suspected label errors of execution-plans/segmentation/02-truth-check.md, applied as the truth-check
+# suggests. NOT the owner's ruling (W36.seg-truth-owner-ok is open): a sensitivity, reported apart.
+SUSPECTED = {"Dean": {13: "Cont", 15: "Cont"},                      # "-2-" pages labelled New
+             "Herrnstein": {19: "Folder", 20: "New", 21: "Cont", 22: "New", 23: "Cont", 24: "Cont",
+                            25: "New"}}                            # 19-25 read one row down
+
+
+def with_suspected(col):
+    import copy
+    import dataclasses
+    c = copy.copy(col)
+    fix = SUSPECTED.get(col.name, {})
+    c.pages = [dataclasses.replace(p, label=fix.get(p.n, p.label)) for p in col.pages]
+    return c
 
 
 def _pct(x):
@@ -602,21 +625,25 @@ def report() -> str:
     L.append(f"| pooled | {g} | {tw} | {dis} | {_pct(ea / na)} ({ea}/{na}) | "
              f"{_pct(ed / dis) if dis else '—'} ({ed}/{dis}) |")
     L.append("")
+    load98 = {}
     for truth_photos in (True, False):
         var = "photo labels from the truth" if truth_photos else "the model's own photo labels"
         L += [f"## Risk–coverage, {var}", "",
               "Document gaps (both pages are document pages in the truth), pooled over the three collections, "
-              "accepted most-trusted first. Error = accepted gaps whose boundary is wrong.", "",
-              "| signal | coverage | accepted | errors among accepted | error rate | gaps left to review per 100 pages |",
-              "|---|---:|---:|---:|---:|---:|"]
+              "accepted when the combined confidence is at or above a threshold (with agreement: only gaps "
+              "both windows agreed on, at or above it). Thresholds rather than coverage fractions, because the "
+              "confidences are coarse and a fraction would split ties arbitrarily. Error = accepted gaps whose "
+              "boundary is wrong.", "",
+              "| signal | threshold | coverage | accepted | errors among accepted | error rate | gaps left to review per 100 pages |",
+              "|---|---:|---:|---:|---:|---:|---:|"]
         for signal in ("confidence", "agreement, then confidence"):
             rows = rc_table(cols, truth_photos, "confidence" if signal == "confidence" else "agree")
             n = len(rows)
-            for cov in (1.0, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5):
-                k = round(cov * n)
-                err = sum(w for _, w in rows[:k])
-                L.append(f"| {signal} | {_pct(cov)} | {k} | {err} | {_pct(err / k) if k else '—'} | "
-                         f"{100 * (n - k) / pages:.1f} |")
+            for t in (0.0, 0.8, 0.9, 0.93, 0.95, 0.96, 0.97, 0.98):
+                acc = [w for key, w in rows if key[-1] >= t - 1e-9 and (signal == "confidence" or key[0])]
+                k, err = len(acc), sum(acc)
+                L.append(f"| {signal} | {t:.2f} | {_pct(k / n)} | {k} | {err} | "
+                         f"{_pct(err / k) if k else '—'} | {100 * (n - k) / pages:.1f} |")
         L += ["", f"### Review load to reach 98% pages in an exact document, {var}", "",
               "Simulated review: the owner checks the least-trusted boundaries in one order across all three "
               "collections (a single threshold) and each checked boundary is corrected to the truth"
@@ -641,10 +668,28 @@ def report() -> str:
                 if pt[0] in shown:
                     continue
                 shown.add(pt[0])
+                if target == 0.98:
+                    load98[(truth_photos, signal)] = pt[0]
                 tag = {None: " (no review)", "all98": " (98% in every collection)"}.get(target, "")
                 L.append(f"| {label}{tag} | {pt[0]} | {100 * pt[0] / pages:.1f} | {_pct(pt[1])} | "
                          + " | ".join(_pct(pt[2][n]) for n in data.DEV) + " |")
         L.append("")
+    # sensitivity: the suspected label errors corrected as suggested
+    scols = [with_suspected(c) for c in cols]
+    L += ["## Sensitivity: the suspected label errors corrected", "",
+          "The truth-check (02-truth-check.md) suspects Dean 13 and 15 (\"-2-\" pages labelled New) and a one-row "
+          "shift at Herrnstein 19-25. The owner has NOT ruled on them; this applies them as suggested "
+          "(`SUSPECTED` in method_window.py) to show how much of the result they carry. Own photo labels.", "",
+          "| truth | pooled | Dean | Deaver | Herrnstein | doc-gap errors | of them at confidence >= 0.95 | "
+          "boundaries reviewed to 98% pooled | per 100 pages |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    for tname, cs in (("as labelled", cols), ("suspected errors corrected", scols)):
+        curve = review_curve(cs, False, "confidence")
+        rows = rc_table(cs, False, "confidence")
+        pt = next((p for p in curve if p[1] >= 0.98), None)
+        L.append(f"| {tname} | {_pct(curve[0][1])} | " + " | ".join(_pct(curve[0][2][n]) for n in data.DEV)
+                 + f" | {sum(w for _, w in rows)} | {sum(w for k, w in rows if k[0] >= 0.95 - 1e-9)} | "
+                 + (f"{pt[0]} | {100 * pt[0] / pages:.1f} |" if pt else "not reached | |"))
+    L.append("")
     # call accounting
     recs = [json.loads(l) for l in LOG.read_text().splitlines()] if LOG.exists() else []
     calls = [r for r in recs if r["event"] in ("call", "parse-failure")]
@@ -665,9 +710,29 @@ def report() -> str:
            "review-load tables: window-claude-report.md.", "",
            "| variant | pages in exact doc | docs exact | false splits | false merges | boundary F1 |",
            "|---|---:|---:|---:|---:|---:|"]
-    for k, r in pooled.items():
-        sec.append(f"| {k} | {_pct(r['pages_in_exact_doc'])} | {_pct(r['docs_exact'])} | {r['false_splits']} | "
-                   f"{r['false_merges']} | {r['boundary_f1']:.3f} |")
+    import csv
+    with open(run.RESULTS / "spring-v1-dev.tsv", newline="") as fh:
+        spring = list(csv.DictReader(fh, delimiter="\t"))
+    sec[-2:] = ["| variant | collection | pages in exact doc | docs exact | false splits | false merges | boundary F1 |",
+                "|---|---|---:|---:|---:|---:|---:|"]
+    for k, rows in list(headlines.items()) + [("spring-v1 (for comparison)", spring)]:
+        for r in rows:
+            col = "pooled" if str(r["collections"]).startswith("POOLED") else r["collections"]
+            f = lambda key: float(r[key])
+            sec.append(f"| {k} | {col} | {_pct(f('pages_in_exact_doc'))} | {_pct(f('docs_exact'))} | "
+                       f"{r['false_splits']} | {r['false_merges']} | {f('boundary_f1'):.3f} |")
+    sp = float(spring[-1]["pages_in_exact_doc"])
+    wc = pooled["window-claude"]["pages_in_exact_doc"]
+    sec += ["", f"Against spring-v1 (the shipped per-page prompt, {_pct(sp)} pooled; tuned on all five collections), "
+            f"the window method scores {_pct(wc)} pooled, {100 * (wc - sp):+.1f} points, with its own photo labels. "
+            "Review load to 98% pages in an exact document, pooled, by a single confidence threshold: "
+            f"{load98[(False, 'confidence')]} boundaries ({100 * load98[(False, 'confidence')] / pages:.0f} per 100 "
+            f"pages) with its own photo labels, {load98[(True, 'confidence')]} "
+            f"({100 * load98[(True, 'confidence')] / pages:.0f} per 100) with the truth's. Two-window agreement adds "
+            f"nothing: the windows disagreed on {dis} of {g} document gaps, and those already had the lowest confidence. "
+            "Most of the high-confidence errors sit at the truth-check's suspected label errors; with those "
+            "corrected as suggested (not yet the owner's ruling) the figures change a good deal, see the "
+            "sensitivity section of window-claude-report.md."]
     (run.RESULTS / "window-claude.summary-section.md").write_text("\n".join(sec) + "\n")
     run.write_summary()
     return text

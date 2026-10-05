@@ -78,7 +78,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   readings so the five-hour windows are used; claims, a heavy-work lock, per-lane workers, pace rule. `00-plan.md`.
 - `segmentation/` — **PLANNED 2026-10-05 (W36, Archive Processor)**: a bake-off of automatic segmentation methods
   (frontier models over page windows, a second model as voter, on-device feature and vision models, agreement plus
-  review) on the owner's ground truth, the owner's decision, then a build only if usable. `00-plan.md`.
+  review) on the owner's ground truth, the owner's decision, then a build only if usable. `00-plan.md`; the first early read (W36.seg-window) is `03-early-read.md`.
 - `verification-phase/` — **APPROVED 2026-10-04 (W40, all three apps + both companions)**: the phase after the
   build queue — honest gates, the iPhone companion revived, feature ledgers that replace checkboxes as the
   measure of done, end-to-end rehearsals on copies of real material, tool-based bug finders, the owner's guided
@@ -905,7 +905,6 @@ the owner's decision, then a build only if the result is usable. `W40.a1` waits 
 OWNER sit in the plan's HOLD QUEUE.
 
 - [ ] **`W36.seg-truth-owner-ok` — owner checks the suspected label errors and approves the document rules**. Detail: `execution-plans/segmentation/00-plan.md` Part 2; the cases, the draft rules and how to open the review pack: `execution-plans/segmentation/02-truth-check.md`.
-- [ ] **`W36.seg-window` — frontier model over overlapping page windows [M · paid]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-second` — an independent second frontier model as a voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
