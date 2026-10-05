@@ -95,7 +95,7 @@ printf '#!/bin/sh\necho STATUS-OK\n' > "$T/status-stub.sh"; chmod +x "$T/status-
 
 launch() {   # $1 = AUTONOMOUS_AGENT value ("" = unset)
   env -u AUTONOMOUS_AGENT ${1:+AUTONOMOUS_AGENT="$1"} CODEX_THREAD_ID=leaked-parent CODEX_SANDBOX=seatbelt \
-  AUTONOMOUS_HB_STALL="${HB_STALL:-600}" AUTONOMOUS_HB_IDLE_N=2 \
+  AUTONOMOUS_HB_STALL="${HB_STALL:-600}" AUTONOMOUS_HB_IDLE_N=2 AUTONOMOUS_YIELD_CMD="${YIELD_CMD:-$T/no-yield}" \
   AUTONOMOUS_LABEL=provecodex AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" AUTONOMOUS_STATE="$STATE" \
   AUTONOMOUS_CLAUDE="$T/claude" AUTONOMOUS_CODEX="$T/codex" \
   AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=2 AUTONOMOUS_IDLE_STOP=0 AUTONOMOUS_MAX_NOCOMPLETE=0 \
@@ -185,6 +185,15 @@ grep -q 'watchdog:' "$L" && bad "killed a session whose rollout was growing: $(g
 grep -q 'turns, ended completed' "$L" && ok "…and it ran to completion" || bad "session did not complete: $(grep 'session' "$L" | tail -2)"
 reset; echo "0:30:3600:no:silent:20" > "$CTRL"; P=$(HB_STALL=3 launch codex); sleep 12; stop "$P"
 grep -q 'watchdog:' "$L" && ok "silent session killed by the watchdog" || bad "silent session never killed: $(cat "$L")"
+
+echo "[7] yield (owner, 2026-10-04): no gate or session while the priority project says so; resumes after"
+printf '#!/bin/sh\n[ -f "%s" ] && { echo "Vision OCR is running a model job (stub)"; exit 0; }\nexit 1\n' "$T/yield.on" > "$T/yield-stub"; chmod +x "$T/yield-stub"
+reset; echo "0:30:3600:no" > "$CTRL"; touch "$T/yield.on"; P=$(YIELD_CMD="$T/yield-stub" launch codex); sleep 4
+[ ! -s "$ARGV" ] && ok "no session while yielding" || bad "a session started while yielding"
+[ "$(grep -c 'yielding — Vision OCR is running a model job (stub)' "$L")" = 1 ] && ok "yield logged once, not every cycle" || bad "yield log count $(grep -c yielding "$L")"
+[ ! -f "$STATE/idle.since" ] && ok "a yield is not idleness (no idle stopwatch)" || bad "idle.since set while yielding"
+rm -f "$T/yield.on"; sleep 4; stop "$P"
+grep -q 'yield over' "$L" && [ -s "$ARGV" ] && ok "session starts once the yield ends" || bad "no session after the yield ended: $(tail -3 "$L")"
 
 echo "[5] refusals"
 refusal_rc() {   # $1 = agent; runs the daemon in THIS shell (not a $(…) subshell) so its exit code is waitable

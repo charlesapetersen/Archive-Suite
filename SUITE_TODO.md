@@ -891,6 +891,26 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
   cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
   Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | L | none
 
+## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
+
+- [ ] **W35.lanes — let the daemons lend a subscription across projects, then run two workers on one queue
+  [L — split before starting].** Owner, 2026-10-04: one coordinator for all projects "with the intent to not let
+  any usage windows go to waste across both the Claude and Codex subscriptions"; the owner names the priority
+  project, the other gets what is spare; Vision OCR's main work ends soon, after which all of it goes to Archive
+  Suite. What exists (W34.codex-agent, `yield-check.sh`): each project daemon runs on one agent the owner picks,
+  and Archive Suite yields during Vision OCR model jobs. What is missing, in order of value:
+  (a) **two workers on the Archive Suite queue**, one per subscription, once Vision OCR is done — the payoff that
+  uses both windows on one project. Needs: an item claim the resolver honours (`next-queue-item.sh` skips an item
+  another worker holds, with a stale-claim rule like engine.lock's), a per-worker state dir and engine lock
+  (`AUTONOMOUS_LABEL` already separates them), one health gate at a time across workers, `compact-plan.sh` and
+  `tidy.sh` run only when NO worker has a session in flight (both assume the plan is quiet), housekeeping that
+  never removes another worker's worktree, and plan edits that tolerate a concurrent writer;
+  (b) **`--agent auto`**: choose the agent per session — the subscription the priority project is not using,
+  falling back to the other when this one's window is spent and the priority project has nothing runnable.
+  Vision OCR's daemon has no codex support; porting W34 there is a Vision OCR item, not this one, and is worth
+  doing only if its work outlasts the short term. Split into sub-items with `(blocked-on:)` chains before
+  starting; each needs a prove-harness in the gate like `prove-codex-agent.sh`. | ops/autonomous | L | med | none
+
 ## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
 
 The next work once the build queue above is exhausted. Plans: `execution-plans/verification-phase/00-owner-plan.md`

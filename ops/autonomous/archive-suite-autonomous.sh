@@ -232,6 +232,7 @@ DOCFIX_MAX="${AUTONOMOUS_DOCFIX_MAX:-3}"
 # stdout is not a terminal, so the file written here stays clean text. Overridable (harness stub).
 STATUS_CMD="${AUTONOMOUS_STATUS_CMD:-$REPO/ops/autonomous/status-digest.sh}"
 USAGE_CMD="${AUTONOMOUS_USAGE_CMD:-$REPO/ops/autonomous/usage-window.sh}"   # reads the window from a session log
+YIELD_CMD="${AUTONOMOUS_YIELD_CMD:-$REPO/ops/autonomous/yield-check.sh}"    # exit 0 = hold off for a priority project
 
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
@@ -1348,6 +1349,21 @@ tick() {
     local age; age=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || echo 0) ))
     if [ "$age" -lt "$STALE" ]; then log "engine busy (lock ${age}s old) — skip."; return 0; fi
     log "stale lock (${age}s) — taking over."
+  fi
+
+  # 3a. Yield to the priority project (owner, 2026-10-04): Vision OCR first, Archive Suite on the spare capacity,
+  #     and never beside a Vision OCR model job (ops/autonomous/yield-check.sh says why). Before the gate as well
+  #     as the session, because the gate builds and boots the VM too. Logged once per change of reason, not every
+  #     cycle. A long yield is not idleness: the idle stopwatch is cleared, so days of model jobs cannot park the run.
+  if [ -x "$YIELD_CMD" ]; then
+    local yr
+    if yr="$("$YIELD_CMD" 2>/dev/null)"; then
+      [ "$yr" = "$(cat "$STATE/yield.reason" 2>/dev/null)" ] || log "yielding — ${yr:-the priority project is busy}; no gate or session until it ends."
+      printf '%s\n' "$yr" > "$STATE/yield.reason"
+      rm -f "$IDLE_SINCE" 2>/dev/null || true
+      return 0
+    fi
+    [ -f "$STATE/yield.reason" ] && { log "yield over — $(cat "$STATE/yield.reason") has ended."; rm -f "$STATE/yield.reason"; }
   fi
 
   # 3b. Disk guard (WS2). Placed AFTER the step-3 "another engine active" check ON PURPOSE, not for tidiness:

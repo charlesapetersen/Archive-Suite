@@ -9585,4 +9585,11 @@ none of this was fixed by starting it.
   review found three defects, all fixed here with tests: an exported `AUTONOMOUS_AGENT` leaking into the gate, a
   premium-only rollout hiding a 97% codex reading, and no codex liveness signal for the watchdog. Not run: a real
   daemon session under codex (only the owner starts the daemon).
+- [x] **W34.yield — Archive Suite yields to Vision OCR model jobs** — SHIPPED 2026-10-04 (this commit). Owner, asked
+  when Archive Suite may run beside Vision OCR on this 18 GB Mac: "Not during model jobs". `yield-check.sh` (a
+  `run-guarded.sh` or `bakeoff.sh` process = a model job) is checked before each cycle's gate and session; the
+  wait is logged once per reason and clears the idle stopwatch. Verified: `prove-codex-agent.sh` §[7] 41/0, and a
+  mutant that drops the yield's `return` turns three checks RED; the real check reports the running bake-off
+  (`bakeoff.lightonocr-2-1b-4bit-1540.s55.crops`). First cut used `pgrep -E`, which macOS pgrep rejects — the
+  check silently said "go ahead" during the bake-off; caught by running it against the live job.
 

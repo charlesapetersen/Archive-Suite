@@ -103,6 +103,18 @@ Proof: `tests/prove-codex-agent.sh` (a gate step) runs the real daemon against a
 a usage limit (no rollout on this machine recorded one), and how its reviewer treats `git push` and builds.
 Watch the first real codex run's `daemon.log` and `last-session.log` for both.
 
+### Sharing the Mac with Vision OCR: `yield-check.sh` (owner, 2026-10-04)
+
+Vision OCR has priority; Archive Suite takes the spare capacity. In practice the two run on different
+subscriptions — Vision OCR's daemon on Claude, this one on Codex (`start --agent codex`) — so neither spends the
+other's window. They share one 18 GB Mac, though, and a Vision OCR model job (the OCR bake-off and its kin) uses
+up to 11 GB, times every page and runs under a memory guard. The owner's rule: **Archive Suite does not run
+during a Vision OCR model job**, and otherwise runs beside Vision OCR's sessions. Before each cycle's gate and
+session the daemon runs `yield-check.sh`; exit 0 means wait (logged once per reason, and the idle stopwatch is
+cleared so a long model job cannot park the run). A session already running is never stopped. Override the
+check with `AUTONOMOUS_YIELD_CMD`; proof in `tests/prove-codex-agent.sh` §[7]. Lending a subscription across
+projects, and two workers on one queue, are `W35.lanes` in `SUITE_TODO.md`.
+
 The committed copies here are the source of truth; install to the runtime location:
 
 ```bash
