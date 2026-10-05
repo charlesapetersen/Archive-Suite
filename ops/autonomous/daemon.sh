@@ -61,6 +61,14 @@ PLIST_SRC="$REPO/ops/autonomous/com.archivesuite.autonomous.plist"
 PLIST_DST="$HOME/Library/LaunchAgents/$JOB.plist"
 GUI_DOMAIN="gui/$(id -u)"                                 # per-user launchd domain for the LaunchAgent
 
+# Match only this user's installed copy, with literal regex characters and path boundaries. A scratch
+# harness daemon (or a path that merely extends this one) must never veto the owner's next start.
+daemon_pids() {
+  local pattern
+  pattern="$(printf '%s' "$DAEMON_DST" | sed 's/[][\\.^$*+?(){}|]/\\&/g')"
+  pgrep -f "(^|[[:space:]])${pattern}([[:space:]]|$)"
+}
+
 runstatus() { grep -m1 '^RUN STATUS:' "$PLAN" 2>/dev/null | cut -c1-90; }
 # Why the daemon is idle is decided in ONE place, shared with status-digest.sh — see run-state-lib.sh.
 # Guarded: daemon.sh runs from the PRIMARY checkout, which may not have merged this file yet (memory
@@ -87,8 +95,8 @@ status() {
     echo "status-digest.sh is missing or not executable at:"
     echo "  $digest"
     echo
-    pgrep -f archive-suite-autonomous.sh >/dev/null 2>&1 \
-      && echo "The worker IS running (pid $(pgrep -f archive-suite-autonomous.sh | head -1))." \
+    daemon_pids >/dev/null 2>&1 \
+      && echo "The worker IS running (pid $(daemon_pids | head -1))." \
       || echo "The worker is NOT running. Start it: $0"
     tail -n 6 "$LOG" 2>/dev/null
   fi
@@ -221,10 +229,10 @@ bash "$REPO/ops/autonomous/ensure-signing.sh" || echo "daemon.sh: ensure-signing
 #    a keepalive job can be registered but momentarily process-down (crash/throttle window), and starting plain
 #    `daemon.sh` then would miss it via pgrep and start a SECOND nohup sibling that park's self-bootout can't
 #    stop. Checking the job regardless catches that cross-mode collision.
-if pgrep -f archive-suite-autonomous.sh >/dev/null \
+if daemon_pids >/dev/null \
    || launchctl print "$GUI_DOMAIN/$JOB" >/dev/null 2>&1; then
   echo "daemon ALREADY running (or launchd job loaded) — not launching a second one:"
-  pgrep -fl archive-suite-autonomous.sh || echo "  (process down but job loaded — launchd will relaunch)"
+  daemon_pids || echo "  (process down but job loaded — launchd will relaunch)"
   echo "  To switch modes or restart: '$0 stop' first, then '$0' (or '$0 nohup')."
   echo; status; exit 0
 fi
@@ -290,7 +298,7 @@ fi
 # 6. verify the first cycle actually started (bounded poll — no unbounded wait)
 ok=""
 for _ in $(seq 1 20); do
-  if pgrep -f archive-suite-autonomous.sh >/dev/null && tail -n 4 "$LOG" 2>/dev/null | grep -q 'daemon up'; then
+  if daemon_pids >/dev/null && tail -n 4 "$LOG" 2>/dev/null | grep -q 'daemon up'; then
     ok=1; break
   fi
   sleep 0.5

@@ -7,7 +7,7 @@
 # perfectly ordinary overnight shutdown was indistinguishable from a crash, and on 2026-07-29 that produced a
 # wrong "reproducible code failure" diagnosis. This harness pins the fix.
 #
-# It runs the REAL daemon, fully sandboxed via the AUTONOMOUS_* overrides (throwaway $HOME, $STATE, repo,
+# It runs the REAL daemon, fully sandboxed via the AUTONOMOUS_* overrides (throwaway $FIXTURE_HOME, $STATE, repo,
 # plan, and a FAKE `claude` that never spends a cent). It never touches ~/.local/state/archive-autonomous,
 # the real repo, or the real launchd job. Safe to run anytime. Run interactively.
 set -uo pipefail
@@ -18,15 +18,13 @@ DAEMON="$HERE/../archive-suite-autonomous.sh"
 [ -f "$DAEMON" ] || { echo "cannot find daemon at $DAEMON" >&2; exit 1; }
 
 T="$(mktemp -d)"
-reap() { while read -r p; do kill -9 "$p" 2>/dev/null; done < "$T/daemon.pids" 2>/dev/null; }
-trap 'reap; rm -rf "$T"' EXIT
-: > "$T/daemon.pids"
+. "$HERE/fixture-processes.sh"
 PASS=0; FAIL=0
 ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
 
 # ---- sandbox (mirrors prove-daemon.sh) -----------------------------------------------------------------
-export HOME="$T/home"; mkdir -p "$HOME/Desktop" "$HOME/.local/bin"
+FIXTURE_HOME="$T/home"; mkdir -p "$FIXTURE_HOME/Desktop" "$FIXTURE_HOME/.local/bin"
 BIN="$T/bin"; mkdir -p "$BIN"
 for c in osascript launchctl caffeinate; do printf '#!/bin/sh\nexit 0\n' > "$BIN/$c"; chmod +x "$BIN/$c"; done
 # `security` is scriptable: $SECOUT holds what it prints. Empty => taskport reminder finds no 'allow' and bails.
@@ -80,31 +78,26 @@ chmod +x "$T/claude"
 printf '#!/bin/sh\necho "STATUS-OK"\n' > "$T/status-stub.sh"; chmod +x "$T/status-stub.sh"
 
 launch() {
-  AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
+  fixture_launch env HOME="$FIXTURE_HOME" AUTONOMOUS_YIELD_CMD="$T/no-yield" AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
   AUTONOMOUS_STATE="$STATE" AUTONOMOUS_CLAUDE="$T/claude" \
   AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=4 AUTONOMOUS_IDLE_STOP=0 \
   AUTONOMOUS_MINFREE_MB=10 AUTONOMOUS_MAX_NOCOMPLETE=0 \
   AUTONOMOUS_GATE_EVERY=0 AUTONOMOUS_GATE_CMD=/bin/true \
   AUTONOMOUS_STATUS_CMD="$T/status-stub.sh" AUTONOMOUS_HB_POLL=1 \
-    bash "$DAEMON" >/dev/null 2>&1 &
-  local pid=$!; echo "$pid" >> "$T/daemon.pids"; echo "$pid"
+    bash "$DAEMON" >/dev/null 2>&1
 }
 LOG="$STATE/daemon.log"
-reset() { : > "$LOG"; rm -f "$STATE/engine.lock" "$STATE/idle.since" "$STATE/STATUS.md"; : > "$SECOUT"; rm -f "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt"; }
+reset() { : > "$LOG"; rm -f "$STATE/engine.lock" "$STATE/idle.since" "$STATE/STATUS.md"; : > "$SECOUT"; rm -f "$FIXTURE_HOME/Desktop/REVERT-TASKPORT-SECURITY.txt"; }
 downlines() { grep -c 'daemon down' "$LOG" 2>/dev/null | tr -d ' '; }
 waitfor() { local n=0; while [ "$n" -lt 60 ]; do grep -q "$1" "$LOG" 2>/dev/null && return 0; sleep 0.2; n=$((n+1)); done; return 1; }
-# Wait for a daemon pid to actually be gone. NOTE: plain `wait "$p"` does NOT work here — launch() runs inside
-# a command substitution, so the daemon is a child of THAT subshell, not of this shell, and `wait` on a
-# non-child returns immediately. Every assertion that counted log lines straight after a `wait` was therefore
-# racing the daemon's EXIT trap; the SIGTERM case had no sleep cushion either and false-failed ~4 runs in 6
-# ("expected 1 'daemon down' line, got 1" — the count changed between the test and the error message).
+# Wait for the signal exit before counting log lines; group cleanup follows the assertions.
 waitgone() { local n=0; while kill -0 "$1" 2>/dev/null && [ "$n" -lt 80 ]; do sleep 0.2; n=$((n+1)); done; }
 
 echo "prove-exit-logging — the daemon must say WHY it exited"
 
 # ---- 1. SIGTERM (the lid-close / launchd-bootout case) -------------------------------------------------
 reset; write_plan IN_PROGRESS
-p=$(launch)
+launch; p="$P"
 if waitfor "launching fresh resume session"; then
   kill -TERM "$p" 2>/dev/null; waitgone "$p"; waitfor "daemon down"
   if [ "$(downlines)" = "1" ]; then ok "SIGTERM logs exactly ONE 'daemon down' line"; else bad "SIGTERM: expected 1 'daemon down' line, got $(downlines)"; fi
@@ -116,9 +109,11 @@ else
   bad "daemon never launched a session (harness problem)"
 fi
 
+stop "$p" || exit 1
+
 # ---- 2. normal terminal exit (rc 9) -------------------------------------------------------------------
 reset; write_plan COMPLETE
-p=$(launch)
+launch; p="$P"
 n=0; while kill -0 "$p" 2>/dev/null && [ "$n" -lt 80 ]; do sleep 0.2; n=$((n+1)); done
 if kill -0 "$p" 2>/dev/null; then
   bad "daemon did not self-exit on RUN STATUS: COMPLETE (harness problem)"; kill -9 "$p" 2>/dev/null
@@ -136,9 +131,11 @@ else
   if grep -q 'reason: SIGTERM' "$LOG"; then bad "normal exit wrongly blamed SIGTERM"; else ok "normal exit does NOT blame a signal"; fi
 fi
 
+stop "$p" || exit 1
+
 # ---- 3. SIGKILL — untrappable, and that absence is itself the diagnostic ------------------------------
 reset; write_plan IN_PROGRESS
-p=$(launch)
+launch; p="$P"
 if waitfor "launching fresh resume session"; then
   kill -9 "$p" 2>/dev/null; waitgone "$p"; sleep 0.5
   if [ "$(downlines)" = "0" ]; then ok "SIGKILL logs NOTHING (documents the untrappable case)"; else bad "SIGKILL somehow logged $(downlines) line(s)"; fi
@@ -147,19 +144,23 @@ else
   bad "daemon never launched a session (harness problem)"
 fi
 
+stop "$p" || exit 1
+
 # ---- 4. REGRESSION: the EXIT trap still fires the taskport security reminder --------------------------
 # _log_exit now calls remind_revert_taskport; if that call were dropped, a real standing security exposure
 # would silently stop being reported. Script `security` to report the rule as 'allow' and assert the file.
 reset; write_plan IN_PROGRESS
 printf '<string>allow</string>\n' > "$SECOUT"
-p=$(launch)
+launch; p="$P"
 if waitfor "launching fresh resume session"; then
   kill -TERM "$p" 2>/dev/null; waitgone "$p"; sleep 0.3
-  if [ -f "$HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" ]; then ok "taskport reminder still fires from the EXIT trap"; else bad "taskport reminder LOST — remind_revert_taskport no longer runs on exit"; fi
+  if [ -f "$FIXTURE_HOME/Desktop/REVERT-TASKPORT-SECURITY.txt" ]; then ok "taskport reminder still fires from the EXIT trap"; else bad "taskport reminder LOST — remind_revert_taskport no longer runs on exit"; fi
   if grep -q 'reason: SIGTERM' "$LOG"; then ok "reason still logged alongside the reminder"; else bad "reason missing on the reminder path"; fi
 else
   bad "daemon never launched a session (harness problem)"
 fi
+
+stop "$p" || exit 1
 
 printf '\n  %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
