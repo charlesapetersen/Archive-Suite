@@ -1,7 +1,7 @@
 # The next phase: proving the Suite works
 
-Written 4 October 2026 for the owner's review. Status: **proposed, not approved.** Nothing in this plan runs until
-you approve it. The daemon's version of the same plan is `01-daemon-plan.md` in this folder.
+Written 4 October 2026 for the owner's review. Status: **approved by the owner on 4 October 2026**, with the
+answers recorded under *Decisions* below. It starts once the current queue is finished. The daemon's version of the same plan is `01-daemon-plan.md` in this folder.
 
 ## Where things stand
 
@@ -125,7 +125,7 @@ DEVONthink import and new features can resume.
 ## Your part
 
 You make a handful of decisions, listed below. You run the guided sessions, perhaps one or two a week once Stage 7
-begins. You do the iPhone check on a real phone if you have one. You do the final acceptance pass. Decisions the
+begins. You do the iPhone check on a borrowed phone, in one concentrated period. You do the final acceptance pass. Decisions the
 daemon meets along the way, such as whether to finish or drop an unreachable feature, reach you through the usual
 daemon report walkthrough, one at a time.
 
@@ -135,16 +135,18 @@ The daemon's version has about 45 items. Most should take one session and a few 
 add more. At the daemon's past pace that is several weeks of unattended running. Paid AI calls for the rehearsals
 should come to tens of dollars. The daemon states the cost before any run that pays a provider.
 
-## Decisions for you
+## Decisions (answered by the owner, 4 October 2026)
 
-1. **Approve the plan,** or change it. Until you approve, the items are queued but blocked.
-2. **The paused code reviews.** You paused AI whole-project reviews in July. This plan does not restart them. It
-   finds bugs with tools, rehearsals and your sessions instead, and every finding must be demonstrated. Please
-   confirm that is acceptable, or say if you want the reviews back as well.
-3. **A sample of the real collection.** The Reader rehearsal needs real documents at real size. The proposal is
-   that the daemon copies about 5,000 PDFs, together with their tags, out of the collection into a scratch folder,
-   reading only.
-4. **The iPhone.** Do you have an iPhone to test on? Do you have a paid Apple Developer account? Without one, an
-   app installed from this Mac stops working after seven days and has to be reinstalled.
-5. **Android screen tests.** In July you declined an Android test lane that needed an emulator. There is now a way to
-   test the Android screens without one. It is offered once here; declining again is fine.
+1. **Approve the plan.** Approved.
+2. **The paused code reviews.** The AI whole-project reviews stay paused. Finding bugs with tools, rehearsals and
+   the owner's sessions, each finding demonstrated, is acceptable.
+3. **A sample of the real collection.** Yes. The daemon may copy about 5,000 PDFs with their tags out of the
+   collection into a scratch folder, reading only.
+4. **The iPhone.** The owner has no iPhone at present but can borrow one occasionally, and has no paid Apple
+   Developer account. So the real-phone tests happen in one concentrated period on a borrowed phone, installed
+   from this Mac with a free Apple ID (the install lasts seven days, which is enough). Everything else is done in
+   the simulator beforehand, and the daemon prepares a session pack so the borrowed time goes on testing.
+5. **Android screen tests.** Yes, add the emulator-free Android screen tests.
+
+(The Google Drive test folder that was decision 4 in the first draft was withdrawn: the collection's folder is
+local, and Google Drive is not running on this machine.)

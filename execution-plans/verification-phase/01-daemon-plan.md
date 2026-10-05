@@ -1,7 +1,8 @@
 # W40 — verification phase: the daemon's plan
 
-Written 2026-10-04. **Status: PROPOSED — gated on `W40-owner-ok` (HOLD QUEUE).** The owner-facing version, with the
-reasoning and the open decisions, is `00-owner-plan.md` in this folder. Read it once before the first W40 item;
+Written 2026-10-04. **Status: APPROVED by the owner 2026-10-04** (`W40-owner-ok`, `W40.c2-owner-ok` and `W40.e8-owner-ok` all
+granted; reviews stay paused). Starts when the current queue is exhausted. The owner-facing version, with the
+reasoning and the owner's answers, is `00-owner-plan.md` in this folder. Read it once before the first W40 item;
 it is short.
 
 This plan is the *detail*. The *order* is the `### TIER 7` block in `.maintenance/AUTONOMOUS_PLAN.md` `## WORK QUEUE`,
@@ -103,7 +104,14 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
 - **`W40.i3` — iOS in the phone↔Mac E2E [M].** Extend `ArchiveProcessor/scripts/e2e-phone-mac.sh` to drive the
   iOS simulator through the same inject seam Android uses. Blocked on the parity fixes the comparison files; add
   their tags to this line when they are filed.
-- **`W40.i4` — real-iPhone pass — OWNER.** HOLD QUEUE only. Needs a device and signing; see owner decision 5.
+- **`W40.i5` — borrowed-iPhone session pack [S].** The owner has no iPhone and no paid developer account; a
+  phone is borrowed for one concentrated period. Prepare `verification/sessions/iphone-1.md` so that period goes
+  on testing: free-Apple-ID signing steps in Xcode (Personal Team; the install lasts seven days), enabling
+  Developer Mode on the phone and trusting the developer, pairing with the Mac over Wi-Fi and USB, then the
+  capture tasks in order with a note form. Everything the simulator can show must already be shown, so the
+  borrowed phone tests only camera, real network and the device itself.
+- **`W40.i4` — real-iPhone pass — OWNER.** HOLD QUEUE only. The owner's concentrated session with a borrowed
+  phone, using the `W40.i5` pack.
 
 ## B — feature ledgers
 

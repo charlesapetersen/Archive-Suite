@@ -74,7 +74,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
-- `verification-phase/` — **PROPOSED 2026-10-04 (W40, all three apps + both companions)**: the phase after the
+- `verification-phase/` — **APPROVED 2026-10-04 (W40, all three apps + both companions)**: the phase after the
   build queue — honest gates, the iPhone companion revived, feature ledgers that replace checkboxes as the
   measure of done, end-to-end rehearsals on copies of real material, tool-based bug finders, the owner's guided
   sessions, then a release candidate. `00-owner-plan.md` (owner-facing) + `01-daemon-plan.md` (daemon detail).
@@ -891,16 +891,15 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
   cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
   Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | L | none
 
-## W40 — verification phase: prove the Suite works (proposed 2026-10-04; gated on owner approval)
+## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
 
 The next work once the build queue above is exhausted. Plans: `execution-plans/verification-phase/00-owner-plan.md`
 (the owner's version, with the open decisions) and `01-daemon-plan.md` (method, phase rules and item detail).
-Order lives in the plan's `### TIER 7` block. **Every item is blocked until `W40-owner-ok` is ticked**, and
-`W40.a1` also waits on the last items of the current queue. Items marked OWNER sit in the plan's HOLD QUEUE and are
+Order lives in the plan's `### TIER 7` block. The owner approved it on 2026-10-04 (the three owner gates are in `SUITE_TODO_DONE.md` §W40), so
+`W40.a1` waits only on the last items of the current queue. Items marked OWNER sit in the plan's HOLD QUEUE and are
 never auto-picked; an `-owner-ok` line ticked `DECLINED` sends its dependant to the fallback in rule 11 of the
 daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>` with a severity (rule 8).
 
-- [ ] **`W40-owner-ok` — owner approves the verification-phase plan**. Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.a1` — health gate green at HEAD, and run at hand-off [M]** (blocked-on: W40-owner-ok, W9.cand2, W9.e4, W12.dedup-fu1, W22.mixed-batch-fu2, W24.cal1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a2` — the gate runs ArchiveCore's tests [S]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a3` — every lane green in full, in any order [M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
@@ -909,7 +908,8 @@ daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>`
 - [ ] **`W40.i1` — iPhone companion builds again [S-M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i2` — iPhone companion parity with Android [M]** (blocked-on: W40.i1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i4` — real-iPhone pass — OWNER** (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
+- [ ] **`W40.i5` — borrowed-iPhone session pack [S]** (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i4` — real-iPhone pass on a borrowed phone — OWNER** (blocked-on: W40.i5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.b0` — ledger format, verification/README.md [S]** (blocked-on: W40.a1, W40.a4). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.b1` — Reader feature ledger [M]** (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.b2` — Notes feature ledger [M]** (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
@@ -917,7 +917,6 @@ daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>`
 - [ ] **`W40.b4` — capture feature ledger, Android and iOS [S]** (blocked-on: W40.b0, W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.b5` — correct the doc drift the ledgers found [S-M]** (blocked-on: W40.b1, W40.b2, W40.b3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.c1` — Processor and Notes rehearsal sets [S-M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
-- [ ] **`W40.c2-owner-ok` — owner allows a read-only sample copy of the real corpus**. Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.c2` — Reader rehearsal sample copied from the real corpus [S]** (blocked-on: W40.c2-owner-ok, W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
 - [ ] **`W40.d1` — bulk OCR on a ground-truth collection [M]** (blocked-on: W40.b3, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d2` — Processor review dialogs driven by hand [M]** (blocked-on: W40.d1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
@@ -937,7 +936,6 @@ daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>`
 - [ ] **`W40.e5` — dead-code scan [S-M]** (blocked-on: W40.b5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e6` — parser robustness: fuzz loops and round-trip properties [M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e7` — mutation sample on the irreversible paths [M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e8-owner-ok` — owner decides on emulator-free Android screen tests**. Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.e8` — Android screen tests without an emulator [M]** (blocked-on: W40.e8-owner-ok, W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.f1` — Reader undo durability and the missing audit ledger [S]** (blocked-on: W40.b1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
 - [ ] **`W40.f2` — the Reader's undisclosed root-marker write [S]** (blocked-on: W40.b1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.

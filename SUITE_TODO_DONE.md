@@ -9560,3 +9560,9 @@ none of this was fixed by starting it.
 - **`_has_claude_descendant` correctly matches the real CLI.** `~/.local/bin/claude` resolves to
   `~/.local/share/claude/versions/2.1.222` — a binary *not* named `claude` — but the second pattern
   `*/claude/*` matches the `claude/` path component, and the repo at `~/Claude` (capital C) correctly does not.
+
+## W40 — verification phase: owner gates (2026-10-04)
+
+- [x] **`W40-owner-ok` — owner approves the verification-phase plan**. Granted by the owner 2026-10-04; answers recorded in `execution-plans/verification-phase/00-owner-plan.md` §Decisions.
+- [x] **`W40.c2-owner-ok` — owner allows a read-only sample copy of the real corpus**. Granted by the owner 2026-10-04; answers recorded in `execution-plans/verification-phase/00-owner-plan.md` §Decisions.
+- [x] **`W40.e8-owner-ok` — owner decides on emulator-free Android screen tests**. Granted by the owner 2026-10-04; answers recorded in `execution-plans/verification-phase/00-owner-plan.md` §Decisions.
