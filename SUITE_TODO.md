@@ -919,8 +919,6 @@ daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>`
 - [ ] **`W40.c1` — Processor and Notes rehearsal sets [S-M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
 - [ ] **`W40.c2-owner-ok` — owner allows a read-only sample copy of the real corpus**. Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.c2` — Reader rehearsal sample copied from the real corpus [S]** (blocked-on: W40.c2-owner-ok, W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
-- [ ] **`W40.c3-owner-ok` — owner allows a tag-test folder inside Google Drive**. Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
-- [ ] **`W40.c3` — Google Drive tag-test folder [S]** (blocked-on: W40.c3-owner-ok, W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
 - [ ] **`W40.d1` — bulk OCR on a ground-truth collection [M]** (blocked-on: W40.b3, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d2` — Processor review dialogs driven by hand [M]** (blocked-on: W40.d1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d3` — every OCR provider through the app's own client [S-M]** (blocked-on: W40.b3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
@@ -932,7 +930,6 @@ daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>`
 - [ ] **`W40.d9` — Notes writing session with real keystrokes [M]** (blocked-on: W40.b2, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d10` — Notes with real Zotero, real Reader and real links [M]** (blocked-on: W40.b2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d11` — the shared tag contract across apps [S-M]** (blocked-on: W40.d1, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d12` — tags survive Google Drive sync [S]** (blocked-on: W40.c3, W40.b1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.e1` — Thread and Address Sanitizer runs [M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e2` — crash, hang and leak harvest from VM runs [S-M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e3` — accessibility audit of every main screen [S-M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
@@ -948,7 +945,7 @@ daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>`
 - [ ] **`W40.g2` — Notes guided-session pack [S]** (blocked-on: W40.d9, W40.d10). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
 - [ ] **`W40.g3` — Processor and capture guided-session pack [S]** (blocked-on: W40.d1, W40.d2, W40.d5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
 - [ ] **`W40.g-sessions` — owner runs the guided sessions — OWNER** (blocked-on: W40.g1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
-- [ ] **`W40.h2` — re-run every journey at HEAD [M]** (blocked-on: W40.d1, W40.d2, W40.d3, W40.d4, W40.d5, W40.d6, W40.d7, W40.d8, W40.d9, W40.d10, W40.d11, W40.d12, W40.e1, W40.e2, W40.e3, W40.e4, W40.e5, W40.e6, W40.e7, W40.f1, W40.f2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §H.
+- [ ] **`W40.h2` — re-run every journey at HEAD [M]** (blocked-on: W40.d1, W40.d2, W40.d3, W40.d4, W40.d5, W40.d6, W40.d7, W40.d8, W40.d9, W40.d10, W40.d11, W40.e1, W40.e2, W40.e3, W40.e4, W40.e5, W40.e6, W40.e7, W40.f1, W40.f2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §H.
 - [ ] **`W40.h3` — release candidate — OWNER (Tier-3)** (blocked-on: W40.h2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.h4` — owner acceptance pass with the ledgers — OWNER** (blocked-on: W40.h3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 

@@ -29,9 +29,7 @@ large parts of the Reader and Notes were rewritten. Some specific gaps:
 - In Archive Notes, typing a note and having it saved when you quit has never been tested by anything. That is the
   app's main activity. Real Zotero has never been connected; every Zotero test talks to a stand-in.
 - Archive Reader has been timed on 150,000 made-up files but never with real document text. The full-text search,
-  the main list and the library health panel have never been measured at the size of your collection. Its tag
-  writes have only ever been tested on the Mac's own disk, while your collection lives in Google Drive. Nothing has
-  checked that a tag written there survives Google's syncing.
+  the main list and the library health panel have never been measured at the size of your collection.
 - Some features described as shipped are not reachable. The Reader's single-click Read toggle and date pop-up
   exist in code that nothing uses. The Reader's guide promises a permanent record of every tag change, and no such
   record exists; undo is lost when the app quits.
@@ -122,8 +120,7 @@ DEVONthink import and new features can resume.
 - **The agent fixing a feature is not the one that confirms it.** A later, separate run re-checks it.
 - **Tests written from the promise are protected.** A fix may not change what such a test expects without saying
   why, and the ledger records it.
-- **The real collection is never written.** Rehearsals use copies. The one exception asked of you below is a small
-  test folder in Google Drive, outside the collection.
+- **The real collection is never written.** Rehearsals use copies.
 
 ## Your part
 
@@ -146,10 +143,8 @@ should come to tens of dollars. The daemon states the cost before any run that p
    confirm that is acceptable, or say if you want the reviews back as well.
 3. **A sample of the real collection.** The Reader rehearsal needs real documents at real size. The proposal is
    that the daemon copies about 5,000 PDFs, together with their tags, out of the collection into a scratch folder,
-   reading only. Copying may make Google Drive download files that are stored online only.
-4. **A test folder in Google Drive.** Checking that tags survive Google's syncing needs a folder inside Google
-   Drive, separate from the collection, where the daemon may write tags on copies.
-5. **The iPhone.** Do you have an iPhone to test on? Do you have a paid Apple Developer account? Without one, an
+   reading only.
+4. **The iPhone.** Do you have an iPhone to test on? Do you have a paid Apple Developer account? Without one, an
    app installed from this Mac stops working after seven days and has to be reinstalled.
-6. **Android screen tests.** In July you declined an Android test lane that needed an emulator. There is now a way to
+5. **Android screen tests.** In July you declined an Android test lane that needed an emulator. There is now a way to
    test the Android screens without one. It is offered once here; declining again is fine.

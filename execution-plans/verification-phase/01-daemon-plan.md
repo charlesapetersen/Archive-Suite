@@ -20,8 +20,7 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
   Anthropic/Mistral/OpenAI never called through the app's own clients; no real batch submission; USB bridge has no
   entry point and no run. Notes: typing → autosave → flush on ⌘Q never driven; Zotero only ever a stub; last *full*
   GUI-suite pass 2026-09-19 and the suite is order-dependent (G19 deletes the fixture note). Reader: FTS index, the
-  AppKit list and the health popover never measured at corpus size; tag writes never tested on the Google Drive
-  volume the corpus lives on; owner GUI passes all predate the August discovery rewrite.
+  AppKit list and the health popover never measured at corpus size; owner GUI passes all predate the August discovery rewrite.
 - **Docs claim what code does not do.** Reader `InlineEditCells.swift` cells have zero references (single-click
   Read toggle, date pop-up); Reader `CLAUDE.md` §12 promises an append-only audit ledger that does not exist (undo
   is in memory, `Views/NavigationModel.swift` `undoLast`); Processor `KNOWN_ISSUES.md` §1 says
@@ -63,7 +62,7 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
 11. **A declined owner gate does not strand its dependants.** The owner's "no" is recorded by ticking the
     `-owner-ok` line with `DECLINED` and the date, and the gated item closes the same way in the same commit. Its
     dependants then take their fallback: `W40.c2` declined → `W40.d7` runs on the synthetic tree only and says so;
-    `W40.c3` declined → `W40.d12` closes `unverifiable-here`; `W40.e8` declined → its entry moves to the DECLINED
+    `W40.e8` declined → its entry moves to the DECLINED
     list in `SUITE_TODO.md`.
 12. **Reviews.** This phase does not lift the `REVIEW.md` pause. Its finders are tools, journeys and the owner's
     sessions. Owner approval of `W40-owner-ok` is the authorization for the `W40.e*` items specifically.
@@ -137,8 +136,9 @@ regenerable. It is never committed. Each set gets a `MANIFEST.txt` saying what i
   PDFs and their JPEG partners with xattrs preserved (`ditto`), sampled across the tree, not the first 5,000.
   Before copying, list each sampled file's size, mtime and tag xattr; after, list them again and prove them
   identical. That listing is the evidence the corpus was not touched.
-- **`W40.c3` — Google Drive test folder [S].** Gated on `W40.c3-owner-ok`. A folder inside Google Drive, outside
-  `Archival Photos/`, holding copies only. Record whether the mount is a File Provider volume.
+- **No Google Drive sync test.** The corpus path contains `Google Drive`, but it is a plain local folder and Google
+  Drive is not running on this machine (owner, 2026-10-04; also `SUITE_TODO.md` §Wave 26). There is no sync
+  behaviour to test. Do not file one.
 
 ## D — journeys (rehearse the four real uses end to end)
 
@@ -174,8 +174,6 @@ where it can.
   launch and deep links both ways; Copy Link; an inbound `archivenotes://` URL dispatched by the OS.
 - **`W40.d11` — the shared contract across apps [S-M].** Open `W40.d1`'s output in the Reader; tags, dates,
   quality and classification must read as written. Make a Notes source block from one of them.
-- **`W40.d12` — tags survive Google Drive [S].** Write tags with the Reader on copies in the `W40.c3` folder,
-  let Drive sync, then re-read them; repeat after quitting and reopening Drive.
 
 ## E — machine bug-finders
 
