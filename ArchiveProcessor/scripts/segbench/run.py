@@ -130,6 +130,9 @@ def write_summary() -> None:
         lines.append(f"| {method} | {split} | {r['pages']} | {fmt(num('pages_in_exact_doc'), '%')} | "
                      f"{fmt(num('docs_exact'), '%')} | {r['false_splits']} | {r['false_merges']} | "
                      f"{fmt(num('boundary_f1'), 'f')} | {fmt(num('edits_per_100_pages'), 'f1')} |")
+    # Sections a method's own report adds (e.g. features-lr.summary-section.md), appended verbatim.
+    for extra in sorted(RESULTS.glob("*.summary-section.md")):
+        lines.append(extra.read_text().rstrip())
     (RESULTS / "SUMMARY.md").write_text("\n".join(lines) + "\n")
 
 

@@ -102,3 +102,7 @@ class RuleCuesSketch(Method):
 
 
 METHODS = {m.name: m for m in (AllNew(), NoBoundaries(), RuleCuesSketch())}
+
+
+# W36.seg-features: the on-device feature model lives in its own module, which adds itself to METHODS.
+import method_features  # noqa: E402,F401
