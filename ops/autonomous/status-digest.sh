@@ -136,6 +136,12 @@ if [ -n "${STATUS_PARKED:-}" ]; then
   # check below would say "working" for a run that has actually given up. The flag wins.
   STATE_ICON="${AMB}◆${OFF}"; STATE_LINE="Stopped itself — everything left needs a decision from you"
   STATE_HINT="reason: $(printf '%s' "$STATUS_PARKED" | tr -d '\n' | cut -c1-70)"
+elif [ "$running" = 1 ] && [ -s "$STATE/yield.reason" ]; then
+  # Holding off for the priority project (yield-check.sh; owner, 2026-10-04). It said "Working now" here all night
+  # on 2026-10-04 while it was doing nothing but waiting.
+  STATE_ICON="${AMB}◐${OFF}"
+  STATE_LINE="Waiting — $(sed 's/ (.*//' "$STATE/yield.reason" | head -1)"
+  STATE_HINT="It does not run during a Vision OCR model job, by your rule. It starts again by itself when the job ends."
 elif [ "$running" = 1 ]; then
   if checkpoint="$(active_session_checkpoint)"; then
     IFS=$'\t' read -r checkpoint_item checkpoint_count checkpoint_age <<< "$checkpoint"

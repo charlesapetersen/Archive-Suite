@@ -1358,12 +1358,15 @@ tick() {
   if [ -x "$YIELD_CMD" ]; then
     local yr
     if yr="$("$YIELD_CMD" 2>/dev/null)"; then
-      [ "$yr" = "$(cat "$STATE/yield.reason" 2>/dev/null)" ] || log "yielding — ${yr:-the priority project is busy}; no gate or session until it ends."
+      # Compare without the "(…)" detail: it names the page being read, which changes every cycle, and logging
+      # on every change of it wrote the same wait every 90 s all night (2026-10-05).
+      local yprev; yprev="$(cat "$STATE/yield.reason" 2>/dev/null)"
+      [ "${yr%% (*}" = "${yprev%% (*}" ] || log "yielding — ${yr:-the priority project is busy}; no gate or session until it ends."
       printf '%s\n' "$yr" > "$STATE/yield.reason"
       rm -f "$IDLE_SINCE" 2>/dev/null || true
       return 0
     fi
-    [ -f "$STATE/yield.reason" ] && { log "yield over — $(cat "$STATE/yield.reason") has ended."; rm -f "$STATE/yield.reason"; }
+    [ -f "$STATE/yield.reason" ] && { log "yield over — $(sed 's/ (.*//' "$STATE/yield.reason") has ended."; rm -f "$STATE/yield.reason"; }
   fi
 
   # 3b. Disk guard (WS2). Placed AFTER the step-3 "another engine active" check ON PURPOSE, not for tidiness:

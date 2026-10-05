@@ -187,10 +187,11 @@ reset; echo "0:30:3600:no:silent:20" > "$CTRL"; P=$(HB_STALL=3 launch codex); sl
 grep -q 'watchdog:' "$L" && ok "silent session killed by the watchdog" || bad "silent session never killed: $(cat "$L")"
 
 echo "[7] yield (owner, 2026-10-04): no gate or session while the priority project says so; resumes after"
-printf '#!/bin/sh\n[ -f "%s" ] && { echo "Vision OCR is running a model job (stub)"; exit 0; }\nexit 1\n' "$T/yield.on" > "$T/yield-stub"; chmod +x "$T/yield-stub"
+# The detail in brackets changes on every call, as the real one's page label does: still logged once.
+printf '#!/bin/sh\n[ -f "%s" ] && { echo "Vision OCR is running a model job (stub page $(date +%%s%%N))"; exit 0; }\nexit 1\n' "$T/yield.on" > "$T/yield-stub"; chmod +x "$T/yield-stub"
 reset; echo "0:30:3600:no" > "$CTRL"; touch "$T/yield.on"; P=$(YIELD_CMD="$T/yield-stub" launch codex); sleep 4
 [ ! -s "$ARGV" ] && ok "no session while yielding" || bad "a session started while yielding"
-[ "$(grep -c 'yielding — Vision OCR is running a model job (stub)' "$L")" = 1 ] && ok "yield logged once, not every cycle" || bad "yield log count $(grep -c yielding "$L")"
+[ "$(grep -c 'yielding — Vision OCR is running a model job (stub page' "$L")" = 1 ] && ok "yield logged once, not every cycle, though its detail changes" || bad "yield log count $(grep -c yielding "$L")"
 [ ! -f "$STATE/idle.since" ] && ok "a yield is not idleness (no idle stopwatch)" || bad "idle.since set while yielding"
 rm -f "$T/yield.on"; sleep 4; stop "$P"
 grep -q 'yield over' "$L" && [ -s "$ARGV" ] && ok "session starts once the yield ends" || bad "no session after the yield ended: $(tail -3 "$L")"

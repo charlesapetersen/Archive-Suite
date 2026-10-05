@@ -9592,4 +9592,10 @@ none of this was fixed by starting it.
   mutant that drops the yield's `return` turns three checks RED; the real check reports the running bake-off
   (`bakeoff.lightonocr-2-1b-4bit-1540.s55.crops`). First cut used `pgrep -E`, which macOS pgrep rejects — the
   check silently said "go ahead" during the bake-off; caught by running it against the live job.
+- [x] **W34.yield-fu1 — the yield says "waiting" and is logged once** — SHIPPED 2026-10-05 (this commit). The first
+  night showed two faults: `daemon.sh status` said "Working now" while the daemon only waited, and the wait was
+  logged every 90 s because its reason carried the page being read. The status now reads "Waiting — Vision OCR is
+  running a model job", and the log compares reasons without the bracketed detail. Verified: `prove-status.sh`
+  50/0 and `prove-codex-agent.sh` 41/0; against the previous code the new checks fail (2 and 1 RED). The status
+  fix is live at once (the digest is read from the repo); the log fix needs the next `daemon.sh start`.
 

@@ -135,6 +135,14 @@ printf '%s' "$OUT" | grep -q 'Working now' && ok "still reports the working stat
 # opening the file, it re-tested the no-lock state already asserted at the top of [2].
 rm -f "$S/engine.lock"
 
+echo "[2b] running but yielding to Vision OCR -> says it is waiting, not working (2026-10-05)"
+echo 'Vision OCR is running a model job (bakeoff.chandra-ocr-2-oQ8.s05.whole)' > "$S/yield.reason"
+OUT="$(RUNNING=1 run)"
+printf '%s' "$OUT" | grep -q 'Waiting — Vision OCR is running a model job$' && ok "yield shown as waiting, without the page detail" || bad "yield state wrong" "$OUT"
+printf '%s' "$OUT" | grep -q 'Working now' && bad "still says Working now while yielding" "$OUT" || ok "not 'Working now' while yielding"
+rm -f "$S/yield.reason"
+OUT="$(RUNNING=1 run)"; printf '%s' "$OUT" | grep -q 'Working now' && ok "back to working once the yield file is gone" || bad "no working state after yield" "$OUT"
+
 echo "[3] running + idle + a 429 in the last session -> THROTTLED, and explicitly not 'out of work'"
 echo "$(( $(date +%s) - 3000 ))" > "$S/idle.since"
 printf '{"is_error":true,"api_error_status":429}\n{"resetsAt":%s}\n' "$(( $(date +%s) + 900 ))" > "$S/last-session.log"
