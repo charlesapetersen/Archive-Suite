@@ -125,7 +125,8 @@ experiment are TOOLS: they do not change the app until `W36.seg-build*`. The W40
 
 - **Headline: pages in an exact document** — the share of document pages whose document's page set is exactly the
   ground truth's. It counts the damage directly (every page in a wrongly split or merged document is mis-dated,
-  mis-tagged, mis-filed). Doing nothing (no boundaries) scores about 25%; every page a new document scores 58.6% of
+  mis-tagged, mis-filed). Measured by `W36.seg-bench` (2026-10-05), all five collections: no boundaries at all scores 3.7% (the
+  "about 25%" first written here was wrong); every page a new document scores 58.6% of
   documents exact.
 - False splits and false merges separately (they cost differently); boundary precision, recall, F1; Pk/WindowDiff;
   documents exact; folders perfectly segmented (STP); edits per 100 pages; box/folder photo accuracy apart.
