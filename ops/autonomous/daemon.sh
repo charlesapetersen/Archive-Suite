@@ -16,13 +16,17 @@
 #                                      #   launchd re-bootstraps ~/Library/LaunchAgents at the next GUI login
 #                                      #   (W32.plist-relogin). `stop` removes the plist, so a stop sticks.
 #   ./ops/autonomous/daemon.sh         # same thing — a bare invocation still means `start`.
+#   ./ops/autonomous/daemon.sh start --agent codex   # run the sessions with Codex (`codex exec`) instead of
+#                                      #   Claude. `--agent claude` is the default. The choice is saved to the
+#                                      #   state dir, so a launchd relaunch keeps it; each `start` sets it afresh.
 #   ./ops/autonomous/daemon.sh stop    # stop it (boots out the launchd job first, then kills the process)
 #   ./ops/autonomous/daemon.sh status  # daemon state + supervisor + RUN STATUS + recent log (read-only)
 #   ./ops/autonomous/daemon.sh nohup   # opt-in: detached nohup, NO crash-restart. (GUI now runs off-screen in
 #                                      #   the Tart VM — ops/gui/README §3 — so nohup no longer buys GUI-verify.)
 #                                      #   `keepalive` is an explicit alias for the default `start` mode.
 #
-# Prereqs it enforces (and explains if missing): claude CLI outside ~/Desktop (launchd/TCC),
+# Prereqs it enforces (and explains if missing): the chosen agent's CLI (claude outside ~/Desktop for
+# launchd/TCC; codex from the ChatGPT app or ~/.local/bin/codex),
 # the daemon script + resume prompt present, an L0 plan whose RUN STATUS is IN_PROGRESS with
 # unchecked [ ] work-queue items. See README.md for the design (L0 plan / L1 daemon / L2 prompt).
 set -uo pipefail
@@ -41,6 +45,9 @@ STATE_SLUG="$LABEL"; [ "$LABEL" = archivesuite ] && STATE_SLUG=archive
 STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${STATE_SLUG}-autonomous}"
 BIN="$HOME/.local/bin"
 CLAUDE="$BIN/claude"
+CODEX_APP_CLI="/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+if [ -x "$BIN/codex" ]; then CODEX="$BIN/codex"; else CODEX="$CODEX_APP_CLI"; fi   # same order as the daemon
+PREAMBLE_SRC="$REPO/ops/autonomous/codex-preamble.txt"
 DAEMON_SRC="$REPO/ops/autonomous/archive-suite-autonomous.sh"
 DAEMON_DST="$BIN/archive-suite-autonomous.sh"
 COMPACT_SRC="$REPO/ops/autonomous/compact-plan.sh"
@@ -110,6 +117,20 @@ warn_unmarked_keychain_provider() {
 DRYRUN=""
 if [ "${1:-}" = "--dry-run" ]; then DRYRUN=1; shift; fi
 
+# `--agent claude|codex` (owner, 2026-10-04) may come anywhere after the command; pull it out before dispatch.
+# Typed, not inherited, for the same reason as --dry-run: an exported variable would silently pick the agent
+# for every later start. Default claude; a `start` without the flag goes back to claude.
+AGENT_CHOICE=claude; _args=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --agent)   [ $# -ge 2 ] || fail "--agent needs a value: claude or codex"; AGENT_CHOICE="$2"; shift 2 ;;
+    --agent=*) AGENT_CHOICE="${1#--agent=}"; shift ;;
+    *)         _args+=("$1"); shift ;;
+  esac
+done
+set -- ${_args[@]+"${_args[@]}"}
+case "$AGENT_CHOICE" in claude|codex) ;; *) fail "unknown agent '$AGENT_CHOICE' — use --agent claude or --agent codex" ;; esac
+
 case "${1:-start}" in
   status) shift; status "$@"; exit 0 ;;   # extra args (e.g. --details) pass through to the digest
   stop)
@@ -164,11 +185,16 @@ esac
 
 # --dry-run: report the resolved launch mode and exit BEFORE any install/launch — a loud, unmistakable line so
 # a preview is never mistaken for a real start. (tests/prove-daemon-dispatch.sh asserts the dispatch through this.)
-[ -n "$DRYRUN" ] && { echo "daemon.sh --dry-run: would launch in mode '$MODE' — NOTHING installed or launched."; exit 0; }
+[ -n "$DRYRUN" ] && { echo "daemon.sh --dry-run: would launch in mode '$MODE' with agent '$AGENT_CHOICE' — NOTHING installed or launched."; exit 0; }
 
 # ---- start ----
 # 1. prerequisites (each with a fix hint)
-[ -x "$CLAUDE" ] || fail "claude CLI not executable at $CLAUDE — it MUST live outside ~/Desktop for launchd/TCC. Install/symlink it there."
+if [ "$AGENT_CHOICE" = codex ]; then
+  [ -x "$CODEX" ] || fail "codex CLI not executable at $CODEX — install the ChatGPT app, or symlink a codex CLI to $BIN/codex."
+  [ -s "$PREAMBLE_SRC" ] || fail "codex preamble missing: $PREAMBLE_SRC"
+else
+  [ -x "$CLAUDE" ] || fail "claude CLI not executable at $CLAUDE — it MUST live outside ~/Desktop for launchd/TCC. Install/symlink it there."
+fi
 [ -f "$DAEMON_SRC" ] || fail "daemon script missing: $DAEMON_SRC"
 [ -f "$PROMPT_SRC" ] || fail "L2 resume prompt missing: $PROMPT_SRC"
 [ -f "$PLAN" ]       || fail "L0 plan missing: $PLAN — write it (queue + directives) before starting."
@@ -183,7 +209,8 @@ install -m 755 "$COMPACT_SRC" "$COMPACT_DST"   # plan compactor: Session Log + D
 # The committed prompt carries a __REPO__ placeholder rather than one machine's absolute path; the
 # daemon renders the real checkout in here, since the session that reads it needs a literal path.
 sed "s|__REPO__|$(sed_repl "$REPO")|g" "$PROMPT_SRC" >"$STATE/resume-prompt.txt"
-echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prompt -> $STATE/"
+sed "s|__REPO__|$(sed_repl "$REPO")|g" "$PREAMBLE_SRC" >"$STATE/codex-preamble.txt"
+echo "installed: daemon -> $DAEMON_DST ; compactor -> $COMPACT_DST ; resume prompt + codex preamble -> $STATE/"
 
 # 2b. ensure a stable local code-signing identity exists so Debug builds re-sign stably and the macOS
 #     Keychain stops re-prompting for the API key every rebuild (see ArchiveProcessor/launch.sh).
@@ -221,6 +248,11 @@ EOF
   exit 1
 fi
 echo "plan status OK: $st"
+
+# 4b. record the agent. Written only here, past the double-launch guard: a `start --agent codex` refused
+#     because a daemon is already running must not switch that daemon's next relaunch to codex behind its back.
+echo "$AGENT_CHOICE" > "$STATE/agent"
+echo "agent: $AGENT_CHOICE$( [ "$AGENT_CHOICE" = codex ] && echo " ($CODEX)")"
 
 # 5. launch — launchd KeepAlive (DEFAULT, crash-restart; WS1) or opt-in detached nohup
 if [ "$MODE" = keepalive ]; then

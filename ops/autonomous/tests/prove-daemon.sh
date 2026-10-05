@@ -13,6 +13,7 @@
 # USAGE:  ops/autonomous/tests/prove-daemon.sh [path/to/archive-suite-autonomous.sh]
 #         (defaults to the copy next to this script's parent dir)
 set -uo pipefail
+unset AUTONOMOUS_AGENT   # the daemon reads it as an override of its agent; this harness drives the claude lane
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DAEMON="${1:-$HERE/../archive-suite-autonomous.sh}"

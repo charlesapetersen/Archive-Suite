@@ -11,6 +11,7 @@
 # plan, and a FAKE `claude` that never spends a cent). It never touches ~/.local/state/archive-autonomous,
 # the real repo, or the real launchd job. Safe to run anytime. Run interactively.
 set -uo pipefail
+unset AUTONOMOUS_AGENT   # the daemon reads it as an override of its agent; this harness drives the claude lane
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DAEMON="$HERE/../archive-suite-autonomous.sh"

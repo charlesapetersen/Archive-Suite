@@ -5,6 +5,14 @@ uses the same queue, the same trackers and the same rules as the daemon, so eith
 other stopped. The rules themselves live in [`AGENTS.md`](../../AGENTS.md) and [`CLAUDE.md`](../../CLAUDE.md);
 this file only puts them in order.
 
+## Unattended instead: the daemon can run Codex (2026-10-04)
+
+`./ops/autonomous/daemon.sh start --agent codex` runs this same queue with Codex, one fresh `codex exec` session
+per item, and waits out the five-hour window by itself, so nobody has to type "Continue". It gives each session
+`codex-preamble.txt` ahead of the daemon's resume prompt; the preamble points back here for how to work an item.
+Only the owner starts the daemon. Do not run this interactive loop while the daemon is running: two workers on
+one queue take the same item. Details: `README.md` §*Choosing the agent*.
+
 ## Starting prompt for the owner
 
 Paste this into Codex, opened on `~/Claude/Archive Suite`:

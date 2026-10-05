@@ -70,14 +70,48 @@ PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"     # L0 durabl
 STATE_SLUG="$LABEL"; [ "$LABEL" = archivesuite ] && STATE_SLUG=archive
 STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/${STATE_SLUG}-autonomous}"  # runtime state (logs, lock, resume prompt)
 CLAUDE="${AUTONOMOUS_CLAUDE:-$HOME/.local/bin/claude}"             # claude CLI — MUST be outside ~/Desktop (launchd/TCC)
+# AGENT — which CLI runs the sessions: `claude` (the default) or `codex` (owner, 2026-10-04: "takes a command line
+# flag from me to choose"). The flag is `daemon.sh start --agent codex`; daemon.sh writes the choice to
+# $STATE/agent, which is what a launchd KeepAlive relaunch reads, since the plist runs this script directly and
+# passes no arguments. AUTONOMOUS_AGENT overrides the file (the test harnesses use it).
+AGENT="${AUTONOMOUS_AGENT:-}"
+[ -z "$AGENT" ] && [ -r "$STATE/agent" ] && AGENT="$(tr -d '[:space:]' < "$STATE/agent")"
+AGENT="${AGENT:-claude}"
+# Resolved once; never inherited. An AUTONOMOUS_AGENT left in the environment would reach every session and the
+# health gate, whose harnesses read it as an override (2026-10-04 review: it turned the gate RED).
+unset AUTONOMOUS_AGENT
+# The codex CLI. The ChatGPT app ships it inside its bundle (no `codex` on PATH on this Mac, 2026-10-04); a
+# ~/.local/bin/codex symlink wins if one exists. /Applications is not TCC-protected, so launchd can exec it.
+CODEX_APP_CLI="/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+if [ -n "${AUTONOMOUS_CODEX:-}" ]; then CODEX="$AUTONOMOUS_CODEX"
+elif [ -x "$HOME/.local/bin/codex" ]; then CODEX="$HOME/.local/bin/codex"
+else CODEX="$CODEX_APP_CLI"; fi
+CODEX_SESSIONS="${CODEX_HOME:-$HOME/.codex}/sessions"   # codex writes one rollout-*-<thread>.jsonl per session here
+CODEX_MODEL="${AUTONOMOUS_CODEX_MODEL:-}"                # empty = the model in ~/.codex/config.toml
 # =======================================================================================================
 LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
+CODEX_PREAMBLE="$STATE/codex-preamble.txt"   # rendered by daemon.sh; prepended to the prompt for codex sessions
 # …and the two W32.preflight-gap checks the block above explains. `-s` not `-f` for the prompt: an empty
 # rendered prompt is as useless as a missing one and produces the same silent `claude -p ""`.
-[ -x "$CLAUDE" ] || {
-  echo "archive-suite-autonomous: claude CLI not executable at '$CLAUDE' — refusing to start." >&2
-  echo "  (it MUST live outside ~/Desktop for launchd/TCC). Start via ops/autonomous/daemon.sh." >&2
-  _refuse; }
+case "$AGENT" in
+  claude)
+    [ -x "$CLAUDE" ] || {
+      echo "archive-suite-autonomous: claude CLI not executable at '$CLAUDE' — refusing to start." >&2
+      echo "  (it MUST live outside ~/Desktop for launchd/TCC). Start via ops/autonomous/daemon.sh." >&2
+      _refuse; } ;;
+  codex)
+    [ -x "$CODEX" ] || {
+      echo "archive-suite-autonomous: codex CLI not executable at '$CODEX' — refusing to start." >&2
+      echo "  (it ships inside the ChatGPT app; AUTONOMOUS_CODEX or ~/.local/bin/codex overrides the path)." >&2
+      _refuse; }
+    [ -s "$CODEX_PREAMBLE" ] || {
+      echo "archive-suite-autonomous: codex preamble missing or empty at '$CODEX_PREAMBLE' — refusing to start." >&2
+      echo "  ops/autonomous/daemon.sh renders it from ops/autonomous/codex-preamble.txt; run that rather than this." >&2
+      _refuse; } ;;
+  *)
+    echo "archive-suite-autonomous: unknown agent '$AGENT' (from AUTONOMOUS_AGENT or $STATE/agent) — use claude or codex." >&2
+    _refuse ;;
+esac
 [ -s "$PROMPT" ] || {
   echo "archive-suite-autonomous: L2 resume prompt missing or empty at '$PROMPT' — refusing to start." >&2
   echo "  ops/autonomous/daemon.sh renders it from the committed template; run that rather than this." >&2
@@ -246,6 +280,17 @@ DENY=(
 # (`mkdir -p "$STATE"` moved below the SOURCE GUARD — W32.source-guard. Nothing above the guard writes to
 # $STATE: every function here is defined, not called, and log() only runs inside the loop.)
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+# codex accepts minimal|low|medium|high|xhigh; this daemon's EFFORT scale also has `max`, which codex lacks.
+codex_effort() { case "$1" in max) echo xhigh ;; *) echo "$1" ;; esac; }
+# The rollout file of the codex session whose `codex exec --json` output is in $1: its first event is
+# {"type":"thread.started","thread_id":"…"}, and codex names the rollout after that id. Empty if not found
+# (an --ephemeral run, or a session that died before it started a thread).
+codex_rollout() {
+  local tid
+  tid="$(grep -m1 -o '"thread_id":"[^"]*"' "$1" 2>/dev/null | sed 's/.*:"//; s/"$//')"
+  [ -n "$tid" ] || return 0
+  find "$CODEX_SESSIONS" -name "rollout-*${tid}.jsonl" 2>/dev/null | head -1
+}
 # usage_row KIND START END EFFORT RC FIRST PEAKS CUT [COST TURNS END] — append to $USAGE_LOG, header first.
 # Ported from vision-ocr; the last three columns (from the session's result event) are this copy's addition.
 # FIRST is the first window reading "PCT RESET". PEAKS is the highest reading of each window the session saw,
@@ -1137,6 +1182,10 @@ trap '_EXIT_REASON="SIGHUP — controlling terminal closed / login session ended
 # refuse to launch ("cannot be launched inside another Claude Code session"). The daemon needs none of them,
 # so scrub every CLAUDE* var from this process; children then inherit a clean env. (Keeps OCR_KEY etc.)
 for _v in $(env | sed -n 's/^\(CLAUDE[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$_v"; done
+# The same for codex: a daemon started from a shell inside a Codex session inherits CODEX_SANDBOX*,
+# CODEX_THREAD_ID and the like, which would make a child `codex exec` think it is nested in that session's
+# sandbox. CODEX_HOME is kept: it says where the login and the session logs live.
+for _v in $(env | sed -n 's/^\(CODEX[A-Za-z0-9_]*\)=.*/\1/p'); do [ "$_v" = CODEX_HOME ] || unset "$_v"; done
 
 # Keep the machine awake for the daemon's whole lifetime. -d (prevent DISPLAY sleep) is essential, not just
 # -i: even on AC (where the system won't idle-sleep), once the display sleeps macOS drops its "prevent sleep
@@ -1144,7 +1193,7 @@ for _v in $(env | sed -n 's/^\(CLAUDE[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$_v"; 
 # on 2026-07-12 (display slept 03:27 → 5h gap). -di holds the display on and keeps the whole machine up.
 caffeinate -di -w "$$" &
 
-log "=== daemon up (pid $$, interval ${INTERVAL}s, budget \$$BUDGET) ==="
+log "=== daemon up (pid $$, agent $AGENT, interval ${INTERVAL}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET")) ==="
 
 # W27.parkstick — retire the previous park's Desktop note. `park_run` writes
 # ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt and, until now, a repo-wide grep found ONE writer and NO remover, so
@@ -1230,8 +1279,23 @@ _has_claude_descendant() {
 # Monitor claude pid $1 and TERM/KILL it when the session is wedged or a single tool has run away. Args:
 #   $1=cpid  $2=stream-json logfile  $3=baseline meaningful-byte count at launch.
 # Globals: HB_POLL HB_STALL HB_HARD HB_CPU LOG. Returns when cpid dies (0) or after it issues a kill.
+# Codex liveness (2026-10-04 review): `codex exec --json` emits no token deltas, and codex runs its subagents
+# inside its own process, so neither the event stream nor a `claude` child shows a codex session that is
+# thinking or delegating. Its rollout files do grow meanwhile. True if any rollout under $CODEX_SESSIONS that was
+# CREATED after this session started ($1, epoch) was written in the last HB_STALL seconds — the session's own
+# rollout, or one a subagent started. Birth time, not mtime, keeps the owner's older interactive sessions out.
+_codex_alive() {
+  local start="$1" now f m b
+  now="$(date +%s)"
+  while IFS= read -r f; do
+    read -r m b < <(stat -f '%m %B' "$f" 2>/dev/null) || continue
+    [ "${b:-0}" -ge "$start" ] && [ $(( now - ${m:-0} )) -lt "$HB_STALL" ] && return 0
+  done < <(find "$CODEX_SESSIONS" -name 'rollout-*.jsonl' -mmin -$(( HB_STALL / 60 + 1 )) 2>/dev/null)
+  return 1
+}
+
 health_watchdog() {
-  local cpid="$1" logf="$2" last="$3"
+  local cpid="$1" logf="$2" last="$3" started="${4:-}"
   local quiet_since=0 now sz quiet busy idle_streak=0
   case "$last" in ''|*[!0-9]*) last=0 ;; esac
   while kill -0 "$cpid" 2>/dev/null; do
@@ -1245,6 +1309,7 @@ health_watchdog() {
     [ "$quiet" -lt "$HB_STALL" ] && continue                     # not quiet long enough to judge yet
     # L2 — quiet >= HB_STALL. Spare if the session is still doing real work by EITHER signal:
     if _has_claude_descendant "$cpid"; then idle_streak=0; continue; fi      # (a) active subagent/Workflow child
+    if [ "$AGENT" = codex ] && [ -n "$started" ] && _codex_alive "$started"; then idle_streak=0; continue; fi  # (a') codex rollout growing
     busy="$(_tree_cpu "$cpid")"; case "$busy" in ''|*[!0-9]*) busy=0 ;; esac
     if [ "$busy" -gt "$HB_CPU" ]; then                                       # (b) CPU-busy tool (build/test)
       idle_streak=0
@@ -1328,6 +1393,18 @@ tick() {
   #       rejection's reset can be days out; the next session re-reads it). After the gate, which spends no
   #       usage, and before the snapshot below, so nothing that lands during the wait reads as this session's.
   local w_pct w_reset w_cut w_now
+  # Codex: the window is the ACCOUNT's, and the owner's own Codex sessions spend it too, so refresh the reading
+  # from the newest rollout of any session before deciding (usage-window.sh --codex-latest). A `cut` mark from
+  # the daemon's last session is kept only while it is about the same window.
+  if [ "$AGENT" = codex ]; then
+    local c_line c_p c_r o_p o_r o_c
+    c_line="$("$USAGE_CMD" --raw --codex-latest 2>/dev/null)" || c_line=""
+    if [ -n "$c_line" ]; then
+      read -r c_p c_r <<< "$c_line"
+      { read -r o_p o_r o_c < "$WINDOW_LAST"; } 2>/dev/null || true
+      if [ "${o_c:-}" = cut ] && [ "${o_r:-}" = "$c_r" ]; then echo "$c_p $c_r cut"; else echo "$c_p $c_r"; fi > "$WINDOW_LAST"
+    fi
+  fi
   { read -r w_pct w_reset w_cut < "$WINDOW_LAST"; } 2>/dev/null || true
   w_now=$(date +%s)
   if [ -n "${w_reset:-}" ] && [ "$w_reset" -gt "$w_now" ] 2>/dev/null \
@@ -1383,7 +1460,7 @@ tick() {
     *) export PATH="$REPO/ops/autonomous/bin:$PATH" ;;
   esac
 
-  log "launching fresh resume session (backstop ${MAXRUN}s, budget \$$BUDGET, health-wd on)…"
+  log "launching fresh resume session (agent $AGENT, backstop ${MAXRUN}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET"), health-wd on)…"
   cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; return 0; }
   # Fresh per-session log (keep one previous). stream-json is larger than text, so don't append forever; a
   # fresh file also gives the heartbeat + usage watchdogs a clean zero baseline.
@@ -1398,6 +1475,35 @@ tick() {
   # resolves before the session knows which item it will pick, and the Wave-23 queue is full of no-undo work
   # (file-writing tag paths, the tag/PDF SPEC, shared ArchiveCore) where the Tier-2 gate — not a cost heuristic —
   # decides. Per-task tuning lives one level down, in the session's SUBAGENTS (resume prompt, Efficiency).
+  # Session start for _codex_alive, taken BEFORE the launch so the session's own rollout is born after it.
+  # Codex only: the claude path's launch timing stays exactly as prove-exit-logging measures it.
+  local _started=""; [ "$AGENT" = codex ] && _started="$(date +%s)"
+  if [ "$AGENT" = codex ]; then
+    # CODEX (owner, 2026-10-04). `codex exec` is the non-interactive mode: it runs the prompt and exits. What
+    # replaces each claude flag above, and what has no equivalent:
+    #   * --json streams one JSONL event per item into $SLOG, which the health watchdog uses as its heartbeat.
+    #     Codex emits no token deltas, so a long silent reasoning stretch looks quieter than under claude; the
+    #     watchdog's CPU and HB_STALL rules still decide, and AUTONOMOUS_HB_STALL raises the bar if needed.
+    #   * --approve-for-me keeps codex's workspace-write sandbox (the one the owner's interactive Codex sessions
+    #     run in) and routes each escalation request — network, a write outside the writable roots — through
+    #     codex's automatic reviewer instead of a human. NEVER --dangerously-bypass-approvals-and-sandbox: the
+    #     same rule as claude's "never --dangerously-skip-permissions".
+    #   * --add-dir: the session's worktrees are siblings of the repo (../suite-wt-*), and it writes $STATE
+    #     (the plan's runtime files, doc-budget-fix). Both would otherwise need an escalation for every edit.
+    #   * The claude DENY list has no codex flag. The preamble states it as a rule, and the sandbox plus the
+    #     reviewer are the mechanical layer — weaker than --disallowedTools; see ops/autonomous/README.md.
+    #   * No --max-budget-usd: codex bills against the subscription window, which the usage-window wait above
+    #     handles. MAXRUN and the health watchdog still bound a single session.
+    #   * < /dev/null: with stdin not a terminal, codex exec waits to read extra prompt text from it.
+    # The prompt is passed as ONE argv element so `daemon.sh stop` can match the session by its text, as it
+    # does for `claude -p`.
+    "$CODEX" exec --json --approve-for-me \
+        --add-dir "$(dirname "$REPO")" --add-dir "$STATE" \
+        -c model_reasoning_effort="$(codex_effort "$EFFORT")" \
+        ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
+        "$(cat "$CODEX_PREAMBLE" "$PROMPT")" \
+        < /dev/null >> "$SLOG" 2>&1 &
+  else
   "$CLAUDE" -p "$(cat "$PROMPT")" \
       --permission-mode default \
       --model opus --fallback-model sonnet \
@@ -1407,6 +1513,7 @@ tick() {
       --allowedTools "${ALLOW[@]}" \
       --disallowedTools "${DENY[@]}" \
       >> "$SLOG" 2>&1 &
+  fi
   local cpid=$!
   # Start stamp — used ONLY to tell a usage-limit fast-fail apart from a genuine no-op in the verdict below.
   # Bash's SECONDS builtin, NOT $(date +%s): this runs on every session launch, and a fork+exec here lands in
@@ -1429,7 +1536,7 @@ tick() {
   # false-kill a session that merely reads a file mentioning the limit phrase — this daemon being one.)
   # Watchdog C — health (Layers 1+2): event heartbeat + subagent/CPU liveness. PRIMARY killer for wedged/
   # runaway sessions (see health_watchdog + the HB_* config block). Baseline 0 (fresh log).
-  health_watchdog "$cpid" "$SLOG" 0 &
+  health_watchdog "$cpid" "$SLOG" 0 "$_started" &
   local cwpid=$!
   wait "$cpid"; local rc=$?
   kill "$wpid" "$cwpid" 2>/dev/null; wait "$wpid" "$cwpid" 2>/dev/null
@@ -1437,8 +1544,21 @@ tick() {
   # Best-effort readable mirror of the final result for Daemon Report (jq present -> extract; else skip).
   # Cost, turns and how the session ended, from the stream-json result event (2026-09-28). August's log could
   # not say what any session cost, nor whether a long rc=1 session hit --max-budget-usd or the usage window.
-  local s_cost="" s_turns="" s_end=""
-  if command -v jq >/dev/null 2>&1; then
+  local s_cost="" s_turns="" s_end="" c_roll=""
+  if [ "$AGENT" = codex ]; then
+    # Codex reports tokens, not dollars, so the cost column stays "-". Turns = turn.completed events; `ended`
+    # is the last turn's outcome, or the first error event's message when the session failed.
+    c_roll="$(codex_rollout "$SLOG")"
+    s_turns="$(grep -c '"type":"turn.completed"' "$SLOG" 2>/dev/null)"; s_turns="${s_turns:-0}"
+    # Only turn.failed counts: codex also emits {"type":"error"} for transient retries ("Reconnecting... 2/5")
+    # inside a session that then succeeds (seen 2026-10-04).
+    if grep -q '"type":"turn.failed"' "$SLOG" 2>/dev/null; then s_end="failed"; else s_end="completed"; fi
+    [ "$s_turns" = 0 ] && [ "$s_end" = completed ] && s_end="no-turn"
+    if command -v jq >/dev/null 2>&1; then
+      jq -rc 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' "$SLOG" 2>/dev/null \
+        | tail -1 > "$STATE/last-session.txt" 2>/dev/null || true
+    fi
+  elif command -v jq >/dev/null 2>&1; then
     jq -rc 'select(.type=="result") | (.result // .error // empty)' "$SLOG" 2>/dev/null \
       | tail -1 > "$STATE/last-session.txt" 2>/dev/null || true
     # `ended` is subtype/terminal_reason[/error]: a usage-limited session reports subtype "success" with
@@ -1465,7 +1585,14 @@ tick() {
   # vision-ocr, a fast exit with no reading is NOT assumed to be the window — that guess is the W32.usage-guess
   # misreport below; the CLI logs a rejection when there is one.
   local verdict=0 w_line w_p w_r w_cutoff=0
-  w_line="$("$USAGE_CMD" --raw "$SLOG" 2>/dev/null)" || w_line=""
+  if [ "$AGENT" = codex ]; then
+    # codex keeps the window readings in the session's rollout file, not in the --json stream
+    if [ -n "$c_roll" ]; then w_line="$("$USAGE_CMD" --raw "$c_roll" 2>/dev/null)" || w_line=""
+    else w_line=""; fi
+    [ -n "$w_line" ] || { w_line="$("$USAGE_CMD" --raw --codex-latest 2>/dev/null)" || w_line=""; }
+  else
+    w_line="$("$USAGE_CMD" --raw "$SLOG" 2>/dev/null)" || w_line=""
+  fi
   read -r w_p w_r <<< "${w_line:-0 0}"
   if [ "$rc" -ne 0 ] && [ "${w_p:-0}" -ge "$WINDOW_CUT_AT" ] 2>/dev/null && [ ! -f "$KILLED" ] \
      && ! grep -q '"subtype":"error_max_budget_usd"' "$SLOG" 2>/dev/null; then
@@ -1474,9 +1601,15 @@ tick() {
   [ -n "$w_line" ] && echo "$w_line$( [ "$w_cutoff" = 1 ] && echo ' cut')" > "$WINDOW_LAST"
   # Usage ledger row: the session's first window reading, and the peak of each window it saw.
   local u_all u_end; u_end=$(date +%s)
+  if [ "$AGENT" = codex ]; then
+    u_all="$(grep -o '"primary":{"used_percent":[0-9.]*,"window_minutes":[0-9]*,"resets_at":[0-9]*' "${c_roll:-/dev/null}" 2>/dev/null \
+      | sed -E 's/.*"used_percent":([0-9.]*),.*"resets_at":([0-9]*)/\1 \2/' \
+      | awk '{printf "%d %s\n", $1 + 0.5, $2}')"
+  else
   u_all="$(grep -o '"five_hour":{"utilization":[0-9.]*,"resetsAt":[0-9]*' "$SLOG" 2>/dev/null \
     | sed -E 's/.*"utilization":([0-9.]*),"resetsAt":([0-9]*)/\1 \2/' \
     | awk '{printf "%d %s\n", $1*100 + 0.5, $2}')"
+  fi
   usage_row session "$(( u_end - (SECONDS - _t0) ))" "$u_end" "$EFFORT" "$rc" \
     "$(printf '%s\n' "$u_all" | head -1)" \
     "$(printf '%s\n' "$u_all" | awk 'NF==2{if(!($2 in m)){o[++n]=$2; m[$2]=$1} else if($1>m[$2]) m[$2]=$1}
@@ -1509,8 +1642,14 @@ tick() {
     if grep -q '"type":"rate_limit_event"' "$SLOG" 2>/dev/null \
        && grep -q '"status":"rejected"' "$SLOG" 2>/dev/null; then
       log "session (rc=$rc) hit a USAGE LIMIT (rate_limit_event: rejected, after ${_elapsed}s) — not an empty queue; backing off until it resets."
+    elif [ "$AGENT" = codex ] && { [ "${w_p:-0}" -ge 100 ] 2>/dev/null \
+         || printf '%s\n' "$(grep '"type":"turn.failed"' "$SLOG" 2>/dev/null)" "$(grep '"type":"error"' "$SLOG" 2>/dev/null | tail -1)" \
+              | grep -qiE 'usage limit|rate limit|quota|status 429|429 Too Many'; }; then
+      # (Collected with $(…) rather than a { …; } group piped to grep: under pipefail a group whose LAST grep
+      # finds nothing fails the whole pipeline even when the match succeeded — the first cut did exactly that.)
+      log "session (rc=$rc) hit a USAGE LIMIT (codex: window ${w_p:-?}% or a limit error, after ${_elapsed}s) — not an empty queue; waiting for the reset."
     elif [ "$rc" -ne 0 ] && [ "$_elapsed" -lt 10 ]; then
-      log "session (rc=$rc) died after only ${_elapsed}s with NO rate-limit event — NOT a usage limit. Check $SLOG (a missing/!x claude CLI, a bad flag, or an MCP/init failure all look like this)."
+      log "session (rc=$rc) died after only ${_elapsed}s with NO rate-limit event — NOT a usage limit. Check $SLOG (a missing/!x $AGENT CLI, a bad flag, or an MCP/init failure all look like this)."
     else
       log "session (rc=$rc) advanced nothing (queue + tip unchanged) — no progress."
     fi

@@ -1,0 +1,45 @@
+YOU ARE RUNNING UNDER CODEX, NOT CLAUDE CODE. The Archive Suite daemon started this session with
+`codex exec`, because the owner chose `daemon.sh start --agent codex`. The daemon's prompt follows this
+preamble and was written for Claude Code. It binds you in full, with these differences, which win where the
+two disagree:
+
+1. ONE ITEM, THEN STOP. Do exactly one item (or the one doc-budget fix the prompt's STEP 1.5 describes) and
+   end the session. `ops/autonomous/CODEX_RUNBOOK.md` is the right reference for HOW to work an item under
+   Codex — its Pick, Read, Isolate, Do and verify, Checkpoint, Ship, Record and Hand off steps, its commit
+   subject format and its rule on tags without backticks — but NOT for how many: its "go back to step 1
+   without asking" does not apply here, because the daemon is the loop and starts a fresh session for the
+   next item. Its "confirm the daemon is stopped" check does not apply either: the daemon is running, and it
+   is what started you. Skip `tidy.sh`; the daemon does that upkeep between sessions.
+
+2. CLAUDE CODE HOOKS DO NOT RUN UNDER CODEX. The prompt says hooks enforce two rules; here only you do:
+   * Nothing may draw on the owner's screen. The daemon has set ARCHIVE_UNATTENDED=1 and put the GUI shims
+     from `ops/autonomous/bin` first on PATH; keep both, and use the off-screen VM lane for any GUI check
+     (`ops/gui/vm-gui-runner.sh <reader|notes|processor> xcuitest`).
+   * Docs and trackers move in the SAME commit as the code (no hook will stop the turn if you forget).
+
+3. COMMANDS YOU MUST NEVER RUN. Claude sessions have these blocked mechanically; you do not, so treat the
+   list as absolute: sudo; launchctl; rm -rf / rm -fr / rm -r / rm -R; git push --force / -f /
+   --force-with-lease; git reset --hard; git clean; git worktree remove --force / -f; git branch -D;
+   shutdown, reboot, halt; diskutil; dd; mkfs; curl; wget; hdiutil; gh release (any path). Never start,
+   stop or edit the daemon or its launchd job.
+
+4. THE SANDBOX. You run in codex's workspace-write sandbox with automatic review of escalations. The
+   repository, its parent directory (where the `../suite-wt-*` worktrees go) and the daemon's state
+   directory are writable. Network access and writes elsewhere need an escalation; ask for it with a short
+   reason and accept the reviewer's answer. Never try to get around the sandbox. If a step cannot be done
+   inside it, checkpoint, append the blocker to the plan's Daemon Report, and stop.
+
+5. CLAUDE-ONLY TOOLS. Where the prompt names the `Agent` or `Task` tool, `Workflow`, a skill such as
+   `lean-review`, or a per-subagent model or effort setting, use codex's own equivalent if you have one, or
+   do the work yourself. The Tier-2 rule still holds: an adversarial review of your own diff, done as a
+   separate pass from writing it, plus a functional test on scratch copies.
+
+6. COMMIT TRAILER. End commit messages with `Agent: Codex (<your model>)`, as `CODEX_RUNBOOK.md` says, not
+   with the Claude `Co-Authored-By` line the prompt shows.
+
+7. THE USAGE WINDOW. `ops/autonomous/usage-window.sh` (no arguments) reads Codex's own window, which the
+   owner's interactive Codex sessions share. Its thresholds in the prompt's USAGE WINDOW block apply as
+   written.
+
+The repository is "__REPO__". The daemon's prompt begins on the next line.
+

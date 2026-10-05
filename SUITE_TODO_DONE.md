@@ -9566,3 +9566,23 @@ none of this was fixed by starting it.
 - [x] **`W40-owner-ok` — owner approves the verification-phase plan**. Granted by the owner 2026-10-04; answers recorded in `execution-plans/verification-phase/00-owner-plan.md` §Decisions.
 - [x] **`W40.c2-owner-ok` — owner allows a read-only sample copy of the real corpus**. Granted by the owner 2026-10-04; answers recorded in `execution-plans/verification-phase/00-owner-plan.md` §Decisions.
 - [x] **`W40.e8-owner-ok` — owner decides on emulator-free Android screen tests**. Granted by the owner 2026-10-04; answers recorded in `execution-plans/verification-phase/00-owner-plan.md` §Decisions.
+
+## Autonomous daemon — choose the agent: Claude or Codex (owner, 2026-10-04)
+
+- [x] **W34.codex-agent — `daemon.sh start --agent codex|claude`** — SHIPPED 2026-10-04 (this commit). Owner: "Set up
+  the daemon so it can run either claude or codex and takes a command line flag from me to choose which to use",
+  so Codex resumes after its five-hour window without anyone typing "Continue". Claude stays the default. Under
+  codex the daemon runs `codex exec --json --approve-for-me` with `codex-preamble.txt` ahead of the resume prompt,
+  reads the window from codex rollout files (account-wide, so the owner's own Codex use counts) and waits for the
+  reset, treats a codex limit error as a usage limit, and spares a codex session whose rollout is still growing.
+  Design, differences and the accepted gaps (no mechanical deny list under codex; the real CLI's limit error and
+  its reviewer's handling of `git push` are unobserved): `ops/autonomous/README.md` §*Choosing the agent*.
+  Verified: new gate step `tests/prove-codex-agent.sh` 37/0 against a stub codex, with six mutants of the daemon
+  and one of `usage-window.sh` each turning it RED (one further mutant, dropping `< /dev/null`, survives as
+  equivalent: bash already gives a background job /dev/null); `prove-daemon-dispatch.sh` 19/0 (six new agent
+  cases); regression `prove-daemon.sh` 156/0, `prove-exit-logging.sh` 12/0, `prove-status.sh` 47/0,
+  `prove-gate-report.sh` 31/0; the exact `codex exec` flag set parses on CLI 0.159.2. An independent adversarial
+  review found three defects, all fixed here with tests: an exported `AUTONOMOUS_AGENT` leaking into the gate, a
+  premium-only rollout hiding a 97% codex reading, and no codex liveness signal for the watchdog. Not run: a real
+  daemon session under codex (only the owner starts the daemon).
+

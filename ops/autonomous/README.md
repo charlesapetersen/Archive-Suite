@@ -55,6 +55,54 @@ posture for a long unattended run. `daemon.sh nohup` is the opt-in detached mode
 and `daemon.sh stop` round it out. `./ops/autonomous/daemon.sh --dry-run [nohup]` previews the resolved launch
 mode without touching anything. The manual steps below are what it automates.
 
+### Choosing the agent: `--agent claude` (default) or `--agent codex` (owner, 2026-10-04)
+
+`./ops/autonomous/daemon.sh start --agent codex` runs every session with Codex (`codex exec`) instead of Claude;
+`start` or `start --agent claude` goes back to Claude. The choice is written to `$STATE/agent`, which is what a
+launchd KeepAlive relaunch reads, and `daemon.sh status` shows which one is running. Everything else is the
+same loop: one item per fresh session, the same plan, queue, resume prompt, health gate, watchdogs, park rules
+and housekeeping. The owner asked for this so Codex resumes by itself after its five-hour window instead of
+waiting for someone to type "Continue".
+
+What differs under codex, and why:
+
+- **The CLI.** The ChatGPT app ships it at `/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/
+  Contents/MacOS/codex`; a `~/.local/bin/codex` symlink, or `AUTONOMOUS_CODEX`, wins. The model is the one in
+  `~/.codex/config.toml` unless `AUTONOMOUS_CODEX_MODEL` names another; effort is `AUTONOMOUS_EFFORT` as for
+  claude (`max` becomes codex's `xhigh`).
+- **The prompt.** `codex-preamble.txt` goes in front of the same `resume-prompt.txt`. It says: one item, then
+  stop (the runbook's keep-going loop is the daemon's job here); hooks do not run, so the screen rule and the
+  same-commit docs rule are the session's own; the claude deny list as a list of commands never to run; the
+  Codex commit trailer; how to treat Claude-only tools.
+- **Permissions.** `--approve-for-me`: codex's workspace-write sandbox, the one the owner's interactive Codex
+  sessions use, with each escalation (network, a write outside the writable roots) decided by codex's automatic
+  reviewer rather than a person. `--add-dir` makes the repo's parent (for the `../suite-wt-*` worktrees) and the
+  state directory writable. **Never `--dangerously-bypass-approvals-and-sandbox`.**
+- **Accepted gap: no mechanical deny list.** Claude's `--disallowedTools` has no codex flag. Codex's execpolicy
+  `.rules` files can forbid commands, but they load from `~/.codex/rules` or the project, so they would also bind
+  the owner's interactive Codex sessions; that was not done unasked. Under codex the deny list is a rule in the
+  preamble, backed by the sandbox and the reviewer.
+- **No `--max-budget-usd`.** Codex bills against the subscription window. `MAXRUN` and the health watchdog
+  still bound a session. Codex reports tokens, not dollars, so the cost column in `usage-window.tsv` is `-`.
+- **The usage window.** Codex writes its readings into the session's rollout file under `~/.codex/sessions`, not
+  into the `--json` stream. `usage-window.sh` reads that format, and before each launch the daemon reads the
+  newest rollout of ANY session (`--codex-latest`), because the owner's interactive Codex use spends the same
+  window. At 95% or over, or after a cut-off session, it waits for the reset exactly as it does for claude. A
+  codex limit error, or a 100% reading, is logged as a usage limit, never as an empty queue.
+- **The heartbeat.** `--json` emits one event per item but no token deltas, and codex runs its subagents inside
+  its own process, so neither the stream nor a child process shows a codex session that is thinking or
+  delegating. Its rollout files do grow meanwhile, so the watchdog also spares a session while any rollout born
+  after the session started was written within `HB_STALL` (`_codex_alive`). If a codex session is still killed
+  while working, raise `AUTONOMOUS_HB_STALL`.
+- **No environment variable for the agent.** The daemon unsets `AUTONOMOUS_AGENT` once it has read it, and
+  `usage-window.sh` finds the agent in `$STATE/agent`. An exported variable leaked into the health gate's
+  harnesses and turned the gate RED under either agent (found in review, 2026-10-04).
+
+Proof: `tests/prove-codex-agent.sh` (a gate step) runs the real daemon against a stub codex; the dispatch is in
+`tests/prove-daemon-dispatch.sh`. Not proven by either, because both use stubs: how the real `codex exec` reports
+a usage limit (no rollout on this machine recorded one), and how its reviewer treats `git push` and builds.
+Watch the first real codex run's `daemon.log` and `last-session.log` for both.
+
 The committed copies here are the source of truth; install to the runtime location:
 
 ```bash

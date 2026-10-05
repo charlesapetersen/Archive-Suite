@@ -22,6 +22,16 @@ out="$(mode start)"    ; case "$out" in *"mode 'keepalive'"*) ok "'start' -> kee
 out="$(mode keepalive)"; case "$out" in *"mode 'keepalive'"*) ok "'keepalive' -> keepalive" ;; *) no "'keepalive' (got: $out)" ;; esac
 out="$(mode nohup)"    ; case "$out" in *"mode 'nohup'"*)     ok "'nohup' -> nohup (opt-in)" ;; *) no "'nohup' (got: $out)" ;; esac
 
+# --agent (owner, 2026-10-04): claude by default; `--agent codex` anywhere after the command; anything else refused.
+out="$(mode start)"; case "$out" in *"agent 'claude'"*) ok "default agent is claude" ;; *) no "default agent (got: $out)" ;; esac
+out="$(mode start --agent codex)"; case "$out" in *"mode 'keepalive' with agent 'codex'"*) ok "'start --agent codex' -> codex" ;; *) no "'start --agent codex' (got: $out)" ;; esac
+out="$(mode --agent=codex nohup)"; case "$out" in *"mode 'nohup' with agent 'codex'"*) ok "'--agent=codex nohup' -> nohup + codex" ;; *) no "'--agent=codex nohup' (got: $out)" ;; esac
+out="$(mode start --agent claude)"; case "$out" in *"agent 'claude'"*) ok "'--agent claude' -> claude" ;; *) no "'--agent claude' (got: $out)" ;; esac
+out="$(bash "$DAEMON" --dry-run start --agent gpt 2>&1)"; rc=$?
+[ "$rc" != 0 ] && case "$out" in *"unknown agent 'gpt'"*) true ;; *) false ;; esac && ok "unknown agent refused ($rc)" || no "unknown agent should be refused (rc=$rc, got: $out)"
+out="$(bash "$DAEMON" --dry-run start --agent 2>&1)"; rc=$?
+[ "$rc" != 0 ] && ok "--agent with no value refused ($rc)" || no "--agent with no value should be refused (got: $out)"
+
 # a bogus command must fail (nonzero) and name the valid commands incl. nohup — never silently launch
 out="$(bash "$DAEMON" bogus 2>&1)"; rc=$?
 [ "$rc" != 0 ] && ok "bogus command exits nonzero ($rc)" || no "bogus command should exit nonzero"

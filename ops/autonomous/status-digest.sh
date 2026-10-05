@@ -305,6 +305,11 @@ fi
 printf '%s\n' "${B}Archive Suite — overnight worker${OFF}   ${DIM}$(date '+%a %-d %b, %H:%M')${OFF}"
 printf '\n  %s  %s\n' "$STATE_ICON" "${B}${STATE_LINE}${OFF}"
 [ -n "$STATE_HINT" ] && printf '     %s%s%s\n' "$DIM" "$STATE_HINT" "$OFF"
+# Which CLI runs the sessions (daemon.sh start --agent …), shown only while the daemon is running or loaded.
+if [ "$running" = 1 ] || [ "$supervised" = 1 ]; then
+  agent_now="$( { tr -d '[:space:]' < "$STATE/agent"; } 2>/dev/null)"
+  printf '     %sSessions run with %s.%s\n' "$DIM" "$( [ "${agent_now:-claude}" = codex ] && echo Codex || echo Claude)" "$OFF"
+fi
 
 if [ "$commits24" -gt 0 ] 2>/dev/null; then
   printf '\n  %-10s %s in the last 24 hours · latest %s\n' "Done" "$(plural "$commits24" change)" "$lastwhen"
