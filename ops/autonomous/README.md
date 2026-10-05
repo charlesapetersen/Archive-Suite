@@ -115,7 +115,7 @@ runs, and only then, and the bake-off itself is run when the owner is not using 
 and session the daemon runs `yield-check.sh`; exit 0 means wait (logged once, and the idle stopwatch is cleared so
 a long bake-off cannot park the run). A session already running is never stopped. Override the check with
 `AUTONOMOUS_YIELD_CMD`; proof in `tests/prove-codex-agent.sh` §[7]. Lending a subscription across projects, and
-two workers on one queue, are `W35.lanes` in `SUITE_TODO.md`.
+two workers on one queue, are the `W35.*` items (`execution-plans/parallel-workers/00-plan.md`).
 
 The committed copies here are the source of truth; install to the runtime location:
 

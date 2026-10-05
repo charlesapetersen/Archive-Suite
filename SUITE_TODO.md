@@ -74,6 +74,8 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
+- `parallel-workers/` — **PLANNED 2026-10-05 (W35, the daemon)**: several sessions at once, sized from the usage
+  readings so the five-hour windows are used; claims, a heavy-work lock, per-lane workers, pace rule. `00-plan.md`.
 - `segmentation/` — **PLANNED 2026-10-05 (W36, Archive Processor)**: a bake-off of automatic segmentation methods
   (frontier models over page windows, a second model as voter, on-device feature and vision models, agreement plus
   review) on the owner's ground truth, the owner's decision, then a build only if usable. `00-plan.md`.
@@ -917,23 +919,17 @@ OWNER sit in the plan's HOLD QUEUE.
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
-- [ ] **W35.lanes — let the daemons lend a subscription across projects, then run two workers on one queue
-  [L — split before starting].** Owner, 2026-10-04: one coordinator for all projects "with the intent to not let
-  any usage windows go to waste across both the Claude and Codex subscriptions"; the owner names the priority
-  project, the other gets what is spare; Vision OCR's main work ends soon, after which all of it goes to Archive
-  Suite. What exists (W34.codex-agent, `yield-check.sh`): each project daemon runs on one agent the owner picks,
-  and Archive Suite yields during Vision OCR model jobs. What is missing, in order of value:
-  (a) **two workers on the Archive Suite queue**, one per subscription, once Vision OCR is done — the payoff that
-  uses both windows on one project. Needs: an item claim the resolver honours (`next-queue-item.sh` skips an item
-  another worker holds, with a stale-claim rule like engine.lock's), a per-worker state dir and engine lock
-  (`AUTONOMOUS_LABEL` already separates them), one health gate at a time across workers, `compact-plan.sh` and
-  `tidy.sh` run only when NO worker has a session in flight (both assume the plan is quiet), housekeeping that
-  never removes another worker's worktree, and plan edits that tolerate a concurrent writer;
-  (b) **`--agent auto`**: choose the agent per session — the subscription the priority project is not using,
-  falling back to the other when this one's window is spent and the priority project has nothing runnable.
-  Vision OCR's daemon has no codex support; porting W34 there is a Vision OCR item, not this one, and is worth
-  doing only if its work outlasts the short term. Split into sub-items with `(blocked-on:)` chains before
-  starting; each needs a prove-harness in the gate like `prove-codex-agent.sh`. | ops/autonomous | L | med | none
+Owner, 2026-10-05: one session at a time leaves the Claude five-hour window unused, because sessions spend most
+of their time in builds, tests and the VM; "the point of running multiple sessions would be to actually use the
+full usage window". Made the daemon's next work, ahead of everything else in the queue. Replaces the single
+W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
+staggered starts, the subscription policy) and the design are in the plan.
+
+- [ ] **`W35.claims` — claims: per-worker state, the supervisor picks and claims items, plan-edit lock, upkeep only when idle [M]**. Detail: `execution-plans/parallel-workers/00-plan.md`.
+- [ ] **`W35.heavy` — one build, gate or VM run at a time across workers (heavy.lock) [S-M]**. Detail: `execution-plans/parallel-workers/00-plan.md`.
+- [ ] **`W35.workers` — the supervisor runs N workers per lane, per-lane pause, staggered starts [M]** (blocked-on: W35.claims, W35.heavy). Detail: `execution-plans/parallel-workers/00-plan.md`.
+- [ ] **`W35.pace` — worker count sized from the usage readings, Vision OCR keeps Claude priority [M]** (blocked-on: W35.workers). Detail: `execution-plans/parallel-workers/00-plan.md`.
+- [ ] **`W35.live` — first real run with two workers, measured; the owner decides whether to keep it [S]** (blocked-on: W35.pace). Detail: `execution-plans/parallel-workers/00-plan.md`.
 
 ## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
 
