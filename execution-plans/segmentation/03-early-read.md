@@ -90,3 +90,38 @@ in every collection separately takes 147 (about 27 per 100 pages), because Deave
 So: close to the owner's bar with a review load worth having, before any use of the owner's domain cues — on the
 development boxes only, with a prompt written after reading them. The test boxes (Stanton, RG 165) are still unseen.
 
+
+## Addendum 3, 2026-10-05 evening — a second model as a voter (W36.seg-second)
+
+What was run: Gemini 3.1 Flash-Lite through the paid API, with thinking set to minimal, over the same
+seven-page windows as the Claude method. The prompt was new. It stated your domain cues: show-through,
+a small item lying on a full sheet, bylines and wire credits, the full magazine, and runs of empty folder
+or box photos. It also stated the approved document rules. The run made 187 calls and cost about $0.67
+at the list price. The estimate before the run was about $0.65 to $0.77. No call was made to the larger
+Gemini 3.8 Flash.
+
+On its own, Flash-Lite is worse than both earlier methods. It put 84.6% of pages in an exactly right
+document, against 90.3% for the Claude window method and 86.5% for the prompt the app ships. Most of
+its errors are false splits: it made 27 and missed only 3 boundaries. They cluster in two places. In
+Deaver, 17 times, it starts a new article at a photo that your labels keep with the clipping before it,
+usually citing a headline it saw. In Herrnstein it splits a run of six figure pages that your labels
+keep with the document before them. Reaching 98% with its own confidence would take about 37
+reviewed boundaries per 100 pages, against 6 for Claude.
+
+Voting did not find Claude's errors. Where the two models disagree, a boundary would be flagged for
+you. That happened at 25 boundaries, about 4.5 per 100 pages. But 22 of those 25 were Flash-Lite's own
+mistakes, and they held only 3 of Claude's 11. The other 8 errors are boundaries where both models
+made the same wrong call, so voting would accept them without showing them to you. Reviewing the 25
+flagged boundaries brings the result to 92.5%. Reaching 98% takes 49 reviews (about 9 per 100 pages),
+which is more than the 34 that Claude's own confidence needs.
+
+So this second voter adds nothing. A weak model mostly disagrees where it is wrong itself. The errors
+that matter are the ones both models share.
+
+Caveats. These are development numbers only, from Dean, Deaver and Herrnstein. Stanton and RG 165 were
+not touched. The prompt was written after reading your notes on these boxes. The model and the prompt
+both changed from the Claude run, so this result cannot say how much of the gap is the model and how
+much is the prompt. A stronger second model might do better. The confidences Flash-Lite gives are very
+coarse, mostly 0.95 or 1.0.
+
+Detail: `ArchiveProcessor/segbench-results/window-gemini-lite-report.md`; summary in `SUMMARY.md`.

@@ -369,15 +369,18 @@ def collect(names) -> None:
 
 # --- combining ----------------------------------------------------------------------------------
 
-def combine(col) -> dict:
-    """Per gap: P(new), decision, confidence, judgements; per page: photo kind by vote."""
+def combine(col, judge=None) -> dict:
+    """Per gap: P(new), decision, confidence, judgements; per page: photo kind by vote.
+    ``judge(col, a, b, allow_call=False)`` gives one window's parsed judgement (default: this
+    module's Claude ``judge_window``; method_gemini passes its own)."""
+    judge = judge or judge_window
     n = len(col.pages)
     votes_new = [[] for _ in range(n - 1)]
     cues = [[] for _ in range(n - 1)]
     kinds = [[] for _ in range(n)]
     index = {p.n: i for i, p in enumerate(col.pages)}
     for a, b in windows(n):
-        j = judge_window(col, a, b, allow_call=False)
+        j = judge(col, a, b, allow_call=False)
         if j is None:
             raise RuntimeError(f"{col.name}: window {col.pages[a].n}-{col.pages[b - 1].n} not collected; "
                                "run `method_window.py collect` first")
@@ -506,14 +509,14 @@ def order(pred, signal: str) -> list[int]:
     return sorted(idx, key=lambda i: (pred.boundaries[i]["agree"], pred.boundaries[i]["confidence"]))
 
 
-def review_curve(cols, truth_photos: bool, signal: str):
+def review_curve(cols, truth_photos: bool, signal: str, judge=None):
     """Pooled: review the least-trusted gaps across the collections (one global order by the
     signal); returns [(k, pooled headline, {name: headline})] at k = 0 and at the end of each TIE
     GROUP. The model's confidences are coarse (0.97 alone covers 81 of 494 document gaps), so within
     a tie the order is arbitrary and any point inside a group would depend on it (a stable sort
     reviews Dean before Herrnstein). A threshold cannot split a tie either, so the curve steps a whole
     group at a time: the review load it reports is the one a confidence threshold would give."""
-    preds = {c.name: (c, combine(c)) for c in cols}
+    preds = {c.name: (c, combine(c, judge)) for c in cols}
     items = []
     for name, (c, comb) in preds.items():
         pred = assemble(c, comb, truth_photos)
@@ -544,11 +547,11 @@ def review_curve(cols, truth_photos: bool, signal: str):
     return curve
 
 
-def rc_table(cols, truth_photos: bool, signal: str):
+def rc_table(cols, truth_photos: bool, signal: str, judge=None):
     """Risk-coverage over document gaps (truth both sides), pooled: accept the most trusted first."""
     rows = []
     for c in cols:
-        comb = combine(c)
+        comb = combine(c, judge)
         pred = assemble(c, comb, truth_photos)
         t_ids, p_ids = segment_ids(c.labels), segment_ids(pred.labels)
         for i, b in enumerate(pred.boundaries):
@@ -581,28 +584,16 @@ def _pct(x):
     return f"{100 * x:.1f}%"
 
 
-def report() -> str:
-    import run
-    cols = [data.load(n) for n in data.DEV]
-    pages = sum(len(c.pages) for c in cols)
-    headlines = {}
-    for name in ("window-claude", "window-claude-truth-photos"):
-        rows = run.run(name, list(data.DEV), False)
-        run.write(name, list(data.DEV), rows)
-        headlines[name] = rows
-    L = ["# W36.seg-window — Claude over overlapping page windows (development set)", "",
-         f"Run 2026-10-05 on Dean, Deaver and Herrnstein ({pages} pages) only; the test collections were not "
-         "touched. Model claude-sonnet-5-5 through `claude -p` on the owner's subscription. "
-         f"Windows of {WINDOW} pages, stride {STRIDE}, every gap judged in two windows "
-         "(see method_window.py for why 7 and not 6). The prompt was written once, after earlier bench items had read "
-         "development pages, and was not revised against page-level errors; nothing was fitted. So these are "
-         "development numbers, not held-out ones in the strict sense.", ""]
+def analysis_lines(cols, pages: int, judge=None):
+    """The two-window agreement, risk-coverage and review-load-to-98% sections of a window
+    method's report, for any judge (method_gemini reuses it). Returns (lines, load98, (gaps, disagreements))."""
+    L = []
     # agreement statistics
     L += ["## Two-window agreement", "", "| collection | document gaps | judged twice+ | disagreements | "
           "error rate when agreed | error rate when disagreed |", "|---|---:|---:|---:|---:|---:|"]
     tot = [0, 0, 0, 0, 0, 0]
     for c in cols:
-        comb = combine(c)
+        comb = combine(c, judge)
         pred = assemble(c, comb, True)
         t_ids, p_ids = segment_ids(c.labels), segment_ids(pred.labels)
         g = tw = dis = ea = ed = na = 0
@@ -637,7 +628,7 @@ def report() -> str:
               "| signal | threshold | coverage | accepted | errors among accepted | error rate | gaps left to review per 100 pages |",
               "|---|---:|---:|---:|---:|---:|---:|"]
         for signal in ("confidence", "agreement, then confidence"):
-            rows = rc_table(cols, truth_photos, "confidence" if signal == "confidence" else "agree")
+            rows = rc_table(cols, truth_photos, "confidence" if signal == "confidence" else "agree", judge)
             n = len(rows)
             for t in (0.0, 0.8, 0.9, 0.93, 0.95, 0.96, 0.97, 0.98):
                 acc = [w for key, w in rows if key[-1] >= t - 1e-9 and (signal == "confidence" or key[0])]
@@ -652,7 +643,7 @@ def report() -> str:
               "| signal | boundaries reviewed | per 100 pages | pooled | Dean | Deaver | Herrnstein |",
               "|---|---:|---:|---:|---:|---:|---:|"]
         for signal in ("confidence", "agree"):
-            curve = review_curve(cols, truth_photos, signal)
+            curve = review_curve(cols, truth_photos, signal, judge)
             label = "confidence" if signal == "confidence" else "agreement, then confidence"
             shown = set()
             for target in (None, 0.90, 0.95, 0.98, "all98"):
@@ -665,15 +656,36 @@ def report() -> str:
                 if pt is None:
                     L.append(f"| {label} | not reached | | | | | |")
                     continue
+                if target == 0.98:   # before the de-duplication: 0.95 and 0.98 can be the same point
+                    load98[(truth_photos, signal)] = pt[0]
                 if pt[0] in shown:
                     continue
                 shown.add(pt[0])
-                if target == 0.98:
-                    load98[(truth_photos, signal)] = pt[0]
                 tag = {None: " (no review)", "all98": " (98% in every collection)"}.get(target, "")
                 L.append(f"| {label}{tag} | {pt[0]} | {100 * pt[0] / pages:.1f} | {_pct(pt[1])} | "
                          + " | ".join(_pct(pt[2][n]) for n in data.DEV) + " |")
         L.append("")
+    return L, load98, (g, dis)
+
+
+def report() -> str:
+    import run
+    cols = [data.load(n) for n in data.DEV]
+    pages = sum(len(c.pages) for c in cols)
+    headlines = {}
+    for name in ("window-claude", "window-claude-truth-photos"):
+        rows = run.run(name, list(data.DEV), False)
+        run.write(name, list(data.DEV), rows)
+        headlines[name] = rows
+    L = ["# W36.seg-window — Claude over overlapping page windows (development set)", "",
+         f"Run 2026-10-05 on Dean, Deaver and Herrnstein ({pages} pages) only; the test collections were not "
+         "touched. Model claude-sonnet-5-5 through `claude -p` on the owner's subscription. "
+         f"Windows of {WINDOW} pages, stride {STRIDE}, every gap judged in two windows "
+         "(see method_window.py for why 7 and not 6). The prompt was written once, after earlier bench items had read "
+         "development pages, and was not revised against page-level errors; nothing was fitted. So these are "
+         "development numbers, not held-out ones in the strict sense.", ""]
+    A, load98, (g, dis) = analysis_lines(cols, pages)
+    L += A
     # sensitivity: the suspected label errors corrected as suggested
     scols = [with_suspected(c) for c in cols]
     L += ["## Sensitivity: the suspected label errors corrected", "",

@@ -224,3 +224,6 @@ import method_features  # noqa: E402,F401
 
 # W36.seg-window: approach A, Claude over overlapping page windows; adds itself to METHODS.
 import method_window  # noqa: E402,F401
+
+# W36.seg-second: approach B, Gemini Flash-Lite over the same windows; adds itself to METHODS.
+import method_gemini  # noqa: E402,F401

@@ -20,6 +20,8 @@ Photos: "truth" means the method was given the box/folder photo labels from the 
 | spring-v2 | dev | 551 | 80.9% | 86.3% | 16 | 17 | 0.943 | 7.4 | own | NO: the prompts were tuned on all five collections |
 | window-claude | dev | 551 | 90.3% | 94.9% | 5 | 6 | 0.981 | 2.0 | own | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
 | window-claude-truth-photos | dev | 551 | 90.3% | 94.9% | 5 | 6 | 0.981 | 2.0 | truth | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
+| window-gemini-lite | dev | 551 | 84.6% | 91.8% | 27 | 3 | 0.951 | 5.4 | own | no: prompt written after reading the owner's notes on dev pages, not tuned on its errors; no fitted parameters |
+| window-gemini-lite-truth-photos | dev | 551 | 84.6% | 91.8% | 27 | 3 | 0.951 | 5.4 | truth | no: prompt written after reading the owner's notes on dev pages, not tuned on its errors; no fitted parameters |
 
 ## W36.seg-features checkpoint 1 — on-device feature model (development set, leave-one-collection-out)
 
@@ -60,3 +62,11 @@ Claude Sonnet 5.5 via `claude -p`, 7-page windows, stride 3, every gap judged tw
 | spring-v1 (for comparison) | pooled | 86.5% | 92.1% | 20 | 6 | 0.957 |
 
 Against spring-v1 (the shipped per-page prompt, 86.5% pooled; tuned on all five collections), the window method scores 90.3% pooled, +3.9 points, with its own photo labels. Review load to 98% pages in an exact document, pooled, by a single confidence threshold: 34 boundaries (6 per 100 pages) with its own photo labels, 34 (6 per 100) with the truth's. Two-window agreement adds nothing: the windows disagreed on 4 of 494 document gaps, and those already had the lowest confidence. Most of the high-confidence errors sit at the truth-check's suspected label errors; with those corrected as suggested (not yet the owner's ruling) the figures change a good deal, see the sensitivity section of window-claude-report.md.
+
+## W36.seg-second — Gemini Flash-Lite over page windows, and two-model voting (development set)
+
+Model gemini-3.1-flash-lite, thinkingLevel minimal, temperature 0; the window-claude windows with a new prompt carrying the owner's domain cues. Detail: window-gemini-lite-report.md.
+
+Pages in an exact document, pooled, own photo labels: window-gemini-lite 84.6%, window-claude 90.3%, spring-v1 86.5%. Review load to 98% by its own confidence: 204 boundaries (37 per 100 pages).
+
+Voting with window-claude (own photo labels): 25 of 548 boundaries flagged (4.5 per 100 pages), holding 3 of window-claude's errors and 22 of window-gemini-lite's; 8 errors left among the agreed document boundaries (both models wrong the same way); 92.5% of pages in an exact document after reviewing the flagged ones; 98% pooled after 49 reviews (8.9 per 100 pages).
