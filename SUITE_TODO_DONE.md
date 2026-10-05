@@ -9609,4 +9609,10 @@ none of this was fixed by starting it.
   `Archival Photos JPEGS/` partner folder to the Reader GUI fixture: its `ls` count read the folder as a 13th file.
   It now counts files and checks the folder's one JPEG (37/37). `prove-codex-agent.sh` §[2] gave its usage window a
   4 s reset, which had passed on the busy gate machine before the next cycle looked; it now uses 60 s (41/0).
+- [x] **W34.codex-model — Codex sessions default to gpt-6.1-sol at high effort** — SHIPPED 2026-10-05 (this commit). Owner:
+  "The default effort level should be different between Codex and Claude. Set the default to 6.1 Sol at High effort
+  level for the daemon with Codex." The model is now pinned in the daemon instead of read from
+  `~/.codex/config.toml`; `AUTONOMOUS_CODEX_MODEL` / `AUTONOMOUS_CODEX_EFFORT` override; Claude keeps
+  `AUTONOMOUS_EFFORT` (medium). Removes the `max`→`xhigh` mapping, which was wrong: Codex's model list shows `max`
+  supported. `prove-codex-agent.sh` 42/0, and both new checks fail against a daemon with the old defaults.
 

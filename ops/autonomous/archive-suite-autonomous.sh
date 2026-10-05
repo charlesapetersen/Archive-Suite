@@ -87,7 +87,12 @@ if [ -n "${AUTONOMOUS_CODEX:-}" ]; then CODEX="$AUTONOMOUS_CODEX"
 elif [ -x "$HOME/.local/bin/codex" ]; then CODEX="$HOME/.local/bin/codex"
 else CODEX="$CODEX_APP_CLI"; fi
 CODEX_SESSIONS="${CODEX_HOME:-$HOME/.codex}/sessions"   # codex writes one rollout-*-<thread>.jsonl per session here
-CODEX_MODEL="${AUTONOMOUS_CODEX_MODEL:-}"                # empty = the model in ~/.codex/config.toml
+# Codex's own model and effort, set apart from Claude's (owner, 2026-10-05: "The default effort level should be
+# different between Codex and Claude. Set the default to 6.1 Sol at High effort level for the daemon with Codex.").
+# Pinned here rather than read from ~/.codex/config.toml, so a change the owner makes for their own Codex use does
+# not change the daemon. `gpt-6.1-sol` is the slug in ~/.codex/models_cache.json; it supports low…max (and ultra).
+CODEX_MODEL="${AUTONOMOUS_CODEX_MODEL:-gpt-6.1-sol}"
+CODEX_EFFORT="${AUTONOMOUS_CODEX_EFFORT:-high}"
 # =======================================================================================================
 LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
 CODEX_PREAMBLE="$STATE/codex-preamble.txt"   # rendered by daemon.sh; prepended to the prompt for codex sessions
@@ -281,8 +286,6 @@ DENY=(
 # (`mkdir -p "$STATE"` moved below the SOURCE GUARD — W32.source-guard. Nothing above the guard writes to
 # $STATE: every function here is defined, not called, and log() only runs inside the loop.)
 log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
-# codex accepts minimal|low|medium|high|xhigh; this daemon's EFFORT scale also has `max`, which codex lacks.
-codex_effort() { case "$1" in max) echo xhigh ;; *) echo "$1" ;; esac; }
 # The rollout file of the codex session whose `codex exec --json` output is in $1: its first event is
 # {"type":"thread.started","thread_id":"…"}, and codex names the rollout after that id. Empty if not found
 # (an --ephemeral run, or a session that died before it started a thread).
@@ -1194,7 +1197,7 @@ for _v in $(env | sed -n 's/^\(CODEX[A-Za-z0-9_]*\)=.*/\1/p'); do [ "$_v" = CODE
 # on 2026-07-12 (display slept 03:27 → 5h gap). -di holds the display on and keeps the whole machine up.
 caffeinate -di -w "$$" &
 
-log "=== daemon up (pid $$, agent $AGENT, interval ${INTERVAL}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET")) ==="
+log "=== daemon up (pid $$, agent $AGENT$( [ "$AGENT" = codex ] && echo " ($CODEX_MODEL, effort $CODEX_EFFORT)" || echo " (effort $EFFORT)"), interval ${INTERVAL}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET")) ==="
 
 # W27.parkstick — retire the previous park's Desktop note. `park_run` writes
 # ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt and, until now, a repo-wide grep found ONE writer and NO remover, so
@@ -1518,7 +1521,7 @@ tick() {
     # does for `claude -p`.
     "$CODEX" exec --json --approve-for-me \
         --add-dir "$(dirname "$REPO")" --add-dir "$STATE" \
-        -c model_reasoning_effort="$(codex_effort "$EFFORT")" \
+        -c model_reasoning_effort="$CODEX_EFFORT" \
         ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
         "$(cat "$CODEX_PREAMBLE" "$PROMPT")" \
         < /dev/null >> "$SLOG" 2>&1 &
@@ -1629,7 +1632,7 @@ tick() {
     | sed -E 's/.*"utilization":([0-9.]*),"resetsAt":([0-9]*)/\1 \2/' \
     | awk '{printf "%d %s\n", $1*100 + 0.5, $2}')"
   fi
-  usage_row session "$(( u_end - (SECONDS - _t0) ))" "$u_end" "$EFFORT" "$rc" \
+  usage_row session "$(( u_end - (SECONDS - _t0) ))" "$u_end" "$( [ "$AGENT" = codex ] && echo "$CODEX_EFFORT" || echo "$EFFORT")" "$rc" \
     "$(printf '%s\n' "$u_all" | head -1)" \
     "$(printf '%s\n' "$u_all" | awk 'NF==2{if(!($2 in m)){o[++n]=$2; m[$2]=$1} else if($1>m[$2]) m[$2]=$1}
                                     END{for(i=1;i<=n;i++) printf "%s%s %s", (i>1?";":""), m[o[i]], o[i]}')" \

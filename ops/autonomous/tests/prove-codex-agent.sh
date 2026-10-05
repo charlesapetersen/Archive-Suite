@@ -122,7 +122,9 @@ for f in --json --approve-for-me --add-dir; do grep -qx -- "$f" "$ARGV" && ok "p
 grep -qx -- "$STATE" "$ARGV" && ok "state dir is writable (--add-dir)" || bad "state dir not passed to --add-dir"
 grep -qx -- "$T" "$ARGV" && ok "the repo's parent is writable, for sibling worktrees" || bad "repo parent not passed to --add-dir"
 grep -q -- 'dangerously' "$ARGV" && bad "a --dangerously flag was passed" || ok "no --dangerously flag"
-grep -qx -- 'model_reasoning_effort=medium' "$ARGV" && ok "effort passed as model_reasoning_effort=medium" || bad "effort not passed"
+grep -qx -- 'model_reasoning_effort=high' "$ARGV" && ok "Codex's own effort passed: high, not Claude's medium" || bad "codex effort not high"
+awk 'BEGIN{RS="\n----\n"} {a[NR]=$0} END{for(i=1;i<NR;i++) if(a[i]=="-m" && a[i+1]=="gpt-6.1-sol") f=1; exit !f}' "$ARGV" \
+  && ok "model pinned: -m gpt-6.1-sol" || bad "model not pinned to gpt-6.1-sol"
 # The prompt: preamble first, then the resume prompt, in ONE argument (what `daemon.sh stop` matches).
 awk 'BEGIN{RS="\n----\n"} /YOU ARE RUNNING UNDER CODEX/ && /autonomous maintenance session for the Archive Suite/ {f=1}
      END{exit !f}' "$ARGV" && ok "preamble + resume prompt are one argument" || bad "prompt not one argument with both parts"

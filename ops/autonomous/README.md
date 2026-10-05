@@ -66,10 +66,12 @@ waiting for someone to type "Continue".
 
 What differs under codex, and why:
 
+- **Model and effort, set apart from Claude's.** `gpt-6.1-sol` at `high` effort (owner, 2026-10-05), pinned in the
+  daemon rather than read from `~/.codex/config.toml`, so changing the model for interactive Codex use does not change
+  the daemon. `AUTONOMOUS_CODEX_MODEL` and `AUTONOMOUS_CODEX_EFFORT` override them; Claude sessions keep
+  `AUTONOMOUS_EFFORT` (medium).
 - **The CLI.** The ChatGPT app ships it at `/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/
-  Contents/MacOS/codex`; a `~/.local/bin/codex` symlink, or `AUTONOMOUS_CODEX`, wins. The model is the one in
-  `~/.codex/config.toml` unless `AUTONOMOUS_CODEX_MODEL` names another; effort is `AUTONOMOUS_EFFORT` as for
-  claude (`max` becomes codex's `xhigh`).
+  Contents/MacOS/codex`; a `~/.local/bin/codex` symlink, or `AUTONOMOUS_CODEX`, wins.
 - **The prompt.** `codex-preamble.txt` goes in front of the same `resume-prompt.txt`. It says: one item, then
   stop (the runbook's keep-going loop is the daemon's job here); hooks do not run, so the screen rule and the
   same-commit docs rule are the session's own; the claude deny list as a list of commands never to run; the
