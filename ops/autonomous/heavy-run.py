@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Serialize heavy work across worktrees, with validated nesting and wait liveness.
 
+After heavy.lock it also takes the Mac-wide lock shared with Vision OCR
+(mac-heavy-lock.py, W35.machine-lock), held until the child session ends.
+
 The kernel lock has no age expiry. A published child session protects work even
 if the supervisor is killed and a tool closes its inherited lock descriptor.
 Unknown/corrupt ownership fails closed. All proofs use an explicit scratch state.
@@ -8,6 +11,7 @@ Unknown/corrupt ownership fails closed. All proofs use an explicit scratch state
 import argparse
 import contextlib
 import fcntl
+import importlib.util
 import json
 import os
 import re
@@ -17,6 +21,10 @@ import subprocess
 import sys
 import time
 import uuid
+
+_spec = importlib.util.spec_from_file_location("mac_heavy_lock", Path(__file__).with_name("mac-heavy-lock.py"))
+mac_lock = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(mac_lock)
 
 
 def identity(pid):
@@ -154,12 +162,16 @@ def held(state):
 
 def waiting(state, root):
     r = read(state / "owner.json")
-    if not r or not active(state, r):
+    heavy_busy = bool(r and active(state, r))
+    m = None if heavy_busy else mac_lock.read_owner(mac_lock.lock_path())
+    # A Mac-lock holder inside the session itself is a self-wait, not queued work.
+    if not heavy_busy and not (m and mac_lock.alive(m) and not descendant(m["pid"], root)):
         return False
     for path in (state / "waiters").glob("*.json"):
         w = json.loads(path.read_text())
+        # With heavy.lock free, only a waiter its last attempt found blocked by the Mac lock counts.
         if (time.time() - w["heartbeat"] < 10 and identity(w["pid"]) == w["start"]
-                and descendant(w["pid"], root)):
+                and (heavy_busy or w.get("mac")) and descendant(w["pid"], root)):
             return True
     return False
 
@@ -195,9 +207,16 @@ def run(state, command, ready):
         signal.signal(sig, stop)
     owner_path = state / "owner.json"
     waited_from = None
+    machine = None
+    session_done = False
+    label = " ".join(command)[:120]
+    mac_logged = False
+
     with (state / "heavy.lock").open("a+") as lock:
         try:
+            blocked_by_mac = False
             while not interrupted:
+                blocker = None
                 try:
                     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     with metadata_lock(state):
@@ -205,17 +224,32 @@ def run(state, command, ready):
                         if not old or not active(state, old):
                             if old:
                                 retire_members(state, old["token"])
-                            break
+                            # W35.machine-lock: then the Mac-wide lock shared with Vision OCR, tried
+                            # ONCE. Never wait for it holding heavy.lock: its holder may need heavy.lock
+                            # next (a hand-run `mac-heavy-lock.py run`), and that would deadlock.
+                            got = mac_lock.attempt("archive-suite", label)
+                            if not isinstance(got, dict):
+                                machine = got
+                                break
+                            blocker = got
                     fcntl.flock(lock, fcntl.LOCK_UN)
+                    blocked_by_mac = bool(blocker)
                 except BlockingIOError:
-                    pass
+                    pass  # another worker's turn at heavy.lock: what this one waits on is unchanged
+                if blocker and not mac_logged:
+                    mac_logged = True
+                    mac_lock.log_wait("archive-suite", label, blocker)
                 if waited_from is None:
                     waited_from = time.time()
+                # "mac" lets the watchdog tell a Mac-lock wait from a heavy.lock spin.
                 publish(waiter, {"pid": os.getpid(), "start": identity(os.getpid()),
-                                 "heartbeat": time.time()})
-                time.sleep(.25)
+                                 "heartbeat": time.time(), "mac": blocked_by_mac})
+                # Each try runs `ps`; behind the Mac lock (minutes, on a loaded Mac) poll gently.
+                time.sleep(1 if blocked_by_mac else .25)
             if interrupted:
                 return 128 + interrupted
+            if mac_logged:
+                mac_lock.log_got("archive-suite", label)
             waiter.unlink(missing_ok=True)
             if waited_from is not None:
                 # W35.live counts these waits; the record is never a reason to refuse the work.
@@ -229,8 +263,9 @@ def run(state, command, ready):
             # The launcher cannot execute the command before its birth/session
             # identity is durable. EOF on supervisor death makes it exit safely.
             rd, wr = os.pipe()
+            # MAC_HEAVY_HELD tells a Vision OCR helper under this command that the Mac lock is covered.
             env = dict(os.environ, ARCHIVE_HEAVY_TOKEN=token, AUTONOMOUS_HEAVY_ENABLED="1",
-                       AUTONOMOUS_HEAVY_STATE=str(state))
+                       AUTONOMOUS_HEAVY_STATE=str(state), MAC_HEAVY_HELD="1")
             try:
                 child = subprocess.Popen([sys.executable, __file__, "--child", str(rd), *command],
                                          env=env, start_new_session=True, pass_fds=(rd, lock.fileno()))
@@ -251,11 +286,17 @@ def run(state, command, ready):
             # metadata and kernel ownership until the whole child session ends.
             while session_live(record) or members_live(state, token):
                 time.sleep(.25)
+            session_done = True
             retire_members(state, token)
             owner_path.unlink()
             return 128 + interrupted if interrupted else (128 - rc if rc < 0 else rc)
         finally:
             waiter.unlink(missing_ok=True)
+            # Never release while the child session may still run (a failure mid-run). That buys
+            # little — this supervisor exits next, and its dead pid makes the lock stale — but an
+            # explicit release would hand the Mac over with the work certainly still going.
+            if machine == "taken" and (child is None or session_done):
+                mac_lock.release()
 
 
 def main():

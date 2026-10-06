@@ -68,6 +68,29 @@ refusal, the real watchdog and gate timer, and the GUI/sandbox boundaries withou
 VM. It is a health-gate step. Set `AUTONOMOUS_HEAVY_STATE` to scratch for standalone harness runs.
 Source changes take effect at the next owner restart; sessions never alter installed runtime state.
 
+### One heavy job per Mac, shared with Vision OCR (W35.machine-lock)
+
+`heavy.lock` serialises only this project. With it, `heavy-run.py` also takes
+`~/.local/state/mac-heavy.lock` through `mac-heavy-lock.py`, and holds it until the child session ends.
+It TRIES the Mac lock once while holding `heavy.lock` and backs off (releasing `heavy.lock`) when the Mac
+lock is busy, never waiting for one lock while holding the other: a hand-run `mac-heavy-lock.py run` holder
+whose command then needs `heavy.lock` would otherwise deadlock.
+Vision OCR speaks the same wire protocol with its own bash helper (`ops/autonomous/mac-heavy-lock.sh`
+there, its `mac-heavy-lock` item), so neither repo depends on the other — the protocol in this helper's
+header is the contract; change both sides together. In short: an `mkdir` lock directory with an `owner`
+file (pid, project, label, start epoch, started), a `<lock>.reclaim` mkdir mutex around every stale
+reclaim, and `mac-heavy.log` beside it with one line per wait and per reclaim. A dead or recycled owner
+pid is stale and is reclaimed by the next taker; a taker waits rather than failing; `MAC_HEAVY_HELD=1`
+(exported to the holder's command) or a holder that is an ancestor means nested, taking nothing. Checked
+against Vision OCR's helper by hand on 2026-10-06: mixed takers serialised, each reclaimed the other's
+dead holder, nesting crossed. A drift in either side's format is not caught by either repo's gate. The wait keeps heavy-run's waiter heartbeat fresh (marked `mac`,
+so a heavy.lock spin with no live owner is not spared), so the watchdog spares it, and
+`--ready` (which starts the gate's execution cap) is written only once both locks are held.
+`python3 ops/autonomous/mac-heavy-lock.py status` shows the holder; `... run -- CMD` wraps a command by hand.
+Known limit: a SIGKILLed supervisor whose child session survives frees the Mac lock early (its pid is
+dead), though `heavy.lock` still protects this project. `tests/prove-mac-heavy-lock.sh` (a gate step)
+uses a scratch `MAC_HEAVY_LOCK`, never the real one.
+
 ## Item claims and shared plan edits (W35.claims)
 
 On the next owner restart, the serial supervisor reserves the item before launching its CLI. Each session

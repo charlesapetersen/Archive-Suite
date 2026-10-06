@@ -315,6 +315,10 @@ step gui-vm-proof   bash "$ROOT/ops/autonomous/tests/prove-gui-vm.sh"
 #     AUTONOMOUS_REVIEW_ENABLED=1 on purpose: paced reviews are OFF by owner directive, and the picker
 #     machinery must keep working while the deployment default is off, so this stays watched while it sleeps.
 step heavy-work-proof     bash "$ROOT/ops/autonomous/tests/prove-heavy.sh"
+# prove-mac-heavy-lock.sh (~25 s) — W35.machine-lock: the Mac-wide lock shared with Vision OCR, on a scratch
+#   path: two projects never overlap, a dead holder is reclaimed, a wait is watchdog work and not gate time,
+#   and a heavy-run.py mutant without the take turns it red.
+step mac-heavy-lock-proof bash "$ROOT/ops/autonomous/tests/prove-mac-heavy-lock.sh"
 step worker-supervisor-proof bash "$ROOT/ops/autonomous/tests/prove-worker-supervisor.sh"
 step usage-pace-proof     bash "$ROOT/ops/autonomous/tests/prove-usage-pace.sh"
 step measure-workers-proof bash "$ROOT/ops/autonomous/tests/prove-measure-workers.sh"

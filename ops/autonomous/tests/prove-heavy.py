@@ -39,8 +39,10 @@ def until(predicate, seconds=8):
 with tempfile.TemporaryDirectory(prefix="heavy work [scratch] ") as scratch:
     root = Path(scratch)
     state = root / "state with space"
-    env = dict(os.environ, AUTONOMOUS_HEAVY_STATE=str(state), ARCHIVE_UNATTENDED="1", AUTONOMOUS_HEAVY_ENABLED="1")
+    env = dict(os.environ, AUTONOMOUS_HEAVY_STATE=str(state), ARCHIVE_UNATTENDED="1", AUTONOMOUS_HEAVY_ENABLED="1",
+               MAC_HEAVY_LOCK=str(root / "mac-heavy.lock"))
     env.pop("ARCHIVE_HEAVY_TOKEN", None)
+    env.pop("MAC_HEAVY_HELD", None)
     children = []
     groups = []
 
