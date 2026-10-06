@@ -6,7 +6,9 @@ import ArchiveCore
 //
 //  Reimplements every TagWriter invariant (CoordinatedTagWriter.write) for the narrow projection
 //  use case: Notes mirrors an item's title-cased front-matter subjects and canonical Quality facet
-//  (`Q1`...`Q3`) onto the note's own .md file via Finder tags.
+//  (`Q1`...`Q3`) onto the note's own .md file via Finder tags — plus its date facets, which include
+//  the W37 sent-with tokens (`Sent With …`, `Sent With Date Uncertain`) under the same exact-ownership
+//  ledger (`NotesTagVocabulary.dateFacetTokens`). Linked corpus PDFs are never projected onto.
 //
 //  This is the ONLY place Notes touches file-level tag metadata. It writes ONLY files under
 //  <NotesStore>/items/<uuid>/ (component-boundary guard). It never touches color labels,

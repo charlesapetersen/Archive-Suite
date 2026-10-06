@@ -3,19 +3,44 @@ import UserNotifications
 import os
 
 extension OCRProcessor {
+    /// W37.dual-date — the enclosure-proposal BASELINE for `files` (aligned with `jobs` by index): the
+    /// segmentation the OCR model's own classifications imply, over ALL files (nothing removed), reduced
+    /// to each proposal's exact cover-page sequence. Every rebuild passes it as `expectedCoverPages`, so a
+    /// relation never survives a removal, insertion or boundary change around its cover.
+    func enclosureBaseline(files: [URL]) -> [URL: [URL]] {
+        let modelClasses: [DocumentClassification?] = files.indices.map {
+            $0 < jobs.count ? jobs[$0].result?.ocrClassification : nil
+        }
+        let flags = files.indices.map { $0 < jobs.count && jobs[$0].result?.ocrEnclosure == true }
+        let baseline = DocumentSegmenter().segment(files: files, classifications: modelClasses,
+                                                   texts: [], enclosureFlags: flags)
+        return DocumentSegmenter.coverPageSequences(baseline)
+    }
     /// Rebuild `segments` from current job classifications, excluding user-removed files.
     func rebuildSegments(files: [URL]) {
+        segments = currentSegments(files: files)
+    }
+    /// The segmentation `rebuildSegments` would assign, without assigning it (W37 reconcile reuses it).
+    func currentSegments(files: [URL]) -> [DocumentSegment] {
         let segmenter = DocumentSegmenter()
         var activeFiles: [URL] = []
         var classifications: [DocumentClassification?] = []
         var texts: [String] = []
+        var enclosureFlags: [Bool] = []
         for (i, url) in files.enumerated() {
             if removedSourceURLs.contains(url) { continue }
             activeFiles.append(url)
             classifications.append(i < jobs.count ? jobs[i].result?.classification : nil)
             texts.append(i < jobs.count ? (jobs[i].result?.text ?? "") : "")
+            // W37: the model judged "enclosure of the PREVIOUS page's letter". If that previous page was
+            // removed, the unit now in front of it is not what the model saw — drop the proposal rather
+            // than carry it across the gap.
+            let previousRemoved = i > 0 && removedSourceURLs.contains(files[i - 1])
+            enclosureFlags.append(!previousRemoved && i < jobs.count && jobs[i].result?.enclosure == true)
         }
-        segments = segmenter.segment(files: activeFiles, classifications: classifications, texts: texts)
+        return segmenter.segment(files: activeFiles, classifications: classifications, texts: texts,
+                                 enclosureFlags: enclosureFlags,
+                                 expectedCoverPages: enclosureBaseline(files: files))
     }
     /// Apply Live-Capture group boundaries/types to job classifications, so segmentation uses
     /// the phone's grouping instead of the LLM. Boundaries → documentStart/continuation;
@@ -176,6 +201,8 @@ extension OCRProcessor {
                 }
             }
         }
+        // W37: a reclassified label/document can invalidate (or move) an enclosure relation.
+        reconcileSentWithAfterReclassification(runConfig: runConfig)
 
         // Find box labels in order (user may have reclassified some)
         let boxIndices = collectionReviewItems
@@ -314,6 +341,10 @@ extension OCRProcessor {
                       colorIsAuthoritative: true,
                       stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             jobs[index].appliedTags = updatedTags
+        }
+        // W37: the edit can invalidate (or move) an enclosure relation.
+        if oldClassification != newClassification {
+            reconcileSentWithAfterReclassification(runConfig: runConfig)
         }
     }
     /// Dedicated, standalone rotation-review pass (separate from the tagging/segmentation review).
@@ -610,7 +641,11 @@ extension OCRProcessor {
         let updatedClassifications = jobs.map { $0.result?.classification }
         let texts = jobs.map { $0.result?.text ?? "" }
         let segmenter = DocumentSegmenter()
-        segments = segmenter.segment(files: allFiles, classifications: updatedClassifications, texts: texts)
+        segments = segmenter.segment(files: allFiles, classifications: updatedClassifications, texts: texts,
+                                     enclosureFlags: jobs.map { $0.result?.enclosure == true },
+                                     expectedCoverPages: enclosureBaseline(files: allFiles))
+        // W37: refresh/strip written Sent With tokens + sidecar relation against the new segmentation.
+        reconcileSentWithAfterReclassification(runConfig: runConfig)
 
         return collectionChanged
     }

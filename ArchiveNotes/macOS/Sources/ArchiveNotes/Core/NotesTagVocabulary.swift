@@ -31,10 +31,25 @@ enum NotesTagVocabulary {
         return tokens
     }
 
-    /// Existing ArchiveCore date facets for the item's exact, normalized front-matter date. The array
-    /// order is deliberate: the projector appends these after user subjects, so a subject such as
-    /// `1984` cannot become the parsed date when the authoritative date is `1968`.
+    /// Existing ArchiveCore date facets for the item's exact, normalized front-matter date, followed by
+    /// its sent-with tokens (W37.dual-date). The array order is deliberate: the projector appends these
+    /// after user subjects, so a subject such as `1984` (or `Sent With 1960`) cannot become the parsed
+    /// date when the authoritative value differs. Every token here is `DocumentTags.isDateFacetLike`,
+    /// so the sent-with tokens share the own date's exact-ownership ledger (`NoteStore`) unchanged.
     static func dateFacetTokens(for item: Item) -> [String] {
+        ownDateFacetTokens(for: item) + sentWithFacetTokens(for: item)
+    }
+
+    /// The sent-with date as Core's single whole-value token, plus `Sent With Date Uncertain` when the
+    /// value is speculative. Nothing without a sent-with date (the flag never stands alone).
+    static func sentWithFacetTokens(for item: Item) -> [String] {
+        guard let sent = item.sentWith else { return [] }
+        var tokens = [SentWithTag.token(for: sent)]
+        if item.sentWithUncertain { tokens.append(SentWithTag.uncertainToken) }
+        return tokens
+    }
+
+    private static func ownDateFacetTokens(for item: Item) -> [String] {
         guard let date = item.date, let precision = item.datePrecision,
               Item.normalizedDate(date, precision: precision) == (date, precision) else { return [] }
 

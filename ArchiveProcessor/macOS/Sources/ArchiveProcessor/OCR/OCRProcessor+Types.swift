@@ -76,6 +76,13 @@ struct SegmentTagData {
     var subjectTags: [String] = []
     /// Human-set 0...3 rating; 0 is deliberately emitted as no Finder tag.
     var quality: Int = 0
+    /// W37.dual-date — the covering letter's date, typed as a wire value ("1958", "1958-03",
+    /// "1958-03-12", "1950s"); empty = none. An invalid value is never written.
+    var sentWith: String = ""
+    var sentWithUncertain: Bool = false
+
+    /// False while `sentWith` holds text that is not a valid date (the card refuses to save).
+    var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
 }
 
 /// One document segment presented for manual/human tagging (feature 6).
@@ -95,4 +102,15 @@ struct ManualTagSegment: Identifiable {
     var quality: Int = 0
     /// True while the auto-date LLM prefetch for this segment is still in flight.
     var dateLoading: Bool = false
+    /// W37.dual-date — the PROPOSED enclosure relation, seeded from `DocumentSegment.enclosureOf`: the
+    /// covering letter's index into `segments`. The owner can clear it (→ nil); it is never invented here.
+    var enclosureOfSegmentIndex: Int? = nil
+    /// The covering letter's first page file name, for display only.
+    var enclosureCoverName: String? = nil
+    /// Explicit covering-letter date (wire value); empty = take it from the relation's cover, if any.
+    var sentWith: String = ""
+    var sentWithUncertain: Bool = false
+
+    /// False while `sentWith` holds text that is not a valid date (the sheet refuses to advance).
+    var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
 }

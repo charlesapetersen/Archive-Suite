@@ -9,6 +9,7 @@ struct NavigationWindowView: View {
     @EnvironmentObject private var linkContext: ArchiveLinkContext
     @Environment(\.openWindow) private var openWindow
     @State private var showingHealth = false
+    @State private var showingDateFilter = false      // W37: the year-range popover
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.sidebarWidth") private var sidebarWidth = 210.0
@@ -344,20 +345,23 @@ struct NavigationWindowView: View {
 
             subjectFilterField
 
-            HStack(spacing: 3) {
-                TextField("From", value: $model.filter.dateFromYear, format: .number.grouping(.never))
-                    .accessibilityIdentifier("ar.filter.dateFrom")
-                Text("\u{2013}").foregroundStyle(.secondary)
-                TextField("To", value: $model.filter.dateToYear, format: .number.grouping(.never))
-                    .accessibilityIdentifier("ar.filter.dateTo")
+            // W37: a compact button (the bar is already full at narrow widths); the range lives in a popover.
+            Button { showingDateFilter = true } label: {
+                if let years = model.filter.dateYearsSummary {
+                    Label(years, systemImage: "calendar")
+                } else {
+                    Label("Dates", systemImage: "calendar").labelStyle(.iconOnly)
+                }
             }
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 104)
+            .controlSize(.small)
+            .fixedSize()
             .help("Filter by year: matches a document's own date or the date of the letter it was sent with")
+            .accessibilityIdentifier("ar.filter.dates")
+            .popover(isPresented: $showingDateFilter) { dateFilterPopover }
 
             TextField("Filter file name…", text: $model.filterSearchText)
                 .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 160)
+                .frame(minWidth: 90, maxWidth: 160)   // a full bar must not squeeze it to nothing
                 .help("Filter the list by file name")
                 .accessibilityIdentifier("ar.filter.name")
 
@@ -365,7 +369,7 @@ struct NavigationWindowView: View {
                 Image(systemName: "text.magnifyingglass").foregroundStyle(model.ftsPaths != nil ? Color.accentColor : .secondary)
                 TextField("Search OCR text…", text: $model.fullTextQuery)
                     .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 180)
+                    .frame(minWidth: 100, maxWidth: 180)
                     .focused($searchFocused)
                     .help("Search the full OCR text of documents")
                     .accessibilityIdentifier("ar.filter.ocr")
@@ -403,6 +407,30 @@ struct NavigationWindowView: View {
         .padding(8)
     }
 
+    private var dateFilterPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Year range").font(.headline)
+            HStack(spacing: 4) {
+                TextField("From", value: $model.filter.dateFromYear, format: .number.grouping(.never))
+                    .accessibilityIdentifier("ar.filter.dateFrom")
+                Text("\u{2013}").foregroundStyle(.secondary)
+                TextField("To", value: $model.filter.dateToYear, format: .number.grouping(.never))
+                    .accessibilityIdentifier("ar.filter.dateTo")
+            }
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 160)
+            Text("Matches a document's own date or the date of the letter it was sent with.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Clear") { model.filter.dateFromYear = nil; model.filter.dateToYear = nil }
+                    .disabled(model.filter.dateRange == nil)
+                Spacer()
+                Button("Done") { showingDateFilter = false }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(12).frame(width: 220)
+    }
+
     /// Existing tags offered for autocomplete — the library's distinct topical tags, minus any already
     /// chosen. (`allSubjects` is the deduped topical-tag set the model already maintains.)
     private var tagSuggestions: [String] {
@@ -420,7 +448,7 @@ struct NavigationWindowView: View {
                 placeholder: "Filter by tag…",
                 focusToken: tagFilterFocusToken
             )
-            .frame(width: 220)
+            .frame(minWidth: 140, idealWidth: 220, maxWidth: 220)   // gives way first in a narrow window
             .help("Filter by tag — type to autocomplete existing tags; Return adds it; select a token and press ⌫ to remove")
             if model.filter.subjects.count > 1 {
                 Picker("Match", selection: $model.filter.subjectCombine) {

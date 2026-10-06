@@ -362,6 +362,17 @@ private struct ManualSegTagCard: View {
                 DayField(day: $processor.manualSegDraftTags.day)
             }
             Toggle("Date uncertain", isOn: $processor.manualSegDraftTags.dateUncertain)
+            // W37.dual-date — the covering letter's date, for an enclosure with its own date.
+            HStack(alignment: .bottom, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sent with (covering letter's date)").font(.caption2).foregroundStyle(.secondary)
+                    TextField("1958-03-12", text: $processor.manualSegDraftTags.sentWith)
+                        .textFieldStyle(.roundedBorder).frame(width: 120)
+                }
+                Toggle("Sent with date uncertain", isOn: $processor.manualSegDraftTags.sentWithUncertain)
+            }
+            SentWithHint(text: processor.manualSegDraftTags.sentWith,
+                         fallback: "Optional. 1958, 1958-03, 1958-03-12 or 1950s.")
             if processor.manualSegAutoDate {
                 HStack(spacing: 6) {
                     if processor.manualSegDateFetching {
@@ -384,6 +395,7 @@ private struct ManualSegTagCard: View {
                 Button("◂ Back") { processor.manualSegCancelTagging() }
                 Spacer()
                 Button("Save ▸") { processor.manualSegCommitPendingSegment() }
+                    .disabled(!processor.manualSegDraftTags.sentWithIsValid)
                     .buttonStyle(.borderedProminent)
             }
         }

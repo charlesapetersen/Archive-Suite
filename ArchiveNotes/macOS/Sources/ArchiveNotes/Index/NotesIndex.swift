@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import ArchiveCore
 
 /// A disposable, rebuildable full-text index over Archive Notes items, backed by the
 /// **system SQLite** FTS5 engine. The filesystem + front-matter remain the source of truth;
@@ -71,7 +72,9 @@ actor NotesIndex {
                 modified REAL,
                 managed_tags TEXT,
                 source_count INTEGER DEFAULT 0,
-                roundup INTEGER NOT NULL DEFAULT 0
+                roundup INTEGER NOT NULL DEFAULT 0,
+                sent_with TEXT,
+                sent_with_uncertain INTEGER NOT NULL DEFAULT 0
             );
             """)
 
@@ -87,6 +90,14 @@ actor NotesIndex {
         // Keep the durable folders/memberships tables and the existing FTS rows intact during migration.
         if !itemsHasColumn("roundup") {
             try exec("ALTER TABLE items ADD COLUMN roundup INTEGER;")
+        }
+        // W37.dual-date: the sent-with date's role-labelled columns (wire value, e.g. "1958-03" or
+        // "1950s"). Same additive guard; no backfill is needed — nothing yet carries a sent-with date.
+        if !itemsHasColumn("sent_with") {
+            try exec("ALTER TABLE items ADD COLUMN sent_with TEXT;")
+        }
+        if !itemsHasColumn("sent_with_uncertain") {
+            try exec("ALTER TABLE items ADD COLUMN sent_with_uncertain INTEGER NOT NULL DEFAULT 0;")
         }
 
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).
@@ -268,10 +279,11 @@ actor NotesIndex {
             try run("""
                 UPDATE items SET mtime=?, title=?, kind=?, date=?, date_precision=?,
                     date_uncertain=?, authors=?, sort_date=?, quality=?, created=?,
-                    modified=?, managed_tags=?, source_count=?, roundup=? WHERE rowid=?;
+                    modified=?, managed_tags=?, source_count=?, roundup=?, sent_with=?,
+                    sent_with_uncertain=? WHERE rowid=?;
                 """) { stmt in
                 self.bindItemColumns(stmt, row, startIndex: 1)
-                sqlite3_bind_int64(stmt, 15, rowid)
+                sqlite3_bind_int64(stmt, 17, rowid)
             }
             try insertFTS(rowid: rowid, row: row)
         } else {
@@ -279,8 +291,8 @@ actor NotesIndex {
             try run("""
                 INSERT INTO items(id, mtime, title, kind, date, date_precision,
                     date_uncertain, authors, sort_date, quality, created, modified, managed_tags,
-                    source_count, roundup)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    source_count, roundup, sent_with, sent_with_uncertain)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """) { stmt in
                 self.bindText(stmt, 1, idStr)
                 self.bindItemColumns(stmt, row, startIndex: 2)
@@ -305,6 +317,8 @@ actor NotesIndex {
         bindText(stmt, s + 11, row.managedTags)
         sqlite3_bind_int(stmt, s + 12, Int32(row.sourceCount))
         sqlite3_bind_int(stmt, s + 13, row.roundup ? 1 : 0)
+        if let sent = row.sentWith { bindText(stmt, s + 14, sent.wireValue) } else { sqlite3_bind_null(stmt, s + 14) }
+        sqlite3_bind_int(stmt, s + 15, row.sentWithUncertain ? 1 : 0)
     }
 
     private func insertFTS(rowid: Int64, row: NoteIndexRow) throws {
@@ -348,7 +362,8 @@ actor NotesIndex {
     func summary(for id: UUID) -> ItemSummary? {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
-                   sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup
+                   sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup,
+                   sent_with, sent_with_uncertain
             FROM items WHERE id = ?;
             """) else { return nil }
         defer { sqlite3_finalize(stmt) }
@@ -363,7 +378,8 @@ actor NotesIndex {
     func allSummaries() -> [ItemSummary] {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
-                   sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup
+                   sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup,
+                   sent_with, sent_with_uncertain
             FROM items;
             """) else { return [] }
         defer { sqlite3_finalize(stmt) }
@@ -774,13 +790,19 @@ actor NotesIndex {
         let tagsJSON = sqlite3_column_text(stmt, 12).map { String(cString: $0) } ?? "[]"
         let managedTags = (try? JSONDecoder().decode([String].self, from: Data(tagsJSON.utf8))) ?? []
         let sourceCount = Int(sqlite3_column_int(stmt, 13))
+        // A wire value that no longer parses (hand-edited cache) reads as no sent-with date; the next
+        // re-index from the authoritative `.md` repairs it.
+        let sentWith: ArchiveDate? = sqlite3_column_type(stmt, 15) == SQLITE_NULL ? nil :
+            sqlite3_column_text(stmt, 15).flatMap { ArchiveDate.parse(wireValue: String(cString: $0)) }
 
         return ItemSummary(id: uuid, title: title, kind: kind, date: date,
                            datePrecision: datePrecision, dateUncertain: dateUncertain,
                            authors: authors, sortDate: sortDate, quality: quality,
                            created: created, modified: modified, mtime: mtime,
                            managedTags: managedTags, sourceNoteCount: sourceCount,
-                           roundup: sqlite3_column_int(stmt, 14) != 0)
+                           roundup: sqlite3_column_int(stmt, 14) != 0,
+                           sentWith: sentWith,
+                           sentWithUncertain: sentWith != nil && sqlite3_column_int(stmt, 16) != 0)
     }
 
     private func exec(_ sql: String) throws {

@@ -2,6 +2,18 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W37.dual-date, 2026-10-06): where enclosure dates are and are not produced
+
+- **Process Files PDFs carry no `Document date:` / `Sent with:` header lines.** Those PDFs are rendered at
+  OCR time, before tagging, and finished PDFs are not rewritten to add them (rewriting risks tags and bytes).
+  Live Capture renders after tagging and writes the `Document date:` line. The Finder tags are the live
+  value either way; the header is only a snapshot.
+- **Enclosure proposals come only from the OCR prompt's `[enclosure]` marker**, so Mistral, Apple Vision and
+  pre-OCRed classification-only runs propose none; the owner can still type a sent-with date in the manual
+  tag sheet. Nothing checks that the covering unit is actually a letter.
+- **The manual sheet can clear a proposed relation or type a date, but cannot re-point it** at another letter.
+- The OCR prompt gained one optional instruction (the marker), so it is in every paid OCR call.
+
 ## ✅ FIXED (W34.recov-flake): recovery Test 25 could clear a different session's staging folder
 
 The missing-source fixture deleted U1's source before reopening its capture session. Without surviving

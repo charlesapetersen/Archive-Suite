@@ -890,6 +890,46 @@ final class NotesModel: ObservableObject {
         await mutateItem(id, "set date uncertainty") { $0.dateUncertain = uncertain }
     }
 
+    /// Set the covering letter's ("sent with") date — W37.dual-date. The same normalization as the own
+    /// date (`Item.normalizedDate`), then the Core whole value; a `nil`/blank date clears it together
+    /// with its uncertainty flag. A value Core cannot carry (a year outside 3–4 digits) is refused with
+    /// a status message rather than written or silently clearing the existing date. Projection mirrors
+    /// it as `Sent With …` through the same exact-ownership facet path as the own date.
+    @discardableResult
+    func setSentWith(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async -> Bool {
+        let n = Item.normalizedDate(date, precision: precision)
+        // An explicit edit of the role settles it: any other kept `sent_with` entry (or an unreadable
+        // inline value) is retired, so a cleared date can never be replaced by it on the next load.
+        @Sendable func retireStale(_ item: inout Item) {
+            item.unparsedAdditionalDates.removeAll {
+                $0.key == FrontMatterCodec.sentWithAdditionalDateKey || $0.key == FrontMatterCodec.inlineAdditionalDatesKey
+            }
+        }
+        guard n.date != nil else {
+            return await mutateItem(id, "clear the sent-with date") { item in
+                item.sentWith = nil
+                item.sentWithUncertain = false
+                retireStale(&item)
+            }
+        }
+        guard let value = Item.archiveDate(n.date, precision: n.precision) else {
+            statusMessage = "A sent-with date needs a 3- or 4-digit year."
+            return false
+        }
+        return await mutateItem(id, "set the sent-with date") { item in
+            item.sentWith = value
+            retireStale(&item)
+        }
+    }
+
+    /// Toggle the sent-with date's own uncertainty flag (independent of the own date's). A no-op
+    /// without a sent-with date, so the flag can never be stored on its own.
+    func setSentWithUncertain(_ uncertain: Bool, for id: UUID) async {
+        await mutateItem(id, "set sent-with date uncertainty") { item in
+            item.sentWithUncertain = item.sentWith != nil && uncertain
+        }
+    }
+
     /// Round-up is ordinary-note metadata, persisted through the same fresh-load transaction as authors.
     @discardableResult
     func setRoundup(_ roundup: Bool, for id: UUID) async -> Bool {

@@ -4,6 +4,7 @@
 // convention (SPEC; Reader W3.f6 pinned the same locale for PDF dates).
 
 import Foundation
+import ArchiveCore
 
 extension ItemSummary {
     /// Human-readable date for the Date column, derived from `date` + `datePrecision` per the SPEC
@@ -26,6 +27,24 @@ extension ItemSummary {
             return "\(name) \(d), \(p[0])"                      // "1970-03-05" → "Mar 5, 1970"
         }
     }
+
+    /// The sent-with (covering letter) date for display, e.g. "Mar 12, 1958" — nil when none (W37).
+    var displaySentWith: String? { sentWith?.display }
+
+    /// The Date column's text. The own date leads; a sent-with date is always labelled so it is never
+    /// read as the item's own date: "Nov 3, 1957 · sent with Mar 12, 1958" when both exist, and
+    /// "Sent with Mar 12, 1958" when the row sorts by that fallback because it has no own date.
+    var dateColumnText: String? {
+        switch (displayDate, displaySentWith) {
+        case let (own?, sent?): return "\(own) · sent with \(sent)"
+        case let (nil, sent?):  return "Sent with \(sent)"
+        case let (own, nil):    return own
+        }
+    }
+
+    /// Whether the value the row sorts by is speculative (italic): the own date's flag, or the
+    /// sent-with flag when the sent-with fallback is what sorts it.
+    var sortDateUncertain: Bool { sortsBySentWith ? sentWithUncertain : dateUncertain }
 
     /// Quality rendered on the canonical three-star scale, or "—" when unrated/invalid.
     var qualityStars: String {

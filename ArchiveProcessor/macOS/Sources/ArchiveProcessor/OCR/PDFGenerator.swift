@@ -3,6 +3,26 @@ import AppKit
 import PDFKit
 import CoreText
 import ImageIO
+import ArchiveCore
+
+/// W37.dual-date — the optional source-document date lines of a newly generated PDF's OCR-text header
+/// (`Document date: …` / `Sent with: …`). Display strings (`ArchiveDate.display`). These are the
+/// document's own dates, distinct from the provider line's OCR processing date, and are an output-time
+/// snapshot: the live value is always the Finder tags. Parsed back out by Core `PDFHeaderParser`.
+struct PDFSourceDates: Sendable, Equatable {
+    var documentDate: String?
+    var sentWith: String?
+
+    var isEmpty: Bool { documentDate == nil && sentWith == nil }
+
+    /// The header lines, in SPEC order, each with Core's exact prefix.
+    var headerLines: [String] {
+        var lines: [String] = []
+        if let documentDate { lines.append(PDFHeaderParser.documentDatePrefix + documentDate) }
+        if let sentWith { lines.append(PDFHeaderParser.sentWithPrefix + sentWith) }
+        return lines
+    }
+}
 
 struct PDFGenerator {
 
@@ -25,7 +45,8 @@ struct PDFGenerator {
     func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL,
                   originalFileName: String? = nil, gatewayDisplayName: String? = nil,
                   localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
-                  pdfImageMB: Double = 0, textColumns: Int = 1) throws -> ImagePageOutcome {
+                  pdfImageMB: Double = 0, textColumns: Int = 1,
+                  sourceDates: PDFSourceDates? = nil) throws -> ImagePageOutcome {
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
 
@@ -44,7 +65,7 @@ struct PDFGenerator {
                                     gatewayDisplayName: gatewayDisplayName,
                                     localAgentDisplayName: localAgentDisplayName,
                                     localAgentModelName: localAgentModelName,
-                                    textColumns: textColumns)
+                                    textColumns: textColumns, sourceDates: sourceDates)
         pdfDocument.insert(textPage, at: pdfDocument.pageCount)
 
         guard pdfDocument.write(to: outputURL) else {
@@ -233,7 +254,8 @@ struct PDFGenerator {
 
     private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
                               gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
-                              localAgentModelName: String? = nil, textColumns: Int = 1) -> PDFPage {
+                              localAgentModelName: String? = nil, textColumns: Int = 1,
+                              sourceDates: PDFSourceDates? = nil) -> PDFPage {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "d MMMM yyyy"
@@ -252,6 +274,11 @@ struct PDFGenerator {
         }
         if let classification = result.classification {
             headerLine += "\nClassification: \(classification.displayName)"
+        }
+        // W37.dual-date — the document's own date / covering-letter date, after Classification and
+        // before the blank separator, only when known at render time (see `PDFSourceDates`).
+        for line in sourceDates?.headerLines ?? [] {
+            headerLine += "\n\(line)"
         }
         headerLine += "\n\n"
 

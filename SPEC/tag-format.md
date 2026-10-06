@@ -149,6 +149,8 @@ Extracted text.
 <original filename>            ← verbatim source name, ANY image ext (.jpg/.png/.tiff/.heic); may be ABSENT
 <Provider> · <Model> · <D Month YYYY>   ← separator is U+00B7 with surrounding spaces; date e.g. "9 March 2026"
 Classification: <value>        ← OPTIONAL line; absent on older/heuristic/Mistral/hand-added files
+Document date: <display>       ← OPTIONAL (W37); the document's OWN date, e.g. "Nov 3, 1957"
+Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e.g. "Mar 12, 1958"
                                ← blank line
 <body text…>                   ← or "No text returned by model." (+ error) on OCR failure
 ```
@@ -165,6 +167,13 @@ Classification: <value>        ← OPTIONAL line; absent on older/heuristic/Mist
 - **Classification may be ABSENT.** It is written only when the Processor knows it; consumers **must
   degrade gracefully** (fall back to filename-sequence order + manual grouping). Never build a core
   behavior that assumes it exists.
+- **Source-date lines (W37.dual-date).** `Document date:` / `Sent with:` are the SOURCE document's dates
+  (`ArchiveDate.display` form), distinct from the provider line's OCR processing date, and only an
+  output-time snapshot: the live value is always the Finder tags. Exact case-sensitive prefixes
+  (`PDFHeaderParser.documentDatePrefix` / `sentWithPrefix`), recognised only inside the header block
+  (after the provider line, before the first blank line), so a body line starting with the same words
+  is never stripped. Written today only where the date is known at render time — Live Capture; Process
+  Files renders PDFs before tagging and does not rewrite finished PDFs to add them.
 - **Reading segments = document units.** A _document_ (a `Document Start` + following `Continuation`
   pages) is finer than the Red/Purple box/folder markers. The Classification lives in page-2 **text**,
   so it is read via the content index, not a tag.
@@ -220,7 +229,8 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 | Read/Unread + `Unread`-last | `Tagging/MacOSTagger.swift` (`stampUnread`) | `Core/DocumentTags.swift` (`ReadState`), `Core/TagWriter.swift` (`setReadState`) |
 | Subjects | `Tagging/TagGenerator.swift` | `Core/DocumentTags.swift` (`subjects`) |
 | Color label (Red=6/Purple=3) | `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | `Core/DocumentTags.swift` (`ArchiveColor`), `Core/TagWriter.swift` |
-| Chronological sort key | (n/a — Reader-derived) | `Core/DocumentTags.swift` (`sortDate`) |
+| **Sent With** date (W37) | `Tagging/DocumentSegmenter.swift` (`enclosureOf`), `OCR/OCRProcessor+Tagging.swift` (cover date → `GeneratedTags.sentWith`), `Views/ManualTaggingSheet.swift` | ArchiveCore `Tags/ArchiveDate.swift` (`ArchiveDate`, `SentWithTag`, `DateRangeFilter`) + `DocumentTags.sentWith`; Reader `Core/LibraryFilter.swift` (year range), `Views/InlineEditCells.swift`; Notes front-matter `additional_dates` → `NotesTagProjector` |
+| Chronological sort key | (n/a — Reader-derived) | `Core/DocumentTags.swift` (`sortDate`; own date, sent-with fallback) |
 | 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |
 | Classification enum / values | `Models/ProviderModels.swift` (`DocumentClassification`), `OCR/PDFTextExtractor.swift` (shim maps string→enum) | `ArchiveCore` `PDFHeaderParser` returns raw `String?`; `Core/DocumentRuns.swift`, `Search/ContentIndex.swift` |
 
@@ -247,11 +257,20 @@ The shared contract is the single biggest risk in the Suite. Therefore:
 
 ---
 
-## W37.dual-date — enclosure dates (proposal, 2026-10-05)
+## W37.dual-date — enclosure dates (design record, 2026-10-05; IMPLEMENTED 2026-10-06)
 
-**DESIGN ONLY; pending the owner's behaviour choices.** The contract above still describes the
-implemented single-date format. None of the tokens or behaviour below is implemented or normative yet.
-Baseline: `3465e15`. The owner already required two dates for an enclosure with its own date; the open
+**Implemented.** The owner chose all three recommendations below on 2026-10-05; the normative rules
+now live in the tables above (facet rows *Sent With*, the sort-key section, the page-2 header). This
+section is kept as the design record and for its proof list. Baseline: `3465e15`.
+
+**How enclosures are identified (as built).** The OCR prompt lets the model add an optional
+`[enclosure]` marker on a `[document_start]` page that begins a separately dated document sent with the
+letter before it (`OCRPrompt.parseEnclosureFlag`, header lines only). `DocumentSegmenter` turns a marked
+page into `DocumentSegment.enclosureOf` (the covering segment), never across a box/folder label or an
+unclassified page and never from adjacency alone; consecutive enclosures share one letter. The
+enclosure's `Sent With` value is the covering letter's own date at tagging time (none if the letter is
+undated — no neighbour is borrowed). The manual tag sheet shows the proposal, can clear it, and takes a
+typed sent-with date. Mistral/Vision and pre-OCRed classification-only runs propose nothing. The owner already required two dates for an enclosure with its own date; the open
 question is how those dates behave in the apps, not whether to add the feature.
 
 ### Recommended behaviour
@@ -359,5 +378,6 @@ run Reader's write-surface lint, and verify visible controls in the off-screen V
 - Notes save/reload/index rebuild and smart-folder matching on each role, one row per UUID, with projection
   confined to a scratch note store. The dormant import does not run.
 
-**Next step:** owner answers the three behaviour choices above (`W37.dual-date-owner-ok` in the trackers).
-Then implement and prove the chosen design; this proposal checkpoint does not complete W37.dual-date.
+Proofs as shipped: ArchiveCore `DualDateTests` + `PDFHeaderParserTests`; Reader `DualDateLibraryTests` +
+the scratch-file `TagEditingIntegrationTests.testApplySentWithEditsOnDiskPreserveEverythingElse`; Notes
+`DualDateTests`; Processor `scripts/test-dual-date.sh` (`DualDateTestDriver`, headless, $0).

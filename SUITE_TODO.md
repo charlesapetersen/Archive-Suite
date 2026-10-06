@@ -935,24 +935,6 @@ OWNER sit in the plan's HOLD QUEUE.
 - [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (blocked-on: W36.seg-ensemble, W36.seg-corpus-survey). Include an overnight option (owner, 2026-10-05: "we may want to include an option for models that can basically only be used overnight when the computer is in limited use otherwise"): for each on-device method, its time and memory per 1,000 pages and whether it is usable only as an overnight run on a Mac left alone, put to the owner beside the cloud options at the decision. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 
-## Two dates on one document — enclosures (owner, 2026-10-05; before the W40 freeze)
-
-- [ ] **W37.dual-date — an enclosure with its own date carries two dates: its own and the covering letter's
-  [M-L · Tier-2 · SPEC change, all three apps].** (blocked-on: W37.dual-date-owner-ok). Owner, 2026-10-05, approving the segmentation document rules:
-  "when enclosures have their own dates, they should be dated twice, both with the letter that sent them and with
-  their own dates", and "Queue before the feature freeze." Today `SPEC/tag-format.md` allows 0–1 Year, Month and
-  Day per file. Reader sorts by one date; its `LibraryFilter` has no date-range predicate yet. Design first (one short session, recorded in the
-  SPEC): a second, labelled date family on the same file (e.g. a "sent with" date carried beside the item's own),
-  which date sorts and which filters match (the recommendation to put to the owner: the item's own date sorts;
-  both dates match a date filter), how a merged PDF's page 2 shows both, and how the Processor knows a document is
-  an enclosure (the segmentation pass, a manual mark, or both). Then build it in ArchiveCore, the Processor's
-  tagger and manual tag sheet, the Reader's display, sort and filters, and Notes (its planned primary-plus-
-  additional dates model from the DEVONthink plan), all three together per the shared-contract rule, Tier-2, with
-  scratch-copy tests. No migration: there is no production material. | SPEC + all apps | M-L | med | none
-  Design checkpoint 2026-10-05 (this commit): concrete proposal in `SPEC/tag-format.md` §W37.dual-date;
-  existing contract remains single-date until implementation. Owner's choices 2026-10-05: own date sorts
-  (covering-letter fallback), either date matches filters, the app proposes relations and the owner corrects
-  them. Build and verify all four surfaces; no runtime implementation or functional tag/PDF proof is claimed yet.
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
 Owner, 2026-10-05: one session at a time leaves the Claude five-hour window unused, because sessions spend most

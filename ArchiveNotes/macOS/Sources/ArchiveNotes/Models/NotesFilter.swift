@@ -2,6 +2,7 @@
 // Canonical definition: 00-overview.md §16.3 (Interface Contract)
 
 import Foundation
+import ArchiveCore
 
 /// How multiple tag filters combine.
 enum TagCombine: String, Codable, Sendable {
@@ -36,6 +37,15 @@ struct NotesFilter: Codable, Equatable, Sendable {
     var roundup: Bool? = nil
     /// Persist an empty intersection when a smart scope and live round-up facet conflict.
     var matchesNothing: Bool = false
+
+    /// The bounds as Core's either-role range predicate (`DateRangeFilter`).
+    var dateRange: DateRangeFilter { DateRangeFilter(lower: dateFrom, upper: dateTo) }
+
+    /// Which date roles of `item` lie inside the date bounds — empty when unbounded or none does.
+    /// Lets a caller say which date matched (the item is still listed once).
+    func matchingDateRoles(_ item: ItemSummary) -> [DateRole] {
+        dateRange.isUnbounded ? [] : dateRange.matchingRoles(item.dateKeysByRole)
+    }
 
     /// Whether this filter is effectively empty (matches everything).
     var isEmpty: Bool {
@@ -78,13 +88,11 @@ struct NotesFilter: Codable, Equatable, Sendable {
         if !qualities.isEmpty {
             guard let q = item.quality, qualities.contains(q) else { return false }
         }
-        // Date range over the SPEC sortDate int (year*10000 + month*100 + day). Undated items are
-        // excluded whenever any bound is set (they can't be placed in a chronological window).
-        if dateFrom != nil || dateTo != nil {
-            guard let sd = item.sortDate else { return false }
-            if let lo = dateFrom, sd < lo { return false }
-            if let hi = dateTo,   sd > hi { return false }
-        }
+        // Date range over the SPEC sort key (year*10000 + month*100 + day), matching EITHER the item's
+        // own date or its sent-with date (W37.dual-date, owner 2026-10-05). Each value is tested on its
+        // own — both bounds must hold for the SAME value, so own 1950 + sent 1970 never matches
+        // 1960–1965. Undated items are excluded whenever any bound is set.
+        if !dateRange.isUnbounded, dateRange.matchingRoles(item.dateKeysByRole).isEmpty { return false }
         // Tags (managed tokens) — ALL (subset) or ANY (intersection). Exact-token match, mirroring
         // Reader's subject set logic; the filter bar supplies canonical tokens.
         if !tags.isEmpty {

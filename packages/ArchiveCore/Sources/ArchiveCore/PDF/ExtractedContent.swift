@@ -82,6 +82,20 @@ public enum PDFHeaderParser {
         return nil
     }
 
+    /// W37.dual-date: exact prefix of the optional source-document date line in the OCR-text header
+    /// (the item's OWN date, e.g. `Document date: Nov 3, 1957`). Distinct from the provider line's OCR
+    /// processing date. Written by Processor `PDFGenerator.makeTextPage`.
+    public static let documentDatePrefix = "Document date: "
+    /// W37.dual-date: exact prefix of the optional covering-letter date line (`Sent with: Mar 12, 1958`).
+    public static let sentWithPrefix = "Sent with: "
+
+    /// True when a trimmed header line is one of the two W37 source-date lines. Exact, case-sensitive
+    /// prefixes; only consulted INSIDE the header block (after the provider/model line, before the first
+    /// blank line), so body text that happens to start with these words is never consumed.
+    static func isSourceDateLine(_ trimmed: String) -> Bool {
+        trimmed.hasPrefix(documentDatePrefix) || trimmed.hasPrefix(sentWithPrefix)
+    }
+
     /// Strip the Processor's app-format header from page-2 text, returning only the body below it.
     ///
     /// Header format (from PDFGenerator.makeTextPage):
@@ -89,6 +103,8 @@ public enum PDFHeaderParser {
     ///   {original filename}
     ///   {Provider} · {Model} · {Date}
     ///   Classification: {value}   (optional)
+    ///   Document date: {display}  (optional, W37.dual-date)
+    ///   Sent with: {display}      (optional, W37.dual-date)
     ///
     ///   {body text}
     public static func stripHeader(from pageText: String) -> String {
@@ -100,6 +116,14 @@ public enum PDFHeaderParser {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
             if trimmed.hasPrefix("Classification:") {
+                bodyStartIndex = i + 1
+                continue
+            }
+
+            // W37 source-date lines sit after the provider/model line and before the blank separator.
+            // Gated on `seenMetaLine` so they are only recognised inside the header block; the loop has
+            // already broken out at the first blank line, so body text never reaches this test.
+            if seenMetaLine && isSourceDateLine(trimmed) {
                 bodyStartIndex = i + 1
                 continue
             }

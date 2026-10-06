@@ -406,13 +406,36 @@ struct OCRResult: Codable {
     let rotationDegrees: Int
     let errorMessage: String?
     let errorCode: String?
+    /// W37.dual-date — the OCR model's optional `[enclosure]` marker on a `[document_start]` page: "this
+    /// page begins a separate, independently dated/headed document that was sent WITH the covering
+    /// letter on the preceding pages". A PROPOSAL only; `DocumentSegmenter` turns it into a segment
+    /// relation, and the owner can clear it in review. `nil`/`false` = no relation proposed. Optional so
+    /// the synthesized Codable decodes a persisted result written before this field existed.
+    let enclosure: Bool?
+    /// W37.dual-date — the classification the OCR model itself returned, kept through every review
+    /// reclassification (`with`). It is the frame the model's `[enclosure]` judgement was made in:
+    /// `DocumentSegmenter.coverPageSequences` over these is the proposal BASELINE, and a rebuilt
+    /// segmentation keeps a relation only while its cover pages are still exactly that baseline's.
+    /// `nil` on a legacy persisted result (which carries no proposal either).
+    let ocrClassification: DocumentClassification?
+    /// W37.dual-date — the model's ORIGINAL `[enclosure]` marker, kept through reclassification like
+    /// `ocrClassification` (which clears `enclosure`). The baseline must be built from the model's frame
+    /// whole: with a reclassified enclosure's flag missing, its page would read as a new letter and move
+    /// the recorded cover of every later enclosure that shares the same letter.
+    let ocrEnclosure: Bool?
 
-    init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?) {
+    init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
+         enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil) {
         self.text = text
         self.classification = classification
         self.rotationDegrees = rotationDegrees
         self.errorMessage = errorMessage
         self.errorCode = errorCode
+        // Only a document START can begin an enclosure; anything else carries no proposal.
+        self.enclosure = (classification == .documentStart && enclosure == true) ? true : nil
+        // A fresh result's model classification IS its classification; a rebuild passes the original.
+        self.ocrClassification = ocrClassification ?? classification
+        self.ocrEnclosure = ocrEnclosure ?? self.enclosure
     }
 
     /// A copy of this result with a new classification and/or rotation, **preserving** `text`,
@@ -421,9 +444,14 @@ struct OCRResult: Codable {
     /// all five fields — which is how `errorCode` got silently dropped before (W9.1). (Sites that
     /// intentionally *reset* `errorCode` to nil on a fresh success rebuild keep their explicit init and
     /// deliberately don't use this.)
+    ///
+    /// W37: the enclosure proposal survives ONLY an unchanged classification (a rotation-only fix). A
+    /// reclassified page is a changed boundary, and a relation is never carried across one.
     func with(classification: DocumentClassification?, rotationDegrees: Int) -> OCRResult {
         OCRResult(text: text, classification: classification, rotationDegrees: rotationDegrees,
-                  errorMessage: errorMessage, errorCode: errorCode)
+                  errorMessage: errorMessage, errorCode: errorCode,
+                  enclosure: classification == self.classification ? enclosure : nil,
+                  ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure))
     }
 }
 

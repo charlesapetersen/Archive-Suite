@@ -90,7 +90,7 @@ struct GeminiClient {
             return OCRResult(text: nil, classification: nil, errorMessage: "Gemini returned no text (\(fr)).", errorCode: fr)
         }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
-        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
+        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(rawText))
     }
 
     static func parseErrorResponse(data: Data, statusCode: Int) -> String {

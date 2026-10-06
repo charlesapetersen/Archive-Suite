@@ -23,9 +23,17 @@ enum SegmentJSONBuilder {
     ///     in the emitted `format` field. The Live path always passes `nil` (it writes JSON for
     ///     documents only); the Process-Files path passes the box/folder override for label segments.
     ///
+    ///   - enclosureOf: W37.dual-date — when this document is an enclosure, the first page file name of
+    ///     its covering-letter segment (same naming as `files`), emitted as `enclosure_of`. `nil` → no key.
+    ///
+    /// W37 also emits `sent_with` (the `ArchiveDate.wireValue`, e.g. "1958-03-12" / "1950s") and
+    /// `sent_with_uncertain` — only when `tags.sentWith` is set, so a sidecar without a sent-with date is
+    /// byte-identical to the pre-W37 output.
+    ///
     /// The output is `[.prettyPrinted, .sortedKeys]` JSON, so it is byte-for-byte deterministic.
     static func buildData(fileURLs: [URL], texts: [String],
-                          tags: GeneratedTags, formatOverride: String? = nil) -> Data? {
+                          tags: GeneratedTags, formatOverride: String? = nil,
+                          enclosureOf: String? = nil) -> Data? {
         // Body text with per-image markers (image marker always; text line only when non-empty).
         var bodyParts: [String] = []
         for (i, url) in fileURLs.enumerated() {
@@ -37,6 +45,11 @@ enum SegmentJSONBuilder {
         var dict: [String: Any] = [:]
         if let date = tags.machineDate { dict["date"] = date }
         dict["date_uncertain"] = tags.dateUncertain
+        if let sentWith = tags.sentWith {
+            dict["sent_with"] = sentWith.wireValue
+            dict["sent_with_uncertain"] = tags.sentWithUncertain
+        }
+        if let enclosureOf { dict["enclosure_of"] = enclosureOf }
         dict["subjects"] = tags.subjectTags.map { GeneratedTags.capitalizeFirstLetters($0) }
         if let v = tags.format { dict["format"] = v }
         if let v = tags.authorName { dict["author_name"] = v }

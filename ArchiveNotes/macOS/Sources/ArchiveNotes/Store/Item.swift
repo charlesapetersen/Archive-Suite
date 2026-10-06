@@ -35,12 +35,45 @@ struct Item: Sendable, Equatable, Identifiable {
     /// nil when the body starts directly with a `<!-- block:` header (or is empty).
     var trailingBodyRaw: String?
 
-    /// Chronological sort key. Parses the `date` string to the precision `datePrecision` claims, then
-    /// defers the SPEC arithmetic to the shared `ArchiveCore.DocumentTags.sortDateKey` so Notes' key can
-    /// never drift from the Reader's (`year * 10_000 + month * 100 + day`; decade → `decade * 10_000`;
-    /// nil if no usable date). The string-parsing/guards below are Notes-specific input handling — a
-    /// component too coarse for its precision yields nil, matching the prior behavior exactly.
-    var sortDate: Int? {
+    /// W37.dual-date: the covering letter's date (front-matter `additional_dates`, role `sent_with`).
+    /// `date`/`datePrecision`/`dateUncertain` stay the item's OWN date; this is a second, separately
+    /// labelled whole value, so its precision can never cross-pair with the own date's components.
+    var sentWith: ArchiveDate? = nil
+    /// Speculative sent-with date — independent of `dateUncertain`. Meaningless without `sentWith`.
+    var sentWithUncertain: Bool = false
+    /// `additional_dates` entries this build does not understand (another role, a second `sent_with`,
+    /// an invalid value), kept verbatim so a save never silently drops owner-written YAML.
+    var unparsedAdditionalDates: [UnknownKey] = []
+
+    /// Chronological sort key: the item's OWN date, falling back to the sent-with date when it has none
+    /// (owner, 2026-10-05; `sortsBySentWith` labels the fallback). nil when neither exists.
+    var sortDate: Int? { ownSortDate ?? sentWith?.sortKey }
+
+    /// The own date's sort key alone (no sent-with fallback).
+    var ownSortDate: Int? { Self.sortKey(date: date, precision: datePrecision) }
+
+    /// True when `sortDate` comes from the sent-with fallback.
+    var sortsBySentWith: Bool { ownSortDate == nil && sentWith != nil }
+
+    /// Each role's sort key, for a date filter that matches either date (`DateRangeFilter`).
+    var dateKeysByRole: [DateRole: Int] {
+        Self.dateKeysByRole(own: ownSortDate, sentWith: sentWith)
+    }
+
+    static func dateKeysByRole(own: Int?, sentWith: ArchiveDate?) -> [DateRole: Int] {
+        var keys: [DateRole: Int] = [:]
+        if let own { keys[.own] = own }
+        if let sentWith { keys[.sentWith] = sentWith.sortKey }
+        return keys
+    }
+
+    /// Chronological sort key of a front-matter `(date, precision)` pair. Parses the string to the
+    /// precision it claims, then defers the SPEC arithmetic to the shared
+    /// `ArchiveCore.DocumentTags.sortDateKey` so Notes' key can never drift from the Reader's
+    /// (`year * 10_000 + month * 100 + day`; decade → `decade * 10_000`; nil if no usable date). The
+    /// string-parsing/guards below are Notes-specific input handling — a component too coarse for its
+    /// precision yields nil, matching the prior behavior exactly.
+    static func sortKey(date: String?, precision datePrecision: DatePrecision?) -> Int? {
         guard let date else { return nil }
         switch datePrecision {
         case .decade:
@@ -62,6 +95,32 @@ struct Item: Sendable, Equatable, Identifiable {
 }
 
 extension Item {
+    /// The Core whole-value date a normalized front-matter `(date, precision)` pair names, or nil when
+    /// the pair is not self-consistent or outside `ArchiveDate`'s supported 3–4 digit year range.
+    /// Notes stores a decade as its start year ("1950", precision `decade`), as for the own date.
+    static func archiveDate(_ date: String?, precision: DatePrecision?) -> ArchiveDate? {
+        guard let date, let precision,
+              normalizedDate(date, precision: precision) == (date, precision) else { return nil }
+        let parts = date.split(separator: "-").compactMap { Int($0) }
+        guard let year = parts.first else { return nil }
+        switch precision {
+        case .decade: return ArchiveDate(decade: year)
+        case .year:   return parts.count == 1 ? ArchiveDate(year: year) : nil
+        case .month:  return parts.count == 2 ? ArchiveDate(year: year, month: parts[1]) : nil
+        case .day:    return parts.count == 3 ? ArchiveDate(year: year, month: parts[1], day: parts[2]) : nil
+        }
+    }
+
+    /// The front-matter `(date, precision)` spelling of a Core date — the inverse of `archiveDate`.
+    static func frontMatterDate(_ value: ArchiveDate) -> (date: String, precision: DatePrecision) {
+        switch value.precision {
+        case .decade: return (String(value.year), .decade)
+        case .year:   return (value.wireValue, .year)
+        case .month:  return (value.wireValue, .month)
+        case .day:    return (value.wireValue, .day)
+        }
+    }
+
     /// Normalize a `(date, precision)` pair into a *self-consistent* one before it is written to
     /// front-matter (W6-S7 date UI). The invariant this enforces: the `date` string always carries
     /// exactly the components its `datePrecision` claims, so `sortDate`/`displayDate` never see a

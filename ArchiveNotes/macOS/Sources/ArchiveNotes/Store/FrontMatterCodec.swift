@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// Hand-rolled strict YAML front-matter (de)serializer for the locked
 /// Archive Notes schema (00-overview §5). Round-trip preserves unknown keys
@@ -40,7 +41,10 @@ enum FrontMatterCodec {
             schema: fields.schema,
             blocks: blocks,
             unknownFrontMatter: fields.unknownKeys,
-            trailingBodyRaw: leadingText
+            trailingBodyRaw: leadingText,
+            sentWith: fields.sentWith,
+            sentWithUncertain: fields.sentWith != nil && fields.sentWithUncertain,
+            unparsedAdditionalDates: fields.unparsedAdditionalDates
         )
     }
 
@@ -66,6 +70,28 @@ enum FrontMatterCodec {
         }
         if item.date != nil {
             lines.append("date_uncertain: \(item.dateUncertain)")
+        }
+
+        // W37.dual-date: role-labelled dates beyond the own date. The key is omitted entirely when
+        // there is nothing to say; entries this build could not interpret follow verbatim.
+        let inline = item.unparsedAdditionalDates.filter { $0.key == Self.inlineAdditionalDatesKey }
+        let entries = item.unparsedAdditionalDates.filter { $0.key != Self.inlineAdditionalDatesKey }
+        if item.sentWith == nil, entries.isEmpty, !inline.isEmpty {
+            // A non-block value kept whole: its raw lines already carry the `additional_dates:` key, so
+            // they replace the generated header rather than following it (never a duplicate key).
+            for u in inline { lines.append(contentsOf: u.rawLines) }
+        } else if item.sentWith != nil || !entries.isEmpty {
+            lines.append("additional_dates:")
+            if let sent = item.sentWith {
+                let fm = Item.frontMatterDate(sent)
+                lines.append("  - role: \(DateRole.sentWith.rawValue)")
+                lines.append("    date: \(quoteScalar(fm.date))")
+                lines.append("    precision: \(fm.precision.rawValue)")
+                lines.append("    uncertain: \(item.sentWithUncertain)")
+            }
+            for u in entries {
+                for raw in u.rawLines { lines.append(raw) }
+            }
         }
 
         if let q = item.quality {
@@ -179,6 +205,9 @@ enum FrontMatterCodec {
         var date: String?
         var datePrecision: String?
         var dateUncertain: Bool = false
+        var sentWith: ArchiveDate?
+        var sentWithUncertain: Bool = false
+        var unparsedAdditionalDates: [UnknownKey] = []
         var quality: Int?
         var tags: [String] = []
         var roundup: Bool = false
@@ -190,7 +219,7 @@ enum FrontMatterCodec {
 
     private static let knownKeys: Set<String> = [
         "schema", "id", "kind", "title", "authors", "date",
-        "date_precision", "date_uncertain", "quality", "tags",
+        "date_precision", "date_uncertain", "additional_dates", "quality", "tags",
         "roundup", "zotero", "created", "modified"
     ]
 
@@ -262,6 +291,9 @@ enum FrontMatterCodec {
             case "date_uncertain":
                 fields.dateUncertain = parseBool(valuePart)
                 i += 1
+
+            case "additional_dates":
+                i += parseAdditionalDates(valuePart, lines: lines, from: i, into: &fields)
 
             case "quality":
                 fields.quality = Int(valuePart)
@@ -349,6 +381,79 @@ enum FrontMatterCodec {
         if !last.isEmpty || !elements.isEmpty { elements.append(last) }
 
         return elements.filter { !$0.isEmpty }
+    }
+
+    // MARK: - additional_dates (W37.dual-date)
+
+    private static let knownAdditionalDateKeys: Set<String> = ["role", "date", "precision", "uncertain"]
+    /// `UnknownKey.key` of a kept entry whose role is `sent_with`, so a user edit of that role can retire
+    /// it (otherwise clearing the date would let a second hand-written entry take its place on reload).
+    static let sentWithAdditionalDateKey = "additional_dates.sent_with"
+    /// `UnknownKey.key` of a whole non-block `additional_dates:` value kept verbatim (header line included).
+    static let inlineAdditionalDatesKey = "additional_dates.inline"
+    private static let strictBools: Set<String> = ["true", "false", "yes", "no", "on", "off"]
+
+    /// Parse the `additional_dates:` block list starting at line `idx`; returns the lines consumed.
+    /// Each `- role: …` entry is interpreted only when it is a complete, valid `sent_with` value with no
+    /// unrecognised keys and no earlier `sent_with` has been taken (at most one). Anything else —
+    /// another role, a second `sent_with`, an impossible or out-of-range date, a precision the string
+    /// does not carry — is kept verbatim in `unparsedAdditionalDates`: never coerced into a date,
+    /// never dropped on save. A non-block value (other than an empty `[]`) is kept verbatim whole.
+    private static func parseAdditionalDates(_ value: String, lines: [String], from idx: Int,
+                                             into fields: inout ParsedFields) -> Int {
+        var j = idx + 1
+        if !value.isEmpty, !value.hasPrefix("#") {
+            var raw = [lines[idx]]
+            while j < lines.count && isIndented(lines[j]) { raw.append(lines[j]); j += 1 }
+            if value != "[]" {
+                fields.unparsedAdditionalDates.append(UnknownKey(key: inlineAdditionalDatesKey, rawLines: raw))
+            }
+            return j - idx
+        }
+
+        var entryLines: [String] = []
+        var entry: [String: String] = [:]
+        var entryHasUnknownKey = false
+
+        func flushEntry() {
+            defer { entryLines = []; entry = [:]; entryHasUnknownKey = false }
+            guard !entryLines.isEmpty else { return }
+            if fields.sentWith == nil, !entryHasUnknownKey,
+               entry["role"] == DateRole.sentWith.rawValue,
+               let precision = entry["precision"].flatMap(Item.DatePrecision.init(rawValue:)),
+               let value = Item.archiveDate(entry["date"], precision: precision),
+               entry["uncertain"].map({ strictBools.contains($0.lowercased()) }) ?? true {
+                let uncertain = entry["uncertain"].map(parseBool) ?? false
+                fields.sentWith = value
+                fields.sentWithUncertain = uncertain
+                return
+            }
+            let key = entry["role"] == DateRole.sentWith.rawValue ? sentWithAdditionalDateKey : "additional_dates"
+            fields.unparsedAdditionalDates.append(UnknownKey(key: key, rawLines: entryLines))
+        }
+
+        func take(_ pair: String) {
+            guard let (k, v) = parseKV(pair) else { entryHasUnknownKey = true; return }
+            if knownAdditionalDateKeys.contains(k), entry[k] == nil { entry[k] = v }
+            else { entryHasUnknownKey = true }
+        }
+
+        while j < lines.count && isIndented(lines[j]) {
+            let trimmed = lines[j].trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("- ") || trimmed == "-" {
+                flushEntry()
+                entryLines = [lines[j]]
+                if trimmed.count > 2 { take(String(trimmed.dropFirst(2))) }
+            } else if !trimmed.isEmpty {
+                // A continuation line before any `- ` opener still belongs to the key: keep it.
+                if entryLines.isEmpty { entryHasUnknownKey = true }
+                entryLines.append(lines[j])
+                take(trimmed)
+            }
+            j += 1
+        }
+        flushEntry()
+        return j - idx
     }
 
     // MARK: - Zotero nested map parsing

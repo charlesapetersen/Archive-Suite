@@ -535,6 +535,8 @@ extension OCRProcessor {
             let phoneYear = phoneFileIdx.flatMap { phoneYearTag(at: $0) }
             let phoneMonth = phoneFileIdx.flatMap { phoneMonthTag(at: $0) }
             let prefilledQuality = phoneFileIdx.map { phoneQuality(at: $0) } ?? 0
+            // W37: seed the segmenter's PROPOSED enclosure relation for the owner to confirm or clear.
+            let coverIndex = Self.validCoverIndex(of: i, in: segments)
             manual.append(ManualTagSegment(
                 segmentIndex: i,
                 images: images,
@@ -542,7 +544,9 @@ extension OCRProcessor {
                 month: phoneMonth ?? "",
                 subjectTags: ["Unread"],
                 quality: prefilledQuality,
-                dateLoading: mode == .autoDate && phoneYear == nil && phoneMonth == nil
+                dateLoading: mode == .autoDate && phoneYear == nil && phoneMonth == nil,
+                enclosureOfSegmentIndex: coverIndex,
+                enclosureCoverName: coverIndex.flatMap { segments[$0].pdfURLs.first?.lastPathComponent }
             ))
         }
         guard !manual.isEmpty else { return }
@@ -573,6 +577,18 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
         isProcessing = true
 
+        // W37: every card's OWN tags first, so an enclosure can read its (owner-reviewed) cover's final
+        // date regardless of card order. The cover never receives the enclosure's date.
+        var ownTagsBySeg: [Int: GeneratedTags] = [:]
+        for m in manualTagSegments where m.segmentIndex < segments.count {
+            var own = GeneratedTags()
+            own.year = m.year.isEmpty ? nil : m.year
+            own.month = Self.normalizeMonth(m.month)
+            own.day = Self.normalizeDay(m.day)
+            own.dateUncertain = m.dateUncertain
+            ownTagsBySeg[m.segmentIndex] = own
+        }
+
         // Apply the user's tags to each segment's output PDF(s) and write JSON.
         for m in manualTagSegments where m.segmentIndex < segments.count {
             let seg = segments[m.segmentIndex]
@@ -583,11 +599,19 @@ extension OCRProcessor {
             tags.dateUncertain = m.dateUncertain
             tags.subjectTags = m.subjectTags
             tags.quality = m.quality
+            // W37: only a relation the owner left in place, and only to a valid preceding document cover.
+            let coverIndex = m.enclosureOfSegmentIndex.flatMap { c in
+                Self.validCoverIndex(of: m.segmentIndex, in: segments) == c ? c : nil
+            }
+            EnclosureDates.resolveManual(entry: m.sentWith, uncertain: m.sentWithUncertain,
+                                         cover: coverIndex.flatMap { ownTagsBySeg[$0] }, into: &tags)
+            let enclosureOfName = coverIndex.flatMap { segments[$0].pdfURLs.first?.lastPathComponent }
             // The late Live-Capture boundary runs after this phase. Save the manual decision into
             // its aligned handoff array so it cannot re-apply the incoming phone P value afterwards.
             recordManualQualityIntent(m.quality, for: seg.pdfURLs)
 
             for sourceURL in seg.pdfURLs {
+                appliedGeneratedTags[sourceURL] = tags
                 if let outputPDF = outputURLMap[sourceURL] {
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
                     tagOutput(tags, at: outputPDF, source: sourceURL, stampUnread: stampUnread)
@@ -597,7 +621,8 @@ extension OCRProcessor {
                 }
             }
             if enableSegmentJSON {
-                writeSegmentJSON(segment: seg, tags: tags, outputDirectory: outputDirectory)
+                writeSegmentJSON(segment: seg, tags: tags, outputDirectory: outputDirectory,
+                                 enclosureOf: enclosureOfName)
             }
         }
     }
@@ -672,7 +697,11 @@ extension OCRProcessor {
         }
     }
     /// UI: advance to the next manual-tag segment, or finish if on the last one.
+    /// W37: refuses while the current card's Sent-with text is not a valid date (the sheet shows why),
+    /// so an invalid value can never be carried to the write.
     func advanceManualSegment() {
+        if currentManualIndex < manualTagSegments.count,
+           !manualTagSegments[currentManualIndex].sentWithIsValid { return }
         if currentManualIndex < manualTagSegments.count - 1 {
             currentManualIndex += 1
         } else {
@@ -774,7 +803,9 @@ extension OCRProcessor {
                       img.rotationDegrees != existing.rotationDegrees else { continue }
                 let updated = OCRResult(text: existing.text, classification: existing.classification,
                                         rotationDegrees: img.rotationDegrees,
-                                        errorMessage: existing.errorMessage, errorCode: nil)
+                                        errorMessage: existing.errorMessage, errorCode: nil,
+                                        enclosure: existing.enclosure,
+                                        ocrClassification: .some(existing.ocrClassification), ocrEnclosure: .some(existing.ocrEnclosure))
                 jobs[fileIndex].result = updated
                 if let outputURL = outputURLMap[jobs[fileIndex].sourceURL] {
                     let imageURL = pdfToImageMap[img.url] ?? img.url
@@ -843,11 +874,16 @@ extension OCRProcessor {
             gtags.dateUncertain = data.dateUncertain
             gtags.subjectTags = data.subjectTags
             gtags.quality = data.quality
+            // W37: this mode's boundaries are drawn by the owner, so no segmenter relation exists to
+            // propose; only an explicitly typed (valid) Sent-with date is written.
+            EnclosureDates.resolveManual(entry: data.sentWith, uncertain: data.sentWithUncertain,
+                                         cover: nil, into: &gtags)
             // Only an actually completed manual card supersedes the phone input. A defensively
             // defaulted segment has no human quality decision and keeps the imported rating.
             if manualData != nil { recordManualQualityIntent(data.quality, for: seg.pdfURLs) }
 
             for sourceURL in seg.pdfURLs {
+                appliedGeneratedTags[sourceURL] = gtags
                 if let outputPDF = outputURLMap[sourceURL] {
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     tagOutput(gtags, at: outputPDF, source: sourceURL, stampUnread: outputSettings.stampUnread)
@@ -934,6 +970,8 @@ extension OCRProcessor {
     /// Commit the pending segment with the drafted tags — its document pages are consumed (drop out).
     func manualSegCommitPendingSegment() {
         guard let range = manualSegTaggingRange else { return }
+        // W37: never commit an invalid Sent-with value (the card shows the error and disables Save).
+        guard manualSegDraftTags.sentWithIsValid else { return }
         let indices = range.filter { manualSegImages[$0].kind == .document && !manualSegRemoved.contains($0) }
         manualSegTaggingRange = nil
         manualSegDateFetching = false
@@ -1020,6 +1058,12 @@ extension OCRProcessor {
             return preGroupedSubjects[fileIdx]
         }
 
+        // W37.dual-date — an enclosure's `Sent With` date is its covering letter's FINAL own date, which
+        // only exists once that cover's result has been applied. Results arrive out of order, so an
+        // enclosure's write is deferred until the pool drains, then applied from `finalTagsBySeg`.
+        var finalTagsBySeg: [Int: GeneratedTags] = [:]
+        var deferredEnclosures: [(index: Int, raw: GeneratedTags)] = []
+
         // Tag segments concurrently (bounded pool) instead of one-at-a-time. Each call is small,
         // text-only, and independent, so overlapping the network round-trips is a big speedup.
         // Tagging is a simple text→JSON task, so we skip thinking (`thinkingLevel: nil`).
@@ -1043,9 +1087,14 @@ extension OCRProcessor {
             }
             for await (i, rawTags) in group {
                 if Task.isCancelled { break }
-                applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
-                                   enableSegmentJSON: enableSegmentJSON, outputDirectory: outputDirectory,
-                                   runConfig: runConfig)
+                if Self.validCoverIndex(of: i, in: snapshot) != nil {
+                    deferredEnclosures.append((i, rawTags))
+                } else {
+                    finalTagsBySeg[i] = applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
+                                                           enableSegmentJSON: enableSegmentJSON,
+                                                           outputDirectory: outputDirectory,
+                                                           runConfig: runConfig)
+                }
                 completed += 1
                 progress = 0.7 + (Double(completed) / Double(total)) * 0.3
                 statusMessage = "Tagging \(completed)/\(total)…"
@@ -1066,13 +1115,36 @@ extension OCRProcessor {
                 }
             }
         }
+        // Same cancellation contract as the pool: a cancelled run writes nothing further.
+        guard !Task.isCancelled else { return }
+        for (i, raw) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
+            // A cover that was never applied (absent from `finalTagsBySeg`) yields NO sent-with date —
+            // never a neighbour's.
+            let cover = Self.validCoverIndex(of: i, in: snapshot).flatMap { finalTagsBySeg[$0] }
+            finalTagsBySeg[i] = applyGeneratedTags(raw, toSegmentAt: i, in: snapshot,
+                                                   enableSegmentJSON: enableSegmentJSON,
+                                                   outputDirectory: outputDirectory,
+                                                   runConfig: runConfig, coverTags: cover ?? GeneratedTags())
+        }
+    }
+    /// W37 — the covering segment's index when `snapshot[i]` carries a usable enclosure relation: the
+    /// cover precedes it, is in range, and is a document (never a box/folder label). `nil` otherwise.
+    nonisolated static func validCoverIndex(of i: Int, in snapshot: [DocumentSegment]) -> Int? {
+        guard i < snapshot.count, let c = snapshot[i].enclosureOf, c >= 0, c < i,
+              !snapshot[i].isBox, !snapshot[i].isFolder,
+              !snapshot[c].isBox, !snapshot[c].isFolder else { return nil }
+        return c
     }
     /// Apply generated tags to one segment's output PDFs, layering the Live Capture phone date on top
     /// and writing the segment JSON. Runs on the main actor (called from the tagging task group).
+    /// W37: `coverTags` non-nil marks an enclosure — its `Sent With` date is taken from the cover's own
+    /// (final) date; the cover itself is never touched here. Returns the tags actually applied.
+    @discardableResult
     private func applyGeneratedTags(_ rawTags: GeneratedTags, toSegmentAt i: Int, in snapshot: [DocumentSegment],
                                     enableSegmentJSON: Bool, outputDirectory: URL,
-                                    runConfig: SessionProcessingConfig?) {
-        guard i < snapshot.count else { return }
+                                    runConfig: SessionProcessingConfig?,
+                                    coverTags: GeneratedTags? = nil) -> GeneratedTags {
+        guard i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
         var tags = rawTags
         // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
@@ -1081,7 +1153,16 @@ extension OCRProcessor {
             if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false }
             if let mo = phoneMonthTag(at: fileIdx) { tags.month = mo }
         }
+        // W37: the tagger never proposes a sent-with date; only a relation does.
+        tags.sentWith = nil
+        tags.sentWithUncertain = false
+        var enclosureOfName: String? = nil
+        if let coverTags, let c = Self.validCoverIndex(of: i, in: snapshot) {
+            EnclosureDates.applySentWith(fromCover: coverTags, to: &tags)
+            enclosureOfName = snapshot[c].pdfURLs.first?.lastPathComponent
+        }
         for sourceURL in segment.pdfURLs {
+            appliedGeneratedTags[sourceURL] = tags
             if let outputPDF = outputURLMap[sourceURL] {
                 tagOutput(tags, at: outputPDF, source: sourceURL,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
@@ -1091,10 +1172,119 @@ extension OCRProcessor {
             }
         }
         if enableSegmentJSON && !segment.isBox && !segment.isFolder {
-            writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory)
+            writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory,
+                             enclosureOf: enclosureOfName)
+        }
+        return tags
+    }
+    /// W37.dual-date — after a POST-tagging reclassification, bring every written `Sent With` token (and
+    /// each sidecar's `sent_with` / `sent_with_uncertain` / `enclosure_of`) back in line with the
+    /// relation the CURRENT segmentation still supports: a relation that no longer holds (the enclosure
+    /// page became a continuation or a label, a label was inserted, the cover's boundary moved) is
+    /// stripped; one that still holds is refreshed to the cover's current own date. Only tokens that parse
+    /// as a valid sent-with token (or are exactly the uncertain flag) are touched — never a prose subject.
+    /// Only pages that were already tagged this run are rewritten; a pre-tagging review is a no-op.
+    func reconcileSentWithAfterReclassification(runConfig: SessionProcessingConfig?) {
+        // Cheap exit for the common case (no proposal, nothing written) — `updateClassification` runs
+        // this once per edited page.
+        guard jobs.contains(where: { !$0.appliedTags.isEmpty }),
+              jobs.contains(where: { $0.result?.enclosure == true
+                                     || $0.appliedTags.contains(where: Self.isSentWithToken) })
+        else { return }
+        let files = jobs.map { $0.sourceURL }
+        let segs = currentSegments(files: files)
+        let jobIndexBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) },
+                                          uniquingKeysWith: { first, _ in first })
+        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
+
+        for (i, seg) in segs.enumerated() {
+            var desired = GeneratedTags()
+            var coverName: String? = nil
+            if let c = Self.validCoverIndex(of: i, in: segs), let coverFirst = segs[c].pdfURLs.first,
+               let coverJob = jobIndexBySource[coverFirst], !jobs[coverJob].appliedTags.isEmpty {
+                EnclosureDates.applySentWith(fromCover: appliedGeneratedTags[coverFirst], to: &desired)
+                coverName = coverFirst.lastPathComponent
+            }
+            let desiredTokens = Self.sentWithTokens(for: desired)
+            for source in seg.pdfURLs {
+                guard let j = jobIndexBySource[source], !jobs[j].appliedTags.isEmpty else { continue }
+                if var applied = appliedGeneratedTags[source] {
+                    applied.sentWith = desired.sentWith
+                    applied.sentWithUncertain = desired.sentWithUncertain
+                    appliedGeneratedTags[source] = applied
+                }
+                guard let outputURL = outputURLMap[source] else { continue }
+                let current = jobs[j].appliedTags
+                let updated = Self.replacingSentWithTokens(in: current, with: desiredTokens)
+                if updated != current {
+                    tagOutput(updated, at: outputURL, source: source,
+                              appColor: Self.authoritativeColor(forJob: jobs[j]),
+                              colorIsAuthoritative: true, stampUnread: stampUnread)
+                    jobs[j].appliedTags = updated
+                }
+                let sidecar = outputURL.deletingPathExtension().appendingPathExtension("json")
+                Self.patchSidecarSentWith(at: sidecar, tags: desired,
+                                          enclosureOf: seg.isBox || seg.isFolder ? nil : coverName)
+            }
         }
     }
-    private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL) {
+    /// A trimmed tag that is a VALID `Sent With …` date token or exactly the uncertain flag.
+    nonisolated static func isSentWithToken(_ tag: String) -> Bool {
+        let t = tag.trimmingCharacters(in: .whitespaces)
+        return SentWithTag.parse(t) != nil || t == SentWithTag.uncertainToken
+    }
+    /// The sent-with tokens `GeneratedTags.allTags` would emit for these tags (empty when no date).
+    nonisolated static func sentWithTokens(for tags: GeneratedTags) -> [String] {
+        guard let d = tags.sentWith else { return [] }
+        return [SentWithTag.token(for: d)] + (tags.sentWithUncertain ? [SentWithTag.uncertainToken] : [])
+    }
+    /// Replace every sent-with token in `tags` with `replacement`, at the first removed token's position
+    /// (else after the leading own-date run, matching `allTags`' order). Everything else is untouched.
+    nonisolated static func replacingSentWithTokens(in tags: [String], with replacement: [String]) -> [String] {
+        let firstRemoved = tags.firstIndex(where: isSentWithToken)
+        var kept = tags.filter { !isSentWithToken($0) }
+        guard !replacement.isEmpty else { return kept }
+        let insertAt: Int
+        if let firstRemoved {
+            insertAt = tags[..<firstRemoved].filter { !isSentWithToken($0) }.count
+        } else {
+            insertAt = kept.prefix(while: isLeadingOwnDateToken).count
+        }
+        kept.insert(contentsOf: replacement, at: insertAt)
+        return kept
+    }
+    /// The own-date tokens `allTags` emits first: Year (or decade), "MM Month", "Day N", "Date Uncertain".
+    private nonisolated static func isLeadingOwnDateToken(_ t: String) -> Bool {
+        if t == "Date Uncertain" { return true }
+        if DocumentTags.parseDay(t) != nil { return true }
+        let digits = t.hasSuffix("s") ? String(t.dropLast()) : t
+        if (3...4).contains(digits.count), digits.allSatisfy({ ("0"..."9").contains($0) }) { return true }
+        let parts = t.split(separator: " ")
+        return parts.count == 2 && parts[0].count == 2 && Int(parts[0]) != nil
+            && GeneratedTags.englishMonthNames.contains(String(parts[1]))
+    }
+    /// Rewrite ONLY the W37 keys of an existing sidecar (absent file → nothing). Same serialization
+    /// options as `SegmentJSONBuilder`, atomic write; an unreadable sidecar is left alone.
+    nonisolated static func patchSidecarSentWith(at url: URL, tags: GeneratedTags, enclosureOf: String?) {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              var dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        let before = dict
+        dict["sent_with"] = nil
+        dict["sent_with_uncertain"] = nil
+        dict["enclosure_of"] = nil
+        if let d = tags.sentWith {
+            dict["sent_with"] = d.wireValue
+            dict["sent_with_uncertain"] = tags.sentWithUncertain
+        }
+        if let enclosureOf { dict["enclosure_of"] = enclosureOf }
+        guard !NSDictionary(dictionary: before).isEqual(to: dict),
+              let out = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
+        else { return }
+        try? out.write(to: url, options: .atomic)
+    }
+    private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL,
+                                  enclosureOf: String? = nil) {
         guard let firstFile = segment.pdfURLs.first else { return }
         // Write JSON next to the output PDF, using its base name so they match
         let jsonURL: URL
@@ -1109,7 +1299,8 @@ extension OCRProcessor {
         // format override. The sidecar-URL computation above and the atomic write below are unchanged.
         let formatOverride = SegmentJSONBuilder.labelFormatOverride(isBox: segment.isBox, isFolder: segment.isFolder)
         guard let data = SegmentJSONBuilder.buildData(fileURLs: segment.pdfURLs, texts: segment.texts,
-                                                      tags: tags, formatOverride: formatOverride) else { return }
+                                                      tags: tags, formatOverride: formatOverride,
+                                                      enclosureOf: enclosureOf) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
     /// Merge multi-page document segments into single PDFs.
@@ -1129,7 +1320,9 @@ extension OCRProcessor {
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
             let texts = jobs.map { $0.result?.text ?? "" }
-            segs = segmenter.segment(files: files, classifications: classifications, texts: texts)
+            segs = segmenter.segment(files: files, classifications: classifications, texts: texts,
+                                     enclosureFlags: jobs.map { $0.result?.enclosure == true },
+                                     expectedCoverPages: enclosureBaseline(files: files))
         } else {
             segs = segments
         }

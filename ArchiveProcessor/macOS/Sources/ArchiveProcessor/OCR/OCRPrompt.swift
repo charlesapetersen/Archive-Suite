@@ -22,6 +22,7 @@ struct OCRPrompt {
           • A printed form, table, or list that is clearly a new item
           • The previous page ended mid-page with blank space below (its document ended)
           Even if the topic is the same as the previous page, a new letter or memo is a NEW DOCUMENT.
+          ENCLOSURE (optional): if this [document_start] page begins a separate document with its OWN date or heading (a report, memo, list or clipping) that was clearly sent WITH the covering letter on the previous pages (e.g. that letter says "I enclose…" / "attached is…"), write [enclosure] after the tag on the same first line: [document_start] [enclosure]. Omit it when unsure, and never use it with any other tag.
 
         [document_continuation] — A later page of the SAME document as the previous page. Signals:
           • Text continues mid-sentence from where the previous page ended
@@ -71,32 +72,10 @@ struct OCRPrompt {
         guard !trimmed.isEmpty else { return (nil, 0, nil) }
 
         let lines = trimmed.components(separatedBy: .newlines)
-
-        // Search first 5 lines for classification and rotation tags
-        let searchLimit = min(5, lines.count)
-        var classification: DocumentClassification?
-        var rotationDegrees = 0
-        var contentStartLine = 0
-
-        for i in 0..<searchLimit {
-            if classification == nil, let cls = parseClassificationTag(lines[i]) {
-                classification = cls
-                contentStartLine = i + 1
-                continue
-            }
-            if let rot = parseRotationTag(lines[i]) {
-                rotationDegrees = rot
-                contentStartLine = max(contentStartLine, i + 1)
-                break
-            }
-            // Skip blank lines when searching for rotation tag after classification
-            if classification != nil {
-                let trimmedLine = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmedLine.isEmpty { continue }
-                // Non-blank, non-rotation line after classification — stop searching
-                break
-            }
-        }
+        let header = parseHeader(lines)
+        let classification = header.classification
+        let rotationDegrees = header.rotationDegrees
+        let contentStartLine = header.contentStartLine
 
         if classification == nil {
             // No classification tag — but a rotation tag may still have been parsed. Keep that rotation
@@ -112,6 +91,62 @@ struct OCRPrompt {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return (classification, rotationDegrees, text.isEmpty ? nil : text)
     }
+
+    /// W37.dual-date — whether the response's header proposes this page as an ENCLOSURE: the
+    /// `[enclosure]` marker on the `[document_start]` line, or alone on its own header line after it.
+    /// Header-only: an `[enclosure]` string in the transcribed body is never read as the marker, and a
+    /// marker on any other classification is ignored. Absent/garbled → `false` (no relation proposed).
+    static func parseEnclosureFlag(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let header = parseHeader(trimmed.components(separatedBy: .newlines))
+        return header.classification == .documentStart && header.enclosure
+    }
+
+    /// The tag-header scan shared by `parseResponse` and `parseEnclosureFlag` (one scan, so the two can
+    /// never disagree about where the header ends). Searches the first 5 lines for the classification
+    /// and rotation tags; W37 adds only the optional `[enclosure]` marker, recognised on the
+    /// classification line or as a whole line of its own between classification and rotation (skipped
+    /// so it never leaks into the transcription or hides the rotation tag behind it).
+    private static func parseHeader(_ lines: [String])
+        -> (classification: DocumentClassification?, rotationDegrees: Int, contentStartLine: Int, enclosure: Bool) {
+        let searchLimit = min(5, lines.count)
+        var classification: DocumentClassification?
+        var rotationDegrees = 0
+        var contentStartLine = 0
+        var enclosure = false
+
+        for i in 0..<searchLimit {
+            if classification == nil, let cls = parseClassificationTag(lines[i]) {
+                classification = cls
+                contentStartLine = i + 1
+                if lines[i].lowercased().contains(enclosureTag) { enclosure = true }
+                continue
+            }
+            if let rot = parseRotationTag(lines[i]) {
+                rotationDegrees = rot
+                contentStartLine = max(contentStartLine, i + 1)
+                break
+            }
+            // Skip blank lines when searching for rotation tag after classification
+            if classification != nil {
+                let trimmedLine = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedLine.isEmpty { continue }
+                // W37: a whole-line `[enclosure]` marker is part of the header, not the transcription.
+                if trimmedLine.lowercased() == enclosureTag {
+                    enclosure = true
+                    contentStartLine = max(contentStartLine, i + 1)
+                    continue
+                }
+                // Non-blank, non-rotation line after classification — stop searching
+                break
+            }
+        }
+        return (classification, rotationDegrees, contentStartLine, enclosure)
+    }
+
+    /// The optional W37 enclosure marker (compared lower-cased).
+    static let enclosureTag = "[enclosure]"
 
     /// Build a text-only classification prompt for pre-OCRed text.
     /// Used when PDFs already contain OCR text and only classification is needed.

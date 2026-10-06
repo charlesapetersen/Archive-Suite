@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// A row of extracted content ready for batch insertion into the index. `Sendable` so
 /// task-group children can return it safely from off-actor extraction.
@@ -23,6 +24,11 @@ struct NoteIndexRow: Sendable {
     /// and source-less extracts. Projected into `items.source_count` so the list never reads `.md`.
     let sourceCount: Int
     var roundup: Bool = false
+    /// W37.dual-date: the role-labelled sent-with date, stored in its own columns of the SAME items
+    /// row — either date matches a filter without a second row per UUID. `sortDate` above already
+    /// carries the own-date-else-sent-with fallback.
+    var sentWith: ArchiveDate? = nil
+    var sentWithUncertain: Bool = false
 }
 
 extension NoteIndexRow {
@@ -54,7 +60,9 @@ extension NoteIndexRow {
             modified: item.modified,
             managedTags: tagsJSON,
             sourceCount: item.blocks.distinctSourceNoteCount,
-            roundup: item.roundup
+            roundup: item.roundup,
+            sentWith: item.sentWith,
+            sentWithUncertain: item.sentWith != nil && item.sentWithUncertain
         )
     }
 }
@@ -80,4 +88,22 @@ struct ItemSummary: Sendable, Identifiable {
     /// projection (`NotesIndex.readSummaryRow`) supplies the real value from `items.source_count`.
     var sourceNoteCount: Int = 0
     var roundup: Bool = false
+    /// W37.dual-date: the covering letter's date (nil when none) and its own uncertainty flag.
+    var sentWith: ArchiveDate? = nil
+    var sentWithUncertain: Bool = false
+}
+
+extension ItemSummary {
+    /// The own date's sort key alone, never the fallback. Without a sent-with date the stored
+    /// `sortDate` IS the own key (so a summary built from just a sort key keeps filtering as before);
+    /// with one, re-derive it from `date`/`datePrecision` by the same parse `Item.ownSortDate` uses.
+    var ownSortDate: Int? {
+        sentWith == nil ? sortDate : Item.sortKey(date: date, precision: datePrecision)
+    }
+
+    /// True when the list sorts this row by its sent-with date because it has no own date.
+    var sortsBySentWith: Bool { ownSortDate == nil && sentWith != nil }
+
+    /// Each role's sort key, for a date filter that matches either date (`DateRangeFilter`).
+    var dateKeysByRole: [DateRole: Int] { Item.dateKeysByRole(own: ownSortDate, sentWith: sentWith) }
 }

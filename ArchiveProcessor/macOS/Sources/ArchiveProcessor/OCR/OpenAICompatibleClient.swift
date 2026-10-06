@@ -65,7 +65,7 @@ struct OpenAICompatibleClient {
         }
 
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(content)
-        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
+        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(content))
     }
 
     func textCompletion(prompt: String, maxTokens: Int = 512) async throws -> String {

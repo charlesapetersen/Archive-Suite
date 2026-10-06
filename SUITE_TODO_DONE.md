@@ -9721,6 +9721,23 @@ none of this was fixed by starting it.
 
 ## Two dates on one document — enclosures (owner, 2026-10-05; before the W40 freeze)
 
+- [x] **W37.dual-date — an enclosure with its own date carries two dates: its own and the covering letter's
+  [M-L · Tier-2 · SPEC change, all three apps].**. Owner, 2026-10-05, approving the segmentation document rules:
+  "when enclosures have their own dates, they should be dated twice, both with the letter that sent them and with
+  their own dates", and "Queue before the feature freeze." Today `SPEC/tag-format.md` allows 0–1 Year, Month and
+  Day per file. Reader sorts by one date; its `LibraryFilter` has no date-range predicate yet. Design first (one short session, recorded in the
+  SPEC): a second, labelled date family on the same file (e.g. a "sent with" date carried beside the item's own),
+  which date sorts and which filters match (the recommendation to put to the owner: the item's own date sorts;
+  both dates match a date filter), how a merged PDF's page 2 shows both, and how the Processor knows a document is
+  an enclosure (the segmentation pass, a manual mark, or both). Then build it in ArchiveCore, the Processor's
+  tagger and manual tag sheet, the Reader's display, sort and filters, and Notes (its planned primary-plus-
+  additional dates model from the DEVONthink plan), all three together per the shared-contract rule, Tier-2, with
+  scratch-copy tests. No migration: there is no production material. | SPEC + all apps | M-L | med | none
+  Design checkpoint 2026-10-05 (this commit): concrete proposal in `SPEC/tag-format.md` §W37.dual-date;
+  existing contract remains single-date until implementation. Owner's choices 2026-10-05: own date sorts
+  (covering-letter fallback), either date matches filters, the app proposes relations and the owner corrects
+  them. Build and verify all four surfaces; no runtime implementation or functional tag/PDF proof is claimed yet. SHIPPED 2026-10-06 (this commit). ArchiveCore: `ArchiveDate`/`SentWithTag`/`DateRangeFilter`; one whole-value `Sent With 1958[-03[-12]]`/`Sent With 1950s` token + independent `Sent With Date Uncertain`; own date sorts, sent-with fallback; either-date range with the same value meeting both bounds; role-aware edit ops remove only the consumed token. Reader: year-range filter (popover) on either date, labelled Date column, per-file sent-with edit. Processor: optional OCR `[enclosure]` marker → `DocumentSegment.enclosureOf` (never adjacency, never across box/folder or a changed boundary), cover's own date → `Sent With` (none if undated, stripped when a review reclassification invalidates it), sidecar keys, manual-sheet field/relation clear, Live PDF `Document date:` line + shared header parser. Notes: front-matter `additional_dates` (one `sent_with`), index columns, either-role filter, projection of the tokens with exact ownership. Three adversarial reviews (Core, Notes, Processor) — no HIGH; all MED fixed with tests. Proof: Core 245+, Reader `DualDateLibraryTests` + scratch-file set/replace/clear test, Notes 923 Swift Testing, Processor `scripts/test-dual-date.sh` ALL PASS + related drivers; Reader UITests in the VM 32/32 (after a filter-bar squeeze the VM caught was fixed). Limits in Processor/Reader `KNOWN_ISSUES.md`. No migration: nothing to migrate.
+
 - [x] **W37.dual-date-owner-ok — ANSWERED by the owner 2026-10-05 (walkthrough):** all three recommendations. (1) An enclosure sorts by its own date, falling back to the covering letter's date when it has none. (2) A date filter or search matches either date. (3) The app proposes the enclosure-to-letter relation (from segmentation) and the owner corrects it in review. Proposal: `SPEC/tag-format.md` §W37.dual-date.
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)

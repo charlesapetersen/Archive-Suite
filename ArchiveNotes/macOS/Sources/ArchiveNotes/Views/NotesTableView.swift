@@ -289,9 +289,9 @@ struct NotesTableView: NSViewRepresentable {
                 tf.setAccessibilityIdentifier("an.cell.instances.\(item.id.uuidString)")
 
             case "date":
-                tf.stringValue = item.displayDate ?? "—"
+                tf.stringValue = item.dateColumnText ?? "—"
                 tf.textColor = item.sortDate == nil ? .secondaryLabelColor : .labelColor
-                if item.dateUncertain {
+                if item.sortDateUncertain {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)
                 }
                 tf.setAccessibilityIdentifier("an.cell.date.\(item.id.uuidString)")

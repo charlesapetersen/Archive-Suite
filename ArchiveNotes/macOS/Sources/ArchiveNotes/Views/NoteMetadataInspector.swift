@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCore
 
 /// The detail-pane **metadata strip** for the selected note/extract: edit authors, document DATE
 /// (precision + precision-appropriate fields + a "date uncertain" toggle), and QUALITY. These fields
@@ -26,6 +27,12 @@ struct NoteMetadataInspector: View {
     @State private var yearText = ""
     @State private var month = 0          // 0 = none
     @State private var dayText = ""
+    // W37.dual-date: the covering letter's ("sent with") date — same field idiom, separate state, so
+    // the two dates' components can never cross-pair.
+    @State private var swPrecision: Item.DatePrecision = .year
+    @State private var swYearText = ""
+    @State private var swMonth = 0        // 0 = none
+    @State private var swDayText = ""
     @State private var authorsText = ""
     @State private var extractSources: [ExtractSourceUsage]?
     @State private var extractSourcesFailed = false
@@ -245,6 +252,85 @@ struct NoteMetadataInspector: View {
 
             Toggle("Date uncertain (shown in italics)", isOn: uncertainBinding)
                 .accessibilityIdentifier("an.detail.date.uncertain")
+
+            sentWithSection
+        }
+    }
+
+    /// The covering letter's date (W37.dual-date): an item enclosed with a dated letter keeps its own
+    /// date above and records the letter's here. Sorting uses the own date and falls back to this one
+    /// only when there is no own date — said explicitly below so the fallback is never mistaken for
+    /// the item's own date.
+    @ViewBuilder private var sentWithSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Sent with").font(.subheadline.bold())
+                .accessibilityIdentifier("an.detail.sentWith.heading")
+            Picker("Sent-with precision", selection: swPrecisionBinding) {
+                Text("Decade").tag(Item.DatePrecision.decade)
+                Text("Year").tag(Item.DatePrecision.year)
+                Text("Month").tag(Item.DatePrecision.month)
+                Text("Day").tag(Item.DatePrecision.day)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .accessibilityIdentifier("an.detail.sentWith.precision")
+
+            HStack {
+                Text(swPrecision == .decade ? "Decade" : "Year").frame(width: 54, alignment: .leading)
+                TextField(swPrecision == .decade ? "e.g. 1950" : "e.g. 1958", text: $swYearText)
+                    .textFieldStyle(.roundedBorder).frame(width: 90)
+                    .onSubmit { commitSentWith() }
+                    .accessibilityIdentifier("an.detail.sentWith.year")
+                Button("Set") { commitSentWith() }
+                    .disabled((Int(swYearText.trimmingCharacters(in: .whitespaces)) ?? 0) <= 0)
+                Button("Clear") { swYearText = ""; swMonth = 0; swDayText = ""; commitSentWith() }
+                    .disabled(item.sentWith == nil)
+            }
+
+            if swPrecision == .month || swPrecision == .day {
+                HStack {
+                    Text("Month").frame(width: 54, alignment: .leading)
+                    Picker("", selection: swMonthBinding) {
+                        Text("—").tag(0)
+                        ForEach(1...12, id: \.self) { m in Text(Self.monthNames[m - 1]).tag(m) }
+                    }
+                    .labelsHidden().frame(width: 150)
+                    .accessibilityIdentifier("an.detail.sentWith.month")
+                }
+            }
+
+            if swPrecision == .day {
+                HStack {
+                    Text("Day").frame(width: 54, alignment: .leading)
+                    TextField("1–31", text: $swDayText).textFieldStyle(.roundedBorder).frame(width: 60)
+                        .onSubmit { commitSentWith() }
+                        .accessibilityIdentifier("an.detail.sentWith.day")
+                    Button("Set") { commitSentWith() }
+                        .disabled(!DateFieldEntry.dayCommittable(yearText: swYearText, month: swMonth,
+                                                                 dayText: swDayText))
+                }
+                if let msg = DateFieldEntry.impossibleDayNote(yearText: swYearText, month: swMonth,
+                                                              dayText: swDayText) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text(msg).font(.caption).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("an.detail.sentWith.dayWarning")
+                    }
+                    .padding(.leading, 54)
+                }
+            }
+
+            Toggle("Sent-with date uncertain", isOn: sentWithUncertainBinding)
+                .disabled(item.sentWith == nil)
+                .accessibilityIdentifier("an.detail.sentWith.uncertain")
+
+            if let sent = item.displaySentWith {
+                Text(item.sortsBySentWith
+                     ? "Sent with: \(sent) — sorted by this date (no own date)."
+                     : "Sent with: \(sent)")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("an.detail.sentWith.summary")
+            }
         }
     }
 
@@ -270,6 +356,12 @@ struct NoteMetadataInspector: View {
         yearText = parts.first ?? ""
         month = parts.count >= 2 ? (Int(parts[1]) ?? 0) : 0
         dayText = parts.count >= 3 ? parts[2] : ""
+        let sent = item.sentWith.map(Item.frontMatterDate)
+        swPrecision = sent?.precision ?? .year
+        let swParts = (sent?.date ?? "").split(separator: "-").map(String.init)
+        swYearText = swParts.first ?? ""
+        swMonth = swParts.count >= 2 ? (Int(swParts[1]) ?? 0) : 0
+        swDayText = swParts.count >= 3 ? swParts[2] : ""
     }
 
     /// Why a typed day is being dropped (nil when there is nothing to report) — see `DateFieldEntry`.
@@ -294,6 +386,16 @@ struct NoteMetadataInspector: View {
         Task { await nav.setDate(date, precision: p, for: id) }
     }
 
+    private func commitSentWith() {
+        let date = DateFieldEntry.composed(yearText: swYearText, month: swMonth, dayText: swDayText,
+                                           precision: swPrecision)
+        // A precision/month change with no year typed and nothing stored is not an edit.
+        if date == nil && item.sentWith == nil { return }
+        let p = swPrecision
+        let id = item.id
+        Task { await nav.setSentWith(date, precision: p, for: id) }
+    }
+
     private var composedAuthors: [String] {
         authorsText.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -313,6 +415,16 @@ struct NoteMetadataInspector: View {
     }
     private var monthBinding: Binding<Int> {
         Binding(get: { month }, set: { month = $0; commit() })
+    }
+    private var swPrecisionBinding: Binding<Item.DatePrecision> {
+        Binding(get: { swPrecision }, set: { swPrecision = $0; commitSentWith() })
+    }
+    private var swMonthBinding: Binding<Int> {
+        Binding(get: { swMonth }, set: { swMonth = $0; commitSentWith() })
+    }
+    private var sentWithUncertainBinding: Binding<Bool> {
+        Binding(get: { item.sentWithUncertain },
+                set: { v in let id = item.id; Task { await nav.setSentWithUncertain(v, for: id) } })
     }
     private var uncertainBinding: Binding<Bool> {
         Binding(get: { item.dateUncertain },

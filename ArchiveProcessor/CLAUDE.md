@@ -463,7 +463,8 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   MacOSTagger.swift            Fresh-write ADAPTER over `ArchiveCore.CoordinatedTagWriter`; writes Finder tags
                                (subjects/date/Quality/color + trailing Unread) — no direct `setResourceValue` here.
   TagGenerator.swift           LLM tag generation (subjects + date) from OCR text.
-  DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification.
+  DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification;
+                               `enclosureOf` (W37) from the OCR `[enclosure]` marker, never adjacency.
   CollectionSegmenter.swift    Group files into box/folder collections.
   SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
@@ -485,6 +486,9 @@ Capture/                       Live Capture core (Tier-2):
   ProcessFilesTagWarningTestDriver.swift   $0/no-OCR headless self-test (`PROCESSFILES_TAGWARN_TEST=1`) of
                                the W23.m5/h5-fu output-warning contract: a refused Finder-tag write and a
                                placeholder image page are REPORTED, not swallowed by `try?`.
+  DualDateTestDriver.swift     $0/no-OCR headless self-test (`DUAL_DATE_TEST=1`, `scripts/test-dual-date.sh`)
+                               of W37.dual-date: enclosure marker/relation, cover date → `Sent With`, JSON/
+                               resume round-trips, PDF source-date header lines.
 Net/                           Phone↔Mac transports + cloud relay (Tier-2; the protocol is a SHARED HOTSPOT):
   CaptureServer.swift          LAN HTTP/NWListener receiver; Bearer-authed routes (see hotspot list).
   CaptureReceiver.swift        The receiver role: accept phone pages → ingest, ack only on durable.

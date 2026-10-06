@@ -2,6 +2,17 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ⚠️ LIMITATION (W37.dual-date, 2026-10-06) — the year filter does not say which date matched
+
+The Sort & Filter year range matches a file's own date OR its `Sent With` date (each value meeting both
+bounds) and lists the file once. The Date column shows both dates (`Nov 3, 1957 · sent Mar 12, 1958`), but
+nothing highlights which of the two put the row in the result. The sent-with date is edited per file in the
+Date cell's popover; the ⌘I group editor has no sent-with control.
+
+The filter bar is crowded in a narrow window (the VM's ~900-pt window): the quality toggles collapse to
+`…`, which already happened before W37. W37 adds only a calendar button (the range is in its popover), and
+the name/OCR fields now have minimum widths so the tag field gives way first; all 32 VM UITests pass.
+
 ## ⚠️ LIMITATION (W24.jpeg1, 2026-09-26) — duplicate JPEG stems need a known collection mapping
 
 Reader resolves exact mirrored paths and unique stems across relocated folders. If the same stem occurs in

@@ -373,6 +373,10 @@ private struct DetailPane: View {
                 }
                 HStack(spacing: 10) {
                     if let d = item.displayDate { Label(d, systemImage: "calendar").labelStyle(.titleAndIcon) }
+                    if let s = item.displaySentWith {
+                        Label("Sent with: \(s)", systemImage: "envelope").labelStyle(.titleAndIcon)
+                            .accessibilityIdentifier("an.detail.header.sentWith")
+                    }
                     if item.quality != nil { Text(item.qualityStars).foregroundStyle(.yellow) }
                     if !item.authors.isEmpty {
                         Label(item.authors.joined(separator: ", "), systemImage: "person")

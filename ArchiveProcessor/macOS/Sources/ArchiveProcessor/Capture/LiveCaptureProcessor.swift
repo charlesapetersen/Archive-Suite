@@ -1124,7 +1124,8 @@ final class LiveCaptureProcessor: ObservableObject {
             if let rot = rotationOverride {
                 r = OCRResult(text: r.text, classification: r.classification,
                               rotationDegrees: ((rot % 360) + 360) % 360,
-                              errorMessage: r.errorMessage, errorCode: r.errorCode)
+                              errorMessage: r.errorMessage, errorCode: r.errorCode,
+                              enclosure: r.enclosure, ocrClassification: .some(r.ocrClassification), ocrEnclosure: .some(r.ocrEnclosure))
             }
             results.append(r)
             texts.append(r.text ?? "")
@@ -1377,6 +1378,11 @@ final class LiveCaptureProcessor: ObservableObject {
         // passed to every tag write below so a *subject* string is never mistaken for one. See
         // `tagStagedArtifact`.
         let appColor = jsonTags.colorTag
+        // W37.dual-date — Live Capture computes the tags BEFORE rendering, so its documents' text pages
+        // can carry the source-date header lines (repeated on every page of the unit). Documents in
+        // real-tagging modes only: a no-tagging / copy-source run writes no generated date anywhere.
+        let sourceDates: PDFSourceDates? = (type == .document && taggingMode.stampsUnread)
+            ? EnclosureDates.pdfSourceDates(for: jsonTags) : nil
 
         for page in pages {
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
@@ -1386,7 +1392,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                                  gatewayDisplayName: gatewayName,
                                                  localAgentDisplayName: localAgentDisplayName,
                                                  localAgentModelName: localAgentModelName,
-                                                 pdfImageMB: pdfImageMB, textColumns: textColumns)
+                                                 pdfImageMB: pdfImageMB, textColumns: textColumns,
+                                                 sourceDates: sourceDates)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as

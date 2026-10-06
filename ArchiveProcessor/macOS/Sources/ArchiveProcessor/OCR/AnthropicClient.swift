@@ -79,7 +79,7 @@ struct AnthropicClient {
             .joined(separator: "\n")
 
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
-        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
+        return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(rawText))
     }
 
     /// Returns a friendly message plus the provider's semantic error code (Anthropic `error.type`,

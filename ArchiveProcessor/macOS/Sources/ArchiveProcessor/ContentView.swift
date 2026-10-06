@@ -62,6 +62,7 @@ struct ContentView: View {
             ProcessingHistoryTestDriver.runIfRequested()     // $0 cost/run-log record + bounded-persist self-test (env-gated)
             IncrementalSkipTestDriver.runIfRequested()       // $0 incremental-processing skip-decision self-test (env-gated)
             SegmentJSONBuilderTestDriver.runIfRequested()    // $0 segment-JSON sidecar byte-identity self-test (env-gated)
+            DualDateTestDriver.runIfRequested()              // $0 W37 enclosure relation + Sent With date self-test (env-gated)
             LocalAgentTestDriver.runIfRequested()            // $0 Local Agent CLI backend + PendingRun resume self-test (env-gated)
             NetworkSessionTestDriver.runIfRequested()        // $0 injected HTTP retry/limiter safety test (env-gated)
             VisionHybridTestDriver.runIfRequested()          // $0 Vision OCR + text-only judgement request-shape contract

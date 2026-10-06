@@ -102,7 +102,8 @@ struct LocalAgentClient: Sendable {
         case .success(let text):
             let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(text)
             return OCRResult(text: ocrText, classification: classification,
-                             rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil)
+                             rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil,
+                             enclosure: OCRPrompt.parseEnclosureFlag(text))
         }
     }
 

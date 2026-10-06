@@ -208,6 +208,16 @@ final class NotesNavigationModel: ObservableObject {
         await model.setDateUncertain(uncertain, for: id)
     }
 
+    /// Set or clear the sent-with (covering letter) date for `id` (W37.dual-date).
+    func setSentWith(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async {
+        await model.setSentWith(date, precision: precision, for: id)
+    }
+
+    /// Toggle the sent-with date's own uncertainty flag for `id`.
+    func setSentWithUncertain(_ uncertain: Bool, for id: UUID) async {
+        await model.setSentWithUncertain(uncertain, for: id)
+    }
+
     @discardableResult
     func setRoundup(_ roundup: Bool, for id: UUID) async -> Bool {
         await model.setRoundup(roundup, for: id)

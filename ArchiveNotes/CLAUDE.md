@@ -76,7 +76,8 @@ macOS/Sources/ArchiveNotes/
                                    Extract ⌘⌥E / Append to Extract…, W7-S2), DebugBlockCommands
   Models/
     NotesFilter.swift              Filter type (§16.3) + matches(_:folderItemIDs:) (kind/quality/
-                                   date-range/tags ALL|ANY/title-substring/graph folder-membership/round-up),
+                                   date-range — own OR sent-with date, same value both bounds (W37) —
+                                   /tags ALL|ANY/title-substring/graph folder-membership/round-up),
                                    effective(base:user:) merge, tolerant init(from:) (W6-S4)
   Store/
     Item.swift                     Item/ZoteroRef/UnknownKey domain models; normalizedDate is THE
@@ -91,7 +92,8 @@ macOS/Sources/ArchiveNotes/
                                    (W23.l4)
     Template.swift                 Template projection (id/name/kind) + pure TemplateResolution
                                    (nearest-ancestor walk + dangling detection, §16.4) (W6-S6)
-    FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer
+    FrontMatterCodec.swift         Hand-rolled YAML front-matter (de)serializer; `additional_dates` (W37:
+                                   one `sent_with` entry; unreadable entries written back verbatim)
     BlockParser.swift              Block/SourceAnchor + HTML-comment header parser
     NoteStore.swift                actor — UUID-folder CRUD, atomic writes, coordinated Trash delete
                                    (file-presenter refusal preserves the note, W9.d12c), assets, and

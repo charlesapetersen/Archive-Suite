@@ -1452,6 +1452,7 @@ extension OCRProcessor {
         failedFiles = []
         clearOutputWarnings()
         segments = []
+        appliedGeneratedTags = [:]
         collectionSegments = []
         outputURLMap = [:]
         _takenOutputPaths = []
@@ -1561,7 +1562,9 @@ extension OCRProcessor {
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
             let texts = jobs.map { $0.result?.text ?? "" }
-            segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts)
+            segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
+                                         enclosureFlags: jobs.map { $0.result?.enclosure == true },
+                                         expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
             statusMessage = "Found \(segments.count) segments. Generating tags…"
 
             switch runOutputSettings.taggingMode {
@@ -1686,6 +1689,7 @@ extension OCRProcessor {
         failedFiles = []
         clearOutputWarnings()
         segments = []
+        appliedGeneratedTags = [:]
         collectionSegments = []
         outputURLMap = [:]
         _takenOutputPaths = []
@@ -1930,7 +1934,9 @@ extension OCRProcessor {
             let segmenter = DocumentSegmenter()
             let classifications = jobs.map { $0.result?.classification }
             let texts = jobs.map { $0.result?.text ?? "" }
-            segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts)
+            segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
+                                         enclosureFlags: jobs.map { $0.result?.enclosure == true },
+                                         expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
             statusMessage = "Found \(segments.count) segments. Tagging…"
 
             switch runOutputSettings.taggingMode {
@@ -2709,6 +2715,7 @@ extension OCRProcessor {
         failedFiles = []
         clearOutputWarnings()
         segments = []
+        appliedGeneratedTags = [:]
         collectionSegments = []
         outputURLMap = [:]
         _takenOutputPaths = []
@@ -3305,7 +3312,8 @@ extension OCRProcessor {
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,
-                               errorMessage: result.errorMessage, errorCode: result.errorCode)
+                               errorMessage: result.errorMessage, errorCode: result.errorCode,
+                               enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure))
         }
         result = await Self.applyingVisionTextClassification(
             to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,

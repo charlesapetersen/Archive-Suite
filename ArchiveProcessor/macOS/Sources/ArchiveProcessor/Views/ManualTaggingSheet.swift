@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ArchiveCore
 
 /// Sequential manual tagging — one document segment at a time. Shows all page images in the
 /// segment plus editable date fields and an autocompleting subject-tag input. In `.autoDate`
@@ -15,6 +16,11 @@ struct ManualTaggingSheet: View {
 
     private var count: Int { processor.manualTagSegments.count }
     private var isLast: Bool { processor.currentManualIndex >= count - 1 }
+    /// W37: the current card's Sent-with text is empty or a valid date (Next/Finish refuse otherwise).
+    private var currentSentWithValid: Bool {
+        guard processor.currentManualIndex < count else { return true }
+        return processor.manualTagSegments[processor.currentManualIndex].sentWithIsValid
+    }
     private var currentImages: [ManualTagImage] {
         guard processor.currentManualIndex < count else { return [] }
         return processor.manualTagSegments[processor.currentManualIndex].images
@@ -64,6 +70,7 @@ struct ManualTaggingSheet: View {
                     .disabled(processor.currentManualIndex == 0)
                 Spacer()
                 Button(isLast ? "Finish" : "Next") { processor.advanceManualSegment() }
+                    .disabled(!currentSentWithValid)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .keyboardShortcut(.return, modifiers: [])
@@ -173,6 +180,34 @@ struct ManualTagSegmentView: View {
                     .padding(6)
                 }
 
+                // W37.dual-date — the covering letter's date, for an enclosure with its own date.
+                GroupBox("Sent with (covering letter's date)") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let cover = segment.enclosureCoverName, segment.enclosureOfSegmentIndex != nil {
+                            HStack(spacing: 8) {
+                                Image(systemName: "paperclip")
+                                Text("Proposed: enclosure sent with the letter starting “\(cover)”.")
+                                    .font(.caption)
+                                Button("Not an enclosure") {
+                                    segment.enclosureOfSegmentIndex = nil
+                                    segment.enclosureCoverName = nil
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                        HStack(alignment: .bottom, spacing: 12) {
+                            dateField("Sent with", text: $segment.sentWith, width: 120, prompt: "1958-03-12")
+                            Toggle("Sent with date uncertain", isOn: $segment.sentWithUncertain)
+                            Spacer()
+                        }
+                        SentWithHint(text: segment.sentWith,
+                                     fallback: segment.enclosureOfSegmentIndex != nil
+                                        ? "Empty: the covering letter's own date is used (none if it is undated)."
+                                        : "Optional. 1958, 1958-03, 1958-03-12 or 1950s.")
+                    }
+                    .padding(6)
+                }
+
                 // Subjects
                 GroupBox("Subject tags") {
                     VStack(alignment: .leading, spacing: 4) {
@@ -207,6 +242,27 @@ struct ManualTagSegmentView: View {
             TextField(prompt, text: text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: width)
+        }
+    }
+}
+
+/// W37.dual-date — the validation line under a Sent-with field: the parsed date, a clear error for an
+/// invalid entry (which is never written), or a hint when empty.
+struct SentWithHint: View {
+    let text: String
+    let fallback: String
+
+    var body: some View {
+        switch EnclosureDates.parseManual(text) {
+        case .empty:
+            Text(fallback).font(.caption2).foregroundStyle(.secondary)
+        case .valid(let date):
+            Text("Sent with: \(date.display)").font(.caption2).foregroundStyle(.secondary)
+        case .invalid:
+            Label("Not a valid date — use 1958, 1958-03, 1958-03-12 or 1950s. It will not be saved.",
+                  systemImage: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.red)
         }
     }
 }

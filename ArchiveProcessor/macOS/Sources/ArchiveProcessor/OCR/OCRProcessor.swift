@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import ArchiveCore
 
 
 @MainActor
@@ -202,6 +203,10 @@ class OCRProcessor: ObservableObject {
 
     /// Maps source image URL → output PDF URL (for tagging the output, not the source)
     var outputURLMap: [URL: URL] = [:]
+    /// W37.dual-date — the `GeneratedTags` last applied to each source page this run (every page of a
+    /// segment), so a post-tagging reclassification can refresh an enclosure's `Sent With` from its
+    /// cover's CURRENT own date. Reset with `segments` at each run start.
+    var appliedGeneratedTags: [URL: GeneratedTags] = [:]
     /// Cached lowercased paths of all values in `outputURLMap`, maintained by `uniqueOutputURL`
     /// and cleared alongside `outputURLMap = [:]` resets. Avoids O(n) set-rebuild per call.
     var _takenOutputPaths = Set<String>()
