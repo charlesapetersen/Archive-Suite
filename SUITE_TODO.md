@@ -908,8 +908,31 @@ OWNER sit in the plan's HOLD QUEUE.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
   - 2026-10-05, checkpoint 1 of 2 (commit "feat(segmentation): W36.seg-features (checkpoint 1/2)"): a numpy logistic regression on 26 per-boundary features (OCR rule cues, TF-IDF cosine, length, blank, paper colour, ink, aspect/orientation, and the capture-time gap as one feature) in `scripts/segbench/features.py` + `method_features.py`, leave-one-collection-out on Dean/Deaver/Herrnstein, methods `features-lr` and `features-lr-notime`, tests in `test_features.py`. Dev pooled pages in an exact document 59.3% with the time gap, 52.5% without; Dean and Herrnstein 72-83%, Deaver (clippings) 0-10% because the letter cues it learns do not occur there. Detail: `segbench-results/features-lr-report.md`. Remaining for checkpoint 2: embedding features (a SigLIP/CLIP image embedding and a small text embedder, through MLX), then re-run.
 - [ ] **`W36.seg-localvlm` — on-device vision model, zero-shot [M]** (blocked-on: W36.seg-base, interactive-claim-20261005). Claimed by an interactive session (owner, 2026-10-05: Qwen3.5-4B, Gemma 4 12B and Qwen3-VL-8B on Deaver tonight, before the bake-off; `scripts/segbench/method_local.py`, fit-tested). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-corpus-survey` — can the owner's tagged corpus train a segmentation model? Read-only survey [S-M]** (blocked-on: W36.seg-base).
+  Owner, 2026-10-06: "if we want to try training a small model on thousands of segmented documents, the already tagged
+  documents in the Archival Photos PDF folder could work. There will be mistakes and non-standardized tagging. But
+  perhaps it's close enough, given the scale." Then: "Add to the queue." What an interactive look found the same day:
+  each PDF in `~/Desktop/Google Drive/Archival Photos/` is ONE photo, numbered in capture order, so a document is only
+  implied by its tags. Folders tagged per document (HBS/Doriot: 00033-00045 all "1951, 09 September, Manufacturing…",
+  00032 Purple) give a boundary wherever the tag set changes between neighbours, and Red/Purple label the box and
+  folder photos; folders tagged per collection (the corpus copy of Deaver: every page "Jerry Brown", "DP chapters")
+  give nothing. Against the answer key the tags recovered 0% of Deaver's and Dean's document starts and 16% of
+  Herrnstein's, so those three are collection-tagged. Known noise, one-sided both ways: neighbouring documents with
+  identical tags merge, and an uneven re-tag inside one document splits it.
+  WHAT. (1) For every folder of photos, read each file's Finder tags (`mdls -raw -name kMDItemUserTags`, or
+  `getxattr`; READ ONLY, nothing in the corpus is ever written, renamed, moved or opened for writing; ~102,500
+  files), ignoring `Unread`, and record per folder: photos, share of neighbour pairs whose tags differ, share of
+  photos carrying a year tag, Red/Purple counts, and the implied documents. Classify each folder per-document,
+  per-collection or mixed, by a rule stated before looking at the totals. (2) The totals: how many folders and
+  implied boundaries are usable, by collection. (3) A noise sample for the owner: 40 implied boundaries and 40
+  implied continuations drawn at random from per-document folders, as a review pack (page n beside page n+1, built in
+  the cache outside git like `seg-truth/index.html`), so the owner can mark each right or wrong; then the measured
+  noise rate. Results (numbers only, no page text or images) in `segbench-results/corpus-survey.md`; feeds
+  `W36.seg-report`'s training-data option, i.e. whether a fine-tuned on-device model is worth costing at the decision.
+  DONE WHEN the survey table and the review pack exist and the owner has been asked for the noise sample.
+  Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-ensemble` — agreement plus review: risk-coverage, then the test collections once [S-M]** (blocked-on: W36.seg-window, W36.seg-second, W36.seg-whole, W36.seg-features, W36.seg-localvlm, W36.seg-truth-owner-ok). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
-- [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (blocked-on: W36.seg-ensemble). Include an overnight option (owner, 2026-10-05: "we may want to include an option for models that can basically only be used overnight when the computer is in limited use otherwise"): for each on-device method, its time and memory per 1,000 pages and whether it is usable only as an overnight run on a Mac left alone, put to the owner beside the cloud options at the decision. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (blocked-on: W36.seg-ensemble, W36.seg-corpus-survey). Include an overnight option (owner, 2026-10-05: "we may want to include an option for models that can basically only be used overnight when the computer is in limited use otherwise"): for each on-device method, its time and memory per 1,000 pages and whether it is usable only as an overnight run on a Mac left alone, put to the owner beside the cloud options at the decision. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 
 ## Two dates on one document — enclosures (owner, 2026-10-05; before the W40 freeze)

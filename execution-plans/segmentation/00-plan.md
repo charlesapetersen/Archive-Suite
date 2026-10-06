@@ -182,6 +182,14 @@ spring prompts saw all five.
 - **`W36.seg-localvlm` [M]** — approach E, on device: a local vision model prompted per boundary or per small window
   (Qwen3-VL-8B 4-bit or Qwen3.5-4B, through the Vision OCR lab's guarded MLX setup; peak under 12 GB). Zero-shot only
   here; a LoRA fine-tune needs thousands of labelled boundaries and is noted as future work fed by corrections.
+- **`W36.seg-corpus-survey` [S-M]** — training data from the owner's own tagged corpus (owner, 2026-10-06). Each
+  corpus PDF is one photo in capture order; a change of Finder tags between neighbours implies a document start where a
+  folder was tagged per document (HBS/Doriot), and nothing where it was tagged per collection (the corpus Deaver, Dean,
+  Herrnstein). Read-only survey of all ~102,500 files' tags, per-folder classification, usable boundary count, and an
+  owner-checked noise sample of 80 implied decisions. If enough usable, noisy-but-large data exists, approach E's
+  LoRA fine-tune ("future work fed by corrections") gets costed at the decision instead of waiting for corrections.
+  The corpus is never written. Zero-shot on-device results for comparison (Deaver, 2026-10-05): Qwen3.5-4B 57.4%,
+  Qwen3-VL-8B 53.2%, Gemma 4 12B 46.8%, against 97.9% for the cloud models (`segbench-results/local-models-Deaver.md`).
 - **`W36.seg-ensemble` [S-M]** — approach F: combine the voters (unanimous agreement = auto-accept; any disagreement
   or low confidence = flag), thresholds set leave-one-collection-out; risk–coverage curves; then score the finalists
   ONCE on the test collections. Also measure approach G on RG 165, the only Live Capture box: how many errors the
