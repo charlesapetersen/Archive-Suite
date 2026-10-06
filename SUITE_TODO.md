@@ -904,17 +904,6 @@ on the owner's five ground-truth boxes, scored by the share of pages that land i
 the owner's decision, then a build only if the result is usable. `W40.a1` waits on `W36.seg-decision`. Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-window2` — the window method again, with the owner's domain cues in the prompt [S-M · Claude window]**
-  (blocked-on: W36.seg-window). Owner, 2026-10-05: "Should we try the segmentation test again given what we've
-  learned?" Same route, model, windows and bench as W36.seg-window (`method_window.py`, `claude -p`), with the
-  prompt revised to state the cues from the owner's answers (`02-truth-check.md`, last sections; the plan's
-  "owner's domain cues"): ignore text showing through from the sheet beneath (a page number read through onion
-  skin is not a continuation cue); a small item laid on a full sheet means the sheet underneath is the next
-  document; a byline, a wire credit or a section heading starts a clipping, a newspaper page number at the top is
-  where it began; a full magazine is one document; never reorder; runs of empty folder and box photos are normal.
-  A new PROMPT_VERSION so nothing is reused from the old cache. Development boxes only. Report against window v1
-  (90.3% on the final labels; 34 reviews to 98%) and say which errors the cues removed. USAGE GUARD: stop calls at
-  70% of the Claude five-hour window (Vision OCR has priority on it). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
   - 2026-10-05, checkpoint 1 of 2 (commit "feat(segmentation): W36.seg-features (checkpoint 1/2)"): a numpy logistic regression on 26 per-boundary features (OCR rule cues, TF-IDF cosine, length, blank, paper colour, ink, aspect/orientation, and the capture-time gap as one feature) in `scripts/segbench/features.py` + `method_features.py`, leave-one-collection-out on Dean/Deaver/Herrnstein, methods `features-lr` and `features-lr-notime`, tests in `test_features.py`. Dev pooled pages in an exact document 59.3% with the time gap, 52.5% without; Dean and Herrnstein 72-83%, Deaver (clippings) 0-10% because the letter cues it learns do not occur there. Detail: `segbench-results/features-lr-report.md`. Remaining for checkpoint 2: embedding features (a SigLIP/CLIP image embedding and a small text embedder, through MLX), then re-run.
@@ -1143,6 +1132,13 @@ Design-level ideas the owner wants recorded but explicitly de-prioritised. An au
 **skip** these: they need the owner's scoping before any code is written.
 
 ### ⛔ DECLINED — settled, do NOT re-raise in Daemon Report
+- **The full re-run of the window method with the owner's cues (`W36.seg-window2`) — SKIPPED by the owner
+  2026-10-05:** "Use only the one box so we have one small comparison. Let's skip the larger re-run." The
+  one-box comparison replaced it: the cues prompt through Claude Sonnet 5.5, Claude Opus 5.5, Codex
+  gpt-6.1-sol (low) and Gemini 3.8 Flash (low) on Deaver all scored 96.5% pages in an exact document, each
+  with the same single false split at page 57, which is also window v1's only error there
+  (`segbench-results/cues-models-Deaver.md`, `scripts/segbench/method_window_cues.py`). ⛔ Do not queue the
+  three-box Claude re-run again.
 - **Auditing the daemon runs that started themselves at login (`W32.plist-relogin`) — DECLINED by the owner
   2026-08-16.** Until `9b05a62` every `stop`/park/COMPLETE only `launchctl bootout`ed the job and left the
   LaunchAgent plist installed with `RunAtLoad=true`, so the next GUI login restarted the daemon with no human

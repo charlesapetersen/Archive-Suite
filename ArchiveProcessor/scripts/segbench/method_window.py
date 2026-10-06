@@ -255,12 +255,12 @@ def call_claude(prompt: str, workdir: Path) -> dict:
         out = json.loads(r.stdout)
     except json.JSONDecodeError:
         msg = (r.stdout + r.stderr)[-600:]
-        if re.search(r"usage limit|rate limit|429|limit reached", msg, re.I):
+        if re.search(r"usage limit|session limit|hit your limit|rate limit|429|limit reached", msg, re.I):
             raise UsageLimit(msg)
         raise RuntimeError(f"exit {r.returncode}, no JSON: {msg}")
     if out.get("is_error") or out.get("subtype") != "success":
         msg = str(out.get("result") or out)[-600:]
-        if re.search(r"usage limit|rate limit|429|limit reached", msg, re.I):
+        if re.search(r"usage limit|session limit|hit your limit|rate limit|429|limit reached", msg, re.I):
             raise UsageLimit(msg)
         raise RuntimeError(f"claude error: {msg}")
     out["_wall_s"] = wall
