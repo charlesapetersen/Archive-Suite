@@ -927,15 +927,9 @@ OWNER sit in the plan's HOLD QUEUE.
   additional dates model from the DEVONthink plan), all three together per the shared-contract rule, Tier-2, with
   scratch-copy tests. No migration: there is no production material. | SPEC + all apps | M-L | med | none
   Design checkpoint 2026-10-05 (this commit): concrete proposal in `SPEC/tag-format.md` §W37.dual-date;
-  existing contract remains single-date until implementation. Await the behaviour choices below, then build
-  and verify all four surfaces; no runtime implementation or functional tag/PDF proof is claimed yet.
-- [ ] **W37.dual-date-owner-ok — OWNER GATE for W37.dual-date: choose date sorting/filtering and enclosure
-  handling.** Recommendation: own date sorts (sent-with fallback when absent), either date matches filters,
-  automatic relation proposals plus manual correction/review. Separately dated enclosure outputs already
-  follow the approved segmentation rules; that decision is not being reopened.
-  Alternatives and worked example: `SPEC/tag-format.md` §W37.dual-date. This is a behaviour question explicitly
-  requested by the item, not a per-item permission requirement for Tier-2 code or contract work.
-
+  existing contract remains single-date until implementation. Owner's choices 2026-10-05: own date sorts
+  (covering-letter fallback), either date matches filters, the app proposes relations and the owner corrects
+  them. Build and verify all four surfaces; no runtime implementation or functional tag/PDF proof is claimed yet.
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
 Owner, 2026-10-05: one session at a time leaves the Claude five-hour window unused, because sessions spend most
@@ -945,7 +939,6 @@ W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware 
 staggered starts, the subscription policy) and the design are in the plan.
 
 - [ ] **`W35.claims` — claims: per-worker state, the supervisor picks and claims items, plan-edit lock, upkeep only when idle [M]** (blocked-on: W35.claims-owner-ok). Detail: `execution-plans/parallel-workers/00-plan.md`.
-- [ ] **W35.claims-owner-ok — OWNER GATE for W35.claims: clarify whether the Codex preamble permits editing repository daemon source in an isolated worktree while leaving the installed daemon and launchd job untouched.** The preamble currently says “Never start, stop or edit the daemon or its launchd job.” W35.claims requires changes to `archive-suite-autonomous.sh` (`tick()`, session prompt construction and `housekeeping()`). The same clarification also blocks W35.heavy: its wait-as-work requirement needs `health_watchdog()` to recognize lock waiters; `_run_gate_once()` currently charges lock contention to the gate timeout. Neither implementation has begun; this is a session-instruction conflict, not a new Tier-2 approval requirement.
 - [ ] **W35.heavy — one build, gate or VM run at a time across workers (heavy.lock) [S-M]** (blocked-on: W35.claims-owner-ok). Detail: `execution-plans/parallel-workers/00-plan.md`. Baseline `3465e15`: daemon `health_watchdog()` has no lock-wait signal, and `_run_gate_once()` starts its timeout before any gate-level lock acquisition. Await the existing source-edit clarification; implementation and scratch concurrency/lifecycle proofs remain.
 - [ ] **`W35.workers` — the supervisor runs N workers per lane, per-lane pause, staggered starts [M]** (blocked-on: W35.claims, W35.heavy). Detail: `execution-plans/parallel-workers/00-plan.md`.
 - [ ] **`W35.pace` — worker count sized from the usage readings, Vision OCR keeps Claude priority [M]** (blocked-on: W35.workers). Detail: `execution-plans/parallel-workers/00-plan.md`.

@@ -9719,3 +9719,10 @@ none of this was fixed by starting it.
   proof runner. Every interruption reaped descendants and preserved an unrelated peer. Independent
   adversarial review and warning-level ShellCheck clean. No installed runtime/job or real corpus touched.
 
+## Two dates on one document — enclosures (owner, 2026-10-05; before the W40 freeze)
+
+- [x] **W37.dual-date-owner-ok — ANSWERED by the owner 2026-10-05 (walkthrough):** all three recommendations. (1) An enclosure sorts by its own date, falling back to the covering letter's date when it has none. (2) A date filter or search matches either date. (3) The app proposes the enclosure-to-letter relation (from segmentation) and the owner corrects it in review. Proposal: `SPEC/tag-format.md` §W37.dual-date.
+
+## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
+
+- [x] **W35.claims-owner-ok — ANSWERED by the owner 2026-10-05 (walkthrough):** yes. A Codex session may change the daemon's SOURCE (`archive-suite-autonomous.sh` and its helpers) in its own worktree; it still never starts, stops or touches the running daemon or its launchd job. Every such change passes the daemon's prove harnesses and an adversarial review before it is pushed, and takes effect only when the daemon next restarts. `codex-preamble.txt` §3 says so. Unblocks W35.claims and W35.heavy.

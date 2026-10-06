@@ -21,7 +21,11 @@ two disagree:
    list as absolute: sudo; launchctl; rm -rf / rm -fr / rm -r / rm -R; git push --force / -f /
    --force-with-lease; git reset --hard; git clean; git worktree remove --force / -f; git branch -D;
    shutdown, reboot, halt; diskutil; dd; mkfs; curl; wget; hdiutil; gh release (any path). Never start,
-   stop or edit the daemon or its launchd job.
+   stop or signal the running daemon, and never touch its launchd job or its installed state. Changing the
+   daemon's SOURCE (`ops/autonomous/*.sh` and its helpers) in your own worktree is ordinary work when a
+   queue item calls for it (owner, 2026-10-05, W35.claims-owner-ok), on two conditions: the daemon's prove
+   harnesses (`ops/autonomous/tests/prove-*.sh`) pass, and an adversarial review of the diff finds nothing
+   open, BEFORE you push. A pushed change takes effect only when the owner next restarts the daemon.
 
 4. THE SANDBOX. You run in codex's workspace-write sandbox with automatic review of escalations. The
    repository, its parent directory (where the `../suite-wt-*` worktrees go) and the daemon's state
