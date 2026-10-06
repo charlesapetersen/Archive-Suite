@@ -159,11 +159,14 @@ final class EditorTextView: NSTextView {
 #if DEBUG
         attachmentRelayoutRequests += 1
 #endif
-        // Re-scroll after the relayout, as `insertStyled` does: redo scrolls to the restored text BEFORE this
-        // pass, and the VM then showed the redone chip's view installed but stranded off-screen (W9.cand2-fu1).
-        relayoutViewportSoon { [weak self] in
-            guard let self else { return }
-            self.scrollRangeToVisible(self.selectedRange())
+        // One turn later than `insertStyled`'s, then re-scroll. Redo lays out and scrolls on the NEXT turn
+        // itself; a pass on that same turn left the redone chip's view installed but stranded below the
+        // viewport (VM, W9.cand2-fu1: y=177, visible 0–119, slot blank). Two turns: G13 green.
+        DispatchQueue.main.async { [weak self] in
+            self?.relayoutViewportSoon { [weak self] in
+                guard let self else { return }
+                self.scrollRangeToVisible(self.selectedRange())
+            }
         }
     }
 
