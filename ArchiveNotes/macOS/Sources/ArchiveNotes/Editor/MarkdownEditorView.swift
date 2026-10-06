@@ -178,20 +178,6 @@ struct MarkdownEditorView: NSViewRepresentable {
             guard coordinator?.formattingContext?.currentItemKind == .extract else { return }
             coordinator?.parent.onPasteDegraded?("Pasted as plain text; source provenance was not imported.")
         }
-        if isRaw {
-            textView.string = markdown
-        } else {
-            let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
-                                               assetStore: assetStore,
-                                               onRevealBlock: onRevealBlock,
-                                               onPreviewBlock: onPreviewBlock,
-                                               onJumpBlock: onJumpBlock,
-                                               passageSummaries: passageSummaries)
-            textView.textStorage?.setAttributedString(styled)
-#if DEBUG
-            textView.refreshUITestPassageChipStateSnapshot()
-#endif
-        }
         context.coordinator.lastAppliedMarkdown = markdown
         context.coordinator.lastPassageGeneration = passageGeneration
 
@@ -204,6 +190,21 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude,
                                    height: CGFloat.greatestFiniteMagnitude)
+
+        if isRaw {
+            textView.string = markdown
+        } else {
+            let styled = MarkdownBridge.parse(markdown: markdown, fontSize: fontSize,
+                                               assetStore: assetStore,
+                                               onRevealBlock: onRevealBlock,
+                                               onPreviewBlock: onPreviewBlock,
+                                               onJumpBlock: onJumpBlock,
+                                               passageSummaries: passageSummaries)
+            textView.replaceStyledDocument(with: styled)
+#if DEBUG
+            textView.refreshUITestPassageChipStateSnapshot()
+#endif
+        }
 
         context.coordinator.textView = textView
         context.coordinator.lastContentID = contentID
@@ -272,6 +273,8 @@ struct MarkdownEditorView: NSViewRepresentable {
         let passageChanged = !wantRaw && !markdownChanged
             && coordinator.lastPassageGeneration != passageGeneration
             && markdown.contains(Self.notePassageMarker)
+            && coordinator.passageDisplayNeedsRefresh()
+        if !passageChanged { coordinator.lastPassageGeneration = passageGeneration }
         // Selection changes must install the newly loaded item even if the old editor still has
         // focus. Distinct items may have identical Markdown but different assets or provenance.
         if (!isEditing || contentChanged), markdownChanged || passageChanged || contentChanged {
@@ -286,7 +289,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                    onPreviewBlock: coordinator.onPreviewBlock,
                                                    onJumpBlock: coordinator.onJumpBlock,
                                                    passageSummaries: coordinator.passageSummaries)
-                textView.textStorage?.setAttributedString(styled)
+                textView.replaceStyledDocument(with: styled)
 #if DEBUG
                 textView.refreshUITestPassageChipStateSnapshot()
 #endif
@@ -433,9 +436,27 @@ struct MarkdownEditorView: NSViewRepresentable {
             } else {
                 current = textView.string
             }
+            lastAppliedMarkdown = current
             if parent.markdown != current {
                 parent.markdown = current
             }
+        }
+
+        func passageDisplayNeedsRefresh() -> Bool {
+            guard let storage = textView?.textStorage else { return false }
+            var changed = false
+            storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
+                guard let attachment = value as? BlockHeaderAttachment,
+                      attachment.sourceBox.anchor.notePassageTarget != nil else { return }
+                let anchor = attachment.sourceBox.anchor
+                let label = NotePassageResolve.chipLabel(anchor: anchor, among: passageSummaries)
+                let missing = NotePassageResolve.isSourceMissing(anchor: anchor, among: passageSummaries)
+                if attachment.passageLiveLabel != label || attachment.passageSourceMissing != missing {
+                    changed = true
+                    stop.pointee = true
+                }
+            }
+            return changed
         }
 
         // MARK: Raw-mode toggle
@@ -470,7 +491,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                 }
                 currentIsRaw = false
                 textView.applyRawMode(false, fontSize: currentFontSize)
-                textView.textStorage?.setAttributedString(parsed.attributed)
+                textView.replaceStyledDocument(with: parsed.attributed)
 #if DEBUG
                 textView.refreshUITestPassageChipStateSnapshot()
 #endif
@@ -669,7 +690,9 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                   onJumpBlock: onJumpBlock,
                                                   passageSummaries: passageSummaries)
             textView.undoManager?.beginUndoGrouping()
-            textView.insertText(attributed, replacementRange: textView.selectedRange())
+            textView.performContentEditingTransaction {
+                textView.insertText(attributed, replacementRange: textView.selectedRange())
+            }
             textView.undoManager?.endUndoGrouping()
             scheduleWriteBack()
             return true

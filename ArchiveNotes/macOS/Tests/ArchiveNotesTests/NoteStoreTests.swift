@@ -38,6 +38,54 @@ struct NoteStoreTests {
         try? FileManager.default.removeItem(at: url)
     }
 
+    @Test("fresh passage survives editor flush and reload without a retired-editor overwrite")
+    @MainActor
+    func pastedPassageEditorRoundTrip() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+        let source = makeItem(title: "Passage source")
+        let target = makeItem(title: "Passage extract", kind: .extract)
+        _ = try await store.create(source)
+        let ref = try await store.create(target)
+        let markdown = "<!-- block: note-passage\n     note: archivenotes://open?id=\(source.id.uuidString.lowercased())#block-0\n     display: \"Passage source\" -->\nCopied passage.\n"
+        let editor = EditorTextView()
+        editor.replaceStyledDocument(with: MarkdownBridge.parse(markdown: markdown))
+        let body = MarkdownBridge.serialize(try #require(editor.textStorage))
+        #expect(body.contains("<!-- block: note-passage"))
+        #expect(BlockParser.parse(body).blocks.first?.source?.notePassageTarget?.id == source.id)
+        let model = NoteBodyEditorModel()
+        model.saveDebounce = .seconds(60)
+        var errors: [String] = []
+        model.load = { id in
+            do {
+                let item = try await store.load(id)
+                return BlockParser.serialize(leadingText: item.trailingBodyRaw, blocks: item.blocks)
+            } catch { errors.append(String(describing: error)); return nil }
+        }
+        model.save = { id, body in
+            do {
+                var item = try await store.load(id)
+                let parsed = BlockParser.parse(body)
+                item.blocks = parsed.blocks
+                item.trailingBodyRaw = parsed.leadingText
+                _ = try await store.save(item)
+            } catch { errors.append(String(describing: error)) }
+        }
+        await model.select(target.id)
+        model.acceptEditorMarkdown(body, for: target.id)
+        await model.select(source.id)
+        let saved = try Data(contentsOf: ref.url)
+        model.acceptEditorMarkdown("retired extract callback", for: target.id)
+        await model.flush()
+        await model.select(target.id)
+        editor.replaceStyledDocument(with: MarkdownBridge.parse(markdown: model.markdown))
+        let restored = MarkdownBridge.serialize(try #require(editor.textStorage))
+        #expect(restored.contains("Copied passage."))
+        #expect(restored.contains(source.id.uuidString.lowercased()))
+        #expect(try Data(contentsOf: ref.url) == saved)
+        #expect(errors.isEmpty)
+    }
+
     // MARK: - Create
 
     @Test("create writes item dir + .md + assets dir")

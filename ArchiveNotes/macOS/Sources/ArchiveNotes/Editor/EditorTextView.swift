@@ -11,12 +11,59 @@ final class EditorTextView: NSTextView {
     /// W21.vmgui-c-fu test is meant to prove.
     private lazy var passageChipStateProbe = PassageChipStateProbe(textView: self)
 
+    // Read installed views only: no layout, view-provider getter, or SwiftUI state mutation.
+    private lazy var chipGeometryProbe = ChipGeometryProbe(textView: self)
+
+    func uiTestInstalledChipGeometry() -> String? {
+        var states: [[String: Any]] = []
+        func visit(_ view: NSView) {
+            if let chip = view as? BlockHeaderChipView, let id = chip.uiTestSourceNoteID {
+                var visible = chip.convert(chip.bounds, to: self).intersection(self.visibleRect)
+                var ancestor: NSView? = chip
+                var belongsToEditor = false
+                while let current = ancestor {
+                    if current === self { belongsToEditor = true }
+                    visible = visible.intersection(current.convert(current.visibleRect, to: self))
+                    ancestor = current.superview
+                }
+                states.append(["id": id, "width": chip.bounds.width, "height": chip.bounds.height,
+                               "inEditor": belongsToEditor,
+                               "visible": chip.window === self.window && !chip.isHiddenOrHasHiddenAncestor && !visible.isEmpty])
+            }
+            view.subviews.forEach(visit)
+        }
+        if let root = window?.contentView { visit(root) }
+        guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
     override func accessibilityChildren() -> [Any]? {
         var children = super.accessibilityChildren() ?? []
         children.append(passageChipStateProbe)
+        children.append(chipGeometryProbe)
         return children
     }
 #endif
+
+    /// Notify the TextKit 2 content manager when replacing the styled document.
+    func replaceStyledDocument(with attributed: NSAttributedString) {
+        performContentEditingTransaction {
+            textStorage?.setAttributedString(attributed)
+        }
+        if let layout = textLayoutManager, let manager = layout.textContentManager {
+            layout.invalidateLayout(for: manager.documentRange)
+        }
+        needsLayout = true
+        needsDisplay = true
+    }
+
+    func performContentEditingTransaction(_ edit: () -> Void) {
+        if let manager = textLayoutManager?.textContentManager {
+            manager.performEditingTransaction(edit)
+        } else {
+            edit()
+        }
+    }
 
     /// Font size for formatting actions triggered from keyboard overrides (Tab/Return/Backspace).
     var configuredFontSize: CGFloat = 14
@@ -27,6 +74,7 @@ final class EditorTextView: NSTextView {
         let contentStorage = NSTextContentStorage()
         let layoutManager = NSTextLayoutManager()
         contentStorage.addTextLayoutManager(layoutManager)
+        contentStorage.primaryTextLayoutManager = layoutManager
         let container = NSTextContainer()
         layoutManager.textContainer = container
         super.init(frame: .zero, textContainer: container)
@@ -36,6 +84,18 @@ final class EditorTextView: NSTextView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Not supported") }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window != nil, let layout = self.textLayoutManager,
+                  let content = layout.textContentManager else { return }
+            layout.invalidateLayout(for: content.documentRange)
+            layout.textViewportLayoutController.layoutViewport()
+            self.needsDisplay = true
+        }
+    }
 
     private func commonInit() {
         isRichText = true           // W3-S2: rich text for styled mode
@@ -596,6 +656,22 @@ final class EditorTextView: NSTextView {
 /// exists. Its value is a renderer-time snapshot of the text storage, with no click handler, binding, or
 /// SwiftUI state update. The one-point frame is inside the editor only to give XCUITest a real visible AX
 /// frame; it has no backing visual view and is omitted from Release.
+private final class ChipGeometryProbe: NSAccessibilityElement {
+    nonisolated(unsafe) private weak var textView: EditorTextView?
+    init(textView: EditorTextView) { self.textView = textView; super.init() }
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
+    override func accessibilityLabel() -> String? { "Installed chip geometry" }
+    override func accessibilityIdentifier() -> String? { "an.editor.test.chipGeometry" }
+    override func accessibilityParent() -> Any? { textView }
+    override func accessibilityFrameInParentSpace() -> NSRect { NSRect(x: 1, y: 1, width: 1, height: 1) }
+    override func accessibilityValue() -> Any? {
+        guard Thread.isMainThread else { return nil }
+        let editor = textView
+        return MainActor.assumeIsolated { editor?.uiTestInstalledChipGeometry() }
+    }
+}
+
 private final class PassageChipStateProbe: NSAccessibilityElement {
     // AX getters are synchronous Obj-C entry points. The parent and snapshot are set on the main thread by
     // `EditorTextView`; the getter only returns the already-formed String and never touches AppKit storage.

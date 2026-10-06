@@ -1,12 +1,5 @@
 import AppKit
 
-/// Sendable wrapper for a non-Sendable preview callback so it can cross the
-/// MainActor.assumeIsolated boundary in `loadView()`. Safe: loadView always runs on main.
-final class PreviewCallbackBox: @unchecked Sendable {
-    let callback: ((SourceAnchor, NSView) -> Void)?
-    init(_ callback: ((SourceAnchor, NSView) -> Void)?) { self.callback = callback }
-}
-
 /// Reference wrapper so a `SourceAnchor` (value type) can ride on an `NSAttributedString.Key`.
 /// Immutable + `@unchecked Sendable` — all fields are `let`.
 ///
@@ -40,7 +33,7 @@ final class BlockHeaderAttachment: NSTextAttachment {
     let sourceBox: SourceAnchorBox
 
     /// Callback invoked when the user clicks "Reveal in Reader" on the chip.
-    /// `nonisolated(unsafe)` — set once after init, read from nonisolated viewProvider.
+    /// `nonisolated(unsafe)` — set once after init, copied when the provider initializes.
     nonisolated(unsafe) var onReveal: (@Sendable (SourceAnchor) -> Void)?
 
     /// Callback invoked when the user clicks "Preview" on the chip.
@@ -64,6 +57,7 @@ final class BlockHeaderAttachment: NSTextAttachment {
     init(sourceBox: SourceAnchorBox) {
         self.sourceBox = sourceBox
         super.init(data: nil, ofType: nil)
+        allowsTextAttachmentView = true
         self.bounds = CGRect(origin: .zero, size: CGSize(width: 1, height: chipHeight))
     }
 
@@ -85,12 +79,6 @@ final class BlockHeaderAttachment: NSTextAttachment {
             textLayoutManager: textContainer?.textLayoutManager,
             location: location
         )
-        provider.chipBox = sourceBox
-        provider.chipReveal = onReveal
-        provider.chipPreview = onPreview
-        provider.chipJump = onJump
-        provider.chipLiveLabel = passageLiveLabel
-        provider.chipSourceMissing = passageSourceMissing
         provider.tracksTextAttachmentViewBounds = true
         return provider
     }
@@ -110,31 +98,56 @@ final class BlockHeaderAttachment: NSTextAttachment {
 
 // MARK: - View provider
 
-final class BlockHeaderViewProvider: NSTextAttachmentViewProvider {
-    /// Set before `loadView`; `nonisolated(unsafe)` because NSTextAttachmentViewProvider's
-    /// inherited interfaces are nonisolated but `loadView` runs on main thread.
-    nonisolated(unsafe) var chipBox: SourceAnchorBox?
-    nonisolated(unsafe) var chipReveal: (@Sendable (SourceAnchor) -> Void)?
-    nonisolated(unsafe) var chipPreview: ((SourceAnchor, NSView) -> Void)?
-    nonisolated(unsafe) var chipJump: (@Sendable (SourceAnchor) -> Void)?
-    nonisolated(unsafe) var chipLiveLabel: String?
-    nonisolated(unsafe) var chipSourceMissing = false
+/// Frozen display configuration. Only the preview callback is non-Sendable; it crosses the synchronous
+/// main-thread `loadView` bridge and is invoked by the chip's main-thread UI action, never a worker.
+private final class BlockHeaderViewConfiguration: @unchecked Sendable {
+    let box: SourceAnchorBox
+    let reveal: (@Sendable (SourceAnchor) -> Void)?
+    let preview: ((SourceAnchor, NSView) -> Void)?
+    let jump: (@Sendable (SourceAnchor) -> Void)?
+    let label: String?
+    let missing: Bool
 
-    // loadView is always called on the main thread by TextKit 2.
+    init(_ attachment: BlockHeaderAttachment) {
+        box = attachment.sourceBox
+        reveal = attachment.onReveal
+        preview = attachment.onPreview
+        jump = attachment.onJump
+        label = attachment.passageLiveLabel
+        missing = attachment.passageSourceMissing
+    }
+}
+
+final class BlockHeaderViewProvider: NSTextAttachmentViewProvider {
+    private let configuration: BlockHeaderViewConfiguration?
+
+    override init(textAttachment: NSTextAttachment, parentView: NSView?,
+                  textLayoutManager: NSTextLayoutManager?, location: any NSTextLocation) {
+        // Own immutable fields are ready before AppKit's initializer can request the view.
+        // Retain display values rather than depending on the base provider's weak attachment getter.
+        configuration = (textAttachment as? BlockHeaderAttachment).map(BlockHeaderViewConfiguration.init)
+        super.init(textAttachment: textAttachment, parentView: parentView,
+                   textLayoutManager: textLayoutManager, location: location)
+    }
+
+
+    override nonisolated func attachmentBounds(
+        for attributes: [NSAttributedString.Key: Any]?, location: any NSTextLocation,
+        textContainer: NSTextContainer?, proposedLineFragment: CGRect, position: CGPoint
+    ) -> CGRect {
+        CGRect(origin: .zero, size: CGSize(width: max(proposedLineFragment.width - position.x, 200), height: 28))
+    }
+
     @preconcurrency override func loadView() {
-        let box = chipBox
-        let reveal = chipReveal
-        let jump = chipJump
-        let liveLabel = chipLiveLabel
-        let sourceMissing = chipSourceMissing
-        let previewBox = PreviewCallbackBox(chipPreview)
-        // NSView.init is @MainActor — assumeIsolated is correct here (always main thread).
+        let captured = configuration
         let chipView: NSView = MainActor.assumeIsolated {
-            if let box {
-                return BlockHeaderChipView(box: box, onReveal: reveal, onPreview: previewBox.callback,
-                                           onJump: jump, liveLabel: liveLabel, sourceMissing: sourceMissing)
-            }
-            return NSView()
+            guard let captured else { return NSView() }
+            return BlockHeaderChipView(box: captured.box,
+                                       onReveal: captured.reveal,
+                                       onPreview: captured.preview,
+                                       onJump: captured.jump,
+                                       liveLabel: captured.label,
+                                       sourceMissing: captured.missing)
         }
         self.view = chipView
     }
@@ -153,6 +166,9 @@ final class BlockHeaderChipView: NSView {
     private let liveLabel: String?
     /// W7-S3 — the note-passage source no longer resolves; render greyed with a "source removed" hint.
     private let sourceMissing: Bool
+#if DEBUG
+    var uiTestSourceNoteID: String? { box.anchor.notePassageTarget?.id.uuidString.lowercased() }
+#endif
 
     @preconcurrency
     init(box: SourceAnchorBox, onReveal: (@Sendable (SourceAnchor) -> Void)?,

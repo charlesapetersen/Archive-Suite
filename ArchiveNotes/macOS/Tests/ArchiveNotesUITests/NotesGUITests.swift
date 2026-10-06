@@ -2130,6 +2130,8 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertTrue(pollUntil(timeout: 12) { ((editor.value as? String) ?? "").contains("Moore says") },
                       "selecting the extract should load its body into the editor")
         ensureStyled()
+        XCTAssertFalse((passageChipStates() ?? []).contains { ($0["id"] as? String) == Self.idPlain },
+                       "the fixture extract must not already contain the passage we are about to paste")
         // Not `_ =`: this silently failed for the whole life of the test (the field was never cleared, so the
         // parse produced three parts and the seam was never called). W21.vmgui-g13.
         XCTAssertTrue(setEditorSelection(location: 0, length: 0),
@@ -2144,7 +2146,8 @@ final class NotesGUITests: NotesFixtureUITestCase {
         // --- 4. The BYTES must be in the extract's own assets/, and the .md must reference them there. ---
         XCTAssertTrue(outcome.hasPrefix("ok"),
                       "the passage paste must RUN, not decline — it reported: \(outcome) "
-                      + "(the target extract is \(Self.idExtract.prefix(8)))")
+                      + "(the target extract is \(Self.idExtract.prefix(8))) "
+                      + "\(mainWindow.descendants(matching: .any)["an.editor.test.chipGeometry"].value ?? "no geometry")")
         // ⚠️ ORDER IS LOAD-BEARING. `continueAfterFailure = false`, so the FIRST failing assertion aborts
         // the test — a discriminating check placed after the one that fails never runs. This one goes first
         // for exactly that reason: it separates "the paste declined" from "the paste imported into the WRONG
@@ -2165,8 +2168,49 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertTrue(pollUntil(timeout: 10) {
             (rawMarkdown(inItemDir: Self.idExtract) ?? "").contains("](assets/\(importedAsset))")
         }, "the extract .md should reference the imported asset by its own assets/ path")
-        // (Both items are left dirty — the runner can't delete under /Users/; the next pre-run fixture
-        // rebuild restores them.)
+        // W9.cand2: bytes alone cannot prove that a fresh passage became a styled chip. The probe
+        // snapshots actual text-storage attachments; reading it does not trigger a late re-style.
+        var missingViews: [String] = []
+        func assertPastedChip(_ phase: String) {
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                (self.passageChipStates(timeout: 1) ?? []).contains {
+                    ($0["id"] as? String) == Self.idPlain && ($0["missing"] as? Bool) == false
+                }
+            }, "the pasted source must have an actual rendered chip \(phase)")
+            XCTAssertFalse(((editor.value as? String) ?? "").contains("<!-- block:"),
+                           "styled provenance must not appear as a raw HTML comment \(phase)")
+            // Pasting a whole note moves the caret below its header. Bring the first block into
+            // view before pixel review; scrolling does not change mode or rebuild the body.
+            editor.scroll(byDeltaX: 0, deltaY: 1_000)
+            Thread.sleep(forTimeInterval: 1)
+            let geometry = mainWindow.descendants(matching: .any)["an.editor.test.chipGeometry"]
+            XCTAssertTrue(geometry.waitForExistence(timeout: 5))
+            let visible = pollUntil(timeout: 5) {
+                guard let json = geometry.value as? String, let data = json.data(using: .utf8),
+                      let views = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return false }
+                return views.contains { ($0["id"] as? String) == Self.idPlain && ($0["visible"] as? Bool) == true && ($0["inEditor"] as? Bool) == true
+                    && ($0["width"] as? Double ?? 0) > 0 && ($0["height"] as? Double ?? 0) > 0 }
+            }
+            if !visible { missingViews.append("\(phase): \(geometry.value ?? "unavailable")") }
+            let shot = XCTAttachment(screenshot: mainWindow.screenshot())
+            shot.name = "W9.cand2 pasted chip \(phase)"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        assertPastedChip("immediately after paste")
+        let saved = try XCTUnwrap(rawMarkdown(inItemDir: Self.idExtract))
+        XCTAssertTrue(saved.contains("<!-- block: note-passage"))
+        selectItem(uuid: Self.idPlain)
+        XCTAssertTrue(pollUntil(timeout: 10) { !(self.passageChipStates(timeout: 1) ?? []).contains {
+            ($0["id"] as? String) == Self.idPlain
+        } })
+        selectItem(uuid: Self.idExtract)
+        XCTAssertTrue(pollUntil(timeout: 10) { ((self.editor.value as? String) ?? "").contains("Moore says") })
+        assertPastedChip("after reselect")
+        XCTAssertEqual(rawMarkdown(inItemDir: Self.idExtract), saved,
+                       "reselecting must preserve the saved provenance and asset references")
+        XCTAssertTrue(missingViews.isEmpty, "visible installed chip views are required: \(missingViews)")
+        // Both items are scratch-only; the next pre-run fixture rebuild restores them.
     }
 
     /// G14 — the target window is RAISED and FOCUSED, not merely updated (W14.4 b). Two phases over one

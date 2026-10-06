@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 @testable import ArchiveNotes
 
 /// Tests for block-header chip parse → serialize round-trip via `MarkdownBridge`.
@@ -6,6 +7,46 @@ import XCTest
 /// attribute), NOT the storage-layer `BlockParser` (tested in `BlockParserTests`).
 @MainActor
 final class BlockChipTests: XCTestCase {
+
+    func testViewProviderUsesAttachmentBeforeAnyFactorySetup() throws {
+        let id = UUID()
+        let anchor = SourceAnchor.notePassage(sourceNoteId: id, sourceBlockIndex: 0,
+                                             sourceTitle: "Pasted source", sourceDateDisplay: "")
+        let attachment = BlockHeaderAttachment(sourceBox: SourceAnchorBox(anchor: anchor, kind: .notePassage))
+        XCTAssertTrue(attachment.usesTextAttachmentView, "block chips must opt into view rendering")
+        let storage = NSTextContentStorage()
+        // View loading may occur during provider initialization, before the factory returns.
+        let provider = BlockHeaderViewProvider(textAttachment: attachment, parentView: nil,
+                                              textLayoutManager: nil, location: storage.documentRange.location)
+        let chip = try XCTUnwrap(provider.view as? BlockHeaderChipView,
+                                 "provider must read its already-configured attachment without late setup")
+        XCTAssertEqual(chip.uiTestSourceNoteID, id.uuidString.lowercased())
+    }
+
+    func testConfiguredChipRendersPixelsWithoutAWindow() throws {
+        let anchor = SourceAnchor.notePassage(sourceNoteId: UUID(), sourceBlockIndex: 0,
+                                             sourceTitle: "Fresh passage pixel guard", sourceDateDisplay: "")
+        let attachment = BlockHeaderAttachment(sourceBox: SourceAnchorBox(anchor: anchor, kind: .notePassage))
+        let storage = NSTextContentStorage()
+        let provider = BlockHeaderViewProvider(textAttachment: attachment, parentView: nil,
+                                              textLayoutManager: nil, location: storage.documentRange.location)
+        let chip = try XCTUnwrap(provider.view as? BlockHeaderChipView)
+        chip.frame = NSRect(x: 0, y: 0, width: 600, height: 28)
+        chip.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(chip.bitmapImageRepForCachingDisplay(in: chip.bounds))
+        chip.cacheDisplay(in: chip.bounds, to: bitmap)
+        var ink = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                if let color = bitmap.colorAt(x: x, y: y), color.alphaComponent > 0.4 { ink += 1 }
+            }
+        }
+        XCTAssertGreaterThan(ink, 50, "the configured chip must draw its label and action, not a blank view")
+        let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        let artifact = FileManager.default.temporaryDirectory.appendingPathComponent("cand2-chip-\(UUID().uuidString).png")
+        try png.write(to: artifact)
+        print("ARTIFACT W9.cand2 chip: \(artifact.path)")
+    }
 
     // MARK: - Multi-block body
 

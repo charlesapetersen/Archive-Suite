@@ -42,6 +42,25 @@ private func makeModel(_ rec: Recorder, debounce: Duration = .milliseconds(40)) 
 @MainActor
 struct NoteBodyEditorModelTests {
 
+    @Test("a retired editor cannot save its passage into the newly selected item")
+    func rejectsRetiredEditorWriteBack() async {
+        let a = UUID(), b = UUID()
+        let rec = Recorder([a: "A-body", b: "B-body"])
+        let model = makeModel(rec, debounce: .seconds(60))
+        await model.select(a)
+        model.acceptEditorMarkdown("A edited", for: a)
+        await model.select(b)
+        model.acceptEditorMarkdown("late A passage", for: a)
+        await model.flush()
+        #expect(model.markdown == "B-body")
+        #expect(rec.bodies[a] == "A edited")
+        #expect(rec.bodies[b] == "B-body")
+        #expect(rec.saves.count == 1)
+        model.acceptEditorMarkdown("B edited", for: b)
+        await model.flush()
+        #expect(rec.bodies[b] == "B edited")
+    }
+
     @Test("an in-flight autosave finishes before a newer forced save")
     func forcedSaveWaitsForOlderAutosave() async {
         let id = UUID()

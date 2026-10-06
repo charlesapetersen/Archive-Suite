@@ -63,6 +63,12 @@ final class NoteBodyEditorModel: ObservableObject {
 
     init() {}
 
+    /// A retired editor may finish a delayed serialize after another item has loaded.
+    func acceptEditorMarkdown(_ body: String, for editorItemID: UUID?) {
+        guard loadedID == editorItemID else { return }
+        markdown = body
+    }
+
     // MARK: Selection
 
     /// The selected single item changed (nil = no single selection). Flush the OUTGOING item's pending

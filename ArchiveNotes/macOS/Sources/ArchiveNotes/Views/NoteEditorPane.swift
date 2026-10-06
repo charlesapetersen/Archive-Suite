@@ -80,6 +80,7 @@ struct NoteEditorPane: View {
                     .accessibilityIdentifier("an.editor.parseFailure")
             }
             bodyEditorView
+                .id(bodyEditor.loadedID)
                 .id(extractEditorGeneration)
                 .disabled(nav.selectedItemID == nil)   // nothing single-selected → no editable target
 #if DEBUG
@@ -151,8 +152,12 @@ struct NoteEditorPane: View {
     /// to the value-type representable before it's returned; Release omits the seam entirely (the editor
     /// is byte-identical to the previous inline construction).
     private var bodyEditorView: MarkdownEditorView {
+        let editorItemID = bodyEditor.loadedID
         var view = MarkdownEditorView(
-            markdown: $bodyEditor.markdown,
+            markdown: Binding(
+                get: { bodyEditor.markdown },
+                set: { bodyEditor.acceptEditorMarkdown($0, for: editorItemID) }
+            ),
             isRaw: $isRaw,
             formatting: formatting,
             assetStore: assetStore,
@@ -187,7 +192,7 @@ struct NoteEditorPane: View {
             contentID: bodyEditor.loadedID,
             revealFirstBlockOnModeSwitch: nav.selectedSummary?.kind == .extract,
             onStyledSwitchApplied: { extractEditorGeneration &+= 1 },
-            focusRequestToken: initialEditorFocusRequested ? editorFocusToken : nil,
+            focusRequestToken: initialEditorFocusRequested && !initialEditorFocusCompleted ? editorFocusToken : nil,
             onFocusApplied: {
                 DispatchQueue.main.async { initialEditorFocusCompleted = true }
             },
