@@ -2198,6 +2198,20 @@ final class NotesGUITests: NotesFixtureUITestCase {
             add(shot)
         }
         assertPastedChip("immediately after paste")
+        // W9.cand2-fu1: NSTextView's own undo/redo put the chip back without the paste path's relayout.
+        // The selection seam focuses the editor, so ⌘Z / ⇧⌘Z take the real menu path.
+        func chipGeometry() -> [[String: Any]] {
+            let probe = mainWindow.descendants(matching: .any)["an.editor.test.chipGeometry"]
+            guard let json = probe.value as? String, let data = json.data(using: .utf8) else { return [] }
+            return (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
+        }
+        func noChipView() -> Bool { !chipGeometry().contains { ($0["id"] as? String) == Self.idPlain } }
+        XCTAssertTrue(setEditorSelection(location: 0, length: 0), "the selection seam must focus the editor")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(pollUntil(timeout: 10, noChipView),
+                      "⌘Z must undo the paste, chip view and all: \(chipGeometry())")
+        app.typeKey("z", modifierFlags: [.command, .shift])
+        assertPastedChip("after undo then redo of the paste")
         let saved = try XCTUnwrap(rawMarkdown(inItemDir: Self.idExtract))
         XCTAssertTrue(saved.contains("<!-- block: note-passage"))
         selectItem(uuid: Self.idPlain)
@@ -2210,6 +2224,16 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertEqual(rawMarkdown(inItemDir: Self.idExtract), saved,
                        "reselecting must preserve the saved provenance and asset references")
         XCTAssertTrue(missingViews.isEmpty, "visible installed chip views are required: \(missingViews)")
+
+        // W9.cand2-fu1: delete the chip, then ⌘Z. The restore is NSTextView's own undo, not a paste.
+        let chipAt = try XCTUnwrap(passageChipStates()?.first { ($0["id"] as? String) == Self.idPlain }?["location"]
+                                   as? Int, "the reloaded chip's offset should be in the probe")
+        XCTAssertTrue(setEditorSelection(location: chipAt, length: 1), "the selection seam must select the chip")
+        app.typeKey(.delete, modifierFlags: [])
+        XCTAssertTrue(pollUntil(timeout: 10, noChipView), "Delete must remove the chip view: \(chipGeometry())")
+        app.typeKey("z", modifierFlags: .command)
+        assertPastedChip("after deleting the chip then undo")
+        XCTAssertTrue(missingViews.isEmpty, "undo/redo must restore visible chip views: \(missingViews)")
         // Both items are scratch-only; the next pre-run fixture rebuild restores them.
     }
 
