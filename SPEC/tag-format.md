@@ -74,6 +74,8 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Day** | `Day N` (unpadded), e.g. `Day 25`, `Day 1` | 0–1 | N = 1–31. Often absent. |
 | **Decade** | `NNNNs`, e.g. `1970s` (a 3–4 digit run whose **last digit is `0`**, then a **lowercase** `s`; medieval-friendly `970s`) | 0–1 | An **approximate** date spanning ten years. **Mutually exclusive with Year** — a concrete Year supersedes a Decade. Recognized alongside the bare-number Year test (the trailing `s` means it can never match the digits-only Year test, so order is immaterial). Written by the Processor **only** when the user types it into the manual tag dialog's Year field; the LLM tagger never emits it. Reader parser: `DocumentTags.parseDecade`. |
 | **Date Uncertain** | literal `Date Uncertain` | 0–1 | Flags a **speculative year** — the file _usually still carries a Year tag_. Not "no date." |
+| **Sent With** *(W37.dual-date)* | `Sent With 1958`, `Sent With 1958-03`, `Sent With 1958-03-12` or `Sent With 1950s` | 0–1 | The **covering letter's** date on an enclosure that has its own date. ONE whole-value token so its precision never cross-pairs with the item's own Year/Month/Day. Exact, case-sensitive prefix `Sent With `; 3–4 ASCII year digits, no leading zero; zero-padded month/day that must exist (Gregorian); decade `NNN0s`. Anything else (`sent with 1958`, `Sent With 1958-02-30`, `Sent With Love`) stays a verbatim subject. Two valid tokens: last wins, the earlier is demoted to a subject (`sentWithIsAmbiguous`), never combined. Core: `ArchiveDate` / `SentWithTag` (`Tags/ArchiveDate.swift`). |
+| **Sent With Date Uncertain** | literal `Sent With Date Uncertain` (exact case) | 0–1 | Speculative sent-with date. Independent of `Date Uncertain`; written only beside a `Sent With` value, and cleared with it. |
 | **Quality** *(the rating facet)* | exactly one of `Q1` `Q2` `Q3` (higher = better) | 0–1 | **The single importance/quality rating (W19, 2026-07-18) — MERGED with + supersedes the legacy Priority facet** (`Q3` = old `P10`). A human 0–3 rating; **`Q0`/unrated writes NO tag** (absence *is* 0 stars, so the wire only ever carries `Q1`/`Q2`/`Q3`). Human-set everywhere, **never LLM-emitted**: Notes (front-matter `quality`), Reader (edit), Processor's interactive tagging (Live Capture tag card + Process Files manual tagging), and the **phone companions** (per-page/segment — the old priority control now emits `Q`). Q-prefix can never collide with the digits-only Year test. |
 | **Priority** *(legacy → Quality)* | `P7`–`P10`, on pre-W19 files only | 0–1 | **RETIRED — merged into Quality (W19, 2026-07-18).** No longer written by any app or companion. **Read-only alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3` and `P7` as unrated, so pre-W19 phone-captured files still resolve without a corpus rewrite. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
@@ -109,6 +111,13 @@ sortDate = year * 10_000 + (month ?? 0) * 100 + (day ?? 0)     // nil when no ye
   dumped to the end.** The nav window renders their derived date in **italics**
   (`dateIsSpeculative`) to signal speculation.
 - Undated rows (`sortDate == nil`) sort to the end.
+- **Sent-with fallback (W37, owner 2026-10-05).** The item's OWN date sorts. Only when it has none does
+  the `Sent With` date's key sort it (`DocumentTags.sortsBySentWith`), and the UI labels that fallback.
+  A covering letter never acquires an enclosure's date, and an enclosure's own date is never replaced.
+- **Date filters match either date.** `ArchiveCore.DateRangeFilter` tests each role's key on its own
+  (`DocumentTags.dateKeysByRole`): a file matches once if its own OR its sent-with date is inside, and
+  both bounds must be met by the SAME value — dated 1950, sent 1970 never matches 1960–1965. Year-only
+  and decade values keep their sort-key position; this is not interval overlap.
 - BC dates are **not currently representable** — the year token is unsigned digits; true BC support
   would need a negative-year token this format does not yet define.
 

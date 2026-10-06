@@ -12,6 +12,10 @@ public struct GeneratedTags: Codable, Sendable {
     public var month: String?            // e.g. "03 March"
     public var day: String?              // e.g. "Day 15"
     public var dateUncertain: Bool
+    /// W37.dual-date: the covering letter's date when this document is an enclosure with its own date;
+    /// written as one `Sent With …` token. `sentWithUncertain` is independent of `dateUncertain`.
+    public var sentWith: ArchiveDate?
+    public var sentWithUncertain: Bool
     public var ocrFailed: Bool
     public var subjectTags: [String]
     /// Human-set 0...3 rating. Zero is deliberately represented by the absence of a Finder tag.
@@ -31,6 +35,8 @@ public struct GeneratedTags: Codable, Sendable {
         month: String? = nil,
         day: String? = nil,
         dateUncertain: Bool = false,
+        sentWith: ArchiveDate? = nil,
+        sentWithUncertain: Bool = false,
         ocrFailed: Bool = false,
         subjectTags: [String] = [],
         quality: Int = 0,
@@ -46,6 +52,8 @@ public struct GeneratedTags: Codable, Sendable {
         self.month = month
         self.day = day
         self.dateUncertain = dateUncertain
+        self.sentWith = sentWith
+        self.sentWithUncertain = sentWithUncertain
         self.ocrFailed = ocrFailed
         self.subjectTags = subjectTags
         self.quality = quality
@@ -81,6 +89,10 @@ public struct GeneratedTags: Codable, Sendable {
         if let m = month { tags.append(Self.capitalizeFirstLetters(m)) }
         if let d = day { tags.append(d) }
         if dateUncertain { tags.append("Date Uncertain") }
+        if let sentWith {
+            tags.append(SentWithTag.token(for: sentWith))
+            if sentWithUncertain { tags.append(SentWithTag.uncertainToken) }
+        }
         tags.append(contentsOf: subjectTags.map { Self.capitalizeFirstLetters($0) })
         if let qualityTag = DocumentTags.qualityTag(for: quality) { tags.append(qualityTag) }
         if let c = colorTag { tags.append(c) }

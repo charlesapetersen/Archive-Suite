@@ -14,6 +14,10 @@ public enum TagEditOp: Sendable, Equatable {
     case setDateUncertain(Bool)
     case setQuality(Int?)       // 1...3, or nil to clear (unrated writes NO token — never `Q0`)
     case setColor(ArchiveColor?)// box / folder, or nil to clear
+    /// W37: the covering letter's date, one whole `Sent With …` token; nil clears it. Clearing it also
+    /// clears its uncertain flag, which means nothing on its own.
+    case setSentWith(ArchiveDate?)
+    case setSentWithUncertain(Bool)
 }
 
 public enum TagEditing {
@@ -51,6 +55,21 @@ public enum TagEditing {
                             remove: tags.qualityToken.map { [$0] } ?? [])
         case .setColor(let c):
             return TagDelta(color: c.map { .set($0) } ?? .clear)
+        case .setSentWith(let d):
+            // Removes ONLY the one token this file consumed for the facet (a demoted duplicate or a
+            // malformed lookalike is a subject and is untouched); a no-op set writes nothing.
+            let new = d.map(SentWithTag.token(for:))
+            if let new, new == tags.sentWithToken { return TagDelta() }
+            var remove = tags.sentWithToken.map { [$0] } ?? []
+            if d == nil, tags.sentWithUncertain { remove += tokens(in: tags) { $0 == SentWithTag.uncertainToken } }
+            return TagDelta(add: new.map { [$0] } ?? [], remove: remove)
+        case .setSentWithUncertain(let on):
+            if on {
+                return tags.sentWithUncertain || tags.sentWith == nil
+                    ? TagDelta() : TagDelta(add: [SentWithTag.uncertainToken])
+            }
+            return tags.sentWithUncertain
+                ? TagDelta(remove: tokens(in: tags) { $0 == SentWithTag.uncertainToken }) : TagDelta()
         }
     }
 

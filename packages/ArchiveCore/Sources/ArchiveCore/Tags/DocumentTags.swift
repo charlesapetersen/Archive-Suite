@@ -68,12 +68,21 @@ public struct DocumentTags: Sendable, Equatable {
     public var decadeToken: String?   // the verbatim raw token consumed for the decade facet ("1970s")
     public var qualityToken: String?  // canonical Q1...Q3 or current phone P7...P10 wire input
 
+    // W37.dual-date: the covering letter's date, carried as ONE whole-value token ("Sent With 1958-03-12")
+    // so its precision never cross-pairs with the item's own Year/Month/Day. Last valid token wins; an
+    // earlier one is demoted to a subject (visible, never silently merged). `sentWithUncertain` is
+    // independent of `dateUncertain`.
+    public var sentWith: ArchiveDate?
+    public var sentWithUncertain: Bool
+    public var sentWithToken: String?
+
     public init(
         raw: [String], labelNumber: Int?,
         year: Int?, month: Month?, day: Int?, dateUncertain: Bool, decade: Int?,
         quality: Int?, readState: ReadState?, color: ArchiveColor?, subjects: [String],
         yearToken: String?, monthToken: String?, dayToken: String?, decadeToken: String?,
-        qualityToken: String?
+        qualityToken: String?,
+        sentWith: ArchiveDate? = nil, sentWithUncertain: Bool = false, sentWithToken: String? = nil
     ) {
         self.raw = raw; self.labelNumber = labelNumber
         self.year = year; self.month = month; self.day = day
@@ -86,14 +95,40 @@ public struct DocumentTags: Sendable, Equatable {
         self.yearToken = yearToken; self.monthToken = monthToken; self.dayToken = dayToken
         self.decadeToken = decadeToken
         self.qualityToken = qualityToken
+        self.sentWith = sentWith; self.sentWithUncertain = sentWithUncertain
+        self.sentWithToken = sentWithToken
     }
 
-    /// Chronological sort key derived from the date tags. **No epoch limit** (medieval-safe).
-    /// `nil` when there is no year → the caller sorts undated rows to the end.
+    /// Chronological sort key. **No epoch limit** (medieval-safe). The item's OWN date sorts; when it
+    /// has none, the sent-with (covering letter) date is the fallback (owner, 2026-10-05) — check
+    /// `sortsBySentWith` to label it. `nil` when neither exists → the caller sorts undated rows to the end.
     /// Month/day absent count as 0, so a year-only doc sorts just before its January.
-    public var sortDate: Int? {
+    public var sortDate: Int? { ownSortDate ?? sentWith?.sortKey }
+
+    /// Sort key of the item's own date alone (no sent-with fallback).
+    public var ownSortDate: Int? {
         DocumentTags.sortDateKey(year: year, month: month?.number, day: day, decade: decade)
     }
+
+    /// True when `sortDate` comes from the sent-with fallback, i.e. the item has no own date.
+    public var sortsBySentWith: Bool { ownSortDate == nil && sentWith != nil }
+
+    /// Each role's sort key, for a date filter that matches either date (owner, 2026-10-05).
+    public var dateKeysByRole: [DateRole: Int] {
+        var keys: [DateRole: Int] = [:]
+        if let own = ownSortDate { keys[.own] = own }
+        if let sent = sentWith { keys[.sentWith] = sent.sortKey }
+        return keys
+    }
+
+    /// True when the file carries more than one sent-with lookalike: a demoted valid token or a
+    /// malformed `Sent With …` token stays a subject and the date is shown as needing review.
+    public var sentWithIsAmbiguous: Bool {
+        subjects.contains { $0.trimmingCharacters(in: .whitespaces).hasPrefix(SentWithTag.prefix) }
+    }
+
+    /// Display form of the sent-with date, e.g. "Mar 12, 1958"; `nil` when absent.
+    public var displaySentWith: String? { sentWith?.display }
 
     /// The canonical chronological sort key from already-parsed numeric date components — the single
     /// source of truth for the SPEC sort formula (`year * 10_000 + month * 100 + day`), shared by every
@@ -122,6 +157,7 @@ public struct DocumentTags: Sendable, Equatable {
             if let t = monthToken { s.insert(t) }
             if let t = dayToken { s.insert(t) }
             if let t = decadeToken { s.insert(t) }
+            if let t = sentWithToken { s.insert(t) }
             return s
         }()
         return raw.filter { token in
@@ -129,6 +165,7 @@ public struct DocumentTags: Sendable, Equatable {
             if s.isEmpty { return false }
             if ReadState.allCases.contains(where: { $0.rawValue.caseInsensitiveCompare(s) == .orderedSame }) { return false }
             if s.caseInsensitiveCompare("Date Uncertain") == .orderedSame { return false }
+            if s == SentWithTag.uncertainToken { return false }
             if excluded.contains(token) { return false }
             return true
         }
@@ -169,6 +206,9 @@ extension DocumentTags {
         var dayToken: String?
         var decadeToken: String?
         var qualityToken: String?
+        var sentWith: ArchiveDate?
+        var sentWithUncertain = false
+        var sentWithToken: String?
 
         let color = labelNumber.flatMap(ArchiveColor.init(labelNumber:))
 
@@ -179,6 +219,16 @@ extension DocumentTags {
             // Read state — exact whole-string, case-insensitive (never substring).
             if let rs = ReadState.allCases.first(where: { $0.rawValue.caseInsensitiveCompare(s) == .orderedSame }) {
                 readState = rs
+                continue
+            }
+            // Sent-with date (W37) — exact title-cased prefix, whole value; before the generic facets.
+            if s == SentWithTag.uncertainToken {
+                sentWithUncertain = true
+                continue
+            }
+            if let d = SentWithTag.parse(s) {
+                if let prev = sentWithToken { subjects.append(prev) }
+                sentWith = d; sentWithToken = token
                 continue
             }
             // Date Uncertain.
@@ -234,7 +284,8 @@ extension DocumentTags {
             year: year, month: month, day: day, dateUncertain: dateUncertain, decade: decade,
             quality: quality, readState: readState, color: color, subjects: subjects,
             yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, decadeToken: decadeToken,
-            qualityToken: qualityToken
+            qualityToken: qualityToken,
+            sentWith: sentWith, sentWithUncertain: sentWithUncertain, sentWithToken: sentWithToken
         )
     }
 
@@ -333,6 +384,7 @@ extension DocumentTags {
         if parseMonth(s) != nil { return true }
         if parseDay(s) != nil { return true }
         if parseDecade(s) != nil { return true }
+        if s == SentWithTag.uncertainToken || SentWithTag.parse(s) != nil { return true }
         return false
     }
 }
