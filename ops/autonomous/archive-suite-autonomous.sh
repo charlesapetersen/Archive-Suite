@@ -97,6 +97,10 @@ CODEX_EFFORT="${AUTONOMOUS_CODEX_EFFORT:-high}"
 # Helper availability keeps this reusable template's old serial fixtures working.
 # The Archive Suite launcher requires the helper before installing a new daemon.
 CLAIMS_CMD="${AUTONOMOUS_CLAIMS_CMD:-$REPO/ops/autonomous/worker-state.py}"
+HEAVY_CMD="${AUTONOMOUS_HEAVY_CMD:-$REPO/ops/autonomous/heavy-run.py}"
+HEAVY_STATE="${AUTONOMOUS_HEAVY_STATE:-$STATE/heavy}"
+export AUTONOMOUS_HEAVY_STATE="$HEAVY_STATE"
+export AUTONOMOUS_HEAVY_ENABLED=1   # installed supervisor activates coordination at owner restart
 WORKER_ID="${AUTONOMOUS_WORKER_ID:-worker-1}"
 WORKER_STATE="$STATE"
 if [ -f "$CLAIMS_CMD" ]; then
@@ -679,11 +683,26 @@ _gate_tip() {
 }
 GATE_REF="$(_gate_tip)"
 _run_gate_once() {
-  "$GATE_CMD" >"$glog" 2>&1 &
-  local gpid=$! waited=0
+  local ready="" gpid waited=0
+  if [ -f "$HEAVY_CMD" ]; then
+    ready="$(mktemp "$STATE/gate-ready.XXXXXX")" || { GATE_RC=1; return; }
+    rm -f "$ready"
+    python3 "$HEAVY_CMD" --state "$HEAVY_STATE" --ready "$ready" run -- "$GATE_CMD" >"$glog" 2>&1 &
+    gpid=$!
+  else
+    # Serial template fixtures without repository helpers retain their old path.
+    "$GATE_CMD" >"$glog" 2>&1 &
+    gpid=$!
+  fi
   # Small poll granularity so a finished gate is noticed promptly (a 15s poll would make even an instant gate
   # cost 15s); still cheap for a minutes-long real gate.
-  while kill -0 "$gpid" 2>/dev/null && [ "$waited" -lt "$GATE_MAXRUN" ]; do sleep 2; waited=$(( waited + 2 )); done
+  while kill -0 "$gpid" 2>/dev/null && [ "$waited" -lt "$GATE_MAXRUN" ]; do
+    sleep 2
+    # Contention is work, not gate execution. Start the cap after acquisition.
+    [ -z "$ready" ] || [ -f "$ready" ] || continue
+    waited=$(( waited + 2 ))
+  done
+  [ -z "$ready" ] || rm -f "$ready"
   if kill -0 "$gpid" 2>/dev/null; then
     _terminate_tree "$gpid"; wait "$gpid" 2>/dev/null || true   # reap so no zombie lingers
     GATE_RC=2; return
@@ -1454,6 +1473,11 @@ health_watchdog() {
     [ "$quiet_since" = 0 ] && quiet_since="$now"
     quiet=$(( now - quiet_since ))
     [ "$quiet" -lt "$HB_STALL" ] && continue                     # not quiet long enough to judge yet
+    # A waiting tool publishes a fresh, birth-validated descendant heartbeat.
+    # Verify the competing owner is still live; a stale file never spares a wedge.
+    if [ -f "$HEAVY_CMD" ] && python3 "$HEAVY_CMD" --state "$HEAVY_STATE" waiting "$cpid"; then
+      quiet_since=0; idle_streak=0; continue
+    fi
     # L2 — quiet >= HB_STALL. Spare if the session is still doing real work by EITHER signal:
     if _has_claude_descendant "$cpid"; then idle_streak=0; continue; fi      # (a) active subagent/Workflow child
     if [ "$AGENT" = codex ] && [ -n "$started" ] && _codex_alive "$started"; then idle_streak=0; continue; fi  # (a') codex rollout growing

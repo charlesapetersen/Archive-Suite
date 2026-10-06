@@ -14,6 +14,7 @@
 # Its LAN READY line supplies both the port and the valid high-entropy bearer; `e2e-phone-mac.sh` reads it
 # without logging or screenshotting it. The distinct file-relay READY line intentionally stays on `token`.
 set -uo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 
 SDK="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 export ANDROID_HOME="$SDK"

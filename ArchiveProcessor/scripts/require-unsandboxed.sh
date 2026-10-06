@@ -15,3 +15,5 @@ if [ -n "${CODEX_SANDBOX:-}" ]; then
   echo "  request an escalation for it. Nothing was launched." >&2
   exit 3
 fi
+
+. "$(dirname "${BASH_SOURCE[0]}")/../../ops/autonomous/heavy-enter.sh"

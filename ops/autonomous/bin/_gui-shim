@@ -37,8 +37,8 @@ real_tool() {
 REAL="${ARCHIVE_REAL_TOOL:-$(real_tool)}"
 [ -n "$REAL" ] || { echo "$TOOL: no real binary found behind the shim" >&2; exit 127; }
 
-# Interactive owner session -> get out of the way entirely.
-if [ "${ARCHIVE_UNATTENDED:-0}" != "1" ]; then exec "$REAL" "$@"; fi
+# Interactive calls retain their behavior; xcodebuild still shares heavy ownership.
+if [ "${ARCHIVE_UNATTENDED:-0}" != "1" ] && [ "$TOOL" != xcodebuild ]; then exec "$REAL" "$@"; fi
 
 deny() {   # $1 = what happened, $2 = the off-screen route to take instead
   cat >&2 <<EOF
@@ -56,6 +56,7 @@ EOF
   exit 74
 }
 
+if [ "${ARCHIVE_UNATTENDED:-0}" = 1 ]; then
 case "$TOOL" in
 
   xcodebuild)
@@ -124,5 +125,9 @@ unattended form of it." \
     fi
     ;;
 esac
+fi
 
+if [ "$TOOL" = xcodebuild ] && { [ "${ARCHIVE_UNATTENDED:-0}" != 1 ] || [ "${AUTONOMOUS_HEAVY_ENABLED:-0}" = 1 ]; }; then
+  exec python3 "$(dirname "$0")/../heavy-run.py" run -- "$REAL" "$@"
+fi
 exec "$REAL" "$@"

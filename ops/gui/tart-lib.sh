@@ -308,10 +308,10 @@ tart_lock_acquire() {
   local limit="${1:-0}" waited=0 age owner
   mkdir -p "$(dirname "$TART_LOCK_DIR")" 2>/dev/null || true
   while ! mkdir "$TART_LOCK_DIR" 2>/dev/null; do
-    # Break a lock left behind by a killed run: either its pid is gone, or it is older than the stale bound.
+    # Break a lock left behind by a killed run: its published pid is gone; age alone never evicts a live owner.
     owner="$(cat "$TART_LOCK_DIR/pid" 2>/dev/null || echo '')"
     age=$(( $(date +%s) - $(stat -f %m "$TART_LOCK_DIR" 2>/dev/null || echo 0) ))
-    if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } || [ "$age" -gt "$TART_LOCK_STALE" ]; then
+    if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } || { [ -z "$owner" ] && [ "$age" -gt "$TART_LOCK_STALE" ]; }; then
       rm -rf "$TART_LOCK_DIR" 2>/dev/null || true
       continue
     fi

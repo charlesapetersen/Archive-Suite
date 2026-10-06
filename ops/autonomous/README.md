@@ -40,6 +40,34 @@ read that section.
   (detected via `git log` + the plan's Session Log) rather than restarting the whole item. Only the *final*
   commit flips the `SUITE_TODO` checkbox; interim checkpoints are plain mid-feature commits.
 
+## Heavy work across workers (W35.heavy)
+
+`heavy-run.py run -- COMMAND ...` holds a kernel `heavy.lock` under
+`${AUTONOMOUS_HEAVY_STATE:-${AUTONOMOUS_STATE:-~/.local/state/archive-autonomous}/heavy}`.
+Every worktree uses the same state. The installed supervisor exports `AUTONOMOUS_HEAVY_ENABLED=1`
+on restart. Unattended wrappers from an older running supervisor retain their old path until then,
+so its older watchdog/timer cannot misclassify a new lock wait. Explicit helper runs activate their children. Source `heavy-enter.sh` at a script entry before changing directory
+or taking another lock; it re-enters that script under the supervisor and preserves its traps/argv.
+The xcodebuild PATH shim intercepts direct builds after unattended and sandbox refusals. Whole-script
+entries cover suite/app smokes, Processor headless tests, scale/standalone compiler and Android test
+lanes, the health gate and both VM routes. Explicit build commands outside the shim should use
+`python3 ops/autonomous/heavy-run.py run -- COMMAND ...`.
+
+Nested calls reuse ownership only after checking the token and the published child session/ancestry.
+The lock has no age expiry. Child-session and nested-entry records protect surviving tools even if the supervisor
+is killed and a tool closes its inherited descriptor; corrupt or uninspectable records refuse work.
+TERM/INT/HUP forward to the supervisor's own child group, and ownership lasts through cleanup and
+background descendants in those registered sessions. A hung surviving tool retains ownership for inspection.
+Fresh waiter records count as watchdog work only when their PID birth, ancestry and competing live
+owner validate. Stale records cannot spare a wedged session. The outer session backstop still applies.
+The gate's execution cap starts after acquisition; nested gate steps reuse the lock. Both VM routes
+acquire heavy ownership before the VM lock, whose age never evicts a live owner.
+
+`tests/prove-heavy.sh` drives scratch contention, nesting, failure/cancellation/crash, copied-token
+refusal, the real watchdog and gate timer, and the GUI/sandbox boundaries without launching an app or
+VM. It is a health-gate step. Set `AUTONOMOUS_HEAVY_STATE` to scratch for standalone harness runs.
+Source changes take effect at the next owner restart; sessions never alter installed runtime state.
+
 ## Item claims and shared plan edits (W35.claims)
 
 On the next owner restart, the serial supervisor reserves the item before launching its CLI. Each session
@@ -47,7 +75,7 @@ gets an overriding assignment in its prompt and writes engine/session artifacts 
 root session paths mirror worker 1 for existing status readers. Other worker IDs have separate artifacts.
 An intentional owner stop records a cleanup marker: confirmed-dead worker claims and locks retire at once,
 while live tools stay protected; a restart retries that cleanup before the engine guard. Ordinary crash
-expiry still uses `AUTONOMOUS_STALE`. Starting several workers and sharing the heavy build/VM lane remain W35.workers and W35.heavy.
+expiry still uses `AUTONOMOUS_STALE`. Starting several workers remains W35.workers. Heavy work already shares one lock (below).
 
 `worker-state.py` serializes selection with `coordination.lock`, then atomically creates `claims/<TAG>`.
 The claim records the supervisor and CLI process birth identities, token, worker, lane, start time and

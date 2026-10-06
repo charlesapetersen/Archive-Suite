@@ -11,6 +11,12 @@
 # Usage:  ./test-smoke.sh [archivecore|reader|notes|processor|all]
 # Run from anywhere; it cd's to its own directory = repo root.
 set -uo pipefail
+if [ -n "${CODEX_SANDBOX:-}" ]; then
+  case "${1:-all}" in archivecore|core|ArchiveCore) : ;;
+    *) echo "This smoke launches apps; request execution outside the Codex sandbox." >&2; exit 3 ;;
+  esac
+fi
+. "$(cd "$(dirname "$0")" && pwd)/ops/autonomous/heavy-enter.sh"
 export PATH="/opt/homebrew/bin:$PATH"
 cd "$(dirname "$0")"
 

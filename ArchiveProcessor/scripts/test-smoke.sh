@@ -19,6 +19,7 @@
 # It does NOT drive the Process Files GUI pipeline (review dialogs need interaction) — that's the
 # Tier-2 GUI checklist in TESTING.md. Usage: ./scripts/test-smoke.sh
 set -uo pipefail
+. "$(dirname "$0")/require-unsandboxed.sh"
 cd "$(dirname "$0")/.."
 REPO="$PWD"
 APPDIR="macOS"

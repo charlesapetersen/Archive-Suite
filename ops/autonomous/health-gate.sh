@@ -11,6 +11,11 @@
 #
 # Run from anywhere (cd's to the repo root). Builds into gitignored build dirs; makes NO commits, no edits.
 set -uo pipefail
+if [ -n "${CODEX_SANDBOX:-}" ]; then
+  echo "The health gate launches apps; request execution outside the Codex sandbox." >&2
+  exit 3
+fi
+. "$(dirname "$0")/heavy-enter.sh"
 export PATH="/opt/homebrew/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT" || { echo "cannot cd to repo root $ROOT"; exit 2; }
 # The gate runs in the DAEMON LOOP, not in a `claude` session — so the PreToolUse hook does not apply to it
@@ -306,6 +311,7 @@ step gui-vm-proof   bash "$ROOT/ops/autonomous/tests/prove-gui-vm.sh"
 #     for runtime; 43 s against a ~22 min gate is not the exclusion prove-daemon.sh earns. It forces
 #     AUTONOMOUS_REVIEW_ENABLED=1 on purpose: paced reviews are OFF by owner directive, and the picker
 #     machinery must keep working while the deployment default is off, so this stays watched while it sleeps.
+step heavy-work-proof     bash "$ROOT/ops/autonomous/tests/prove-heavy.sh"
 step worker-claims-proof  bash "$ROOT/ops/autonomous/tests/prove-worker-claims.sh"
 step dep-gating-proof     bash "$ROOT/ops/autonomous/tests/prove-dep-gating.sh"
 step tracker-sync-proof   bash "$ROOT/ops/autonomous/tests/prove-tracker-sync.sh"

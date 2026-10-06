@@ -24,6 +24,7 @@
 #
 # Usage: ./scripts/test-tag-vocabulary.sh      (~1 min, mostly the one-off ArchiveCore compile)
 set -uo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 REPO="$PWD"
 SUITE="$(cd "$REPO/.." && pwd)"

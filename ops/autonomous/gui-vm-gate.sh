@@ -34,6 +34,7 @@
 #        AUTONOMOUS_GUI_VM_APPS (default "reader notes processor"), AUTONOMOUS_GUI_VM_AGENTWAIT (default 240s),
 #        AUTONOMOUS_GUI_VM_STATE (round-robin state; default $ROOT/.maintenance/gui-vm-next-app).
 set -uo pipefail
+. "$(dirname "$0")/heavy-enter.sh"
 # The normal Homebrew prefix is retained as belt-and-braces above tart-lib's shared resolver. The
 # override is deliberately only a directory prefix, used by the mechanism proof's fake `tart`; production
 # leaves it unset and therefore cannot change which system tools are used.

@@ -15,6 +15,11 @@
 # A run log is kept under `.maintenance/test-results/` (gitignored).
 # Usage: bash ArchiveNotes/test-smoke.sh
 set -uo pipefail
+if [ -n "${CODEX_SANDBOX:-}" ]; then
+  echo "This smoke launches an app; request execution outside the Codex sandbox." >&2
+  exit 3
+fi
+. "$(dirname "$0")/../ops/autonomous/heavy-enter.sh"
 export PATH="/opt/homebrew/bin:$PATH"
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"          # .../ArchiveNotes (outer app dir)

@@ -217,6 +217,7 @@ mkdir -p "$BIN" "$STATE"
 warn_unmarked_keychain_provider
 
 [ -f "$REPO/ops/autonomous/worker-state.py" ] || fail "worker-state helper missing"
+[ -f "$REPO/ops/autonomous/heavy-run.py" ] || fail "heavy-work helper missing"
 [ -f "$REPO/ops/autonomous/plan-edit.py" ] || fail "plan-edit helper missing"
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
 install -m 755 "$DAEMON_SRC" "$DAEMON_DST"

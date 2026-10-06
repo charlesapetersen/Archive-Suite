@@ -23,6 +23,7 @@
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
 set -euo pipefail
+. "$(dirname "$0")/../autonomous/heavy-enter.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/tart-lib.sh"          # per-app table + tart_wait_agent (read its header)

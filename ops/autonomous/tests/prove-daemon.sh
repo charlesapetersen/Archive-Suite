@@ -197,7 +197,10 @@ grep -q 'COMPLETE — daemon stopping' "$L" && ok "COMPLETE terminates" || bad "
 
 echo "[6] Fingerprint — arming work mid-backoff wakes it early (accelerator, not gate)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-launch 0; sleep 12; echo "0:no" > "$CTRL"; write_plan "AND A NEWLY ARMED ITEM"; sleep 10; stop "$P" || exit 1; L="$STATE/daemon.log"
+launch 0; wait_logged "next attempt in 2s" 12 || bad "never entered backoff"
+echo "0:no" > "$CTRL"; write_plan "AND A NEWLY ARMED ITEM"
+wait_logged "progress — backoff reset to 1s" 10 || true
+stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'progress — backoff reset to 1s' "$L" && ok "queue edit (no commit) -> instant retry" || bad "queue edit did not reset backoff"
 
 echo "[7] Stale idle.since from a prior run must NOT park on cycle 1 (confirmed-HIGH regression)"

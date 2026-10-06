@@ -30,6 +30,7 @@
 # Exit 0 = every lane green. Non-zero = a real failure; the corpus is left in place for inspection.
 
 set -uo pipefail
+. "$(dirname "$0")/../autonomous/heavy-enter.sh"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRATCH="${ARCHIVE_SCALE_SCRATCH:-$HOME/Library/Caches/ArchiveSuiteScale}"

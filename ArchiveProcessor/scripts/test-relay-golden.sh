@@ -5,6 +5,7 @@
 # (SPEC/relay-golden/, generated from the Mac writer). This checks iOS (swiftc standalone) and Android
 # (plain-JVM JUnit). Catches any Swift<->Kotlin escaping / key-order / hex-case divergence. Key-free, $0.
 set -uo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 REPO="$PWD"; GOLD="$REPO/SPEC/relay-golden"; fail=0
 WORK=$(mktemp -d); mkdir -p "$WORK/out"
