@@ -923,19 +923,6 @@ OWNER sit in the plan's HOLD QUEUE.
 - [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (blocked-on: W36.seg-ensemble). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 
-## Autonomous daemon — a leaked test daemon blocked a real start (found 2026-10-05)
-
-- [ ] **W34.harness-leak — two test-harness daemons outlived their harness, and `daemon.sh start` took them for the
-  real daemon [S].** On 2026-10-05 two processes running `<worktree>/ops/autonomous/tests/../archive-suite-autonomous.sh`
-  were still alive after the harness runs that started them (prove-daemon, prove-gate-fix, prove-exit-logging and
-  mutant runs were all used that morning; which one leaked is not known), in a worktree that had since been
-  removed. `daemon.sh start` refused to launch ("ALREADY running") because its guard is
-  `pgrep -f archive-suite-autonomous.sh`, which matches ANY copy. Fix both halves: find and close the leak (each
-  harness must reap every daemon it starts, on every exit path, as prove-daemon's reaper does), and make
-  `daemon.sh`'s running check match only the installed copy (`$BIN/archive-suite-autonomous.sh`) or the launchd
-  job, with a test. The gate-fix proof’s lifecycle portion shipped as W34.gate-fix-fu1 (2026-10-05, `c359978`/`6036756`);
-  the other harnesses and real-daemon running guard remain open. | ops/autonomous | S | low | none
-
 ## Two dates on one document — enclosures (owner, 2026-10-05; before the W40 freeze)
 
 - [ ] **`W37.dual-date` — an enclosure with its own date carries two dates: its own and the covering letter's

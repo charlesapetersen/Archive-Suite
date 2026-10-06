@@ -9696,3 +9696,26 @@ none of this was fixed by starting it.
   Independent adversarial review found no blocking defect. All test files are scratch-only; app recovery,
   Clear, finalization and their file-safety gates are unchanged.
 
+## Autonomous daemon — a leaked test daemon blocked a real start (found 2026-10-05)
+
+- [x] **W34.harness-leak — two test-harness daemons outlived their harness, and `daemon.sh start` took them for the
+  real daemon [S].** On 2026-10-05 two processes running `<worktree>/ops/autonomous/tests/../archive-suite-autonomous.sh`
+  were still alive after the harness runs that started them (prove-daemon, prove-gate-fix, prove-exit-logging and
+  mutant runs were all used that morning; which one leaked is not known), in a worktree that had since been
+  removed. `daemon.sh start` refused to launch ("ALREADY running") because its guard is
+  `pgrep -f archive-suite-autonomous.sh`, which matches ANY copy. Fix both halves: find and close the leak (each
+  harness must reap every daemon it starts, on every exit path, as prove-daemon's reaper does), and make
+  `daemon.sh`'s running check match only the installed copy (`$BIN/archive-suite-autonomous.sh`) or the launchd
+  job, with a test. The gate-fix proof’s lifecycle portion shipped as W34.gate-fix-fu1 (2026-10-05, `c359978`/`6036756`);
+  the other harnesses and real-daemon running guard were still open at filing. | ops/autonomous | S | low | none
+
+  **SHIPPED 2026-10-05 (this commit; code `9d4640d`, `f2b792d`, `22872c9`).** All four daemon harnesses
+  launch direct, waitable fixture groups through one shared reaper; registration and cleanup signals are safe,
+  failed process inspection retains scratch, and the Python lifecycle proof cleans up on interruption. The
+  installed-copy guard ignores scratch/suffix/regex-lookalike copies while preserving the loaded-job guard.
+  The lifecycle proof is a health-gate step. Full scratch proofs: daemon 156/0, gate-fix 14/0, Codex 42/0,
+  exit logging 12/0, lifecycle 57/0; five additional lifecycle repetitions (285 checks), four rejected
+  cleanup/running-guard mutants, and TERM/INT interruptions of all four real harnesses plus the Python
+  proof runner. Every interruption reaped descendants and preserved an unrelated peer. Independent
+  adversarial review and warning-level ShellCheck clean. No installed runtime/job or real corpus touched.
+
