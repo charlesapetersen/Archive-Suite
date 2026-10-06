@@ -84,4 +84,70 @@ struct StyledInsertTests {
         let reloaded = MarkdownBridge.serialize(MarkdownBridge.parse(markdown: saved))
         #expect(reloaded == saved, "the pasted shape must be stable across a reload")
     }
+
+    // MARK: - W9.cand2-fu1: every edit that lands an attachment asks for a viewport relayout
+
+    private func chipMarkdown() -> String {
+        """
+        <!-- block: note-passage
+             note: archivenotes://open?id=\(UUID().uuidString)#block-0
+             display: "Src — 1968" -->
+        Passage.
+
+        """
+    }
+
+    /// The first attachment run in `tv`, or nil.
+    private func attachmentRange(in tv: EditorTextView) -> NSRange? {
+        guard let storage = tv.textStorage else { return nil }
+        var found: NSRange?
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { v, r, stop in
+            if v != nil { found = r; stop.pointee = true }
+        }
+        return found
+    }
+
+    @Test func insertTextOfAChipAsksForARelayoutButTypingDoesNot() throws {
+        let tv = editor()
+        tv.insertText("\n", replacementRange: tv.selectedRange())   // the chip gets its own paragraph
+        let chip = MarkdownBridge.parse(markdown: chipMarkdown())
+        tv.insertText(chip, replacementRange: tv.selectedRange())   // the insertBlock / insertSourceBlocks shape
+        #expect(attachmentRange(in: tv) != nil)
+        let afterChip = tv.attachmentRelayoutRequests
+        #expect(afterChip >= 1, "inserting a chip through insertText must ask for a relayout")
+        tv.insertText("x", replacementRange: tv.selectedRange())
+        tv.insertText("y", replacementRange: NSRange(location: 0, length: 0))
+        #expect(tv.attachmentRelayoutRequests == afterChip,
+                "typing in a paragraph without an attachment must not relayout: \(tv.string.debugDescription)")
+    }
+
+    @Test func undoOfADeletedChipAsksForARelayoutAndTheDeleteDoesNot() throws {
+        let tv = EditorTextView()
+        let host = UndoHost()
+        tv.delegate = host
+        defer { withExtendedLifetime(host) {} }
+        tv.replaceStyledDocument(with: MarkdownBridge.parse(markdown: "Lead.\n\n" + chipMarkdown()))
+        #expect(tv.attachmentRelayoutRequests == 0, "a document load is not an edit")
+        let chip = try #require(attachmentRange(in: tv))
+        tv.insertText("", replacementRange: chip)
+        #expect(attachmentRange(in: tv) == nil)
+        #expect(tv.attachmentRelayoutRequests == 0, "deleting a chip leaves nothing to load")
+        let undo = try #require(tv.undoManager)
+        undo.undo()
+        #expect(attachmentRange(in: tv) != nil, "undo must restore the chip")
+        let afterUndo = tv.attachmentRelayoutRequests
+        #expect(afterUndo >= 1, "NSTextView's own undo putting the chip back must ask for a relayout")
+        undo.redo()
+        #expect(attachmentRange(in: tv) == nil)
+        #expect(tv.attachmentRelayoutRequests == afterUndo, "redoing the delete leaves nothing to load")
+        undo.undo()
+        #expect(tv.attachmentRelayoutRequests > afterUndo, "a second undo asks again")
+    }
+
+    @Test func insertStyledRelaysOutOnceItself() throws {
+        let tv = editor()
+        tv.insertStyled(MarkdownBridge.parse(markdown: chipMarkdown()), replacementRange: tv.selectedRange())
+        #expect(attachmentRange(in: tv) != nil)
+        #expect(tv.attachmentRelayoutRequests == 0, "insertStyled schedules its own relayout-then-scroll")
+    }
 }

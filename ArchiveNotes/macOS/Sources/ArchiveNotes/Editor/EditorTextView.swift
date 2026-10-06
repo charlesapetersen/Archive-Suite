@@ -47,6 +47,9 @@ final class EditorTextView: NSTextView {
 
     /// Notify the TextKit 2 content manager when replacing the styled document.
     func replaceStyledDocument(with attributed: NSAttributedString) {
+        // A load is not an edit: the callers lay the new document out themselves (W9.cand2-fu1).
+        suppressAttachmentRelayout = true
+        defer { suppressAttachmentRelayout = false }
         performContentEditingTransaction {
             textStorage?.setAttributedString(attributed)
         }
@@ -76,9 +79,11 @@ final class EditorTextView: NSTextView {
         breakUndoCoalescing()                  // a paste is its own undo step, not part of typing
         guard let storage = textStorage, NSMaxRange(range) <= storage.length,
               shouldChangeText(in: range, replacementString: attributed.string) else { return }
+        suppressAttachmentRelayout = true   // the relayout below must run first and then scroll
         performContentEditingTransaction {
             storage.replaceCharacters(in: range, with: attributed)
         }
+        suppressAttachmentRelayout = false
         didChangeText()
         setSelectedRange(NSRange(location: range.location + attributed.length, length: 0))
         // Scroll only AFTER the relayout: scrolling first left the chip's view installed at a position the
@@ -130,6 +135,36 @@ final class EditorTextView: NSTextView {
         }
     }
 
+    /// Every other edit that lands an attachment has the same unloaded-view gap as `insertStyled` (W9.cand2-fu1):
+    /// chip and image inserts through `insertText`, and NSTextView's own undo/redo putting a deleted chip back.
+    /// So the relayout hangs off the storage's own edit notification, not `didChangeText`: measured in the
+    /// unit bundle, undo restores the chip WITHOUT calling `didChangeText`. A keystroke in a paragraph with
+    /// no attachment does not qualify; one in a paragraph that shares a line with an attachment can, since
+    /// the storage widens the edited range to the paragraph (measured). Attribute-only changes are skipped.
+    private var suppressAttachmentRelayout = false
+
+    @objc private func storageDidProcessEditing(_ note: Notification) {
+        guard !suppressAttachmentRelayout, let storage = note.object as? NSTextStorage,
+              storage.editedMask.contains(.editedCharacters) else { return }
+        let edited = storage.editedRange
+        guard edited.location != NSNotFound, edited.length > 0, NSMaxRange(edited) <= storage.length else { return }
+        var holdsAttachment = false
+        storage.enumerateAttribute(.attachment, in: edited) { value, _, stop in
+            if value != nil { holdsAttachment = true; stop.pointee = true }
+        }
+        guard holdsAttachment else { return }
+#if DEBUG
+        attachmentRelayoutRequests += 1
+#endif
+        relayoutViewportSoon()
+    }
+
+#if DEBUG
+    /// How many edits asked for an attachment relayout. Unit tests have no window, so they cannot see a view
+    /// load; this is how they prove which edits ask for one.
+    private(set) var attachmentRelayoutRequests = 0
+#endif
+
     private func commonInit() {
         isRichText = true           // W3-S2: rich text for styled mode
         isAutomaticQuoteSubstitutionEnabled = false
@@ -152,6 +187,9 @@ final class EditorTextView: NSTextView {
             tc.widthTracksTextView = true
             tc.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(storageDidProcessEditing(_:)),
+                                               name: NSTextStorage.didProcessEditingNotification,
+                                               object: textStorage)
     }
 
     /// `.noteBlockSource` and `.noteImageRelPath` describe ONE attachment character each — they are
@@ -568,6 +606,9 @@ final class EditorTextView: NSTextView {
     /// the extract-from-selection GUI check (G9).
     func uiTestSetSelection(location: Int, length: Int) {
         setSelectedRange(uiTestClampedRange(location: location, length: length))
+        // Focus the editor too, so a following ⌘Z / ⇧⌘Z / Delete keystroke reaches it through the real
+        // menu and key path (W9.cand2-fu1) instead of the strip's selection field the seam was typed into.
+        window?.makeFirstResponder(self)
     }
 
     /// Clamp a requested `(location, length)` into `[0, textLength]`. Pure — unit-tested directly.
@@ -598,11 +639,12 @@ final class EditorTextView: NSTextView {
         guard let storage = textStorage else { return "unavailable:noTextStorage" }
         var states: [[String: Any]] = []
         storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) {
-            value, _, _ in
+            value, range, _ in
             guard let chip = value as? BlockHeaderAttachment,
                   let target = chip.sourceBox.anchor.notePassageTarget else { return }
             states.append([
                 "id": target.id.uuidString.lowercased(),
+                "location": range.location,
                 "label": chip.passageLiveLabel ?? chip.sourceBox.anchor.display ?? "",
                 "missing": chip.passageSourceMissing
             ])
