@@ -851,7 +851,7 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
 - [ ] **`W9.cand2` — CONFIRM: a freshly pasted note-passage provenance block renders as raw HTML comment
-  [S].** Plan addendum 2026-07-18, CANDIDATE. After a W14.3 copy-passage→paste-into-extract, the chip showed as
+  [S].** PART-DONE WORK on two branches (unverified; start from the newer and judge it): `codex/cand2-20261005-174720-97484` (fafe5d3, a daemon session cut off by the usage limit, 9 files with tests) and `codex/w9-cand2-20261004` (5f0c292, the interactive Codex session the owner quit). Saved by the 2026-10-06 worktree cleanup. Plan addendum 2026-07-18, CANDIDATE. After a W14.3 copy-passage→paste-into-extract, the chip showed as
   the literal `<!-- block: note-passage … -->` in the **styled** editor and persisted across reselect/reload,
   while pre-existing chips render correctly — so it may be specific to the freshly pasted block not being
   re-styled. Bytes import correctly (W14.3), so this is rendering, not data. Confirm on a clean paste; if real,

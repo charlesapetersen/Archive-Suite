@@ -232,7 +232,15 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
   second warning channel W23.m5 exists to prevent. The prose is for the reader; the tag is what runs.
   Append to the Session Log either way, and append anything owner-needed to
   Daemon Report. Remove your worktree only if it is clean (`git worktree remove "../suite-wt-$stamp"`); if git
-  refuses, leave it and log to Daemon Report. If you just finished the LAST "[ ]" item in the whole queue, set
+  refuses, leave it and log to Daemon Report.
+  LEFTOVER WORKTREES are yours to settle, not the owner's (owner, 2026-10-06: "The daemon should just make
+  decisions like this itself. I wouldn't know how to evaluate."). When the handoff audit flags ANOTHER session's
+  `../suite-wt-*` worktree that no process is using (`lsof +D <dir>` empty) and that has not changed in 6 hours:
+  commit anything uncommitted ON ITS OWN BRANCH (`git -C <dir> add -A && git -C <dir> commit -m "wip: … saved by
+  worktree cleanup"`), then `git worktree remove <dir>` (it is clean now, so no force), and KEEP the branch — nothing
+  is lost. If the work belongs to an OPEN item, add the branch name to that item in `SUITE_TODO.md` so the session
+  that takes the item can start from it (`git worktree add ../suite-wt-… <branch>`, then judge it like any draft).
+  Log one line in the Session Log; do not raise it in the Daemon Report. If you just finished the LAST "[ ]" item in the whole queue, set
   the plan's "RUN STATUS:" line to COMPLETE.
 
 STEP 6 — STOP — after COMPLETING the item (or if genuinely interrupted/blocked). Never stop voluntarily
