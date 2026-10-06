@@ -944,6 +944,22 @@ full usage window". Made the daemon's next work, ahead of everything else in the
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
 
+- [ ] **`W35.machine-lock` — one heavy job at a time on the Mac, across Archive Suite AND Vision OCR [S-M · TOP PRIORITY]**
+  One machine-wide lock for heavy work, shared with Vision OCR (owner, 2026-10-06, after the Mac froze: "Queue a
+  shared lock, top priority"). Measured at the freeze (about 13:30-14:05): 15-minute load average about 28, swap
+  6.6 of 8 GB, no reboot or panic; running at once were Vision OCR's full suite (its health gate), this daemon's
+  worker-2 builds and Tart VM runs (macOS logged the VM over its CPU limit five times 11:10-13:09), and CrashPlan.
+  W35.heavy's heavy.lock serialises only THIS project's builds, gates and VM runs; nothing stops them overlapping
+  Vision OCR's suite, gate or model runs. THE PROTOCOL, identical in both repos (each carries its own copy of a
+  small helper, so neither repo depends on the other): `~/.local/state/mac-heavy.lock`, a directory taken with
+  `mkdir` (atomic), holding `owner` (pid, project, label, start time); released by the holder on exit (trap);
+  stale when its pid is dead (the next taker removes it and logs that); a taker WAITS (polling, logged once)
+  rather than failing, and the wait is not charged to the job's time limit (as W35.heavy does for heavy.lock).
+  HERE: `heavy-run.py` takes mac-heavy.lock around everything it already serialises (builds, the health gate, VM
+  runs), after heavy.lock. Vision OCR's own item (its `mac-heavy-lock`) wraps its suite (`test-lock.sh`), its
+  health gate and its guarded model runs (`run-guarded.sh`, the bake-off). DONE WHEN a proof shows two takers
+  from different "projects" never hold it at once, a dead holder is reclaimed, a waiter's wait does not count
+  against its cap, and a mutant removing the take turns it red; prove harness in the gate.
 - [ ] **`W35.live` — first real run with two workers, measured; the owner decides whether to keep it [S]** (blocked-on: W35.pace, W35.live-owner-ok). Measurement tooling landed 2026-10-06 (checkpoint): `ops/autonomous/measure-workers.py` compares before/after the first `pace.log` line, and `heavy-run.py` now records heavy-lock waits; see `ops/autonomous/README.md` §Measuring a multi-worker run. What remains needs the owner: the daemon still runs one worker (`$STATE/max-workers` = 1), and a session cannot start the two-worker run (`daemon.sh start --workers 2`, an owner action). After about a day of it, run `measure-workers.py` and decide keep / revert / raise the limits. Owner, 2026-10-06: W35 runs ahead of Vision OCR until done (Codex is out until Sun 11 Oct, so Archive Suite runs on Claude). The Vision OCR daemon is stopped meanwhile (`~/.local/state/visionocr-autonomous/paused-for-w35`); when W35 is done, delete that file and restart it (`daemon.sh start` in ~/Claude/vision-ocr), and remove `$STATE/restart-on-source-change`. Detail: `execution-plans/parallel-workers/00-plan.md`.
 
 ## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
