@@ -155,7 +155,21 @@ health_watchdog {waiter.pid} /dev/null 0
         release_survivor.touch()
         finish(waiter)
         check(after.exists(), "dead child session is reclaimed without an age override")
+        waits = [line.split("\t") for line in (state / "waits.log").read_text().splitlines()]
+        # Up to 7 of the 8 racers block (fewer if one starts after its predecessor ends); nothing else does.
+        check(waits[-1][2] == "true" and float(waits[-1][1]) >= .4 and 1 <= len(waits) - 1 <= 7
+              and all("events" in w[2] for w in waits[:-1]),
+              "only blocked entries are recorded in waits.log, with their wait time")
         holder.communicate()
+        # A non-UTF-8 argument must not turn the wait record into "heavy work refused".
+        bytes_ready = root / "bytes-ready"
+        holder = spawn(sys.executable, "-c", "import time; time.sleep(.6)", ready=bytes_ready)
+        check(until(bytes_ready.exists), "byte-argument fixture acquired lock")
+        r = subprocess.run([os.fsencode(sys.executable), os.fsencode(HELPER), b"--state", os.fsencode(state),
+                            b"run", b"--", b"true", b"a\xffb"], env=env, capture_output=True)
+        finish(holder)
+        check(r.returncode == 0 and "a\\udcffb" in (state / "waits.log").read_text(),
+              "a waited entry with a non-UTF-8 argument still runs, and is logged escaped")
         detached_ready = root / "detached-ready"
         release_detached = root / "release-detached"
         detached_result = root / "detached-result"

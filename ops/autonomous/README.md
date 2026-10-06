@@ -175,6 +175,17 @@ lane. Changes are logged to `$STATE/pace.log` (time, lane, band, slots, readings
 current band. `AUTONOMOUS_PACE=0` restores the fixed W35.workers count; one worker never reads usage for pacing. Any unreadable or malformed source reads as unknown, never a crash.
 Proof: `tests/prove-usage-pace.sh` in the health gate (fixture lines in the real CLI shapes, scratch files only).
 
+### Measuring a multi-worker run (W35.live)
+
+`ops/autonomous/measure-workers.py` (read-only) compares the run before and after the split, which defaults to
+the first `pace.log` line (only a `--workers 2` supervisor writes one; `--split` overrides, `--since` sets the
+start, default 7 days). It reports each five-hour window's peak reading and whether it was cut (windows that
+straddle the split are listed but kept out of both means); only the one-worker loop writes `wait` rows, so a two-worker cut shows only through its session rows, items finished per day from `SUITE_TODO_DONE.md`
+on `origin/main`, collisions — an item finished twice, git `CONFLICT` lines in the retained Claude session
+logs (the last two per worker, so an undercount), and heavy-lock waits, which `heavy-run.py` appends to
+`$STATE/heavy/waits.log` (start, seconds waited, command) whenever an entry had to wait — and minutes at each
+slot count. Proof: `tests/prove-measure-workers.sh` in the health gate (fixture state and a scratch repo).
+
 ## Install / run
 
 > **Renamed 2026-08-06 (owner):** this script was `arm.sh` and its verb was `arm`; it is now

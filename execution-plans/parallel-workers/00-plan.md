@@ -99,3 +99,6 @@ is Archive Suite's.
 - `W35.live` [S] — the first real run with 2 workers, measured: window used at each reset before and after, items
   finished per day, collisions (duplicate items, merge conflicts, heavy-lock waits). The owner decides whether to
   keep it, and whether to raise the limits.
+  Tooling landed 2026-10-06: `ops/autonomous/measure-workers.py` (README §Measuring a multi-worker run), heavy
+  waits in `$STATE/heavy/waits.log`. Waiting on the owner to start `daemon.sh start --workers 2`
+  (`W35.live-owner-ok`), then on the owner's decision after about a day of readings.

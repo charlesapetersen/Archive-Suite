@@ -194,6 +194,7 @@ def run(state, command, ready):
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, stop)
     owner_path = state / "owner.json"
+    waited_from = None
     with (state / "heavy.lock").open("a+") as lock:
         try:
             while not interrupted:
@@ -208,12 +209,23 @@ def run(state, command, ready):
                     fcntl.flock(lock, fcntl.LOCK_UN)
                 except BlockingIOError:
                     pass
+                if waited_from is None:
+                    waited_from = time.time()
                 publish(waiter, {"pid": os.getpid(), "start": identity(os.getpid()),
                                  "heartbeat": time.time()})
                 time.sleep(.25)
             if interrupted:
                 return 128 + interrupted
             waiter.unlink(missing_ok=True)
+            if waited_from is not None:
+                # W35.live counts these waits; the record is never a reason to refuse the work.
+                try:
+                    with (state / "waits.log").open("a", errors="backslashreplace") as log:
+                        log.write("%s\t%.1f\t%s\n" % (time.strftime("%F %T", time.localtime(waited_from)),
+                                                      time.time() - waited_from,
+                                                      " ".join(command)[:200].replace("\t", " ").replace("\n", " ")))
+                except (OSError, ValueError):
+                    pass
             # The launcher cannot execute the command before its birth/session
             # identity is durable. EOF on supervisor death makes it exit safely.
             rd, wr = os.pipe()
