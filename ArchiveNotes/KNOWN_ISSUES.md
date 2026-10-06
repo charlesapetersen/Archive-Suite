@@ -43,6 +43,21 @@ same year; missing, undated, mixed-year, renamed, or escaping sources suppress i
 access refreshes the offer. Only accepting the button changes the note's date; toggling preserves its
 body, other metadata, and date. Tier-2 find→refute review and scratch functional checks passed.
 
+## ✅ FIXED (W9.cand2) — a freshly pasted note passage drew as raw text, then as a blank slot
+
+**2026-10-06.** Pasting a copied passage into an extract once showed the chip as the literal
+`<!-- block: note-passage … -->` comment. The chip view provider now captures its configuration at init
+and the attachment opts into view rendering (`aa2e192`). Two more defects remained. First, the paste used
+`insertText`, which re-fonted the run from `typingAttributes`: a 28 pt heading landed at 14 pt. Second,
+TextKit 2 kept the edited fragments' view providers but never loaded their views, which left the chip slot
+blank and the inline image grey until a reselect rebuilt the editor. `EditorTextView.insertStyled` now
+replaces the storage through `shouldChangeText`/`didChangeText`, so attributes and undo are exact. It then
+re-lays the viewport on the next main-queue turn, the same pass a freshly loaded editor runs, and scrolls
+only after that: scrolling first left the chip's view stranded off-screen. `insertLargeTextAsync` uses the
+same path. `StyledInsertTests` covers fonts, undo/redo and the chip round-trip. VM `testG13` checks that a
+visible, installed chip view is present both straight after the paste and after a reselect. Residual:
+`W9.cand2-fu1` (redo, undo of a deleted chip, and the chip/image `insertText` sites).
+
 ## ✅ FIXED (W9.d12a) — extract editor could hide its first provenance chip
 
 **2026-09-28.** Selecting an item now replaces the editor body by item identity, even if the previous

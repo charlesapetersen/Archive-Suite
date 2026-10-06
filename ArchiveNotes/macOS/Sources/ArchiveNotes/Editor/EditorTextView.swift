@@ -65,6 +65,30 @@ final class EditorTextView: NSTextView {
         }
     }
 
+    /// Insert an already-styled `MarkdownBridge.parse` result over `range`, keeping its attributes exactly
+    /// (W9.cand2). `insertText(_:replacementRange:)` re-fonts the run from `typingAttributes` — measured: a
+    /// pasted 28 pt heading landed at 14 pt — so a fresh paste drew differently from the same markdown
+    /// after a reload. This goes through `shouldChangeText`/`didChangeText`, so undo and the delegate's
+    /// write-back behave as for a keystroke; the caret ends after the inserted text, scrolled into view once
+    /// laid out. It also skips `insertText`'s typingAttributes merge entirely.
+    func insertStyled(_ attributed: NSAttributedString, replacementRange range: NSRange) {
+        if hasMarkedText() { unmarkText() }   // `insertText` commits an IME composition first
+        breakUndoCoalescing()                  // a paste is its own undo step, not part of typing
+        guard let storage = textStorage, NSMaxRange(range) <= storage.length,
+              shouldChangeText(in: range, replacementString: attributed.string) else { return }
+        performContentEditingTransaction {
+            storage.replaceCharacters(in: range, with: attributed)
+        }
+        didChangeText()
+        setSelectedRange(NSRange(location: range.location + attributed.length, length: 0))
+        // Scroll only AFTER the relayout: scrolling first left the chip's view installed at a position the
+        // later scroll back up never corrected (VM, W9.cand2: inEditor, visible:false).
+        relayoutViewportSoon { [weak self] in
+            guard let self else { return }
+            self.scrollRangeToVisible(self.selectedRange())
+        }
+    }
+
     /// Font size for formatting actions triggered from keyboard overrides (Tab/Return/Backspace).
     var configuredFontSize: CGFloat = 14
 
@@ -88,12 +112,21 @@ final class EditorTextView: NSTextView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil else { return }
+        relayoutViewportSoon()
+    }
+
+    /// Re-lay the viewport on the next main-queue turn. TextKit 2 installs attachment views (chips, inline
+    /// images) only from a viewport layout pass, and an edit's own pass leaves the edited fragments'
+    /// providers with no view loaded — measured in the VM for W9.cand2: providers present, views unloaded
+    /// with a zero frame, so a pasted chip's slot stayed blank until the editor was rebuilt.
+    private func relayoutViewportSoon(then: (@MainActor () -> Void)? = nil) {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window != nil, let layout = self.textLayoutManager,
                   let content = layout.textContentManager else { return }
             layout.invalidateLayout(for: content.documentRange)
             layout.textViewportLayoutController.layoutViewport()
             self.needsDisplay = true
+            then?()
         }
     }
 
@@ -442,12 +475,12 @@ final class EditorTextView: NSTextView {
     /// Defer a large paste's parse and insertion to a later main-actor turn.
     private func insertLargeTextAsync(_ text: String) {
         let fontSize = configuredFontSize
-        let range = selectedRange()
         Task { @MainActor [weak self] in
             guard let self else { return }
             let parsed = MarkdownBridge.parse(markdown: text, fontSize: fontSize)
             self.undoManager?.beginUndoGrouping()
-            self.insertText(parsed, replacementRange: range)
+            // Read the selection now, not before the hop: an edit in between would make it stale.
+            self.insertStyled(parsed, replacementRange: self.selectedRange())
             self.undoManager?.endUndoGrouping()
         }
     }

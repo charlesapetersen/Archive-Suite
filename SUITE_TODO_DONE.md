@@ -257,6 +257,15 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.cand2 — CONFIRM: a freshly pasted note-passage provenance block renders as raw HTML comment [S].**
+  **SHIPPED 2026-10-06 (this commit; checkpoints `aa2e192`, `3713516`).** Confirmed real. The raw-comment
+  form was the view provider reading its attachment late (`aa2e192`). The paste also drew wrong until a
+  reselect: `insertText` re-fonted the run, and TextKit 2 never loaded the edited fragments' attachment
+  views. This commit adds `EditorTextView.insertStyled`, which does an exact-attribute replace, undo, then
+  a deferred viewport relayout and scroll. VM `testG13` passes with the chip visible straight after the
+  paste. Notes unit bundle green. Residual: `W9.cand2-fu1`. Both saved WIP branches
+  (`codex/cand2-20261005-174720-97484`, `codex/w9-cand2-20261004`) are superseded by this. | Editor/ | S | low | done
+
 - [x] **W9.d12d — log filename/front-matter divergence [XS].** **SHIPPED 2026-10-04 (this commit).** Plan D12 split. When the note filename
   and front-matter title disagree, log the divergence without rewriting either. | ArchiveNotes/macOS/
   Sources/ArchiveNotes/Index/ | XS | low | none

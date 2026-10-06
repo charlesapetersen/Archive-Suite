@@ -850,13 +850,14 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.cand2` — CONFIRM: a freshly pasted note-passage provenance block renders as raw HTML comment
-  [S].** PART-DONE WORK on two branches (unverified; start from the newer and judge it): `codex/cand2-20261005-174720-97484` (fafe5d3, a daemon session cut off by the usage limit, 9 files with tests) and `codex/w9-cand2-20261004` (5f0c292, the interactive Codex session the owner quit). Saved by the 2026-10-06 worktree cleanup. Plan addendum 2026-07-18, CANDIDATE. After a W14.3 copy-passage→paste-into-extract, the chip showed as
-  the literal `<!-- block: note-passage … -->` in the **styled** editor and persisted across reselect/reload,
-  while pre-existing chips render correctly — so it may be specific to the freshly pasted block not being
-  re-styled. Bytes import correctly (W14.3), so this is rendering, not data. Confirm on a clean paste; if real,
-  either the paste path must re-run chip styling or the pasted block's on-disk form differs from what
-  `MarkdownBridge` chip-parses. Folds into `W9.d12a` if confirmed trivial. | Editor/ | S | low | **needs:** gui
+- [ ] **`W9.cand2-fu1` — attachment views after OTHER edits: redo, undo, and the chip/image inserts [S · gui]**
+  W9.cand2 review residual (2026-10-06). TextKit 2 does not load attachment views for fragments an edit
+  re-lays out. `EditorTextView.insertStyled` fixes this for passage paste and large paste with a deferred
+  `relayoutViewportSoon`. Check in the VM: paste → ⌘Z → ⇧⌘Z, and delete a chip → ⌘Z. Both restore
+  attachments through NSTextView's own undo path, with no relayout. Also check `insertBlock`,
+  `insertSourceBlocks` and `tryPasteImage`, which still use `insertText`. If they reproduce, hook the
+  relayout to `didChangeText` when the edited range holds an attachment. Display only; no data effect. |
+  Editor/ | S | low | **needs:** gui
 
 **Phase E — verification review. Do LAST; it gates deleting the plan.** This phase exists because the W0–W8
 checkboxes overstated completion once already; do not repeat that on the fixes. Use the paced method in

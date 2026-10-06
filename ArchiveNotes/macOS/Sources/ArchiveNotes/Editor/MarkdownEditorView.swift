@@ -690,9 +690,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                                                   onJumpBlock: onJumpBlock,
                                                   passageSummaries: passageSummaries)
             textView.undoManager?.beginUndoGrouping()
-            textView.performContentEditingTransaction {
-                textView.insertText(attributed, replacementRange: textView.selectedRange())
-            }
+            textView.insertStyled(attributed, replacementRange: textView.selectedRange())
             textView.undoManager?.endUndoGrouping()
 #if DEBUG
             // W9.cand2: a paste inserts chips without a full restyle, so cache them here too.
