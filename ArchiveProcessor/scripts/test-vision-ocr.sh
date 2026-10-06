@@ -3,6 +3,7 @@
 # VisionClient with a deliberately tiny command-line test host, then sends it two CoreGraphics-generated
 # PNGs. No app window, key, network, selected input folder, or output directory is involved.
 set -euo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 
 work=$(mktemp -d)

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Standalone pure regression for post-parse controlled-vocabulary enforcement.
 set -euo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

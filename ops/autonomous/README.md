@@ -50,7 +50,7 @@ so its older watchdog/timer cannot misclassify a new lock wait. Explicit helper 
 or taking another lock; it re-enters that script under the supervisor and preserves its traps/argv.
 The xcodebuild PATH shim intercepts direct builds after unattended and sandbox refusals. Whole-script
 entries cover suite/app smokes, Processor headless tests, scale/standalone compiler and Android test
-lanes, the health gate and both VM routes. Explicit build commands outside the shim should use
+lanes, the health gate, both VM test routes and VM accessibility seeding. Explicit build commands outside the shim should use
 `python3 ops/autonomous/heavy-run.py run -- COMMAND ...`.
 
 Nested calls reuse ownership only after checking the token and the published child session/ancestry.
@@ -75,7 +75,7 @@ gets an overriding assignment in its prompt and writes engine/session artifacts 
 root session paths mirror worker 1 for existing status readers. Other worker IDs have separate artifacts.
 An intentional owner stop records a cleanup marker: confirmed-dead worker claims and locks retire at once,
 while live tools stay protected; a restart retries that cleanup before the engine guard. Ordinary crash
-expiry still uses `AUTONOMOUS_STALE`. Starting several workers remains W35.workers. Heavy work already shares one lock (below).
+expiry still uses `AUTONOMOUS_STALE`. Starting several workers remains W35.workers. Heavy work already shares one lock (above).
 
 `worker-state.py` serializes selection with `coordination.lock`, then atomically creates `claims/<TAG>`.
 The claim records the supervisor and CLI process birth identities, token, worker, lane, start time and

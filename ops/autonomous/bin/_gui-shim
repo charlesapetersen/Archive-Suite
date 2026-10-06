@@ -14,7 +14,8 @@
 # test launches the app with `open` and drives it with `osascript`. One shim per screen-reaching mechanism,
 # so the exec layer is closed for the whole class rather than for one instance of it.
 #
-# ACTIVE ONLY when ARCHIVE_UNATTENDED=1 — the owner's interactive sessions get the real tools, unchanged.
+# GUI refusals activate only when ARCHIVE_UNATTENDED=1. xcodebuild also shares
+# heavy ownership in interactive calls; its command and exit status are preserved.
 #
 # A shim is still not a hard boundary (an absolute path like /usr/bin/open bypasses it), which is why the
 # scripts owning each dangerous step ALSO guard themselves. Hook + shim + source guard: increasing order of

@@ -11,6 +11,7 @@
 #   export DRIVE_ACCESS_TOKEN=$(python3 <scratchpad>/drive_token.py)
 # or DriveAuth.signIn in-app). Touches only files this run creates; safe to re-run.
 set -uo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 REPO="$PWD"; NET="$REPO/ArchiveProcessor/Sources/ArchiveProcessor/Net"
 [ -n "${DRIVE_ACCESS_TOKEN:-}" ] || { echo "set DRIVE_ACCESS_TOKEN (a drive.file access token) first"; exit 2; }

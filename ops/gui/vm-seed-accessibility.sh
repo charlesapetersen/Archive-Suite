@@ -31,6 +31,7 @@
 #
 # Idempotent: if the probe already passes it does nothing. Backs the database up before every write.
 set -euo pipefail
+. "$(dirname "$0")/../autonomous/heavy-enter.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/tart-lib.sh"

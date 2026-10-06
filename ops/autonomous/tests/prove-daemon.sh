@@ -30,6 +30,18 @@ BIN="$T/bin"; mkdir -p "$BIN"
 # `security` prints nothing -> the taskport reminder greps for 'allow', finds none, and bails.
 for c in security osascript launchctl caffeinate; do printf '#!/bin/sh\nexit 0\n' > "$BIN/$c"; chmod +x "$BIN/$c"; done
 
+# Observe the main fixture entering its actual backoff sleep. The no-progress
+# log precedes bookkeeping and fingerprint capture, so it cannot synchronize a
+# queue edit that is meant to happen AFTER the sleep's baseline is captured.
+cat > "$BIN/sleep" <<STUB
+#!/bin/bash
+if [ -f "$T/backoff-watch.pid" ] && [ "\$PPID" = "\$(cat "$T/backoff-watch.pid")" ] && [ "\${1:-}" = 2 ]; then
+  : > "$T/backoff-waiting"
+fi
+exec /bin/sleep "\$@"
+STUB
+chmod +x "$BIN/sleep"
+
 # Stub `curl` (WS6): record invocations instead of phoning out.
 CURLLOG="$T/curl.log"; : > "$CURLLOG"
 cat > "$BIN/curl" <<STUB
@@ -197,10 +209,15 @@ grep -q 'COMPLETE — daemon stopping' "$L" && ok "COMPLETE terminates" || bad "
 
 echo "[6] Fingerprint — arming work mid-backoff wakes it early (accelerator, not gate)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-launch 0; wait_logged "next attempt in 2s" 12 || bad "never entered backoff"
+rm -f "$T/backoff-waiting"
+launch 0; printf '%s\n' "$P" > "$T/backoff-watch.pid"
+deadline=$(( SECONDS + 12 ))
+while [ ! -f "$T/backoff-waiting" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1; done
+[ -f "$T/backoff-waiting" ] || bad "never entered backoff sleep"
 echo "0:no" > "$CTRL"; write_plan "AND A NEWLY ARMED ITEM"
 wait_logged "progress — backoff reset to 1s" 10 || true
 stop "$P" || exit 1; L="$STATE/daemon.log"
+rm -f "$T/backoff-watch.pid" "$T/backoff-waiting"
 grep -q 'progress — backoff reset to 1s' "$L" && ok "queue edit (no commit) -> instant retry" || bad "queue edit did not reset backoff"
 
 echo "[7] Stale idle.since from a prior run must NOT park on cycle 1 (confirmed-HIGH regression)"
@@ -753,8 +770,12 @@ grep -q 'waiting until' "$L" && bad "waited at 50%" || ok "no wait under WINDOW_
 
 echo "[29c] usage window — a REJECTED fast-fail is cut off and waits; a fast exit with NO event is not"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-echo "rejected 5" > "$RLECTL"                 # (run_daemon's reset_state would clear it, so launch by hand)
-launch 0; sleep 6; stop "$P" || exit 1; L="$STATE/daemon.log"
+# Keep the reading live through fixture bookkeeping. A five-second reset could
+# expire before the next cycle, correctly avoiding a wait and making this oracle
+# flaky. The observation deadline remains six seconds; 29a retains its short reset.
+echo "rejected 600" > "$RLECTL"               # launch by hand: run_daemon clears this control
+launch 0; wait_logged 'usage window 100% used, and the last session was cut off by it — waiting' 6 || true
+stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'USAGE LIMIT (rate_limit_event: rejected' "$L" && ok "the rejection is still named in the log" || bad "rejection not named"
 grep -q 'usage window 100% used, and the last session was cut off by it — waiting' "$L" && ok "a rejection reads 100% and waits for its reset" || bad "no wait after a rejection"
 echo "1:no" > "$CTRL"; write_plan; reset_state
@@ -765,8 +786,12 @@ grep -q 'waiting until' "$L" && bad "waited on a 92% reading below WINDOW_WAIT_A
 
 echo "[29d] usage window — an rc=0 session that leaves the window at 96% makes the next launch wait"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-echo "96 5" > "$RLECTL"
-launch 0; sleep 3; : > "$RLECTL"; sleep 5; stop "$P" || exit 1; L="$STATE/daemon.log"
+# Keep the event available until the next-cycle wait is observed. Clearing it
+# after a fixed three seconds could precede the first session on a busy host.
+# Preserve the original 3+5-second observation bound; 29a retains its short reset.
+echo "96 600" > "$RLECTL"
+launch 0; wait_logged 'usage window 96% used — waiting until' 8 || true
+: > "$RLECTL"; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'usage window 96% used — waiting until' "$L" && ok "waits at or over WINDOW_WAIT_AT" || bad "did not wait at 96%"
 grep -q 'cut off' "$L" && bad "an rc=0 session read as cut off" || ok "rc=0 is never cut off"
 

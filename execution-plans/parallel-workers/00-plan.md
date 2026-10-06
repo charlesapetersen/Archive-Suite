@@ -78,14 +78,12 @@ is Archive Suite's.
   worker artifact directories, birth-identity/token protected claims, lane-aware resolver, locked plan-edit
   complete/block/log/report/append and idle upkeep. Contract and usage: `ops/autonomous/README.md`
   §Item claims and shared plan edits. Scratch concurrency/crash and real-dispatch proof in the gate.
-- `W35.heavy` [S-M] — `heavy.lock` around builds, the VM lane and the gate; waiting on it counts as work.
-  **Source-edit clarification answered 2026-10-05 in 5967e4f:** isolated source edits with proofs and
-  adversarial review are permitted, effective at the next owner restart. Baseline `3465e15` measured no
-  lock-wait liveness signal in `health_watchdog()` and `_run_gate_once()` counting lock waits against its cap.
-  No implementation begun. Resume with a global, nested-call-safe lock; validated waiter liveness in the
-  watchdog; gate acquisition before its execution timer; heavy-before-VM lock ordering; and scratch proofs
-  for contention, nesting, signals, dead owners and unchanged GUI/sandbox refusals. Keep live owners protected
-  regardless of lock age. This shares the existing question; it does not create another safety approval gate.
+- `W35.heavy` — SHIPPED 2026-10-06 (this commit). Machine-wide, nested-call-safe kernel lock
+  around build/test/gate/VM entries; live registered sessions remain protected after supervisor death.
+  Fresh, birth/ancestry-validated waiters count as watchdog work; gate timing starts after acquisition.
+  GUI/sandbox refusals precede waiting; all VM entries take heavy ownership before the VM lock.
+  Older unattended supervisors retain their prior path until the next owner restart. Contract and
+  scratch functional proof: `ops/autonomous/README.md` §Heavy work across workers and `tests/prove-heavy.sh`.
 - `W35.workers` [M] — the supervisor running N workers per lane, per-lane pause, staggered starts, `daemon.sh
   status` showing each worker.
 - `W35.pace` [M] — pace-aware slot sizing from both lanes' readings, the weekly gate, Vision OCR priority.

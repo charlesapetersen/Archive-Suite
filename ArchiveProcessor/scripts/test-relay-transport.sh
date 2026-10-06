@@ -8,6 +8,7 @@
 # Android's transport is the symmetric blocking mirror (org.json parse), covered by the format golden +
 # the Mac receiver invariants. Key-free, $0.
 set -uo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 REPO="$PWD"; W=$(mktemp -d)
 cat > "$W/main.swift" <<'SWIFT'

@@ -5,6 +5,7 @@
 # and asserts the name→fileId mapping, idempotent overwrite, list-filtering, quarantine, and delete. The
 # live Drive integration test is owner-gated (OAuth); this proves the store logic. Key-free, $0.
 set -uo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 REPO="$PWD"; W=$(mktemp -d); NET="$REPO/ArchiveProcessor/Sources/ArchiveProcessor/Net"
 cat > "$W/main.swift" <<'SWIFT'

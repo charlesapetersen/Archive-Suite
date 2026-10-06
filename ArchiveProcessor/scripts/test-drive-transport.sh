@@ -5,6 +5,7 @@
 # true ONLY after a matching-(token,epoch,group,seq,fp) receipt appears — never on a write alone, and rejects
 # stale-fp (A1) / wrong-epoch (A2) acks. Key-free, $0.
 set -uo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 REPO="$PWD"; W=$(mktemp -d); NET="$REPO/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net"
 cat > "$W/main.swift" <<'SWIFT'

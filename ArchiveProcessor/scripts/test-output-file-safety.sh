@@ -1,6 +1,7 @@
 #!/bin/bash
 # Key-free standalone regression test for OutputFileSafety. Uses only a fresh temporary directory.
 set -euo pipefail
+. "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
 
 work=$(mktemp -d)

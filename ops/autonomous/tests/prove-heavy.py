@@ -203,8 +203,31 @@ health_watchdog {waiter.pid} /dev/null 0
             p = subprocess.run(["bash", str(shim), *args], env=dict(env, ARCHIVE_REAL_TOOL=str(fake), **extra),
                                capture_output=True, text=True, timeout=3)
             check(p.returncode == expected and "real-ran" not in p.stdout, "GUI/sandbox refusal precedes heavy waiting")
+        # Old installed supervisors lack wait liveness and readiness timing;
+        # their source wrappers stay on the old path until an owner restart.
+        entry = root / "entry.sh"
+        entry_marker = root / "entry-marker"
+        entry_cleanup = root / "entry-cleanup"
+        entry.write_text(f'''set -e
+. {shlex.quote(str(HERE / 'heavy-enter.sh'))}
+trap {shlex.quote("touch " + shlex.quote(str(entry_cleanup)))} EXIT
+printf '%s' "$1" > {shlex.quote(str(entry_marker))}
+''')
+        legacy = subprocess.run(["bash", str(entry), "sentinel value"], env=dict(env, AUTONOMOUS_HEAVY_ENABLED="0"),
+                                capture_output=True, text=True, timeout=3)
+        check(legacy.returncode == 0 and entry_marker.read_text() == "sentinel value" and entry_cleanup.exists(),
+              "old unattended supervisor does not activate source locking before restart")
+        entry_marker.unlink()
+        entry_cleanup.unlink()
+        activated = subprocess.Popen(["bash", str(entry), "sentinel value"], env=env, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, text=True)
+        children.append(activated)
+        check(until(lambda: probe("waiting", activated.pid).returncode == 0) and not entry_marker.exists(),
+              "restarted supervisor serializes entry before any script work")
         holder.terminate()
         finish(holder, 143)
+        finish(activated)
+        check(entry_marker.read_text() == "sentinel value" and entry_cleanup.exists(), "activated entry resumes after contention without losing argv or traps")
         p = subprocess.run(["bash", str(shim), "build"], env=dict(env, ARCHIVE_REAL_TOOL=str(fake)),
                            capture_output=True, text=True, timeout=5)
         check(p.returncode == 0 and "real-ran" in p.stdout, "safe shim build still reaches the real tool")
@@ -253,11 +276,21 @@ echo "gate-rc=$GATE_RC"
                    "ops/gui/vm-gui-runner.sh", "ArchiveReader/test-smoke.sh", "ArchiveNotes/test-smoke.sh",
                    "ArchiveProcessor/test-smoke.sh", "ArchiveProcessor/scripts/require-unsandboxed.sh",
                    "ArchiveProcessor/scripts/android-ui-drive.sh", "ArchiveProcessor/scripts/test-relay-golden.sh",
-                   "ArchiveProcessor/scripts/test-tag-vocabulary.sh", "ops/scale/run-scale-verify.sh")
+                   "ArchiveProcessor/scripts/test-tag-vocabulary.sh", "ops/scale/run-scale-verify.sh",
+                   "ops/gui/vm-seed-accessibility.sh",
+                   "ArchiveProcessor/scripts/test-controlled-vocabulary.sh",
+                   "ArchiveProcessor/scripts/test-thinking-budgets.sh",
+                   "ArchiveProcessor/scripts/test-output-file-safety.sh",
+                   "ArchiveProcessor/scripts/test-vision-ocr.sh",
+                   "ArchiveProcessor/scripts/test-drive-store.sh",
+                   "ArchiveProcessor/scripts/test-drive-transport.sh",
+                   "ArchiveProcessor/scripts/test-relay-transport.sh",
+                   "ArchiveProcessor/scripts/test-drive-live.sh")
         for path in entries:
             text = (ROOT / path).read_text()
             check("heavy-enter.sh" in text, "whole-script ownership wired: " + path)
-        for path in ("ops/autonomous/gui-vm-gate.sh", "ops/gui/vm-gui-runner.sh"):
+        for path in ("ops/autonomous/gui-vm-gate.sh", "ops/gui/vm-gui-runner.sh",
+                     "ops/gui/vm-seed-accessibility.sh"):
             text = (ROOT / path).read_text()
             check(text.index("heavy-enter.sh") < text.index("tart_lock_acquire"), "heavy-before-VM ordering: " + path)
     finally:
