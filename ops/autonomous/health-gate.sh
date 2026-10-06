@@ -312,6 +312,7 @@ step todo-stubs-proof     bash "$ROOT/ops/autonomous/tests/prove-todo-stubs.sh"
 step housekeeping-proof   bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
 step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
+step harness-lifecycle-proof python3 "$ROOT/ops/autonomous/tests/prove-harness-lifecycle.py"
 step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"
 
 # ── The two harnesses that are NOT gate steps, and why ────────────────────────────────────────────────────

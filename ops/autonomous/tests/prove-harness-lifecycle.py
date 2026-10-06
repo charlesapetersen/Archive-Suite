@@ -2,6 +2,7 @@
 """Scratch process trees: direct stop, EXIT, TERM, INT, and the launcher's real running check.
 No installed daemon, launchd, app, network, or owner state is touched.
 """
+import argparse
 import os
 from pathlib import Path
 import shlex
@@ -11,9 +12,20 @@ import tempfile
 import time
 
 HERE = Path(__file__).resolve().parent
-LIB = HERE / 'fixture-processes.sh'
-LAUNCHER = HERE.parent / 'daemon.sh'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--fixture-lib', type=Path, default=HERE / 'fixture-processes.sh')
+parser.add_argument('--launcher', type=Path, default=HERE.parent / 'daemon.sh')
+args = parser.parse_args()
+LIB = args.fixture_lib.resolve()
+LAUNCHER = args.launcher.resolve()
 PASS = 0
+
+
+def interrupted(signum, _frame):
+    raise SystemExit(128 + signum)
+
+
+signal.signal(signal.SIGTERM, interrupted)
 
 
 def check(condition, label):
@@ -49,14 +61,23 @@ with tempfile.TemporaryDirectory(prefix='harness lifecycle [scratch] ') as root:
         peer = subprocess.Popen(['bash', str(sleeper)], start_new_session=True)
         processes.append(peer)
         groups.append(peer.pid)
-        for mode in ('stop', 'exit', 'failure', 'term', 'int'):
+        for mode in ('stop', 'exit', 'failure', 'term', 'int', 'register-term', 'register-int', 'cleanup-term', 'cleanup-int', 'ps-failure'):
             scratch = root / mode
             script = root / f'{mode}.sh'
             record = root / f'{mode}.pids'
+            registration = ''
+            if mode.startswith('register-'):
+                sig = 'TERM' if mode == 'register-term' else 'INT'
+                debug = f'if [ "$BASH_COMMAND" = \'P=$!\' ]; then printf \'%s\\n\' "$!" > {shlex.quote(str(record))}; trap - DEBUG; kill -{sig} "$$"; fi'
+                registration = 'set -T\ntrap ' + shlex.quote(debug) + ' DEBUG\n'
+            if mode.startswith('cleanup-'):
+                sig = 'TERM' if mode == 'cleanup-term' else 'INT'
+                debug = f'if [ "$BASH_COMMAND" = \'local pid failed=0\' ]; then trap - DEBUG; kill -{sig} "$$"; fi'
+                registration = 'set -T\ntrap ' + shlex.quote(debug) + ' DEBUG\n'
             script.write_text(f'''set -uo pipefail
 T={shlex.quote(str(scratch))}; mkdir -p "$T"
 . {shlex.quote(str(LIB))}
-fixture_launch bash {shlex.quote(str(sleeper))}
+{registration}fixture_launch bash {shlex.quote(str(sleeper))}
 p1=$P
 fixture_launch bash {shlex.quote(str(sleeper))}
 p2=$P
@@ -64,8 +85,9 @@ printf '%s\\n' "$p1" "$p2" > {shlex.quote(str(record))}
 case {mode} in
   stop) stop "$p1" || exit 1; stop "$p2" || exit 1
         stop {peer.pid} && exit 1; exit 0 ;;
-  exit) exit 0 ;;
+  exit|cleanup-*) exit 0 ;;
   failure) exit 7 ;;
+  ps-failure) ps() {{ [ "$1" = -ax ] && return 1; command ps "$@"; }}; exit 0 ;;
   *) while :; do sleep .1; done ;;
 esac
 ''')
@@ -79,9 +101,12 @@ esac
                     check(all(group_alive(p) for p in pids), f'{mode}: groups alive before interrupt')
                     harness.send_signal(signal.SIGTERM if mode == 'term' else signal.SIGINT)
                 rc = harness.wait(timeout=8)
-                check(rc == {'term': 143, 'int': 130, 'failure': 7}.get(mode, 0), f'{mode}: exit status retained ({rc})')
+                check(rc == {'term': 143, 'int': 130, 'register-term': 143, 'register-int': 130, 'failure': 7, 'ps-failure': 1}.get(mode, 0), f'{mode}: exit status retained ({rc})')
                 check(await_true(lambda: not any(group_alive(p) for p in pids)), f'{mode}: leaders and descendants reaped')
-                check(not scratch.exists(), f'{mode}: scratch deleted only after reaping')
+                if mode == 'ps-failure':
+                    check(scratch.exists(), 'ps-failure: uncertain process inspection retains scratch')
+                else:
+                    check(not scratch.exists(), f'{mode}: scratch deleted only after reaping')
                 check(peer.poll() is None, f'{mode}: unrelated peer survives')
 
         # Extract the production function and guard, not a copy. Evaluate only that region, never installs
@@ -121,6 +146,17 @@ status() { :; }
         check(await_true(lambda: 'START-ALLOWED' in verdict()), 'test copies alone allow start again')
         check('ALREADY running' in verdict(True), 'loaded job still blocks a second launch when process is down')
     finally:
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        # Let each harness finish its own EXIT reaper even if failure occurred before PID registration.
+        for process in processes:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=8)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
         # Only process groups created above, never name-wide pkill or an installed job.
         for pid in groups:
             try:

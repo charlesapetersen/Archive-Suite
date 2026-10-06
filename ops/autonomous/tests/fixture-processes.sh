@@ -7,7 +7,10 @@ fixture_rc=0
 FIXTURE_LAUNCHING=0
 FIXTURE_SIGNAL=0
 fixture_group_alive() {
-  ps -ax -o pgid= | awk -v group="$1" '$1 == group { found=1 } END { exit !found }'
+  local groups
+  # Failure to inspect the process table cannot authorize deleting scratch state.
+  groups="$(ps -ax -o pgid=)" || return 2
+  printf '%s\n' "$groups" | awk -v group="$1" '$1 == group { found=1 } END { exit !found }'
 }
 fixture_launch() {
   FIXTURE_LAUNCHING=1
@@ -41,9 +44,14 @@ stop() {
   kill -KILL -- "-$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   n=0
-  while fixture_group_alive "$pid" && [ "$n" -lt 20 ]; do sleep 0.1; n=$((n+1)); done
-  if fixture_group_alive "$pid"; then
-    echo "fixture group $pid survived cleanup; scratch retained at $T" >&2
+  while [ "$n" -lt 20 ]; do
+    state=0; fixture_group_alive "$pid" || state=$?
+    [ "$state" = 0 ] || break   # a failed inspection must fail promptly, not consume a retry window
+    sleep 0.1; n=$((n+1))
+  done
+  state=0; fixture_group_alive "$pid" || state=$?
+  if [ "$state" != 1 ]; then
+    echo "fixture group $pid is present or cannot be inspected; scratch retained at $T" >&2
     return 1
   fi
   for n in "${!FIXTURE_PIDS[@]}"; do
@@ -52,6 +60,8 @@ stop() {
   return 0
 }
 fixture_cleanup() {
+  # Once EXIT cleanup starts, another interruption must not abort reaping the remaining groups.
+  trap '' INT TERM
   local pid failed=0
   for pid in "${FIXTURE_PIDS[@]+"${FIXTURE_PIDS[@]}"}"; do stop "$pid" || failed=1; done
   [ "$failed" = 0 ] || return 1

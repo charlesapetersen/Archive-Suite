@@ -19,34 +19,13 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 DAEMON="${1:-$HERE/../archive-suite-autonomous.sh}"
 [ -f "$DAEMON" ] || { echo "no daemon at $DAEMON"; exit 2; }
 T="$(mktemp -d)"
-# Leak-proof cleanup: every launch() records its daemon pid to $T/daemon.pids; the EXIT trap kills any that
-# are STILL the daemon (guarded by a command-name check, so a recycled pid is never killed). Without this, a
-# run interrupted BETWEEN launch() and stop() (e.g. a harness timeout) reparents its daemon to init, which
-# then spins forever against the (deleted) sandbox — a real leak observed 2026-07-17.
-reap_launched() {
-  [ -f "$T/daemon.pids" ] || return 0
-  while read -r _p; do
-    [ -n "$_p" ] || continue
-    # Guard against pid RECYCLING: only kill if the pid is STILL running the EXACT $DAEMON path this harness
-    # launched (matched literally — $DAEMON is quoted in the pattern). For the DEFAULT in-repo $DAEMON that
-    # differs from the installed real daemon (~/.local/bin/…), so a recycled pid that became the owner's real
-    # daemon won't match. CAVEAT: if you invoke this harness with $1 = the installed path, the guard degenerates
-    # to the real daemon's command line and a recycled pid COULD match it — so pass the repo copy (the default).
-    case "$(ps -p "$_p" -o command= 2>/dev/null)" in
-      *"$DAEMON"*) kill -9 "$_p" 2>/dev/null ;;
-    esac
-  done < "$T/daemon.pids"
-}
-# NOTE: no `pkill -f provetest` here — AUTONOMOUS_LABEL=provetest is an ENV var, not argv, so `pkill -f` never
-# matched the daemon anyway; reap_launched (pid-scoped) is the real reaper, and the daemon's stub children
-# (sleep/claude/caffeinate) are short-lived.
-trap 'reap_launched; rm -rf "$T"' EXIT
+. "$HERE/fixture-processes.sh"
 PASS=0; FAIL=0
 ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
 
 # ---- sandbox -------------------------------------------------------------------------------------------
-export HOME="$T/home"; mkdir -p "$HOME/Desktop" "$HOME/.local/bin"
+FIXTURE_HOME="$T/home"; mkdir -p "$FIXTURE_HOME/Desktop" "$FIXTURE_HOME/.local/bin"
 BIN="$T/bin"; mkdir -p "$BIN"
 # `security` prints nothing -> the taskport reminder greps for 'allow', finds none, and bails.
 for c in security osascript launchctl caffeinate; do printf '#!/bin/sh\nexit 0\n' > "$BIN/$c"; chmod +x "$BIN/$c"; done
@@ -148,8 +127,8 @@ chmod +x "$T/claude"
 # WS5 status-digest stub — the daemon should write its stdout to $STATE/STATUS.md each cycle + on park.
 printf '#!/bin/sh\necho "STATUS-DIGEST-OK parked=${STATUS_PARKED:-no}"\n' > "$T/status-stub.sh"; chmod +x "$T/status-stub.sh"
 
-launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
-  AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
+launch() {   # $1=IDLE_STOP ; starts daemon directly; P is its waitable pid
+  fixture_launch env HOME="$FIXTURE_HOME" AUTONOMOUS_YIELD_CMD="$T/no-yield" AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
   AUTONOMOUS_STATE="$STATE" AUTONOMOUS_CLAUDE="$T/claude" \
   AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=8 AUTONOMOUS_IDLE_STOP="$1" \
   AUTONOMOUS_MINFREE_MB="${MINFREE:-10240}" AUTONOMOUS_MAX_NOCOMPLETE="${MAXNC:-0}" \
@@ -163,62 +142,60 @@ launch() {   # $1=IDLE_STOP ; starts daemon in background, echoes pid
   AUTONOMOUS_DOCFIX_MAX="${DOCFIX_MAX:-3}" \
   AUTONOMOUS_HB_POLL=1 \
   AUTONOMOUS_USAGE_CMD="$HERE/../usage-window.sh" AUTONOMOUS_WINDOW_POLL=1 AUTONOMOUS_WINDOW_SLACK=0 \
-    bash "$DAEMON" >/dev/null 2>&1 &
-  local pid=$!; echo "$pid" >> "$T/daemon.pids"; echo "$pid"   # record for the leak-proof EXIT reaper
+    bash "$DAEMON" >/dev/null 2>&1
 }
 reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md" "$STATE/doc-budget-fix" "$STATE/doc-budget-tries" "$STATE/doc-budget-head" "$STATE/usage-window.last" "$STATE/usage-window.tsv" "$STATE/session-killed"; : > "$RLECTL"; : > "$ENDCTL"; }
-stop() { kill -TERM "$1" 2>/dev/null; wait "$1" 2>/dev/null; }   # (dropped no-op `pkill -f provetest`; label is env, not argv)
-run_daemon() { reset_state; local p; p=$(launch "$1"); sleep "$2"; stop "$p"; echo "$STATE/daemon.log"; }
+run_daemon() { reset_state; launch "$1"; sleep "$2"; stop "$P" || exit 1; L="$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
 
 # ================= idle backoff / auto-park (2026-07-16, ffd2165) =================
 echo "[1] Mode A — rc=1 usage-limit fast-fail must back off, not spin"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999
-L=$(run_daemon 0 26); G=$(gaps "$L"); echo "    backoff gaps: $G"
+run_daemon 0 26; G=$(gaps "$L"); echo "    backoff gaps: $G"
 [ "$(echo "$G" | awk '{print $1, $2, $3}')" = "2 4 8" ] && ok "doubles 2 -> 4 -> 8" || bad "expected '2 4 8', got '$G'"
 echo "$G" | grep -qv '16' && ok "never exceeds MAXBACKOFF=8" || bad "blew past the cap"
 [ "$(grep -c 'launching fresh' "$L")" -le 6 ] && ok "spawns bounded ($(grep -c 'launching fresh' "$L") in 26s)" || bad "too many spawns"
 
 echo "[2] Mode B — rc=0 but nothing advanced (Session-Log churn must not count)"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999
-L=$(run_daemon 0 20)
+run_daemon 0 20
 grep -qE 'rc=0\) advanced nothing' "$L" && ok "clean-but-idle detected as no-progress" || bad "no-progress not detected"
 G=$(gaps "$L"); [ "$(echo "$G" | awk '{print $1, $2}')" = "2 4" ] && ok "backs off despite churn" || bad "expected '2 4', got '$G'"
 
 echo "[3] Progress (a real commit) resets the backoff"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-P=$(launch 0); sleep 12; echo "0:yes" > "$CTRL"; sleep 10; stop "$P"; L="$STATE/daemon.log"
+launch 0; sleep 12; echo "0:yes" > "$CTRL"; sleep 10; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'progress — backoff reset to 1s' "$L" && ok "commit detected as progress -> reset" || bad "no reset on progress"
 grep -q 'no progress' "$L" && ok "had backed off first" || bad "never backed off"
 
 echo "[4] Auto-park after IDLE_STOP of no progress"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999
-L=$(run_daemon 5 25)
+run_daemon 5 25
 grep -q 'PARKED' "$L" && ok "parked after IDLE_STOP=5s" || bad "never parked"
-[ -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && ok "owner-visible Desktop notice written" || bad "no Desktop notice"
+[ -f "$FIXTURE_HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" ] && ok "owner-visible Desktop notice written" || bad "no Desktop notice"
 grep -q 'daemon down' "$L" && ok "loop exited cleanly" || bad "daemon did not exit"
 
 echo "[5] Regression — RUN STATUS: COMPLETE still stops immediately"
 sed -i '' 's/^RUN STATUS:.*/RUN STATUS: COMPLETE/' "$PLAN"; dfset 999999
-L=$(run_daemon 0 6)
+run_daemon 0 6
 grep -q 'COMPLETE — daemon stopping' "$L" && ok "COMPLETE terminates" || bad "COMPLETE path broken"
 [ "$(grep -c 'launching fresh' "$L")" = 0 ] && ok "COMPLETE spawns no session" || bad "spawned despite COMPLETE"
 
 echo "[6] Fingerprint — arming work mid-backoff wakes it early (accelerator, not gate)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-P=$(launch 0); sleep 12; echo "0:no" > "$CTRL"; write_plan "AND A NEWLY ARMED ITEM"; sleep 10; stop "$P"; L="$STATE/daemon.log"
+launch 0; sleep 12; echo "0:no" > "$CTRL"; write_plan "AND A NEWLY ARMED ITEM"; sleep 10; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'progress — backoff reset to 1s' "$L" && ok "queue edit (no commit) -> instant retry" || bad "queue edit did not reset backoff"
 
 echo "[7] Stale idle.since from a prior run must NOT park on cycle 1 (confirmed-HIGH regression)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo "$(( $(date +%s) - 100000 ))" > "$STATE/idle.since"   # ~28h-old stamp left by a dead daemon
-P=$(launch 3600); sleep 9; stop "$P"; L="$STATE/daemon.log"
+launch 3600; sleep 9; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'PARKED' "$L" && bad "parked on cycle 1 off a stale stamp (HIGH bug present)" || ok "stale stamp cleared at init"
 [ "$(grep -c 'launching fresh' "$L")" -ge 2 ] && ok "kept retrying, not one-and-park" || bad "only one session"
 
 echo "[8] Progress is fingerprint-move, INDEPENDENT of exit code (commit then rc=1)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-P=$(launch 0); sleep 12; echo "1:yes" > "$CTRL"; sleep 8; stop "$P"; L="$STATE/daemon.log"
+launch 0; sleep 12; echo "1:yes" > "$CTRL"; sleep 8; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'no progress' "$L" && ok "backed off while rc=1 committed nothing" || bad "never backed off"
 grep -q 'backoff reset to 1s' "$L" && ok "rc=1-with-commit counts as progress (rc not gating)" || bad "commit+rc=1 missed"
 
@@ -226,7 +203,7 @@ grep -q 'backoff reset to 1s' "$L" && ok "rc=1-with-commit counts as progress (r
 echo "[9] WS6 — park fires a remote alert, and the endpoint secret never reaches the log"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999
 printf 'ALERT_URL="https://example.invalid/SECRETTOKEN123"\n' > "$STATE/alert.env"
-L=$(run_daemon 5 22)
+run_daemon 5 22
 grep -q 'PARKED' "$L" && ok "parked" || bad "never parked"
 grep -q 'SECRETTOKEN123' "$CURLLOG" && ok "alert POSTed to the configured endpoint" || bad "no alert sent"
 grep -q 'alert sent' "$L" && ok "alert logged as sent" || bad "alert not logged"
@@ -243,7 +220,7 @@ STUB
 chmod +x "$BIN/curl"
 printf 'ALERT_URL="https://example.invalid/SECRETTOKEN123"\nALERT_AUTH="Bearer tok with spaces"\n' > "$STATE/alert.env"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999
-L=$(run_daemon 5 22)
+run_daemon 5 22
 grep -qx 'ARG:Authorization: Bearer tok with spaces' "$CURLLOG" \
   && ok "auth header is exactly one argv element" \
   || bad "auth header word-split/mangled: $(grep '^ARG:' "$CURLLOG" | tr '\n' '|')"
@@ -258,7 +235,7 @@ chmod +x "$BIN/curl"
 
 echo "[10] WS6 — unconfigured is a silent no-op (daemon must run fine without alerting)"
 rm -f "$STATE/env" "$STATE/alert.env"; echo "1:no" > "$CTRL"; write_plan; dfset 999999
-L=$(run_daemon 5 20)
+run_daemon 5 20
 grep -q 'PARKED' "$L" && ok "still parks with no ALERT_URL" || bad "park broke when unconfigured"
 [ -s "$CURLLOG" ] && bad "curl called despite no ALERT_URL" || ok "no curl invoked (clean no-op)"
 grep -q 'alert FAILED' "$L" && bad "logged a spurious alert failure" || ok "no spurious failure logged"
@@ -269,7 +246,7 @@ echo "[11] WS2 — low disk parks + alerts and NEVER launches a session"
 # misplaced config would silently fail to alert on the very first cycle. This asserts the documented setup.
 printf 'ALERT_URL="https://example.invalid/SECRETTOKEN123"\n' > "$STATE/alert.env"
 echo "0:no" > "$CTRL"; write_plan; dfset 100          # 100MB free, persistently (< MINFREE 10240)
-L=$(run_daemon 0 8)
+run_daemon 0 8
 grep -q 'PARKED (low disk' "$L" && ok "parked on low disk" || bad "did not park on low disk"
 [ "$(grep -c 'launching fresh' "$L")" = 0 ] && ok "no session launched (never builds on a full disk)" || bad "launched a session anyway"
 grep -q 'SECRETTOKEN123' "$CURLLOG" && ok "low-disk alert reached the endpoint" || bad "no low-disk alert"
@@ -277,11 +254,11 @@ grep -q 'daemon down' "$L" && ok "loop exited cleanly" || bad "daemon did not ex
 
 echo "[12] WS2 — unreadable df FAILS OPEN (a broken check must never stop a healthy run)"
 rm -f "$STATE/env" "$STATE/alert.env"; echo "0:no" > "$CTRL"; write_plan; dfset notanumber
-L=$(run_daemon 0 8)
+run_daemon 0 8
 grep -q 'PARKED' "$L" && bad "parked on an unreadable df (should fail open)" || ok "did not park on garbage df"
 [ "$(grep -c 'launching fresh' "$L")" -ge 1 ] && ok "kept working normally" || bad "stopped launching sessions"
 dfset FAIL                                            # df exits 1, no output at all
-L=$(run_daemon 0 8)
+run_daemon 0 8
 grep -q 'PARKED' "$L" && bad "parked when df exited nonzero (should fail open)" || ok "df exit!=0 also fails open"
 
 echo "[9c] WS6 — the alert credential must NEVER reach the claude session's environment (confirmed-HIGH)"
@@ -292,14 +269,14 @@ echo "[9c] WS6 — the alert credential must NEVER reach the claude session's en
 rm -f "$STATE/env"; : > "$CHILDENV"
 printf 'ALERT_URL="https://example.invalid/SECRETTOKEN123"\n' > "$STATE/alert.env"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999
-L=$(run_daemon 0 8)
+run_daemon 0 8
 grep -q 'SECRETTOKEN123' "$CHILDENV" && bad "SECRET LEAKED into the session env (via alert.env)" || ok "alert.env stays daemon-only — child env clean"
 grep -q 'alert sent\|CURL' "$L" "$CURLLOG" >/dev/null 2>&1 || true
 # now the misplacement case: operator wrongly puts it in the child's env file
 : > "$CHILDENV"
 printf 'ALERT_URL="https://example.invalid/MISPLACED456"\n' > "$STATE/env"
 rm -f "$STATE/alert.env"
-L=$(run_daemon 0 8)
+run_daemon 0 8
 grep -q 'MISPLACED456' "$CHILDENV" && bad "misplaced ALERT_URL in \$STATE/env LEAKED to the child" || ok "misplaced ALERT_* un-exported before spawn (defence in depth)"
 rm -f "$STATE/env"
 
@@ -309,7 +286,7 @@ echo "[11b] WS2 — must NOT run housekeeping while another engine is active (co
 # is real. The disk check must therefore sit AFTER the "engine busy" skip.
 rm -f "$STATE/alert.env"; echo "0:no" > "$CTRL"; write_plan; dfset 100   # low disk would trigger reclaim…
 reset_state; touch "$STATE/engine.lock"                                  # …but another engine holds a FRESH lock
-P=$(launch 0); sleep 6; stop "$P"; L="$STATE/daemon.log"
+launch 0; sleep 6; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'engine busy' "$L" && ok "skipped the cycle (engine busy)" || bad "did not detect the busy engine"
 grep -q 'running housekeeping to reclaim' "$L" && bad "ran housekeeping while another engine was live" || ok "no housekeeping while another engine is live"
 grep -q 'PARKED' "$L" && bad "parked while another engine was live" || ok "did not park behind a live engine"
@@ -317,7 +294,7 @@ rm -f "$STATE/engine.lock"
 
 echo "[13] WS2 — housekeeping self-heal: low then reclaimed -> continue, no park"
 echo "0:no" > "$CTRL"; write_plan; dfset 100 50000    # 1st read low, 2nd (post-housekeeping) fine
-L=$(run_daemon 0 8)
+run_daemon 0 8
 grep -q 'running housekeeping to reclaim' "$L" && ok "attempted reclaim before giving up" || bad "no reclaim attempt"
 grep -q 'disk reclaimed' "$L" && ok "detected the reclaim and continued" || bad "did not continue after reclaim"
 grep -q 'PARKED' "$L" && bad "parked despite reclaiming enough space" || ok "did not park"
@@ -325,7 +302,7 @@ grep -q 'PARKED' "$L" && bad "parked despite reclaiming enough space" || ok "did
 # ================= WS4 per-item attempt cap =================
 echo "[14] WS4 — commits that complete NO queue item park after MAX_NOCOMPLETE (the checkpoint-loop backoff can't catch)"
 echo "0:yes:no" > "$CTRL"; write_plan; dfset 999999      # every session commits (fingerprint moves) but never completes an item
-L=$(MAXNC=3 run_daemon 0 14)
+MAXNC=3 run_daemon 0 14
 grep -q 'attempt streak 1/3' "$L" && ok "counts checkpoint-only sessions" || bad "no streak count"
 grep -q 'PARKED (no item completed in 3 sessions' "$L" && ok "parked at the cap with a clear reason" || bad "never parked at the cap"
 grep -q 'daemon down' "$L" && ok "loop exited cleanly" || bad "did not exit"
@@ -335,29 +312,29 @@ echo "[15] WS4 — DRAIN-PHASE completion (SUITE_TODO flip, plan WORK QUEUE stat
 # plan WORK QUEUE stays constant. If completion were measured off the plan WORK QUEUE alone, cc would never
 # rise and a healthy item-per-session drain would false-park after MAX_NOCOMPLETE.
 write_plan; dfset 999999; reset_state
-P=$(MAXNC=6 launch 0)
+MAXNC=6 launch 0
 echo "0:yes:no"   > "$CTRL"; sleep 4      # a few checkpoints (streak climbs)
 echo "0:yes:todo" > "$CTRL"; sleep 3      # complete a SUITE_TODO item (plan WORK QUEUE unchanged) -> reset
 echo "0:yes:no"   > "$CTRL"; sleep 4      # checkpoints again (streak restarts from 1)
-stop "$P"; L="$STATE/daemon.log"
+stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'attempt streak reset' "$L" && ok "SUITE_TODO completion detected -> streak reset" || bad "reset not logged (drain completion missed!)"
 [ "$(grep -c 'attempt streak 1/6' "$L")" -ge 2 ] && ok "streak restarted from 1 after the reset" || bad "streak did not restart (count=$(grep -c 'attempt streak 1/6' "$L"))"
 grep -q 'PARKED (no item completed' "$L" && bad "parked despite the drain completion resetting the streak" || ok "did not park a healthy drain run"
 
 echo "[15b] WS4 — WAVE-PHASE completion (plan WORK QUEUE flip) also resets the streak"
 write_plan; dfset 999999; reset_state
-P=$(MAXNC=6 launch 0)
+MAXNC=6 launch 0
 echo "0:yes:no"    > "$CTRL"; sleep 4
 echo "0:yes:queue" > "$CTRL"; sleep 3     # complete a plan WORK QUEUE item -> reset
 echo "0:yes:no"    > "$CTRL"; sleep 4
-stop "$P"; L="$STATE/daemon.log"
+stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'attempt streak reset' "$L" && ok "WORK QUEUE completion detected -> streak reset" || bad "reset not logged"
 grep -q 'PARKED (no item completed' "$L" && bad "parked despite a wave completion" || ok "did not park"
 
 echo "[16] WS4 — a stale nocomplete.count from a prior run must NOT park on cycle 1 (mirror the idle.since HIGH)"
 echo "0:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo 10 > "$STATE/nocomplete.count"      # stale, well over the cap
-P=$(MAXNC=5 launch 0); sleep 4; stop "$P"; L="$STATE/daemon.log"
+MAXNC=5 launch 0; sleep 4; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'PARKED (no item completed' "$L" && bad "parked off a stale count (startup didn't clear it)" || ok "stale count cleared at startup"
 grep -q 'attempt streak 1/5' "$L" && ok "streak restarted from 1" || bad "did not restart from 1"
 
@@ -366,7 +343,14 @@ grep -q 'attempt streak 1/5' "$L" && ok "streak restarted from 1" || bad "did no
 # then passes (via a counter file — exercises the WS7 retry-once).
 printf '#!/bin/sh\necho "gate ok"\nexit 0\n' > "$T/gate-green.sh"; chmod +x "$T/gate-green.sh"
 printf '#!/bin/sh\necho "BUILD FAILED: boom in Reader"\nexit 1\n' > "$T/gate-red.sh"; chmod +x "$T/gate-red.sh"
-printf '#!/bin/sh\nsleep 999\n' > "$T/gate-hang.sh"; chmod +x "$T/gate-hang.sh"
+cat > "$T/gate-hang.sh" <<HANG
+#!/bin/sh
+echo "\$\$" >> "$T/gate.pids"
+sleep 999 &
+echo "\$!" >> "$T/gate-child.pids"
+wait
+HANG
+chmod +x "$T/gate-hang.sh"
 cat > "$T/gate-flaky.sh" <<FLAKY
 #!/bin/sh
 c="$T/flaky.count"; n=\$(cat "\$c" 2>/dev/null || echo 0); n=\$((n+1)); echo "\$n" > "\$c"
@@ -377,7 +361,7 @@ chmod +x "$T/gate-flaky.sh"
 
 echo "[22] WS7 — a DUE gate that passes is GREEN: runs, records last-gate, and is NON-terminal (run continues)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-green.sh" run_daemon 0 8)
+GATE_EVERY=1 GATE_CMD="$T/gate-green.sh" run_daemon 0 8
 grep -q 'health gate GREEN' "$L" && ok "gate ran green" || bad "gate did not run/pass"
 [ -s "$STATE/last-gate" ] && ok "recorded last-gate sha" || bad "last-gate not recorded"
 grep -q 'launching fresh' "$L" && ok "green gate is non-terminal — daemon continued to normal work" || bad "daemon stopped after a green gate"
@@ -385,7 +369,7 @@ grep -q 'launching fresh' "$L" && ok "green gate is non-terminal — daemon cont
 echo "[23] WS7 — a REPRODUCIBLE failure (red twice) parks + alerts; does NOT launch a session"
 printf 'ALERT_URL="https://example.invalid/GATETOKEN9"\n' > "$STATE/alert.env"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red.sh" run_daemon 0 8)
+GATE_EVERY=1 GATE_CMD="$T/gate-red.sh" run_daemon 0 8
 grep -q 'retrying ONCE' "$L" && ok "retried once before parking" || bad "did not retry before parking"
 grep -q 'PARKED (health gate RED (x2)' "$L" && ok "parked only after a reproducible 2nd failure" || bad "did not park on x2 red"
 grep -q 'GATETOKEN9' "$CURLLOG" && ok "alerted the owner" || bad "no alert on red gate"
@@ -407,7 +391,7 @@ echo "[23c] WS7 — the park note NAMES the failing step, and never sells a DOCU
   printf 'echo "\xe2\x9c\x97 context-budget: OVER budget: execution-plans/despotlight.md"\n'
   printf 'exit 1\n'; } > "$T/gate-red-doc.sh"; chmod +x "$T/gate-red-doc.sh"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" run_daemon 0 8)
+GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" run_daemon 0 8
 grep -q 'PARKED (health gate RED (x2) — context-budget' "$L" && ok "park reason names the failing step" || bad "park reason is still anonymous"
 grep -q 'NOTHING IS WRONG WITH THE CODE' "$L" && ok "a document RED is not sold as a code regression" || bad "document park still implies a code regression"
 grep -q 'broken tree' "$L" && bad "still asserts a broken tree for a document-size failure" || ok "no broken-tree claim on a document RED"
@@ -417,7 +401,7 @@ grep -q 'context-budget.sh' "$L" && ok "points at that step's own remedy" || bad
 { printf '#!/bin/sh\necho "BUILD FAILED: boom in Reader"\n'
   printf 'echo "HEALTH GATE: RED \xe2\x80\x94 reader"\nexit 1\n'; } > "$T/gate-red-code.sh"; chmod +x "$T/gate-red-code.sh"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-code.sh" run_daemon 0 8)
+GATE_EVERY=1 GATE_CMD="$T/gate-red-code.sh" run_daemon 0 8
 grep -q 'build/test regression' "$L" && ok "a real code RED still says regression" || bad "lost the code-regression wording on a real build failure"
 grep -q 'PARKED (health gate RED (x2) — reader' "$L" && ok "code RED names its step too" || bad "code RED is still anonymous"
 grep -q 'NOTHING IS WRONG WITH THE CODE' "$L" && bad "called a broken build a document problem" || ok "code RED not misfiled as a document problem"
@@ -445,7 +429,7 @@ printf '#!/bin/sh\necho "compact-plan: archived N lines"\necho ran >> "%s"\nexit
 chmod +x "$T/compactor.sh"
 rm -f "$T/gdg.count" "$T/compacted.marker"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-doc-then-green.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+GATE_EVERY=1 GATE_CMD="$T/gate-doc-then-green.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10
 grep -q 'attempting SELF-REPAIR' "$L" && ok "a document-only RED triggers self-repair" || bad "no self-repair attempted on a document RED"
 [ -f "$T/compacted.marker" ] && ok "the compactor actually RAN (marker written, not just logged)" || bad "compactor never executed"
 grep -q 'GREEN after SELF-REPAIR' "$L" && ok "gate went green after the repair" || bad "did not recover after repair"
@@ -456,7 +440,7 @@ echo "[23e] WS7 — if self-repair does NOT clear it, still park, and SAY repair
 # The note must not imply the owner has an unrun remedy available when the daemon already ran it.
 rm -f "$T/compacted.marker"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10
 grep -q 'attempting SELF-REPAIR' "$L" && ok "tried to repair first" || bad "parked without trying"
 grep -q 'STILL RED after self-repair' "$L" && ok "logged that the repair did not clear it" || bad "silent about the failed repair"
 grep -q 'PARKED (health gate RED (x2) — context-budget' "$L" && ok "parks, still naming the failing step" || bad "park reason lost the step name"
@@ -467,7 +451,7 @@ echo "[23f] WS7 — a CODE red must NEVER be self-repaired (compaction cannot fi
 # Laundering a build failure through a compactor would be strictly worse than the bug this replaced.
 rm -f "$T/compacted.marker"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-code.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+GATE_EVERY=1 GATE_CMD="$T/gate-red-code.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10
 grep -q 'SELF-REPAIR' "$L" && bad "attempted to compact away a BUILD failure" || ok "no self-repair on a code RED"
 [ -f "$T/compacted.marker" ] && bad "ran the compactor for a broken build" || ok "compactor never invoked for code"
 grep -q 'build/test regression' "$L" && ok "still reported as a regression" || bad "lost the regression wording"
@@ -479,56 +463,65 @@ echo "[23g] WS7 — a MIXED red (document + code) is treated as CODE: no repair,
   printf 'echo "BUILD FAILED: boom"\nexit 1\n'; } > "$T/gate-red-mixed.sh"; chmod +x "$T/gate-red-mixed.sh"
 rm -f "$T/compacted.marker"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-mixed.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10)
+GATE_EVERY=1 GATE_CMD="$T/gate-red-mixed.sh" COMPACTOR="$T/compactor.sh" run_daemon 0 10
 grep -q 'SELF-REPAIR' "$L" && bad "self-repaired a mixed RED that includes a code failure" || ok "mixed RED is not self-repaired"
 [ -f "$T/compacted.marker" ] && bad "compactor ran on a mixed RED" || ok "compactor not invoked on a mixed RED"
 grep -q 'build/test regression' "$L" && ok "mixed RED keeps the conservative code wording" || bad "mixed RED misfiled as a document problem"
 
 echo "[23b] WS7 — a FLAKY failure (red once, then green) must NOT park (F1 retry-once)"
 rm -f "$T/flaky.count"; echo "0:no" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-flaky.sh" run_daemon 0 8)
+GATE_EVERY=1 GATE_CMD="$T/gate-flaky.sh" run_daemon 0 8
 grep -q 'GREEN on retry' "$L" && ok "transient failure recovered on retry -> green" || bad "flaky failure not recovered"
 grep -q 'PARKED (health gate' "$L" && bad "PARKED on a flaky (transient) failure" || ok "did not park a healthy run on a flaky test"
 
 echo "[24] WS7 — a single gate TIMEOUT is killed + SKIPPED (inconclusive; must NOT park a healthy run)"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-hang.sh" GATE_MAXRUN=2 GATE_MAX_TIMEOUTS=9 run_daemon 0 8)
+reset_state; : > "$T/gate.pids"; : > "$T/gate-child.pids"
+GATE_EVERY=1 GATE_CMD="$T/gate-hang.sh" GATE_MAXRUN=2 GATE_MAX_TIMEOUTS=9 launch 0
+sleep 8
+# Inspect the FIRST timed-out gate before harness teardown. Group cleanup must not mask a production leak,
+# and a later gate currently running is allowed. Pin both the shell and its sleeping child by scratch PID.
+first_gate="$(head -1 "$T/gate.pids")"; first_child="$(head -1 "$T/gate-child.pids")"
+if [ -n "$first_gate" ] && [ -n "$first_child" ] &&
+   ! kill -0 "$first_gate" 2>/dev/null && ! kill -0 "$first_child" 2>/dev/null; then
+  ok "timed-out gate and its child were killed before fixture cleanup"
+else bad "timed-out gate process leaked (gate=$first_gate child=$first_child)"; fi
+stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'health gate TIMED OUT' "$L" && ok "timed out + killed" || bad "did not time out a hung gate"
 grep -q 'PARKED (health gate' "$L" && bad "PARKED on a single hang (should skip)" || ok "did not park on a single hang (inconclusive)"
-pgrep -f gate-hang >/dev/null && { bad "hung gate process leaked"; pkill -f gate-hang; } || ok "hung gate process was killed"
 
 echo "[24b] WS7 — PERSISTENT timeouts escalate: park + alert after GATE_MAX_TIMEOUTS consecutive hangs"
 printf 'ALERT_URL="https://example.invalid/HANGTOKEN7"\n' > "$STATE/alert.env"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-hang.sh" GATE_MAXRUN=2 GATE_MAX_TIMEOUTS=2 run_daemon 0 14)
+GATE_EVERY=1 GATE_CMD="$T/gate-hang.sh" GATE_MAXRUN=2 GATE_MAX_TIMEOUTS=2 run_daemon 0 14
 grep -q 'PARKED (health gate hung' "$L" && ok "parked after repeated hangs" || bad "did not escalate persistent hangs to a park"
 grep -q 'HANGTOKEN7' "$CURLLOG" && ok "alerted the owner about the hang" || bad "no alert on persistent hang"
-pkill -f gate-hang 2>/dev/null; rm -f "$STATE/alert.env"
+rm -f "$STATE/alert.env"
 
 echo "[25] WS7 — NOT due (few commits since last gate) -> no gate, normal session runs"
 # Manual launch pattern: seed last-gate AFTER reset_state (run_daemon would wipe it).
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 git -C "$REPO" rev-parse HEAD > "$STATE/last-gate"    # just gated at HEAD -> 0 commits since
-P=$(GATE_EVERY=100 GATE_CMD="$T/gate-green.sh" launch 0); sleep 6; stop "$P"; L="$STATE/daemon.log"
+GATE_EVERY=100 GATE_CMD="$T/gate-green.sh" launch 0; sleep 6; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'health gate DUE' "$L" && bad "ran a gate when not due" || ok "skipped the gate (not due)"
 grep -q 'launching fresh' "$L" && ok "normal session ran instead" || bad "no session ran"
 
 echo "[26] WS7 — bad/stale last-gate sha FAILS OPEN (gate due), not a silent skip"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo deadbeefdeadbeefdeadbeefdeadbeefdeadbeef > "$STATE/last-gate"   # seed AFTER reset (see [25])
-P=$(GATE_EVERY=100 GATE_CMD="$T/gate-green.sh" launch 0); sleep 8; stop "$P"; L="$STATE/daemon.log"
+GATE_EVERY=100 GATE_CMD="$T/gate-green.sh" launch 0; sleep 8; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'health gate DUE' "$L" && ok "bad last-gate sha -> gate ran (fail-open)" || bad "bad sha silently skipped the gate"
 
 # ================= WS5 STATUS digest =================
 echo "[27] WS5 — the daemon writes \$STATE/STATUS.md each cycle (and on park)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999
-L=$(run_daemon 0 6)
+run_daemon 0 6
 [ -s "$STATE/STATUS.md" ] && ok "STATUS.md written" || bad "STATUS.md not written"
 grep -q 'STATUS-DIGEST-OK' "$STATE/STATUS.md" 2>/dev/null && ok "digest content present" || bad "digest content missing"
 
 echo "[27b] WS5 — STATUS.md is refreshed on PARK, and the park flag reaches the digest (not stale 'running')"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; rm -f "$STATE/STATUS.md"
-L=$(run_daemon 5 22)
+run_daemon 5 22
 grep -q 'PARKED' "$L" && [ -s "$STATE/STATUS.md" ] && ok "STATUS.md refreshed at park" || bad "STATUS.md not refreshed on park"
 grep -qE 'parked=.*(progress|blocked)' "$STATE/STATUS.md" 2>/dev/null && ok "park flag passed to the digest" || bad "park flag not passed ($(cat "$STATE/STATUS.md" 2>/dev/null | tr -d '\n'))"
 
@@ -593,7 +586,7 @@ echo "0:yes" > "$CTRL"; write_plan; dfset 999999
 # ⚠️ GATE_EVERY=0 deliberately. A per-file overage does not defer the gate (that is the point), so leaving a
 # RED document gate armed here would park for the GATE — correct behaviour, but a different assertion, and it
 # would mask what this case is actually about. The gate's own document handling is [23a-d]'s job.
-L=$(GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 10)
+GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 10
 grep -q 'per-file advisory' "$L" && ok "logged the per-file state as ADVISORY (still measured, still visible)" || bad "did not log the per-file advisory"
 grep -q 'per-file caps do not gate work' "$L" && ok "the log says plainly that per-file caps do not gate" || bad "advisory line does not state the policy"
 [ -f "$DOCFIX" ] && bad "queued a trim for a merely per-file overage — the 2026-08-13 de-gating is undone" || ok "wrote NO fix request (per-file does not dispatch)"
@@ -613,7 +606,7 @@ rm -f "$T/compacted2.marker"
 bstate "context-budget: WARN SUITE_TODO.md 200000 205000
 context-budget: TOTAL OVER 520000 500000"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" COMPACTOR="$T/compactor2.sh" run_daemon 0 8)
+GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" COMPACTOR="$T/compactor2.sh" run_daemon 0 8
 # Assert the DISPATCH DECISION from the log: the between-cycles housekeeping compaction runs $COMPACTOR every
 # cycle regardless, so a bare marker check would pass even if the pre-gate had done nothing — vacuously green.
 grep -q 'orientation total over — running the plan compactor first' "$L" && ok "dispatched the compactor for a TOTAL overage" || bad "pre-gate never dispatched the compactor for a TOTAL overage"
@@ -630,7 +623,7 @@ rm -f "$T/compacted3.marker"
 bstate "context-budget: WARN SUITE_TODO.md 200000 205000
 context-budget: TOTAL OVER 520000 500000"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" DOC_PREGATE=1 DOCFIX_MAX=99 BUDGET_CMD="$T/budget-cmd.sh" COMPACTOR="$T/compactor3.sh" run_daemon 0 10)
+GATE_EVERY=1 GATE_CMD="$T/gate-red-doc.sh" DOC_PREGATE=1 DOCFIX_MAX=99 BUDGET_CMD="$T/budget-cmd.sh" COMPACTOR="$T/compactor3.sh" run_daemon 0 10
 grep -q 'handed the trim to the next session' "$L" && ok "handed the trim to a session once the free remedy failed" || bad "no session hand-off after the compactor failed to fix it"
 [ -f "$DOCFIX" ] && ok "wrote the fix request a session reads ($DOCFIX)" || bad "no fix request written"
 head -1 "$DOCFIX" 2>/dev/null | grep -q '^REQUIRED' && ok "the request is marked REQUIRED (the total IS over)" || bad "request not marked REQUIRED"
@@ -647,7 +640,7 @@ echo "[28d] WS13 — NEAR dispatches NOTHING (the pre-emptive-trim case was RETI
 bstate "context-budget: NEAR SUITE_TODO.md 195000 205000
 context-budget: TOTAL OK 434506 500000"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 8)
+GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 8
 grep -q 'near=\[SUITE_TODO.md\]' "$L" && ok "NEAR is still MEASURED and logged (visibility kept)" || bad "NEAR no longer even reported"
 [ -f "$DOCFIX" ] && bad "queued a pre-emptive trim for a NEAR — the retired behaviour is back" || ok "wrote no request for a NEAR"
 grep -q 'health gate DEFERRED' "$L" && bad "deferred the gate for a file that is merely NEAR its budget" || ok "did not defer the gate on a NEAR"
@@ -657,7 +650,7 @@ echo "[28e] WS13 — all clear CLEARS a satisfied request, so a fixed document c
 bstate "context-budget: TOTAL OK 100 500000"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
 reset_state; printf 'REQUIRED\nFILES: CLAUDE.md\n' > "$DOCFIX"; echo 2 > "$STATE/doc-budget-tries"
-P=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" launch 0); sleep 7; stop "$P"; L="$STATE/daemon.log"
+GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" launch 0; sleep 7; stop "$P" || exit 1; L="$STATE/daemon.log"
 [ -f "$DOCFIX" ] && bad "left a satisfied fix request in place — every future session would burn itself on it" || ok "cleared the satisfied request"
 [ -f "$STATE/doc-budget-tries" ] && bad "left the attempt counter, so an unrelated later overage starts pre-charged toward a park" || ok "cleared the attempt counter"
 
@@ -669,7 +662,7 @@ bstate "context-budget: WARN SUITE_TODO.md 200000 205000
 context-budget: TOTAL OVER 520000 500000"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
 printf '#!/bin/sh\nexit 0\n' > "$T/compactor-noop.sh"; chmod +x "$T/compactor-noop.sh"
-L=$(GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" DOCFIX_MAX=1 COMPACTOR="$T/compactor-noop.sh" run_daemon 0 14)
+GATE_EVERY=0 DOC_PREGATE=1 BUDGET_CMD="$T/budget-cmd.sh" DOCFIX_MAX=1 COMPACTOR="$T/compactor-noop.sh" run_daemon 0 14
 grep -q 'PARKED (documents over budget after 1 trim attempts' "$L" && ok "parks once the attempt cap is hit" || bad "never parked despite exceeding DOCFIX_MAX ($(grep -c 'handed the trim' "$L") hand-offs)"
 grep -q 'compact-plan.sh ran (it can only shrink' "$L" && ok "the note says WHY the mechanical remedy could not help" || bad "note does not explain the compactor's scope"
 grep -q 'BUDGET is wrong rather than the document' "$L" && ok "the note names the likeliest real cause after repeated failures" || bad "note offers no diagnosis"
@@ -683,7 +676,7 @@ echo "[28h] WS13 — a TOTAL overage with NO per-file OVER still names something
 bstate "context-budget: WARN SUITE_TODO.md 200000 205000
 context-budget: TOTAL OVER 520000 500000"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=99 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 8)
+GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=99 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 8
 [ -f "$DOCFIX" ] && ok "a total-only overage still produces a fix request" || bad "no request written for a total overage"
 head -1 "$DOCFIX" 2>/dev/null | grep -q '^REQUIRED' && ok "marked REQUIRED (the gate will stay RED)" || bad "total overage not marked REQUIRED"
 # The assertion that matters: the FILES line must never be empty.
@@ -703,7 +696,7 @@ echo "[28i] WS13 — THE LAPTOP CASE: sessions that commit nothing must NEVER pu
 bstate "context-budget: WARN SUITE_TODO.md 200000 205000
 context-budget: TOTAL OVER 520000 500000"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 16)
+GATE_EVERY=0 DOC_PREGATE=1 DOCFIX_MAX=1 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 16
 grep -q 'PARKED' "$L" && bad "PARKED after cycles that committed nothing — a laptop lid close would now stop the run over an unattempted trim" || ok "does not park when no session ever committed"
 grep -q 'not counting it' "$L" && ok "logged that an empty/killed session was NOT counted as an attempt" || bad "silently counted (or never re-checked) a session that did nothing"
 [ "$(cat "$STATE/doc-budget-tries" 2>/dev/null)" = "1" ] && ok "the attempt counter stayed at 1 across several cycles" || bad "counter drifted to '$(cat "$STATE/doc-budget-tries" 2>/dev/null)' without any commit"
@@ -714,7 +707,7 @@ echo "[28g] WS13 — the pre-gate can be turned OFF, and then the old gate path 
 # overage dispatches nothing even when the pre-gate is ON (W32.prove-stale).
 bstate "context-budget: TOTAL OVER 520000 500000"
 echo "0:yes" > "$CTRL"; write_plan; dfset 999999
-L=$(GATE_EVERY=0 DOC_PREGATE=0 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 6)
+GATE_EVERY=0 DOC_PREGATE=0 BUDGET_CMD="$T/budget-cmd.sh" run_daemon 0 6
 grep -q 'doc pre-gate' "$L" && bad "the pre-gate ran with AUTONOMOUS_DOC_PREGATE=0" || ok "AUTONOMOUS_DOC_PREGATE=0 disables it completely"
 [ -f "$DOCFIX" ] && bad "wrote a fix request while disabled" || ok "writes nothing while disabled"
 
@@ -722,7 +715,7 @@ grep -q 'doc pre-gate' "$L" && bad "the pre-gate ran with AUTONOMOUS_DOC_PREGATE
 echo "[29a] usage window — a session cut off at 92% is NOT a no-completion, and the next launch waits for the reset"
 echo "1:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo "92 6" > "$RLECTL"; : > "$STATE/session-killed"   # a stale kill marker must be cleared at launch
-P=$(MAXNC=2 launch 0); sleep 5; : > "$RLECTL"; echo "0:no" > "$CTRL"; sleep 6; stop "$P"; L="$STATE/daemon.log"
+MAXNC=2 launch 0; sleep 5; : > "$RLECTL"; echo "0:no" > "$CTRL"; sleep 6; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'cut off by the usage window (92%)' "$L" && ok "a nonzero exit at 92% is logged as cut off" || bad "cut-off not detected"
 grep -q 'attempt streak' "$L" && bad "a cut-off session was counted toward the no-completion streak" || ok "not counted toward the streak"
 grep -q 'PARKED' "$L" && bad "parked on sessions the window cut off" || ok "did not park"
@@ -734,7 +727,7 @@ grep -q $'^wait\t' "$STATE/usage-window.tsv" && ok "ledger records the wait" || 
 echo "[29b] usage window — the same checkpoint at 50% with rc=0 still counts, and nothing waits"
 echo "0:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo "50 600" > "$RLECTL"
-L=$(MAXNC=3 run_daemon 0 8)
+MAXNC=3 run_daemon 0 8
 grep -q 'attempt streak 1/3' "$L" && ok "an ordinary checkpoint still counts toward the streak" || bad "streak not counted"
 grep -q 'cut off' "$L" && bad "an rc=0 session at 50% read as cut off" || ok "not read as cut off"
 grep -q 'waiting until' "$L" && bad "waited at 50%" || ok "no wait under WINDOW_WAIT_AT"
@@ -742,19 +735,19 @@ grep -q 'waiting until' "$L" && bad "waited at 50%" || ok "no wait under WINDOW_
 echo "[29c] usage window — a REJECTED fast-fail is cut off and waits; a fast exit with NO event is not"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo "rejected 5" > "$RLECTL"                 # (run_daemon's reset_state would clear it, so launch by hand)
-P=$(launch 0); sleep 6; stop "$P"; L="$STATE/daemon.log"
+launch 0; sleep 6; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'USAGE LIMIT (rate_limit_event: rejected' "$L" && ok "the rejection is still named in the log" || bad "rejection not named"
 grep -q 'usage window 100% used, and the last session was cut off by it — waiting' "$L" && ok "a rejection reads 100% and waits for its reset" || bad "no wait after a rejection"
 echo "1:no" > "$CTRL"; write_plan; reset_state
 W92="92 $(( $(date +%s) + 600 ))"; echo "$W92" > "$STATE/usage-window.last"   # a live high reading, not cut
-P=$(launch 0); sleep 5; stop "$P"; L="$STATE/daemon.log"
+launch 0; sleep 5; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'waiting until' "$L" && bad "waited on a 92% reading below WINDOW_WAIT_AT" || ok "a 92% reading alone does not wait"
 [ "$(cat "$STATE/usage-window.last")" = "$W92" ] && ok "a session with no reading leaves the last reading alone (not marked cut)" || bad "usage-window.last rewritten to '$(cat "$STATE/usage-window.last")'"
 
 echo "[29d] usage window — an rc=0 session that leaves the window at 96% makes the next launch wait"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo "96 5" > "$RLECTL"
-P=$(launch 0); sleep 3; : > "$RLECTL"; sleep 5; stop "$P"; L="$STATE/daemon.log"
+launch 0; sleep 3; : > "$RLECTL"; sleep 5; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'usage window 96% used — waiting until' "$L" && ok "waits at or over WINDOW_WAIT_AT" || bad "did not wait at 96%"
 grep -q 'cut off' "$L" && bad "an rc=0 session read as cut off" || ok "rc=0 is never cut off"
 
@@ -763,12 +756,12 @@ echo "[29e] usage window — a session that hit --max-budget-usd, or that a watc
 # each spend their budget late in a window would then never advance the no-completion streak.
 echo "1:yes:no" > "$CTRL"; write_plan; dfset 999999; reset_state
 echo "93 600" > "$RLECTL"; echo "budget" > "$ENDCTL"
-P=$(MAXNC=5 launch 0); sleep 4; stop "$P"; L="$STATE/daemon.log"
+MAXNC=5 launch 0; sleep 4; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'cut off' "$L" && bad "a budget-capped session read as cut off by the window" || ok "the budget cap is not a window cut"
 grep -q 'attempt streak 1/5' "$L" && ok "the budget-capped checkpoint counts toward the streak" || bad "streak not counted"
 echo "1:yes:no" > "$CTRL"; write_plan; reset_state
 echo "93 600" > "$RLECTL"; echo "sleep 30" > "$ENDCTL"
-P=$(AUTONOMOUS_MAXRUN=2 MAXNC=5 launch 0); sleep 12; stop "$P"; L="$STATE/daemon.log"
+AUTONOMOUS_MAXRUN=2 MAXNC=5 launch 0; sleep 12; stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'resume session exited rc=[1-9]' "$L" && ok "the MAXRUN backstop killed the session (nonzero rc)" || bad "the session was not killed: $(grep 'exited rc' "$L" | head -1)"
 grep -q 'cut off' "$L" && bad "a watchdog-killed session read as cut off by the window" || ok "a watchdog kill is not a window cut"
 

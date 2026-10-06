@@ -572,13 +572,15 @@ ops/autonomous/tests/prove-todo-stubs.sh       # the ticked-stub lint: a COLUMN-
                                                # sub-step and fenced/quoted examples stay silent ($0, <1s).
 ```
 
-The daemon-loop, exit-logging and Codex-agent harnesses source `tests/fixture-processes.sh` and launch
+The daemon-loop, gate-fix, exit-logging and Codex-agent harnesses source `tests/fixture-processes.sh` and launch
 fixtures directly into owned process groups. EXIT, TERM and INT cleanup waits for every leader and its
 session/watchdog descendants before removing scratch state; it never uses a name-wide reaper. Do not wrap
 `launch` or `run_daemon` in a command substitution: that loses child ownership and cleanup registration.
 `python3 ops/autonomous/tests/prove-harness-lifecycle.py` checks normal/failing exits, explicit stop, both
-signals and an unrelated surviving peer, then exercises the real launcher's installed-copy process guard.
-That guard ignores test copies and retains the loaded-launchd-job check. These tests use scratch state and
+signals (including launch registration and a second signal during cleanup) and an unrelated surviving
+peer, then exercises the real launcher's installed-copy process guard.
+The lifecycle proof is a health-gate step; its Python runner also reaps its scratch trees on TERM.
+The launcher's guard ignores test copies and retains the loaded-launchd-job check. These tests use scratch state and
 stub host commands; they neither install nor restart the running daemon.
 
 ### Which of these actually run, and the assertion that keeps it that way (W26.fixwarn-fu1, 2026-08-10)

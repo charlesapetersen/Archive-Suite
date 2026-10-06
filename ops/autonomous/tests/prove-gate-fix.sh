@@ -17,45 +17,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 DAEMON="${1:-$HERE/../archive-suite-autonomous.sh}"
 [ -f "$DAEMON" ] || { echo "no daemon at $DAEMON"; exit 2; }
 T="$(mktemp -d)"
-# Monitor mode gives every directly launched fixture its own process group, including its session and
-# watchdog descendants. Only groups verified at launch are recorded for cleanup.
-set -m
-FIXTURE_PIDS=()
-group_alive() {
-  ps -ax -o pgid= | awk -v group="$1" '$1 == group { found=1 } END { exit !found }'
-}
-stop() {
-  local pid="$1" n=0 state
-  kill -TERM -- "-$pid" 2>/dev/null || true
-  while [ "$n" -lt 20 ]; do
-    state="$(ps -p "$pid" -o stat= 2>/dev/null)"
-    case "$state" in ''|*Z*) break ;; esac
-    sleep 0.1; n=$((n+1))
-  done
-  # TERM can exit the daemon during a session, leaving heartbeat/watchdog children alive. Reap the entire
-  # owned group before resetting scratch state, including on harness interruption.
-  kill -KILL -- "-$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  n=0
-  while group_alive "$pid" && [ "$n" -lt 20 ]; do sleep 0.1; n=$((n+1)); done
-  if group_alive "$pid"; then
-    echo "fixture process group $pid survived cleanup; scratch state retained at $T" >&2
-    return 1
-  fi
-  for n in "${!FIXTURE_PIDS[@]}"; do
-    [ "${FIXTURE_PIDS[$n]}" = "$pid" ] && unset 'FIXTURE_PIDS[n]'
-  done
-  return 0
-}
-cleanup() {
-  local pid
-  for pid in "${FIXTURE_PIDS[@]+"${FIXTURE_PIDS[@]}"}"; do stop "$pid" || return 1; done
-  python3 -c 'import shutil,sys; shutil.rmtree(sys.argv[1])' "$T"
-}
-fixture_rc=0
-trap 'fixture_rc=$?; cleanup || fixture_rc=1; exit "$fixture_rc"' EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+. "$HERE/fixture-processes.sh"
 PASS=0; FAIL=0
 ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
 bad() {
@@ -123,20 +85,13 @@ chmod +x "$T/claude"
 printf '#!/bin/sh\necho STATUS-OK\n' > "$T/status-stub.sh"; chmod +x "$T/status-stub.sh"
 
 launch() {
-  env -u BASH_ENV -u SHELLOPTS HOME="$FIXTURE_HOME" GATEFIX_FIXTURE_DELAY="${1:-0}" AUTONOMOUS_LABEL=provegatefix AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" AUTONOMOUS_STATE="$STATE" \
+  fixture_launch env -u BASH_ENV -u SHELLOPTS HOME="$FIXTURE_HOME" GATEFIX_FIXTURE_DELAY="${1:-0}" AUTONOMOUS_LABEL=provegatefix AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" AUTONOMOUS_STATE="$STATE" \
     AUTONOMOUS_CLAUDE="$T/claude" AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=2 AUTONOMOUS_IDLE_STOP=0 \
     AUTONOMOUS_MAX_NOCOMPLETE=0 AUTONOMOUS_GATE_EVERY=1 AUTONOMOUS_GATE_CMD="$GATE" AUTONOMOUS_GATE_MAXRUN=30 \
     AUTONOMOUS_GATEFIX_MAX="${GFMAX:-3}" AUTONOMOUS_STATUS_CMD="$T/status-stub.sh" AUTONOMOUS_COMPACTOR="$T/none" \
     AUTONOMOUS_DOC_PREGATE=0 AUTONOMOUS_BUDGET_CMD="$T/none" AUTONOMOUS_HB_POLL=1 AUTONOMOUS_YIELD_CMD="$T/no-yield" \
     AUTONOMOUS_USAGE_CMD="$HERE/../usage-window.sh" AUTONOMOUS_WINDOW_POLL=1 \
-    bash "$DAEMON" >"$T/daemon.out" 2>&1 &
-  P=$!
-  if [ "$(ps -p "$P" -o pgid= | tr -d ' ')" != "$P" ]; then
-    echo "fixture $P has no isolated process group" >&2
-    kill -TERM "$P" 2>/dev/null; wait "$P" 2>/dev/null
-    exit 1
-  fi
-  FIXTURE_PIDS+=("$P")
+    bash "$DAEMON" >"$T/daemon.out" 2>&1
 }
 reset() { : > "$STATE/daemon.log"; rm -f "$STATE"/gate-fix* "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/idle.since" \
           "$STATE/engine.lock" "$SEEN" "$T/request.copy" "$FIXTURE_HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt"; }
