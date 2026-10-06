@@ -962,7 +962,7 @@ W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware 
 staggered starts, the subscription policy) and the design are in the plan.
 
 - [ ] **`W35.pace` — worker count sized from the usage readings, Vision OCR keeps Claude priority [M]** (blocked-on: W35.workers). Detail: `execution-plans/parallel-workers/00-plan.md`.
-- [ ] **`W35.live` — first real run with two workers, measured; the owner decides whether to keep it [S]** (blocked-on: W35.pace). Detail: `execution-plans/parallel-workers/00-plan.md`.
+- [ ] **`W35.live` — first real run with two workers, measured; the owner decides whether to keep it [S]** (blocked-on: W35.pace). Owner, 2026-10-06: W35 runs ahead of Vision OCR until done (Codex is out until Sun 11 Oct, so Archive Suite runs on Claude). The Vision OCR daemon is stopped meanwhile (`~/.local/state/visionocr-autonomous/paused-for-w35`); when W35 is done, delete that file and restart it (`daemon.sh start` in ~/Claude/vision-ocr), and remove `$STATE/restart-on-source-change`. Detail: `execution-plans/parallel-workers/00-plan.md`.
 
 ## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
 
