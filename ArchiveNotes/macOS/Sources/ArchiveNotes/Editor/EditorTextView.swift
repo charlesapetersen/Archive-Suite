@@ -26,7 +26,10 @@ final class EditorTextView: NSTextView {
                     visible = visible.intersection(current.convert(current.visibleRect, to: self))
                     ancestor = current.superview
                 }
+                let frame = chip.convert(chip.bounds, to: self)
                 states.append(["id": id, "width": chip.bounds.width, "height": chip.bounds.height,
+                               "y": Double(frame.minY), "visibleY": Double(self.visibleRect.minY),
+                               "visibleH": Double(self.visibleRect.height), "sel": self.selectedRange().location,
                                "inEditor": belongsToEditor,
                                "visible": chip.window === self.window && !chip.isHiddenOrHasHiddenAncestor && !visible.isEmpty])
             }
@@ -156,7 +159,12 @@ final class EditorTextView: NSTextView {
 #if DEBUG
         attachmentRelayoutRequests += 1
 #endif
-        relayoutViewportSoon()
+        // Re-scroll after the relayout, as `insertStyled` does: redo scrolls to the restored text BEFORE this
+        // pass, and the VM then showed the redone chip's view installed but stranded off-screen (W9.cand2-fu1).
+        relayoutViewportSoon { [weak self] in
+            guard let self else { return }
+            self.scrollRangeToVisible(self.selectedRange())
+        }
     }
 
 #if DEBUG
