@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""W35.claims: serialize reservations and idle upkeep; never signal an owner.
+
+Claims are atomic mkdir entries. A kernel flock serializes selection, metadata,
+release and upkeep (and disappears on process death). Dead owners expire after
+AUTONOMOUS_STALE, just like engine locks; age alone never evicts a live owner.
+Empty unpublished claims expire; corrupt metadata and unknown files are preserved. All paths come from the caller's explicit state/repo arguments.
+"""
+import argparse
+import contextlib
+import fcntl
+import json
+import math
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import time
+import uuid
+
+
+def identity(pid):
+    if not isinstance(pid, int) or pid <= 0:
+        return ""
+    p = subprocess.run(["ps", "-p", str(pid), "-o", "stat=,lstart="],
+                       capture_output=True, text=True, check=False)
+    if p.stderr.strip():
+        raise RuntimeError("cannot inspect process identity: " + p.stderr.strip())
+    fields = p.stdout.strip().split(maxsplit=1)
+    return fields[1] if p.returncode == 0 and len(fields) == 2 and "Z" not in fields[0] else ""
+
+
+def live(record):
+    return (identity(record.get("pid")) == record.get("pid_start") and bool(record.get("pid_start"))) or session_live(record)
+
+
+def session_live(record):
+    if record.get("uncertain"):
+        raise RuntimeError("claim requires inspection: termination victim disappeared before session capture")
+    if identity(record.get("child")) == record.get("child_start") and record.get("child_start"):
+        return True
+    for member in record.get("protected", []):
+        if identity(member["pid"]) == member["start"]:
+            return True
+    sessions = {member["sid"] for member in record.get("protected", []) if member.get("sid")}
+    if record.get("sid"):
+        sessions.add(record["sid"])
+    if sessions:
+        with subprocess.Popen(["ps", "-ax", "-o", "pid=,stat="], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, text=True) as probe:
+            stdout, stderr = probe.communicate()
+            probe_pid = probe.pid
+        if probe.returncode != 0 or stderr.strip():
+            raise RuntimeError("cannot inspect session process group")
+        # A separate OS session prevents unrelated processes joining the group.
+        for line in stdout.splitlines():
+            fields = line.split()
+            if len(fields) == 2 and "Z" not in fields[1]:
+                pid = int(fields[0])
+                if pid in (probe_pid, os.getpid()):
+                    continue  # our owned probe necessarily exits before this scan
+                try:
+                    if os.getsid(pid) in sessions:
+                        return True
+                except ProcessLookupError:
+                    # It may have forked a same-session successor after ps took
+                    # its snapshot. Retain once; the next release takes a new scan.
+                    return True
+        return False
+    return False
+
+
+@contextlib.contextmanager
+def locked(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield f
+
+
+def write_record(path, value):
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("w") as f:
+        json.dump(value, f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def validate_record(record, tag):
+    if not isinstance(record, dict) or record.get("tag") != tag:
+        raise ValueError("claim tag does not match directory")
+    for field in ("worker", "lane"):
+        valid(record.get(field, ""))
+    if type(record.get("pid")) is not int or record["pid"] <= 0 or not isinstance(record.get("pid_start"), str) or not record["pid_start"]:
+        raise ValueError("missing claim owner identity")
+    if not isinstance(record.get("token"), str) or not re.fullmatch(r"[a-f0-9]{32}", record["token"]):
+        raise ValueError("invalid claim token")
+    if type(record.get("started")) not in (float, int) or not math.isfinite(record["started"]) or record["started"] <= 0:
+        raise ValueError("invalid claim start time")
+    if "child" in record or "child_start" in record:
+        if type(record.get("child")) is not int or record["child"] <= 0 or not isinstance(record.get("child_start"), str) or not record["child_start"]:
+            raise ValueError("missing CLI identity")
+    if "sid" in record and (type(record["sid"]) is not int or record["sid"] != record.get("child")):
+        raise ValueError("invalid session identity")
+    if "protected" in record:
+        if not isinstance(record["protected"], list):
+            raise ValueError("invalid protected descendants")
+        for member in record["protected"]:
+            if not isinstance(member, dict) or type(member.get("pid")) is not int or member["pid"] <= 0 or not isinstance(member.get("start"), str) or not member["start"]:
+                raise ValueError("invalid protected descendant identity")
+            if "sid" in member and (type(member["sid"]) is not int or member["sid"] <= 0):
+                raise ValueError("invalid protected descendant session")
+    if "uncertain" in record and type(record["uncertain"]) is not bool:
+        raise ValueError("invalid descendant uncertainty")
+
+
+def claims(state, stale):
+    """Only retire a known dead, expired claim, under coordination.lock."""
+    directory = state / "claims"
+    if not directory.exists():
+        return []
+    result = []
+    for entry in sorted(directory.iterdir()):
+        if not entry.is_dir() or entry.is_symlink():
+            raise RuntimeError("unexpected claim entry: " + str(entry))
+        names = {p.name for p in entry.iterdir()}
+        if not names:
+            # An interrupted mkdir cannot have launched a CLI: reserve returns only
+            # after durable metadata. Protect it for STALE, then remove only empty.
+            if time.time() - entry.stat().st_mtime >= stale:
+                entry.rmdir()
+                continue
+            result.append((entry, {"tag": entry.name, "lane": "suite", "unknown": True}))
+            continue
+        if names - {"owner.json", "owner.json.tmp"}:
+            raise RuntimeError("unexpected files in claim: " + str(entry))
+        if "owner.json" not in names and "owner.json.tmp" in names:
+            # A complete temp record is the interrupted atomic publish, under our
+            # shared lock. Validate it before finishing that same publish.
+            pending = json.loads((entry / "owner.json.tmp").read_text())
+            validate_record(pending, entry.name)
+            os.replace(entry / "owner.json.tmp", entry / "owner.json")
+        elif "owner.json.tmp" in names:
+            # The previous record remains authoritative after interrupted update.
+            (entry / "owner.json.tmp").unlink()
+        try:
+            record = json.loads((entry / "owner.json").read_text())
+            validate_record(record, entry.name)
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("invalid claim (preserved): " + str(entry)) from exc
+        if not record.get("unknown") and not live(record) and time.time() - entry.stat().st_mtime >= stale:
+            # No recursive removal: unexpected files preserve the claim and stop dispatch.
+            if {p.name for p in entry.iterdir()} != {"owner.json"}:
+                raise RuntimeError("unexpected files in expired claim: " + str(entry))
+            (entry / "owner.json").unlink()
+            entry.rmdir()
+            continue
+        result.append((entry, record))
+    return result
+
+
+def valid(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value):
+        raise ValueError("invalid tag/worker: " + repr(value))
+    return value
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--state", required=True, type=Path)
+    p.add_argument("--repo", required=True, type=Path)
+    p.add_argument("--plan", type=Path)
+    p.add_argument("--stale", type=int, default=int(os.environ.get("AUTONOMOUS_STALE", "1500")))
+    sub = p.add_subparsers(dest="action", required=True)
+    reserve = sub.add_parser("reserve")
+    reserve.add_argument("worker", type=valid)
+    reserve.add_argument("pid", type=int)
+    reserve.add_argument("--special", choices=["doc-budget-fix", "gate-fix", "review"])
+    for name in ("release", "heartbeat", "child", "worktree"):
+        cmd = sub.add_parser(name)
+        cmd.add_argument("tag", type=valid)
+        cmd.add_argument("token")
+        if name in ("child", "worktree"):
+            cmd.add_argument("value")
+    sub.add_parser("filter")
+    sub.add_parser("stopped")
+    sub.add_parser("restart")
+    upkeep = sub.add_parser("idle")
+    upkeep.add_argument("command", nargs=argparse.REMAINDER)
+    session = sub.add_parser("session")
+    session.add_argument("tag", type=valid)
+    session.add_argument("token")
+    session.add_argument("command", nargs=argparse.REMAINDER)
+    protect = sub.add_parser("protect")
+    protect.add_argument("tag", type=valid)
+    protect.add_argument("token")
+    protect.add_argument("pids", type=int, nargs="+")
+    args = p.parse_args()
+    state = args.state.resolve()
+    env = os.environ.copy()
+    plan = args.plan or Path(env.get("AUTONOMOUS_PLAN", str(args.repo / ".maintenance/AUTONOMOUS_PLAN.md")))
+    session_command = None
+    plan = plan.resolve()
+    env["AUTONOMOUS_PLAN"] = str(plan)
+    if args.action == "filter" and not (state / "claims").exists():
+        # Advisory resolver reads must not initialize the installed runtime of a
+        # still-running serial daemon. Actual reservations always lock below.
+        for row in sys.stdin.read().splitlines():
+            if len(row.split("\t", 2)) != 3:
+                raise ValueError("malformed resolver row")
+            print(row)
+        return 0
+    with locked(state / "coordination.lock") as coordination:
+        stopped = state / "owner-stopped"
+        if args.action == "stopped":
+            stopped.touch()
+        if args.action in ("stopped", "restart"):
+            if not stopped.exists():
+                return 0
+            active = claims(state, 0)  # explicit owner stop, never a normal crash
+            for lock in state.glob("worker-*/engine.lock"):
+                if not any(r.get("worker") == lock.parent.name or r.get("unknown") for _, r in active):
+                    lock.unlink()
+            if active:
+                return 4
+            stopped.unlink()
+            return 0
+        active = claims(state, args.stale)
+        if args.action == "filter":
+            rows = sys.stdin.read().splitlines()
+            for row in rows:
+                fields = row.split("\t", 2)
+                if len(fields) != 3:
+                    raise ValueError("malformed resolver row")
+                status, tag, text = fields
+                lane_match = re.search(r"\(lane:\s*([A-Za-z0-9._-]+)\s*\)", text)
+                lane = lane_match[1] if lane_match else "suite"
+                if any(r.get("tag") == tag or lane == "suite" or r.get("lane", "suite") in ("suite", lane)
+                       for _, r in active):
+                    continue
+                print(row)
+            return 0
+        if args.action == "reserve":
+            start = identity(args.pid)
+            if not start:
+                raise ValueError("claim owner is not alive")
+            if any(r.get("worker") == args.worker for _, r in active):
+                return 4
+            if args.special:
+                rows = ["ok\t" + args.special + "\tspecial repair/review"]
+            else:
+                env["AUTONOMOUS_IGNORE_CLAIMS"] = "1"
+                env["AUTONOMOUS_PLAN"] = str(plan)
+                proc = subprocess.run(["bash", str(args.repo / "ops/autonomous/next-queue-item.sh"), str(args.repo)],
+                                      env=env, capture_output=True, text=True)
+                if proc.returncode not in (0, 3, 4):
+                    raise RuntimeError(proc.stderr or proc.stdout)
+                rows = proc.stdout.splitlines() if proc.returncode in (0, 4) else []
+            for row in rows:
+                fields = row.split("\t", 2)
+                if len(fields) != 3 or fields[0] != "ok":
+                    continue
+                _, tag, text = fields
+                valid(tag)
+                if re.search(r"\[hold\]|needs:\s*owner", text, re.I):
+                    continue
+                m = re.search(r"\(lane:\s*([A-Za-z0-9._-]+)\s*\)", text)
+                lane = m[1] if m else "suite"
+                if any(r.get("tag") == tag or lane == "suite" or r.get("lane", "suite") in ("suite", lane)
+                       for _, r in active):
+                    continue
+                directory = state / "claims" / tag
+                directory.parent.mkdir(parents=True, exist_ok=True)
+                directory.mkdir()  # atomic claim; a pre-existing entry is never overwritten
+                token = uuid.uuid4().hex
+                record = dict(tag=tag, worker=args.worker, pid=args.pid, pid_start=start,
+                              lane=lane, token=token, started=time.time(), text=text)
+                write_record(directory / "owner.json", record)
+                print(tag + "\t" + token + "\t" + text)
+                return 0
+            return 4
+        if args.action == "idle":
+            if active:
+                return 4
+            # Compatibility: an old serial daemon has no claim. Keep its fresh lock protected.
+            locks = [state / "engine.lock"] + list(state.glob("worker-*/engine.lock"))
+            if any(f.exists() and time.time() - f.stat().st_mtime < args.stale for f in locks):
+                return 4
+            command = args.command
+            if command[:1] == ["--"]:
+                command = command[1:]
+            if not command:
+                return 0
+            env["AUTONOMOUS_COORDINATED_UPKEEP"] = "1"
+            # Same lock as plan-edit: compaction and tick/report edits cannot overlap.
+            with locked(plan.with_name(plan.name + ".lock")) as plan_lock:
+                # Keep both flocks in the mutating child if its coordinator dies.
+                return subprocess.run(command, env=env, check=False,
+                                      pass_fds=(coordination.fileno(), plan_lock.fileno())).returncode
+        matches = [(d, r) for d, r in active if d.name == args.tag and r.get("token") == args.token]
+        if len(matches) != 1:
+            return 4
+        directory, record = matches[0]
+        if args.action == "session":
+            session_command = args.command
+            if session_command[:1] == ["--"]:
+                session_command = session_command[1:]
+            if not session_command:
+                raise ValueError("missing session command")
+            # Publish ownership BEFORE exec. If the supervisor died and a new claim
+            # won, the token check above refuses to launch the old CLI at all.
+            os.setsid()
+            record["child"] = os.getpid()
+            record["child_start"] = identity(os.getpid())
+            record["sid"] = os.getsid(0)
+            if not record["child_start"]:
+                raise RuntimeError("cannot identify session process")
+            write_record(directory / "owner.json", record)
+            os.utime(directory, None)
+        elif args.action == "release":
+            # A supervisor may exit while its CLI survives. Keep that CLI's work claimed.
+            if session_live(record):
+                return 4
+            if {p.name for p in directory.iterdir()} != {"owner.json"}:
+                raise RuntimeError("unexpected files in claim: " + str(directory))
+            (directory / "owner.json").unlink()
+            directory.rmdir()
+        elif args.action == "heartbeat":
+            os.utime(directory, None)
+        elif args.action == "protect":
+            members = record.setdefault("protected", [])
+            for pid in args.pids:
+                try:
+                    sid = os.getsid(pid)
+                except ProcessLookupError:
+                    # No safe way to reconstruct an escaped SID after its root
+                    # disappeared. Preserve the claim rather than clear blindly.
+                    record["uncertain"] = True
+                    continue
+                start = identity(pid)
+                member = {"pid": pid, "start": start or "exited-after-session-snapshot", "sid": sid}
+                if start and member not in members:
+                    members.append(member)
+                elif not start:
+                    members.append(member)  # SID remains the successor protection
+            write_record(directory / "owner.json", record)
+            os.utime(directory, None)
+            if record.get("uncertain"):
+                raise RuntimeError("termination victim disappeared before session capture; claim preserved")
+        else:
+            if args.action == "child":
+                record["child"] = int(args.value)
+                record["child_start"] = identity(record["child"])
+                if not record["child_start"]:
+                    raise ValueError("child is not alive")
+            else:
+                path = Path(args.value).resolve()
+                common = subprocess.check_output(["git", "-C", str(path), "rev-parse", "--path-format=absolute",
+                                                  "--git-common-dir"], text=True).strip()
+                expected = subprocess.check_output(["git", "-C", str(args.repo), "rev-parse", "--path-format=absolute",
+                                                    "--git-common-dir"], text=True).strip()
+                if common != expected or path == args.repo.resolve():
+                    raise ValueError("worktree must be isolated in this repository")
+                record["worktree"] = str(path)
+            write_record(directory / "owner.json", record)
+            os.utime(directory, None)
+        if session_command is None:
+            return 0
+    # exec preserves PID + birth identity; flock is closed before a long session.
+    os.execvpe(session_command[0], session_command, env)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        print("worker-state: " + str(exc), file=sys.stderr)
+        sys.exit(2)

@@ -57,7 +57,7 @@ if [ "$latest" = 1 ]; then
            | while IFS= read -r x; do printf '%s\t%s\n' "$(stat -f %m "$x")" "$x"; done | sort -rn | cut -f2-)
   [ -n "$ev" ] || { [ "$raw" = 1 ] || echo "five-hour window: unknown (no recent codex session has a reading)"; exit 3; }
 else
-  LOG="${1:-$STATE/last-session.log}"
+  LOG="${1:-${AUTONOMOUS_WORKER_STATE:-$STATE}/last-session.log}"
   # One "<pct> <resetsAt> <type>" per rate_limit_event, in log order; the last one wins.
   ev="$(grep '"type":"rate_limit_event"' "$LOG" 2>/dev/null | awk '
     /"status":"rejected"/ {

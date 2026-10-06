@@ -94,7 +94,17 @@ CODEX_SESSIONS="${CODEX_HOME:-$HOME/.codex}/sessions"   # codex writes one rollo
 CODEX_MODEL="${AUTONOMOUS_CODEX_MODEL:-gpt-6.1-sol}"
 CODEX_EFFORT="${AUTONOMOUS_CODEX_EFFORT:-high}"
 # =======================================================================================================
-LOCK="$STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
+# Helper availability keeps this reusable template's old serial fixtures working.
+# The Archive Suite launcher requires the helper before installing a new daemon.
+CLAIMS_CMD="${AUTONOMOUS_CLAIMS_CMD:-$REPO/ops/autonomous/worker-state.py}"
+WORKER_ID="${AUTONOMOUS_WORKER_ID:-worker-1}"
+WORKER_STATE="$STATE"
+if [ -f "$CLAIMS_CMD" ]; then
+  [[ "$WORKER_ID" =~ ^worker-[0-9]+$ ]] || { echo "invalid worker id: $WORKER_ID" >&2; _refuse; }
+  WORKER_STATE="$STATE/$WORKER_ID"
+fi
+CLAIM_TAG=""; CLAIM_TOKEN=""; SESSION_REAPED=0; CLAIM_INSPECTION=0
+LOCK="$WORKER_STATE/engine.lock"; LOG="$STATE/daemon.log"; PROMPT="$STATE/resume-prompt.txt"
 CODEX_PREAMBLE="$STATE/codex-preamble.txt"   # rendered by daemon.sh; prepended to the prompt for codex sessions
 # …and the two W32.preflight-gap checks the block above explains. `-s` not `-f` for the prompt: an empty
 # rendered prompt is as useless as a missing one and produces the same silent `claude -p ""`.
@@ -150,7 +160,7 @@ WINDOW_POLL="${AUTONOMOUS_WINDOW_POLL:-30}"       # seconds between clock checks
                                           # (30, like backoff_sleep: a TERM is handled when the sleep returns)
 WINDOW_SLACK="${AUTONOMOUS_WINDOW_SLACK:-120}"    # seconds past resetsAt before the next launch
 WINDOW_LAST="$STATE/usage-window.last"    # "<pct> <resetsAt> [cut]" from the latest session that reported one
-KILLED="$STATE/session-killed"            # a watchdog touches this when it kills the session: not a window cut
+KILLED="$WORKER_STATE/session-killed"            # a watchdog touches this when it kills the session: not a window cut
 USAGE_LOG="$STATE/usage-window.tsv"       # one row per session and per reset wait: how much of each five-hour
                                           # window the run spent, so unused headroom shows. usage-window.last
                                           # keeps only the latest reading, and session logs are overwritten.
@@ -1131,6 +1141,17 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -25)"
 #   * NEVER the primary checkout ($REPO); every step best-effort (|| true / 2>/dev/null) — no `set -e`, so a
 #     failing git call can't abort the daemon loop.
 housekeeping() {
+  local coordinator="${CLAIMS_CMD:-${REPO:-}/ops/autonomous/worker-state.py}"
+  if [ -f "$coordinator" ] && [ "${AUTONOMOUS_COORDINATED_UPKEEP:-}" != 1 ]; then
+    local coord_state="${STATE:-${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}}"
+    # Hold coordination.lock across the entire GC, not just a racy idle check.
+    REPO="$REPO" STATE="$coord_state" LOG="${LOG:-/dev/null}" \
+      python3 "$coordinator" --state "$coord_state" --repo "$REPO" idle -- \
+      bash -c 'log(){ printf "%s\n" "$*" >> "$LOG"; }; eval "$1"; housekeeping' _ "$(declare -f housekeeping)"
+    local coord_rc=$?
+    [ "$coord_rc" = 4 ] && { log "housekeeping: worker in flight — deferred"; return 0; }
+    return "$coord_rc"
+  fi
   cd "$REPO" 2>/dev/null || return 0
   git rev-parse --verify --quiet origin/main >/dev/null 2>&1 || return 0   # no ref yet -> nothing to compare
   git worktree prune 2>/dev/null || true                                   # drop admin entries for gone dirs
@@ -1149,13 +1170,13 @@ housekeeping() {
   git worktree prune 2>/dev/null || true
   # Phase 2: delete ALL merged wt/* branches (any slug the sessions used). Safe: no working tree involved,
   # git refuses to delete a branch still checked out anywhere (so an active worktree — a dirty one skipped
-  # above, YOUR interactive one, or the running session's — keeps its branch), and the ancestor gate means -D
-  # drops no unpushed commit (plain -d would refuse these because local main lags origin/main).
+  # above, YOUR interactive one, or the running session's — keeps its branch), and plain -d retains
+  # a branch if local main still lags origin/main; a later idle pass can retry after fast-forward.
   while read -r br; do
     [ -n "$br" ] || continue
     case "$br" in wt/*|codex/*) ;; *) continue ;; esac
     git merge-base --is-ancestor "$br" origin/main 2>/dev/null || continue
-    git branch -D "$br" 2>/dev/null && delbr=$((delbr+1))
+    git branch -d "$br" 2>/dev/null && delbr=$((delbr+1))
   done < <(git for-each-ref --format='%(refname:short)' refs/heads/wt/ refs/heads/codex/ 2>/dev/null)
   [ $((removed + delbr)) -gt 0 ] && log "housekeeping: GC'd $removed spent worktree(s), $delbr merged branch(es)"
   # Logged only when the SET of refused worktrees changes (2026-09-28): the same line was 1,341 of daemon.log's
@@ -1168,6 +1189,46 @@ housekeeping() {
     [ -n "$hk_last" ] && printf '%s' "$left" > "$hk_last" 2>/dev/null
   fi
   return 0
+}
+
+# Claims live in the coordinator state, while CLI artifacts belong to a worker.
+claims_release() {
+  [ "$CLAIM_INSPECTION" = 0 ] || return 9
+  [ -n "$CLAIM_TAG" ] || return 0
+  python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --plan "$PLAN" --stale "$STALE" \
+    release "$CLAIM_TAG" "$CLAIM_TOKEN" >> "$LOG" 2>&1
+  local claim_release_rc=$?
+  if [ "$claim_release_rc" != 0 ]; then
+    log "claim release refused (rc=$claim_release_rc); claim preserved for inspection: $CLAIM_TAG"
+    [ "$claim_release_rc" = 4 ] && return 0
+    CLAIM_INSPECTION=1
+    park_run "worker claim inspection required" "Worker $WORKER_ID could not safely release $CLAIM_TAG. Its claim and worktree are preserved; inspect daemon.log and claims/ before restarting."
+    return 9
+  fi
+  CLAIM_TAG=""; CLAIM_TOKEN=""
+}
+
+claims_launch() {
+  if [ -n "$CLAIM_TAG" ]; then
+    exec python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --plan "$PLAN" --stale "$STALE" \
+      session "$CLAIM_TAG" "$CLAIM_TOKEN" -- "$@"
+  else
+    exec "$@"
+  fi
+}
+
+claims_prompt() {
+  [ "$AGENT" = codex ] && cat "$CODEX_PREAMBLE"
+  if [ -n "$CLAIM_TAG" ]; then
+    printf '\nSUPERVISOR ASSIGNMENT (W35.claims), OVERRIDES ALL PICK/CONTINUE INSTRUCTIONS BELOW: Your ONE item is %s, already claimed for %s.\n' "$CLAIM_TAG" "$WORKER_ID"
+    printf 'Skip STEP 2 selection and STEP 2.0 cadence: do only the assigned item, even if the resolver hides it as claimed. Do not reconcile into another item or follow owner-pending next-item instruction. If already done or blocked, record and stop.\n'
+    [ "$CLAIM_TAG" = review ] && printf 'For the assigned paced review, run STEP 2.0 to obtain its UNIT/PATHS and perform that review only.\n'
+    printf 'Use the locked helper for all shared plan edits: bash %q %q complete TAG SHA RESULT (or log/report TEXT).\n' "$REPO/ops/autonomous/plan-edit.sh" "$PLAN"
+    printf 'Owner-pending: use block TAG TAG-owner-ok QUESTION; it locks the queue dependency and HOLD gate together, then report TEXT and mirror SUITE_TODO. complete sets RUN STATUS when the queue is empty.\n'
+    printf 'Under Codex, escalate the process-inspecting claim helper outside the sandbox.\n'
+    printf 'After isolation, register your worktree: python3 %q --state %q --repo %q worktree %q %q "$PWD"\n' "$CLAIMS_CMD" "$STATE" "$REPO" "$CLAIM_TAG" "$CLAIM_TOKEN"
+  fi
+  cat "$PROMPT"
 }
 
 # SECURITY REMINDER (owner: TOP PRIORITY) — on ANY daemon exit, if the taskport debugger authorization is
@@ -1202,7 +1263,20 @@ fi
 # $DENY/$ALLOW created directories, pulled the operator's alert credential into the interactive shell, and
 # WIPED a live run's idle clock + attempt streak. They belong here, where "the daemon is really starting" is
 # established. Order matters: $STATE must exist before anything writes into it.
-mkdir -p "$STATE"
+mkdir -p "$STATE" "$WORKER_STATE"
+if [ "$WORKER_STATE" != "$STATE" ] && [ "$WORKER_ID" = worker-1 ]; then
+  if [ -f "$STATE/engine.lock" ] && [ ! -L "$STATE/engine.lock" ]; then
+    _legacy_age=$(( $(date +%s) - $(stat -f %m "$STATE/engine.lock" 2>/dev/null || echo 0) ))
+    [ "$_legacy_age" -ge "$STALE" ] || { echo "serial engine still active — refusing state migration" >&2; exit 2; }
+  fi
+  # Root paths remain the single-worker status view. Preserve old serial artifacts.
+  for artifact in engine.lock last-session.log last-session.txt session-killed; do
+    if [ -e "$STATE/$artifact" ] && [ ! -L "$STATE/$artifact" ]; then
+      mv "$STATE/$artifact" "$STATE/$artifact.pre-workers-$(date +%s)-$$"
+    fi
+    ln -sfn "$WORKER_STATE/$artifact" "$STATE/$artifact"
+  done
+fi
 # Alert config, sourced WITHOUT `set -a` — see the rationale block above notify(): $STATE/env is the CHILD's
 # environment, $STATE/alert.env is the daemon's, and the credential must never reach a session.
 [ -f "$STATE/alert.env" ] && . "$STATE/alert.env"
@@ -1234,6 +1308,7 @@ _log_exit() {
   local sess="no"
   [ -f "$LOCK" ] && sess="YES (engine.lock present — a resume session was in flight and may leave it stale)"
   log "=== daemon down (pid $$) — reason: ${_EXIT_REASON} | status=${st} | uptime=${up}s | session-in-flight=${sess} ==="
+  [ "$SESSION_REAPED" = 1 ] && claims_release  # otherwise retain launch-in-flight claim
   remind_revert_taskport         # preserve the pre-existing EXIT behaviour (WS6 security reminder)
 }
 trap _log_exit EXIT
@@ -1298,6 +1373,13 @@ _terminate_tree() {
   local root="$1" victims p
   kill -0 "$root" 2>/dev/null || return 0        # never fire on a stale/reused pid (orphaned-watchdog guard)
   victims="$(_descendants "$root")"
+  if [ -n "$CLAIM_TAG" ] && [ -n "$victims" ]; then
+    # Pin even descendants that made their own OS session before TERM can reparent
+    # them. Their birth identities keep cleanup off still-running tools.
+    python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --stale "$STALE" \
+      protect "$CLAIM_TAG" "$CLAIM_TOKEN" $victims >> "$LOG" 2>&1 \
+      || log "claim: termination victims not confirmed; preserving claim for inspection after watchdog termination"
+  fi
   for p in $victims; do kill -TERM "$p" 2>/dev/null; done
   ( sleep 8; for p in $victims; do kill -KILL "$p" 2>/dev/null; done ) &
 }
@@ -1395,6 +1477,23 @@ health_watchdog() {
 }
 
 tick() {
+  if [ -f "$CLAIMS_CMD" ] && [ -f "$STATE/owner-stopped" ]; then
+    python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --plan "$PLAN" restart >> "$LOG" 2>&1
+    local restart_rc=$?
+    if [ "$restart_rc" != 0 ]; then
+      log "owner-stop cleanup deferred (rc=$restart_rc) — worker state preserved"
+      [ "$restart_rc" = 4 ] && return 0
+      park_run "owner-stop claim inspection required" "Worker state could not be inspected safely after an owner stop. Claims are preserved; inspect daemon.log before restarting."
+      return 9
+    fi
+  fi
+  if [ "$SESSION_REAPED" = 1 ] && [ -n "$CLAIM_TAG" ]; then
+    claims_release || return 9
+    if [ -n "$CLAIM_TAG" ]; then
+      log "claim: session descendants still in flight — no gate, upkeep or new session"
+      return 0
+    fi
+  fi
   # 1. Done? unload + stop.
   if grep -q '^RUN STATUS: COMPLETE' "$PLAN" 2>/dev/null; then
     log "plan RUN STATUS: COMPLETE — daemon stopping."
@@ -1504,10 +1603,36 @@ tick() {
   #     Also snapshot the completed-item count (WS4) to tell a checkpoint from a genuine item completion.
   local fp_before cc_before; fp_before="$(work_fingerprint)"; cc_before="$(completed_items)"
 
+  SESSION_REAPED=0
+  if [ -f "$CLAIMS_CMD" ]; then
+    local reservation special="" claim_rc
+    [ -f "$DOCFIX" ] && special=doc-budget-fix
+    [ -z "$special" ] && [ -f "$GATEFIX" ] && special=gate-fix
+    if [ -z "$special" ] && "$REPO/ops/autonomous/next-review-unit.sh" "$REPO" >/dev/null 2>&1; then special=review; fi
+    reservation="$(python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --plan "$PLAN" --stale "$STALE" \
+      reserve "$WORKER_ID" "$$" ${special:+--special "$special"})"; claim_rc=$?
+    if [ "$claim_rc" != 0 ]; then
+      log "claim: no reservable item (rc=$claim_rc) — no session launched"
+      if [ "$claim_rc" != 4 ]; then
+        park_run "worker claim inspection required" "No CLI launched: claim selection could not safely inspect worker state. Claims are preserved; inspect daemon.log before restarting."
+        return 9
+      fi
+      return 0
+    fi
+    IFS=$'\t' read -r CLAIM_TAG CLAIM_TOKEN _claim_text <<< "$reservation"
+  fi
+
   # 4. Acquire the lock + heartbeat it for the child's lifetime, so overlapping cycles/sessions skip.
   touch "$LOCK"
   local ppid=$$
-  ( while kill -0 "$ppid" 2>/dev/null; do touch "$LOCK" 2>/dev/null; sleep 60; done ) &
+  ( while kill -0 "$ppid" 2>/dev/null; do
+      touch "$LOCK" 2>/dev/null
+      if [ -n "$CLAIM_TAG" ]; then
+        python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --stale "$STALE" \
+          heartbeat "$CLAIM_TAG" "$CLAIM_TOKEN" >/dev/null 2>&1 || break
+      fi
+      sleep 60
+    done ) &
   local hb=$!
   LOCK_HB_PID=$hb   # so park_run() can stop it before releasing the lock (W32.lock-heartbeat-race)
 
@@ -1528,6 +1653,7 @@ tick() {
   export ARCHIVE_UNATTENDED=1
   # usage-window.sh, run by the session with no argument, reads $AUTONOMOUS_STATE/last-session.log.
   export AUTONOMOUS_STATE="$STATE"
+  export AUTONOMOUS_WORKER_STATE="$WORKER_STATE"
   # …and put the GUI SHIMS (xcodebuild, open, osascript, cliclick, emulator) ahead of the real tools on
   # the child's PATH. The hook above matches the Bash
   # tool's command STRING, which a wrapper script defeats: on 2026-07-30 a session ran
@@ -1545,10 +1671,10 @@ tick() {
   esac
 
   log "launching fresh resume session (agent $AGENT, backstop ${MAXRUN}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET"), health-wd on)…"
-  cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; return 0; }
+  cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; claims_release; return 0; }
   # Fresh per-session log (keep one previous). stream-json is larger than text, so don't append forever; a
   # fresh file also gives the heartbeat + usage watchdogs a clean zero baseline.
-  local SLOG="$STATE/last-session.log"
+  local SLOG="$WORKER_STATE/last-session.log"
   [ -f "$SLOG" ] && mv -f "$SLOG" "$SLOG.prev" 2>/dev/null; : > "$SLOG"
   rm -f "$KILLED" 2>/dev/null || true
   # Run claude in the background so watchdogs can TERM/KILL it (macOS has no `timeout`). $cpid is claude's own
@@ -1581,14 +1707,14 @@ tick() {
     #   * < /dev/null: with stdin not a terminal, codex exec waits to read extra prompt text from it.
     # The prompt is passed as ONE argv element so `daemon.sh stop` can match the session by its text, as it
     # does for `claude -p`.
-    "$CODEX" exec --json --approve-for-me \
+    claims_launch "$CODEX" exec --json --approve-for-me \
         --add-dir "$(dirname "$REPO")" --add-dir "$STATE" \
         -c model_reasoning_effort="$CODEX_EFFORT" \
         ${CODEX_MODEL:+-m "$CODEX_MODEL"} \
-        "$(cat "$CODEX_PREAMBLE" "$PROMPT")" \
+        "$(claims_prompt)" \
         < /dev/null >> "$SLOG" 2>&1 &
   else
-  "$CLAUDE" -p "$(cat "$PROMPT")" \
+  claims_launch "$CLAUDE" -p "$(claims_prompt)" \
       --permission-mode default \
       --model opus --fallback-model sonnet \
       --effort "$EFFORT" \
@@ -1623,6 +1749,7 @@ tick() {
   health_watchdog "$cpid" "$SLOG" 0 "$_started" &
   local cwpid=$!
   wait "$cpid"; local rc=$?
+  SESSION_REAPED=1
   kill "$wpid" "$cwpid" 2>/dev/null; wait "$wpid" "$cwpid" 2>/dev/null
   log "resume session exited rc=$rc"
   # Best-effort readable mirror of the final result for Daemon Report (jq present -> extract; else skip).
@@ -1640,11 +1767,11 @@ tick() {
     [ "$s_turns" = 0 ] && [ "$s_end" = completed ] && s_end="no-turn"
     if command -v jq >/dev/null 2>&1; then
       jq -rc 'select(.type=="item.completed" and .item.type=="agent_message") | .item.text' "$SLOG" 2>/dev/null \
-        | tail -1 > "$STATE/last-session.txt" 2>/dev/null || true
+        | tail -1 > "$WORKER_STATE/last-session.txt" 2>/dev/null || true
     fi
   elif command -v jq >/dev/null 2>&1; then
     jq -rc 'select(.type=="result") | (.result // .error // empty)' "$SLOG" 2>/dev/null \
-      | tail -1 > "$STATE/last-session.txt" 2>/dev/null || true
+      | tail -1 > "$WORKER_STATE/last-session.txt" 2>/dev/null || true
     # `ended` is subtype/terminal_reason[/error]: a usage-limited session reports subtype "success" with
     # terminal_reason "api_error" and is_error true (13 Aug log), so subtype alone would call it a success.
     read -r s_cost s_turns s_end < <(jq -rR 'fromjson? | select(.type=="result")
@@ -1742,6 +1869,7 @@ tick() {
 
   kill "$hb" 2>/dev/null || true; LOCK_HB_PID=""
   rm -f "$LOCK" 2>/dev/null || true
+  claims_release || return 9
   housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
   # Keep the durable plan small: archive old Session Log entries AND rotate the Daemon Report tail (WS8) so
   # the plan a fresh session reads doesn't inflate startup cost unbounded. Runs HERE — between cycles, lock

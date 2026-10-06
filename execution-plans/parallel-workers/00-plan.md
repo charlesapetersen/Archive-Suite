@@ -74,15 +74,14 @@ is Archive Suite's.
 
 ## Items (each with a prove-harness in the gate, as W34's)
 
-- `W35.claims` [M] — per-worker state, the supervisor picking and claiming items, `next-queue-item.sh` skipping
-  claims, stale-claim rule, the item named in the prompt; `plan-edit.sh`; housekeeping, compaction and tidy only
-  when no worker is in flight.
+- `W35.claims` — SHIPPED 2026-10-05 (this commit). Supervisor reservation + assigned prompt,
+  worker artifact directories, birth-identity/token protected claims, lane-aware resolver, locked plan-edit
+  complete/block/log/report/append and idle upkeep. Contract and usage: `ops/autonomous/README.md`
+  §Item claims and shared plan edits. Scratch concurrency/crash and real-dispatch proof in the gate.
 - `W35.heavy` [S-M] — `heavy.lock` around builds, the VM lane and the gate; waiting on it counts as work.
-  **Blocked 2026-10-05 on W35.claims-owner-ok**, the existing Codex daemon-source clarification. At baseline
-  `3465e15`, `archive-suite-autonomous.sh::health_watchdog()` recognizes log/rollout growth, Claude descendants
-  and CPU activity, but no lock waiter; wrapper stderr is not a reliable pending-tool heartbeat.
-  `_run_gate_once()` also charges all time after `GATE_CMD` starts against `GATE_MAXRUN`, including any gate-level
-  lock wait. Completing this contract requires daemon source changes prohibited by the overriding preamble.
+  **Source-edit clarification answered 2026-10-05 in 5967e4f:** isolated source edits with proofs and
+  adversarial review are permitted, effective at the next owner restart. Baseline `3465e15` measured no
+  lock-wait liveness signal in `health_watchdog()` and `_run_gate_once()` counting lock waits against its cap.
   No implementation begun. Resume with a global, nested-call-safe lock; validated waiter liveness in the
   watchdog; gate acquisition before its execution timer; heavy-before-VM lock ordering; and scratch proofs
   for contention, nesting, signals, dead owners and unchanged GUI/sandbox refusals. Keep live owners protected

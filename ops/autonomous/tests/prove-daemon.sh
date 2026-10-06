@@ -147,6 +147,18 @@ launch() {   # $1=IDLE_STOP ; starts daemon directly; P is its waitable pid
 reset_state() { : > "$STATE/daemon.log"; : > "$CURLLOG"; rm -f "$STATE/idle.since" "$STATE/engine.lock" "$DFCTL.count" "$STATE/nocomplete.count" "$STATE/last-gate" "$STATE/last-gate.log" "$STATE/gate-timeouts" "$STATE/STATUS.md" "$STATE/doc-budget-fix" "$STATE/doc-budget-tries" "$STATE/doc-budget-head" "$STATE/usage-window.last" "$STATE/usage-window.tsv" "$STATE/session-killed"; : > "$RLECTL"; : > "$ENDCTL"; }
 run_daemon() { reset_state; launch "$1"; sleep "$2"; stop "$P" || exit 1; L="$STATE/daemon.log"; }
 gaps() { grep -o 'next attempt in [0-9]*s' "$1" | grep -o '[0-9]*' | tr '\n' ' '; }
+# Arm progress only after observing a real backoff. A fixed 12s sleep can land
+# just AFTER the third attempt selected "no", then stop before its 8s backoff
+# and bookkeeping finish. Preserve the original deadlines; synchronize the
+# control change to the state whose transition these cases actually test.
+wait_logged() {
+  local pattern="$1" deadline=$(( SECONDS + $2 ))
+  while ! grep -q "$pattern" "$STATE/daemon.log"; do
+    [ "$SECONDS" -lt "$deadline" ] || return 1
+    sleep 0.1
+  done
+}
+
 
 # ================= idle backoff / auto-park (2026-07-16, ffd2165) =================
 echo "[1] Mode A — rc=1 usage-limit fast-fail must back off, not spin"
@@ -164,7 +176,9 @@ G=$(gaps "$L"); [ "$(echo "$G" | awk '{print $1, $2}')" = "2 4" ] && ok "backs o
 
 echo "[3] Progress (a real commit) resets the backoff"
 echo "0:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-launch 0; sleep 12; echo "0:yes" > "$CTRL"; sleep 10; stop "$P" || exit 1; L="$STATE/daemon.log"
+launch 0; wait_logged "next attempt in 2s" 12 || bad "never entered backoff"
+echo "0:yes" > "$CTRL"; wait_logged "progress — backoff reset to 1s" 10 || true
+stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'progress — backoff reset to 1s' "$L" && ok "commit detected as progress -> reset" || bad "no reset on progress"
 grep -q 'no progress' "$L" && ok "had backed off first" || bad "never backed off"
 
@@ -195,7 +209,9 @@ grep -q 'PARKED' "$L" && bad "parked on cycle 1 off a stale stamp (HIGH bug pres
 
 echo "[8] Progress is fingerprint-move, INDEPENDENT of exit code (commit then rc=1)"
 echo "1:no" > "$CTRL"; write_plan; dfset 999999; reset_state
-launch 0; sleep 12; echo "1:yes" > "$CTRL"; sleep 8; stop "$P" || exit 1; L="$STATE/daemon.log"
+launch 0; wait_logged "next attempt in 2s" 12 || bad "never entered backoff"
+echo "1:yes" > "$CTRL"; wait_logged "backoff reset to 1s" 8 || true
+stop "$P" || exit 1; L="$STATE/daemon.log"
 grep -q 'no progress' "$L" && ok "backed off while rc=1 committed nothing" || bad "never backed off"
 grep -q 'backoff reset to 1s' "$L" && ok "rc=1-with-commit counts as progress (rc not gating)" || bad "commit+rc=1 missed"
 

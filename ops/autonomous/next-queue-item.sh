@@ -131,6 +131,21 @@ ITEMS=$(awk '
 
 [ -n "$ITEMS" ] || { echo "next-queue-item: no unchecked [ ] items in WORK QUEUE"; exit 3; }
 
+CLAIMS_CMD="${AUTONOMOUS_CLAIMS_CMD:-$REPO/ops/autonomous/worker-state.py}"
+if [ "${AUTONOMOUS_IGNORE_CLAIMS:-}" != 1 ] && [ -f "$CLAIMS_CMD" ]; then
+  # Re-enter once for dependency rows; worker-state filters atomically under the same
+  # lock used by supervisor selection. No helper mutation occurs outside that lock.
+  rows="$(AUTONOMOUS_IGNORE_CLAIMS=1 bash "$0" "$REPO")"; resolver_rc=$?
+  case "$resolver_rc" in 0|4) ;; *) printf '%s\n' "$rows"; exit "$resolver_rc" ;; esac
+  filtered="$(printf '%s\n' "$rows" | python3 "$CLAIMS_CMD" \
+    --state "${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}" --repo "$REPO" --plan "$PLAN" filter)"; filter_rc=$?
+  [ "$filter_rc" = 0 ] || exit "$filter_rc"
+  [ -n "$filtered" ] || { echo "next-queue-item: all remaining items claimed or share a live lane"; exit 4; }
+  printf '%s\n' "$filtered"
+  printf '%s\n' "$filtered" | grep -q '^ok' && exit 0
+  exit 4
+fi
+
 any_ok=1   # 1 = none ok yet (shell-true is 0); flip to 0 when we find an ok item
 while IFS=$'\t' read -r tag dep text; do
   [ -n "$tag" ] || continue

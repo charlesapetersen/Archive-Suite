@@ -938,8 +938,7 @@ full usage window". Made the daemon's next work, ahead of everything else in the
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
 
-- [ ] **`W35.claims` — claims: per-worker state, the supervisor picks and claims items, plan-edit lock, upkeep only when idle [M]** (blocked-on: W35.claims-owner-ok). Detail: `execution-plans/parallel-workers/00-plan.md`.
-- [ ] **W35.heavy — one build, gate or VM run at a time across workers (heavy.lock) [S-M]** (blocked-on: W35.claims-owner-ok). Detail: `execution-plans/parallel-workers/00-plan.md`. Baseline `3465e15`: daemon `health_watchdog()` has no lock-wait signal, and `_run_gate_once()` starts its timeout before any gate-level lock acquisition. Await the existing source-edit clarification; implementation and scratch concurrency/lifecycle proofs remain.
+- [ ] **W35.heavy — one build, gate or VM run at a time across workers (heavy.lock) [S-M]** (blocked-on: W35.claims-owner-ok). Detail: `execution-plans/parallel-workers/00-plan.md`. Baseline `3465e15`: daemon `health_watchdog()` has no lock-wait signal, and `_run_gate_once()` starts its timeout before any gate-level lock acquisition. Source-edit clarification answered in 5967e4f; implementation and scratch concurrency/lifecycle proofs remain.
 - [ ] **`W35.workers` — the supervisor runs N workers per lane, per-lane pause, staggered starts [M]** (blocked-on: W35.claims, W35.heavy). Detail: `execution-plans/parallel-workers/00-plan.md`.
 - [ ] **`W35.pace` — worker count sized from the usage readings, Vision OCR keeps Claude priority [M]** (blocked-on: W35.workers). Detail: `execution-plans/parallel-workers/00-plan.md`.
 - [ ] **`W35.live` — first real run with two workers, measured; the owner decides whether to keep it [S]** (blocked-on: W35.pace). Detail: `execution-plans/parallel-workers/00-plan.md`.

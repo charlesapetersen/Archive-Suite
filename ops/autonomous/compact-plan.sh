@@ -28,6 +28,14 @@ set -u
 
 REPO="${1:-$HOME/Claude/Archive Suite}"
 PLAN="${AUTONOMOUS_PLAN:-$REPO/.maintenance/AUTONOMOUS_PLAN.md}"
+COORDINATOR="${AUTONOMOUS_CLAIMS_CMD:-$REPO/ops/autonomous/worker-state.py}"
+if [ -f "$COORDINATOR" ] && [ "${AUTONOMOUS_COORDINATED_UPKEEP:-}" != 1 ]; then
+  python3 "$COORDINATOR" --state "${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}" \
+    --repo "$REPO" --plan "$PLAN" idle -- bash "$0" "$@"
+  coord_rc=$?
+  [ "$coord_rc" = 4 ] && { echo "compact-plan: worker in flight — deferred"; exit 0; }
+  exit "$coord_rc"
+fi
 ARCHIVE="${AUTONOMOUS_SESSION_ARCHIVE:-$REPO/.maintenance/AUTONOMOUS_SESSION_LOG_ARCHIVE.md}"
 KEEP="${KEEP:-6}"           # recent Session Log entries to retain inline
 TRIGGER="${TRIGGER:-10}"    # only compact when the log exceeds this many entries (else no-op)

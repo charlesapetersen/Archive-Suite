@@ -306,6 +306,7 @@ step gui-vm-proof   bash "$ROOT/ops/autonomous/tests/prove-gui-vm.sh"
 #     for runtime; 43 s against a ~22 min gate is not the exclusion prove-daemon.sh earns. It forces
 #     AUTONOMOUS_REVIEW_ENABLED=1 on purpose: paced reviews are OFF by owner directive, and the picker
 #     machinery must keep working while the deployment default is off, so this stays watched while it sleeps.
+step worker-claims-proof  bash "$ROOT/ops/autonomous/tests/prove-worker-claims.sh"
 step dep-gating-proof     bash "$ROOT/ops/autonomous/tests/prove-dep-gating.sh"
 step tracker-sync-proof   bash "$ROOT/ops/autonomous/tests/prove-tracker-sync.sh"
 step todo-stubs-proof     bash "$ROOT/ops/autonomous/tests/prove-todo-stubs.sh"

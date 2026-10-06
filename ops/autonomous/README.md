@@ -40,6 +40,41 @@ read that section.
   (detected via `git log` + the plan's Session Log) rather than restarting the whole item. Only the *final*
   commit flips the `SUITE_TODO` checkbox; interim checkpoints are plain mid-feature commits.
 
+## Item claims and shared plan edits (W35.claims)
+
+On the next owner restart, the serial supervisor reserves the item before launching its CLI. Each session
+gets an overriding assignment in its prompt and writes engine/session artifacts under `$STATE/worker-1/`;
+root session paths mirror worker 1 for existing status readers. Other worker IDs have separate artifacts.
+An intentional owner stop records a cleanup marker: confirmed-dead worker claims and locks retire at once,
+while live tools stay protected; a restart retries that cleanup before the engine guard. Ordinary crash
+expiry still uses `AUTONOMOUS_STALE`. Starting several workers and sharing the heavy build/VM lane remain W35.workers and W35.heavy.
+
+`worker-state.py` serializes selection with `coordination.lock`, then atomically creates `claims/<TAG>`.
+The claim records the supervisor and CLI process birth identities, token, worker, lane, start time and
+registered worktree. A live owner is protected at any age; a dead owner expires after `AUTONOMOUS_STALE`.
+Interrupted empty creation expires on that interval, known interrupted metadata writes recover, and corrupt
+or unexpected content stays preserved with an explicit error. Tokens prevent delayed cleanup from dropping
+another worker's claim. The CLI publishes its identity before exec, so supervisor death cannot leave an
+unclaimed surviving CLI. Its separate OS session keeps surviving tool descendants protected too; watchdog
+termination snapshots also pin descendants that made their own session. Session EXIT retains a claim until
+the CLI and its protected descendants finish or expire as confirmed dead. A victim that disappears before
+its escaped session can be identified requires inspection: the claim is preserved and the daemon parks
+instead of retrying forever or letting upkeep touch an ambiguous worktree.
+
+The resolver hides claimed tags and conflicting `(lane: reader|notes|processor|suite)` items. An unlabelled
+item uses `suite`, which conflicts with every lane. A doc-budget fix, gate fix or paced review takes a suite
+claim instead of a normal queue item. Housekeeping, tidy and every compaction call hold the coordinator lock
+through their entire operation and defer when any worker is in flight. Their children inherit the locks;
+compaction also holds the stable plan lock, so a coordinator crash does not unlock ongoing mutations.
+
+Assigned sessions use `bash ops/autonomous/plan-edit.sh "$PLAN" complete TAG SHA RESULT`, `log TEXT`,
+`report TEXT`, or `append '## SECTION' TEXT`. `block TAG TAG-owner-ok QUESTION` atomically adds the queue
+prerequisite and HOLD gate; mirror the dependency into SUITE_TODO in the same commit. Completion changes
+RUN STATUS only when no real unchecked queue entry remains, using the resolver's fence/blockquote/indent
+rules. Register an isolated worktree with `worker-state.py --state "$STATE" --repo "$REPO" worktree TAG TOKEN
+"$PWD"` using the token supplied in the assignment. Codex escalates this process-inspecting helper outside
+the sandbox. All operations use scratch fixtures in `tests/prove-worker-claims.sh`, wired into the health gate.
+
 ## Install / run
 
 > **Renamed 2026-08-06 (owner):** this script was `arm.sh` and its verb was `arm`; it is now

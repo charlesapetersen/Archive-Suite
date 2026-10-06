@@ -32,6 +32,15 @@ if pgrep -f 'archive-suite-autonomous\.sh' >/dev/null 2>&1 \
   exit 2
 fi
 
+COORDINATOR="$HERE/worker-state.py"
+if [ "${AUTONOMOUS_COORDINATED_UPKEEP:-}" != 1 ]; then
+  python3 "$COORDINATOR" --state "${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}" \
+    --repo "$REPO" idle -- bash "$0" "$REPO"
+  coord_rc=$?
+  [ "$coord_rc" = 4 ] && { echo "tidy: worker in flight — deferred"; exit 2; }
+  exit "$coord_rc"
+fi
+
 echo "== compact-plan ($REPO)"
 bash "$HERE/compact-plan.sh" "$REPO"; rc=$?
 [ "$rc" = 0 ] || echo "tidy: compact-plan.sh exited $rc — a pass aborted and left the plan untouched (detail above)."

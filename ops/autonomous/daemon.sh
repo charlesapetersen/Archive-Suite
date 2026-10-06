@@ -178,6 +178,11 @@ case "${1:-start}" in
     # "✅ daemon is up and starting its first session". Observed twice: 2026-08-05 (13 consecutive skips,
     # 22 minutes lost) and 2026-08-11. The EXIT trap only ever REPORTED this ("session-in-flight=YES").
     rm -f "$LOCK" 2>/dev/null || true
+    if [ -f "$REPO/ops/autonomous/worker-state.py" ]; then
+      python3 "$REPO/ops/autonomous/worker-state.py" --state "$STATE" --repo "$REPO" stopped
+      stopped_rc=$?
+      [ "$stopped_rc" = 0 ] || echo "worker state retained (rc=$stopped_rc); restart waits for confirmed-dead session descendants."
+    fi
     if [ "$k" = 1 ]; then echo "daemon + any resume session stopped."
     elif [ "$booted" = 1 ]; then echo "launchd job stopped (its process was already down)."
     else echo "daemon was not running."; fi
@@ -211,6 +216,8 @@ fi
 mkdir -p "$BIN" "$STATE"
 warn_unmarked_keychain_provider
 
+[ -f "$REPO/ops/autonomous/worker-state.py" ] || fail "worker-state helper missing"
+[ -f "$REPO/ops/autonomous/plan-edit.py" ] || fail "plan-edit helper missing"
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
 install -m 755 "$DAEMON_SRC" "$DAEMON_DST"
 install -m 755 "$COMPACT_SRC" "$COMPACT_DST"   # plan compactor: Session Log + Daemon Report (daemon calls it between cycles)
