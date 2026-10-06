@@ -121,10 +121,15 @@ public struct DocumentTags: Sendable, Equatable {
         return keys
     }
 
-    /// True when the file carries more than one sent-with lookalike: a demoted valid token or a
-    /// malformed `Sent With …` token stays a subject and the date is shown as needing review.
+    /// True when a sent-with date needs review: a second valid token was demoted to a subject, or a
+    /// `Sent With <digit…>` token is malformed (e.g. `Sent With 1958-13`). A prose subject such as
+    /// `Sent With Love` is not a date and does not count.
     public var sentWithIsAmbiguous: Bool {
-        subjects.contains { $0.trimmingCharacters(in: .whitespaces).hasPrefix(SentWithTag.prefix) }
+        subjects.contains { subject in
+            let s = subject.trimmingCharacters(in: .whitespaces)
+            guard s.hasPrefix(SentWithTag.prefix) else { return false }
+            return s.dropFirst(SentWithTag.prefix.count).first.map { ("0"..."9").contains($0) } ?? false
+        }
     }
 
     /// Display form of the sent-with date, e.g. "Mar 12, 1958"; `nil` when absent.

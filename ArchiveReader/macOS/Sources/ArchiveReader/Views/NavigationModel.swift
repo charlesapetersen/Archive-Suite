@@ -297,6 +297,7 @@ final class NavigationModel: ObservableObject {
         if !f.qualities.isEmpty {
             parts.append(f.qualities.sorted(by: >).map { "Q\($0)" }.joined(separator: "/"))
         }
+        if let years = f.dateYearsSummary { parts.append(years) }
         if !f.subjects.isEmpty {
             parts.append(f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
         }
@@ -322,6 +323,7 @@ final class NavigationModel: ObservableObject {
         if !f.qualities.isEmpty {
             parts.append(f.qualities.sorted(by: >).map { "Q\($0)" }.joined(separator: "/"))
         }
+        if let years = f.dateYearsSummary { parts.append(years) }
         if !f.subjects.isEmpty {
             parts.append("tags: " + f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
         }

@@ -344,6 +344,17 @@ struct NavigationWindowView: View {
 
             subjectFilterField
 
+            HStack(spacing: 3) {
+                TextField("From", value: $model.filter.dateFromYear, format: .number.grouping(.never))
+                    .accessibilityIdentifier("ar.filter.dateFrom")
+                Text("\u{2013}").foregroundStyle(.secondary)
+                TextField("To", value: $model.filter.dateToYear, format: .number.grouping(.never))
+                    .accessibilityIdentifier("ar.filter.dateTo")
+            }
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 104)
+            .help("Filter by year: matches a document's own date or the date of the letter it was sent with")
+
             TextField("Filter file name…", text: $model.filterSearchText)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 160)

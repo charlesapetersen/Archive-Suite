@@ -311,9 +311,9 @@ struct AppKitTableView: NSViewRepresentable {
                 }
 
             case "date":
-                tf.stringValue = file.tags.displayDate ?? "—"
+                tf.stringValue = file.dateCellText
                 tf.textColor = file.sortDate == nil ? .secondaryLabelColor : .labelColor
-                if file.dateIsSpeculative {
+                if file.dateCellIsSpeculative {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)
                 }
 

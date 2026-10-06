@@ -31,9 +31,18 @@ struct LibraryFilter: Sendable, Equatable, Codable {
     /// no-text-layer). The status lives in the async content index, so this dimension is applied by
     /// the model (like full-text search), not inside `matches`.
     var needsAttentionOnly: Bool = false
+    /// W37: whole-year date range. A file matches when its own date OR its sent-with (covering letter)
+    /// date lies inside, each tested on its own (`ArchiveCore.DateRangeFilter`); undated files never
+    /// match an active range. Optional so a smart folder saved before this field still decodes.
+    var dateFromYear: Int? = nil
+    var dateToYear: Int? = nil
+
+    var dateRange: DateRangeFilter? {
+        dateFromYear == nil && dateToYear == nil ? nil : DateRangeFilter(fromYear: dateFromYear, toYear: dateToYear)
+    }
 
     var isActive: Bool {
-        !subjects.isEmpty || !qualities.isEmpty || read != .all
+        !subjects.isEmpty || !qualities.isEmpty || read != .all || dateRange != nil
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
             || (pathPrefix?.isEmpty == false)
             || needsAttentionOnly
@@ -64,6 +73,8 @@ struct LibraryFilter: Sendable, Equatable, Codable {
             case .any: if subjects.isDisjoint(with: fileSubjects) { return false }
             }
         }
+        // Date range — either role, the same value meeting both bounds.
+        if let dateRange, dateRange.matchingRoles(file.tags.dateKeysByRole).isEmpty { return false }
         // Filename text
         let q = searchText.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty, file.name.range(of: q, options: .caseInsensitive) == nil { return false }
@@ -72,6 +83,16 @@ struct LibraryFilter: Sendable, Equatable, Codable {
 }
 
 extension LibraryFilter {
+    /// "1950–1960", "from 1950", "to 1960", or nil when no date range is set.
+    var dateYearsSummary: String? {
+        switch (dateFromYear, dateToYear) {
+        case let (a?, b?): return a == b ? String(a) : "\(a)\u{2013}\(b)"
+        case let (a?, nil): return "from \(a)"
+        case let (nil, b?): return "to \(b)"
+        case (nil, nil): return nil
+        }
+    }
+
     /// Fold a user filter onto a base scope for "Save Current Search" / the status summary.
     /// Per-facet: user wins when set, else inherit the base; subjects = union;
     /// pathPrefix/searchText = user's if non-empty, else base's; needsAttentionOnly = OR.
@@ -86,6 +107,11 @@ extension LibraryFilter {
         let up = user.pathPrefix
         r.pathPrefix = (up == nil || up?.isEmpty == true) ? base.pathPrefix : up
         r.needsAttentionOnly = base.needsAttentionOnly || user.needsAttentionOnly
+        if user.dateRange != nil {
+            r.dateFromYear = user.dateFromYear; r.dateToYear = user.dateToYear
+        } else {
+            r.dateFromYear = base.dateFromYear; r.dateToYear = base.dateToYear
+        }
         return r
     }
 }

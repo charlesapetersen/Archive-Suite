@@ -34,15 +34,17 @@ struct DateCell: View {
     @State private var showing = false
     @State private var yearText = ""
     @State private var dayText = ""
+    @State private var sentWithText = ""
 
     var body: some View {
         Button {
             yearText = file.tags.year.map(String.init) ?? file.tags.decadeToken ?? ""
             dayText  = file.tags.day.map(String.init) ?? ""
+            sentWithText = file.tags.sentWith?.wireValue ?? ""
             showing = true
         } label: {
-            Text(file.tags.displayDate ?? "—")
-                .italic(file.dateIsSpeculative)
+            Text(file.dateCellText)
+                .italic(file.dateCellIsSpeculative)
                 .foregroundStyle(file.sortDate == nil ? .secondary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -77,6 +79,22 @@ struct DateCell: View {
                 Button("Clear") { model.applyEdit(.setDay(nil), to: file); dayText = "" }
             }
             Toggle("Date uncertain (show year in italics)", isOn: uncertainBinding)
+            Divider()
+            // W37: the covering letter's date, for an enclosure that has its own date above.
+            HStack {
+                Text("Sent with").frame(width: 64, alignment: .leading)
+                TextField("1958-03-12", text: $sentWithText).frame(width: 90)
+                    .help("The date of the letter this was enclosed with: 1958, 1958-03, 1958-03-12 or 1950s")
+                Button("Set") { if let d = parsedSentWith { model.applyEdit(.setSentWith(d), to: file) } }
+                    .disabled(parsedSentWith == nil)
+                Button("Clear") { model.applyEdit(.setSentWith(nil), to: file); sentWithText = "" }
+                    .disabled(file.tags.sentWith == nil)
+            }
+            if !sentWithText.isEmpty, parsedSentWith == nil {
+                Text("Use 1958, 1958-03, 1958-03-12 or 1950s").font(.caption).foregroundStyle(.red)
+            }
+            Toggle("Sent-with date uncertain", isOn: sentWithUncertainBinding)
+                .disabled(file.tags.sentWith == nil)
             HStack { Spacer(); Button("Done") { showing = false }.keyboardShortcut(.defaultAction) }
         }
         .padding(14).frame(width: 320)
@@ -85,6 +103,13 @@ struct DateCell: View {
     private var monthBinding: Binding<Int> {
         Binding(get: { file.tags.month?.number ?? 0 },
                 set: { model.applyEdit(.setMonth($0 == 0 ? nil : $0), to: file) })
+    }
+    private var parsedSentWith: ArchiveDate? {
+        ArchiveDate.parse(wireValue: sentWithText.trimmingCharacters(in: .whitespaces))
+    }
+    private var sentWithUncertainBinding: Binding<Bool> {
+        Binding(get: { file.tags.sentWithUncertain },
+                set: { model.applyEdit(.setSentWithUncertain($0), to: file) })
     }
     private var uncertainBinding: Binding<Bool> {
         Binding(get: { file.dateIsSpeculative },

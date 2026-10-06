@@ -86,7 +86,8 @@ final class DualDateTests: XCTestCase {
         let t = tags(["sent with 1958", "Sent With 1958-13", "Sent With Love", "Sent  With 1958", "1957"])
         XCTAssertNil(t.sentWith)
         XCTAssertEqual(t.subjects, ["sent with 1958", "Sent With 1958-13", "Sent With Love", "Sent  With 1958"])
-        XCTAssertTrue(t.sentWithIsAmbiguous)
+        XCTAssertTrue(t.sentWithIsAmbiguous, "Sent With 1958-13 is a malformed date")
+        XCTAssertFalse(tags(["Sent With Love", "sent with 1958"]).sentWithIsAmbiguous)
         XCTAssertFalse(DocumentTags.isDateFacetLike("Sent With Love"))
         XCTAssertTrue(DocumentTags.isDateFacetLike("Sent With 1958"))
         XCTAssertTrue(DocumentTags.isDateFacetLike("Sent With Date Uncertain"))
@@ -131,6 +132,13 @@ final class DualDateTests: XCTestCase {
         let back = try JSONDecoder().decode(GeneratedTags.self, from: JSONEncoder().encode(g))
         XCTAssertEqual(back.sentWith, ArchiveDate(decade: 1950))
         XCTAssertTrue(back.sentWithUncertain)
+    }
+
+    func testArchiveDateCodableIsTheValidatedWireString() throws {
+        let d = try XCTUnwrap(ArchiveDate(year: 1958, month: 3))
+        XCTAssertEqual(String(data: try JSONEncoder().encode([d]), encoding: .utf8), #"["1958-03"]"#)
+        XCTAssertEqual(try JSONDecoder().decode([ArchiveDate].self, from: Data(#"["1950s"]"#.utf8)), [ArchiveDate(decade: 1950)!])
+        XCTAssertThrowsError(try JSONDecoder().decode([ArchiveDate].self, from: Data(#"["1958-13"]"#.utf8)))
     }
 
     // MARK: Editing

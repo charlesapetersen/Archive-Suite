@@ -33,6 +33,22 @@ public struct ArchiveDate: Sendable, Hashable, Codable {
         precision = day != nil ? .day : (month != nil ? .month : .year)
     }
 
+    /// Codable as the single wire string ("1958-03"), decoded through the strict parser, so a
+    /// persisted value can never hold components the failable initialisers would reject.
+    public init(from decoder: Decoder) throws {
+        let s = try decoder.singleValueContainer().decode(String.self)
+        guard let d = ArchiveDate.parse(wireValue: s) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Invalid ArchiveDate \(s)"))
+        }
+        self = d
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(wireValue)
+    }
+
     /// The SPEC sort key (`year * 10_000 + month * 100 + day`), via the one shared formula.
     public var sortKey: Int {
         precision == .decade

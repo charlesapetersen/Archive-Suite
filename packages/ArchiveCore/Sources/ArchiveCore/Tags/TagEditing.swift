@@ -56,8 +56,9 @@ public enum TagEditing {
         case .setColor(let c):
             return TagDelta(color: c.map { .set($0) } ?? .clear)
         case .setSentWith(let d):
-            // Removes ONLY the one token this file consumed for the facet (a demoted duplicate or a
-            // malformed lookalike is a subject and is untouched); a no-op set writes nothing.
+            // Names ONLY the one token this file consumed for the facet, so a malformed lookalike or a
+            // different demoted date is untouched. The writer matches by VALUE, so an identical demoted
+            // copy goes with it (as for `setQuality`) — the intended end state. Same value: no write.
             let new = d.map(SentWithTag.token(for:))
             if let new, new == tags.sentWithToken { return TagDelta() }
             var remove = tags.sentWithToken.map { [$0] } ?? []
