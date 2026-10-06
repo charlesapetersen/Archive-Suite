@@ -234,3 +234,121 @@ The shared contract is the single biggest risk in the Suite. Therefore:
   trustworthy-read guard, verify-by-re-read, and inverse-delta derivation. Processor's `MacOSTagger`
   and Reader's `TagWriter` are thin adapters that translate app-specific semantics (fresh-write vs
   delta-apply) into transform closures over the shared primitive. This spec is that package's contract.
+
+
+---
+
+## W37.dual-date — enclosure dates (proposal, 2026-10-05)
+
+**DESIGN ONLY; pending the owner's behaviour choices.** The contract above still describes the
+implemented single-date format. None of the tokens or behaviour below is implemented or normative yet.
+Baseline: `3465e15`. The owner already required two dates for an enclosure with its own date; the open
+question is how those dates behave in the apps, not whether to add the feature.
+
+### Recommended behaviour
+
+| Concern | Proposal | Alternative for the owner |
+|---|---|---|
+| Sort | The item's own date sorts; when it is absent, use the sent-with date as a visibly labelled fallback. | Sort by the covering letter's date whenever present. |
+| Filter | A date filter matches either complete date value, returns the file/note once, and shows which role matched. | Match only the date used for sorting. |
+| Enclosure identification | Automatic segmentation may propose a relation; a manual control can confirm, correct, or remove it. Ambiguous relations go to review. | Require a manual relation for every enclosure. |
+
+Example: a report dated 1957-11-03 sent with a letter dated 1958-03-12 sorts at **1957-11-03**;
+filters for either date find it once. The table/inspector shows **Date: 3 November 1957; Sent with:
+12 March 1958**. It does not imply the report was written in 1958. A covering letter keeps its own
+1958 date; it does not acquire the report's 1957 date. Equal dates remain separately labelled, with
+one list row. Missing dates stay missing; uncertainty belongs to each role separately.
+
+Use the existing Notes sort-key range semantics for each value; never pair the item's year with the
+covering letter's month/day. Lower and upper bounds must both be satisfied by the SAME value:
+an item dated 1950 and sent in 1970 must not match a 1960–1965 range. Year-only and decade values
+retain their existing sort-key behaviour; this feature does not silently replace it with interval overlap.
+
+### Proposed wire and display
+
+Keep the existing Year/Month/Day/Decade/Date Uncertain family as the **item date**. Add one labelled
+whole-value token for the covering letter's date, so precision and role cannot cross-pair:
+
+| Token | Cardinality | Meaning |
+|---|---|---|
+| `Sent With 1958`, `Sent With 1958-03`, `Sent With 1958-03-12`, or `Sent With 1950s` | 0–1 total | Covering letter date, with year/month/day/decade precision respectively. |
+| `Sent With Date Uncertain` | 0–1 | Speculative sent-with date; independent of `Date Uncertain`. |
+
+Proposal grammar: exact title-cased prefix `Sent With `; 3–4 ASCII year digits (same supported width
+as the existing Year facet), zero-padded month/day, or a decade ending in `0s`. Validate components
+without inventing missing precision. Invalid or conflicting tokens remain verbatim and surface as
+ambiguous metadata; they must not silently produce a synthetic combined date or trigger a cleanup write.
+A role-looking subject is still a subject-collision risk: facet parsing must never authorize deletion.
+Date edits use explicit exact-token deltas against a fresh read, preserving untouched tokens and
+multiplicity through the existing audited writers. Notes projection retains its exact ownership ledger.
+
+For newly generated PDFs, add optional **Document date:** and **Sent with:** lines to the OCR-text
+header, before its separating blank line, repeating the document-unit pair on that unit's text pages.
+These are source-document dates, distinct from the provider/model line's **OCR processing date**.
+Both shared-header body stripping and classification extraction must recognize the new lines together;
+Reader keeps its existing full-header search behaviour. Reader edits remain metadata-only: they must
+never rewrite existing PDF bytes. The PDF header is an output-time snapshot; the Reader's live display
+uses fresh Finder tags. An owner correction can therefore differ from that snapshot.
+
+### Extraction and Notes
+
+The owner already approved independent document units for enclosures with their own date/author/heading
+(`execution-plans/segmentation/02-truth-check.md` §Document rules); an undated/unheaded attachment stays
+part of the letter. Preserve that decision. New merged outputs follow those units; an existing input PDF
+combining independently dated units needs review/resegmentation, not an arbitrary choice of a single own date.
+
+A document-unit relation, not mere adjacency or a date mentioned in body text, identifies an enclosure.
+Carry the covering unit's identifier and independently extracted date through segmentation, review,
+tag generation and finalize. Allow multiple enclosures to reference one letter; never carry a relation
+across an unconfirmed boundary. The manual tag sheet exposes both labelled values and the relation.
+If either date/relation is missing or disputed, retain the known value and ask for review rather than
+borrowing the nearest date. The segmentation experiment is not itself a production relation detector.
+
+Notes keeps its primary `date`/`date_precision`/`date_uncertain` as the item's own date and adds structured
+`additional_dates` entries with role, date, precision and uncertainty; at most one `sent_with` entry.
+Reuse the primary-plus-additional model idea from `execution-plans/devonthink-import.md` §3a, while
+leaving the DEVONthink import ON HOLD and its retained plan untouched. Other additional date roles may
+use that model later; W37 needs only `sent_with`. List/search snapshots stay one row per UUID; store
+role-labelled dates separately in the disposable index and match either role without duplicate rows.
+Project only the item's own Markdown file through `NotesTagProjector`; linked corpus PDFs stay read-only.
+No migration is planned because there is no production material to migrate.
+
+### Observed implementation seams at the baseline
+
+- Core `Tags/DocumentTags.swift` (`parse`, `sortDate`) and `Tags/GeneratedTags.swift` (`allTags`,
+  `machineDate`) carry one date. Repeated bare components can cross-pair; `Tags/TagEditing.swift`
+  (`delta`, `GroupTagSummary`) needs explicit role-aware edits.
+- Reader `Core/LibraryFilter.swift` (`LibrarySort.rank`) sorts that date. **Its `LibraryFilter.matches`
+  has no date-range fields today**: date filtering is new work, not just extending an existing date predicate.
+- Processor `Tagging/DocumentSegmenter.swift` (`DocumentSegment`) has no enclosure relation;
+  `Tagging/TagGenerator.swift` (`generateDateOnly`, `parseTagResponse`) returns one date. Thread both values
+  through manual tag data, `OCRProcessor+Tagging` and `SegmentJSONBuilder.buildData`, including recovery.
+  `OCR/PDFGenerator.swift` (`makeTextPage`) currently receives no generated document date;
+  `mergeDocumentPDFs` concatenates already rendered pages. Add a post-tagging metadata-rendering seam.
+- Notes `Store/Item.swift` (`sortDate`), `Store/FrontMatterCodec.swift` and `Models/NotesFilter.swift`
+  (`matches`) use one primary value. Extend `Index/NotesIndex.swift` and `Core/NotesTagProjector.swift`
+  with role-aware storage/ownership rather than duplicating the list row.
+
+### Implementation and proof after the decision
+
+Implement the chosen contract coherently across ArchiveCore, Processor, Reader and Notes, updating the
+normative tables above at that point. Core owns role-labelled values, parsing, formatting and matching;
+apps retain their audited write adapters. Include all date-filter consumers (live filters, saved smart
+folders, search/year facets), cache rehydration, sort fallback, inspectors and manual tagging; serialization
+must preserve each value's precision, uncertainty and role through interrupted/resumed processing.
+
+Tier-2 remains mandatory: a separate adversarial review plus scratch-copy functional proofs for tag/PDF
+writes, Notes serialization/projection, and relation persistence; build/test all three apps and Core,
+run Reader's write-surface lint, and verify visible controls in the off-screen VM. Include these cases:
+
+- Different dates, identical dates, own-only, sent-only, speculative dates and all four precisions.
+- A bounded range cannot match by using one date for each bound; sorting stays stable under a sent-date edit when an own date exists.
+- Malformed/conflicting tokens, role-looking subjects, duplicates, clear/edit/undo and unreadable tag guards;
+  untouched tag multiplicity, colour and PDF data-fork bytes survive Reader edits.
+- Several enclosures, continuation pages, a missing cover date and a disputed relation; no neighbour inference.
+- PDF source-date lines strip from the OCR body correctly without consuming real body text or classification.
+- Notes save/reload/index rebuild and smart-folder matching on each role, one row per UUID, with projection
+  confined to a scratch note store. The dormant import does not run.
+
+**Next step:** owner answers the three behaviour choices above (`W37.dual-date-owner-ok` in the trackers).
+Then implement and prove the chosen design; this proposal checkpoint does not complete W37.dual-date.

@@ -925,11 +925,11 @@ OWNER sit in the plan's HOLD QUEUE.
 
 ## Two dates on one document — enclosures (owner, 2026-10-05; before the W40 freeze)
 
-- [ ] **`W37.dual-date` — an enclosure with its own date carries two dates: its own and the covering letter's
-  [M-L · Tier-2 · SPEC change, all three apps].** Owner, 2026-10-05, approving the segmentation document rules:
+- [ ] **W37.dual-date — an enclosure with its own date carries two dates: its own and the covering letter's
+  [M-L · Tier-2 · SPEC change, all three apps].** (blocked-on: W37.dual-date-owner-ok). Owner, 2026-10-05, approving the segmentation document rules:
   "when enclosures have their own dates, they should be dated twice, both with the letter that sent them and with
   their own dates", and "Queue before the feature freeze." Today `SPEC/tag-format.md` allows 0–1 Year, Month and
-  Day per file, and the Reader sorts and filters by that one date. Design first (one short session, recorded in the
+  Day per file. Reader sorts by one date; its `LibraryFilter` has no date-range predicate yet. Design first (one short session, recorded in the
   SPEC): a second, labelled date family on the same file (e.g. a "sent with" date carried beside the item's own),
   which date sorts and which filters match (the recommendation to put to the owner: the item's own date sorts;
   both dates match a date filter), how a merged PDF's page 2 shows both, and how the Processor knows a document is
@@ -937,6 +937,15 @@ OWNER sit in the plan's HOLD QUEUE.
   tagger and manual tag sheet, the Reader's display, sort and filters, and Notes (its planned primary-plus-
   additional dates model from the DEVONthink plan), all three together per the shared-contract rule, Tier-2, with
   scratch-copy tests. No migration: there is no production material. | SPEC + all apps | M-L | med | none
+  Design checkpoint 2026-10-05 (this commit): concrete proposal in `SPEC/tag-format.md` §W37.dual-date;
+  existing contract remains single-date until implementation. Await the behaviour choices below, then build
+  and verify all four surfaces; no runtime implementation or functional tag/PDF proof is claimed yet.
+- [ ] **W37.dual-date-owner-ok — OWNER GATE for W37.dual-date: choose date sorting/filtering and enclosure
+  handling.** Recommendation: own date sorts (sent-with fallback when absent), either date matches filters,
+  automatic relation proposals plus manual correction/review. Separately dated enclosure outputs already
+  follow the approved segmentation rules; that decision is not being reopened.
+  Alternatives and worked example: `SPEC/tag-format.md` §W37.dual-date. This is a behaviour question explicitly
+  requested by the item, not a per-item permission requirement for Tier-2 code or contract work.
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
