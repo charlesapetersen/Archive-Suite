@@ -80,6 +80,12 @@ AGENT="${AGENT:-claude}"
 # Resolved once; never inherited. An AUTONOMOUS_AGENT left in the environment would reach every session and the
 # health gate, whose harnesses read it as an override (2026-10-04 review: it turned the gate RED).
 unset AUTONOMOUS_AGENT
+WORKER_CHILD="${AUTONOMOUS_WORKER_CHILD:-0}"
+UPKEEP_ONLY="${AUTONOMOUS_UPKEEP_ONLY:-0}"
+MAX_WORKERS="${AUTONOMOUS_MAX_WORKERS:-}"
+[ -n "$MAX_WORKERS" ] || { [ ! -r "$STATE/max-workers" ] || MAX_WORKERS="$(tr -d '[:space:]' < "$STATE/max-workers")"; }
+MAX_WORKERS="${MAX_WORKERS:-1}"
+unset AUTONOMOUS_WORKER_CHILD AUTONOMOUS_UPKEEP_ONLY AUTONOMOUS_MAX_WORKERS AUTONOMOUS_START_STAGGER
 # The codex CLI. The ChatGPT app ships it inside its bundle (no `codex` on PATH on this Mac, 2026-10-04); a
 # ~/.local/bin/codex symlink wins if one exists. /Applications is not TCC-protected, so launchd can exec it.
 CODEX_APP_CLI="/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
@@ -102,6 +108,7 @@ HEAVY_STATE="${AUTONOMOUS_HEAVY_STATE:-$STATE/heavy}"
 export AUTONOMOUS_HEAVY_STATE="$HEAVY_STATE"
 export AUTONOMOUS_HEAVY_ENABLED=1   # installed supervisor activates coordination at owner restart
 WORKER_ID="${AUTONOMOUS_WORKER_ID:-worker-1}"
+unset AUTONOMOUS_WORKER_ID
 WORKER_STATE="$STATE"
 if [ -f "$CLAIMS_CMD" ]; then
   [[ "$WORKER_ID" =~ ^worker-[0-9]+$ ]] || { echo "invalid worker id: $WORKER_ID" >&2; _refuse; }
@@ -113,7 +120,7 @@ CODEX_PREAMBLE="$STATE/codex-preamble.txt"   # rendered by daemon.sh; prepended 
 # …and the two W32.preflight-gap checks the block above explains. `-s` not `-f` for the prompt: an empty
 # rendered prompt is as useless as a missing one and produces the same silent `claude -p ""`.
 case "$AGENT" in
-  claude)
+  claude|both)
     [ -x "$CLAUDE" ] || {
       echo "archive-suite-autonomous: claude CLI not executable at '$CLAUDE' — refusing to start." >&2
       echo "  (it MUST live outside ~/Desktop for launchd/TCC). Start via ops/autonomous/daemon.sh." >&2
@@ -131,6 +138,9 @@ case "$AGENT" in
     echo "archive-suite-autonomous: unknown agent '$AGENT' (from AUTONOMOUS_AGENT or $STATE/agent) — use claude or codex." >&2
     _refuse ;;
 esac
+if [ "$AGENT" = both ]; then
+  [ -x "$CODEX" ] && [ -s "$CODEX_PREAMBLE" ] || { echo "both lanes require Codex CLI and preamble" >&2; _refuse; }
+fi
 [ -s "$PROMPT" ] || {
   echo "archive-suite-autonomous: L2 resume prompt missing or empty at '$PROMPT' — refusing to start." >&2
   echo "  ops/autonomous/daemon.sh renders it from the committed template; run that rather than this." >&2
@@ -168,6 +178,10 @@ KILLED="$WORKER_STATE/session-killed"            # a watchdog touches this when 
 USAGE_LOG="$STATE/usage-window.tsv"       # one row per session and per reset wait: how much of each five-hour
                                           # window the run spent, so unused headroom shows. usage-window.last
                                           # keeps only the latest reading, and session logs are overwritten.
+if [ "$WORKER_CHILD" = 1 ]; then
+  WINDOW_LAST="$WORKER_STATE/usage-window.last"
+  USAGE_LOG="$WORKER_STATE/usage-window.tsv"
+fi
 EFFORT="${AUTONOMOUS_EFFORT:-medium}"     # reasoning effort for every resume session (low|medium|high|xhigh|max).
                                           # medium since 2026-09-24 (owner decision), replacing xhigh
                                           # (2026-07-31), which had replaced max. Raise it for one hard run
@@ -309,7 +323,7 @@ DENY=(
 
 # (`mkdir -p "$STATE"` moved below the SOURCE GUARD — W32.source-guard. Nothing above the guard writes to
 # $STATE: every function here is defined, not called, and log() only runs inside the loop.)
-log() { printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+log() { [ "$WORKER_CHILD" != 1 ] || set -- "[$WORKER_ID/$AGENT] $*"; printf '%s  %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
 # The rollout file of the codex session whose `codex exec --json` output is in $1: its first event is
 # {"type":"thread.started","thread_id":"…"}, and codex names the rollout after that id. Empty if not found
 # (an --ephemeral run, or a session that died before it started a thread).
@@ -342,6 +356,7 @@ usage_row() {
 # then mv'd so a concurrent reader never sees a half-written file.
 write_status() {   # $1 (optional) = a park reason -> STATUS.md shows PARKED even though this process is still
                    # alive (park_run calls this BEFORE its bootout, so the digest's pgrep check would else lie).
+  [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ] || return 0
   [ -x "$STATUS_CMD" ] || return 0
   STATUS_PARKED="${1:-}" "$STATUS_CMD" > "$STATE/STATUS.md.tmp" 2>/dev/null && mv -f "$STATE/STATUS.md.tmp" "$STATE/STATUS.md" 2>/dev/null || rm -f "$STATE/STATUS.md.tmp" 2>/dev/null
   return 0
@@ -486,6 +501,10 @@ BACKOFF="$INTERVAL"
 LOCK_HB_PID=""
 IDLE_SINCE="$STATE/idle.since"
 NOCOMPLETE="$STATE/nocomplete.count"   # WS4: consecutive committed-but-completed-nothing sessions
+if [ "$WORKER_CHILD" = 1 ]; then
+  IDLE_SINCE="$WORKER_STATE/idle.since"
+  NOCOMPLETE="$WORKER_STATE/nocomplete.count"
+fi
 # Clear EVERY park counter at daemon startup so on-disk state shares the daemon's lifetime (BACKOFF is
 # in-memory and resets on start; these must too). Otherwise a stale stamp/count from a PRIOR run makes the
 # first cycle PARK immediately — turning the owner's restart (an explicit "try again" signal) into a single
@@ -598,6 +617,12 @@ backoff_sleep() {
 #   $1 = short reason (log + notification title)   $2 = the owner-facing message
 park_run() {
   local reason="$1" m="$2"
+  if [ "$WORKER_CHILD" = 1 ]; then
+    printf '%s\n' "$reason: $m" > "$WORKER_STATE/park.reason"
+    log "worker parked ($reason) — supervisor will stop dispatch; live sessions remain protected"
+    return 0
+  fi
+  if [ "$UPKEEP_ONLY" = 1 ]; then printf '%s\n' "$reason: $m" > "$STATE/supervisor-park.reason"; fi
   # W32.park-reason — claim the exit reason BEFORE the bootout below SIGTERMs us. That signal fires the TERM
   # trap, which overwrites $_EXIT_REASON, so every park in daemon.log was logged as "SIGTERM — launchd
   # bootout/stop, logout, shutdown, or the laptop lid closing" (all four parks on record). The exit-reason
@@ -1229,6 +1254,7 @@ claims_release() {
 
 claims_launch() {
   if [ -n "$CLAIM_TAG" ]; then
+    [ "$WORKER_CHILD" != 1 ] || export AUTONOMOUS_START_STAGGER=1
     exec python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --plan "$PLAN" --stale "$STALE" \
       session "$CLAIM_TAG" "$CLAIM_TOKEN" -- "$@"
   else
@@ -1276,6 +1302,14 @@ if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
+# Parallel mode is opt-in; the installed supervisor owns children and global upkeep.
+# exec preserves the installed daemon's command line for start/stop/status discovery.
+case "$MAX_WORKERS" in 1|2) ;; *) echo "AUTONOMOUS_MAX_WORKERS must be 1 or 2 per lane" >&2; exit 2 ;; esac
+if [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ] && { [ "$AGENT" = both ] || [ "$MAX_WORKERS" -gt 1 ]; }; then
+  exec python3 "$REPO/ops/autonomous/worker-supervisor.py" --repo "$REPO" --state "$STATE" --plan "$PLAN" \
+    --script "$0" --agent "$AGENT" --workers "$MAX_WORKERS"
+fi
+
 # ---- Startup side effects (W32.source-guard) ---------------------------------------------------------
 # These three used to sit up in the config block, ABOVE the guard, which made the guard's own promise
 # ("everything above is config + function definitions, safe to source") false: sourcing the file to read
@@ -1283,7 +1317,14 @@ fi
 # WIPED a live run's idle clock + attempt streak. They belong here, where "the daemon is really starting" is
 # established. Order matters: $STATE must exist before anything writes into it.
 mkdir -p "$STATE" "$WORKER_STATE"
-if [ "$WORKER_STATE" != "$STATE" ] && [ "$WORKER_ID" = worker-1 ]; then
+if [ "$WORKER_CHILD" = 1 ] && [ -r "$WORKER_STATE/next-delay" ]; then
+  _previous_backoff="$(cat "$WORKER_STATE/next-delay")"
+  case "$_previous_backoff" in
+    ''|*[!0-9]*) ;;
+    *) [ "$_previous_backoff" -le "$MAXBACKOFF" ] && BACKOFF="$_previous_backoff" ;;
+  esac
+fi
+if [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ] && [ "$WORKER_STATE" != "$STATE" ] && [ "$WORKER_ID" = worker-1 ]; then
   if [ -f "$STATE/engine.lock" ] && [ ! -L "$STATE/engine.lock" ]; then
     _legacy_age=$(( $(date +%s) - $(stat -f %m "$STATE/engine.lock" 2>/dev/null || echo 0) ))
     [ "$_legacy_age" -ge "$STALE" ] || { echo "serial engine still active — refusing state migration" >&2; exit 2; }
@@ -1305,7 +1346,9 @@ fi
 # can persist for weeks across restarts) made the next run park on its FIRST timeout instead of its second,
 # and a doc-budget count of 3 parked a restarted run as soon as HEAD moved. An owner restart buys a full
 # window for ALL of them or the invariant is not an invariant.
-rm -f "$IDLE_SINCE" "$NOCOMPLETE" "$GATE_TO" "$DOCFIX_TRIES" "$DOCFIX_HEAD" "$GATEFIX_TRIES" "$GATEFIX_HEAD" 2>/dev/null || true
+if [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ]; then
+  rm -f "$IDLE_SINCE" "$NOCOMPLETE" "$GATE_TO" "$DOCFIX_TRIES" "$DOCFIX_HEAD" "$GATEFIX_TRIES" "$GATEFIX_HEAD" 2>/dev/null || true
+fi
 
 # ---- WHY the daemon used to vanish without a trace (added 2026-07-29) --------------------------------
 # Only the NORMAL loop exit logged "=== daemon down ===" (bottom of file). `trap 'exit 0' TERM INT` exited
@@ -1328,7 +1371,7 @@ _log_exit() {
   [ -f "$LOCK" ] && sess="YES (engine.lock present — a resume session was in flight and may leave it stale)"
   log "=== daemon down (pid $$) — reason: ${_EXIT_REASON} | status=${st} | uptime=${up}s | session-in-flight=${sess} ==="
   [ "$SESSION_REAPED" = 1 ] && claims_release  # otherwise retain launch-in-flight claim
-  remind_revert_taskport         # preserve the pre-existing EXIT behaviour (WS6 security reminder)
+  [ "$WORKER_CHILD" = 1 ] || remind_revert_taskport         # preserve the pre-existing EXIT behaviour (WS6 security reminder)
 }
 trap _log_exit EXIT
 # Each signal records WHY before exiting. Keep `exit 0` (launchd KeepAlive semantics unchanged).
@@ -1350,7 +1393,7 @@ for _v in $(env | sed -n 's/^\(CODEX[A-Za-z0-9_]*\)=.*/\1/p'); do [ "$_v" = CODE
 # -i: even on AC (where the system won't idle-sleep), once the display sleeps macOS drops its "prevent sleep
 # while display is on" assertion and the machine darkwakes/sleeps anyway — this cost a ~5h overnight stall
 # on 2026-07-12 (display slept 03:27 → 5h gap). -di holds the display on and keeps the whole machine up.
-caffeinate -di -w "$$" &
+if [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ]; then caffeinate -di -w "$$" & fi
 
 log "=== daemon up (pid $$, agent $AGENT$( [ "$AGENT" = codex ] && echo " ($CODEX_MODEL, effort $CODEX_EFFORT)" || echo " (effort $EFFORT)"), interval ${INTERVAL}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET")) ==="
 
@@ -1362,7 +1405,7 @@ log "=== daemon up (pid $$, agent $AGENT$( [ "$AGENT" = codex ] && echo " ($CODE
 # this line IS the event that retires the note: the restart it asks for has happened. Deleted rather than
 # archived because `daemon.log` already holds every park message durably, and park_run rewrites the file the
 # moment we park again — so nothing is lost and the bullet becomes true-by-construction.
-rm -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true
+if [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ]; then rm -f "$HOME/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt" 2>/dev/null || true; fi
 
 # ---- Health watchdog (Layers 1+2) — see the HB_* config block above for the full rationale. ----
 # Print pid $1 and every descendant pid. macOS `ps` has no recursive ppid filter, so snapshot the whole
@@ -1525,6 +1568,7 @@ tick() {
     # W32.plist-relogin — a finished run must stay finished. Without removing the LaunchAgent, the next GUI
     # login re-bootstrapped the job and the daemon came back up on a COMPLETE plan, immediately re-stopped,
     # and repeated that at every login. `daemon.sh start` reinstalls it.
+    [ "$WORKER_CHILD" = 1 ] && return 9
     rm -f "$HOME/Library/LaunchAgents/$JOB.plist" 2>/dev/null || true
     launchctl bootout "gui/$(id -u)/$JOB" 2>/dev/null || true
     return 9
@@ -1538,6 +1582,11 @@ tick() {
     log "stale lock (${age}s) — taking over."
   fi
 
+  if [ "$WORKER_CHILD" = 1 ] && [ -x "$YIELD_CMD" ] && "$YIELD_CMD" >/dev/null 2>&1; then
+    log "yielding — priority project became busy before worker dispatch"
+    return 0
+  fi
+  if [ "$WORKER_CHILD" != 1 ]; then
   # 3a. Yield to the priority project (owner, 2026-10-04): Vision OCR first, Archive Suite on the spare capacity,
   #     and never beside a Vision OCR model job (ops/autonomous/yield-check.sh says why). Before the gate as well
   #     as the session, because the gate builds and boots the VM too. Logged once per change of reason, not every
@@ -1551,6 +1600,7 @@ tick() {
       [ "${yr%% (*}" = "${yprev%% (*}" ] || log "yielding — ${yr:-the priority project is busy}; no gate or session until it ends."
       printf '%s\n' "$yr" > "$STATE/yield.reason"
       rm -f "$IDLE_SINCE" 2>/dev/null || true
+      [ "$UPKEEP_ONLY" = 1 ] && return 10
       return 0
     fi
     [ -f "$STATE/yield.reason" ] && { log "yield over — $(sed 's/ (.*//' "$STATE/yield.reason") has ended."; rm -f "$STATE/yield.reason"; }
@@ -1590,8 +1640,17 @@ tick() {
   else
     health_gate; local hg=$?
     [ "$hg" = 9 ] && return 9
-    if [ "$hg" = 10 ]; then note_progress; return 0; fi
+    if [ "$hg" = 10 ]; then note_progress; [ "$UPKEEP_ONLY" = 1 ] && return 10; return 0; fi
     # 11 = a red was handed to a fix session ($GATEFIX): fall through and launch it now.
+  fi
+
+  # The supervisor runs this entire preflight under the idle coordination lock.
+  # A child starts only after it, and never compacts, gates or clears global state.
+  if [ "$UPKEEP_ONLY" = 1 ]; then
+    housekeeping
+    if [ -x "$COMPACTOR" ]; then "$COMPACTOR" "$REPO" >> "$LOG" 2>&1 || return 2; fi
+    return 0
+  fi
   fi
 
   # 3b-w. Usage window (owner, 2026-09-28, from vision-ocr). If the last session left the five-hour window at or
@@ -1618,6 +1677,7 @@ tick() {
      && { [ "${w_pct:-0}" -ge "$WINDOW_WAIT_AT" ] 2>/dev/null || [ "${w_cut:-}" = cut ]; }; then
     local w_until=$(( w_reset + WINDOW_SLACK )); [ "$w_until" -gt $(( w_now + 18600 )) ] && w_until=$(( w_now + 18600 ))
     log "usage window ${w_pct}% used$( [ "${w_cut:-}" = cut ] && echo ', and the last session was cut off by it') — waiting until $(date -r "$w_until" '+%H:%M') for the reset."
+    [ "$WORKER_CHILD" = 1 ] && return 0
     while [ "$(date +%s)" -lt "$w_until" ]; do sleep "$WINDOW_POLL"; done
     usage_row wait "$w_now" "$(date +%s)" - - "${w_pct:-} ${w_reset:-}" "" "${w_cut:-}"
   fi
@@ -1633,7 +1693,7 @@ tick() {
     [ -f "$DOCFIX" ] && special=doc-budget-fix
     [ -z "$special" ] && [ -f "$GATEFIX" ] && special=gate-fix
     if [ -z "$special" ] && "$REPO/ops/autonomous/next-review-unit.sh" "$REPO" >/dev/null 2>&1; then special=review; fi
-    reservation="$(python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --plan "$PLAN" --stale "$STALE" \
+    reservation="$(AUTONOMOUS_SUBSCRIPTION="$AGENT" AUTONOMOUS_WORKER_RESERVATION_V2=1 python3 "$CLAIMS_CMD" --state "$STATE" --repo "$REPO" --plan "$PLAN" --stale "$STALE" \
       reserve "$WORKER_ID" "$$" ${special:+--special "$special"})"; claim_rc=$?
     if [ "$claim_rc" != 0 ]; then
       log "claim: no reservable item (rc=$claim_rc) — no session launched"
@@ -1894,6 +1954,7 @@ tick() {
   kill "$hb" 2>/dev/null || true; LOCK_HB_PID=""
   rm -f "$LOCK" 2>/dev/null || true
   claims_release || return 9
+  if [ "$WORKER_CHILD" != 1 ]; then
   housekeeping   # GC this (and any prior) session's spent worktree/branch — see above. Only after a real run.
   # Keep the durable plan small: archive old Session Log entries AND rotate the Daemon Report tail (WS8) so
   # the plan a fresh session reads doesn't inflate startup cost unbounded. Runs HERE — between cycles, lock
@@ -1913,6 +1974,7 @@ tick() {
     if "$COMPACTOR" "$REPO" >> "$LOG" 2>&1; then :; else
       log "⚠⚠ compact-plan ABORTED a pass (rc=$?) — the plan is NOT being kept within its context budget. Detail just above in this log; mechanism proof: ops/autonomous/tests/prove-compact.sh"
     fi
+  fi
   fi
   # WS5 — refresh the digest at the cycle tail, EXCEPT when the cycle parked (verdict 9): park_run already
   # wrote a PARKED digest (with the flag), and an unflagged tail write here would clobber it back to "running".
@@ -1942,6 +2004,10 @@ runtime_stale() {
   [ -f "$a/compact-plan.sh" ] && [ -f "$COMPACTOR" ] && { cmp -s "$a/compact-plan.sh" "$COMPACTOR" || out="$out compactor"; }
   _render "$a/resume-prompt.txt" | cmp -s - "$PROMPT" || out="$out resume-prompt"
   [ -f "$a/codex-preamble.txt" ] && [ -f "$CODEX_PREAMBLE" ] && { _render "$a/codex-preamble.txt" | cmp -s - "$CODEX_PREAMBLE" || out="$out codex-preamble"; }
+  if [ -n "${AUTONOMOUS_SUPERVISOR_SOURCE_SHA:-}" ]; then
+    git -C "$REPO" diff --quiet "$AUTONOMOUS_SUPERVISOR_SOURCE_SHA" HEAD -- \
+      ops/autonomous/worker-supervisor.py ops/autonomous/worker-state.py 2>/dev/null || out="$out supervisor-helpers"
+  fi
   printf '%s' "${out# }"
 }
 _SRC_REFUSED=""
@@ -1966,6 +2032,18 @@ source_restart_due() {
   return 0
 }
 
+if [ -n "${AUTONOMOUS_SUPERVISOR_PARK:-}" ]; then
+  park_run "worker supervisor" "$AUTONOMOUS_SUPERVISOR_PARK"
+  exit 9
+fi
+if [ "$WORKER_CHILD" = 1 ] || [ "$UPKEEP_ONLY" = 1 ]; then
+  tick; rc=$?
+  if [ "$UPKEEP_ONLY" = 1 ] && [ "$rc" != 9 ]; then
+    source_restart_due && exit 12
+  fi
+  printf '%s\n' "$BACKOFF" > "$WORKER_STATE/next-delay"
+  exit "$rc"
+fi
 while true; do
   tick; rc=$?
   [ "$rc" = "9" ] && break

@@ -99,6 +99,8 @@ def validate_record(record, tag):
         raise ValueError("invalid claim token")
     if type(record.get("started")) not in (float, int) or not math.isfinite(record["started"]) or record["started"] <= 0:
         raise ValueError("invalid claim start time")
+    if "subscription" in record and record["subscription"] not in ("claude", "codex", "unknown"):
+        raise ValueError("invalid subscription lane")
     if "child" in record or "child_start" in record:
         if type(record.get("child")) is not int or record["child"] <= 0 or not isinstance(record.get("child_start"), str) or not record["child_start"]:
             raise ValueError("missing CLI identity")
@@ -204,6 +206,22 @@ def main():
     session_command = None
     plan = plan.resolve()
     env["AUTONOMOUS_PLAN"] = str(plan)
+    dispatch_guard = None
+    if args.action == "session" and env.pop("AUTONOMOUS_START_STAGGER", "") == "1":
+        # Serialize actual CLI starts, including a shell delayed before session().
+        # Do not hold coordination.lock while waiting: releases remain responsive.
+        dispatch_guard = (state / "dispatch.lock").open("a+")
+        fcntl.flock(dispatch_guard, fcntl.LOCK_EX)
+        try:
+            last = float((state / "dispatch.last").read_text())
+        except FileNotFoundError:
+            last = 0
+        if not math.isfinite(last) or last < 0:
+            raise ValueError("invalid dispatch start stamp (preserved)")
+        remaining = max(0, min(60, last + 60 - time.time()))
+        deadline = time.monotonic() + remaining
+        while time.monotonic() < deadline:
+            time.sleep(min(1, deadline - time.monotonic()))
     if args.action == "filter" and not (state / "claims").exists():
         # Advisory resolver reads must not initialize the installed runtime of a
         # still-running serial daemon. Actual reservations always lock below.
@@ -248,6 +266,11 @@ def main():
                 raise ValueError("claim owner is not alive")
             if any(r.get("worker") == args.worker for _, r in active):
                 return 4
+            # Repairs serialize the whole suite. A pending request wins even if
+            # it appeared after the worker's pre-reservation snapshot.
+            pending = next((name for name in ("doc-budget-fix", "gate-fix") if (state / name).exists()), None)
+            if pending and env.get("AUTONOMOUS_WORKER_RESERVATION_V2") == "1":
+                args.special = pending
             if args.special:
                 rows = ["ok\t" + args.special + "\tspecial repair/review"]
             else:
@@ -276,7 +299,7 @@ def main():
                 directory.mkdir()  # atomic claim; a pre-existing entry is never overwritten
                 token = uuid.uuid4().hex
                 record = dict(tag=tag, worker=args.worker, pid=args.pid, pid_start=start,
-                              lane=lane, token=token, started=time.time(), text=text)
+                              lane=lane, subscription=env.get("AUTONOMOUS_SUBSCRIPTION", "unknown"), token=token, started=time.time(), text=text)
                 write_record(directory / "owner.json", record)
                 print(tag + "\t" + token + "\t" + text)
                 return 0
@@ -294,6 +317,10 @@ def main():
             if not command:
                 return 0
             env["AUTONOMOUS_COORDINATED_UPKEEP"] = "1"
+            # Idle holds coordination.lock and proves there are no claims. Queue
+            # reads in check-handoff/health-gate must not reacquire that same lock.
+            # This flag reaches only this upkeep child, never dispatched sessions.
+            env["AUTONOMOUS_IGNORE_CLAIMS"] = "1"
             # Same lock as plan-edit: compaction and tick/report edits cannot overlap.
             with locked(plan.with_name(plan.name + ".lock")) as plan_lock:
                 # Keep both flocks in the mutating child if its coordinator dies.
@@ -369,6 +396,13 @@ def main():
         if session_command is None:
             return 0
     # exec preserves PID + birth identity; flock is closed before a long session.
+    if dispatch_guard is not None:
+        stamp = state / "dispatch.last.tmp"
+        stamp.write_text(str(time.time()))
+        stamp.replace(state / "dispatch.last")
+        # CLOEXEC releases this lock at exec, after the start stamp is published.
+    env.pop("AUTONOMOUS_WORKER_RESERVATION_V2", None)
+    env.pop("AUTONOMOUS_SUBSCRIPTION", None)
     os.execvpe(session_command[0], session_command, env)
 
 

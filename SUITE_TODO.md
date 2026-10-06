@@ -961,7 +961,6 @@ full usage window". Made the daemon's next work, ahead of everything else in the
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
 
-- [ ] **`W35.workers` — the supervisor runs N workers per lane, per-lane pause, staggered starts [M]** (blocked-on: W35.claims, W35.heavy). Keep restart-on-source-change working in the new loop (between ticks, never mid-session; `tests/prove-source-restart.sh` must stay green): the owner asked for a restart after every W35 commit, and the flag file `$STATE/restart-on-source-change` is removed when W35 is done. Detail: `execution-plans/parallel-workers/00-plan.md`.
 - [ ] **`W35.pace` — worker count sized from the usage readings, Vision OCR keeps Claude priority [M]** (blocked-on: W35.workers). Detail: `execution-plans/parallel-workers/00-plan.md`.
 - [ ] **`W35.live` — first real run with two workers, measured; the owner decides whether to keep it [S]** (blocked-on: W35.pace). Detail: `execution-plans/parallel-workers/00-plan.md`.
 

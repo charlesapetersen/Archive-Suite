@@ -315,6 +315,7 @@ step gui-vm-proof   bash "$ROOT/ops/autonomous/tests/prove-gui-vm.sh"
 #     AUTONOMOUS_REVIEW_ENABLED=1 on purpose: paced reviews are OFF by owner directive, and the picker
 #     machinery must keep working while the deployment default is off, so this stays watched while it sleeps.
 step heavy-work-proof     bash "$ROOT/ops/autonomous/tests/prove-heavy.sh"
+step worker-supervisor-proof bash "$ROOT/ops/autonomous/tests/prove-worker-supervisor.sh"
 step worker-claims-proof  bash "$ROOT/ops/autonomous/tests/prove-worker-claims.sh"
 step dep-gating-proof     bash "$ROOT/ops/autonomous/tests/prove-dep-gating.sh"
 step tracker-sync-proof   bash "$ROOT/ops/autonomous/tests/prove-tracker-sync.sh"

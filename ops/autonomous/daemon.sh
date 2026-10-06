@@ -128,16 +128,19 @@ if [ "${1:-}" = "--dry-run" ]; then DRYRUN=1; shift; fi
 # `--agent claude|codex` (owner, 2026-10-04) may come anywhere after the command; pull it out before dispatch.
 # Typed, not inherited, for the same reason as --dry-run: an exported variable would silently pick the agent
 # for every later start. Default claude; a `start` without the flag goes back to claude.
-AGENT_CHOICE=claude; _args=()
+AGENT_CHOICE=claude; WORKER_CHOICE="${AUTONOMOUS_MAX_WORKERS:-1}"; _args=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --agent)   [ $# -ge 2 ] || fail "--agent needs a value: claude or codex"; AGENT_CHOICE="$2"; shift 2 ;;
+    --agent)   [ $# -ge 2 ] || fail "--agent needs a value: claude, codex or both"; AGENT_CHOICE="$2"; shift 2 ;;
+    --workers) [ $# -ge 2 ] || fail "--workers needs 1 or 2 per lane"; WORKER_CHOICE="$2"; shift 2 ;;
+    --workers=*) WORKER_CHOICE="${1#--workers=}"; shift ;;
     --agent=*) AGENT_CHOICE="${1#--agent=}"; shift ;;
     *)         _args+=("$1"); shift ;;
   esac
 done
 set -- ${_args[@]+"${_args[@]}"}
-case "$AGENT_CHOICE" in claude|codex) ;; *) fail "unknown agent '$AGENT_CHOICE' — use --agent claude or --agent codex" ;; esac
+case "$WORKER_CHOICE" in 1|2) ;; *) fail "--workers must be 1 or 2 per lane" ;; esac
+case "$AGENT_CHOICE" in claude|codex|both) ;; *) fail "unknown agent '$AGENT_CHOICE' — use --agent claude, --agent codex or --agent both" ;; esac
 
 case "${1:-start}" in
   status) shift; status "$@"; exit 0 ;;   # extra args (e.g. --details) pass through to the digest
@@ -198,14 +201,15 @@ esac
 
 # --dry-run: report the resolved launch mode and exit BEFORE any install/launch — a loud, unmistakable line so
 # a preview is never mistaken for a real start. (tests/prove-daemon-dispatch.sh asserts the dispatch through this.)
-[ -n "$DRYRUN" ] && { echo "daemon.sh --dry-run: would launch in mode '$MODE' with agent '$AGENT_CHOICE' — NOTHING installed or launched."; exit 0; }
+[ -n "$DRYRUN" ] && { echo "daemon.sh --dry-run: would launch in mode '$MODE' with agent '$AGENT_CHOICE', $WORKER_CHOICE worker(s) per lane — NOTHING installed or launched."; exit 0; }
 
 # ---- start ----
 # 1. prerequisites (each with a fix hint)
-if [ "$AGENT_CHOICE" = codex ]; then
+if [ "$AGENT_CHOICE" = codex ] || [ "$AGENT_CHOICE" = both ]; then
   [ -x "$CODEX" ] || fail "codex CLI not executable at $CODEX — install the ChatGPT app, or symlink a codex CLI to $BIN/codex."
   [ -s "$PREAMBLE_SRC" ] || fail "codex preamble missing: $PREAMBLE_SRC"
-else
+fi
+if [ "$AGENT_CHOICE" = claude ] || [ "$AGENT_CHOICE" = both ]; then
   [ -x "$CLAUDE" ] || fail "claude CLI not executable at $CLAUDE — it MUST live outside ~/Desktop for launchd/TCC. Install/symlink it there."
 fi
 [ -f "$DAEMON_SRC" ] || fail "daemon script missing: $DAEMON_SRC"
@@ -217,6 +221,7 @@ mkdir -p "$BIN" "$STATE"
 warn_unmarked_keychain_provider
 
 [ -f "$REPO/ops/autonomous/worker-state.py" ] || fail "worker-state helper missing"
+[ -f "$REPO/ops/autonomous/worker-supervisor.py" ] || fail "worker-supervisor helper missing"
 [ -f "$REPO/ops/autonomous/heavy-run.py" ] || fail "heavy-work helper missing"
 [ -f "$REPO/ops/autonomous/plan-edit.py" ] || fail "plan-edit helper missing"
 # 2. install the latest committed copies to the runtime location (source of truth = the repo)
@@ -268,6 +273,8 @@ echo "plan status OK: $st"
 # 4b. record the agent. Written only here, past the double-launch guard: a `start --agent codex` refused
 #     because a daemon is already running must not switch that daemon's next relaunch to codex behind its back.
 echo "$AGENT_CHOICE" > "$STATE/agent"
+echo "$WORKER_CHOICE" > "$STATE/max-workers"
+printf '%s-%s\n' "$(date +%s)" "$$" > "$STATE/run-generation"
 echo "agent: $AGENT_CHOICE$( [ "$AGENT_CHOICE" = codex ] && echo " ($CODEX)")"
 
 # 5. launch — launchd KeepAlive (DEFAULT, crash-restart; WS1) or opt-in detached nohup

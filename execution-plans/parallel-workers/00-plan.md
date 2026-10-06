@@ -84,8 +84,13 @@ is Archive Suite's.
   GUI/sandbox refusals precede waiting; all VM entries take heavy ownership before the VM lock.
   Older unattended supervisors retain their prior path until the next owner restart. Contract and
   scratch functional proof: `ops/autonomous/README.md` §Heavy work across workers and `tests/prove-heavy.sh`.
-- `W35.workers` [M] — the supervisor running N workers per lane, per-lane pause, staggered starts, `daemon.sh
-  status` showing each worker.
+- `W35.workers` — SHIPPED 2026-10-06 (this commit). Opt-in bounded Claude/Codex lanes,
+  per-worker artifacts/counters and per-lane usage pauses; 60-second CLI start barrier, protected-orphan
+  and pending-start capacity, idle-only global upkeep and repair draining. Explicit owner generations
+  reset prior-layout counters/markers; crash relaunch preserves terminal reasons and ambiguous claims.
+  Every worker appears in status. Owner-enabled source refresh drains before exiting for KeepAlive,
+  including helper-only commits; automatic refresh retains the run generation. Contract: `ops/autonomous/README.md` §Several workers and subscription
+  lanes; functional proof: `tests/prove-worker-supervisor.sh` in the health gate.
 - `W35.pace` [M] — pace-aware slot sizing from both lanes' readings, the weekly gate, Vision OCR priority.
 - `W35.live` [S] — the first real run with 2 workers, measured: window used at each reset before and after, items
   finished per day, collisions (duplicate items, merge conflicts, heavy-lock waits). The owner decides whether to

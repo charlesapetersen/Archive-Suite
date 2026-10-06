@@ -314,7 +314,16 @@ printf '\n  %s  %s\n' "$STATE_ICON" "${B}${STATE_LINE}${OFF}"
 # Which CLI runs the sessions (daemon.sh start --agent …), shown only while the daemon is running or loaded.
 if [ "$running" = 1 ] || [ "$supervised" = 1 ]; then
   agent_now="$( { tr -d '[:space:]' < "$STATE/agent"; } 2>/dev/null)"
-  printf '     %sSessions run with %s.%s\n' "$DIM" "$( [ "${agent_now:-claude}" = codex ] && echo Codex || echo Claude)" "$OFF"
+  case "${agent_now:-claude}" in
+    codex) agent_label=Codex ;;
+    both) agent_label="Claude and Codex" ;;
+    *) agent_label=Claude ;;
+  esac
+  printf '     %sSessions run with %s.%s\n' "$DIM" "$agent_label" "$OFF"
+fi
+
+if [ -s "$STATE/supervisor.json" ]; then
+  python3 "$HERE/worker-supervisor.py" --state "$STATE" --status 2>/dev/null || true
 fi
 
 if [ "$commits24" -gt 0 ] 2>/dev/null; then

@@ -103,6 +103,53 @@ rules. Register an isolated worktree with `worker-state.py --state "$STATE" --re
 "$PWD"` using the token supplied in the assignment. Codex escalates this process-inspecting helper outside
 the sandbox. All operations use scratch fixtures in `tests/prove-worker-claims.sh`, wired into the health gate.
 
+## Several workers and subscription lanes (W35.workers)
+
+The default remains one worker on the chosen subscription. The owner can opt into both with
+`daemon.sh start --agent both`, or two workers on each enabled lane with
+`daemon.sh start --agent both --workers 2`. `--workers` accepts 1 or 2 per lane and is saved in
+`$STATE/max-workers` for crash relaunches. `AUTONOMOUS_MAX_WORKERS=1` overrides the saved count.
+The ordinary single-agent, one-worker loop keeps its existing path; changing source does not change
+an already installed supervisor. An owner-enabled `restart-on-source-change` flag lets the daemon
+refresh committed source at a drained boundary under launchd, including changes to imported supervisor
+helpers. The parent exits cleanly for KeepAlive to relaunch; worker children never install runtime files.
+An automatic refresh retains the run generation and its counters. Direct starts/restarts remain owner actions. The first real multi-worker run
+and adaptive usage pacing remain W35.live and W35.pace.
+
+Parallel mode uses a single, kernel-locked supervisor and one-cycle workers. Each gets its own
+`worker-N/` engine lock, stream, last answer, usage reading/ledger and retry counters. Root session
+and usage paths retain the worker-1 view, preserving regular legacy files before making aliases.
+`daemon.sh status` and STATUS.md list each worker's subscription, claimed item, pause or stopped state.
+Worker IDs are independent of an item's `(lane: reader|notes|processor|suite)` conflict territory.
+Unlabelled items remain suite-wide claims, so extra slots do not bypass file-conflict safety.
+
+Starts are globally staggered by at least 60 seconds, including replacements and delayed worker
+initialization; a separate start lock sits immediately before CLI exec. Each subscription pauses
+independently when a sibling's current usage reading reaches the existing 95% threshold or records
+a cutoff. Codex also refreshes its account-wide rollout reading. Exhaustion cannot be overwritten by
+an older sibling sample, and the reset slack is observed. A session's no-argument usage command
+reads its own worker's agent, including Codex workers while the root choice is `both`.
+
+Claims and pending starts both occupy capacity. Surviving CLI/tool claims remain protected after
+supervisor death and count against the correct subscription. Ambiguous claims stop new dispatch
+and retain their files. A worker park stops refills while other owned sessions finish; only the
+supervisor requests the durable global park. Automatic crash relaunches preserve retry counters and
+park reasons, including reasons published while the supervisor was absent. An explicit owner start
+writes a new run generation and resets those counters/markers across the previous worker layout.
+
+Global disk/document/gate checks, housekeeping and compaction run only after all workers drain,
+under the existing idle coordinator and canonical plan lock. Periodic drain points prevent upkeep
+starvation; a pending document/gate repair stops ordinary refills immediately and takes one suite
+claim after draining. Owner-stop reconciliation precedes idle locking. Idle queue reads use the
+coordinator's known-empty claim view, avoiding nested lock acquisition. Worker children never run
+shared upkeep or overwrite the global status file, and retain their backoff between cycles.
+
+`tests/prove-worker-supervisor.sh` is a health-gate step: scratch scheduler/claim/recovery proofs,
+actual shell startup, harmless CLI subprocesses, and a complete two-lane dispatch with a real
+60-second start gap. Delayed-start cases also use a controlled clock. Existing daemon
+and claim harnesses cover the session watchdog and CLI argument paths. These fixtures do not prove
+real subscription throughput or owner acceptance; W35.live measures those after W35.pace.
+
 ## Install / run
 
 > **Renamed 2026-08-06 (owner):** this script was `arm.sh` and its verb was `arm`; it is now
@@ -118,7 +165,7 @@ posture for a long unattended run. `daemon.sh nohup` is the opt-in detached mode
 and `daemon.sh stop` round it out. `./ops/autonomous/daemon.sh --dry-run [nohup]` previews the resolved launch
 mode without touching anything. The manual steps below are what it automates.
 
-### Choosing the agent: `--agent claude` (default) or `--agent codex` (owner, 2026-10-04)
+### Choosing the agent: `--agent claude` (default), `--agent codex` or `--agent both` (owner, 2026-10-04)
 
 `./ops/autonomous/daemon.sh start --agent codex` runs every session with Codex (`codex exec`) instead of Claude;
 `start` or `start --agent claude` goes back to Claude. The choice is written to `$STATE/agent`, which is what a
@@ -160,7 +207,7 @@ What differs under codex, and why:
   after the session started was written within `HB_STALL` (`_codex_alive`). If a codex session is still killed
   while working, raise `AUTONOMOUS_HB_STALL`.
 - **No environment variable for the agent.** The daemon unsets `AUTONOMOUS_AGENT` once it has read it, and
-  `usage-window.sh` finds the agent in `$STATE/agent`. An exported variable leaked into the health gate's
+  `usage-window.sh` finds the agent in the worker's agent file, falling back to `$STATE/agent`. An exported variable leaked into the health gate's
   harnesses and turned the gate RED under either agent (found in review, 2026-10-04).
 
 Proof: `tests/prove-codex-agent.sh` (a gate step) runs the real daemon against a stub codex; the dispatch is in

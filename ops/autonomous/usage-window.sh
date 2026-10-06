@@ -29,7 +29,9 @@ STATE="${AUTONOMOUS_STATE:-$HOME/.local/state/archive-autonomous}"   # the daemo
 # A session calls this with no argument. Under codex its own log holds no readings, so read codex's instead.
 # The daemon's agent choice is in $STATE/agent (daemon.sh writes it); there is deliberately no environment
 # variable for it, because an exported one leaked into the health gate and its harnesses (2026-10-04 review).
-[ -z "${1:-}" ] && [ "$( { tr -d '[:space:]' < "$STATE/agent"; } 2>/dev/null)" = codex ] && latest=1
+agent_file="$STATE/agent"
+[ -r "${AUTONOMOUS_WORKER_STATE:-$STATE}/agent" ] && agent_file="${AUTONOMOUS_WORKER_STATE:-$STATE}/agent"
+[ -z "${1:-}" ] && [ "$( { tr -d '[:space:]' < "$agent_file"; } 2>/dev/null)" = codex ] && latest=1
 
 # Codex readings (see the header): the account-wide "codex" limit only. Other limit_ids occur in real rollouts
 # ("premium", with primary null) and say nothing about the codex window.

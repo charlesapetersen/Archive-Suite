@@ -32,6 +32,18 @@ out="$(bash "$DAEMON" --dry-run start --agent gpt 2>&1)"; rc=$?
 out="$(bash "$DAEMON" --dry-run start --agent 2>&1)"; rc=$?
 [ "$rc" != 0 ] && ok "--agent with no value refused ($rc)" || no "--agent with no value should be refused (got: $out)"
 
+# W35.workers: bounded per-subscription workers are an explicit launch option.
+out="$(mode start --agent both --workers 2)"
+case "$out" in *"agent 'both', 2 worker(s) per lane"*) ok "both lanes accept two workers each" ;; *) no "both workers (got: $out)" ;; esac
+out="$(mode start --agent codex --workers=1)"
+case "$out" in *"agent 'codex', 1 worker(s) per lane"*) ok "one-worker Codex remains available" ;; *) no "single Codex (got: $out)" ;; esac
+for workers in 0 3 invalid; do
+  out="$(mode start --workers "$workers")"; rc=$?
+  [ "$rc" != 0 ] && ok "worker bound $workers refused" || no "worker bound $workers accepted"
+done
+out="$(mode start --workers)"; rc=$?
+[ "$rc" != 0 ] && ok "missing worker count refused" || no "missing worker count accepted"
+
 # a bogus command must fail (nonzero) and name the valid commands incl. nohup — never silently launch
 out="$(bash "$DAEMON" bogus 2>&1)"; rc=$?
 [ "$rc" != 0 ] && ok "bogus command exits nonzero ($rc)" || no "bogus command should exit nonzero"
