@@ -78,6 +78,15 @@ is Archive Suite's.
   claims, stale-claim rule, the item named in the prompt; `plan-edit.sh`; housekeeping, compaction and tidy only
   when no worker is in flight.
 - `W35.heavy` [S-M] — `heavy.lock` around builds, the VM lane and the gate; waiting on it counts as work.
+  **Blocked 2026-10-05 on W35.claims-owner-ok**, the existing Codex daemon-source clarification. At baseline
+  `3465e15`, `archive-suite-autonomous.sh::health_watchdog()` recognizes log/rollout growth, Claude descendants
+  and CPU activity, but no lock waiter; wrapper stderr is not a reliable pending-tool heartbeat.
+  `_run_gate_once()` also charges all time after `GATE_CMD` starts against `GATE_MAXRUN`, including any gate-level
+  lock wait. Completing this contract requires daemon source changes prohibited by the overriding preamble.
+  No implementation begun. Resume with a global, nested-call-safe lock; validated waiter liveness in the
+  watchdog; gate acquisition before its execution timer; heavy-before-VM lock ordering; and scratch proofs
+  for contention, nesting, signals, dead owners and unchanged GUI/sandbox refusals. Keep live owners protected
+  regardless of lock age. This shares the existing question; it does not create another safety approval gate.
 - `W35.workers` [M] — the supervisor running N workers per lane, per-lane pause, staggered starts, `daemon.sh
   status` showing each worker.
 - `W35.pace` [M] — pace-aware slot sizing from both lanes' readings, the weekly gate, Vision OCR priority.
