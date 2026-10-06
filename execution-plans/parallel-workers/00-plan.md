@@ -91,7 +91,11 @@ is Archive Suite's.
   Every worker appears in status. Owner-enabled source refresh drains before exiting for KeepAlive,
   including helper-only commits; automatic refresh retains the run generation. Contract: `ops/autonomous/README.md` §Several workers and subscription
   lanes; functional proof: `tests/prove-worker-supervisor.sh` in the health gate.
-- `W35.pace` [M] — pace-aware slot sizing from both lanes' readings, the weekly gate, Vision OCR priority.
+- `W35.pace` — SHIPPED 2026-10-06 (this commit). `usage-pace.py` sizes each lane from its newest current
+  reading (highest across sources) with §5's bands plus "steady keeps the count" hysteresis; never below one
+  worker, so §5's 0.97 pause stays the existing 95%/cutoff pause; the weekly window only holds back (tight),
+  never blocks grow. Vision OCR's log is a Claude source. Contract: `ops/autonomous/README.md`
+  §Pace-aware slots; proof: `tests/prove-usage-pace.sh` in the health gate.
 - `W35.live` [S] — the first real run with 2 workers, measured: window used at each reset before and after, items
   finished per day, collisions (duplicate items, merge conflicts, heavy-lock waits). The owner decides whether to
   keep it, and whether to raise the limits.

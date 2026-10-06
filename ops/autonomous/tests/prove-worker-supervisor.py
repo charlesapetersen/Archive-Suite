@@ -91,11 +91,14 @@ class Proof(unittest.TestCase):
         self.assertEqual(env["AUTONOMOUS_WORKER_CHILD"], "1")
         return child
 
-    def cycle(self, sup, now, active=None, pauses=None):
+    def cycle(self, sup, now, active=None, pauses=None, caps=None):
+        # Scheduler cases hold pacing at the lane limit unless a case sets caps;
+        # the W35.pace cases below drive lane_cap from fixture readings.
         self.now = now
         with patch.object(module.time, "time", return_value=now), \
                 patch.object(module.subprocess, "Popen", side_effect=self.fake_launch), \
-                patch.object(sup, "lane_pause", side_effect=lambda lane, _: (pauses or {}).get(lane, 0)):
+                patch.object(sup, "lane_pause", side_effect=lambda lane, _: (pauses or {}).get(lane, 0)), \
+                patch.object(sup, "lane_cap", side_effect=lambda lane, _: (caps or {}).get(lane, sup.args.workers)):
             if active is None:
                 with patch.object(sup, "active", return_value=[]):
                     return sup.cycle(now)
@@ -232,12 +235,19 @@ class Proof(unittest.TestCase):
         self.assertEqual(len(self.launches), 1)
 
     def test_real_drained_upkeep_refreshes_committed_helper_only_change(self):
+        # Every module the supervisor imports (W35.pace added usage-pace.py).
+        for name in ("worker-supervisor.py", "worker-state.py", "usage-pace.py"):
+            with self.subTest(helper=name):
+                self.setUp()
+                self.helper_only_change_refreshes(name)
+
+    def helper_only_change_refreshes(self, name):
         env = self.shell_env()
         autonomous = self.repo / "ops/autonomous"
         autonomous.mkdir(parents=True)
         (autonomous / "archive-suite-autonomous.sh").write_bytes(self.script.read_bytes())
         (autonomous / "resume-prompt.txt").write_text("scratch prompt")
-        helper = autonomous / "worker-supervisor.py"
+        helper = autonomous / name
         helper.write_text("# helper version one\n")
         git = ["git", "-C", str(self.repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid"]
         subprocess.run(git + ["add", "-A"], check=True, capture_output=True)

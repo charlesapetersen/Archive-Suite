@@ -2006,7 +2006,7 @@ runtime_stale() {
   [ -f "$a/codex-preamble.txt" ] && [ -f "$CODEX_PREAMBLE" ] && { _render "$a/codex-preamble.txt" | cmp -s - "$CODEX_PREAMBLE" || out="$out codex-preamble"; }
   if [ -n "${AUTONOMOUS_SUPERVISOR_SOURCE_SHA:-}" ]; then
     git -C "$REPO" diff --quiet "$AUTONOMOUS_SUPERVISOR_SOURCE_SHA" HEAD -- \
-      ops/autonomous/worker-supervisor.py ops/autonomous/worker-state.py 2>/dev/null || out="$out supervisor-helpers"
+      ops/autonomous/worker-supervisor.py ops/autonomous/worker-state.py ops/autonomous/usage-pace.py 2>/dev/null || out="$out supervisor-helpers"
   fi
   printf '%s' "${out# }"
 }

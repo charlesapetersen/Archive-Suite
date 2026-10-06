@@ -20,6 +20,9 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("worker_state", HERE / "worker-state.py")
 coord = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(coord)
+spec = importlib.util.spec_from_file_location("usage_pace", HERE / "usage-pace.py")
+pace = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(pace)
 
 
 def number(env, name, default, minimum=0):
@@ -54,6 +57,8 @@ def snapshot_status(state):
     print("     Workers (supervisor " + ("running" if alive else "stopped; last snapshot") + "):")
     for row in snapshot.get("workers", []):
         print("       {id}  {lane}  {status}".format(**row))
+    for lane, note in sorted((snapshot.get("pace") or {}).items()):
+        print("       pace " + lane + ": " + note)
 
 
 class Supervisor:
@@ -81,6 +86,10 @@ class Supervisor:
         self.global_stopped = False
         self.cursor = 0
         self.last_active = []
+        # W35.pace: per-lane slot count, sized from the usage readings (usage-pace.py).
+        self.pacing = self.args.workers > 1 and self.env.get("AUTONOMOUS_PACE", "1") != "0"
+        self.caps = {}
+        self.pace_notes = {}
 
     def child_env(self, worker, lane, upkeep=False):
         env = self.env.copy()
@@ -112,7 +121,7 @@ class Supervisor:
                 except FileNotFoundError:
                     pass
         # Codex exposes the account-wide latest reading; Claude sibling logs are
-        # the available CLI events (pace/account discovery belongs to W35.pace).
+        # the available CLI events. Slot sizing below the pause is lane_cap's.
         if lane == "codex":
             command = self.env.get("AUTONOMOUS_USAGE_CMD", str(self.repo / "ops/autonomous/usage-window.sh"))
             p = subprocess.run([command, "--raw", "--codex-latest"], env=self.env,
@@ -120,6 +129,37 @@ class Supervisor:
             if p.returncode == 0:
                 readings.append(p.stdout)
         return paused(readings, now, self.threshold, self.slack)
+
+    def pace_sources(self, lane, now):
+        if lane == "codex":
+            return pace.codex_sources(self.env.get("CODEX_HOME", str(Path.home() / ".codex")), now)
+        # Live and finished Claude worker logs, plus Vision OCR's: one account, one window.
+        shared = self.env.get("AUTONOMOUS_SHARED_USAGE_LOGS",
+                              str(Path.home() / ".local/state/visionocr-autonomous/last-session.log"))
+        return ([self.state / worker / "last-session.log" for worker, l in self.workers if l == lane]
+                + [Path(p) for p in shared.split(os.pathsep) if p])
+
+    def lane_cap(self, lane, now):
+        """How many sessions this lane may hold now; the fixed limit when pacing is off."""
+        if not self.pacing:
+            return self.args.workers
+        try:
+            parse = pace.codex_windows if lane == "codex" else pace.claude_windows
+            name, note = pace.assess(pace.current_reading(self.pace_sources(lane, now), parse, now), now)
+        except Exception as exc:  # any bad source is an unknown reading: cycle() must never die here
+            name, note = "unknown", "reading failed: " + repr(exc)
+        previous = self.caps.get(lane, 1)
+        cap = pace.next_cap(previous, name, self.args.workers)
+        if cap != previous or lane not in self.caps:
+            try:
+                with (self.state / "pace.log").open("a") as log:
+                    log.write("%s\t%s\t%s\t%d\t%s\n" % (time.strftime("%F %T", time.localtime(now)),
+                                                         lane, name, cap, note))
+            except OSError:
+                pass  # the log is for W35.live's measurements, never a reason to stop dispatch
+        self.caps[lane] = cap
+        self.pace_notes[lane] = "%s, %d of %d slots (%s)" % (name, cap, self.args.workers, note)
+        return cap
 
     def publish(self, active, pauses):
         rows = []
@@ -136,7 +176,7 @@ class Supervisor:
                 status = "dispatch stopped: " + self.terminal
             rows.append(dict(id=worker, lane=lane, status=status))
         coord.write_record(self.state / "supervisor.json", dict(pid=os.getpid(), pid_start=coord.identity(os.getpid()),
-                           updated=time.time(), workers=rows, terminal=self.terminal))
+                           updated=time.time(), workers=rows, terminal=self.terminal, pace=self.pace_notes))
         command = self.env.get("AUTONOMOUS_STATUS_CMD", str(self.repo / "ops/autonomous/status-digest.sh"))
         if Path(command).is_file():
             env = self.env.copy()
@@ -198,6 +238,7 @@ class Supervisor:
             self.terminal = "worker state inspection required: " + str(exc)
             active = self.last_active  # preserve state, drain known children, then park
         pauses = {lane: self.lane_pause(lane, now) for _, lane in self.workers}
+        caps = {lane: self.lane_cap(lane, now) for lane in dict.fromkeys(l for _, l in self.workers)}
         self.publish(active, pauses)
         if self.terminal:
             (self.state / "supervisor-park.reason").write_text(self.terminal)
@@ -253,7 +294,7 @@ class Supervisor:
             pending_children = sum(w in self.children and w not in claimed_workers and l == lane
                                    for w, l in self.workers)
             other_lane_active = pending_children + sum(r.get("subscription", "unknown") in (lane, "unknown") for r in active)
-            if other_lane_active >= self.args.workers:
+            if other_lane_active >= caps[lane]:
                 continue
             if repair and (active or self.children):
                 break

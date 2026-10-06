@@ -114,7 +114,7 @@ an already installed supervisor. An owner-enabled `restart-on-source-change` fla
 refresh committed source at a drained boundary under launchd, including changes to imported supervisor
 helpers. The parent exits cleanly for KeepAlive to relaunch; worker children never install runtime files.
 An automatic refresh retains the run generation and its counters. Direct starts/restarts remain owner actions. The first real multi-worker run
-and adaptive usage pacing remain W35.live and W35.pace.
+remains W35.live.
 
 Parallel mode uses a single, kernel-locked supervisor and one-cycle workers. Each gets its own
 `worker-N/` engine lock, stream, last answer, usage reading/ledger and retry counters. Root session
@@ -149,6 +149,31 @@ actual shell startup, harmless CLI subprocesses, and a complete two-lane dispatc
 60-second start gap. Delayed-start cases also use a controlled clock. Existing daemon
 and claim harnesses cover the session watchdog and CLI argument paths. These fixtures do not prove
 real subscription throughput or owner acceptance; W35.live measures those after W35.pace.
+
+### Pace-aware slots (W35.pace)
+
+With `--workers 2`, a lane runs its second worker only while it is under pace; the limit is a ceiling,
+not a target. Each supervisor poll, `usage-pace.py` takes the HIGHEST current reading across all sources
+(usage only rises within a window; file mtimes say nothing about the last reading): Claude
+`rate_limit_event` lines in every Claude worker's `last-session.log` plus Vision OCR's
+(`AUTONOMOUS_SHARED_USAGE_LOGS`, default `~/.local/state/visionocr-autonomous/last-session.log`), and
+Codex `rate_limits` in rollouts touched within six hours. With elapsed as the share of a window's time gone:
+
+| band | rule | slots |
+|---|---|---|
+| grow | used < elapsed − 0.10 and used < 0.80 | the lane limit |
+| tight | used > elapsed + 0.15 or used > 0.85 | 1 |
+| steady | between | the previous count (no flapping) |
+| unknown | no current five-hour reading | 1 |
+
+The five-hour window sets the band. The weekly window can only hold a lane back: tight against the week's
+elapsed share forces one worker, but it never blocks grow (which, read literally, it would for ~17 h after
+every weekly reset). The Claude CLI has only been seen to report weekly rejections, so in practice the weekly
+gate is Codex's. Claude readings are account-wide, so Vision OCR's spend counts and it keeps priority. Pacing
+never goes below one worker and never stops a running session. The existing 95%/cutoff pause still idles the
+lane. Changes are logged to `$STATE/pace.log` (time, lane, band, slots, readings); `daemon.sh status` shows the
+current band. `AUTONOMOUS_PACE=0` restores the fixed W35.workers count; one worker never reads usage for pacing. Any unreadable or malformed source reads as unknown, never a crash.
+Proof: `tests/prove-usage-pace.sh` in the health gate (fixture lines in the real CLI shapes, scratch files only).
 
 ## Install / run
 
