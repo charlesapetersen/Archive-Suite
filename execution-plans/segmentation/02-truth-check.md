@@ -221,3 +221,9 @@ Case 42 (RG 165 107–113): Keep as is (seven box labels) | note: Empty box phot
 **Herrnstein 19–20 (owner, 2026-10-05):** "Herrnstein file 19 is a folder. Herrnstein File 20 is the start of a
 letter." Applied: 19 Cont→Folder, 20 Folder→New (same backup folder). The ground-truth check is complete.
 
+
+**Deaver 57–58 (owner, 2026-10-05, after the one-box model comparison):** "Deaver 57 actually is a new article and
+should be separated from Deaver 56" and "58 is also a new clipping." Applied: 57 Cont→New, 58 Cont→New (backup
+`csv-backup-20261005-p57/`). Every model had split 57|58; that error was the label's. All five runs on Deaver now
+score 97.9%, their one remaining error being 56|57 joined (`segbench-results/cues-models-Deaver.md`). Results
+scored before this correction (the `*-dev` tables and SUMMARY.md) still use the old Deaver labels.
