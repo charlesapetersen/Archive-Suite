@@ -1924,9 +1924,52 @@ tick() {
 # $MAXBACKOFF once cycles stop advancing anything, and is cut short the moment the decision surface changes.
 # rc 9 = terminal (RUN STATUS: COMPLETE, or parked after $IDLE_STOP of no progress) -> fall out of the loop
 # and let the EXIT trap fire the taskport security reminder.
+# Restart on a newer committed daemon (owner, 2026-10-06: "Plan to re-start after every commit for the
+# multi-session work"). launchd runs an INSTALLED copy ($SELF, from `daemon.sh start`), and the prompt and
+# preamble sessions read are copies rendered at that start, so a committed daemon change otherwise waits for
+# the owner's next restart. While $STATE/restart-on-source-change exists, the loop checks between ticks (never
+# while a session runs: tick returns only after it) whether the primary checkout's committed copies differ
+# from the installed ones; if so it installs them as `daemon.sh start` step 2 does and exits, and launchd's
+# KeepAlive relaunches the new copy (the agent persists in $STATE/agent). Only under launchd, since a nohup
+# run would just end; never from a dirty ops/autonomous/ (only committed code is installed); never a daemon
+# that fails `bash -n` (the running code stays). Remove the file to stop.
+SELF="${BASH_SOURCE[0]}"
+RESTART_FLAG="$STATE/restart-on-source-change"
+_render() { sed "s|__REPO__|$(printf '%s' "$REPO" | sed -e 's/[\\&]/\\&/g')|g" "$1"; }
+runtime_stale() {
+  local a="$REPO/ops/autonomous" out=""
+  cmp -s "$a/archive-suite-autonomous.sh" "$SELF" || out="$out daemon"
+  [ -f "$a/compact-plan.sh" ] && [ -f "$COMPACTOR" ] && { cmp -s "$a/compact-plan.sh" "$COMPACTOR" || out="$out compactor"; }
+  _render "$a/resume-prompt.txt" | cmp -s - "$PROMPT" || out="$out resume-prompt"
+  [ -f "$a/codex-preamble.txt" ] && [ -f "$CODEX_PREAMBLE" ] && { _render "$a/codex-preamble.txt" | cmp -s - "$CODEX_PREAMBLE" || out="$out codex-preamble"; }
+  printf '%s' "${out# }"
+}
+_SRC_REFUSED=""
+source_restart_due() {
+  [ -f "$RESTART_FLAG" ] || return 1
+  [ "${XPC_SERVICE_NAME:-}" = "$JOB" ] || return 1
+  local what; what="$(runtime_stale)"; [ -n "$what" ] || return 1
+  local why=""
+  git -C "$REPO" diff --quiet HEAD -- ops/autonomous/ 2>/dev/null || why="ops/autonomous/ has uncommitted changes"
+  [ -z "$why" ] && ! bash -n "$REPO/ops/autonomous/archive-suite-autonomous.sh" 2>/dev/null && why="the committed daemon fails bash -n"
+  if [ -n "$why" ]; then
+    [ "$_SRC_REFUSED" != "$what|$why" ] && log "restart-on-source-change: newer $what in the checkout, NOT installed — $why; keeping the running code."
+    _SRC_REFUSED="$what|$why"; return 1
+  fi
+  local a="$REPO/ops/autonomous"
+  install -m 755 "$a/archive-suite-autonomous.sh" "$SELF" || return 1
+  [ -f "$a/compact-plan.sh" ] && [ -f "$COMPACTOR" ] && install -m 755 "$a/compact-plan.sh" "$COMPACTOR"
+  _render "$a/resume-prompt.txt" > "$PROMPT.new" && mv "$PROMPT.new" "$PROMPT"
+  [ -f "$a/codex-preamble.txt" ] && [ -f "$CODEX_PREAMBLE" ] && _render "$a/codex-preamble.txt" > "$CODEX_PREAMBLE.new" && mv "$CODEX_PREAMBLE.new" "$CODEX_PREAMBLE"
+  log "restart-on-source-change: installed the committed $what at $(git -C "$REPO" rev-parse --short HEAD 2>/dev/null); exiting so launchd relaunches the new code."
+  _EXIT_REASON="restart-on-source-change — newer committed $what installed; launchd KeepAlive relaunches it"
+  return 0
+}
+
 while true; do
   tick; rc=$?
   [ "$rc" = "9" ] && break
+  source_restart_due && exit 0
   backoff_sleep
 done
 # NOTE: no log here on purpose — the EXIT trap (_log_exit) is the SINGLE place that logs "daemon down",

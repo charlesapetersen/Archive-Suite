@@ -273,6 +273,9 @@ step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
 step codex-agent-proof bash "$ROOT/ops/autonomous/tests/prove-codex-agent.sh"
 # prove-gate-fix.sh (~75 s) — a red gate goes to a fix session before it may park (owner, 2026-10-05).
 step gate-fix-proof bash "$ROOT/ops/autonomous/tests/prove-gate-fix.sh"
+# prove-source-restart.sh (~20 s) — restart-on-source-change installs only committed, parseable daemon code,
+# only under launchd and only with $STATE/restart-on-source-change present (owner, 2026-10-06).
+step source-restart-proof bash "$ROOT/ops/autonomous/tests/prove-source-restart.sh"
 # step_skippable, not step: this harness greps with `rg`, which is a brew prereq rather than a repo file,
 # so a machine without ripgrep must report ⊘ NOT VERIFIED — not park the run. See the harness header.
 step_skippable keychain-partition-proof bash "$ROOT/ops/autonomous/tests/prove-keychain-partition.sh"
