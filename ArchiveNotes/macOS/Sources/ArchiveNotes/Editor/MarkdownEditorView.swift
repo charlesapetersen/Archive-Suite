@@ -694,6 +694,10 @@ struct MarkdownEditorView: NSViewRepresentable {
                 textView.insertText(attributed, replacementRange: textView.selectedRange())
             }
             textView.undoManager?.endUndoGrouping()
+#if DEBUG
+            // W9.cand2: a paste inserts chips without a full restyle, so cache them here too.
+            textView.refreshUITestPassageChipStateSnapshot()
+#endif
             scheduleWriteBack()
             return true
         }
