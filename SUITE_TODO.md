@@ -952,7 +952,7 @@ staggered starts, the subscription policy) and the design are in the plan.
   under the shared mac-heavy.lock. Keep 6 GB only if no run fails that passed at 8 GB and the median is no more than
   25% slower; record both sets of figures either way in `ops/gui/README.md`. Changing the VM's memory is `tart set`
   on the runner image; never on a running VM.
-- [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok)
+- [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok, agent-manager-plan-ok) HELD 2026-10-07: the owner is reviewing a machine-wide Agent Manager (`~/Claude/Agent Manager/PLAN.md`) that would own worker counts across projects.
   Owner, 2026-10-06, preparing for the larger Claude plan.
   The supervisor and `daemon.sh --workers` accept 1 or 2 per lane. Allow 3, still sized by `W35.pace` from the usage
   readings (a third slot only when used is well under elapsed), and gated on the machine: no third worker while
