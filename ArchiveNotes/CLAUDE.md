@@ -619,7 +619,8 @@ macOS/Tests/ArchiveNotesTests/
   NotePassageResolveTests.swift    20 tests (W7-S3): resolve ×4 outcomes, chipLabel live/fallback/format,
                                    isSourceMissing, scrollRange in/out-of-range/nil/empty, openItem token
                                    re-fire, resolvePassage, openAction (select-scroll / kind-mismatch
-                                   ignore / extract target / missing-on-note-window-only)
+                                   opens the featuring window (W9.b5-fu1) / extract target /
+                                   missing-on-note-window-only)
   ReaderLinkResolverTests.swift    resolve/unknown-guid/missing/renamed/traversal/grant/wrong-guid/
                                    special-chars + Notes deep-link router (including pre-index hold,
                                    one-time forward, repeat) + root-store; an unavailable saved root

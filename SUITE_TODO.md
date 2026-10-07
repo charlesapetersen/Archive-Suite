@@ -857,15 +857,12 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
 ✅ **`W9.e1` (plan E1) shipped 2026-10-06** — the per-item result is in the plan under *E1 result*; the
 completion record is in `SUITE_TODO_DONE.md`.
 
-- [ ] **`W9.b5-fu1` — an open request for a closed window's kind opens that window [S · gui]** (W9.e1 finding
-  on B5/B9/D5). `NotePassageResolve.openAction` (`Core/NotePassageResolve.swift:95`) sends `.ignore` to the
-  window that does not feature the target's kind, and only the featuring window's mounted `NoteEditorPane`
-  acts (`Views/NoteEditorPane.swift:319`). With the Extracts window closed, an extract's
-  `archivenotes://open` link, a pasted Copy Link, or Create Extract from the Notes window only activates the
-  app; the reverse holds for a jump-to-source with every Notes window closed. Fix: when the target exists
-  and is of the other kind, open its window (`openWindow(id:)`) so its pane mounts and consumes the still-
-  pending request — without opening a duplicate Notes window (`WindowGroup`) when one is already up. Unit-test
-  the decision in `openAction`; VM-check both directions with the other window closed. | ArchiveNotes | S | low | none
+- [ ] **`W9.w21-red` — `testW21_CrossWindowPassageChipReStylesAfterSourceTrash` is RED on main [S · gui]**
+  Found 2026-10-06 while VM-verifying `W9.b5-fu1`; reproduced ALONE on a pristine `origin/main` (`e8f12f8`)
+  checkout, so it is not that change. Fails at `NotesGUITests.swift:1377`: after trashing the cited note, the
+  open Extracts editor's chip still reports `missing: 0` (label "Moore on Intel culture — 1968", id
+  `22222222-…`). Either the W14.4c cross-window re-style regressed or the probe/fixture drifted — find which
+  before touching the product. | ArchiveNotes | S | med | none
 - [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]**
   (blocked-on: W9.e1, W9.b5-fu1). Plan E2 — also settle the two D1 doubts E1 could not decide from source:
   whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents

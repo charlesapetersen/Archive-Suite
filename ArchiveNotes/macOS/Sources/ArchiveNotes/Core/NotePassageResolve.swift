@@ -91,8 +91,12 @@ enum NotePassageResolve {
             // owns the "source removed" report; other windows stay quiet (no duplicate status).
             return windowKind == .note ? .reportSourceMissing : .ignore
         }
-        // The window featuring the target's kind handles it; the other window ignores it.
-        return summary.kind == windowKind ? .selectAndScroll(id: id, block: block) : .ignore
+        // The window featuring the target's kind handles it. The other window opens (or fronts) the
+        // featuring window, because that window may be CLOSED — then no pane is mounted to act and the
+        // request would only activate the app (W9.b5-fu1). The opened pane consumes the still-pending
+        // request on mount; both scenes are singleton `Window`s, so this never duplicates one.
+        return summary.kind == windowKind ? .selectAndScroll(id: id, block: block)
+                                          : .openFeaturingWindow(summary.kind)
     }
 }
 
@@ -103,6 +107,9 @@ enum PassageOpenAction: Equatable {
     case selectAndScroll(id: UUID, block: Int?)
     /// The target no longer resolves to any item — report the preserved-text status (Note window only).
     case reportSourceMissing
-    /// Not this window's concern; the window that features the target's kind handles it.
+    /// The target exists but is the other kind — open/front the window featuring `kind` so its pane
+    /// mounts (if closed) and handles the request. Does NOT consume it: the featuring pane does.
+    case openFeaturingWindow(Item.Kind)
+    /// Not this window's concern (a missing target in the Extract window).
     case ignore
 }

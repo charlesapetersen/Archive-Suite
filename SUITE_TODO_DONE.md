@@ -257,6 +257,16 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase E verification (2026-10-06)
 
+- [x] **W9.b5-fu1 — an open request for a closed window's kind opens that window [S · gui].** **SHIPPED 2026-10-06 (this commit).**
+  W9.e1 finding on B5/B9/D5: `NotePassageResolve.openAction` returned `.ignore` in the window not featuring the
+  target's kind, so with the featuring window closed Create Extract, an extract's `archivenotes://open` link or
+  a pasted Copy Link (and, reversed, a jump-to-source with the Note window closed) only activated the app. It
+  now returns `.openFeaturingWindow(kind)`; `NoteEditorPane.handleOpen` calls `openWindow(id:)` one main-loop
+  turn later (`@Published` emits in `willSet`, and a synchronously built window read the request as nil — seen
+  in the VM). Both scenes are singleton `Window`s, so no duplicate. The opened pane's `onAppear` handles the
+  still-pending request; a pane ignores the publish until it has appeared, since selecting before the body
+  seams are wired would mark the item loaded with an empty body. Unit tests updated in `NotePassageResolveTests`; VM `testG15_OpenRequestOpensTheClosedFeaturingWindow`
+  checks both directions with the other window closed, and G14 (both windows open) still passes.
 - [x] **W9.e1 — re-run the plan-vs-build gap analysis over every A–D item [M].** **SHIPPED 2026-10-06 (this commit).**
   Plan E1. A source-read pass, one reviewer per phase, traced every B/C/D item from a production entry point
   (menu, context menu, inspector, `onOpenURL`, health gate) to its effect; the per-item `file:line` result is in

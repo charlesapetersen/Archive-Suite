@@ -185,21 +185,23 @@ struct NotePassageResolveTests {
                 == .selectAndScroll(id: sourceID, block: 3))
     }
 
-    @Test func openActionIgnoresWhenTargetKindDiffersFromWindow() {
-        // The Extract window must NOT act on a note target — the Note window owns it.
+    @Test func openActionOpensNoteWindowWhenTargetIsNoteInExtractWindow() {
+        // The Extract window must NOT select a note target — but it opens the Note window, which may be
+        // closed (W9.b5-fu1: jump-to-source with every Notes window closed only activated the app).
         let items = [summary(sourceID, title: "The source note", kind: .note)]
         #expect(NotePassageResolve.openAction(forItemID: sourceID, block: 3, among: items, windowKind: .extract)
-                == .ignore)
+                == .openFeaturingWindow(.note))
     }
 
     @Test func openActionExtractTargetHandledByExtractWindow() {
         // The generic archivenotes://open path can target an extract; the Extract window handles it,
-        // the Note window ignores it (no false "source missing" report for an existing item).
+        // the Note window opens the (possibly closed) Extracts window instead of selecting it — and
+        // never a false "source missing" report for an existing item (W9.b5-fu1).
         let items = [summary(sourceID, title: "An extract", kind: .extract)]
         #expect(NotePassageResolve.openAction(forItemID: sourceID, block: nil, among: items, windowKind: .extract)
                 == .selectAndScroll(id: sourceID, block: nil))
         #expect(NotePassageResolve.openAction(forItemID: sourceID, block: nil, among: items, windowKind: .note)
-                == .ignore)
+                == .openFeaturingWindow(.extract))
     }
 
     @Test func openActionReportsMissingOnNoteWindowOnly() {

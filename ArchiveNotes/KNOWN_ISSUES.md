@@ -1689,6 +1689,17 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   `openWindow(id:)` (fronts the singleton Notes/Extracts `Window` scene, never duplicates) + `NSApp.activate`,
   so a jump-to-source brings the source note's window forward + focuses it. **Live raise/focus GUI drive →
   Daemon Report.**
+- ✅ **FIXED (W9.b5-fu1, 2026-10-06):** a request for the kind whose window is CLOSED now opens that window.
+  `openAction` used to return `.ignore` in the non-featuring window, so with the featuring window closed no pane
+  was mounted to act and Create Extract / an extract link / jump-to-source only activated the app. It now
+  returns `.openFeaturingWindow(kind)`: the other window calls `openWindow(id:)` (singleton `Window`, never a
+  duplicate) and the opened pane's `onAppear` handles + consumes the still-pending request. Two traps, both
+  measured in the VM: `@Published` emits in `willSet` and `openWindow` builds a closed window synchronously,
+  so the open is deferred one main-loop turn (else the new pane reads `pendingOpen` as nil and never acts);
+  and a pane ignores the publish until it has appeared, because before `onAppear` wires the body seams a
+  select would mark the item loaded with an EMPTY body (the default `load` returns nil). Residual
+  edge: if the Note window's detail is showing a template, its `NoteEditorPane` is not mounted and a note
+  request stays pending until it is. VM-checked by `testG15_OpenRequestOpensTheClosedFeaturingWindow`.
 - ✅ **FIXED (W14.4c, 2026-07-17 `d615589`):** the chip live title now refreshes reactively. `NotesModel`
   gained an `itemsGeneration` counter (bumped on every `replaceItems`); `MarkdownEditorView.updateNSView`
   re-styles a chip-bearing extract when that generation changes even if THIS note's markdown didn't, so a

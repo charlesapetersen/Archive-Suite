@@ -20,6 +20,8 @@ struct NoteEditorPane: View {
     /// W7-S3 — a pending jump-to-source request this window should honor (select the note + scroll to
     /// its block). Set by `handleOpen`; the scroll fires once `bodyEditor.loadedID` reaches the target.
     @State private var jumpTarget: NotesModel.OpenRequest?
+    /// Set in `onAppear`; until then an open request is left pending for `onAppear` to handle (W9.b5-fu1).
+    @State private var hasAppeared = false
     @State private var initialEditorFocusRequested = false
     @State private var initialEditorFocusCompleted = false
     @State private var editorFocusToken = 0
@@ -115,6 +117,15 @@ struct NoteEditorPane: View {
             // W7-S6: register this pane's flush so app-terminate persists its pending edit (idempotent —
             // onAppear may fire more than once, and the same paneID just overwrites its own entry).
             flushRegistry.register(paneID) { [bodyEditor] in await bodyEditor.flushPending() }
+            // W9.b5-fu1: a window opened FOR an open request (`.openFeaturingWindow`) can get that request
+            // as `onReceive`'s initial value, before this `onAppear` has wired the body seams above.
+            // Selecting then would load through the default `load` (returns nil): the item would be marked
+            // loaded with an EMPTY body, this method's own select would no-op, and a next keystroke would
+            // save over the real body. So a request already pending is handled here, once wired.
+            hasAppeared = true
+            if nav.model.pendingOpen != nil {
+                DispatchQueue.main.async { handleOpen(nav.model.pendingOpen) }
+            }
         }
         .onChange(of: nav.selectedItemID) { _, newID in
             parseFailureMessage = nil
@@ -139,7 +150,8 @@ struct NoteEditorPane: View {
             refreshZotero()
         }
         // W7-S3 jump-to-source consume side: the window featuring the target's kind selects it + scrolls.
-        .onReceive(nav.model.$pendingOpen) { handleOpen($0) }
+        // Only once this pane has appeared — `onAppear` picks up a request that was already pending.
+        .onReceive(nav.model.$pendingOpen) { if hasAppeared { handleOpen($0) } }
         .onReceive(nav.model.$itemsGeneration) { _ in
             refreshZoteroAutoFillReference(for: nav.selectedItemID)
         }
@@ -335,8 +347,17 @@ struct NoteEditorPane: View {
         case .reportSourceMissing:
             nav.model.statusMessage = "The source note for this passage no longer exists — the extract text is preserved."
             DispatchQueue.main.async { nav.model.consumeOpen() }
+        case let .openFeaturingWindow(kind):
+            // W9.b5-fu1: the featuring window may be closed, leaving no pane to act. Opening it mounts
+            // its pane, whose `onAppear` picks up the still-pending request; if it is already open this
+            // only fronts it (singleton `Window`), and its own pane handles + consumes the request.
+            // One turn later, not here: `@Published` emits in `willSet`, and `openWindow` builds a closed
+            // window synchronously — its pane would read `pendingOpen` before the request is stored, see
+            // nil, and never act (measured in the VM).
+            let windowID = kind == .extract ? NotesWindowID.extracts : NotesWindowID.notes
+            DispatchQueue.main.async { openWindow(id: windowID) }
         case .ignore:
-            break               // the window featuring the target's kind handles it
+            break               // a missing target is reported by the Note window only
         }
     }
 

@@ -378,7 +378,7 @@ No item regressed to "built but dead"; every B/C/D entry point is production cod
   **PARTIAL: B5 and B9** — `archivenotes://open` and Copy Link work for notes and for extracts while the
   Extracts window is open, but `NotePassageResolve.openAction` (`:95`) returns `.ignore` in a window that does
   not feature the target's kind, and nothing opens the other window, so an extract link with the Extracts
-  window closed (or a note link with every Notes window closed) only activates the app. → **`W9.b5-fu1`**.
+  window closed (or a note link with every Notes window closed) only activates the app. → **`W9.b5-fu1`** — ✅ fixed 2026-10-06 (`openAction` → `.openFeaturingWindow`; VM G15).
 - **C** — PASS: C1 (root `test-smoke.sh:23,35`), C2 (`ArchiveProcessor/scripts/lint-write-surface.sh`, run
   with its mutation proof by `ops/autonomous/health-gate.sh:146-147`), C3 (Reader lint rule 4 over Core,
   `health-gate.sh:144-145`), C4 (`ArchiveNotesUnit` scheme), C5 (`ArchiveCore/Tags/TagWrite.swift:152`

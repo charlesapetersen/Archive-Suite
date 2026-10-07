@@ -2312,6 +2312,66 @@ final class NotesGUITests: NotesFixtureUITestCase {
         closeExtractsWindow(extractWin)
     }
 
+    /// G15 — an open request for a kind whose window is CLOSED opens that window (W9.b5-fu1). G14 has both
+    /// windows up; before this fix the non-featuring window `.ignore`d the request, so with the featuring
+    /// window closed nothing was mounted to act and the request only activated the app.
+    /// Phase 1: Create Extract with the Extracts window closed must OPEN it, with the new extract loaded.
+    /// Phase 2: Jump to Source with the Note window closed must reopen the Note window, focused.
+    func testG15_OpenRequestOpensTheClosedFeaturingWindow() throws {
+        try withFixture { try runG15_OpenRequestOpensTheClosedFeaturingWindow() }
+    }
+
+    private func runG15_OpenRequestOpensTheClosedFeaturingWindow() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()   // Create Extract writes a new extract
+        let noteWin = app.windows["Archive Notes"]
+        XCTAssertTrue(noteWin.waitForExistence(timeout: 10), "the Note window should exist")
+        let extractWin = app.windows["Extracts"]
+        closeExtractsWindow(extractWin)
+        XCTAssertFalse(extractWin.exists, "the Extracts window must start CLOSED for this check")
+
+        // --- Phase 1: ⌘⌥E with the Extracts window closed. ---
+        // Closing the Extracts window leaves no key window, and the selection seam types into a field —
+        // so front the Note window by name first (as G14 does).
+        frontWindow(named: "Archive Notes")
+        selectItem(uuid: Self.idPlain)
+        XCTAssertTrue(pollUntil(timeout: 10) { isKey(noteWin) },
+                      "the Note window should be key before the trigger")
+        let noteEditor = noteWin.textViews["an.editor.text"]
+        XCTAssertTrue(noteEditor.waitForExistence(timeout: 10), "the Note window's editor should exist")
+        XCTAssertTrue(pollUntil(timeout: 10) { !((noteEditor.value as? String) ?? "").isEmpty },
+                      "the note body should load before selecting text")
+        XCTAssertTrue(setEditorSelection(location: 0, length: 8, in: noteWin),
+                      "the DEBUG selection seam must be drivable")
+        app.activate()
+        app.typeKey("e", modifierFlags: [.command, .option])
+
+        XCTAssertTrue(extractWin.waitForExistence(timeout: 15),
+                      "Create Extract should OPEN the closed Extracts window (W9.b5-fu1)")
+        XCTAssertTrue(pollUntil(timeout: 15) { isKey(extractWin) },
+                      "the opened Extracts window should be key")
+        let extractEditor = extractWin.textViews["an.editor.text"]
+        let loaded = pollUntil(timeout: 15) { !((extractEditor.value as? String) ?? "").isEmpty }
+        XCTAssertTrue(loaded, "the opened Extracts window should have loaded the new extract")
+
+        // --- Phase 2: Jump to Source with the Note window closed. ---
+        // The Note window sits one pixel under the Extracts window, so front it before clicking its
+        // close button (the generic close-button helper works for either window).
+        frontWindow(named: "Archive Notes")
+        XCTAssertTrue(pollUntil(timeout: 10) { isKey(noteWin) }, "the Note window should be fronted to close it")
+        closeExtractsWindow(noteWin)
+        XCTAssertFalse(noteWin.exists, "the Note window must be CLOSED before the jump")
+        XCTAssertTrue(clickStripButton("an.editor.test.jump", timeout: 10, in: extractWin),
+                      "the jump seam must be drivable in the Extracts window")
+        XCTAssertTrue(noteWin.waitForExistence(timeout: 15),
+                      "Jump to Source should REOPEN the closed Note window (W9.b5-fu1)")
+        XCTAssertTrue(pollUntil(timeout: 15) { isKey(noteWin) },
+                      "the reopened Note window should be key")
+        XCTAssertTrue(pollUntil(timeout: 15) { !((noteWin.textViews["an.editor.text"].value as? String) ?? "").isEmpty },
+                      "the reopened Note window should have loaded the source note")
+
+        closeExtractsWindow(extractWin)
+    }
+
     // MARK: - G12/G13/G14 helpers
 
     /// Is `win` the key window, per its own `an.status.keyWindow` probe? The probe publishes `key`/`notkey`
