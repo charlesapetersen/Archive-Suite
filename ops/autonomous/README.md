@@ -209,6 +209,16 @@ logs (the last two per worker, so an undercount), and heavy-lock waits, which `h
 `$STATE/heavy/waits.log` (start, seconds waited, command) whenever an entry had to wait — and minutes at each
 slot count. Proof: `tests/prove-measure-workers.sh` in the health gate (fixture state and a scratch repo).
 
+**Usage left unspent (W35.unspent).** `measure-workers.py --unspent` prints one line per subscription, which
+`status-digest.sh` shows as *Unspent*: the share of each five-hour window not spent over the last 24 h and
+7 days (100 − peak, or 0 for a window a session was cut by, weighted by the window's hours in the period), plus
+the weekly limit where a reading carries it — Codex's `secondary`; Claude's events carried none as of
+2026-10-07. Hours no window's reading covers are shown as "no reading", never folded into either side, and a
+window not yet reset is left out (it is not over). Claude reads this daemon's ledgers and Vision OCR's (same
+account; each ledger read by its header); a ledger window whose reset is a Codex window's ran under Codex and
+is counted there instead. Codex reads `~/.codex/sessions` rollouts (account-wide; ~1 s over a week's). Peaks
+are what sessions read, so use after a window's last reading is unseen and the unspent share is an upper bound.
+
 ## Install / run
 
 > **Renamed 2026-08-06 (owner):** this script was `arm.sh` and its verb was `arm`; it is now

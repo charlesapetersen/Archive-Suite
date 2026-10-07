@@ -334,6 +334,14 @@ fi
 [ -n "$lastsubj" ] && printf '  %-10s %s%s%s\n' "" "$DIM" "\"$lastsubj\"" "$OFF"
 printf '  %-10s %s to do · %s finished\n' "Left" "$(plural "$open_todo" task)" "$done_todo"
 printf '  %-10s %s\n' "Health" "$HEALTH"
+# W35.unspent: usage left unspent per subscription — the before/after for a larger plan. One parser, in
+# measure-workers.py; read-only like the rest of this file, and silent if it fails.
+unspent_lines="$(python3 "$HERE/measure-workers.py" --state "$STATE" --unspent 2>/dev/null)" || unspent_lines=""
+first=1
+while IFS= read -r l; do
+  [ -n "$l" ] || continue
+  printf '  %-10s %s\n' "$( [ "$first" = 1 ] && echo Unspent)" "$l"; first=0
+done <<< "$unspent_lines"
 
 if [ -n "$needs" ]; then
   printf '\n  %-10s%s\n' "Needs you" "$needs"

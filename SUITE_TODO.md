@@ -944,15 +944,6 @@ full usage window". Made the daemon's next work, ahead of everything else in the
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
 
-- [ ] **`W35.unspent` — a standing measure of usage left unspent [S]**
-  Owner, 2026-10-06: "We'll be moving up a tier in usage plans shortly so we should prepare for that in advance"
-  (the Claude plan). A before/after is needed to see whether the extra capacity is used. Add to `status-digest.sh` one
-  line per subscription: share of usage left unspent over the last 24 h and 7 days, from the five-hour peaks that
-  `measure-workers.py` already reads (Claude: session stream-json `rate_limit_event`s from both daemons' logs; Codex:
-  rollout `rate_limits`), and the WEEKLY limit where the readings carry it (Codex `secondary`; Claude's weekly window
-  if present). A window with no reading is reported as "no reading", never as spent or unspent. Reuse
-  measure-workers.py's parsing rather than a second parser. DONE WHEN the digest shows the line and a proof covers a
-  fully spent window, a 56%-peak window and a window with no reading.
 - [ ] **`W35.vm-mem` — measure the GUI VM at 6 GB instead of 8 [S]**
   Owner, 2026-10-06 (the plan upgrade means more workers; the Mac, 18 GB, is the limit). The Tart VM
   `archive-gui-runner` is set to 8192 MB and 4 CPUs and used all of it (about 8.2 GB, 6.4 GB compressed) on
