@@ -90,6 +90,29 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         check((state / "claims" / winners[0][0]).exists(), "wrong token cannot release another owner")
         for c in winners:
             release(c)
+        # Lane LISTS (efficiency plan round 1): sets conflict on intersection, suite on everything.
+        queue("- [ ] **A — notes and reader** (lane: notes, reader)", "- [ ] **B — reader** (lane: reader)",
+              "- [ ] **C — processor** (lane: processor)", "- [ ] **E — ops** (lane: ops)")
+        c = reserve("worker-1")
+        c2 = reserve("worker-2")
+        check(c[0] == "A" and c2[0] == "C", "a lane list skips an item sharing one of its lanes")
+        check(json.loads((state / "claims/A/owner.json").read_text())["lane"] == "notes,reader",
+              "a lane list is recorded as its sorted set")
+        resolver = subprocess.run(["bash", str(HERE / "next-queue-item.sh"), str(repo)], env=env,
+                                  capture_output=True, text=True)
+        check(resolver.returncode == 0 and "\tB\t" not in resolver.stdout and "ok\tE\t" in resolver.stdout,
+              "resolver hides the intersecting item and offers the disjoint one")
+        release(c); release(c2)
+        queue("- [ ] **A — unlabelled** ", "- [ ] **B — notes and reader** (lane: notes,reader)")
+        c = reserve("worker-1")
+        reserve("worker-2", expected=4)
+        check(c[0] == "A", "an unlabelled suite claim still blocks a lane list")
+        release(c)
+        queue("- [ ] **B — notes and reader** (lane: notes,reader)", "- [ ] **A — unlabelled**")
+        c = reserve("worker-1")
+        reserve("worker-2", expected=4)
+        check(c[0] == "B", "a lane-list claim still blocks an unlabelled suite item")
+        release(c)
         queue("- [ ] **A — unlabelled suite edit**", "- [ ] **C — notes** (lane: notes)")
         c = reserve("worker-1")
         reserve("worker-2", expected=4)
@@ -289,13 +312,41 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
             pid = 999991; returncode = 0
             def __enter__(self): return self
             def __exit__(self, *args): pass
-            def communicate(self): return "999992 S\n", ""
+            def communicate(self): return "999992 999993 S\n", ""
         original_probe, original_sid = module.subprocess.Popen, module.os.getsid
         try:
             module.subprocess.Popen = lambda *args, **kwargs: Snapshot()
             def gone(pid): raise ProcessLookupError()
             module.os.getsid = gone
             check(module.session_live({"sid": 999990}), "fork/exit between ps and session lookup retains claim for a fresh scan")
+            # A machine-wide exit is not a session member: the next snapshot decides.
+            scans = []
+            class Churn(Snapshot):
+                def communicate(self):
+                    scans.append(1)
+                    return ("999992 999993 S\n" if len(scans) == 1 else "999994 999994 S\n"), ""
+            module.subprocess.Popen = lambda *args, **kwargs: Churn()
+            module.os.getsid = lambda pid: 1 if pid == 999994 else gone(pid)
+            check(not module.session_live({"sid": 999990}) and len(scans) == 2,
+                  "one vanished unrelated process costs a rescan, not a refused release")
+            # A vanished process whose live group leader is in another session is resolved at once.
+            scans.clear()
+            module.subprocess.Popen = lambda *args, **kwargs: Snapshot()
+            module.os.getsid = lambda pid: 1 if pid == 999993 else gone(pid)
+            check(not module.session_live({"sid": 999990}) and not scans,
+                  "a vanished process is placed by its live group leader")
+            module.os.getsid = lambda pid: 999990 if pid == 999993 else gone(pid)
+            check(module.session_live({"sid": 999990}),
+                  "a vanished process whose group leader is in the session keeps the claim")
+            scans.clear()
+            class Member(Snapshot):
+                def communicate(self):
+                    scans.append(1)
+                    return "999992 999990 S\n", ""
+            module.subprocess.Popen = lambda *args, **kwargs: Member()
+            module.os.getsid = gone
+            check(module.session_live({"sid": 999990}) and len(scans) == 1,
+                  "a vanished process in the session's own group is a member at once, without rescans")
         finally:
             module.subprocess.Popen, module.os.getsid = original_probe, original_sid
         queue("- [ ] **A — uncertain termination**")

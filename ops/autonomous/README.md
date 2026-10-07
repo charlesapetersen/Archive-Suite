@@ -123,8 +123,13 @@ the CLI and its protected descendants finish or expire as confirmed dead. A vict
 its escaped session can be identified requires inspection: the claim is preserved and the daemon parks
 instead of retrying forever or letting upkeep touch an ambiguous worktree.
 
-The resolver hides claimed tags and conflicting `(lane: reader|notes|processor|suite)` items. An unlabelled
-item uses `suite`, which conflicts with every lane. A doc-budget fix, gate fix or paced review takes a suite
+The resolver hides claimed tags and conflicting `(lane: …)` items. A lane names the files an item may edit:
+`reader`, `notes`, `processor` (each app's tree), `core` (reads ArchiveCore without editing it), `segbench`
+(the segmentation bench), `ops` (ops/autonomous), `gui` (ops/gui and the VM runner), `docs` (verification and
+plan documents), or `suite`. A list `(lane: notes,reader)` is a set: two items conflict when their sets share a
+lane. An unlabelled item uses `suite`, which conflicts with every lane, and anything that edits `packages/`,
+`SPEC/` or code several apps share stays `suite`. Every open item in the plan and SUITE_TODO carries a lane
+(efficiency plan, 2026-10-07: until then every item was `suite`, so two workers never overlapped). A doc-budget fix, gate fix or paced review takes a suite
 claim instead of a normal queue item. Housekeeping, tidy and every compaction call hold the coordinator lock
 through their entire operation and defer when any worker is in flight. Their children inherit the locks;
 compaction also holds the stable plan lock, so a coordinator crash does not unlock ongoing mutations.
@@ -154,7 +159,7 @@ Parallel mode uses a single, kernel-locked supervisor and one-cycle workers. Eac
 `worker-N/` engine lock, stream, last answer, usage reading/ledger and retry counters. Root session
 and usage paths retain the worker-1 view, preserving regular legacy files before making aliases.
 `daemon.sh status` and STATUS.md list each worker's subscription, claimed item, pause or stopped state.
-Worker IDs are independent of an item's `(lane: reader|notes|processor|suite)` conflict territory.
+Worker IDs are independent of an item's `(lane: …)` conflict territory.
 Unlabelled items remain suite-wide claims, so extra slots do not bypass file-conflict safety.
 
 Starts are globally staggered by at least 60 seconds, including replacements and delayed worker

@@ -94,7 +94,9 @@ After that, "Continue" is enough to resume after an interruption.
 A follow-up you discover gets a `[ ]` entry in `SUITE_TODO.md` **and** a one-line mirror in the plan's
 `## WORK QUEUE`, in the same commit, with the tag byte-identical in both. An item that is not in the plan does
 not exist for the daemon. If the follow-up must wait for another item, write `(blocked-on: <TAG>)` on it;
-the resolver reads that tag and cannot read prose.
+the resolver reads that tag and cannot read prose. Give it a `(lane: …)` on its first line, the same in both
+files (`ops/autonomous/README.md` §W35.claims lists the lanes); an item with none is `suite` and blocks every
+other worker while it runs.
 
 ## When to stop
 

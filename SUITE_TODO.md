@@ -420,7 +420,7 @@ in this repo, and both predate the W16.cfg* rewrite of the same files.
 
 ### Follow-ups discovered while fixing Wave 23
 
-- [ ] **W23.m4-fu — a page-specific reveal opens a NEW window per page instead of navigating an open one
+- [ ] **W23.m4-fu — a page-specific reveal opens a NEW window per page instead of navigating an open one (lane: reader)
   [S · LOW · UX] — ⛔ DO NOT IMPLEMENT UNPROMPTED: the owner chose to KEEP the current behaviour.**
   ⚠️ **This item is filed as the REVERSAL of a decision, not as work.** It is contingent on a judgement only the
   owner can make — *"implement it only if window sprawl becomes a real annoyance"* <!-- policy-ok: this IS the gated item, parked in the plan's HOLD QUEUE as owner judgement --> — so a session must NOT pick
@@ -463,7 +463,7 @@ W13.cli-1…4 is COMPLETE; only the keyed/owner tail below remains):
   the current GPT-5 generation (gpt-5-nano/-mini/5.4-mini/5.4/5.5) priced per the owner-provided SoCOCRbench
   source; the live-key smoke remains the final ID confirmation, but nothing is blocked on it: the provider is
   additive + opt-in.)_
-- [ ] **W13.cli Phase 0 — install `gemini` + `codex` CLIs and confirm entitlements (owner).** Was buried in a
+- [ ] **W13.cli Phase 0 — install `gemini` + `codex` CLIs and confirm entitlements (owner).** (lane: ops) Was buried in a
   prose note with no checkbox, so nothing ever tracked it (owner asked for it to be a real item, 2026-07-16).
   ⏸ **PARKED by the owner 2026-08-13** — *"Park the gemini and codex CLI for now."* Neither CLI is installed on
   the machine (`command -v gemini` / `codex` → nothing; `claude` is at `~/.local/bin/claude`). **Nothing is
@@ -762,7 +762,7 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W22.mixed-batch-fu2 — price direct PDF pages separately in mixed batch estimates [S-M].** In a mixed Batch run, `performMultiPagePDFReOCR` calls the model directly once per PDF page, while `RunHistorySnapshot.estimatedCost` applies discounted batch pricing to the full file count; the pre-run pane also lacks PDF page accounting. Show the image-subset batch estimate plus direct PDF-page estimate consistently before the run and in history. Found in W22.mixed-batch Tier-2 review (2026-09-26), `RunHistorySnapshot.estimatedCost` / `performMultiPagePDFReOCR`. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProcessingHistory.swift, Views/OCRView.swift | S-M | low | none
+- [ ] **W22.mixed-batch-fu2 — price direct PDF pages separately in mixed batch estimates [S-M].** (lane: processor) In a mixed Batch run, `performMultiPagePDFReOCR` calls the model directly once per PDF page, while `RunHistorySnapshot.estimatedCost` applies discounted batch pricing to the full file count; the pre-run pane also lacks PDF page accounting. Show the image-subset batch estimate plus direct PDF-page estimate consistently before the run and in history. Found in W22.mixed-batch Tier-2 review (2026-09-26), `RunHistorySnapshot.estimatedCost` / `performMultiPagePDFReOCR`. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProcessingHistory.swift, Views/OCRView.swift | S-M | low | none
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
@@ -783,7 +783,7 @@ launch safeguards; the gate rotates one route per run.
 >   now* — and stops being free the moment 7.5 GB of real research lands in it. Importing into a shape that
 >   later changes means doing the import twice.
 
-- [ ] **Import the personal DEVONthink database into Archive Notes** ⏸ **ON HOLD (owner, 2026-08-01 — see the
+- [ ] **Import the personal DEVONthink database into Archive Notes** (lane: notes) ⏸ **ON HOLD (owner, 2026-08-01 — see the
   block above; plans retained, do not progress)** — plan
   `execution-plans/devonthink-import.md` (PLANNING). Losslessly migrate the owner's ~7.5 GB DEVONthink 3
   "Meritocracy Project" DB (`~/Desktop/Scholarship/1000 Research Database.dtBase2`; ~40k notes+excerpts) into
@@ -857,13 +857,13 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
 ✅ **`W9.e1` (plan E1) shipped 2026-10-06** — the per-item result is in the plan under *E1 result*; the
 completion record is in `SUITE_TODO_DONE.md`.
 
-- [ ] **`W9.w21-red` — `testW21_CrossWindowPassageChipReStylesAfterSourceTrash` is RED on main [S · gui]**
+- [ ] **`W9.w21-red` — `testW21_CrossWindowPassageChipReStylesAfterSourceTrash` is RED on main [S · gui]** (lane: notes)
   Found 2026-10-06 while VM-verifying `W9.b5-fu1`; reproduced ALONE on a pristine `origin/main` (`e8f12f8`)
   checkout, so it is not that change. Fails at `NotesGUITests.swift:1377`: after trashing the cited note, the
   open Extracts editor's chip still reports `missing: 0` (label "Moore on Intel culture — 1968", id
   `22222222-…`). Either the W14.4c cross-window re-style regressed or the probe/fixture drifted — find which
   before touching the product. | ArchiveNotes | S | med | none
-- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]** SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080.
+- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]** (lane: notes) SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080.
   (blocked-on: W9.e1, W9.b5-fu1). Plan E2 — also settle the two D1 doubts E1 could not decide from source:
   whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents
   a folder back to top level. Plan E2 — and the 2026-07-18 addendum's own unfinished business: note delete +
@@ -874,15 +874,15 @@ completion record is in `SUITE_TODO_DONE.md`.
   Verification note 2026-10-04 (baseline `1ed3e5e`): `NotesGUITests.runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`
   removes the Reader fixture note that `setUpOnMainActor` requires on every launch. Run destructive checks
   last or against a separately rebuilt fixture; prove the remaining UI checks actually execute.
-- [ ] **`W9.e3` — prove the safety net actually bites on a planted violation [S]** (blocked-on: W9.c2, W9.c3).
+- [ ] **`W9.e3` — prove the safety net actually bites on a planted violation [S]** (lane: notes) (blocked-on: W9.c2, W9.c3).
   Plan E3. A lint that has never failed is not a guard — same class as `W26.oracle-fu1`. | scripts/ | S | low | none
-- [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (blocked-on: W9.e1,
+- [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (lane: notes) (blocked-on: W9.e1,
   W9.e2, W9.e3, W9.b5-fu1). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
   convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
 
 ## Cross-app date display — owner-promoted 2026-09-26
 
-- [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.**
+- [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.** (lane: suite)
   Owner direction (2026-07-31 Daemon Report, in response to the W23.l4 `Calendar` deviation); owner promoted
   it from the deferred ideas list into the active work queue 2026-09-26. Two halves:
   (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
@@ -905,10 +905,10 @@ on the owner's five ground-truth boxes, scored by the share of pages that land i
 the owner's decision, then a build only if the result is usable. `W40.a1` waits on `W36.seg-decision`. Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
-- [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (lane: segbench) (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (lane: segbench) (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
   - 2026-10-05, checkpoint 1 of 2 (commit "feat(segmentation): W36.seg-features (checkpoint 1/2)"): a numpy logistic regression on 26 per-boundary features (OCR rule cues, TF-IDF cosine, length, blank, paper colour, ink, aspect/orientation, and the capture-time gap as one feature) in `scripts/segbench/features.py` + `method_features.py`, leave-one-collection-out on Dean/Deaver/Herrnstein, methods `features-lr` and `features-lr-notime`, tests in `test_features.py`. Dev pooled pages in an exact document 59.3% with the time gap, 52.5% without; Dean and Herrnstein 72-83%, Deaver (clippings) 0-10% because the letter cues it learns do not occur there. Detail: `segbench-results/features-lr-report.md`. Remaining for checkpoint 2: embedding features (a SigLIP/CLIP image embedding and a small text embedder, through MLX), then re-run.
-- [ ] **`W36.seg-corpus-survey` — can the owner's tagged corpus train a segmentation model? Read-only survey [S-M]** (blocked-on: W36.seg-base).
+- [ ] **`W36.seg-corpus-survey` — can the owner's tagged corpus train a segmentation model? Read-only survey [S-M]** (lane: segbench) (blocked-on: W36.seg-base).
   Owner, 2026-10-06: "if we want to try training a small model on thousands of segmented documents, the already tagged
   documents in the Archival Photos PDF folder could work. There will be mistakes and non-standardized tagging. But
   perhaps it's close enough, given the scale." Then: "Add to the queue." What an interactive look found the same day:
@@ -931,9 +931,9 @@ OWNER sit in the plan's HOLD QUEUE.
   `W36.seg-report`'s training-data option, i.e. whether a fine-tuned on-device model is worth costing at the decision.
   DONE WHEN the survey table and the review pack exist and the owner has been asked for the noise sample.
   Detail: `execution-plans/segmentation/00-plan.md` Part 2.
-- [ ] **`W36.seg-ensemble` — agreement plus review: risk-coverage, then the test collections once [S-M]** (blocked-on: W36.seg-window, W36.seg-second, W36.seg-whole, W36.seg-features, W36.seg-localvlm, W36.seg-truth-owner-ok). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
-- [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (blocked-on: W36.seg-ensemble, W36.seg-corpus-survey). Include an overnight option (owner, 2026-10-05: "we may want to include an option for models that can basically only be used overnight when the computer is in limited use otherwise"): for each on-device method, its time and memory per 1,000 pages and whether it is usable only as an overnight run on a Mac left alone, put to the owner beside the cloud options at the decision. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
-- [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-ensemble` — agreement plus review: risk-coverage, then the test collections once [S-M]** (lane: segbench) (blocked-on: W36.seg-window, W36.seg-second, W36.seg-whole, W36.seg-features, W36.seg-localvlm, W36.seg-truth-owner-ok). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (lane: segbench) (blocked-on: W36.seg-ensemble, W36.seg-corpus-survey). Include an overnight option (owner, 2026-10-05: "we may want to include an option for models that can basically only be used overnight when the computer is in limited use otherwise"): for each on-device method, its time and memory per 1,000 pages and whether it is usable only as an overnight run on a Mac left alone, put to the owner beside the cloud options at the decision. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (lane: segbench) (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
@@ -943,7 +943,7 @@ full usage window". Made the daemon's next work, ahead of everything else in the
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
 
-- [ ] **`W35.vm-mem-fu1` — Notes UITests are red in the GUI VM (21 of 31), and `vm-gui-runner.sh` exits 0 anyway [S-M]**
+- [ ] **`W35.vm-mem-fu1` — Notes UITests are red in the GUI VM (21 of 31), and `vm-gui-runner.sh` exits 0 anyway [S-M]** (lane: notes,gui)
   Found by W35.vm-mem, 2026-10-07: every one of six `vm-gui-runner.sh notes xcuitest` runs, at 8192 MB and at
   6144 MB alike, ended `** TEST FAILED **` with 21–22 failures; 17 of the 21 are `a seeded note row should populate
   the list`, the rest G13/G16/G17/`testDateRowWarns…` (evidence: `~/.tart-mirror/vm-mem-measure/notes-*.log`,
@@ -952,7 +952,7 @@ staggered starts, the subscription policy) and the design are in the plan.
   add the pass/fail to `ops/gui/README.md`'s memory table. Also: the interactive runner printed only a WARN and
   exited 0 on `** TEST FAILED **`, so a script wrapping it saw success; make it exit non-zero on a failed
   test run (check the gate's own `TEST FAILED` handling is unchanged and still covers Notes in its rotation).
-- [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok, agent-manager-plan-ok) HELD 2026-10-07: the owner is reviewing a machine-wide Agent Manager (`~/Claude/Agent Manager/PLAN.md`) that would own worker counts across projects.
+- [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (lane: ops) (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok, agent-manager-plan-ok) HELD 2026-10-07: the owner is reviewing a machine-wide Agent Manager (`~/Claude/Agent Manager/PLAN.md`) that would own worker counts across projects.
   Owner, 2026-10-06, preparing for the larger Claude plan.
   The supervisor and `daemon.sh --workers` accept 1 or 2 per lane. Allow 3, still sized by `W35.pace` from the usage
   readings (a third slot only when used is well under elapsed), and gated on the machine: no third worker while
@@ -968,52 +968,52 @@ Order lives in the plan's `### TIER 7` block. The owner approved it on 2026-10-0
 never auto-picked; an `-owner-ok` line ticked `DECLINED` sends its dependant to the fallback in rule 11 of the
 daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>` with a severity (rule 8).
 
-- [ ] **`W40.a1` — health gate green at HEAD, and run at hand-off [M]** (blocked-on: W40-owner-ok, W9.cand2, W9.e4, W12.dedup-fu1, W22.mixed-batch-fu2, W24.cal1, W36.seg-decision, W37.dual-date). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
-- [ ] **`W40.a2` — the gate runs ArchiveCore's tests [S]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
-- [ ] **`W40.a3` — every lane green in full, in any order [M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
-- [ ] **`W40.a4` — remove tests that cannot fail [S]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
-- [ ] **`W40.a5` — test drivers out of the Processor Release build [S · Tier-2]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
-- [ ] **`W40.i1` — iPhone companion builds again [S-M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i2` — iPhone companion parity with Android [M]** (blocked-on: W40.i1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i5` — borrowed-iPhone session pack [S]** (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i4` — real-iPhone pass on a borrowed phone — OWNER** (blocked-on: W40.i5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
-- [ ] **`W40.b0` — ledger format, verification/README.md [S]** (blocked-on: W40.a1, W40.a4). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
-- [ ] **`W40.b1` — Reader feature ledger [M]** (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
-- [ ] **`W40.b2` — Notes feature ledger [M]** (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
-- [ ] **`W40.b3` — Processor feature ledger [M]** (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
-- [ ] **`W40.b4` — capture feature ledger, Android and iOS [S]** (blocked-on: W40.b0, W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
-- [ ] **`W40.b5` — correct the doc drift the ledgers found [S-M]** (blocked-on: W40.b1, W40.b2, W40.b3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
-- [ ] **`W40.c1` — Processor and Notes rehearsal sets [S-M]** (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
-- [ ] **`W40.c2` — Reader rehearsal sample copied from the real corpus [S]** (blocked-on: W40.c2-owner-ok, W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
-- [ ] **`W40.d1` — bulk OCR on a ground-truth collection [M]** (blocked-on: W40.b3, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d2` — Processor review dialogs driven by hand [M]** (blocked-on: W40.d1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d3` — every OCR provider through the app's own client [S-M]** (blocked-on: W40.b3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d4` — one tiny real batch job per batch provider [S-M]** (blocked-on: W40.d3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d5` — live capture with hand-driven review [M]** (blocked-on: W40.b4, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d6` — is the USB transport reachable [S]** (blocked-on: W40.b4). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d7` — Reader at corpus size [M]** (blocked-on: W40.b1, W40.c2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d8` — Reader triage writes, checked per step [M]** (blocked-on: W40.b1, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d9` — Notes writing session with real keystrokes [M]** (blocked-on: W40.b2, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d10` — Notes with real Zotero, real Reader and real links [M]** (blocked-on: W40.b2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d11` — the shared tag contract across apps [S-M]** (blocked-on: W40.d1, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.e1` — Thread and Address Sanitizer runs [M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e2` — crash, hang and leak harvest from VM runs [S-M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e3` — accessibility audit of every main screen [S-M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e4` — never-executed code from coverage [M]** (blocked-on: W40.d1, W40.d8, W40.d9). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e5` — dead-code scan [S-M]** (blocked-on: W40.b5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e6` — parser robustness: fuzz loops and round-trip properties [M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e7` — mutation sample on the irreversible paths [M]** (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e8` — Android screen tests without an emulator [M]** (blocked-on: W40.e8-owner-ok, W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.f1` — Reader undo durability and the missing audit ledger [S]** (blocked-on: W40.b1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
-- [ ] **`W40.f2` — the Reader's undisclosed root-marker write [S]** (blocked-on: W40.b1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
-- [ ] **`W40.g1` — Reader guided-session pack [S]** (blocked-on: W40.d7, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
-- [ ] **`W40.g2` — Notes guided-session pack [S]** (blocked-on: W40.d9, W40.d10). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
-- [ ] **`W40.g3` — Processor and capture guided-session pack [S]** (blocked-on: W40.d1, W40.d2, W40.d5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
-- [ ] **`W40.g-sessions` — owner runs the guided sessions — OWNER** (blocked-on: W40.g1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
-- [ ] **`W40.h2` — re-run every journey at HEAD [M]** (blocked-on: W40.d1, W40.d2, W40.d3, W40.d4, W40.d5, W40.d6, W40.d7, W40.d8, W40.d9, W40.d10, W40.d11, W40.e1, W40.e2, W40.e3, W40.e4, W40.e5, W40.e6, W40.e7, W40.f1, W40.f2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §H.
-- [ ] **`W40.h3` — release candidate — OWNER (Tier-3)** (blocked-on: W40.h2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
-- [ ] **`W40.h4` — owner acceptance pass with the ledgers — OWNER** (blocked-on: W40.h3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
+- [ ] **`W40.a1` — health gate green at HEAD, and run at hand-off [M]** (lane: suite) (blocked-on: W40-owner-ok, W9.cand2, W9.e4, W12.dedup-fu1, W22.mixed-batch-fu2, W24.cal1, W36.seg-decision, W37.dual-date). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.a2` — the gate runs ArchiveCore's tests [S]** (lane: ops,core) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.a3` — every lane green in full, in any order [M]** (lane: suite) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.a4` — remove tests that cannot fail [S]** (lane: reader,notes,processor) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.a5` — test drivers out of the Processor Release build [S · Tier-2]** (lane: processor) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.i1` — iPhone companion builds again [S-M]** (lane: processor,ops) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i2` — iPhone companion parity with Android [M]** (lane: processor) (blocked-on: W40.i1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (lane: processor) (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i5` — borrowed-iPhone session pack [S]** (lane: docs) (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i4` — real-iPhone pass on a borrowed phone — OWNER** (lane: processor) (blocked-on: W40.i5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
+- [ ] **`W40.b0` — ledger format, verification/README.md [S]** (lane: docs) (blocked-on: W40.a1, W40.a4). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.b1` — Reader feature ledger [M]** (lane: reader) (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.b2` — Notes feature ledger [M]** (lane: notes) (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.b3` — Processor feature ledger [M]** (lane: processor) (blocked-on: W40.b0). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.b4` — capture feature ledger, Android and iOS [S]** (lane: processor) (blocked-on: W40.b0, W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.b5` — correct the doc drift the ledgers found [S-M]** (lane: reader,notes,processor) (blocked-on: W40.b1, W40.b2, W40.b3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.c1` — Processor and Notes rehearsal sets [S-M]** (lane: processor,notes) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
+- [ ] **`W40.c2` — Reader rehearsal sample copied from the real corpus [S]** (lane: reader) (blocked-on: W40.c2-owner-ok, W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
+- [ ] **`W40.d1` — bulk OCR on a ground-truth collection [M]** (lane: processor) (blocked-on: W40.b3, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d2` — Processor review dialogs driven by hand [M]** (lane: processor) (blocked-on: W40.d1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d3` — every OCR provider through the app's own client [S-M]** (lane: processor) (blocked-on: W40.b3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d4` — one tiny real batch job per batch provider [S-M]** (lane: processor) (blocked-on: W40.d3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d5` — live capture with hand-driven review [M]** (lane: processor) (blocked-on: W40.b4, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d6` — is the USB transport reachable [S]** (lane: processor) (blocked-on: W40.b4). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d7` — Reader at corpus size [M]** (lane: reader) (blocked-on: W40.b1, W40.c2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d8` — Reader triage writes, checked per step [M]** (lane: reader) (blocked-on: W40.b1, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d9` — Notes writing session with real keystrokes [M]** (lane: notes) (blocked-on: W40.b2, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d10` — Notes with real Zotero, real Reader and real links [M]** (lane: notes,reader) (blocked-on: W40.b2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d11` — the shared tag contract across apps [S-M]** (lane: suite) (blocked-on: W40.d1, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.e1` — Thread and Address Sanitizer runs [M]** (lane: suite) (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e2` — crash, hang and leak harvest from VM runs [S-M]** (lane: gui) (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e3` — accessibility audit of every main screen [S-M]** (lane: reader,notes,processor) (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e4` — never-executed code from coverage [M]** (lane: reader,notes,processor) (blocked-on: W40.d1, W40.d8, W40.d9). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e5` — dead-code scan [S-M]** (lane: suite) (blocked-on: W40.b5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e6` — parser robustness: fuzz loops and round-trip properties [M]** (lane: suite) (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e7` — mutation sample on the irreversible paths [M]** (lane: suite) (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e8` — Android screen tests without an emulator [M]** (lane: processor) (blocked-on: W40.e8-owner-ok, W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.f1` — Reader undo durability and the missing audit ledger [S]** (lane: reader) (blocked-on: W40.b1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
+- [ ] **`W40.f2` — the Reader's undisclosed root-marker write [S]** (lane: reader) (blocked-on: W40.b1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
+- [ ] **`W40.g1` — Reader guided-session pack [S]** (lane: reader) (blocked-on: W40.d7, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
+- [ ] **`W40.g2` — Notes guided-session pack [S]** (lane: notes) (blocked-on: W40.d9, W40.d10). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
+- [ ] **`W40.g3` — Processor and capture guided-session pack [S]** (lane: processor) (blocked-on: W40.d1, W40.d2, W40.d5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
+- [ ] **`W40.g-sessions` — owner runs the guided sessions — OWNER** (lane: suite) (blocked-on: W40.g1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
+- [ ] **`W40.h2` — re-run every journey at HEAD [M]** (lane: suite) (blocked-on: W40.d1, W40.d2, W40.d3, W40.d4, W40.d5, W40.d6, W40.d7, W40.d8, W40.d9, W40.d10, W40.d11, W40.e1, W40.e2, W40.e3, W40.e4, W40.e5, W40.e6, W40.e7, W40.f1, W40.f2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §H.
+- [ ] **`W40.h3` — release candidate — OWNER (Tier-3)** (lane: suite) (blocked-on: W40.h2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
+- [ ] **`W40.h4` — owner acceptance pass with the ledgers — OWNER** (lane: suite) (blocked-on: W40.h3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 
 ## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
 All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
@@ -1030,7 +1030,7 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 (cross-app + SPEC). Legend as above (S/M/L · risk · needs).
 
 ### Archive Processor
-- [ ] **W12.dedup-fu1 — Anthropic collection-name requests exceed their output ceiling [S, Tier-1].** Baseline `07c0c1c`; `LLMTextClient.callAnthropic` and `CollectionSegmenter.segment`. With direct Anthropic and Low/High thinking selected, collection-name extraction or clustering sends `max_tokens: 256` alongside `budget_tokens: 1024/4000`; Anthropic requires the latter to be smaller. Preserve the 256-token visible-answer allowance by raising the total ceiling when thinking is enabled, or explicitly omit thinking for these short calls. Verify both request shapes with a key-free request-body check and a scratch collection run before closing. Tag/date paths already pass `nil` thinking in their main flow; keep them unchanged. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMTextClient.swift,Tagging/CollectionSegmenter.swift} | S | low | none
+- [ ] **W12.dedup-fu1 — Anthropic collection-name requests exceed their output ceiling [S, Tier-1].** (lane: processor) Baseline `07c0c1c`; `LLMTextClient.callAnthropic` and `CollectionSegmenter.segment`. With direct Anthropic and Low/High thinking selected, collection-name extraction or clustering sends `max_tokens: 256` alongside `budget_tokens: 1024/4000`; Anthropic requires the latter to be smaller. Preserve the 256-token visible-answer allowance by raising the total ceiling when thinking is enabled, or explicitly omit thinking for these short calls. Verify both request shapes with a key-free request-body check and a scratch collection run before closing. Tag/date paths already pass `nil` thinking in their main flow; keep them unchanged. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMTextClient.swift,Tagging/CollectionSegmenter.swift} | S | low | none
 ### Capture companions (Android + iOS) — owner decisions 2026-07-15
 ### Archive Reader — layout & panels
 ### Archive Reader — tag cloud & filters

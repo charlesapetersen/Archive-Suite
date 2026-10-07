@@ -46,29 +46,55 @@ def session_live(record):
     sessions = {member["sid"] for member in record.get("protected", []) if member.get("sid")}
     if record.get("sid"):
         sessions.add(record["sid"])
-    if sessions:
-        with subprocess.Popen(["ps", "-ax", "-o", "pid=,stat="], stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, text=True) as probe:
-            stdout, stderr = probe.communicate()
-            probe_pid = probe.pid
-        if probe.returncode != 0 or stderr.strip():
-            raise RuntimeError("cannot inspect session process group")
-        # A separate OS session prevents unrelated processes joining the group.
-        for line in stdout.splitlines():
-            fields = line.split()
-            if len(fields) == 2 and "Z" not in fields[1]:
-                pid = int(fields[0])
-                if pid in (probe_pid, os.getpid()):
-                    continue  # our owned probe necessarily exits before this scan
-                try:
-                    if os.getsid(pid) in sessions:
-                        return True
-                except ProcessLookupError:
-                    # It may have forked a same-session successor after ps took
-                    # its snapshot. Retain once; the next release takes a new scan.
-                    return True
+    if not sessions:
         return False
-    return False
+    # A process that exits between the ps snapshot and getsid() has an unknown
+    # session: it may have forked a same-session successor the snapshot missed.
+    # That successor is visible to a fresh snapshot, so rescan rather than
+    # retaining the claim on any machine-wide exit (the cause of most refused
+    # releases on a busy Mac, 6-7 Oct 2026). Still unknown after three scans:
+    # retain, as before.
+    for _ in range(3):
+        member, unknown = session_scan(sessions)
+        if member:
+            return True
+        if not unknown:
+            return False
+    return True
+
+
+def session_scan(sessions):
+    """(a live member was seen, some process vanished before its session was read)."""
+    with subprocess.Popen(["ps", "-ax", "-o", "pid=,pgid=,stat="], stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, text=True) as probe:
+        stdout, stderr = probe.communicate()
+        probe_pid = probe.pid
+    if probe.returncode != 0 or stderr.strip():
+        raise RuntimeError("cannot inspect session process group")
+    unknown = False
+    # A separate OS session prevents unrelated processes joining the group.
+    for line in stdout.splitlines():
+        fields = line.split()
+        if len(fields) == 3 and "Z" not in fields[2]:
+            pid, pgid = int(fields[0]), int(fields[1])
+            if pid in (probe_pid, os.getpid()):
+                continue  # our owned probe necessarily exits before this scan
+            try:
+                if os.getsid(pid) in sessions:
+                    return True, False
+            except ProcessLookupError:
+                # A process group never spans sessions: a live group leader
+                # still names the vanished process's session.
+                if pgid in sessions:
+                    return True, False
+                try:
+                    if pgid <= 0:
+                        raise ProcessLookupError(pgid)  # getsid(0) would name OUR session
+                    if os.getsid(pgid) in sessions:
+                        return True, False
+                except OSError:
+                    unknown = True
+    return False, unknown
 
 
 @contextlib.contextmanager
@@ -91,8 +117,9 @@ def write_record(path, value):
 def validate_record(record, tag):
     if not isinstance(record, dict) or record.get("tag") != tag:
         raise ValueError("claim tag does not match directory")
-    for field in ("worker", "lane"):
-        valid(record.get(field, ""))
+    valid(record.get("worker", ""))
+    for lane in str(record.get("lane", "")).split(","):
+        valid(lane)
     if type(record.get("pid")) is not int or record["pid"] <= 0 or not isinstance(record.get("pid_start"), str) or not record["pid_start"]:
         raise ValueError("missing claim owner identity")
     if not isinstance(record.get("token"), str) or not re.fullmatch(r"[a-f0-9]{32}", record["token"]):
@@ -161,6 +188,21 @@ def claims(state, stale):
             continue
         result.append((entry, record))
     return result
+
+
+LANE_RE = re.compile(r"\(lane:\s*([A-Za-z0-9._-]+(?:\s*,\s*[A-Za-z0-9._-]+)*)\s*\)")
+
+
+def lanes(text):
+    """An item's conflict territory: `(lane: a,b)` is a set; no tag means `suite`."""
+    m = LANE_RE.search(text)
+    return frozenset(x.strip() for x in m[1].split(",")) if m else frozenset(["suite"])
+
+
+def conflicts(mine, record):
+    """`suite` conflicts with every lane; other lane sets conflict when they intersect."""
+    theirs = frozenset(str(record.get("lane", "suite")).split(","))
+    return "suite" in mine or "suite" in theirs or bool(mine & theirs)
 
 
 def valid(value):
@@ -253,10 +295,8 @@ def main():
                 if len(fields) != 3:
                     raise ValueError("malformed resolver row")
                 status, tag, text = fields
-                lane_match = re.search(r"\(lane:\s*([A-Za-z0-9._-]+)\s*\)", text)
-                lane = lane_match[1] if lane_match else "suite"
-                if any(r.get("tag") == tag or lane == "suite" or r.get("lane", "suite") in ("suite", lane)
-                       for _, r in active):
+                lane = lanes(text)
+                if any(r.get("tag") == tag or conflicts(lane, r) for _, r in active):
                     continue
                 print(row)
             return 0
@@ -289,17 +329,15 @@ def main():
                 valid(tag)
                 if re.search(r"\[hold\]|needs:\s*owner", text, re.I):
                     continue
-                m = re.search(r"\(lane:\s*([A-Za-z0-9._-]+)\s*\)", text)
-                lane = m[1] if m else "suite"
-                if any(r.get("tag") == tag or lane == "suite" or r.get("lane", "suite") in ("suite", lane)
-                       for _, r in active):
+                lane = lanes(text)
+                if any(r.get("tag") == tag or conflicts(lane, r) for _, r in active):
                     continue
                 directory = state / "claims" / tag
                 directory.parent.mkdir(parents=True, exist_ok=True)
                 directory.mkdir()  # atomic claim; a pre-existing entry is never overwritten
                 token = uuid.uuid4().hex
                 record = dict(tag=tag, worker=args.worker, pid=args.pid, pid_start=start,
-                              lane=lane, subscription=env.get("AUTONOMOUS_SUBSCRIPTION", "unknown"), token=token, started=time.time(), text=text)
+                              lane=",".join(sorted(lane)), subscription=env.get("AUTONOMOUS_SUBSCRIPTION", "unknown"), token=token, started=time.time(), text=text)
                 write_record(directory / "owner.json", record)
                 print(tag + "\t" + token + "\t" + text)
                 return 0

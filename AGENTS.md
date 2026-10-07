@@ -53,7 +53,9 @@ touch, so these rules are not optional. Each one repairs something that actually
 3. **An item in `SUITE_TODO.md` is invisible to the daemon until it is mirrored into the plan's queue**, as a
    one-liner with the tag byte-identical. On 2026-08-13, 27 open items had no plan line, and attribution put
    every one in a commit in this project's own convention, not an external agent's. The omission happens at
-   filing time, so **whenever you FILE an item, mirror it in the same commit**, whoever you are.
+   filing time, so **whenever you FILE an item, mirror it in the same commit**, whoever you are, and give both
+   lines the same `(lane: …)` (lanes: `ops/autonomous/README.md` §W35.claims; untagged means `suite`, which
+   blocks every other worker).
 4. **Irreversible-path findings are gated by TIER-2, not by an owner signature** (lifted 2026-08-13; see
    §*Gating baseline*). Do not re-impose the old per-item rule. Existing grants in
    [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md) stay a record and their ⛔ constraints still bind.
