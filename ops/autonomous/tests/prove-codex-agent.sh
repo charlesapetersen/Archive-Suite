@@ -205,7 +205,7 @@ STUB
 chmod +x "$T/grant-stub"
 # held_reason() alone, sourced from the daemon: every answer the helper can give, and its fallback.
 held() { env HOME="$FIXTURE_HOME" AUTONOMOUS_REPO="$REPO" AUTONOMOUS_STATE="$STATE" AUTONOMOUS_AGENT=codex \
-           AUTONOMOUS_WORKER_ID=worker-2 AUTONOMOUS_GRANT_CMD="$1" AUTONOMOUS_YIELD_CMD="$2" \
+           AUTONOMOUS_WORKER_ID=worker-2 AUTONOMOUS_GRANT_CMD="$1" AUTONOMOUS_YIELD_CMD="$2" ${GT:+AUTONOMOUS_GRANT_TIMEOUT=$GT} \
            bash -c '. "$1" >/dev/null 2>&1; held_reason $2' _ "$DAEMON" "${3:-}"; }
 rm -f "$T/grant.calls" "$T/grant.rc"; touch "$T/grant.wait" "$T/yield.on"
 out="$(held "$T/grant-stub" "$T/yield-stub")"; rc=$?
@@ -247,6 +247,35 @@ UPKEEP=1 GRANT_CMD="$T/grant-stub" YIELD_CMD="$T/yield-stub" launch codex; sleep
 grep -q -- '--gate|' "$T/grant.calls" && ! grep -q -- '--agent' "$T/grant.calls" \
   && ok "upkeep asks with --gate only" || bad "upkeep argv: $(cat "$T/grant.calls" 2>/dev/null)"
 rm -f "$T/grant.wait"
+# Upkeep clears only the wait it recorded itself (2026-10-07 review, finding E). Its own hold above ends: logged
+# once and both files go. A lane wait the supervisor wrote to yield.reason is not upkeep's: a --gate grant leaves it.
+reset; UPKEEP=1 GRANT_CMD="$T/grant-stub" YIELD_CMD="$T/yield-stub" launch codex; sleep 3; stop "$P" || exit 1
+[ "$(grep -c 'yield over — no longer waiting: Claude' "$L")" = 1 ] && [ ! -f "$STATE/upkeep-yield.reason" ] && [ ! -f "$STATE/yield.reason" ] \
+  && ok "upkeep's own hold ending is logged once and cleared" || bad "upkeep hold end: $(grep -E 'yield' "$L") / $(ls "$STATE" | grep yield)"
+echo "Codex's five-hour window is 97% used (supervisor lane wait)" > "$STATE/yield.reason"
+reset; UPKEEP=1 GRANT_CMD="$T/grant-stub" YIELD_CMD="$T/yield-stub" launch codex; sleep 3; stop "$P" || exit 1
+grep -q 'yield over' "$L" && bad "upkeep's --gate grant logged a false yield over: $(grep 'yield over' "$L")" \
+  || ok "a --gate grant does not log a lane's wait as over"
+[ "$(cat "$STATE/yield.reason" 2>/dev/null)" = "Codex's five-hour window is 97% used (supervisor lane wait)" ] \
+  && ok "…and leaves the supervisor's yield.reason in place" || bad "upkeep deleted the supervisor's yield.reason"
+# Upkeep held, then the supervisor writes a lane wait over upkeep's words: upkeep's hold ending is logged, but the
+# lanes' yield.reason stays.
+touch "$T/grant.wait"; reset; UPKEEP=1 GRANT_CMD="$T/grant-stub" YIELD_CMD="$T/yield-stub" launch codex; sleep 3; stop "$P" || exit 1
+echo "Codex's five-hour window is 97% used (supervisor lane wait)" > "$STATE/yield.reason"; rm -f "$T/grant.wait"
+reset; UPKEEP=1 GRANT_CMD="$T/grant-stub" YIELD_CMD="$T/yield-stub" launch codex; sleep 3; stop "$P" || exit 1
+grep -q 'yield over — no longer waiting: Claude' "$L" && [ ! -f "$STATE/upkeep-yield.reason" ] \
+  && [ "$(cat "$STATE/yield.reason" 2>/dev/null)" = "Codex's five-hour window is 97% used (supervisor lane wait)" ] \
+  && ok "upkeep's hold ending keeps a lane wait the supervisor wrote since" || bad "upkeep hold end over a lane wait: $(grep yield "$L") / $(cat "$STATE/yield.reason" 2>/dev/null)"
+rm -f "$STATE/yield.reason"
+# A hung helper (finding H): the call is bounded by AUTONOMOUS_GRANT_TIMEOUT and yield-check.sh decides. The stub's
+# sleep is a child of its shell, so after the alarm kills the shell the sleep still holds whatever stdout it was given.
+printf '#!/bin/sh\nsleep 20\necho granted\n' > "$T/grant-hang"; chmod +x "$T/grant-hang"
+touch "$T/yield.on"; t0=$(date +%s)
+out="$(GT=2 held "$T/grant-hang" "$T/yield-stub")"; rc=$?; took=$(( $(date +%s) - t0 ))
+[ "$took" -le 6 ] && ok "a hung helper is cut off (${took}s, timeout 2s)" || bad "a hung helper held the caller ${took}s"
+[ "$rc" = 0 ] && case "$out" in "Vision OCR is running a model job"*) true ;; *) false ;; esac \
+  && ok "…and yield-check decides after the timeout" || bad "after the timeout: rc=$rc out='$out'"
+rm -f "$T/yield.on"
 
 echo "[5] refusals"
 refusal_rc() {   # $1 = agent; runs the daemon in THIS shell (not a $(…) subshell) so its exit code is waitable

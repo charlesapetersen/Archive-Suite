@@ -282,19 +282,24 @@ YIELD_CMD="${AUTONOMOUS_YIELD_CMD:-$REPO/ops/autonomous/yield-check.sh}"    # ex
 # yield-check.sh decides exactly as before, so a manager fault cannot stop this daemon.
 GRANT_CMD="${AUTONOMOUS_GRANT_CMD:-$HOME/Claude/Agent Manager/bin/grant}"
 GRANT_PROJECT="${AUTONOMOUS_GRANT_PROJECT:-Archive Suite}"
+# The helper is bounded: past this many seconds perl's alarm kills it (exit 142) and yield-check.sh decides, so a
+# hung manager cannot stall a cycle. Its answer goes to a file, not $(…): a helper killed mid-run can leave a
+# child holding a pipe open, and a command substitution would wait for that child as well.
+GRANT_TIMEOUT="${AUTONOMOUS_GRANT_TIMEOUT:-30}"
 # held_reason [--gate]: prints why to hold off and returns 0, or returns non-zero to go ahead. --gate asks only
 # about exclusive jobs (heavy upkeep such as the health gate, which spends no subscription).
 held_reason() {
-  if [ -x "$GRANT_CMD" ]; then
-    local out rc
-    if [ "${1:-}" = --gate ]; then
-      out="$("$GRANT_CMD" --project "$GRANT_PROJECT" --gate --worker "$WORKER_ID" 2>/dev/null)"; rc=$?
-    else
-      out="$("$GRANT_CMD" --project "$GRANT_PROJECT" --agent "$AGENT" --worker "$WORKER_ID" 2>/dev/null)"; rc=$?
-    fi
+  local gout
+  if [ -x "$GRANT_CMD" ] && gout="$(mktemp -t archive-grant 2>/dev/null)"; then
+    local out rc ask=(--agent "$AGENT")
+    [ "${1:-}" = --gate ] && ask=(--gate)
+    # (The outer 2>/dev/null is for bash's own "Alarm clock" job notice, which the inner one does not cover.)
+    { perl -e 'alarm shift; exec @ARGV or exit 127' "$GRANT_TIMEOUT" \
+        "$GRANT_CMD" --project "$GRANT_PROJECT" "${ask[@]}" --worker "$WORKER_ID" >"$gout" 2>/dev/null; } 2>/dev/null; rc=$?
+    out="$(head -1 "$gout" 2>/dev/null)"; rm -f "$gout"
     case "$rc" in
       0) return 1 ;;
-      75) out="${out%%$'\n'*}"; out="${out#wait: }"; printf '%s\n' "${out:-the Agent Manager says wait}"; return 0 ;;
+      75) out="${out#wait: }"; printf '%s\n' "${out:-the Agent Manager says wait}"; return 0 ;;
     esac
   fi
   [ -x "$YIELD_CMD" ] && "$YIELD_CMD" 2>/dev/null
@@ -1607,6 +1612,7 @@ tick() {
 
   if [ "$WORKER_CHILD" = 1 ] && held_reason >/dev/null 2>&1; then
     log "yielding — priority project became busy before worker dispatch"
+    rm -f "$IDLE_SINCE" 2>/dev/null || true   # a hold is not idleness, here as in 3a below
     return 0
   fi
   if [ "$WORKER_CHILD" != 1 ]; then
@@ -1616,20 +1622,30 @@ tick() {
   #     cycle. A long yield is not idleness: the idle stopwatch is cleared, so days of model jobs cannot park the run.
   #     The Agent Manager is asked first (held_reason); under the supervisor this is upkeep, which asks only about
   #     exclusive jobs (--gate), because the supervisor asks per lane before each session.
-  local ygate=""; [ "$UPKEEP_ONLY" = 1 ] && ygate=--gate
+  #     Upkeep keeps its own record (upkeep-yield.reason): yield.reason under the supervisor is the lanes' wait
+  #     (a full window, priority), which a --gate grant says nothing about, so upkeep must not log it over or
+  #     delete it (2026-10-07 review). Upkeep still writes yield.reason while held, because nothing is running
+  #     then and the supervisor asks no lane that cycle, so it is the only writer that can show "Waiting".
+  local ygate="" yfile="$STATE/yield.reason"
+  [ "$UPKEEP_ONLY" = 1 ] && { ygate=--gate; yfile="$STATE/upkeep-yield.reason"; }
   {
     local yr
     if yr="$(held_reason $ygate)"; then
       # Compare without the "(…)" detail: it names the page being read, which changes every cycle, and logging
       # on every change of it wrote the same wait every 90 s all night (2026-10-05).
-      local yprev; yprev="$(cat "$STATE/yield.reason" 2>/dev/null)"
+      local yprev; yprev="$(cat "$yfile" 2>/dev/null)"
       [ "${yr%% (*}" = "${yprev%% (*}" ] || log "yielding — ${yr:-the priority project is busy}; no gate or session until it ends."
-      printf '%s\n' "$yr" > "$STATE/yield.reason"
+      printf '%s\n' "$yr" > "$yfile"
       rm -f "$IDLE_SINCE" 2>/dev/null || true
-      [ "$UPKEEP_ONLY" = 1 ] && return 10
+      [ "$UPKEEP_ONLY" = 1 ] && { printf '%s\n' "$yr" > "$STATE/yield.reason"; return 10; }
       return 0
     fi
-    [ -f "$STATE/yield.reason" ] && { log "yield over — no longer waiting: $(sed 's/ (.*//' "$STATE/yield.reason")."; rm -f "$STATE/yield.reason"; }
+    if [ -f "$yfile" ]; then
+      log "yield over — no longer waiting: $(sed 's/ (.*//' "$yfile")."
+      # Upkeep removes yield.reason only while it still holds upkeep's own words; anything else is the lanes'.
+      [ "$UPKEEP_ONLY" != 1 ] || cmp -s "$yfile" "$STATE/yield.reason" && rm -f "$STATE/yield.reason"
+      rm -f "$yfile"
+    fi
   }
 
   # 3b. Disk guard (WS2). Placed AFTER the step-3 "another engine active" check ON PURPOSE, not for tidiness:

@@ -204,6 +204,64 @@ class Proof(unittest.TestCase):
                 self.cycle(sup, 1060)
                 self.assertEqual(len(self.launches), 1)
 
+    def test_lane_hold_is_logged_once_per_change_of_reason(self):
+        # 2026-10-07 review (finding E): the supervisor owns the lanes' wait, so it logs it, once per change.
+        sup = self.supervisor(1, agent="claude")
+        said = self.root / "grant says"
+        grant = self.stub("fake grant", '[ -s "' + str(said) + '" ] && { echo "wait: $(cat "' + str(said) + '")"; exit 75; }'
+                          '\necho granted')
+        sup.env["AUTONOMOUS_GRANT_CMD"] = str(grant)
+        log = self.state / "daemon.log"
+        for now, page in ((1000, 1), (1060, 2), (1120, 3)):
+            said.write_text("Claude's window is 98%% used (page %d)\n" % page)
+            self.cycle(sup, now)
+        self.assertEqual(log.read_text().count("yielding — claude lane: Claude's window is 98% used"), 1)
+        said.write_text("Vision OCR is running its model bake-off\n")
+        self.cycle(sup, 1180)
+        self.assertEqual(log.read_text().count("yielding — claude lane"), 2)
+        self.assertEqual(self.launches, [])
+        said.write_text("")
+        self.cycle(sup, 1240)
+        self.assertEqual(len(self.launches), 1)
+        self.assertEqual(log.read_text().count("yield over — claude lane no longer waiting: Vision OCR"), 1)
+        self.assertEqual(log.read_text().count("yield over"), 1)
+
+    def test_lane_hold_clears_that_lanes_idle_stopwatch(self):
+        # Finding F: a held lane is waiting, not idle; the other lane's stopwatch is its own business.
+        sup = self.supervisor(1, agent="both")
+        sup.env["AUTONOMOUS_GRANT_CMD"] = str(self.stub("fake grant",
+                                                        '[ "$4" = claude ] && { echo "wait: Claude is full"; exit 75; }\necho granted'))
+        for worker, _ in sup.workers:
+            (self.state / worker).mkdir()
+            (self.state / worker / "idle.since").write_text("100")
+        self.cycle(sup, 1000)
+        self.assertFalse((self.state / "worker-1" / "idle.since").exists())   # worker-1 is the claude lane
+        self.assertEqual((self.state / "worker-2" / "idle.since").read_text(), "100")
+
+    def test_held_worker_child_clears_its_idle_stopwatch(self):
+        # Finding F, the shell side: a real worker child that is held on its own recheck clears its stopwatch.
+        env = self.shell_env()
+        env["AUTONOMOUS_GRANT_CMD"] = str(self.stub("fake grant", 'echo "wait: Claude is full"; exit 75'))
+        directory = self.state / "worker-1"
+        directory.mkdir()
+        (directory / "idle.since").write_text("100")
+        proc = subprocess.run(["bash", str(self.script)], env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("yielding — priority project became busy", (self.state / "daemon.log").read_text())
+        self.assertFalse((directory / "idle.since").exists())
+
+    def test_hung_grant_helper_times_out_and_falls_back(self):
+        # Finding H: a helper that never answers is cut off at AUTONOMOUS_GRANT_TIMEOUT and yield-check.sh decides.
+        sup = self.supervisor(1, agent="claude")
+        sup.env["AUTONOMOUS_GRANT_CMD"] = str(self.stub("hung grant", "sleep 20\necho granted"))
+        sup.env["AUTONOMOUS_GRANT_TIMEOUT"] = "2"
+        sup.env["AUTONOMOUS_YIELD_CMD"] = str(self.stub("yield says hold", "echo held by yield-check; exit 0"))
+        started = module.time.monotonic()
+        self.cycle(sup, 1000)
+        self.assertLess(module.time.monotonic() - started, 6)
+        self.assertEqual(self.launches, [])
+        self.assertEqual((self.state / "yield.reason").read_text(), "held by yield-check\n")
+
     def test_complete_waits_for_claims_and_children_before_teardown(self):
         sup = self.supervisor(1)
         self.cycle(sup, 1000)

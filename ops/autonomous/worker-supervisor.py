@@ -90,6 +90,7 @@ class Supervisor:
         self.pacing = self.args.workers > 1 and self.env.get("AUTONOMOUS_PACE", "1") != "0"
         self.caps = {}
         self.pace_notes = {}
+        self.lane_reasons = {}  # the last hold logged per lane, so a wait is logged once per change, not per cycle
 
     def child_env(self, worker, lane, upkeep=False):
         env = self.env.copy()
@@ -330,15 +331,16 @@ class Supervisor:
             try:
                 answer = subprocess.run([grant, "--project", self.env.get("AUTONOMOUS_GRANT_PROJECT", "Archive Suite"),
                                          "--agent", lane, "--worker", worker], env=self.env, capture_output=True,
-                                        text=True, check=False, timeout=30)
+                                        text=True, check=False,
+                                        timeout=float(self.env.get("AUTONOMOUS_GRANT_TIMEOUT", 30)))
                 if answer.returncode == 0:
                     decided = True
                 elif answer.returncode == 75:
                     line = (answer.stdout.strip().splitlines() or [""])[0]
                     reason = (line[len("wait: "):] if line.startswith("wait: ") else line) or "the Agent Manager says wait"
                     decided = True
-            except (OSError, subprocess.SubprocessError):
-                pass
+            except (OSError, subprocess.SubprocessError, ValueError):
+                pass  # a timeout, a bad AUTONOMOUS_GRANT_TIMEOUT or an unrunnable helper: yield-check.sh decides
         if not decided:
             yield_cmd = self.env.get("AUTONOMOUS_YIELD_CMD", str(self.repo / "ops/autonomous/yield-check.sh"))
             if Path(yield_cmd).is_file():
@@ -346,7 +348,27 @@ class Supervisor:
                 if yielded.returncode == 0:
                     reason = yielded.stdout.strip() or "the priority project is busy"
         asked[lane] = reason
+        # Logged once per change of reason, compared without the "(…)" detail as the shell does (it names the page
+        # being read and changes every cycle). A hold is not idleness: the lane's idle stopwatches are cleared, or
+        # hours of waiting would park the run on its first unproductive session after the hold ends.
+        previous = self.lane_reasons.get(lane)
+        if reason is not None:
+            if previous is None or reason.split(" (")[0] != previous.split(" (")[0]:
+                self.log("yielding — %s lane: %s; no %s session until it ends." % (lane, reason, lane))
+            for name, worker_lane in self.workers:
+                if worker_lane == lane:
+                    (self.state / name / "idle.since").unlink(missing_ok=True)
+        elif previous is not None:
+            self.log("yield over — %s lane no longer waiting: %s." % (lane, previous.split(" (")[0]))
+        self.lane_reasons[lane] = reason
         return reason
+
+    def log(self, message):
+        try:
+            with (self.state / "daemon.log").open("a") as log:
+                log.write("%s  [supervisor] %s\n" % (time.strftime("%F %T"), message))
+        except OSError:
+            pass  # the log is for the owner; never a reason to stop dispatch
 
     def run(self):
         self.state.mkdir(parents=True, exist_ok=True)
