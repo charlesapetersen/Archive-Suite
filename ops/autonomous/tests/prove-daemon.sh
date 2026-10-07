@@ -140,7 +140,7 @@ chmod +x "$T/claude"
 printf '#!/bin/sh\necho "STATUS-DIGEST-OK parked=${STATUS_PARKED:-no}"\n' > "$T/status-stub.sh"; chmod +x "$T/status-stub.sh"
 
 launch() {   # $1=IDLE_STOP ; starts daemon directly; P is its waitable pid
-  fixture_launch env HOME="$FIXTURE_HOME" AUTONOMOUS_YIELD_CMD="$T/no-yield" AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
+  fixture_launch env HOME="$FIXTURE_HOME" AUTONOMOUS_YIELD_CMD="$T/no-yield" AUTONOMOUS_GRANT_CMD="$T/no-grant" AUTONOMOUS_LABEL=provetest AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" \
   AUTONOMOUS_STATE="$STATE" AUTONOMOUS_CLAUDE="$T/claude" \
   AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=8 AUTONOMOUS_IDLE_STOP="$1" \
   AUTONOMOUS_MINFREE_MB="${MINFREE:-10240}" AUTONOMOUS_MAX_NOCOMPLETE="${MAXNC:-0}" \

@@ -276,6 +276,29 @@ DOCFIX_MAX="${AUTONOMOUS_DOCFIX_MAX:-3}"
 STATUS_CMD="${AUTONOMOUS_STATUS_CMD:-$REPO/ops/autonomous/status-digest.sh}"
 USAGE_CMD="${AUTONOMOUS_USAGE_CMD:-$REPO/ops/autonomous/usage-window.sh}"   # reads the window from a session log
 YIELD_CMD="${AUTONOMOUS_YIELD_CMD:-$REPO/ops/autonomous/yield-check.sh}"    # exit 0 = hold off for a priority project
+# Agent Manager stage 4 (2026-10-07): the manager owns the cross-project rules (another project's exclusive job such
+# as Vision OCR's bake-off, a subscription at its stop threshold, priority while a window is tight). Its grant
+# helper answers 0 = granted, 75 = wait (one line, "wait: <reason>"). When it is absent, or answers anything else,
+# yield-check.sh decides exactly as before, so a manager fault cannot stop this daemon.
+GRANT_CMD="${AUTONOMOUS_GRANT_CMD:-$HOME/Claude/Agent Manager/bin/grant}"
+GRANT_PROJECT="${AUTONOMOUS_GRANT_PROJECT:-Archive Suite}"
+# held_reason [--gate]: prints why to hold off and returns 0, or returns non-zero to go ahead. --gate asks only
+# about exclusive jobs (heavy upkeep such as the health gate, which spends no subscription).
+held_reason() {
+  if [ -x "$GRANT_CMD" ]; then
+    local out rc
+    if [ "${1:-}" = --gate ]; then
+      out="$("$GRANT_CMD" --project "$GRANT_PROJECT" --gate --worker "$WORKER_ID" 2>/dev/null)"; rc=$?
+    else
+      out="$("$GRANT_CMD" --project "$GRANT_PROJECT" --agent "$AGENT" --worker "$WORKER_ID" 2>/dev/null)"; rc=$?
+    fi
+    case "$rc" in
+      0) return 1 ;;
+      75) out="${out%%$'\n'*}"; out="${out#wait: }"; printf '%s\n' "${out:-the Agent Manager says wait}"; return 0 ;;
+    esac
+  fi
+  [ -x "$YIELD_CMD" ] && "$YIELD_CMD" 2>/dev/null
+}
 
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
@@ -1582,7 +1605,7 @@ tick() {
     log "stale lock (${age}s) — taking over."
   fi
 
-  if [ "$WORKER_CHILD" = 1 ] && [ -x "$YIELD_CMD" ] && "$YIELD_CMD" >/dev/null 2>&1; then
+  if [ "$WORKER_CHILD" = 1 ] && held_reason >/dev/null 2>&1; then
     log "yielding — priority project became busy before worker dispatch"
     return 0
   fi
@@ -1591,9 +1614,12 @@ tick() {
   #     and never beside a Vision OCR model job (ops/autonomous/yield-check.sh says why). Before the gate as well
   #     as the session, because the gate builds and boots the VM too. Logged once per change of reason, not every
   #     cycle. A long yield is not idleness: the idle stopwatch is cleared, so days of model jobs cannot park the run.
-  if [ -x "$YIELD_CMD" ]; then
+  #     The Agent Manager is asked first (held_reason); under the supervisor this is upkeep, which asks only about
+  #     exclusive jobs (--gate), because the supervisor asks per lane before each session.
+  local ygate=""; [ "$UPKEEP_ONLY" = 1 ] && ygate=--gate
+  {
     local yr
-    if yr="$("$YIELD_CMD" 2>/dev/null)"; then
+    if yr="$(held_reason $ygate)"; then
       # Compare without the "(…)" detail: it names the page being read, which changes every cycle, and logging
       # on every change of it wrote the same wait every 90 s all night (2026-10-05).
       local yprev; yprev="$(cat "$STATE/yield.reason" 2>/dev/null)"
@@ -1603,8 +1629,8 @@ tick() {
       [ "$UPKEEP_ONLY" = 1 ] && return 10
       return 0
     fi
-    [ -f "$STATE/yield.reason" ] && { log "yield over — $(sed 's/ (.*//' "$STATE/yield.reason") has ended."; rm -f "$STATE/yield.reason"; }
-  fi
+    [ -f "$STATE/yield.reason" ] && { log "yield over — no longer waiting: $(sed 's/ (.*//' "$STATE/yield.reason")."; rm -f "$STATE/yield.reason"; }
+  }
 
   # 3b. Disk guard (WS2). Placed AFTER the step-3 "another engine active" check ON PURPOSE, not for tidiness:
   #     disk_ok() calls housekeeping() to try to reclaim, and housekeeping's whole safety argument rests on

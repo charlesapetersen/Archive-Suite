@@ -371,7 +371,7 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
                     AUTONOMOUS_REPO=str(repo), AUTONOMOUS_AGENT="codex", AUTONOMOUS_CODEX=str(cli),
                     AUTONOMOUS_CODEX_MODEL="fixture", AUTONOMOUS_WORKER_ID="worker-1",
                     AUTONOMOUS_DOC_PREGATE="0", AUTONOMOUS_GATE_EVERY="0", AUTONOMOUS_COMPACTOR=str(root / "none"),
-                    AUTONOMOUS_YIELD_CMD=str(root / "none"), AUTONOMOUS_USAGE_CMD=str(root / "none"),
+                    AUTONOMOUS_YIELD_CMD=str(root / "none"), AUTONOMOUS_GRANT_CMD=str(root / "none"), AUTONOMOUS_USAGE_CMD=str(root / "none"),
                     AUTONOMOUS_STATUS_CMD="/usr/bin/true", AUTONOMOUS_MAXRUN="10", AUTONOMOUS_HB_POLL="1",
                     AUTONOMOUS_INTERVAL="1", AUTONOMOUS_MAX_NOCOMPLETE="0", AUTONOMOUS_IDLE_STOP="0")
         denv.pop("AUTONOMOUS_WORKER_STATE", None)

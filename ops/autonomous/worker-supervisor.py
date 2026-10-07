@@ -274,13 +274,7 @@ class Supervisor:
             return True
         if self.last_launch and now - self.last_launch < 60:
             return True
-        yield_cmd = self.env.get("AUTONOMOUS_YIELD_CMD", str(self.repo / "ops/autonomous/yield-check.sh"))
-        if Path(yield_cmd).is_file():
-            yielded = subprocess.run([yield_cmd], env=self.env, capture_output=True, text=True, check=False)
-            if yielded.returncode == 0:
-                (self.state / "yield.reason").write_text(yielded.stdout)
-                return True
-            (self.state / "yield.reason").unlink(missing_ok=True)
+        asked, held = {}, None
         for offset in range(len(self.workers)):
             index = (self.cursor + offset) % len(self.workers)
             worker, lane = self.workers[index]
@@ -298,6 +292,10 @@ class Supervisor:
                 continue
             if repair and (active or self.children):
                 break
+            reason = self.held(worker, lane, asked)
+            if reason is not None:
+                held = reason
+                continue
             directory = self.state / worker
             directory.mkdir(exist_ok=True)
             (directory / "agent").write_text(lane)
@@ -308,7 +306,47 @@ class Supervisor:
             self.last_launch = now
             self.cursor = (index + 1) % len(self.workers)
             break
+        # yield.reason says the run as a whole is waiting (status-digest shows "Waiting"): only when no lane was
+        # granted and nothing is running. A lane held while another works is still a working run.
+        if held is not None and not any(r is None for r in asked.values()) and not (self.children or active):
+            (self.state / "yield.reason").write_text(held + "\n")
+        elif asked:
+            (self.state / "yield.reason").unlink(missing_ok=True)
         return True
+
+    def held(self, worker, lane, asked):
+        """Why this lane must not start a session now, or None; asked once per lane per cycle.
+
+        The Agent Manager's grant helper is asked first (stage 4, 2026-10-07): it owns the cross-project rules,
+        such as another project's exclusive job (Vision OCR's bake-off), a subscription at its stop threshold, and
+        priority while a window is tight. Exit 0 is granted and 75 is wait. When the helper is absent, or answers
+        anything else, yield-check.sh decides as before (exit 0 = hold off), so a manager fault cannot stop work."""
+        if lane in asked:
+            return asked[lane]
+        reason, decided = None, False
+        grant = self.env.get("AUTONOMOUS_GRANT_CMD",
+                             os.path.join(self.env.get("HOME", str(Path.home())), "Claude/Agent Manager/bin/grant"))
+        if Path(grant).is_file() and os.access(grant, os.X_OK):
+            try:
+                answer = subprocess.run([grant, "--project", self.env.get("AUTONOMOUS_GRANT_PROJECT", "Archive Suite"),
+                                         "--agent", lane, "--worker", worker], env=self.env, capture_output=True,
+                                        text=True, check=False, timeout=30)
+                if answer.returncode == 0:
+                    decided = True
+                elif answer.returncode == 75:
+                    line = (answer.stdout.strip().splitlines() or [""])[0]
+                    reason = (line[len("wait: "):] if line.startswith("wait: ") else line) or "the Agent Manager says wait"
+                    decided = True
+            except (OSError, subprocess.SubprocessError):
+                pass
+        if not decided:
+            yield_cmd = self.env.get("AUTONOMOUS_YIELD_CMD", str(self.repo / "ops/autonomous/yield-check.sh"))
+            if Path(yield_cmd).is_file():
+                yielded = subprocess.run([yield_cmd], env=self.env, capture_output=True, text=True, check=False)
+                if yielded.returncode == 0:
+                    reason = yielded.stdout.strip() or "the priority project is busy"
+        asked[lane] = reason
+        return reason
 
     def run(self):
         self.state.mkdir(parents=True, exist_ok=True)

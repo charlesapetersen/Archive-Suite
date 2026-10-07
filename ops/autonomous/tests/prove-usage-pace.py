@@ -196,7 +196,7 @@ class Supervisor(unittest.TestCase):
         self.vision = self.root / "vision ocr" / "last-session.log"
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("AUTONOMOUS_")}
         self.env.update(AUTONOMOUS_INTERVAL="1", AUTONOMOUS_WINDOW_SLACK="0",
-                        AUTONOMOUS_YIELD_CMD=str(self.root / "absent yield"),
+                        AUTONOMOUS_YIELD_CMD=str(self.root / "absent yield"), AUTONOMOUS_GRANT_CMD=str(self.root / "absent grant"),
                         AUTONOMOUS_STATUS_CMD=str(self.root / "absent status"),
                         AUTONOMOUS_SHARED_USAGE_LOGS=str(self.vision),
                         CODEX_HOME=str(self.root / "codex home"))

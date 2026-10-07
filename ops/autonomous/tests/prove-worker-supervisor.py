@@ -57,6 +57,7 @@ class Proof(unittest.TestCase):
                 del self.env[key]
         self.env.update(AUTONOMOUS_INTERVAL="1", AUTONOMOUS_WINDOW_SLACK="0",
                         AUTONOMOUS_YIELD_CMD=str(self.root / "absent yield"),
+                        AUTONOMOUS_GRANT_CMD=str(self.root / "absent grant"),
                         AUTONOMOUS_STATUS_CMD=str(self.root / "absent status"))
         self.launches = []
         self.now = 1000
@@ -151,6 +152,57 @@ class Proof(unittest.TestCase):
         self.cycle(sup, 1060)
         self.assertEqual(len(self.launches), 1)
         self.assertFalse((self.state / "yield.reason").exists())
+
+    def stub(self, name, body):
+        path = self.root / name
+        path.write_text("#!/bin/sh\n" + body + "\n")
+        path.chmod(0o755)
+        return path
+
+    def test_grant_helper_decides_before_yield_check(self):
+        # Agent Manager stage 4: the manager's answer wins; yield-check.sh (here saying "hold off") is not asked.
+        sup = self.supervisor(1, agent="claude")
+        calls = self.root / "grant calls"
+        grant = self.stub("fake grant", 'printf "%s|" "$@" >> "' + str(calls) + '"; echo >> "' + str(calls) + '"\n'
+                          '[ -f "' + str(self.root / "grant.wait") + '" ] && { echo "wait: Vision OCR is running its '
+                          'model bake-off (bakeoff.s05)"; exit 75; }\necho granted')
+        sup.env["AUTONOMOUS_GRANT_CMD"] = str(grant)
+        sup.env["AUTONOMOUS_YIELD_CMD"] = str(self.stub("yield says hold", "echo held by yield-check; exit 0"))
+        (self.root / "grant.wait").touch()
+        self.cycle(sup, 1000)
+        self.assertEqual(self.launches, [])
+        self.assertEqual((self.state / "yield.reason").read_text(),
+                         "Vision OCR is running its model bake-off (bakeoff.s05)\n")
+        self.assertEqual(calls.read_text().splitlines()[0], "--project|Archive Suite|--agent|claude|--worker|worker-1|")
+        (self.root / "grant.wait").unlink()
+        self.cycle(sup, 1060)
+        self.assertEqual(len(self.launches), 1)
+        self.assertFalse((self.state / "yield.reason").exists())
+
+    def test_grant_is_asked_per_lane(self):
+        sup = self.supervisor(1, agent="both")
+        grant = self.stub("fake grant", '[ "$4" = claude ] && { echo "wait: Claude is full"; exit 75; }\necho granted')
+        sup.env["AUTONOMOUS_GRANT_CMD"] = str(grant)
+        for now in (1000, 1060, 1120):
+            self.cycle(sup, now)
+        self.assertEqual([row[2] for row in self.launches], ["codex"])
+        self.assertFalse((self.state / "yield.reason").exists())   # a lane went ahead: not waiting
+
+    def test_grant_absent_or_erroring_falls_back_to_yield_check(self):
+        for grant in (self.root / "absent grant", self.stub("broken grant", "echo boom >&2; exit 3"),
+                      self.stub("crashing grant", "exit 1")):
+            with self.subTest(grant=grant.name):
+                self.launches.clear()
+                (self.state / "yield.reason").unlink(missing_ok=True)
+                sup = self.supervisor(1, agent="claude")
+                sup.env["AUTONOMOUS_GRANT_CMD"] = str(grant)
+                sup.env["AUTONOMOUS_YIELD_CMD"] = str(self.stub("yield says hold", "echo held by yield-check; exit 0"))
+                self.cycle(sup, 1000)
+                self.assertEqual(self.launches, [])
+                self.assertEqual((self.state / "yield.reason").read_text(), "held by yield-check\n")
+                sup.env["AUTONOMOUS_YIELD_CMD"] = str(self.stub("yield says go", "exit 1"))
+                self.cycle(sup, 1060)
+                self.assertEqual(len(self.launches), 1)
 
     def test_complete_waits_for_claims_and_children_before_teardown(self):
         sup = self.supervisor(1)

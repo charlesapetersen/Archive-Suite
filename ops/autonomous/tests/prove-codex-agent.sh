@@ -91,7 +91,7 @@ printf '#!/bin/sh\necho STATUS-OK\n' > "$T/status-stub.sh"; chmod +x "$T/status-
 
 launch() {   # $1 = AUTONOMOUS_AGENT value ("" = unset)
   fixture_launch env -u AUTONOMOUS_AGENT HOME="$FIXTURE_HOME" CODEX_HOME="$FIXTURE_CODEX_HOME" ${1:+AUTONOMOUS_AGENT="$1"} CODEX_THREAD_ID=leaked-parent CODEX_SANDBOX=seatbelt \
-  AUTONOMOUS_HB_STALL="${HB_STALL:-600}" AUTONOMOUS_HB_IDLE_N=2 AUTONOMOUS_YIELD_CMD="${YIELD_CMD:-$T/no-yield}" \
+  AUTONOMOUS_HB_STALL="${HB_STALL:-600}" AUTONOMOUS_HB_IDLE_N=2 AUTONOMOUS_YIELD_CMD="${YIELD_CMD:-$T/no-yield}" AUTONOMOUS_GRANT_CMD="${GRANT_CMD:-$T/no-grant}" ${UPKEEP:+AUTONOMOUS_UPKEEP_ONLY=1} \
   AUTONOMOUS_LABEL=provecodex AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" AUTONOMOUS_STATE="$STATE" \
   AUTONOMOUS_CLAUDE="$T/claude" AUTONOMOUS_CODEX="$T/codex" \
   AUTONOMOUS_INTERVAL=1 AUTONOMOUS_MAXBACKOFF=2 AUTONOMOUS_IDLE_STOP=0 AUTONOMOUS_MAX_NOCOMPLETE=0 \
@@ -192,6 +192,61 @@ reset; echo "0:30:3600:no" > "$CTRL"; touch "$T/yield.on"; YIELD_CMD="$T/yield-s
 [ ! -f "$STATE/idle.since" ] && ok "a yield is not idleness (no idle stopwatch)" || bad "idle.since set while yielding"
 rm -f "$T/yield.on"; sleep 4; stop "$P" || exit 1
 grep -q 'yield over' "$L" && [ -s "$ARGV" ] && ok "session starts once the yield ends" || bad "no session after the yield ended: $(tail -3 "$L")"
+
+echo "[7b] Agent Manager grant (stage 4, 2026-10-07): the manager's helper decides first; yield-check.sh is the fallback"
+# The stub grant logs its argv, says wait while $T/grant.wait exists, and otherwise exits with $T/grant.rc (0 = granted).
+cat > "$T/grant-stub" <<STUB
+#!/bin/sh
+printf '%s|' "\$@" >> "$T/grant.calls"; echo >> "$T/grant.calls"
+[ -f "$T/grant.wait" ] && { echo "wait: Claude's five-hour window is 98% used; it resets at 19:00"; exit 75; }
+rc=\$(cat "$T/grant.rc" 2>/dev/null || echo 0); [ "\$rc" = 0 ] && echo granted || echo "broken" >&2
+exit "\$rc"
+STUB
+chmod +x "$T/grant-stub"
+# held_reason() alone, sourced from the daemon: every answer the helper can give, and its fallback.
+held() { env HOME="$FIXTURE_HOME" AUTONOMOUS_REPO="$REPO" AUTONOMOUS_STATE="$STATE" AUTONOMOUS_AGENT=codex \
+           AUTONOMOUS_WORKER_ID=worker-2 AUTONOMOUS_GRANT_CMD="$1" AUTONOMOUS_YIELD_CMD="$2" \
+           bash -c '. "$1" >/dev/null 2>&1; held_reason $2' _ "$DAEMON" "${3:-}"; }
+rm -f "$T/grant.calls" "$T/grant.rc"; touch "$T/grant.wait" "$T/yield.on"
+out="$(held "$T/grant-stub" "$T/yield-stub")"; rc=$?
+[ "$rc" = 0 ] && [ "$out" = "Claude's five-hour window is 98% used; it resets at 19:00" ] \
+  && ok "grant 75 holds off, with its reason and no 'wait:' prefix" || bad "grant wait: rc=$rc out='$out'"
+[ "$(head -1 "$T/grant.calls")" = "--project|Archive Suite|--agent|codex|--worker|worker-2|" ] \
+  && ok "asks for this project, agent and worker" || bad "grant argv: $(head -1 "$T/grant.calls")"
+rm -f "$T/grant.wait"
+held "$T/grant-stub" "$T/yield-stub" >/dev/null && bad "grant 0 still held off (yield-check was consulted)" \
+  || ok "grant 0 goes ahead even though yield-check would hold off"
+echo 3 > "$T/grant.rc"
+out="$(held "$T/grant-stub" "$T/yield-stub")" && case "$out" in "Vision OCR is running a model job"*) true ;; *) false ;; esac \
+  && ok "an erroring helper (exit 3) falls back to yield-check" || bad "erroring helper: out='$out'"
+echo 1 > "$T/grant.rc"
+held "$T/grant-stub" "$T/yield-stub" >/dev/null && ok "a crashing helper (exit 1) falls back to yield-check" || bad "crashing helper went ahead"
+rm -f "$T/yield.on"
+held "$T/grant-stub" "$T/yield-stub" >/dev/null && bad "erroring helper + yield go still held" || ok "erroring helper + yield-check go: goes ahead"
+touch "$T/yield.on"
+out="$(held "$T/absent-grant" "$T/yield-stub")" && ok "no helper installed: yield-check decides ($out)" || bad "absent helper did not fall back"
+rm -f "$T/yield.on" "$T/grant.calls" "$T/grant.rc"
+held "$T/grant-stub" "$T/yield-stub" --gate >/dev/null
+[ "$(head -1 "$T/grant.calls")" = "--project|Archive Suite|--gate|--worker|worker-2|" ] \
+  && ok "--gate asks about exclusive jobs only (no agent)" || bad "gate argv: $(head -1 "$T/grant.calls")"
+# The real daemon: a grant wait holds the session (logged once, not idleness); the grant ending lets it start.
+reset; rm -f "$T/grant.calls"; echo "0:30:3600:no" > "$CTRL"; touch "$T/grant.wait"
+GRANT_CMD="$T/grant-stub" YIELD_CMD="$T/yield-stub" launch codex; sleep 4
+[ ! -s "$ARGV" ] && ok "no session while the manager says wait" || bad "a session started while the manager said wait"
+[ "$(grep -c "yielding — Claude's five-hour window is 98% used; it resets at 19:00" "$L")" = 1 ] \
+  && ok "the manager's reason is logged once" || bad "grant wait log: $(grep yielding "$L")"
+[ "$(cat "$STATE/yield.reason" 2>/dev/null)" = "Claude's five-hour window is 98% used; it resets at 19:00" ] \
+  && ok "yield.reason carries the manager's reason (status shows Waiting)" || bad "yield.reason: $(cat "$STATE/yield.reason" 2>/dev/null)"
+grep -q -- '--agent|codex|' "$T/grant.calls" && ok "serial daemon asks with its agent, not --gate" || bad "serial argv: $(head -1 "$T/grant.calls")"
+[ ! -f "$STATE/idle.since" ] && ok "a grant wait is not idleness" || bad "idle.since set during a grant wait"
+rm -f "$T/grant.wait"; sleep 4; stop "$P" || exit 1
+grep -q 'yield over' "$L" && [ -s "$ARGV" ] && ok "session starts once the manager grants" || bad "no session after the grant: $(tail -3 "$L")"
+# Upkeep under the supervisor asks with --gate: a full Claude window must not stop the health gate or the other lane.
+reset; rm -f "$T/grant.calls"; touch "$T/grant.wait"
+UPKEEP=1 GRANT_CMD="$T/grant-stub" YIELD_CMD="$T/yield-stub" launch codex; sleep 3; stop "$P" || exit 1
+grep -q -- '--gate|' "$T/grant.calls" && ! grep -q -- '--agent' "$T/grant.calls" \
+  && ok "upkeep asks with --gate only" || bad "upkeep argv: $(cat "$T/grant.calls" 2>/dev/null)"
+rm -f "$T/grant.wait"
 
 echo "[5] refusals"
 refusal_rc() {   # $1 = agent; runs the daemon in THIS shell (not a $(…) subshell) so its exit code is waitable
