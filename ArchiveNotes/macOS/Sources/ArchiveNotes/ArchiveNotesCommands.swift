@@ -83,11 +83,12 @@ struct SourceBlockCommands: Commands {
 struct ZoteroCommands: Commands {
     @FocusedValue(\.formattingContext) private var formatting
     @FocusedValue(\.zoteroAutoFillAvailable) private var autoFillAvailable
+    @FocusedValue(\.copyLinkAvailable) private var copyLinkAvailable
 
     var body: some Commands {
         CommandMenu("Note") {
             Button("Copy Link") { formatting?.copyCurrentItemLink() }
-                .disabled(formatting?.canCopyCurrentItemLink != true)
+                .disabled(copyLinkAvailable != true)
             Divider()
             Button("Attach Zotero Link\u{2026}") { formatting?.attachZoteroLink() }
                 .disabled(formatting == nil)

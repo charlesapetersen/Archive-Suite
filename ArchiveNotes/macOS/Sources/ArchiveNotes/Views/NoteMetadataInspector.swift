@@ -188,6 +188,7 @@ struct NoteMetadataInspector: View {
                     commitAuthors([])
                 }
                 .disabled(item.authors.isEmpty && composedAuthors.isEmpty)
+                .accessibilityIdentifier("an.detail.authors.clear")
             }
         }
     }

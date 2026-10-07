@@ -365,6 +365,12 @@ struct ZoteroAutoFillAvailabilityKey: FocusedValueKey {
     typealias Value = Bool
 }
 
+/// Note ▸ Copy Link's enablement, for the same reason (W9.e2-fu2): the context's identity fields are not
+/// published, so a menu reading `canCopyCurrentItemLink` off the reference stayed disabled after selection.
+struct CopyLinkAvailabilityKey: FocusedValueKey {
+    typealias Value = Bool
+}
+
 extension FocusedValues {
     var formattingContext: FormattingContext? {
         get { self[FormattingContextKey.self] }
@@ -374,6 +380,11 @@ extension FocusedValues {
     var zoteroAutoFillAvailable: Bool? {
         get { self[ZoteroAutoFillAvailabilityKey.self] }
         set { self[ZoteroAutoFillAvailabilityKey.self] = newValue }
+    }
+
+    var copyLinkAvailable: Bool? {
+        get { self[CopyLinkAvailabilityKey.self] }
+        set { self[CopyLinkAvailabilityKey.self] = newValue }
     }
 }
 

@@ -40,7 +40,7 @@ final class NotesE2SweepTests: NotesFixtureUITestCase {
             }, "Set should write the extract's authors to front matter")
 
             // Put both back so the later checks see the fixture as generated.
-            win.buttons["Clear"].firstMatch.click()
+            win.buttons["an.detail.authors.clear"].click()
             closeExtractsWindow(win)
             clearAuthors(on: Self.idPlain)
             XCTAssertTrue(pollUntil(timeout: 10) {
@@ -59,11 +59,15 @@ final class NotesE2SweepTests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) {
                 ((editor.value as? String) ?? "").contains("egalitarian")
             }, "the linked note should be loaded before copying its link")
-            // Note ▸ Copy Link follows the editor's focused value, so it is greyed out while the list
-            // has focus (W9.e2 finding, filed as W9.e2-fu2); click into the editor first.
-            editor.click()
+            // W9.e2-fu2: the menu used to read `canCopyCurrentItemLink` off the focused reference, whose
+            // identity fields are not published, so it stayed disabled with a note selected.
             NSPasteboard.general.clearContents()
-            clickMenu("Note", "Copy Link")
+            editor.click()
+            app.menuBars.menuBarItems["Note"].click()
+            let menuEntry = app.menuBars.menuItems["Copy Link"]
+            XCTAssertTrue(menuEntry.waitForExistence(timeout: 5))
+            XCTAssertTrue(menuEntry.isEnabled, "Note ▸ Copy Link should be enabled with a note selected")
+            menuEntry.click()
             var link: String?
             XCTAssertTrue(pollUntil(timeout: 10) {
                 link = NSPasteboard.general.string(forType: .string)
@@ -77,7 +81,18 @@ final class NotesE2SweepTests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) {
                 ((editor.value as? String) ?? "").contains("A plain note")
             }, "a different note should be showing before the link is opened")
-            app.open(url)
+            // `XCUIApplication.open(_:)` relaunches the app (losing the fixture launch environment), so
+            // hand the URL to the RUNNING instance through Launch Services, as a clicked link would.
+            let running = try XCTUnwrap(NSRunningApplication
+                .runningApplications(withBundleIdentifier: "com.archivenotes.app").first?.bundleURL)
+            let delivered = expectation(description: "Launch Services delivered the link")
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
+            NSWorkspace.shared.open([url], withApplicationAt: running, configuration: config) { _, error in
+                XCTAssertNil(error, "opening the link should reach the running app")
+                delivered.fulfill()
+            }
+            wait(for: [delivered], timeout: 15)
             XCTAssertTrue(pollUntil(timeout: 15) {
                 ((self.mainWindow.textViews["an.editor.text"].value as? String) ?? "").contains("egalitarian")
             }, "opening the copied link should select and load the linked note")
@@ -169,11 +184,22 @@ final class NotesE2SweepTests: NotesFixtureUITestCase {
             app.typeKey(.escape, modifierFlags: [])
 
             for (name, id) in [("E2 Renamed", child.id), ("E2 Parent", parent.id)] {
+                // Edit ▸ Delete shares the label; only the open context menu's item is hittable.
                 folderRow(named: name).rightClick()
-                app.menuItems["Delete"].click()
-                let confirm = app.buttons["Delete Folder"]
-                XCTAssertTrue(confirm.waitForExistence(timeout: 5), "an empty folder deletes without stranding notes")
-                confirm.click()
+                let delete = app.menuItems.matching(identifier: "Delete").allElementsBoundByIndex
+                    .first { $0.isHittable }
+                XCTAssertNotNil(delete, "the folder context menu should offer Delete")
+                delete?.click()
+                // The Touch Bar carries a second "Delete Folder" (and reports it hittable); scope to the
+                // confirmation dialog, which may be a window sheet or a free dialog.
+                var confirm: XCUIElement?
+                XCTAssertTrue(pollUntil(timeout: 5) {
+                    confirm = [self.app.sheets.firstMatch, self.app.dialogs.firstMatch]
+                        .map { $0.buttons["Delete Folder"].firstMatch }
+                        .first { $0.exists }
+                    return confirm != nil
+                }, "an empty folder deletes without stranding notes")
+                confirm?.click()
                 XCTAssertTrue(pollUntil(timeout: 10) { self.folderRecord(id: id) == nil },
                               "Delete should remove \(name) from organization.json")
             }
@@ -209,10 +235,11 @@ final class NotesE2SweepTests: NotesFixtureUITestCase {
             attachment.lifetime = .keepAlways
             XCTContext.runActivity(named: "Capture the folder tree after the reorder drag") { $0.add(attachment) }
             // Strict: once the gap drop reorders, this expected failure itself fails and must come out.
-            XCTExpectFailure("W9.e2-fu1: the folder row's .onDrop takes the gap drop as a reparent")
-            XCTAssertTrue(reordered, "dropping Ideas in the gap above Reading should reorder the top level; "
-                          + "Ideas is now parent=\(after?.parent ?? "nil") order=\(after?.sortOrder ?? -1), "
-                          + "Reading order=\(readingAfter?.sortOrder ?? -1)")
+            XCTExpectFailure("W9.e2-fu1: the folder row's .onDrop takes the gap drop as a reparent") {
+                XCTAssertTrue(reordered, "dropping Ideas in the gap above Reading should reorder the top level; "
+                              + "Ideas is now parent=\(after?.parent ?? "nil") order=\(after?.sortOrder ?? -1), "
+                              + "Reading order=\(readingAfter?.sortOrder ?? -1)")
+            }
 
             // Put Ideas back at the top level so the checks after this one find the fixture tree intact.
             if after?.parent != nil {
@@ -253,7 +280,7 @@ final class NotesE2SweepTests: NotesFixtureUITestCase {
 
     private func clearAuthors(on id: String) {
         selectItem(uuid: id)
-        let clear = mainWindow.buttons["Clear"].firstMatch
+        let clear = mainWindow.buttons["an.detail.authors.clear"]
         XCTAssertTrue(clear.waitForExistence(timeout: 10))
         clear.click()
     }
@@ -302,14 +329,19 @@ final class NotesE2SweepTests: NotesFixtureUITestCase {
 
     /// Fill the text field of the SwiftUI alert that is up, then press its `button`.
     private func answerNameAlert(_ text: String, button: String) {
-        let field = app.sheets.textFields.firstMatch.exists ? app.sheets.textFields.firstMatch
-            : app.dialogs.textFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "the name alert should be up")
+        // The alert may be a window sheet or a free dialog, and it appears a beat after the click.
+        var alert: XCUIElement?
+        XCTAssertTrue(pollUntil(timeout: 8) {
+            alert = [self.app.sheets.firstMatch, self.app.dialogs.firstMatch]
+                .first { $0.exists && $0.textFields.firstMatch.exists }
+            return alert != nil
+        }, "the name alert should be up")
+        guard let alert else { return }
+        let field = alert.textFields.firstMatch
         field.click()
         app.typeKey("a", modifierFlags: .command)
         app.typeText(text)
         // Scoped to the alert: an unscoped query also matches the Touch Bar's copy of the button.
-        let alert = app.sheets.firstMatch.exists ? app.sheets.firstMatch : app.dialogs.firstMatch
         alert.buttons[button].firstMatch.click()
     }
 

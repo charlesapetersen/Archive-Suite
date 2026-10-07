@@ -92,6 +92,8 @@ struct NoteEditorPane: View {
         .background(Color(nsColor: .textBackgroundColor))
         .focusedSceneValue(\.formattingContext, formatting)
         .focusedSceneValue(\.zoteroAutoFillAvailable, formatting.canAutoFillFromZotero)
+        // Read from `nav`, not the context: `syncFormattingIdentity` runs in onChange, after this body.
+        .focusedSceneValue(\.copyLinkAvailable, nav.selectedItemID != nil && nav.selectedSummary?.kind != nil)
         .sheet(item: $formatting.zoteroAutoFillModel) { model in
             ZoteroAutoFillSheet(model: model) { formatting.zoteroAutoFillModel = nil }
         }
