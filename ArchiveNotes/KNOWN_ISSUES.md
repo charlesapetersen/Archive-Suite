@@ -55,8 +55,9 @@ replaces the storage through `shouldChangeText`/`didChangeText`, so attributes a
 re-lays the viewport on the next main-queue turn, the same pass a freshly loaded editor runs, and scrolls
 only after that: scrolling first left the chip's view stranded off-screen. `insertLargeTextAsync` uses the
 same path. `StyledInsertTests` covers fonts, undo/redo and the chip round-trip. VM `testG13` checks that a
-visible, installed chip view is present both straight after the paste and after a reselect. Residual:
-`W9.cand2-fu1` (redo, undo of a deleted chip, and the chip/image `insertText` sites).
+visible, installed chip view is present both straight after the paste and after a reselect. Residual
+`W9.cand2-fu1` (redo, undo of a deleted chip, the chip/image `insertText` sites) fixed the same day: any edit
+whose range holds an attachment re-lays the viewport two turns later, then re-scrolls; VM `testG13` covers it.
 
 ## ✅ FIXED (W9.d12a) — extract editor could hide its first provenance chip
 

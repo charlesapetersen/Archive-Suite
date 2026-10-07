@@ -850,24 +850,6 @@ inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.
 **Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
 shippable. **D5 is already shipped** (W14.4b) and is not listed.
 
-- [ ] **`W9.cand2-fu1` — attachment views after OTHER edits: redo, undo, and the chip/image inserts [S · gui]**
-  W9.cand2 review residual (2026-10-06). TextKit 2 does not load attachment views for fragments an edit
-  re-lays out. `EditorTextView.insertStyled` fixes this for passage paste and large paste with a deferred
-  `relayoutViewportSoon`. Check in the VM: paste → ⌘Z → ⇧⌘Z, and delete a chip → ⌘Z. Both restore
-  attachments through NSTextView's own undo path, with no relayout. Also check `insertBlock`,
-  `insertSourceBlocks` and `tryPasteImage`, which still use `insertText`. If they reproduce, hook the
-  relayout to `didChangeText` when the edited range holds an attachment. Display only; no data effect. |
-  Editor/ | S | low | **needs:** gui
-  **Progress 2026-10-06 (`92b0afe` + checkpoint 2):** the relayout now hangs off the storage's
-  `didProcessEditing` (undo restores a chip WITHOUT `didChangeText`, measured), then re-scrolls. Unit
-  `StyledInsertTests` green. **REPRODUCED in the VM and NOT yet fixed:** paste → ⌘Z (chip gone, OK) →
-  ⇧⌘Z leaves the chip's slot blank at the top; its view is installed (309×28) but stranded at y=177 with
-  the visible rect 0–119 (screenshot confirms). Relayout + re-scroll after the redo did not move it. Next
-  idea: the provider's cached view keeps its pre-undo frame, so force a fresh view (or invalidate that
-  attachment's fragment) instead of a viewport pass. The VM test extension (G13 undo/redo + delete→undo)
-  is on branch `wt/autonomous-20261006-152435-7913` (pushed as `wip/W9.cand2-fu1`); land it with the fix,
-  never alone, because it is red until then.
-
 **Phase E — verification review. Do LAST; it gates deleting the plan.** This phase exists because the W0–W8
 checkboxes overstated completion once already; do not repeat that on the fixes. Use the paced method in
 `REVIEW.md`, one subsystem per session, never a giant fan-out.

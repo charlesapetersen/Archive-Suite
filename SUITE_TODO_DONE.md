@@ -257,6 +257,15 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
 
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
+- [x] **W9.cand2-fu1 — attachment views after OTHER edits: redo, undo, and the chip/image inserts [S · gui]**
+  **SHIPPED 2026-10-06 (this commit; checkpoints `92b0afe`, `4bbf5f4`, `910ea13`).** Reproduced in the VM:
+  paste → ⌘Z → ⇧⌘Z left the redone chip's view installed but stranded below the viewport, slot blank. Undo
+  restores text WITHOUT `didChangeText` (measured), so the relayout now hangs off the storage's
+  `didProcessEditing` whenever the edited range holds an attachment (covers `insertBlock`,
+  `insertSourceBlocks`, `tryPasteImage`, undo, redo), runs two main-queue turns later, then re-scrolls.
+  Loads and `insertStyled` are suppressed. VM `testG13` now also checks paste→undo→redo and delete chip→undo;
+  new `StyledInsertTests` pin which edits ask. Notes unit bundle green. | Editor/ | S | low | done
+
 - [x] **W9.cand2 — CONFIRM: a freshly pasted note-passage provenance block renders as raw HTML comment [S].**
   **SHIPPED 2026-10-06 (this commit; checkpoints `aa2e192`, `3713516`).** Confirmed real. The raw-comment
   form was the view provider reading its attachment late (`aa2e192`). The paste also drew wrong until a
