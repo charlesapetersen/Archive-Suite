@@ -217,23 +217,37 @@ def manager_helper():
     return path if os.path.isfile(path) and os.access(path, os.X_OK) else None
 
 
-def options(argv):
-    """The option names given before the action, as argparse below reads them (after it, all is command)."""
-    names, i = [], 0
+# The options before the action: argparse's below, plus the manager's --wait.
+OPTIONS = ("--lock", "--project", "--label", "--wait")
+
+
+def canonical(argv):
+    """(names, argv) with the leading options spelled out as argparse reads them -- '--label=x' and the
+    abbreviation '--proj x' become '--label', 'x' and '--project', 'x' -- or None when one is not a single
+    known option or lacks its value, so argparse below reports it. After the action, all is untouched."""
+    names, out, i = [], [], 0
     while i < len(argv) and argv[i].startswith("-") and argv[i] != "--":
-        name = argv[i].split("=", 1)[0]
-        names.append(name)
-        i += 1 if "=" in argv[i] else 2
-    return names
+        given, eq, value = argv[i].partition("=")
+        match = [o for o in OPTIONS if o == given] or [o for o in OPTIONS if len(given) > 2 and o.startswith(given)]
+        if len(match) != 1:
+            return None
+        if not eq:
+            if i + 1 >= len(argv):
+                return None
+            value, i = argv[i + 1], i + 1
+        names.append(match[0])
+        out += [match[0], value]
+        i += 1
+    return names, out + argv[i:]
 
 
 def delegate(argv):
     """Exec the manager's helper with these arguments; return only if there is none to exec."""
-    helper = manager_helper()
-    if helper is None or "--lock" in options(argv):
+    helper, spelled = manager_helper(), canonical(argv)
+    if helper is None or spelled is None or "--lock" in spelled[0]:
         return
     try:
-        os.execv(helper, [helper, "--project", "archive-suite"] + argv)
+        os.execv(helper, [helper, "--project", "archive-suite"] + spelled[1])
     except OSError as e:
         print("mac-heavy-lock: cannot run %s (%s); using this copy" % (helper, e), file=sys.stderr, flush=True)
 

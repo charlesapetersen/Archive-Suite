@@ -11,7 +11,9 @@ own protocol. The DELEGATE part then points it at a scratch copy of the Agent Ma
 (AGENT_MANAGER_HEAVY_LOCK_SOURCE, default the installed ~/Claude/Agent Manager/bin/heavy-lock; skipped,
 and said so, when neither exists) with its state in scratch, and proves the CLI hands over to it, that
 delegated, fallback and heavy-run.py takers never overlap, that --lock and a non-executable helper fall
-back, and that three mutants of mac-heavy-lock.py each turn a delegate check red.
+back, that argparse's --opt=value and abbreviated spellings still hand over, that a fake sysctl keeps
+the real memory pressure out of it (and a 60 s cap turns a wait red instead of hanging), and that five
+mutants of mac-heavy-lock.py each turn a delegate check red.
 """
 import shutil
 import contextlib
@@ -275,8 +277,15 @@ else:
         mstate = root / "manager state"
         lock = root / "old" / "mac-heavy.lock"
         mowner = mstate / "heavy.owner"
+        # A fake sysctl reading "normal": the Mac's real memory pressure at critical (4) would otherwise make
+        # every delegated taker wait for it to clear, and this harness is a step of the gate, which holds
+        # the real Mac lock while it waits. Pinned here, whatever the caller's environment says.
+        sysctl = root / "fake sysctl"
+        sysctl.write_text("#!/bin/sh\necho 1\n")
+        sysctl.chmod(0o755)
         env = dict(os.environ, MAC_HEAVY_LOCK=str(lock), AGENT_MANAGER_STATE=str(mstate), MAC_HEAVY_POLL="0.1",
-                   AGENT_MANAGER_HEAVY_LOCK=str(manager), ARCHIVE_UNATTENDED="1", AUTONOMOUS_HEAVY_ENABLED="1")
+                   AGENT_MANAGER_HEAVY_LOCK=str(manager), ARCHIVE_UNATTENDED="1", AUTONOMOUS_HEAVY_ENABLED="1",
+                   HEAVY_LOCK_SYSCTL=str(sysctl))
         for k in ("ARCHIVE_HEAVY_TOKEN", "MAC_HEAVY_HELD", "HEAVY_LOCK_FILE", "MAC_HEAVY_PROJECT", "MAC_HEAVY_TOUCH"):
             env.pop(k, None)
         fallback = dict(env, AGENT_MANAGER_HEAVY_LOCK=str(root / "no manager" / "heavy-lock"))
@@ -312,16 +321,33 @@ else:
                     os.killpg(p.pid, signal.SIGTERM)
                 p.communicate(timeout=30)
 
+        def run(lockpy, args, environ=None):
+            """The finished CompletedProcess, or one with returncode None and no output if it ran past 60 s:
+            a wait that never ends turns a check red instead of hanging the gate."""
+            try:
+                return subprocess.run([sys.executable, str(lockpy)] + args, env=environ or env,
+                                      capture_output=True, text=True, timeout=60)
+            except subprocess.TimeoutExpired:
+                return subprocess.CompletedProcess(args, None, "", "")
+
         def delegate_checks(lockpy):
             """(name, ok) for each delegate check, run against this copy of mac-heavy-lock.py."""
             out = []
-            r = subprocess.run([sys.executable, str(lockpy), "status"], env=env, capture_output=True, text=True)
+            r = run(lockpy, ["status"])
             out.append(("status is the manager's", r.stdout.startswith("heavy      free")))
-            r = subprocess.run([sys.executable, str(lockpy), "status"], env=fallback, capture_output=True, text=True)
+            r = run(lockpy, ["status"], fallback)
             out.append(("missing manager falls back", r.stdout.startswith("free (")))
-            r = subprocess.run([sys.executable, str(lockpy), "run", "--", "sh", "-c", "exit 7"], env=env,
-                               capture_output=True, text=True)
+            r = run(lockpy, ["run", "--", "sh", "-c", "exit 7"])
             out.append(("exit status passes through", r.returncode == 7))
+            # argparse's spellings, which the manager's parser does not read, still hand over.
+            r = run(lockpy, ["--label=eq-form", "run", "--", "sh", "-c", "exit 7"])
+            out.append(("an --opt=value option hands over", r.returncode == 7))
+            h = hold(lockpy, ["--label=eq-form"])
+            out.append(("the --label=value label reaches the manager", kv(mowner).get("label") == "eq-form"))
+            stop(h)
+            h = hold(lockpy, ["--proj", "vision-ocr"])
+            out.append(("an abbreviated --proj reaches the manager", kv(mowner).get("project") == "vision-ocr"))
+            stop(h)
             h = hold(lockpy, [])
             o, old = kv(mowner), kv(lock / "owner")
             out.append(("delegated holder is the manager's, same pid, project archive-suite",
@@ -335,9 +361,13 @@ else:
             h = hold(lockpy, ["--lock", str(other)])
             out.append(("--lock falls back", kv(other / "owner").get("pid") == pid(h) and not mowner.exists()))
             stop(h)
+            h = hold(lockpy, ["--lo=" + str(other)])
+            out.append(("an abbreviated --lo=path falls back",
+                        kv(other / "owner").get("pid") == pid(h) and not mowner.exists()))
+            stop(h)
             manager.chmod(0o644)
             try:
-                r = subprocess.run([sys.executable, str(lockpy), "status"], env=env, capture_output=True, text=True)
+                r = run(lockpy, ["status"])
                 out.append(("non-executable manager falls back", r.stdout.startswith("free (")))
             finally:
                 manager.chmod(0o755)
@@ -374,9 +404,13 @@ else:
             source = LOCKPY.read_text()
             mutants = {
                 "no delegate call": ("    delegate(sys.argv[1:])\n", "    pass\n"),
-                "--lock not honoured": ('if helper is None or "--lock" in options(argv):',
-                                        "if helper is None:"),
-                "default project dropped": ('[helper, "--project", "archive-suite"] + argv', "[helper] + argv"),
+                "--lock not honoured": ('if helper is None or spelled is None or "--lock" in spelled[0]:',
+                                        "if helper is None or spelled is None:"),
+                "--opt=value not split": ('given, eq, value = argv[i].partition("=")',
+                                          'given, eq, value = argv[i], "", ""'),
+                "abbreviation not resolved": (" or [o for o in OPTIONS if len(given) > 2 and o.startswith(given)]",
+                                              ""),
+                "default project dropped": ('[helper, "--project", "archive-suite"] + spelled[1]', "[helper] + spelled[1]"),
             }
             for name, (needle, broken) in mutants.items():
                 check(source.count(needle) == 1, "mutant anchor unique: " + name)
