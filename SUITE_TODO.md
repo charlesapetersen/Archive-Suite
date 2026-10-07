@@ -944,6 +944,30 @@ full usage window". Made the daemon's next work, ahead of everything else in the
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
 
+- [ ] **`W35.unspent` — a standing measure of usage left unspent [S]**
+  Owner, 2026-10-06: "We'll be moving up a tier in usage plans shortly so we should prepare for that in advance"
+  (the Claude plan). A before/after is needed to see whether the extra capacity is used. Add to `status-digest.sh` one
+  line per subscription: share of usage left unspent over the last 24 h and 7 days, from the five-hour peaks that
+  `measure-workers.py` already reads (Claude: session stream-json `rate_limit_event`s from both daemons' logs; Codex:
+  rollout `rate_limits`), and the WEEKLY limit where the readings carry it (Codex `secondary`; Claude's weekly window
+  if present). A window with no reading is reported as "no reading", never as spent or unspent. Reuse
+  measure-workers.py's parsing rather than a second parser. DONE WHEN the digest shows the line and a proof covers a
+  fully spent window, a 56%-peak window and a window with no reading.
+- [ ] **`W35.vm-mem` — measure the GUI VM at 6 GB instead of 8 [S]**
+  Owner, 2026-10-06 (the plan upgrade means more workers; the Mac, 18 GB, is the limit). The Tart VM
+  `archive-gui-runner` is set to 8192 MB and 4 CPUs and used all of it (about 8.2 GB, 6.4 GB compressed) on
+  2026-10-06 while swap reached 10.7 of 11.2 GB. Measure the off-screen GUI runs (`ops/gui/vm-gui-runner.sh` for
+  reader, notes and processor) at 6144 MB against their 8192 MB timings and pass/fail, at least three runs each,
+  under the shared mac-heavy.lock. Keep 6 GB only if no run fails that passed at 8 GB and the median is no more than
+  25% slower; record both sets of figures either way in `ops/gui/README.md`. Changing the VM's memory is `tart set`
+  on the runner image; never on a running VM.
+- [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok)
+  Owner, 2026-10-06, preparing for the larger Claude plan.
+  The supervisor and `daemon.sh --workers` accept 1 or 2 per lane. Allow 3, still sized by `W35.pace` from the usage
+  readings (a third slot only when used is well under elapsed), and gated on the machine: no third worker while
+  memory pressure is above normal or swap is above a stated share, read the way `run-guarded.sh` reads them. Report
+  heavy-lock waits per worker count, since on 2026-10-06 two workers already queued 110 min for the lock in half a
+  day. The owner's W35.live decision comes first.
 - [ ] **`W35.live` — first real run with two workers, measured; the owner decides whether to keep it [S]** (blocked-on: W35.pace, W35.live-owner-ok). Measurement tooling landed 2026-10-06 (checkpoint): `ops/autonomous/measure-workers.py` compares before/after the first `pace.log` line, and `heavy-run.py` now records heavy-lock waits; see `ops/autonomous/README.md` §Measuring a multi-worker run. What remains needs the owner: the daemon still runs one worker (`$STATE/max-workers` = 1), and a session cannot start the two-worker run (`daemon.sh start --workers 2`, an owner action). After about a day of it, run `measure-workers.py` and decide keep / revert / raise the limits. Owner, 2026-10-06: W35 runs ahead of Vision OCR until done (Codex is out until Sun 11 Oct, so Archive Suite runs on Claude). The Vision OCR daemon is stopped meanwhile (`~/.local/state/visionocr-autonomous/paused-for-w35`); when W35 is done, delete that file and restart it (`daemon.sh start` in ~/Claude/vision-ocr), and remove `$STATE/restart-on-source-change`. Detail: `execution-plans/parallel-workers/00-plan.md`.
 
 ## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
