@@ -86,11 +86,13 @@ fi
 exit "\$rc"
 STUB
 chmod +x "$T/codex"
-printf '#!/bin/sh\necho CLAUDE-WAS-CALLED >> "%s"\nexit 1\n' "$T/claude.calls" > "$T/claude"; chmod +x "$T/claude"
+# The stub claude records that it ran and, for the FIRST session since a reset, its argv one argument per line.
+printf '#!/bin/sh\necho CLAUDE-WAS-CALLED >> "%s"\n[ -e "%s" ] || printf "%%s\\n" "$@" > "%s"\nexit 1\n' \
+  "$T/claude.calls" "$T/claude.argv" "$T/claude.argv" > "$T/claude"; chmod +x "$T/claude"
 printf '#!/bin/sh\necho STATUS-OK\n' > "$T/status-stub.sh"; chmod +x "$T/status-stub.sh"
 
 launch() {   # $1 = AUTONOMOUS_AGENT value ("" = unset)
-  fixture_launch env -u AUTONOMOUS_AGENT HOME="$FIXTURE_HOME" CODEX_HOME="$FIXTURE_CODEX_HOME" ${1:+AUTONOMOUS_AGENT="$1"} CODEX_THREAD_ID=leaked-parent CODEX_SANDBOX=seatbelt \
+  fixture_launch env -u AUTONOMOUS_AGENT -u AUTONOMOUS_EFFORT -u AUTONOMOUS_MAX_MODEL ${EFF:+AUTONOMOUS_EFFORT="$EFF"} ${MAXM:+AUTONOMOUS_MAX_MODEL="$MAXM"} HOME="$FIXTURE_HOME" CODEX_HOME="$FIXTURE_CODEX_HOME" ${1:+AUTONOMOUS_AGENT="$1"} CODEX_THREAD_ID=leaked-parent CODEX_SANDBOX=seatbelt \
   AUTONOMOUS_HB_STALL="${HB_STALL:-600}" AUTONOMOUS_HB_IDLE_N=2 AUTONOMOUS_YIELD_CMD="${YIELD_CMD:-$T/no-yield}" AUTONOMOUS_GRANT_CMD="${GRANT_CMD:-$T/no-grant}" ${UPKEEP:+AUTONOMOUS_UPKEEP_ONLY=1} \
   AUTONOMOUS_LABEL=provecodex AUTONOMOUS_REPO="$REPO" AUTONOMOUS_PLAN="$PLAN" AUTONOMOUS_STATE="$STATE" \
   AUTONOMOUS_CLAUDE="$T/claude" AUTONOMOUS_CODEX="$T/codex" \
@@ -101,7 +103,7 @@ launch() {   # $1 = AUTONOMOUS_AGENT value ("" = unset)
     bash "$DAEMON" >"$T/daemon.out" 2>&1
 }
 reset() { : > "$STATE/daemon.log"; rm -f "$STATE/usage-window.last" "$STATE/usage-window.tsv" "$STATE/idle.since" \
-          "$STATE/engine.lock" "$STATE/agent" "$T/claude.calls" "$ARGV" "$STDIN"; rm -f "$FIXTURE_CODEX_HOME/sessions/2026/10/04"/*; }
+          "$STATE/engine.lock" "$STATE/agent" "$T/claude.calls" "$T/claude.argv" "$ARGV" "$STDIN"; rm -f "$FIXTURE_CODEX_HOME/sessions/2026/10/04"/*; }
 L="$STATE/daemon.log"
 
 echo "[1] AUTONOMOUS_AGENT=codex launches codex exec, never claude"
@@ -276,6 +278,33 @@ out="$(GT=2 held "$T/grant-hang" "$T/yield-stub")"; rc=$?; took=$(( $(date +%s) 
 [ "$rc" = 0 ] && case "$out" in "Vision OCR is running a model job"*) true ;; *) false ;; esac \
   && ok "…and yield-check decides after the timeout" || bad "after the timeout: rc=$rc out='$out'"
 rm -f "$T/yield.on"
+
+echo "[8] the Claude session's model follows its effort (owner, 2026-10-07: Fable for hard items only)"
+# claude_after FLAG — the value the stub claude session was given for FLAG.
+claude_after() { awk -v f="$1" 'p{print; exit} $0==f{p=1}' "$T/claude.argv" 2>/dev/null; }
+reset; echo "0:30:3600:no" > "$CTRL"; launch claude; sleep 4; stop "$P" || exit 1
+[ -s "$T/claude.argv" ] && ok "premise: the claude stub ran and recorded its argv" || bad "claude stub never ran: $(tail -3 "$L")"
+[ "$(claude_after --model)" = opus ] && [ "$(claude_after --fallback-model)" = sonnet ] && [ "$(claude_after --effort)" = medium ] \
+  && ok "default effort: --model opus --fallback-model sonnet --effort medium" \
+  || bad "default: --model '$(claude_after --model)' --fallback-model '$(claude_after --fallback-model)' --effort '$(claude_after --effort)'"
+grep -q 'agent claude, backstop [0-9]*s, model opus, effort medium' "$L" && ok "…and the launch line names the model" \
+  || bad "launch line: $(grep 'launching fresh' "$L" | head -1)"
+reset; EFF=max launch claude; sleep 4; stop "$P" || exit 1
+[ "$(claude_after --model)" = fable ] && [ "$(claude_after --fallback-model)" = opus ] && [ "$(claude_after --effort)" = max ] \
+  && ok "AUTONOMOUS_EFFORT=max: --model fable --fallback-model opus --effort max" \
+  || bad "max: --model '$(claude_after --model)' --fallback-model '$(claude_after --fallback-model)' --effort '$(claude_after --effort)'"
+grep -q 'agent claude (fable, effort max)' "$L" && grep -q 'model fable, effort max' "$L" && ok "…and both log lines say fable" \
+  || bad "max log lines: $(grep -E 'daemon up|launching fresh' "$L" | head -2)"
+reset; EFF=max MAXM=claude-test-model launch claude; sleep 4; stop "$P" || exit 1
+[ "$(claude_after --model)" = claude-test-model ] && [ "$(claude_after --fallback-model)" = opus ] \
+  && ok "AUTONOMOUS_MAX_MODEL overrides the max-effort model" || bad "override: --model '$(claude_after --model)' --fallback-model '$(claude_after --fallback-model)'"
+reset; EFF=max MAXM=opus launch claude; sleep 4; stop "$P" || exit 1
+[ "$(claude_after --model)" = opus ] && [ "$(claude_after --fallback-model)" = sonnet ] \
+  && ok "an override to opus never falls back to itself" || bad "opus override: --model '$(claude_after --model)' --fallback-model '$(claude_after --fallback-model)'"
+reset; EFF=max launch codex; sleep 4; stop "$P" || exit 1
+awk 'BEGIN{RS="\n----\n"} {a[NR]=$0} END{for(i=1;i<NR;i++) if(a[i]=="-m" && a[i+1]=="gpt-6.1-sol") f=1; exit !f}' "$ARGV" \
+  && grep -qx -- 'model_reasoning_effort=high' "$ARGV" && ! grep -qx -- fable "$ARGV" \
+  && ok "a codex lane is unchanged by AUTONOMOUS_EFFORT=max (gpt-6.1-sol, effort high)" || bad "codex lane changed under EFF=max"
 
 echo "[5] refusals"
 refusal_rc() {   # $1 = agent; runs the daemon in THIS shell (not a $(…) subshell) so its exit code is waitable

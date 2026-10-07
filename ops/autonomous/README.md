@@ -1003,6 +1003,9 @@ STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `o
 
 Every resume session launches as **`--model opus --fallback-model sonnet --effort medium`**
 (`EFFORT` = `AUTONOMOUS_EFFORT`, default `medium` since 2026-09-24; the CLI accepts `low|medium|high|xhigh|max`).
+At `max` the model follows the effort (owner, 2026-10-07, "Fable for hard items only"): the session launches as
+`--model fable --fallback-model opus` (`AUTONOMOUS_MAX_MODEL` overrides `fable`). This daemon never raises effort
+itself, so that happens only when the operator sets `AUTONOMOUS_EFFORT=max`. Codex lanes are unaffected.
 
 **Why the session's own model/effort is FIXED, not chosen per queue item.** Both flags are resolved when the
 process launches — *before* the session picks its item, which happens inside the session at resume-prompt

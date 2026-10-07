@@ -953,7 +953,8 @@ staggered starts, the subscription policy) and the design are in the plan.
   add the pass/fail to `ops/gui/README.md`'s memory table. Also: the interactive runner printed only a WARN and
   exited 0 on `** TEST FAILED **`, so a script wrapping it saw success; make it exit non-zero on a failed
   test run (check the gate's own `TEST FAILED` handling is unchanged and still covers Notes in its rotation).
-- [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (lane: ops) (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok, agent-manager-plan-ok) HELD 2026-10-07: the owner is reviewing a machine-wide Agent Manager (`~/Claude/Agent Manager/PLAN.md`) that would own worker counts across projects.
+- [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (lane: ops) (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok) HELD 2026-10-07: the owner is reviewing a machine-wide Agent Manager (`~/Claude/Agent Manager/PLAN.md`) that would own worker counts across projects.
+  Owner, 2026-10-07: the owner approved the Agent Manager plan and the Claude plan is now about 5x larger (Education Premium), so a third worker gated on the Mac's capacity is worth building, and the heavy-job load log the manager records from stage 5 (`~/.local/state/agent-manager/heavy-jobs.log`) should inform its machine gate.
   Owner, 2026-10-06, preparing for the larger Claude plan.
   The supervisor and `daemon.sh --workers` accept 1 or 2 per lane. Allow 3, still sized by `W35.pace` from the usage
   readings (a third slot only when used is well under elapsed), and gated on the machine: no third worker while

@@ -193,6 +193,17 @@ EFFORT="${AUTONOMOUS_EFFORT:-medium}"     # reasoning effort for every resume se
                                           # session and into this script. What a session CAN vary per task is its
                                           # SUBAGENTS' effort/model, which the resume prompt's Efficiency block
                                           # now delegates to it explicitly.
+# The Claude session's model follows EFFORT (owner, 2026-10-07: the account moved to Claude for Education
+# Premium, which carries Fable, and the ruling was "Fable for hard items only"). Opus with sonnet as the
+# overload fallback is the default; a session at max effort runs $AUTONOMOUS_MAX_MODEL with opus as the
+# fallback. This daemon never raises a Claude session to max on its own — no attempt count or gate-fix try
+# changes EFFORT — so max, and with it Fable, happens only when the operator sets AUTONOMOUS_EFFORT=max.
+# Codex lanes are unaffected (CODEX_MODEL above).
+MAX_MODEL="${AUTONOMOUS_MAX_MODEL:-fable}"
+if [ "$EFFORT" = max ]; then SESSION_MODEL="$MAX_MODEL"; SESSION_FALLBACK=opus
+else SESSION_MODEL=opus; SESSION_FALLBACK=sonnet; fi
+# claude refuses a fallback equal to the main model, so an override to opus at max falls back to sonnet.
+[ "$SESSION_FALLBACK" = "$SESSION_MODEL" ] && SESSION_FALLBACK=sonnet
 
 # Idle backoff — the loop's answer to "nothing is happening". $INTERVAL is the cadence while the run is
 # PRODUCTIVE; a cycle that advances nothing doubles the gap up to $MAXBACKOFF, and $IDLE_STOP of unbroken
@@ -1422,7 +1433,7 @@ for _v in $(env | sed -n 's/^\(CODEX[A-Za-z0-9_]*\)=.*/\1/p'); do [ "$_v" = CODE
 # on 2026-07-12 (display slept 03:27 → 5h gap). -di holds the display on and keeps the whole machine up.
 if [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ]; then caffeinate -di -w "$$" & fi
 
-log "=== daemon up (pid $$, agent $AGENT$( [ "$AGENT" = codex ] && echo " ($CODEX_MODEL, effort $CODEX_EFFORT)" || echo " (effort $EFFORT)"), interval ${INTERVAL}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET")) ==="
+log "=== daemon up (pid $$, agent $AGENT$( [ "$AGENT" = codex ] && echo " ($CODEX_MODEL, effort $CODEX_EFFORT)" || echo " ($SESSION_MODEL, effort $EFFORT)"), interval ${INTERVAL}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET")) ==="
 
 # W27.parkstick — retire the previous park's Desktop note. `park_run` writes
 # ~/Desktop/ARCHIVE-SUITE-RUN-PARKED.txt and, until now, a repo-wide grep found ONE writer and NO remover, so
@@ -1795,7 +1806,7 @@ tick() {
     *) export PATH="$REPO/ops/autonomous/bin:$PATH" ;;
   esac
 
-  log "launching fresh resume session (agent $AGENT, backstop ${MAXRUN}s$( [ "$AGENT" = claude ] && echo ", budget \$$BUDGET"), health-wd on)…"
+  log "launching fresh resume session (agent $AGENT, backstop ${MAXRUN}s$( [ "$AGENT" = claude ] && echo ", model $SESSION_MODEL, effort $EFFORT, budget \$$BUDGET"), health-wd on)…"
   cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; claims_release; return 0; }
   # Fresh per-session log (keep one previous). stream-json is larger than text, so don't append forever; a
   # fresh file also gives the heartbeat + usage watchdogs a clean zero baseline.
@@ -1841,7 +1852,7 @@ tick() {
   else
   claims_launch "$CLAUDE" -p "$(claims_prompt)" \
       --permission-mode default \
-      --model opus --fallback-model sonnet \
+      --model "$SESSION_MODEL" --fallback-model "$SESSION_FALLBACK" \
       --effort "$EFFORT" \
       --max-budget-usd "$BUDGET" \
       --output-format stream-json --verbose --include-partial-messages \
