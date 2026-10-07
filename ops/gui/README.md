@@ -184,6 +184,26 @@ view/interaction changes here off-screen — the old `gui-mode` flag was retired
 (CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/hooks/no-host-gui.sh` now *enforces* that for
 unattended runs. VM TCC grants live on the VM's disk (re-apply if the VM is rebuilt).
 
+**VM memory is 6144 MB (W35.vm-mem, measured 2026-10-07; was 8192).** Memory lives only in the VM's own
+config — no script passes `--memory` — so `tart get archive-gui-runner` is the source of truth, and changing it
+is `tart set archive-gui-runner --memory N` on a **stopped** VM, under `mac-heavy.lock`. The Mac has 18 GB; at
+8 GB the VM used all of it while host swap reached 10.7 of 11.2 GB (2026-10-06). Three `xcuitest` runs per app
+per size, interleaved, each under the heavy lock (lock wait excluded), 4 CPUs both ways:
+
+| app | 8192 MB wall s (median) | 6144 MB wall s (median) | Δ median | in-guest test s, 8192 / 6144 (median) | result, both sizes |
+|---|---|---|---|---|---|
+| reader | 542 · 508 · 486 (**508**) | 494 · 2827 · 461 (**494**) | −3% | 422 / 416 | 31 passed + 1 skipped, every run |
+| notes | 2114 · 1189 · 1148 (**1189**) | 1328 · 1207 · 1264 (**1264**) | +6% | 1104 / 1129 | **21–22 failed every run at BOTH sizes** (22, 21, 21 / 21, 21, 21) |
+| processor | 212 · 136 · 148 (**148**) | 132 · 123 · 116 (**123**) | −17% | 60 / 58 | 7 passed, every run |
+
+Keep rule was "no run fails that passed at 8 GB, median no more than 25% slower" — met. The one 2827 s Reader
+run spent its extra ~40 min outside test execution (its tests took 435 s, like the others); with no timestamps
+in that log the cause is unknown, and the median absorbs it. Notes was already red at 8 GB (17 of its 21 are
+`a seeded note row should populate the list`), so it adds timing but little pass/fail evidence — tracked as
+`W35.vm-mem-fu1`, which re-checks at 6 GB once the suite is green. Peak host swap during a run (3.1–7.8 GB)
+rose through the day with other machine load at both sizes and is not attributable to the VM. If 6 GB ever
+looks like the cause of a failure, `tart set … --memory 8192` and rerun before debugging anything else.
+
 **One table, one wait — `ops/gui/tart-lib.sh`.** The per-app config (project/scheme/test selectors/guest
 DerivedData/app bundle/fixture + its builder/launch command/pre-run) and the guest-agent wait are **shared** by
 `vm-gui-runner.sh` and `ops/autonomous/gui-vm-gate.sh`. That is load-bearing,

@@ -944,14 +944,15 @@ full usage window". Made the daemon's next work, ahead of everything else in the
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
 
-- [ ] **`W35.vm-mem` — measure the GUI VM at 6 GB instead of 8 [S]**
-  Owner, 2026-10-06 (the plan upgrade means more workers; the Mac, 18 GB, is the limit). The Tart VM
-  `archive-gui-runner` is set to 8192 MB and 4 CPUs and used all of it (about 8.2 GB, 6.4 GB compressed) on
-  2026-10-06 while swap reached 10.7 of 11.2 GB. Measure the off-screen GUI runs (`ops/gui/vm-gui-runner.sh` for
-  reader, notes and processor) at 6144 MB against their 8192 MB timings and pass/fail, at least three runs each,
-  under the shared mac-heavy.lock. Keep 6 GB only if no run fails that passed at 8 GB and the median is no more than
-  25% slower; record both sets of figures either way in `ops/gui/README.md`. Changing the VM's memory is `tart set`
-  on the runner image; never on a running VM.
+- [ ] **`W35.vm-mem-fu1` — Notes UITests are red in the GUI VM (21 of 31), and `vm-gui-runner.sh` exits 0 anyway [S-M]**
+  Found by W35.vm-mem, 2026-10-07: every one of six `vm-gui-runner.sh notes xcuitest` runs, at 8192 MB and at
+  6144 MB alike, ended `** TEST FAILED **` with 21–22 failures; 17 of the 21 are `a seeded note row should populate
+  the list`, the rest G13/G16/G17/`testDateRowWarns…` (evidence: `~/.tart-mirror/vm-mem-measure/notes-*.log`,
+  latest full log `~/.tart-mirror/vm-artifacts/notes/xcuitest.log`). Not a memory effect. Find the cause (fixture,
+  index-ready wait, or app) and make the suite green in the VM; then rerun it three times at the VM's 6144 MB and
+  add the pass/fail to `ops/gui/README.md`'s memory table. Also: the interactive runner printed only a WARN and
+  exited 0 on `** TEST FAILED **`, so a script wrapping it saw success; make it exit non-zero on a failed
+  test run (check the gate's own `TEST FAILED` handling is unchanged and still covers Notes in its rotation).
 - [ ] **`W35.three-workers` — let pacing run up to three Claude workers [S-M]** (blocked-on: W35.unspent, W35.vm-mem, W35.live-owner-ok, agent-manager-plan-ok) HELD 2026-10-07: the owner is reviewing a machine-wide Agent Manager (`~/Claude/Agent Manager/PLAN.md`) that would own worker counts across projects.
   Owner, 2026-10-06, preparing for the larger Claude plan.
   The supervisor and `daemon.sh --workers` accept 1 or 2 per lane. Allow 3, still sized by `W35.pace` from the usage
