@@ -5,7 +5,16 @@ Proves two projects never hold it at once (through the CLI and through heavy-run
 holder is reclaimed, a fresh half-taken lock is not, nesting takes nothing, a heavy-run waiting
 on the Mac lock is watchdog work and its gate cap is not started, and a mutant of heavy-run.py
 without the take turns the exclusion check red.
+
+All of that runs with AGENT_MANAGER_HEAVY_LOCK pointing at a missing file: the fallback, this copy's
+own protocol. The DELEGATE part then points it at a scratch copy of the Agent Manager's heavy-lock
+(AGENT_MANAGER_HEAVY_LOCK_SOURCE, default the installed ~/Claude/Agent Manager/bin/heavy-lock; skipped,
+and said so, when neither exists) with its state in scratch, and proves the CLI hands over to it, that
+delegated, fallback and heavy-run.py takers never overlap, that --lock and a non-executable helper fall
+back, and that three mutants of mac-heavy-lock.py each turn a delegate check red.
 """
+import shutil
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -53,7 +62,8 @@ def serialized(log):
 with tempfile.TemporaryDirectory(prefix="mac heavy [scratch] ") as scratch:
     root = Path(scratch)
     lock = root / "state dir" / "mac-heavy.lock"
-    env = dict(os.environ, MAC_HEAVY_LOCK=str(lock), ARCHIVE_UNATTENDED="1", AUTONOMOUS_HEAVY_ENABLED="1")
+    env = dict(os.environ, MAC_HEAVY_LOCK=str(lock), ARCHIVE_UNATTENDED="1", AUTONOMOUS_HEAVY_ENABLED="1",
+               AGENT_MANAGER_HEAVY_LOCK=str(root / "no manager" / "heavy-lock"))  # the fallback: never the real one
     env.pop("ARCHIVE_HEAVY_TOKEN", None)
     env.pop("MAC_HEAVY_HELD", None)  # the real gate holds the real lock; this proof must not inherit that
     mlog = lock.parent / "mac-heavy.log"
@@ -249,4 +259,138 @@ with tempfile.TemporaryDirectory(prefix="mac heavy [scratch] ") as scratch:
             except (ProcessLookupError, PermissionError):
                 pass
             p.communicate()
+
+# ---- DELEGATE: the Agent Manager's shared helper, as a scratch copy ---------------------------------
+SOURCE = Path(os.environ.get("AGENT_MANAGER_HEAVY_LOCK_SOURCE")
+              or Path.home() / "Claude/Agent Manager/bin/heavy-lock")
+if not SOURCE.is_file():
+    print("SKIP delegate: no Agent Manager heavy-lock at %s (set AGENT_MANAGER_HEAVY_LOCK_SOURCE)" % SOURCE)
+else:
+    with tempfile.TemporaryDirectory(prefix="mac heavy delegate [scratch] ") as scratch:
+        root = Path(scratch)
+        manager = root / "manager bin" / "heavy-lock"
+        manager.parent.mkdir()
+        shutil.copyfile(SOURCE, manager)
+        manager.chmod(0o755)
+        mstate = root / "manager state"
+        lock = root / "old" / "mac-heavy.lock"
+        mowner = mstate / "heavy.owner"
+        env = dict(os.environ, MAC_HEAVY_LOCK=str(lock), AGENT_MANAGER_STATE=str(mstate), MAC_HEAVY_POLL="0.1",
+                   AGENT_MANAGER_HEAVY_LOCK=str(manager), ARCHIVE_UNATTENDED="1", AUTONOMOUS_HEAVY_ENABLED="1")
+        for k in ("ARCHIVE_HEAVY_TOKEN", "MAC_HEAVY_HELD", "HEAVY_LOCK_FILE", "MAC_HEAVY_PROJECT", "MAC_HEAVY_TOUCH"):
+            env.pop(k, None)
+        fallback = dict(env, AGENT_MANAGER_HEAVY_LOCK=str(root / "no manager" / "heavy-lock"))
+        for path in (manager, mstate, lock):
+            assert str(path).startswith(scratch), path  # never the real locks
+        procs = []
+
+        def popen(lockpy, args, environ=None):
+            p = subprocess.Popen([sys.executable, str(lockpy)] + args, env=environ or env, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True, start_new_session=True)
+            procs.append(p)
+            return p
+
+        def kv(path):
+            try:
+                return dict(l.split("=", 1) for l in path.read_text().splitlines() if "=" in l)
+            except OSError:
+                return {}
+
+        def hold(lockpy, args, environ=None):
+            ready = root / ("ready-%d" % len(procs))
+            p = popen(lockpy, args + ["run", "--", sys.executable, "-c",
+                                      "import sys,time;open(sys.argv[1],'w').close();time.sleep(30)", str(ready)],
+                      environ)
+            return p if until(ready.exists) else None  # None: it never held (a mutant may refuse)
+
+        def pid(p):
+            return str(p.pid) if p else "no holder"
+
+        def stop(p):
+            if p:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(p.pid, signal.SIGTERM)
+                p.communicate(timeout=30)
+
+        def delegate_checks(lockpy):
+            """(name, ok) for each delegate check, run against this copy of mac-heavy-lock.py."""
+            out = []
+            r = subprocess.run([sys.executable, str(lockpy), "status"], env=env, capture_output=True, text=True)
+            out.append(("status is the manager's", r.stdout.startswith("heavy      free")))
+            r = subprocess.run([sys.executable, str(lockpy), "status"], env=fallback, capture_output=True, text=True)
+            out.append(("missing manager falls back", r.stdout.startswith("free (")))
+            r = subprocess.run([sys.executable, str(lockpy), "run", "--", "sh", "-c", "exit 7"], env=env,
+                               capture_output=True, text=True)
+            out.append(("exit status passes through", r.returncode == 7))
+            h = hold(lockpy, [])
+            o, old = kv(mowner), kv(lock / "owner")
+            out.append(("delegated holder is the manager's, same pid, project archive-suite",
+                        o.get("pid") == pid(h) and o.get("project") == "archive-suite"
+                        and old.get("pid") == pid(h)))
+            stop(h)
+            h = hold(lockpy, ["--project", "vision-ocr"])
+            out.append(("an explicit --project wins", kv(mowner).get("project") == "vision-ocr"))
+            stop(h)
+            other = root / "other" / "mac-heavy.lock"
+            h = hold(lockpy, ["--lock", str(other)])
+            out.append(("--lock falls back", kv(other / "owner").get("pid") == pid(h) and not mowner.exists()))
+            stop(h)
+            manager.chmod(0o644)
+            try:
+                r = subprocess.run([sys.executable, str(lockpy), "status"], env=env, capture_output=True, text=True)
+                out.append(("non-executable manager falls back", r.stdout.startswith("free (")))
+            finally:
+                manager.chmod(0o755)
+            return out
+
+        try:
+            for name, ok in delegate_checks(LOCKPY):
+                check(ok, "delegate: " + name)
+            check(not lock.exists() and not mowner.exists(), "delegate: every holder released")
+
+            # Delegated CLI takers, fallback CLI takers (an un-switched project) and heavy-run.py: never two inside.
+            log = root / "three.log"
+            ps = []
+            for i in range(9):
+                tag = "%s%d" % ("dfh"[i % 3], i)
+                cmd = ["--project", "vision-ocr", "run", "--"] + interval(log, tag)
+                if i % 3 == 0:
+                    ps.append(popen(LOCKPY, cmd))
+                elif i % 3 == 1:
+                    ps.append(popen(LOCKPY, cmd, fallback))
+                else:
+                    p = subprocess.Popen([sys.executable, str(HEAVY), "--state", str(root / ("heavy-%d" % i)), "run",
+                                          "--"] + interval(log, tag), env=env, stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE, text=True, start_new_session=True)
+                    procs.append(p)
+                    ps.append(p)
+            for p in ps:
+                o, e = p.communicate(timeout=60)
+                assert p.returncode == 0, (p.returncode, o, e)
+            ok, lines = serialized(log)
+            check(ok and len(lines) == 18, "delegate: delegated, fallback and heavy-run.py takers never overlap")
+
+            # Mutants: each must turn at least one delegate check red. Anchors unique, file changed.
+            source = LOCKPY.read_text()
+            mutants = {
+                "no delegate call": ("    delegate(sys.argv[1:])\n", "    pass\n"),
+                "--lock not honoured": ('if helper is None or "--lock" in options(argv):',
+                                        "if helper is None:"),
+                "default project dropped": ('[helper, "--project", "archive-suite"] + argv', "[helper] + argv"),
+            }
+            for name, (needle, broken) in mutants.items():
+                check(source.count(needle) == 1, "mutant anchor unique: " + name)
+                mutant = root / "mutant" / name.replace(" ", "-") / LOCKPY.name
+                mutant.parent.mkdir(parents=True)
+                mutant.write_text(source.replace(needle, broken))
+                check(mutant.read_text() != source, "mutant landed: " + name)
+                red = [n for n, ok in delegate_checks(mutant) if not ok]
+                check(red, "mutant turns delegate checks red: %s (%s)" % (name, ", ".join(red)))
+        finally:
+            for p in procs:
+                try:
+                    os.killpg(p.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+                p.communicate()
 print(f"Mac heavy lock proof: {PASS} passed, 0 failed")

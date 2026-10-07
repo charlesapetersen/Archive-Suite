@@ -87,9 +87,17 @@ dead holder, nesting crossed. A drift in either side's format is not caught by e
 so a heavy.lock spin with no live owner is not spared), so the watchdog spares it, and
 `--ready` (which starts the gate's execution cap) is written only once both locks are held.
 `python3 ops/autonomous/mac-heavy-lock.py status` shows the holder; `... run -- CMD` wraps a command by hand.
+Run as a command, `mac-heavy-lock.py` now hands over to the Agent Manager's shared helper when that is
+installed and executable (`AGENT_MANAGER_HEAVY_LOCK`, default `~/Claude/Agent Manager/bin/heavy-lock`): it
+execs it with the same arguments plus `--project archive-suite`. That helper takes a kernel flock and this
+mkdir lock both, so takers here still see it; its `status` reads differently and exits 1 while held.
+Without the manager, or with `--lock`, the command runs as before. `heavy-run.py` imports the functions and
+so always speaks the mkdir protocol directly; the manager is never required.
 Known limit: a SIGKILLed supervisor whose child session survives frees the Mac lock early (its pid is
 dead), though `heavy.lock` still protects this project. `tests/prove-mac-heavy-lock.sh` (a gate step)
-uses a scratch `MAC_HEAVY_LOCK`, never the real one.
+uses a scratch `MAC_HEAVY_LOCK`, never the real one, and a missing `AGENT_MANAGER_HEAVY_LOCK` for the
+fallback; its delegate part runs a scratch copy of the manager's helper (`AGENT_MANAGER_HEAVY_LOCK_SOURCE`,
+default the installed one) and says SKIP when there is none.
 
 ## Item claims and shared plan edits (W35.claims)
 

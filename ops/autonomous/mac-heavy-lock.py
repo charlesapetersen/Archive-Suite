@@ -21,6 +21,15 @@ repo depends on the other, so the WIRE PROTOCOL below is the contract: change it
 A caller that holds another lock must not WAIT here while holding it (hold-and-wait deadlocks
 against a holder that needs that lock next): use attempt() and back off, as heavy-run.py does.
 Tests point MAC_HEAVY_LOCK at a scratch path; never at the real lock.
+
+DELEGATE (Agent Manager stage 2). Run as a command, this file hands over to the Agent Manager's shared
+helper when it is installed: if AGENT_MANAGER_HEAVY_LOCK (default ~/Claude/Agent Manager/bin/heavy-lock)
+names an executable file, main() execs it with the same arguments, adding `--project archive-suite`
+first so this file's default project survives. That helper takes its own kernel lock AND this mkdir
+lock, so every taker here still sees it. Otherwise, or when --lock is given (the manager has no such
+option), the command runs exactly as below. Importing this file (heavy-run.py does) never delegates:
+the functions here are the old protocol itself. The manager is not required for this project to run.
+Tests set AGENT_MANAGER_HEAVY_LOCK to a scratch copy, or to a missing path for the fallback.
 """
 import argparse
 import contextlib
@@ -201,7 +210,36 @@ def release(lock=None, pid=None):
         shutil.rmtree(lock, ignore_errors=True)
 
 
+def manager_helper():
+    """The Agent Manager's heavy-lock if it is installed and executable, else None."""
+    path = os.environ.get("AGENT_MANAGER_HEAVY_LOCK") or str(Path.home() / "Claude/Agent Manager/bin/heavy-lock")
+    path = os.path.expanduser(path)
+    return path if os.path.isfile(path) and os.access(path, os.X_OK) else None
+
+
+def options(argv):
+    """The option names given before the action, as argparse below reads them (after it, all is command)."""
+    names, i = [], 0
+    while i < len(argv) and argv[i].startswith("-") and argv[i] != "--":
+        name = argv[i].split("=", 1)[0]
+        names.append(name)
+        i += 1 if "=" in argv[i] else 2
+    return names
+
+
+def delegate(argv):
+    """Exec the manager's helper with these arguments; return only if there is none to exec."""
+    helper = manager_helper()
+    if helper is None or "--lock" in options(argv):
+        return
+    try:
+        os.execv(helper, [helper, "--project", "archive-suite"] + argv)
+    except OSError as e:
+        print("mac-heavy-lock: cannot run %s (%s); using this copy" % (helper, e), file=sys.stderr, flush=True)
+
+
 def main():
+    delegate(sys.argv[1:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--lock", type=Path)
     ap.add_argument("--project", default="archive-suite")
