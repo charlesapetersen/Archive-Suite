@@ -854,10 +854,22 @@ shippable. **D5 is already shipped** (W14.4b) and is not listed.
 checkboxes overstated completion once already; do not repeat that on the fixes. Use the paced method in
 `REVIEW.md`, one subsystem per session, never a giant fan-out.
 
-- [ ] **`W9.e1` — re-run the plan-vs-build gap analysis over every A–D item [M]** (blocked-on: W9.b1, W9.b2,
-  W9.b3, W9.b4, W9.b5, W9.b6, W9.b7, W9.b8, W9.b9). Plan E1. | ArchiveNotes | M | low | none
+✅ **`W9.e1` (plan E1) shipped 2026-10-06** — the per-item result is in the plan under *E1 result*; the
+completion record is in `SUITE_TODO_DONE.md`.
+
+- [ ] **`W9.b5-fu1` — an open request for a closed window's kind opens that window [S · gui]** (W9.e1 finding
+  on B5/B9/D5). `NotePassageResolve.openAction` (`Core/NotePassageResolve.swift:95`) sends `.ignore` to the
+  window that does not feature the target's kind, and only the featuring window's mounted `NoteEditorPane`
+  acts (`Views/NoteEditorPane.swift:319`). With the Extracts window closed, an extract's
+  `archivenotes://open` link, a pasted Copy Link, or Create Extract from the Notes window only activates the
+  app; the reverse holds for a jump-to-source with every Notes window closed. Fix: when the target exists
+  and is of the other kind, open its window (`openWindow(id:)`) so its pane mounts and consumes the still-
+  pending request — without opening a duplicate Notes window (`WindowGroup`) when one is already up. Unit-test
+  the decision in `openAction`; VM-check both directions with the other window closed. | ArchiveNotes | S | low | none
 - [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]**
-  (blocked-on: W9.e1). Plan E2 — and the 2026-07-18 addendum's own unfinished business: note delete +
+  (blocked-on: W9.e1, W9.b5-fu1). Plan E2 — also settle the two D1 doubts E1 could not decide from source:
+  whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents
+  a folder back to top level. Plan E2 — and the 2026-07-18 addendum's own unfinished business: note delete +
   delete-last-instance guard, tag editing, quality quick-edit, manual author, keyword FTS + quality/tag/date
   filters, folder create/rename/delete + move/reorder + replicate, templates, context menu, Zotero
   attach/auto-fill, source-block paste, Copy Link, deep-link, smart folders, empty state. Headless render
@@ -868,7 +880,7 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
 - [ ] **`W9.e3` — prove the safety net actually bites on a planted violation [S]** (blocked-on: W9.c2, W9.c3).
   Plan E3. A lint that has never failed is not a guard — same class as `W26.oracle-fu1`. | scripts/ | S | low | none
 - [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (blocked-on: W9.e1,
-  W9.e2, W9.e3). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
+  W9.e2, W9.e3, W9.b5-fu1). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
   convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
 
 ## Cross-app date display — owner-promoted 2026-09-26

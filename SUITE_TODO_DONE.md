@@ -255,6 +255,18 @@ Grouped under the `SUITE_TODO.md` section each item was completed in.
   live output folder, GUI, credentials, or network is used. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/
   {Capture/CaptureSession.swift,Capture/LiveCaptureRecoveryTestDriver.swift} | S | low | done
 
+## W9 gap-closure — Phase E verification (2026-10-06)
+
+- [x] **W9.e1 — re-run the plan-vs-build gap analysis over every A–D item [M].** **SHIPPED 2026-10-06 (this commit).**
+  Plan E1. A source-read pass, one reviewer per phase, traced every B/C/D item from a production entry point
+  (menu, context menu, inspector, `onOpenURL`, health gate) to its effect; the per-item `file:line` result is in
+  `09-gap-closure.md` under *E1 result*. All of A–D PASS except **B5/B9 (and D5) PARTIAL**: an open request for
+  the kind whose window is closed is ignored → filed `W9.b5-fu1`, which now gates `W9.e2` and `W9.e4`. Also
+  fixed here: A10 marked done after a dry-run proved `docsync-guard.sh` trips on a packages-only commit; the
+  deleted `TagFilterField.swift` dropped from `ArchiveReader/CLAUDE.md`; the A11 deviation note corrected
+  (date IS projected as Finder date facets; only author is front-matter only). Nothing built or run — runtime
+  proof is E2.
+
 ## W9 gap-closure — Phase D secondary UI (2026-09-26)
 
 - [x] **W9.cand2-fu1 — attachment views after OTHER edits: redo, undo, and the chip/image inserts [S · gui]**

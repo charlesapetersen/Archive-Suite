@@ -117,7 +117,7 @@ do not recreate the deferred exclusion feature.
 **A9. Drop `@testable` from `DocumentTagsTests`. — ✅ DONE (W9 Phase A, 2026-07-18).** — `01` S1 Verify required plain `import ArchiveCore` (types are `public`); `DocumentTagsTests.swift:2` had used `@testable`. *Shipped:* changed the import to plain `import ArchiveCore` (+ a comment noting the test now doubles as a guard that the parse surface stays public); every symbol the test exercises (`DocumentTags.parse`/`.parsePriority`/`.parseDecade`/`.sortDateKey` + the facet properties) is public. *Verified:* `swift test` in `packages/ArchiveCore` → **100 tests in 8 suites passed**, clean build.
 - *Files:* that test. *Steps:* change to `import ArchiveCore`; `swift test` still green. *Verify:* package tests pass. *Tier-1.*
 
-**A10. Confirm doc-sync hook covers `packages/`.** — the W0 plan asked to prove the doc-sync backstop fires for a package outside both app dirs; `.claude/hooks/docsync-*.sh` contain no `packages/ArchiveCore` reference.
+**A10. Confirm doc-sync hook covers `packages/`. — ✅ DONE (W9.e1, 2026-10-06).** `docsync-guard.sh:39-41` flags any `*.swift`/`*.kt` path in the landed range, so `packages/` is covered without naming it; a dry-run (`DOCSYNC_TEST_BASE=67340a9~1 DOCSYNC_TEST_HEAD=67340a9`, a packages-only commit) tripped the backstop. — the W0 plan asked to prove the doc-sync backstop fires for a package outside both app dirs; `.claude/hooks/docsync-*.sh` contain no `packages/ArchiveCore` reference.
 - *Files:* `.claude/hooks/docsync-*.sh` (+ their config). *Steps:* verify/extend scope so a `packages/ArchiveCore` code change without a doc touch is caught. *Verify:* a dry-run trips the hook. **Tier-2** (autonomous-setup change — prove the mechanism before install).
 
 **A11. Reconcile the original spec's "author/date/quality → macOS Finder tags" durability intent. — ✅ DONE (W9 Phase A, 2026-07-18).** — **DOC**
@@ -360,6 +360,36 @@ Phase B/C item specifically, prove there is a **production caller** — grep eac
 outside `Tests/` — so nothing regressed back into "built but dead." *Verify:* each A–D item is CONFIRMED,
 with `file:line` evidence. *Done:* a written pass/fail per item; any FAIL loops back to its phase.
 
+**E1 result — ✅ DONE (W9.e1, 2026-10-06).** Source-read pass, one reviewer per phase; nothing built or run
+(runtime proof is E2). Paths below are under `ArchiveNotes/macOS/Sources/ArchiveNotes/` unless prefixed.
+No item regressed to "built but dead"; every B/C/D entry point is production code, none `#if DEBUG`-only.
+- **A** — PASS: A1, A2 (`README.md:11,64,70,81`), A3 (root `AGENTS.md:5`), A4 (no marker row in SPEC; the
+  remaining "suite marker" wording means `RootMarker`), A5 (only `00-overview` + this plan remain), A6, A8,
+  A9 (`DocumentTagsTests.swift:2`), A10 (dry-run, above). Fixed in this pass: A7 — `ArchiveReader/CLAUDE.md`
+  still listed the deleted `TagFilterField.swift`; A11 — this plan's deviation note said date was
+  front-matter only.
+- **B** — PASS: B1 (Note ▸ Auto-fill `ArchiveNotesCommands.swift:94` → sheet `NoteEditorPane.swift:93` →
+  `NotesModel.applyZoteroAutoFill`), B2 (`NoteZoteroInspector` in `NoteMetadataInspector.swift:71`), B3
+  (rename `NotesTableView.swift:72/386/531` → `NoteStore.swift:384`; tags `NoteTagsInspector.swift:71` →
+  `NotesTagProjector`), B4 (`MarkdownEditorView.swift:539` → `SourceBlockThumbnailRenderer`), B6
+  (`EditorFormatting.swift:290` → `ExtractBuilder.swift:131`), B7 (`ReaderPreviewPopover.swift:105` →
+  `ReaderRootChooser` → `ReaderLinkResolver.grantAndResolve:279`; also File ▸ Choose Archive Folder…), B8
+  (`NoteMetadataInspector.swift:175`, notes and extracts → `NotesModel.setAuthors:946`, FTS `authors`).
+  **PARTIAL: B5 and B9** — `archivenotes://open` and Copy Link work for notes and for extracts while the
+  Extracts window is open, but `NotePassageResolve.openAction` (`:95`) returns `.ignore` in a window that does
+  not feature the target's kind, and nothing opens the other window, so an extract link with the Extracts
+  window closed (or a note link with every Notes window closed) only activates the app. → **`W9.b5-fu1`**.
+- **C** — PASS: C1 (root `test-smoke.sh:23,35`), C2 (`ArchiveProcessor/scripts/lint-write-surface.sh`, run
+  with its mutation proof by `ops/autonomous/health-gate.sh:146-147`), C3 (Reader lint rule 4 over Core,
+  `health-gate.sh:144-145`), C4 (`ArchiveNotesUnit` scheme), C5 (`ArchiveCore/Tags/TagWrite.swift:152`
+  `PathWriteSerializer` + `NotesTagProjectorSafetyTests:126`), C6 (`NotesScalePerfTests`, bounded times +
+  scratch guard). Note: C6 is opt-in only (`ArchiveNotes/scripts/test-scale-acceptance.sh`, run by nothing),
+  as designed; and the health gate runs no `swift test` for ArchiveCore (only `test-smoke.sh all` does).
+- **D** — PASS: D1–D12. **D5 shares the B5 gap** (Create Extract from the Notes window raises nothing when
+  the Extracts window is closed — fixed by `W9.b5-fu1`). For **E2** to settle at runtime: D1 — a row-level
+  `.onDrag` (`NotesFolderTreeView.swift:211`) may pre-empt the List's `.onMove` reorder (`:235`), and there
+  is no drop target that re-parents a folder back to top level; D2 — context-menu "Open" only re-selects.
+
 **E2. Drive the wired features at runtime.** For B1–B9 and the Phase D UI items, actually exercise them in
 the running app (or via `ArchiveNotesUITests` / `scripts/gui-drive-notes.sh` + the `an.editor.test.*` DEBUG
 seams against the **scratch fixture only**): auto-fill writes front-matter; note-level chips render; a note
@@ -391,7 +421,7 @@ in the same commit — the docs move with the code. *Tier per the items reviewed
 
 ## Explicitly out of scope (plan-stated deferrals — NOT gaps)
 
-Recorded here so a future reviewer doesn't re-flag them: mirroring **author/date** into Finder tags
+Recorded here so a future reviewer doesn't re-flag them: mirroring **author** into Finder tags (date already projects as date facets)
 (see the A11 deviation note below); a
 single merged unified-writer signature; unifying the page-2 header *builder*; a shared suite-wide storage
 path; page-within-merged-PDF scroll navigation; editor tables/footnotes/task-lists/strikethrough/HTML and
@@ -415,13 +445,15 @@ renames (authorized by overview §16).
 **Author/date → front-matter; Quality → canonical Q tag (A11 — spec-vs-build).** The original spec's
 durability section said other metadata "e.g. **author and date**" should go in macOS tags, and its tags
 section wanted a **quality** ordering "akin to the priority tag in Reader … **not** a regular tag"
-(Reader's priority *is* a projected Finder tag). The build keeps `authors` and `date` in the note's
-**YAML front-matter** (authoritative, durable plain text), while it projects the front-matter Quality
-value as canonical `Q1`...`Q3` on the note's own `.md` Finder tags alongside its subjects — overview
+(Reader's priority *is* a projected Finder tag). The build keeps `authors` in the note's **YAML
+front-matter** only (authoritative, durable plain text). `date` is authoritative in front-matter too, but
+is ALSO projected as date-facet Finder tags (`NotesTagProjector.dateFacetTokens`; corrected by W9.e1 —
+this note used to say date was front-matter only), and the Quality value projects as canonical
+`Q1`...`Q3` on the note's own `.md` Finder tags alongside its subjects — overview
 **D2**, **D4** ("no `Author:` facet"), and **D9** (Quality = front-matter `1..3`, zero/unrated = no Q
 token).
 **Functionally sound, no work required:** front-matter YAML still satisfies the original "durable against
 this program no longer being developed" intent. **Open owner decision (→ Daemon Report):** whether to
-*additionally* mirror author/date to Finder tags for cross-app (Reader/Processor) parity — if adopted,
-author needs a **Tier-2** projection change through `NotesTagProjector` and a **HOLD-QUEUE** SPEC `Author:`
-facet. Until then author/date stay deferred (out-of-scope list above).
+*additionally* mirror author to Finder tags for cross-app (Reader/Processor) parity — if adopted,
+author needs a **Tier-2** projection change through `NotesTagProjector` and a SPEC `Author:` facet. Until
+then author stays deferred (out-of-scope list above).

@@ -411,7 +411,6 @@ Views/
                               edit-start-base diff → ONE TagWriter delta; commits the field's tokens on
                               blur — WYSIWYG, so a typed-but-not-Return'd word sticks (owner 2026-07-08;
                               GUI-verified). Adds only route through TagWriter, so existing tags never lost.
-  TagFilterField.swift        NSComboBox-backed tag filter with autocomplete (+focus token for ⌘L).
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
