@@ -173,6 +173,18 @@ struct NotesFolderTreeView: View {
         return handleItemDrop(payloads, onto: folderId, replicate: replicate, source: source)
     }
 
+    private func parentID(of folderId: UUID) -> UUID? {
+        model.organization.folders.first { $0.id == folderId }?.parentId
+    }
+
+    /// Re-parent a nested folder to the root, after the existing top-level folders.
+    private func moveToTopLevel(_ folderId: UUID) {
+        let topOrders = model.organization.folders.filter { $0.kind == .normal && $0.parentId == nil }
+            .map(\.sortOrder)
+        let nextIndex = (topOrders.max() ?? -1) + 1
+        Task { await model.moveFolder(folderId, newParent: nil, at: nextIndex) }
+    }
+
     /// Renumber the moved sibling level in its existing parent; descendant membership and parent links stay put.
     private func reorderFolders(_ siblings: [NotesFolderNode], parentID: UUID?,
                                 fromOffsets: IndexSet, toOffset: Int) {
@@ -257,6 +269,10 @@ struct NotesFolderTreeView: View {
         Button("New Subfolder…") { beginNewFolder(parent: node.id) }
         Button("Rename…") { renameText = node.name; renameID = node.id }
             .disabled(isSystem)
+        // The only way back out of a nesting: a folder row is a drop target only for INTO, and each
+        // level's `.onMove` reorders within that level (W9.e2, D1).
+        Button("Move to Top Level") { moveToTopLevel(node.id) }
+            .disabled(parentID(of: node.id) == nil)
         Divider()
         templateAssignmentMenu(node)
         Divider()
