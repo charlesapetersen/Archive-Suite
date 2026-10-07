@@ -863,7 +863,7 @@ completion record is in `SUITE_TODO_DONE.md`.
   open Extracts editor's chip still reports `missing: 0` (label "Moore on Intel culture — 1968", id
   `22222222-…`). Either the W14.4c cross-window re-style regressed or the probe/fixture drifted — find which
   before touching the product. | ArchiveNotes | S | med | none
-- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]**
+- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]** SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080.
   (blocked-on: W9.e1, W9.b5-fu1). Plan E2 — also settle the two D1 doubts E1 could not decide from source:
   whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents
   a folder back to top level. Plan E2 — and the 2026-07-18 addendum's own unfinished business: note delete +
