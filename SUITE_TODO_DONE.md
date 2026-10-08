@@ -9850,3 +9850,4 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **EFF.core-cache — ArchiveCore built once per exact input** — `ArchiveProcessor/scripts/archivecore-cache.sh`
   (cache in `~/Library/Caches/ArchiveSuite/archivecore`, outside every checkout), used by `test-tag-vocabulary.sh`, the
   only Processor swiftc harness that compiles ArchiveCore; proved by `test-archivecore-cache.sh` (a gate step).
+- [x] **W35.unspent — superseded 2026-10-07.** The Agent Manager (~/Claude/Agent Manager, stage 5) now reports usage left unspent for every project from its own readings (status.md "Unspent", the menu bar's "Unspent this week"), and paces both subscriptions' weekly windows in its grants. The digest line from `measure-workers.py --unspent` still works and was left in place; the manager's figure is the one to read.
