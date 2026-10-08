@@ -72,8 +72,6 @@ final class ProcessorUITests: XCTestCase {
         let taggingPicker = element("ap.ocr.taggingPicker")
         XCTAssertTrue(taggingPicker.exists && !taggingPicker.isEnabled,
                       "tagging controls must be disabled whenever auto re-OCR owns the document")
-        XCTAssertTrue(element("ap.ocr.pdfPageCost").exists,
-                      "re-OCR calls the model once per page, so the cost pane must price PDF pages directly")
         attachScreenshot("processor-multipage-auto-reocr")
     }
 

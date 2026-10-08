@@ -10126,17 +10126,17 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Notes VM run was 40/42 green, 1 skipped (corrupt-index), and G16 (Zotero chip) failed once; it passed on
   re-run, so it is filed as `W9.g16-flake`. The unit bundle was not re-run because no app source changed.
   <!-- /W9.e2-search -->
-
-- [x] **W22.mixed-batch-fu2 — price direct PDF pages separately in mixed batch estimates [S-M]** · §W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28) · SHIPPED 2026-10-08 (this commit)
-  Multi-page PDF re-OCR makes one direct, standard-rate model call per page with no tagging or segmentation,
-  but both the pre-run cost pane and `RunHistorySnapshot.estimatedCost` priced every dropped file as an image
-  (batch rate and tagging included). `CostEstimator.estimateDirectPDFPages` now prices those pages on their own
-  and `CostEstimator.runTotal` adds them to the image subset's standard or batch total; the pane and history
-  both use the pair. The pane shows a "PDF pages (N in M PDFs, direct)" row, an Images count, and a batch total
-  labelled "batch images + direct PDF pages". History records `pdfFileCount`/`pdfPageCount` at run start and on
-  both resume paths (page count read from each source PDF; an unreadable one counts as 2, the multi-page
-  minimum). A PDF-only run with Batch selected is now priced per page at standard. Proven by three new checks
-  in `ProcessingHistoryTestDriver` (`scripts/test-processing-history.sh`, 26/26 PASS) and an `ap.ocr.pdfPageCost` assertion in
-  the multi-page UITest (VM-green; screenshot shows "PDF pages (2 in 1 PDF, direct)"). Time estimate unchanged.
-  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/{CostEstimator,ProcessingHistory,ProcessingHistoryTestDriver}.swift, OCR/{PDFToImageConverter,OCRProcessor+Pipeline}.swift, Views/OCRView.swift, Tests/ArchiveProcessorUITests/ProcessorUITests.swift
-  <!-- /W22.mixed-batch-fu2 -->
+- [x] **W9.e2-folders — runtime sweep, folders: create/rename/delete, move/reorder, replicate, the D1 doubts [S-M · gui]** · §W9 gap-closure · SHIPPED 2026-10-08 (this commit)
+  Part of `W9.e2` (plan E2). New `NotesE2FolderTests`, VM-green on this commit
+  (`ONLY_TESTING=ArchiveNotesUITests/NotesE2FolderTests`, 3/3 passed, about 92 s). The tests cover: create from the
+  bottom-bar +, New Subfolder, Rename, Move to Top Level, and Delete of both folders, each asserted on
+  `organization.json`; Move Up and Move Down reordering the top level; and the gap drag. Replicate is the existing
+  `testG7_ReplicateItemIntoFolderAddsMembership`, and a drop ON a folder row re-parenting it is `testG18_…`; both
+  were already VM-green. D1 doubt 1 is real: dragging Ideas into the gap above Reading re-parents it
+  (`parent=f1f1…`, order 0) instead of reordering. That test pins it under a strict `XCTExpectFailure`, and the
+  bug is filed as `W9.e2-fu1`. D1 doubt 2 is also real: no drop target re-parents a folder to the top level. It is
+  fixed by a new "Move to Top Level" context item, disabled on top-level folders. The new "Move Up" and
+  "Move Down" items are the reorder path that works until fu1 lands. The folder context-menu change in
+  `NotesFolderTreeView` and the test helpers came from the draft `4f7642f` on `origin/wip/W9.e2`, rewritten and
+  re-verified here. The Notes unit bundle is green.
+  <!-- /W9.e2-folders -->

@@ -173,6 +173,33 @@ struct NotesFolderTreeView: View {
         return handleItemDrop(payloads, onto: folderId, replicate: replicate, source: source)
     }
 
+    /// The displayed sibling level that holds `id`, with that level's parent id (nil = top level).
+    private func level(containing id: UUID) -> (siblings: [NotesFolderNode], parentID: UUID?)? {
+        func search(_ nodes: [NotesFolderNode], parent: UUID?) -> (siblings: [NotesFolderNode], parentID: UUID?)? {
+            if nodes.contains(where: { $0.id == id }) { return (nodes, parent) }
+            for node in nodes { if let hit = search(node.children, parent: node.id) { return hit } }
+            return nil
+        }
+        return search(model.normalTree, parent: nil)
+    }
+
+    /// Swap a folder with its neighbour one place up (`-1`) or down (`+1`) within its own level.
+    private func shiftFolder(_ id: UUID, by delta: Int) {
+        guard let (siblings, parentID) = level(containing: id),
+              let from = siblings.firstIndex(where: { $0.id == id }),
+              siblings.indices.contains(from + delta) else { return }
+        reorderFolders(siblings, parentID: parentID, fromOffsets: IndexSet(integer: from),
+                       toOffset: delta > 0 ? from + delta + 1 : from + delta)
+    }
+
+    /// Re-parent a nested folder to the root, after the existing top-level folders.
+    private func moveToTopLevel(_ id: UUID) {
+        let topOrders = model.organization.folders.filter { $0.kind == .normal && $0.parentId == nil }
+            .map(\.sortOrder)
+        let nextIndex = (topOrders.max() ?? -1) + 1
+        Task { await model.moveFolder(id, newParent: nil, at: nextIndex) }
+    }
+
     /// Renumber the moved sibling level in its existing parent; descendant membership and parent links stay put.
     private func reorderFolders(_ siblings: [NotesFolderNode], parentID: UUID?,
                                 fromOffsets: IndexSet, toOffset: Int) {
@@ -257,6 +284,18 @@ struct NotesFolderTreeView: View {
         Button("New Subfolder…") { beginNewFolder(parent: node.id) }
         Button("Rename…") { renameText = node.name; renameID = node.id }
             .disabled(isSystem)
+        Divider()
+        // Menu twins of the drag gestures (W9.e2-folders, D1): a gap drop between rows is taken by the
+        // row's own `.onDrop` as a re-parent before the level's `.onMove` sees it (W9.e2-fu1), and no drop
+        // target re-parents to the top level at all, so these are the dependable way to reorder and un-nest.
+        let place = level(containing: node.id)
+        let index = place?.siblings.firstIndex { $0.id == node.id }
+        Button("Move Up") { shiftFolder(node.id, by: -1) }
+            .disabled(index == nil || index == 0)
+        Button("Move Down") { shiftFolder(node.id, by: 1) }
+            .disabled(index == nil || index == (place?.siblings.count ?? 0) - 1)
+        Button("Move to Top Level") { moveToTopLevel(node.id) }
+            .disabled(place == nil || place?.parentID == nil)
         Divider()
         templateAssignmentMenu(node)
         Divider()

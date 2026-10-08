@@ -767,6 +767,8 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
+- [ ] **W22.mixed-batch-fu2 — price direct PDF pages separately in mixed batch estimates [S-M].** (lane: processor) (uses: build) In a mixed Batch run, `performMultiPagePDFReOCR` calls the model directly once per PDF page, while `RunHistorySnapshot.estimatedCost` applies discounted batch pricing to the full file count; the pre-run pane also lacks PDF page accounting. Show the image-subset batch estimate plus direct PDF-page estimate consistently before the run and in history. Found in W22.mixed-batch Tier-2 review (2026-09-26), `RunHistorySnapshot.estimatedCost` / `performMultiPagePDFReOCR`. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProcessingHistory.swift, Views/OCRView.swift | S-M | low | none
+
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
 > ## ⏸ ON HOLD — owner directive, 2026-08-01. PLANS RETAINED IN FULL.
@@ -880,15 +882,17 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-folders` — runtime sweep, folders: create/rename/delete, move/reorder, replicate, the D1 doubts [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
-  Part of `W9.e2` (plan E2). Settle the two D1 doubts E1 could not decide from source: whether the row `.onDrag`
-  (`NotesFolderTreeView.swift:211`) pre-empts the list's `.onMove` reorder (`:235`), and whether any drop target
-  re-parents a folder to top level. The draft `4f7642f` on `origin/wip/W9.e2` found the first one real (gap-drag
-  re-parents instead of reordering, pinned under a strict `XCTExpectFailure`) and adds a "Move to Top Level"
-  command; a folder alert after the first Create was still red there. Judge the draft before reuse.
-  DONE WHEN create, rename, delete, move, reorder and replicate are each observed in VM-green UITests, and each
-  D1 doubt is either fixed with a test or filed as its own item with the evidence. | ArchiveNotes | S-M | low |
-  **needs:** gui
+- [ ] **`W9.e2-fu1` — dragging a folder into the gap between two folders re-parents it instead of reordering [S · gui]** (lane: notes) (uses: vm)
+  Found by W9.e2-folders, 2026-10-08 (D1 doubt 1, now confirmed at runtime). Dragging Ideas onto the top edge of
+  Reading, the gap above it, in the VM: `organization.json` then has Ideas with `parentId` = Reading and
+  `sortOrder` 0, so the folder row's own `.onDrop` (`NotesFolderTreeView.folderRow`) takes the drop as a re-parent
+  before the level's `ForEach.onMove` sees it. `NotesE2FolderTests.testE2_FolderDragToSiblingGapReorders` pins
+  this under a strict `XCTExpectFailure`. Users can reorder with the context menu's Move Up and Move Down and
+  un-nest with Move to Top Level (added by W9.e2-folders), so no folder is stuck, but the drag does the wrong
+  thing silently. Fix candidates: drop the row-level `.onDrop` for folder payloads and let `.onMove` and an
+  outline-level drop handle them, or have the row delegate re-parent only when the drop lands in the row's middle
+  band. DONE WHEN a gap drag reorders, the expected failure is removed, and testG18 (drop ON a row re-parents)
+  still passes in the VM. | ArchiveNotes | S | low | **needs:** gui
 - [ ] **`W9.e2-zotero` — runtime sweep, Zotero attach and auto-fill, note-level chips, templates [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Zotero attach and auto-fill (B1/B2) write front-matter; note-level chips render;
   templates (D3) create the expected note. Use the scratch fixture and a stubbed Zotero source; a real Zotero

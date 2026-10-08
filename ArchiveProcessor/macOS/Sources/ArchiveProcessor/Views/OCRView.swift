@@ -81,10 +81,6 @@ struct OCRView: View {
     /// re-opened on every render). Combined with `!preOCRedInput` this is the auto re-OCR routing the
     /// pipeline applies — surfaced here only to grey out the (inapplicable) Tagging controls.
     @State private var droppedHasMultiPagePDF = false
-    /// Multi-page PDFs among the dropped files and their total pages (recomputed with the flag above).
-    /// Re-OCR calls the model once per page, so the cost pane prices those pages separately.
-    @State private var droppedPDFFileCount = 0
-    @State private var droppedPDFPageCount = 0
     /// Pre-grouped segmentation from a Live Capture handoff (aligned to droppedFiles); empty otherwise.
     @State private var captureBoundaries: [Bool] = []
     @State private var captureTypes: [CaptureGroupType] = []
@@ -155,17 +151,11 @@ struct OCRView: View {
             : (KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "")
     }
 
-    /// Dropped files that go down the image path; multi-page PDFs are re-OCR'd page by page instead.
-    private var imageFileCount: Int {
-        preOCRedInput ? droppedFiles.count : max(0, droppedFiles.count - droppedPDFFileCount)
-    }
-
-    /// The image subset's estimate (nil when every dropped file is a multi-page PDF).
     private var costEstimate: CostEstimate? {
-        guard imageFileCount > 0 else { return nil }
+        guard !droppedFiles.isEmpty else { return nil }
         let model = useAppleVision && visionUseLLMJudgment ? selectedModel : effectiveModel
         return CostEstimator.estimate(
-            fileCount: imageFileCount,
+            fileCount: droppedFiles.count,
             model: model,
             enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
@@ -178,15 +168,6 @@ struct OCRView: View {
             imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil,
             visionTextOnly: useAppleVision && visionUseLLMJudgment
         )
-    }
-
-    /// Direct per-page calls for the dropped multi-page PDFs, priced with the model that OCRs them.
-    private var pdfPageEstimate: CostEstimate? {
-        guard !preOCRedInput, droppedPDFPageCount > 0 else { return nil }
-        return CostEstimator.estimateDirectPDFPages(
-            pageCount: droppedPDFPageCount, model: effectiveModel, imageScale: imageScale / 100.0,
-            rotationMode: rotationMode, useGateway: useGateway || useAppleVision,
-            imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil)
     }
 
     /// Processing-time estimate for the current batch (LLM/processing time only).
@@ -236,10 +217,7 @@ struct OCRView: View {
         .onChange(of: droppedFiles) { _, files in
             // Recompute the multi-page-PDF flag off the main render path (opens PDFs once per change,
             // not per render). Short-circuits at the first multi-page PDF; non-PDFs never open a file.
-            let pageCounts = files.compactMap(PDFToImageConverter.multiPagePDFPageCount)
-            droppedHasMultiPagePDF = !pageCounts.isEmpty
-            droppedPDFFileCount = pageCounts.count
-            droppedPDFPageCount = pageCounts.reduce(0, +)
+            droppedHasMultiPagePDF = files.contains(where: PDFToImageConverter.isMultiPagePDF)
         }
         .onChange(of: processor.stagedCaptureFiles) { _, staged in
             guard !staged.isEmpty else { return }
@@ -523,83 +501,60 @@ struct OCRView: View {
                             .foregroundStyle(.secondary)
                             .padding(4)
                     }
-                } else if costEstimate != nil || pdfPageEstimate != nil {
+                } else if let est = costEstimate {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text("Files:").foregroundStyle(.secondary)
                                 Spacer()
-                                Text("\(droppedFiles.count)")
+                                Text("\(est.fileCount)")
                             }
-                            if let pdf = pdfPageEstimate {
+                            if !preOCRedInput {
                                 HStack {
-                                    Text("PDF pages (\(droppedPDFPageCount) in \(droppedPDFFileCount) PDF\(droppedPDFFileCount == 1 ? "" : "s"), direct):")
-                                        .foregroundStyle(.secondary)
+                                    Text("OCR + classification:").foregroundStyle(.secondary)
                                     Spacer()
-                                    Text(pdf.totalStandardFormatted)
-                                        .accessibilityIdentifier("ap.ocr.pdfPageCost")
+                                    Text(est.ocrFormatted)
                                 }
                             }
-                            if let est = costEstimate {
-                                if pdfPageEstimate != nil {
-                                    HStack {
-                                        Text("Images:").foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text("\(est.fileCount)")
-                                    }
+                            if preOCRedInput && (enableTagging || enableCollectionSegmentation) {
+                                HStack {
+                                    Text("Classification (text-only):").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.classificationFormatted)
                                 }
-                                if !preOCRedInput {
-                                    HStack {
-                                        Text("OCR + classification:").foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(est.ocrFormatted)
-                                    }
+                            }
+                            if taggingMode.llmTags {
+                                HStack {
+                                    Text("Tagging (~\(max(1, est.fileCount / 3)) segments):").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.taggingFormatted)
                                 }
-                                if preOCRedInput && (enableTagging || enableCollectionSegmentation) {
-                                    HStack {
-                                        Text("Classification (text-only):").foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(est.classificationFormatted)
-                                    }
+                            }
+                            if enableCollectionSegmentation {
+                                HStack {
+                                    Text("Collection ID:").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.collectionFormatted)
                                 }
-                                if taggingMode.llmTags {
-                                    HStack {
-                                        Text("Tagging (~\(max(1, est.fileCount / 3)) segments):").foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(est.taggingFormatted)
-                                    }
-                                }
-                                if enableCollectionSegmentation {
-                                    HStack {
-                                        Text("Collection ID:").foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(est.collectionFormatted)
-                                    }
-                                }
-                                if est.rotationCost > 0 {
-                                    HStack {
-                                        Text("Rotation:").foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(est.rotationFormatted)
-                                    }
+                            }
+                            if est.rotationCost > 0 {
+                                HStack {
+                                    Text("Rotation:").foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(est.rotationFormatted)
                                 }
                             }
                             Divider()
                             HStack {
                                 Text("Total (standard):").fontWeight(.medium)
                                 Spacer()
-                                Text(CostEstimate.money(CostEstimator.runTotal(
-                                    images: costEstimate, directPDFPages: pdfPageEstimate, batch: false)))
-                                    .fontWeight(.medium)
+                                Text(est.totalStandardFormatted).fontWeight(.medium)
                             }
-                            if !useGateway && batchMode && !preOCRedInput && costEstimate != nil {
+                            if !useGateway && batchMode && !preOCRedInput {
                                 HStack {
-                                    Text(pdfPageEstimate == nil ? "Total (batch):" : "Total (batch images + direct PDF pages):")
-                                        .foregroundStyle(.secondary)
+                                    Text("Total (batch):").foregroundStyle(.secondary)
                                     Spacer()
-                                    Text(CostEstimate.money(CostEstimator.runTotal(
-                                        images: costEstimate, directPDFPages: pdfPageEstimate, batch: true)))
-                                        .accessibilityIdentifier("ap.ocr.batchTotal")
+                                    Text(est.totalBatchFormatted)
                                 }
                             }
                             Text(useGateway ? "Estimates based on user-provided pricing. Actual gateway costs may differ." : "Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")

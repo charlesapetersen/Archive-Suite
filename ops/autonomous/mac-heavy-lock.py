@@ -19,8 +19,7 @@ repo depends on the other, so the WIRE PROTOCOL below is the contract: change it
            through. This copy also treats a live holder that is its own ancestor as nesting.
 
 A caller that holds another lock must not WAIT here while holding it (hold-and-wait deadlocks
-against a holder that needs that lock next): use attempt() and back off, as heavy-run.py does when
-the Agent Manager is absent (with it, heavy-run.py tries the manager's lock instead; see there).
+against a holder that needs that lock next): use attempt() and back off, as heavy-run.py does.
 Tests point MAC_HEAVY_LOCK at a scratch path; never at the real lock.
 
 DELEGATE (Agent Manager stage 2). Run as a command, this file hands over to the Agent Manager's shared
@@ -28,9 +27,8 @@ helper when it is installed: if AGENT_MANAGER_HEAVY_LOCK (default ~/Claude/Agent
 names an executable file, main() execs it with the same arguments, adding `--project archive-suite`
 first so this file's default project survives. That helper takes its own kernel lock AND this mkdir
 lock, so every taker here still sees it. Otherwise, or when --lock is given (the manager has no such
-option), the command runs exactly as below. Importing this file (heavy-run.py and worker-state.py do)
-never delegates: the functions here are the old protocol itself, heavy-run.py's fallback, and the
-readers of the old lock's owner record, which the manager's helper keeps writing. The manager is not required for this project to run.
+option), the command runs exactly as below. Importing this file (heavy-run.py does) never delegates:
+the functions here are the old protocol itself. The manager is not required for this project to run.
 Tests set AGENT_MANAGER_HEAVY_LOCK to a scratch copy, or to a missing path for the fallback.
 """
 import argparse
