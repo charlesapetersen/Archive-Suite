@@ -48,6 +48,39 @@ def paused(readings, now, threshold, slack):
     return until
 
 
+# W35.three-workers: a third session in one lane also needs the Mac, which is the limit on more workers (owner,
+# 2026-10-06: at 8 GB the GUI VM used all 18 GB while swap reached 10.7 of 11.2 GB). Read the way run-guarded.sh
+# reads it: `kern.memorystatus_vm_pressure_level` (1 normal, 2 warn, 4 critical) and the `used` of vm.swapusage.
+# Swap is measured against physical memory, not against vm.swapusage's total, which macOS grows on demand.
+THIRD_SWAP_SHARE = 0.25     # no third session while swap in use exceeds this share of RAM (4.5 GB of 18)
+HEAVY_RECENT = 30 * 60      # ... nor within this long of a heavy job that pushed pressure above normal
+
+
+def machine_reading():
+    """(pressure level, swap used MB, RAM MB) from sysctl; raises when any is unreadable."""
+    out = subprocess.run(["/usr/sbin/sysctl", "-n", "kern.memorystatus_vm_pressure_level", "vm.swapusage", "hw.memsize"],
+                         capture_output=True, text=True, check=True, timeout=10).stdout.splitlines()
+    swap = out[1].split("used = ")[1].split()[0]
+    scale = {"K": 1 / 1024, "M": 1, "G": 1024}[swap[-1]]
+    return int(out[0]), float(swap[:-1]) * scale, int(out[2]) / 1048576
+
+
+def heavy_pressure(path, now, recent=HEAVY_RECENT):
+    """The label of a heavy job ending within `recent` seconds whose pressure went above normal, or None.
+
+    The Agent Manager logs every heavy job's load (heavy-jobs.log, one JSON object a line): a build, a test run or
+    a Vision OCR model run that has just pushed the Mac into pressure says the next one will too, even if the
+    instantaneous reading has already fallen back to normal."""
+    for line in pace.tail_lines(path, 1 << 18):
+        try:
+            job = json.loads(line)
+            if job.get("pressure_peak", 1) > 1 and job["start"] + job.get("duration", 0) >= now - recent:
+                return str(job.get("label") or job.get("command") or "a heavy job")
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue
+    return None
+
+
 def snapshot_status(state):
     try:
         snapshot = json.loads((state / "supervisor.json").read_text())
@@ -91,6 +124,7 @@ class Supervisor:
         self.caps = {}
         self.pace_notes = {}
         self.lane_reasons = {}  # the last hold logged per lane, so a wait is logged once per change, not per cycle
+        self.machine_note = None  # the last third-session hold logged, for the same reason
 
     def child_env(self, worker, lane, upkeep=False):
         env = self.env.copy()
@@ -143,7 +177,7 @@ class Supervisor:
     def lane_cap(self, lane, now):
         """How many sessions this lane may hold now; the fixed limit when pacing is off."""
         if not self.pacing:
-            return self.args.workers
+            return min(self.args.workers, 2)  # a third slot always needs the "wide" band (W35.three-workers)
         try:
             parse = pace.codex_windows if lane == "codex" else pace.claude_windows
             name, note = pace.assess(pace.current_reading(self.pace_sources(lane, now), parse, now), now)
@@ -275,7 +309,7 @@ class Supervisor:
             return True
         if self.last_launch and now - self.last_launch < 60:
             return True
-        asked, held = {}, None
+        asked, held, machine = {}, None, {}
         for offset in range(len(self.workers)):
             index = (self.cursor + offset) % len(self.workers)
             worker, lane = self.workers[index]
@@ -291,6 +325,8 @@ class Supervisor:
             other_lane_active = pending_children + sum(r.get("subscription", "unknown") in (lane, "unknown") for r in active)
             if other_lane_active >= caps[lane]:
                 continue
+            if other_lane_active >= 2 and self.machine_hold(now, machine) is not None:
+                continue  # a third session waits for the Mac; the first two never do
             if repair and (active or self.children):
                 break
             reason = self.held(worker, lane, asked)
@@ -314,6 +350,31 @@ class Supervisor:
         elif asked:
             (self.state / "yield.reason").unlink(missing_ok=True)
         return True
+
+    def machine_hold(self, now, cache):
+        """Why the Mac cannot take a third session now, or None; read once per cycle (`cache` is per cycle)."""
+        if "reason" in cache:
+            return cache["reason"]
+        try:
+            level, swap_mb, ram_mb = machine_reading()
+            share = number(self.env, "AUTONOMOUS_THIRD_SWAP_SHARE", THIRD_SWAP_SHARE)
+            if level > 1:
+                reason = "memory pressure above normal (level %d)" % level
+            elif swap_mb > share * ram_mb:
+                reason = "swap over %d%% of RAM (%.1f of %.0f GB)" % (round(share * 100), swap_mb / 1024, ram_mb / 1024)
+            else:
+                log = self.env.get("AUTONOMOUS_HEAVY_JOBS_LOG",
+                                   str(Path.home() / ".local/state/agent-manager/heavy-jobs.log"))
+                job = heavy_pressure(log, now)
+                reason = None if job is None else "a recent heavy job raised memory pressure (%s)" % job
+        except (OSError, ValueError, IndexError, KeyError, subprocess.SubprocessError) as exc:
+            reason = "no machine reading (%s)" % exc  # unknown is not calm: hold the third slot only
+        cache["reason"] = reason
+        head = lambda text: text and text.split(" (")[0]  # the "(…)" detail changes every cycle
+        if head(reason) != head(self.machine_note):
+            self.log("third session %s." % ("held — " + reason if reason else "allowed again: the Mac is calm"))
+        self.machine_note = reason
+        return reason
 
     def held(self, worker, lane, asked):
         """Why this lane must not start a session now, or None; asked once per lane per cycle.
@@ -447,7 +508,7 @@ def main():
     p.add_argument("--plan", type=Path)
     p.add_argument("--script", type=Path)
     p.add_argument("--agent", choices=("claude", "codex", "both"), default="claude")
-    p.add_argument("--workers", type=int, choices=(1, 2), default=1)
+    p.add_argument("--workers", type=int, choices=(1, 2, 3), default=1)
     p.add_argument("--status", action="store_true")
     args = p.parse_args()
     if args.status:
@@ -455,6 +516,8 @@ def main():
         return 0
     if not all((args.repo, args.plan, args.script)):
         p.error("--repo, --plan and --script are required")
+    if args.workers == 3 and args.agent != "claude":
+        p.error("--workers 3 is for the Claude lane alone (W35.three-workers); use --workers 2 with --agent " + args.agent)
     return Supervisor(args).run()
 
 

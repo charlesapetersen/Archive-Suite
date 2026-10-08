@@ -2,7 +2,7 @@
 """W35.live: measure a multi-worker run against the one-worker run before it. Read-only.
 
 Prints, before and after the split (default: the first pace.log line, which only a
-`--workers 2` supervisor writes):
+`--workers 2`/`3` supervisor writes):
   * each five-hour window an Archive Suite session saw: its peak reading, and whether it was cut;
   * items finished per day (whole `- [x] **TAG` entries added to SUITE_TODO_DONE.md on origin/main);
   * collisions: an item finished twice, merge conflicts in the retained session logs, heavy-lock waits;
@@ -298,6 +298,25 @@ def tsv(path, since):
     return rows
 
 
+def sessions(state):
+    """(start, end) of every session row in this daemon's ledgers, to the minute the ledger records."""
+    out = []
+    for path in ledgers(state):
+        lines = path.read_text(errors="replace").splitlines()
+        head = lines[0].split("\t") if lines else []
+        if not {"kind", "start", "end"} <= set(head):
+            continue
+        k, s, e = head.index("kind"), head.index("start"), head.index("end")
+        for line in lines[1:]:
+            f = line.split("\t")
+            if len(f) > max(k, s, e) and f[k] == "session":
+                try:
+                    out.append((when(f[s]), when(f[e]) + dt.timedelta(seconds=59)))
+                except ValueError:
+                    continue
+    return out
+
+
 def pace_time(rows, now):
     """Minutes spent at each (lane, slots) between pace.log changes, up to now."""
     spent, last = {}, {}
@@ -396,6 +415,16 @@ def main():
         if sel:
             print("  heavy-lock waits %-6s %d, total %.1f min, longest %.1f min" % (
                 k, len(sel), sum(sel) / 60, max(sel) / 60))
+    # W35.three-workers: the same waits by how many sessions were running when each began, from the ledgers'
+    # session rows (a session still running has no row yet, so the latest waits can undercount).
+    spans, by_count = sessions(a.state), {}
+    for t, f in waits:
+        if f and re.fullmatch(r"\d+(\.\d+)?", f[0]):
+            by_count.setdefault(sum(lo <= t <= hi for lo, hi in spans), []).append(float(f[0]))
+    for n in sorted(by_count):
+        sel = by_count[n]
+        print("  heavy-lock waits with %d session(s) running%s: %d, total %.1f min, longest %.1f min" % (
+            n, " (gate/upkeep)" if n == 0 else "", len(sel), sum(sel) / 60, max(sel) / 60))
     if not waits:
         print("  heavy-lock waits: none recorded")
 
@@ -404,7 +433,7 @@ def main():
     for (lane, slots), mins in sorted(spent.items()):
         print("  %-6s %s slot(s): %d min" % (lane, slots, mins))
     if not spent:
-        print("  (no pace.log — the supervisor has not run with --workers 2)")
+        print("  (no pace.log — the supervisor has not run with --workers 2 or 3)")
 
 
 if __name__ == "__main__":

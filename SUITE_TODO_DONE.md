@@ -9806,6 +9806,23 @@ none of this was fixed by starting it.
   second slot 277 of 1,406 minutes. Vision OCR was not held back. Raising beyond two waits for W35.vm-mem and the Agent
   Manager's session grants (W35.three-workers, held). restart-on-source-change switched off (its flag removed).
 
+- [x] **W35.three-workers — let pacing run up to three Claude workers [S-M]** (lane: ops) SHIPPED 2026-10-07 (this commit). Owner, 2026-10-06, preparing for the larger Claude plan; the 2026-10-07 hold lifted the same day when the owner approved the Agent Manager plan, with the Claude plan about 5x larger (Education Premium) and the manager's heavy-jobs.log to inform the machine gate.
+  `daemon.sh start --workers 3` is accepted for `--agent claude` alone (`--agent both`/`codex` refuse 3, in daemon.sh, the
+  autonomous script and the supervisor). Pacing (`usage-pace.py`) gains a **wide** band, used < elapsed − 0.25 and used < 0.60:
+  wide adds the third slot, grow keeps one already running, steady drops back to two; with a limit of two wide and grow act
+  alike, so a two-worker lane is unchanged, and `AUTONOMOUS_PACE=0` gives a fixed two, never three. Machine gate
+  (`worker-supervisor.py`, only when a start would be the lane's third session, never stopping one): held while
+  `kern.memorystatus_vm_pressure_level` > 1, swap in use > 25% of RAM (`AUTONOMOUS_THIRD_SWAP_SHARE`; against RAM because macOS
+  grows the swap total), a heavy job in the Agent Manager's `heavy-jobs.log` ended within 30 min with `pressure_peak` > 1, or
+  the reading fails; logged to daemon.log once per change. `measure-workers.py` now splits heavy-lock waits by sessions running
+  when each began (from the ledgers): on the real state 0 running 4 waits/66 min, 1 running 38/133 min, none yet with 2 — so
+  the 110-minute queueing of 2026-10-06 was mostly behind one session or Vision OCR, not two-way overlap. At ship time this
+  Mac read swap 5.2 GB (over the 4.5 GB line) and pressure 1–2, so a third session would be held now. Adversarial review: no
+  HIGH; its pace-off bypass, a test leaking state between subtests and a PATH-resolved sysctl fixed; accepted LOWs: an empty
+  interrupted claim counts as a session (pre-existing conservative count), and a leftover session of the other lane is not
+  counted by the gate. Proof: prove-usage-pace 26/0 (13 mutations killed), prove-daemon-dispatch 28/0, prove-measure-workers
+  24/0, prove-worker-supervisor 30/0; no new ShellCheck warnings.
+
 ## Autonomous daemon — lock less, more independent items (Agent Manager efficiency plan, owner 2026-10-07)
 
 Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive Suite parts). Evidence:

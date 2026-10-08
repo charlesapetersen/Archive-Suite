@@ -132,15 +132,18 @@ AGENT_CHOICE=claude; WORKER_CHOICE="${AUTONOMOUS_MAX_WORKERS:-1}"; _args=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --agent)   [ $# -ge 2 ] || fail "--agent needs a value: claude, codex or both"; AGENT_CHOICE="$2"; shift 2 ;;
-    --workers) [ $# -ge 2 ] || fail "--workers needs 1 or 2 per lane"; WORKER_CHOICE="$2"; shift 2 ;;
+    --workers) [ $# -ge 2 ] || fail "--workers needs 1, 2 or 3 per lane"; WORKER_CHOICE="$2"; shift 2 ;;
     --workers=*) WORKER_CHOICE="${1#--workers=}"; shift ;;
     --agent=*) AGENT_CHOICE="${1#--agent=}"; shift ;;
     *)         _args+=("$1"); shift ;;
   esac
 done
 set -- ${_args[@]+"${_args[@]}"}
-case "$WORKER_CHOICE" in 1|2) ;; *) fail "--workers must be 1 or 2 per lane" ;; esac
+case "$WORKER_CHOICE" in 1|2|3) ;; *) fail "--workers must be 1, 2 or 3 per lane" ;; esac
 case "$AGENT_CHOICE" in claude|codex|both) ;; *) fail "unknown agent '$AGENT_CHOICE' — use --agent claude, --agent codex or --agent both" ;; esac
+# W35.three-workers: a third worker is for the Claude lane alone, and the supervisor still starts it only when the
+# account is well under pace and the Mac is calm (memory pressure normal, swap under a quarter of RAM).
+[ "$WORKER_CHOICE" != 3 ] || [ "$AGENT_CHOICE" = claude ] || fail "--workers 3 is for --agent claude alone; use --workers 2 with --agent $AGENT_CHOICE"
 
 case "${1:-start}" in
   status) shift; status "$@"; exit 0 ;;   # extra args (e.g. --details) pass through to the digest

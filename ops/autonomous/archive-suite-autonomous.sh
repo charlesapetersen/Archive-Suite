@@ -1342,7 +1342,8 @@ fi
 
 # Parallel mode is opt-in; the installed supervisor owns children and global upkeep.
 # exec preserves the installed daemon's command line for start/stop/status discovery.
-case "$MAX_WORKERS" in 1|2) ;; *) echo "AUTONOMOUS_MAX_WORKERS must be 1 or 2 per lane" >&2; exit 2 ;; esac
+case "$MAX_WORKERS" in 1|2) ;; 3) [ "$AGENT" = claude ] || { echo "AUTONOMOUS_MAX_WORKERS=3 is for the Claude lane alone" >&2; exit 2; } ;;
+  *) echo "AUTONOMOUS_MAX_WORKERS must be 1, 2 or 3 per lane" >&2; exit 2 ;; esac
 if [ "$WORKER_CHILD" != 1 ] && [ "$UPKEEP_ONLY" != 1 ] && { [ "$AGENT" = both ] || [ "$MAX_WORKERS" -gt 1 ]; }; then
   exec python3 "$REPO/ops/autonomous/worker-supervisor.py" --repo "$REPO" --state "$STATE" --plan "$PLAN" \
     --script "$0" --agent "$AGENT" --workers "$MAX_WORKERS"

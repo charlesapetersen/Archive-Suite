@@ -6,10 +6,18 @@ already used trails the share of the window's time already gone. The rule is orc
 (https://github.com/hathbanger/orc/issues/127), with the margins from
 execution-plans/parallel-workers/00-plan.md §5:
 
-  grow    used < elapsed - 0.10 and used < 0.80   -> up to the lane's limit
+  wide    used < elapsed - 0.25 and used < 0.60   -> up to the lane's limit (three)
+  grow    used < elapsed - 0.10 and used < 0.80   -> two, or keep a third already running
   tight   used > elapsed + 0.15 or used > 0.85    -> back to one worker
-  steady  anything between                        -> keep the previous count
+  steady  anything between                        -> keep the previous count, but not a third
   unknown no current five-hour reading            -> one worker
+
+W35.three-workers (owner, 2026-10-06/07, the larger Claude plan): a third slot is
+only for a window the account is well under, so it has its own wider margin and
+the same shape of hysteresis one band lower: "wide" adds it, "grow" keeps it, and
+"steady" drops it back to two. With a limit of two, "wide" and "grow" act alike,
+so a two-worker lane behaves exactly as before. The supervisor also gates a third
+session on the Mac (memory pressure, swap); that gate is not a usage question.
 
 The five-hour window sets the band. The weekly window, when a reading has it, can
 only hold the lane back: "tight" against the week's elapsed share (so the week is
@@ -44,7 +52,7 @@ from pathlib import Path
 FIVE_HOUR = 5 * 3600
 WEEK = 7 * 24 * 3600
 TAIL = 1 << 20  # bytes read from the end of each source; a session log can be many MB
-ORDER = {"grow": 0, "steady": 1, "tight": 2, "unknown": 3}
+ORDER = {"wide": 0, "grow": 1, "steady": 2, "tight": 3, "unknown": 4}
 
 
 def tail_lines(path, limit=TAIL):
@@ -155,6 +163,8 @@ def band(used, reset, length, now):
     elapsed = min(1.0, max(0.0, 1 - (reset - now) / length))
     if used > elapsed + 0.15 or used > 0.85:
         return "tight", elapsed
+    if used < elapsed - 0.25 and used < 0.60:
+        return "wide", elapsed
     if used < elapsed - 0.10 and used < 0.80:
         return "grow", elapsed
     return "steady", elapsed
@@ -164,7 +174,7 @@ def assess(windows, now):
     """(band, description) for a lane: the most restrictive current window wins."""
     if "five_hour" not in windows:
         return "unknown", "no current five-hour reading"
-    worst, notes = "grow", []
+    worst, notes = "wide", []
     for kind in ("five_hour", "weekly"):
         if kind in windows:
             used, reset, length = windows[kind][:3]
@@ -177,8 +187,10 @@ def assess(windows, now):
 
 
 def next_cap(previous, name, limit):
-    if name == "grow":
+    if name == "wide":
         return limit
+    if name == "grow":
+        return min(limit, max(2, previous))
     if name == "steady":
-        return min(limit, max(1, previous))
+        return min(limit, max(1, previous), 2)
     return 1

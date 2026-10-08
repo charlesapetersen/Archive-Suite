@@ -74,10 +74,22 @@ class Rules(unittest.TestCase):
         self.assertEqual(pace.band(0.0, 5 * H, 5 * H, 0)[0], "steady")
         self.assertEqual(pace.band(0.16, 5 * H, 5 * H, 0)[0], "tight")
 
+    def test_wide_band_is_well_under_pace(self):
+        # W35.three-workers: a third slot needs 25 points under elapsed and under 60% used.
+        now, reset = 0, 2.5 * H
+        for used, expected in ((0.24, "wide"), (0.25, "grow")):
+            with self.subTest(used=used):
+                self.assertEqual(pace.band(used, reset, 5 * H, now)[0], expected)
+        self.assertEqual(pace.band(0.59, 1, 5 * H, 0)[0], "wide")
+        self.assertEqual(pace.band(0.60, 1, 5 * H, 0)[0], "grow")
+        # A wide weekly window never widens a lane whose five-hour window is only grow.
+        five = (0.45, 2 * H, 5 * H)
+        self.assertEqual(pace.assess({"five_hour": five, "weekly": (0.0, 1, 7 * 24 * H)}, 0)[0], "grow")
+
     def test_weekly_gates_against_its_own_elapsed_share(self):
         now = 0
         five = (0.10, 2 * H, 5 * H)  # 60% of the window gone: far under pace
-        self.assertEqual(pace.assess({"five_hour": five}, now)[0], "grow")
+        self.assertEqual(pace.assess({"five_hour": five}, now)[0], "wide")
         # Two days into the week with 60% spent: tight, so the lane holds at one.
         week = (0.60, 5 * 24 * H, 7 * 24 * H)
         name, note = pace.assess({"five_hour": five, "weekly": week}, now)
@@ -88,7 +100,7 @@ class Rules(unittest.TestCase):
         # not hold a second worker back for ~17 h after every weekly reset.
         fresh_week = (0.01, 7 * 24 * H - H, 7 * 24 * H)
         self.assertEqual(pace.band(*fresh_week, now)[0], "steady")
-        self.assertEqual(pace.assess({"five_hour": five, "weekly": fresh_week}, now)[0], "grow")
+        self.assertEqual(pace.assess({"five_hour": five, "weekly": fresh_week}, now)[0], "wide")
 
     def test_cap_never_drops_below_one_and_steady_keeps_the_count(self):
         sequence = [("unknown", 1), ("steady", 1), ("grow", 2), ("steady", 2), ("tight", 1),
@@ -98,6 +110,20 @@ class Rules(unittest.TestCase):
             cap = pace.next_cap(cap, name, 2)
             self.assertEqual(cap, expected, name)
         self.assertEqual(pace.next_cap(1, "grow", 1), 1)
+        self.assertEqual(pace.next_cap(1, "wide", 1), 1)
+
+    def test_third_slot_comes_with_wide_and_leaves_with_steady(self):
+        sequence = [("unknown", 1), ("grow", 2), ("wide", 3), ("grow", 3), ("steady", 2), ("grow", 2),
+                    ("wide", 3), ("tight", 1), ("steady", 1), ("wide", 3), ("unknown", 1)]
+        cap = 1
+        for name, expected in sequence:
+            cap = pace.next_cap(cap, name, 3)
+            self.assertEqual(cap, expected, name)
+
+    def test_a_two_worker_lane_is_unchanged_by_the_wide_band(self):
+        for previous in (1, 2):
+            self.assertEqual(pace.next_cap(previous, "wide", 2), pace.next_cap(previous, "grow", 2))
+            self.assertEqual(pace.next_cap(previous, "steady", 2), min(2, previous))
 
 
 class Parsing(unittest.TestCase):
@@ -245,9 +271,9 @@ class Supervisor(unittest.TestCase):
         self.assertEqual([w for _, w, _ in self.launches], ["worker-1", "worker-2"])
         self.assertGreaterEqual(self.launches[1][0] - self.launches[0][0], 60)
         log = (self.state / "pace.log").read_text()
-        self.assertIn("claude\tgrow\t2\t5h 20% used / 60% elapsed", log)
+        self.assertIn("claude\twide\t2\t5h 20% used / 60% elapsed", log)
         snapshot = json.loads((self.state / "supervisor.json").read_text())
-        self.assertIn("grow, 2 of 2 slots", snapshot["pace"]["claude"])
+        self.assertIn("wide, 2 of 2 slots", snapshot["pace"]["claude"])
 
     def test_on_or_ahead_of_pace_and_unknown_hold_one_worker(self):
         for used, elapsed in ((0.55, 0.60), (0.70, 0.40), (0.86, 0.95), (None, None)):
@@ -287,7 +313,7 @@ class Supervisor(unittest.TestCase):
         self.reading(0.55, 0.60)  # steady again: stays at one
         self.assertEqual(sup.lane_cap("claude", self.now), 1)
         rows = (self.state / "pace.log").read_text().splitlines()
-        self.assertEqual([r.split("\t")[2:4] for r in rows], [["grow", "2"], ["tight", "1"]])
+        self.assertEqual([r.split("\t")[2:4] for r in rows], [["wide", "2"], ["tight", "1"]])
 
     def test_codex_lane_reads_account_rollouts_with_its_weekly_gate(self):
         rollout = self.root / "codex home" / "sessions" / "2026" / "10" / "06" / "rollout-x.jsonl"
@@ -305,7 +331,75 @@ class Supervisor(unittest.TestCase):
         sup = self.supervisor(AUTONOMOUS_PACE="0")
         with patch.object(sup_module.pace, "current_reading", side_effect=AssertionError("read")):
             self.assertEqual(sup.lane_cap("claude", self.now), 2)
+        sup = self.supervisor(workers=3, AUTONOMOUS_PACE="0")  # no fixed third slot: it needs the wide band
+        with patch.object(sup_module.pace, "current_reading", side_effect=AssertionError("read")):
+            self.assertEqual(sup.lane_cap("claude", self.now), 2)
         self.assertFalse((self.state / "pace.log").exists())
+
+    # ----- W35.three-workers: a third Claude session needs a calm Mac --------------------------------------
+    CALM = (1, 1024.0, 18432.0)  # pressure normal, 1 GB swap of 18 GB RAM
+
+    def third(self, reading=CALM, used=0.20, elapsed=0.60, heavy=None, **env):
+        """Launches over four minutes with three slots, the machine reading patched; heavy = heavy-jobs.log lines."""
+        self.launches.clear()
+        log = self.root / "agent manager" / "heavy-jobs.log"
+        self.log(log, heavy or [], self.now)  # rewritten every call, so no case inherits another's jobs
+        self.reading(used, elapsed)
+        sup = self.supervisor(workers=3, AUTONOMOUS_HEAVY_JOBS_LOG=str(log), **env)
+        side = reading if isinstance(reading, Exception) else None
+        with patch.object(sup_module, "machine_reading", return_value=reading, side_effect=side) as read:
+            self.run_minutes(sup)
+        return [w for _, w, _ in self.launches], read, sup
+
+    def test_wide_and_calm_runs_three_workers_staggered(self):
+        workers, _, _ = self.third()
+        self.assertEqual(workers, ["worker-1", "worker-2", "worker-3"])
+        times = [t for t, _, _ in self.launches]
+        self.assertTrue(all(b - a >= 60 for a, b in zip(times, times[1:])), times)
+        self.assertIn("claude\twide\t3\t", (self.state / "pace.log").read_text())
+
+    def test_only_grow_holds_at_two_and_never_reads_the_machine(self):
+        workers, read, _ = self.third(used=0.45, elapsed=0.60)
+        self.assertEqual(workers, ["worker-1", "worker-2"])
+        read.assert_not_called()  # the first two sessions never wait for the Mac
+
+    def test_the_mac_holds_the_third_session_only(self):
+        recent = json.dumps({"label": "run-guarded churro", "pressure_peak": 2, "start": self.now - 900, "duration": 600})
+        cases = {"memory pressure above normal (level 2)": dict(reading=(2, 0.0, 18432.0)),
+                 "memory pressure above normal (level 4)": dict(reading=(4, 0.0, 18432.0)),
+                 "swap over 25% of RAM (4.6 of 18 GB)": dict(reading=(1, 4700.0, 18432.0)),
+                 "no machine reading (sysctl failed)": dict(reading=OSError("sysctl failed")),
+                 "raised memory pressure (run-guarded churro)": dict(heavy=["not json", "[1]", '{"pressure_peak": null}', recent]),
+                 "swap over 5% of RAM": dict(reading=(1, 1024.0, 18432.0), AUTONOMOUS_THIRD_SWAP_SHARE="0.05")}
+        for name, kwargs in cases.items():
+            with self.subTest(name):
+                (self.root / "state with space" / "daemon.log").unlink(missing_ok=True)
+                workers, _, _ = self.third(**kwargs)
+                self.assertEqual(workers, ["worker-1", "worker-2"])
+                held = [l for l in (self.state / "daemon.log").read_text().splitlines() if "third session held" in l]
+                self.assertEqual(len(held), 1, held)  # logged once, not every cycle
+                self.assertIn(name, held[0])
+
+    def test_calm_again_after_old_or_normal_heavy_jobs(self):
+        old = json.dumps({"label": "old", "pressure_peak": 2, "start": self.now - 7200, "duration": 600})
+        normal = json.dumps({"label": "normal", "pressure_peak": 1, "start": self.now - 60, "duration": 30})
+        workers, _, _ = self.third(heavy=[old, normal])
+        self.assertEqual(workers, ["worker-1", "worker-2", "worker-3"])
+
+    def test_machine_reading_parses_sysctl_as_macos_prints_it(self):
+        for swap, mb in (("5350.12M", 5350.12), ("1.50G", 1536.0), ("512.00K", 0.5)):
+            out = "1\ntotal = 6144.00M  used = %s  free = 793.88M  (encrypted)\n19327352832\n" % swap
+            done = subprocess.CompletedProcess([], 0, stdout=out)
+            with self.subTest(swap), patch.object(sup_module.subprocess, "run", return_value=done):
+                self.assertEqual(sup_module.machine_reading(), (1, mb, 18432.0))
+
+    def test_three_workers_is_refused_outside_the_claude_lane(self):
+        for agent in ("both", "codex"):
+            p = subprocess.run([sys.executable, str(SOURCE / "worker-supervisor.py"), "--state", str(self.state),
+                                "--repo", str(self.repo), "--plan", str(self.plan), "--script", "x",
+                                "--agent", agent, "--workers", "3"], capture_output=True, text=True)
+            self.assertEqual(p.returncode, 2, p.stderr)
+            self.assertIn("Claude lane alone", p.stderr)
 
     def test_unreadable_source_is_unknown_not_a_crash(self):
         sup = self.supervisor()

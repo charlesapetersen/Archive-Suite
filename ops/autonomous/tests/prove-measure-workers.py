@@ -54,6 +54,7 @@ with tempfile.TemporaryDirectory(prefix="measure workers [scratch] ") as scratch
     (state / "heavy" / "waits.log").write_text("2026-10-01 10:30:00\t30.0\tbash test-smoke.sh\n"
                                                "2026-10-02 19:30:00\t120.0\tbash health-gate.sh\n"
                                                "2026-10-02 19:40:00\t60.0\txcodebuild test\n"
+                                               "2026-10-02 22:00:00\t6.0\tbash health-gate.sh\n"
                                                "2026-10-02 19:45:00\t1.2.3\tbad\n"
                                                "2026-10-02 19:46:00\n")
     (state / "worker-2" / "last-session.log").write_text(
@@ -98,8 +99,13 @@ with tempfile.TemporaryDirectory(prefix="measure workers [scratch] ") as scratch
           or "2026-10-02   3  W1.c W1.b W1.b" in out, "items counted per day", out)
     check("items finished more than once: W1.b (" in out, "an item finished twice is a collision", out)
     check("worker-2/last-session.log ×1" in out, "a git conflict in a tool result counts; a quote in prose does not", out)
-    check("heavy-lock waits before 1, total 0.5 min" in out and "heavy-lock waits after  2, total 3.0 min, longest 2.0 min" in out,
+    check("heavy-lock waits before 1, total 0.5 min" in out and "heavy-lock waits after  3, total 3.1 min, longest 2.0 min" in out,
           "heavy-lock waits split before/after", out)
+    # W35.three-workers: by sessions running when each wait began (the 22:00 one fell between sessions).
+    check("waits with 0 session(s) running (gate/upkeep): 1, total 0.1 min" in out
+          and "waits with 1 session(s) running: 1, total 0.5 min" in out
+          and "waits with 2 session(s) running: 2, total 3.0 min, longest 2.0 min" in out,
+          "heavy-lock waits split by sessions running", out)
     check("claude 2 slot(s): 240 min" in out and "claude 1 slot(s): 240 min" in out, "time at each slot count", out)
     r = run("--split", "2026-10-03 00:00")
     wins = r.stdout.split("== Items")[0].split("== Five")[1]

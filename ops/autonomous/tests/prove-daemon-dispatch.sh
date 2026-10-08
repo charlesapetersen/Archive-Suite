@@ -37,9 +37,17 @@ out="$(mode start --agent both --workers 2)"
 case "$out" in *"agent 'both', 2 worker(s) per lane"*) ok "both lanes accept two workers each" ;; *) no "both workers (got: $out)" ;; esac
 out="$(mode start --agent codex --workers=1)"
 case "$out" in *"agent 'codex', 1 worker(s) per lane"*) ok "one-worker Codex remains available" ;; *) no "single Codex (got: $out)" ;; esac
-for workers in 0 3 invalid; do
+for workers in 0 4 invalid; do
   out="$(mode start --workers "$workers")"; rc=$?
   [ "$rc" != 0 ] && ok "worker bound $workers refused" || no "worker bound $workers accepted"
+done
+# W35.three-workers: three is for the Claude lane alone.
+out="$(mode start --workers 3)"
+case "$out" in *"agent 'claude', 3 worker(s) per lane"*) ok "three Claude workers accepted" ;; *) no "three Claude workers (got: $out)" ;; esac
+for agent in both codex; do
+  out="$(mode start --agent "$agent" --workers 3)"; rc=$?
+  [ "$rc" != 0 ] && case "$out" in *"--agent claude alone"*) true ;; *) false ;; esac \
+    && ok "three workers refused with --agent $agent" || no "three workers with --agent $agent (rc=$rc, got: $out)"
 done
 out="$(mode start --workers)"; rc=$?
 [ "$rc" != 0 ] && ok "missing worker count refused" || no "missing worker count accepted"

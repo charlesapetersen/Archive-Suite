@@ -164,7 +164,7 @@ the sandbox. All operations use scratch fixtures in `tests/prove-worker-claims.s
 
 The default remains one worker on the chosen subscription. The owner can opt into both with
 `daemon.sh start --agent both`, or two workers on each enabled lane with
-`daemon.sh start --agent both --workers 2`. `--workers` accepts 1 or 2 per lane and is saved in
+`daemon.sh start --agent both --workers 2`. `--workers` accepts 1 or 2 per lane, or 3 with `--agent claude` alone (W35.three-workers), and is saved in
 `$STATE/max-workers` for crash relaunches. `AUTONOMOUS_MAX_WORKERS=1` overrides the saved count.
 The ordinary single-agent, one-worker loop keeps its existing path; changing source does not change
 an already installed supervisor. An owner-enabled `restart-on-source-change` flag lets the daemon
@@ -218,9 +218,10 @@ Codex `rate_limits` in rollouts touched within six hours. With elapsed as the sh
 
 | band | rule | slots |
 |---|---|---|
-| grow | used < elapsed − 0.10 and used < 0.80 | the lane limit |
+| wide | used < elapsed − 0.25 and used < 0.60 | the lane limit (3 with `--workers 3`) |
+| grow | used < elapsed − 0.10 and used < 0.80 | 2, or keep a third already running |
 | tight | used > elapsed + 0.15 or used > 0.85 | 1 |
-| steady | between | the previous count (no flapping) |
+| steady | between | the previous count (no flapping), but not a third |
 | unknown | no current five-hour reading | 1 |
 
 The five-hour window sets the band. The weekly window can only hold a lane back: tight against the week's
@@ -232,6 +233,17 @@ lane. Changes are logged to `$STATE/pace.log` (time, lane, band, slots, readings
 current band. `AUTONOMOUS_PACE=0` restores the fixed W35.workers count; one worker never reads usage for pacing. Any unreadable or malformed source reads as unknown, never a crash.
 Proof: `tests/prove-usage-pace.sh` in the health gate (fixture lines in the real CLI shapes, scratch files only).
 
+**A third Claude worker (W35.three-workers, owner 2026-10-06/07, the larger Claude plan).** `--workers 3` is
+Claude-only. With a limit of two, wide and grow act alike, so a two-worker lane is unchanged. A third session
+also needs the Mac, which is the real limit (18 GB; at 8 GB the GUI VM alone drove swap to 10.7 of 11.2 GB): the
+supervisor starts it only when `kern.memorystatus_vm_pressure_level` reads normal (1), swap in use
+(`vm.swapusage`) is at most a quarter of RAM (`AUTONOMOUS_THIRD_SWAP_SHARE`, default 0.25 — measured against RAM
+because macOS grows the swap total on demand), and no heavy job in the Agent Manager's load log
+(`~/.local/state/agent-manager/heavy-jobs.log`, `AUTONOMOUS_HEAVY_JOBS_LOG`) ended in the last 30 minutes with
+pressure above normal. An unreadable reading holds the third slot, never the first two. The gate is checked only
+when starting a third session; it never stops a running one. Holds and releases go to `daemon.log`, once per change.
+`AUTONOMOUS_PACE=0` gives a fixed two, never a fixed three: the third slot always needs the wide band.
+
 ### Measuring a multi-worker run (W35.live)
 
 `ops/autonomous/measure-workers.py` (read-only) compares the run before and after the split, which defaults to
@@ -240,8 +252,9 @@ start, default 7 days). It reports each five-hour window's peak reading and whet
 straddle the split are listed but kept out of both means); only the one-worker loop writes `wait` rows, so a two-worker cut shows only through its session rows, items finished per day from `SUITE_TODO_DONE.md`
 on `origin/main`, collisions — an item finished twice, git `CONFLICT` lines in the retained Claude session
 logs (the last two per worker, so an undercount), and heavy-lock waits, which `heavy-run.py` appends to
-`$STATE/heavy/waits.log` (start, seconds waited, command) whenever an entry had to wait — and minutes at each
-slot count. Proof: `tests/prove-measure-workers.sh` in the health gate (fixture state and a scratch repo).
+`$STATE/heavy/waits.log` (start, seconds waited, command) whenever an entry had to wait, also split by how many
+sessions the ledgers show running when the wait began (0 = a gate or upkeep run between sessions) — and minutes at
+each slot count. Proof: `tests/prove-measure-workers.sh` in the health gate (fixture state and a scratch repo).
 
 **Usage left unspent (W35.unspent).** `measure-workers.py --unspent` prints one line per subscription, which
 `status-digest.sh` shows as *Unspent*: the share of each five-hour window not spent over the last 24 h and
