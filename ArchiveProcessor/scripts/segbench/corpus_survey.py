@@ -258,13 +258,37 @@ def write_results(folders, n_files, out):
     for lo, hi in bins:
         sel = [m for m in folders if m["class"] not in ("small", "untagged") and lo <= m["change"] < hi]
         L.append(f"| {pct(lo)}–{pct(min(hi, 1))} | {len(sel)} | {sum(m['photos'] for m in sel):,} |")
-    L.append("\n## Noise sample\n")
-    L.append("Pending the owner: 40 implied boundaries and 40 implied continuations drawn at random (seed 36) from "
-             "per-document folders, shown blind and shuffled in `~/Library/Caches/ArchiveSuiteRehearsal/"
+    noise = existing_noise(out)
+    L.append(NOISE_HEAD.rstrip("\n"))
+    L.append(noise if noise else
+             "\nPending the owner: 40 implied boundaries and 40 implied continuations drawn at random (seed 36) "
+             "from per-document folders, shown blind and shuffled in `~/Library/Caches/ArchiveSuiteRehearsal/"
              "corpus-survey/pack/index.html`. The measured noise rate is added here by "
              "`corpus_survey.py score` once the owner's answers are in.\n")
     with open(out, "w") as f:
         f.write("\n".join(L) + "\n")
+
+
+NOISE_HEAD = "\n## Noise sample\n"
+
+
+def existing_noise(out):
+    """A measured noise section already in the results file, kept when the survey is rerun; else None."""
+    try:
+        with open(out) as f:
+            text = f.read()
+    except FileNotFoundError:
+        return None
+    body = text.split(NOISE_HEAD, 1)[1] if NOISE_HEAD in text else ""
+    return body.rstrip("\n") if body.strip() and not body.strip().startswith("Pending") else None
+
+
+def wilson(k, n, z=1.96):
+    if not n:
+        return 0.0, 0.0
+    p, d = k / n, 1 + z * z / n
+    c, h = (p + z * z / (2 * n)) / d, z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** .5) / d
+    return max(0.0, c - h), min(1.0, c + h)
 
 
 def cmd_pack(args):
@@ -358,11 +382,36 @@ def cmd_score(args):
                 cid, a = line.strip().split(",", 1)
                 answers[cid.strip()] = a.strip()
     res = score(key, answers)
+    rows = []
     for kind, label in (("new", "implied boundaries"), ("same", "implied continuations")):
         right, wrong, unsure = res[kind]
         n = right + wrong
+        lo, hi = wilson(wrong, n)
         print(f"{label}: {right} right, {wrong} wrong, {unsure} unsure; "
               f"noise {pct(wrong / n) if n else 'n/a'} of {n} judged")
+        rows.append(f"| {label} | {right} | {wrong} | {unsure} | {pct(wrong / n) if n else 'n/a'} | "
+                    f"{pct(lo)}–{pct(hi)} |")
+    if not args.results:
+        return
+    with open(args.results) as f:
+        text = f.read()
+    if NOISE_HEAD not in text:
+        sys.exit(f"no '## Noise sample' section in {args.results}; run `survey` first")
+    section = "\n".join([
+        "",
+        f"The owner judged 40 implied boundaries and 40 implied continuations drawn at random (seed 36) from "
+        f"per-document folders, shown blind and shuffled (answers: `{os.path.basename(args.answers)}`, kept in "
+        f"the cache outside git). A wrong boundary is a tag change inside one document; a wrong continuation is "
+        f"a document change the tags miss. Noise is wrong / (right + wrong); unsure answers are left out. "
+        f"Interval: Wilson 95%.",
+        "",
+        "| implied label | right | wrong | unsure | noise | 95% interval |",
+        "|---|---:|---:|---:|---:|---:|",
+        *rows,
+    ]) + "\n"
+    with open(args.results, "w") as f:
+        f.write(text.split(NOISE_HEAD, 1)[0] + NOISE_HEAD + section)
+    print(f"noise section -> {args.results}")
 
 
 def main():
@@ -372,6 +421,8 @@ def main():
     s = sub.add_parser("survey"); s.add_argument("--results", default=RESULTS)
     p = sub.add_parser("pack"); p.add_argument("--n", type=int, default=40)
     c = sub.add_parser("score"); c.add_argument("answers")
+    c.add_argument("--results", default=RESULTS, help="results file whose Noise sample section is rewritten; "
+                   "'' to only print")
     args = ap.parse_args()
     {"survey": cmd_survey, "pack": cmd_pack, "score": cmd_score}[args.cmd](args)
 

@@ -1027,13 +1027,6 @@ OWNER sit in the plan's HOLD QUEUE.
 - [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (lane: segbench) (uses: light,paid) (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (lane: segbench) (uses: model:4) (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
   Notes: `execution-plans/items/W36.seg-features.md` (checkpoint 1 of 2 landed; what remains).
-- [ ] **`W36.seg-corpus-noise` — score the owner's corpus noise sample [XS]** (lane: segbench) (uses: light) (blocked-on: W36.seg-corpus-noise-owner-ok).
-  Follow-up of `W36.seg-corpus-survey` (shipped 2026-10-08). The owner marks the 80 blind pairs in
-  `~/Library/Caches/ArchiveSuiteRehearsal/corpus-survey/pack/index.html` and exports the answers; then
-  `python3 ArchiveProcessor/scripts/segbench/corpus_survey.py score <answers>` gives the noise rate of implied
-  boundaries and continuations, which goes into the Noise sample section of `segbench-results/corpus-survey.md`.
-  DONE WHEN the measured noise rate is in that file. Not a prerequisite of `W36.seg-report`: the report can state it
-  as pending.
 - [ ] **`W36.seg-ensemble` — agreement plus review: risk-coverage, then the test collections once [S-M]** (lane: segbench) (uses: light,paid) (blocked-on: W36.seg-window, W36.seg-second, W36.seg-whole, W36.seg-features, W36.seg-localvlm, W36.seg-truth-owner-ok). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (lane: segbench) (uses: light) (blocked-on: W36.seg-ensemble, W36.seg-corpus-survey). Include an overnight option (owner, 2026-10-05: "we may want to include an option for models that can basically only be used overnight when the computer is in limited use otherwise"): for each on-device method, its time and memory per 1,000 pages and whether it is usable only as an overnight run on a Mac left alone, put to the owner beside the cloud options at the decision. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (lane: segbench) (uses: light) (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.

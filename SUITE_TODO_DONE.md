@@ -10048,3 +10048,13 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   commit's 22 Processor files). Only the Reader fetches SPM (4 packages, from the global cache) — on every cold
   build, never warm.
   <!-- /W35.warm-dd-measure -->
+- [x] **W36.seg-corpus-noise — score the owner's corpus noise sample [XS]** · §Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze) · SHIPPED 2026-10-08 (this commit)
+  Follow-up of `W36.seg-corpus-survey`. The owner marked all 80 blind pairs (answers in
+  `~/Library/Caches/ArchiveSuiteRehearsal/corpus-survey/owner-answers-2026-10-08.csv`, outside git). Measured, of
+  38 judged each (2 unsure each, left out): **implied boundaries 21.1% wrong (8/38, Wilson 95% 11.1-36.3%);
+  implied continuations 7.9% wrong (3/38, 2.7-20.8%).** So roughly one in five tag changes inside a per-document
+  folder is not a real document start, while missed starts are rarer; the 8,700 implied boundaries are usable as
+  weak labels, not as truth. `corpus_survey.py score` now writes the Noise sample section of
+  `segbench-results/corpus-survey.md` itself (its docs already said it did; it only printed), with the interval,
+  and `survey` keeps a measured section when rerun instead of resetting it to "Pending".
+  <!-- /W36.seg-corpus-noise -->

@@ -171,5 +171,9 @@ Corpus copies of the development collections, which the 2026-10-06 look found ta
 
 ## Noise sample
 
-Pending the owner: 40 implied boundaries and 40 implied continuations drawn at random (seed 36) from per-document folders, shown blind and shuffled in `~/Library/Caches/ArchiveSuiteRehearsal/corpus-survey/pack/index.html`. The measured noise rate is added here by `corpus_survey.py score` once the owner's answers are in.
+The owner judged 40 implied boundaries and 40 implied continuations drawn at random (seed 36) from per-document folders, shown blind and shuffled (answers: `owner-answers-2026-10-08.csv`, kept in the cache outside git). A wrong boundary is a tag change inside one document; a wrong continuation is a document change the tags miss. Noise is wrong / (right + wrong); unsure answers are left out. Interval: Wilson 95%.
 
+| implied label | right | wrong | unsure | noise | 95% interval |
+|---|---:|---:|---:|---:|---:|
+| implied boundaries | 30 | 8 | 2 | 21.1% | 11.1%–36.3% |
+| implied continuations | 35 | 3 | 2 | 7.9% | 2.7%–20.8% |
