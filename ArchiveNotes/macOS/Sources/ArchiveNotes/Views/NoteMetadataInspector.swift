@@ -183,11 +183,13 @@ struct NoteMetadataInspector: View {
             HStack {
                 Button("Set") { commitAuthors() }
                     .disabled(composedAuthors == item.authors)
+                    .accessibilityIdentifier("an.detail.authors.set")
                 Button("Clear") {
                     authorsText = ""
                     commitAuthors([])
                 }
                 .disabled(item.authors.isEmpty && composedAuthors.isEmpty)
+                .accessibilityIdentifier("an.detail.authors.clear")
             }
         }
     }
