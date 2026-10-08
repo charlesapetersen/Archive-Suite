@@ -1085,7 +1085,6 @@ unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the 
 - [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (lane: processor) (uses: build) (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i5` — borrowed-iPhone session pack [S]** (lane: docs) (uses: light) (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
 - [ ] **`W40.i4` — real-iPhone pass on a borrowed phone — OWNER** (lane: processor) (uses: light) (blocked-on: W40.i5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
-- [ ] **`W40.b0` — ledger format, verification/README.md [S]** (lane: docs) (uses: light). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.b1` — Reader feature ledger [M]** (lane: reader) (uses: light) (blocked-on: W40.b0, W24.cal1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.b2` — Notes feature ledger [M]** (lane: notes) (uses: light) (blocked-on: W40.b0, W24.cal1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.b3` — Processor feature ledger [M]** (lane: processor) (uses: light) (blocked-on: W40.b0, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.

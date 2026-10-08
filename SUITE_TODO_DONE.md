@@ -10058,3 +10058,11 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `segbench-results/corpus-survey.md` itself (its docs already said it did; it only printed), with the interval,
   and `survey` keeps a measured section when rerun instead of resetting it to "Pending".
   <!-- /W36.seg-corpus-noise -->
+- [x] **W40.b0 — ledger format, verification/README.md [S]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-08 (this commit)
+  `verification/README.md` defines the seven row statuses and the evidence each needs (`works` needs Reached by +
+  real-path test + runtime evidence), the fixed row fields as bullets under one `###` per feature with stable ids
+  (`R-`/`N-`/`P-`/`C-`, never reused), the evidence-file rules (where, header, excerpts not dumps, no corpus content,
+  no secrets, never edited after the fact), and `SUSPECTS.md` (ids `S-001`+, open/reproduced/cleared/superseded,
+  moved only by a linked run). `verification/SUSPECTS.md` created empty. Unblocks `W40.b1`-`b4` (each still on its
+  feature gate).
+  <!-- /W40.b0 -->
