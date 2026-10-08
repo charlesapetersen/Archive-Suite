@@ -9963,3 +9963,17 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   (`wt/autonomous-20261007-200815-20485`, `wt/autonomous-20261007-202524-1261`) were judged hunk by hunk as
   superseded by checkpoints 1–8. They are kept, not deleted, because deleting an unmerged branch needs `-D`.
   <!-- /W35.vm-mem-fu1 -->
+- [x] **W36.seg-corpus-survey — can the owner's tagged corpus train a segmentation model? Read-only survey [S-M]** · §Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze) · SHIPPED 2026-10-08 (this commit; checkpoint `775ef42`)
+  `ArchiveProcessor/scripts/segbench/corpus_survey.py` reads every corpus PDF's Finder tags with getxattr(2) only (no
+  write, rename or open-for-write; `find -newermt/-newerct` over the corpus afterwards: 0 changed), ignoring `Unread`
+  and colour labels, Red/Purple photos taken as box/folder cards. The classification rule was committed in
+  `775ef42` before the survey ran. 102,478 PDFs in 375 folders: per-document 120 folders / 51,566 photos /
+  8,700 implied boundaries / 38,354 implied continuations; mixed 69 / 26,622; per-collection 93 / 21,993; untagged
+  30 / 2,143; small 63 / 154. Rule check, not used to set it: the `05 Final Tagging` copies of Deaver, Dean and
+  Herrnstein all classify per-collection (0.0% change). Four per-document folders (124 photos) change on 75%+ of
+  pairs, which looks like per-page tagging. Table: `ArchiveProcessor/segbench-results/corpus-survey.md`. Review
+  pack, 40 implied boundaries and 40 continuations drawn at random (seed 36) from 32 per-document folders, shown
+  blind and shuffled, with the key in a separate file: `~/Library/Caches/ArchiveSuiteRehearsal/corpus-survey/pack/`
+  (outside git). The owner has been asked to mark it (Daemon Report). Scoring is the follow-up `W36.seg-corpus-noise`.
+  Tests: `python3 test_corpus_survey.py` 6/6.
+  <!-- /W36.seg-corpus-survey -->

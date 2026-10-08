@@ -225,16 +225,26 @@ def write_results(folders, n_files, out):
              "mixed (folders/photos) | per-collection (folders/photos) | untagged (folders/photos) | small (folders) |")
     L.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     order = sorted(by_col, key=lambda k: (-by_col[k]["per-document"][3], k))
+    rest = [k for k in order if not by_col[k]["per-document"][0]]
     for k in order:
         a = by_col[k]
+        if not a["per-document"][0]:
+            continue
         p = a["per-document"]
         L.append(f"| {k} | {p[0]} | {p[1]:,} | {p[3]:,} | {p[2] - p[3]:,} | {a['mixed'][0]}/{a['mixed'][1]:,} | "
                  f"{a['per-collection'][0]}/{a['per-collection'][1]:,} | {a['untagged'][0]}/{a['untagged'][1]:,} | "
                  f"{a['small'][0]} |")
+    rest_photos = sum(sum(v[1] for v in by_col[k].values()) for k in rest)
+    L.append(f"\nThe other {len(rest)} collections ({rest_photos:,} photos) hold no per-document folder; their "
+             "folders are in the class totals above and, one by one, in the cache TSV.\n")
+    odd = [m for m in folders if m["class"] == "per-document" and m["change"] >= 0.75]
+    L.append(f"Per-document folders whose tags change on 75% or more of pairs (a sign of per-page rather than "
+             f"per-document tagging): {len(odd)}, {sum(m['photos'] for m in odd):,} photos.\n")
     L.append("\n## Rule check against the known collection-tagged boxes\n")
     L.append("Corpus copies of the development collections, which the 2026-10-06 look found tagged per collection "
              "(tags recovered 0% of Deaver's and Dean's document starts, 16% of Herrnstein's). Not used to set "
-             "the rule.\n")
+             "the rule. Folders are matched by name, so other boxes that share a name (Harvard's Herrnstein and "
+             "Dean's-office folders) are listed too; the development copies are the `05 Final Tagging` ones.\n")
     L.append("| folder | class | pages | change | tagged | year | implied documents |")
     L.append("|---|---|---:|---:|---:|---:|---:|")
     for m in folders:
