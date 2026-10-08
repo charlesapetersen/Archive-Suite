@@ -89,9 +89,27 @@ record per job to the manager's `heavy-jobs.log`; a scratch `MAC_HEAVY_LOCK` wit
 
 ### One heavy job per Mac, shared with Vision OCR (W35.machine-lock)
 
-`heavy.lock` serialises only this project. With it, `heavy-run.py` also takes
-`~/.local/state/mac-heavy.lock` through `mac-heavy-lock.py`, and holds it until the child session ends.
-It TRIES the Mac lock once while holding `heavy.lock` and backs off (releasing `heavy.lock`) when the Mac
+`heavy.lock` serialises only this project. With it, `heavy-run.py` also takes the Mac-wide lock and holds
+it until the child session ends. Since Agent Manager R6 (2026-10-08) that is the manager's `bin/heavy-lock`
+whenever it is installed (`AGENT_MANAGER_HEAVY_LOCK`, default `~/Claude/Agent Manager/bin/heavy-lock`):
+`heavy-run.py` loads it as a module and drives one `Taker` per job, so there is one lock implementation on
+the Mac. The job is then the holder `heavy-lock status` names (project `archive-suite`, the supervisor's
+pid), a waiter here is in the manager's queue (listed by `status`, found by `waiting-under`), and the queue
+is first come, first served across projects: before this, back-to-back VM jobs held the old lock one after
+another and a Vision OCR waiter polling every 5 s never got in, while the manager's own lock read free. The
+manager's taker holds its kernel flock AND the old mkdir lock, so everything below that reads or waits on
+`~/.local/state/mac-heavy.lock` still sees the job. When the manager is missing or will not load, or on a
+scratch `MAC_HEAVY_LOCK` without a scratch `AGENT_MANAGER_STATE` (every harness), `heavy-run.py` falls back
+to `mac-heavy-lock.py`'s mkdir protocol directly, as before: the manager is never required.
+At the cutover a job already holding only the old mkdir lock (code from before R6) blocks a new taker, which
+waits for it; a waiter still running the old code waits for a new holder's mkdir lock. Neither direction can
+make a second holder. Once loaded, a manager error that leaves the job holding nothing (an unwritable manager
+state, say) is logged and that job takes the mkdir lock instead of being refused. A job that defers to an
+earlier waiter in the manager's queue (both locks free meanwhile) records that waiter's pid in its heartbeat
+(`queued`), and `heavy-run.py waiting` counts it as a Mac wait unless that waiter is inside the session, so the
+watchdog, the wall backstop and the gate cap treat it like any other queue time. The manager does not apply
+its memory-pressure gate to this project's jobs, and a waiter that gate holds back holds no place in the queue,
+so this project runs under critical pressure as it did before R6. It TRIES the Mac lock once while holding `heavy.lock` and backs off (releasing `heavy.lock`) when the Mac
 lock is busy, never waiting for one lock while holding the other: a hand-run `mac-heavy-lock.py run` holder
 whose command then needs `heavy.lock` would otherwise deadlock.
 Vision OCR speaks the same wire protocol with its own bash helper (`ops/autonomous/mac-heavy-lock.sh`
@@ -112,14 +130,21 @@ execs it with the same arguments plus `--project archive-suite`, the options bef
 spelled out first (`--label=x` and `--proj x` as argparse reads them; anything it would reject falls back).
 That helper takes a kernel flock and this
 mkdir lock both, so takers here still see it; its `status` reads differently and exits 1 while held.
-Without the manager, or with `--lock`, the command runs as before. `heavy-run.py` imports the functions and
-so always speaks the mkdir protocol directly; the manager is never required.
-Known limit: a SIGKILLed supervisor whose child session survives frees the Mac lock early (its pid is
-dead), though `heavy.lock` still protects this project. `tests/prove-mac-heavy-lock.sh` (a gate step)
+Without the manager, or with `--lock`, the command runs as before. `heavy-run.py` and `worker-state.py`
+import its functions: the fallback, and the readers of the old lock's owner record (`waiting`, the
+`heavy_busy` selection order), which stay correct while the manager keeps writing that record.
+Known limit: a SIGKILLed supervisor whose child session survives frees the Mac lock early (the manager's
+flock belongs to the supervisor process, and the old lock's pid is dead), though `heavy.lock` still
+protects this project. `tests/prove-mac-heavy-lock.sh` (a gate step)
 uses a scratch `MAC_HEAVY_LOCK`, never the real one, and a missing `AGENT_MANAGER_HEAVY_LOCK` for the
 fallback; its delegate part runs a scratch copy of the manager's helper (`AGENT_MANAGER_HEAVY_LOCK_SOURCE`,
 default the installed one) and says SKIP when there is none. That part pins `HEAVY_LOCK_SYSCTL` to a fake
 reading normal, so the Mac's real memory pressure cannot make the gate step wait, and caps each call at 60 s.
+Its R6 part proves, on the same scratch copy, that a `heavy-run.py` job is the manager's holder, that a
+manager waiter queued during it goes before this project's next back-to-back job (SKIP, said so, while the
+installed helper predates the queue), that nested takers inside a held job take nothing, that an old-code
+holder and a new job never overlap in either order, and that the opposite lock order still finishes; three
+`heavy-run.py` mutants each turn one of those red.
 
 ## Item claims and shared plan edits (W35.claims)
 

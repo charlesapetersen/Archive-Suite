@@ -13,14 +13,14 @@ struct CostEstimate {
     var totalStandard: Double { ocrCost + classificationCost + taggingCost + collectionCost + rotationCost }
     var totalBatch: Double { batchOcrCost + classificationCost + taggingCost + collectionCost + rotationCost }
 
-    private func money(_ v: Double) -> String { "$" + String(format: "%.4f", v) }
-    var ocrFormatted: String { money(ocrCost) }
-    var classificationFormatted: String { money(classificationCost) }
-    var taggingFormatted: String { money(taggingCost) }
-    var collectionFormatted: String { money(collectionCost) }
-    var rotationFormatted: String { money(rotationCost) }
-    var totalStandardFormatted: String { money(totalStandard) }
-    var totalBatchFormatted: String { money(totalBatch) }
+    static func money(_ v: Double) -> String { "$" + String(format: "%.4f", v) }
+    var ocrFormatted: String { Self.money(ocrCost) }
+    var classificationFormatted: String { Self.money(classificationCost) }
+    var taggingFormatted: String { Self.money(taggingCost) }
+    var collectionFormatted: String { Self.money(collectionCost) }
+    var rotationFormatted: String { Self.money(rotationCost) }
+    var totalStandardFormatted: String { Self.money(totalStandard) }
+    var totalBatchFormatted: String { Self.money(totalBatch) }
 }
 
 struct CostEstimator {
@@ -176,5 +176,27 @@ struct CostEstimator {
             fileCount: fileCount,
             model: model
         )
+    }
+
+    /// Multi-page PDF re-OCR calls the model directly once per page, with no tagging, segmentation or
+    /// Batch API. Price those pages on their own at standard rates; `runTotal` adds them to the image
+    /// subset's standard or batch total. The pre-run pane and run history both use this pair.
+    static func estimateDirectPDFPages(
+        pageCount: Int,
+        model: LLMModel,
+        imageScale: Double = 1.0,
+        rotationMode: RotationMode = .off,
+        useGateway: Bool = false,
+        imageTokenProvider: LLMProvider? = nil
+    ) -> CostEstimate {
+        estimate(fileCount: pageCount, model: model, enableTagging: false,
+                 sendPreviousImage: false, contextCharCount: 0, imageScale: imageScale,
+                 rotationMode: rotationMode, useGateway: useGateway,
+                 imageTokenProvider: imageTokenProvider)
+    }
+
+    /// Whole-run total: the image subset at its batch or standard rate plus direct PDF pages at standard.
+    static func runTotal(images: CostEstimate?, directPDFPages: CostEstimate?, batch: Bool) -> Double {
+        (images.map { batch ? $0.totalBatch : $0.totalStandard } ?? 0) + (directPDFPages?.totalStandard ?? 0)
     }
 }

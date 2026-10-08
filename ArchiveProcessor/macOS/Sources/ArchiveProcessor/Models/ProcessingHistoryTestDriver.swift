@@ -75,6 +75,39 @@ enum ProcessingHistoryTestDriver {
         check("reOCR modeLabel", snapshot(fileCount: 2, reOCR: true).makeRun(succeeded: 2).modeLabel == "Re-OCR PDF")
         check("providerLabel is the provider (no gateway)", r.providerLabel == LLMProvider.gemini.rawValue)
 
+        // Mixed Batch run: 4 images go through the Batch API, while 2 PDFs (7 pages) are OCR'd directly,
+        // one standard-rate call per page with no tagging. The history cost must be that sum.
+        var mixed = snapshot(fileCount: 6, batch: true, reOCR: true)
+        mixed.pdfFileCount = 2
+        mixed.pdfPageCount = 7
+        let mixedImages = CostEstimator.estimate(
+            fileCount: 4, model: model, enableTagging: true,
+            sendPreviousImage: false, contextCharCount: 0)
+        let mixedPages = CostEstimator.estimateDirectPDFPages(pageCount: 7, model: model)
+        let mixedExpected = mixedImages.totalBatch + mixedPages.totalStandard
+        check("mixed batch prices images at batch and PDF pages at standard",
+              mixedPages.totalStandard > 0 && mixedPages.taggingCost == 0
+                  && abs(mixed.makeRun(succeeded: 6).cost - mixedExpected) < 1e-9
+                  && abs(CostEstimator.runTotal(images: mixedImages, directPDFPages: mixedPages, batch: true)
+                         - mixedExpected) < 1e-9)
+        var pdfOnly = snapshot(fileCount: 2, batch: true, reOCR: true)
+        pdfOnly.pdfFileCount = 2
+        pdfOnly.pdfPageCount = 5
+        check("PDF-only run with Batch selected is priced per page at standard, without tagging",
+              abs(pdfOnly.makeRun(succeeded: 2).cost
+                  - CostEstimator.estimateDirectPDFPages(pageCount: 5, model: model).totalStandard) < 1e-9)
+        let pagesDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("APPageCountTest-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: pagesDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: pagesDir) }
+        let threePage = pagesDir.appendingPathComponent("three.pdf")
+        let threeDoc = PDFDocument()
+        for i in 0..<3 { threeDoc.insert(PDFPage(), at: i) }
+        threeDoc.write(to: threePage)
+        check("direct PDF page count reads pages and counts an unreadable PDF as 2",
+              RunHistorySnapshot.directPDFPageCount(
+                  [threePage, pagesDir.appendingPathComponent("missing.pdf")]) == 5)
+
         // Local Agent calls do not use the selected API provider or its price. Persist the actual CLI plus
         // its override/default marker, and generate a real scratch PDF to prove the shared header parser
         // still strips the new free-form provenance line correctly.
