@@ -118,6 +118,20 @@ SWIFT
 expect 1 'an optional PDFDocument?.write fails' 'PlantedOptionalPDFWrite.swift'
 
 fresh_tree
+mkdir -p "$SCRATCH/$SRC/OCR"
+cat > "$SCRATCH/$SRC/OCR/PlantedParameterPDFWrite.swift" <<'SWIFT'
+import PDFKit
+func plantedParameterPDFWrite(_ document: PDFDocument, to outputURL: URL) {
+    _ = document.write(to: outputURL)
+}
+func plantedClosurePDFWrite(_ outputURL: URL) -> (PDFKit.PDFDocument) -> Bool {
+    { (doc: PDFKit.PDFDocument) in doc.write(to: outputURL) }
+}
+SWIFT
+expect 1 'a PDFDocument.write on a function parameter fails (W9.e3)' 'PlantedParameterPDFWrite.swift:3:'
+expect 1 'a PDFDocument.write on a closure parameter fails (W9.e3)' 'PlantedParameterPDFWrite.swift:6:'
+
+fresh_tree
 mv "$SCRATCH/$SRC" "$SCRATCH/macOS/Sources/ArchiveProcessorMoved"
 expect 1 'a missing source root fails instead of passing vacuously' 'source root is missing'
 

@@ -99,7 +99,10 @@ pdf_document_write_hits() {
       while ($source =~ /\b(?:let|var|guard\s+let)\s+([A-Za-z_]\w*)\s*(?::\s*(?:PDFKit\.)?PDFDocument\??)?\s*=\s*(?:PDFKit\.)?PDFDocument\b/g) {
         $variables{$1} = 1;
       }
-      while ($source =~ /\b(?:let|var|guard\s+let)\s+([A-Za-z_]\w*)\s*:\s*(?:PDFKit\.)?PDFDocument\??/g) {
+      # Any binding annotated as PDFDocument: let/var, stored property, and function or closure parameter
+      # (incl. `_ doc:`, `inout`). W9.e3 planted `func f(_ d: PDFDocument, _ u: URL) { d.write(to: u) }`
+      # and the let/var-only form passed it. Still unseen: a type inferred from elsewhere (`for d in docs`).
+      while ($source =~ /\b([A-Za-z_]\w*)\s*:\s*(?:inout\s+)?(?:PDFKit\.)?PDFDocument\b/g) {
         $variables{$1} = 1;
       }
       my @starts;
