@@ -10074,3 +10074,14 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `vm-gui-runner.sh notes xcuitest` runs at 6144 MB (37 passed, 1 skipped, 0 failed, W21 included). Not
   re-run alone for this record.
   <!-- /W9.w21-red -->
+- [x] **W9.e3-fu1 — clear the ~45 Swift 6 isolation warnings in `ArchiveReaderUITests` [S · gui]** · §Archive Notes — NEW APP (SHIPPED W0–W8, 2026-07; `execution-plans/archive-notes/00-overview.md` retained) · SHIPPED 2026-10-08 (this commit; checkpoint `211a849`)
+  45 warnings, all one cause: `FixtureUITestCase` and `ArchiveReaderUITests` are `@MainActor`, but their
+  `setUpWithError`/`tearDownWithError` overrides inherit XCTestCase's nonisolated isolation, so every touch of
+  `app` there warned. Both now override the async `setUp`/`tearDown`, which inherit the class's isolation (the
+  pattern `WarmStartUITests` already used). `UITestLaunchTests` gained `@MainActor`, and an unused `header` in
+  `NavigationUITests` went. Subclasses of `FixtureUITestCase` must now override `setUp() async throws` (noted
+  in its comment); none overrode either hook. `build-for-testing` of the whole Reader scheme: 0 compiler warnings
+  (only the usual `appintentsmetadataprocessor` notices). `ops/gui/vm-gui-runner.sh reader xcuitest` in the Tart
+  VM: `** TEST SUCCEEDED **`, 32 tests, 0 failures, 1 skipped (`ContentIndexFailureUITests`, which skips by design
+  without `CORRUPT_INDEX_FIXTURE=1`), exit 0. Test-only change: no app source, corpus or host GUI touched.
+  <!-- /W9.e3-fu1 -->

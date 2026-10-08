@@ -928,15 +928,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   renders as a raw `<!-- block: note-passage … -->` comment (fold into D12 if real).
   DONE WHEN each behaviour is observed in a VM-green UITest or render-guard shot, and the CANDIDATE is settled
   in writing. | ArchiveNotes | S-M | low | **needs:** gui
-- [ ] **`W9.e3-fu1` — clear the ~45 Swift 6 isolation warnings in `ArchiveReaderUITests` [S · gui]** (lane: reader) (uses: vm)
-  Found by W9.e3: every `xcodebuild test -only-testing:ArchiveReaderTests` compiles the UITest target too and
-  prints ~45 warnings, all in `ArchiveReaderUITests/` (`FixtureUITestCase.swift`, `ArchiveReaderUITests.swift`,
-  `UITestLaunchTests.swift`, plus one unused `header` in `NavigationUITests.swift`). They are main-actor
-  `XCUIApplication` members (`app`, `launchArguments`, `launch()`, `waitForExistence`) used from nonisolated
-  `setUp`/`tearDown`/helpers, so a test-only `@MainActor` annotation is the likely fix. They hide a NEW warning in
-  the noise, which is why E3's "no new warnings" bar couldn't be read off the log. Not fixed inside E3 because
-  only the VM can prove a UITest still runs. DONE WHEN the Reader unit run prints no warning from that target and
-  `ops/gui/vm-gui-runner.sh reader xcuitest` is green. | ArchiveReader/macOS/Tests/ArchiveReaderUITests/ | S | low | **needs:** gui
 - [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (lane: notes) (uses: light) (blocked-on: W9.e1,
   W9.e2, W9.e3, W9.b5-fu1). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
   convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
