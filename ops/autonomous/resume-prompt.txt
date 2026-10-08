@@ -139,8 +139,8 @@ STEP 2 — PICK EXACTLY ONE ITEM: the first "[ ]" item in the Work Queue, top to
   W15.tu4 (2026-07-28). Only stop if the reconcile leaves nothing else actionable.
   Otherwise, if CHECKPOINT commits exist, they are already on origin/main (so your fresh worktree from STEP 3
   contains them) — CONTINUE the REMAINING sub-steps, do NOT redo the committed parts. A KILLED session won't
-  have written a Session Log note, so reconstruct what's left from the item's `execution-plans/` plan + the
-  checkpoint commit messages + `git diff <last-checkpoint-sha>..origin/main`.
+  have written a Session Log note, so reconstruct what's left from `execution-plans/items/<TAG>.md`, the
+  item's plan, the checkpoint commit messages + `git diff <last-checkpoint-sha>..origin/main`.
 
 STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (also in the plan):
   * NEVER write to a real corpus — scratch/TESTOUT/mktemp output only. File safety beats getting it done.
@@ -203,7 +203,8 @@ STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --
   commit + push. This completing commit MUST also MOVE the item's whole entry from SUITE_TODO.md to
   SUITE_TODO_DONE.md under the matching heading, as `- [x] **<TAG> — <title>** … SHIPPED <date>` (tag bare, no
   backticks; a `[x]` left in SUITE_TODO.md fails check-todo-stubs.sh), and/or update the relevant
-  KNOWN_ISSUES.md, IN THE SAME COMMIT (a Stop hook blocks the turn otherwise).
+  KNOWN_ISSUES.md, IN THE SAME COMMIT (a Stop hook blocks the turn otherwise). Delete the item's
+  `execution-plans/items/<TAG>.md` in that commit, folding its useful lines into the DONE entry.
   Edge cases (the ack file is read from the PRIMARY checkout — use its absolute path, NOT a worktree-relative
   one): a change that ships no tracked item at all (infra) →
   `touch "__REPO__/.docsync-ok"`. If you must stop with the item only PARTIALLY
@@ -212,8 +213,7 @@ STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --
   remaining sub-steps (STEP 5). End the commit message with a co-author trailer naming THE MODEL YOU ARE
   ACTUALLY RUNNING AS — not a version copied from this file or from the last commit:
       Co-Authored-By: Claude <your model, e.g. Opus 5> (1M context) <noreply@anthropic.com>
-  (This line used to hard-code `Opus 4.8`, which silently outlived the model and made `git log` claim work
-  was done by something that never ran it. Name yourself; the history is a record, not a template.)
+  (A hard-coded `Opus 4.8` here once outlived its model and made `git log` lie. Name yourself.)
   Push commits freely; do NOT cut a DMG/GitHub release (that's owner-gated).
 
 STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4's push, in the SAME TURN — before
@@ -223,9 +223,10 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
   plan BEFORE the push** — the plan's `[ ]` is what makes `next-queue-item.sh` OFFER the item, so a tick that
   lands without its push would silently drop the item from the queue entirely. Push first, tick immediately after.
   If you COMPLETED the item, tick it in .maintenance/AUTONOMOUS_PLAN.md ([x] + sha
-  + one-line result); if you only ADVANCED it (checkpointed, not complete), leave it "[ ]" and note in its
-  Session Log EXACTLY which sub-steps remain + your last checkpoint sha, so the next session continues from
-  there instead of restarting.
+  + one-line result); if you only ADVANCED it, leave it "[ ]" and write EXACTLY which sub-steps remain + your
+  last checkpoint sha to `execution-plans/items/<TAG>.md` (committed with the checkpoint; the claimant alone
+  writes it) and a line in the Session Log. NEVER into its SUITE_TODO body (shared by every worker: a
+  rebase-conflict hotspot).
   ⚠️ **Filing a residual/follow-up item? The dependency has to be a TAG, not a sentence.** If the item's text
   says it should be done *inside* / *folded into* / *along with* another item X, it MUST also carry a literal
   `(blocked-on: X)`, mirrored into BOTH trackers (SUITE_TODO.md and the plan's WORK QUEUE).
@@ -242,7 +243,7 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
   `../suite-wt-*` worktree that no process is using (`lsof +D <dir>` empty) and that has not changed in 6 hours:
   commit anything uncommitted ON ITS OWN BRANCH (`git -C <dir> add -A && git -C <dir> commit -m "wip: … saved by
   worktree cleanup"`), then `git worktree remove <dir>` (it is clean now, so no force), and KEEP the branch — nothing
-  is lost. If the work belongs to an OPEN item, add the branch name to that item in `SUITE_TODO.md` so the session
+  is lost. If the work belongs to an OPEN item, add the branch name to `execution-plans/items/<TAG>.md` so the session
   that takes the item can start from it (`git worktree add ../suite-wt-… <branch>`, then judge it like any draft).
   Log one line in the Session Log; do not raise it in the Daemon Report. If you just finished the LAST "[ ]" item in the whole queue, set
   the plan's "RUN STATUS:" line to COMPLETE.

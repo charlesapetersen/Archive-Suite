@@ -74,6 +74,8 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 (`Net/USBBridge.swift`), the **Android** app (`ArchiveCapture/`), and the Mac pipeline + Reader.
 
 ## Active execution plans (`execution-plans/`)
+- `items/<TAG>.md` — per-item progress notes (checkpoints, session notes, saved-draft branches), one file per
+  open item, deleted when it ships; the item's entry here carries only a `Notes:` pointer (W35.item-notes).
 - `parallel-workers/` — **PLANNED 2026-10-05 (W35, the daemon)**: several sessions at once, sized from the usage
   readings so the five-hour windows are used; claims, a heavy-work lock, per-lane workers, pace rule. `00-plan.md`.
 - `segmentation/` — **PLANNED 2026-10-05 (W36, Archive Processor)**: a bake-off of automatic segmentation methods
@@ -863,7 +865,8 @@ completion record is in `SUITE_TODO_DONE.md`.
   open Extracts editor's chip still reports `missing: 0` (label "Moore on Intel culture — 1968", id
   `22222222-…`). Either the W14.4c cross-window re-style regressed or the probe/fixture drifted — find which
   before touching the product. | ArchiveNotes | S | med | none
-- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [S · ~0.25 session]** (lane: notes) (uses: light) SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080, wt/w9e2-w1c-20261007-143731-8614 (1 wip commit, saved 2026-10-08).
+- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [S · ~0.25 session]** (lane: notes) (uses: light)
+  Notes: `execution-plans/items/W9.e2.md` (saved draft branches).
   Original body, kept for reference; the work now lives in the six parts below. Plan E2 — also settle the two
   D1 doubts E1 could not decide from source:
   whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents
@@ -879,7 +882,7 @@ completion record is in `SUITE_TODO_DONE.md`.
   `~/Claude/Agent Manager/analysis/QUEUE-ANALYSIS-2026-10-07.md` proposal c: "W9.e2 into ~six feature-group
   sub-items"; one M item had run through six worktrees and two saved draft branches without shipping). The work
   is in the six `W9.e2-*` entries below. This entry now only closes the sweep: when all six have shipped, settle
-  the saved draft branches listed above (merged, superseded, or deleted, each named), and move all seven entries
+  the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
 - [ ] **`W9.e2-notes` — runtime sweep, note lifecycle: delete, tags, quality, author, context menu, empty state [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
@@ -1014,7 +1017,7 @@ OWNER sit in the plan's HOLD QUEUE.
 
 - [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (lane: segbench) (uses: light,paid) (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (lane: segbench) (uses: model:4) (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
-  - 2026-10-05, checkpoint 1 of 2 (commit "feat(segmentation): W36.seg-features (checkpoint 1/2)"): a numpy logistic regression on 26 per-boundary features (OCR rule cues, TF-IDF cosine, length, blank, paper colour, ink, aspect/orientation, and the capture-time gap as one feature) in `scripts/segbench/features.py` + `method_features.py`, leave-one-collection-out on Dean/Deaver/Herrnstein, methods `features-lr` and `features-lr-notime`, tests in `test_features.py`. Dev pooled pages in an exact document 59.3% with the time gap, 52.5% without; Dean and Herrnstein 72-83%, Deaver (clippings) 0-10% because the letter cues it learns do not occur there. Detail: `segbench-results/features-lr-report.md`. Remaining for checkpoint 2: embedding features (a SigLIP/CLIP image embedding and a small text embedder, through MLX), then re-run.
+  Notes: `execution-plans/items/W36.seg-features.md` (checkpoint 1 of 2 landed; what remains).
 - [ ] **`W36.seg-corpus-survey` — can the owner's tagged corpus train a segmentation model? Read-only survey [S-M]** (lane: segbench) (uses: light) (blocked-on: W36.seg-base).
   Owner, 2026-10-06: "if we want to try training a small model on thousands of segmented documents, the already tagged
   documents in the Archival Photos PDF folder could work. There will be mistakes and non-standardized tagging. But
@@ -1092,19 +1095,6 @@ to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their ow
   moving cleanly, and a dirty or unpublished tree preserved; the README states the path; the warm figure is
   re-measured once and added to the measure table; the entry notes it takes effect at the next owner restart. |
   ops/autonomous/ + execution-plans/parallel-workers/warm-dd-measure.md | M | med | none
-- [ ] **`W35.item-notes` — checkpoint notes go to per-item files, not into this file's entry bodies [S-M · ~1 session]** (lane: ops,docs) (uses: light)
-  Efficiency plan item 17, first half. Evidence: `analysis/QUEUE-ANALYSIS-2026-10-07.md` §What stops extra
-  workers 5 (this file had 101 commits since 20 Sep; checkpoints write into item bodies; one recorded rebase
-  conflict) and `analysis/ARCHIVE-SUITE-TEST-LOAD-2026-10-07.md` (touched in 31 of 47 commits since 5 Oct). The
-  W35.three-workers session log records a rebase conflict on this file when upstream unblocked the same entry.
-  WHAT. Checkpoints, session notes and saved-draft lists go to `execution-plans/items/<TAG>.md`, written only by
-  the item's claimant; the entry here keeps its spec and one pointer line. The file is deleted when the item
-  ships, its useful lines folded into the `SUITE_TODO_DONE.md` entry. Write the rule into `resume-prompt.txt`
-  (29,083 of its 31,000-byte budget, so replace words rather than add them), the README and `CLAUDE.md`'s docs
-  convention; check the doc-sync hook (`.claude/hooks/docsync-guard.sh`) accepts an items file as the docs half
-  of a checkpoint commit. Move the existing in-body checkpoint notes (for example `W36.seg-features`) out.
-  DONE WHEN the rule is written in those three places, the existing checkpoint bodies are moved, and
-  context-budget, handoff, tracker-sync and coherence pass. | ops/autonomous/ + docs | S-M | low | none
 - [ ] **`W35.done-union` — `SUITE_TODO_DONE.md` becomes append-only with `merge=union` [S · ~1 session]** (lane: ops,docs) (uses: light)
   Efficiency plan item 17, second half. Evidence as `W35.item-notes`: every completion moves an entry into
   `SUITE_TODO_DONE.md` under its section heading, so two workers finishing at once both edit the middle of a

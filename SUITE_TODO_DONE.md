@@ -9873,3 +9873,16 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   prove-worker-supervisor, prove-dep-gating 45/0, prove-tracker-sync 32/0, policy-coherence pass. Takes effect at the
   next owner restart; the check after a day of running is the owner's `measure-workers.py` report (minutes with two
   workers running).
+- [x] **W35.item-notes — checkpoint notes go to per-item files, not into SUITE_TODO entry bodies** — SHIPPED
+  2026-10-08. Efficiency plan item 17, first half. Checkpoint notes, session notes and saved-draft branch lists now
+  go to `execution-plans/items/<TAG>.md`, written by the item's claimant (worktree cleanup may add a saved branch to
+  an idle item's file); the SUITE_TODO entry keeps its spec and one `Notes:` pointer; the final commit deletes the
+  file and folds its useful lines into the DONE entry. Rule written in `resume-prompt.txt` (STEP 2 continue, STEP 4
+  final commit, STEP 5 advanced-item note and leftover-worktree branch; 29,083 → 29,208 bytes of 31,000, with a
+  trim to pay for it), `ops/autonomous/README.md` §L2 and `CLAUDE.md`'s docs convention; SUITE_TODO's plan index
+  names `items/`. Moved out: `W36.seg-features`' checkpoint-1 note and `W9.e2`'s seven saved draft branches. ⚠️ The
+  doc-sync Stop hook (`.claude/hooks/docsync-guard.sh`) does NOT yet count an items file as a tracker touch, and an
+  unattended session cannot edit `.claude/` (sensitive path), so a code checkpoint whose only doc is an items file
+  still needs the `.docsync-ok` ack; the one-line regex patch is in the Daemon Report for the owner. Checks:
+  context-budget OK, tracker-sync 72 shared items agree, policy-coherence OK, todo-stubs OK; check-handoff's only
+  failures were uncommitted worktrees (this session's own, before commit, and other sessions').

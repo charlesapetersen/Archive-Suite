@@ -39,6 +39,15 @@ read that section.
   only the work since its last push, and the next session **continues** from the committed checkpoints
   (detected via `git log` + the plan's Session Log) rather than restarting the whole item. Only the *final*
   commit flips the `SUITE_TODO` checkbox; interim checkpoints are plain mid-feature commits.
+  **Per-item notes (W35.item-notes).** A checkpoint's progress note (what remains, the last checkpoint sha),
+  session notes and saved-draft branch lists go to `execution-plans/items/<TAG>.md`, committed with the
+  checkpoint and written only by the item's claimant (worktree cleanup may add a saved branch to an idle
+  item's file). The `SUITE_TODO.md` entry keeps its spec plus one `Notes: execution-plans/items/<TAG>.md`
+  pointer line; the final commit deletes the file and folds its useful lines into the `SUITE_TODO_DONE.md`
+  entry. Reason: every worker edits `SUITE_TODO.md`, and progress written into entry bodies made it the
+  queue's rebase-conflict hotspot (101 commits in 18 days, one recorded conflict). The doc-sync Stop hook
+  does not yet count an items file as a tracker touch, so a code checkpoint whose only doc is that file still
+  needs the `.docsync-ok` ack.
 
 ## Heavy work across workers (W35.heavy)
 
