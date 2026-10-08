@@ -1041,24 +1041,54 @@ STEP 2.0 — REVIEW CADENCE (WS11 — check BEFORE picking a queue item): run `o
   (correct) park; that's acceptable.
 ```
 
-## Model & effort — one fixed choice, plus per-task subagent sizing (2026-07-31)
+## Model, effort and limits — asked per session from the Agent Manager (W35.session-policy, 2026-10-08)
 
-Every resume session launches as **`--model opus --fallback-model sonnet --effort medium`**
-(`EFFORT` = `AUTONOMOUS_EFFORT`, default `medium` since 2026-09-24; the CLI accepts `low|medium|high|xhigh|max`).
-At `max` the model follows the effort (owner, 2026-10-07, "Fable for hard items only"): the session launches as
-`--model fable --fallback-model opus` (`AUTONOMOUS_MAX_MODEL` overrides `fable`). This daemon never raises effort
-itself, so that happens only when the operator sets `AUTONOMOUS_EFFORT=max`. Codex lanes are unaffected.
+Since Agent Manager stage 7 the manager, not this daemon, decides each Claude session's model, fallback, effort,
+wall limit, quiet limit and dollar cap. The worker reservation (W35.claims) names the item before the launch, so
+the daemon can ask about it. **Takes effect at the next owner restart.**
 
-**Why the session's own model/effort is FIXED, not chosen per queue item.** Both flags are resolved when the
-process launches — *before* the session picks its item, which happens inside the session at resume-prompt
-STEP 2 (`next-queue-item.sh`). A session cannot change its own model or effort mid-flight, so "let the daemon
-match the model to the task" would mean moving item selection out of the session and into this script — a
-Tier-2 change to the daemon, and one that risks divergence, since the resume prompt layers hold-queue and
-already-done skips *on top* of `next-queue-item.sh` (the daemon's guess at "the next item" wouldn't always be
-the item the session picks). The queue is also the wrong place to economize: Wave 23 is bug work in
-file-writing tag paths, the tag/PDF SPEC, actor isolation and shared `ArchiveCore`, where the **Tier-2 gate**
-decides what's enough — not a cost heuristic. `sonnet` stays what it already was: the *overload* fallback, the
-one model switch worth automating.
+**The ask.** After `reserve` and before the launch, `session_policy` calls `bin/grant --project … --agent claude
+--worker … --evidence FILE --policy-out FILE`, bounded by `GRANT_TIMEOUT` like the stage 4 hold check. The
+evidence (a copy of the last one is kept in `$WORKER_STATE/policy-evidence.json`):
+
+| key | from |
+|---|---|
+| `item`, `uses` | the reservation's tag and uses field (a `gate-fix`/`doc-budget-fix`/`review` tag is a special reservation, whatever the daemon asked for) |
+| `estimate_sessions` | the item header's `~N session(s)` / `~N-M sessions` text, as written (absent if none) |
+| `sessions_since_progress` | `$STATE/item-progress/<tag>`: one counter **per item**, shared by workers, updated under the claim after each session — reset to 0 when a new commit names the tag as a whole word (so another worker's commit, or one for `<tag>-fu`, is not progress), +1 otherwise, removed when the plan shows the item `[x]`. A window-cut session is not counted. Not sent for a special reservation. |
+| `escalate_requested`, `escalate_reason` | `$WORKER_STATE/escalate`, one line `TAG<TAB>reason` a session may write (resume prompt, STEP 6). Sent at the next ask for **that tag only** — this worker's file first, then any other worker's, since the next session on the tag may run elsewhere — and deleted once an ask comes back with a policy: it raises one session. A wait, a failure or an omitted policy keeps it; a line for another tag is left for its own ask. |
+| `is_gatefix`, `gatefix_tries`, `gatefix_max` | for `special=gate-fix`: `$STATE/gate-fix-tries` as it stands — `_gatefix_handoff` has already counted the try about to run, so it is the manager's "this try counting from 1" (the queue entry's "plus one" would have handed the last try to the second session) — and `GATEFIX_MAX` |
+
+No `marker` is sent: the queue carries no `(effort: …)` markers yet.
+
+**The launch.** On a policy the `claude -p` line takes its `--model`, `--fallback-model`, `--effort` and
+`--max-budget-usd`; Watchdog A takes `wall_limit_seconds` and, when the answer says
+`wall_excludes=heavy-lock-wait`, does not charge a poll during which the session's tree is queued for the heavy
+lock (`heavy-run.py waiting`, the test the health watchdog already used) — capped at the wall limit again, so a
+session queued behind a hung holder inside its own tree still meets a backstop at twice the limit; the health watchdog's `HB_STALL` takes
+`quiet_limit_seconds`. The policy is logged (`session policy for TAG: model=… wall=…s quiet=…s budget=$…`), the
+launch line names the values, and the usage ledger gains a `model` column (last, so older rows keep their positions).
+
+**A wait** (exit 75) at this ask releases the claim and skips the cycle, like any other hold.
+
+**The fallback is today's behaviour, byte for byte.** A missing helper, a timeout, any other exit, `policy-omitted`,
+or a file that does not parse or carries an unusable value (unknown effort, fallback equal to the model, a
+non-positive limit) leaves the fixed settings below and logs `session policy: none (<why>) — fixed settings.`
+Every Claude session launched as **`--model opus --fallback-model sonnet --effort medium`** with a 3 h `MAXRUN`
+and a `$60` `BUDGET`, and at `AUTONOMOUS_EFFORT=max` as `--model fable --fallback-model opus`
+(`AUTONOMOUS_MAX_MODEL` overrides `fable`). An operator-exported `AUTONOMOUS_EFFORT` (which keeps the model rule
+with it), `AUTONOMOUS_MAXRUN`, `AUTONOMOUS_BUDGET` or `AUTONOMOUS_HB_STALL` still wins over the answer, setting by
+setting, and the policy log line says which it kept. Codex lanes are unchanged (no policy is asked), and the
+supervisor's own grant ask in `worker-supervisor.py` is untouched; only the first line of the grant answer is ever
+read by those, so the stage 6 contract stands.
+
+Proof: `tests/prove-session-policy.sh` (stub grant, stub claude, the real claims helper; compares every fallback
+against the daemon as it stood before this change).
+
+*Before stage 7 — why the model was fixed.* Both flags resolved before the session picked its item, inside the
+session at resume-prompt STEP 2, so per-item choice would have meant moving selection into the daemon. W35.claims
+did exactly that (the reservation), which is what made the policy ask possible. The Tier-2 gate, not a cost
+heuristic, still decides what is enough on no-undo work; `sonnet` remains the overload fallback.
 
 **Why `medium` (owner, 2026-09-24).** The owner set the default to Opus at medium effort. The paragraph below
 is the earlier reasoning for `xhigh` over `max` (2026-07-31), kept as the record; it applies with more force
@@ -1099,7 +1129,8 @@ autonomous run for a different repo:
    adjust the repo path + any per-item notes.
 4. **Tune** `AUTONOMOUS_INTERVAL` / `STALE` / `MAXRUN` / `BUDGET` / `EFFORT` and the `ALLOW`/`DENY` tool lists
    for the project's risk surface (keep the destructive denylist; deny always wins over allow). `EFFORT`
-   defaults to **`medium`** — see *Model & effort* below for why that, and why the model is fixed.
+   defaults to **`medium`**; with an Agent Manager these are only the fallback — see *Model, effort and limits*
+   above.
 5. **Start** it detached (the standard way — `( nohup … & )`, under the launching session's grant); the
    per-project `.plist` (`Label` = `com.<LABEL>.autonomous`) is an optional reboot-durable extra, not required.
 

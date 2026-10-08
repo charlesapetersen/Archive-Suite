@@ -187,12 +187,9 @@ EFFORT="${AUTONOMOUS_EFFORT:-medium}"     # reasoning effort for every resume se
                                           # (2026-07-31), which had replaced max. Raise it for one hard run
                                           # with AUTONOMOUS_EFFORT=high|xhigh; subagent effort is still the
                                           # session's per-task choice (resume prompt, Efficiency block).
-                                          # NOTE both this and --model are resolved BEFORE the session picks its
-                                          # item (resume prompt STEP 2), so per-ITEM model/effort is not
-                                          # expressible here — it would require moving item selection out of the
-                                          # session and into this script. What a session CAN vary per task is its
-                                          # SUBAGENTS' effort/model, which the resume prompt's Efficiency block
-                                          # now delegates to it explicitly.
+                                          # Since W35.session-policy this is the FALLBACK: the Agent Manager
+                                          # chooses each Claude session's effort per item (session_policy).
+                                          # Subagent effort stays the session's per-task choice.
 # The Claude session's model follows EFFORT (owner, 2026-10-07: the account moved to Claude for Education
 # Premium, which carries Fable, and the ruling was "Fable for hard items only"). Opus with sonnet as the
 # overload fallback is the default; a session at max effort runs $AUTONOMOUS_MAX_MODEL with opus as the
@@ -355,12 +352,16 @@ session_policy() {
   if _policy_tag_ok "$tag" && [ -z "$special" ]; then
     n="$(cat "$ITEM_PROGRESS/$tag" 2>/dev/null)"; case "$n" in ''|*[!0-9]*) n=0 ;; esac
   fi
-  if [ -f "$ESCALATE" ]; then
-    IFS=$'\t' read -r esc_tag esc_reason < "$ESCALATE" 2>/dev/null || true
-    [ "$esc_tag" = "$tag" ] && esc=1
-  fi
+  # This worker's file first, then any other worker's: the session that asked may have run on another worker.
+  local esc_file="" f
+  for f in "$ESCALATE" "$STATE"/worker-*/escalate; do
+    [ -f "$f" ] || continue
+    IFS=$'\t' read -r esc_tag esc_reason < "$f" 2>/dev/null || true
+    if [ "$esc_tag" = "$tag" ]; then esc=1; esc_file="$f"; break; fi
+    esc_reason=""
+  done
   [ "$special" = gate-fix ] && { tries="$(cat "$GATEFIX_TRIES" 2>/dev/null)"; case "$tries" in ''|*[!0-9]*|0) tries=1 ;; esac; }
-  local ev pout gout rc parsed
+  local ev="" pout="" gout="" rc parsed
   ev="$(mktemp -t archive-evidence 2>/dev/null)" && pout="$(mktemp -t archive-policy 2>/dev/null)" \
     && gout="$(mktemp -t archive-grant 2>/dev/null)" || { rm -f "$ev" "$pout"; log "session policy: none (mktemp failed) — fixed settings."; return 0; }
   if ! python3 -I - "$ev" "$tag" "$uses" "$text" "$special" "$n" "$esc" "$esc_reason" "${tries:-}" "$GATEFIX_MAX" <<'PY' 2>/dev/null
@@ -384,8 +385,6 @@ PY
   { perl -e 'alarm shift; exec @ARGV or exit 127' "$GRANT_TIMEOUT" \
       "$GRANT_CMD" --project "$GRANT_PROJECT" --agent claude --worker "$WORKER_ID" \
       --evidence "$ev" --policy-out "$pout" >"$gout" 2>/dev/null; } 2>/dev/null; rc=$?
-  # The escalate request has been asked with; it raises this one session only.
-  [ "$esc" = 1 ] && rm -f "$ESCALATE"
   if [ "$rc" = 75 ]; then
     local w; w="$(head -1 "$gout" 2>/dev/null)"; rm -f "$ev" "$pout" "$gout"
     log "session policy: the Agent Manager says wait (${w#wait: }) — releasing $tag, no session this cycle."
@@ -436,6 +435,9 @@ PY
     log "session policy: none (${p_model:-unparseable answer}) — fixed settings."
     return 0
   fi
+  # The escalate request has been answered with a policy; it raises this one session only. A wait, a failure or
+  # an omitted policy leaves it for the next ask on the same tag.
+  [ "$esc" = 1 ] && rm -f "$esc_file"
   local kept=""
   if [ -n "$OP_EFFORT" ]; then kept="$kept effort+model (AUTONOMOUS_EFFORT=$EFFORT)"
   else S_MODEL="$p_model"; S_FALLBACK="$p_fb"; S_EFFORT="$p_eff"; fi
@@ -540,8 +542,11 @@ usage_row() {
       [ -n "$r" ] && printf '%s%% (resets %s), ' "$p" "$(date -r "$r" '+%H:%M')"; done)"; peaks="${peaks%, }"
   fi
   [ -s "$USAGE_LOG" ] || printf 'kind\tstart\tend\tminutes\teffort\trc\tfirst_pct\tfirst_reset\twindow_peaks\tcut\tcost_usd\tturns\tended\tmodel\n' > "$USAGE_LOG"
-  head -1 "$USAGE_LOG" 2>/dev/null | grep -q $'\tmodel$' \
-    || sed -i '' '1s/$/\tmodel/' "$USAGE_LOG" 2>/dev/null || true
+  # Written back through the path (cat >, not sed -i): the root ledger may be a symlink to worker-1's.
+  if ! head -1 "$USAGE_LOG" 2>/dev/null | grep -q $'\tmodel$'; then
+    local uh; uh="$(awk 'NR==1{print $0 "\tmodel"; next} {print}' "$USAGE_LOG" 2>/dev/null)" \
+      && [ -n "$uh" ] && printf '%s\n' "$uh" > "$USAGE_LOG" 2>/dev/null || true
+  fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$(date -r "$t0" '+%F %H:%M')" "$(date -r "$t1" '+%F %H:%M')" \
     "$(( (t1 - t0 + 30) / 60 ))" "$eff" "$rc" "${fp:-}" "${fr:+$(date -r "$fr" '+%H:%M')}" \
     "$peaks" "$cut" "$cost" "$turns" "$ended" "$model" >> "$USAGE_LOG" 2>/dev/null || true
@@ -1917,7 +1922,10 @@ tick() {
   fi
   # 3e. Session policy (W35.session-policy): the item is known now, so ask for its model, effort and limits. A
   #     wait here releases the claim and skips the cycle like any other hold.
-  local pol_special="${special:-}" pol_h0 pol_o0
+  # The helper may substitute a pending special for what the daemon asked (worker-state.py, reserve V2), so the
+  # reserved tag decides.
+  local pol_special="" pol_h0 pol_o0
+  case "$CLAIM_TAG" in gate-fix|doc-budget-fix|review) pol_special="$CLAIM_TAG" ;; esac
   pol_h0="$(git -C "$REPO" rev-parse -q --verify HEAD 2>/dev/null)"; pol_o0="$(git -C "$REPO" rev-parse -q --verify origin/main 2>/dev/null)"
   session_policy "$CLAIM_TAG" "${_claim_uses:-}" "${_claim_text:-}" "$pol_special"
   if [ $? = 75 ]; then
@@ -1985,10 +1993,8 @@ tick() {
   # pid. --output-format stream-json --include-partial-messages makes $SLOG grow with a JSON event per
   # message/tool AND per token-delta during generation, IN REAL TIME — the health watchdog (Watchdog C) uses
   # that as a liveness heartbeat (token-delta streaming keeps a long high-effort generation from looking hung).
-  # MODEL IS DELIBERATELY FIXED (opus, sonnet only as the overload fallback) and NOT chosen per item: this flag
-  # resolves before the session knows which item it will pick, and the Wave-23 queue is full of no-undo work
-  # (file-writing tag paths, the tag/PDF SPEC, shared ArchiveCore) where the Tier-2 gate — not a cost heuristic —
-  # decides. Per-task tuning lives one level down, in the session's SUBAGENTS (resume prompt, Efficiency).
+  # Model, fallback, effort and budget are the S_* values session_policy chose for the reserved item (the fixed
+  # settings when there is no usable policy). Per-task tuning below that lives in the session's SUBAGENTS.
   # Session start for _codex_alive, taken BEFORE the launch so the session's own rollout is born after it.
   # Codex only: the claude path's launch timing stays exactly as prove-exit-logging measures it.
   local _started=""; [ "$AGENT" = codex ] && _started="$(date +%s)"
@@ -2039,12 +2045,16 @@ tick() {
   # the daemon dies uncleanly (crash/OOM/kill-by-pid). Last resort behind the health watchdog (Watchdog C).
   # Under a session policy with wall_excludes=heavy-lock-wait, a poll during which this session's tree is queued
   # for the heavy lock (`heavy-run.py waiting`, the test the health watchdog uses) is not charged to the limit.
-  ( waited=0
+  # The excluded time is itself capped at the wall limit (so at most twice the limit in all): a session queued
+  # behind a hung holder inside its own tree must still meet a backstop.
+  ( waited=0; excused=0
     while [ "$waited" -lt "$S_WALL" ]; do
       kill -0 "$cpid" 2>/dev/null || exit 0
       sleep "$HB_POLL"
-      if [ "$S_EXCLUDE_HEAVY" = 1 ] && [ -f "$HEAVY_CMD" ] \
-         && python3 "$HEAVY_CMD" --state "$HEAVY_STATE" waiting "$cpid" >/dev/null 2>&1; then continue; fi
+      if [ "$S_EXCLUDE_HEAVY" = 1 ] && [ "$excused" -lt "$S_WALL" ] && [ -f "$HEAVY_CMD" ] \
+         && python3 "$HEAVY_CMD" --state "$HEAVY_STATE" waiting "$cpid" >/dev/null 2>&1; then
+        excused=$(( excused + HB_POLL )); continue
+      fi
       waited=$(( waited + HB_POLL ))
     done
     : > "$KILLED"; _terminate_tree "$cpid" ) &

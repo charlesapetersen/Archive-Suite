@@ -9,16 +9,19 @@ COMPLETE first, so the daemon exits after it.
 WHAT IT PROVES
   [1] the evidence a stub grant receives for an ordinary item, a gate fix and an escalated item;
   [2] the launch line uses the returned model, fallback, effort and budget, and the usage row names the model;
-  [3] the wall limit is not charged while the session is queued for the heavy lock, and still fires outside it;
+  [3] the wall limit is not charged while the session is queued for the heavy lock (up to the limit again), and
+      still fires outside it;
   [4] the quiet limit is applied to the health watchdog;
   [5] the per-item counter climbs on a no-commit session and resets on a commit naming the tag, independently for
       two tags, ignores a commit for a longer tag, and is removed when the item completes;
-  [6] the escalate file is used once and only for its own tag;
+  [6] the escalate file is used once and only for its own tag, survives a wait or an omitted policy, and is found
+      when another worker's session wrote it;
   [7] policy-omitted, a missing helper, garbage, a timeout, a non-zero exit and an unusable policy each give the
       baseline daemon's launch line byte for byte (the claim token normalised);
   [8] an operator-exported AUTONOMOUS_BUDGET still wins, and the log says so;
   [9] a wait at the policy ask releases the claim and launches nothing.
-Usage: prove-session-policy.sh [BASELINE_DAEMON]  (default: `git show origin/main:` of the daemon)
+Usage: prove-session-policy.sh [BASELINE_DAEMON]  (default: the daemon at the parent of the commit that introduced
+W35.session-policy). A later change that deliberately alters the launch line must pass a new reference.
 """
 import json, os, re, shutil, signal, subprocess, sys, tempfile, time
 from pathlib import Path
@@ -110,10 +113,14 @@ baseline = root / "baseline-daemon.sh"
 if len(sys.argv) > 1:
     shutil.copy(sys.argv[1], baseline)
 else:
-    src = subprocess.run(["git", "-C", str(HERE), "show", "origin/main:ops/autonomous/archive-suite-autonomous.sh"],
+    # The daemon as it stood just before the commit that introduced this change.
+    intro = subprocess.run(["git", "-C", str(HERE), "log", "--format=%H", "--reverse", "-S", "W35.session-policy",
+                            "--", "archive-suite-autonomous.sh"], capture_output=True, text=True).stdout.split()
+    rev = (intro[0] + "^") if intro else "HEAD"
+    src = subprocess.run(["git", "-C", str(HERE), "show", rev + ":ops/autonomous/archive-suite-autonomous.sh"],
                          capture_output=True, text=True)
     if src.returncode != 0 or "W35.session-policy" in src.stdout:
-        sys.exit("no pre-change baseline on origin/main; pass one as the first argument")
+        sys.exit("no pre-change baseline found; pass one as the first argument")
     baseline.write_text(src.stdout)
 
 ITEMS = {
@@ -250,6 +257,18 @@ try:
           "the next W99.beta ask sends it with its reason, then deletes it")
     _, ev, _ = run(grant=pol())
     check(ev.get("escalate_requested") is False, "the following W99.beta ask is back to no escalate")
+    esc.write_text("W99.beta\tsecond try\n")
+    argv, ev, _ = run(grant="wait", until=lambda t: "says wait" in t, timeout=20)
+    check(ev.get("escalate_requested") is True and esc.exists(), "a wait sends the request but keeps it for the next ask")
+    run(grant="omitted")
+    check(esc.exists(), "an omitted policy keeps it too")
+    _, ev, _ = run(grant=pol())
+    check(ev.get("escalate_reason") == "second try" and not esc.exists(), "the next ask that gets a policy uses it up")
+    other = state / "worker-2/escalate"; other.parent.mkdir(exist_ok=True)
+    other.write_text("W99.beta\tasked on another worker\n")
+    _, ev, _ = run(grant=pol())
+    check(ev.get("escalate_reason") == "asked on another worker" and not other.exists(),
+          "a request written on another worker reaches the next ask for its tag")
 
     print("[1] a gate fix")
     setplan("alpha")
@@ -264,9 +283,12 @@ try:
 
     print("[3] the wall limit and the heavy-lock queue")
     (root / "heavy-waiting").write_text("")
-    _, _, log = run("sleep:7", grant=pol(wall_limit_seconds=3))
+    _, _, log = run("sleep:6", grant=pol(wall_limit_seconds=4))
     check("resume session exited rc=0" in log and not (state / "worker-1/session-killed").exists(),
-          "queued for the heavy lock the whole time: a 3 s wall limit does not fire on a 7 s session")
+          "queued for the heavy lock the whole time: a 4 s wall limit does not fire on a 6 s session")
+    _, _, log = run("sleep:20", grant=pol(wall_limit_seconds=3))
+    check((state / "worker-1/session-killed").exists() and "resume session exited rc=0" not in log,
+          "the excused time is capped at the wall limit: queued forever still meets the backstop")
     (root / "heavy-waiting").unlink()
     _, _, log = run("sleep:15", grant=pol(wall_limit_seconds=3))
     check((state / "worker-1/session-killed").exists() and "resume session exited rc=0" not in log,
@@ -281,6 +303,19 @@ try:
     check("watchdog: session wedged" in log, "a 2 s quiet limit reaches the health watchdog")
     _, _, log = run("sleep:6", grant=pol())
     check("watchdog:" not in log and "resume session exited rc=0" in log, "the default 600 s quiet limit leaves a 6 s quiet session alone")
+
+    print("[2] an older ledger header gains the column, through the root symlink")
+    real = root / "worker-ledger.tsv"; (state / "usage-window.tsv").unlink()
+    real.write_text("kind\tstart\tend\tminutes\teffort\trc\tfirst_pct\tfirst_reset\twindow_peaks\tcut\tcost_usd\tturns\tended\n"
+                    "session\t-\t-\t1\tmedium\t0\t\t\t\t\t\t\t\n")
+    (state / "usage-window.tsv").symlink_to(real)
+    run(grant=pol())
+    lines = real.read_text().splitlines()
+    check((state / "usage-window.tsv").is_symlink() and lines[0].endswith("\tended\tmodel") and len(lines) == 3
+          and lines[1].startswith("session\t-") and lines[2].split("\t")[-1] == "fable",
+          "header upgraded once, old row kept, new row appended, the symlink left a symlink")
+    run(grant=pol())
+    check(real.read_text().splitlines()[0].count("model") == 1, "a second row does not add the column again")
 
     print("[8] an operator export wins")
     argv, _, log = run(grant=pol(), extra={"AUTONOMOUS_BUDGET": "11"})
