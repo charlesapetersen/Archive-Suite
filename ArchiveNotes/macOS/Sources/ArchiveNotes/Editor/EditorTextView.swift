@@ -27,8 +27,7 @@ final class EditorTextView: NSTextView {
                     ancestor = current.superview
                 }
                 let frame = chip.convert(chip.bounds, to: self)
-                states.append(["id": id, "slots": uiTestChipSlots(for: chip, id: id),
-                               "width": chip.bounds.width, "height": chip.bounds.height,
+                states.append(["id": id, "width": chip.bounds.width, "height": chip.bounds.height,
                                "y": Double(frame.minY), "visibleY": Double(self.visibleRect.minY),
                                "visibleH": Double(self.visibleRect.height), "sel": self.selectedRange().location,
                                "inEditor": belongsToEditor,
@@ -37,27 +36,31 @@ final class EditorTextView: NSTextView {
             view.subviews.forEach(visit)
         }
         if let root = window?.contentView { visit(root) }
+        states += uiTestHeaderSlots()
         guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    /// Where the text says this chip belongs (W35.vm-mem-fu1 diagnostics): for each passage header with the
-    /// chip's source id, its character offset, its existing layout fragment's y, how many view providers that
-    /// fragment holds, and whether one of them owns THIS view. Reads existing fragments; asks for no layout.
-    private func uiTestChipSlots(for chip: NSView, id: String) -> [[String: Any]] {
+    /// One entry per passage header in the TEXT, whether or not a view exists (W35.vm-mem-fu1 diagnostics):
+    /// `sourceID` (deliberately not `id`, which callers read as "a chip view exists"), character offset,
+    /// whether a layout fragment exists, its y, its provider count and how many have an installed view.
+    /// Reads existing fragments; asks for no layout.
+    private func uiTestHeaderSlots() -> [[String: Any]] {
         guard let storage = textStorage, let layout = textLayoutManager, let content = layout.textContentManager
         else { return [] }
         var slots: [[String: Any]] = []
         storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
-            guard let header = value as? BlockHeaderAttachment,
-                  header.sourceBox.anchor.notePassageTarget?.id.uuidString.lowercased() == id,
-                  let location = content.location(content.documentRange.location, offsetBy: range.location),
-                  let fragment = layout.textLayoutFragment(for: location) else { return }
-            let providers = fragment.textAttachmentViewProviders
-            let expected = fragment.frameForTextAttachment(at: location).minY + fragment.layoutFragmentFrame.minY
-            slots.append(["loc": range.location, "slotY": Double(fragment.layoutFragmentFrame.minY + textContainerOrigin.y),
-                          "expectY": Double(expected + textContainerOrigin.y),
-                          "providers": providers.count, "owns": providers.contains { $0.view === chip }])
+            guard let header = value as? BlockHeaderAttachment else { return }
+            var slot: [String: Any] = ["sourceID": header.sourceBox.anchor.notePassageTarget?.id.uuidString.lowercased() ?? "",
+                                       "loc": range.location]
+            if let location = content.location(content.documentRange.location, offsetBy: range.location),
+               let fragment = layout.textLayoutFragment(for: location) {
+                let providers = fragment.textAttachmentViewProviders
+                slot["fragY"] = Double(fragment.layoutFragmentFrame.minY + textContainerOrigin.y)
+                slot["providers"] = providers.count
+                slot["installed"] = providers.filter { $0.view?.superview != nil }.count
+            }
+            slots.append(slot)
         }
         return slots
     }
@@ -150,9 +153,11 @@ final class EditorTextView: NSTextView {
     /// providers with no view loaded — measured in the VM for W9.cand2: providers present, views unloaded
     /// with a zero frame, so a pasted chip's slot stayed blank until the editor was rebuilt.
     ///
-    /// A fixed number of turns is a race on a slow host (W35.vm-mem-fu1: VM G13 failed one run in three
-    /// after redo), so after each pass this checks the viewport and re-lays, a bounded number of times,
-    /// while any attachment in it has no view installed or a view left where its fragment no longer is.
+    /// Two fixed turns were the whole guard until W35.vm-mem-fu1, when the VM showed (G13, after undo/redo
+    /// of a paste) a restored chip whose fragment held no installed view however often the viewport was
+    /// re-laid, while the probe's header slots proved the chip was in the text. So after each pass this
+    /// counts the chips in each viewport fragment against its installed views and, while any is short,
+    /// re-lays (at most five more times), rebuilding the short paragraphs from the second pass on.
     private func relayoutViewportSoon(attempt: Int = 0, then: (@MainActor () -> Void)? = nil) {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window != nil, let layout = self.textLayoutManager,
@@ -160,27 +165,19 @@ final class EditorTextView: NSTextView {
             layout.invalidateLayout(for: content.documentRange)
             layout.textViewportLayoutController.layoutViewport()
             self.needsDisplay = true
-            let misplaced = self.misplacedAttachments()
-            if attempt < 5, !misplaced.isEmpty {
-                // A relayout does not move a view TextKit already considers placed (VM G13 after redo,
-                // W35.vm-mem-fu1). From the second pass on, mark those paragraphs edited so the content
-                // storage rebuilds their elements and fresh fragments install fresh views.
-                if attempt >= 1 { self.rebuildFragments(in: misplaced.map(\.paragraph)) }
+            let short = self.viewportParagraphsMissingChipViews()
+            if attempt < 5, !short.isEmpty {
+                if attempt >= 1 { self.rebuildFragments(in: short) }
                 self.relayoutViewportSoon(attempt: attempt + 1, then: then)
                 return
-            }
-            // Out of passes: put any installed view still away from its slot where its layout says it goes.
-            for item in misplaced {
-                guard let view = item.view, let expected = item.expected, let host = view.superview else { continue }
-                view.frame = host.convert(expected, from: self)
             }
             then?()
         }
     }
 
     /// Marks `ranges` attribute-edited so the content storage rebuilds their elements, and layout their
-    /// fragments and attachment views. Changes no text and registers no undo; `storageDidProcessEditing`
-    /// ignores attribute-only edits, so this cannot re-enter the relayout.
+    /// fragments and chip views. Changes no text and registers no undo; `storageDidProcessEditing` ignores
+    /// attribute-only edits, so this cannot re-enter the relayout.
     private func rebuildFragments(in ranges: [NSRange]) {
         guard let storage = textStorage else { return }
         storage.beginEditing()
@@ -190,40 +187,29 @@ final class EditorTextView: NSTextView {
         storage.endEditing()
     }
 
-    /// An attachment view in the viewport that is not where its layout says: not loaded, not in the view
-    /// hierarchy (`expected` is then nil), or installed away from its attachment's frame — the blank-slot
-    /// states `relayoutViewportSoon` exists to clear. The last is the redo case (VM G13, W35.vm-mem-fu1):
-    /// the restored chip's fragment at y=93 owned its view, but the view sat at y=177. The whole-fragment
-    /// frame cannot show that, so the check is against `frameForTextAttachment`.
-    private struct MisplacedAttachment { let paragraph: NSRange; let view: NSView?; let expected: CGRect? }
-
-    private func misplacedAttachments() -> [MisplacedAttachment] {
-        guard let layout = textLayoutManager, let content = layout.textContentManager,
+    /// The character ranges of viewport layout fragments holding more chips (`BlockHeaderAttachment`, the
+    /// only view-backed attachment) than installed chip views. Counting the text, not the providers, is the
+    /// point: the VM's blank slot had a fragment with no provider at all, which a provider check passes.
+    private func viewportParagraphsMissingChipViews() -> [NSRange] {
+        guard let storage = textStorage, let layout = textLayoutManager, let content = layout.textContentManager,
               let viewport = layout.textViewportLayoutController.viewportRange else { return [] }
-        let origin = textContainerOrigin
         let documentStart = content.documentRange.location
-        var misplaced: [MisplacedAttachment] = []
+        var short: [NSRange] = []
         layout.enumerateTextLayoutFragments(from: viewport.location, options: []) { fragment in
             guard fragment.rangeInElement.location.compare(viewport.endLocation) == .orderedAscending else { return false }
             let range = fragment.rangeInElement
             let paragraph = NSRange(location: content.offset(from: documentStart, to: range.location),
                                     length: content.offset(from: range.location, to: range.endLocation))
-            let fragmentOrigin = fragment.layoutFragmentFrame.origin
-            for provider in fragment.textAttachmentViewProviders {
-                guard let view = provider.view, view.superview != nil else {
-                    misplaced.append(MisplacedAttachment(paragraph: paragraph, view: nil, expected: nil))
-                    continue
-                }
-                let expected = fragment.frameForTextAttachment(at: provider.location)
-                    .offsetBy(dx: fragmentOrigin.x + origin.x, dy: fragmentOrigin.y + origin.y)
-                let actual = view.convert(view.bounds, to: self)
-                if !expected.isEmpty, abs(actual.minY - expected.minY) > 2 || abs(actual.minX - expected.minX) > 2 {
-                    misplaced.append(MisplacedAttachment(paragraph: paragraph, view: view, expected: expected))
-                }
+            guard paragraph.location != NSNotFound, NSMaxRange(paragraph) <= storage.length else { return true }
+            var chips = 0
+            storage.enumerateAttribute(.attachment, in: paragraph) { value, _, _ in
+                if value is BlockHeaderAttachment { chips += 1 }
             }
+            let installed = fragment.textAttachmentViewProviders.filter { $0.view?.superview != nil }.count
+            if installed < chips { short.append(paragraph) }
             return true
         }
-        return misplaced
+        return short
     }
 
     /// Every other edit that lands an attachment has the same unloaded-view gap as `insertStyled` (W9.cand2-fu1):
@@ -248,17 +234,9 @@ final class EditorTextView: NSTextView {
         attachmentRelayoutRequests += 1
 #endif
         // One turn later than `insertStyled`'s, then re-scroll. Redo lays out and scrolls on the NEXT turn
-        // itself, so a pass on that same turn can be undone by it: the redone chip's view was left installed
-        // but stranded (VM, W9.cand2-fu1 and again W35.vm-mem-fu1: y=177 while its fragment is at the top,
-        // visible 0–119, slot blank). Two turns were not always enough on the VM, so `relayoutViewportSoon`
-        // now checks each view against its fragment and retries rather than trusting the turn count.
-        // Undo/redo re-inserts attachments through NSTextView's own path, which (VM G13, W35.vm-mem-fu1) can
-        // leave the restored chip's view stranded away from its fragment however many relayouts follow. For
-        // those edits, also mark the restored paragraphs edited so their fragments, and views, are rebuilt.
-        let restoredRange = (undoManager?.isUndoing == true || undoManager?.isRedoing == true)
-            ? (storage.string as NSString).paragraphRange(for: edited) : nil
+        // itself; a pass on that same turn left the redone chip's view installed but stranded below the
+        // viewport (VM, W9.cand2-fu1: y=177, visible 0–119, slot blank). Two turns: G13 green.
         DispatchQueue.main.async { [weak self] in
-            if let restoredRange { self?.rebuildFragments(in: [restoredRange]) }
             self?.relayoutViewportSoon { [weak self] in
                 guard let self else { return }
                 self.scrollRangeToVisible(self.selectedRange())

@@ -2254,13 +2254,31 @@ final class NotesGUITests: NotesFixtureUITestCase {
             Thread.sleep(forTimeInterval: 1)
             let geometry = mainWindow.descendants(matching: .any)["an.editor.test.chipGeometry"]
             XCTAssertTrue(geometry.waitForExistence(timeout: 5))
+            // The chip under test heads the extract's SECOND block (offset 64, laid out at y≈177), and the
+            // VM's editor shows only ~119 pt, so "top of the document" leaves it below the fold whenever
+            // layout has settled at its real height (W35.vm-mem-fu1: the probe's `slots` put the view exactly
+            // at its laid-out frame). Scroll it into view, then demand it be visible.
+            for _ in 0..<12 {
+                guard let json = geometry.value as? String, let data = json.data(using: .utf8),
+                      let views = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                      let chip = views.first(where: { ($0["id"] as? String) == Self.idPlain }),
+                      let y = chip["y"] as? Double, let h = chip["height"] as? Double,
+                      let top = chip["visibleY"] as? Double, let shown = chip["visibleH"] as? Double else { break }
+                if y >= top && y + h <= top + shown { break }
+                editor.scroll(byDeltaX: 0, deltaY: y + h > top + shown ? -40 : 40)   // negative reveals lower text
+                Thread.sleep(forTimeInterval: 0.3)
+            }
             let visible = pollUntil(timeout: 5) {
                 guard let json = geometry.value as? String, let data = json.data(using: .utf8),
                       let views = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return false }
                 return views.contains { ($0["id"] as? String) == Self.idPlain && ($0["visible"] as? Bool) == true && ($0["inEditor"] as? Bool) == true
                     && ($0["width"] as? Double ?? 0) > 0 && ($0["height"] as? Double ?? 0) > 0 }
             }
-            if !visible { missingViews.append("\(phase): \(geometry.value ?? "unavailable")") }
+            if !visible {
+                let chips = (passageChipStates(timeout: 1) ?? []).map { "\($0["id"] ?? "?")@\($0["location"] ?? "?")" }
+                let text = String(((editor.value as? String) ?? "").prefix(120)).debugDescription
+                missingViews.append("\(phase): \(geometry.value ?? "unavailable") chips=\(chips) text=\(text)")
+            }
             let shot = XCTAttachment(screenshot: mainWindow.screenshot())
             shot.name = "W9.cand2 pasted chip \(phase)"
             shot.lifetime = .keepAlways
