@@ -194,9 +194,18 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         check(time.monotonic() - before > .5, "reservation waits until upkeep finishes")
         holder.wait(); release(c)
         # Trapping/kill does not strand a kernel lock.
+        # The child announces it holds the inherited locks before the coordinator is killed: a fixed 0.1 s
+        # head start lost the race on a loaded Mac (gate RED twice, 7 Oct 2026) and proved nothing.
+        orphan = root / "orphan-upkeep-running"
         holder = subprocess.Popen(["python3", str(HERE / "worker-state.py"), "--state", str(state),
-                                   "--repo", str(repo), "idle", "--", "sleep", "1"], env=env)
-        children.append(holder); time.sleep(.1); holder.terminate(); holder.wait()
+                                   "--repo", str(repo), "idle", "--", "python3", "-c",
+                                   "from pathlib import Path; import time; Path(" + repr(str(orphan))
+                                   + ").touch(); time.sleep(1.5)"], env=env)
+        children.append(holder)
+        deadline = time.monotonic() + 10
+        while not orphan.exists() and time.monotonic() < deadline:
+            time.sleep(.02)
+        holder.terminate(); holder.wait()
         before = time.monotonic(); c = reserve("worker-1"); release(c)
         check(time.monotonic() - before > .5, "orphan upkeep child retains kernel lock until mutation ends")
         c = reserve("worker-1", special="gate-fix")
