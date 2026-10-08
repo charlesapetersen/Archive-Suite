@@ -1062,6 +1062,7 @@ staggered starts, the subscription policy) and the design are in the plan.
   add the pass/fail to `ops/gui/README.md`'s memory table. Also: the interactive runner printed only a WARN and
   exited 0 on `** TEST FAILED **`, so a script wrapping it saw success; make it exit non-zero on a failed
   test run (check the gate's own `TEST FAILED` handling is unchanged and still covers Notes in its rotation).
+  Notes: `execution-plans/items/W35.vm-mem-fu1.md` (saved draft branches).
 
 **Efficiency plan, rounds 3-4 (queued 2026-10-07).** Owner, 2026-10-07: lock less, and make more independent
 items that several workers can run at once. Plan and evidence: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` and
