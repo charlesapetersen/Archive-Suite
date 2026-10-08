@@ -199,11 +199,18 @@ EFFORT="${AUTONOMOUS_EFFORT:-medium}"     # reasoning effort for every resume se
 # fallback. This daemon never raises a Claude session to max on its own — no attempt count or gate-fix try
 # changes EFFORT — so max, and with it Fable, happens only when the operator sets AUTONOMOUS_EFFORT=max.
 # Codex lanes are unaffected (CODEX_MODEL above).
+# W35.session-policy (Agent Manager stage 7, 2026-10-08): this rule, MAXRUN, BUDGET and HB_STALL are now the
+# FALLBACK, not the normal path. Each Claude session asks the manager for its model, effort, wall and quiet limits
+# and dollar cap once the item is reserved (session_policy, below); these fixed values are used only when that
+# answer is omitted, absent, unparseable or timed out, and then give exactly the launch line they always did.
 MAX_MODEL="${AUTONOMOUS_MAX_MODEL:-fable}"
 if [ "$EFFORT" = max ]; then SESSION_MODEL="$MAX_MODEL"; SESSION_FALLBACK=opus
 else SESSION_MODEL=opus; SESSION_FALLBACK=sonnet; fi
 # claude refuses a fallback equal to the main model, so an override to opus at max falls back to sonnet.
 [ "$SESSION_FALLBACK" = "$SESSION_MODEL" ] && SESSION_FALLBACK=sonnet
+# What the operator exported still wins over the manager's answer, setting by setting (the log says so).
+OP_EFFORT="${AUTONOMOUS_EFFORT:+1}"; OP_MAXRUN="${AUTONOMOUS_MAXRUN:+1}"; OP_BUDGET="${AUTONOMOUS_BUDGET:+1}"
+OP_HB_STALL="${AUTONOMOUS_HB_STALL:+1}"
 
 # Idle backoff — the loop's answer to "nothing is happening". $INTERVAL is the cadence while the run is
 # PRODUCTIVE; a cycle that advances nothing doubles the gap up to $MAXBACKOFF, and $IDLE_STOP of unbroken
@@ -316,6 +323,152 @@ held_reason() {
   [ -x "$YIELD_CMD" ] && "$YIELD_CMD" 2>/dev/null
 }
 
+# SESSION POLICY (W35.session-policy, Agent Manager stage 7; interface in the manager's README §Session policy).
+# Once the reservation names the item, session_policy asks the grant helper once more, with --evidence about that
+# item and --policy-out, and sets the S_* values the launch uses. The first-line read above is untouched: the
+# policy comes only from the --policy-out file. Fail-open in every branch — a missing helper, a timeout, any exit
+# but 0 or 75, `policy-omitted`, or a file that does not parse leaves today's fixed values, so the launch line is
+# byte for byte what it was. Claude only: the manager decides no policy for Codex.
+#   Evidence: item, uses (the reservation's field), estimate_sessions (the header's `~N[-M] session(s)` text as
+#   written), sessions_since_progress (PER ITEM, below), escalate_requested/escalate_reason, and for a gate fix
+#   is_gatefix, gatefix_tries and gatefix_max. gatefix_tries is $GATEFIX_TRIES as it stands: _gatefix_handoff has
+#   already counted THIS try into it before the session launches, so it is "this try counting from 1" as the
+#   manager defines it (adding one more would hand the last allowed try to the second session).
+#   Per-item progress: $ITEM_PROGRESS/<tag> counts consecutive sessions on that tag that committed nothing naming
+#   it. The worker's nocomplete.count streak spans items and is the misleading count the owner's design names.
+#   Escalate: a session may write `TAG<TAB>reason` to $WORKER_STATE/escalate; it is sent at the next ask for that
+#   same tag only and deleted after that ask, so it raises one session.
+ITEM_PROGRESS="$STATE/item-progress"
+ESCALATE="$WORKER_STATE/escalate"
+S_MODEL=""; S_FALLBACK=""; S_EFFORT=""; S_BUDGET=""; S_WALL=""; S_QUIET=""; S_EXCLUDE_HEAVY=0
+_policy_defaults() {
+  S_MODEL="$SESSION_MODEL"; S_FALLBACK="$SESSION_FALLBACK"; S_EFFORT="$EFFORT"; S_BUDGET="$BUDGET"
+  S_WALL="$MAXRUN"; S_QUIET="$HB_STALL"; S_EXCLUDE_HEAVY=0
+}
+_policy_tag_ok() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; }
+# session_policy TAG USES TEXT SPECIAL: sets S_*; returns 75 when the manager says wait (caller holds), else 0.
+session_policy() {
+  local tag="$1" uses="$2" text="$3" special="$4" n=0 esc_tag="" esc_reason="" esc=0 tries=""
+  _policy_defaults
+  [ "$AGENT" = claude ] && [ -n "$tag" ] || return 0
+  if ! [ -x "$GRANT_CMD" ]; then log "session policy: none (no grant helper at $GRANT_CMD) — fixed settings."; return 0; fi
+  if _policy_tag_ok "$tag" && [ -z "$special" ]; then
+    n="$(cat "$ITEM_PROGRESS/$tag" 2>/dev/null)"; case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  fi
+  if [ -f "$ESCALATE" ]; then
+    IFS=$'\t' read -r esc_tag esc_reason < "$ESCALATE" 2>/dev/null || true
+    [ "$esc_tag" = "$tag" ] && esc=1
+  fi
+  [ "$special" = gate-fix ] && { tries="$(cat "$GATEFIX_TRIES" 2>/dev/null)"; case "$tries" in ''|*[!0-9]*|0) tries=1 ;; esac; }
+  local ev pout gout rc parsed
+  ev="$(mktemp -t archive-evidence 2>/dev/null)" && pout="$(mktemp -t archive-policy 2>/dev/null)" \
+    && gout="$(mktemp -t archive-grant 2>/dev/null)" || { rm -f "$ev" "$pout"; log "session policy: none (mktemp failed) — fixed settings."; return 0; }
+  if ! python3 -I - "$ev" "$tag" "$uses" "$text" "$special" "$n" "$esc" "$esc_reason" "${tries:-}" "$GATEFIX_MAX" <<'PY' 2>/dev/null
+import json, re, sys
+out, tag, uses, text, special, n, esc, reason, tries, gmax = sys.argv[1:]
+ev = {"item": tag, "uses": uses}
+m = re.search(r"~\d+(?:-\d+)?\s+sessions?\b", text)
+if m:
+    ev["estimate_sessions"] = m.group(0)
+if not special:
+    ev["sessions_since_progress"] = int(n)
+ev["escalate_requested"] = esc == "1"
+if esc == "1" and reason:
+    ev["escalate_reason"] = reason
+if special == "gate-fix":
+    ev.update(is_gatefix=True, gatefix_tries=int(tries), gatefix_max=int(gmax))
+open(out, "w").write(json.dumps(ev, sort_keys=True) + "\n")
+PY
+  then rm -f "$ev" "$pout" "$gout"; log "session policy: none (could not write the evidence) — fixed settings."; return 0; fi
+  cp "$ev" "$WORKER_STATE/policy-evidence.json" 2>/dev/null || true
+  { perl -e 'alarm shift; exec @ARGV or exit 127' "$GRANT_TIMEOUT" \
+      "$GRANT_CMD" --project "$GRANT_PROJECT" --agent claude --worker "$WORKER_ID" \
+      --evidence "$ev" --policy-out "$pout" >"$gout" 2>/dev/null; } 2>/dev/null; rc=$?
+  # The escalate request has been asked with; it raises this one session only.
+  [ "$esc" = 1 ] && rm -f "$ESCALATE"
+  if [ "$rc" = 75 ]; then
+    local w; w="$(head -1 "$gout" 2>/dev/null)"; rm -f "$ev" "$pout" "$gout"
+    log "session policy: the Agent Manager says wait (${w#wait: }) — releasing $tag, no session this cycle."
+    return 75
+  fi
+  if [ "$rc" != 0 ]; then
+    rm -f "$ev" "$pout" "$gout"
+    log "session policy: none (grant helper exit $rc$( [ "$rc" = 142 ] && echo ", timed out after ${GRANT_TIMEOUT}s")) — fixed settings."
+    return 0
+  fi
+  # One tab-separated line of validated values, or "omitted<TAB>reason". Anything else is unparseable.
+  parsed="$(python3 -I - "$pout" <<'PY' 2>/dev/null
+import json, re, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception as e:
+    print("omitted\tunreadable policy file (%s)" % type(e).__name__); sys.exit()
+p = d.get("policy") if isinstance(d, dict) else None
+if not isinstance(p, dict):
+    r = d.get("omitted") if isinstance(d, dict) else None
+    print("omitted\t%s" % re.sub(r"[\t\n]", " ", str(r or "no policy in the file"))); sys.exit()
+def word(k):
+    v = p.get(k)
+    if not isinstance(v, str) or not re.fullmatch(r"[a-z0-9][a-z0-9.\-]*", v): raise ValueError(k)
+    return v
+def count(k):
+    v = p.get(k)
+    if isinstance(v, bool) or not isinstance(v, int) or v <= 0: raise ValueError(k)
+    return v
+try:
+    model, fb, eff = word("model"), word("fallback_model"), word("effort")
+    if eff not in ("low", "medium", "high", "xhigh", "max"): raise ValueError("effort")
+    if fb == model: raise ValueError("fallback_model")
+    wall, quiet = count("wall_limit_seconds"), count("quiet_limit_seconds")
+    b = p.get("budget_usd")
+    if isinstance(b, bool) or not isinstance(b, (int, float)) or not 0 < b < 10000: raise ValueError("budget_usd")
+    budget = ("%d" % b) if float(b).is_integer() else ("%.2f" % b)
+    excl = "1" if p.get("wall_excludes") == "heavy-lock-wait" else "0"
+except ValueError as e:
+    print("omitted\tunusable %s in the policy" % e); sys.exit()
+print("\t".join(["policy", model, fb, eff, str(wall), str(quiet), budget, excl]))
+PY
+)"
+  rm -f "$ev" "$pout" "$gout"
+  local kind p_model p_fb p_eff p_wall p_quiet p_budget p_excl
+  IFS=$'\t' read -r kind p_model p_fb p_eff p_wall p_quiet p_budget p_excl <<< "$parsed"
+  if [ "$kind" != policy ]; then
+    log "session policy: none (${p_model:-unparseable answer}) — fixed settings."
+    return 0
+  fi
+  local kept=""
+  if [ -n "$OP_EFFORT" ]; then kept="$kept effort+model (AUTONOMOUS_EFFORT=$EFFORT)"
+  else S_MODEL="$p_model"; S_FALLBACK="$p_fb"; S_EFFORT="$p_eff"; fi
+  if [ -n "$OP_MAXRUN" ]; then kept="$kept wall (AUTONOMOUS_MAXRUN=$MAXRUN)"
+  else S_WALL="$p_wall"; S_EXCLUDE_HEAVY="$p_excl"; fi
+  if [ -n "$OP_BUDGET" ]; then kept="$kept budget (AUTONOMOUS_BUDGET=$BUDGET)"; else S_BUDGET="$p_budget"; fi
+  if [ -n "$OP_HB_STALL" ]; then kept="$kept quiet (AUTONOMOUS_HB_STALL=$HB_STALL)"; else S_QUIET="$p_quiet"; fi
+  log "session policy for $tag: model=$p_model fallback=$p_fb effort=$p_eff wall=${p_wall}s$( [ "$p_excl" = 1 ] && echo ' (heavy-lock wait excluded)') quiet=${p_quiet}s budget=\$$p_budget$( [ -n "$kept" ] && echo " — operator export kept:$kept")"
+  return 0
+}
+# policy_progress TAG SPECIAL BEFORE_HEAD BEFORE_ORIGIN CUT: after a session, before its claim is released. A
+# session that left a new commit naming the tag resets the tag's count; one that did not adds one; the item's
+# completion removes it. Naming the tag, not just moving the fingerprint: with parallel workers another worker's
+# commit moves origin/main too, and must not read as progress on this item. A window-cut session is not counted.
+policy_progress() {
+  local tag="$1" special="$2" h0="$3" o0="$4" cut="$5" f n
+  [ "$AGENT" = claude ] && [ -n "$tag" ] && [ -z "$special" ] && _policy_tag_ok "$tag" || return 0
+  f="$ITEM_PROGRESS/$tag"
+  if grep -qF -e "- [x] **$tag " -e "- [x] **\`$tag\`" "$PLAN" 2>/dev/null; then rm -f "$f"; return 0; fi
+  mkdir -p "$ITEM_PROGRESS" 2>/dev/null || return 0
+  # The tag as a whole word: W23.h5 must not match a commit for W23.h5-fu, nor W35.a one for W35.a3.
+  local re refs=(HEAD)
+  re="(^|[^A-Za-z0-9_.-])${tag//./\\.}([^A-Za-z0-9_-]|$)"
+  git -C "$REPO" rev-parse -q --verify origin/main >/dev/null 2>&1 && refs+=(origin/main)
+  if [ -n "$(git -C "$REPO" log --format=%H -E --grep="$re" "${refs[@]}" \
+              ${h0:+"^$h0"} ${o0:+"^$o0"} -- 2>/dev/null | head -1)" ]; then
+    echo 0 > "$f"; return 0
+  fi
+  [ "$cut" = 1 ] && return 0
+  n="$(cat "$f" 2>/dev/null)"; case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  echo $(( n + 1 )) > "$f"
+}
+
 # Health watchdog (Layers 1+2) — detect a session that has gone ASTRAY without relying on the clock. The
 # session runs with --output-format stream-json --include-partial-messages (see the launch in tick()), so
 # last-session.log grows IN REAL TIME with a JSON event per assistant-message / tool_use / tool_result AND
@@ -372,22 +525,26 @@ codex_rollout() {
   [ -n "$tid" ] || return 0
   find "$CODEX_SESSIONS" -name "rollout-*${tid}.jsonl" 2>/dev/null | head -1
 }
-# usage_row KIND START END EFFORT RC FIRST PEAKS CUT [COST TURNS END] — append to $USAGE_LOG, header first.
+# usage_row KIND START END EFFORT RC FIRST PEAKS CUT [COST TURNS END MODEL] — append to $USAGE_LOG, header first.
+# MODEL (W35.session-policy) is the last column, so a ledger written before it keeps its column positions; its
+# header gains the name in place. Readers go by header (measure-workers.py), so an older short row stays valid.
 # Ported from vision-ocr; the last three columns (from the session's result event) are this copy's addition.
 # FIRST is the first window reading "PCT RESET". PEAKS is the highest reading of each window the session saw,
 # "PCT RESET" pairs separated by ";" (a session that spans a reset saw two). A `wait` row passes the reading
 # that caused the wait as FIRST and no PEAKS. A session with no readings leaves both blank.
 usage_row() {
-  local k="$1" t0="$2" t1="$3" eff="$4" rc="$5" f="$6" pk="$7" cut="$8" cost="${9:-}" turns="${10:-}" ended="${11:-}" fp fr peaks=""
+  local k="$1" t0="$2" t1="$3" eff="$4" rc="$5" f="$6" pk="$7" cut="$8" cost="${9:-}" turns="${10:-}" ended="${11:-}" model="${12:-}" fp fr peaks=""
   read -r fp fr <<< "$f"
   if [ -n "$pk" ]; then
     peaks="$(printf '%s\n' "$pk" | tr ';' '\n' | while read -r p r; do
       [ -n "$r" ] && printf '%s%% (resets %s), ' "$p" "$(date -r "$r" '+%H:%M')"; done)"; peaks="${peaks%, }"
   fi
-  [ -s "$USAGE_LOG" ] || printf 'kind\tstart\tend\tminutes\teffort\trc\tfirst_pct\tfirst_reset\twindow_peaks\tcut\tcost_usd\tturns\tended\n' > "$USAGE_LOG"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$(date -r "$t0" '+%F %H:%M')" "$(date -r "$t1" '+%F %H:%M')" \
+  [ -s "$USAGE_LOG" ] || printf 'kind\tstart\tend\tminutes\teffort\trc\tfirst_pct\tfirst_reset\twindow_peaks\tcut\tcost_usd\tturns\tended\tmodel\n' > "$USAGE_LOG"
+  head -1 "$USAGE_LOG" 2>/dev/null | grep -q $'\tmodel$' \
+    || sed -i '' '1s/$/\tmodel/' "$USAGE_LOG" 2>/dev/null || true
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$k" "$(date -r "$t0" '+%F %H:%M')" "$(date -r "$t1" '+%F %H:%M')" \
     "$(( (t1 - t0 + 30) / 60 ))" "$eff" "$rc" "${fp:-}" "${fr:+$(date -r "$fr" '+%H:%M')}" \
-    "$peaks" "$cut" "$cost" "$turns" "$ended" >> "$USAGE_LOG" 2>/dev/null || true
+    "$peaks" "$cut" "$cost" "$turns" "$ended" "$model" >> "$USAGE_LOG" 2>/dev/null || true
 }
 
 # WS5 — regenerate the one-screen $STATE/STATUS.md digest. Cheap (greps + git log + df), read-only, never
@@ -1758,6 +1915,16 @@ tick() {
     fi
     IFS=$'\t' read -r CLAIM_TAG CLAIM_TOKEN _claim_uses _claim_text <<< "$reservation"
   fi
+  # 3e. Session policy (W35.session-policy): the item is known now, so ask for its model, effort and limits. A
+  #     wait here releases the claim and skips the cycle like any other hold.
+  local pol_special="${special:-}" pol_h0 pol_o0
+  pol_h0="$(git -C "$REPO" rev-parse -q --verify HEAD 2>/dev/null)"; pol_o0="$(git -C "$REPO" rev-parse -q --verify origin/main 2>/dev/null)"
+  session_policy "$CLAIM_TAG" "${_claim_uses:-}" "${_claim_text:-}" "$pol_special"
+  if [ $? = 75 ]; then
+    rm -f "$IDLE_SINCE" 2>/dev/null || true   # a hold is not idleness
+    claims_release || return 9
+    return 0
+  fi
 
   # 4. Acquire the lock + heartbeat it for the child's lifetime, so overlapping cycles/sessions skip.
   touch "$LOCK"
@@ -1807,7 +1974,7 @@ tick() {
     *) export PATH="$REPO/ops/autonomous/bin:$PATH" ;;
   esac
 
-  log "launching fresh resume session (agent $AGENT, backstop ${MAXRUN}s$( [ "$AGENT" = claude ] && echo ", model $SESSION_MODEL, effort $EFFORT, budget \$$BUDGET"), health-wd on)…"
+  log "launching fresh resume session (agent $AGENT, backstop ${S_WALL}s$( [ "$AGENT" = claude ] && echo ", model $S_MODEL, effort $S_EFFORT, budget \$$S_BUDGET"), health-wd on)…"
   cd "$REPO" || { log "cannot cd $REPO — skip."; kill "$hb" 2>/dev/null; rm -f "$LOCK"; claims_release; return 0; }
   # Fresh per-session log (keep one previous). stream-json is larger than text, so don't append forever; a
   # fresh file also gives the heartbeat + usage watchdogs a clean zero baseline.
@@ -1853,9 +2020,9 @@ tick() {
   else
   claims_launch "$CLAUDE" -p "$(claims_prompt)" \
       --permission-mode default \
-      --model "$SESSION_MODEL" --fallback-model "$SESSION_FALLBACK" \
-      --effort "$EFFORT" \
-      --max-budget-usd "$BUDGET" \
+      --model "$S_MODEL" --fallback-model "$S_FALLBACK" \
+      --effort "$S_EFFORT" \
+      --max-budget-usd "$S_BUDGET" \
       --output-format stream-json --verbose --include-partial-messages \
       --allowedTools "${ALLOW[@]}" \
       --disallowedTools "${DENY[@]}" \
@@ -1870,10 +2037,15 @@ tick() {
   # Watchdog A — OUTER wall-clock backstop. POLLS cpid liveness (rather than one long unconditional sleep) so
   # it self-exits promptly when the session ends AND never fires _terminate_tree against a stale/reused pid if
   # the daemon dies uncleanly (crash/OOM/kill-by-pid). Last resort behind the health watchdog (Watchdog C).
+  # Under a session policy with wall_excludes=heavy-lock-wait, a poll during which this session's tree is queued
+  # for the heavy lock (`heavy-run.py waiting`, the test the health watchdog uses) is not charged to the limit.
   ( waited=0
-    while [ "$waited" -lt "$MAXRUN" ]; do
+    while [ "$waited" -lt "$S_WALL" ]; do
       kill -0 "$cpid" 2>/dev/null || exit 0
-      sleep "$HB_POLL"; waited=$(( waited + HB_POLL ))
+      sleep "$HB_POLL"
+      if [ "$S_EXCLUDE_HEAVY" = 1 ] && [ -f "$HEAVY_CMD" ] \
+         && python3 "$HEAVY_CMD" --state "$HEAVY_STATE" waiting "$cpid" >/dev/null 2>&1; then continue; fi
+      waited=$(( waited + HB_POLL ))
     done
     : > "$KILLED"; _terminate_tree "$cpid" ) &
   local wpid=$!
@@ -1883,7 +2055,7 @@ tick() {
   # false-kill a session that merely reads a file mentioning the limit phrase — this daemon being one.)
   # Watchdog C — health (Layers 1+2): event heartbeat + subagent/CPU liveness. PRIMARY killer for wedged/
   # runaway sessions (see health_watchdog + the HB_* config block). Baseline 0 (fresh log).
-  health_watchdog "$cpid" "$SLOG" 0 "$_started" &
+  HB_STALL="$S_QUIET" health_watchdog "$cpid" "$SLOG" 0 "$_started" &
   local cwpid=$!
   wait "$cpid"; local rc=$?
   SESSION_REAPED=1
@@ -1958,11 +2130,13 @@ tick() {
     | sed -E 's/.*"utilization":([0-9.]*),"resetsAt":([0-9]*)/\1 \2/' \
     | awk '{printf "%d %s\n", $1*100 + 0.5, $2}')"
   fi
-  usage_row session "$(( u_end - (SECONDS - _t0) ))" "$u_end" "$( [ "$AGENT" = codex ] && echo "$CODEX_EFFORT" || echo "$EFFORT")" "$rc" \
+  usage_row session "$(( u_end - (SECONDS - _t0) ))" "$u_end" "$( [ "$AGENT" = codex ] && echo "$CODEX_EFFORT" || echo "$S_EFFORT")" "$rc" \
     "$(printf '%s\n' "$u_all" | head -1)" \
     "$(printf '%s\n' "$u_all" | awk 'NF==2{if(!($2 in m)){o[++n]=$2; m[$2]=$1} else if($1>m[$2]) m[$2]=$1}
                                     END{for(i=1;i<=n;i++) printf "%s%s %s", (i>1?";":""), m[o[i]], o[i]}')" \
-    "$( [ "$w_cutoff" = 1 ] && echo cut)" "${s_cost:-}" "${s_turns:-}" "${s_end:-}"
+    "$( [ "$w_cutoff" = 1 ] && echo cut)" "${s_cost:-}" "${s_turns:-}" "${s_end:-}" \
+    "$( [ "$AGENT" = codex ] && echo "${CODEX_MODEL:-codex}" || echo "$S_MODEL")"
+  policy_progress "$CLAIM_TAG" "$pol_special" "$pol_h0" "$pol_o0" "$w_cutoff"
   if [ -n "$fp_after" ] && [ "$fp_after" != "$fp_before" ]; then
     note_progress               # work happened -> fast cadence (independent of WS4)
     # WS4: work happened, but did an ITEM complete, or is this the Nth checkpoint on a stuck item? A session the

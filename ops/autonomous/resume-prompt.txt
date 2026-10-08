@@ -249,7 +249,9 @@ STEP 5 — RECORD + CLEAN UP. ⚠️ **Do the plan tick IMMEDIATELY after STEP 4
   the plan's "RUN STATUS:" line to COMPLETE.
 
 STEP 6 — STOP — after COMPLETING the item (or if genuinely interrupted/blocked). Never stop voluntarily
-  mid-item, and never pick up a second item.
+  mid-item, and never pick up a second item. ESCALATE: if you judge that the item needs a stronger model or
+  more effort than you had, write one line `TAG<TAB>reason` to "$AUTONOMOUS_WORKER_STATE/escalate" before you
+  stop; the daemon sends it with the next grant ask for that same tag only, so it raises the next session once.
 
 ITEM-SPECIFIC NOTE — Live-Capture E2E: `caffeinate -di "__REPO__/ArchiveProcessor/scripts/e2e-phone-mac.sh"`
   (Android emulator only; the OCR key is $OCR_KEY, else the Keychain; artifacts land in /tmp/ap-e2e-*). Copy
