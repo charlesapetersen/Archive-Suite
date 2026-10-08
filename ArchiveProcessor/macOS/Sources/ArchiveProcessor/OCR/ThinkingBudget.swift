@@ -20,8 +20,13 @@ extension ThinkingLevel {
         }
     }
 
-    /// Anthropic counts its thinking tokens inside max_tokens. Preserve the OCR output allowance.
+    /// Anthropic counts its thinking tokens inside max_tokens and requires the budget to be smaller.
+    /// Adding the budget preserves the caller's visible-answer allowance.
+    func anthropicMaxTokens(baseOutputTokens: Int, purpose: ThinkingBudgetPurpose) -> Int {
+        baseOutputTokens + budgetTokens(for: purpose)
+    }
+
     func anthropicOCRMaxTokens(baseOutputTokens: Int) -> Int {
-        baseOutputTokens + budgetTokens(for: .documentOCR)
+        anthropicMaxTokens(baseOutputTokens: baseOutputTokens, purpose: .documentOCR)
     }
 }

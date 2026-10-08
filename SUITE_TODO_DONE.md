@@ -10099,3 +10099,15 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   other parts. No defects found, so no `W9.e2-fu*` items were filed. The unit bundle was not re-run; the only
   app change is the two accessibility ids, and the full VM suite exercised them.
   <!-- /W9.e2-notes -->
+- [x] **W12.dedup-fu1 — Anthropic collection-name requests exceed their output ceiling [S, Tier-1]** · §Owner-requested batch (2026-07-09) — Processor output + Reader UX/viewer · SHIPPED 2026-10-08 (this commit)
+  Direct Anthropic text completion with Low/High thinking sent `max_tokens: 256` (collection names) or
+  `512` (tags) beside `budget_tokens: 1024/4000`, which Anthropic rejects. The body is now built by the new
+  app-type-free `OCR/AnthropicTextRequest.swift`: with thinking, `max_tokens` = visible-answer allowance +
+  budget (via the new `ThinkingLevel.anthropicMaxTokens(baseOutputTokens:purpose:)`, which the OCR ceiling
+  helper now delegates to), so collection names get 1280/4256 and keep their 256-token answer; without
+  thinking the request is byte-for-byte unchanged, so the tag/date main flow (which passes `nil`) is untouched.
+  Verified: `scripts/test-thinking-budgets.sh` compiles the production files and asserts all six request
+  shapes (no thinking / Low / High × 256 / 512); the Processor Debug build is warning-free; the key-free
+  scratch `scripts/test-collection-organize.sh` passes. No live Anthropic call was made (no key reachable
+  unattended without a Keychain prompt); the provider rule is the documented `budget_tokens < max_tokens`.
+  <!-- /W12.dedup-fu1 -->

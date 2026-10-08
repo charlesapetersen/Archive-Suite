@@ -1108,7 +1108,6 @@ at implementation). Not yet scoped into execution plans — the **decades** item
 (cross-app + SPEC). Legend as above (S/M/L · risk · needs).
 
 ### Archive Processor
-- [ ] **W12.dedup-fu1 — Anthropic collection-name requests exceed their output ceiling [S, Tier-1].** (lane: processor) (uses: build) Baseline `07c0c1c`; `LLMTextClient.callAnthropic` and `CollectionSegmenter.segment`. With direct Anthropic and Low/High thinking selected, collection-name extraction or clustering sends `max_tokens: 256` alongside `budget_tokens: 1024/4000`; Anthropic requires the latter to be smaller. Preserve the 256-token visible-answer allowance by raising the total ceiling when thinking is enabled, or explicitly omit thinking for these short calls. Verify both request shapes with a key-free request-body check and a scratch collection run before closing. Tag/date paths already pass `nil` thinking in their main flow; keep them unchanged. | ArchiveProcessor/macOS/Sources/ArchiveProcessor/{OCR/LLMTextClient.swift,Tagging/CollectionSegmenter.swift} | S | low | none
 ### Capture companions (Android + iOS) — owner decisions 2026-07-15
 ### Archive Reader — layout & panels
 ### Archive Reader — tag cloud & filters

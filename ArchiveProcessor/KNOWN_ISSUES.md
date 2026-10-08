@@ -37,9 +37,13 @@ whose status is known. An unresolved in-flight page or uncertain output is shown
 automatically retried. The synthetic scratch interruption/relaunch check and Processor smoke passed on
 2026-09-27; no real corpus was touched.
 
-## OPEN (W12.dedup-fu1): Anthropic collection-name thinking exceeds `max_tokens`
+## ✅ FIXED (W12.dedup-fu1): Anthropic collection-name thinking exceeded `max_tokens`
 
-At baseline `07c0c1c`, `LLMTextClient.callAnthropic` sends `max_tokens: 256` for `CollectionSegmenter` calls while also sending `budget_tokens: 1024` (Low) or `4000` (High). Direct Anthropic collection-name extraction and clustering with thinking enabled therefore violate the provider's requirement that a manual thinking budget be below `max_tokens`. The main tag/date paths omit thinking; the collection path forwards the chosen level. This predates the Wave-12 budget refactor, which deliberately preserves the request. Follow-up: `W12.dedup-fu1` in `SUITE_TODO.md`.
+`LLMTextClient.callAnthropic` used to send `max_tokens: 256` for `CollectionSegmenter` calls alongside
+`budget_tokens: 1024` (Low) or `4000` (High), which Anthropic rejects. The body now comes from
+`AnthropicTextRequest.body`: with thinking enabled, `max_tokens` is the caller's visible-answer allowance
+plus the budget (1280/4256 for collection names), and without thinking the request is unchanged. The
+key-free `scripts/test-thinking-budgets.sh` asserts both shapes at the 256 and 512 allowances. Fixed 2026-10-08.
 
 ## ✅ FIXED (W3.cap-r3-fu4): a late page could create a second filed document
 

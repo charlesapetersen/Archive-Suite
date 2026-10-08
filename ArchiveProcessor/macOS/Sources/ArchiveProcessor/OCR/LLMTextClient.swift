@@ -17,7 +17,8 @@ struct LLMTextConfiguration: Sendable {
 /// Extracted verbatim from the (byte-for-byte) duplicated `callLLM`/`callGateway`/`callAnthropic`/
 /// `callGemini`/`callMistralChat` paths in `TagGenerator` and `CollectionSegmenter`, which differed
 /// only by the request `maxTokens` (512 vs 256) and `timeout` (120 s vs 60 s). Each caller passes its
-/// own original values, so the requests this issues are identical to the pre-refactor ones.
+/// own original values, so the requests this issues are identical to the pre-refactor ones — except that
+/// Anthropic with thinking now raises `max_tokens` by the budget (W12.dedup-fu1; see `AnthropicTextRequest`).
 enum LLMTextClient {
     static func complete(
         prompt: String,
@@ -57,14 +58,7 @@ enum LLMTextClient {
 
     private static func callAnthropic(prompt: String, model: LLMModel, thinkingLevel: ThinkingLevel?, apiKey: String, maxTokens: Int, timeout: TimeInterval) async throws -> String {
         let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
-        var body: [String: Any] = [
-            "model": model.id,
-            "max_tokens": maxTokens,
-            "messages": [["role": "user", "content": prompt]]
-        ]
-        if let thinking = thinkingLevel {
-            body["thinking"] = ["type": "enabled", "budget_tokens": thinking.budgetTokens(for: .textCompletion)]
-        }
+        let body = AnthropicTextRequest.body(prompt: prompt, modelID: model.id, thinkingLevel: thinkingLevel, maxTokens: maxTokens)
         var request = URLRequest(url: endpoint, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
