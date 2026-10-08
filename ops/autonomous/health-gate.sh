@@ -15,7 +15,11 @@ if [ -n "${CODEX_SANDBOX:-}" ]; then
   echo "The health gate launches apps; request execution outside the Codex sandbox." >&2
   exit 3
 fi
-. "$(dirname "$0")/heavy-enter.sh"
+# No whole-gate lock (efficiency plan round 2, 2026-10-07). Until then this line re-entered the gate under
+# heavy-run.py and the daemon wrapped it again, so the Mac-wide lock was held for the gate's whole run — about
+# 10 of its 32 minutes on 6 Oct were light harnesses that touch no build or VM. Each heavy step now takes the
+# lock itself and only for itself: xcodebuild through the PATH shim below, the VM lane, tag-vocabulary and the
+# OCR smoke through their own heavy-enter.sh. The light block runs first and unlocked.
 export PATH="/opt/homebrew/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT" || { echo "cannot cd to repo root $ROOT"; exit 2; }
 # The gate runs in the DAEMON LOOP, not in a `claude` session — so the PreToolUse hook does not apply to it
@@ -24,6 +28,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT" || { echo "cannot cd to 
 # test-smoke.sh scripts, and the Processor's host launch step), and the PATH shims below catch the rest.
 # Concretely, without this `AUTONOMOUS_GATE_OCR=1` would open the Processor on the owner's screen.
 export ARCHIVE_UNATTENDED=1
+# The shim and heavy-enter.sh lock only when this is set; set it here so a hand-run gate locks per step too.
+export AUTONOMOUS_HEAVY_ENABLED=1
 export PATH="$ROOT/ops/autonomous/bin:$PATH"
 LOG="$(mktemp)"; fails=""
 trap 'rm -f "$LOG"' EXIT
@@ -43,6 +49,8 @@ trap 'rm -f "$LOG"' EXIT
 _gate_t0=$SECONDS
 step() {
   local name="$1"; shift
+  # A retry names only the steps that failed (AUTONOMOUS_GATE_ONLY); the rest already passed at this tip.
+  case " ${AUTONOMOUS_GATE_ONLY:-} " in "  "|*" $name "*) ;; *) return 0 ;; esac
   printf '── %s ──\n' "$name"
   local out _t=$SECONDS; out="$(mktemp)"
   if "$@" >"$out" 2>&1; then
@@ -67,6 +75,8 @@ step() {
 skips=""; warns=""
 step_skippable() {
   local name="$1"; shift
+  # A retry names only the steps that failed (AUTONOMOUS_GATE_ONLY); the rest already passed at this tip.
+  case " ${AUTONOMOUS_GATE_ONLY:-} " in "  "|*" $name "*) ;; *) return 0 ;; esac
   printf '── %s ──\n' "$name"
   # Capture THIS step's output separately. Reading a shared transcript would report the first 'SKIPPED:'
   # anywhere in the file — including one left by an earlier step — as this step's reason. ($LOG is now
@@ -92,38 +102,6 @@ step_skippable() {
   rm -f "$out"
 }
 
-# UNIT tests only — `-only-testing:<UnitBundle>`, NOT the whole scheme. This is load-bearing for an UNATTENDED
-# gate: the schemes also contain UITest bundles (ArchiveReaderUITests / ArchiveNotesUITests), and running a
-# UITest pops the macOS "Enable UI Automation" / taskport prompt — which would HANG this gate (and, since the
-# daemon runs the gate synchronously, the whole daemon) and wake the owner. Reader's smoke wrapper selects
-# the unit bundle when this gate sets ARCHIVE_UNATTENDED; Notes' wrapper now does so on every run (W9.c4).
-# The gate still invokes the unit bundles directly, with build implied.
-# NOTE — `-only-testing:<UnitBundle>` does NOT mean "no GUI". Both unit bundles are APP-HOSTED
-# (TEST_HOST = the .app), so this LAUNCHES the real app. Until 2026-07-30 that put a window on the owner's
-# screen for the whole run (Reader 2m52s, Notes 49s) on every gate — the daemon's single biggest screen
-# intrusion. Fixed at the source, not here: each app's local `ArchiveTestHost` makes it draw nothing when
-# it is only a unit-test host, pinned by TestHostWindowSuppressionTests in both suites. Side effect worth
-# knowing: with no UI to build, the Reader suite went 172s → ~2s. Don't "simplify" that away.
-# DeepLinkTests.testRevealAndSelectNoRoot is deliberately INCLUDED: W26.fixturehang made the defaults
-# injectable and the test now passes an unpinned `fixtureDefaults()` suite to NavigationModel. It cannot
-# resolve the owner's `archiveRootBookmark`, so a regression in the no-root path must RED rather than hide
-# behind an environmental skip. See ArchiveReader/KNOWN_ISSUES.md (W20.deeplink-isolation).
-# Pixel-truth runs here too: DocumentRenderGuardTests (RenderProbe) lives INSIDE ArchiveReaderTests and renders a
-# PDF page / SwiftUI view to a bitmap headlessly (no "Enable UI Automation"/TCC prompt) — so "did it actually
-# draw" (blank PDF pane, blank thumbnail) is caught in this gate without the UITest hang. See ops/gui/README.md.
-step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -derivedDataPath ./build/gate-DD'
-step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
-# Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
-# ($0, no network, no OCR, no GUI) and confirms the app reached main; a build alone cannot catch a pre-main
-# abort. `ARCHIVEPROC_TEST_BINARY` is explicit so this cannot accidentally pass against stale build/DD.
-step processor-build bash -c 'cd ArchiveProcessor/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/gate-DD build'
-step processor-launch bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-recovery.sh'
-# Opt-in paid OCR smoke. PREREQ before enabling this in an unattended run: the Gemini key must be readable
-# WITHOUT a prompt — test-smoke.sh reads it via `security find-generic-password`, so run the WS12 keychain
-# fix (ops/autonomous/fix-keychain-access.sh) first, else this either prompts (→ the daemon's GATE_MAXRUN
-# kills it) or fails to read the key (→ RED, but the daemon retries once before parking). It's also a paid
-# network round-trip, so leave it OFF unless you specifically want OCR-pipeline coverage in the gate.
-[ "${AUTONOMOUS_GATE_OCR:-0}" = 1 ] && step processor-ocr bash ./test-smoke.sh processor   # paid, opt-in (OCR only; no UITest)
 
 # ── Tier-2 script gates that nothing was running (W26.lint-fu, 2026-08-07) ────────────────────────
 # Five harnesses shipped across Wave 26, each the mechanism proof for a Core-Directive or
@@ -145,7 +123,6 @@ step write-surface-lint       bash "$ROOT/ArchiveReader/scripts/lint-write-surfa
 step write-surface-lint-proof bash "$ROOT/ArchiveReader/scripts/test-lint-write-surface.sh"
 step processor-write-surface-lint       bash "$ROOT/ArchiveProcessor/scripts/lint-write-surface.sh"
 step processor-write-surface-lint-proof bash "$ROOT/ArchiveProcessor/scripts/test-lint-write-surface.sh"
-step tag-vocabulary           bash "$ROOT/ArchiveProcessor/scripts/test-tag-vocabulary.sh"
 # PYTHONDONTWRITEBYTECODE: this one imports `finder_tags.py` from the source tree, so CPython would
 # leave a `__pycache__` dir in ArchiveProcessor/scripts on every gate run. The repo ignores that path
 # now as well, but the gate should not be dirtying the checkout it is judging in the first place.
@@ -159,9 +136,6 @@ step finder-tags              env PYTHONDONTWRITEBYTECODE=1 bash "$ROOT/ArchiveP
 # no longer a gate prerequisite; the old corpus-backed smoke-fixture portion reports itself separately.
 step_skippable fixture-scripts bash "$ROOT/ArchiveReader/scripts/test-fixture-scripts.sh"
 
-# W28.cert-fu3: prove the launch gate itself runs a binary that aborts before main and reports a failing
-# launch, rather than merely checking that the command text still mentions `test-recovery.sh`.
-step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-launch-gate.sh"
 
 # W31.handoff-gate: an open tracker item must be mirrored into the primary plan or `next-queue-item.sh` cannot
 # offer it. Use only check-handoff's visibility mode here: full handoff rightly rejects an active worktree and
@@ -192,14 +166,6 @@ bash "$ROOT/ops/autonomous/check-tracker-sync.sh" || true
 # 5 of its fixtures (W26.donecount).
 bash "$ROOT/ops/autonomous/check-todo-stubs.sh" || true
 
-# Run EVERY app's UITests in a headless Tart VM — off the owner's screen, and without the "Enable UI
-# Automation" prompt that makes the steps above avoid UITests on the host. ON by default (2026-07-28;
-# set AUTONOMOUS_GUI_VM=0 to disable). Fail-open: a missing VM / boot failure / guest-agent timeout SKIPs
-# (so it's inert where no VM is built); only a reproducible UITest failure REDs (park). Runs via
-# step_skippable, NOT step — a lane that ran zero tests must never print ✓ (see its comment).
-# The VM step adds ~15-20 min, which is why the daemon's GATE_MAXRUN is 50 min.
-# See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
-[ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] && step_skippable gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
 
 # Context budget (2026-08-04) — the ONE thing nothing was watching. Owner: "token use is the real
 # bottleneck for development, not build speed." A fresh session's dominant fixed cost is the orientation
@@ -332,6 +298,57 @@ step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh
 step harness-lifecycle-proof python3 "$ROOT/ops/autonomous/tests/prove-harness-lifecycle.py"
 step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"
 
+# ── HEAVY STEPS, after every light one (efficiency plan round 2, 2026-10-07) ─────────────────────────────
+# Everything above is hermetic and lock-free, so it runs first and a RED there lands in the first minutes
+# without waiting for the Mac. Each step below takes the Mac-wide heavy lock for itself only.
+# UNIT tests only — `-only-testing:<UnitBundle>`, NOT the whole scheme. This is load-bearing for an UNATTENDED
+# gate: the schemes also contain UITest bundles (ArchiveReaderUITests / ArchiveNotesUITests), and running a
+# UITest pops the macOS "Enable UI Automation" / taskport prompt — which would HANG this gate (and, since the
+# daemon runs the gate synchronously, the whole daemon) and wake the owner. Reader's smoke wrapper selects
+# the unit bundle when this gate sets ARCHIVE_UNATTENDED; Notes' wrapper now does so on every run (W9.c4).
+# The gate still invokes the unit bundles directly, with build implied.
+# NOTE — `-only-testing:<UnitBundle>` does NOT mean "no GUI". Both unit bundles are APP-HOSTED
+# (TEST_HOST = the .app), so this LAUNCHES the real app. Until 2026-07-30 that put a window on the owner's
+# screen for the whole run (Reader 2m52s, Notes 49s) on every gate — the daemon's single biggest screen
+# intrusion. Fixed at the source, not here: each app's local `ArchiveTestHost` makes it draw nothing when
+# it is only a unit-test host, pinned by TestHostWindowSuppressionTests in both suites. Side effect worth
+# knowing: with no UI to build, the Reader suite went 172s → ~2s. Don't "simplify" that away.
+# DeepLinkTests.testRevealAndSelectNoRoot is deliberately INCLUDED: W26.fixturehang made the defaults
+# injectable and the test now passes an unpinned `fixtureDefaults()` suite to NavigationModel. It cannot
+# resolve the owner's `archiveRootBookmark`, so a regression in the no-root path must RED rather than hide
+# behind an environmental skip. See ArchiveReader/KNOWN_ISSUES.md (W20.deeplink-isolation).
+# Pixel-truth runs here too: DocumentRenderGuardTests (RenderProbe) lives INSIDE ArchiveReaderTests and renders a
+# PDF page / SwiftUI view to a bitmap headlessly (no "Enable UI Automation"/TCC prompt) — so "did it actually
+# draw" (blank PDF pane, blank thumbnail) is caught in this gate without the UITest hang. See ops/gui/README.md.
+step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -derivedDataPath ./build/gate-DD'
+step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
+# Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
+# ($0, no network, no OCR, no GUI) and confirms the app reached main; a build alone cannot catch a pre-main
+# abort. `ARCHIVEPROC_TEST_BINARY` is explicit so this cannot accidentally pass against stale build/DD.
+step processor-build bash -c 'cd ArchiveProcessor/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/gate-DD build'
+step processor-launch bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-recovery.sh'
+# W28.cert-fu3 (heavy block: test-recovery.sh takes the heavy lock as a whole-script entry): prove the launch gate itself runs a binary that aborts before main and reports a failing
+# launch, rather than merely checking that the command text still mentions `test-recovery.sh`.
+step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-launch-gate.sh"
+# Opt-in paid OCR smoke. PREREQ before enabling this in an unattended run: the Gemini key must be readable
+# WITHOUT a prompt — test-smoke.sh reads it via `security find-generic-password`, so run the WS12 keychain
+# fix (ops/autonomous/fix-keychain-access.sh) first, else this either prompts (→ the daemon's GATE_MAXRUN
+# kills it) or fails to read the key (→ RED, but the daemon retries once before parking). It's also a paid
+# network round-trip, so leave it OFF unless you specifically want OCR-pipeline coverage in the gate.
+[ "${AUTONOMOUS_GATE_OCR:-0}" = 1 ] && step processor-ocr bash ./test-smoke.sh processor   # paid, opt-in (OCR only; no UITest)
+
+# tag-vocabulary compiles the ArchiveCore sources with swiftc -O (~141 s); its script takes the lock itself.
+step tag-vocabulary           bash "$ROOT/ArchiveProcessor/scripts/test-tag-vocabulary.sh"
+
+# Run EVERY app's UITests in a headless Tart VM — off the owner's screen, and without the "Enable UI
+# Automation" prompt that makes the steps above avoid UITests on the host. ON by default (2026-07-28;
+# set AUTONOMOUS_GUI_VM=0 to disable). Fail-open: a missing VM / boot failure / guest-agent timeout SKIPs
+# (so it's inert where no VM is built); only a reproducible UITest failure REDs (park). Runs via
+# step_skippable, NOT step — a lane that ran zero tests must never print ✓ (see its comment).
+# The VM step adds ~15-20 min, which is why the daemon's GATE_MAXRUN is 50 min.
+# See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
+[ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] && step_skippable gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
+
 # ── The two harnesses that are NOT gate steps, and why ────────────────────────────────────────────────────
 # The line below is MACHINE-READ: `prove-gate-report.sh` asserts that every ops/autonomous/tests/prove-*.sh
 # is either a `step` above or named here (W26.fixwarn-fu1 part 2), so harness #14 cannot land unwatched the
@@ -375,6 +392,10 @@ if [ -n "$skips" ] || [ -n "$warns" ]; then
   # sending the reader to an empty directory is how a summary line starts lying about what it knows.
   [ -n "$skips" ] && echo "  ↳ the skipped lane(s) ran ZERO tests — the reason is printed above (gui-vm additionally leaves artifacts in ~/.tart-mirror/vm-artifacts/)."
   [ -n "$warns" ] && echo "  ↳ the warned lane(s) RAN and FAILED; they are tracked, so they don't park the run. Detail above + ~/.tart-mirror/vm-artifacts/gui-vm-<app>-LAST-FAILURE.log."
+  exit 0
+fi
+if [ -n "${AUTONOMOUS_GATE_ONLY:-}" ]; then
+  echo "HEALTH GATE: GREEN (re-ran only: ${AUTONOMOUS_GATE_ONLY}; every other step passed in the run before)"
   exit 0
 fi
 echo "HEALTH GATE: GREEN (all builds + Reader/Notes suites + write-surface lint + script gates + coherence + GUI-VM UITests)"

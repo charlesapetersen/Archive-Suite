@@ -59,6 +59,7 @@ GATECTL="$T/gatectl"; GATE="$T/health-gate.sh"
 cat > "$GATE" <<STUB
 #!/bin/bash
 # step notes-ui bash ops/gui/vm-gui-runner.sh notes xcuitest
+echo "ONLY=\${AUTONOMOUS_GATE_ONLY:-}" >> "$T/gate-calls"
 if [ "\$(cat "$GATECTL")" = red ]; then echo "── notes-ui ──"; echo "  ✗ notes-ui (rc=1)"; echo "HEALTH GATE: RED — notes-ui"; exit 1; fi
 echo "HEALTH GATE: GREEN"; exit 0
 STUB
@@ -126,6 +127,9 @@ grep -q 'PARKED' "$L" && bad "parked on the first red" || ok "did not park"
 grep -q 'notes-ui: step notes-ui bash ops/gui/vm-gui-runner.sh notes xcuitest' "$T/request.copy" 2>/dev/null \
   && ok "the request names the step's own command" || bad "request lacks the step command: $(head -6 "$T/request.copy" 2>/dev/null)"
 grep -q 'HEALTH GATE: RED — notes-ui' "$T/request.copy" 2>/dev/null && ok "the request carries the log's tail" || bad "no log tail in the request"
+[ "$(sed -n 1,2p "$T/gate-calls" 2>/dev/null | tr '\n' '|')" = "ONLY=|ONLY=notes-ui|" ] \
+  && ok "the first gate runs every step; its retry re-runs only the failing step" \
+  || bad "gate calls: $(tr '\n' '|' < "$T/gate-calls" 2>/dev/null)"
 
 echo "[2] the next GREEN gate retires the request"
 # Keep the SAME fixture alive: SIGTERM during [1]'s session intentionally leaves engine.lock behind in

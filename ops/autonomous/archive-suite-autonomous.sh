@@ -735,27 +735,22 @@ _gate_tip() {
   if [ "$co" -gt "$ch" ]; then printf 'origin/main\n'; else printf 'HEAD\n'; fi
 }
 GATE_REF="$(_gate_tip)"
+# $1 (optional) = space-separated step names: re-run only those (a retry of a RED gate). The gate is NOT wrapped
+# in the heavy lock (efficiency plan round 2, 2026-10-07): each heavy step takes it for itself, so the cap below
+# skips every poll during which a step of this gate is queued for that lock — contention is not gate execution.
 _run_gate_once() {
-  local ready="" gpid waited=0
-  if [ -f "$HEAVY_CMD" ]; then
-    ready="$(mktemp "$STATE/gate-ready.XXXXXX")" || { GATE_RC=1; return; }
-    rm -f "$ready"
-    python3 "$HEAVY_CMD" --state "$HEAVY_STATE" --ready "$ready" run -- "$GATE_CMD" >"$glog" 2>&1 &
-    gpid=$!
-  else
-    # Serial template fixtures without repository helpers retain their old path.
-    "$GATE_CMD" >"$glog" 2>&1 &
-    gpid=$!
-  fi
+  local gpid waited=0
+  AUTONOMOUS_GATE_ONLY="${1:-}" "$GATE_CMD" >"$glog" 2>&1 &
+  gpid=$!
   # Small poll granularity so a finished gate is noticed promptly (a 15s poll would make even an instant gate
   # cost 15s); still cheap for a minutes-long real gate.
   while kill -0 "$gpid" 2>/dev/null && [ "$waited" -lt "$GATE_MAXRUN" ]; do
     sleep 2
-    # Contention is work, not gate execution. Start the cap after acquisition.
-    [ -z "$ready" ] || [ -f "$ready" ] || continue
+    if [ -f "$HEAVY_CMD" ] && python3 "$HEAVY_CMD" --state "$HEAVY_STATE" waiting "$gpid" 2>/dev/null; then
+      continue
+    fi
     waited=$(( waited + 2 ))
   done
-  [ -z "$ready" ] || rm -f "$ready"
   if kill -0 "$gpid" 2>/dev/null; then
     _terminate_tree "$gpid"; wait "$gpid" 2>/dev/null || true   # reap so no zombie lingers
     GATE_RC=2; return
@@ -1092,8 +1087,12 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
   # RED — RETRY ONCE before parking (F1). A real compounding regression is deterministic and fails the retry
   # too; a flaky XCTest / transient xcodebuild-infra blip ("Lost connection to test manager", a one-off
   # xcodegen hiccup) passes it. Retrying strictly cuts false-parks without hiding a real regression.
-  log "health gate RED — retrying ONCE before parking (guards against a flaky test / transient xcodebuild error)…"
-  _run_gate_once
+  # The retry re-runs only the steps that failed (efficiency plan round 2): the others passed at this tip a
+  # minute ago, and on 5 Oct five RED gates and full re-runs held the lock ~260 min. No verdict line = run all.
+  local first_red
+  first_red="$(grep -m1 '^HEALTH GATE: RED' "$glog" 2>/dev/null | sed 's/^HEALTH GATE: RED[^A-Za-z0-9]*//' | tr -s ' ' | sed 's/^ *//; s/ *$//')"
+  log "health gate RED — retrying ONCE before parking, ${first_red:+only the failing step(s): $first_red }(guards against a flaky test / transient xcodebuild error)…"
+  _run_gate_once "$first_red"
   if [ "$GATE_RC" -eq 0 ]; then
     git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
     log "health gate GREEN on retry — the first failure was transient (not parking)."
@@ -1132,7 +1131,7 @@ $(printf '%s' "$(cat "$glog" 2>/dev/null)" | tail -20)"
       log "health gate RED on DOCUMENT step(s) only ($doc_list) — attempting SELF-REPAIR (compact-plan) before parking…"
       "$COMPACTOR" "$REPO" >>"$LOG" 2>&1 \
         || log "self-repair: compact-plan aborted a pass (rc=$?) — detail just above in this log."
-      _run_gate_once
+      _run_gate_once "$steps"
       if [ "$GATE_RC" -eq 0 ]; then
         git -C "$REPO" rev-parse "$(_gate_tip)" > "$GATE_STATE" 2>/dev/null || true
         log "health gate GREEN after SELF-REPAIR — a document was over budget and the daemon fixed it itself (not parking)."

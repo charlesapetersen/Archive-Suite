@@ -270,7 +270,10 @@ printf '%s' "$1" > {shlex.quote(str(entry_marker))}
         source = (HERE / "archive-suite-autonomous.sh").read_text()
         gate_fn = source[source.index("_run_gate_once() {"):source.index("\n# Classify the gate's RED")]
         gate = root / "gate.sh"
-        gate.write_text("#!/bin/bash\necho gate-ran\n")
+        light = root / "gate-light-ran"
+        # A gate whose light part runs unlocked and whose one heavy step queues for the held lock.
+        gate.write_text("#!/bin/bash\ntouch %s\npython3 %s --state %s run -- true || exit 1\necho gate-ran\n"
+                        % (shlex.quote(str(light)), shlex.quote(str(HELPER)), shlex.quote(str(state))))
         gate.chmod(0o755)
         timing = root / "timing.sh"
         timing.write_text(f'''set -uo pipefail
@@ -279,20 +282,34 @@ HEAVY_CMD={shlex.quote(str(HELPER))}
 HEAVY_STATE={shlex.quote(str(state))}
 GATE_CMD={shlex.quote(str(gate))}
 glog={shlex.quote(str(root / 'gate.log'))}
-GATE_MAXRUN=2
+GATE_MAXRUN=10
 _terminate_tree() {{ kill -TERM "$1"; }}
 {gate_fn}
 _run_gate_once
 echo "gate-rc=$GATE_RC"
 ''')
         ready = root / "timer-holder"
-        holder = spawn("sleep", "3", ready=ready)
+        holder = spawn("sleep", "30", ready=ready)
         check(until(ready.exists), "timer fixture owns lock")
         owner()
-        p = subprocess.run(["bash", str(timing)], env=env, capture_output=True, text=True, timeout=12)
-        finish(holder)
-        check(p.returncode == 0 and "gate-rc=0" in p.stdout and "gate-ran" in (root / "gate.log").read_text(),
-              "gate execution cap excludes contention longer than the cap")
+        gate_run = subprocess.Popen(["bash", str(timing)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        children.append(gate_run)
+        check(until(light.exists) and holder.poll() is None,
+              "the gate's light steps run while another job holds the heavy lock (no whole-gate lock)")
+        # The REAL health gate takes no whole-gate lock: a light step runs to completion while the lock is held.
+        real_gate = subprocess.run(["bash", str(HERE / "health-gate.sh")], env=dict(env, AUTONOMOUS_GATE_ONLY="context-budget"),
+                                   capture_output=True, text=True, timeout=60)
+        check(holder.poll() is None and "✓ context-budget" in real_gate.stdout and "HEALTH GATE: GREEN (re-ran only" in real_gate.stdout,
+              "health-gate.sh runs its light steps while another job holds the lock")
+        out, _ = gate_run.communicate(timeout=90)
+        check(gate_run.returncode == 0 and "gate-rc=0" in out and "gate-ran" in (root / "gate.log").read_text(),
+              "gate execution cap excludes a step's lock wait longer than the cap")
+        if holder.poll() is None:
+            holder.terminate()
+        holder.communicate(timeout=10)
+        gate.write_text("#!/bin/bash\nsleep 25\necho gate-ran\n")
+        p = subprocess.run(["bash", str(timing)], env=env, capture_output=True, text=True, timeout=60)
+        check("gate-rc=2" in p.stdout, "a gate that really runs past the cap is still stopped")
         check('waiting "$cpid"' in source and 'quiet_since=0; idle_streak=0; continue' in source,
               "watchdog consults validated heavy waiters and resets idle budget")
         vm_lock = root / "old-live-vm-lock"

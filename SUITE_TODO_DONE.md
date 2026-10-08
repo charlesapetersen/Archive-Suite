@@ -9827,3 +9827,6 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **EFF.holds — lock hold time is logged** — `heavy-run.py` appends start, end, seconds held, holder and command per
   held job to `heavy/holds.log` (bounded), and feeds the Agent Manager's load sampler so Archive Suite jobs reach its
   `heavy-jobs.log`.
+- [x] **EFF.gate-lock — the health gate locks per step** — no whole-gate lock (gate and daemon wrapper both gone); the
+  light block runs first and unlocked; a RED retry re-runs only the failing steps (`AUTONOMOUS_GATE_ONLY`); the
+  execution cap skips polls while a step waits for the lock.

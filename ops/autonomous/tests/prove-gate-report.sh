@@ -98,6 +98,20 @@ case "$rep" in *"BREAKER-MARKER"*) ok "a hard-failing step_skippable step report
 case "$rep" in *"SKIPDECOY"*) no "a SKIPPED step's reason leaked into the failing-output block" ;; *) ok "a SKIPPED step contributes nothing to the failing output" ;; esac
 case "$rep" in *"WARNDECOY"*) no "a KNOWN-FAILURE step's output leaked into the failing-output block" ;; *) ok "a KNOWN-FAILURE step contributes nothing to the failing output" ;; esac
 
+# --- 3b. a retry names only the failing steps (AUTONOMOUS_GATE_ONLY, efficiency plan round 2) -----------
+cat > "$T/s3b.sh" <<'EOS'
+step passed-before  bash -c 'echo "PASSED-BEFORE-RAN"'
+step retried-FAIL   bash -c 'echo "RETRIED-MARKER"; exit 1'
+step_skippable retried-skip bash -c 'echo "SKIPPED: RETRIED-SKIP"; exit 3'
+step_skippable not-retried bash -c 'echo "NOT-RETRIED-RAN"; exit 1'
+EOS
+out="$(AUTONOMOUS_GATE_ONLY="retried-FAIL retried-skip" drive "$T/s3b.sh")"
+case "$out" in *"PASSED-BEFORE"*|*"── passed-before"*|*"not-retried"*) no "a retry ran a step it did not name (got: $out)" ;; *) ok "a retry runs only the named steps" ;; esac
+case "$out" in *"HEALTH GATE: RED — retried-FAIL"*) ok "a retried step that fails again still REDs the gate" ;; *) no "retried-FAIL should RED (got: $out)" ;; esac
+case "$out" in *"⊘ retried-skip"*) ok "a named step_skippable step runs on a retry" ;; *) no "retried-skip should run (got: $out)" ;; esac
+out="$(AUTONOMOUS_GATE_ONLY="" drive "$T/s3b.sh")"
+case "$out" in *"── passed-before"*"── not-retried"*) ok "an empty step list runs every step" ;; *) no "an empty list should run all (got: $out)" ;; esac
+
 # --- 4. all green: no verdict, no report ----------------------------------------------------------------
 cat > "$T/s4.sh" <<'EOS'
 step all-good   bash -c 'echo "GREENDECOY"'

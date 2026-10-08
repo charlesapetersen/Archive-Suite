@@ -61,7 +61,11 @@ TERM/INT/HUP forward to the supervisor's own child group, and ownership lasts th
 background descendants in those registered sessions. A hung surviving tool retains ownership for inspection.
 Fresh waiter records count as watchdog work only when their PID birth, ancestry and competing live
 owner validate. Stale records cannot spare a wedged session. The outer session backstop still applies.
-The gate's execution cap starts after acquisition; nested gate steps reuse the lock. Both VM routes
+The gate holds no lock as a whole (efficiency plan round 2, 2026-10-07): its light block runs first and
+unlocked, and each heavy step — the three app builds and unit suites, the Processor launch, tag-vocabulary,
+the paid OCR smoke, the VM lane — takes the lock for itself through the shim or `heavy-enter.sh`. The gate
+exports `AUTONOMOUS_HEAVY_ENABLED=1`, so a hand-run gate locks per step too. The daemon's execution cap skips
+every poll during which a step of the gate is queued for the lock (`heavy-run.py waiting`). Both VM routes
 acquire heavy ownership before the VM lock, whose age never evicts a live owner.
 
 `tests/prove-heavy.sh` drives scratch contention, nesting, failure/cancellation/crash, copied-token
@@ -595,7 +599,8 @@ driver with no key, network, OCR, or GUI; it is specifically what catches an app
   cover the Processor the day it gains a test target (W21.vmgui-d). The other half of that guarantee is in the apps themselves: the
   unit bundles are app-hosted, so `xcodebuild test -only-testing:<App>Tests` launches the real `.app` — it now
   draws nothing under a test host (each app's local `ArchiveTestHost` + `TestHostWindowSuppressionTests`).
-- **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once — a real regression is
+- **Retry-once before parking** (`AUTONOMOUS_GATE_*`): a RED result is re-run once, and only its failing
+  steps (`AUTONOMOUS_GATE_ONLY`, read by `step`/`step_skippable`; no verdict line means a full re-run) — a real regression is
   deterministic and fails again (→ park), but a flaky XCTest / transient `xcodebuild` blip passes the retry
   (→ green, no park). This is what keeps a routine flake from false-parking a multi-day run.
 - **Wall-clock capped** (`AUTONOMOUS_GATE_MAXRUN`, 50 min — raised from 30 to absorb the on-by-default GUI-VM
