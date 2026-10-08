@@ -1106,6 +1106,48 @@ to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their ow
   moving cleanly, and a dirty or unpublished tree preserved; the README states the path; the warm figure is
   re-measured once and added to the measure table; the entry notes it takes effect at the next owner restart. |
   ops/autonomous/ + execution-plans/parallel-workers/warm-dd-measure.md | M | med | none
+- [ ] **`W35.session-policy` — ask the Agent Manager for each session's model, effort and limits, and retire the fixed ones [M · ~1-2 sessions]** (lane: ops) (uses: light)
+  Agent Manager stage 7, daemon side (owner design, 2026-10-08, the Stage 7 box in `~/Claude/Agent Manager/PROGRESS.md`).
+  The manager side is on its master at `82c75ee`: `bin/grant` takes `--evidence JSON|FILE` with `--policy-line` or
+  `--policy-out FILE`, and on a Claude grant answers with model, fallback model, effort, `wall_limit_seconds`
+  (`wall_excludes=heavy-lock-wait`), `quiet_limit_seconds` and `budget_usd`. Interface, rules and fail-open:
+  its `README.md` §Session policy. Today this daemon fixes all four before the item is known (`EFFORT` medium,
+  Opus, Fable only when the operator sets max, `MAXRUN` 3 h, `BUDGET` $60), but the reservation (step 3c,
+  `reserve` in `tick()`) now names the item before the launch, so the evidence exists in time.
+  WHAT. (a) Evidence: after the reservation and before the launch, ask `bin/grant` once more for the reserved tag
+  with `--evidence` and `--policy-out` (bounded by `GRANT_TIMEOUT` as `held_reason` is; a wait at this point
+  releases the claim and skips the cycle like any other hold). Send `item` (the tag), `uses` (the reservation's
+  uses field), `estimate_sessions` (the header's `~N` or `~N-M sessions` text, as written), `sessions_since_progress`,
+  `escalate_requested`/`escalate_reason`, and for `special=gate-fix` `is_gatefix`, `gatefix_tries` (counted tries
+  plus one) and `gatefix_max` (`GATEFIX_MAX`). This queue carries no `(effort: …)` markers (0 on 2026-10-08), so
+  no `marker` is sent until one is written. `sessions_since_progress` is PER ITEM, not the worker's
+  `nocomplete.count` streak: keep one counter per tag under `$STATE` (shared by workers, written under the claim),
+  reset when a session on that tag moves `work_fingerprint` with a commit, incremented when it does not, removed
+  when the item completes. A worker streak spread across several items is the misleading count the owner's design
+  names. Escalate: a session that judges its item needs more may write one line, `TAG<TAB>reason`, to
+  `$WORKER_STATE/escalate`; the daemon sends it at the next ask for that same tag only and deletes it after the
+  ask, so it raises one session. Add the one-sentence rule to `resume-prompt.txt`. (b) Launch: on a policy, use its
+  model, fallback, effort and `budget_usd` in the `claude -p` line; Watchdog A uses `wall_limit_seconds` and skips
+  each poll during which this session's tree is queued for the heavy lock (`heavy-run.py waiting`, the test the
+  gate's cap already uses); the health watchdog's `HB_STALL` takes `quiet_limit_seconds`. Log the policy line and
+  add model and effort to the usage row. (c) Retire: delete the `EFFORT = max -> MAX_MODEL` rule and the fixed
+  `MAXRUN`/`BUDGET` as the normal path; they stay only as the fallback when the answer is `policy-omitted`,
+  absent, unparseable or timed out, which must give exactly today's launch line. An operator-exported
+  `AUTONOMOUS_EFFORT`, `AUTONOMOUS_MAXRUN` or `AUTONOMOUS_BUDGET` still wins, and the log says so. Codex lanes are
+  unchanged (the manager decides no policy for Codex). The supervisor's own grant ask in `worker-supervisor.py`
+  stays as it is; the child daemon owns the launch.
+  CONSTRAINTS. `bin/grant` is live and both daemons parse its first line and exit code: those must keep working
+  exactly; read the policy only from `--policy-out` (or the second line), never by changing the first-line read.
+  Fail-open in every branch. The change takes effect at the next owner restart; never restart the daemon.
+  DONE WHEN a new `ops/autonomous/tests/prove-session-policy.sh` (stub `AUTONOMOUS_GRANT_CMD`, stub `claude`)
+  shows: the evidence file a stub grant receives for an ordinary item, a gate fix and an escalated item; the
+  launch line using the returned model, effort and budget; the wall limit not charged for heavy-lock queue time
+  and still firing outside it; the quiet limit applied; the per-item counter climbing on a no-commit session and
+  resetting on a commit, independently for two tags; the escalate file used once and only for its own tag; and
+  `policy-omitted`, a missing helper, garbage output and a timeout each giving today's launch line byte for byte.
+  `prove-daemon.sh`, `prove-exit-logging.sh`, `prove-gate-fix.sh`, `prove-worker-claims.sh` and
+  `prove-worker-supervisor.sh` stay green; `ops/autonomous/README.md` describes the policy path and the fallback;
+  the entry notes it takes effect at the next owner restart. | ops/autonomous/ | M | med | none
 ## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
 
 The next work once the build queue above is exhausted. Plans: `execution-plans/verification-phase/00-owner-plan.md`
