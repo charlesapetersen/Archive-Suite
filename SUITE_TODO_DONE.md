@@ -10066,3 +10066,11 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   moved only by a linked run). `verification/SUSPECTS.md` created empty. Unblocks `W40.b1`-`b4` (each still on its
   feature gate).
   <!-- /W40.b0 -->
+- [x] **W9.w21-red — `testW21_CrossWindowPassageChipReStylesAfterSourceTrash` is RED on main [S · gui]** · §W9 gap-closure · SHIPPED 2026-10-08 (no code in this commit; fixed by `9d2c6bf`)
+  Already fixed inside `W35.vm-mem-fu1`, checkpoint 3 (`9d2c6bf`). The product had regressed; the probe had not
+  drifted. A passage-only chip re-style was refused while the Extracts editor sat in a non-key window behind the
+  Note window, even though it was still first responder. The fix lets that re-style run in a non-key window when
+  there is no marked text and no pending write-back. Evidence: W35.vm-mem-fu1's three full
+  `vm-gui-runner.sh notes xcuitest` runs at 6144 MB (37 passed, 1 skipped, 0 failed, W21 included). Not
+  re-run alone for this record.
+  <!-- /W9.w21-red -->

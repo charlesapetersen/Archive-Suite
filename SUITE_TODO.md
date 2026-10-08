@@ -862,12 +862,6 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
 ✅ **`W9.e1` (plan E1) shipped 2026-10-06** — the per-item result is in the plan under *E1 result*; the
 completion record is in `SUITE_TODO_DONE.md`.
 
-- [ ] **`W9.w21-red` — `testW21_CrossWindowPassageChipReStylesAfterSourceTrash` is RED on main [S · gui]** (lane: notes) (uses: build,vm)
-  Found 2026-10-06 while VM-verifying `W9.b5-fu1`; reproduced ALONE on a pristine `origin/main` (`e8f12f8`)
-  checkout, so it is not that change. Fails at `NotesGUITests.swift:1377`: after trashing the cited note, the
-  open Extracts editor's chip still reports `missing: 0` (label "Moore on Intel culture — 1968", id
-  `22222222-…`). Either the W14.4c cross-window re-style regressed or the probe/fixture drifted — find which
-  before touching the product. | ArchiveNotes | S | med | none
 - [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [S · ~0.25 session]** (lane: notes) (uses: light)
   Notes: `execution-plans/items/W9.e2.md` (saved draft branches).
   Original body, kept for reference; the work now lives in the six parts below. Plan E2 — also settle the two
