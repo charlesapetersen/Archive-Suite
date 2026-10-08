@@ -149,25 +149,64 @@ def pending_holds(rows):
     return out
 
 
+BLOCKED_ON = re.compile(r"\(blocked-on:([^)]*)\)")
+
+
+def tag_states():
+    """(done, pending): next-queue-item.sh's tag -> state map, from every anchored checkbox line in SUITE_TODO.md,
+    SUITE_TODO_DONE.md and the plan, fenced and blockquoted lines skipped. A tag is done iff it is ticked somewhere
+    and open nowhere."""
+    done, pend = set(), set()
+    for path in (os.path.join(REPO, "SUITE_TODO.md"), os.path.join(REPO, "SUITE_TODO_DONE.md"), PLAN):
+        fence = False
+        for line in (read(path) or "").splitlines():
+            if re.match(r"^\s*(```|~~~)", line):
+                fence = not fence
+                continue
+            if fence or re.match(r"^\s*>", line):
+                continue
+            m = CHECKBOX.match(line)
+            if m:
+                tag = tag_of(line[m.end():])
+                if tag:
+                    (pend if m.group(1) == " " else done).add(tag)
+    return done, pend
+
+
+def own_prerequisites_met(text, states):
+    """A hold is ready to decide only when its own (blocked-on: ...) tags are all done (R1 review finding 4)."""
+    done, pend = states
+    for clause in BLOCKED_ON.findall(text):
+        for t in clause.split(","):
+            t = t.replace("`", "").strip()
+            if t and (t in pend or t not in done):
+                return False
+    return True
+
+
 def short_hash(s):
     return hashlib.sha1(s.strip().encode("utf-8")).hexdigest()[:8]
 
 
+DIGEST_ENTRY = re.compile(r"^(### 20\d\d-\d\d-\d\d|- \*\*\[|\*\*\[)")   # status-digest.sh's DR_ENTRY_RE
+
+
 def report_entries(plan):
-    """The Daemon Report's entries above the newest `### ✅ … walkthrough` heading, newest first. An entry is a
-    blank-separated block; a block that opens with a `### ` heading carries the blocks after it until the next
-    heading (its body). Entries before any heading are one block each, which is how sessions append today."""
-    lines, inside, body = plan.splitlines(), False, []
-    for line in lines:
+    """The first lines of the Daemon Report's entries above the newest `### ✅ … walkthrough` heading, newest
+    first. Each blank-separated block is an entry, and a block opening with a `### ` heading carries the blocks
+    after it until the next heading. status-digest.sh's rule (a line opening `### <date>`, `- **[` or `**[`) is
+    used instead when it finds every entry the block rule finds; today's entries are plain paragraphs, which it
+    misses."""
+    inside, body = False, []
+    for line in plan.splitlines():
         if REPORT_HEADER.match(line):
             inside = True
             continue
-        if inside and line.startswith("## "):
-            break
-        if inside and WALKED.match(line):
+        if inside and (line.startswith("## ") or WALKED.match(line)):
             break
         if inside:
             body.append(line)
+    digest = [line for line in body if DIGEST_ENTRY.match(line)]
     blocks, cur = [], []
     for line in body + [""]:
         if line.strip():
@@ -181,7 +220,9 @@ def report_entries(plan):
             entries.append(list(b))
         else:
             entries[-1].extend(b)
-    return entries
+    if digest and len(digest) >= len(entries):
+        return digest
+    return [e[0] for e in entries]
 
 
 def holds():
@@ -193,7 +234,7 @@ def holds():
     if rc not in (0, 3, 4):
         print("next-queue-item.sh exited %d: %s" % (rc, msg[:300]), file=sys.stderr)
         return 1
-    pending, seen, out = pending_holds(rows), set(), []
+    pending, states, seen, out = pending_holds(rows), tag_states(), set(), []
     for line in section(plan, "HOLD QUEUE"):
         m = CHECKBOX.match(line)
         if not m or m.group(1) != " ":
@@ -202,17 +243,23 @@ def holds():
         if not tag or tag in seen:
             continue
         seen.add(tag)
-        out.append({"key": tag, "text": clean(line[m.end():]), "permanent": tag not in pending,
-                    "source": "HOLD QUEUE"})
+        ready = tag in pending and own_prerequisites_met(line, states)
+        out.append({"key": tag, "text": clean(line[m.end():]), "permanent": not ready, "source": "HOLD QUEUE"})
     for status, tag, text in rows:
         if HOLD_MARK.search(text) and tag not in seen:
             seen.add(tag)
-            out.append({"key": tag, "text": clean(text), "permanent": tag not in pending, "source": "WORK QUEUE"})
-    for e in report_entries(plan):
-        first = e[0]
-        m = DATE.search(first)
-        d = {"key": "report-%s-%s" % (m.group(1) if m else "undated", short_hash(first)), "text": clean(first),
+            ready = tag in pending and not status.startswith("blocked:")
+            out.append({"key": tag, "text": clean(text), "permanent": not ready, "source": "WORK QUEUE"})
+    # The Daemon Report is ONE pending item, keyed by its newest unwalked entry: a new entry notifies once, and the
+    # owner walks the report as a whole (decision 2026-10-08, R1 review finding 3).
+    entries = report_entries(plan)
+    if entries:
+        newest = clean(entries[0], 100)
+        d = {"key": "daemon-report:" + short_hash(entries[0]),
+             "text": "Daemon Report: %d entr%s since the last walkthrough; newest: %s"
+                     % (len(entries), "y" if len(entries) == 1 else "ies", newest),
              "permanent": False, "source": "Daemon Report"}
+        m = DATE.search(entries[0])
         if m:
             d["since"] = m.group(1)
         out.append(d)

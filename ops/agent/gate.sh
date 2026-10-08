@@ -4,7 +4,11 @@
 #   HEALTH GATE: GREEN                                   exit 0
 #   HEALTH GATE: RED — <step>, <step>                    exit 1
 #   HEALTH GATE CLASS: doc|code|mixed                    (after a RED line)
-#   no verdict at all (killed, refused, cannot start)    exit 3, inconclusive
+#   HEALTH GATE: SKIPPED — <reason>                      exit 3
+# The one skip code: health-gate.sh exits 3 when it runs inside the Codex sandbox, where it refuses to launch
+# apps (its own header). Any other nonzero exit without a RED line (killed, cannot cd, a tool missing) is RED,
+# named "no verdict (exit N)", because the daemon reads every nonzero gate exit as RED. Exit 0 is GREEN, as the
+# daemon reads it.
 # The step names are read from the gate's own RED line the way the daemon's _classify_red does; a document
 # step is `context-budget`, the only step that measures document size. Heavy: the engine runs it under the
 # heavy lock. It writes only what the gate writes (build products).
@@ -31,9 +35,14 @@ if [ -n "$vline" ]; then
   else echo "HEALTH GATE CLASS: code"; fi
   exit 1
 fi
-if [ "$rc" = 0 ] && grep -q '^HEALTH GATE: GREEN' "$log"; then
+if [ "$rc" = 0 ]; then
   echo "HEALTH GATE: GREEN"
   exit 0
 fi
-echo "health-gate.sh gave no verdict (exit $rc): inconclusive"
-exit 3
+if [ "$rc" = 3 ]; then
+  echo "HEALTH GATE: SKIPPED — health-gate.sh exit 3: it refuses to launch apps inside the Codex sandbox"
+  exit 3
+fi
+echo "HEALTH GATE: RED — no verdict (exit $rc)"
+echo "HEALTH GATE CLASS: code"
+exit 1

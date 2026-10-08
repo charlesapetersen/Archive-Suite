@@ -35,6 +35,7 @@ RUN STATUS: IN_PROGRESS — fixture
 - [ ] **A.three — waits on two** (blocked-on: H.two, A.one)
 - [ ] **A.held — held here [hold]** (lane: docs)
 - [ ] **A.bad — bad uses** (uses: lots)
+- [ ] **A.four — waits on a hold that is not ready** (blocked-on: H.wait)
 
 ## HOLD QUEUE (owner-gated — the daemon must NOT execute these)
 
@@ -42,6 +43,7 @@ RUN STATUS: IN_PROGRESS — fixture
 - [ ] **H.two — owner second**
 - [ ] **H.perm — a settled judgement** ⛔ OWNER JUDGEMENT
 - [x] **H.done — answered**
+- [ ] **H.wait — decide once A.one reports** (blocked-on: A.one)
 
 ## Session Log
 
@@ -130,7 +132,7 @@ class Queue(Fixture):
         r = self.hook("queue")
         self.assertEqual(r.returncode, 0, r.stderr)
         items = {d["tag"]: d for d in self.jsonl(r.stdout)}
-        self.assertEqual(list(items), ["A.one", "A.two", "A.three", "A.held", "A.bad"])
+        self.assertEqual(list(items), ["A.one", "A.two", "A.three", "A.held", "A.bad", "A.four"])
         one = items["A.one"]
         self.assertEqual((one["status"], one["lanes"], one["uses"], one["effort"], one["estimate"]),
                          ("ok", ["notes"], ["light"], "high", "~1 session"))
@@ -181,25 +183,53 @@ class Holds(Fixture):
         self.assertTrue(by["H.perm"]["permanent"])
         self.assertNotIn("H.done", by)
         self.assertEqual((by["A.held"]["source"], by["A.held"]["permanent"]), ("WORK QUEUE", True))
-        report = [d for d in items if d["source"] == "Daemon Report"]
-        self.assertEqual(len(report), 3)
-        self.assertTrue(all(d["permanent"] is False for d in report))
-        self.assertTrue(report[0]["key"].startswith("report-2026-10-08-"))
-        self.assertEqual(report[0]["since"], "2026-10-08")
-        self.assertTrue(report[1]["key"].startswith("report-undated-"))
-        self.assertNotIn("since", report[1])
-        self.assertEqual(report[2]["text"], "2026-10-07 — a headed entry")
         self.assertFalse(any("W0.old" in d["text"] for d in items))   # below the walkthrough: settled
 
-    def test_keys_are_stable_and_follow_the_entry(self):
+    def test_a_hold_whose_own_prerequisite_is_open_is_not_pending(self):
+        # R1 review finding 4: A.four waits on H.wait alone, but H.wait itself waits on A.one.
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertTrue(by["H.wait"]["permanent"])
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.one", "- [x] **A.one"))
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertFalse(by["H.wait"]["permanent"])
+        # done only in SUITE_TODO_DONE.md counts too, as next-queue-item.sh counts it
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("(blocked-on: A.one)", "(blocked-on: T.old)"))
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertFalse(by["H.wait"]["permanent"])
+
+    def test_the_daemon_report_is_one_pending_item(self):
+        # R1 review finding 3 (decision 3): one item for the report, keyed by its newest entry, so a new entry
+        # notifies once and the cutover notifies once.
+        items = self.jsonl(self.hook("holds").stdout)
+        report = [d for d in items if d["source"] == "Daemon Report"]
+        self.assertEqual(len(report), 1)
+        d = report[0]
+        self.assertTrue(d["key"].startswith("daemon-report:"))
+        self.assertFalse(d["permanent"])
+        self.assertTrue(d["text"].startswith("Daemon Report: 3 entries since the last walkthrough; newest: W1.x "
+                                             "(2026-10-08) \u2014 first unheaded entry"), d["text"])
+        self.assertEqual(d["since"], "2026-10-08")
+
+    def test_keys_are_stable_and_a_new_entry_changes_the_report_key(self):
         first = [d["key"] for d in self.jsonl(self.hook("holds").stdout)]
         self.assertEqual(first, [d["key"] for d in self.jsonl(self.hook("holds").stdout)])
-        # A new entry prepended above the others adds one key and changes none.
         self.write(".maintenance/AUTONOMOUS_PLAN.md",
-                   PLAN.replace("follow-ups\n\n", "follow-ups\n\nW3.z (2026-10-09) — newest\n\n"))
-        second = [d["key"] for d in self.jsonl(self.hook("holds").stdout)]
-        self.assertEqual(len(second), len(first) + 1)
-        self.assertTrue(set(first) <= set(second))
+                   PLAN.replace("follow-ups\n\n", "follow-ups\n\nW3.z (2026-10-09) \u2014 newest\n\n"))
+        items = self.jsonl(self.hook("holds").stdout)
+        second = [d["key"] for d in items]
+        self.assertEqual(len(second), len(first))
+        changed = set(first) ^ set(second)
+        self.assertEqual(len(changed), 2)
+        self.assertTrue(all(k.startswith("daemon-report:") for k in changed))
+        self.assertIn("Daemon Report: 4 entries", [d for d in items if d["source"] == "Daemon Report"][0]["text"])
+
+    def test_a_walked_report_has_no_item(self):
+        plan = PLAN.replace("## Daemon Report \u2014 owner decisions / follow-ups\n\n",
+                            "## Daemon Report \u2014 owner decisions / follow-ups\n\n"
+                            "### \u2705 2026-10-09 \u2014 walkthrough done (owner)\n\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        items = self.jsonl(self.hook("holds").stdout)
+        self.assertEqual([d for d in items if d["source"] == "Daemon Report"], [])
 
     def test_unblocking_the_other_prerequisite_makes_a_hold_pending(self):
         self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.one", "- [x] **A.one"))
@@ -259,13 +289,21 @@ class Gate(Fixture):
                                  ["HEALTH GATE: RED %s %s" % (EM, ", ".join(steps.split())),
                                   "HEALTH GATE CLASS: %s" % klass])
 
-    def test_no_verdict_is_inconclusive(self):
-        for lines, rc in (([], 3), (["half a log"], 137), (["HEALTH GATE: GREEN"], 2)):
+    def test_no_verdict_is_red(self):
+        # R1 review finding 1 (decision 1): the daemon calls any nonzero gate exit RED.
+        for lines, rc in (([], 2), (["half a log"], 137), (["HEALTH GATE: GREEN"], 2)):
             with self.subTest(rc=rc):
                 self.fake_gate(lines, rc)
                 r = self.hook("gate")
-                self.assertEqual(r.returncode, 3)
-                self.assertFalse(r.stdout.splitlines()[-1].startswith("HEALTH GATE:"))
+                self.assertEqual(r.returncode, 1)
+                self.assertEqual(r.stdout.splitlines()[-2:],
+                                 ["HEALTH GATE: RED %s no verdict (exit %d)" % (EM, rc), "HEALTH GATE CLASS: code"])
+
+    def test_the_sandbox_refusal_is_the_one_skip(self):
+        self.fake_gate(["The health gate launches apps; request execution outside the Codex sandbox."], 3)
+        r = self.hook("gate")
+        self.assertEqual(r.returncode, 3)
+        self.assertTrue(r.stdout.splitlines()[-1].startswith("HEALTH GATE: SKIPPED %s " % EM), r.stdout)
 
 
 class Pregate(Fixture):
