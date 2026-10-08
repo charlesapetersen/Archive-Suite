@@ -236,11 +236,34 @@ struct NotesFolderTreeView: View {
                 model.setFolderScope(node.id)
             }
             .onDrag { NotesItemDrag.folderProvider(node.id) }
-            .onDrop(of: NotesFolderDropDelegate.types, delegate: NotesFolderDropDelegate(
+            .modifier(NotesFolderRowDropTarget(
                 sourceFolder: { model.selectedFolderId },
                 accept: { payload, replicate, source in
                     _ = handleDrop([payload], onto: node.id, replicate: replicate, source: source)
-                }))
+                },
+                reorder: { payload, after in placeFolder(payload, beside: node.id, after: after) }))
+    }
+
+    /// A folder dropped on a row's top or bottom edge lands beside that row, in its level (W9.e2-fu1).
+    /// Removes the dragged folder from wherever it was and renumbers the target level around it, so the
+    /// same gesture reorders siblings and moves a folder in from another level.
+    private func placeFolder(_ payload: String, beside targetID: UUID, after: Bool) {
+        guard let dragged = UUID(uuidString: payload), dragged != targetID,
+              model.organization.folders.contains(where: { $0.id == dragged }),
+              let (siblings, parentID) = level(containing: targetID) else { return }
+        // A folder can't sit beside one of its own descendants; `moveFolder` explains the refusal.
+        if model.wouldCreateCycle(moving: dragged, to: parentID) {
+            Task { await model.moveFolder(dragged, newParent: parentID, at: 0) }
+            return
+        }
+        var ids = siblings.map(\.id).filter { $0 != dragged }
+        guard let targetIndex = ids.firstIndex(of: targetID) else { return }
+        ids.insert(dragged, at: after ? targetIndex + 1 : targetIndex)
+        Task {
+            for (index, id) in ids.enumerated() {
+                await model.moveFolder(id, newParent: parentID, at: index)
+            }
+        }
     }
 
     /// Build each level with its own `ForEach.onMove`, retaining nested disclosure rows while giving reorder
@@ -285,9 +308,8 @@ struct NotesFolderTreeView: View {
         Button("Rename…") { renameText = node.name; renameID = node.id }
             .disabled(isSystem)
         Divider()
-        // Menu twins of the drag gestures (W9.e2-folders, D1): a gap drop between rows is taken by the
-        // row's own `.onDrop` as a re-parent before the level's `.onMove` sees it (W9.e2-fu1), and no drop
-        // target re-parents to the top level at all, so these are the dependable way to reorder and un-nest.
+        // Menu twins of the drag gestures (W9.e2-folders, D1): a drop on a row's edge reorders, and on a
+        // top-level row's edge un-nests (W9.e2-fu1), but the menu needs no aim at a few-point band.
         let place = level(containing: node.id)
         let index = place?.siblings.firstIndex { $0.id == node.id }
         Button("Move Up") { shiftFolder(node.id, by: -1) }
@@ -411,16 +433,45 @@ struct NotesFolderTreeView: View {
     }
 }
 
+/// Measures the folder row so its drop delegate can tell an edge drop (reorder) from a middle one
+/// (re-parent). A row's own `.onDrop` sees every folder drop over it before the level's `ForEach.onMove`
+/// does, so the edge band has to be decided here (W9.e2-fu1).
+private struct NotesFolderRowDropTarget: ViewModifier {
+    let sourceFolder: @MainActor @Sendable () -> UUID?
+    let accept: @MainActor @Sendable (String, Bool, UUID?) -> Void
+    let reorder: @MainActor @Sendable (String, Bool) -> Void
+    @State private var height: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .onDrop(of: NotesFolderDropDelegate.types, delegate: NotesFolderDropDelegate(
+                rowHeight: height, sourceFolder: sourceFolder, accept: accept, reorder: reorder))
+    }
+}
+
 /// The AppKit table writes pasteboard bytes, while SwiftUI folder drags carry NSString. Read both
 /// explicitly rather than relying on Transferable String decoding. Capture modifiers and source
 /// scope at drop time; asynchronous provider loading cannot change the promised move/copy operation.
 private struct NotesFolderDropDelegate: DropDelegate {
     static let types = [NotesItemDrag.folderTypeIdentifier, NotesItemDrag.pasteboardType.rawValue,
                         UTType.utf8PlainText.identifier, UTType.plainText.identifier]
+    let rowHeight: CGFloat
     // SwiftUI may retain the delegate across selection updates. Resolve the current scope at the
     // drop boundary, then capture the value before any provider callback can run.
     let sourceFolder: @MainActor @Sendable () -> UUID?
     let accept: @MainActor @Sendable (String, Bool, UUID?) -> Void
+    /// A folder payload dropped in the top (`false`) or bottom (`true`) quarter of the row.
+    let reorder: @MainActor @Sendable (String, Bool) -> Void
+
+    /// Which edge band a folder drop at `y` falls in: nil for the middle, or before the row is measured.
+    static func edge(y: CGFloat, rowHeight: CGFloat) -> Bool? {
+        guard rowHeight > 0 else { return nil }
+        let band = rowHeight / 4
+        if y <= band { return false }
+        if y >= rowHeight - band { return true }
+        return nil
+    }
 
     func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: Self.types) }
 
@@ -433,6 +484,18 @@ private struct NotesFolderDropDelegate: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         let providers = info.itemProviders(for: Self.types)
         guard !providers.isEmpty else { return false }
+        let folderType = NotesItemDrag.folderTypeIdentifier
+        if let after = Self.edge(y: info.location.y, rowHeight: rowHeight),
+           let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(folderType) }) {
+            let reorder = reorder
+            provider.loadItem(forTypeIdentifier: folderType, options: nil) { item, error in
+                guard error == nil else { return }
+                let payload = (item as? Data).flatMap { String(data: $0, encoding: .utf8) } ?? item as? String
+                guard let payload else { return }
+                Task { @MainActor in reorder(payload, after) }
+            }
+            return true
+        }
         let replicate = NSEvent.modifierFlags.contains(.option)
         let source = MainActor.assumeIsolated { sourceFolder() }
         let accept = accept

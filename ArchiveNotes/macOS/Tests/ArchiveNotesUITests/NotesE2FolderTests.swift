@@ -5,8 +5,9 @@ import XCTest
 /// doubts E1 could not settle from source. Replicate is `NotesGUITests.testG7_…` and a drag onto a folder
 /// row re-parenting is `testG18_…`; neither is repeated here.
 ///
-/// D1 doubt 1 — does the row's `.onDrag`/`.onDrop` pre-empt the level's `.onMove`? Yes: a gap drop
-/// re-parents (`testE2_FolderDragToSiblingGapReorders`, a strict expected failure, → W9.e2-fu1). D1 doubt 2
+/// D1 doubt 1 — does the row's `.onDrag`/`.onDrop` pre-empt the level's `.onMove`? Yes, so since
+/// W9.e2-fu1 the row itself reorders a folder dropped on its top or bottom quarter, and only a middle drop
+/// re-parents (`testE2_FolderDragToSiblingGapReorders`, `testE2_FolderDragToBottomEdgeReorders`). D1 doubt 2
 /// — can anything re-parent a folder to the top level? No drop target can, so the context menu gained
 /// "Move to Top Level", and "Move Up"/"Move Down" as the reorder path that does work.
 ///
@@ -120,12 +121,22 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             attachment.name = "W9.e2-folder-reorder"
             attachment.lifetime = .keepAlways
             XCTContext.runActivity(named: "Capture the folder tree after the reorder drag") { $0.add(attachment) }
-            // Strict: once the gap drop reorders, this expected failure itself fails and must come out.
-            XCTExpectFailure("W9.e2-fu1: the folder row's .onDrop takes the gap drop as a reparent") {
-                XCTAssertTrue(reordered, "dropping Ideas in the gap above Reading should reorder the top level; "
-                              + "Ideas is now parent=\(after?.parent ?? "nil") order=\(after?.sortOrder ?? -1), "
-                              + "Reading order=\(readingAfter?.sortOrder ?? -1)")
-            }
+            XCTAssertTrue(reordered, "dropping Ideas in the gap above Reading should reorder the top level; "
+                          + "Ideas is now parent=\(after?.parent ?? "nil") order=\(after?.sortOrder ?? -1), "
+                          + "Reading order=\(readingAfter?.sortOrder ?? -1)")
+        }
+    }
+
+    /// The bottom edge of a row puts the dropped folder after it: Reading onto Ideas' bottom edge.
+    func testE2_FolderDragToBottomEdgeReorders() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            XCTAssertEqual(ideasAboveReading(), false, "fixture: Ideas starts below Reading")
+            folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .press(forDuration: 1.0,
+                       thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)))
+            XCTAssertTrue(pollUntil(timeout: 10) { self.ideasAboveReading() == true },
+                          "dropping Reading on Ideas' bottom edge should put it after Ideas, still at the top level")
         }
     }
 
