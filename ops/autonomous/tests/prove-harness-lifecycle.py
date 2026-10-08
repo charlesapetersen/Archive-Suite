@@ -26,6 +26,11 @@ def interrupted(signum, _frame):
 
 
 signal.signal(signal.SIGTERM, interrupted)
+# A process started in the background by a non-interactive shell (`cmd &`, as the daemon can run the gate)
+# inherits SIGINT as IGNORED, exec keeps it ignored, and bash can neither trap nor reset a signal ignored on
+# entry — so the int/register-int/cleanup-int fixtures never saw the INT and timed out (gate-fix 2026-10-08).
+# Installing a handler here makes every child exec with SIGINT at its default, which the cases require.
+signal.signal(signal.SIGINT, signal.default_int_handler)
 
 
 def check(condition, label):

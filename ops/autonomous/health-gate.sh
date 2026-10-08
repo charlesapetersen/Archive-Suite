@@ -296,6 +296,9 @@ step worker-claims-proof  bash "$ROOT/ops/autonomous/tests/prove-worker-claims.s
 step dep-gating-proof     bash "$ROOT/ops/autonomous/tests/prove-dep-gating.sh"
 step tracker-sync-proof   bash "$ROOT/ops/autonomous/tests/prove-tracker-sync.sh"
 step todo-stubs-proof     bash "$ROOT/ops/autonomous/tests/prove-todo-stubs.sh"
+# prove-done-union.sh (~9 s) — W35.done-union: SUITE_TODO_DONE.md's append-only + merge=union rule, in scratch
+#   repos with the real .gitattributes. Shipped unwired, which turned gate-report red (gate-fix 2026-10-08).
+step done-union-proof     bash "$ROOT/ops/autonomous/tests/prove-done-union.sh"
 step housekeeping-proof   bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
 step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
@@ -356,7 +359,7 @@ step archivecore-cache        bash "$ROOT/ArchiveProcessor/scripts/test-archivec
 # See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] && step_skippable gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
 
-# ── The two harnesses that are NOT gate steps, and why ────────────────────────────────────────────────────
+# ── The harnesses that are NOT gate steps, and why ─────────────────────────────────────────────────────────
 # The line below is MACHINE-READ: `prove-gate-report.sh` asserts that every ops/autonomous/tests/prove-*.sh
 # is either a `step` above or named here (W26.fixwarn-fu1 part 2), so harness #14 cannot land unwatched the
 # way seven of them did. Adding a name here SILENCES that assertion for it — so a name belongs here only
@@ -367,6 +370,10 @@ step archivecore-cache        bash "$ROOT/ArchiveProcessor/scripts/test-archivec
 #   * prove-daemon.sh — RUNTIME. ~10 min of real daemon loops does not belong in a gate that already runs
 #     ~22 min against GATE_MAXRUN=50 min. Run it by hand for daemon-behaviour changes. (Runtime, not
 #     principle — which is why the sub-second prove-gate-report.sh above IS in.)
+#   * prove-session-policy.sh — RUNTIME, the same reason as prove-daemon.sh and the same kind of harness: it
+#     drives the REAL daemon through scratch sessions, and measured 5 min 9 s (49/0) on 2026-10-08. The gate
+#     had just taken 64 and 80 min wall on 2026-10-07/08, so 5 more minutes is the cap, not a rounding error.
+#     Run it by hand for any change to how the daemon asks for or applies a session's model/effort/limits.
 #   * prove-keepalive.sh — SIDE EFFECTS OUTSIDE ITS OWN SANDBOX. It is fast (7 s) and green on main, so
 #     runtime is not the objection: it drives the owner's REAL launchd, bootstrapping a throwaway
 #     `com.archivesuite.ws1probe.<pid>` job into gui/$UID, `kill -9`ing it and booting it out. Two problems
@@ -378,7 +385,7 @@ step archivecore-cache        bash "$ROOT/ArchiveProcessor/scripts/test-archivec
 #     mid-step leaves a job LOADED in gui/$UID, and it is `KeepAlive=true`: it RELAUNCHES itself forever. The
 #     label is `$$`-unique, so that accumulates one phantom supervised `com.archivesuite.ws1probe.*` per
 #     killed gate, in the same domain and under the same prefix the owner reads while diagnosing the daemon.
-# GATE-UNWATCHED-BY-DESIGN: prove-daemon.sh prove-keepalive.sh
+# GATE-UNWATCHED-BY-DESIGN: prove-daemon.sh prove-session-policy.sh prove-keepalive.sh
 
 echo
 echo "gate wall time: $(( SECONDS - _gate_t0 ))s"
