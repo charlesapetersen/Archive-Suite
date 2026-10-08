@@ -150,10 +150,22 @@ claim instead of a normal queue item. Housekeeping, tidy and every compaction ca
 through their entire operation and defer when any worker is in flight. Their children inherit the locks;
 compaction also holds the stable plan lock, so a coordinator crash does not unlock ongoing mutations.
 
+A lane says which files an item edits; a `(uses: …)` tag says which machine resource it needs (W35.uses-tags,
+efficiency plan item 12): `light` (no heavy lock — bash, lint, Python, a read-only survey, a cloud API), `build`
+(xcodebuild or swift under the heavy lock), `vm` (the Tart VM), `model:N` (an on-device model needing N GB),
+`machine` (needs the Mac to itself, e.g. a timing run), `paid` (spends API money); a list `(uses: build,vm)` is
+allowed. The last `(uses…)` on the item's line is its tag, so a title may quote one first. An untagged item reads
+as `build`; a malformed tag or unknown value is refused, not defaulted: `worker-state.py reserve` skips that item
+and prints `refused TAG: …` to the worker log, and `check-tracker-sync.sh` fails the gate with `BAD USES TAG` so
+the item cannot starve quietly. Reservation returns
+`tag<TAB>token<TAB>uses<TAB>text` and records `uses` in the claim. It is deliberately not `needs:`, which the
+hold test reads as an owner hold. Every open item in both trackers carries one; selection order does not use
+it yet (that is `W35.uses-slot`). The installed daemon picks it up at the next owner restart.
+
 Assigned sessions use `bash ops/autonomous/plan-edit.sh "$PLAN" complete TAG SHA RESULT`, `log TEXT`,
 `report TEXT`, `append '## SECTION' TEXT`, or `add TAG AFTER-TAG TEXT`, which files a new `- [ ] TEXT` queue
 line after AFTER-TAG's item (TEXT must begin with TAG; a tag already in the plan is refused; a COMPLETE queue
-reopens). File the SUITE_TODO entry in the same commit, with the same tag and lane. `block TAG TAG-owner-ok QUESTION` atomically adds the queue
+reopens). File the SUITE_TODO entry in the same commit, with the same tag, lane and uses. `block TAG TAG-owner-ok QUESTION` atomically adds the queue
 prerequisite and HOLD gate; mirror the dependency into SUITE_TODO in the same commit. Completion changes
 RUN STATUS only when no real unchecked queue entry remains, using the resolver's fence/blockquote/indent
 rules. Register an isolated worktree with `worker-state.py --state "$STATE" --repo "$REPO" worktree TAG TOKEN

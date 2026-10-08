@@ -9851,3 +9851,12 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   (cache in `~/Library/Caches/ArchiveSuite/archivecore`, outside every checkout), used by `test-tag-vocabulary.sh`, the
   only Processor swiftc harness that compiles ArchiveCore; proved by `test-archivecore-cache.sh` (a gate step).
 - [x] **W35.unspent — superseded 2026-10-07.** The Agent Manager (~/Claude/Agent Manager, stage 5) now reports usage left unspent for every project from its own readings (status.md "Unspent", the menu bar's "Unspent this week"), and paces both subscriptions' weekly windows in its grants. The digest line from `measure-workers.py --unspent` still works and was left in place; the manager's figure is the one to read.
+- [x] **W35.uses-tags — every open item carries a `(uses: …)` resource tag, and the resolver reads it** — SHIPPED
+  2026-10-08. `worker-state.py` parses `(uses: light|build|vm|model:N|machine|paid[,…])` beside the lane; untagged reads
+  as `build`; the last `(uses…)` on the line is the tag; a malformed tag or unknown value refuses that item (stderr
+  `refused TAG: …`) instead of defaulting, and `check-tracker-sync.sh` fails the gate with `BAD USES TAG` so a refused
+  item cannot starve quietly (adversarial review finding).
+  Reservation prints `tag<TAB>token<TAB>uses<TAB>text` and records `uses` in the claim; selection order unchanged.
+  61 SUITE_TODO and 59 plan items tagged (classified from `QUEUE-ANALYSIS-2026-10-07.md` and each item's plan); README
+  paragraph after the lane one. Proof: prove-worker-claims 87/0 (five new uses checks), prove-tracker-sync 32/0, prove-worker-supervisor 30/0,
+  tracker-sync and policy-coherence pass. Takes effect at the next owner restart.

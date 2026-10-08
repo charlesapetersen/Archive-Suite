@@ -100,8 +100,28 @@ report="$(printf '%s\n' "$both" | awk -F"$TAB" 'NF==3 && $2 != $3')"
 untracked="$(awk -F"$TAB" '$2==" " && $1 ~ /\./ {print $1}' "$P" \
              | while IFS= read -r t; do grep -qxF -- "$t" <(cut -f1 "$T") || echo "$t"; done)"
 unparseable="$(cat "$BP" "$BT" "$BD")"
+# W35.uses-tags: worker-state.py refuses an item whose `(uses: …)` tag is malformed or unknown, and that refusal
+# lands only in a worker log, so the item would starve quietly. Make it loud here, on every gate, instead.
+baduses="$(python3 -I - "$ROOT/ops/autonomous/worker-state.py" "$PLAN" "$TODO" <<'PY'
+import importlib.util, re, sys
+spec = importlib.util.spec_from_file_location("worker_state", sys.argv[1])
+ws = importlib.util.module_from_spec(spec); spec.loader.exec_module(ws)
+for path in sys.argv[2:]:
+    fence = False
+    for line in open(path, encoding="utf-8"):
+        if re.match(r"\s*(\x60\x60\x60|~~~)", line): fence = not fence; continue  # no literal backticks inside $( )
+        if fence or not re.match(r"\s*[-*]\s+\[ \]", line): continue
+        try: ws.uses(line)
+        except ValueError as exc: print(path.rsplit("/", 1)[-1] + ": " + line.strip()[:70] + " — " + str(exc))
+PY
+)" || baduses="uses audit could not run"
 
-if [ -z "$report" ] && [ -z "$untracked" ] && [ -z "$unparseable" ]; then
+if [ -n "$baduses" ]; then
+  printf '%s\n' "$baduses" | sed 's/^/  ⚠ BAD USES TAG — /'
+  echo "      The claim helper refuses these items, so they never run. Fix the tag in BOTH trackers (README: uses)."
+fi
+
+if [ -z "$report" ] && [ -z "$untracked" ] && [ -z "$unparseable" ] && [ -z "$baduses" ]; then
   [ "$QUIET" = 1 ] || echo "  ✓ tracker-sync: plan WORK QUEUE and SUITE_TODO agree on all $overlap shared items"
   exit 0
 fi

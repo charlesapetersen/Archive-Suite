@@ -1306,7 +1306,7 @@ claims_prompt() {
     printf '\nSUPERVISOR ASSIGNMENT (W35.claims), OVERRIDES ALL PICK/CONTINUE INSTRUCTIONS BELOW: Your ONE item is %s, already claimed for %s.\n' "$CLAIM_TAG" "$WORKER_ID"
     printf 'Skip STEP 2 selection and STEP 2.0 cadence: do only the assigned item, even if the resolver hides it as claimed. Do not reconcile into another item or follow owner-pending next-item instruction. If already done or blocked, record and stop.\n'
     [ "$CLAIM_TAG" = review ] && printf 'For the assigned paced review, run STEP 2.0 to obtain its UNIT/PATHS and perform that review only.\n'
-    printf 'Use the locked helper for all shared plan edits: bash %q %q complete TAG SHA RESULT (or log/report TEXT; file new work with add TAG AFTER-TAG TEXT, same tag and lane as its SUITE_TODO entry).\n' "$REPO/ops/autonomous/plan-edit.sh" "$PLAN"
+    printf 'Use the locked helper for all shared plan edits: bash %q %q complete TAG SHA RESULT (or log/report TEXT; file new work with add TAG AFTER-TAG TEXT, same tag, lane and uses as its SUITE_TODO entry).\n' "$REPO/ops/autonomous/plan-edit.sh" "$PLAN"
     printf 'Owner-pending: use block TAG TAG-owner-ok QUESTION; it locks the queue dependency and HOLD gate together, then report TEXT and mirror SUITE_TODO. complete sets RUN STATUS when the queue is empty.\n'
     printf 'Under Codex, escalate the process-inspecting claim helper outside the sandbox.\n'
     printf 'After isolation, register your worktree: python3 %q --state %q --repo %q worktree %q %q "$PWD"\n' "$CLAIMS_CMD" "$STATE" "$REPO" "$CLAIM_TAG" "$CLAIM_TOKEN"
@@ -1756,7 +1756,7 @@ tick() {
       fi
       return 0
     fi
-    IFS=$'\t' read -r CLAIM_TAG CLAIM_TOKEN _claim_text <<< "$reservation"
+    IFS=$'\t' read -r CLAIM_TAG CLAIM_TOKEN _claim_uses _claim_text <<< "$reservation"
   fi
 
   # 4. Acquire the lock + heartbeat it for the child's lifetime, so overlapping cycles/sessions skip.

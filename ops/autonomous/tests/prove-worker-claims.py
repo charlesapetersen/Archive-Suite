@@ -105,6 +105,41 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         check(resolver.returncode == 0 and "\tB\t" not in resolver.stdout and "ok\tE\t" in resolver.stdout,
               "resolver hides the intersecting item and offers the disjoint one")
         release(c); release(c2)
+        # Resource tags (W35.uses-tags): parsed beside the lane, returned and recorded; untagged reads as build.
+        queue("- [ ] **A — quotes (uses: …) and (uses: build) in prose** (lane: notes) (uses: light, paid)",
+              "- [ ] **B — untagged** (lane: reader)", "- [ ] **C — model** (lane: ops) (uses: model:12,vm)")
+        c, c2, c3 = reserve("worker-1"), reserve("worker-2"), reserve("worker-3")
+        check([x[0] for x in (c, c2, c3)] == ["A", "B", "C"]
+              and [x[2].split("\t")[0] for x in (c, c2, c3)] == ["light,paid", "build", "model:12,vm"],
+              "a uses tag is returned with the selection; the last tag wins over prose; untagged reads as build")
+        check(json.loads((state / "claims/A/owner.json").read_text())["uses"] == "light,paid",
+              "the uses value is recorded in the claim")
+        release(c); release(c2); release(c3)
+        queue("- [ ] **A — typo** (lane: notes) (uses: lite)", "- [ ] **B — zero model** (lane: ops) (uses: model:0)",
+              "- [ ] **C — owner word** (lane: reader) (uses: owner)", "- [ ] **E — fine** (lane: processor) (uses: light)")
+        p = subprocess.run(["python3", str(HERE / "worker-state.py"), "--state", str(state), "--repo", str(repo),
+                            "--plan", str(plan), "reserve", "worker-1", str(os.getpid())],
+                           env=env, capture_output=True, text=True)
+        c = p.stdout.strip().split("\t", 2)
+        check(p.returncode == 0 and c[0] == "E" and all("refused " + t + ": unknown uses value" in p.stderr
+                                                        for t in "ABC"),
+              "an unknown uses value refuses the item, with a stderr reason, instead of defaulting")
+        release(c)
+        queue("- [ ] **A — trailing comma** (lane: notes) (uses: light,)", "- [ ] **B — no comma** (lane: ops) (uses: light paid)",
+              "- [ ] **C — capital** (lane: reader) (Uses: light)", "- [ ] **D — empty** (lane: gui) (uses:)",
+              "- [ ] **E — fine** (lane: processor) (uses: vm)")
+        p = subprocess.run(["python3", str(HERE / "worker-state.py"), "--state", str(state), "--repo", str(repo),
+                            "--plan", str(plan), "reserve", "worker-1", str(os.getpid())],
+                           env=env, capture_output=True, text=True)
+        c = p.stdout.strip().split("\t", 2)
+        check(p.returncode == 0 and c[0] == "E" and all("refused " + t + ": malformed uses tag" in p.stderr
+                                                        for t in "ABCD"),
+              "a malformed uses tag is refused, never read as untagged build")
+        release(c)
+        queue("- [ ] **A — light is no hold** (lane: notes) (uses: light)")
+        c = reserve("worker-1")
+        check(c[0] == "A", "a uses tag is never read as a `needs: owner` hold")
+        release(c)
         queue("- [ ] **A — unlabelled** ", "- [ ] **B — notes and reader** (lane: notes,reader)")
         c = reserve("worker-1")
         reserve("worker-2", expected=4)

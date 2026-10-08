@@ -263,6 +263,28 @@ def lanes(text):
     return frozenset(x.strip() for x in m[1].split(",")) if m else frozenset(["suite"])
 
 
+USES_ANY = re.compile(r"\(\s*uses\b[^)]*\)", re.I)
+USES_RE = re.compile(r"\(uses:\s*([a-z0-9:]+(?:\s*,\s*[a-z0-9:]+)*)\s*\)")
+USES_VALUES = re.compile(r"light|build|vm|machine|paid|model:[1-9][0-9]*")
+
+
+def uses(text):
+    """An item's machine resources: `(uses: a,b)`; no tag means `build`. The LAST `(uses…)` is the
+    tag, so a title may quote one before it (`(uses: …)` in prose). Unlike a lane, a malformed tag or
+    unknown value is refused (ValueError), never defaulted. Distinct from `needs:`, which is a hold."""
+    found = USES_ANY.findall(text)
+    if not found:
+        return "build"
+    m = USES_RE.fullmatch(found[-1])
+    if not m:
+        raise ValueError("malformed uses tag: " + found[-1])
+    values = [x.strip() for x in m[1].split(",")]
+    bad = [x for x in values if not USES_VALUES.fullmatch(x)]
+    if bad:
+        raise ValueError("unknown uses value: " + ", ".join(bad))
+    return ",".join(values)
+
+
 def conflicts(mine, record):
     """`suite` conflicts with every lane; other lane sets conflict when they intersect."""
     theirs = frozenset(str(record.get("lane", "suite")).split(","))
@@ -396,14 +418,19 @@ def main():
                 lane = lanes(text)
                 if any(r.get("tag") == tag or conflicts(lane, r) for _, r in active):
                     continue
+                try:
+                    resources = uses(text)
+                except ValueError as exc:
+                    print("worker-state: refused " + tag + ": " + str(exc), file=sys.stderr)
+                    continue
                 directory = state / "claims" / tag
                 directory.parent.mkdir(parents=True, exist_ok=True)
                 directory.mkdir()  # atomic claim; a pre-existing entry is never overwritten
                 token = uuid.uuid4().hex
                 record = dict(tag=tag, worker=args.worker, pid=args.pid, pid_start=start,
-                              lane=",".join(sorted(lane)), subscription=env.get("AUTONOMOUS_SUBSCRIPTION", "unknown"), token=token, started=time.time(), text=text)
+                              lane=",".join(sorted(lane)), uses=resources, subscription=env.get("AUTONOMOUS_SUBSCRIPTION", "unknown"), token=token, started=time.time(), text=text)
                 write_record(directory / "owner.json", record)
-                print(tag + "\t" + token + "\t" + text)
+                print(tag + "\t" + token + "\t" + resources + "\t" + text)
                 return 0
             return 4
         if args.action == "idle":

@@ -39,6 +39,17 @@ run '## WORK QUEUE
 [ "$RC" = 0 ] && ok "identical trackers -> exit 0" || bad "identical trackers: expected 0, got $RC ($OUT)"
 case "$OUT" in *"agree on all 2 shared items"*) ok "reports the shared-item count";; *) bad "count line missing: $OUT";; esac
 
+# ---- 1b. W35.uses-tags: a bad uses tag is refused by the claim helper, so it must be loud here ---------
+run '## WORK QUEUE
+- [ ] **W1.a — thing** (lane: ops) (uses: lite)
+
+## HOLD QUEUE' '- [ ] **W1.a — thing** (lane: ops) (uses: light,)
+- [ ] **W1.c — prose (uses: …) then a tag** (lane: ops) (uses: model:8,vm)'
+[ "$RC" = 1 ] && ok "a bad uses tag in either tracker -> exit 1" || bad "bad uses tag: expected 1, got $RC ($OUT)"
+case "$OUT" in *"unknown uses value: lite"*"malformed uses tag: (uses: light,)"*) ok "names both bad tags";;
+  *) bad "bad tags not named: $OUT";; esac
+case "$OUT" in *"W1.c"*) bad "a valid tag after prose was flagged: $OUT";; *) ok "a valid tag after prose is not flagged";; esac
+
 # ---- 2. THE REGRESSION: the W21.vmgui-path shape (plan open, tracker done) ----------------------------
 run '## WORK QUEUE
 - [ ] **W21.vmgui-path — fixed interactively, never mirrored**
