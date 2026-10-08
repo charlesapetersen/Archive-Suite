@@ -107,7 +107,7 @@ final class TagEditingTests: XCTestCase {
     func testGroupSummaryReportsQuality() {
         // `nil` = the selection disagrees; `.some(nil)` = they agree, and agree on UNRATED.
         let mixed = GroupTagSummary([tags(["Q1"]), tags(["P10"])])
-        XCTAssertNil(mixed.commonQuality, "1 vs 3 — no common value")
+        XCTAssertEqual(mixed.commonQuality, .none, "1 vs 3 — no common value")
 
         let agreeing = GroupTagSummary([tags(["Q3"]), tags(["P10", "Economics"])])
         XCTAssertEqual(agreeing.commonQuality, .some(3), "the two spellings are the same rating")
@@ -204,7 +204,7 @@ final class TagEditingTests: XCTestCase {
 
     func testGroupSummaryMixedYearIsNil() {
         let s = GroupTagSummary([tags(["1975", "Unread"]), tags(["1980", "Unread"])])
-        XCTAssertNil(s.commonYear)
+        XCTAssertEqual(s.commonYear, .none)
         XCTAssertEqual(s.commonReadState, .some(.some(.unread)))
     }
 }

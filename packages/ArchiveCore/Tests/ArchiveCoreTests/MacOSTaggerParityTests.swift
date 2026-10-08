@@ -26,10 +26,10 @@ final class MacOSTaggerParityTests: XCTestCase {
         return (rv.tagNames ?? [], rv.labelNumber ?? 0)
     }
     private func msEq(_ a: [String], _ b: [String]) -> Bool { a.sorted() == b.sorted() }
-    private func fLabel(_ c: String) -> Int { c == "Red" ? 6 : c == "Purple" ? 3 : -1 }
+    private static func fLabel(_ c: String) -> Int { c == "Red" ? 6 : c == "Purple" ? 3 : -1 }
 
     /// The real-tagging transform extracted from MacOSTagger.applyTags (stampUnread=true).
-    private func realTransform(
+    private static func realTransform(
         tags: [String], appColor: String?, authColor: Bool,
         _ cur: [String], _ lbl: Int?
     ) -> ([String], Int?)? {
@@ -59,7 +59,7 @@ final class MacOSTaggerParityTests: XCTestCase {
     // (a) dated+subjects with box color
     func testBoxTagging() throws {
         let u = mkf("a_box.pdf")
-        _ = try CoordinatedTagWriter.write(u) { c,l in self.realTransform(tags:["1962","Red","Corr","Tax"],appColor:nil,authColor:false,c,l) }
+        _ = try CoordinatedTagWriter.write(u) { c,l in Self.realTransform(tags:["1962","Red","Corr","Tax"],appColor:nil,authColor:false,c,l) }
         let (t,l) = readBack(u)
         XCTAssert(msEq(t, ["Red","Corr","Tax","1962","Unread"]), "box tags: \(t.sorted())")
         XCTAssertEqual(l, 6, "box label")
@@ -68,7 +68,7 @@ final class MacOSTaggerParityTests: XCTestCase {
     // (a) folder color
     func testFolderTagging() throws {
         let u = mkf("a_fld.pdf")
-        _ = try CoordinatedTagWriter.write(u) { c,l in self.realTransform(tags:["Purple","Rcpt","1974"],appColor:nil,authColor:false,c,l) }
+        _ = try CoordinatedTagWriter.write(u) { c,l in Self.realTransform(tags:["Purple","Rcpt","1974"],appColor:nil,authColor:false,c,l) }
         let (t,l) = readBack(u)
         XCTAssert(msEq(t, ["Purple","Rcpt","1974","Unread"]), "folder tags: \(t.sorted())")
         XCTAssertEqual(l, 3, "folder label")
@@ -77,7 +77,7 @@ final class MacOSTaggerParityTests: XCTestCase {
     // (a) no-color (OCR failed)
     func testNoColorTagging() throws {
         let u = mkf("a_nc.pdf")
-        _ = try CoordinatedTagWriter.write(u) { c,l in self.realTransform(tags:["OCR Failed","1999"],appColor:nil,authColor:false,c,l) }
+        _ = try CoordinatedTagWriter.write(u) { c,l in Self.realTransform(tags:["OCR Failed","1999"],appColor:nil,authColor:false,c,l) }
         let (t,l) = readBack(u)
         XCTAssert(msEq(t, ["OCR Failed","1999","Unread"]), "nc tags: \(t.sorted())")
         XCTAssertEqual(l, 0, "nc label")
@@ -88,7 +88,7 @@ final class MacOSTaggerParityTests: XCTestCase {
         let u = mkf("b_ret.pdf")
         try (u as NSURL).setResourceValue(["OldTag","Unread"], forKey: .tagNamesKey)
         try (u as NSURL).setResourceValue(6, forKey: .labelNumberKey)
-        _ = try CoordinatedTagWriter.write(u) { c,l in self.realTransform(tags:["Purple","New"],appColor:nil,authColor:false,c,l) }
+        _ = try CoordinatedTagWriter.write(u) { c,l in Self.realTransform(tags:["Purple","New"],appColor:nil,authColor:false,c,l) }
         let (t,l) = readBack(u)
         XCTAssert(msEq(t, ["Purple","New","Unread"]), "retag tags: \(t.sorted())")
         XCTAssertEqual(l, 3, "retag label")
@@ -117,7 +117,7 @@ final class MacOSTaggerParityTests: XCTestCase {
     // (d) incoming Unread deduplicated, one trailing
     func testUnreadDedup() throws {
         let u = mkf("d.pdf")
-        _ = try CoordinatedTagWriter.write(u) { c,l in self.realTransform(tags:["S1","Unread","unread","UNREAD","Red"],appColor:nil,authColor:false,c,l) }
+        _ = try CoordinatedTagWriter.write(u) { c,l in Self.realTransform(tags:["S1","Unread","unread","UNREAD","Red"],appColor:nil,authColor:false,c,l) }
         let (t,l) = readBack(u)
         let uc = t.filter { $0.caseInsensitiveCompare("Unread") == .orderedSame }.count
         XCTAssertEqual(uc, 1, "exactly 1 Unread")
@@ -134,7 +134,7 @@ final class MacOSTaggerParityTests: XCTestCase {
     // (f) "Red" as subject with colorIsAuthoritative=true, appColor=nil
     func testRedAsSubject() throws {
         let u = mkf("f.pdf")
-        _ = try CoordinatedTagWriter.write(u) { c,l in self.realTransform(tags:["Red","Comm","1955"],appColor:nil,authColor:true,c,l) }
+        _ = try CoordinatedTagWriter.write(u) { c,l in Self.realTransform(tags:["Red","Comm","1955"],appColor:nil,authColor:true,c,l) }
         let (t,l) = readBack(u)
         XCTAssert(t.contains("Red"), "Red kept as text: \(t)")
         XCTAssertEqual(l, 0, "no color label")
@@ -144,7 +144,7 @@ final class MacOSTaggerParityTests: XCTestCase {
     // (f2) "Purple" as subject alongside appColor=Red
     func testPurpleSubjectRedColor() throws {
         let u = mkf("f2.pdf")
-        _ = try CoordinatedTagWriter.write(u) { c,l in self.realTransform(tags:["Red","Purple","CW","1962"],appColor:"Red",authColor:true,c,l) }
+        _ = try CoordinatedTagWriter.write(u) { c,l in Self.realTransform(tags:["Red","Purple","CW","1962"],appColor:"Red",authColor:true,c,l) }
         let (t,l) = readBack(u)
         XCTAssert(t.contains("Purple"), "Purple kept as text: \(t)")
         XCTAssertEqual(l, 6, "Red label from appColor")
@@ -159,7 +159,7 @@ final class MacOSTaggerParityTests: XCTestCase {
     func testDuplicateSubjectSurvivesFreshWrite() throws {
         let u = mkf("tu4_dup.pdf")
         _ = try CoordinatedTagWriter.write(u) { c, l in
-            self.realTransform(tags: ["Corr", "Corr", "1962", "Red"], appColor: nil, authColor: false, c, l)
+            Self.realTransform(tags: ["Corr", "Corr", "1962", "Red"], appColor: nil, authColor: false, c, l)
         }
         let (t, l) = readBack(u)
         try XCTSkipUnless(t.filter { $0 == "Corr" }.count == 2,
@@ -187,8 +187,8 @@ final class MacOSTaggerParityTests: XCTestCase {
                 _ = try CoordinatedTagWriter.write(u) { c, l in
                     Thread.sleep(forTimeInterval: 0.15)  // widen the RMW window to force overlap
                     return i == 0
-                        ? self.realTransform(tags: ["Alpha", "Red"], appColor: nil, authColor: false, c, l)
-                        : self.realTransform(tags: ["Beta", "Purple"], appColor: nil, authColor: false, c, l)
+                        ? Self.realTransform(tags: ["Alpha", "Red"], appColor: nil, authColor: false, c, l)
+                        : Self.realTransform(tags: ["Beta", "Purple"], appColor: nil, authColor: false, c, l)
                 }
             } catch { box.record(error) }
         }
