@@ -46,8 +46,7 @@ read that section.
   pointer line; the final commit deletes the file and folds its useful lines into the `SUITE_TODO_DONE.md`
   entry. Reason: every worker edits `SUITE_TODO.md`, and progress written into entry bodies made it the
   queue's rebase-conflict hotspot (101 commits in 18 days, one recorded conflict). The doc-sync Stop hook
-  does not yet count an items file as a tracker touch, so a code checkpoint whose only doc is that file still
-  needs the `.docsync-ok` ack.
+  counts an items file as a tracker touch.
 
 ## Heavy work across workers (W35.heavy)
 

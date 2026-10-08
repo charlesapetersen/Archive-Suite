@@ -39,7 +39,7 @@ head="${DOCSYNC_TEST_HEAD:-$(git rev-parse --verify -q origin/main 2>/dev/null)}
 files="$(git diff --name-only "$base..$head" 2>/dev/null)" || exit 0
 [ -z "$files" ] && exit 0
 code="$(printf '%s\n' "$files"    | grep -E '\.(swift|kt)$' || true)"
-tracker="$(printf '%s\n' "$files" | grep -E '(^|/)(SUITE_TODO|KNOWN_ISSUES)\.md$' || true)"
+tracker="$(printf '%s\n' "$files" | grep -E '(^|/)(SUITE_TODO|KNOWN_ISSUES)\.md$|(^|/)execution-plans/items/[^/]+\.md$' || true)"
 
 if [ -n "$code" ] && [ -z "$tracker" ]; then
   n="$(git rev-list --count "$base..$head" 2>/dev/null || echo '?')"
