@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """Serialize heavy work across worktrees, with validated nesting and wait liveness.
 
-After heavy.lock it also takes the Mac-wide lock shared with Vision OCR
-(mac-heavy-lock.py, W35.machine-lock), held until the child session ends.
+After heavy.lock it also takes the Mac-wide lock shared with Vision OCR (W35.machine-lock), held
+until the child session ends. That lock is the Agent Manager's bin/heavy-lock when it is installed
+(AGENT_MANAGER_HEAVY_LOCK, default ~/Claude/Agent Manager/bin/heavy-lock, as mac-heavy-lock.py resolves
+it): this file loads it as a module and drives one Taker per job, because it may only TRY the Mac lock
+while holding heavy.lock, and `heavy-lock run` waits. The holder is then visible to `heavy-lock status`,
+a waiter here is in its queue, and the queue is first come, first served across projects. Without the
+manager, or on a scratch MAC_HEAVY_LOCK with no scratch AGENT_MANAGER_STATE (a harness), it falls back
+to mac-heavy-lock.py's mkdir protocol, which bin/heavy-lock also takes and honours (Agent Manager R6).
 
 The kernel lock has no age expiry. A published child session protects work even
 if the supervisor is killed and a tool closes its inherited lock descriptor.
@@ -11,6 +17,7 @@ Unknown/corrupt ownership fails closed. All proofs use an explicit scratch state
 import argparse
 import contextlib
 import fcntl
+import importlib.machinery
 import importlib.util
 import json
 import os
@@ -25,6 +32,36 @@ import uuid
 _spec = importlib.util.spec_from_file_location("mac_heavy_lock", Path(__file__).with_name("mac-heavy-lock.py"))
 mac_lock = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mac_lock)
+
+
+def manager_lock():
+    """bin/heavy-lock loaded as a module, or None: no manager, a scratch run, or a helper that will not load.
+
+    A scratch Mac lock (every harness) uses the manager only if it names a scratch manager state too, so a
+    harness never takes the real manager lock. None means the mkdir fallback: fail open, as Vision OCR does."""
+    helper = mac_lock.manager_helper()
+    if not helper or (os.environ.get("MAC_HEAVY_LOCK") and not os.environ.get("AGENT_MANAGER_STATE")):
+        return None
+    try:
+        loader = importlib.machinery.SourceFileLoader("agent_manager_heavy_lock", helper)
+        module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        loader.exec_module(module)
+        for name in ("attempt", "register", "unregister", "release"):
+            getattr(module.Taker, name)
+        return module
+    except Exception:
+        return None
+
+
+def try_mac(taker, label):
+    """One try at the Mac-wide lock: 'taken' (release it), 'nested', or the record of what blocks it."""
+    if taker is None:
+        return mac_lock.attempt("archive-suite", label)
+    got = taker.attempt()
+    if got is not None:
+        return got
+    # Held: the manager's kernel lock and the old mkdir lock, or nested under an ancestor that holds them.
+    return "taken" if taker.fd is not None or taker.old == "taken" else "nested"
 
 
 def identity(pid):
@@ -207,9 +244,9 @@ def log_hold(state, start, end, command):
 def start_load_sampler(pid, label, command):
     """The Agent Manager's load sampler for this held job, when the manager is installed; else None.
 
-    Archive Suite takes the Mac lock itself (mac-heavy-lock.py's old protocol), so `heavy-lock run` never sees
-    its jobs, and a nested `heavy-lock run` under MAC_HEAVY_HELD=1 runs straight through without sampling.
-    So the sampler (`heavy-lock _sample`) is started directly: it appends one record per job to the manager's
+    Archive Suite takes the Mac lock in this process (through heavy-lock's Taker, or the mkdir fallback), so
+    `heavy-lock run` never wraps its jobs, and a nested `heavy-lock run` under MAC_HEAVY_HELD=1 runs straight
+    through without sampling. So the sampler (`heavy-lock _sample`) is started directly: it appends one record per job to the manager's
     heavy-jobs.log and holds no lock. Any failure records nothing and never touches the job."""
     helper = mac_lock.manager_helper()
     # A scratch Mac lock (every harness) records into the real log only if it names a scratch manager state too.
@@ -273,6 +310,8 @@ def run(state, command, ready):
     mac_logged = False
     held_from = None
     sampler = None
+    manager = manager_lock()
+    taker = manager.Taker("archive-suite", label) if manager else None
 
     with (state / "heavy.lock").open("a+") as lock:
         try:
@@ -289,7 +328,7 @@ def run(state, command, ready):
                             # W35.machine-lock: then the Mac-wide lock shared with Vision OCR, tried
                             # ONCE. Never wait for it holding heavy.lock: its holder may need heavy.lock
                             # next (a hand-run `mac-heavy-lock.py run`), and that would deadlock.
-                            got = mac_lock.attempt("archive-suite", label)
+                            got = try_mac(taker, label)
                             if not isinstance(got, dict):
                                 machine = got
                                 break
@@ -298,9 +337,16 @@ def run(state, command, ready):
                     blocked_by_mac = bool(blocker)
                 except BlockingIOError:
                     pass  # another worker's turn at heavy.lock: what this one waits on is unchanged
+                if blocker and taker:
+                    # In heavy-lock's queue (and its `status`); refreshed only on a poll the Mac lock blocked,
+                    # so a wait on this project's heavy.lock alone does not keep a place in the Mac queue.
+                    taker.register()
                 if blocker and not mac_logged:
                     mac_logged = True
                     mac_lock.log_wait("archive-suite", label, blocker)
+                    if manager:
+                        manager.log("archive-suite", "'%s' (pid %d) waiting for %s" % (
+                            label, os.getpid(), manager.describe(blocker)))
                 if waited_from is None:
                     waited_from = time.time()
                 # "mac" lets the watchdog tell a Mac-lock wait from a heavy.lock spin.
@@ -310,8 +356,12 @@ def run(state, command, ready):
                 time.sleep(1 if blocked_by_mac else .25)
             if interrupted:
                 return 128 + interrupted
+            if taker:
+                taker.unregister()
             if mac_logged:
                 mac_lock.log_got("archive-suite", label)
+                if manager:
+                    manager.log("archive-suite", "'%s' took the lock after waiting" % label)
             waiter.unlink(missing_ok=True)
             if waited_from is not None:
                 # W35.live counts these waits; the record is never a reason to refuse the work.
@@ -359,11 +409,13 @@ def run(state, command, ready):
             return 128 + interrupted if interrupted else (128 - rc if rc < 0 else rc)
         finally:
             waiter.unlink(missing_ok=True)
+            if taker:
+                taker.unregister()
             # Never release while the child session may still run (a failure mid-run). That buys
             # little — this supervisor exits next, and its dead pid makes the lock stale — but an
             # explicit release would hand the Mac over with the work certainly still going.
             if machine == "taken" and (child is None or session_done):
-                mac_lock.release()
+                taker.release() if taker else mac_lock.release()
 
 
 def main():
