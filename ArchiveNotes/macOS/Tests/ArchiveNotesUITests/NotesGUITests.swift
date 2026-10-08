@@ -484,7 +484,16 @@ class NotesFixtureUITestCase: XCTestCase {
               button.waitForExistence(timeout: timeout) else { return false }
         _ = pollUntil(timeout: timeout) { app.activate(); return field.isHittable }
         guard field.isHittable else { return false }
-        field.click()
+        // A click on a hittable field can still leave it without keyboard focus — VM, W35.vm-mem-fu1: G14
+        // with both windows up failed in `typeText` with "Neither element nor any descendant has keyboard
+        // focus". Typing then throws, so confirm focus and re-click before typing.
+        func focused() -> Bool { (field.value(forKey: "hasKeyboardFocus") as? Bool) == true }
+        for _ in 0..<3 where !focused() {
+            app.activate()
+            field.click()
+            _ = pollUntil(timeout: 2, focused)
+        }
+        guard focused() else { return false }
         // Select-all first: the field is per-pane @State that PERSISTS across calls, so typing without
         // clearing APPENDS. G13 calls this twice ("0,100000" then "0,0"), and the second call produced a
         // three-part string whose `parts.count == 2` parse failed, so `testBox.setSelection` was never
@@ -2254,10 +2263,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
             Thread.sleep(forTimeInterval: 1)
             let geometry = mainWindow.descendants(matching: .any)["an.editor.test.chipGeometry"]
             XCTAssertTrue(geometry.waitForExistence(timeout: 5))
-            // The chip under test heads the extract's SECOND block (offset 64, laid out at y≈177), and the
-            // VM's editor shows only ~119 pt, so "top of the document" leaves it below the fold whenever
-            // layout has settled at its real height (W35.vm-mem-fu1: the probe's `slots` put the view exactly
-            // at its laid-out frame). Scroll it into view, then demand it be visible.
+            // The VM's editor shows only ~119 pt, so wherever the caret left the viewport the chip under
+            // test (the pasted one, at offset 0) may be out of view. Scroll it into view, then demand it be
+            // visible. (Checkpoint 5's reading of the probe was wrong: the chip at offset 64, y≈177, is the
+            // extract's own.)
             for _ in 0..<12 {
                 guard let json = geometry.value as? String, let data = json.data(using: .utf8),
                       let views = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
@@ -2274,6 +2283,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
                 return views.contains { ($0["id"] as? String) == Self.idPlain && ($0["visible"] as? Bool) == true && ($0["inEditor"] as? Bool) == true
                     && ($0["width"] as? Double ?? 0) > 0 && ($0["height"] as? Double ?? 0) > 0 }
             }
+            print("G13 chip geometry \(phase): \(geometry.value ?? "unavailable")")   // y vs slotY, in the log
             if !visible {
                 let chips = (passageChipStates(timeout: 1) ?? []).map { "\($0["id"] ?? "?")@\($0["location"] ?? "?")" }
                 let text = String(((editor.value as? String) ?? "").prefix(120)).debugDescription

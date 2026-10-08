@@ -11,7 +11,7 @@ final class EditorTextView: NSTextView {
     /// W21.vmgui-c-fu test is meant to prove.
     private lazy var passageChipStateProbe = PassageChipStateProbe(textView: self)
 
-    // Read installed views only: no layout, view-provider getter, or SwiftUI state mutation.
+    // Reads installed views and existing fragments only: no layout request or SwiftUI state mutation.
     private lazy var chipGeometryProbe = ChipGeometryProbe(textView: self)
 
     func uiTestInstalledChipGeometry() -> String? {
@@ -30,13 +30,15 @@ final class EditorTextView: NSTextView {
                 states.append(["id": id, "width": chip.bounds.width, "height": chip.bounds.height,
                                "y": Double(frame.minY), "visibleY": Double(self.visibleRect.minY),
                                "visibleH": Double(self.visibleRect.height), "sel": self.selectedRange().location,
-                               "inEditor": belongsToEditor,
+                               "inEditor": belongsToEditor, "hidden": chip.isHiddenOrHasHiddenAncestor,
+                               "parent": chip.superview.map { String(describing: type(of: $0)) } ?? "",
                                "visible": chip.window === self.window && !chip.isHiddenOrHasHiddenAncestor && !visible.isEmpty])
             }
             view.subviews.forEach(visit)
         }
         if let root = window?.contentView { visit(root) }
         states += uiTestHeaderSlots()
+        states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes])
         guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
         return String(data: data, encoding: .utf8)
     }
@@ -57,6 +59,8 @@ final class EditorTextView: NSTextView {
                let fragment = layout.textLayoutFragment(for: location) {
                 let providers = fragment.textAttachmentViewProviders
                 slot["fragY"] = Double(fragment.layoutFragmentFrame.minY + textContainerOrigin.y)
+                slot["slotY"] = Double(fragment.frameForTextAttachment(at: location).minY
+                                       + fragment.layoutFragmentFrame.minY + textContainerOrigin.y)
                 slot["providers"] = providers.count
                 slot["installed"] = providers.filter { $0.view?.superview != nil }.count
             }
@@ -78,6 +82,7 @@ final class EditorTextView: NSTextView {
         // A load is not an edit: the callers lay the new document out themselves (W9.cand2-fu1).
         suppressAttachmentRelayout = true
         defer { suppressAttachmentRelayout = false }
+        removeRehostedChipViews()   // they belong to the old document's chips
         performContentEditingTransaction {
             textStorage?.setAttributedString(attributed)
         }
@@ -145,6 +150,15 @@ final class EditorTextView: NSTextView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard window != nil else { return }
+        if let clip = enclosingScrollView?.contentView, clip !== observedClipView {
+            if let old = observedClipView {
+                NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: old)
+            }
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(clipBoundsDidChange(_:)),
+                                                   name: NSView.boundsDidChangeNotification, object: clip)
+            observedClipView = clip
+        }
         relayoutViewportSoon()
     }
 
@@ -166,11 +180,15 @@ final class EditorTextView: NSTextView {
             layout.textViewportLayoutController.layoutViewport()
             self.needsDisplay = true
             let short = self.viewportParagraphsMissingChipViews()
+#if DEBUG
+            self.relayoutLastPass = ["attempt": attempt, "short": short.map(\.location)]
+#endif
             if attempt < 5, !short.isEmpty {
                 if attempt >= 1 { self.rebuildFragments(in: short) }
                 self.relayoutViewportSoon(attempt: attempt + 1, then: then)
                 return
             }
+            self.installStrandedChipViews()
             then?()
         }
     }
@@ -185,7 +203,92 @@ final class EditorTextView: NSTextView {
             storage.edited(.editedAttributes, range: range, changeInLength: 0)
         }
         storage.endEditing()
+#if DEBUG
+        relayoutRebuilds += 1
+#endif
     }
+
+    /// The last resort after re-laying: install each viewport chip view TextKit left out, and move each one
+    /// it left away from its laid-out slot. In the VM (G13, W35.vm-mem-fu1) a chip restored by redo kept a
+    /// provider whose loaded view was never installed, and one restored by undo of a delete kept a provider
+    /// that never loaded a view — each through five re-lays and four paragraph rebuilds, and through the
+    /// viewport passes of later scrolling. TextKit's own later passes still own these views through their
+    /// providers, so they can take them back.
+    private func installStrandedChipViews() {
+        guard let layout = textLayoutManager,
+              let viewport = layout.textViewportLayoutController.viewportRange else { return }
+        var placements: [(NSView, CGRect)] = []
+        layout.enumerateTextLayoutFragments(from: viewport.location, options: []) { fragment in
+            guard fragment.rangeInElement.location.compare(viewport.endLocation) == .orderedAscending else { return false }
+            let origin = fragment.layoutFragmentFrame.origin
+            for provider in fragment.textAttachmentViewProviders where provider.textAttachment is BlockHeaderAttachment {
+                let slot = fragment.frameForTextAttachment(at: provider.location)
+                guard !slot.isEmpty else { continue }
+                // After delete-then-undo the provider had never loaded its view at all (VM, G13).
+                if provider.view == nil { provider.loadView() }
+                guard let view = provider.view else { continue }
+                placements.append((view, slot.offsetBy(dx: origin.x + textContainerOrigin.x,
+                                                       dy: origin.y + textContainerOrigin.y)))
+            }
+            return true
+        }
+        for (view, frame) in placements {
+            if let parent = view.superview {
+                let current = parent.convert(view.frame, to: self)
+                if abs(current.minX - frame.minX) < 1, abs(current.minY - frame.minY) < 1 { continue }
+            }
+            // A slot outside the view's current parent would be clipped by it, so such a view, like one with
+            // no parent, is hosted by the text view itself (VM: a view adopted into another chip's
+            // container sat at its exact slot and drew nothing).
+            if let parent = view.superview, parent !== self, !parent.bounds.contains(parent.convert(frame, from: self)) {
+                view.removeFromSuperview()
+            }
+            if view.superview == nil {
+                addSubview(view)
+                rehostedChipViews.add(view)
+            }
+            view.frame = view.superview?.convert(frame, from: self) ?? frame
+#if DEBUG
+            strandedChipFixes += 1
+#endif
+        }
+        // A view this put in the text view is removed as soon as its provider leaves the viewport — its
+        // chip deleted, its paragraph rebuilt with a new provider, or scrolled away (the next pass or
+        // TextKit re-installs it when it returns). TextKit takes down only the views it hosts, so without
+        // this a deleted chip would stay painted where it was.
+        let live = Set(placements.map { ObjectIdentifier($0.0) })
+        for view in rehostedChipViews.allObjects where view.superview === self && !live.contains(ObjectIdentifier(view)) {
+            view.removeFromSuperview()
+        }
+        rehostedChipViews.allObjects.filter { $0.superview !== self }.forEach { rehostedChipViews.remove($0) }
+    }
+
+    /// Chip views `installStrandedChipViews` hosts in the text view itself, until TextKit takes them back.
+    private let rehostedChipViews = NSHashTable<NSView>.weakObjects()
+
+    private func removeRehostedChipViews() {
+        for view in rehostedChipViews.allObjects where view.superview === self { view.removeFromSuperview() }
+        rehostedChipViews.removeAllObjects()
+    }
+
+    /// Scrolling lays out newly exposed fragments, which can strand a chip view the same way an edit does.
+    @objc private func clipBoundsDidChange(_ note: Notification) {
+        scheduleStrandedCheck()
+    }
+
+    /// One `installStrandedChipViews` pass on the next turn, however many requests arrive before it.
+    private func scheduleStrandedCheck() {
+        guard !strandedCheckQueued else { return }
+        strandedCheckQueued = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.strandedCheckQueued = false
+            guard self.window != nil else { return }
+            self.installStrandedChipViews()
+        }
+    }
+    private var strandedCheckQueued = false
+    private weak var observedClipView: NSClipView?
 
     /// The character ranges of viewport layout fragments holding more chips (`BlockHeaderAttachment`, the
     /// only view-backed attachment) than installed chip views. Counting the text, not the providers, is the
@@ -223,6 +326,9 @@ final class EditorTextView: NSTextView {
     @objc private func storageDidProcessEditing(_ note: Notification) {
         guard !suppressAttachmentRelayout, let storage = note.object as? NSTextStorage,
               storage.editedMask.contains(.editedCharacters) else { return }
+        // Any text edit — a deletion too, which the attachment test below skips — can delete or move a chip
+        // whose view this class hosts itself, so re-place or remove those.
+        if rehostedChipViews.count > 0 { scheduleStrandedCheck() }
         let edited = storage.editedRange
         guard edited.location != NSNotFound, edited.length > 0, NSMaxRange(edited) <= storage.length else { return }
         var holdsAttachment = false
@@ -248,6 +354,11 @@ final class EditorTextView: NSTextView {
     /// How many edits asked for an attachment relayout. Unit tests have no window, so they cannot see a view
     /// load; this is how they prove which edits ask for one.
     private(set) var attachmentRelayoutRequests = 0
+    /// For the geometry probe: how many chip rebuilds ran, and the latest relayout pass's attempt number
+    /// and short paragraph offsets.
+    private(set) var relayoutRebuilds = 0
+    private(set) var strandedChipFixes = 0
+    private var relayoutLastPass: [String: Any] = [:]
 #endif
 
     private func commonInit() {

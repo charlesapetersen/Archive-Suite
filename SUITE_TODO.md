@@ -863,7 +863,7 @@ completion record is in `SUITE_TODO_DONE.md`.
   open Extracts editor's chip still reports `missing: 0` (label "Moore on Intel culture — 1968", id
   `22222222-…`). Either the W14.4c cross-window re-style regressed or the probe/fixture drifted — find which
   before touching the product. | ArchiveNotes | S | med | none
-- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [S · ~0.25 session]** (lane: notes) (uses: light) SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080.
+- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [S · ~0.25 session]** (lane: notes) (uses: light) SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080, wt/w9e2-w1c-20261007-143731-8614 (1 wip commit, saved 2026-10-08).
   Original body, kept for reference; the work now lives in the six parts below. Plan E2 — also settle the two
   D1 doubts E1 could not decide from source:
   whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents
