@@ -9824,3 +9824,6 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **EFF.xcb-shim — build-free xcodebuild queries skip the lock; one `xcodebuild test` per build-and-test** — the
   shim passes `-list`, `-showBuildSettings`, `-version`, `-showsdks` straight through (a `-list` once waited 198 s);
   resume prompt STEP 3 says build and test in one call.
+- [x] **EFF.holds — lock hold time is logged** — `heavy-run.py` appends start, end, seconds held, holder and command per
+  held job to `heavy/holds.log` (bounded), and feeds the Agent Manager's load sampler so Archive Suite jobs reach its
+  `heavy-jobs.log`.

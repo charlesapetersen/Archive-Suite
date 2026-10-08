@@ -5,6 +5,7 @@ import importlib.util
 import os
 from pathlib import Path
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -43,6 +44,11 @@ with tempfile.TemporaryDirectory(prefix="heavy work [scratch] ") as scratch:
                MAC_HEAVY_LOCK=str(root / "mac-heavy.lock"))
     env.pop("ARCHIVE_HEAVY_TOKEN", None)
     env.pop("MAC_HEAVY_HELD", None)
+    for name in ("AGENT_MANAGER_STATE", "HEAVY_LOCK_FILE", "AUTONOMOUS_WORKER_STATE"):
+        env.pop(name, None)  # the manager's real heavy-jobs.log is never a fixture
+    # No proof below reaches the installed Agent Manager unless it names a scratch copy (a guard mutant that
+    # skipped this once wrote 22 fixture jobs into the owner's real heavy-jobs.log, 7 Oct 2026).
+    env["AGENT_MANAGER_HEAVY_LOCK"] = str(root / "no manager installed")
     children = []
     groups = []
 
@@ -321,6 +327,52 @@ echo "gate-rc=$GATE_RC"
                      "ops/gui/vm-seed-accessibility.sh"):
             text = (ROOT / path).read_text()
             check(text.index("heavy-enter.sh") < text.index("tart_lock_acquire"), "heavy-before-VM ordering: " + path)
+        # Hold time and the Agent Manager's load record (efficiency plan round 1, unit 5).
+        hold_state = root / "hold state"
+        mstate = root / "manager state"
+
+        def held_run(extra):
+            p = subprocess.Popen([sys.executable, str(HELPER), "--state", str(hold_state), "run", "--", "sleep", "0.4"],
+                                 env=dict(env, **extra), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            p.communicate(timeout=60)
+            return p
+        p = held_run({"AGENT_MANAGER_HEAVY_LOCK": str(root / "no manager")})
+        holds = (hold_state / "holds.log").read_text().splitlines()
+        f = holds[-1].split("\t")
+        check(p.returncode == 0 and len(holds) == 1 and len(f) == 5 and float(f[2]) >= .4
+              and f[3] == "interactive:" + str(p.pid) and f[4] == "sleep 0.4",
+              "each held job logs start, end, seconds held, holder and command")
+        check(not mstate.exists(), "with no manager installed the job runs and records nothing else")
+        p = held_run({"AGENT_MANAGER_HEAVY_LOCK": str(root / "no manager"), "AUTONOMOUS_WORKER_STATE": "/s/worker-2"})
+        check(p.returncode == 0 and (hold_state / "holds.log").read_text().splitlines()[-1].split("\t")[3]
+              == "worker-2:" + str(p.pid), "a worker's held job names that worker")
+        source = Path(os.environ.get("AGENT_MANAGER_HEAVY_LOCK_SOURCE",
+                                     str(Path.home() / "Claude/Agent Manager/bin/heavy-lock")))
+        if source.is_file():
+            manager = root / "manager" / "heavy-lock"
+            manager.parent.mkdir()
+            shutil.copy2(source, manager)
+            jobs = mstate / "heavy-jobs.log"
+            mstate.mkdir()
+            p = held_run({"AGENT_MANAGER_HEAVY_LOCK": str(manager), "AGENT_MANAGER_STATE": str(mstate),
+                          "HEAVY_LOCK_SAMPLE_EVERY": "0.1"})
+            check(p.returncode == 0 and until(lambda: jobs.exists() and jobs.read_text().strip(), 30),
+                  "a held job reaches the manager's heavy-jobs.log")
+            rec = json.loads(jobs.read_text().splitlines()[-1])
+            check(rec["project"] == "archive-suite" and rec["command"] == "sleep 0.4" and rec["rc"] == 0
+                  and rec["duration"] >= .4 and rec["samples"] >= 2,
+                  "the manager's record names the project, the command, its status, duration and samples")
+            before = jobs.read_text()
+            # HOME is scratch here, so even a broken guard writes only to scratch-home's default manager state.
+            home = root / "scratch home"
+            (home / ".local/state/agent-manager").mkdir(parents=True)  # so a broken guard WOULD leave a record
+            p = held_run({"AGENT_MANAGER_HEAVY_LOCK": str(manager), "HEAVY_LOCK_SAMPLE_EVERY": "0.1", "HOME": str(home)})
+            time.sleep(2)
+            check(p.returncode == 0 and jobs.read_text() == before
+                  and not (home / ".local/state/agent-manager/heavy-jobs.log").exists(),
+                  "a scratch Mac lock without a scratch manager state never samples into a manager log")
+        else:
+            print("SKIP manager load record: no Agent Manager heavy-lock at " + str(source), flush=True)
     finally:
         # Release crash fixtures even if an assertion interrupted the proof.
         for name in ("release-survivor", "release-detached"):

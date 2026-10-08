@@ -176,6 +176,66 @@ def waiting(state, root):
     return False
 
 
+HOLDS_KEEP = 2000             # holds.log keeps its newest lines once it passes HOLDS_MAX_BYTES
+HOLDS_MAX_BYTES = 512 * 1024
+
+
+def log_hold(state, start, end, command):
+    """One line per held job: start, end, seconds held, holder, command (efficiency plan, 2026-10-07).
+
+    waits.log says how long work queued for the lock; this says how long the lock was then HELD, so a change
+    to what holds it can be measured. Bounded; never a reason to fail the work."""
+    worker = os.environ.get("AUTONOMOUS_WORKER_STATE", "")
+    holder = (Path(worker).name if worker else "interactive") + ":" + str(os.getpid())
+    line = "%s\t%s\t%.1f\t%s\t%s\n" % (time.strftime("%F %T", time.localtime(start)),
+                                         time.strftime("%F %T", time.localtime(end)), end - start, holder,
+                                         " ".join(command)[:200].replace("\t", " ").replace("\n", " "))
+    path = state / "holds.log"
+    try:
+        with metadata_lock(state), path.open("a", errors="backslashreplace") as log:
+            log.write(line)
+            log.flush()
+            if log.tell() > HOLDS_MAX_BYTES:
+                lines = path.read_text(errors="backslashreplace").splitlines(keepends=True)[-HOLDS_KEEP:]
+                tmp = path.with_name(path.name + ".tmp")
+                tmp.write_text("".join(lines), errors="backslashreplace")
+                os.replace(tmp, path)
+    except (OSError, ValueError):
+        pass
+
+
+def start_load_sampler(pid, label, command):
+    """The Agent Manager's load sampler for this held job, when the manager is installed; else None.
+
+    Archive Suite takes the Mac lock itself (mac-heavy-lock.py's old protocol), so `heavy-lock run` never sees
+    its jobs, and a nested `heavy-lock run` under MAC_HEAVY_HELD=1 runs straight through without sampling.
+    So the sampler (`heavy-lock _sample`) is started directly: it appends one record per job to the manager's
+    heavy-jobs.log and holds no lock. Any failure records nothing and never touches the job."""
+    helper = mac_lock.manager_helper()
+    # A scratch Mac lock (every harness) records into the real log only if it names a scratch manager state too.
+    if not helper or (os.environ.get("MAC_HEAVY_LOCK") and not os.environ.get("AGENT_MANAGER_STATE")):
+        return None
+    try:
+        sampler = subprocess.Popen([helper, "_sample"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, close_fds=True)
+        sampler.stdin.write((json.dumps({"pid": pid, "project": "archive-suite", "label": label,
+                                         "command": " ".join(command), "start": time.time()}) + "\n").encode())
+        sampler.stdin.flush()
+        return sampler
+    except Exception:
+        return None
+
+
+def stop_load_sampler(sampler, rc):
+    if sampler is None:
+        return
+    try:
+        sampler.stdin.write(("end %d\n" % rc).encode())
+        sampler.stdin.close()
+    except Exception:
+        pass
+
+
 def run(state, command, ready):
     if held(state):
         protect(state, os.getpid())
@@ -211,6 +271,8 @@ def run(state, command, ready):
     session_done = False
     label = " ".join(command)[:120]
     mac_logged = False
+    held_from = None
+    sampler = None
 
     with (state / "heavy.lock").open("a+") as lock:
         try:
@@ -279,6 +341,8 @@ def run(state, command, ready):
                     if ready:
                         ready.write_text("ready\n")
                     os.write(wr, b"1")
+                    held_from = time.time()
+                    sampler = start_load_sampler(child.pid, label, command)
             finally:
                 os.close(wr)
             rc = child.wait()
@@ -287,6 +351,9 @@ def run(state, command, ready):
             while session_live(record) or members_live(state, token):
                 time.sleep(.25)
             session_done = True
+            if held_from is not None:
+                stop_load_sampler(sampler, 128 - rc if rc < 0 else rc)
+                log_hold(state, held_from, time.time(), command)
             retire_members(state, token)
             owner_path.unlink()
             return 128 + interrupted if interrupted else (128 - rc if rc < 0 else rc)

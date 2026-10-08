@@ -69,6 +69,12 @@ refusal, the real watchdog and gate timer, and the GUI/sandbox boundaries withou
 VM. It is a health-gate step. Set `AUTONOMOUS_HEAVY_STATE` to scratch for standalone harness runs.
 Source changes take effect at the next owner restart; sessions never alter installed runtime state.
 
+Hold time (efficiency plan, 2026-10-07): each held job appends `start, end, seconds held, holder, command` to
+`$AUTONOMOUS_HEAVY_STATE/holds.log` (bounded to its newest 2,000 lines past 512 KB); `waits.log` beside it has
+the queueing time. When the Agent Manager is installed, its load sampler (`heavy-lock _sample`) also adds one
+record per job to the manager's `heavy-jobs.log`; a scratch `MAC_HEAVY_LOCK` without a scratch
+`AGENT_MANAGER_STATE` samples nothing.
+
 ### One heavy job per Mac, shared with Vision OCR (W35.machine-lock)
 
 `heavy.lock` serialises only this project. With it, `heavy-run.py` also takes
