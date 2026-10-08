@@ -1909,6 +1909,33 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// G20 — An editor left alone stops laying itself out (W35.vm-mem-fu1). The stranded-chip pass that
+    /// `EditorTextView.layout()` schedules must not keep scheduling itself: every full VM run after it
+    /// landed wedged the guest WindowServer around the fourteenth test. The probe's `layoutPasses` counts
+    /// layout-caused passes; with no input between two reads it must not keep climbing.
+    func testG20_IdleEditorStopsLayingOut() throws {
+        try withFixture { try runG20_IdleEditorStopsLayingOut() }
+    }
+
+    private func runG20_IdleEditorStopsLayingOut() throws {
+        func layoutPasses() -> Int? {
+            let probe = mainWindow.descendants(matching: .any)["an.editor.test.chipGeometry"]
+            guard probe.waitForExistence(timeout: 5), let json = probe.value as? String,
+                  let data = json.data(using: .utf8),
+                  let states = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return nil }
+            return states.compactMap { $0["layoutPasses"] as? Int }.last
+        }
+        for id in [Self.idReader, Self.idPlain] {   // a note with a chip, and one without
+            selectItem(uuid: id)
+            Thread.sleep(forTimeInterval: 3)   // let the load's own layouts and relayout chain finish
+            guard let first = layoutPasses() else { return XCTFail("no chip-geometry probe for \(id)") }
+            Thread.sleep(forTimeInterval: 4)
+            guard let second = layoutPasses() else { return XCTFail("no chip-geometry probe for \(id)") }
+            XCTAssertLessThanOrEqual(second - first, 2,
+                                     "an idle editor kept laying out (\(first) → \(second) passes in 4 s) for \(id)")
+        }
+    }
+
     /// G19 — The row's whole-item Delete action confirms before removing every replicated placement,
     /// then moves the note to Trash. Cancel is a no-op; confirmation is verified against the scratch
     /// fixture's item directory and canonical organization.json.
