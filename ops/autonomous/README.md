@@ -48,7 +48,8 @@ Every worktree uses the same state. The installed supervisor exports `AUTONOMOUS
 on restart. Unattended wrappers from an older running supervisor retain their old path until then,
 so its older watchdog/timer cannot misclassify a new lock wait. Explicit helper runs activate their children. Source `heavy-enter.sh` at a script entry before changing directory
 or taking another lock; it re-enters that script under the supervisor and preserves its traps/argv.
-The xcodebuild PATH shim intercepts direct builds after unattended and sandbox refusals. Whole-script
+The xcodebuild PATH shim intercepts direct builds after unattended and sandbox refusals; `-list`,
+`-showBuildSettings`, `-version` and `-showsdks` build nothing and pass straight through unlocked. Whole-script
 entries cover suite/app smokes, Processor headless tests, scale/standalone compiler and Android test
 lanes, the health gate, both VM test routes and VM accessibility seeding. Explicit build commands outside the shim should use
 `python3 ops/autonomous/heavy-run.py run -- COMMAND ...`.

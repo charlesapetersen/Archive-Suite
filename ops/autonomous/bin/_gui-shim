@@ -129,6 +129,12 @@ esac
 fi
 
 if [ "$TOOL" = xcodebuild ] && { [ "${ARCHIVE_UNATTENDED:-0}" != 1 ] || [ "${AUTONOMOUS_HEAVY_ENABLED:-0}" = 1 ]; }; then
+  # Queries that compile nothing pass straight through: on 7 Oct a `-list` waited 198 s for the Mac-wide lock
+  # behind a Vision OCR model run (efficiency plan round 1). Any of these flags makes xcodebuild report and exit
+  # without building, whatever action is also named.
+  for a in "$@"; do
+    case "$a" in -list|-showBuildSettings|-version|-showsdks) exec "$REAL" "$@" ;; esac
+  done
   exec python3 "$(dirname "$0")/../heavy-run.py" run -- "$REAL" "$@"
 fi
 exec "$REAL" "$@"

@@ -153,7 +153,11 @@ STEP 3 — DO IT, honoring the PRIME DIRECTIVES verbatim. The non-negotiables (a
     STOP + investigate + log to Daemon Report. Dirty files may be a parallel session's work — do not destroy.
   * Tier-2 (Capture/·Net/, file-writing tag/output, finalize/manifest, actor isolation, the tag/PDF SPEC):
     adversarial self-review + a functional test on a scratch copy. Don't ship Tier-2 on a bare build.
-  * Build must be clean with NO new warnings; run the touched app's smoke test.
+  * Build must be clean with NO new warnings; run the touched app's smoke test. Build and test in ONE call:
+    `xcodebuild test -only-testing:<App>Tests …` builds what it tests and prints the same warnings, while a
+    `build` first and then `test` compiles twice and waits twice for the Mac-wide heavy lock. Use a bare `build`
+    only where there is nothing to test (Processor). `-list`, `-showBuildSettings`, `-version`, `-showsdks` take
+    no lock.
   * CHECKPOINT as you go — this is what bounds redo if you're interrupted (usage cutoff / watchdog kill), so
     keep the distance between checkpoints SHORT: on a kill you lose only what you wrote since your last push,
     so push OFTEN. Checkpoint at the SMALLEST self-contained build-GREEN unit — a single new file/type that

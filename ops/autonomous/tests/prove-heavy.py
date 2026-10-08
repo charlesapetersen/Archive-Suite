@@ -219,6 +219,18 @@ health_watchdog {waiter.pid} /dev/null 0
             p = subprocess.run(["bash", str(shim), *args], env=dict(env, ARCHIVE_REAL_TOOL=str(fake), **extra),
                                capture_output=True, text=True, timeout=3)
             check(p.returncode == expected and "real-ran" not in p.stdout, "GUI/sandbox refusal precedes heavy waiting")
+        # Build-free queries skip the lock; anything that compiles still waits for it (efficiency plan round 1).
+        for query in (["-list"], ["-showBuildSettings", "-scheme", "X"], ["-version"], ["-showsdks"]):
+            p = subprocess.run(["bash", str(shim), *query], env=dict(env, ARCHIVE_REAL_TOOL=str(fake)),
+                               capture_output=True, text=True, timeout=3)
+            check(p.returncode == 0 and "real-ran" in p.stdout, "xcodebuild %s runs while the lock is held" % query[0])
+        try:
+            subprocess.run(["bash", str(shim), "-scheme", "X", "build"], env=dict(env, ARCHIVE_REAL_TOOL=str(fake)),
+                           capture_output=True, text=True, timeout=2)
+            waited = False
+        except subprocess.TimeoutExpired:
+            waited = True
+        check(waited, "a build still waits for the held lock")
         # Old installed supervisors lack wait liveness and readiness timing;
         # their source wrappers stay on the old path until an owner restart.
         entry = root / "entry.sh"

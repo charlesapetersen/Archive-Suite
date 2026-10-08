@@ -9821,3 +9821,6 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   the feature freeze are gone; only an app's ledger and journeys wait for its unfinished features (Processor `b3`,
   `d1`-`d4` on `W36.seg-decision`; Reader/Notes `b1`/`b2` on `W24.cal1`). `W40.b0`, `d6`, `e5`, `f1`, `f2` became
   actionable. Rule 7 of `execution-plans/verification-phase/01-daemon-plan.md` now says the freeze is per area.
+- [x] **EFF.xcb-shim — build-free xcodebuild queries skip the lock; one `xcodebuild test` per build-and-test** — the
+  shim passes `-list`, `-showBuildSettings`, `-version`, `-showsdks` straight through (a `-list` once waited 198 s);
+  resume prompt STEP 3 says build and test in one call.
