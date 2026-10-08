@@ -90,6 +90,52 @@ class NotesFixtureUITestCase: XCTestCase {
         }
     }
 
+    /// The pristine snapshot `make-notes-fixture.sh` writes beside the fixture (`AN-GUI-Fixture.pristine`).
+    /// The runner's entitlement grants it READ only; the fixture itself is the one read-write path.
+    static var pristineFixturePath: String { canonicalFixturePath + ".pristine" }
+
+    /// Return the canonical fixture to the state `make-notes-fixture.sh` built, before EVERY test
+    /// (W35.vm-mem-fu1). The script used to run once per suite, so a test that deletes a seed took it away
+    /// from every test after it in alphabetical order: G19 trashes the plain note, G8 the Zotero note, W21
+    /// the reader note — and 17 later tests then failed "a seeded note row should populate the list", in
+    /// every VM run, while looking like app bugs. Copying the snapshot back makes each test independent of
+    /// which tests ran before it, which is what every test here was already written to assume.
+    ///
+    /// The app is not running here (setUp launches it after this, tearDown terminated the previous one),
+    /// and its UITest index DB is reset on every launch (`NotesModel.indexDatabaseURL`), so the files are
+    /// the whole state. Skipped for an `AN_GUI_FIXTURE_PATH` override (read-only diagnostics). Both
+    /// directories must be real directories carrying the generated root marker, so a path bug cannot point
+    /// the deletes anywhere else; a missing snapshot is an error, not a silent fall-back to the old
+    /// cascade.
+    func restoreCanonicalFixtureFromPristine() throws {
+        guard Self.fixturePath == Self.canonicalFixturePath else { return }
+        let fm = FileManager.default
+        let root = URL(fileURLWithPath: Self.canonicalFixturePath)
+        let pristine = URL(fileURLWithPath: Self.pristineFixturePath)
+        func isGeneratedFixture(_ dir: URL) -> Bool {
+            guard let values = try? dir.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+                  values.isDirectory == true, values.isSymbolicLink != true,
+                  let data = fm.contents(atPath: dir.appendingPathComponent(".archive-suite-root.json").path),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+            return object["guid"] as? String == "a11ce5e7-1000-4000-8000-000000000001"
+                && object["name"] as? String == "AN-GUI-Fixture"
+                && object["kind"] as? String == "notes"
+        }
+        guard isGeneratedFixture(pristine) else {
+            throw FixtureWriteSafetyError("no pristine fixture snapshot at \(pristine.path) — rerun scripts/make-notes-fixture.sh")
+        }
+        guard isGeneratedFixture(root) else {
+            throw FixtureWriteSafetyError("canonical GUI fixture is missing its generated Notes root marker")
+        }
+        for child in try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
+            try fm.removeItem(at: child)
+        }
+        // `copyItem` preserves extended attributes, so the fixture's initial Finder-tag projection survives.
+        for child in try fm.contentsOfDirectory(at: pristine, includingPropertiesForKeys: nil) {
+            try fm.copyItem(at: child, to: root.appendingPathComponent(child.lastPathComponent))
+        }
+    }
+
     /// Index-failure UI checks can replace only the generated Notes fixture cache.
     func requireCanonicalScratchFixtureForIndexTests() throws {
         guard Self.fixturePath == Self.canonicalFixturePath else {
@@ -122,6 +168,8 @@ class NotesFixtureUITestCase: XCTestCase {
             FileManager.default.fileExists(atPath: Self.fixturePath),
             "GUI fixture not found — run scripts/make-notes-fixture.sh first"
         )
+
+        try restoreCanonicalFixtureFromPristine()
 
         app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launchArguments += [
@@ -206,11 +254,10 @@ class NotesFixtureUITestCase: XCTestCase {
     //
     // The scratch fixture is (re)built EXTERNALLY by `scripts/make-notes-fixture.sh` before each GUI run
     // (the session/daemon that runs this suite does so) — mirroring the Reader harness, which likewise
-    // assumes a pre-built fixture. The UITest *runner* is granted only READ of `/Users/` (the RW
-    // temporary-exception entitlement is on the app-under-test, NOT the runner), so a test CANNOT delete
-    // the items it creates. Creating checks (G1 note, G9 extract) therefore leave their new item behind
-    // within a run; every assertion tolerates that by subtracting a pre-test `itemDirs()` snapshot, so a
-    // dirty fixture never changes a result. The next pre-run rebuild returns the fixture to 4 items.
+    // assumes a pre-built fixture. The script also writes a pristine snapshot beside it, and
+    // `restoreCanonicalFixtureFromPristine()` copies that back before EVERY test (W35.vm-mem-fu1), so a
+    // test that creates, edits or trashes an item never changes what the next test sees. The `itemDirs()`
+    // snapshot-subtraction in the creating checks (G1 note, G9 extract) predates that and stays harmless.
 
     // MARK: - Elements
 

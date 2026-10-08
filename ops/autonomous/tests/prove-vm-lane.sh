@@ -312,6 +312,19 @@ for f in ops/gui/vm-gui-runner.sh ops/autonomous/gui-vm-gate.sh; do
     || ok "$f has no raw mkfixture exec left"
 done
 
+echo "== 12. a failed XCUITest run makes the interactive runner exit non-zero (W35.vm-mem-fu1) =="
+# It used to WARN and exit 0, so a wrapper read Notes' 21/31-red suite as a pass for days.
+grep -q 'XCUITEST_FAILED=1' "$RUNNER" \
+  && ok "runner records a missing TEST SUCCEEDED marker as a failure" \
+  || no "runner only warns on a missing TEST SUCCEEDED marker"
+grep -q '\[ "\$XCUITEST_FAILED" = 0 \] || die' "$RUNNER" \
+  && ok "runner exits non-zero at the end when the XCUITest run failed" \
+  || no "runner still exits 0 after a failed XCUITest run"
+# The gate keys on the markers itself and never calls the runner; its RED rule must be untouched.
+grep -q "is_fail()    { grep -q '\\\*\\\* TEST FAILED" "$GATEF" \
+  && ok "gate still keys RED on its own '** TEST FAILED **' check" \
+  || no "gate's TEST FAILED check changed"
+
 echo
 echo "prove-vm-lane: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

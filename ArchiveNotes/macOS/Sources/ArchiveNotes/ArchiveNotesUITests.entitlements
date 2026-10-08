@@ -2,12 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- The VM UI runner may replace only the generated Notes fixture cache. -->
+	<!-- The VM UI runner may write only the generated Notes fixture (its cache, and a per-test restore). -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
 	<array>
 		<string>/Users/admin/Library/Application Support/ArchiveNotes/AN-GUI-Fixture/</string>
+	</array>
+	<!-- The pristine snapshot the runner restores the fixture from before each test (W35.vm-mem-fu1). Read only. -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+	<array>
+		<string>/Users/admin/Library/Application Support/ArchiveNotes/AN-GUI-Fixture.pristine/</string>
 	</array>
 </dict>
 </plist>

@@ -315,6 +315,19 @@ PY
   echo "make-notes-fixture: wrote 1 KiB corrupt Notes index (opt-in UI failure fixture)" >&2
 fi
 
+# --- Pristine snapshot (W35.vm-mem-fu1) -------------------------------------
+# NotesGUITests copies this back over $DST before EVERY test, so a test that trashes or edits a seeded
+# item (G19, G8, W21, …) cannot break the tests that run after it. Written LAST, so it matches exactly
+# what this run built (the opt-in corrupt index included). `ditto` keeps the Finder-tag xattrs.
+PRISTINE="$DST.pristine"
+case "$PRISTINE" in
+  */"$FIXTURE_NAME.pristine") : ;;
+  *) echo "make-notes-fixture: REFUSING — unexpected pristine path: $PRISTINE" >&2; exit 2 ;;
+esac
+rm -rf "$PRISTINE"
+ditto "$DST" "$PRISTINE"
+echo "make-notes-fixture: wrote pristine snapshot ($PRISTINE)" >&2
+
 echo "make-notes-fixture: ready ($DST)" >&2
 # The fixture path on stdout, for `-ANUITestStorePath`.
 echo "$DST"

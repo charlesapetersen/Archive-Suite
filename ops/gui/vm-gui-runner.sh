@@ -278,7 +278,13 @@ run_xcuitest() {
   if grep -q '\*\* TEST SUCCEEDED \*\*' "$APP_ART/xcuitest.log" 2>/dev/null; then
     collect_snapshot_reference
   else
-    warn "no '** TEST SUCCEEDED **' marker for $APP — read the log before believing this run passed."
+    # W35.vm-mem-fu1: this used to be a WARN and the script still exited 0, so anything wrapping the lane
+    # (the W35.vm-mem measurement, a session's own `&& echo green`) read a red suite as a pass — Notes was
+    # 21/31 red for days that way. Record the verdict; the script exits non-zero at the end, after the
+    # artifacts (and, for `both`, the sighted lane) are collected. The health gate does not call this
+    # script — gui-vm-gate.sh keys on the same marker itself — so the gate's verdict is unchanged.
+    warn "no '** TEST SUCCEEDED **' marker for $APP — the XCUITest run FAILED (or never finished); see the log."
+    XCUITEST_FAILED=1
   fi
 }
 
@@ -404,6 +410,7 @@ log "app=$APP  lane=$LANE  vm=$VM"
 # dead on that error, with the pbxproj present and correct on the host the whole time. The health gate
 # has always generated every app's project before `boot_vm`, which is why this only ever bit the
 # interactive lane — the same one-entry-point-fixed asymmetry `tart-lib.sh`'s header exists to prevent.
+XCUITEST_FAILED=0
 gen_project
 ensure_vm
 ensure_fixture
@@ -413,3 +420,4 @@ case "$LANE" in
   both)     run_xcuitest; build_for_sighted; run_sighted ;;
 esac
 log "done. Artifacts in $APP_ART"
+[ "$XCUITEST_FAILED" = 0 ] || die "$APP XCUITest run did not succeed — exiting non-zero (log: $APP_ART/xcuitest.log)"
