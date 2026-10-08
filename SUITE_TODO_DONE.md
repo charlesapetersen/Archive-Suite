@@ -9923,3 +9923,28 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   prove-todo-stubs, prove-compact, prove-status, prove-measure-workers. Entries already in the file stay where
   they are; nothing was moved, because nothing reads position.
   <!-- /W35.done-union -->
+
+- [x] **W9.e3 — prove the safety net actually bites on a planted violation** · §W9 gap-closure — Phase E verification (2026-10-06) · SHIPPED 2026-10-08 (this commit; checkpoints `4c75011`, `6b319b3`)
+  Plan E3. The lints' own mutation harnesses plant violations into synthetic files. This went further: it planted
+  violations into a mktemp COPY of the real current source trees and ran the real lints against it. 7 of 8 tripped:
+  `import AppKit` / `@preconcurrency import SwiftUI` in Core, `setResourceValue` in Core and in Notes, `setxattr`
+  in Reader, and `setResourceValue` / `setxattr` in Processor. **The eighth was a real hole:**
+  `func f(_ d: PDFDocument, _ u: URL) { d.write(to: u) }` outside `PDFGenerator` passed the Processor lint, which
+  learned PDFDocument names only from `let`/`var` bindings. Fixed in `4c75011` (any `name: PDFDocument`
+  annotation, including parameters, closure params and `inout`). The proof gains two cases that fail on the old
+  lint (11/2) and pass on the new one (13/0). Still not caught, and documented in the lint: a type inferred from
+  elsewhere (`for d in docs`). Reader/Core/Notes lint proof 22/22. Notes `lint-editor` clean.
+  `test-smoke-unit-scope.sh` confirms the Notes smoke selects `ArchiveNotesTests` only. The suite dispatcher's
+  `archivecore` target exists and runs first in `all`.
+  Whole suite: `swift test` 245 XCTest (4 skipped) + 110 Swift Testing, **0 warnings** after `6b319b3` cleared
+  four test-only ones. Notes unit bundle with `TEST_RUNNER_ARCHIVE_NOTES_SCALE_ACCEPTANCE=1`: 932 Swift Testing
+  + 220 XCTest green, 0 warnings. The C6 100k-note / 2M-word scale test ran (104 s) inside its time limits, with
+  the scratch-path and not-the-live-store assertions holding. The delete-last-instance guards
+  (`removeMembershipWasLastInstanceDoesNotMutate`, `removeConfirmedLastMembershipDeletesTheLastInstance`) and the
+  `HardDeleteWindow` suite pass. Reader unit bundle: 420 XCTest (3 skipped) green, including
+  `DocumentRenderGuardTests`. This commit also clears the Reader's one app-source warning:
+  `ArchiveLibrary.startAsyncPass`'s `onBatch` captured `self` strongly around an inner `[weak self]`, which kept
+  the library alive for the whole walk. Processor Debug build clean. The ~45 warnings left are all in
+  `ArchiveReaderUITests` → filed as `W9.e3-fu1` (needs the VM to prove). The paid Processor OCR smoke was not
+  run, and the health gate doesn't run it either. No corpus, live store, network or GUI was used.
+  <!-- /W9.e3 -->

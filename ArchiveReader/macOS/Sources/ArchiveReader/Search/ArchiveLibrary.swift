@@ -644,7 +644,7 @@ final class ArchiveLibrary: ObservableObject {
         // deadline covers that interval).
         armScanStallDeadline(generation: generation)
         // Progress only — NOT rows. See `finish`: rows are published once per pass, atomically.
-        let onBatch: @Sendable (CorpusScanBatch) -> Void = { batch in
+        let onBatch: @Sendable (CorpusScanBatch) -> Void = { [weak self] batch in
             let found = batch.entries.filter { CorpusWalker.tracksReadState($0.tagNames) }.count
             let seen = batch.filesSeen
             DispatchQueue.main.async { [weak self] in
