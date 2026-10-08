@@ -10039,3 +10039,12 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Row status for the ledgers: Mac side + tunnel `works`; physical phone over a cable `unverifiable-here`. Not an
   `unreachable` row, so nothing goes to the owner. `e2e-phone-mac.sh` pairs over `10.0.2.2` and never touched USB.
   <!-- /W40.d6 -->
+- [x] **W35.warm-dd-measure — measure cold and warm DerivedData for each app before building anything [S · ~1 session]** · §Autonomous daemon — use both subscriptions (owner, 2026-10-04) · SHIPPED 2026-10-08 (this commit)
+  Efficiency plan item 14, first half. Table and method: `execution-plans/parallel-workers/warm-dd-measure.md`.
+  Three runs per app, each build timed inside the heavy lock. Cold median → moved-tree median (same path, 10
+  commits later on main): Reader 132 → 19 s, Notes 108 → 15 s, Processor 243 → 16 s (86%, 86%, 93%). A one-line
+  edit rebuilds in 19-26 s. **Verdict: build `W35.warm-dd`** — every app clears the 30% / 60 s rule. A
+  pessimistic move across a public ArchiveCore change still saved 71% / 44% / 16% (the Processor's 16% is that
+  commit's 22 Processor files). Only the Reader fetches SPM (4 packages, from the global cache) — on every cold
+  build, never warm.
+  <!-- /W35.warm-dd-measure -->

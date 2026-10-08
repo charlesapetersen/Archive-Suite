@@ -1052,21 +1052,9 @@ the three `analysis/*-2026-10-07.md` files beside it. Rounds 1-2 are built. Thes
 round 3 items 12 and 14 and round 4 item 17; item 16 (the W40 edges) is done, item 15 (resource pools) belongs
 to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their own sections.
 
-- [ ] **`W35.warm-dd-measure` — measure cold and warm DerivedData for each app before building anything [S · ~1 session]** (lane: ops,docs) (uses: build)
-  Efficiency plan item 14, first half ("measured cold vs warm first"). Evidence:
-  `analysis/ARCHIVE-SUITE-TEST-LOAD-2026-10-07.md` §Heavy jobs: every fresh worktree builds into its own empty
-  `./build/DD` (Notes 124 s), the gate's warm DerivedData still takes Reader 114 s, Notes 184 s, Processor 359 s,
-  and the Reader re-fetches a remote SPM package into each fresh DerivedData. Whether warm is much faster is
-  not known.
-  WHAT. For Reader, Notes and Processor, three runs each under the heavy lock of: a cold build in a fresh
-  worktree; a rebuild after a one-line change in the same tree; and a build after the same tree path is moved
-  to the next commit on main. Record wall time and whether SPM re-fetched, in
-  `execution-plans/parallel-workers/warm-dd-measure.md`. The rule, fixed before measuring: build `W35.warm-dd`
-  only if the third case saves at least 30% or 60 s of the cold median for at least two apps.
-  DONE WHEN the table and the verdict are written; if the verdict is no, close `W35.warm-dd` in the same commit
-  with a pointer to the table. | ops/autonomous/ + execution-plans/parallel-workers/ | S | low | none
 - [ ] **`W35.warm-dd` — a stable worktree path per worker, re-pointed each session, so DerivedData stays warm [M · ~1-2 sessions]** (lane: ops,docs) (uses: build) (blocked-on: W35.warm-dd-measure)
-  Efficiency plan item 14, second half. Each worker keeps one worktree at a fixed absolute path outside the
+  Efficiency plan item 14, second half. Measured worth building (2026-10-08: the moved-tree build saves 86-93% of
+  cold, `execution-plans/parallel-workers/warm-dd-measure.md`). Each worker keeps one worktree at a fixed absolute path outside the
   primary; housekeeping keeps it instead of removing it; at session start it is moved to a fresh branch off
   origin/main only when it is clean and fully published, and otherwise preserved while the session falls back
   to a fresh path. Claims register it exactly as today. Never symlink build directories into a worktree (the
