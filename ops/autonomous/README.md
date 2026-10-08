@@ -159,8 +159,16 @@ as `build`; a malformed tag or unknown value is refused, not defaulted: `worker-
 and prints `refused TAG: …` to the worker log, and `check-tracker-sync.sh` fails the gate with `BAD USES TAG` so
 the item cannot starve quietly. Reservation returns
 `tag<TAB>token<TAB>uses<TAB>text` and records `uses` in the claim. It is deliberately not `needs:`, which the
-hold test reads as an owner hold. Every open item in both trackers carries one; selection order does not use
-it yet (that is `W35.uses-slot`). The installed daemon picks it up at the next owner restart.
+hold test reads as an owner hold. Every open item in both trackers carries one.
+
+Selection reads it in one case (W35.uses-slot): while the heavy lock is held or queued, `reserve` takes the
+first actionable item whose uses is `light` alone ahead of higher-priority work, because a slot that starts a
+build then spends itself waiting (39 waits, about 125 minutes, on 6 Oct). "Busy" is a live owner of this repo's
+heavy lock, a waiter for it with a fresh heartbeat, or a live holder of the Mac-wide lock (any project). With
+the lock free, or no light item available, priority order is unchanged. Lanes, claims, holds and the worker
+limit still apply, and pacing is untouched: it decides whether a slot starts at all, before `reserve` runs.
+An unreadable heavy record counts as free, since this only reorders. A reordering logs
+`heavy lock busy; light X ahead of Y` to the worker log. Both changes take effect at the next owner restart.
 
 Assigned sessions use `bash ops/autonomous/plan-edit.sh "$PLAN" complete TAG SHA RESULT`, `log TEXT`,
 `report TEXT`, `append '## SECTION' TEXT`, or `add TAG AFTER-TAG TEXT`, which files a new `- [ ] TEXT` queue

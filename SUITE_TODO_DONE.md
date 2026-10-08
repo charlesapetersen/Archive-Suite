@@ -9860,3 +9860,16 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   61 SUITE_TODO and 59 plan items tagged (classified from `QUEUE-ANALYSIS-2026-10-07.md` and each item's plan); README
   paragraph after the lane one. Proof: prove-worker-claims 87/0 (five new uses checks), prove-tracker-sync 32/0, prove-worker-supervisor 30/0,
   tracker-sync and policy-coherence pass. Takes effect at the next owner restart.
+- [x] **W35.uses-slot — while the heavy lock is busy, a free worker slot goes to a `uses: light` item** — SHIPPED
+  2026-10-08. `worker-state.py reserve` collects the actionable candidates as before (claims, lanes, holds, refused
+  uses tags), then, when this repo's heavy lock has a live owner or a fresh-heartbeat waiter, or the Mac-wide lock has
+  a live holder, takes the first candidate whose uses is `light` alone ahead of higher-priority work, logging
+  `heavy lock busy; light X ahead of Y`. Lock free or no light candidate: priority order unchanged; an unreadable
+  heavy record counts as free. Pacing is untouched (it decides whether a slot starts, before reserve). README states
+  the rule. Adversarial review finding fixed: candidates are scanned lazily, so rows up to the top item are checked
+  exactly as before and a malformed row further down is skipped in the look-ahead instead of parking the run.
+  Proof: prove-worker-claims 104/0 (17 new: free/held/waiter/stale waiter/dead owner/corrupt record/Mac lock held and
+  dead/`light,paid` not light/claimed light skipped/no light item/bad row below), on a scratch `MAC_HEAVY_LOCK`;
+  prove-worker-supervisor, prove-dep-gating 45/0, prove-tracker-sync 32/0, policy-coherence pass. Takes effect at the
+  next owner restart; the check after a day of running is the owner's `measure-workers.py` report (minutes with two
+  workers running).

@@ -38,6 +38,7 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
     env.pop("AUTONOMOUS_IGNORE_CLAIMS", None)
     env.pop("AUTONOMOUS_HEAVY_STATE", None)  # heavy-lock records are read from the scratch state/heavy
     env.pop("AUTONOMOUS_CLAIMS_CMD", None)
+    env["MAC_HEAVY_LOCK"] = str(root / "mac-heavy.lock")  # selection reads the Mac lock: never the real one
     children = []
 
     def run(*args, stale=1500, expected=0):
@@ -140,6 +141,74 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         c = reserve("worker-1")
         check(c[0] == "A", "a uses tag is never read as a `needs: owner` hold")
         release(c)
+        # W35.uses-slot: while the heavy lock (this repo's or the Mac-wide one) is held or queued, the first
+        # `light`-only item goes ahead of higher-priority work; with the lock free, priority order stands.
+        def lstart(pid):
+            return subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True, text=True).stdout.strip()
+        slot_heavy = state / "heavy"
+        (slot_heavy / "waiters").mkdir(parents=True, exist_ok=True)
+        mac = Path(env["MAC_HEAVY_LOCK"])
+        slot_queue = ("- [ ] **A — build** (lane: notes) (uses: build)", "- [ ] **B — light and paid** (lane: ops) (uses: light,paid)",
+                      "- [ ] **C — light** (lane: reader) (uses: light)", "- [ ] **E — second light** (lane: gui) (uses: light)")
+
+        def pick(worker="worker-1"):
+            p = subprocess.run(["python3", str(HERE / "worker-state.py"), "--state", str(state), "--repo", str(repo),
+                                "--plan", str(plan), "reserve", worker, str(os.getpid())],
+                               env=env, capture_output=True, text=True)
+            assert p.returncode == 0, (p.returncode, p.stdout, p.stderr)
+            return p.stdout.strip().split("\t", 2), p.stderr
+
+        def first(label, expected_tag, *lines):
+            queue(*(lines or slot_queue))
+            claim, err = pick()
+            check(claim[0] == expected_tag, label)
+            release(claim)
+            return err
+
+        err = first("heavy lock free: priority order, the build item first", "A")
+        check("heavy lock busy" not in err, "a free lock logs no reordering")
+        me = {"token": "fedcba9876543210fedcba9876543210", "owner": os.getpid(), "owner_start": lstart(os.getpid()),
+              "child": os.getpid(), "child_start": lstart(os.getpid())}
+        (slot_heavy / "owner.json").write_text(json.dumps(me))
+        err = first("this repo's heavy lock held: the first light-only item goes ahead (light,paid is not light alone)", "C")
+        check("heavy lock busy; light C ahead of A" in err, "the reordering is logged to the worker log")
+        queue(*slot_queue)
+        busy_reader, _ = pick("worker-2")
+        c, _ = pick("worker-1")
+        check(busy_reader[0] == "C" and c[0] == "E",
+              "lanes and claims still apply: a light item another worker holds is skipped for the next light one")
+        release(c); release(busy_reader)
+        first("lock held but no light item: priority order", "A",
+              "- [ ] **A — build** (lane: notes) (uses: build)", "- [ ] **B — vm** (lane: ops) (uses: vm)")
+        first("the top item already light: it is taken", "C", "- [ ] **C — light** (lane: reader) (uses: light)",
+              "- [ ] **A — build** (lane: notes) (uses: build)")
+        first("a malformed row below the top item never parks the look-ahead", "C",
+              "- [ ] **A — build** (lane: notes) (uses: build)", "- [ ] — no tag here (lane: ops)",
+              "- [ ] **C — light** (lane: reader) (uses: light)")
+        first("an untagged item reads as build, so a light one goes ahead of it", "C",
+              "- [ ] **A — untagged** (lane: notes)", "- [ ] **C — light** (lane: reader) (uses: light)")
+        dead = subprocess.Popen(["true"]); dead.wait()
+        (slot_heavy / "owner.json").write_text(json.dumps(dict(me, owner=dead.pid, owner_start="gone",
+                                                               child=dead.pid, child_start="gone")))
+        first("a dead heavy owner is not busy: priority order", "A")
+        (slot_heavy / "owner.json").write_text("{corrupt")
+        first("an unreadable heavy record counts as free: priority order", "A")
+        (slot_heavy / "owner.json").unlink()
+        slot_waiter = slot_heavy / "waiters" / (me["token"] + ".json")
+        slot_waiter.write_text(json.dumps({"pid": os.getpid(), "start": lstart(os.getpid()), "heartbeat": time.time()}))
+        first("a live waiter queued for this repo's heavy lock: the light item goes ahead", "C")
+        slot_waiter.write_text(json.dumps({"pid": os.getpid(), "start": lstart(os.getpid()), "heartbeat": time.time() - 60}))
+        first("a waiter with a stale heartbeat is not queued work: priority order", "A")
+        slot_waiter.unlink()
+        mac.mkdir()
+        (mac / "owner").write_text("pid=%d\nproject=vision-ocr\nlabel=build\nstart=%d\n" % (os.getpid(), int(time.time())))
+        first("the Mac-wide lock held by another project: the light item goes ahead", "C")
+        (mac / "owner").write_text("pid=%d\nproject=vision-ocr\nlabel=build\nstart=%d\n" % (dead.pid, int(time.time())))
+        first("a dead Mac-wide holder is not busy: priority order", "A")
+        shutil.rmtree(mac)
+        first("both locks free again: priority order", "A")
+        check(not (slot_heavy / "owner.json").exists() and not list((slot_heavy / "waiters").iterdir()),
+              "selection never writes heavy-lock state")
         queue("- [ ] **A — unlabelled** ", "- [ ] **B — notes and reader** (lane: notes,reader)")
         c = reserve("worker-1")
         reserve("worker-2", expected=4)

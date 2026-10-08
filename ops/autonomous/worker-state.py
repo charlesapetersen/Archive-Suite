@@ -9,6 +9,7 @@ Empty unpublished claims expire; corrupt metadata and unknown files are preserve
 import argparse
 import contextlib
 import fcntl
+import importlib.util
 import json
 import math
 import os
@@ -285,6 +286,33 @@ def uses(text):
     return ",".join(values)
 
 
+def heavy_busy(state):
+    """W35.uses-slot: the heavy lock is held or queued, this repo's (heavy-run.py) or the Mac-wide one.
+
+    Only selection ORDER reads this, so an unreadable record counts as free: priority order is the safe
+    default. Another project's queue for the Mac lock is not visible here; its holder is."""
+    spec = importlib.util.spec_from_file_location("heavy_run", Path(__file__).with_name("heavy-run.py"))
+    heavy_run = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(heavy_run)
+    heavy = Path(os.environ.get("AUTONOMOUS_HEAVY_STATE") or state / "heavy")
+    try:
+        r = heavy_run.read(heavy / "owner.json")
+        if r and heavy_run.active(heavy, r):
+            return True
+    except (OSError, ValueError, RuntimeError):
+        pass
+    for path in sorted((heavy / "waiters").glob("*.json")):
+        try:
+            waiter = json.loads(path.read_text())
+            if time.time() - float(waiter["heartbeat"]) < 10 and identity(waiter["pid"]) == waiter["start"]:
+                return True
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, OverflowError):
+            continue
+    mac_lock = heavy_run.mac_lock
+    owner = mac_lock.read_owner(mac_lock.lock_path())
+    return bool(owner and mac_lock.alive(owner))
+
+
 def conflicts(mine, record):
     """`suite` conflicts with every lane; other lane sets conflict when they intersect."""
     theirs = frozenset(str(record.get("lane", "suite")).split(","))
@@ -407,32 +435,55 @@ def main():
                 if proc.returncode not in (0, 3, 4):
                     raise RuntimeError(proc.stderr or proc.stdout)
                 rows = proc.stdout.splitlines() if proc.returncode in (0, 4) else []
-            for row in rows:
-                fields = row.split("\t", 2)
-                if len(fields) != 3 or fields[0] != "ok":
-                    continue
-                _, tag, text = fields
-                valid(tag)
-                if re.search(r"\[hold\]|needs:\s*owner", text, re.I):
-                    continue
-                lane = lanes(text)
-                if any(r.get("tag") == tag or conflicts(lane, r) for _, r in active):
-                    continue
-                try:
-                    resources = uses(text)
-                except ValueError as exc:
-                    print("worker-state: refused " + tag + ": " + str(exc), file=sys.stderr)
-                    continue
-                directory = state / "claims" / tag
-                directory.parent.mkdir(parents=True, exist_ok=True)
-                directory.mkdir()  # atomic claim; a pre-existing entry is never overwritten
-                token = uuid.uuid4().hex
-                record = dict(tag=tag, worker=args.worker, pid=args.pid, pid_start=start,
-                              lane=",".join(sorted(lane)), uses=resources, subscription=env.get("AUTONOMOUS_SUBSCRIPTION", "unknown"), token=token, started=time.time(), text=text)
-                write_record(directory / "owner.json", record)
-                print(tag + "\t" + token + "\t" + resources + "\t" + text)
-                return 0
-            return 4
+            strict = [True]
+
+            def candidates():
+                for row in rows:
+                    fields = row.split("\t", 2)
+                    if len(fields) != 3 or fields[0] != "ok":
+                        continue
+                    _, tag, text = fields
+                    try:
+                        valid(tag)
+                    except ValueError:
+                        if strict[0]:
+                            raise
+                        continue  # a bad row below the chosen item never parks a look-ahead
+                    if re.search(r"\[hold\]|needs:\s*owner", text, re.I):
+                        continue
+                    lane = lanes(text)
+                    if any(r.get("tag") == tag or conflicts(lane, r) for _, r in active):
+                        continue
+                    try:
+                        resources = uses(text)
+                    except ValueError as exc:
+                        print("worker-state: refused " + tag + ": " + str(exc), file=sys.stderr)
+                        continue
+                    yield tag, text, lane, resources
+            found = candidates()
+            choice = top = next(found, None)
+            if choice is None:
+                return 4
+            # W35.uses-slot: a slot that starts a build while the heavy lock is busy spends itself waiting, so
+            # while it is busy the first `light`-only item goes ahead of higher-priority work. Lock free:
+            # priority order. Pacing is unaffected: it decides whether a slot starts, before reserve runs.
+            # Rows up to the top candidate are checked exactly as before; the look-ahead skips bad ones.
+            if not args.special and top[3] != "light" and heavy_busy(state):
+                strict[0] = False
+                choice = next((c for c in found if c[3] == "light"), top)
+                if choice is not top:
+                    print("worker-state: heavy lock busy; light " + choice[0] + " ahead of " + top[0],
+                          file=sys.stderr)
+            tag, text, lane, resources = choice
+            directory = state / "claims" / tag
+            directory.parent.mkdir(parents=True, exist_ok=True)
+            directory.mkdir()  # atomic claim; a pre-existing entry is never overwritten
+            token = uuid.uuid4().hex
+            record = dict(tag=tag, worker=args.worker, pid=args.pid, pid_start=start,
+                          lane=",".join(sorted(lane)), uses=resources, subscription=env.get("AUTONOMOUS_SUBSCRIPTION", "unknown"), token=token, started=time.time(), text=text)
+            write_record(directory / "owner.json", record)
+            print(tag + "\t" + token + "\t" + resources + "\t" + text)
+            return 0
         if args.action == "idle":
             if active:
                 return 4

@@ -1066,18 +1066,6 @@ the three `analysis/*-2026-10-07.md` files beside it. Rounds 1-2 are built. Thes
 round 3 items 12 and 14 and round 4 item 17; item 16 (the W40 edges) is done, item 15 (resource pools) belongs
 to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their own sections.
 
-- [ ] **`W35.uses-slot` — while the heavy lock is busy, a free worker slot goes to a `uses: light` item [M · ~1-2 sessions]** (lane: ops) (uses: light) (blocked-on: W35.uses-tags)
-  Efficiency plan item 12, second half. Evidence: `analysis/ARCHIVE-SUITE-TEST-LOAD-2026-10-07.md` headline 1,
-  39 heavy-lock waits of about 125 minutes on 6 Oct, 146 of 154 minutes behind the Mac-wide lock; a worker that
-  starts a build item while the lock is held spends its slot waiting.
-  WHAT. When the heavy lock (this repo's or the Mac-wide one) is held or queued, selection takes the
-  highest-priority actionable item whose uses is `light` alone, ahead of higher-priority build, vm or model
-  items; when the lock is free, priority order is unchanged. Lanes, claims, pacing and the worker limit still
-  apply; this never starts a slot the pace rule withholds.
-  DONE WHEN `prove-worker-supervisor.sh` (or the claims proof, whichever owns selection) shows both cases, lock
-  held picks the light item and lock free keeps priority order, the README states the rule, and the entry
-  notes that the change takes effect at the next owner restart. After a day of running, the owner's
-  `measure-workers.py` report is the check (minutes with two workers running). | ops/autonomous/ | M | med | none
 - [ ] **`W35.warm-dd-measure` — measure cold and warm DerivedData for each app before building anything [S · ~1 session]** (lane: ops,docs) (uses: build)
   Efficiency plan item 14, first half ("measured cold vs warm first"). Evidence:
   `analysis/ARCHIVE-SUITE-TEST-LOAD-2026-10-07.md` §Heavy jobs: every fresh worktree builds into its own empty
