@@ -59,6 +59,33 @@ struct EditorBindingTests {
         #expect(holder.markdown == "changed by user")
     }
 
+    /// W35.vm-mem-fu1: the styled round trip is not byte-lossless, so a focus-loss flush of a note the
+    /// user never touched used to rewrite it (trailing newline dropped, `modified` bumped). The flush
+    /// must compare against the editor's own serialization at load, and a real edit must still save.
+    @Test @MainActor
+    func flushOfUneditedStyledNoteDoesNotRewriteIt() {
+        let original = "Notes on the Lovelace paper.\n"
+        let holder = BindingHolder(original)
+        let coordinator = makeCoordinator(holder: holder)
+        let tv = coordinator.textView!
+        tv.replaceStyledDocument(with: MarkdownBridge.parse(markdown: original))
+        coordinator.recordAppliedSerialization()
+        #expect(MarkdownBridge.serialize(tv.textStorage!) != original,
+                "precondition: this body does not survive the styled round trip byte for byte")
+
+        coordinator.flushWriteBack()
+        #expect(holder.markdown == original, "an unedited note must not be written back")
+
+        tv.textStorage!.append(NSAttributedString(string: " More."))
+        coordinator.flushWriteBack()
+        #expect(holder.markdown != original && holder.markdown.contains("More."), "a real edit must still be written back")
+
+        // Undoing back to the loaded text is an edit relative to what was pushed, so it saves too.
+        tv.textStorage!.deleteCharacters(in: NSRange(location: tv.textStorage!.length - 6, length: 6))
+        coordinator.flushWriteBack()
+        #expect(!holder.markdown.contains("More."), "reverting a pushed edit must write the reverted text")
+    }
+
     @Test @MainActor
     func coordinatorSuppressesProgrammaticWriteBack() {
         let holder = BindingHolder("initial")

@@ -127,15 +127,40 @@ final class EditorTextView: NSTextView {
     /// images) only from a viewport layout pass, and an edit's own pass leaves the edited fragments'
     /// providers with no view loaded — measured in the VM for W9.cand2: providers present, views unloaded
     /// with a zero frame, so a pasted chip's slot stayed blank until the editor was rebuilt.
-    private func relayoutViewportSoon(then: (@MainActor () -> Void)? = nil) {
+    ///
+    /// A fixed number of turns is a race on a slow host (W35.vm-mem-fu1: VM G13 failed one run in three,
+    /// redo leaving the pasted chip with NO installed view), so after each pass this checks the viewport
+    /// and re-lays, a bounded number of times, while any attachment in it still has no view installed.
+    private func relayoutViewportSoon(attempt: Int = 0, then: (@MainActor () -> Void)? = nil) {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window != nil, let layout = self.textLayoutManager,
                   let content = layout.textContentManager else { return }
             layout.invalidateLayout(for: content.documentRange)
             layout.textViewportLayoutController.layoutViewport()
             self.needsDisplay = true
+            if attempt < 5, self.viewportHasUninstalledAttachmentView() {
+                self.relayoutViewportSoon(attempt: attempt + 1, then: then)
+                return
+            }
             then?()
         }
+    }
+
+    /// True when a layout fragment inside the viewport carries an attachment view provider whose view is
+    /// not loaded or not in the view hierarchy — the blank-slot state `relayoutViewportSoon` exists to clear.
+    private func viewportHasUninstalledAttachmentView() -> Bool {
+        guard let layout = textLayoutManager,
+              let viewport = layout.textViewportLayoutController.viewportRange else { return false }
+        var missing = false
+        layout.enumerateTextLayoutFragments(from: viewport.location, options: []) { fragment in
+            guard fragment.rangeInElement.location.compare(viewport.endLocation) == .orderedAscending else { return false }
+            if fragment.textAttachmentViewProviders.contains(where: { $0.view?.superview == nil }) {
+                missing = true
+                return false
+            }
+            return true
+        }
+        return missing
     }
 
     /// Every other edit that lands an attachment has the same unloaded-view gap as `insertStyled` (W9.cand2-fu1):
@@ -160,8 +185,10 @@ final class EditorTextView: NSTextView {
         attachmentRelayoutRequests += 1
 #endif
         // One turn later than `insertStyled`'s, then re-scroll. Redo lays out and scrolls on the NEXT turn
-        // itself; a pass on that same turn left the redone chip's view installed but stranded below the
-        // viewport (VM, W9.cand2-fu1: y=177, visible 0–119, slot blank). Two turns: G13 green.
+        // itself, so a pass on that same turn can be undone by it. (The VM signature once read as a chip
+        // "stranded below the viewport" — y=177, visible 0–119 — was the extract's OWN chip, correctly
+        // below the fold; the pasted chip at the top had no view at all. `relayoutViewportSoon` now
+        // verifies and retries rather than trusting the turn count — W35.vm-mem-fu1.)
         DispatchQueue.main.async { [weak self] in
             self?.relayoutViewportSoon { [weak self] in
                 guard let self else { return }

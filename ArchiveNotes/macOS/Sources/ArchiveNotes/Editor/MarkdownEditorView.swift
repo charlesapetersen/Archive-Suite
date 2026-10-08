@@ -208,6 +208,7 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         context.coordinator.textView = textView
         context.coordinator.lastContentID = contentID
+        context.coordinator.recordAppliedSerialization()
         return scrollView
     }
 
@@ -239,6 +240,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                 // apply guard below doesn't redundantly re-render (which could restart the update loop).
                 coordinator.lastAppliedMarkdown = markdown
                 coordinator.lastPassageGeneration = passageGeneration
+                coordinator.recordAppliedSerialization()
                 if revealFirstBlockOnModeSwitch { scrollToTop(scrollView) }
                 if !wantRaw && revealFirstBlockOnModeSwitch {
                     DispatchQueue.main.async { onStyledSwitchApplied?() }
@@ -275,9 +277,19 @@ struct MarkdownEditorView: NSViewRepresentable {
             && markdown.contains(Self.notePassageMarker)
             && coordinator.passageDisplayNeedsRefresh()
         if !passageChanged { coordinator.lastPassageGeneration = passageGeneration }
+        // W35.vm-mem-fu1 (VM W21): AppKit keeps an editor first responder after its window resigns key, so
+        // a chip-bearing Extracts editor behind the Note window counted as "editing" and never re-styled
+        // its chip when the cited source was trashed. Freeze-during-edit is for an editor being TYPED
+        // into: a passage-only re-style may proceed in a non-key window with no marked text and no
+        // pending write-back, keeping the selection.
+        let passageRestyleWhileFocused = isEditing && passageChanged
+            && textView.window?.isKeyWindow != true
+            && !textView.hasMarkedText() && !coordinator.hasPendingWriteBack
         // Selection changes must install the newly loaded item even if the old editor still has
         // focus. Distinct items may have identical Markdown but different assets or provenance.
-        if (!isEditing || contentChanged), markdownChanged || passageChanged || contentChanged {
+        if (!isEditing || contentChanged || passageRestyleWhileFocused),
+           markdownChanged || passageChanged || contentChanged {
+            let savedSelection = passageRestyleWhileFocused ? textView.selectedRanges : nil
             coordinator.isApplyingProgrammaticChange = true
             if wantRaw {
                 textView.string = markdown
@@ -293,6 +305,14 @@ struct MarkdownEditorView: NSViewRepresentable {
 #if DEBUG
                 textView.refreshUITestPassageChipStateSnapshot()
 #endif
+                if let savedSelection {
+                    let length = (textView.string as NSString).length
+                    textView.selectedRanges = savedSelection.map {
+                        let range = $0.rangeValue
+                        let location = min(range.location, length)
+                        return NSValue(range: NSRange(location: location, length: min(range.length, length - location)))
+                    }
+                }
                 if let savedOrigin {
                     // A chip-label refresh barely changes layout — restore the prior scroll offset so
                     // the reactive re-style is invisible to a reader who isn't editing the extract.
@@ -303,6 +323,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             coordinator.isApplyingProgrammaticChange = false
             coordinator.lastAppliedMarkdown = markdown
             coordinator.lastPassageGeneration = passageGeneration
+            coordinator.recordAppliedSerialization()
         }
 
         if contentChanged, coordinator.lastAppliedMarkdown == markdown {
@@ -369,6 +390,13 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// The re-apply guard compares against THIS (the source), not the rendered `textView.string`,
         /// so updateNSView is idempotent for an unchanged note (see the guard in updateNSView).
         var lastAppliedMarkdown: String?
+        /// The editor's OWN serialization of the content as last installed or pushed (W35.vm-mem-fu1).
+        /// The styled round trip is not byte-lossless (it drops a body's trailing newline and adds a
+        /// blank line after an image under a block header), so comparing against `parent.markdown`
+        /// made the focus-loss flush of an UNTOUCHED note rewrite the file and bump `modified` — the
+        /// VM's G16/G17 "byte-for-byte no-write" failures. Comparing against this baseline means only
+        /// a real edit (typing, paste, chip insert, undo) is pushed.
+        var appliedSerialization: String?
         /// The `passageGeneration` at the last (re)style. Compared in updateNSView so a shared-item-set
         /// change re-styles a chip-bearing document exactly once (W14.4 c).
         var lastPassageGeneration: Int = 0
@@ -376,6 +404,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         var lastFocusToken: Int?
         var pendingFocusToken: Int?
         private var serializeDebounce: Task<Void, Never>?
+        var hasPendingWriteBack: Bool { serializeDebounce != nil }
 #if DEBUG
         /// Forces the hard-failure branch without relying on a malformed Markdown string that
         /// Apple's parser may legitimately accept as plain text.
@@ -416,6 +445,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             serializeDebounce = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(400))
                 guard !Task.isCancelled else { return }
+                self?.serializeDebounce = nil
                 self?.writeBack()
             }
         }
@@ -426,16 +456,24 @@ struct MarkdownEditorView: NSViewRepresentable {
             writeBack()
         }
 
-        private func writeBack() {
-            guard let textView else { return }
-            let current: String
-            if currentIsRaw {
-                current = textView.string
-            } else if let storage = textView.textStorage {
-                current = MarkdownBridge.serialize(storage)
-            } else {
-                current = textView.string
+        private func currentSerialization() -> String? {
+            guard let textView else { return nil }
+            if !currentIsRaw, let storage = textView.textStorage {
+                return MarkdownBridge.serialize(storage)
             }
+            return textView.string
+        }
+
+        func recordAppliedSerialization() {
+            appliedSerialization = currentSerialization()
+        }
+
+        private func writeBack() {
+            guard let current = currentSerialization() else { return }
+            // Unedited since the last install/push: nothing to save, even when `current` is not
+            // byte-identical to the stored Markdown (see `appliedSerialization`).
+            guard current != appliedSerialization else { return }
+            appliedSerialization = current
             lastAppliedMarkdown = current
             if parent.markdown != current {
                 parent.markdown = current

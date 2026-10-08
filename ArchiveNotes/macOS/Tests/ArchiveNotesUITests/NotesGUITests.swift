@@ -179,6 +179,11 @@ class NotesFixtureUITestCase: XCTestCase {
             // into `fetchCitation`, rather than merely receiving a canned citation.
             "-ANUITestZoteroStub", "YES",
             "-notes.zotero.cslStyleID", "archive-notes-ui-test",
+            // Each window's kind filter persists in the app's defaults, which the per-test fixture restore
+            // does not reach: G10/G13 leave the Note window on "Both", and W9D9 then saved its smart folder
+            // as kind .both and counted the extract too (W35.vm-mem-fu1). Pin both windows' defaults.
+            "-an.noteWindow.kindFilter", "notes",
+            "-an.extractWindow.kindFilter", "extracts",
         ]
         app.launch()
         app.activate()
@@ -722,6 +727,20 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// Scroll `an.detail.metadataScroll` until `element` lies wholly inside its visible area (W35.vm-mem-fu1).
+    /// In the VM's window the day row sits below the pane's fold, so a click there landed outside the
+    /// field and the year field kept keyboard focus ("Neither element nor any descendant has keyboard focus").
+    private func revealInMetadataScroll(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let scroll = mainWindow.scrollViews["an.detail.metadataScroll"]
+        guard scroll.exists else { return }
+        for _ in 0..<10 {
+            let clip = scroll.frame, frame = element.frame
+            if frame.minY >= clip.minY && frame.maxY <= clip.maxY { return }
+            scroll.scroll(byDeltaX: 0, deltaY: frame.maxY > clip.maxY ? -60 : 60)   // negative reveals lower content
+        }
+        XCTFail("could not scroll \(element.identifier) into the metadata pane \(scroll.frame)", file: file, line: line)
+    }
+
     /// W23.l4-fu — the metadata date row renders the impossible-day warning and persists the
     /// coarser month, while an actual month end remains day precision.
     func testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd() throws {
@@ -738,18 +757,21 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
             let year = mainWindow.textFields["an.detail.date.year"]
             XCTAssertTrue(year.waitForExistence(timeout: 5), "the date year field should be visible")
+            revealInMetadataScroll(year)
             year.click()
             year.typeKey("a", modifierFlags: .command)
             year.typeText("2026")
 
             let day = mainWindow.textFields["an.detail.date.day"]
             XCTAssertTrue(day.waitForExistence(timeout: 5), "the day field should be visible at day precision")
+            revealInMetadataScroll(day)
             day.click()
             day.typeKey("a", modifierFlags: .command)
             day.typeText("31")
 
             let month = mainWindow.descendants(matching: .any)["an.detail.date.month"]
             XCTAssertTrue(month.waitForExistence(timeout: 5), "the month picker should be visible")
+            revealInMetadataScroll(month)
             month.click()
             let february = app.menuItems["February"]
             XCTAssertTrue(february.waitForExistence(timeout: 5), "February should be available in the month menu")
