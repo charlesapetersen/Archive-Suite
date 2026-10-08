@@ -38,7 +38,8 @@ final class EditorTextView: NSTextView {
         }
         if let root = window?.contentView { visit(root) }
         states += uiTestHeaderSlots()
-        states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes])
+        states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes,
+                       "layoutPasses": layoutStrandedPasses])
         guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
         return String(data: data, encoding: .utf8)
     }
@@ -83,6 +84,7 @@ final class EditorTextView: NSTextView {
         suppressAttachmentRelayout = true
         defer { suppressAttachmentRelayout = false }
         removeRehostedChipViews()   // they belong to the old document's chips
+        layoutStrandedFixesInARow = 0
         performContentEditingTransaction {
             textStorage?.setAttributedString(attributed)
         }
@@ -188,6 +190,7 @@ final class EditorTextView: NSTextView {
                 self.relayoutViewportSoon(attempt: attempt + 1, then: then)
                 return
             }
+            self.layoutStrandedFixesInARow = 0
             self.installStrandedChipViews()
             then?()
         }
@@ -214,9 +217,12 @@ final class EditorTextView: NSTextView {
     /// that never loaded a view — each through five re-lays and four paragraph rebuilds, and through the
     /// viewport passes of later scrolling. TextKit's own later passes still own these views through their
     /// providers, so they can take them back.
-    private func installStrandedChipViews() {
+    /// Returns whether it installed, moved or removed any view.
+    @discardableResult
+    private func installStrandedChipViews() -> Bool {
         guard let layout = textLayoutManager,
-              let viewport = layout.textViewportLayoutController.viewportRange else { return }
+              let viewport = layout.textViewportLayoutController.viewportRange else { return false }
+        var changed = false
         var placements: [(NSView, CGRect)] = []
         layout.enumerateTextLayoutFragments(from: viewport.location, options: []) { fragment in
             guard fragment.rangeInElement.location.compare(viewport.endLocation) == .orderedAscending else { return false }
@@ -248,6 +254,7 @@ final class EditorTextView: NSTextView {
                 rehostedChipViews.add(view)
             }
             view.frame = view.superview?.convert(frame, from: self) ?? frame
+            changed = true
 #if DEBUG
             strandedChipFixes += 1
 #endif
@@ -259,8 +266,10 @@ final class EditorTextView: NSTextView {
         let live = Set(placements.map { ObjectIdentifier($0.0) })
         for view in rehostedChipViews.allObjects where view.superview === self && !live.contains(ObjectIdentifier(view)) {
             view.removeFromSuperview()
+            changed = true
         }
         rehostedChipViews.allObjects.filter { $0.superview !== self }.forEach { rehostedChipViews.remove($0) }
+        return changed
     }
 
     /// Chip views `installStrandedChipViews` hosts in the text view itself, until TextKit takes them back.
@@ -276,18 +285,36 @@ final class EditorTextView: NSTextView {
         scheduleStrandedCheck()
     }
 
-    /// One `installStrandedChipViews` pass on the next turn, however many requests arrive before it.
-    private func scheduleStrandedCheck() {
-        guard !strandedCheckQueued else { return }
+    /// A viewport pass can take down a chip view with no edit or scroll to follow it: in the VM (G13), after
+    /// delete-then-undo the chip ABOVE the restored one ended with an unloaded provider once the relayout
+    /// chain had finished, and nothing asked again. So every layout asks too. (The exact hook,
+    /// `textViewportLayoutControllerDidLayout`, is public only from macOS 27.)
+    override func layout() {
+        super.layout()
+        scheduleStrandedCheck(fromLayout: true)
+    }
+
+    /// One `installStrandedChipViews` pass on the next turn, however many requests arrive before it. A pass
+    /// that moves a view may itself cause a layout, so layout-caused passes that keep changing something stop
+    /// after `maxLayoutStrandedFixes` in a row; an edit or scroll starts the count again.
+    private func scheduleStrandedCheck(fromLayout: Bool = false) {
+        if !fromLayout { layoutStrandedFixesInARow = 0 }
+        guard !strandedCheckQueued, !fromLayout || layoutStrandedFixesInARow < Self.maxLayoutStrandedFixes else { return }
         strandedCheckQueued = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.strandedCheckQueued = false
             guard self.window != nil else { return }
-            self.installStrandedChipViews()
+#if DEBUG
+            if fromLayout { self.layoutStrandedPasses += 1 }
+#endif
+            let changed = self.installStrandedChipViews()
+            self.layoutStrandedFixesInARow = changed ? self.layoutStrandedFixesInARow + 1 : 0
         }
     }
     private var strandedCheckQueued = false
+    private var layoutStrandedFixesInARow = 0
+    private static let maxLayoutStrandedFixes = 4
     private weak var observedClipView: NSClipView?
 
     /// The character ranges of viewport layout fragments holding more chips (`BlockHeaderAttachment`, the
@@ -324,6 +351,7 @@ final class EditorTextView: NSTextView {
     private var suppressAttachmentRelayout = false
 
     @objc private func storageDidProcessEditing(_ note: Notification) {
+        layoutStrandedFixesInARow = 0   // an edit, or a document replace, earns layout passes again
         guard !suppressAttachmentRelayout, let storage = note.object as? NSTextStorage,
               storage.editedMask.contains(.editedCharacters) else { return }
         // Any text edit — a deletion too, which the attachment test below skips — can delete or move a chip
@@ -358,6 +386,7 @@ final class EditorTextView: NSTextView {
     /// and short paragraph offsets.
     private(set) var relayoutRebuilds = 0
     private(set) var strandedChipFixes = 0
+    private(set) var layoutStrandedPasses = 0
     private var relayoutLastPass: [String: Any] = [:]
 #endif
 
