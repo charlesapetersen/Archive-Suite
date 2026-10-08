@@ -121,7 +121,12 @@ unclaimed surviving CLI. Its separate OS session keeps surviving tool descendant
 termination snapshots also pin descendants that made their own session. Session EXIT retains a claim until
 the CLI and its protected descendants finish or expire as confirmed dead. A victim that disappears before
 its escaped session can be identified requires inspection: the claim is preserved and the daemon parks
-instead of retrying forever or letting upkeep touch an ambiguous worktree.
+instead of retrying forever or letting upkeep touch an ambiguous worktree. A release refused because a
+straggler in the session still runs stamps `release_refused`; once the supervisor and the CLI are both gone,
+that claim expires one hour after the first refusal (`AUTONOMOUS_PRESERVED_CLAIM_TTL`, default 3600 s — longer
+than the longest heavy job a finished session can leave running). Nothing is signalled. A process that exits
+anywhere on the Mac between release's `ps` snapshot and its session lookup is placed by its live group
+leader, or costs a rescan, never a refused release.
 
 The resolver hides claimed tags and conflicting `(lane: …)` items. A lane names the files an item may edit:
 `reader`, `notes`, `processor` (each app's tree), `core` (reads ArchiveCore without editing it), `segbench`
@@ -135,7 +140,9 @@ through their entire operation and defer when any worker is in flight. Their chi
 compaction also holds the stable plan lock, so a coordinator crash does not unlock ongoing mutations.
 
 Assigned sessions use `bash ops/autonomous/plan-edit.sh "$PLAN" complete TAG SHA RESULT`, `log TEXT`,
-`report TEXT`, or `append '## SECTION' TEXT`. `block TAG TAG-owner-ok QUESTION` atomically adds the queue
+`report TEXT`, `append '## SECTION' TEXT`, or `add TAG AFTER-TAG TEXT`, which files a new `- [ ] TEXT` queue
+line after AFTER-TAG's item (TEXT must begin with TAG; a tag already in the plan is refused; a COMPLETE queue
+reopens). File the SUITE_TODO entry in the same commit, with the same tag and lane. `block TAG TAG-owner-ok QUESTION` atomically adds the queue
 prerequisite and HOLD gate; mirror the dependency into SUITE_TODO in the same commit. Completion changes
 RUN STATUS only when no real unchecked queue entry remains, using the resolver's fence/blockquote/indent
 rules. Register an isolated worktree with `worker-state.py --state "$STATE" --repo "$REPO" worktree TAG TOKEN

@@ -143,6 +143,27 @@ def validate_record(record, tag):
                 raise ValueError("invalid protected descendant session")
     if "uncertain" in record and type(record["uncertain"]) is not bool:
         raise ValueError("invalid descendant uncertainty")
+    if "release_refused" in record and (type(record["release_refused"]) not in (float, int)
+                                        or not math.isfinite(record["release_refused"]) or record["release_refused"] <= 0):
+        raise ValueError("invalid release refusal time")
+
+
+# A claim kept after a refused release (its CLI and supervisor are gone, but something in its session
+# lives on) expires this long after the first refusal, like a stale one. An hour outlasts the longest
+# heavy job a finished session can leave behind (a Notes VM UI run, ~21 min); before this bound the
+# claim was held for as long as any straggler lived, and under the old "suite" default that idled
+# every other worker (W35.vm-mem x3, W9.e2 x2 on 7 Oct 2026).
+PRESERVED_TTL = int(os.environ.get("AUTONOMOUS_PRESERVED_CLAIM_TTL", "3600"))
+
+
+def preserved_expired(record):
+    refused = record.get("release_refused")
+    if not refused or record.get("uncertain") or time.time() - refused < PRESERVED_TTL:
+        return False
+    for key in ("pid", "child"):
+        if record.get(key) and record.get(key + "_start") and identity(record[key]) == record[key + "_start"]:
+            return False  # the supervisor or the CLI itself is still running: never expire
+    return True
 
 
 def claims(state, stale):
@@ -179,7 +200,8 @@ def claims(state, stale):
             validate_record(record, entry.name)
         except (OSError, ValueError) as exc:
             raise RuntimeError("invalid claim (preserved): " + str(entry)) from exc
-        if not record.get("unknown") and not live(record) and time.time() - entry.stat().st_mtime >= stale:
+        if not record.get("unknown") and (preserved_expired(record) or
+                                          not live(record) and time.time() - entry.stat().st_mtime >= stale):
             # No recursive removal: unexpected files preserve the claim and stop dispatch.
             if {p.name for p in entry.iterdir()} != {"owner.json"}:
                 raise RuntimeError("unexpected files in expired claim: " + str(entry))
@@ -387,6 +409,9 @@ def main():
         elif args.action == "release":
             # A supervisor may exit while its CLI survives. Keep that CLI's work claimed.
             if session_live(record):
+                if not record.get("release_refused"):
+                    record["release_refused"] = time.time()  # starts the preserved-claim bound
+                    write_record(directory / "owner.json", record)
                 return 4
             if {p.name for p in directory.iterdir()} != {"owner.json"}:
                 raise RuntimeError("unexpected files in claim: " + str(directory))

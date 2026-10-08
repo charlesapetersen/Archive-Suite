@@ -56,6 +56,34 @@ def pending_entries(body):
     return entries
 
 
+def entries(body):
+    """(tag, start, end-of-item-span) for every checkbox entry, any state, by the resolver's span rule:
+    an item runs to the next checkbox, blank line or heading."""
+    offset = 0
+    infence = False
+    out = []
+    current = None
+    for line in body.splitlines(keepends=True):
+        start = offset
+        offset += len(line)
+        if re.match(r"^\s*(```|~~~)", line):
+            infence = not infence
+            continue
+        if infence or re.match(r"^\s*>", line):
+            continue
+        m = re.match(r"^\s*[-*]\s+\[[ xX]\]\s*", line)
+        if m or not line.strip() or line.startswith("#"):
+            current = None
+        if m:
+            rest = re.sub(r"^`", "", re.sub(r"^\*+\s*", "", line[m.end():]))
+            tag = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", rest)
+            current = [tag[0] if tag else "?", start, offset]
+            out.append(current)
+        elif current is not None:
+            current[2] = offset
+    return out
+
+
 def edit(plan, action, values):
     plan = plan.resolve()
     with plan.with_name(plan.name + ".lock").open("a+") as lock:
@@ -92,6 +120,31 @@ def edit(plan, action, values):
                 text, n = re.subn(r"(?m)^RUN STATUS:.*$", "RUN STATUS: COMPLETE", text)
                 if n != 1:
                     raise ValueError("expected one RUN STATUS marker")
+        elif action == "add":
+            # File new work into the WORK QUEUE after AFTER-TAG, so an item filed in SUITE_TODO reaches the resolver.
+            tag, after, item = values
+            for value in (tag, after):
+                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", value):
+                    raise ValueError("invalid tag")
+            if "\n" in item or "\r" in item:
+                raise ValueError("item text must be one line")
+            item = re.sub(r"^\s*[-*]\s+\[[ xX]\]\s*", "", item.strip())
+            first = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", re.sub(r"^`", "", re.sub(r"^\*+\s*", "", item)))
+            if not first or first[0] != tag:
+                raise ValueError("item text must begin with its tag")
+            if any(t == tag for t, _, _ in entries(text)):
+                raise ValueError("tag already has a checkbox line in the plan")
+            start, end = section(text, "## WORK QUEUE")
+            body = text[start:end]
+            anchors = [hi for t, _, hi in entries(body) if t == after]
+            if len(anchors) != 1:
+                raise ValueError("expected exactly one queue item to add after")
+            hi = anchors[0]
+            prefix = "" if body[:hi].endswith("\n") else "\n"
+            body = body[:hi] + prefix + "- [ ] " + item + "\n" + body[hi:]
+            text = text[:start] + body + text[end:]
+            # New open work reopens a finished queue.
+            text = re.sub(r"(?m)^RUN STATUS: COMPLETE\s*$", "RUN STATUS: IN_PROGRESS", text)
         else:
             if action == "log":
                 heading, content = "## Session Log", values[0]

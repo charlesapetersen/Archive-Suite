@@ -144,6 +144,34 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         c2 = reserve("worker-2", stale=0)
         release(c2)
         check(True, "claim becomes reclaimable after the last live owner exits")
+        # A claim kept after a refused release expires after the preserved bound, not never.
+        owner = subprocess.Popen(["sleep", "60"])
+        child = subprocess.Popen(["sleep", "60"])
+        straggler = subprocess.Popen(["sleep", "60"])
+        children += [owner, child, straggler]
+        c = reserve("worker-1", pid=owner.pid)
+        run("child", *c[:2], str(child.pid))
+        run("protect", *c[:2], str(straggler.pid))
+        owner.terminate(); owner.wait()
+        run("release", *c[:2], expected=4)
+        refused = json.loads((d / "owner.json").read_text()).get("release_refused")
+        check(isinstance(refused, (int, float)) and refused > 0, "a refused release stamps when it was first refused")
+        record = json.loads((d / "owner.json").read_text()); record["release_refused"] = time.time() - 4000
+        (d / "owner.json").write_text(json.dumps(record))
+        reserve("worker-2", stale=0, expected=4)
+        check(d.exists(), "a preserved claim whose CLI still runs never expires, however old the refusal")
+        child.terminate(); child.wait()
+        record = json.loads((d / "owner.json").read_text()); record["release_refused"] = time.time() - 60
+        (d / "owner.json").write_text(json.dumps(record))
+        reserve("worker-2", stale=0, expected=4)
+        check(d.exists(), "a straggler keeps a recently refused claim inside the bound")
+        record["release_refused"] = time.time() - 3601
+        (d / "owner.json").write_text(json.dumps(record))
+        c2 = reserve("worker-2", stale=0)
+        check(c2[0] == "A" and straggler.poll() is None,
+              "past the bound a preserved claim expires though a straggler lives, and nothing is signalled")
+        release(c2)
+        straggler.terminate(); straggler.wait()
         # Known dead claims are still protected until the engine's timeout.
         c = reserve("worker-1")
         record = json.loads((d / "owner.json").read_text()); record["pid_start"] = "dead"
@@ -196,6 +224,34 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         text = plan.read_text()
         check(text.count("[x]") == 2 and "- [ ] **Owner" in text, "simultaneous ticks stay inside WORK QUEUE")
         check("RUN STATUS: COMPLETE" in text, "last queue tick sets COMPLETE through the locked helper")
+        # `add` files new work into the queue, after a named item's whole span, under the same lock.
+        plan_run("add", "C", "A", "**C — filed later** (lane: notes)")
+        text = plan.read_text()
+        check("RUN STATUS: IN_PROGRESS" in text and text.index("**C — filed later**") > text.index("**A — complete")
+              and text.index("**C — filed later**") < text.index("**B — complete"),
+              "add files the item after its anchor and reopens a finished queue")
+        resolver = subprocess.run(["bash", str(HERE / "next-queue-item.sh"), str(repo)], env=dict(env, AUTONOMOUS_IGNORE_CLAIMS="1"),
+                                  capture_output=True, text=True)
+        check("ok\tC\t" in resolver.stdout, "an added item is offered by the resolver")
+        queue("- [ ] **A — first**", "  continuation of A", "- [ ] **B — second**")
+        plan_run("add", "D", "A", "**`D` — after a wrapped item**")
+        lines = plan.read_text().splitlines()
+        check(lines.index("  continuation of A") + 1 == lines.index("- [ ] **`D` — after a wrapped item**"),
+              "add never splits an item from its continuation line")
+        def plan_fail(*values):
+            return subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "add", *values],
+                                  env=env, capture_output=True).returncode
+        before = plan.read_text()
+        check(plan_fail("D", "A", "**D — again**") == 2 and plan_fail("Owner", "A", "**Owner — hold**") == 2,
+              "add refuses a tag that already has a checkbox line, in the queue or the HOLD QUEUE")
+        check(plan_fail("E", "A", "**F — wrong tag**") == 2 and plan_fail("E", "A", "**E — two\nlines**") == 2
+              and plan_fail("E", "Missing", "**E — x**") == 2 and plan_fail("E", "Owner", "**E — x**") == 2,
+              "add refuses a mismatched tag, a second line, and an anchor outside the WORK QUEUE")
+        check(plan.read_text() == before, "a refused add leaves the plan byte-identical")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(lambda i: plan_run("add", "N" + str(i), "B", "**N%d — racer**" % i), range(12)))
+        text = plan.read_text()
+        check(all(text.count("**N%d — racer**" % i) == 1 for i in range(12)), "12 simultaneous adds conserve every item")
         queue("- [ ] **A — needs a decision**")
         plan_run("block", "A", "A-owner-ok", "choose X or Y?")
         text = plan.read_text()

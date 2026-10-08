@@ -9805,3 +9805,15 @@ none of this was fixed by starting it.
   word CONFLICT inside measure-workers.py itself). Heavy-lock waits 32, about 124 min, longest 9.4 min. Pacing ran the
   second slot 277 of 1,406 minutes. Vision OCR was not held back. Raising beyond two waits for W35.vm-mem and the Agent
   Manager's session grants (W35.three-workers, held). restart-on-source-change switched off (its flag removed).
+
+## Autonomous daemon — lock less, more independent items (Agent Manager efficiency plan, owner 2026-10-07)
+
+Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive Suite parts). Evidence:
+`~/Claude/Agent Manager/analysis/QUEUE-ANALYSIS-2026-10-07.md` and `ARCHIVE-SUITE-TEST-LOAD-2026-10-07.md`.
+
+- [x] **EFF.lanes — lane lists, and a lane on every open item** — 5566d99. `(lane: a,b)` conflicts on intersection,
+  `suite` on everything; 64 SUITE_TODO and 60 plan items tagged. Release no longer refuses a claim when an unrelated
+  process exits between `ps` and `getsid()` (placed by its group leader, else a rescan).
+- [x] **EFF.plan-add — `plan-edit.sh add TAG AFTER-TAG TEXT`; preserved claims expire** — this commit. W35.vm-mem-fu1
+  and W9.w21-red, filed only in SUITE_TODO, are now in the plan's WORK QUEUE. A claim kept after a refused release
+  expires one hour after the first refusal once its supervisor and CLI are gone (`AUTONOMOUS_PRESERVED_CLAIM_TTL`).
