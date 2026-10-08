@@ -7,7 +7,8 @@ it is short.
 
 This plan is the *detail*. The *order* is the `### TIER 7` block in `.maintenance/AUTONOMOUS_PLAN.md` `## WORK QUEUE`,
 mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-queue-item.sh` reads only the
-`(blocked-on: …)` tags, so every dependency below is written as one.
+`(blocked-on: …)` tags, so every dependency below is written as one. The edges were loosened on 2026-10-07 (rule 7):
+`b0`, `d6`, `e5`, `f1` and `f2` wait on nothing, and `e1`, `e6` and `e7` on `a1` rather than `a3`.
 
 ## Why this phase exists (the evidence, 2026-10-04 survey)
 
@@ -48,8 +49,14 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
    AI-generated findings are suspects until reproduced.
 6. **Builder is not verifier.** The session that fixes a bug or wires a feature may move its ledger row only to
    `fixed-pending-recheck`. A later, separate item (`W40.h2`, or the next journey re-run) moves it to `works`.
-7. **Feature freeze.** No new features in this phase. Allowed new code: wiring or removing a ledger row the owner
-   has ruled on, fixing a reproduced bug, and test or diagnostic tooling.
+7. **Feature freeze, per area (owner, 2026-10-07: "Start the independent parts now").** No new features in this
+   phase. Allowed new code: wiring or removing a ledger row the owner has ruled on, fixing a reproduced bug, and test
+   or diagnostic tooling. The freeze is per app, not suite-wide: the phase starts while features are still being
+   finished elsewhere, and only an app's **ledger and journeys** wait for that app's unfinished features —
+   Processor `W40.b3` and `W40.d1`–`d4` on `W36.seg-decision` (and on any `W36.seg-build*` it files), the Reader and
+   Notes ledgers `W40.b1`/`b2` on `W24.cal1`, whose journeys follow through the ledgers. Gate, tooling and
+   suspicion items (`a1`–`a5`, `b0`, `d6`, `e*`, `f*`) do not wait for features. Until 2026-10-07 `W40.a1` waited on
+   every open feature item and the whole phase hung off it.
 8. **Severity orders fixes.** Reproduced bugs are filed as `W40.fix-<slug>` with a severity:
    `S1` data loss or a write to the wrong file · `S2` a promised feature broken or unreachable · `S3` wrong but
    recoverable · `S4` cosmetic. `S1` goes to the TOP of TIER 7; `S2`–`S4` go to the `W40 fixes` sub-block, above
@@ -78,7 +85,8 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
 - **`W40.a1` — health gate green at HEAD, and run at hand-off [M].** Run `ops/autonomous/health-gate.sh` at HEAD;
   fix or file whatever is red. Change `CODEX_RUNBOOK.md` so an external agent runs the gate on the daemon's cadence
   (read `STATE/last-gate`, same commit threshold), so the 58-commit gap cannot recur. Blocked on the owner's
-  approval and on the current queue's last items.
+  approval and on the gate-relevant queue items (`W9.cand2`, `W9.e4`, `W37.dual-date`); not on unfinished features
+  (rule 7).
 - **`W40.a2` — the gate runs ArchiveCore's tests [S].** Add `swift test` for `packages/ArchiveCore` to
   `health-gate.sh`. Prove it bites: plant a failing Core assertion, see the gate go red, revert.
 - **`W40.a3` — every lane green in full, in any order [M].** Run all three apps' full VM UI suites, the phone↔Mac

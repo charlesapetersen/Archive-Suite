@@ -4,8 +4,9 @@ Written 2026-10-05 at the owner's request: "improving automatic segmentation in 
 original goal of the project ... Consider both using paid API calls for segmentation and using a small on device
 model. We'll likely need to do a bakeoff ... The results will need to be extremely good to be usable. Getting
 segmentation wrong ... can change how items are dated, tagged, and broken into individual files." It is queued
-**before the W40 feature freeze**: `W40.a1` waits on this plan's decision item, and on its build items if the owner
-approves a build.
+**before the Processor's part of the W40 feature freeze**: the Processor ledger and journeys (`W40.b3`,
+`W40.d1`–`d4`) wait on this plan's decision item, and on its build items if the owner approves a build. `W40.a1`
+no longer does (owner, 2026-10-07: the freeze is per area).
 
 Part 1 is for the owner. Part 2 is the daemon's detail.
 
@@ -82,7 +83,7 @@ About a dozen daemon sessions before your decision, and a similar number to buil
 
 Tags are `W36.seg-*`. Each item is sized for one or two sessions (`resume-prompt.txt`). The bench and every
 experiment are TOOLS: they do not change the app until `W36.seg-build*`. The W40 freeze does not cover this plan;
-`W40.a1` waits on `W36.seg-decision` (and on the build items the decision files).
+`W40.b3` and `W40.d1`–`d4` wait on `W36.seg-decision` (and on the build items the decision files).
 
 ### What exists (survey, 2026-10-05)
 
@@ -199,7 +200,7 @@ spring prompts saw all five.
   recommendation. Then a Daemon Report entry for the decision.
 - **`W36.seg-decision` — OWNER (HOLD)** — usable or not; which combination; the review design. If approved, the session
   that records the answer files `W36.seg-build1…N` (below), mirrors them into the plan, and adds their tags to
-  `W40.a1`'s `(blocked-on:)`. If not, it records the outcome and `W40.a1` proceeds.
+  the `(blocked-on:)` of `W40.b3` and `W40.d1`–`d4`. If not, it records the outcome and those proceed.
 - **`W36.seg-build*` [filed at the decision; roughly L in all, Tier-2]** — a sequence-level segmentation pass after OCR
   that emits the same per-page `DocumentClassification` plus a per-boundary confidence (no SPEC change); a review
   screen showing only flagged boundaries, page n beside page n+1; `CostEstimator`/`TimeEstimator` lines; the batch

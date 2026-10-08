@@ -9817,3 +9817,7 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **EFF.plan-add — `plan-edit.sh add TAG AFTER-TAG TEXT`; preserved claims expire** — this commit. W35.vm-mem-fu1
   and W9.w21-red, filed only in SUITE_TODO, are now in the plan's WORK QUEUE. A claim kept after a refused release
   expires one hour after the first refusal once its supervisor and CLI are gone (`AUTONOMOUS_PRESERVED_CLAIM_TTL`).
+- [x] **EFF.w40-edges — W40 starts its independent parts now (owner, 2026-10-07)** — this commit. The edges that encoded
+  the feature freeze are gone; only an app's ledger and journeys wait for its unfinished features (Processor `b3`,
+  `d1`-`d4` on `W36.seg-decision`; Reader/Notes `b1`/`b2` on `W24.cal1`). `W40.b0`, `d6`, `e5`, `f1`, `f2` became
+  actionable. Rule 7 of `execution-plans/verification-phase/01-daemon-plan.md` now says the freeze is per area.
