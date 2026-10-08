@@ -1780,7 +1780,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
             let input = mainWindow.textFields["an.detail.tags.input"]
             XCTAssertTrue(input.waitForExistence(timeout: 5))
-            mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -180)
+            revealInMetadataScroll(input)
             input.click()
             input.typeText("ui subject")
             mainWindow.buttons["an.detail.tags.add"].click()

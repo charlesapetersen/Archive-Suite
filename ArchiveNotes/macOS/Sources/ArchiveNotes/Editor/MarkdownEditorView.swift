@@ -306,6 +306,9 @@ struct MarkdownEditorView: NSViewRepresentable {
                 textView.refreshUITestPassageChipStateSnapshot()
 #endif
                 if let savedSelection {
+                    // The re-parse can change the character count, so undo entries recorded against the
+                    // old storage would land at wrong offsets (or out of range). Same rule as switchMode.
+                    textView.undoManager?.removeAllActions()
                     let length = (textView.string as NSString).length
                     textView.selectedRanges = savedSelection.map {
                         let range = $0.rangeValue
