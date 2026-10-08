@@ -863,14 +863,15 @@ completion record is in `SUITE_TODO_DONE.md`.
   open Extracts editor's chip still reports `missing: 0` (label "Moore on Intel culture — 1968", id
   `22222222-…`). Either the W14.4c cross-window re-style regressed or the probe/fixture drifted — find which
   before touching the product. | ArchiveNotes | S | med | none
-- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [M · gui]** (lane: notes) (uses: light) SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080.
-  Plan E2 — also settle the two D1 doubts E1 could not decide from source:
+- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [S · ~0.25 session]** (lane: notes) (uses: light) SAVED DRAFTS (2026-10-07 worktree cleanup; unverified, judge before reuse): wt/w9e2-w1b-20261006-225502-38121 (3 commits), wt/saved-suite-wt-w9e2-bisect (3), wt/w9e2-w2-20261006-221042-87275 (2), wt/w9e2-w1-20261006-213248-32628, wt/w9e2-20261006-211331-6220, wt/w9e2-20261006-202323-39080.
+  Original body, kept for reference; the work now lives in the six parts below. Plan E2 — also settle the two
+  D1 doubts E1 could not decide from source:
   whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents
   a folder back to top level. Plan E2 — and the 2026-07-18 addendum's own unfinished business: note delete +
   delete-last-instance guard, tag editing, quality quick-edit, manual author, keyword FTS + quality/tag/date
   filters, folder create/rename/delete + move/reorder + replicate, templates, context menu, Zotero
   attach/auto-fill, source-block paste, Copy Link, deep-link, smart folders, empty state. Headless render
-  guards for pixel truth; the Notes VM lane for the rest. | ops/gui/ + ArchiveNotes | M | low | **needs:** gui
+  guards for pixel truth; the Notes VM lane for the rest. | ops/gui/ + ArchiveNotes | S | low | **needs:** gui
   Verification note 2026-10-04 (baseline `1ed3e5e`): `NotesGUITests.runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`
   removes the Reader fixture note that `setUpOnMainActor` requires on every launch. Run destructive checks
   last or against a separately rebuilt fixture; prove the remaining UI checks actually execute.
@@ -881,7 +882,7 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed above (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-notes` — runtime sweep, note lifecycle: delete, tags, quality, author, context menu, empty state [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1)
+- [ ] **`W9.e2-notes` — runtime sweep, note lifecycle: delete, tags, quality, author, context menu, empty state [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Drive in the Notes VM lane or a headless render guard, against the scratch fixture
   only: note delete and the delete-last-instance guard; tag editing (B3) with the Finder-tag projection
   following; quality quick-edit (D4); a manual author set in-app without Zotero on a note and on an extract,
@@ -889,14 +890,17 @@ completion record is in `SUITE_TODO_DONE.md`.
   empty state (D8). The authors check on `origin/wip/W9.e2` (`4f7642f`) was red on an unscoped "Clear" button;
   judge it before reuse. `runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation` removes the fixture note
   `setUpOnMainActor` needs, so run destructive checks last or on a rebuilt fixture.
+  All six parts wait on `W35.vm-mem-fu1`: on 7 Oct Notes UITests were red in the GUI VM (21 of 31, 17 of them
+  on "a seeded note row should populate the list", the precondition every sweep test needs), and the 6 Oct
+  5/5 VM-green runs of the `f4f39c4` sweep tests predate that finding.
   DONE WHEN each behaviour above is observed in a VM-green UITest or a render-guard shot, not inferred, and any
   defect found is filed as its own `W9.e2-fu*` item. | ArchiveNotes + ops/gui/ | S-M | low | **needs:** gui
-- [ ] **`W9.e2-search` — runtime sweep, search: keyword FTS, quality/tag/date filters, smart folders [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1)
+- [ ] **`W9.e2-search` — runtime sweep, search: keyword FTS, quality/tag/date filters, smart folders [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). The keyword and facet filter checks passed in the VM on `origin/wip/W9.e2`
   (`4f7642f`, "keyword+facet filters PASS"); bring them to main and add smart folders, which no draft covers.
   DONE WHEN keyword FTS, each facet filter and a smart folder are observed in VM-green UITests on main. |
   ArchiveNotes | S | low | **needs:** gui
-- [ ] **`W9.e2-folders` — runtime sweep, folders: create/rename/delete, move/reorder, replicate, the D1 doubts [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1)
+- [ ] **`W9.e2-folders` — runtime sweep, folders: create/rename/delete, move/reorder, replicate, the D1 doubts [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Settle the two D1 doubts E1 could not decide from source: whether the row `.onDrag`
   (`NotesFolderTreeView.swift:211`) pre-empts the list's `.onMove` reorder (`:235`), and whether any drop target
   re-parents a folder to top level. The draft `4f7642f` on `origin/wip/W9.e2` found the first one real (gap-drag
@@ -905,20 +909,20 @@ completion record is in `SUITE_TODO_DONE.md`.
   DONE WHEN create, rename, delete, move, reorder and replicate are each observed in VM-green UITests, and each
   D1 doubt is either fixed with a test or filed as its own item with the evidence. | ArchiveNotes | S-M | low |
   **needs:** gui
-- [ ] **`W9.e2-zotero` — runtime sweep, Zotero attach and auto-fill, note-level chips, templates [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1)
+- [ ] **`W9.e2-zotero` — runtime sweep, Zotero attach and auto-fill, note-level chips, templates [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Zotero attach and auto-fill (B1/B2) write front-matter; note-level chips render;
   templates (D3) create the expected note. Use the scratch fixture and a stubbed Zotero source; a real Zotero
   install is owner-eye, so flag it and do not claim it.
   DONE WHEN auto-fill's front-matter write, chip rendering and a template-created note are each observed in a
   VM-green UITest or render-guard shot, and the owner-eye remainder is written in this entry. | ArchiveNotes |
   S-M | low | **needs:** gui
-- [ ] **`W9.e2-links` — runtime sweep, Copy Link and the `archivenotes://open` round trip [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1)
+- [ ] **`W9.e2-links` — runtime sweep, Copy Link and the `archivenotes://open` round trip [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Copy Link (B9) puts the item's `archivenotes://open?id=…` URL on the pasteboard, and
   opening it selects and raises that item (B5), the full round trip E2 asks for. `f4f39c4` on
   `origin/wip/W9.e2` fixes the Copy Link menu's enablement and was 5/5 VM-green with the sweep tests; judge it,
   then bring it to main.
   DONE WHEN the round trip is observed in a VM-green UITest on main. | ArchiveNotes | S | low | **needs:** gui
-- [ ] **`W9.e2-paste` — runtime sweep, paste and extracts: source blocks, page-link thumbnails, image bytes, re-grant [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1)
+- [ ] **`W9.e2-paste` — runtime sweep, paste and extracts: source blocks, page-link thumbnails, image bytes, re-grant [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Source-block paste; a pasted page-link shows a thumbnail (`RenderProbe` for pixel
   truth); a menu-created extract embeds its image bytes; a moved source re-grants in-app. Also confirm or retire
   the CANDIDATE in `execution-plans/archive-notes/09-gap-closure.md` that a freshly pasted note-passage block
@@ -934,6 +938,7 @@ completion record is in `SUITE_TODO_DONE.md`.
 ## Cross-app date display — owner-promoted 2026-09-26
 
 - [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.** (lane: docs) (uses: light)
+  Original body, kept for reference; the work now lives in the four parts below.
   Owner direction (2026-07-31 Daemon Report, in response to the W23.l4 `Calendar` deviation); owner promoted
   it from the deferred ideas list into the active work queue 2026-09-26. Two halves:
   (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
@@ -946,26 +951,33 @@ completion record is in `SUITE_TODO_DONE.md`.
   colonial `1700-02-29` is rejected today — under this design that becomes a *display/validation profile*
   rather than a global constant. Not urgent: the working corpus begins 1789, after every candidate
   cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
-  Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | L | none
+  Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | S | none
   **Split 2026-10-07 into four parts** (efficiency plan, from its queue analysis:
   `~/Claude/Agent Manager/analysis/QUEUE-ANALYSIS-2026-10-07.md` proposal c: "W24.cal1 into core calendar, Notes
   toggle/field, Notes validator, Reader parity"; as one L item on the `suite` lane it blocked every other worker
   for its whole length). The work is in the four `W24.cal1-*` entries below. This entry now only closes the
-  feature: when all four have shipped, check end to end that a stored date is still the same ISO 8601 bytes with
-  the option on and off, and move all five entries to `SUITE_TODO_DONE.md`. Est. a quarter of a session. It stays
+  feature: when all four have shipped, confirm from main and the gate's latest run that the byte-comparison
+  tests `W24.cal1-toggle` and `W24.cal1-validator` shipped (a stored date is the same ISO 8601 bytes with the
+  option on and off) are present and green; no build or test run of its own, so it stays `uses: light`. Then
+  move all five entries to `SUITE_TODO_DONE.md`. Est. a quarter of a session. It stays
   the tag `W40.b1` and `W40.b2` wait on.
   Edges: (blocked-on: W24.cal1-core, W24.cal1-toggle, W24.cal1-validator, W24.cal1-reader)
 - [ ] **`W24.cal1-core` — display-calendar profiles as a pure ArchiveCore module, with `swift test` [M · ~1-2 sessions]** (lane: suite) (uses: build)
-  Part of `W24.cal1`. For each display calendar the item names (proleptic Gregorian as today, Julian, Julian with
-  the 1752 English cutover, French Republican, Hebrew, Islamic), convert a stored ISO 8601 day to that
-  calendar's year, month and day and back, and answer days-in-month. No UI and no app host; storage and
+  Part of `W24.cal1`. For each display calendar the item names (today's `GregorianDay` rule, which is Julian leap
+  years before 1582 and Gregorian from 1582; Julian; Julian with the 1752 English cutover; French Republican;
+  Hebrew; Islamic), convert a stored ISO 8601 day to that calendar's year, month and day and back, and answer
+  days-in-month. A stored value that is not a proleptic
+  Gregorian day but that `GregorianDay` accepts (a pre-1582 Julian leap day such as `1500-02-29`, which can be
+  on disk today) is read as a Julian date and converted from that; it is never rejected or rewritten. No UI and
+  no app host; storage and
   `Store/GregorianDay.swift` (the 1582 switch) do not change. The analysis put this on lane `core`, but that lane
   only reads ArchiveCore, and the README's lane rule keeps any edit under `packages/` on `suite`; it is one
   bounded session of `suite` instead of the whole L item.
   DONE WHEN `swift test` in `packages/ArchiveCore` is green with round trips over the corpus's date range and
   known anchor dates per calendar (England went from Wednesday 2 September 1752 to Thursday 14 September
   1752, so the stored day 1752-09-13 shows as 2 September under Julian-1752 and the next day as 14 September
-  under both), and no app's behaviour changed. | packages/ArchiveCore | M | low | none
+  under both), a stored `1500-02-29` converts without error, and no app's behaviour changed. |
+  packages/ArchiveCore | M | low | none
 - [ ] **`W24.cal1-toggle` — Notes: a Settings toggle (default off) and a per-item calendar choice [S-M · Tier-2 · ~1 session]** (lane: notes) (uses: build) (blocked-on: W24.cal1-core)
   Part of `W24.cal1`. Settings gains the option, off by default; with it off nothing visible changes. With it on,
   each item offers a calendar choice from the core module's list, the choice persists in the item's
@@ -976,11 +988,13 @@ completion record is in `SUITE_TODO_DONE.md`.
   displayed in a non-Gregorian calendar. | ArchiveNotes Settings + Views | S-M | med | none
 - [ ] **`W24.cal1-validator` — Notes: the date-entry days-in-month rule follows the item's calendar [S · Tier-2 · ~1 session]** (lane: notes) (uses: build) (blocked-on: W24.cal1-core, W24.cal1-toggle)
   Part of `W24.cal1`. `Views/DateFieldEntry.swift` validates an entered day against the chosen calendar's month
-  lengths and converts it to ISO for storage; with the option off it keeps today's proleptic-Gregorian rule. The
-  case this item exists for: an English `1700-02-29` is accepted under Julian with the 1752 cutover and rejected
+  lengths and converts it to ISO for storage; with the option off it keeps today's `GregorianDay`
+  rule (Julian leap years before 1582, Gregorian from 1582), so `1500-02-29` is still accepted. The case this
+  item exists for: an English `1700-02-29` is accepted under Julian with the 1752 cutover and rejected
   under Gregorian.
   DONE WHEN unit tests cover that case both ways, one Hebrew or Islamic month-length case, and unchanged
-  behaviour with the option off. | ArchiveNotes Views/DateFieldEntry.swift | S | med | none
+  behaviour with the option off, including a `1500-02-29` that is still accepted. |
+  ArchiveNotes Views/DateFieldEntry.swift | S | med | none
 - [ ] **`W24.cal1-reader` — Reader display parity, scoped first [M · ~1-2 sessions]** (lane: reader) (uses: build) (blocked-on: W24.cal1-core)
   Part of `W24.cal1`. First write the scope into this entry: which Reader surfaces show dates (list, inspector,
   decade facets), and whether a per-document choice needs storage the Reader does not have today. If parity
@@ -1063,8 +1077,9 @@ to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their ow
   Mac to itself), `paid` (spends API money); a comma list is allowed. An untagged item reads as `build`. It is
   NOT `needs:`, which `worker-state.py`'s hold test (`needs:\s*owner`) reads as an owner hold.
   `worker-state.py` parses `(uses: …)` beside `LANE_RE` and returns it with the selection; an unknown value is
-  an error, not a default. Tag every open item in the plan and in this file in the same commit, and add a uses
-  paragraph after the README's lane paragraph. Selection order does not change in this item.
+  an error, not a default. Tag every open entry in this file in one commit, and the matching plan lines under
+  the plan lock (`.maintenance/AUTONOMOUS_PLAN.md.lock`) in the same session (the plan is gitignored and is
+  never committed); add a uses paragraph after the README's lane paragraph. Selection order does not change in this item.
   DONE WHEN every open item in both trackers carries a uses tag, `prove-worker-claims.sh` shows the tag parsed,
   returned, unknown values refused and never read as a hold, and tracker-sync and coherence pass. |
   ops/autonomous/ | S-M | low | none
@@ -1080,7 +1095,7 @@ to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their ow
   held picks the light item and lock free keeps priority order, the README states the rule, and the entry
   notes that the change takes effect at the next owner restart. After a day of running, the owner's
   `measure-workers.py` report is the check (minutes with two workers running). | ops/autonomous/ | M | med | none
-- [ ] **`W35.warm-dd-measure` — measure cold and warm DerivedData for each app before building anything [S · ~1 session]** (lane: ops) (uses: build)
+- [ ] **`W35.warm-dd-measure` — measure cold and warm DerivedData for each app before building anything [S · ~1 session]** (lane: ops,docs) (uses: build)
   Efficiency plan item 14, first half ("measured cold vs warm first"). Evidence:
   `analysis/ARCHIVE-SUITE-TEST-LOAD-2026-10-07.md` §Heavy jobs: every fresh worktree builds into its own empty
   `./build/DD` (Notes 124 s), the gate's warm DerivedData still takes Reader 114 s, Notes 184 s, Processor 359 s,
@@ -1093,7 +1108,7 @@ to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their ow
   only if the third case saves at least 30% or 60 s of the cold median for at least two apps.
   DONE WHEN the table and the verdict are written; if the verdict is no, close `W35.warm-dd` in the same commit
   with a pointer to the table. | ops/autonomous/ + execution-plans/parallel-workers/ | S | low | none
-- [ ] **`W35.warm-dd` — a stable worktree path per worker, re-pointed each session, so DerivedData stays warm [M · ~1-2 sessions]** (lane: ops) (uses: build) (blocked-on: W35.warm-dd-measure)
+- [ ] **`W35.warm-dd` — a stable worktree path per worker, re-pointed each session, so DerivedData stays warm [M · ~1-2 sessions]** (lane: ops,docs) (uses: build) (blocked-on: W35.warm-dd-measure)
   Efficiency plan item 14, second half. Each worker keeps one worktree at a fixed absolute path outside the
   primary; housekeeping keeps it instead of removing it; at session start it is moved to a fresh branch off
   origin/main only when it is clean and fully published, and otherwise preserved while the session falls back
@@ -1105,7 +1120,7 @@ to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their ow
   DONE WHEN `prove-housekeeping.sh` and `prove-worker-claims.sh` show the stable tree surviving housekeeping,
   moving cleanly, and a dirty or unpublished tree preserved; the README states the path; the warm figure is
   re-measured once and added to the measure table; the entry notes it takes effect at the next owner restart. |
-  ops/autonomous/ | M | med | none
+  ops/autonomous/ + execution-plans/parallel-workers/warm-dd-measure.md | M | med | none
 - [ ] **`W35.item-notes` — checkpoint notes go to per-item files, not into this file's entry bodies [S-M · ~1 session]** (lane: ops,docs) (uses: light)
   Efficiency plan item 17, first half. Evidence: `analysis/QUEUE-ANALYSIS-2026-10-07.md` §What stops extra
   workers 5 (this file had 101 commits since 20 Sep; checkpoints write into item bodies; one recorded rebase
