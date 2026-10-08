@@ -882,18 +882,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-notes` — runtime sweep, note lifecycle: delete, tags, quality, author, context menu, empty state [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
-  Part of `W9.e2` (plan E2). Drive in the Notes VM lane or a headless render guard, against the scratch fixture
-  only: note delete and the delete-last-instance guard; tag editing (B3) with the Finder-tag projection
-  following; quality quick-edit (D4); a manual author set in-app without Zotero on a note and on an extract,
-  persisted to front-matter and FTS (B8); the context menu (D2; "Open" only re-selects, per the E1 result); the
-  empty state (D8). The authors check on `origin/wip/W9.e2` (`4f7642f`) was red on an unscoped "Clear" button;
-  judge it before reuse. `runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation` removes the fixture note
-  `setUpOnMainActor` needs, so run destructive checks last or on a rebuilt fixture.
-  All six parts waited on `W35.vm-mem-fu1` (Notes UITests red in the GUI VM on 7 Oct); it shipped 2026-10-08
-  with the suite 0-failed in three full VM runs at 6144 MB.
-  DONE WHEN each behaviour above is observed in a VM-green UITest or a render-guard shot, not inferred, and any
-  defect found is filed as its own `W9.e2-fu*` item. | ArchiveNotes + ops/gui/ | S-M | low | **needs:** gui
 - [ ] **`W9.e2-search` — runtime sweep, search: keyword FTS, quality/tag/date filters, smart folders [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). The keyword and facet filter checks passed in the VM on `origin/wip/W9.e2`
   (`4f7642f`, "keyword+facet filters PASS"); bring them to main and add smart folders, which no draft covers.

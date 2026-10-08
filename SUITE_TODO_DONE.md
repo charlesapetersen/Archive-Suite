@@ -10085,3 +10085,17 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   VM: `** TEST SUCCEEDED **`, 32 tests, 0 failures, 1 skipped (`ContentIndexFailureUITests`, which skips by design
   without `CORRUPT_INDEX_FIXTURE=1`), exit 0. Test-only change: no app source, corpus or host GUI touched.
   <!-- /W9.e3-fu1 -->
+- [x] **W9.e2-notes — runtime sweep, note lifecycle: delete, tags, quality, author, context menu, empty state [S-M · gui]** · §W9 gap-closure · SHIPPED 2026-10-08 (this commit; checkpoint `e59e3bd`)
+  Part of `W9.e2`. Each behaviour is now observed in a VM-green UITest, not inferred. The full
+  `vm-gui-runner.sh notes xcuitest` run on this branch had 40 tests: 39 passed, 1 skipped (the corrupt-index
+  check, which needs `AN_GUI_CORRUPT_INDEX=1`), 0 failed. Four of the six were already driven on main: note
+  delete + the delete-last-instance guard (`testG8_…`, `testG19_…`), tag editing with the Finder-tag projection
+  read back via `tagNamesKey` (`testG17_…`), the inline quality edit (`testW9D4_…`), and the empty states
+  (`testW9D8_…`). New in `NotesE2NoteLifecycleTests`: manual authors (B8) set on a note and on an extract with
+  no Zotero, written to front matter, the note found by keyword search on the author, then cleared; and the
+  row context menu's Open (D2), which loads the right-clicked note and opens no window. The authors test comes
+  from `origin/wip/W9.e2` (`4f7642f`). Its red was a test bug: the test clicked an unscoped "Clear" button. The
+  fix gives Set/Clear the ids `an.detail.authors.set` and `.clear`. The rest of that draft belongs to the
+  other parts. No defects found, so no `W9.e2-fu*` items were filed. The unit bundle was not re-run; the only
+  app change is the two accessibility ids, and the full VM suite exercised them.
+  <!-- /W9.e2-notes -->
