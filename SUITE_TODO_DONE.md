@@ -10111,3 +10111,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   scratch `scripts/test-collection-organize.sh` passes. No live Anthropic call was made (no key reachable
   unattended without a Keychain prompt); the provider rule is the documented `budget_tokens < max_tokens`.
   <!-- /W12.dedup-fu1 -->
+- [x] **W9.e2-search — runtime sweep, search: keyword FTS, quality/tag/date filters, smart folders [S · gui]** · §W9 gap-closure · SHIPPED 2026-10-08 (this commit; checkpoint `850aac3`)
+  Part of `W9.e2` (plan E2). New `NotesE2SearchTests` (UITests only, no app change), VM-green on main:
+  `ONLY_TESTING=…/NotesE2SearchTests` 2/2 passed, and 3/3 with G16 run after it. The keyword + facet test comes
+  from `origin/wip/W9.e2` (`4f7642f`): the body-only word "egalitarian" finds just the Reader note, so the match
+  is FTS rather than a title substring; Quality 3, the intel tag, and a 1960–1970 date range each narrow the list
+  to the right notes, and Clear restores it. The smart-folder test is new. It saves one smart folder from the
+  intel tag facet and one from the live keyword "Lovelace". It checks that both persist as `kind: smart` with
+  their query in `organization.json`, that selecting each in the sidebar scopes the list to exactly its matches,
+  and that All Notes brings back all three notes. `testW9D9_…` already covered the badge count. One finding about
+  the design, not a defect: on save, the live keyword is folded in as a title substring
+  (`NotesNavigationModel.currentUserFilter`, documented in `NotesFilter`), so a smart folder saved from a word
+  that appears only in a note's body will not match that note. The test uses a title word for that reason. A full
+  Notes VM run was 40/42 green, 1 skipped (corrupt-index), and G16 (Zotero chip) failed once; it passed on
+  re-run, so it is filed as `W9.g16-flake`. The unit bundle was not re-run because no app source changed.
+  <!-- /W9.e2-search -->

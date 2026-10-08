@@ -882,11 +882,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-search` — runtime sweep, search: keyword FTS, quality/tag/date filters, smart folders [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
-  Part of `W9.e2` (plan E2). The keyword and facet filter checks passed in the VM on `origin/wip/W9.e2`
-  (`4f7642f`, "keyword+facet filters PASS"); bring them to main and add smart folders, which no draft covers.
-  DONE WHEN keyword FTS, each facet filter and a smart folder are observed in VM-green UITests on main. |
-  ArchiveNotes | S | low | **needs:** gui
 - [ ] **`W9.e2-folders` — runtime sweep, folders: create/rename/delete, move/reorder, replicate, the D1 doubts [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Settle the two D1 doubts E1 could not decide from source: whether the row `.onDrag`
   (`NotesFolderTreeView.swift:211`) pre-empts the list's `.onMove` reorder (`:235`), and whether any drop target
@@ -903,6 +898,14 @@ completion record is in `SUITE_TODO_DONE.md`.
   DONE WHEN auto-fill's front-matter write, chip rendering and a template-created note are each observed in a
   VM-green UITest or render-guard shot, and the owner-eye remainder is written in this entry. | ArchiveNotes |
   S-M | low | **needs:** gui
+- [ ] **`W9.g16-flake` — `testG16_NoteZoteroAttachmentChipsAndClipboardDedup` failed once in a full VM run [S · gui]** (lane: notes) (uses: vm)
+  Found by W9.e2-search, 2026-10-08. A full `vm-gui-runner.sh notes xcuitest` run on `850aac3` was 40/42 green, 1
+  skipped (corrupt-index), and failed G16 at `NotesGUITests.swift:1718`: after typing the link into
+  `an.zotero.note.link` and clicking `an.zotero.note.attach`, the chip `an.zotero.chip.NOTE1234` did not appear
+  within 5 s. Re-run straight after `NotesE2SearchTests`, G16 passed, so it is intermittent and does not depend
+  on that class running first. Find the race (is the attach click reaching the button after the -600 scroll? is
+  the chip insert async past 5 s under VM load?) and make it deterministic. Do not just raise the timeout.
+  DONE WHEN the cause is fixed and G16 passes in repeated VM runs. | ArchiveNotes | S | low | **needs:** gui
 - [ ] **`W9.e2-links` — runtime sweep, Copy Link and the `archivenotes://open` round trip [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Copy Link (B9) puts the item's `archivenotes://open?id=…` URL on the pasteboard, and
   opening it selects and raises that item (B5), the full round trip E2 asks for. `f4f39c4` on
