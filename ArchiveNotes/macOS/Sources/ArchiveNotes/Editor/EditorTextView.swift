@@ -27,7 +27,8 @@ final class EditorTextView: NSTextView {
                     ancestor = current.superview
                 }
                 let frame = chip.convert(chip.bounds, to: self)
-                states.append(["id": id, "width": chip.bounds.width, "height": chip.bounds.height,
+                states.append(["id": id, "slots": uiTestChipSlots(for: chip, id: id),
+                               "width": chip.bounds.width, "height": chip.bounds.height,
                                "y": Double(frame.minY), "visibleY": Double(self.visibleRect.minY),
                                "visibleH": Double(self.visibleRect.height), "sel": self.selectedRange().location,
                                "inEditor": belongsToEditor,
@@ -38,6 +39,27 @@ final class EditorTextView: NSTextView {
         if let root = window?.contentView { visit(root) }
         guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    /// Where the text says this chip belongs (W35.vm-mem-fu1 diagnostics): for each passage header with the
+    /// chip's source id, its character offset, its existing layout fragment's y, how many view providers that
+    /// fragment holds, and whether one of them owns THIS view. Reads existing fragments; asks for no layout.
+    private func uiTestChipSlots(for chip: NSView, id: String) -> [[String: Any]] {
+        guard let storage = textStorage, let layout = textLayoutManager, let content = layout.textContentManager
+        else { return [] }
+        var slots: [[String: Any]] = []
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard let header = value as? BlockHeaderAttachment,
+                  header.sourceBox.anchor.notePassageTarget?.id.uuidString.lowercased() == id,
+                  let location = content.location(content.documentRange.location, offsetBy: range.location),
+                  let fragment = layout.textLayoutFragment(for: location) else { return }
+            let providers = fragment.textAttachmentViewProviders
+            let expected = fragment.frameForTextAttachment(at: location).minY + fragment.layoutFragmentFrame.minY
+            slots.append(["loc": range.location, "slotY": Double(fragment.layoutFragmentFrame.minY + textContainerOrigin.y),
+                          "expectY": Double(expected + textContainerOrigin.y),
+                          "providers": providers.count, "owns": providers.contains { $0.view === chip }])
+        }
+        return slots
     }
 
     override func accessibilityChildren() -> [Any]? {
@@ -138,31 +160,65 @@ final class EditorTextView: NSTextView {
             layout.invalidateLayout(for: content.documentRange)
             layout.textViewportLayoutController.layoutViewport()
             self.needsDisplay = true
-            if attempt < 5, self.viewportHasMisplacedAttachmentView() {
+            let misplaced = self.misplacedAttachments()
+            if attempt < 5, !misplaced.isEmpty {
+                // A relayout does not move a view TextKit already considers placed (VM G13 after redo,
+                // W35.vm-mem-fu1). From the second pass on, mark those paragraphs edited so the content
+                // storage rebuilds their elements and fresh fragments install fresh views.
+                if attempt >= 1 { self.rebuildFragments(in: misplaced.map(\.paragraph)) }
                 self.relayoutViewportSoon(attempt: attempt + 1, then: then)
                 return
+            }
+            // Out of passes: put any installed view still away from its slot where its layout says it goes.
+            for item in misplaced {
+                guard let view = item.view, let expected = item.expected, let host = view.superview else { continue }
+                view.frame = host.convert(expected, from: self)
             }
             then?()
         }
     }
 
-    /// True when a layout fragment inside the viewport carries an attachment view provider whose view is
-    /// not loaded, not in the view hierarchy, or not inside that fragment's frame — the blank-slot states
-    /// `relayoutViewportSoon` exists to clear. The last is the redo case (VM G13, W35.vm-mem-fu1): the
-    /// pasted chip's view was installed but still at y=177 while its fragment sat at the top of the text.
-    private func viewportHasMisplacedAttachmentView() -> Bool {
-        guard let layout = textLayoutManager,
-              let viewport = layout.textViewportLayoutController.viewportRange else { return false }
+    /// Marks `ranges` attribute-edited so the content storage rebuilds their elements, and layout their
+    /// fragments and attachment views. Changes no text and registers no undo; `storageDidProcessEditing`
+    /// ignores attribute-only edits, so this cannot re-enter the relayout.
+    private func rebuildFragments(in ranges: [NSRange]) {
+        guard let storage = textStorage else { return }
+        storage.beginEditing()
+        for range in ranges where NSMaxRange(range) <= storage.length {
+            storage.edited(.editedAttributes, range: range, changeInLength: 0)
+        }
+        storage.endEditing()
+    }
+
+    /// An attachment view in the viewport that is not where its layout says: not loaded, not in the view
+    /// hierarchy (`expected` is then nil), or installed away from its attachment's frame — the blank-slot
+    /// states `relayoutViewportSoon` exists to clear. The last is the redo case (VM G13, W35.vm-mem-fu1):
+    /// the restored chip's fragment at y=93 owned its view, but the view sat at y=177. The whole-fragment
+    /// frame cannot show that, so the check is against `frameForTextAttachment`.
+    private struct MisplacedAttachment { let paragraph: NSRange; let view: NSView?; let expected: CGRect? }
+
+    private func misplacedAttachments() -> [MisplacedAttachment] {
+        guard let layout = textLayoutManager, let content = layout.textContentManager,
+              let viewport = layout.textViewportLayoutController.viewportRange else { return [] }
         let origin = textContainerOrigin
-        var misplaced = false
+        let documentStart = content.documentRange.location
+        var misplaced: [MisplacedAttachment] = []
         layout.enumerateTextLayoutFragments(from: viewport.location, options: []) { fragment in
             guard fragment.rangeInElement.location.compare(viewport.endLocation) == .orderedAscending else { return false }
-            let slot = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y).insetBy(dx: -2, dy: -2)
+            let range = fragment.rangeInElement
+            let paragraph = NSRange(location: content.offset(from: documentStart, to: range.location),
+                                    length: content.offset(from: range.location, to: range.endLocation))
+            let fragmentOrigin = fragment.layoutFragmentFrame.origin
             for provider in fragment.textAttachmentViewProviders {
-                guard let view = provider.view, view.superview != nil,
-                      slot.intersects(view.convert(view.bounds, to: self)) else {
-                    misplaced = true
-                    return false
+                guard let view = provider.view, view.superview != nil else {
+                    misplaced.append(MisplacedAttachment(paragraph: paragraph, view: nil, expected: nil))
+                    continue
+                }
+                let expected = fragment.frameForTextAttachment(at: provider.location)
+                    .offsetBy(dx: fragmentOrigin.x + origin.x, dy: fragmentOrigin.y + origin.y)
+                let actual = view.convert(view.bounds, to: self)
+                if !expected.isEmpty, abs(actual.minY - expected.minY) > 2 || abs(actual.minX - expected.minX) > 2 {
+                    misplaced.append(MisplacedAttachment(paragraph: paragraph, view: view, expected: expected))
                 }
             }
             return true
@@ -196,7 +252,13 @@ final class EditorTextView: NSTextView {
         // but stranded (VM, W9.cand2-fu1 and again W35.vm-mem-fu1: y=177 while its fragment is at the top,
         // visible 0–119, slot blank). Two turns were not always enough on the VM, so `relayoutViewportSoon`
         // now checks each view against its fragment and retries rather than trusting the turn count.
+        // Undo/redo re-inserts attachments through NSTextView's own path, which (VM G13, W35.vm-mem-fu1) can
+        // leave the restored chip's view stranded away from its fragment however many relayouts follow. For
+        // those edits, also mark the restored paragraphs edited so their fragments, and views, are rebuilt.
+        let restoredRange = (undoManager?.isUndoing == true || undoManager?.isRedoing == true)
+            ? (storage.string as NSString).paragraphRange(for: edited) : nil
         DispatchQueue.main.async { [weak self] in
+            if let restoredRange { self?.rebuildFragments(in: [restoredRange]) }
             self?.relayoutViewportSoon { [weak self] in
                 guard let self else { return }
                 self.scrollRangeToVisible(self.selectedRange())
