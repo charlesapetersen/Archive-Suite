@@ -35,6 +35,8 @@ T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 step_def="$(sed -n '/^step() {/,/^}/p'            "$GATE")"
 skip_def="$(sed -n '/^step_skippable() {/,/^}/p'  "$GATE")"
 red_def="$(sed  -n '/^if \[ -n "\$fails" \]; then/,/^fi/p' "$GATE")"
+# The gate reads its retry list once, into a shell variable its steps do not inherit (may be absent; 3c checks it).
+only_def="$(grep -E '^_gate_only=' "$GATE")"
 
 [ -n "$step_def" ] || { echo "FATAL: could not extract step() from $GATE"; exit 1; }
 [ -n "$skip_def" ] || { echo "FATAL: could not extract step_skippable() from $GATE"; exit 1; }
@@ -47,6 +49,7 @@ ok "extracted the real step(), step_skippable() and RED verdict block from healt
 drive() {
   { echo 'set -uo pipefail'
     echo 'LOG="$(mktemp)"; fails=""; skips=""; warns=""'
+    printf '%s\n' "$only_def"
     printf '%s\n' "$step_def"
     printf '%s\n' "$skip_def"
     cat "$1"
@@ -111,6 +114,17 @@ case "$out" in *"HEALTH GATE: RED — retried-FAIL"*) ok "a retried step that fa
 case "$out" in *"⊘ retried-skip"*) ok "a named step_skippable step runs on a retry" ;; *) no "retried-skip should run (got: $out)" ;; esac
 out="$(AUTONOMOUS_GATE_ONLY="" drive "$T/s3b.sh")"
 case "$out" in *"── passed-before"*"── not-retried"*) ok "an empty step list runs every step" ;; *) no "an empty list should run all (got: $out)" ;; esac
+
+# --- 3c. a retried step's CHILD does not inherit the retry list --------------------------------------------
+# A harness that drives the real step() on its own fixture steps (this one, prove-vm-lane.sh) would otherwise
+# see AUTONOMOUS_GATE_ONLY="gate-report", skip every fixture step and fail — so a flaky step could never be
+# cured by the retry that exists to cure it.
+cat > "$T/s3c.sh" <<'EOS'
+step gate-report bash -c '[ -z "${AUTONOMOUS_GATE_ONLY+set}" ] || { echo "LEAKED=$AUTONOMOUS_GATE_ONLY"; exit 1; }'
+step_skippable vm-lane-proof bash -c '[ -z "${AUTONOMOUS_GATE_ONLY+set}" ] || { echo "LEAKED=$AUTONOMOUS_GATE_ONLY"; exit 1; }'
+EOS
+out="$(AUTONOMOUS_GATE_ONLY="gate-report vm-lane-proof" drive "$T/s3c.sh")"
+case "$out" in *"✓ gate-report"*"✓ vm-lane-proof"*) ok "a retried step's child does not inherit AUTONOMOUS_GATE_ONLY" ;; *) no "the retry list leaked into a step's environment (got: $out)" ;; esac
 
 # --- 4. all green: no verdict, no report ----------------------------------------------------------------
 cat > "$T/s4.sh" <<'EOS'

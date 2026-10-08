@@ -166,6 +166,41 @@ def preserved_expired(record):
     return True
 
 
+def heavy_work_in_session(state, record):
+    """A process in the claim's session is queued for, or holds, the heavy lock.
+
+    The hour bound is sized to the longest heavy JOB, not to the time a straggler spends queued for the lock:
+    with three workers and a 20-minute gate a left-behind Notes VM run waited over 40 minutes before its
+    21-minute run (7 Oct 2026). heavy-run.py's waiter records and its owner record are in that process's own
+    session (the held job itself runs in a new one, under the owner), so either names work still in progress."""
+    sessions = {member["sid"] for member in record.get("protected", []) if member.get("sid")}
+    if record.get("sid"):
+        sessions.add(record["sid"])
+    if not sessions:
+        return False
+    heavy = Path(os.environ.get("AUTONOMOUS_HEAVY_STATE") or state / "heavy")
+    found = []
+    try:
+        owner = json.loads((heavy / "owner.json").read_text())
+        found.append((owner.get("owner"), owner.get("owner_start")))
+    except (OSError, ValueError, AttributeError):
+        pass
+    for path in sorted((heavy / "waiters").glob("*.json")):
+        try:
+            waiter = json.loads(path.read_text())
+            if time.time() - float(waiter["heartbeat"]) < 10:  # heavy-run.py refreshes it every 0.25-1 s
+                found.append((waiter.get("pid"), waiter.get("start")))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+    for pid, start in found:
+        try:
+            if isinstance(pid, int) and pid > 0 and start and identity(pid) == start and os.getsid(pid) in sessions:
+                return True
+        except (RuntimeError, ProcessLookupError):
+            continue  # an uninspectable heavy record names no work; the claim's own checks still apply
+    return False
+
+
 def claims(state, stale):
     """Only retire a known dead, expired claim, under coordination.lock."""
     directory = state / "claims"
@@ -200,7 +235,14 @@ def claims(state, stale):
             validate_record(record, entry.name)
         except (OSError, ValueError) as exc:
             raise RuntimeError("invalid claim (preserved): " + str(entry)) from exc
-        if not record.get("unknown") and (preserved_expired(record) or
+        expired = not record.get("unknown") and preserved_expired(record)
+        if expired and heavy_work_in_session(state, record):
+            # Still queued for or holding the heavy lock: the bound restarts from now, so it measures the time
+            # since the straggler was last seen waiting or working, never the time it spent in the queue.
+            record["release_refused"] = time.time()
+            write_record(entry / "owner.json", record)
+            expired = False
+        if not record.get("unknown") and (expired or
                                           not live(record) and time.time() - entry.stat().st_mtime >= stale):
             # No recursive removal: unexpected files preserve the claim and stop dispatch.
             if {p.name for p in entry.iterdir()} != {"owner.json"}:

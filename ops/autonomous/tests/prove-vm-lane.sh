@@ -23,6 +23,11 @@ PASS=0; FAIL=0
 ok(){ PASS=$((PASS+1)); printf '  ok  %s\n' "$1"; }
 no(){ FAIL=$((FAIL+1)); printf 'FAIL  %s\n' "$1"; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+# The Mac-wide lock is SCRATCH here (7 Oct 2026). The shim and the real gate this drives reach heavy-run.py, and
+# with the real lock they queued behind real work — for hours, inside the gate's unlocked light block — then held
+# the Mac-wide lock for a fake tool and wrote fake jobs into waits.log, holds.log and the manager's heavy-jobs.log.
+export AUTONOMOUS_HEAVY_STATE="$TMP/heavy" MAC_HEAVY_LOCK="$TMP/mac-heavy.lock" AGENT_MANAGER_HEAVY_LOCK="$TMP/no manager installed"
+unset AGENT_MANAGER_STATE HEAVY_LOCK_FILE ARCHIVE_HEAVY_TOKEN MAC_HEAVY_HELD AUTONOMOUS_WORKER_STATE
 
 echo "== 1. per-app table (one source of truth for both entry points) =="
 # shellcheck disable=SC1090

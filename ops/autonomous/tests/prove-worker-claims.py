@@ -36,6 +36,7 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
     env = dict(os.environ, AUTONOMOUS_PLAN=str(plan), AUTONOMOUS_STATE=str(state),
                AUTONOMOUS_SUITE_TODO=str(todo), AUTONOMOUS_SUITE_TODO_DONE=str(repo / "done.md"))
     env.pop("AUTONOMOUS_IGNORE_CLAIMS", None)
+    env.pop("AUTONOMOUS_HEAVY_STATE", None)  # heavy-lock records are read from the scratch state/heavy
     env.pop("AUTONOMOUS_CLAIMS_CMD", None)
     children = []
 
@@ -166,6 +167,34 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         (d / "owner.json").write_text(json.dumps(record))
         reserve("worker-2", stale=0, expected=4)
         check(d.exists(), "a straggler keeps a recently refused claim inside the bound")
+        # A straggler still queued for, or holding, the heavy lock keeps the claim past the bound: the hour is
+        # sized to the longest heavy job, and the queue in front of it can be longer than that.
+        def ps_start(pid):
+            return subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True, text=True).stdout.strip()
+        heavy = state / "heavy"
+        (heavy / "waiters").mkdir(parents=True, exist_ok=True)
+        heavy_token = "0123456789abcdef0123456789abcdef"
+        waiter = heavy / "waiters" / (heavy_token + ".json")
+        waiter.write_text(json.dumps({"pid": straggler.pid, "start": ps_start(straggler.pid),
+                                      "heartbeat": time.time(), "mac": True}))
+        record["release_refused"] = time.time() - 3601
+        (d / "owner.json").write_text(json.dumps(record))
+        reserve("worker-2", stale=0, expected=4)
+        restamped = json.loads((d / "owner.json").read_text()).get("release_refused", 0)
+        check(d.exists() and time.time() - restamped < 60,
+              "a straggler queued for the heavy lock keeps its claim past the bound, and the bound restarts")
+        waiter.write_text(json.dumps({"pid": straggler.pid, "start": ps_start(straggler.pid),
+                                      "heartbeat": time.time() - 30, "mac": True}))
+        (heavy / "owner.json").write_text(json.dumps({"token": heavy_token, "owner": straggler.pid,
+                                                      "owner_start": ps_start(straggler.pid),
+                                                      "child": straggler.pid, "child_start": ps_start(straggler.pid)}))
+        record["release_refused"] = time.time() - 3601
+        (d / "owner.json").write_text(json.dumps(record))
+        reserve("worker-2", stale=0, expected=4)
+        check(d.exists(), "a straggler holding the heavy lock keeps its claim past the bound (a stale waiter does not count)")
+        gone = subprocess.Popen(["true"]); gone.wait()
+        (heavy / "owner.json").write_text(json.dumps({"token": heavy_token, "owner": gone.pid, "owner_start": "gone",
+                                                      "child": gone.pid, "child_start": "gone"}))
         record["release_refused"] = time.time() - 3601
         (d / "owner.json").write_text(json.dumps(record))
         c2 = reserve("worker-2", stale=0)
@@ -254,6 +283,12 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         check("RUN STATUS: IN_PROGRESS" in text and text.index("**C — filed later**") > text.index("**A — complete")
               and text.index("**C — filed later**") < text.index("**B — complete"),
               "add files the item after its anchor and reopens a finished queue")
+        # Reopening rewrites only the status line: the blank line after it survives (\s* once ate the newline).
+        plan.write_text("RUN STATUS: COMPLETE  \n\n## WORK QUEUE\n- [x] **A — done**\n## HOLD QUEUE\n## Session Log\n")
+        plan_run("add", "Z", "A", "**Z — reopens**")
+        check(plan.read_text().startswith("RUN STATUS: IN_PROGRESS\n\n## WORK QUEUE\n"),
+              "add reopens a COMPLETE plan without deleting the blank line after the status line")
+        queue("- [x] **A — complete**", "- [ ] **C — filed later** (lane: notes)", "- [x] **B — complete**")
         resolver = subprocess.run(["bash", str(HERE / "next-queue-item.sh"), str(repo)], env=dict(env, AUTONOMOUS_IGNORE_CLAIMS="1"),
                                   capture_output=True, text=True)
         check("ok\tC\t" in resolver.stdout, "an added item is offered by the resolver")

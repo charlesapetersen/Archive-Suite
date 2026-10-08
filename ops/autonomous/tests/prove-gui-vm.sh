@@ -11,6 +11,11 @@ GATE="$HERE/../gui-vm-gate.sh"
 
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/prove-gui-vm.XXXXXX")"
 trap 'rm -rf "$ROOT"' EXIT
+# The Mac-wide lock is SCRATCH here (7 Oct 2026). The shim and the real gate this drives reach heavy-run.py, and
+# with the real lock they queued behind real work — for hours, inside the gate's unlocked light block — then held
+# the Mac-wide lock for a fake tool and wrote fake jobs into waits.log, holds.log and the manager's heavy-jobs.log.
+export AUTONOMOUS_HEAVY_STATE="$ROOT/heavy" MAC_HEAVY_LOCK="$ROOT/mac-heavy.lock" AGENT_MANAGER_HEAVY_LOCK="$ROOT/no manager installed"
+unset AGENT_MANAGER_STATE HEAVY_LOCK_FILE ARCHIVE_HEAVY_TOKEN MAC_HEAVY_HELD AUTONOMOUS_WORKER_STATE
 BIN="$ROOT/bin"; ART="$ROOT/artifacts"; STATE="$ROOT/state/next-app"; CALLS="$ROOT/calls.log"
 mkdir -p "$BIN" "$ART"
 

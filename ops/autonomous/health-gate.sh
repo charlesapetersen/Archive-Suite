@@ -31,6 +31,10 @@ export ARCHIVE_UNATTENDED=1
 # The shim and heavy-enter.sh lock only when this is set; set it here so a hand-run gate locks per step too.
 export AUTONOMOUS_HEAVY_ENABLED=1
 export PATH="$ROOT/ops/autonomous/bin:$PATH"
+# The retry list is read once into a shell variable and REMOVED from the environment. Exported, it reached every
+# step's children, and a harness that drives the real step() on its own fixture steps (prove-gate-report.sh,
+# prove-vm-lane.sh) skipped them all and failed on the retry meant to cure a flake.
+_gate_only="${AUTONOMOUS_GATE_ONLY:-}"; unset AUTONOMOUS_GATE_ONLY; export -n _gate_only 2>/dev/null
 LOG="$(mktemp)"; fails=""
 trap 'rm -f "$LOG"' EXIT
 
@@ -50,7 +54,7 @@ _gate_t0=$SECONDS
 step() {
   local name="$1"; shift
   # A retry names only the steps that failed (AUTONOMOUS_GATE_ONLY); the rest already passed at this tip.
-  case " ${AUTONOMOUS_GATE_ONLY:-} " in "  "|*" $name "*) ;; *) return 0 ;; esac
+  case " ${_gate_only:-} " in "  "|*" $name "*) ;; *) return 0 ;; esac
   printf '── %s ──\n' "$name"
   local out _t=$SECONDS; out="$(mktemp)"
   if "$@" >"$out" 2>&1; then
@@ -76,7 +80,7 @@ skips=""; warns=""
 step_skippable() {
   local name="$1"; shift
   # A retry names only the steps that failed (AUTONOMOUS_GATE_ONLY); the rest already passed at this tip.
-  case " ${AUTONOMOUS_GATE_ONLY:-} " in "  "|*" $name "*) ;; *) return 0 ;; esac
+  case " ${_gate_only:-} " in "  "|*" $name "*) ;; *) return 0 ;; esac
   printf '── %s ──\n' "$name"
   # Capture THIS step's output separately. Reading a shared transcript would report the first 'SKIPPED:'
   # anywhere in the file — including one left by an earlier step — as this step's reason. ($LOG is now
@@ -397,8 +401,8 @@ if [ -n "$skips" ] || [ -n "$warns" ]; then
   [ -n "$warns" ] && echo "  ↳ the warned lane(s) RAN and FAILED; they are tracked, so they don't park the run. Detail above + ~/.tart-mirror/vm-artifacts/gui-vm-<app>-LAST-FAILURE.log."
   exit 0
 fi
-if [ -n "${AUTONOMOUS_GATE_ONLY:-}" ]; then
-  echo "HEALTH GATE: GREEN (re-ran only: ${AUTONOMOUS_GATE_ONLY}; every other step passed in the run before)"
+if [ -n "${_gate_only:-}" ]; then
+  echo "HEALTH GATE: GREEN (re-ran only: ${_gate_only}; every other step passed in the run before)"
   exit 0
 fi
 echo "HEALTH GATE: GREEN (all builds + Reader/Notes suites + write-surface lint + script gates + coherence + GUI-VM UITests)"

@@ -144,7 +144,7 @@ def edit(plan, action, values):
             body = body[:hi] + prefix + "- [ ] " + item + "\n" + body[hi:]
             text = text[:start] + body + text[end:]
             # New open work reopens a finished queue.
-            text = re.sub(r"(?m)^RUN STATUS: COMPLETE\s*$", "RUN STATUS: IN_PROGRESS", text)
+            text = re.sub(r"(?m)^RUN STATUS: COMPLETE[ \t]*$", "RUN STATUS: IN_PROGRESS", text)
         else:
             if action == "log":
                 heading, content = "## Session Log", values[0]

@@ -35,7 +35,7 @@ fi
 
 build() {   # $1 = output directory
   mkdir -p "$1" || return 1
-  if ! xcrun swiftc -swift-version 6 "${FLAGS[@]}" -emit-module -emit-library -static \
+  if ! xcrun swiftc -swift-version 6 ${FLAGS[@]+"${FLAGS[@]}"} -emit-module -emit-library -static \
         -module-name ArchiveCore \
         -emit-module-path "$1/ArchiveCore.swiftmodule" \
         -o "$1/libArchiveCore.a" \
@@ -47,7 +47,7 @@ build() {   # $1 = output directory
 
 key="$(
   {
-    printf 'flags:'; printf ' %s' "${FLAGS[@]}"; printf '\n'
+    printf 'flags:'; [ "${#FLAGS[@]}" -eq 0 ] || printf ' %s' "${FLAGS[@]}"; printf '\n'
     xcrun swiftc --version 2>&1
     xcrun --show-sdk-path 2>&1; xcrun --show-sdk-version 2>&1
     sw_vers -buildVersion 2>&1
@@ -65,7 +65,7 @@ ready() { [ -f "$entry/ArchiveCore.swiftmodule" ] && [ -f "$entry/libArchiveCore
           && [ "$(cat "$entry/COMPLETE" 2>/dev/null)" = "$key" ]; }
 
 if ready; then
-  touch "$entry/COMPLETE" 2>/dev/null || true   # recency for pruning
+  touch "$entry" "$entry/COMPLETE" 2>/dev/null || true   # recency for pruning: `ls -dt` reads the DIRECTORY mtime
   echo "archivecore-cache: reusing $entry" >&2
   echo "$entry"; exit 0
 fi
@@ -81,7 +81,9 @@ if [ -e "$entry" ] && ! ready; then
   # rename): never reuse it. It is this cache's own directory, named core-<key>, so it is removed.
   case "$(basename "$entry")" in core-[0-9a-f]*) rm -rf "$entry" ;; esac
 fi
-mv "$tmp" "$entry" 2>/dev/null || true          # loses only to an identical, complete build
+# rename(2), not mv: mv onto an existing directory moves $tmp INSIDE it (core-<key>/.building.*) and succeeds.
+# rename(2) fails on a non-empty target, so a loser to an identical, complete build leaves $tmp for the trap.
+python3 -c 'import os, sys; os.rename(sys.argv[1], sys.argv[2])' "$tmp" "$entry" 2>/dev/null || true
 ready || { echo "archivecore-cache: entry $entry is not complete after the build" >&2; exit 1; }
 
 # Prune: keep the newest 6 entries; remove stray build directories older than a day.

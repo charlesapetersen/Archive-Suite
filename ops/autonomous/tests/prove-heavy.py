@@ -310,6 +310,35 @@ echo "gate-rc=$GATE_RC"
         gate.write_text("#!/bin/bash\nsleep 25\necho gate-ran\n")
         p = subprocess.run(["bash", str(timing)], env=env, capture_output=True, text=True, timeout=60)
         check("gate-rc=2" in p.stdout, "a gate that really runs past the cap is still stopped")
+        # The light-block harnesses that drive the real shim or the real VM gate (vm-lane-proof, gui-vm-proof)
+        # must use a scratch lock of their own. Inheriting the gate's lock, they queued behind real work inside
+        # the unlocked light block, then held the Mac-wide lock for a fake tool (7 Oct 2026, pid 17075).
+        holds = state / "holds.log"
+        holds_before = holds.read_text() if holds.exists() else ""
+        waiters_before = {w.name for w in (state / "waiters").glob("*.json")}
+        ready = root / "light-harness-holder"
+        holder = spawn("sleep", "150", ready=ready)
+        check(until(ready.exists), "light-harness fixture owns the lock")
+        owner()
+        try:
+            light_gate = subprocess.run(["bash", str(HERE / "health-gate.sh")],
+                                        env=dict(env, AUTONOMOUS_GATE_ONLY="vm-lane-proof gui-vm-proof"),
+                                        capture_output=True, text=True, timeout=120)
+            light_out = light_gate.stdout
+        except subprocess.TimeoutExpired as e:
+            partial = e.stdout or b""
+            light_out = "TIMED OUT (queued on the held lock?)\n" + (
+                partial.decode(errors="replace") if isinstance(partial, bytes) else partial)
+        check(holder.poll() is None and "✓ vm-lane-proof" in light_out and "✓ gui-vm-proof" in light_out
+              and "HEALTH GATE: GREEN (re-ran only" in light_out,
+              "vm-lane-proof and gui-vm-proof finish while another job holds the gate's lock: " + light_out[-600:])
+        check({w.name for w in (state / "waiters").glob("*.json")} <= waiters_before
+              and (holds.read_text() if holds.exists() else "") == holds_before,
+              "the light harnesses neither queue on nor hold the gate's lock: %r %r" % (
+                  sorted({w.name for w in (state / "waiters").glob("*.json")} - waiters_before),
+                  (holds.read_text() if holds.exists() else "")[len(holds_before):]))
+        holder.terminate()
+        holder.communicate(timeout=10)
         check('waiting "$cpid"' in source and 'quiet_since=0; idle_streak=0; continue' in source,
               "watchdog consults validated heavy waiters and resets idle budget")
         vm_lock = root / "old-live-vm-lock"
