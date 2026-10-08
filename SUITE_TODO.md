@@ -8,8 +8,11 @@ bounded item per fresh session.
 
 **This file holds only OPEN items.** Completed work moves to [`SUITE_TODO_DONE.md`](SUITE_TODO_DONE.md) —
 2026-08-01, when 47 open items were buried among 160 done ones in a single 3,580-line file. When you finish an
-item, **move its whole entry there** (under its section heading) rather than ticking it in place; the
-completion note and its commit still belong in the same commit as the code, exactly as before.
+item, **move its whole entry there** rather than ticking it in place; the completion note and its commit still
+belong in the same commit as the code, exactly as before. **That file is append-only (since 2026-10-08,
+`W35.done-union`):** add the entry at its END, naming its section on the header line (`· §<section>`) and closing
+with its own `  <!-- /<TAG> -->` line, and never edit an entry already there — `.gitattributes` gives it
+`merge=union`, which is safe only for appends. The rule and the reason are in that file's header.
 ⚠️ Two scripts read the archive and will mis-report if it is renamed or moved without them:
 `ops/autonomous/next-queue-item.sh` (a `(blocked-on: …)` prerequisite archived there must still resolve as
 done, or its dependents block forever) and `ops/autonomous/check-tracker-sync.sh` (which treats live + archive
@@ -1096,18 +1099,6 @@ to the Agent Manager, and the W9.e2 and W24.cal1 splits are filed under their ow
   moving cleanly, and a dirty or unpublished tree preserved; the README states the path; the warm figure is
   re-measured once and added to the measure table; the entry notes it takes effect at the next owner restart. |
   ops/autonomous/ + execution-plans/parallel-workers/warm-dd-measure.md | M | med | none
-- [ ] **`W35.done-union` — `SUITE_TODO_DONE.md` becomes append-only with `merge=union` [S · ~1 session]** (lane: ops,docs) (uses: light)
-  Efficiency plan item 17, second half. Evidence as `W35.item-notes`: every completion moves an entry into
-  `SUITE_TODO_DONE.md` under its section heading, so two workers finishing at once both edit the middle of a
-  1 MB file. WHAT. A shipped entry is appended at the end, carrying its section name, and `.gitattributes`
-  gets `SUITE_TODO_DONE.md merge=union` (safe only because every change is an append). Write the rule into the
-  headers of `SUITE_TODO.md` and `SUITE_TODO_DONE.md` and `CLAUDE.md`'s docs convention. The readers find
-  entries by tag, not section; prove it rather than assume it: `next-queue-item.sh`, `check-tracker-sync.sh`,
-  `check-todo-stubs.sh`, `compact-plan.sh`, `measure-workers.py` and the completion count at
-  `archive-suite-autonomous.sh:597`.
-  DONE WHEN a scratch-repo test shows two branches each appending an entry and merging without a conflict or an
-  interleaved entry, the readers' prove harnesses pass, and the rule is written in the three places. |
-  .gitattributes + docs | S | low | none
 ## W40 — verification phase: prove the Suite works (owner-approved 2026-10-04)
 
 The next work once the build queue above is exhausted. Plans: `execution-plans/verification-phase/00-owner-plan.md`

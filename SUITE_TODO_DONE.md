@@ -8,6 +8,25 @@ single 3,580-line file).
 reasons: the completion notes cite the commits that shipped each item, and several carry the *reasoning* for
 why a later change may or may not revisit that code.
 
+**⚠️ APPEND-ONLY since 2026-10-08 (`W35.done-union`).** A shipped entry goes at the **END of this file**, under
+the last heading, never under its section: every completion used to insert mid-file, so two workers finishing at
+once edited the same region of a 1 MB file and met in a rebase conflict. The header line names the section the
+entry belongs to, and the entry's **last line is its own closing comment** — the shape is:
+
+```
+- [x] **<TAG> — <title>** · §<section heading> · SHIPPED <date> (<sha or "this commit">)
+  <the completion note, indented>
+  <!-- /<TAG> -->
+```
+
+`.gitattributes` sets `merge=union` here, so two appended entries merge by keeping both. **That is safe only
+because nothing already in this file is ever edited** — union would merge two edits to one line without a
+conflict marker, silently. Fix a wrong entry by appending a correction that names it. The closing line is not
+decoration: before keeping both sides, union drops lines common to their ends, so two entries ending with the
+same sentence would lose it from one and fuse. `ops/autonomous/tests/prove-done-union.sh` proves both halves.
+Readers find entries by tag, never by section (the same harness checks `next-queue-item.sh`,
+`check-tracker-sync.sh` and the completion counts), so where an entry sits does not matter to them.
+
 ## Processor mixed drop — W22
 
 - [x] **W22.mixed-batch — per-file dispatch so a mixed drop stops discarding non-PDF files [M · Tier-2].**
@@ -9886,3 +9905,21 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   still needs the `.docsync-ok` ack; the one-line regex patch is in the Daemon Report for the owner. Checks:
   context-budget OK, tracker-sync 72 shared items agree, policy-coherence OK, todo-stubs OK; check-handoff's only
   failures were uncommitted worktrees (this session's own, before commit, and other sessions').
+
+## Appended entries — newest last (append-only from here; each entry names its section)
+
+- [x] **W35.done-union — `SUITE_TODO_DONE.md` becomes append-only with `merge=union`** · §Autonomous daemon — lock less, more independent items (Agent Manager efficiency plan, owner 2026-10-07) · SHIPPED 2026-10-08 (this commit)
+  Efficiency plan item 17, second half. A completion now appends at the end of this file instead of inserting
+  under its section, and `.gitattributes` gives the file `merge=union`, so two workers finishing at once no
+  longer conflict. Found while proving it: union trims lines common to the END of both sides, so two entries
+  ending with the same sentence ("No real corpus was touched.") fused, one losing its last line — hence every
+  entry closes with its own `<!-- /TAG -->` line. The rule is written in this file's header, `SUITE_TODO.md`'s
+  header, root `CLAUDE.md`'s docs convention, `resume-prompt.txt` STEP 4 and `CODEX_RUNBOOK.md`.
+  Verification: new `ops/autonomous/tests/prove-done-union.sh` (scratch repos with the real `.gitattributes`:
+  merge and rebase of two appended entries — no conflict, each entry whole and contiguous, old content
+  untouched; `next-queue-item.sh` resolves a prerequisite appended at EOF; `check-tracker-sync.sh` agrees and
+  still catches drift; the completion-count and `measure-workers.py` patterns match; and the unterminated-entry
+  trap reproduces as a regression). The readers' own harnesses pass: prove-dep-gating, prove-tracker-sync,
+  prove-todo-stubs, prove-compact, prove-status, prove-measure-workers. Entries already in the file stay where
+  they are; nothing was moved, because nothing reads position.
+  <!-- /W35.done-union -->

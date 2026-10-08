@@ -1,0 +1,6 @@
+# SUITE_TODO_DONE.md is append-only: a shipped entry is added at the END of the file, never under its section
+# heading, so two workers finishing at once never touch the same lines. union keeps both sides of an
+# end-of-file collision instead of conflicting. Safe ONLY because every change is an append — an edit to an
+# existing line would be merged by union without a conflict marker. See the file's header and
+# ops/autonomous/tests/prove-done-union.sh.
+SUITE_TODO_DONE.md merge=union

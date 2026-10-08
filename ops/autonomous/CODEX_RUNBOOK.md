@@ -65,8 +65,9 @@ After that, "Continue" is enough to resume after an interruption.
    subject. Only the final commit moves the tracker entry. Uncommitted work is the one thing that has actually
    been lost in this repo.
 6. **Ship.** The final commit contains the code and the tracker change together:
-   - move the item's whole entry from `SUITE_TODO.md` to `SUITE_TODO_DONE.md`, under the matching heading,
-     as `- [x] **<TAG> — <title>** … SHIPPED <date> (this commit)`. Write the tag bare. A tag wrapped in
+   - move the item's whole entry from `SUITE_TODO.md` to the END of `SUITE_TODO_DONE.md` (append-only,
+     `merge=union` — see its header), as `- [x] **<TAG> — <title>** · §<section> … SHIPPED <date> (this commit)`,
+     ending with its own `  <!-- /<TAG> -->` line. Write the tag bare. A tag wrapped in
      backticks (`` **`W9.b5`** ``) cannot be parsed by the tracker scripts;
    - update `KNOWN_ISSUES.md` and delete a shipped `execution-plans/` plan where that applies;
    - write the subject as `<type>(<scope>): <TAG> — <summary>`. The tag must be in the subject, because

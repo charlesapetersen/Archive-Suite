@@ -201,8 +201,8 @@ STEP 3.5 — GUI-VERIFY — OFF the owner's screen, no flag (GUI is unattended n
 
 STEP 4 — SHIP the FINAL commit (item COMPLETE): in your worktree, `git pull --rebase origin main`, then
   commit + push. This completing commit MUST also MOVE the item's whole entry from SUITE_TODO.md to
-  SUITE_TODO_DONE.md under the matching heading, as `- [x] **<TAG> — <title>** … SHIPPED <date>` (tag bare, no
-  backticks; a `[x]` left in SUITE_TODO.md fails check-todo-stubs.sh), and/or update the relevant
+  the END of SUITE_TODO_DONE.md (append-only, merge=union — its header), as `- [x] **<TAG> — <title>** ·
+  §<section> … SHIPPED <date>`, last line `  <!-- /<TAG> -->` (tag bare, no backticks; a `[x]` left in SUITE_TODO.md fails check-todo-stubs.sh), and/or update the relevant
   KNOWN_ISSUES.md, IN THE SAME COMMIT (a Stop hook blocks the turn otherwise). Delete the item's
   `execution-plans/items/<TAG>.md` in that commit, folding its useful lines into the DONE entry.
   Edge cases (the ack file is read from the PRIMARY checkout — use its absolute path, NOT a worktree-relative
