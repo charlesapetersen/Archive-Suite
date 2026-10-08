@@ -9830,3 +9830,6 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **EFF.gate-lock — the health gate locks per step** — no whole-gate lock (gate and daemon wrapper both gone); the
   light block runs first and unlocked; a RED retry re-runs only the failing steps (`AUTONOMOUS_GATE_ONLY`); the
   execution cap skips polls while a step waits for the lock.
+- [x] **EFF.core-cache — ArchiveCore built once per exact input** — `ArchiveProcessor/scripts/archivecore-cache.sh`
+  (cache in `~/Library/Caches/ArchiveSuite/archivecore`, outside every checkout), used by `test-tag-vocabulary.sh`, the
+  only Processor swiftc harness that compiles ArchiveCore; proved by `test-archivecore-cache.sh` (a gate step).

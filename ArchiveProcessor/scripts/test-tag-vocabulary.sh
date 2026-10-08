@@ -44,35 +44,21 @@ echo "work: $WORK"
 # Built with swiftc rather than SwiftPM: `swift build` emits no linkable archive for a library
 # product nothing depends on, and a hand-rolled `ar` over its object files is a worse contract than
 # one compiler invocation.
-echo "── building ArchiveCore…"
-mkdir -p "$WORK/core"
-# The source list goes into an ARRAY, never an unquoted `$(find …)` spliced into the argv. The suite's
-# primary checkout is "…/Archive Suite" — the path contains a SPACE — so an unquoted command substitution
-# word-splits every absolute path into two broken halves ("/Users/…/Archive" + "Suite/packages/…") and
-# swiftc reports 17 missing input files. This was invisible for two days because a daemon worktree
-# (`suite-wt-<stamp>`) has no space in its name, so the step passed everywhere it was developed and failed
-# 100% of the time in the primary checkout — which is the only place the health gate runs it. `-print0` +
-# `read -d ''` so a newline in a path cannot split one either.
-CORE_SRC=()
-while IFS= read -r -d '' f; do CORE_SRC+=("$f"); done \
-  < <(find "$SUITE/packages/ArchiveCore/Sources" -name '*.swift' -print0)
-# Also the guard for `set -u`: expanding an empty array under it aborts with a bare "unbound variable".
-# A moved/renamed source tree should say so, not surface as a compiler error about nothing.
-if [ "${#CORE_SRC[@]}" -eq 0 ]; then
-  echo "  [FAIL] no ArchiveCore sources found under $SUITE/packages/ArchiveCore/Sources"; exit 1
-fi
-if ! xcrun swiftc -swift-version 6 -O -emit-module -emit-library -static \
-      -module-name ArchiveCore \
-      -emit-module-path "$WORK/core/ArchiveCore.swiftmodule" \
-      -o "$WORK/core/libArchiveCore.a" \
-      "${CORE_SRC[@]}" 2>"$WORK/core.err"; then
+echo "── building ArchiveCore (or reusing the cached build of these exact sources)…"
+# archivecore-cache.sh builds once per exact input (every source's path and content, flags, compiler, SDK,
+# macOS build) into ~/Library/Caches/ArchiveSuite/archivecore, outside every checkout, and prints that
+# directory. Its source list is an ARRAY fed by `find -print0`: the primary checkout's path contains a SPACE,
+# and an unquoted `$(find …)` once split every path in two and failed 100% of the time there and nowhere else.
+# ARCHIVECORE_CACHE names another cache directory.
+if ! CORE="$(bash "$REPO/scripts/archivecore-cache.sh" "$SUITE" -O 2>"$WORK/core.err")" || [ ! -f "$CORE/libArchiveCore.a" ]; then
   echo "  [FAIL] ArchiveCore build:"; head -25 "$WORK/core.err"; exit 1
 fi
+grep -h 'archivecore-cache:' "$WORK/core.err" | sed 's/^/  /'
 
 # --- 2. The driver, compiled with the real Processor sources ------------------------------------
 echo "── building the driver against the real Processor sources…"
 if ! xcrun swiftc -swift-version 6 \
-      -I "$WORK/core" -L "$WORK/core" -lArchiveCore \
+      -I "$CORE" -L "$CORE" -lArchiveCore \
       "$SRC/Tagging/MacOSTagger.swift" \
       "$SRC/Tagging/SystemTagsProvider.swift" \
       "$SRC/Models/DefaultsKeys.swift" \

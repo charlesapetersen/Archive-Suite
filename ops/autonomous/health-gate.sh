@@ -339,6 +339,9 @@ step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-lau
 
 # tag-vocabulary compiles the ArchiveCore sources with swiftc -O (~141 s); its script takes the lock itself.
 step tag-vocabulary           bash "$ROOT/ArchiveProcessor/scripts/test-tag-vocabulary.sh"
+# tag-vocabulary reuses ArchiveCore built once per exact input (archivecore-cache.sh, outside the tree); this
+# proves the reuse is keyed on every input and never stale.
+step archivecore-cache        bash "$ROOT/ArchiveProcessor/scripts/test-archivecore-cache.sh"
 
 # Run EVERY app's UITests in a headless Tart VM — off the owner's screen, and without the "Enable UI
 # Automation" prompt that makes the steps above avoid UITests on the host. ON by default (2026-07-28;
