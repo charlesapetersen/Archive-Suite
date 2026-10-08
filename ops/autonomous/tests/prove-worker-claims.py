@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise real resolver, claims, idle upkeep and plan edits on scratch files."""
 import concurrent.futures
+import fcntl
 import importlib.util
 import json
 import os
@@ -193,21 +194,35 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
         before = time.monotonic(); c = reserve("worker-1")
         check(time.monotonic() - before > .5, "reservation waits until upkeep finishes")
         holder.wait(); release(c)
-        # Trapping/kill does not strand a kernel lock.
-        # The child announces it holds the inherited locks before the coordinator is killed: a fixed 0.1 s
-        # head start lost the race on a loaded Mac (gate RED twice, 7 Oct 2026) and proved nothing.
-        orphan = root / "orphan-upkeep-running"
+        # Trapping/kill does not strand a kernel lock. Kill the coordinator only once its child
+        # is running (a fixed 0.1 s sleep raced holder startup, ~0.25 s, so it usually killed the
+        # holder before the child existed), then probe the locks directly instead of timing.
+        started, finished = root / "orphan-started", root / "orphan-finished"
         holder = subprocess.Popen(["python3", str(HERE / "worker-state.py"), "--state", str(state),
                                    "--repo", str(repo), "idle", "--", "python3", "-c",
-                                   "from pathlib import Path; import time; Path(" + repr(str(orphan))
-                                   + ").touch(); time.sleep(1.5)"], env=env)
+                                   "from pathlib import Path; import time; Path(" + repr(str(started))
+                                   + ").touch(); time.sleep(1.5); Path(" + repr(str(finished))
+                                   + ").touch()"], env=env)
         children.append(holder)
         deadline = time.monotonic() + 10
-        while not orphan.exists() and time.monotonic() < deadline:
+        while not started.exists() and time.monotonic() < deadline:
             time.sleep(.02)
+        check(started.exists(), "orphan upkeep child starts")
         holder.terminate(); holder.wait()
-        before = time.monotonic(); c = reserve("worker-1"); release(c)
-        check(time.monotonic() - before > .5, "orphan upkeep child retains kernel lock until mutation ends")
+
+        def held(path):
+            with path.open("a+") as f:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    return True
+                fcntl.flock(f, fcntl.LOCK_UN)
+                return False
+        check(not finished.exists() and held(state / "coordination.lock")
+              and held(plan.resolve().with_name(plan.name + ".lock")),
+              "orphan upkeep child keeps both kernel locks after its coordinator dies")
+        c = reserve("worker-1"); release(c)
+        check(finished.exists(), "orphan upkeep child retains kernel lock until mutation ends")
         c = reserve("worker-1", special="gate-fix")
         check(c[0] == "gate-fix", "special gate/doc sessions are suite-wide claims")
         reserve("worker-2", expected=4); release(c)
