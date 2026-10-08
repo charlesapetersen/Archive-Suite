@@ -583,9 +583,100 @@ if SOURCE.is_file():
             out.append(("every holder released", mstatus().startswith("heavy      free") and not lock.exists()))
             return out
 
+        def r6_fix_checks(heavy_py):
+            """The R6 review fixes (R6-archive.md 1-3), each a check that failed before its fix."""
+            out = []
+            runs[0] += 1
+            base = root / ("fix-%d" % runs[0])
+            base.mkdir()
+
+            def heavy(state, command, environ=None):
+                return start([sys.executable, str(heavy_py), "--state", str(base / state), "run", "--"] + command,
+                             environ)
+
+            def probe(state, pid):
+                return subprocess.run([sys.executable, str(heavy_py), "--state", str(base / state), "waiting",
+                                       str(pid)], env=env).returncode
+
+            # 1. A job deferring to an earlier queued waiter, with both locks free, is a Mac wait to the watchdog.
+            #    The waiter ahead is a live process outside the session, kept fresh in the manager's queue.
+            other = start(["sleep", "60"])
+            until(lambda: subprocess.run(["ps", "-p", str(other.pid), "-o", "lstart="], capture_output=True,
+                                         text=True).stdout.strip() != "")
+            qdir = mstate / "heavy.waiting"
+            qdir.mkdir(parents=True, exist_ok=True)
+            qfile = qdir / str(other.pid)
+            qfile.write_text("project=vision-ocr\nlabel=ahead\nstart=%d\nsince=%.6f\n" % (time.time() + 1,
+                                                                                          time.time() - 100))
+            log = base / "defer.log"
+            j = heavy("defer", interval(log, "j", .1))
+            note = "(pid %d) waiting for 'ahead, queued first'" % j.pid
+            deferred = until(lambda: (mstate / "heavy.log").exists() and note in (mstate / "heavy.log").read_text())
+            time.sleep(1.2)  # a heartbeat or two after the deferral
+            # (Both locks flicker once a second while it defers, so their state at one instant proves nothing.)
+            out.append(("a job deferring to the queue waits", deferred and "j start" not in lines(log)))
+            out.append(("a job deferring to the queue is watchdog work", probe("defer", j.pid) == 0))
+            out.append(("the same queue wait seen from a root holding the waiter ahead is a self-wait",
+                        probe("defer", os.getpid()) == 1))
+            qfile.unlink()
+            out.append(("the job runs once the waiter ahead leaves", finish(j) == 0 and "j end" in lines(log)))
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(other.pid, signal.SIGKILL)
+
+            # 2. An unusable manager state: the Taker raises holding nothing, and the job falls back to the
+            #    mkdir lock instead of being refused.
+            bad = base / "unwritable manager state"
+            bad.mkdir()
+            bad.chmod(0o500)
+            try:
+                seen = base / "fallback-held"
+                f = heavy("fallback", ["sh", "-c", '[ -f "$1/owner" ] && touch "$2"', "_", str(lock), str(seen)],
+                          dict(env, AGENT_MANAGER_STATE=str(bad)))
+                rc = finish(f, 30)
+            finally:
+                bad.chmod(0o700)
+            out.append(("a Taker error while holding nothing falls back to the mkdir lock",
+                        rc == 0 and seen.exists() and not lock.exists()))
+
+            # 3a. Reverse order: an Archive Suite job blocked by the Mac lock first goes before a manager waiter
+            #     that queues later (and polls far faster).
+            log, go = base / "reverse.log", base / "go-r"
+            h = start([str(manager), "run", "--project", "vision-ocr", "--"] + gated(log, "h", go))
+            until(lambda: "h start" in lines(log))
+            j = heavy("reverse", interval(log, "j", .3))
+            listed = until(lambda: "waiting    pid %d" % j.pid in mstatus())
+            w = start([str(manager), "run", "--project", "vision-ocr", "--label", "late", "--"]
+                      + interval(log, "w", .3), dict(env, MAC_HEAVY_POLL="0.05"))
+            until(lambda: "label=late" in mstatus())
+            time.sleep(.3)
+            go.touch()
+            rcs = [finish(p) for p in (h, j, w)]
+            ok, got = serialized(log)
+            starts = [l.split()[0] for l in got if l.endswith(" start")]
+            if queue_built:
+                out.append(("an Archive Suite job queued first goes before a later manager waiter",
+                            listed and rcs == [0, 0, 0] and ok and starts == ["h", "j", "w"]))
+
+            # 3b. The scratch guard: the default helper path present (scratch HOME), a scratch MAC_HEAVY_LOCK and
+            #     no AGENT_MANAGER_STATE. The job must use the mkdir fallback and never create a manager state.
+            home = base / "scratch home"
+            default = home / "Claude" / "Agent Manager" / "bin" / "heavy-lock"
+            default.parent.mkdir(parents=True)
+            shutil.copyfile(manager, default)
+            default.chmod(0o755)
+            genv = dict(env, HOME=str(home))
+            for k in ("AGENT_MANAGER_STATE", "AGENT_MANAGER_HEAVY_LOCK"):
+                genv.pop(k, None)
+            g = heavy("guard", ["true"], genv)
+            out.append(("a scratch Mac lock without a scratch manager state never touches a manager state",
+                        finish(g) == 0 and not (home / ".local" / "state" / "agent-manager").exists()))
+            return out
+
         try:
             for name, ok in r6_checks(HEAVY):
                 check(ok, "r6: " + name)
+            for name, ok in r6_fix_checks(HEAVY):
+                check(ok, "r6 fix: " + name)
             source = HEAVY.read_text()
             mutants = {
                 "manager never loaded": ("    manager = manager_lock()\n", "    manager = None\n"),
@@ -602,6 +693,25 @@ if SOURCE.is_file():
                 check(mutant.read_text() != source, "r6 mutant landed: " + name)
                 red = [n for n, ok in r6_checks(mutant) if not ok]
                 check(red, "r6 mutant turns checks red: %s (%s)" % (name, ", ".join(red)))
+            # The review fixes' mutants run only the fix checks.
+            fix_mutants = {
+                "a deferral is not marked as a queue wait": ('"mac": blocked_by_mac, "queued": queued}',
+                                                             '"mac": blocked_by_mac}'),
+                "no fallback on a Taker error": ("                                got = try_mac(None, label)\n",
+                                                 "                                raise\n"),
+                "no scratch guard": ('    if not helper or (os.environ.get("MAC_HEAVY_LOCK") and not '
+                                     'os.environ.get("AGENT_MANAGER_STATE")):\n        return None\n    try:\n        loader',
+                                     "    if not helper:\n        return None\n    try:\n        loader"),
+            }
+            for name, (needle, broken) in fix_mutants.items():
+                check(source.count(needle) == 1, "r6 fix mutant anchor unique: " + name)
+                mutant = root / "fix-mutant" / name.replace(" ", "-") / HEAVY.name
+                mutant.parent.mkdir(parents=True)
+                shutil.copyfile(LOCKPY, mutant.parent / LOCKPY.name)
+                mutant.write_text(source.replace(needle, broken))
+                check(mutant.read_text() != source, "r6 fix mutant landed: " + name)
+                red = [n for n, ok in r6_fix_checks(mutant) if not ok]
+                check(red, "r6 fix mutant turns checks red: %s (%s)" % (name, ", ".join(red)))
         finally:
             for p in procs:
                 try:

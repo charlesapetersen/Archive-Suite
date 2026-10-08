@@ -103,7 +103,13 @@ scratch `MAC_HEAVY_LOCK` without a scratch `AGENT_MANAGER_STATE` (every harness)
 to `mac-heavy-lock.py`'s mkdir protocol directly, as before: the manager is never required.
 At the cutover a job already holding only the old mkdir lock (code from before R6) blocks a new taker, which
 waits for it; a waiter still running the old code waits for a new holder's mkdir lock. Neither direction can
-make a second holder. It TRIES the Mac lock once while holding `heavy.lock` and backs off (releasing `heavy.lock`) when the Mac
+make a second holder. Once loaded, a manager error that leaves the job holding nothing (an unwritable manager
+state, say) is logged and that job takes the mkdir lock instead of being refused. A job that defers to an
+earlier waiter in the manager's queue (both locks free meanwhile) records that waiter's pid in its heartbeat
+(`queued`), and `heavy-run.py waiting` counts it as a Mac wait unless that waiter is inside the session, so the
+watchdog, the wall backstop and the gate cap treat it like any other queue time. The manager does not apply
+its memory-pressure gate to this project's jobs, and a waiter that gate holds back holds no place in the queue,
+so this project runs under critical pressure as it did before R6. It TRIES the Mac lock once while holding `heavy.lock` and backs off (releasing `heavy.lock`) when the Mac
 lock is busy, never waiting for one lock while holding the other: a hand-run `mac-heavy-lock.py run` holder
 whose command then needs `heavy.lock` would otherwise deadlock.
 Vision OCR speaks the same wire protocol with its own bash helper (`ops/autonomous/mac-heavy-lock.sh`

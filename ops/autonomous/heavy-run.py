@@ -202,13 +202,19 @@ def waiting(state, root):
     heavy_busy = bool(r and active(state, r))
     m = None if heavy_busy else mac_lock.read_owner(mac_lock.lock_path())
     # A Mac-lock holder inside the session itself is a self-wait, not queued work.
-    if not heavy_busy and not (m and mac_lock.alive(m) and not descendant(m["pid"], root)):
-        return False
+    mac_busy = bool(m and mac_lock.alive(m) and not descendant(m["pid"], root))
+
+    def queue_wait(w):
+        # Deferring to an earlier waiter in the manager's queue (both locks free meanwhile) is a Mac wait too,
+        # unless that waiter is inside the session itself. R6 review, R6-archive.md finding 1.
+        q = w.get("queued")
+        return type(q) is int and q > 0 and bool(identity(q)) and not descendant(q, root)
+
     for path in (state / "waiters").glob("*.json"):
         w = json.loads(path.read_text())
         # With heavy.lock free, only a waiter its last attempt found blocked by the Mac lock counts.
         if (time.time() - w["heartbeat"] < 10 and identity(w["pid"]) == w["start"]
-                and (heavy_busy or w.get("mac")) and descendant(w["pid"], root)):
+                and (heavy_busy or w.get("mac") and (mac_busy or queue_wait(w))) and descendant(w["pid"], root)):
             return True
     return False
 
@@ -316,6 +322,7 @@ def run(state, command, ready):
     with (state / "heavy.lock").open("a+") as lock:
         try:
             blocked_by_mac = False
+            queued = None  # the pid of the earlier waiter this job deferred to, when that is what blocked it
             while not interrupted:
                 blocker = None
                 try:
@@ -328,13 +335,28 @@ def run(state, command, ready):
                             # W35.machine-lock: then the Mac-wide lock shared with Vision OCR, tried
                             # ONCE. Never wait for it holding heavy.lock: its holder may need heavy.lock
                             # next (a hand-run `mac-heavy-lock.py run`), and that would deadlock.
-                            got = try_mac(taker, label)
+                            try:
+                                got = try_mac(taker, label)
+                            except Exception as error:
+                                if taker is None or taker.fd is not None or taker.old is not None:
+                                    raise  # it holds something: refuse, as before
+                                # The manager failed holding nothing (an unwritable state, say): this job
+                                # takes the mkdir lock instead of being refused (R6-archive.md finding 2).
+                                note = "the Agent Manager's heavy-lock failed (%s: %s); this job uses the mkdir lock" % (
+                                    type(error).__name__, error)
+                                print("heavy-run: " + note, file=sys.stderr, flush=True)
+                                mac_lock._log(mac_lock.lock_path(), "archive-suite", note)
+                                taker.unregister()
+                                taker = manager = None
+                                got = try_mac(None, label)
                             if not isinstance(got, dict):
                                 machine = got
                                 break
                             blocker = got
                     fcntl.flock(lock, fcntl.LOCK_UN)
                     blocked_by_mac = bool(blocker)
+                    queued = (int(blocker["pid"]) if blocker and str(blocker.get("label", "")).endswith(", queued first")
+                              and str(blocker.get("pid", "")).isdigit() else None)
                 except BlockingIOError:
                     pass  # another worker's turn at heavy.lock: what this one waits on is unchanged
                 if blocker and taker:
@@ -351,7 +373,7 @@ def run(state, command, ready):
                     waited_from = time.time()
                 # "mac" lets the watchdog tell a Mac-lock wait from a heavy.lock spin.
                 publish(waiter, {"pid": os.getpid(), "start": identity(os.getpid()),
-                                 "heartbeat": time.time(), "mac": blocked_by_mac})
+                                 "heartbeat": time.time(), "mac": blocked_by_mac, "queued": queued})
                 # Each try runs `ps`; behind the Mac lock (minutes, on a loaded Mac) poll gently.
                 time.sleep(1 if blocked_by_mac else .25)
             if interrupted:
