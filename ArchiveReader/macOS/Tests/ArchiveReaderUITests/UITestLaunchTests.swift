@@ -8,6 +8,7 @@
 
 import XCTest
 
+@MainActor   // `XCUIApplication` is main-actor-isolated in the Swift 6 SDK
 final class UITestLaunchTests: XCTestCase {
 
     /// The flag itself, spelled the way AppKit reads it. Written out literally rather than referencing

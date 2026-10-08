@@ -48,7 +48,11 @@ class FixtureUITestCase: XCTestCase {
     /// The table that holds the file list rows.
     var table: XCUIElement { app.tables["ar.table"] }
 
-    override func setUpWithError() throws {
+    // `async` rather than the `…WithError` pair: XCTest's synchronous hooks are nonisolated, so on this
+    // `@MainActor` class every touch of `app` there was a Swift 6 isolation warning. The async overrides
+    // inherit the class's isolation (the `WarmStartUITests` pattern). A subclass that needs its own setup
+    // must override `setUp() async throws` and call `super` — not `setUpWithError()`.
+    override func setUp() async throws {
         continueAfterFailure = false
         try XCTSkipUnless(
             FileManager.default.fileExists(atPath: Self.fixturePath),
@@ -74,7 +78,7 @@ class FixtureUITestCase: XCTestCase {
         waitForRows(minimum: 1, timeout: 15)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         app?.terminate()
         app = nil
     }

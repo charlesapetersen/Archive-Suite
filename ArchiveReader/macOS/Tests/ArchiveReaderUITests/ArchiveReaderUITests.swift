@@ -5,13 +5,15 @@ final class ArchiveReaderUITests: XCTestCase {
 
     private var app: XCUIApplication!
 
-    override func setUpWithError() throws {
+    // Async hooks, not the `…WithError` pair: those are nonisolated, so touching `app` there was a
+    // Swift 6 isolation warning; the async overrides inherit this class's `@MainActor`.
+    override func setUp() async throws {
         continueAfterFailure = false
         app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launch()
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         app.terminate()
         app = nil
     }

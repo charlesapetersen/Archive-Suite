@@ -118,9 +118,7 @@ final class NavigationUITests: FixtureUITestCase {
     // MARK: - Column headers exist
 
     func testColumnHeadersExist() throws {
-        // The table header has id "ar.table.header".
-        let header = app.otherElements["ar.table.header"]
-        // NSTableHeaderView may be exposed differently — check the table's column headers.
+        // NSTableHeaderView ("ar.table.header") may be exposed differently — check the table's column headers.
         // At minimum, verify the table itself is present (covered by setUp).
         // Check that key column header texts are reachable.
         let expectedHeaders = ["Document date", "File name", "File tags", "Quality", "Read"]

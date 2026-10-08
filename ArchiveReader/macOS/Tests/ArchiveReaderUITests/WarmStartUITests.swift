@@ -35,7 +35,7 @@ final class WarmStartUITests: XCTestCase {
 
     // `async` rather than the `…WithError` pair: XCTest's synchronous hooks are nonisolated, so on a
     // `@MainActor` class every touch of a stored property or of `XCUIApplication` there is a Swift 6
-    // actor-isolation warning (nine of them, the same debt `FixtureUITestCase` carries). The async
+    // actor-isolation warning (nine of them; `FixtureUITestCase` moved to this pattern in W9.e3-fu1). The async
     // overrides inherit the class's isolation, so the hooks are warning-free.
     override func setUp() async throws {
         continueAfterFailure = false
