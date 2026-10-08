@@ -193,14 +193,25 @@ per size, interleaved, each under the heavy lock (lock wait excluded), 4 CPUs bo
 | app | 8192 MB wall s (median) | 6144 MB wall s (median) | Δ median | in-guest test s, 8192 / 6144 (median) | result, both sizes |
 |---|---|---|---|---|---|
 | reader | 542 · 508 · 486 (**508**) | 494 · 2827 · 461 (**494**) | −3% | 422 / 416 | 31 passed + 1 skipped, every run |
-| notes | 2114 · 1189 · 1148 (**1189**) | 1328 · 1207 · 1264 (**1264**) | +6% | 1104 / 1129 | **21–22 failed every run at BOTH sizes** (22, 21, 21 / 21, 21, 21) |
+| notes | 2114 · 1189 · 1148 (**1189**) | 1328 · 1207 · 1264 (**1264**) | +6% | 1104 / 1129 | **21–22 failed every run at BOTH sizes** (22, 21, 21 / 21, 21, 21); after the W35.vm-mem-fu1 fixes, 0 failed ×3 at 6144 MB (wall median 1046 s) |
 | processor | 212 · 136 · 148 (**148**) | 132 · 123 · 116 (**123**) | −17% | 60 / 58 | 7 passed, every run |
 
 Keep rule was "no run fails that passed at 8 GB, median no more than 25% slower" — met. The one 2827 s Reader
 run spent its extra ~40 min outside test execution (its tests took 435 s, like the others); with no timestamps
 in that log the cause is unknown, and the median absorbs it. Notes was already red at 8 GB (17 of its 21 are
-`a seeded note row should populate the list`), so it adds timing but little pass/fail evidence — tracked as
-`W35.vm-mem-fu1`, which re-checks at 6 GB once the suite is green. Peak host swap during a run (3.1–7.8 GB)
+`a seeded note row should populate the list`), so it adds timing but little pass/fail evidence. **Re-checked at
+6144 MB once green (W35.vm-mem-fu1, 2026-10-08): three full `notes xcuitest` runs, 38 tests each (37 passed + 1 skipped), 0 failures and exit 0 every run; wall 1046 · 1057 · 1043 s (**1046**), in-guest test 956 · 974 · 968 s.**
+
+**A wedged guest WindowServer looks like an app hang (W35.vm-mem-fu1).** Three full Notes runs on 2026-10-08
+stopped at the same point, 13 passed and then G1 timing out on `Failed to get matching snapshots`, with the
+next tests failing `does not have a process ID`. The app was not at fault: the guest WindowServer was stuck in
+a window capture's Metal submit (`ps` state `U`), every new app launch blocked in `SLSMainConnection`, and the
+guest kernel log (`log show --predicate 'sender == "AppleParavirtIOSurface"'`) had `wire_host_mapping failed`
+with `0xe00002d6` (kIOReturnTimeout). The **host** stopped servicing the VM's GPU surface mappings while its
+swap stood at 4.5 of 5.1 GB. The same tests passed alone and in the next three full runs, with host swap
+up to 5.6 GB, so the swap level alone does not predict it and the trigger is still unknown. If a Notes or Reader run
+stops partway with snapshot timeouts, sample the guest WindowServer (`tart exec archive-gui-runner sudo -n
+/usr/bin/sample <pid> 3`) and read that log before debugging the app. Peak host swap during a run (3.1–7.8 GB)
 rose through the day with other machine load at both sizes and is not attributable to the VM. If 6 GB ever
 looks like the cause of a failure, `tart set … --memory 8192` and rerun before debugging anything else.
 

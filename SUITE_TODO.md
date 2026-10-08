@@ -896,9 +896,8 @@ completion record is in `SUITE_TODO_DONE.md`.
   empty state (D8). The authors check on `origin/wip/W9.e2` (`4f7642f`) was red on an unscoped "Clear" button;
   judge it before reuse. `runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation` removes the fixture note
   `setUpOnMainActor` needs, so run destructive checks last or on a rebuilt fixture.
-  All six parts wait on `W35.vm-mem-fu1`: on 7 Oct Notes UITests were red in the GUI VM (21 of 31, 17 of them
-  on "a seeded note row should populate the list", the precondition every sweep test needs), and the 6 Oct
-  5/5 VM-green runs of the `f4f39c4` sweep tests predate that finding.
+  All six parts waited on `W35.vm-mem-fu1` (Notes UITests red in the GUI VM on 7 Oct); it shipped 2026-10-08
+  with the suite 0-failed in three full VM runs at 6144 MB.
   DONE WHEN each behaviour above is observed in a VM-green UITest or a render-guard shot, not inferred, and any
   defect found is filed as its own `W9.e2-fu*` item. | ArchiveNotes + ops/gui/ | S-M | low | **needs:** gui
 - [ ] **`W9.e2-search` — runtime sweep, search: keyword FTS, quality/tag/date filters, smart folders [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
@@ -1062,17 +1061,6 @@ of their time in builds, tests and the VM; "the point of running multiple sessio
 full usage window". Made the daemon's next work, ahead of everything else in the queue. Replaces the single
 W35.lanes item of 2026-10-04. Research (worktrees, lock-file claims, pace-aware slot sizing, per-lane pauses,
 staggered starts, the subscription policy) and the design are in the plan.
-
-- [ ] **`W35.vm-mem-fu1` — Notes UITests are red in the GUI VM (21 of 31), and `vm-gui-runner.sh` exits 0 anyway [S-M]** (lane: notes,gui) (uses: build,vm)
-  Found by W35.vm-mem, 2026-10-07: every one of six `vm-gui-runner.sh notes xcuitest` runs, at 8192 MB and at
-  6144 MB alike, ended `** TEST FAILED **` with 21–22 failures; 17 of the 21 are `a seeded note row should populate
-  the list`, the rest G13/G16/G17/`testDateRowWarns…` (evidence: `~/.tart-mirror/vm-mem-measure/notes-*.log`,
-  latest full log `~/.tart-mirror/vm-artifacts/notes/xcuitest.log`). Not a memory effect. Find the cause (fixture,
-  index-ready wait, or app) and make the suite green in the VM; then rerun it three times at the VM's 6144 MB and
-  add the pass/fail to `ops/gui/README.md`'s memory table. Also: the interactive runner printed only a WARN and
-  exited 0 on `** TEST FAILED **`, so a script wrapping it saw success; make it exit non-zero on a failed
-  test run (check the gate's own `TEST FAILED` handling is unchanged and still covers Notes in its rotation).
-  Notes: `execution-plans/items/W35.vm-mem-fu1.md` (saved draft branches).
 
 **Efficiency plan, rounds 3-4 (queued 2026-10-07).** Owner, 2026-10-07: lock less, and make more independent
 items that several workers can run at once. Plan and evidence: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` and

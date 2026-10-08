@@ -9948,3 +9948,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `ArchiveReaderUITests` → filed as `W9.e3-fu1` (needs the VM to prove). The paid Processor OCR smoke was not
   run, and the health gate doesn't run it either. No corpus, live store, network or GUI was used.
   <!-- /W9.e3 -->
+- [x] **W35.vm-mem-fu1 — Notes UITests are red in the GUI VM (21 of 31), and `vm-gui-runner.sh` exits 0 anyway [S-M]** · §Autonomous daemon — use both subscriptions (owner, 2026-10-04) · SHIPPED 2026-10-08 (this commit; checkpoints `2f27764` `c9d9ff8` `9d2c6bf` `d47b36c` `a5a9132` `b6a2d4d` `e6a1c58` `0db69b0` `ad05368`)
+  The suite is green in the GUI VM at 6144 MB: three full `vm-gui-runner.sh notes xcuitest` runs, 38 tests each
+  (37 passed + 1 skipped), 0 failures, exit 0. Wall 1046 · 1057 · 1043 s. Row and notes in `ops/gui/README.md` §3.
+  Causes fixed along the way: the per-test fixture restore (the 17 "seeded note row" failures came from tests
+  deleting fixture notes), and the runner exiting non-zero on `** TEST FAILED **` (`2f27764`; `c9d9ff8` pins
+  that and the gate's unchanged rule in `prove-vm-lane`). Then the six VM-only editor faults: an unedited note's
+  flush, a background chip re-style, attachment relayout retries, date-row scroll, pinned kind filters, and
+  chip views TextKit strands after undo/redo (`9d2c6bf`–`0db69b0`).
+  The last three runs before this one each stopped at 13 passed inside G1. That was a wedged guest
+  WindowServer (paravirt IOSurface `wire_host_mapping` timeout, host-side), not the app. G1 passed alone, and
+  the new G20 (`ad05368`) proved checkpoint 8's `layout()` hook does not loop on an idle editor. G20 stays as
+  the guard. The diagnosis recipe is in the README. The two saved draft branches
+  (`wt/autonomous-20261007-200815-20485`, `wt/autonomous-20261007-202524-1261`) were judged hunk by hunk as
+  superseded by checkpoints 1–8. They are kept, not deleted, because deleting an unmerged branch needs `-D`.
+  <!-- /W35.vm-mem-fu1 -->
