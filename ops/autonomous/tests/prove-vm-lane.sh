@@ -321,7 +321,7 @@ grep -q '\[ "\$XCUITEST_FAILED" = 0 \] || die' "$RUNNER" \
   && ok "runner exits non-zero at the end when the XCUITest run failed" \
   || no "runner still exits 0 after a failed XCUITest run"
 # The gate keys on the markers itself and never calls the runner; its RED rule must be untouched.
-grep -q "is_fail()    { grep -q '\\\*\\\* TEST FAILED" "$GATEF" \
+grep -qF "is_fail()    { grep -q '\*\* TEST FAILED \*\*'" "$GATEF" \
   && ok "gate still keys RED on its own '** TEST FAILED **' check" \
   || no "gate's TEST FAILED check changed"
 
