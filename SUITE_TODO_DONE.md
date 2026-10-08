@@ -10030,3 +10030,12 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `prove-session-policy.sh` 49/49; prove-daemon, -exit-logging, -gate-fix, -worker-claims, -worker-supervisor green.
   README §*Model, effort and limits*. **Takes effect at the next owner restart** (the daemon was not restarted).
   <!-- /W35.session-policy -->
+- [x] **W40.d6 — is the USB transport reachable [S]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-08 (this commit).
+  **Yes.** Live Capture → Start → `CaptureSession.start()` → `CaptureServer` ready → `serverDidStart` →
+  `USBBridge.startReverse`; the Android Wired mode forces host `127.0.0.1`. New `ArchiveProcessor/scripts/usb-reverse-probe.sh`
+  ran the real headless app with no device, then booted the headless emulator: the app made `tcp:P tcp:P` itself,
+  in-device `GET 127.0.0.1:P/ping` answered 200 (right token) / 401 (wrong), and after `adb reverse --remove-all`
+  the app re-created the mapping in 3 s. Evidence: `verification/evidence/processor/W40.d6-usb-transport.md` (+ REPORT).
+  Row status for the ledgers: Mac side + tunnel `works`; physical phone over a cable `unverifiable-here`. Not an
+  `unreachable` row, so nothing goes to the owner. `e2e-phone-mac.sh` pairs over `10.0.2.2` and never touched USB.
+  <!-- /W40.d6 -->

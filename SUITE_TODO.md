@@ -1117,7 +1117,6 @@ unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the 
 - [ ] **`W40.d3` — every OCR provider through the app's own client [S-M]** (lane: processor) (uses: build,paid) (blocked-on: W40.b3, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d4` — one tiny real batch job per batch provider [S-M]** (lane: processor) (uses: build,paid) (blocked-on: W40.d3, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d5` — live capture with hand-driven review [M]** (lane: processor) (uses: build) (blocked-on: W40.b4, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d6` — is the USB transport reachable [S]** (lane: processor) (uses: light). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d7` — Reader at corpus size [M]** (lane: reader) (uses: machine) (blocked-on: W40.b1, W40.c2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d8` — Reader triage writes, checked per step [M]** (lane: reader) (uses: vm) (blocked-on: W40.b1, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d9` — Notes writing session with real keystrokes [M]** (lane: notes) (uses: vm) (blocked-on: W40.b2, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.

@@ -1,0 +1,8 @@
+[usb-probe] run dir: /tmp/ap-usb-probe-FJPCnU · app: ~/Claude/suite-wt-20261008-101320-67179/ArchiveProcessor/scripts/../macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor · commit: 2154db2
+[usb-probe] step 1: app listening on port 48627; devices attached at that moment: none
+[usb-probe] step 2: app created the mapping by itself: host-16 tcp:48627 tcp:48627  
+[usb-probe] step 3: in-device GET 127.0.0.1:48627/ping → right token: 'HTTP/1.1 200 OK' · wrong token: 'HTTP/1.1 401 Unauthorized'
+[usb-probe] step 4: after --remove-all → ping: '<no answer>'
+[usb-probe] step 4: app re-created the mapping after 3 s
+[usb-probe] step 4: ping after heal → 'HTTP/1.1 200 OK'
+[usb-probe] RESULT: PASS — USBBridge is reached from session start and the tunnel carries authenticated traffic

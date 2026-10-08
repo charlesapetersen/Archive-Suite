@@ -350,7 +350,8 @@ pipeline, and per-doc phone screencaps are checked. Deterministic + unattended (
 **Needs:** the Mac free + awake (headless, but a live app session — don't drive its GUI meanwhile), the
 `ap_test36` emulator + android-36 image installed, `xcodegen` on PATH, and a Gemini key (env or Keychain);
 spends ~a few cents. It's the Tier-2 functional gate for `Capture/`/`Net/` — **not** a per-commit/CI check
-(use `test-smoke.sh` for that).
+(use `test-smoke.sh` for that). It pairs over `10.0.2.2`, so it never touches USB: for the `adb reverse` tunnel
+run `scripts/usb-reverse-probe.sh` (free, no key; real headless app + emulator; W40.d6).
 
 **Cadence:** **push commits to `origin` frequently** — a clean build + Tier-1 self-review (and Tier-2 for
 high-blast-radius diffs) is enough to push; don't hoard local commits. **Releases are the sparse milestone:**
