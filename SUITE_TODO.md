@@ -767,8 +767,6 @@ launch safeguards; the gate rotates one route per run.
   … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
   | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
 
-- [ ] **W22.mixed-batch-fu2 — price direct PDF pages separately in mixed batch estimates [S-M].** (lane: processor) (uses: build) In a mixed Batch run, `performMultiPagePDFReOCR` calls the model directly once per PDF page, while `RunHistorySnapshot.estimatedCost` applies discounted batch pricing to the full file count; the pre-run pane also lacks PDF page accounting. Show the image-subset batch estimate plus direct PDF-page estimate consistently before the run and in history. Found in W22.mixed-batch Tier-2 review (2026-09-26), `RunHistorySnapshot.estimatedCost` / `performMultiPagePDFReOCR`. | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProcessingHistory.swift, Views/OCRView.swift | S-M | low | none
-
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
 > ## ⏸ ON HOLD — owner directive, 2026-08-01. PLANS RETAINED IN FULL.

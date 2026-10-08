@@ -62,15 +62,26 @@ struct RunHistorySnapshot {
     let imageScale: Double
     let rotationMode: RotationMode
     let fileCount: Int
+    /// Multi-page PDFs among `fileCount` and their total pages. Those pages go to `model` directly, one
+    /// call each, so they are priced apart from the image subset (never at batch rates).
+    var pdfFileCount: Int = 0
+    var pdfPageCount: Int = 0
 
-    /// Cost of this run using the exact same per-model math the pre-run estimator uses (standard vs
-    /// batch total picked by `batchMode`).
+    /// Cost of this run using the exact same per-model math the pre-run estimator uses: the image subset
+    /// at the standard or batch total picked by `batchMode`, plus any direct PDF pages at standard.
     var estimatedCost: Double {
         // A Local Agent consumes the operator's CLI subscription, never this app's API budget.
         guard localAgent == nil else { return 0 }
+        let imageCount = max(0, fileCount - pdfFileCount)
+        let pdfPages = pdfPageCount > 0 ? CostEstimator.estimateDirectPDFPages(
+            pageCount: pdfPageCount, model: model, imageScale: imageScale, rotationMode: rotationMode,
+            useGateway: gatewayConfig != nil, imageTokenProvider: imageTokenProvider) : nil
+        guard imageCount > 0 else {
+            return CostEstimator.runTotal(images: nil, directPDFPages: pdfPages, batch: batchMode)
+        }
         let costModel = visionTextModel ?? model
         let est = CostEstimator.estimate(
-            fileCount: fileCount,
+            fileCount: imageCount,
             model: costModel,
             enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
@@ -83,7 +94,13 @@ struct RunHistorySnapshot {
             imageTokenProvider: imageTokenProvider,
             visionTextOnly: visionTextModel != nil
         )
-        return batchMode ? est.totalBatch : est.totalStandard
+        return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode)
+    }
+
+    /// Page total for the multi-page PDFs a run re-OCRs. A PDF that can no longer be read counts as 2
+    /// pages, the fewest a multi-page PDF can have.
+    static func directPDFPageCount(_ urls: [URL]) -> Int {
+        urls.reduce(0) { $0 + (PDFToImageConverter.multiPagePDFPageCount($1) ?? 2) }
     }
 
     var providerLabel: String {
@@ -149,7 +166,9 @@ extension RunHistorySnapshot {
             contextCharCount: run.previousTextCharCount,
             imageScale: imageScale,
             rotationMode: rotationMode,
-            fileCount: run.fileURLs.count + (run.mixedPDFOutcomes?.count ?? 0)
+            fileCount: run.fileURLs.count + (run.mixedPDFOutcomes?.count ?? 0),
+            pdfFileCount: run.mixedPDFOutcomes?.count ?? 0,
+            pdfPageCount: Self.directPDFPageCount(run.mixedPDFOutcomes?.map(\.sourceURL) ?? [])
         )
     }
 
@@ -176,7 +195,9 @@ extension RunHistorySnapshot {
             contextCharCount: 0,
             imageScale: imageScale,
             rotationMode: rotationMode,
-            fileCount: batch.fileURLs.count + (batch.mixedPDFOutcomes?.count ?? 0)
+            fileCount: batch.fileURLs.count + (batch.mixedPDFOutcomes?.count ?? 0),
+            pdfFileCount: batch.mixedPDFOutcomes?.count ?? 0,
+            pdfPageCount: Self.directPDFPageCount(batch.mixedPDFOutcomes?.map(\.sourceURL) ?? [])
         )
     }
 }

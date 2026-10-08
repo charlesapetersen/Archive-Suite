@@ -10126,3 +10126,17 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Notes VM run was 40/42 green, 1 skipped (corrupt-index), and G16 (Zotero chip) failed once; it passed on
   re-run, so it is filed as `W9.g16-flake`. The unit bundle was not re-run because no app source changed.
   <!-- /W9.e2-search -->
+
+- [x] **W22.mixed-batch-fu2 — price direct PDF pages separately in mixed batch estimates [S-M]** · §W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28) · SHIPPED 2026-10-08 (this commit)
+  Multi-page PDF re-OCR makes one direct, standard-rate model call per page with no tagging or segmentation,
+  but both the pre-run cost pane and `RunHistorySnapshot.estimatedCost` priced every dropped file as an image
+  (batch rate and tagging included). `CostEstimator.estimateDirectPDFPages` now prices those pages on their own
+  and `CostEstimator.runTotal` adds them to the image subset's standard or batch total; the pane and history
+  both use the pair. The pane shows a "PDF pages (N in M PDFs, direct)" row, an Images count, and a batch total
+  labelled "batch images + direct PDF pages". History records `pdfFileCount`/`pdfPageCount` at run start and on
+  both resume paths (page count read from each source PDF; an unreadable one counts as 2, the multi-page
+  minimum). A PDF-only run with Batch selected is now priced per page at standard. Proven by three new checks
+  in `ProcessingHistoryTestDriver` (`scripts/test-processing-history.sh`, 26/26 PASS) and an `ap.ocr.pdfPageCost` assertion in
+  the multi-page UITest (VM-green; screenshot shows "PDF pages (2 in 1 PDF, direct)"). Time estimate unchanged.
+  | files: ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/{CostEstimator,ProcessingHistory,ProcessingHistoryTestDriver}.swift, OCR/{PDFToImageConverter,OCRProcessor+Pipeline}.swift, Views/OCRView.swift, Tests/ArchiveProcessorUITests/ProcessorUITests.swift
+  <!-- /W22.mixed-batch-fu2 -->

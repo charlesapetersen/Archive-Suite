@@ -2827,7 +2827,9 @@ extension OCRProcessor {
             contextCharCount: segmentationContext.previousTextCharCount,
             imageScale: segmentationContext.imageScale,
             rotationMode: rotationMode,
-            fileCount: files.count
+            fileCount: files.count,
+            pdfFileCount: pdfIndices.count,
+            pdfPageCount: RunHistorySnapshot.directPDFPageCount(pdfIndices.map { files[$0] })
         )
 
         if autoReOCR {

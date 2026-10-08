@@ -11,9 +11,15 @@ struct PDFToImageConverter {
     /// reads only its page tree, not page content, so this is cheap enough to call once per input at
     /// run start. A non-PDF, an unreadable PDF, or a single-page PDF returns false.
     static func isMultiPagePDF(_ url: URL) -> Bool {
+        multiPagePDFPageCount(url) != nil
+    }
+
+    /// The page count of an input `isMultiPagePDF` routes to re-OCR, else nil. Cost estimates need it
+    /// because that transform makes one direct model call per page, not one per file.
+    static func multiPagePDFPageCount(_ url: URL) -> Int? {
         guard url.pathExtension.lowercased() == "pdf",
-              let document = PDFDocument(url: url) else { return false }
-        return document.pageCount > 1
+              let document = PDFDocument(url: url), document.pageCount > 1 else { return nil }
+        return document.pageCount
     }
 
     /// If the URL points to a PDF, render its first page to a temporary JPEG and return
