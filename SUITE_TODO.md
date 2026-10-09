@@ -880,17 +880,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-fu1` — dragging a folder into the gap between two folders re-parents it instead of reordering [S · gui]** (lane: notes) (uses: vm)
-  Found by W9.e2-folders, 2026-10-08 (D1 doubt 1, now confirmed at runtime). Dragging Ideas onto the top edge of
-  Reading, the gap above it, in the VM: `organization.json` then has Ideas with `parentId` = Reading and
-  `sortOrder` 0, so the folder row's own `.onDrop` (`NotesFolderTreeView.folderRow`) takes the drop as a re-parent
-  before the level's `ForEach.onMove` sees it. `NotesE2FolderTests.testE2_FolderDragToSiblingGapReorders` pins
-  this under a strict `XCTExpectFailure`. Users can reorder with the context menu's Move Up and Move Down and
-  un-nest with Move to Top Level (added by W9.e2-folders), so no folder is stuck, but the drag does the wrong
-  thing silently. Fix candidates: drop the row-level `.onDrop` for folder payloads and let `.onMove` and an
-  outline-level drop handle them, or have the row delegate re-parent only when the drop lands in the row's middle
-  band. DONE WHEN a gap drag reorders, the expected failure is removed, and testG18 (drop ON a row re-parents)
-  still passes in the VM. | ArchiveNotes | S | low | **needs:** gui
 - [ ] **`W9.e2-zotero` — runtime sweep, Zotero attach and auto-fill, note-level chips, templates [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Zotero attach and auto-fill (B1/B2) write front-matter; note-level chips render;
   templates (D3) create the expected note. Use the scratch fixture and a stubbed Zotero source; a real Zotero

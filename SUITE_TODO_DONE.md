@@ -10154,3 +10154,16 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `NotesFolderTreeView` and the test helpers came from the draft `4f7642f` on `origin/wip/W9.e2`, rewritten and
   re-verified here. The Notes unit bundle is green.
   <!-- /W9.e2-folders -->
+- [x] **W9.e2-fu1 — dragging a folder into the gap between two folders re-parents it instead of reordering [S · gui]** · §W9 gap-closure · SHIPPED 2026-10-08 (this commit)
+  Found by W9.e2-folders (D1 doubt 1). The row's own `.onDrop` sees every folder drop over it before the
+  level's `ForEach.onMove`, so the row now decides: `NotesFolderRowDropTarget` measures the row
+  (`onGeometryChange`) and a folder dropped in its top or bottom quarter is placed before or after it, in its
+  level (`placeFolder`, which also moves a folder in from another level and refuses a cycle via
+  `moveFolder`); a middle drop still re-parents. Found while fixing: the `com.archivenotes.folder-id` type is
+  registered `.ownProcess` and is NOT visible on the drop side (a VM trace showed the edge path never ran), so
+  folder-ness is decided by the payload being a folder id, the same test `handleDrop` uses; a note drag on an
+  edge still files into the folder. VM: `NotesE2FolderTests` 4/4 (the gap-drag strict expected failure is
+  gone; new `testE2_FolderDragToBottomEdgeReorders`) and `testG18_DragFolderOntoFolderReparentsIt` green;
+  Notes unit bundle green. Rows measured 16 pt on a 32 pt pitch, so the band is 4 pt; the context menu's
+  Move Up / Move Down stay the no-aim path.
+  <!-- /W9.e2-fu1 -->

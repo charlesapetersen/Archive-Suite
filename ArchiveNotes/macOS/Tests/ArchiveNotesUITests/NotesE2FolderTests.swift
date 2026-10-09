@@ -135,8 +135,11 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 .press(forDuration: 1.0,
                        thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)))
-            XCTAssertTrue(pollUntil(timeout: 10) { self.ideasAboveReading() == true },
-                          "dropping Reading on Ideas' bottom edge should put it after Ideas, still at the top level")
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                guard let i = self.folderRecord(id: Self.folderIdeas.lowercased()),
+                      let r = self.folderRecord(id: Self.folderReading.lowercased()) else { return false }
+                return i.parent == nil && r.parent == nil && i.sortOrder < r.sortOrder
+            }, "dropping Reading on Ideas' bottom edge should put it after Ideas, still at the top level")
         }
     }
 
