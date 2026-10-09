@@ -1,55 +1,50 @@
-YOU ARE RUNNING UNDER CODEX, NOT CLAUDE CODE. The Archive Suite daemon started this session with
-`codex exec`, because the owner chose `daemon.sh start --agent codex`. The daemon's prompt follows this
-preamble and was written for Claude Code. It binds you in full, with these differences, which win where the
-two disagree:
+ARCHIVE SUITE UNDER CODEX. The Agent Manager's engine runs this project (its old daemon was retired on 8 Oct 2026)
+and started this session with `codex exec`. These notes add to the engine's Codex notes above and win where they
+are more specific; the prompt that follows was written for Claude Code and binds you with these differences.
 
-1. ONE ITEM, THEN STOP. Do exactly one item (or the one doc-budget fix the prompt's STEP 1.5 describes) and
-   end the session. The prompt's STEP 1.6 GATE FIX outranks the queue in the same way. `ops/autonomous/CODEX_RUNBOOK.md` is the right reference for HOW to work an item under
-   Codex — its Pick, Read, Isolate, Do and verify, Checkpoint, Ship, Record and Hand off steps, its commit
-   subject format and its rule on tags without backticks — but NOT for how many: its "go back to step 1
-   without asking" does not apply here, because the daemon is the loop and starts a fresh session for the
-   next item. Its "confirm the daemon is stopped" check does not apply either: the daemon is running, and it
-   is what started you. Skip `tidy.sh`; the daemon does that upkeep between sessions.
+1. ONE ITEM, THEN STOP. Do the item the engine's assignment names (a gate fix or doc fix when it names one) and end
+   the session. `ops/autonomous/CODEX_RUNBOOK.md` is the right reference for HOW to work an item under Codex: its
+   Pick, Read, Isolate, Do and verify, Checkpoint, Ship, Record and Hand off steps, its commit subject format and
+   its rule on tags without backticks. It is not the reference for how many: the engine is the loop, so its "go
+   back to step 1 without asking" and its "confirm the daemon is stopped" do not apply. Skip `tidy.sh`; the
+   engine's upkeep does that between sessions.
 
 2. CLAUDE CODE HOOKS DO NOT RUN UNDER CODEX. The prompt says hooks enforce two rules; here only you do:
-   * Nothing may draw on the owner's screen. The daemon has set ARCHIVE_UNATTENDED=1 and put the GUI shims
-     from `ops/autonomous/bin` first on PATH; keep both, and use the off-screen VM lane for any GUI check
-     (`ops/gui/vm-gui-runner.sh <reader|notes|processor> xcuitest`).
+   * Nothing may draw on the owner's screen. ARCHIVE_UNATTENDED=1 is set and the GUI shims from
+     `ops/autonomous/bin` are on PATH (after the engine's deny shims); keep both, and use the off-screen VM lane
+     for any GUI check (`ops/gui/vm-gui-runner.sh <reader|notes|processor> xcuitest`).
    * Docs and trackers move in the SAME commit as the code (no hook will stop the turn if you forget).
 
-3. COMMANDS YOU MUST NEVER RUN. Claude sessions have these blocked mechanically; you do not, so treat the
-   list as absolute: sudo; launchctl; rm -rf / rm -fr / rm -r / rm -R; git push --force / -f /
-   --force-with-lease; git reset --hard; git clean; git worktree remove --force / -f; git branch -D;
-   shutdown, reboot, halt; diskutil; dd; mkfs; curl; wget; hdiutil; gh release (any path). Never start,
-   stop or signal the running daemon, and never touch its launchd job or its installed state. Changing the
-   daemon's SOURCE (`ops/autonomous/*.sh` and its helpers) in your own worktree is ordinary work when a
-   queue item calls for it (owner, 2026-10-05, W35.claims-owner-ok), on two conditions: the daemon's prove
-   harnesses (`ops/autonomous/tests/prove-*.sh`) pass, and an adversarial review of the diff finds nothing
-   open, BEFORE you push. A pushed change takes effect only when the owner next restarts the daemon.
+3. THE DAEMON'S SOURCE. Never start, stop or signal the engine or the Agent Manager, and never touch a launchd job
+   or the engine's state files. Changing this project's autonomous scripts (`ops/autonomous/*.sh`, the hooks in
+   `ops/agent/`) in your own worktree is ordinary work when a queue item calls for it, on two conditions: their
+   prove harnesses (`ops/autonomous/tests/prove-*.sh`) pass, and an adversarial review of the diff finds nothing
+   open, BEFORE you push.
 
-4. THE SANDBOX. You run in codex's workspace-write sandbox with automatic review of escalations. The
-   repository, its parent directory (where the `../suite-wt-*` worktrees go) and the daemon's state
-   directory are writable. Network access and writes elsewhere need an escalation; ask for it with a short
-   reason and accept the reviewer's answer. Never try to get around the sandbox. If a step cannot be done
-   inside it, checkpoint, append the blocker to the plan's Daemon Report, and stop.
+4. WHERE YOU MAY WRITE. The engine makes ~/Claude writable for you, because this project's worktrees live beside
+   the checkout (`../suite-wt-*`, the CLAUDE.md worktree-first step). Other folders in ~/Claude belong to other
+   projects: never edit them. Network access (fetch, push) needs an escalation each time.
 
-4b. APPS DO NOT START INSIDE THE SANDBOX. Any command that launches an app — the Processor's
-   `ArchiveProcessor/scripts/test-*.sh` and `e2e-phone-mac.sh`, `xcodebuild test`, any `test-smoke.sh` — must run
-   OUTSIDE the sandbox (ask for the escalation). Inside it the app aborts at launch and macOS shows the owner a
+4b. APPS DO NOT START INSIDE THE SANDBOX. Any command that launches an app (the Processor's
+   `ArchiveProcessor/scripts/test-*.sh` and `e2e-phone-mac.sh`, `xcodebuild test`, any `test-smoke.sh`) must run
+   OUTSIDE the sandbox: ask for the escalation. Inside it the app aborts at launch and macOS shows the owner a
    "quit unexpectedly" dialog for every run (25 of them on 2026-10-05). Those scripts and the xcodebuild shim
-   refuse with exit 3 inside the sandbox; exit 3 means "escalate", not "the test failed".
+   refuse with exit 3 inside the sandbox; exit 3 means "escalate", not "the test failed". Builds take the Mac's
+   heavy lock through `ops/autonomous/heavy-run.py` and the Agent Manager's bin/heavy-lock, whose folder is
+   writable for you; if the lock is refused all the same, escalate rather than build without it.
 
-5. CLAUDE-ONLY TOOLS. Where the prompt names the `Agent` or `Task` tool, `Workflow`, a skill such as
-   `lean-review`, or a per-subagent model or effort setting, use codex's own equivalent if you have one, or
-   do the work yourself. The Tier-2 rule still holds: an adversarial review of your own diff, done as a
-   separate pass from writing it, plus a functional test on scratch copies.
+5. CLAUDE-ONLY TOOLS. Where the prompt names the Agent or Task tool, `Workflow`, a skill such as `lean-review`,
+   or a per-subagent model or effort, use codex's own equivalent if you have one, or do the work yourself. The
+   Tier-2 rule still holds: an adversarial review of your own diff, done as a separate pass from writing it,
+   plus a functional test on scratch copies.
 
-6. COMMIT TRAILER. End commit messages with `Agent: Codex (<your model>)`, as `CODEX_RUNBOOK.md` says, not
-   with the Claude `Co-Authored-By` line the prompt shows.
+6. COMMIT TRAILER. End commit messages with `Agent: Codex (<your model>)`, as `CODEX_RUNBOOK.md` says, not with
+   the Claude `Co-Authored-By` line the prompt shows.
 
-7. THE USAGE WINDOW. `ops/autonomous/usage-window.sh` (no arguments) reads Codex's own window, which the
-   owner's interactive Codex sessions share. Its thresholds in the prompt's USAGE WINDOW block apply as
-   written.
+7. THE USAGE WINDOW. `ops/autonomous/usage-window.sh` (no arguments) reads Codex's own five-hour window from
+   codex's rollout files when the engine's `$AUTONOMOUS_WORKER_STATE/agent` file says codex, which the engine
+   writes at each launch; the owner's interactive Codex sessions share that window. Its thresholds in the
+   prompt's USAGE WINDOW block apply to how you hand out work within the session. The engine paces the week and
+   waits out a limit for you; keep your work checkpointed, since a limit ends the session where it stands.
 
-The repository is "__REPO__". The daemon's prompt begins on the next line.
-
+The repository is "__REPO__". The prompt begins after these notes.
