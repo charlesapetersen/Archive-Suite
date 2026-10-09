@@ -880,13 +880,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-zotero` — runtime sweep, Zotero attach and auto-fill, note-level chips, templates [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
-  Part of `W9.e2` (plan E2). Zotero attach and auto-fill (B1/B2) write front-matter; note-level chips render;
-  templates (D3) create the expected note. Use the scratch fixture and a stubbed Zotero source; a real Zotero
-  install is owner-eye, so flag it and do not claim it.
-  DONE WHEN auto-fill's front-matter write, chip rendering and a template-created note are each observed in a
-  VM-green UITest or render-guard shot, and the owner-eye remainder is written in this entry. | ArchiveNotes |
-  S-M | low | **needs:** gui
 - [ ] **`W9.g16-flake` — `testG16_NoteZoteroAttachmentChipsAndClipboardDedup` failed once in a full VM run [S · gui]** (lane: notes) (uses: vm)
   Found by W9.e2-search, 2026-10-08. A full `vm-gui-runner.sh notes xcuitest` run on `850aac3` was 40/42 green, 1
   skipped (corrupt-index), and failed G16 at `NotesGUITests.swift:1718`: after typing the link into

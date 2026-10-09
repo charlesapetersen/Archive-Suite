@@ -330,6 +330,8 @@ struct NotesModelTemplateTests {
         #expect(created.tags == ["oral-history"])
         #expect(created.trailingBodyRaw == "Q: …")
         #expect(env.org.foldersContaining(item: newID) == [folder])
+        // W9.e2-zotero: the list reads the index, so the new note must be indexed at once.
+        #expect(env.model.allItems.contains { $0.id == newID && $0.title == "Interview" })
     }
 
     @Test("blank new note is filed in Inbox; blank new extract in Extracts (§16.6)")
@@ -339,5 +341,6 @@ struct NotesModelTemplateTests {
         let extract = try #require(await env.model.newItem(kind: .extract, in: nil, from: nil))
         #expect(env.org.foldersContaining(item: note) == [OrganizationStore.inboxFolderId])
         #expect(env.org.foldersContaining(item: extract) == [OrganizationStore.extractsFolderId])
+        #expect(Set(env.model.allItems.map(\.id)).isSuperset(of: [note, extract]))
     }
 }

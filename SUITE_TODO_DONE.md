@@ -10167,3 +10167,20 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Notes unit bundle green. Rows measured 16 pt on a 32 pt pitch, so the band is 4 pt; the context menu's
   Move Up / Move Down stay the no-aim path.
   <!-- /W9.e2-fu1 -->
+- [x] **W9.e2-zotero — runtime sweep, Zotero attach and auto-fill, note-level chips, templates [S-M · gui]** · §W9 gap-closure · SHIPPED 2026-10-08 (this commit)
+  Part of `W9.e2` (plan E2). Observed VM-green in one `vm-gui-runner.sh notes xcuitest` run (5/5): B1 auto-fill
+  writing front matter (`testG15_…`: Attach Zotero Link makes a source block, Cancel writes nothing, Apply writes
+  only the accepted date plus the configured-style citation); B2 note-level chips (`testG16_…`: chip appears,
+  shows Fetching then the citation, persists `selectLink`, dispatches on click, survives reselection; `testG11_…`
+  dispatches the select link); D3 templates (`testTemplateBodyEditPersistsAndReloads`, plus new
+  `testTemplateNewFromTemplateCreatesNoteWithTemplateBody`: toolbar New ▸ New from Template ▸ <name> writes a
+  fresh note with the template's title, body and kind, and the list shows it).
+  **Bug found and fixed:** `NotesModel.newItem` (⌘N and New from Template) never wrote the new note's index row,
+  and nothing watches the store, so a new note stayed out of every list until the next launch. The new UITest
+  failed on exactly that (sidebar counted it, list showed 3 rows). It now upserts inline like `createExtract`;
+  an index failure is reported but no longer stops the note being selected. `NotesModelTemplateTests` gained
+  `allItems` assertions that fail without the fix and pass with it. Notes unit bundle green (932 tests).
+  **Owner-eye remainder (not claimed):** every Zotero call here goes through the DEBUG in-process transport. A
+  real Zotero install is untested: the local API answering, a real citation in the configured style, and
+  `zotero://select/…` actually raising the item in Zotero.
+  <!-- /W9.e2-zotero -->

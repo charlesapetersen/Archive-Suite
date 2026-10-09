@@ -736,6 +736,81 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W9.e2-zotero — D3's other half: toolbar New ▸ New from Template ▸ <name> creates a fresh note on
+    /// disk carrying the template's title and body, and the note list shows it. The template is made
+    /// through the Templates manager (production path); only its body goes in via the editor test seam.
+    func testTemplateNewFromTemplateCreatesNoteWithTemplateBody() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let templates = mainWindow.staticTexts
+                .matching(identifier: "an.sidebar.templates").firstMatch
+            XCTAssertTrue(templates.waitForExistence(timeout: 10))
+            templates.click()
+            let newButton = mainWindow.descendants(matching: .any)["an.template.new"]
+            XCTAssertTrue(newButton.waitForExistence(timeout: 10), mainWindow.debugDescription)
+            newButton.click()
+            let alert = mainWindow.sheets.firstMatch
+            XCTAssertTrue(alert.waitForExistence(timeout: 10), "New Template sheet should open")
+            let name = alert.textFields.firstMatch
+            name.click()
+            name.typeKey("a", modifierFlags: .command)
+            name.typeText("Interview Fixture")
+            alert.buttons["Create"].click()
+
+            let templateRoot = URL(fileURLWithPath: Self.canonicalFixturePath)
+                .appendingPathComponent("Templates", isDirectory: true)
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                ((try? FileManager.default.contentsOfDirectory(
+                    at: templateRoot, includingPropertiesForKeys: nil)) ?? []).count == 1
+            }, "the New Template sheet should write one template directory")
+            let dir = try XCTUnwrap(try FileManager.default.contentsOfDirectory(
+                at: templateRoot, includingPropertiesForKeys: nil).first)
+            let id = try XCTUnwrap(UUID(uuidString: dir.lastPathComponent))
+            let row = mainWindow.staticTexts
+                .matching(identifier: "an.template.row.\(id.uuidString)").firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.click()
+            let input = mainWindow.textFields["an.template.editor.test.input"]
+            let commit = mainWindow.buttons["an.template.editor.test.commit"]
+            XCTAssertTrue(commit.waitForExistence(timeout: 10))
+            input.click()
+            input.typeText("Q: where were you in 1971?")
+            commit.click()
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
+                    .contains { ((try? String(contentsOf: $0, encoding: .utf8)) ?? "").contains("in 1971?") }
+            }, "the template body must be saved before a note is made from it")
+
+            mainWindow.staticTexts.matching(identifier: "an.sidebar.allNotes").firstMatch.click()
+            let baseline = itemDirs()
+            let newMenu = mainWindow.descendants(matching: .any)["an.toolbar.new"]
+            XCTAssertTrue(newMenu.waitForExistence(timeout: 10), "the toolbar New menu should exist")
+            newMenu.click()
+            let fromTemplate = app.menuItems["New from Template"]
+            XCTAssertTrue(fromTemplate.waitForExistence(timeout: 5), "New ▸ New from Template should exist")
+            fromTemplate.hover()
+            let choice = app.menuItems["Interview Fixture"]
+            XCTAssertTrue(choice.waitForExistence(timeout: 5), "the note template should be offered by name")
+            choice.click()
+
+            var created: [String] = []
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                created = itemDirs().subtracting(baseline).filter { !mdFiles(inItemDir: $0).isEmpty }
+                return created.count == 1
+            }, "New from Template should create exactly one new item directory with a .md file")
+            let newID = try XCTUnwrap(created.first)
+            XCTAssertNotEqual(newID.lowercased(), id.uuidString.lowercased(), "the note must get its own id")
+            let raw = rawMarkdown(inItemDir: newID) ?? ""
+            XCTAssertTrue(raw.contains("title: Interview Fixture"), "the note takes the template's title: \(raw)")
+            XCTAssertTrue(raw.contains("Q: where were you in 1971?"), "the note takes the template's body: \(raw)")
+            XCTAssertTrue(raw.contains("kind: note"), "a note-window template creates a note: \(raw)")
+            let cell = mainWindow.descendants(matching: .any)["an.cell.title.\(newID.uppercased())"]
+            let cellLower = mainWindow.descendants(matching: .any)["an.cell.title.\(newID.lowercased())"]
+            XCTAssertTrue(pollUntil(timeout: 10) { cell.exists || cellLower.exists },
+                          "the created note should appear in the note list: \(mainWindow.debugDescription)")
+        }
+    }
+
     /// Scroll `an.detail.metadataScroll` until `element` lies wholly inside its visible area (W35.vm-mem-fu1).
     /// In the VM's window the day row sits below the pane's fold, so a click there landed outside the
     /// field and the year field kept keyboard focus ("Neither element nor any descendant has keyboard focus").

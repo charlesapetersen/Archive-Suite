@@ -714,9 +714,16 @@ final class NotesModel: ObservableObject {
                                                     : OrganizationStore.inboxFolderId)
         do {
             let ref = try await noteStore.create(item)
-            _ = try await reconcileFacetProjection(
+            let tx = try await reconcileFacetProjection(
                 from: ItemTransaction(ownedDateFacetTokens: [], item: item, ref: ref), noteStore: noteStore)
             try await organization.addMembership(item: item.id, folder: target)
+            // W9.e2-zotero: upsert the new row inline, as createExtract does. Nothing watches the store,
+            // so without it the new note stayed out of every list until the next launch's index build.
+            // Non-fatal: the note is already written and filed, so still select it if only the cache fails.
+            if let index {
+                do { try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)]) }
+                catch { report(error, "index the new note") }
+            }
             await reloadItems()
             rebuild()
             adoptMirrorFailure()
@@ -749,9 +756,9 @@ final class NotesModel: ObservableObject {
     // Persistence goes ONLY through the audited `NoteStore` (via `ExtractBuilder`) + the atomic
     // `OrganizationStore` membership write — W7 adds no new file-writing choke-point (keeps it Tier-1).
     // The source note is READ-ONLY at snapshot; the archival corpus is never touched (Prime Directive
-    // #1). Unlike `newItem`, these upsert the one new/changed index row inline so the extract appears
-    // in the Extracts window's list immediately (no full re-index pass needed) — same idiom as
-    // `mutateItem`.
+    // #1). These upsert the one new/changed index row inline so the extract appears in the Extracts
+    // window's list immediately (no full re-index pass needed) — same idiom as `mutateItem` and
+    // `newItem`.
 
     /// Create a new extract from a live note selection and file it into the Extracts home folder
     /// (or `folderId`). Returns the new extract's id (nil on empty selection / no store / failure).
