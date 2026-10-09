@@ -32,9 +32,14 @@ answer before moving to the next.** It is a conversation he steers. That is the 
   step. Fold those into one short block at the end, after the real decisions are done.
 
 **The procedure:**
-1. Read `## Daemon Report` in `.maintenance/AUTONOMOUS_PLAN.md` (newest-first). It is the **input** to the
-   walkthrough, never the output. Stop at the newest `### ✅ … walkthrough` heading — everything below it is
-   already settled.
+1. Start from the Agent Manager's walkthrough: run
+   `/usr/bin/python3 "/Users/cp1/Claude/Agent Manager/manager.py" walkthrough`. It lists every project's open
+   questions and the work since the last walkthrough; this project's unwalked Daemon Report entries arrive in it
+   through the holds hook. For the detail of each entry, read `## Daemon Report` in
+   `.maintenance/AUTONOMOUS_PLAN.md` (newest-first). It is the **input** to the walkthrough, never the output. Stop
+   at the newest `### ✅ … walkthrough` heading — everything below it is already settled. The full cross-project
+   procedure (a brief description of the work first, usage as a share of the weekly window, `walkthrough --mark`
+   when the owner opts in to recording) is in `~/Claude/CLAUDE.md`, section "The walkthrough".
 2. Add anything from the current session that genuinely needs his call.
 3. Say up front how many open decisions there are ("three, walking them one at a time").
 4. For **each**, in its own message: what was decided/asked before, what changed since, what is actually at
