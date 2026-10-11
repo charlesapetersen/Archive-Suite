@@ -18,6 +18,10 @@ import Foundation
 ///   7. Failure: a window that fails once is retried; one that fails twice leaves the gaps only it covered
 ///      flagged with confidence 0, and its neighbours' gaps still judged; a reply that does not parse counts.
 ///   8. A usage limit stops the run, keeps what was answered, and a resume does not ask those windows again.
+///   9. The transports send what the bench sent (labelled images, then the prompt; Gemini's schema, temperature 0
+///      and thinking level; the key in a header, never the URL), read the reply as the bench did, map a 429 or a
+///      plan limit to a usage-limit stop, and run `claude` in a temp dir holding the window's page files. A whole
+///      Gemini run through the HTTP seam matches the recorded verdict.
 @MainActor
 enum SegmentationEngineTestDriver {
     private static var didRun = false
@@ -285,6 +289,13 @@ enum SegmentationEngineTestDriver {
                   resume.totalCalls == ws.count - 20 && resume.calls.keys.allSatisfy { kept[keyOf($0)] == nil }
                   && r3?.proposals == clean?.proposals)
         }
+        // 9. Transports
+        if let options {
+            for (name, ok) in await transportChecks(options: options, fx: fx, replies: replies, photo: photo, pages: pages) {
+                check(name, ok)
+            }
+        }
+
         var mismatchRefused = false
         do {
             _ = try await WindowSegmenter(transport: FakeTransport(replies: [:])).segment(
@@ -297,6 +308,154 @@ enum SegmentationEngineTestDriver {
         check("page and photo counts must match", mismatchRefused)
 
         finish(results)
+    }
+
+    private static func transportChecks(options: SegmentationOptions, fx: Fixture, replies: [String: String],
+                                        photo: [PhotoKind?], pages: [PageInput]) async -> [(String, Bool)] {
+        var out: [(String, Bool)] = []
+        func check(_ name: String, _ ok: Bool) { out.append((name, ok)) }
+        func body(_ r: URLRequest) -> [String: Any] {
+            (r.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+        }
+        let claude = WindowVoter.catalog[0], gemini = WindowVoter.catalog[1]
+        let imgs = [Data([1, 2]), Data([3]), Data([4])]
+        func req(_ v: WindowVoter) -> WindowRequest {
+            WindowRequest(voter: v, prompt: "PROMPT", images: imgs, pageNumbers: [8, 9, 10])
+        }
+        let openaiVoter = WindowVoter(name: "window-openai", provider: .openai, modelID: "gpt-x", thinkingLevel: nil, prompt: .g1)
+
+        // Request shapes
+        if let a = try? APIWindowTransport.request(req(claude), key: "K-A") {
+            let b = body(a)
+            let content = ((b["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
+            check("anthropic: Messages, key and version headers, model, labelled images then the prompt",
+                  a.url?.absoluteString == "https://api.anthropic.com/v1/messages"
+                  && a.value(forHTTPHeaderField: "x-api-key") == "K-A"
+                  && a.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01"
+                  && b["model"] as? String == "claude-sonnet-5-5" && content.count == 7
+                  && content[0]["text"] as? String == "Page 8:"
+                  && (content[1]["source"] as? [String: Any])?["data"] as? String == imgs[0].base64EncodedString()
+                  && content[6]["text"] as? String == "PROMPT")
+        } else { check("anthropic request builds", false) }
+        if let g = try? APIWindowTransport.request(req(gemini), key: "K-G") {
+            let b = body(g)
+            let cfg = b["generationConfig"] as? [String: Any] ?? [:]
+            let parts = ((b["contents"] as? [[String: Any]])?.first?["parts"] as? [[String: Any]]) ?? []
+            let schema = (try? JSONSerialization.data(withJSONObject: cfg["responseSchema"] ?? [:], options: .sortedKeys))
+            let want = try? JSONSerialization.data(withJSONObject: APIWindowTransport.geminiResponseSchema, options: .sortedKeys)
+            check("gemini: generateContent on gemini-3.8-flash, the key in a header and not the URL",
+                  g.url?.absoluteString == "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
+                  && g.value(forHTTPHeaderField: "x-goog-api-key") == "K-G" && !(g.url?.absoluteString.contains("K-G") ?? true))
+            check("gemini: temperature 0, JSON, thinking low, the bench's schema, labelled images then the prompt",
+                  (cfg["temperature"] as? NSNumber)?.doubleValue == 0
+                  && cfg["responseMimeType"] as? String == "application/json"
+                  && (cfg["thinkingConfig"] as? [String: Any])?["thinkingLevel"] as? String == "low"
+                  && schema != nil && schema == want && parts.count == 7 && parts[2]["text"] as? String == "Page 9:"
+                  && parts[6]["text"] as? String == "PROMPT")
+        } else { check("gemini request builds", false) }
+        if let o = try? APIWindowTransport.request(req(openaiVoter), key: "K-O") {
+            let b = body(o)
+            let content = ((b["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
+            check("openai: chat completions, bearer key, images as data URLs",
+                  o.url?.absoluteString == "https://api.openai.com/v1/chat/completions"
+                  && o.value(forHTTPHeaderField: "Authorization") == "Bearer K-O" && content.count == 7
+                  && ((content[1]["image_url"] as? [String: Any])?["url"] as? String)?.hasPrefix("data:image/jpeg;base64,") == true)
+        } else { check("openai request builds", false) }
+
+        // Replies and errors
+        func reply(_ p: WindowProvider, _ obj: Any, _ status: Int = 200, headers: [String: String] = [:]) -> Result<String, Error> {
+            let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data()
+            let resp = HTTPURLResponse(url: URL(string: "https://x")!, statusCode: status, httpVersion: nil, headerFields: headers)
+            return Result { try APIWindowTransport.replyText(p, data: data, status: status, response: resp) }
+        }
+        check("anthropic reply: the text blocks joined",
+              (try? reply(.anthropic, ["content": [["type": "thinking", "thinking": "x"], ["type": "text", "text": "{a}"]]]).get()) == "{a}")
+        check("gemini reply: thought parts skipped",
+              (try? reply(.gemini, ["candidates": [["finishReason": "STOP", "content": ["parts": [
+                  ["text": "hmm", "thought": true], ["text": "{g}"]]]]]]).get()) == "{g}")
+        check("gemini reply: a non-STOP finish is a failure",
+              (try? reply(.gemini, ["candidates": [["finishReason": "MAX_TOKENS", "content": ["parts": [["text": "{"]]]]]]).get()) == nil)
+        check("openai reply: the message content",
+              (try? reply(.openai, ["choices": [["message": ["content": "{o}"]]]]).get()) == "{o}")
+        if case .failure(WindowTransportError.usageLimit(let reset, _)) = reply(
+            .gemini, ["error": ["status": "RESOURCE_EXHAUSTED", "message": "quota"]], 429, headers: ["Retry-After": "120"]) {
+            check("a 429 is a usage-limit stop, with Retry-After as the reset", reset.map { $0.timeIntervalSinceNow > 100 } ?? false)
+        } else { check("a 429 is a usage-limit stop", false) }
+        if case .failure(WindowTransportError.failed) = reply(.anthropic, ["error": ["type": "api_error", "message": "boom"]], 500) {
+            check("a 500 is a plain failure (retried once by the engine)", true)
+        } else { check("a 500 is a plain failure", false) }
+        check("an empty answer is a failure", (try? reply(.anthropic, ["content": []]).get()) == nil)
+        let noKey = APIWindowTransport(keys: [:], http: { _ in throw URLError(.badURL) })
+        check("no key for the provider is a failure, and nothing is sent",
+              await { () async -> Bool in
+                  do { _ = try await noKey.send(req(claude)); return false }
+                  catch WindowTransportError.failed { return true } catch { return false }
+              }())
+
+        // A whole Gemini run through the HTTP seam.
+        let geminiHTTP: APIWindowTransport.HTTP = { request in
+            let b = (request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let parts = ((b["contents"] as? [[String: Any]])?.first?["parts"] as? [[String: Any]]) ?? []
+            let nums = parts.compactMap { ($0["text"] as? String).flatMap { t in
+                t.hasPrefix("Page ") && t.hasSuffix(":") ? Int(t.dropFirst(5).dropLast()) : nil } }
+            let text = replies[FakeTransport.key("window-gemini-3.8-flash-low", (nums.first ?? 1) - 1, nums.last ?? 0)] ?? ""
+            let obj: [String: Any] = ["candidates": [["finishReason": "STOP", "content": ["parts": [["text": text]]]]]]
+            return (try JSONSerialization.data(withJSONObject: obj),
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        if let spec = try? options.spec(for: .gemini), let expected = fx.expected["gemini"] {
+            let api = APIWindowTransport(keys: [.gemini: "K"], http: geminiHTTP)
+            let r = try? await WindowSegmenter(transport: api).segment(pages: pages, photoKinds: photo, approach: spec)
+            let flagged = r?.proposals.filter { !$0.fixed && $0.flagged }.map(\.gap)
+            check("a Gemini run through the HTTP seam flags the bench's \(expected.filter(\.flagged).count) gaps",
+                  flagged == expected.filter(\.flagged).map(\.gap) && r?.failed.isEmpty == true)
+        }
+        if let spec = try? options.spec(for: .mix), let expected = fx.expected["mix"] {
+            let routed = RoutingWindowTransport(routes: [
+                .anthropic: FakeTransport(replies: replies),
+                .gemini: APIWindowTransport(keys: [.gemini: "K"], http: geminiHTTP)])
+            let r = try? await WindowSegmenter(transport: routed).segment(pages: pages, photoKinds: photo, approach: spec)
+            check("the mix routes each voter to its own transport",
+                  r?.proposals.filter { !$0.fixed && $0.flagged }.map(\.gap) == expected.filter(\.flagged).map(\.gap))
+        }
+
+        // claude -p
+        func run(_ code: Int32, _ out: String, _ err: String = "", timedOut: Bool = false) -> LocalAgentClient.CLIRun {
+            LocalAgentClient.CLIRun(exitCode: code, stdout: out, stderr: err, timedOut: timedOut, spawnFailed: false)
+        }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        check("claude: the envelope's result on success",
+              (try? LocalAgentWindowTransport.classify(run(0, #"{"type":"result","subtype":"success","is_error":false,"result":"{c}"}"#), now: now)) == "{c}")
+        do {
+            _ = try LocalAgentWindowTransport.classify(
+                run(1, #"{"subtype":"success","is_error":true,"result":"Claude usage limit reached. Your limit will reset at 3pm."}"#), now: now)
+            check("claude: a plan limit stops the run", false)
+        } catch WindowTransportError.usageLimit(let reset, _) {
+            check("claude: a plan limit stops the run, with the printed reset time", reset != nil)
+        } catch { check("claude: a plan limit stops the run", false) }
+        check("claude: garbage output is a failure",
+              (try? LocalAgentWindowTransport.classify(run(1, "segfault"), now: now)) == nil)
+        check("claude: a timeout is a failure",
+              (try? LocalAgentWindowTransport.classify(run(-2, "", timedOut: true), now: now)) == nil)
+
+        // A fake claude: proves the working directory holds the window's files and the prompt arrives on stdin.
+        let fm = FileManager.default
+        let fake = fm.temporaryDirectory.appendingPathComponent("APSegFakeClaude-\(UUID().uuidString).sh")
+        let script = """
+        #!/bin/bash
+        n=$(ls page-0008.jpg page-0009.jpg page-0010.jpg 2>/dev/null | wc -l | tr -d ' ')
+        first=$(head -c 6)
+        model=""; for a in "$@"; do [ "$prev" = "--model" ] && model="$a"; prev="$a"; done
+        printf '{"type":"result","subtype":"success","is_error":false,"result":"%s %s %s"}' "$n" "$first" "$model"
+        """
+        try? Data(script.utf8).write(to: fake)
+        _ = try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        let cli = LocalAgentWindowTransport(binaryPath: fake.path, timeout: 30)
+        let got = try? await cli.send(req(claude))
+        check("claude: run in a temp dir holding page-0008…0010.jpg, prompt on stdin, the voter's model (got \(got ?? "nil"))",
+              got == "3 PROMPT claude-sonnet-5-5")
+        try? fm.removeItem(at: fake)
+        return out
     }
 
     private static func keyOf(_ s: String) -> WindowKey {

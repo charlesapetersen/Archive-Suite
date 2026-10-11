@@ -19,8 +19,9 @@ enum ImageEncoding {
     /// Load an image as JPEG for upload — efficiently. Reads dimensions from the file header and
     /// decodes straight to the target long edge (honoring EXIF orientation) via a thumbnail request,
     /// so the full-resolution bitmap is never materialized. `scale` (0–1) applies the user's
-    /// resolution setting; the result is then capped at `maxOCRDimension`. Never upscales.
-    static func loadImageAsJPEG(url: URL, scale: Double = 1.0) -> Data? {
+    /// resolution setting; the result is then capped at `maxDimension` (default `maxOCRDimension`; the
+    /// segmentation windows pass the bench's 1,600 px). Never upscales.
+    static func loadImageAsJPEG(url: URL, scale: Double = 1.0, maxDimension: Int = maxOCRDimension) -> Data? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let sourceType = CGImageSourceGetType(source) as? String
@@ -31,7 +32,7 @@ enum ImageEncoding {
 
         // Apply the optional user scale, then cap for OCR. Never upscale.
         let scaledDim = (scale > 0 && scale < 1.0) ? Int(Double(maxDim) * scale) : maxDim
-        let target = maxDim > 0 ? min(scaledDim, maxOCRDimension) : maxOCRDimension
+        let target = maxDim > 0 ? min(scaledDim, maxDimension) : maxDimension
 
         // Fast path: an already-small baseline RGB/Gray JPEG with normal orientation → send raw bytes,
         // no decode. Restricted to RGB/Gray: a CMYK/exotic JPEG is a valid `public.jpeg` but is rejected

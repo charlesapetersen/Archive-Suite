@@ -467,11 +467,12 @@ struct LocalAgentClient: Sendable {
 
     /// Async wrapper — the blocking `Process` work runs off the cooperative pool.
     static func runAsync(binaryPath: String, args: [String], stdinText: String,
-                         timeout: TimeInterval) async -> CLIRun {
+                         timeout: TimeInterval, currentDirectory: URL? = nil) async -> CLIRun {
         await withCheckedContinuation { cont in
             DispatchQueue.global(qos: .userInitiated).async {
                 cont.resume(returning: runProcess(binaryPath: binaryPath, args: args,
-                                                  stdinText: stdinText, timeout: timeout))
+                                                  stdinText: stdinText, timeout: timeout,
+                                                  currentDirectory: currentDirectory))
             }
         }
     }
@@ -482,10 +483,13 @@ struct LocalAgentClient: Sendable {
     /// Kept behaviourally identical to `scripts/localagent-mechanism-test.swift`, the standalone $0
     /// test that exercises this exact spawn/drain/timeout logic against the committed fake CLI.
     static func runProcess(binaryPath: String, args: [String], stdinText: String,
-                           timeout: TimeInterval) -> CLIRun {
+                           timeout: TimeInterval, currentDirectory: URL? = nil) -> CLIRun {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: binaryPath)
         proc.arguments = args
+        // The segmentation windows (W36.seg-opt-engine) run `claude -p` in a temp dir holding the window's
+        // pages, because prompt w1 says the files are in the current directory. Nil ⇒ inherited, as before.
+        if let currentDirectory { proc.currentDirectoryURL = currentDirectory }
         // Inherit the environment but strip the Claude Code nested-session guard so a dev/test run
         // from inside a Claude Code session can still spawn `claude` (prod is unaffected — unset).
         var env = ProcessInfo.processInfo.environment
