@@ -42,6 +42,11 @@ struct SessionProcessingConfig: Sendable {
     /// Optional direct LLM used only after Apple Vision has produced text. The image OCR provider
     /// remains `.appleVision`; this value is deliberately never handed to `performOCRCall`.
     var visionTextLLM: LLMTextConfiguration? = nil
+    /// Who proposes this run's boundaries (W36.seg-opt-engine). Read here so the run has one place to take it
+    /// from; nothing consumes it yet. W36.seg-opt-review wires the engine into the pipeline and adds it to
+    /// `PendingRunRuntimeConfig`, so a resumed run keeps its approach. Live Capture ignores it: the phone
+    /// gives the boundaries.
+    var segmentationApproach: SegmentationApproach = .manual
 
     /// The backend for all post-transcription text work. For ordinary runs this is the OCR backend;
     /// for the Vision hybrid it is the separately-selected direct LLM.
@@ -307,7 +312,8 @@ struct SessionProcessingConfig: Sendable {
             textColumns: sizing.textColumns,
             localAgent: useAppleVision ? nil : LocalAgentConfig.fromDefaults(d),
             visionSettings: VisionOCRSettings.fromDefaults(d),
-            visionTextLLM: visionTextLLM
+            visionTextLLM: visionTextLLM,
+            segmentationApproach: SegmentationApproach.stored(d)
         )
     }
 

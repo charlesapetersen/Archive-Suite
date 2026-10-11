@@ -179,8 +179,9 @@ enum WindowAnswerParser {
         let gaps = Array(nums.dropLast())
         var votes: [Int: WindowVote] = [:]
         for b in obj["boundaries"] as? [[String: Any]] ?? [] {
-            let pair = (b["between"] as? [Any] ?? []).compactMap(integer)
-            guard pair.count == 2, pair[1] == pair[0] + 1, gaps.contains(pair[0]) else {
+            let raw = b["between"] as? [Any] ?? []
+            let pair = raw.compactMap(integer)
+            guard raw.count == 2, pair.count == 2, pair[1] == pair[0] + 1, gaps.contains(pair[0]) else {
                 throw WindowParseError(description: "boundary \(pair) not in the window")
             }
             guard let d = GapDecision(rawValue: b["decision"] as? String ?? "") else {
@@ -329,8 +330,11 @@ struct WindowRequest: Sendable {
 enum WindowTransportError: Error, Equatable {
     /// The provider's usage window or rate limit: stop the run, keep what was answered.
     case usageLimit(reset: Date?, message: String)
-    /// Anything else; the window is retried once.
+    /// Anything else; the window is retried once, after a pause.
     case failed(String)
+    /// No window can succeed (no key, a key refused, an unknown model, the CLI missing or signed out): stop the
+    /// run and say why, rather than returning every gap flagged at 0.
+    case fatal(String)
 }
 
 /// Sends one window to its voter's model and returns the reply text. The engine owns parsing and retries.
@@ -343,6 +347,8 @@ protocol WindowTransport: Sendable {
 /// A window of one voter: what is cached across a usage-limit stop so a resumed run does not ask again.
 struct WindowKey: Hashable, Sendable, Codable {
     let voter: String
+    /// The run's page count: an answer kept from a run with other pages never lands on these.
+    let pages: Int
     let start: Int
     let end: Int
 }
@@ -360,6 +366,8 @@ enum WindowSegmenterError: Error {
     /// A voter hit its usage limit. `answered` holds every window answered so far; pass it back as
     /// `answered:` to resume without asking again.
     case usageLimit(reset: Date?, message: String, answered: [WindowKey: WindowAnswer])
+    /// A transport cannot work at all (see `WindowTransportError.fatal`).
+    case fatal(message: String, answered: [WindowKey: WindowAnswer])
     case pageCountMismatch(pages: Int, photoKinds: Int)
 }
 
@@ -367,6 +375,9 @@ struct WindowSegmenter: Sendable {
     let transport: any WindowTransport
     /// Windows in flight at once, per run (the bench ran three Claude and four Gemini calls at a time).
     var maxConcurrent: Int = 3
+    /// The pause before a failed window's one retry, so a burst of 5xx or overload does not fail both tries.
+    /// The API route's `NetworkSession` call is non-idempotent and does not retry 5xx itself.
+    var retryDelay: Duration = .seconds(20)
 
     func segment(pages: [PageInput], photoKinds: [PhotoKind?], approach: ApproachSpec,
                  answered prior: [WindowKey: WindowAnswer] = [:]) async throws -> WindowSegmentation {
@@ -381,10 +392,12 @@ struct WindowSegmenter: Sendable {
         // Every (voter, window) not already answered, voters in approach order, windows in stream order.
         var jobs: [(WindowVoter, Range<Int>)] = []
         for v in approach.voters {
-            for w in windows where answered[key(v, w)] == nil { jobs.append((v, w)) }
+            for w in windows where answered[key(v, w, n)] == nil { jobs.append((v, w)) }
         }
 
         var limit: (Date?, String)?
+        var fatal: String?
+        let retryDelay = self.retryDelay
         try await withThrowingTaskGroup(of: (WindowKey, Result<WindowAnswer, Error>).self) { group in
             var next = 0
             func launch() {
@@ -394,7 +407,7 @@ struct WindowSegmenter: Sendable {
                 let request = makeRequest(voter: v, window: w, pages: pages, approach: approach)
                 let transport = self.transport
                 group.addTask {
-                    (key(v, w), await Self.ask(transport, request))
+                    (key(v, w, n), await Self.ask(transport, request, retryDelay: retryDelay))
                 }
             }
             for _ in 0..<max(1, maxConcurrent) { launch() }
@@ -404,13 +417,18 @@ struct WindowSegmenter: Sendable {
                     answered[k] = a
                 case .failure(WindowTransportError.usageLimit(let reset, let message)):
                     if limit == nil { limit = (reset, message) }
+                case .failure(WindowTransportError.fatal(let message)):
+                    if fatal == nil { fatal = message }
                 case .failure(let e as CancellationError):
                     throw e
                 case .failure:
                     failed.append(k)
                 }
-                if limit == nil { launch() }
+                if limit == nil && fatal == nil { launch() }
             }
+        }
+        if let fatal {
+            throw WindowSegmenterError.fatal(message: fatal, answered: answered)
         }
         if let (reset, message) = limit {
             throw WindowSegmenterError.usageLimit(reset: reset, message: message, answered: answered)
@@ -421,7 +439,7 @@ struct WindowSegmenter: Sendable {
             WindowCombiner.voterVerdicts(
                 pageCount: n, windows: windows,
                 answers: Dictionary(uniqueKeysWithValues: windows.compactMap { w in
-                    answered[key(v, w)].map { (w, $0) }
+                    answered[key(v, w, n)].map { (w, $0) }
                 }))
         }
         let proposals = WindowCombiner.proposals(photoKinds: photoKinds, voters: verdicts,
@@ -430,8 +448,8 @@ struct WindowSegmenter: Sendable {
                                   failed: failed.sorted { ($0.voter, $0.start) < ($1.voter, $1.start) })
     }
 
-    private func key(_ v: WindowVoter, _ w: Range<Int>) -> WindowKey {
-        WindowKey(voter: v.name, start: w.lowerBound, end: w.upperBound)
+    private func key(_ v: WindowVoter, _ w: Range<Int>, _ n: Int) -> WindowKey {
+        WindowKey(voter: v.name, pages: n, start: w.lowerBound, end: w.upperBound)
     }
 
     private func makeRequest(voter: WindowVoter, window w: Range<Int>, pages: [PageInput],
@@ -442,17 +460,24 @@ struct WindowSegmenter: Sendable {
         return WindowRequest(voter: voter, prompt: prompt, images: w.map { pages[$0].jpeg }, pageNumbers: nums)
     }
 
-    /// One window: a failure or an unparseable answer is retried once; a usage limit is not.
-    private static func ask(_ transport: any WindowTransport, _ r: WindowRequest) async -> Result<WindowAnswer, Error> {
+    /// One window: a failure or an unparseable answer is retried once, after `retryDelay`; a usage limit or a
+    /// fatal error is not.
+    private static func ask(_ transport: any WindowTransport, _ r: WindowRequest,
+                            retryDelay: Duration) async -> Result<WindowAnswer, Error> {
         var last: Error = WindowTransportError.failed("not sent")
-        for _ in 0..<2 {
+        for attempt in 0..<2 {
+            if attempt > 0, retryDelay > .zero {
+                do { try await Task.sleep(for: retryDelay) } catch { return .failure(CancellationError()) }
+            }
             if Task.isCancelled { return .failure(CancellationError()) }
             do {
                 let text = try await transport.send(r)
                 return .success(try WindowAnswerParser.parse(text, pageNumbers: r.pageNumbers))
             } catch let e as WindowTransportError {
-                if case .usageLimit = e { return .failure(e) }
-                last = e
+                switch e {
+                case .usageLimit, .fatal: return .failure(e)
+                case .failed: last = e
+                }
             } catch is CancellationError {
                 return .failure(CancellationError())
             } catch {

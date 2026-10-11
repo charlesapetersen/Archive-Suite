@@ -122,11 +122,14 @@ per approach**, with the method and threshold fixed on the development boxes fir
   W36.seg-opt-design). Seven-page windows, a confidence per boundary, the flag threshold per approach from
   `options.json`, the mix rule, and the Claude, Gemini and OpenAI clients the Processor already has. Unit tests on
   recorded responses; no paid call in tests.
+  ✅ Shipped 2026-10-11: `macOS/Sources/ArchiveProcessor/Segmentation/` and `scripts/test-segmentation-engine.sh`,
+  reproducing the bench's verdict on every Deaver gap for Claude, Gemini and the mix. The `TaggingMode` split moved
+  to `W36.seg-opt-review` (§6).
 - **`W36.seg-opt-chooser`** — the approach chooser [M · ~1-2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-engine). The setting, with each approach's figures and both kinds of cost.
 - **`W36.seg-opt-review`** — the review of flagged boundaries [M · ~2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-engine). Page n beside page n+1; keep, split or join; the unflagged boundaries stay in the review
-  sheet.
+  sheet. It also wires the engine into the pipeline and does the `TaggingMode` split (§6).
 - **`W36.seg-opt-subscription`** — the subscription route [M · ~1-2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-usage, W36.seg-opt-engine). Claude only, through the user's installed `claude`, under the four
   conditions and the calibration spec in `segbench-results/usage.md`. It switches `LocalAgentClient` to
@@ -354,9 +357,15 @@ unchanged otherwise. Its edits feed the same `documentReviewItems` that tagging 
 |---|---|---|
 | `W36.seg-opt-engine` | `SegmentationApproach`, `options.json` decode, windows, rules, the clients, failure → flagged | unit tests on recorded windows, reproducing the bench's flags on one box |
 | `W36.seg-opt-chooser` | the setting in Settings and Process Files, the scaled rows, the cost line, unavailable rows | unit tests on the row text for each approach and N; a render guard for the rows |
-| `W36.seg-opt-review` | the flagged pass, the skim note, resume of answered gaps | unit tests on keep/split/join → classifications; the VM XCUITest of one pass |
+| `W36.seg-opt-review` | the engine in the pipeline, the `TaggingMode` split, the flagged pass, the skim note, resume of answered gaps | unit tests on keep/split/join → classifications; the VM XCUITest of one pass |
 | `W36.seg-opt-subscription` | the Claude plan route, `stream-json`, calibration, pause at 90% | a fake CLI emitting `rate_limit_event` (extend `scripts/localagent-fake-cli.sh`); no real plan use in tests |
 | `W36.seg-opt-proof` | one small real folder per provider, end to end in the VM | cents, stated before the run |
 
-**The `TaggingMode` split (§1) lands in `W36.seg-opt-engine`**, because the engine needs a place to read the
-approach from. The chooser item then only adds the UI.
+**The `TaggingMode` split (§1) moved to `W36.seg-opt-review`** (decided by `W36.seg-opt-engine`, 2026-10-11).
+The engine reads the approach from `SegmentationApproach.stored()` and `SessionProcessingConfig.segmentationApproach`,
+which is all it needs. The split itself changes who segments in `automatic` and `autoDate`: today the per-page
+classifier does it. Done before anything replaces that classifier, the split would leave those modes with no
+automated segmentation, and §1 does not say what `automatic` + `manual` should do, since no screen exists where
+the user segments and the model then tags everything. The review item rewires that dispatch anyway, so it does the
+split there, decides `automatic` + `manual`, and adds the approach to `PendingRunRuntimeConfig`. The chooser still
+only adds the UI.

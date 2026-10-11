@@ -105,6 +105,7 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
         .init(key: DefaultsKeys.reviewRotation, def: .bool(false)),
 
         .init(key: DefaultsKeys.taggingModeRaw, def: .string(TaggingMode.automatic.rawValue)),
+        .init(key: DefaultsKeys.segmentationApproach, def: .string(SegmentationApproach.defaultApproach.rawValue)),
         .init(key: DefaultsKeys.enableCollectionSegmentation, def: .bool(false)),
         .init(key: DefaultsKeys.confirmCollectionIDs, def: .bool(false)),
         .init(key: DefaultsKeys.reviewDocumentSegmentation, def: .bool(false)),

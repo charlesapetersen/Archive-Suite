@@ -32,7 +32,7 @@ struct APIWindowTransport: WindowTransport {
 
     func send(_ r: WindowRequest) async throws -> String {
         guard let key = keys[r.voter.provider], !key.isEmpty else {
-            throw WindowTransportError.failed("no API key for \(r.voter.provider.rawValue)")
+            throw WindowTransportError.fatal("no API key for \(r.voter.provider.rawValue)")
         }
         let request = try Self.request(r, key: key)
         let (data, response) = try await http(request)
@@ -130,6 +130,10 @@ struct APIWindowTransport: WindowTransport {
                 let reset = response.flatMap(retryAfter).map { Date().addingTimeInterval($0) }
                 throw WindowTransportError.usageLimit(reset: reset, message: message)
             }
+            // A refused key, a bad request or an unknown model fails every window alike (the bench's Fatal).
+            if [400, 401, 403, 404].contains(status) {
+                throw WindowTransportError.fatal("\(provider.rawValue) \(status): \(message)")
+            }
             throw WindowTransportError.failed("\(provider.rawValue) \(status): \(message)")
         }
         guard let json else { throw WindowTransportError.failed("\(provider.rawValue): malformed response") }
@@ -193,14 +197,19 @@ struct LocalAgentWindowTransport: WindowTransport {
     /// `call_claude`'s classification: the JSON envelope's `result` on success; a limit anywhere in the
     /// output stops the run with the reset time the CLI printed, when it printed one.
     static func classify(_ run: LocalAgentClient.CLIRun, now: Date) throws -> String {
-        if run.spawnFailed { throw WindowTransportError.failed("could not launch claude") }
+        if run.spawnFailed { throw WindowTransportError.fatal("could not launch claude") }
         if run.timedOut || run.exitCode == -2 { throw WindowTransportError.failed("claude timed out") }
         let envelope = (try? JSONSerialization.jsonObject(with: Data(run.stdout.utf8))) as? [String: Any]
         if let envelope, envelope["is_error"] as? Bool != true, envelope["subtype"] as? String == "success",
            let result = envelope["result"] as? String {
             return result
         }
-        let message = (envelope?["result"] as? String).map { $0 + "\n" + run.stderr } ?? (run.stdout + run.stderr)
+        // As call_claude: when the envelope parsed, only its result says why; otherwise all the output does.
+        let message = (envelope?["result"] as? String) ?? (run.stdout + run.stderr)
+        if message.range(of: #"not logged in|please log in|/login|invalid api key|authenticat"#,
+                         options: [.regularExpression, .caseInsensitive]) != nil {
+            throw WindowTransportError.fatal("claude is not signed in: \(String(message.suffix(300)))")
+        }
         if isUsageLimit(message) {
             throw WindowTransportError.usageLimit(
                 reset: LocalAgentClient.parseUsageWindowReset(fromStderr: message, now: now),

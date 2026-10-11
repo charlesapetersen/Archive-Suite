@@ -10545,3 +10545,21 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   was 40 lines of Swift Testing "passed" that never named the failing case (XCTest prints first), so the script
   re-prints `error:`/failure lines last. `prove-gate-report.sh` 38/0.
   <!-- /W40.a2 -->
+- [x] **W36.seg-opt-engine — a provider-neutral window segmenter [M · ~2 sessions]** · §W36 segmentation · SHIPPED 2026-10-11 (this commit; checkpoints 5470e2f6, 2e9458a6)
+  `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/`: `SegmentationApproach` (+ `DefaultsKeys.segmentationApproach`,
+  default manual, in `SessionProcessingConfig` and processing profiles), `SegmentationOptions` decoding the bundled
+  `segbench-results/options.json` (project.yml, by relative path) with `problems()`/`spec(for:)`, voter catalog with a
+  prompt-id check, prompts w1/g1 verbatim, the bench's 7/3 layout, parser, combiner, min/mean rules, a concurrent runner
+  (retry once after 20 s; gaps no answer covered → flagged at 0; usage limit → stop keeping answered windows, resumable,
+  keyed by page count; 400/401/403/404, no key, CLI missing or signed out → fatal stop), and transports (Anthropic /
+  Gemini / OpenAI with an injectable HTTP seam; `claude -p` in a temp dir of `page-NNNN.jpg`; per-provider routing).
+  `scripts/test-segmentation-engine.sh` 71/71, $0: reproduces `ensemble.judge` on every Deaver gap for claude (7 of 136
+  flagged), gemini (33) and mix (8) from recorded answers (`scripts/segbench/engine-fixture-deaver.json`, cues blanked,
+  from `export_engine_fixture.py`); prompts byte-identical to the bench's rendering. Adversarial review (opus): no
+  divergence from the bench; its auth-fatal, retry back-off, envelope-scoped limit check, resume-key and strict-parse
+  findings fixed here; claude cancellation filed on `W36.seg-opt-subscription`. By design: a 429 still standing after
+  NetworkSession's retries stops the run (contract "stop cleanly"). **Moved to `W36.seg-opt-review`:** the `TaggingMode`
+  split, wiring the engine into the pipeline, and the approach in `PendingRunRuntimeConfig` (04-options-build.md §6:
+  done before anything replaces the per-page classifier, the split would leave `automatic`/`autoDate` with no automated
+  segmentation, and `automatic` + manual is undesigned).
+  <!-- /W36.seg-opt-engine -->

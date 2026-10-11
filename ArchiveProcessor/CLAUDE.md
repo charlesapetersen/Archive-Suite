@@ -470,6 +470,22 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.
+Segmentation/                  W36 window segmenter (not Tier-2: proposes boundaries, writes nothing). Contract:
+                               `execution-plans/segmentation/04-options-build.md` Part 3 §2. Not yet wired into
+                               the pipeline (W36.seg-opt-review); `TaggingMode` still decides who segments.
+  SegmentationApproach.swift   `SegmentationApproach` (manual/claude/gemini/openai/mix, `DefaultsKeys.segmentationApproach`,
+                               default manual); `SegmentationOptions` decodes the bundled `segbench-results/options.json`
+                               (window shape, rule, level, voters, figures); `WindowVoter.catalog` + prompt-id check.
+  WindowSegmenter.swift        Port of the bench: 7/3 windows, reply parser, per-voter combine, min/mean rules, the
+                               concurrent runner (retry once; gaps no answer covered → flagged at 0; usage limit →
+                               stop keeping answered windows, resumable).
+  WindowPrompts.swift          Prompts w1/g1, verbatim from the bench (the test compares the rendering byte for byte).
+  WindowTransports.swift       API (Anthropic/Gemini/OpenAI, injectable HTTP seam), `claude -p` (temp dir of page
+                               files), and per-provider routing.
+  SegmentationEngineTestDriver.swift   $0 headless self-test (`SEGMENTATION_ENGINE_TEST=1`,
+                               `scripts/test-segmentation-engine.sh`): reproduces the bench's verdict on every gap
+                               of a recorded box (`scripts/segbench/engine-fixture-deaver.json`, from
+                               `export_engine_fixture.py`), plus rules, failure, usage limit and transports.
 Capture/                       Live Capture core (Tier-2):
   CaptureSession.swift         Owns a live session: incoming folder, token, received photos, receiver
                                lifecycle, ingest(...) (durable-manifest-before-ack, idempotent (group,seq)),

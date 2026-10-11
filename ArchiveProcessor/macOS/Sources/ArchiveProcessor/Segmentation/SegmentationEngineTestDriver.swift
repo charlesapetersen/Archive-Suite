@@ -126,8 +126,17 @@ enum SegmentationEngineTestDriver {
               (try? WindowVoter.resolve("window-claude (Claude Sonnet 5.5, prompt w2)").get()) == nil)
         check("an unknown voter is refused",
               (try? WindowVoter.resolve("window-llama (prompt w1)").get()) == nil)
-        check("the stored approach defaults to manual",
-              SegmentationApproach.stored(UserDefaults(suiteName: "seg-engine-test-\(UUID().uuidString)")!) == .manual)
+        let suite = "seg-engine-test-\(UUID().uuidString)"
+        if let d = UserDefaults(suiteName: suite) {
+            let unset = SegmentationApproach.stored(d)
+            d.set("gemini", forKey: DefaultsKeys.segmentationApproach)
+            let set = SegmentationApproach.stored(d)
+            d.set("per-page", forKey: DefaultsKeys.segmentationApproach)
+            let junk = SegmentationApproach.stored(d)
+            d.removePersistentDomain(forName: suite)
+            check("the stored approach: manual when unset or unknown, the stored case otherwise",
+                  unset == .manual && set == .gemini && junk == .manual)
+        }
 
         // 2. Layout
         check("layout of 7 pages: [0,4) [0,7) [3,7)",
@@ -190,7 +199,7 @@ enum SegmentationEngineTestDriver {
                     check("\(id): resolves", false); continue
                 }
                 let fake = FakeTransport(replies: replies)
-                guard let out = try? await WindowSegmenter(transport: fake).segment(
+                guard let out = try? await WindowSegmenter.instant(fake).segment(
                     pages: pages, photoKinds: photo, approach: spec) else {
                     check("\(id): segments the recorded box", false); continue
                 }
@@ -237,11 +246,11 @@ enum SegmentationEngineTestDriver {
         if let options, let spec = try? options.spec(for: .claude), let ws = fx.windows["C"] {
             let w5 = ws[5], vname = "window-claude"
             let k5 = FakeTransport.key(vname, w5.start, w5.end)
-            let clean = try? await WindowSegmenter(transport: FakeTransport(replies: replies))
+            let clean = try? await WindowSegmenter.instant(FakeTransport(replies: replies))
                 .segment(pages: pages, photoKinds: photo, approach: spec)
 
             let once = FakeTransport(replies: replies, script: [k5: [WindowTransportError.failed("HTTP 503")]])
-            let r1 = try? await WindowSegmenter(transport: once).segment(pages: pages, photoKinds: photo, approach: spec)
+            let r1 = try? await WindowSegmenter.instant(once).segment(pages: pages, photoKinds: photo, approach: spec)
             check("a window that fails once is retried and the result is unchanged",
                   once.calls[k5] == 2 && r1?.proposals == clean?.proposals && r1?.failed.isEmpty == true)
 
@@ -251,7 +260,7 @@ enum SegmentationEngineTestDriver {
             garbled[k5] = "not json"
             garbled[k6] = "{}"
             let twice = FakeTransport(replies: garbled)
-            let r2 = try? await WindowSegmenter(transport: twice).segment(pages: pages, photoKinds: photo, approach: spec)
+            let r2 = try? await WindowSegmenter.instant(twice).segment(pages: pages, photoKinds: photo, approach: spec)
             func gaps(_ w: Fixture.Window) -> Set<Int> { Set(w.start..<(w.end - 1)) }
             let others = gaps(ws[4]).union(gaps(ws[7]))
             let only = gaps(w5).union(gaps(ws[6])).subtracting(others)
@@ -269,7 +278,7 @@ enum SegmentationEngineTestDriver {
             let k20 = FakeTransport.key(vname, ws[20].start, ws[20].end)
             let limited = FakeTransport(replies: replies, script: [
                 k20: [WindowTransportError.usageLimit(reset: reset, message: "limit")]])
-            var seg = WindowSegmenter(transport: limited)
+            var seg = WindowSegmenter.instant(limited)
             seg.maxConcurrent = 1
             var kept: [WindowKey: WindowAnswer] = [:]
             do {
@@ -283,7 +292,7 @@ enum SegmentationEngineTestDriver {
                 check("a usage limit stops the run (\(error))", false)
             }
             let resume = FakeTransport(replies: replies)
-            let r3 = try? await WindowSegmenter(transport: resume)
+            let r3 = try? await WindowSegmenter.instant(resume)
                 .segment(pages: pages, photoKinds: photo, approach: spec, answered: kept)
             check("a resume asks only the windows not yet answered, and matches a clean run",
                   resume.totalCalls == ws.count - 20 && resume.calls.keys.allSatisfy { kept[keyOf($0)] == nil }
@@ -296,9 +305,43 @@ enum SegmentationEngineTestDriver {
             }
         }
 
+        // Fatal: the run stops at once and no window is retried.
+        if let options, let spec = try? options.spec(for: .claude) {
+            final class Refusing: WindowTransport, @unchecked Sendable {
+                let lock = NSLock(); var n = 0
+                func send(_ r: WindowRequest) async throws -> String {
+                    lock.withLock { n += 1 }
+                    throw WindowTransportError.fatal("401")
+                }
+            }
+            let refusing = Refusing()
+            var seg = WindowSegmenter.instant(refusing)
+            seg.maxConcurrent = 1
+            var stopped = false
+            do { _ = try await seg.segment(pages: pages, photoKinds: photo, approach: spec) }
+            catch WindowSegmenterError.fatal { stopped = true } catch {}
+            check("a fatal transport error stops the run after one call, not every gap flagged at 0",
+                  stopped && refusing.lock.withLock { refusing.n } == 1)
+
+            // Answers kept from a run of other pages are not reused.
+            let all = FakeTransport(replies: replies)
+            let full = try? await WindowSegmenter.instant(all).segment(pages: pages, photoKinds: photo, approach: spec)
+            let shorter = FakeTransport(replies: [:])
+            _ = try? await WindowSegmenter.instant(shorter).segment(
+                pages: Array(pages.dropLast()), photoKinds: Array(photo.dropLast()), approach: spec,
+                answered: full?.answered ?? [:])
+            check("answers from a run with another page count are not reused",
+                  full != nil && shorter.totalCalls >= WindowLayout.windows(pageCount: fx.pages - 1, pages: 7, stride: 3).count)
+        }
+        let oneMissing = WindowCombiner.proposals(photoKinds: [nil, nil],
+            voters: [[VoterGapVerdict(pNew: 0.1, decision: .continue, confidence: 0.9, cue: "")], [nil]],
+            rule: .min, level: 0.5)
+        check("mix: a gap one voter did not answer is flagged at 0, decided by the voter that did",
+              oneMissing.first.map { $0.flagged && $0.confidence == 0 && $0.decision == .continue && !$0.agreed } ?? false)
+
         var mismatchRefused = false
         do {
-            _ = try await WindowSegmenter(transport: FakeTransport(replies: [:])).segment(
+            _ = try await WindowSegmenter.instant(FakeTransport(replies: [:])).segment(
                 pages: [PageInput(jpeg: Data(), text: "")], photoKinds: [], approach: ApproachSpec(
                     approach: .claude, voters: [WindowVoter.catalog[0]], rule: .min, level: 0.85,
                     windowPages: 7, windowStride: 3, thumbnailLongEdgePx: 1600, ocrTextChars: 2500))
@@ -386,11 +429,14 @@ enum SegmentationEngineTestDriver {
         } else { check("a 500 is a plain failure", false) }
         check("an empty answer is a failure", (try? reply(.anthropic, ["content": []]).get()) == nil)
         let noKey = APIWindowTransport(keys: [:], http: { _ in throw URLError(.badURL) })
-        check("no key for the provider is a failure, and nothing is sent",
+        check("no key for the provider is fatal, and nothing is sent",
               await { () async -> Bool in
                   do { _ = try await noKey.send(req(claude)); return false }
-                  catch WindowTransportError.failed { return true } catch { return false }
+                  catch WindowTransportError.fatal { return true } catch { return false }
               }())
+        if case .failure(WindowTransportError.fatal) = reply(.anthropic, ["error": ["type": "authentication_error", "message": "invalid x-api-key"]], 401) {
+            check("a refused key (401) is fatal", true)
+        } else { check("a refused key (401) is fatal", false) }
 
         // A whole Gemini run through the HTTP seam.
         let geminiHTTP: APIWindowTransport.HTTP = { request in
@@ -405,7 +451,7 @@ enum SegmentationEngineTestDriver {
         }
         if let spec = try? options.spec(for: .gemini), let expected = fx.expected["gemini"] {
             let api = APIWindowTransport(keys: [.gemini: "K"], http: geminiHTTP)
-            let r = try? await WindowSegmenter(transport: api).segment(pages: pages, photoKinds: photo, approach: spec)
+            let r = try? await WindowSegmenter.instant(api).segment(pages: pages, photoKinds: photo, approach: spec)
             let flagged = r?.proposals.filter { !$0.fixed && $0.flagged }.map(\.gap)
             check("a Gemini run through the HTTP seam flags the bench's \(expected.filter(\.flagged).count) gaps",
                   flagged == expected.filter(\.flagged).map(\.gap) && r?.failed.isEmpty == true)
@@ -414,7 +460,7 @@ enum SegmentationEngineTestDriver {
             let routed = RoutingWindowTransport(routes: [
                 .anthropic: FakeTransport(replies: replies),
                 .gemini: APIWindowTransport(keys: [.gemini: "K"], http: geminiHTTP)])
-            let r = try? await WindowSegmenter(transport: routed).segment(pages: pages, photoKinds: photo, approach: spec)
+            let r = try? await WindowSegmenter.instant(routed).segment(pages: pages, photoKinds: photo, approach: spec)
             check("the mix routes each voter to its own transport",
                   r?.proposals.filter { !$0.fixed && $0.flagged }.map(\.gap) == expected.filter(\.flagged).map(\.gap))
         }
@@ -433,6 +479,19 @@ enum SegmentationEngineTestDriver {
         } catch WindowTransportError.usageLimit(let reset, _) {
             check("claude: a plan limit stops the run, with the printed reset time", reset != nil)
         } catch { check("claude: a plan limit stops the run", false) }
+        do {
+            _ = try LocalAgentWindowTransport.classify(
+                run(1, #"{"subtype":"success","is_error":true,"result":"Not logged in · Please run /login"}"#), now: now)
+            check("claude: signed out is fatal", false)
+        } catch WindowTransportError.fatal { check("claude: signed out is fatal", true) }
+        catch { check("claude: signed out is fatal", false) }
+        do {
+            _ = try LocalAgentWindowTransport.classify(
+                run(1, #"{"subtype":"error_during_execution","is_error":true,"result":"boom"}"#, "retrying after rate limit"), now: now)
+            check("claude: a parsed error envelope is judged by its result, not stderr", false)
+        } catch WindowTransportError.failed {
+            check("claude: a parsed error envelope is judged by its result, not stderr", true)
+        } catch { check("claude: a parsed error envelope is judged by its result, not stderr", false) }
         check("claude: garbage output is a failure",
               (try? LocalAgentWindowTransport.classify(run(1, "segfault"), now: now)) == nil)
         check("claude: a timeout is a failure",
@@ -460,7 +519,7 @@ enum SegmentationEngineTestDriver {
 
     private static func keyOf(_ s: String) -> WindowKey {
         let p = s.split(separator: "|")
-        return WindowKey(voter: String(p[0]), start: Int(p[1])!, end: Int(p[2])!)
+        return WindowKey(voter: String(p[0]), pages: 149, start: Int(p[1])!, end: Int(p[2])!)
     }
 
     private static func finish(_ results: [String]) {
@@ -472,6 +531,15 @@ enum SegmentationEngineTestDriver {
         try? Data(report.utf8).write(to: outPath, options: .atomic)
         NSLog("SEGENGINE DONE: \(passed ? "ALL PASS" : "SOME FAILED") → \(outPath.path)")
         exit(passed ? 0 : 1)
+    }
+}
+
+private extension WindowSegmenter {
+    /// No pause before a retry: the tests' failures are scripted, not overload.
+    static func instant(_ t: any WindowTransport) -> WindowSegmenter {
+        var s = WindowSegmenter(transport: t)
+        s.retryDelay = .zero
+        return s
     }
 }
 

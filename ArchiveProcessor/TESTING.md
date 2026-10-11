@@ -379,6 +379,10 @@ existing scratch, key-free, no-network execution remains unchanged.
 **Providers**
 - **`test-localagent.sh`** — drives the real `LocalAgentClient` against a fake CLI
   (`scripts/localagent-fake-cli.sh`), so the Local Agent path is provable with no account and no spend.
+- **`test-segmentation-engine.sh`** — the W36 window segmenter on recorded answers: the bundled options.json,
+  the bench's layout and prompts byte for byte, both combining rules, failure and usage-limit handling, the
+  transports' request/response shapes (HTTP seam, fake `claude`), and the bench's verdict reproduced on every gap
+  of one recorded development box. No model call.
 
 Counts drift as checks are added — treat the numbers above as a floor, not a contract, and read a script's
 header comment for what it actually covers. Related non-`test-*` drivers in the same directory:
