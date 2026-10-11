@@ -197,6 +197,10 @@ depends on the apps' current settings, structure or outputs.
   guide — cheapest capable model, smallest input set that proves the behaviour, and say what a run will cost
   before a big one. Not-permission, but not a blank cheque either. See §*Gating baseline* in
   [`AGENTS.md`](AGENTS.md).
+- ⛔ **But $3 is the ceiling without asking (owner, 2026-10-11).** Never spend more than $3 of real money on one
+  piece of work (an item across all its sessions) without asking him first. Subscription usage is not money. Over
+  $3, an unattended session asks in the Daemon Report and moves on. The rule's authority is `~/Claude/CLAUDE.md`,
+  section "Spending money".
 - ~~⛔ **Money paths are unchanged.** Stranding a live paid batch costs real money regardless of whether any
   output matters (the W16 `bat3`/`bat5`/`bat2-fu2` work is framed around money, not data).~~ *(superseded
   2026-08-13, above.)*

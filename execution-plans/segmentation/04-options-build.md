@@ -96,12 +96,14 @@ per approach**, with the method and threshold fixed on the development boxes fir
 - **`W36.seg-opt-measure`** — the figures for every approach [M · ~2 sessions] (uses: paid). For Claude Sonnet
   5.5 windows (already measured; re-read its saved results and record tokens), Gemini 3.8 Flash windows (Dean and
   Herrnstein are new, Deaver is done), an OpenAI model through the same window prompt (all three development
-  boxes), and the best mix: choose each approach's flag threshold on the development boxes, held out per box, then
+  boxes; run through Codex on the ChatGPT subscription, never an OpenAI API key, owner 2026-10-11), and the best
+  mix: choose each approach's flag threshold on the development boxes, held out per box, then
   score it once on the locked boxes. Record for each the five Part 1 figures, the dollar cost per 1,000 pages at
   list and batch price, and input and output tokens per 1,000 pages. Write the table to
   `ArchiveProcessor/segbench-results/options.md` and as data the app can read (`options.json`). Manual mode is a row
-  with no cost and every boundary judged by the user. Paid spend for the item: at most $25, stated before each run;
-  the Claude calls run on the subscription as before.
+  with no cost and every boundary judged by the user. Paid spend for the item: at most $5, stated before each run,
+  and the owner is asked before the total passes $3 (the standing rule in `~/Claude/CLAUDE.md`). It spent $2.73,
+  all on Gemini. The Claude and OpenAI calls run on the subscriptions and cost no money.
   ✅ Shipped 2026-10-11: `ArchiveProcessor/segbench-results/options.md` and `options.json` (manual, Claude, Gemini,
   Claude + Gemini; ChatGPT not measured, split to `W36.seg-opt-openai`). $2.73 spent.
 - **`W36.seg-opt-usage`** — can the subscription route work, and how is its cost shown [S-M · ~1 session] (uses:
