@@ -348,6 +348,14 @@ class NotesFixtureUITestCase: XCTestCase {
         return cell
     }
 
+    /// The element holding keyboard focus, for a failure message that has to say where typing went.
+    func keyboardFocusDescription() -> String {
+        let focused = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+        guard focused.exists else { return "no element" }
+        return "\(focused.elementType.rawValue) '\(focused.identifier)' in \(focused.debugDescription.prefix(400))"
+    }
+
     // MARK: - Disk helpers (fixture is scratch; Route-B grants the runner read of /Users/)
 
     var itemsDir: String { Self.fixturePath + "/items" }
@@ -1786,8 +1794,16 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let attach = app.buttons["an.zotero.note.attach"]
             XCTAssertTrue(input.waitForExistence(timeout: 5))
             mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -600)
+            let editorBefore = editor.value as? String
             input.click()
             input.typeText(link)
+            // W9.g16-flake: focus once left this field mid-typing, so Attach stayed disabled and the
+            // failure surfaced only as a missing chip. Name that cause directly if it ever returns.
+            XCTAssertEqual(input.value as? String, link, """
+                the whole link must land in the link field; focus is on \(keyboardFocusDescription()); \
+                editor changed: \((editor.value as? String) != editorBefore); windows: \
+                \(app.windows.allElementsBoundByIndex.map(\.title))
+                """)
             attach.click()
             let chip = app.buttons["an.zotero.chip.NOTE1234"]
             XCTAssertTrue(chip.waitForExistence(timeout: 5), app.debugDescription)
@@ -1814,6 +1830,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             mainWindow.scrollViews["an.detail.metadataScroll"].scroll(byDeltaX: 0, deltaY: -600)
             input.click()
             input.typeText("zotero://select/library/items/FAIL1234")
+            XCTAssertEqual(input.value as? String, "zotero://select/library/items/FAIL1234")
             attach.click()
             let failedChip = app.buttons["an.zotero.chip.FAIL1234"]
             XCTAssertTrue(failedChip.waitForExistence(timeout: 8))

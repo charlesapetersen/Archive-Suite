@@ -17,7 +17,7 @@
 # USAGE:  ops/gui/vm-gui-runner.sh [reader|notes|processor] [xcuitest|sighted|both] (default: reader both)
 #         The app argument is optional, so the old call form still works: a bare
 #         `vm-gui-runner.sh xcuitest` still means "reader, xcuitest".
-# ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, AGENT_WAIT,
+# ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, TEST_ITERATIONS, AGENT_WAIT,
 #                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
@@ -89,6 +89,12 @@ fi
 ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
   || die "invalid VM test selector list '$ONLY_TESTING' (comma-separated Xcode test identifiers only)"
+# TEST_ITERATIONS=N reruns the selection up to N times and stops at the first failure — the way to
+# chase an intermittent test (W9.g16-flake) without paying a VM boot and build per attempt.
+if [ -n "${TEST_ITERATIONS:-}" ]; then
+  [[ "$TEST_ITERATIONS" =~ ^[1-9][0-9]*$ ]] || die "TEST_ITERATIONS must be a positive integer"
+  TEST_ARGS="$TEST_ARGS-test-iterations $TEST_ITERATIONS -run-tests-until-failure "
+fi
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""
 
 # Belt-and-braces: close a Screen Sharing window if one appears anyway. With `--no-graphics
