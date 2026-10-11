@@ -15,6 +15,7 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.readFilterDefault) private var readFilterDefault: ReadFilter = .all
     @AppStorage(SettingsKey.warnNearDuplicate) private var warnNearDuplicate: Bool = true
     @AppStorage("ar.listFontSize") private var listFontSize: Double = 13
+    @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
     @ObservedObject private var excludedFolders = ExcludedFoldersStore.shared
 
     var body: some View {
@@ -52,6 +53,19 @@ struct OptionsView: View {
                     Text("List text size: \(Int(listFontSize)) pt (smaller = more compact rows)")
                     Slider(value: $listFontSize, in: 10...20, step: 1)
                 }
+            }
+            // W24.cal1-reader. Off by default, as in Notes; off, every date reads exactly as tagged.
+            Section {
+                Toggle("Show dates in other calendars", isOn: $calendarsEnabled)
+                    .accessibilityIdentifier("ar.settings.calendars")
+            } header: {
+                Text("Dates")
+            } footer: {
+                Text("Lets each document choose a calendar (Julian, French Republican, Hebrew, Islamic…) "
+                   + "for its Date column, from the list's right-click menu. Tags always hold the date in "
+                   + "ISO 8601; choosing a calendar changes only how it is shown, never the file.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             Section("Tag editing") {
                 Toggle("Warn when a new subject differs only by case from an existing one", isOn: $warnNearDuplicate)

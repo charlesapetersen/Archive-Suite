@@ -50,14 +50,8 @@ struct ArchiveFile: Identifiable, Sendable {
     /// W37: the Date column text. The item's own date, plus the covering letter's date when the file
     /// is an enclosure ("Nov 3, 1957 · sent Mar 12, 1958"); with no own date, the labelled sent-with
     /// fallback that it sorts by ("Sent with Mar 12, 1958") — never presented as the item's own date.
-    var dateCellText: String {
-        switch (tags.displayDate, tags.displaySentWith) {
-        case let (own?, sent?): return "\(own) \u{b7} sent \(sent)"
-        case let (own?, nil): return own
-        case let (nil, sent?): return "Sent with \(sent)"
-        case (nil, nil): return "\u{2014}"
-        }
-    }
+    /// W24.cal1-reader: `dateCellText(in:)` shows it in a document's display calendar.
+    var dateCellText: String { Self.dateCellText(own: tags.displayDate, sent: tags.displaySentWith) }
 
     /// Italic when the date that SORTS the row is speculative (own date, or the sent-with fallback).
     var dateCellIsSpeculative: Bool {

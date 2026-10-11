@@ -10408,3 +10408,26 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `display_calendar: standard` disappears on save (same meaning), an unreadable value can be cleared only by
   picking another calendar first.
   <!-- /W24.cal1-toggle -->
+- [x] **W24.cal1-reader — Reader display parity, scoped first** · §Cross-app date display — owner-promoted 2026-09-26 (lane: reader) SHIPPED 2026-10-11
+  Part of `W24.cal1`. **Scope (written here, as the entry asked):** the Reader shows a document's date in one
+  place, the list's Date column (`AppKitTableView` "date" cell ← `ArchiveFile.dateCellText`); the dead SwiftUI
+  `DateCell` reads the same text. There is no inspector date and no decade/year facet (date-like tags are kept
+  out of the subject lists on purpose). The year-range filter, the sort and the tag editor's Year/Month/Day
+  fields work on the stored ISO date and stay so: they are filtering and entry, not display, and an entry
+  validator in other calendars would be the Reader's analogue of `W24.cal1-validator`, not parity. A
+  per-document choice needs storage the tags must not carry, and the Reader already has the pattern
+  (`DocumentImageSourcePreferences`: UserDefaults keyed by root GUID + relative path), so **no tag-format change
+  and no `packages/` edit** were needed and nothing was filed for one.
+  **Shipped:** Options ▸ Dates ▸ "Show dates in other calendars" (key `displayCalendarsEnabled`, off by default,
+  as in Notes). With it on, the list's right-click menu has "Show Date In ▸" with every `DisplayCalendar` (the
+  selection's shared choice checked); the Date column then shows a day-precision own date and sent-with date in
+  that calendar, Julian marked "(O.S.)" as in Notes, with a tooltip giving the stored ISO day. Year, month and
+  decade dates, and a day before a calendar's epoch, stay as stored. The choice lives in UserDefaults
+  `ar.displayCalendars` (`Core/DisplayCalendarPreferences.swift`); the file and its tags are never touched.
+  `DisplayCalendarReaderTests` (9). Note for later, no item filed: `DisplayCalendarSettings.shown` (the "(O.S.)"
+  rule) is now duplicated in Reader and Notes; moving it into ArchiveCore would be a `suite`-lane dedupe.
+  Verified: full Reader unit bundle 420 tests green (DeepLinkTests skipped as usual), no new warnings. Review:
+  0 HIGH; fixed — the submenu appeared under a root with no marker, where a pick could not be stored (now hidden);
+  the checkmark ignored un-keyable selected files; the tooltip padded the own year differently from the sent-with.
+  No VM UITest run: the change is a string in an existing text cell, pinned by the unit tests.
+  <!-- /W24.cal1-reader -->

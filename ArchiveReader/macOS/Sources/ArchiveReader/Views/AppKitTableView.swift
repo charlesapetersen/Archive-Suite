@@ -311,7 +311,9 @@ struct AppKitTableView: NSViewRepresentable {
                 }
 
             case "date":
-                tf.stringValue = file.dateCellText
+                let calendar = parent.model.displayCalendar(for: file)   // W24.cal1-reader; nil = as tagged
+                tf.stringValue = file.dateCellText(in: calendar)
+                tf.toolTip = file.storedDateTooltip(in: calendar)
                 tf.textColor = file.sortDate == nil ? .secondaryLabelColor : .labelColor
                 if file.dateCellIsSpeculative {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)

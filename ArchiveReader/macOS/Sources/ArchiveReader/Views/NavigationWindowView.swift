@@ -15,6 +15,7 @@ struct NavigationWindowView: View {
     @AppStorage("ar.sidebarWidth") private var sidebarWidth = 210.0
     @AppStorage("ar.tagCloudWidth") private var tagCloudWidth = 240.0
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
+    @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false   // W24.cal1-reader
     @State private var newSearchName = ""
     @State private var renameText = ""
     @FocusState private var searchFocused: Bool     // C5: ⌥⌘F focuses OCR search
@@ -51,6 +52,7 @@ struct NavigationWindowView: View {
         .toolbar { toolbarContent }
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
+        .onChange(of: calendarsEnabled) { model.refreshDisplayedRows() }
         .sheet(isPresented: $model.showingEditor) { TagEditorView(model: model) }
         .sheet(isPresented: Binding(get: { model.renamingTag != nil },
                                     set: { if !$0 { model.renamingTag = nil } })) {
@@ -169,6 +171,14 @@ struct NavigationWindowView: View {
         menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
         menu.addItem(withTitle: "Toggle Flag", action: #selector(ContextMenuActions.toggleFlag), keyEquivalent: "")
         menu.addItem(withTitle: "Edit Tags…", action: #selector(ContextMenuActions.editTags), keyEquivalent: "")
+        // W24.cal1-reader: only with Options ▸ Dates ▸ "Show dates in other calendars" on, and a root
+        // marker to key the choice by (without one a pick could not be stored).
+        let calendarMenu = calendarsEnabled && model.canChooseDisplayCalendar ? displayCalendarMenu() : nil
+        if let calendarMenu {
+            let item = NSMenuItem(title: "Show Date In", action: nil, keyEquivalent: "")
+            item.submenu = calendarMenu
+            menu.addItem(item)
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Select Document Run", action: #selector(ContextMenuActions.selectDocRun), keyEquivalent: "")
 
@@ -178,6 +188,21 @@ struct NavigationWindowView: View {
         objc_setAssociatedObject(menu, "trampoline", trampoline, .OBJC_ASSOCIATION_RETAIN)
         for item in menu.items where !item.isSeparatorItem {
             item.target = trampoline
+        }
+        for item in calendarMenu?.items ?? [] { item.target = trampoline }
+        return menu
+    }
+
+    /// One item per calendar (the names Notes' picker uses), the selection's shared choice checked.
+    private func displayCalendarMenu() -> NSMenu {
+        let menu = NSMenu(title: "Show Date In")
+        let current = model.selectionDisplayCalendar
+        for calendar in DisplayCalendar.allCases {
+            let item = NSMenuItem(title: calendar.displayName, action: #selector(ContextMenuActions.setDisplayCalendar(_:)),
+                                  keyEquivalent: "")
+            item.representedObject = calendar.rawValue
+            item.state = calendar == current ? .on : .off
+            menu.addItem(item)
         }
         return menu
     }
@@ -769,4 +794,8 @@ final class ContextMenuActions: NSObject {
     @objc func toggleFlag()       { model.toggleFlagSelection() }
     @objc func editTags()         { model.showingEditor = true }
     @objc func selectDocRun()     { model.extendSelectionToDocumentRun() }
+    @objc func setDisplayCalendar(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let calendar = DisplayCalendar(rawValue: raw) else { return }
+        model.setDisplayCalendar(calendar)
+    }
 }

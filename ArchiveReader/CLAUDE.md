@@ -375,6 +375,9 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               keyboard triage; touches no file — the caller writes via TagWriter.
   AppSettings.swift           UserDefaults-backed option accessors the models read at point of use;
                               one-time default-hidden migration for the optional Provenance column.
+  DisplayCalendarPreferences.swift  W24.cal1-reader: Options ▸ Dates switch (off by default), each
+                              document's display calendar (UserDefaults, root GUID + relative path), and
+                              the Date column text in it. Display only: sort/filter/tags keep ISO.
 Search/                       Discovery + disposable caches (never the corpus):
   ArchiveLibrary.swift        Warm-cache publication, background revalidation, honest health/absence,
                               verified-write ordering, and FSEvents merge for one granted root.

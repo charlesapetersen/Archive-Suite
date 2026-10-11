@@ -856,13 +856,6 @@ live in `execution-plans/archive-notes/00-overview.md` §17. ⛔ Do not re-file 
   DONE WHEN unit tests cover that case both ways, one Hebrew or Islamic month-length case, and unchanged
   behaviour with the option off, including a `1500-02-29` that is still accepted. |
   ArchiveNotes Views/DateFieldEntry.swift | S | med | none
-- [ ] **`W24.cal1-reader` — Reader display parity, scoped first [M · ~1-2 sessions]** (lane: reader) (uses: build) (blocked-on: W24.cal1-core)
-  Part of `W24.cal1`. First write the scope into this entry: which Reader surfaces show dates (list, inspector,
-  decade facets), and whether a per-document choice needs storage the Reader does not have today. If parity
-  needs a tag-format change (`SPEC/tag-format.md`) or an edit under `packages/`, that part is `suite` and Tier-2:
-  file it as its own item and ship only the display part here. The Reader shares the Settings default (off).
-  DONE WHEN the scope is written and the in-scope display parity ships with tests, or the entry records why
-  parity needs a spec change and names the item filed for it. | ArchiveReader | M | low | none
 
 ## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
 

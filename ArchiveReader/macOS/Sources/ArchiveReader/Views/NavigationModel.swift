@@ -30,6 +30,8 @@ final class NavigationModel: ObservableObject {
     let notes = NotesStore()
     let savedSearches = SavedSearchStore()
     let excludedFolders: ExcludedFoldersStore
+    /// W24.cal1-reader: each document's display calendar, app-side (never written to the corpus).
+    let displayCalendars: DisplayCalendarPreferences
 
     /// The defaults domain EVERY key this model touches is read from and written to — the fixture pin
     /// (`ARUITestRootPath`), the view state (`ar.viewState`), the resumed selection
@@ -138,6 +140,7 @@ final class NavigationModel: ObservableObject {
         self.thumbnailer = thumbnailer
         self.library = ArchiveLibrary(defaults: defaults)
         self.rootStore = RootFolderStore(defaults: defaults)
+        self.displayCalendars = DisplayCalendarPreferences(defaults: defaults)
         self.excludedFolders = excludedFolders
             ?? (defaults === UserDefaults.standard ? .shared : ExcludedFoldersStore(defaults: defaults))
         library.setRootResolver { [weak self] in
@@ -435,6 +438,53 @@ final class NavigationModel: ObservableObject {
         selection = Set(displayed.filter { $0.subjects.contains(tag) }.map(\.id))
     }
     func setNote(_ note: String, forPath path: String) { notes.setNote(note, for: path) }
+
+    // MARK: Display calendars (W24.cal1-reader; app-side, never written to the corpus)
+
+    /// The calendar `file`'s date is shown in: its choice when Options allows it, else nil (as tagged).
+    /// A choice is keyed by the root marker's GUID, so without a marker there is none.
+    func displayCalendar(for file: ArchiveFile) -> DisplayCalendar? {
+        guard DisplayCalendarSettings.isEnabled(defaults), let key = calendarKey(for: file) else { return nil }
+        let calendar = displayCalendars.calendar(rootGUID: key.guid, relativePath: key.path)
+        return calendar == .standard ? nil : calendar
+    }
+
+    /// The choice every selected file shares, for the menu's checkmark; nil when they differ or none
+    /// of them can carry a choice.
+    var selectionDisplayCalendar: DisplayCalendar? {
+        var chosen = Set<DisplayCalendar>()
+        for file in selectedFiles {
+            guard let key = calendarKey(for: file) else { return nil }
+            chosen.insert(displayCalendars.calendar(rootGUID: key.guid, relativePath: key.path))
+        }
+        return chosen.count == 1 ? chosen.first : nil
+    }
+
+    /// Whether a choice can be stored at all: it is keyed by the root marker's GUID.
+    var canChooseDisplayCalendar: Bool { rootStore.rootMarker != nil }
+
+    func setDisplayCalendar(_ calendar: DisplayCalendar) {
+        for file in selectedFiles {
+            guard let key = calendarKey(for: file) else { continue }
+            displayCalendars.set(calendar, rootGUID: key.guid, relativePath: key.path)
+        }
+        refreshDisplayedRows()
+    }
+
+    /// Re-render the visible rows without re-sorting or re-filtering: their date text changed, their
+    /// order did not (sorting and the year filter use the stored date).
+    func refreshDisplayedRows() {
+        objectWillChange.send()
+        displayedGeneration += 1
+    }
+
+    private func calendarKey(for file: ArchiveFile) -> (guid: UUID, path: String)? {
+        guard let guid = rootStore.rootMarker?.guid, let root = rootStore.discoveredPathPrefix else { return nil }
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        let path = file.url.path
+        guard path.hasPrefix(prefix) else { return nil }
+        return (guid, String(path.dropFirst(prefix.count)))
+    }
 
     // MARK: Reading-session resume
 
