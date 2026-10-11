@@ -103,7 +103,9 @@ enum ProcessingHistoryTestDriver {
         let threePage = pagesDir.appendingPathComponent("three.pdf")
         let threeDoc = PDFDocument()
         for i in 0..<3 { threeDoc.insert(PDFPage(), at: i) }
-        threeDoc.write(to: threePage)
+        // Scratch fixture bytes, not PDF output: PDFGenerator owns the only audited PDFDocument.write sites
+        // (scripts/lint-write-surface.sh), so write the data form like ProcessorUITestConfiguration does.
+        try? threeDoc.dataRepresentation()?.write(to: threePage)
         check("direct PDF page count reads pages and counts an unreadable PDF as 2",
               RunHistorySnapshot.directPDFPageCount(
                   [threePage, pagesDir.appendingPathComponent("missing.pdf")]) == 5)
