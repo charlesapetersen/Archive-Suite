@@ -208,7 +208,12 @@ macOS/Sources/ArchiveNotes/
                                    adapts Reader LibrarySort)
     ItemSummaryDisplay.swift       Pure item-list cell rendering: displayDate (decade/year/month/day),
                                    qualityStars, displayTags (W6-S3);
-                                   sourcesText (count for extracts, blank otherwise) (W7-S4)
+                                   sourcesText (count for extracts, blank otherwise) (W7-S4);
+                                   displayDate/dateColumnText(calendarsEnabled:) — day dates in the
+                                   item's display calendar when Settings allows (W24.cal1-toggle)
+    DisplayCalendarSettings.swift  Settings key `displayCalendarsEnabled` (default off) + `shown`: a
+                                   stored ISO day in an item's calendar, Julian marked "(O.S.)";
+                                   display only — front-matter `display_calendar`, never the date
     NotesFolderNode.swift          Id-keyed folder-tree node + buildNormalForest (group-by-parentId,
                                    sortOrder→name sort, distinct-subtree counts, orphan/cycle-safe)
                                    + smartFolderNodes (W6-S2)
@@ -400,7 +405,8 @@ macOS/Sources/ArchiveNotes/
                                    → openAction → select + scroll-to-block (consume, gated on loadedID)
     PanelDivider.swift             Draggable divider (copied from Reader)
     NotesSettingsView.swift        ⌘, Options — Zotero section (enable / clipboard-detect / citation
-                                   style / advanced host+port), @AppStorage-bound (§D.8)
+                                   style / advanced host+port), @AppStorage-bound (§D.8); Dates
+                                   section "Show dates in other calendars" (W24.cal1-toggle)
     ThumbnailImageCache.swift      @MainActor NSCache<NSString, NSImage> (300 count / 64 MB)
     NotesPDFPaneView.swift         Notes-side PDFPaneController + PDFPaneView (read-only, no-persist)
     ReaderPreviewPopover.swift     NSPopover PDF preview via ReaderLinkResolver; degrade messages for

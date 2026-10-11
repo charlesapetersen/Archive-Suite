@@ -10378,3 +10378,33 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   item), closing the 58-commit ungated stretch after `862e305`. Due-count checked against empty, unknown, old and
   current shas (999/999/12/0).
   <!-- /W40.a1 -->
+- [x] **W24.cal1-toggle — Notes: a Settings toggle (default off) and a per-item calendar choice** · §Archive Notes — W24.cal1 (lane: notes) SHIPPED 2026-10-11
+  Part of `W24.cal1`. Settings gains the option, off by default; with it off nothing visible changes. With it on,
+  each item offers a calendar choice from the core module's list, the choice persists in the item's
+  front-matter (Tier-2: scratch store only), and dates display in it. The stored date value stays the same ISO
+  bytes.
+  DONE WHEN unit tests cover the default-off state, the choice's front-matter round trip and an unchanged stored
+  date (byte comparison before and after choosing a calendar), and a headless render or VM shot shows a date
+  displayed in a non-Gregorian calendar. | ArchiveNotes Settings + Views | S-M | med | none
+  **Shipped:** Settings ▸ Dates ▸ "Show dates in other calendars" (`DisplayCalendarSettings.enabledKey` =
+  `displayCalendarsEnabled`, absent = off). Inspector: a Calendar picker under the date, shown only with the switch
+  on, with a "Shown as …" note (or why the stored date is shown). Front-matter `display_calendar: <raw value>`
+  (`Item.displayCalendar`), omitted for `standard`, so a file with no choice encodes byte-for-byte as before; an
+  unreadable value (incl. a block value with indented lines) is kept verbatim and replaced by an explicit choice.
+  `NotesModel.setDisplayCalendar` goes through `mutateItem` (no new write path). Index column
+  `items.display_calendar`; adding it sets every existing row's mtime to -1 so the next build re-reads each `.md`
+  (the `roundup`-NULL marker was tried first and fails: that column is NOT NULL in current DBs — the migration test
+  caught it). Display: only day-precision dates convert (own and sent-with), Julian marked "(O.S.)"
+  (`julian-1752` only before 14 Sep 1752); anything the calendar cannot show falls back to the stored rendering.
+  Table Date column, detail header (`ItemHeaderDates`) and inspector follow the switch; `NotePassageResolve`'s
+  provenance label and the editor's current-date string stay as stored on purpose.
+  Tests: `DisplayCalendarToggleTests` (11) — default-off, off = unchanged rendering, on = Julian/1752/French
+  renderings, fallbacks, codec round trip for every calendar, unknown and block values preserved, byte comparison
+  of the `.md` before/after choosing each calendar (only `modified:`/`display_calendar:` lines differ; `date:` line
+  identical; back to standard removes the key), index projection, pre-column DB migration, and a headless
+  `ImageRenderer` + Vision OCR render of the header reading "2 September 1752". Full Notes unit bundle 944 + 220
+  green, no new warnings. Tier-2 adversarial review: 0 HIGH; 2 MED (block value lost continuation lines; existing
+  DB rows not re-read) and 1 LOW (inspector note with only a sent-with date) fixed; LOWs accepted — a literal
+  `display_calendar: standard` disappears on save (same meaning), an unreadable value can be cleared only by
+  picking another calendar first.
+  <!-- /W24.cal1-toggle -->

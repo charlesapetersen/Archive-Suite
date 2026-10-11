@@ -309,14 +309,21 @@ enum FrontMatterCodec {
                 i += parseAdditionalDates(valuePart, lines: lines, from: i, into: &fields)
 
             case displayCalendarKey:
-                // A value this build does not know (a newer calendar, a typo) is kept verbatim rather
-                // than dropped, and the item shows as stored.
-                if let cal = DisplayCalendar(rawValue: unquoteScalar(valuePart)) {
+                // A value this build does not read — a newer calendar, a typo, a block value with
+                // indented lines — is kept verbatim, continuation lines included, and the item shows
+                // as stored.
+                var rawLines = [line]
+                var j = i + 1
+                while j < lines.count && isIndented(lines[j]) {
+                    rawLines.append(lines[j])
+                    j += 1
+                }
+                if rawLines.count == 1, let cal = DisplayCalendar(rawValue: unquoteScalar(valuePart)) {
                     fields.displayCalendar = cal
                 } else {
-                    fields.unknownKeys.append(UnknownKey(key: key, rawLines: [line]))
+                    fields.unknownKeys.append(UnknownKey(key: key, rawLines: rawLines))
                 }
-                i += 1
+                i = j
 
             case "quality":
                 fields.quality = Int(valuePart)

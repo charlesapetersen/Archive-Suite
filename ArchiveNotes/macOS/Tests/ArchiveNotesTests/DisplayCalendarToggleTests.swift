@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import SwiftUI
 import Vision
+import SQLite3
 import ArchiveCore
 @testable import ArchiveNotes
 
@@ -153,6 +154,46 @@ struct DisplayCalendarToggleTests {
         let replaced = FrontMatterCodec.encode(item)
         #expect(replaced.contains("display_calendar: hebrew\n"))
         #expect(!replaced.contains("mayan-long-count"))
+    }
+
+    @Test("a block-style display_calendar value keeps its indented lines")
+    func blockValuePreserved() throws {
+        let text = """
+            ---
+            schema: 1
+            id: 3f2504e0-4f89-11d3-9a0c-0305e82c3301
+            kind: note
+            title: "x"
+            display_calendar:
+              name: julian
+              cutover: 1752
+            roundup: false
+            ---
+
+            """
+        let item = try FrontMatterCodec.decode(text)
+        #expect(item.displayCalendar == nil)
+        #expect(FrontMatterCodec.encode(item).contains("display_calendar:\n  name: julian\n  cutover: 1752\n"))
+    }
+
+    @Test("an index built before the column re-reads every item's file")
+    func migrationForcesReprojection() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let id = try await makeNote(env)
+        await env.model.setDate("1752-09-13", precision: .day, for: id)
+        #expect(await env.index.existingMTimes()[id.uuidString] != nil)
+        await env.index.close()
+
+        // Put the DB back in its pre-column shape.
+        var db: OpaquePointer?
+        #expect(sqlite3_open(env.root.appendingPathComponent("index.db").path, &db) == SQLITE_OK)
+        #expect(sqlite3_exec(db, "ALTER TABLE items DROP COLUMN display_calendar;", nil, nil, nil) == SQLITE_OK)
+        sqlite3_close(db)
+
+        try await env.index.open()
+        #expect(await env.index.existingMTimes()[id.uuidString] == -1)
+        // The row itself survives until the rebuild replaces it.
+        #expect(await env.index.summary(for: id)?.date == "1752-09-13")
     }
 
     // MARK: - The write path (scratch store)

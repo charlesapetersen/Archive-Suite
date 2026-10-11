@@ -100,10 +100,14 @@ actor NotesIndex {
         if !itemsHasColumn("sent_with_uncertain") {
             try exec("ALTER TABLE items ADD COLUMN sent_with_uncertain INTEGER NOT NULL DEFAULT 0;")
         }
-        // W24.cal1-toggle: the display calendar's raw value. Same additive guard, no backfill — no item
-        // carried `display_calendar` before this column existed, so NULL (as stored) is right for every row.
+        // W24.cal1-toggle: the display calendar's raw value. A file may already carry
+        // `display_calendar` (hand-written, or saved by a newer build) while its row predates the
+        // column, so every existing row's mtime is set to -1: no file has that mtime, so the next build
+        // re-reads every `.md` (the upsert's newer-row guard never fires against -1). Not the `roundup`
+        // NULL marker — that column is NOT NULL in a DB created since it existed.
         if !itemsHasColumn("display_calendar") {
             try exec("ALTER TABLE items ADD COLUMN display_calendar TEXT;")
+            try exec("UPDATE items SET mtime = -1;")
         }
 
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).

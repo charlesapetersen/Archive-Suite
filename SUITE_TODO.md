@@ -847,14 +847,6 @@ live in `execution-plans/archive-notes/00-overview.md` §17. ⛔ Do not re-file 
   move all five entries to `SUITE_TODO_DONE.md`. Est. a quarter of a session. It stays
   the tag `W40.b1` and `W40.b2` wait on.
   Edges: (blocked-on: W24.cal1-core, W24.cal1-toggle, W24.cal1-validator, W24.cal1-reader)
-- [ ] **`W24.cal1-toggle` — Notes: a Settings toggle (default off) and a per-item calendar choice [S-M · Tier-2 · ~1 session]** (lane: notes) (uses: build) (blocked-on: W24.cal1-core)
-  Part of `W24.cal1`. Settings gains the option, off by default; with it off nothing visible changes. With it on,
-  each item offers a calendar choice from the core module's list, the choice persists in the item's
-  front-matter (Tier-2: scratch store only), and dates display in it. The stored date value stays the same ISO
-  bytes.
-  DONE WHEN unit tests cover the default-off state, the choice's front-matter round trip and an unchanged stored
-  date (byte comparison before and after choosing a calendar), and a headless render or VM shot shows a date
-  displayed in a non-Gregorian calendar. | ArchiveNotes Settings + Views | S-M | med | none
 - [ ] **`W24.cal1-validator` — Notes: the date-entry days-in-month rule follows the item's calendar [S · Tier-2 · ~1 session]** (lane: notes) (uses: build) (blocked-on: W24.cal1-core, W24.cal1-toggle)
   Part of `W24.cal1`. `Views/DateFieldEntry.swift` validates an entered day against the chosen calendar's month
   lengths and converts it to ISO for storage; with the option off it keeps today's `GregorianDay`

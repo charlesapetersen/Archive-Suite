@@ -286,7 +286,8 @@ struct NoteMetadataInspector: View {
     /// "Shown as …" under the picker, or why the stored date is shown instead.
     private var calendarNote: String? {
         guard let cal = item.activeCalendar(calendarsEnabled: true) else { return nil }
-        guard item.datePrecision == .day, let date = item.date else {
+        guard let date = item.date else { return nil }
+        guard item.datePrecision == .day else {
             return "Only a full day (year, month and day) is shown in \(cal.displayName)."
         }
         if let shown = DisplayCalendarSettings.shown(isoDay: date, in: cal) { return "Shown as \(shown)." }
