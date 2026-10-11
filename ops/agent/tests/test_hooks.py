@@ -238,6 +238,28 @@ class Holds(Fixture):
         self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.split("## Daemon Report")[0] + only)
         self.assertEqual([d for d in self.jsonl(self.hook("holds").stdout) if d["source"] == "Daemon Report"], [])
 
+    def test_a_report_entry_for_a_pending_hold_is_that_holds_detail(self):
+        # Owner, 2026-10-11: one question emailed as two items, and cut off. The entry becomes the hold's detail.
+        ask = "H.ok (abc1234) \u2014 your call: " + "every figure in full. " * 20 + "Options: (1) yes; (2) no."
+        perm = "H.two \u2014 asked while its hold still waits on A.one"
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace(
+            "follow-ups\n\n", "follow-ups\n\n%s\n\n%s\n\n" % (ask, perm)))
+        items = self.jsonl(self.hook("holds").stdout)
+        by = {d["key"]: d for d in items}
+        self.assertEqual(by["H.ok"]["detail"], ask)
+        self.assertLess(len(by["H.ok"]["text"]), len(ask))
+        self.assertNotIn("asked", by["H.ok"])
+        report = [d for d in items if d["source"] == "Daemon Report"]
+        self.assertEqual(len(report), 1)   # H.two's hold is permanent, so its entry still counts
+        self.assertTrue(report[0]["text"].startswith("Daemon Report: 4 decisions"), report[0]["text"])
+        self.assertTrue(report[0]["detail"].startswith("H.two"))
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.split("## Daemon Report")[0] +
+                   "## Daemon Report \u2014 owner decisions / follow-ups\n\n%s\n\n"
+                   "### \u2705 2026-10-06 \u2014 walkthrough done (owner): settled.\n" % ask)
+        items = self.jsonl(self.hook("holds").stdout)
+        self.assertEqual([d for d in items if d["source"] == "Daemon Report"], [])
+        self.assertEqual([d["key"] for d in items if not d["permanent"]], ["H.ok"])
+
     def test_a_walked_report_has_no_item(self):
         plan = PLAN.replace("## Daemon Report \u2014 owner decisions / follow-ups\n\n",
                             "## Daemon Report \u2014 owner decisions / follow-ups\n\n"

@@ -31,6 +31,7 @@ CHECKBOX = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s*")
 DATE = re.compile(r"\b(20\d\d-\d\d-\d\d)\b")
 WALKED = re.compile(r"^### .*✅.*[Ww]alkthrough")         # status-digest.sh's stop line
 REPORT_HEADER = re.compile(r"^## (Daemon Report|Morning Review)")
+DETAIL_MAX = 4000   # the email's full text of an item; `text` stays one short line
 NO_DECISION = re.compile(r"\bno decision\b", re.I)   # the writer's own label for a mention (resume-prompt.txt)
 
 
@@ -245,18 +246,34 @@ def holds():
             continue
         seen.add(tag)
         ready = tag in pending and own_prerequisites_met(line, states)
-        out.append({"key": tag, "text": clean(line[m.end():]), "permanent": not ready, "source": "HOLD QUEUE"})
+        out.append({"key": tag, "text": clean(line[m.end():]), "permanent": not ready, "source": "HOLD QUEUE",
+                    "detail": clean(line[m.end():], DETAIL_MAX)})
     for status, tag, text in rows:
         if HOLD_MARK.search(text) and tag not in seen:
             seen.add(tag)
             ready = tag in pending and not status.startswith("blocked:")
-            out.append({"key": tag, "text": clean(text), "permanent": not ready, "source": "WORK QUEUE"})
+            out.append({"key": tag, "text": clean(text), "permanent": not ready, "source": "WORK QUEUE",
+                        "detail": clean(text, DETAIL_MAX)})
     # The Daemon Report is ONE pending item, keyed by its newest unwalked entry that asks for a decision: a new
     # question notifies once, and the owner walks the report as a whole (decision 2026-10-08, R1 review finding 3).
     # An entry its writer labels "no decision" is a mention: it never makes the item or changes its key, so a report
     # of mentions only emails nobody (owner, 2026-10-11: "only receive an email when something actually needs me").
+    # An entry that opens with the tag of a pending hold is that hold's question: it becomes the hold's detail (the
+    # email's full text) and is not counted again, so one question is one item (owner, 2026-10-11).
     entries = report_entries(plan)
-    asks = [e for e in entries if not NO_DECISION.search(e)]
+    holds_by_tag = {d["key"]: d for d in out if not d["permanent"]}
+    asks = []
+    for e in entries:
+        if NO_DECISION.search(e):
+            continue
+        h = holds_by_tag.get(tag_of(clean(e, DETAIL_MAX)) or "")
+        if h is not None:
+            if not h.get("asked"):
+                h["detail"], h["asked"] = clean(e, DETAIL_MAX), True
+            continue
+        asks.append(e)
+    for d in out:
+        d.pop("asked", None)
     if asks:
         mentions = len(entries) - len(asks)
         d = {"key": "daemon-report:" + short_hash(asks[0]),
@@ -264,7 +281,7 @@ def holds():
                      % (len(asks), "" if len(asks) == 1 else "s",
                         " (and %d mention%s)" % (mentions, "" if mentions == 1 else "s") if mentions else "",
                         clean(asks[0], 100)),
-             "permanent": False, "source": "Daemon Report"}
+             "permanent": False, "source": "Daemon Report", "detail": clean(asks[0], DETAIL_MAX)}
         m = DATE.search(asks[0])
         if m:
             d["since"] = m.group(1)
