@@ -10366,3 +10366,15 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `swift test` 264 tests green, no warnings. New types only; no app references them yet, so no app behaviour changed
   (grep confirmed no name collision in the three apps).
   <!-- /W24.cal1-core -->
+- [x] **W40.a1 — health gate green at HEAD, and run at hand-off [M]** · §W40 verification phase · SHIPPED 2026-10-11 (this commit)
+  Full `health-gate.sh` at `722b023` (1,721 s): every step green but `codex-agent-proof`, 69/71. Cause: the harness
+  pointed `AUTONOMOUS_STATE` at its fixture but inherited `AUTONOMOUS_WORKER_STATE` from the engine session running
+  the gate, and `usage-window.sh` prefers that, so scenario [2c] read the live session log ("6 1791765000"). Under the
+  daemon loop the variable is unset, which is why the 4bfaaf2 gate was green. Fixed by unsetting it, as
+  `prove-gui-vm.sh` and `prove-vm-lane.sh` already did (`9783d07`); 71/71 with and without it set, and the gate's
+  retry of that step at `9783d07` is GREEN. `STATE/last-gate` advanced to `9783d07`.
+  `ops/autonomous/CODEX_RUNBOOK.md` step 9: after hand-off an external agent runs the gate once 30 commits have
+  landed since `STATE/last-gate` (same threshold, same files, `last-gate` advanced only on GREEN; a RED is the next
+  item), closing the 58-commit ungated stretch after `862e305`. Due-count checked against empty, unknown, old and
+  current shas (999/999/12/0).
+  <!-- /W40.a1 -->
