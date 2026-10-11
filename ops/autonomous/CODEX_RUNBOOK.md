@@ -88,6 +88,26 @@ After that, "Continue" is enough to resume after an interruption.
    git -C "$primary" branch -d "codex/<slug>-$stamp"
    "$primary/ops/autonomous/tidy.sh"
    ```
+9. **Gate when due.** The daemon runs the full health gate once 30 commits have landed since the last green
+   one, and nothing else does; while it is stopped, you are the cadence. Use its state files, so the count
+   carries over in both directions:
+   ```bash
+   state="$HOME/.local/state/archive-autonomous"
+   last="$(cat "$state/last-gate" 2>/dev/null)"; n=999   # never gated, or an unknown sha: due now
+   [ -n "$last" ] && n="$(git -C "$primary" rev-list --count "$last..HEAD" 2>/dev/null || echo 999)"
+   if [ "$n" -ge "${AUTONOMOUS_GATE_EVERY:-30}" ]; then
+     "$primary/ops/autonomous/health-gate.sh" > "$state/last-gate.log" 2>&1 \
+       && git -C "$primary" rev-parse HEAD > "$state/last-gate"
+     tail -3 "$state/last-gate.log"
+   fi
+   ```
+   It runs at the primary checkout, which step 8 just advanced to `origin/main`, and takes 15 to 50 minutes.
+   It launches apps, so request execution outside the Codex sandbox (inside it the gate exits 3 at once).
+   `last-gate` moves only on GREEN. On RED, making the gate pass is your next item, before any queue item: the
+   log names the failing steps and their output; reproduce each step alone, fix the cause and ship it under the
+   failing item's tag if one exists. Never weaken, skip or remove a check to get green. A step that fails
+   because of something only the owner can supply is a stop reason (below).
+
    Then go back to step 1 without asking.
 
 ## Filing new work
@@ -136,5 +156,8 @@ Every step above repairs something that actually went wrong. The long history is
   and interactive sessions filed most of them, so this rule applies to everyone.
 - **Uncommitted work** (2026-07-29, 2026-08-13): a removed worktree held about 2,900 uncommitted lines; later
   `W19.q2` sat as 107 lines of passing work with no commit and collided with the daemon.
+- **No gate while the daemon was stopped** (`W40.a1`): no health gate ran on the 58 commits after `862e305`
+  (2026-09-24), because only the daemon's loop calls it and Codex sessions never did. Step 9 gives the external loop
+  the same cadence on the same state files.
 - **External tools**: Codex's own sandbox supplies `rg`, but the daemon's PATH does not include it. A shell
   script you add must work under `/opt/homebrew/bin` and the system tools alone.

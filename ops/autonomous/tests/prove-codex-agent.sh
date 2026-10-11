@@ -21,6 +21,9 @@ ok()  { printf '  \033[32mPASS\033[0m %s\n' "$1"; PASS=$((PASS+1)); }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
 
 unset AUTONOMOUS_AGENT   # an inherited value would override every scenario below (2026-10-04 review)
+# A gate run from inside an engine session inherits the worker's state dir, and usage-window.sh prefers it over
+# the fixture's AUTONOMOUS_STATE: [2c] then read the live session log (W40.a1, 2026-10-11).
+unset AUTONOMOUS_WORKER_STATE
 FIXTURE_HOME="$T/home"; mkdir -p "$FIXTURE_HOME/Desktop" "$FIXTURE_HOME/.local/bin"
 BIN="$T/bin"; mkdir -p "$BIN"
 for c in security osascript launchctl caffeinate curl; do printf '#!/bin/sh\nexit 0\n' > "$BIN/$c"; chmod +x "$BIN/$c"; done
