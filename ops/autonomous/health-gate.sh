@@ -330,6 +330,9 @@ step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.
 # W40.a2 (2026-10-11): ArchiveCore's own `swift test`, which nothing in the gate ran before. The script takes
 # the heavy lock itself and re-prints failures last so this step's RED tail names them (see its header).
 step archivecore bash "$ROOT/ops/autonomous/archivecore-tests.sh"
+# W40.a3: byte-identical iOS/Android relay JSON is a mandatory, free gate lane.
+# The harness takes the heavy lock for its Swift/JVM builds; missing fixtures fail closed.
+step relay-golden bash "$ROOT/ArchiveProcessor/scripts/test-relay-golden.sh"
 step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -derivedDataPath ./build/gate-DD'
 step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
 # Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
