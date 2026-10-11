@@ -386,7 +386,9 @@ macOS/Sources/ArchiveNotes/
     DateFieldEntry.swift           Pure rules behind NoteMetadataInspector's DATE row (year text +
                                    month index + day text ⟹ committed string, day-Set enablement, and
                                    the note shown when a day the chosen month cannot have is dropped) —
-                                   extracted so they are unit-testable without a window (W23.l4)
+                                   extracted so they are unit-testable without a window (W23.l4). At
+                                   day precision the fields are typed in the item's display calendar
+                                   (when Settings allows) and converted to the ISO day (W24.cal1-validator)
     NoteTagsInspector.swift        Detail add/remove subjects, retrying the exact failed delta rather
                                    than silently dropping it (W9.b3)
     NoteTitleTextField.swift       AppKit inline-title field: Return/Escape/blank semantics and

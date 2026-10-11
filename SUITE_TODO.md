@@ -847,15 +847,6 @@ live in `execution-plans/archive-notes/00-overview.md` §17. ⛔ Do not re-file 
   move all five entries to `SUITE_TODO_DONE.md`. Est. a quarter of a session. It stays
   the tag `W40.b1` and `W40.b2` wait on.
   Edges: (blocked-on: W24.cal1-core, W24.cal1-toggle, W24.cal1-validator, W24.cal1-reader)
-- [ ] **`W24.cal1-validator` — Notes: the date-entry days-in-month rule follows the item's calendar [S · Tier-2 · ~1 session]** (lane: notes) (uses: build) (blocked-on: W24.cal1-core, W24.cal1-toggle)
-  Part of `W24.cal1`. `Views/DateFieldEntry.swift` validates an entered day against the chosen calendar's month
-  lengths and converts it to ISO for storage; with the option off it keeps today's `GregorianDay`
-  rule (Julian leap years before 1582, Gregorian from 1582), so `1500-02-29` is still accepted. The case this
-  item exists for: an English `1700-02-29` is accepted under Julian with the 1752 cutover and rejected
-  under Gregorian.
-  DONE WHEN unit tests cover that case both ways, one Hebrew or Islamic month-length case, and unchanged
-  behaviour with the option off, including a `1500-02-29` that is still accepted. |
-  ArchiveNotes Views/DateFieldEntry.swift | S | med | none
 
 ## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
 

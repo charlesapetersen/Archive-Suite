@@ -10431,3 +10431,30 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   the checkmark ignored un-keyable selected files; the tooltip padded the own year differently from the sent-with.
   No VM UITest run: the change is a string in an existing text cell, pinned by the unit tests.
   <!-- /W24.cal1-reader -->
+- [x] **W24.cal1-validator — Notes: the date-entry days-in-month rule follows the item's calendar [S · Tier-2 · ~1 session]** · §Cross-app date display — owner-promoted 2026-09-26 · SHIPPED 2026-10-11 (lane: notes) (uses: build) (blocked-on: W24.cal1-core, W24.cal1-toggle)
+  Part of `W24.cal1`. `Views/DateFieldEntry.swift` validates an entered day against the chosen calendar's month
+  lengths and converts it to ISO for storage; with the option off it keeps today's `GregorianDay`
+  rule (Julian leap years before 1582, Gregorian from 1582), so `1500-02-29` is still accepted. The case this
+  item exists for: an English `1700-02-29` is accepted under Julian with the 1752 cutover and rejected
+  under Gregorian.
+  DONE WHEN unit tests cover that case both ways, one Hebrew or Islamic month-length case, and unchanged
+  behaviour with the option off, including a `1500-02-29` that is still accepted. |
+  ArchiveNotes Views/DateFieldEntry.swift | S | med | none
+  SHIPPED: `DateFieldEntry` takes the calendar the fields are typed in. `.standard` (always, with the Settings
+  switch off) is the unchanged `GregorianDay` rule; under another calendar a day is judged by that calendar's
+  month lengths (`DisplayCalendar.stored(from:)`) and written as its ISO day. A calendar applies to whole days
+  only: under one, fields short of a whole storable day commit nothing (`Commit.keep`, with a "Not saved" note)
+  rather than a guessed month or a clear, and a stored month/year is entered in Gregorian (`seed`). A commit
+  naming the day already stored writes nothing, so a pre-1582 Julian `1500-02-29` is never rewritten as
+  `1500-03-10`. The inspector's own-date and sent-with rows use it: calendar month menus (13 months in a Hebrew
+  leap year and in French Republican), reseed on calendar change, conversion on precision change.
+  Tests: `DateFieldCalendarEntryTests` (15) — English `1700-02-29` both ways, the 1752 gap, Hebrew Iyyar/Adar I
+  and Islamic Safar month lengths, option-off parity incl. `1500-02-29`, whole-day round trip through every
+  calendar, and a scratch-store test that a Julian entry writes the same `date:` bytes as typing the Gregorian
+  day. Full Notes bundle 959 + 220 XCTest green, no new warnings. Review (Tier-2, adversarial, two rounds):
+  round 1 found a HIGH (partial dates converted by two non-inverse anchors drifted a stored month/year on a
+  precision round trip) and a MEDIUM (an out-of-range calendar year cleared the date) — both fixed by the
+  whole-days-only rule. Known, low: a precision change on the `.keep` path reseeds from `item.date`, which can
+  be stale for the instant an async write is in flight. No VM UITest run: the change is field rules and
+  captions, pinned by the unit tests.
+  <!-- /W24.cal1-validator -->
