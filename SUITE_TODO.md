@@ -886,7 +886,6 @@ on `a1` rather than `a3`. The freeze is now per area: only an app's ledger and j
 unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the Reader and Notes ledgers `b1`/`b2` on
 `W24.cal1` (their journeys follow through `b1`/`b2`). Rule 7 of the daemon plan says the same.
 
-- [ ] **`W40.a2` — the gate runs ArchiveCore's tests [S]** (lane: ops,core) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a3` — every lane green in full, in any order [M]** (lane: suite) (uses: build,vm) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a4` — remove tests that cannot fail [S]** (lane: reader,notes,processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a5` — test drivers out of the Processor Release build [S · Tier-2]** (lane: processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.

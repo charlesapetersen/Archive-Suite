@@ -10536,3 +10536,12 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   - The flagged pass shows page n | n+1 with Keep / Split / Join, then the existing skim sheet.
   - A per-item build table.
   <!-- /W36.seg-opt-design -->
+- [x] **W40.a2 — the gate runs ArchiveCore's tests [S]** · §W40 verification phase · SHIPPED 2026-10-11 (this commit)
+  New gate step `archivecore` → `ops/autonomous/archivecore-tests.sh`: `swift test` for `packages/ArchiveCore`
+  under `heavy-enter.sh` (not xcodebuild, so the PATH shim would not lock it), scratch path `.build-gate/`,
+  `ARCHIVE_SCALE_*_ROOT` unset. Baseline green: 264 XCTest (4 scale cases skipped) + 110 Swift Testing, 21-37 s.
+  Proved it bites: a planted `XCTAssertEqual(1, 2)` in `PDFHeaderParserTests` turned
+  `AUTONOMOUS_GATE_ONLY=archivecore health-gate.sh` RED (rc=1), then reverted. The first inline cut's RED tail
+  was 40 lines of Swift Testing "passed" that never named the failing case (XCTest prints first), so the script
+  re-prints `error:`/failure lines last. `prove-gate-report.sh` 38/0.
+  <!-- /W40.a2 -->
