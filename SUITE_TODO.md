@@ -820,34 +820,6 @@ completion records are under §W9 in `SUITE_TODO_DONE.md`, and the plan's out-of
 live in `execution-plans/archive-notes/00-overview.md` §17. ⛔ Do not re-file A4 (R13d removed the
 `ArchiveSuite` marker on purpose). New Notes gaps are filed as their own items, not under W9.
 
-## Cross-app date display — owner-promoted 2026-09-26
-
-- [ ] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.** (lane: docs) (uses: light)
-  Original body, kept for reference; the work now lives in the four parts below.
-  Owner direction (2026-07-31 Daemon Report, in response to the W23.l4 `Calendar` deviation); owner promoted
-  it from the deferred ideas list into the active work queue 2026-09-26. Two halves:
-  (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
-  does, and it must stay the canonical on-disk form, so this item does not change storage; (b) the
-  **rendering** calendar becomes a user choice **per note and per document**, defaulting **off** in
-  Settings — with it enabled (a medievalist's mode), each item offers a choice of calendar systems
-  (Julian, Julian-with-1752-English-cutover, French Republican, Hebrew, Islamic, …) for display and for
-  the date-entry validator's "N days in that month" rule. Supersedes the narrower fix of hard-coding the
-  Anglo-American 1752 cutover: `GregorianDay` fixes the switchover at **1582**, so a genuine English or
-  colonial `1700-02-29` is rejected today — under this design that becomes a *display/validation profile*
-  rather than a global constant. Not urgent: the working corpus begins 1789, after every candidate
-  cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
-  Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | S | none
-  **Split 2026-10-07 into four parts** (efficiency plan, from its queue analysis:
-  `~/Claude/Agent Manager/analysis/QUEUE-ANALYSIS-2026-10-07.md` proposal c: "W24.cal1 into core calendar, Notes
-  toggle/field, Notes validator, Reader parity"; as one L item on the `suite` lane it blocked every other worker
-  for its whole length). The work is in the four `W24.cal1-*` entries below. This entry now only closes the
-  feature: when all four have shipped, confirm from main and the gate's latest run that the byte-comparison
-  tests `W24.cal1-toggle` and `W24.cal1-validator` shipped (a stored date is the same ISO 8601 bytes with the
-  option on and off) are present and green; no build or test run of its own, so it stays `uses: light`. Then
-  move all five entries to `SUITE_TODO_DONE.md`. Est. a quarter of a session. It stays
-  the tag `W40.b1` and `W40.b2` wait on.
-  Edges: (blocked-on: W24.cal1-core, W24.cal1-toggle, W24.cal1-validator, W24.cal1-reader)
-
 ## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
 
 The owner's original goal for the project, last tried in spring 2026 with a per-page method that "never got near

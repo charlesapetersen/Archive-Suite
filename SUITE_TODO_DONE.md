@@ -10485,3 +10485,39 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Owner's plan, Dean (202 pages, 68 Sonnet 5.5 windows, idle control flat): five-hour 27→37%, weekly 75→76%,
   $10.22 notional → ~5% of a five-hour window and ~0.5% of the week per 100 pages, ~1 point per $0.98.
   <!-- /W36.seg-opt-usage -->
+- [x] **W24.cal1 — dates: store ISO 8601 always; make the *display* calendar a per-item, opt-in toggle.** · §Cross-app date display — owner-promoted 2026-09-26 (lane: docs) (uses: light) SHIPPED 2026-10-11
+  Original body, kept for reference; the work now lives in the four parts below.
+  Owner direction (2026-07-31 Daemon Report, in response to the W23.l4 `Calendar` deviation); owner promoted
+  it from the deferred ideas list into the active work queue 2026-09-26. Two halves:
+  (a) the **stored** value is always proleptic-ISO-8601 — that is what `Store/GregorianDay.swift` already
+  does, and it must stay the canonical on-disk form, so this item does not change storage; (b) the
+  **rendering** calendar becomes a user choice **per note and per document**, defaulting **off** in
+  Settings — with it enabled (a medievalist's mode), each item offers a choice of calendar systems
+  (Julian, Julian-with-1752-English-cutover, French Republican, Hebrew, Islamic, …) for display and for
+  the date-entry validator's "N days in that month" rule. Supersedes the narrower fix of hard-coding the
+  Anglo-American 1752 cutover: `GregorianDay` fixes the switchover at **1582**, so a genuine English or
+  colonial `1700-02-29` is rejected today — under this design that becomes a *display/validation profile*
+  rather than a global constant. Not urgent: the working corpus begins 1789, after every candidate
+  cutover, so nothing is currently mis-handled. Notes `Store/GregorianDay.swift`, `Views/DateFieldEntry.swift`,
+  Settings; Reader display parity to be scoped with it. | Notes + Reader | Tier-2 | S | none
+  **Split 2026-10-07 into four parts** (efficiency plan, from its queue analysis:
+  `~/Claude/Agent Manager/analysis/QUEUE-ANALYSIS-2026-10-07.md` proposal c: "W24.cal1 into core calendar, Notes
+  toggle/field, Notes validator, Reader parity"; as one L item on the `suite` lane it blocked every other worker
+  for its whole length). The work is in the four `W24.cal1-*` entries below. This entry now only closes the
+  feature: when all four have shipped, confirm from main and the gate's latest run that the byte-comparison
+  tests `W24.cal1-toggle` and `W24.cal1-validator` shipped (a stored date is the same ISO 8601 bytes with the
+  option on and off) are present and green; no build or test run of its own, so it stays `uses: light`. Then
+  move all five entries to `SUITE_TODO_DONE.md`. Est. a quarter of a session. It stays
+  the tag `W40.b1` and `W40.b2` wait on.
+  Edges: (blocked-on: W24.cal1-core, W24.cal1-toggle, W24.cal1-validator, W24.cal1-reader)
+  **Closed 2026-10-11** (no code of its own). All four parts shipped the same day and are above in this file:
+  `W24.cal1-core` (722b023, ArchiveCore `DisplayCalendar` + 19 `swift test` cases), `W24.cal1-toggle` (b830e53,
+  4e49706), `W24.cal1-reader` (f83344ad), `W24.cal1-validator` (293b0f49). Confirmed on main: the byte-comparison
+  tests are present — `DisplayCalendarToggleTests.storedDateUnchanged` (choosing a calendar leaves the `date:` line
+  the same bytes) and, in `DateFieldCalendarEntryTests`, `optionOffUnchanged`, `wholeDayRoundTrip`,
+  `julianLeapDayNotRewritten` and the scratch-store test that a Julian entry writes the same `date:` bytes as the
+  Gregorian day. Gate: the latest health-gate run (9783d078) is GREEN with the Reader and Notes suites, and it
+  covers core and toggle; it predates the reader and validator commits, so those two rest on their own sessions'
+  full-bundle runs (Reader 420 green; Notes 959 + 220 XCTest green), and the next periodic gate re-checks them.
+  `W40.b1`/`W40.b2` were blocked on this tag and are now unblocked on it.
+  <!-- /W24.cal1 -->
