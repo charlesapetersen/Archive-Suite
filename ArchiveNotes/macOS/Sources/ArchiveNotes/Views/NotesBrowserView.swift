@@ -237,6 +237,7 @@ struct NotesBrowserView: View {
 private struct ItemListPane: View {
     @ObservedObject var model: NotesModel
     @ObservedObject var nav: NotesNavigationModel
+    @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
     @Binding var selectedTemplateID: UUID?
 
     var body: some View {
@@ -251,7 +252,8 @@ private struct ItemListPane: View {
                         model: nav,
                         selection: $nav.selection,
                         onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
-                        buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) }  // W6-S5
+                        buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) },  // W6-S5
+                        calendarsEnabled: calendarsEnabled
                     )
                     .accessibilityIdentifier("an.list.table")
                     .overlay {
@@ -310,6 +312,7 @@ private struct ItemListPane: View {
 /// item's body and autosaves through `NoteStore` (W7-S1a — `NoteEditorPane` + `NoteBodyEditorModel`).
 private struct DetailPane: View {
     @ObservedObject var nav: NotesNavigationModel
+    @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
     @Binding var selectedTemplateID: UUID?
 
     var body: some View {
@@ -372,11 +375,7 @@ private struct DetailPane: View {
                         .lineLimit(1)
                 }
                 HStack(spacing: 10) {
-                    if let d = item.displayDate { Label(d, systemImage: "calendar").labelStyle(.titleAndIcon) }
-                    if let s = item.displaySentWith {
-                        Label("Sent with: \(s)", systemImage: "envelope").labelStyle(.titleAndIcon)
-                            .accessibilityIdentifier("an.detail.header.sentWith")
-                    }
+                    ItemHeaderDates(item: item, calendarsEnabled: calendarsEnabled)
                     if item.quality != nil { Text(item.qualityStars).foregroundStyle(.yellow) }
                     if !item.authors.isEmpty {
                         Label(item.authors.joined(separator: ", "), systemImage: "person")
@@ -397,6 +396,25 @@ private struct DetailPane: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
+        }
+    }
+}
+
+/// The detail header's date labels — the own date and the sent-with date, each in the item's display
+/// calendar when Settings allows it (W24.cal1-toggle). Its own view so a headless render test can draw
+/// exactly what the header draws.
+struct ItemHeaderDates: View {
+    let item: ItemSummary
+    let calendarsEnabled: Bool
+
+    var body: some View {
+        if let d = item.displayDate(calendarsEnabled: calendarsEnabled) {
+            Label(d, systemImage: "calendar").labelStyle(.titleAndIcon)
+                .accessibilityIdentifier("an.detail.header.date")
+        }
+        if let s = item.displaySentWith(calendarsEnabled: calendarsEnabled) {
+            Label("Sent with: \(s)", systemImage: "envelope").labelStyle(.titleAndIcon)
+                .accessibilityIdentifier("an.detail.header.sentWith")
         }
     }
 }

@@ -44,7 +44,8 @@ enum FrontMatterCodec {
             trailingBodyRaw: leadingText,
             sentWith: fields.sentWith,
             sentWithUncertain: fields.sentWith != nil && fields.sentWithUncertain,
-            unparsedAdditionalDates: fields.unparsedAdditionalDates
+            unparsedAdditionalDates: fields.unparsedAdditionalDates,
+            displayCalendar: fields.displayCalendar
         )
     }
 
@@ -94,6 +95,12 @@ enum FrontMatterCodec {
             }
         }
 
+        // W24.cal1-toggle: omitted when the item is shown as stored, so an item nobody chose a calendar
+        // for encodes byte-for-byte as before.
+        if let cal = item.displayCalendar, cal != .standard {
+            lines.append("\(Self.displayCalendarKey): \(cal.rawValue)")
+        }
+
         if let q = item.quality {
             lines.append("quality: \(q)")
         }
@@ -123,7 +130,9 @@ enum FrontMatterCodec {
         lines.append("created: \(formatISO(item.created))")
         lines.append("modified: \(formatISO(item.modified))")
 
-        for u in item.unknownFrontMatter {
+        // A `display_calendar` value this build could not read is kept verbatim — unless a calendar has
+        // since been chosen, which replaces it (never two `display_calendar` keys).
+        for u in item.unknownFrontMatter where !(u.key == Self.displayCalendarKey && item.displayCalendar != nil) {
             for raw in u.rawLines { lines.append(raw) }
         }
 
@@ -208,6 +217,7 @@ enum FrontMatterCodec {
         var sentWith: ArchiveDate?
         var sentWithUncertain: Bool = false
         var unparsedAdditionalDates: [UnknownKey] = []
+        var displayCalendar: DisplayCalendar?
         var quality: Int?
         var tags: [String] = []
         var roundup: Bool = false
@@ -220,8 +230,11 @@ enum FrontMatterCodec {
     private static let knownKeys: Set<String> = [
         "schema", "id", "kind", "title", "authors", "date",
         "date_precision", "date_uncertain", "additional_dates", "quality", "tags",
-        "roundup", "zotero", "created", "modified"
+        "roundup", "zotero", "created", "modified", displayCalendarKey
     ]
+
+    /// W24.cal1-toggle: the item's display calendar, a `DisplayCalendar` raw value.
+    static let displayCalendarKey = "display_calendar"
 
     /// Takes the region's lines rather than its text: `splitFrontMatter` has already split them on any
     /// of the three line terminators, so this half no longer needs the document normalized to LF first
@@ -294,6 +307,16 @@ enum FrontMatterCodec {
 
             case "additional_dates":
                 i += parseAdditionalDates(valuePart, lines: lines, from: i, into: &fields)
+
+            case displayCalendarKey:
+                // A value this build does not know (a newer calendar, a typo) is kept verbatim rather
+                // than dropped, and the item shows as stored.
+                if let cal = DisplayCalendar(rawValue: unquoteScalar(valuePart)) {
+                    fields.displayCalendar = cal
+                } else {
+                    fields.unknownKeys.append(UnknownKey(key: key, rawLines: [line]))
+                }
+                i += 1
 
             case "quality":
                 fields.quality = Int(valuePart)

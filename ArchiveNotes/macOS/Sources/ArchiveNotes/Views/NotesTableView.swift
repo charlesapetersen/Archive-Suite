@@ -16,6 +16,8 @@ struct NotesTableView: NSViewRepresentable {
     @Binding var selection: Set<UUID>
     var onDoubleClick: () -> Void
     var buildContextMenu: (Set<UUID>) -> NSMenu?
+    /// Settings ▸ "Show dates in other calendars" (W24.cal1-toggle); the Date column follows it.
+    var calendarsEnabled: Bool = false
 
     /// Non-hideable primary column (analogous to Reader's always-visible "File name").
     static let titleColumnID = "title"
@@ -154,6 +156,17 @@ struct NotesTableView: NSViewRepresentable {
             }
         }
 
+        // The Settings calendar switch changes only how dates read, so redraw the visible rows in place.
+        if coordinator.lastCalendarsEnabled != calendarsEnabled {
+            coordinator.lastCalendarsEnabled = calendarsEnabled
+            let visRange = tableView.rows(in: tableView.visibleRect)
+            if visRange.length > 0 {
+                tableView.reloadData(
+                    forRowIndexes: IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length)),
+                    columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+            }
+        }
+
         // Selection sync (SwiftUI → AppKit)
         if coordinator.lastPushedSelection != selection {
             coordinator.syncSelection(selection)
@@ -180,6 +193,7 @@ struct NotesTableView: NSViewRepresentable {
         weak var tableView: NSTableView?
         var dataSource: NSTableViewDiffableDataSource<Int, UUID>?
         var lastPushedSelection: Set<UUID> = []
+        var lastCalendarsEnabled = false
         var isUpdatingSelection = false
         var isSortingFromModel = false
         var displayedByID: [UUID: ItemSummary] = [:]
@@ -289,7 +303,7 @@ struct NotesTableView: NSViewRepresentable {
                 tf.setAccessibilityIdentifier("an.cell.instances.\(item.id.uuidString)")
 
             case "date":
-                tf.stringValue = item.dateColumnText ?? "—"
+                tf.stringValue = item.dateColumnText(calendarsEnabled: parent.calendarsEnabled) ?? "—"
                 tf.textColor = item.sortDate == nil ? .secondaryLabelColor : .labelColor
                 if item.sortDateUncertain {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)

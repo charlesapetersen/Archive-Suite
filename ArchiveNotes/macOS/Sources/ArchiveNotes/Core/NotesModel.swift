@@ -897,6 +897,18 @@ final class NotesModel: ObservableObject {
         await mutateItem(id, "set date uncertainty") { $0.dateUncertain = uncertain }
     }
 
+    /// Choose the calendar `id`'s dates are SHOWN in (W24.cal1-toggle). Display only: `date` and
+    /// `sentWith` are not touched, so the stored ISO values are the same bytes before and after.
+    /// `standard` (or nil) clears the choice and writes no key; any `display_calendar` value this build
+    /// could not read is retired, since an explicit choice settles it.
+    @discardableResult
+    func setDisplayCalendar(_ calendar: DisplayCalendar?, for id: UUID) async -> Bool {
+        await mutateItem(id, "set the display calendar") { item in
+            item.displayCalendar = calendar == .standard ? nil : calendar
+            item.unknownFrontMatter.removeAll { $0.key == FrontMatterCodec.displayCalendarKey }
+        }
+    }
+
     /// Set the covering letter's ("sent with") date — W37.dual-date. The same normalization as the own
     /// date (`Item.normalizedDate`), then the Core whole value; a `nil`/blank date clears it together
     /// with its uncertainty flag. A value Core cannot carry (a year outside 3–4 digits) is refused with

@@ -74,7 +74,8 @@ actor NotesIndex {
                 source_count INTEGER DEFAULT 0,
                 roundup INTEGER NOT NULL DEFAULT 0,
                 sent_with TEXT,
-                sent_with_uncertain INTEGER NOT NULL DEFAULT 0
+                sent_with_uncertain INTEGER NOT NULL DEFAULT 0,
+                display_calendar TEXT
             );
             """)
 
@@ -98,6 +99,11 @@ actor NotesIndex {
         }
         if !itemsHasColumn("sent_with_uncertain") {
             try exec("ALTER TABLE items ADD COLUMN sent_with_uncertain INTEGER NOT NULL DEFAULT 0;")
+        }
+        // W24.cal1-toggle: the display calendar's raw value. Same additive guard, no backfill — no item
+        // carried `display_calendar` before this column existed, so NULL (as stored) is right for every row.
+        if !itemsHasColumn("display_calendar") {
+            try exec("ALTER TABLE items ADD COLUMN display_calendar TEXT;")
         }
 
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).
@@ -280,10 +286,10 @@ actor NotesIndex {
                 UPDATE items SET mtime=?, title=?, kind=?, date=?, date_precision=?,
                     date_uncertain=?, authors=?, sort_date=?, quality=?, created=?,
                     modified=?, managed_tags=?, source_count=?, roundup=?, sent_with=?,
-                    sent_with_uncertain=? WHERE rowid=?;
+                    sent_with_uncertain=?, display_calendar=? WHERE rowid=?;
                 """) { stmt in
                 self.bindItemColumns(stmt, row, startIndex: 1)
-                sqlite3_bind_int64(stmt, 17, rowid)
+                sqlite3_bind_int64(stmt, 18, rowid)
             }
             try insertFTS(rowid: rowid, row: row)
         } else {
@@ -291,8 +297,8 @@ actor NotesIndex {
             try run("""
                 INSERT INTO items(id, mtime, title, kind, date, date_precision,
                     date_uncertain, authors, sort_date, quality, created, modified, managed_tags,
-                    source_count, roundup, sent_with, sent_with_uncertain)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    source_count, roundup, sent_with, sent_with_uncertain, display_calendar)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """) { stmt in
                 self.bindText(stmt, 1, idStr)
                 self.bindItemColumns(stmt, row, startIndex: 2)
@@ -319,6 +325,7 @@ actor NotesIndex {
         sqlite3_bind_int(stmt, s + 13, row.roundup ? 1 : 0)
         if let sent = row.sentWith { bindText(stmt, s + 14, sent.wireValue) } else { sqlite3_bind_null(stmt, s + 14) }
         sqlite3_bind_int(stmt, s + 15, row.sentWithUncertain ? 1 : 0)
+        if let cal = row.displayCalendar { bindText(stmt, s + 16, cal.rawValue) } else { sqlite3_bind_null(stmt, s + 16) }
     }
 
     private func insertFTS(rowid: Int64, row: NoteIndexRow) throws {
@@ -363,7 +370,7 @@ actor NotesIndex {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
                    sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup,
-                   sent_with, sent_with_uncertain
+                   sent_with, sent_with_uncertain, display_calendar
             FROM items WHERE id = ?;
             """) else { return nil }
         defer { sqlite3_finalize(stmt) }
@@ -379,7 +386,7 @@ actor NotesIndex {
         guard let stmt = prepare("""
             SELECT id, title, kind, date, date_precision, date_uncertain, authors,
                    sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup,
-                   sent_with, sent_with_uncertain
+                   sent_with, sent_with_uncertain, display_calendar
             FROM items;
             """) else { return [] }
         defer { sqlite3_finalize(stmt) }
@@ -802,7 +809,9 @@ actor NotesIndex {
                            managedTags: managedTags, sourceNoteCount: sourceCount,
                            roundup: sqlite3_column_int(stmt, 14) != 0,
                            sentWith: sentWith,
-                           sentWithUncertain: sentWith != nil && sqlite3_column_int(stmt, 16) != 0)
+                           sentWithUncertain: sentWith != nil && sqlite3_column_int(stmt, 16) != 0,
+                           displayCalendar: sqlite3_column_text(stmt, 17)
+                               .flatMap { DisplayCalendar(rawValue: String(cString: $0)) })
     }
 
     private func exec(_ sql: String) throws {

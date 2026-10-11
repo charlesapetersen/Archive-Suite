@@ -34,8 +34,39 @@ extension ItemSummary {
     /// The Date column's text. The own date leads; a sent-with date is always labelled so it is never
     /// read as the item's own date: "Nov 3, 1957 · sent with Mar 12, 1958" when both exist, and
     /// "Sent with Mar 12, 1958" when the row sorts by that fallback because it has no own date.
-    var dateColumnText: String? {
-        switch (displayDate, displaySentWith) {
+    var dateColumnText: String? { dateColumnText(calendarsEnabled: false) }
+
+    /// W24.cal1-toggle: the calendar the dates are shown in — the item's choice when Settings allows
+    /// it, else nil (as stored). Only day-precision dates convert; a year or month is left as stored,
+    /// since a Gregorian month does not map onto one month of another calendar.
+    func activeCalendar(calendarsEnabled: Bool) -> DisplayCalendar? {
+        guard calendarsEnabled, let displayCalendar, displayCalendar != .standard else { return nil }
+        return displayCalendar
+    }
+
+    /// `displayDate`, in the item's display calendar when Settings allows it and the date is a day the
+    /// calendar can show; otherwise exactly `displayDate`.
+    func displayDate(calendarsEnabled: Bool) -> String? {
+        if let cal = activeCalendar(calendarsEnabled: calendarsEnabled), datePrecision == .day, let date,
+           let shown = DisplayCalendarSettings.shown(isoDay: date, in: cal) {
+            return shown
+        }
+        return displayDate
+    }
+
+    /// `displaySentWith`, converted the same way as the own date.
+    func displaySentWith(calendarsEnabled: Bool) -> String? {
+        if let cal = activeCalendar(calendarsEnabled: calendarsEnabled), let s = sentWith, s.precision == .day,
+           let m = s.month, let d = s.day,
+           let shown = DisplayCalendarSettings.shown(year: s.year, month: m, day: d, in: cal) {
+            return shown
+        }
+        return displaySentWith
+    }
+
+    /// `dateColumnText` with both dates shown through `displayDate(calendarsEnabled:)`.
+    func dateColumnText(calendarsEnabled: Bool) -> String? {
+        switch (displayDate(calendarsEnabled: calendarsEnabled), displaySentWith(calendarsEnabled: calendarsEnabled)) {
         case let (own?, sent?): return "\(own) · sent with \(sent)"
         case let (nil, sent?):  return "Sent with \(sent)"
         case let (own, nil):    return own

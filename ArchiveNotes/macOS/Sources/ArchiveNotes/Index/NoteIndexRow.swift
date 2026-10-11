@@ -29,6 +29,8 @@ struct NoteIndexRow: Sendable {
     /// carries the own-date-else-sent-with fallback.
     var sentWith: ArchiveDate? = nil
     var sentWithUncertain: Bool = false
+    /// W24.cal1-toggle: the item's display calendar (`items.display_calendar`); nil = as stored.
+    var displayCalendar: DisplayCalendar? = nil
 }
 
 extension NoteIndexRow {
@@ -62,7 +64,8 @@ extension NoteIndexRow {
             sourceCount: item.blocks.distinctSourceNoteCount,
             roundup: item.roundup,
             sentWith: item.sentWith,
-            sentWithUncertain: item.sentWith != nil && item.sentWithUncertain
+            sentWithUncertain: item.sentWith != nil && item.sentWithUncertain,
+            displayCalendar: item.displayCalendar
         )
     }
 }
@@ -91,6 +94,8 @@ struct ItemSummary: Sendable, Identifiable {
     /// W37.dual-date: the covering letter's date (nil when none) and its own uncertainty flag.
     var sentWith: ArchiveDate? = nil
     var sentWithUncertain: Bool = false
+    /// W24.cal1-toggle: the calendar the dates are shown in when Settings allows it; nil = as stored.
+    var displayCalendar: DisplayCalendar? = nil
 }
 
 extension ItemSummary {

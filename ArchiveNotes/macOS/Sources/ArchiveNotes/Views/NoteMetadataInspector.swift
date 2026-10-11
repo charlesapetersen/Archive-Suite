@@ -22,6 +22,7 @@ struct NoteMetadataInspector: View {
     @ObservedObject var nav: NotesNavigationModel
     let item: ItemSummary
     @EnvironmentObject private var sourcePreview: SourceBlockPreviewState
+    @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
 
     @State private var precision: Item.DatePrecision = .year
     @State private var yearText = ""
@@ -255,8 +256,41 @@ struct NoteMetadataInspector: View {
             Toggle("Date uncertain (shown in italics)", isOn: uncertainBinding)
                 .accessibilityIdentifier("an.detail.date.uncertain")
 
+            if calendarsEnabled { calendarSection }
+
             sentWithSection
         }
+    }
+
+    /// W24.cal1-toggle: which calendar this item's day-precision dates are shown in. Only offered while
+    /// Settings ▸ "Show dates in other calendars" is on. Choosing one never changes the stored date.
+    @ViewBuilder private var calendarSection: some View {
+        HStack {
+            Text("Calendar").frame(width: 54, alignment: .leading)
+            Picker("Display calendar", selection: displayCalendarBinding) {
+                ForEach(DisplayCalendarSettings.choices, id: \.self) { cal in
+                    Text(cal.displayName).tag(cal)
+                }
+            }
+            .labelsHidden().frame(width: 220)
+            .accessibilityIdentifier("an.detail.date.calendar")
+        }
+        if let note = calendarNote {
+            Text(note)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("an.detail.date.calendarShown")
+        }
+    }
+
+    /// "Shown as …" under the picker, or why the stored date is shown instead.
+    private var calendarNote: String? {
+        guard let cal = item.activeCalendar(calendarsEnabled: true) else { return nil }
+        guard item.datePrecision == .day, let date = item.date else {
+            return "Only a full day (year, month and day) is shown in \(cal.displayName)."
+        }
+        if let shown = DisplayCalendarSettings.shown(isoDay: date, in: cal) { return "Shown as \(shown)." }
+        return "This date is outside the \(cal.displayName) calendar; shown as stored."
     }
 
     /// The covering letter's date (W37.dual-date): an item enclosed with a dated letter keeps its own
@@ -326,7 +360,7 @@ struct NoteMetadataInspector: View {
                 .disabled(item.sentWith == nil)
                 .accessibilityIdentifier("an.detail.sentWith.uncertain")
 
-            if let sent = item.displaySentWith {
+            if let sent = item.displaySentWith(calendarsEnabled: calendarsEnabled) {
                 Text(item.sortsBySentWith
                      ? "Sent with: \(sent) — sorted by this date (no own date)."
                      : "Sent with: \(sent)")
@@ -427,6 +461,10 @@ struct NoteMetadataInspector: View {
     private var sentWithUncertainBinding: Binding<Bool> {
         Binding(get: { item.sentWithUncertain },
                 set: { v in let id = item.id; Task { await nav.setSentWithUncertain(v, for: id) } })
+    }
+    private var displayCalendarBinding: Binding<DisplayCalendar> {
+        Binding(get: { item.displayCalendar ?? .standard },
+                set: { v in let id = item.id; Task { await nav.setDisplayCalendar(v, for: id) } })
     }
     private var uncertainBinding: Binding<Bool> {
         Binding(get: { item.dateUncertain },

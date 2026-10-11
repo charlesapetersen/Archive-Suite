@@ -44,6 +44,10 @@ struct Item: Sendable, Equatable, Identifiable {
     /// `additional_dates` entries this build does not understand (another role, a second `sent_with`,
     /// an invalid value), kept verbatim so a save never silently drops owner-written YAML.
     var unparsedAdditionalDates: [UnknownKey] = []
+    /// W24.cal1-toggle: the calendar this item's day-precision dates are SHOWN in (front-matter
+    /// `display_calendar`). Display only — `date` and `sentWith` stay the stored ISO 8601 values whatever
+    /// this says — and ignored unless Settings ▸ "Show dates in other calendars" is on. nil = as stored.
+    var displayCalendar: DisplayCalendar? = nil
 
     /// Chronological sort key: the item's OWN date, falling back to the sent-with date when it has none
     /// (owner, 2026-10-05; `sortsBySentWith` labels the fallback). nil when neither exists.

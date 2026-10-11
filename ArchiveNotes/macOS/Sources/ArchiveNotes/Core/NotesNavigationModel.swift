@@ -15,6 +15,7 @@
 
 import Foundation
 import Combine
+import ArchiveCore
 
 /// Cancellation shared with a detached corpus-scale recompute. NSLock keeps the flag Sendable without
 /// holding a lock across filtering or sorting work.
@@ -206,6 +207,11 @@ final class NotesNavigationModel: ObservableObject {
     /// Toggle the "date uncertain" flag for `id` (italic date; still sorts by its value).
     func setDateUncertain(_ uncertain: Bool, for id: UUID) async {
         await model.setDateUncertain(uncertain, for: id)
+    }
+
+    /// Choose the display calendar for `id` (W24.cal1-toggle); `standard` clears it.
+    func setDisplayCalendar(_ calendar: DisplayCalendar?, for id: UUID) async {
+        await model.setDisplayCalendar(calendar, for: id)
     }
 
     /// Set or clear the sent-with (covering letter) date for `id` (W37.dual-date).

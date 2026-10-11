@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Notes ⌘, Options — Zotero integration (05-zotero §D.8). `@AppStorage` binds directly to the
+/// Notes ⌘, Options — Zotero integration (05-zotero §D.8) and the display-calendar switch (W24.cal1-toggle). `@AppStorage` binds directly to the
 /// `ZoteroSettingsKey` defaults so edits persist immediately; the models resolve/validate those
 /// raw values through `ZoteroSettings(reading:)` at point of use.
 struct NotesSettingsView: View {
@@ -9,6 +9,7 @@ struct NotesSettingsView: View {
     @AppStorage(ZoteroSettingsKey.styleID) private var styleID = ZoteroSettings.defaultStyleID
     @AppStorage(ZoteroSettingsKey.host) private var host = ZoteroSettings.defaultHost
     @AppStorage(ZoteroSettingsKey.port) private var port = ZoteroSettings.defaultPort
+    @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
 
     var body: some View {
         Form {
@@ -34,8 +35,22 @@ struct NotesSettingsView: View {
                 TextField("Port", value: $port, format: .number.grouping(.never))
             }
             .disabled(!enabled)
+
+            // W24.cal1-toggle. Off by default; off, every date reads exactly as stored.
+            Section {
+                Toggle("Show dates in other calendars", isOn: $calendarsEnabled)
+                    .accessibilityIdentifier("an.settings.calendars")
+            } header: {
+                Text("Dates")
+            } footer: {
+                Text("Lets each note choose a calendar (Julian, French Republican, Hebrew, Islamic…) "
+                   + "for showing its dates. Dates are always stored in ISO 8601; choosing a calendar "
+                   + "changes only how they are shown.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 340)
+        .frame(width: 460, height: 460)
     }
 }
