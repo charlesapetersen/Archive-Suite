@@ -1,0 +1,69 @@
+{
+ "decided": "2026-10-11",
+ "bar": 0.98,
+ "on": [
+  "Dean",
+  "Deaver",
+  "Herrnstein"
+ ],
+ "gemini": {
+  "model": "gemini-3.8-flash",
+  "thinking": "low"
+ },
+ "approaches": {
+  "claude": {
+   "voters": [
+    "C"
+   ],
+   "rule": "min",
+   "level": 0.85
+  },
+  "gemini": {
+   "voters": [
+    "G"
+   ],
+   "rule": "min",
+   "level": 0.965
+  },
+  "mix": {
+   "voters": [
+    "C",
+    "G"
+   ],
+   "rule": "min",
+   "level": 0.85
+  }
+ },
+ "dev_held_out": {
+  "claude": {
+   "pages": 551,
+   "gaps": 494,
+   "flagged": 32,
+   "pages_exact_no_review": 0.9073359073359073,
+   "flagged_per_100_pages": 5.807622504537205,
+   "pages_exact_after_review": 0.9903474903474904,
+   "unflagged_errors": 2,
+   "unflagged_errors_per_500_pages": 1.8148820326678765
+  },
+  "gemini": {
+   "pages": 551,
+   "gaps": 494,
+   "flagged": 57,
+   "pages_exact_no_review": 0.9073359073359073,
+   "flagged_per_100_pages": 10.344827586206897,
+   "pages_exact_after_review": 0.9864864864864865,
+   "unflagged_errors": 3,
+   "unflagged_errors_per_500_pages": 2.722323049001815
+  },
+  "mix": {
+   "pages": 551,
+   "gaps": 494,
+   "flagged": 33,
+   "pages_exact_no_review": 0.9073359073359073,
+   "flagged_per_100_pages": 5.9891107078039925,
+   "pages_exact_after_review": 0.9903474903474904,
+   "unflagged_errors": 2,
+   "unflagged_errors_per_500_pages": 1.8148820326678765
+  }
+ }
+}
