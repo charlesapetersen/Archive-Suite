@@ -113,17 +113,54 @@ class PairFeatures(unittest.TestCase):
         self.assertEqual(f["log_time_gap"], 2.0)
         g = F.pair_features(a, b, 0.3, None, landscape, 0.0)
         self.assertEqual((g["missing_image"], g["paper_diff"]), (1.0, 0.0))
-        self.assertEqual(set(F.FEATURES), set(f))
+        self.assertEqual(set(F.BASE_FEATURES), set(f))
 
     def test_collection_features_shape_and_order(self):
         pages = [SimpleNamespace(n=i + 1, captured=f"2022:04:14 10:1{i}:00") for i in range(3)]
         texts = [LETTER, "Dear Sam:\nA second letter.", PAGE2]
         col = SimpleNamespace(name="toy", pages=pages, text=lambda i: texts[i])
-        X = F.collection_features(col, with_images=False)
+        X = F.collection_features(col, with_images=False, with_embeddings=False)
         self.assertEqual(X.shape, (2, len(F.FEATURES)))
+        self.assertEqual(X[0, F.FEATURES.index("missing_img_embed")], 1.0)
         self.assertEqual(X[0, F.FEATURES.index("next_salutation")], 1.0)
         self.assertEqual(X[1, F.FEATURES.index("next_pn_top_ge2")], 1.0)
         self.assertEqual(X[0, F.FEATURES.index("missing_image")], 1.0)
+
+
+class Embeddings(unittest.TestCase):
+    def test_similarity_features_and_missing_flags(self):
+        a = {"image": [1, 0, 0], "whole": [1, 1], "head": [0, 1], "tail": [1, 0]}
+        b = {"image": [1, 0, 0], "whole": [1, -1], "head": [1, 0], "tail": [0, 1]}
+        f = F.embedding_features(a, b)
+        self.assertAlmostEqual(f["img_embed_cos"], 1.0)
+        self.assertAlmostEqual(f["text_embed_cos"], 0.0)
+        self.assertAlmostEqual(f["seam_embed_cos"], 1.0)   # a's tail against b's head, not head against head
+        self.assertEqual((f["missing_img_embed"], f["missing_text_embed"]), (0.0, 0.0))
+        g = F.embedding_features({}, {"image": None, "whole": [0, 0]})
+        self.assertEqual((g["img_embed_cos"], g["missing_img_embed"], g["missing_text_embed"]), (0.0, 1.0, 1.0))
+        self.assertEqual(set(F.EMBED_FEATURES), set(f))
+
+    @unittest.skipUnless(Path("/usr/bin/swiftc").exists(), "needs swiftc")
+    def test_embed_tool_on_a_generated_image_and_text(self):
+        import subprocess
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            exe, img, txt, empty = d / "embed", d / "p.jpg", d / "p.txt", d / "e.txt"
+            r = subprocess.run(["/usr/bin/swiftc", "-O", str(F.data.HERE / "embed.swift"), "-o", str(exe)],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            Image.new("RGB", (200, 300), (240, 235, 220)).save(img)
+            txt.write_text(LETTER)
+            empty.write_text("")
+            r = subprocess.run([str(exe)], input=f"image\t{img}\ntext\t{txt}\ntext\t{empty}\nimage\t{d}/none.jpg\n",
+                               capture_output=True, text=True, check=True)
+            out = [__import__("json").loads(l) for l in r.stdout.splitlines()]
+            self.assertEqual([o["kind"] for o in out], ["image", "text", "text", "image"])
+            self.assertGreater(len(out[0]["vec"]), 100)
+            self.assertEqual(len(out[1]["whole"]), len(out[1]["head"]))
+            self.assertIsNone(out[2]["whole"])
+            self.assertIn("error", out[3])
 
 
 class Classifier(unittest.TestCase):
@@ -174,6 +211,10 @@ class Reporting(unittest.TestCase):
         self.assertEqual((k, e), (5, 1))   # the five most confident hold one error (at 0.9)
         self.assertAlmostEqual(rate, 0.2)
 
+    def test_ece(self):
+        self.assertAlmostEqual(M.ece(np.array([0.9, 0.9]), np.array([1, 1])), 0.1)
+        self.assertAlmostEqual(M.ece(np.array([0.05, 0.95]), np.array([0, 1])), 0.05)
+
     def test_calibration_bins_cover_everything(self):
         cal = M.calibration(self.P, self.Y)
         self.assertEqual(sum(r[2] for r in cal), len(self.P))
@@ -184,13 +225,18 @@ class Reporting(unittest.TestCase):
 
 class Interface(unittest.TestCase):
     def test_registered_tuning_and_guarded(self):
-        for name in ("features-lr", "features-lr-notime"):
+        for name in ("features-lr", "features-lr-notime", "features-emb-lr", "features-emb-lr-notime"):
             m = METHODS[name]
             self.assertTrue(m.tuning)
             with self.assertRaises(TestSetGuard):
                 guard(m, ["Dean", "Stanton"], final=True)
         self.assertNotIn("log_time_gap", [F.FEATURES[i] for i in M.columns(False)])
         self.assertIn("log_time_gap", [F.FEATURES[i] for i in M.columns(True)])
+        base = [F.FEATURES[i] for i in M.columns(True)]
+        emb = [F.FEATURES[i] for i in M.columns(False, True)]
+        self.assertFalse(set(F.EMBED_FEATURES) & set(base))
+        self.assertTrue(set(F.EMBED_FEATURES) <= set(emb))
+        self.assertNotIn("log_time_gap", emb)
 
     def test_refuses_a_collection_outside_the_development_set(self):
         with self.assertRaises(ValueError):

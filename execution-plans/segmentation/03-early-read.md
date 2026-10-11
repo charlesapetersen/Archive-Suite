@@ -159,3 +159,20 @@ Caveats: development boxes only (Dean, Deaver, Herrnstein; Stanton and RG 165 un
 after reading your notes on them, and 14 errors in all, so a difference of a few boundaries is noise.
 
 Detail: `ArchiveProcessor/segbench-results/whole-gemini-report.md`; summary in `SUMMARY.md`.
+
+## Addendum 5, 2026-10-11 — the free on-device feature model (W36.seg-features)
+
+A small model that runs on the Mac with no model download and no cost: a logistic regression over clues at each
+boundary (page numbers, a salutation or a closing, a date line, word overlap, paper colour, page shape), plus,
+new here, how alike the two pages look and read by Apple's own built-in image and text embeddings. Each box was
+predicted by a model trained on the other two.
+
+**The embeddings can stand in for the timestamps.** You said timestamps "will not be a very reliable clue". Without
+them, the embeddings raise the model from 56.0% to 66.2% of pages in an exact document, the same as the model
+that does use timestamps (64.7%). The image embedding does most of that work.
+
+**It is far below the cloud models** (90–93%), and it still fails on Deaver (about 20%), the newspaper clippings,
+because the two letter collections it learns from cannot teach it what a clipping boundary looks like. 551 pages
+is little data. At best it is a cheap extra voter for the ensemble, not a method on its own.
+
+Detail: `ArchiveProcessor/segbench-results/features-lr-report.md`; summary in `SUMMARY.md`.

@@ -9,8 +9,10 @@ Photos: "truth" means the method was given the box/folder photo labels from the 
 | method | split | pages | pages in exact doc | docs exact | false splits | false merges | boundary F1 | edits/100 pages | photos | held out |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|---|
 | all-new | dev | 551 | 39.0% | 63.9% | 202 | 0 | 0.743 | 36.7 | truth | no parameters |
-| features-lr | dev | 551 | 64.1% | 67.7% | 9 | 62 | 0.866 | 12.9 | truth | yes, leave-one-collection-out on the development set |
-| features-lr-notime | dev | 551 | 52.5% | 58.7% | 36 | 92 | 0.757 | 23.2 | truth | yes, leave-one-collection-out on the development set |
+| features-emb-lr | dev | 551 | 63.7% | 67.9% | 18 | 56 | 0.865 | 13.4 | truth | yes, leave-one-collection-out on the development set |
+| features-emb-lr-notime | dev | 551 | 66.2% | 67.9% | 21 | 57 | 0.859 | 14.2 | truth | yes, leave-one-collection-out on the development set |
+| features-lr | dev | 551 | 64.7% | 68.2% | 11 | 62 | 0.864 | 13.2 | truth | yes, leave-one-collection-out on the development set |
+| features-lr-notime | dev | 551 | 56.0% | 62.9% | 33 | 88 | 0.773 | 22.0 | truth | yes, leave-one-collection-out on the development set |
 | no-boundaries | dev | 551 | 0.6% | 1.0% | 0 | 291 | — | 52.8 | truth | no parameters |
 | rule-cues | dev | 551 | 57.9% | 75.3% | 95 | 15 | 0.834 | 20.0 | truth | yes, leave-one-collection-out (the rule list itself was written after reading dev pages) |
 | rule-cues-sketch | dev | 551 | 55.6% | 74.9% | 137 | 3 | 0.804 | 25.4 | truth | untuned sketch, written after reading dev pages |
@@ -25,24 +27,37 @@ Photos: "truth" means the method was given the box/folder photo labels from the 
 | window-gemini-lite | dev | 551 | 84.6% | 91.8% | 27 | 3 | 0.951 | 5.4 | own | no: prompt written after reading the owner's notes on dev pages, not tuned on its errors; no fitted parameters |
 | window-gemini-lite-truth-photos | dev | 551 | 84.6% | 91.8% | 27 | 3 | 0.951 | 5.4 | truth | no: prompt written after reading the owner's notes on dev pages, not tuned on its errors; no fitted parameters |
 
-## W36.seg-features checkpoint 1 — on-device feature model (development set, leave-one-collection-out)
+## W36.seg-features — on-device feature model (development set, leave-one-collection-out)
 
-Logistic regression on rule cues, TF-IDF similarity, length, blank, paper colour, ink, aspect and capture-time features; each development collection predicted by a model fitted on the other two (Stanton and RG 165 untouched; photo labels from the truth). 551 pages is little data. Embedding features (image and text) are checkpoint 2. Detail: features-lr-report.md.
+Logistic regression on rule cues, TF-IDF similarity, length, blank, paper colour, ink, aspect and capture-time features; the -emb variants add on-device embedding similarities of adjacent pages (Apple Vision image feature print; NaturalLanguage sentence embedding of the whole page and of the seam, page n's last 400 characters against page n+1's first 400). Each development collection is predicted by a model fitted on the other two (Stanton and RG 165 untouched; photo labels from the truth). 551 pages is little data. Detail: features-lr-report.md.
 
-| variant | collection | pages in exact doc | false splits | false merges | boundary F1 | error rate at the best >=50% coverage | Brier |
-|---|---|---:|---:|---:|---:|---:|---:|
-| with the time gap | Dean | 73.0% | 6 | 10 | 0.930 | 3.6% (4/112, coverage 58.6%) | 0.078 |
-| with the time gap | Deaver | 9.9% | 2 | 67 | 0.303 | 45.5% (40/88, coverage 64.7%) | 0.380 |
-| with the time gap | Herrnstein | 82.9% | 10 | 2 | 0.938 | 2.5% (3/120, coverage 71.9%) | 0.059 |
-| with the time gap | pooled | 59.3% | 18 | 79 | 0.814 | 13.5% (51/378, coverage 76.5%) | 0.155 |
-| without the time gap | Dean | 72.4% | 23 | 8 | 0.876 | 1.0% (1/101, coverage 52.9%) | 0.099 |
-| without the time gap | Deaver | 0.0% | 3 | 79 | 0.068 | 50.6% (41/81, coverage 59.6%) | 0.429 |
-| without the time gap | Herrnstein | 71.8% | 10 | 5 | 0.921 | 2.0% (2/101, coverage 60.5%) | 0.067 |
-| without the time gap | pooled | 52.5% | 36 | 92 | 0.757 | 14.3% (45/314, coverage 63.6%) | 0.179 |
+| variant | collection | pages in exact doc | false splits | false merges | boundary F1 | error rate at the best >=50% coverage | Brier | ECE |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| base, with the time gap | Dean | 74.0% | 6 | 10 | 0.930 | 1.0% (1/104, coverage 54.5%) | 0.061 | 0.040 |
+| base, with the time gap | Deaver | 17.0% | 1 | 51 | 0.559 | 37.9% (47/124, coverage 91.2%) | 0.344 | 0.350 |
+| base, with the time gap | Herrnstein | 91.7% | 4 | 1 | 0.974 | 0.0% (0/84, coverage 50.3%) | 0.029 | 0.051 |
+| base, with the time gap | pooled | 64.7% | 11 | 62 | 0.864 | 10.9% (41/375, coverage 75.9%) | 0.128 | 0.106 |
+| base, without the time gap | Dean | 77.6% | 23 | 3 | 0.897 | 0.0% (0/96, coverage 50.3%) | 0.083 | 0.070 |
+| base, without the time gap | Deaver | 0.0% | 2 | 81 | 0.067 | 54.7% (47/86, coverage 63.2%) | 0.448 | 0.443 |
+| base, without the time gap | Herrnstein | 76.2% | 8 | 4 | 0.938 | 0.0% (0/84, coverage 50.3%) | 0.047 | 0.053 |
+| base, without the time gap | pooled | 56.0% | 33 | 88 | 0.773 | 13.0% (40/308, coverage 62.3%) | 0.172 | 0.137 |
+| embeddings, with the time gap | Dean | 69.4% | 4 | 13 | 0.924 | 0.8% (1/128, coverage 67.0%) | 0.068 | 0.062 |
+| embeddings, with the time gap | Deaver | 23.4% | 11 | 39 | 0.643 | 36.0% (41/114, coverage 83.8%) | 0.319 | 0.310 |
+| embeddings, with the time gap | Herrnstein | 89.0% | 3 | 4 | 0.963 | 0.0% (0/84, coverage 50.3%) | 0.029 | 0.040 |
+| embeddings, with the time gap | pooled | 63.7% | 18 | 56 | 0.865 | 6.0% (15/251, coverage 50.8%) | 0.124 | 0.084 |
+| embeddings, without the time gap | Dean | 81.1% | 3 | 11 | 0.938 | 0.0% (0/96, coverage 50.3%) | 0.065 | 0.051 |
+| embeddings, without the time gap | Deaver | 17.7% | 14 | 42 | 0.600 | 40.2% (49/122, coverage 89.7%) | 0.362 | 0.331 |
+| embeddings, without the time gap | Herrnstein | 87.8% | 4 | 4 | 0.957 | 0.0% (0/84, coverage 50.3%) | 0.036 | 0.027 |
+| embeddings, without the time gap | pooled | 66.2% | 21 | 57 | 0.859 | 9.7% (24/248, coverage 50.2%) | 0.137 | 0.095 |
 
-With the time gap, it ranks 2 of 26 features by permutation importance; the strongest is next_salutation. Top features without the time gap: next_salutation, next_pn_top_ge2, tfidf_cosine, paper_diff, prev_closing.
+- base, with the time gap: the time gap ranks 2 of 26 by permutation importance; the strongest is next_salutation.
+- base, without the time gap: top five next_salutation, next_pn_top_ge2, paper_diff, prev_closing, tfidf_cosine.
+- embeddings, with the time gap: the time gap ranks 2 of 31 by permutation importance; the strongest is next_salutation.
+- embeddings, with the time gap: embedding ranks img_embed_cos 5, text_embed_cos 13, seam_embed_cos 8.
+- embeddings, without the time gap: top five next_salutation, paper_diff, img_embed_cos, next_pn_top_ge2, next_memo.
+- embeddings, without the time gap: embedding ranks img_embed_cos 3, text_embed_cos 10, seam_embed_cos 7.
 
-Reading (as of the 2026-10-05 run): the pooled figures are pulled down by Deaver, mostly newspaper clippings. Its boundaries carry none of the letter cues the other two collections teach (salutation, closing), and the features that do separate them there (TF-IDF similarity, a lower-case first line, orientation change) are flat in Dean and Herrnstein, so the model fitted on those two calls nearly every Deaver gap a continuation. Two collections per fit cannot teach a third document type. The 'best >=50% coverage' column picks its cut on the same held-out predictions, so it is optimistic; the threshold rows in the report are the fixed-cut view.
+Reading (as of the 2026-10-11 run, on the owner-corrected truth of 8308b64, which is why the base rows moved from checkpoint 1's 59.3% / 52.5%): the embeddings stand in for the timestamps. Without the time gap they lift the pooled score from 56.0% to 66.2% of pages in an exact document and cut false merges from 88 to 57, level with the base model that has the time gap (64.7%); with the time gap they add nothing to the pooled score (63.7%) but improve its calibration (ECE 0.106 to 0.084) and its best >=50% coverage error (10.9% to 6.0%). The image feature print is the useful one (importance rank 3 of 30 without the time gap); the sentence embedding of the whole page ranks 10 and of the seam 7. Deaver (clippings) still fails, 17.7%-23.4%: two letter collections per fit cannot teach a third document type, and no feature here changes that. An on-device feature model is therefore far below the cloud windows (90%+) and useful, if at all, as a cheap extra voter for the ensemble, not alone.
 
 ## W36.seg-whole — one long-context call per folder, as a third voter (development set)
 

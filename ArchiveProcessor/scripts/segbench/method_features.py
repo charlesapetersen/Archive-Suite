@@ -1,8 +1,12 @@
-"""The on-device feature model (W36.seg-features, checkpoint 1): logistic regression on the
-per-boundary features of features.py, trained leave-one-collection-out on the development set.
+"""The on-device feature model (W36.seg-features): logistic regression on the per-boundary
+features of features.py, trained leave-one-collection-out on the development set.
 
-    python method_features.py      # both variants (with and without the time gap) through run.py,
-                                   # then the risk-coverage / calibration / weights report
+    python method_features.py      # the four variants through run.py, then the risk-coverage /
+                                   # calibration / weights report
+
+Four variants: the checkpoint-1 features (rule cues, TF-IDF, length, blank, paper, ink, aspect),
+and the same plus the checkpoint-2 on-device embedding similarities (features.EMBED_FEATURES),
+each with and without the capture-time gap.
 
 For a held-out development collection the model is fitted on the OTHER two development
 collections' document gaps and predicts this one's; it refuses anything else, and it is marked
@@ -102,12 +106,13 @@ def collection_xy(name: str):
     return _CACHE[name]
 
 
-def columns(with_time: bool) -> list[int]:
-    return [i for i, k in enumerate(F.FEATURES) if with_time or k not in F.TIME_FEATURES]
+def columns(with_time: bool, with_emb: bool = False) -> list[int]:
+    return [i for i, k in enumerate(F.FEATURES)
+            if (with_time or k not in F.TIME_FEATURES) and (with_emb or k not in F.EMBED_FEATURES)]
 
 
-def fit_fold(held_out: str, with_time: bool) -> Logistic:
-    cols = columns(with_time)
+def fit_fold(held_out: str, with_time: bool, with_emb: bool = False) -> Logistic:
+    cols = columns(with_time, with_emb)
     train = [n for n in data.DEV if n != held_out]
     X = np.vstack([collection_xy(n)[1][collection_xy(n)[2]][:, cols] for n in train])
     y = np.concatenate([collection_xy(n)[3][collection_xy(n)[2]] for n in train])
@@ -133,10 +138,11 @@ class FeatureModel(Method):
     held_out = "yes, leave-one-collection-out on the development set"
     oracle_photos = True
 
-    def __init__(self, with_time: bool):
-        self.with_time = with_time
-        self.name = "features-lr" if with_time else "features-lr-notime"
-        self.description = ("logistic regression on text, image" + (" and capture-time-gap" if with_time else "")
+    def __init__(self, with_time: bool, with_emb: bool = False):
+        self.with_time, self.with_emb = with_time, with_emb
+        self.name = variant_name(with_time, with_emb)
+        self.description = ("logistic regression on text, image" + (", on-device embedding" if with_emb else "")
+                            + (" and capture-time-gap" if with_time else "")
                             + " features of each boundary, leave-one-collection-out over the development set "
                             "(fitted on the other two); photo labels from the truth")
         self.last: dict[str, np.ndarray] = {}
@@ -145,8 +151,8 @@ class FeatureModel(Method):
         if collection.name not in data.DEV:
             raise ValueError(f"{self.name}: leave-one-collection-out is defined on the development set only")
         _, X, mask, _ = collection_xy(collection.name)
-        model = fit_fold(collection.name, self.with_time)
-        p = model.predict_proba(X[:, columns(self.with_time)])
+        model = fit_fold(collection.name, self.with_time, self.with_emb)
+        p = model.predict_proba(X[:, columns(self.with_time, self.with_emb)])
         self.last[collection.name] = p
         labels = labels_from_probs(collection.labels, p)
         bounds = []
@@ -159,23 +165,29 @@ class FeatureModel(Method):
         return Prediction(labels, bounds)
 
 
-FEATURE_METHODS = {m.name: m for m in (FeatureModel(True), FeatureModel(False))}
+def variant_name(with_time: bool, with_emb: bool) -> str:
+    return ("features-emb-lr" if with_emb else "features-lr") + ("" if with_time else "-notime")
+
+
+VARIANTS = [(t, e) for e in (False, True) for t in (True, False)]   # (with_time, with_emb)
+FEATURE_METHODS = {m.name: m for m in (FeatureModel(t, e) for t, e in VARIANTS)}
 METHODS.update(FEATURE_METHODS)
 
 
 # --- the report: risk-coverage, calibration, weights ----------------------------------------
 
 DIAGNOSTIC_FEATURES = ("next_salutation", "prev_closing", "next_pn_any_ge2", "next_date_top", "tfidf_cosine",
-                       "next_starts_lower", "orientation_change", "paper_diff", "log_time_gap")
+                       "next_starts_lower", "orientation_change", "paper_diff", "log_time_gap",
+                       "img_embed_cos", "text_embed_cos", "seam_embed_cos")
 THRESHOLDS = (0.99, 0.98, 0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5)
 
 
-def held_out_probs(with_time: bool) -> dict[str, tuple[np.ndarray, np.ndarray, int]]:
+def held_out_probs(with_time: bool, with_emb: bool = False) -> dict[str, tuple[np.ndarray, np.ndarray, int]]:
     """Per development collection: (P(new) on its document gaps, truth on them, pages)."""
     out = {}
     for n in data.DEV:
         col, X, mask, y = collection_xy(n)
-        p = fit_fold(n, with_time).predict_proba(X[:, columns(with_time)])
+        p = fit_fold(n, with_time, with_emb).predict_proba(X[:, columns(with_time, with_emb)])
         out[n] = (p[mask], y[mask], len(col.pages))
     return out
 
@@ -216,15 +228,15 @@ def calibration(p, y, bins=10) -> list[tuple]:
     return out
 
 
-def permutation_importance(with_time: bool, repeats: int = 20, seed: int = 0) -> np.ndarray:
+def permutation_importance(with_time: bool, with_emb: bool = False, repeats: int = 20, seed: int = 0) -> np.ndarray:
     """Rise in pooled held-out log loss when one feature's column is shuffled within the
     held-out collection (the fold models are fixed). One value per used feature."""
     rng = np.random.default_rng(seed)
-    cols = columns(with_time)
+    cols = columns(with_time, with_emb)
     base_p, ys, folds = [], [], []
     for n in data.DEV:
         _, X, mask, y = collection_xy(n)
-        m = fit_fold(n, with_time)
+        m = fit_fold(n, with_time, with_emb)
         Xh = X[mask][:, cols]
         folds.append((m, Xh))
         base_p.append(m.predict_proba(Xh))
@@ -245,6 +257,11 @@ def permutation_importance(with_time: bool, repeats: int = 20, seed: int = 0) ->
     return imp
 
 
+def ece(p, y, bins=10) -> float:
+    """Expected calibration error over the equal-width bins of calibration()."""
+    return sum(n * abs(mp - ob) for _, _, n, mp, ob in calibration(p, y, bins) if n) / len(p)
+
+
 def _pct(v):
     return "—" if v is None else f"{100 * v:.1f}%"
 
@@ -253,33 +270,51 @@ def _headline(rows):
     return {r["collections"].replace("POOLED ", "pooled "): r for r in rows}
 
 
+READING = (  # written from the numbers of the run named; the table above is regenerated, this is not
+    "Reading (as of the 2026-10-11 run, on the owner-corrected truth of 8308b64, which is why the base rows "
+    "moved from checkpoint 1's 59.3% / 52.5%): the embeddings stand in for the timestamps. Without the time gap "
+    "they lift the pooled score from 56.0% to 66.2% of pages in an exact document and cut false merges from 88 "
+    "to 57, level with the base model that has the time gap (64.7%); with the time gap they add nothing to the "
+    "pooled score (63.7%) but improve its calibration (ECE 0.106 to 0.084) and its best >=50% coverage error "
+    "(10.9% to 6.0%). The image feature print is the useful one (importance rank 3 of 30 without the time gap); "
+    "the sentence embedding of the whole page ranks 10 and of the seam 7. Deaver (clippings) still fails, "
+    "17.7%-23.4%: two letter collections per fit cannot teach a third document type, and no feature here "
+    "changes that. An on-device feature model is therefore far below the cloud windows (90%+) and useful, if at "
+    "all, as a cheap extra voter for the ensemble, not alone.")
+
+
 def report(headlines: dict[str, list[dict]]) -> tuple[str, str]:
     """(the full report markdown, the SUMMARY.md section)."""
     md = ["# features-lr — risk-coverage, calibration and weights (development set, leave-one-collection-out)", "",
-          "W36.seg-features checkpoint 1. Logistic regression (L2, lambda "
+          "W36.seg-features. Logistic regression (L2, lambda "
           f"{LAMBDA}, standardised features, threshold 0.5, none tuned) on per-boundary text, image and "
-          "capture-time features; each development collection is predicted by a model fitted on the other two. "
+          "capture-time features, and in the -emb variants also on-device embedding similarities (Apple Vision "
+          "image feature print, NaturalLanguage English sentence embedding; embed.swift); each development "
+          "collection is predicted by a model fitted on the other two. "
           "Measured on Dean, Deaver, Herrnstein; tuned on nothing but the fixed choices above; Stanton and RG 165 "
           "not touched. Photo labels from the truth. Only gaps between two document pages are counted. "
           "551 pages (about 480 document gaps, two collections per fit) is little data: per-collection numbers "
           "move by several points with one or two boundaries, and the weights below are not stable across folds.",
           ""]
-    summary = ["", "## W36.seg-features checkpoint 1 — on-device feature model (development set, leave-one-collection-out)", "",
+    summary = ["", "## W36.seg-features — on-device feature model (development set, leave-one-collection-out)", "",
                "Logistic regression on rule cues, TF-IDF similarity, length, blank, paper colour, ink, aspect and "
-               "capture-time features; each development collection predicted by a model fitted on the other two "
-               "(Stanton and RG 165 untouched; photo labels from the truth). 551 pages is little data. "
-               "Embedding features (image and text) are checkpoint 2. Detail: features-lr-report.md.", "",
+               "capture-time features; the -emb variants add on-device embedding similarities of adjacent pages "
+               "(Apple Vision image feature print; NaturalLanguage sentence embedding of the whole page and of the "
+               "seam, page n's last 400 characters against page n+1's first 400). Each development collection is "
+               "predicted by a model fitted on the other two (Stanton and RG 165 untouched; photo labels from the "
+               "truth). 551 pages is little data. Detail: features-lr-report.md.", "",
                "| variant | collection | pages in exact doc | false splits | false merges | boundary F1 | "
-               "error rate at the best >=50% coverage | Brier |",
-               "|---|---|---:|---:|---:|---:|---:|---:|"]
-    for with_time in (True, False):
-        name = "features-lr" if with_time else "features-lr-notime"
-        label = "with the time gap" if with_time else "without the time gap"
-        probs = held_out_probs(with_time)
+               "error rate at the best >=50% coverage | Brier | ECE |",
+               "|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+    notes = []
+    for with_time, with_emb in VARIANTS:
+        name = variant_name(with_time, with_emb)
+        label = ("embeddings, " if with_emb else "base, ") + ("with the time gap" if with_time else "without the time gap")
+        probs = held_out_probs(with_time, with_emb)
         hl = _headline(headlines[name])
         md += [f"## {name} ({label})", "",
-               "| collection | pages in exact doc | false splits | false merges | boundary F1 | log loss | Brier |",
-               "|---|---:|---:|---:|---:|---:|---:|"]
+               "| collection | pages in exact doc | false splits | false merges | boundary F1 | log loss | Brier | ECE |",
+               "|---|---:|---:|---:|---:|---:|---:|---:|"]
         groups = list(probs.items()) + [("pooled", (np.concatenate([v[0] for v in probs.values()]),
                                                     np.concatenate([v[1] for v in probs.values()]),
                                                     sum(v[2] for v in probs.values())))]
@@ -287,11 +322,13 @@ def report(headlines: dict[str, list[dict]]) -> tuple[str, str]:
             r = next(v for k, v in hl.items() if k == key or k.startswith(key))
             f1 = "—" if r["boundary_f1"] is None else f"{r['boundary_f1']:.3f}"
             brier = float(np.mean((p - y) ** 2))
+            e = ece(p, y)
             md.append(f"| {key} | {_pct(r['pages_in_exact_doc'])} | {r['false_splits']} | {r['false_merges']} | "
-                      f"{f1} | {log_loss(y, p):.3f} | {brier:.3f} |")
-            cov, rate, e, k = best_at_coverage(p, y)
+                      f"{f1} | {log_loss(y, p):.3f} | {brier:.3f} | {e:.3f} |")
+            cov, rate, ne, k = best_at_coverage(p, y)
             summary.append(f"| {label} | {key} | {_pct(r['pages_in_exact_doc'])} | {r['false_splits']} | "
-                           f"{r['false_merges']} | {f1} | {_pct(rate)} ({e}/{k}, coverage {_pct(cov)}) | {brier:.3f} |")
+                           f"{r['false_merges']} | {f1} | {_pct(rate)} ({ne}/{k}, coverage {_pct(cov)}) | "
+                           f"{brier:.3f} | {e:.3f} |")
         md += ["", "Risk-coverage: a boundary is auto-accepted when the model's confidence in its decision, "
                "max(p, 1-p), is at least the threshold; the rest go to review.", ""]
         for key, (p, y, pages) in groups:
@@ -305,15 +342,16 @@ def report(headlines: dict[str, list[dict]]) -> tuple[str, str]:
                    f"confident gaps, coverage {_pct(cov)}); the cut is chosen on these same predictions, so this "
                    "is optimistic.", ""]
         p_all, y_all = groups[-1][1][0], groups[-1][1][1]
-        md += ["Calibration (pooled held-out predictions, P(new document) in ten equal-width bins):", "",
+        md += ["Calibration (pooled held-out predictions, P(new document) in ten equal-width bins; ECE is the "
+               "gap-weighted mean of |mean predicted - observed| over the bins):", "",
                "| P(new) bin | gaps | mean predicted | observed share new |", "|---|---:|---:|---:|"]
         for lo, hi, n, mp, ob in calibration(p_all, y_all):
             md.append(f"| {lo:.1f}–{hi:.1f} | {n} | {'—' if mp is None else f'{mp:.3f}'} | "
                       f"{'—' if ob is None else f'{ob:.3f}'} |")
-        cols = columns(with_time)
+        cols = columns(with_time, with_emb)
         names = [F.FEATURES[c] for c in cols]
-        coefs = np.array([fit_fold(n, with_time).coef for n in data.DEV])
-        imp = permutation_importance(with_time)
+        coefs = np.array([fit_fold(n, with_time, with_emb).coef for n in data.DEV])
+        imp = permutation_importance(with_time, with_emb)
         order = np.argsort(-imp)
         md += ["", "Weights: standardised logistic weights per fold (positive = favours a new document; the "
                "fold is named by its held-out collection) and permutation importance (rise in pooled held-out "
@@ -324,16 +362,18 @@ def report(headlines: dict[str, list[dict]]) -> tuple[str, str]:
         for j in order:
             md.append(f"| {names[j]} | {imp[j]:.4f} | " + " | ".join(f"{coefs[f, j]:+.2f}" for f in range(3)) + " |")
         md.append("")
+        rank_of = {names[j]: r + 1 for r, j in enumerate(order)}
         if with_time:
             t = names.index("log_time_gap")
-            rank = int(np.where(order == t)[0][0]) + 1
-            md += [f"The time gap ranks {rank} of {len(names)} by importance ({imp[t]:.4f}); the largest is "
-                   f"{names[order[0]]} ({imp[order[0]]:.4f}).", ""]
-            summary_time = (f"With the time gap, it ranks {rank} of {len(names)} features by permutation importance; "
-                            f"the strongest is {names[order[0]]}.")
+            md += [f"The time gap ranks {rank_of['log_time_gap']} of {len(names)} by importance ({imp[t]:.4f}); "
+                   f"the largest is {names[order[0]]} ({imp[order[0]]:.4f}).", ""]
+            notes.append(f"{label}: the time gap ranks {rank_of['log_time_gap']} of {len(names)} by permutation "
+                         f"importance; the strongest is {names[order[0]]}.")
         else:
-            top = ", ".join(names[j] for j in order[:5])
-            summary_top = f"Top features without the time gap: {top}."
+            notes.append(f"{label}: top five " + ", ".join(names[j] for j in order[:5]) + ".")
+        if with_emb:
+            notes.append(f"{label}: embedding ranks " + ", ".join(
+                f"{k} {rank_of[k]}" for k in F.EMBED_FEATURES if k in rank_of and not k.startswith("missing")) + ".")
     md += ["## Why the held-out collections differ", "",
            "Mean of selected features at true boundaries (new) and true continuations (cont), per collection. "
            "A feature that separates the classes in only one collection cannot be learned when that collection "
@@ -349,14 +389,9 @@ def report(headlines: dict[str, list[dict]]) -> tuple[str, str]:
             cells += [f"{Xm[ym == 1, j].mean():.3f}", f"{Xm[ym == 0, j].mean():.3f}"]
         md.append(f"| {k} | " + " | ".join(cells) + " |")
     md.append("")
-    summary += ["", summary_time + " " + summary_top,
-                "", "Reading (as of the 2026-10-05 run): the pooled figures are pulled down by Deaver, mostly newspaper "
-                "clippings. Its boundaries carry none of the letter cues the other two collections teach (salutation, "
-                "closing), and the features that do separate them there (TF-IDF similarity, a lower-case first line, "
-                "orientation change) are flat in Dean and Herrnstein, so the model fitted on those two calls nearly "
-                "every Deaver gap a continuation. Two collections per fit cannot teach a third document type. The "
-                "'best >=50% coverage' column picks its cut on the same held-out predictions, so it is optimistic; "
-                "the threshold rows in the report are the fixed-cut view."]
+    summary += [""] + [f"- {n}" for n in notes]
+    if READING:
+        summary += ["", READING]
     return "\n".join(md) + "\n", "\n".join(summary) + "\n"
 
 

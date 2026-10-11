@@ -1,6 +1,6 @@
-"""Per-boundary features for the on-device feature model (W36.seg-features, checkpoint 1).
+"""Per-boundary features for the on-device feature model (W36.seg-features).
 
-One row per gap between page i and page i+1 of a collection. Three families:
+One row per gap between page i and page i+1 of a collection. Four families:
 
 * TEXT, from the cached Apple Vision OCR (data.ocr_cache_path): page-number cues at the top
   and bottom of both pages, letter/memo opening cues and a date line near the top of page
@@ -9,6 +9,9 @@ One row per gap between page i and page i+1 of a collection. Three families:
   labels), length ratio, near-blank flags.
 * IMAGE, from small thumbnails made once under the bench cache (outside git): paper colour
   and its difference, aspect ratio and orientation change, ink density difference.
+* EMBEDDING (checkpoint 2), from embed.swift: cosine similarity of the two pages' Apple Vision
+  image feature prints, of their NaturalLanguage sentence embeddings, and of page i's last 400
+  characters against page i+1's first 400 (``EMBED_FEATURES``).
 * TIME: the EXIF capture gap in log seconds, ONE feature (the owner: timestamps "will not be
   a very reliable clue"); ``TIME_FEATURES`` names it so a model can be run without it.
 
@@ -173,6 +176,87 @@ def collection_image_stats(col) -> list[dict | None]:
     return out
 
 
+# --- embeddings (checkpoint 2) ----------------------------------------------------------
+#
+# On-device, from the OS frameworks the Processor app could call itself (embed.swift): Vision's image
+# feature print of the 768 px thumbnail, and NaturalLanguage's English sentence embedding of the page's
+# OCR text (the whole page, its first and its last 400 characters). The plan named a SigLIP/CLIP model
+# through MLX; none is in the lab's model cache, and these need no download and no Python in the app.
+
+EMBED_BIN = data.CACHE_DIR / "bin" / "segbench-embed"
+EMBED_IMG_PX = 768
+
+
+def build_embed_tool() -> Path:
+    """Compile embed.swift once (rebuilt if the source is newer)."""
+    import subprocess
+    src = data.HERE / "embed.swift"
+    if EMBED_BIN.exists() and EMBED_BIN.stat().st_mtime >= src.stat().st_mtime:
+        return EMBED_BIN
+    EMBED_BIN.parent.mkdir(parents=True, exist_ok=True)
+    r = subprocess.run(["/usr/bin/swiftc", "-O", str(src), "-o", str(EMBED_BIN)], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"swiftc embed.swift failed:\n{r.stderr}")
+    return EMBED_BIN
+
+
+def _embed_cache(name: str) -> Path:
+    return data.CACHE_DIR / "features" / f"embed-{EMBED_IMG_PX}-{name}.json"
+
+
+def collection_embeddings(col) -> list[dict]:
+    """Per page {"image": vec|None, "whole"/"head"/"tail": vec|None}, computed once and cached outside git."""
+    import subprocess
+    f = _embed_cache(col.name)
+    cache = json.loads(f.read_text()) if f.exists() else {}
+    todo, where = [], []
+    for p in col.pages:
+        if str(p.n) in cache:
+            continue
+        cache[str(p.n)] = {"image": None, "whole": None, "head": None, "tail": None}
+        th = data.thumbnail(col.name, p, max_px=EMBED_IMG_PX)
+        if th:
+            todo.append(f"image\t{th}")
+            where.append((str(p.n), "image"))
+        txt = data.ocr_cache_path(col.name, p.n)
+        if txt.exists():
+            todo.append(f"text\t{txt}")
+            where.append((str(p.n), "text"))
+    if todo:
+        r = subprocess.run([str(build_embed_tool())], input="\n".join(todo) + "\n",
+                           capture_output=True, text=True, check=True)
+        out = [json.loads(l) for l in r.stdout.splitlines() if l.strip()]
+        if len(out) != len(where):
+            raise RuntimeError(f"segbench-embed answered {len(out)} of {len(where)} jobs")
+        for (n, kind), o in zip(where, out):
+            if "error" in o:
+                continue
+            if kind == "image":
+                cache[n]["image"] = o["vec"]
+            else:
+                cache[n].update({k: o.get(k) for k in ("whole", "head", "tail")})
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(cache))
+    return [cache[str(p.n)] for p in col.pages]
+
+
+def cosine(a, b) -> float | None:
+    if a is None or b is None:
+        return None
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+    return float(a @ b / (na * nb)) if na > 0 and nb > 0 else None
+
+
+def embedding_features(ea: dict, eb: dict) -> dict:
+    """Similarity of two adjacent pages' embeddings; a missing one scores 0 and raises its flag."""
+    img = cosine(ea.get("image"), eb.get("image"))
+    whole = cosine(ea.get("whole"), eb.get("whole"))
+    seam = cosine(ea.get("tail"), eb.get("head"))
+    return {"img_embed_cos": img or 0.0, "text_embed_cos": whole or 0.0, "seam_embed_cos": seam or 0.0,
+            "missing_img_embed": float(img is None), "missing_text_embed": float(whole is None)}
+
+
 # --- capture time -----------------------------------------------------------------------
 
 def parse_time(s: str | None) -> dt.datetime | None:
@@ -198,7 +282,8 @@ def log_gap(a: str | None, b: str | None) -> float:
 # --- the boundary feature row -----------------------------------------------------------
 
 TIME_FEATURES = ("log_time_gap",)
-FEATURES = (
+EMBED_FEATURES = ("img_embed_cos", "text_embed_cos", "seam_embed_cos", "missing_img_embed", "missing_text_embed")
+BASE_FEATURES = (
     "next_pn_top_ge2", "next_pn_top_eq1", "next_pn_any_ge2", "pn_sequence", "next_page_of_ge2",
     "next_page_of_eq1", "prev_page_of_last",
     "next_salutation", "next_memo", "next_date_top",
@@ -207,6 +292,7 @@ FEATURES = (
     "paper_diff", "paper_lum_diff", "aspect_change", "orientation_change", "ink_diff",
     "missing_image",
 ) + TIME_FEATURES
+FEATURES = BASE_FEATURES + EMBED_FEATURES
 
 
 def pair_features(a: dict, b: dict, cos: float, ia: dict | None, ib: dict | None, gap: float) -> dict:
@@ -256,15 +342,18 @@ def pair_features(a: dict, b: dict, cos: float, ia: dict | None, ib: dict | None
     return f
 
 
-def collection_features(col, with_images: bool = True) -> np.ndarray:
-    """Matrix (pages-1) x len(FEATURES), one row per gap i -> i+1, in FEATURES order."""
+def collection_features(col, with_images: bool = True, with_embeddings: bool = True) -> np.ndarray:
+    """Matrix (pages-1) x len(FEATURES), one row per gap i -> i+1, in FEATURES order. Without images or
+    embeddings their columns are left as missing (0 with the missing flag raised)."""
     texts = [col.text(i) for i in range(len(col.pages))]
     cues = [text_cues(t) for t in texts]
     cos = adjacent_cosine(texts)
     imgs = collection_image_stats(col) if with_images else [None] * len(texts)
+    embs = collection_embeddings(col) if with_embeddings else [{}] * len(texts)
     rows = []
     for i in range(len(texts) - 1):
         f = pair_features(cues[i], cues[i + 1], cos[i], imgs[i], imgs[i + 1],
                           log_gap(col.pages[i].captured, col.pages[i + 1].captured))
+        f.update(embedding_features(embs[i], embs[i + 1]))
         rows.append([f[k] for k in FEATURES])
     return np.array(rows, dtype=np.float64).reshape(-1, len(FEATURES))
