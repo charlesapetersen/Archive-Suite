@@ -211,6 +211,43 @@ where it can.
   missing tests, filed as `S3`.
 - **`W40.e8` — Android screens without an emulator [M].** Gated on `W40.e8-owner-ok` (an instrumented lane was
   declined 2026-07-31). Robolectric Compose tests plus Roborazzi screenshots under `testDebugUnitTest`.
+- **`W40.e9` — layout guard [M].** Owner-requested 2026-10-11: the Notes note list shipped with every row
+  clipped to half height (`W40.fix-notes-row-clip`) and nothing in the suite could see it, because the UI tests
+  find elements by identifier and a clipped element is still found and clickable. Add a shared helper to each UI
+  suite (Reader, Notes, Processor) that, on each main screen, checks that every visible text element and control
+  lies inside its row or cell and inside the window, and that no two sibling text elements overlap. Run it at the
+  window's minimum size and at a typical size, in light and dark. Run it twice per screen: straight after
+  the screen opens and again once the app is idle (thumbnails, previews and re-layout finished), because
+  `W40.fix-notes-chips-overdrawn` drew correctly on open and broke about two seconds later. The helper must be shown to fail: point it at a
+  deliberately clipped row once (a planted mutant, proved landed) before trusting its passes. Findings are
+  `W40.fix-*` at `S2`–`S4`.
+- **`W40.e10` / `W40.e11` / `W40.e12` — visual review per app [S-M each].** Owner-requested 2026-10-11 so the
+  owner is not the one finding layout bugs. In the VM, on the rehearsal or fixture data, open every screen, sheet,
+  menu-driven panel and empty state the app has (the feature ledger's rows once `W40.b*` exist, the app's
+  `SMOKE_TEST.md` until then), take a screenshot of each in light and dark at minimum and typical window size, once on open
+  and once after the app is idle, and with realistic volume (a note with many chips, a long list), and
+  look at every screenshot. Check: text clipped, truncated without an ellipsis or overlapping; rows or columns
+  squashed; controls off the window or unreachable; misalignment between rows; empty and error states that say
+  nothing; unreadable contrast. Keep the screenshots and a one-line verdict per screen in
+  `verification/evidence/<app>/visual-<date>.md`. Each defect is filed as a `W40.fix-*` with its screenshot as the
+  reproduction (rule 5), and each class of defect the guard in `W40.e9` could catch is added to it. Repeat after a
+  fix batch and before `W40.h3`.
+- **`W40.e13` — transient states [M].** Owner-requested 2026-10-11: in Notes the inspector flickers for a
+  few milliseconds on every note change, too fast for a person to screenshot and far too fast for an XCUITest
+  query, which takes tens of milliseconds and only ever sees a settled screen. Two instruments, both run on the
+  common transitions in each app (select the next item in a list, switch folder or filter, open and close a
+  sheet, toggle a pane):
+  1. **A layout recorder (the test).** A DEBUG-only seam that, from the moment of the transition until the app is
+     idle, logs every frame and every displayed string of the screen's main sections on each layout pass. The UI
+     test drives the transition and fails if any section passes through a state that is neither the old settled
+     state nor the new one: a value that appears and is replaced, a height that changes and changes back, a view
+     that is removed and re-added. Show it failing once on a planted flicker before trusting its passes.
+  2. **Screen video in the VM (the confirmation).** Record the guest screen at its full frame rate across the
+     transition and compare consecutive frames; a region that changes and then returns to an earlier frame is a
+     flicker. Use this to confirm what the recorder reports and to catch drawing glitches it cannot see (a layer
+     painted out of place). Check first that recording works in the headless guest and at what frame rate, and
+     write that down before relying on it.
+  Findings are `W40.fix-*` at `S3`–`S4`, with the log or frames as the reproduction.
 
 ## F — specific suspicions to settle
 
