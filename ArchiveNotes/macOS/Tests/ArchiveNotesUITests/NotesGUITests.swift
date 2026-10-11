@@ -2043,6 +2043,21 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.a3: run the actual delete/read promises in both orders, within one XCTest method.
+    /// XCTest's ordinary method ordering cannot prove both; each called test opens its own
+    /// scratch-fixture lifecycle, so disabling the pristine restore makes delete-then-read fail.
+    func testOrder_DeleteThenReadRestoresTheSeededNote() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
+        try testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation()
+        try testG3_RawMarkdownToggleShowsSourceAndIsLossless()
+    }
+
+    func testOrder_ReadThenDeleteRestoresTheSeededNote() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
+        try testG3_RawMarkdownToggleShowsSourceAndIsLossless()
+        try testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation()
+    }
+
     /// G19 — The row's whole-item Delete action confirms before removing every replicated placement,
     /// then moves the note to Trash. Cancel is a no-op; confirmation is verified against the scratch
     /// fixture's item directory and canonical organization.json.

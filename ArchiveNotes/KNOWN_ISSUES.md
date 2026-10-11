@@ -3,6 +3,15 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## GUI fixture order — regression coverage (W40.a3, 2026-10-11)
+
+`W35.vm-mem-fu1` already restores `AN-GUI-Fixture.pristine` before every test; G19's Trash operation
+therefore cannot remove the next test's plain note. Two explicit compound GUI checks now run G19→G3
+and G3→G19, retaining the original Cancel/confirm/disk assertions and Markdown round trip. Disabling the
+restoration call makes delete-first fail at the next seeded-row setup; both orders pass with it enabled.
+Both checks reject noncanonical scratch fixtures before interacting. Evidence:
+`verification/evidence/notes/W40.a3-order-regression.md` at the suite root.
+
 ## ✅ FIXED (W9.e2-paste) — a pasted page link showed "Missing" beside its chip until the note was reloaded
 
 **2026-10-11.** `ItemAssetStore.addAsset` returns the `assets/…` reference before a background task writes
