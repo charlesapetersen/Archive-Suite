@@ -10256,3 +10256,22 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Swift Testing + 220 XCTest green, no new warnings. Adversarial review: no blockers; its two should-fixes
   (per-pixel cost in the AX getter, popover anchored off-screen) were applied before the VM run.
   <!-- /W9.e2-paste -->
+- [x] **W9.e2 — close the runtime sweep after its six parts; settle the saved draft branches [S · ~0.25 session]** · §W9 gap-closure · SHIPPED 2026-10-11 (lane: notes)
+  The sweep (plan E2) was split on 2026-10-07 into six parts, all shipped and recorded above: `W9.e2-notes`,
+  `W9.e2-search`, `W9.e2-folders`, `W9.e2-zotero`, `W9.e2-links` (83a117c), `W9.e2-paste` (7ae8f24), plus
+  `W9.e2-fu1` (af7d049). The two D1 doubts are settled by `W9.e2-folders`/`W9.e2-fu1`: a gap drop reorders
+  rather than re-parents, and the folder context menu has Move to Top Level. This entry only closed the sweep.
+  **Saved draft branches, each settled as SUPERSEDED (kept, not deleted: unmerged refs need a force delete):**
+  - `wt/w9e2-w1c-20261007-143731-8614`, `wt/w9e2-w1b-20261006-225502-38121`, `origin/wip/W9.e2` (`4f7642f`,
+    `f4f39c4`): every source change is on main — the `copyLinkAvailable` focus key (`W9.e2-links`), Move to Top
+    Level (`W9.e2-folders`), `an.detail.authors.clear`. Their `NotesE2SweepTests` duplicate the per-part
+    `NotesE2*Tests` classes.
+  - `wt/saved-suite-wt-w9e2-bisect`, `wt/w9e2-w2-20261006-221042-87275`, `wt/w9e2-w1-20261006-213248-32628`,
+    `wt/w9e2-20261006-211331-6220`: earlier subsets of the same sweep tests and folder change.
+  - `wt/w9e2-20261006-202323-39080`: G20–G24 in `NotesGUITests` (authors, search filters, folders, template,
+    Copy Link); covered by the per-part classes, and `an.detail.authors.set`/`.clear` are on main.
+  The w1b/w1c drafts also filed four findings that never reached main: `W9.e2-fu1` shipped on its own;
+  `bodysave` (G16/G17 rewrite on select), `daterow` and `g13flake` are not reproducing — G17's byte-for-byte
+  no-write check and the date-row test passed in the `W9.g16-flake` full Notes VM suite (45 passed, 1 skipped),
+  and G13 passed 3/3 in `W9.e2-paste`. Not refiled.
+  <!-- /W9.e2 -->

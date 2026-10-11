@@ -860,26 +860,6 @@ checkboxes overstated completion once already; do not repeat that on the fixes. 
 ✅ **`W9.e1` (plan E1) shipped 2026-10-06** — the per-item result is in the plan under *E1 result*; the
 completion record is in `SUITE_TODO_DONE.md`.
 
-- [ ] **`W9.e2` — drive the wired features at runtime; finish the sweep that was cut short [S · ~0.25 session]** (lane: notes) (uses: light)
-  Notes: `execution-plans/items/W9.e2.md` (saved draft branches).
-  Original body, kept for reference; the work now lives in the six parts below. Plan E2 — also settle the two
-  D1 doubts E1 could not decide from source:
-  whether the row `.onDrag` pre-empts the folder list's `.onMove` reorder, and that no drop target re-parents
-  a folder back to top level. Plan E2 — and the 2026-07-18 addendum's own unfinished business: note delete +
-  delete-last-instance guard, tag editing, quality quick-edit, manual author, keyword FTS + quality/tag/date
-  filters, folder create/rename/delete + move/reorder + replicate, templates, context menu, Zotero
-  attach/auto-fill, source-block paste, Copy Link, deep-link, smart folders, empty state. Headless render
-  guards for pixel truth; the Notes VM lane for the rest. | ops/gui/ + ArchiveNotes | S | low | **needs:** gui
-  Verification note 2026-10-04 (baseline `1ed3e5e`): `NotesGUITests.runG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`
-  removes the Reader fixture note that `setUpOnMainActor` requires on every launch. Run destructive checks
-  last or against a separately rebuilt fixture; prove the remaining UI checks actually execute.
-  **Split 2026-10-07 into six feature-group parts** (efficiency plan, from its queue analysis:
-  `~/Claude/Agent Manager/analysis/QUEUE-ANALYSIS-2026-10-07.md` proposal c: "W9.e2 into ~six feature-group
-  sub-items"; one M item had run through six worktrees and two saved draft branches without shipping). The work
-  is in the six `W9.e2-*` entries below. This entry now only closes the sweep: when all six have shipped, settle
-  the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
-  to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
-  Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
 - [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (lane: notes) (uses: light) (blocked-on: W9.e1,
   W9.e2, W9.e3, W9.b5-fu1). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
   convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
