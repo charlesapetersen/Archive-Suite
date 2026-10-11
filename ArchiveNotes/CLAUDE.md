@@ -672,6 +672,9 @@ packages/ArchiveCore/              Shared read-side contract — see root CLAUDE
   PDF/                             ExtractedContent (PDFHeaderParser), PDFFormatStatus
   Links/                           DurableLink, RootMarker, ArchiveLinkPayload + UTI
   Thumbnails/                      PDFThumbnailer actor, ThumbnailCacheKey (disk LRU)
+  Calendars/                       DisplayCalendar: show a stored ISO day as Julian / English-1752 /
+                                   French Republican / Hebrew / Islamic and back (W24.cal1-core);
+                                   display only — storage and GregorianDay unchanged
 ```
 
 The map grows with each wave (W2 storage, W3 editor, W4 linking, W5 Zotero, W6 viewers,

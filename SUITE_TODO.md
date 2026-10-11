@@ -847,22 +847,6 @@ live in `execution-plans/archive-notes/00-overview.md` §17. ⛔ Do not re-file 
   move all five entries to `SUITE_TODO_DONE.md`. Est. a quarter of a session. It stays
   the tag `W40.b1` and `W40.b2` wait on.
   Edges: (blocked-on: W24.cal1-core, W24.cal1-toggle, W24.cal1-validator, W24.cal1-reader)
-- [ ] **`W24.cal1-core` — display-calendar profiles as a pure ArchiveCore module, with `swift test` [M · ~1-2 sessions]** (lane: suite) (uses: build)
-  Part of `W24.cal1`. For each display calendar the item names (today's `GregorianDay` rule, which is Julian leap
-  years before 1582 and Gregorian from 1582; Julian; Julian with the 1752 English cutover; French Republican;
-  Hebrew; Islamic), convert a stored ISO 8601 day to that calendar's year, month and day and back, and answer
-  days-in-month. A stored value that is not a proleptic
-  Gregorian day but that `GregorianDay` accepts (a pre-1582 Julian leap day such as `1500-02-29`, which can be
-  on disk today) is read as a Julian date and converted from that; it is never rejected or rewritten. No UI and
-  no app host; storage and
-  `Store/GregorianDay.swift` (the 1582 switch) do not change. The analysis put this on lane `core`, but that lane
-  only reads ArchiveCore, and the README's lane rule keeps any edit under `packages/` on `suite`; it is one
-  bounded session of `suite` instead of the whole L item.
-  DONE WHEN `swift test` in `packages/ArchiveCore` is green with round trips over the corpus's date range and
-  known anchor dates per calendar (England went from Wednesday 2 September 1752 to Thursday 14 September
-  1752, so the stored day 1752-09-13 shows as 2 September under Julian-1752 and the next day as 14 September
-  under both), a stored `1500-02-29` converts without error, and no app's behaviour changed. |
-  packages/ArchiveCore | M | low | none
 - [ ] **`W24.cal1-toggle` — Notes: a Settings toggle (default off) and a per-item calendar choice [S-M · Tier-2 · ~1 session]** (lane: notes) (uses: build) (blocked-on: W24.cal1-core)
   Part of `W24.cal1`. Settings gains the option, off by default; with it off nothing visible changes. With it on,
   each item offers a calendar choice from the core module's list, the choice persists in the item's

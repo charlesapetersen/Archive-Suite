@@ -10334,3 +10334,35 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   on Dean and Herrnstein (about $1.50) first, because the app can't use Claude through the subscription (about
   $24-48 per 1,000 pages by API key). Daemon Report entry for `W36.seg-decision` filed.
   <!-- /W36.seg-report -->
+- [x] **W24.cal1-core — display-calendar profiles as a pure ArchiveCore module, with `swift test`** · §Archive Notes — W24.cal1 (lane: suite) SHIPPED 2026-10-11
+  Part of `W24.cal1`. For each display calendar the item names (today's `GregorianDay` rule, which is Julian leap
+  years before 1582 and Gregorian from 1582; Julian; Julian with the 1752 English cutover; French Republican;
+  Hebrew; Islamic), convert a stored ISO 8601 day to that calendar's year, month and day and back, and answer
+  days-in-month. A stored value that is not a proleptic
+  Gregorian day but that `GregorianDay` accepts (a pre-1582 Julian leap day such as `1500-02-29`, which can be
+  on disk today) is read as a Julian date and converted from that; it is never rejected or rewritten. No UI and
+  no app host; storage and
+  `Store/GregorianDay.swift` (the 1582 switch) do not change. The analysis put this on lane `core`, but that lane
+  only reads ArchiveCore, and the README's lane rule keeps any edit under `packages/` on `suite`; it is one
+  bounded session of `suite` instead of the whole L item.
+  DONE WHEN `swift test` in `packages/ArchiveCore` is green with round trips over the corpus's date range and
+  known anchor dates per calendar (England went from Wednesday 2 September 1752 to Thursday 14 September
+  1752, so the stored day 1752-09-13 shows as 2 September under Julian-1752 and the next day as 14 September
+  under both), a stored `1500-02-29` converts without error, and no app's behaviour changed. |
+  packages/ArchiveCore | M | low | none
+  **Shipped:** `packages/ArchiveCore/Sources/ArchiveCore/Calendars/` — `DisplayCalendar` (`standard` = the
+  GregorianDay rule shown as stored, `julian`, `julian-1752`, `french-republican`, `hebrew`, `islamic`; raw values
+  are the persisted form for `W24.cal1-toggle`) with `display(stored:)`, `stored(from:)`, `isValid`,
+  `daysInMonth` (a count: September 1752 English has 19), `lastDayOfMonth`, `monthsInYear`, `monthName`, `format`;
+  `CalendarArithmetic` does Rata Die arithmetic (Reingold & Dershowitz), no `Foundation.Calendar`. A stored
+  pre-1582 `xxxx-02-29` reads as Julian; converting back from a non-standard calendar yields the canonical proleptic
+  Gregorian day (`1500-02-29` Julian → `1500-03-10`), while `.standard` returns the stored triple unchanged.
+  French Republican: decreed sextiles III/VII/XI/XV, Romme's rule from An XX; nil before 1792-09-22. Islamic is
+  tabular (ICU `islamic-civil`). English 1752 does not model the 25 March legal-year start.
+  Tests: `DisplayCalendarTests` (19) — every corpus day 1789–2030 round-trips through every calendar, a sampled
+  round trip over years 1–9999, Hebrew and Islamic matched day by day against ICU over 1789–2030 and Hebrew month
+  lengths for AM 5549–5791, Julian against ICU's pre-1582 Gregorian, the 2→14 September 1752 anchor with
+  weekdays, French anchors (9 Thermidor II, 18 Brumaire VIII, 1 Vendémiaire XII, 10 Nivôse XIV), `1500-02-29`.
+  `swift test` 264 tests green, no warnings. New types only; no app references them yet, so no app behaviour changed
+  (grep confirmed no name collision in the three apps).
+  <!-- /W24.cal1-core -->
