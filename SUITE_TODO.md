@@ -880,12 +880,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-links` — runtime sweep, Copy Link and the `archivenotes://open` round trip [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
-  Part of `W9.e2` (plan E2). Copy Link (B9) puts the item's `archivenotes://open?id=…` URL on the pasteboard, and
-  opening it selects and raises that item (B5), the full round trip E2 asks for. `f4f39c4` on
-  `origin/wip/W9.e2` fixes the Copy Link menu's enablement and was 5/5 VM-green with the sweep tests; judge it,
-  then bring it to main.
-  DONE WHEN the round trip is observed in a VM-green UITest on main. | ArchiveNotes | S | low | **needs:** gui
 - [ ] **`W9.e2-paste` — runtime sweep, paste and extracts: source blocks, page-link thumbnails, image bytes, re-grant [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Source-block paste; a pasted page-link shows a thumbnail (`RenderProbe` for pixel
   truth); a menu-created extract embeds its image bytes; a moved source re-grants in-app. Also confirm or retire

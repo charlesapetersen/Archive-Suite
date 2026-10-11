@@ -10220,3 +10220,15 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   with `declined:noImageOnPasteboard store=11111111 sel=11111111`; NEW → G4 10/10 and G5 10/10. Notes app and
   unit bundle build clean, no new warnings. Commits: checkpoint 9f69f39 (seam diagnosis), then the fix.
   <!-- /W9.g4-flake -->
+- [x] **W9.e2-links — runtime sweep, Copy Link and the `archivenotes://open` round trip [S · gui]** · §W9 gap-closure · SHIPPED 2026-10-11 (this commit; checkpoint `b8c596d`) (lane: notes)
+  Part of `W9.e2` (plan E2). Brought `f4f39c4` (`origin/wip/W9.e2`) to main after judging it: Note ▸ Copy Link
+  read `canCopyCurrentItemLink` off the focused `FormattingContext`, whose identity fields are not `@Published`,
+  so the menu stayed disabled with a note selected (W9.e2-fu2). Enablement now comes from a
+  `copyLinkAvailable` focused scene value computed from the navigation model, the `zoteroAutoFillAvailable`
+  pattern. The draft's other change (`an.detail.authors.clear`) was already on main.
+  New `NotesE2LinkTests`: Note ▸ Copy Link puts `archivenotes://open?id=…` on the pasteboard, a different note
+  is selected, the URL is handed to the RUNNING app through Launch Services, and the linked note is selected
+  and loaded again (B9 ⇄ B5); the row context menu's Copy Link names the clicked row. VM: 10/10 (both tests,
+  `TEST_ITERATIONS=5`), the VM booting `--no-clipboard`. Notes unit bundle green (932 Swift Testing + 220
+  XCTest), no new warnings. The rest of `f4f39c4`'s sweep tests are for the `W9.e2` closing sweep to settle.
+  <!-- /W9.e2-links -->
