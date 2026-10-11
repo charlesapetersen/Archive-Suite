@@ -31,6 +31,7 @@ CHECKBOX = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s*")
 DATE = re.compile(r"\b(20\d\d-\d\d-\d\d)\b")
 WALKED = re.compile(r"^### .*✅.*[Ww]alkthrough")         # status-digest.sh's stop line
 REPORT_HEADER = re.compile(r"^## (Daemon Report|Morning Review)")
+NO_DECISION = re.compile(r"\bno decision\b", re.I)   # the writer's own label for a mention (resume-prompt.txt)
 
 
 def read(path):
@@ -250,16 +251,21 @@ def holds():
             seen.add(tag)
             ready = tag in pending and not status.startswith("blocked:")
             out.append({"key": tag, "text": clean(text), "permanent": not ready, "source": "WORK QUEUE"})
-    # The Daemon Report is ONE pending item, keyed by its newest unwalked entry: a new entry notifies once, and the
-    # owner walks the report as a whole (decision 2026-10-08, R1 review finding 3).
+    # The Daemon Report is ONE pending item, keyed by its newest unwalked entry that asks for a decision: a new
+    # question notifies once, and the owner walks the report as a whole (decision 2026-10-08, R1 review finding 3).
+    # An entry its writer labels "no decision" is a mention: it never makes the item or changes its key, so a report
+    # of mentions only emails nobody (owner, 2026-10-11: "only receive an email when something actually needs me").
     entries = report_entries(plan)
-    if entries:
-        newest = clean(entries[0], 100)
-        d = {"key": "daemon-report:" + short_hash(entries[0]),
-             "text": "Daemon Report: %d entr%s since the last walkthrough; newest: %s"
-                     % (len(entries), "y" if len(entries) == 1 else "ies", newest),
+    asks = [e for e in entries if not NO_DECISION.search(e)]
+    if asks:
+        mentions = len(entries) - len(asks)
+        d = {"key": "daemon-report:" + short_hash(asks[0]),
+             "text": "Daemon Report: %d decision%s since the last walkthrough%s; newest: %s"
+                     % (len(asks), "" if len(asks) == 1 else "s",
+                        " (and %d mention%s)" % (mentions, "" if mentions == 1 else "s") if mentions else "",
+                        clean(asks[0], 100)),
              "permanent": False, "source": "Daemon Report"}
-        m = DATE.search(entries[0])
+        m = DATE.search(asks[0])
         if m:
             d["since"] = m.group(1)
         out.append(d)

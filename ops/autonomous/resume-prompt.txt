@@ -14,6 +14,10 @@ blocker may leave it partial. An item too big to finish in ~2 sessions is mis-si
   WALKTHROUGH"). Do not merge the two: you append and move on. You never compose a walkthrough here, because
   nobody is awake to be walked through it.
 
+  !! An entry that asks the owner nothing (a mention, an FYI) MUST say "no decision" in its first line. The
+  Agent Manager emails the owner for every Daemon Report entry WITHOUT those words, so an unlabelled mention
+  sends a false "needs you" email; a real question must never carry them.
+
 STEP 1 — RECOVER STATE (always, first):
   cd "__REPO__"
   git fetch origin && git pull --rebase origin main

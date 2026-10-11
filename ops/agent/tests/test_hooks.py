@@ -206,7 +206,7 @@ class Holds(Fixture):
         d = report[0]
         self.assertTrue(d["key"].startswith("daemon-report:"))
         self.assertFalse(d["permanent"])
-        self.assertTrue(d["text"].startswith("Daemon Report: 3 entries since the last walkthrough; newest: W1.x "
+        self.assertTrue(d["text"].startswith("Daemon Report: 3 decisions since the last walkthrough; newest: W1.x "
                                              "(2026-10-08) \u2014 first unheaded entry"), d["text"])
         self.assertEqual(d["since"], "2026-10-08")
 
@@ -221,7 +221,22 @@ class Holds(Fixture):
         changed = set(first) ^ set(second)
         self.assertEqual(len(changed), 2)
         self.assertTrue(all(k.startswith("daemon-report:") for k in changed))
-        self.assertIn("Daemon Report: 4 entries", [d for d in items if d["source"] == "Daemon Report"][0]["text"])
+        self.assertIn("Daemon Report: 4 decisions", [d for d in items if d["source"] == "Daemon Report"][0]["text"])
+
+    def test_mentions_never_make_or_move_the_item(self):
+        # Owner, 2026-10-11: an email only when something needs him. A "no decision" entry is a mention.
+        first = [d for d in self.jsonl(self.hook("holds").stdout) if d["source"] == "Daemon Report"]
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace(
+            "follow-ups\n\n", "follow-ups\n\nW3.z (2026-10-11), No decision needed yet \u2014 a mention\n\n"))
+        items = [d for d in self.jsonl(self.hook("holds").stdout) if d["source"] == "Daemon Report"]
+        self.assertEqual([d["key"] for d in items], [d["key"] for d in first])
+        self.assertTrue(items[0]["text"].startswith("Daemon Report: 3 decisions since the last walkthrough "
+                                                    "(and 1 mention); newest: W1.x"), items[0]["text"])
+        only = ("## Daemon Report \u2014 owner decisions / follow-ups\n\n"
+                "W3.z \u2014 worth knowing, no decision\n\nW4.q (no decision needed, FYI)\n\n"
+                "### \u2705 2026-10-06 \u2014 walkthrough done (owner): everything below is settled.\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.split("## Daemon Report")[0] + only)
+        self.assertEqual([d for d in self.jsonl(self.hook("holds").stdout) if d["source"] == "Daemon Report"], [])
 
     def test_a_walked_report_has_no_item(self):
         plan = PLAN.replace("## Daemon Report \u2014 owner decisions / follow-ups\n\n",
