@@ -45,14 +45,22 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     /// the VM on 2026-10-11: every list cell's text is 12 pt tall for a line that needs 16). Its fix ships with
     /// this guard as its failing-before test; that session deletes this entry, and the sweep fails until it does.
     private let rowClip = LayoutGuard.KnownIssue(tag: "W40.fix-notes-row-clip") {
-        $0.kind == .short && $0.element.contains("#an.cell.")
+        $0.kind == .short && $0.identifier.hasPrefix("an.cell.")
     }
 
     /// At its minimum width (1053 pt in the VM) the window is narrower than its three panes: the sidebar's scroll
-    /// view starts 34 pt off the left edge and the inspector's scroll views end 34 pt past the right one (VM,
-    /// 2026-10-11, screenshot in the evidence file). Its fix deletes this entry.
+    /// view starts 34 pt off the left edge and the inspector's scroll views end 34 pt past the right one, taking
+    /// the new-folder button, a location's remove button and the raw/styled toggle wholly off the window (VM,
+    /// 2026-10-11, screenshot in the evidence file). Only at minimum size, and only sideways. Its fix deletes
+    /// this entry.
     private let narrowWindow = LayoutGuard.KnownIssue(tag: "W40.fix-notes-narrow-window") {
-        $0.kind == .window && $0.element.hasPrefix("scrollView")
+        let v = $0
+        let sideways = v.frame.minX < v.bounds.minX || v.frame.maxX > v.bounds.maxX
+        let insideVertically = v.frame.minY >= v.bounds.minY - 2 && v.frame.maxY <= v.bounds.maxY + 2
+        // The panes' scroll views, and the three controls they push entirely off the window with them.
+        let casualty = v.type == .scrollView || v.identifier == "an.sidebar.newFolder"
+            || v.identifier == "an.editor.rawToggle" || v.identifier.hasPrefix("an.locations.remove.")
+        return v.state.hasPrefix("minimum") && v.kind == .window && casualty && sideways && insideVertically
     }
 
     /// UI-test-only harness elements (`ArchiveNotesApp` adds them only under the UITest launch arguments): the

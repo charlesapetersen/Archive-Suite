@@ -20,14 +20,17 @@ final class LayoutGuardUITests: FixtureUITestCase {
     /// window's left edge, the "Smart Folders" header overruns its cell, and the filter bar runs past the right
     /// edge, taking the needs-attention toggle with it (VM, 2026-10-11). Its fix deletes this entry.
     private let narrowWindow = LayoutGuard.KnownIssue(tag: "W40.fix-reader-narrow-window") {
-        $0.element.contains("#ar.filter.needsAttention") || $0.element.contains("\"Smart Folders\"")
-            || ($0.kind == .window && $0.element.hasPrefix("scrollView"))
+        let v = $0
+        let insideVertically = v.frame.minY >= v.bounds.minY - 2 && v.frame.maxY <= v.bounds.maxY + 2
+        return (v.kind == .window && v.type == .scrollView && v.frame.minX < v.bounds.minX && insideVertically)
+            || (v.kind == .window && v.identifier == "ar.filter.needsAttention" && v.frame.maxX > v.bounds.maxX)
+            || (v.kind == .container && v.label == "Smart Folders")
     }
 
     /// The preview sheet is 940×700 over a 900×612 window, so it overhangs it on every side (VM, 2026-10-11).
     /// The sheet's sweep reads the whole window, so it sees `narrowWindow` behind the sheet as well.
     private let oversizeSheet = LayoutGuard.KnownIssue(tag: "W40.fix-reader-preview-sheet-oversize") {
-        $0.kind == .window && $0.element == "sheet"
+        $0.kind == .window && $0.type == .sheet
     }
 
     /// A PDF page's text (PDFKit's `document` group) is laid out by the page and scaled by the zoom: the

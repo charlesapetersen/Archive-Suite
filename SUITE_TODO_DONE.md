@@ -10277,3 +10277,31 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   <!-- /W9.e2 -->
 - [x] **W36.seg-ensemble — agreement plus review: risk-coverage, then the test collections once [S-M]** · §Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze) · SHIPPED 2026-10-11 (this commit; checkpoint b243a05, which froze the finalists before any test-set call). `scripts/segbench/ensemble.py` (+ `test_ensemble.py`, 6 toy checks): voters window-claude (C), window-gemini-lite (L), whole-gemini (W), features-emb-lr-notime (F), all from their caches, truth photo labels; a gap is auto-accepted when the set is unanimous and its lowest confidence is above a level v, else flagged; v fitted leave-one-collection-out as the smallest at which the other two collections reach 98% after review. All 15 voter sets ranked on dev (`segbench-results/ensemble-dev.md`, full risk-coverage curves `ensemble-curves-dev.csv`): C alone and C+W tie at 3/3 held-out collections at 98%, 99.0% pooled after review, 5.8/6.0 flagged per 100 pages, 2 errors left in 551 pages; any set with F flags 34+ per 100 pages and misses Deaver. Test set scored ONCE (`ensemble-test.md`, `ensemble-final.json` makes `final` refuse a second run; 123 `claude -p` windows + 14 whole-gemini calls, $0.46): C 97.3% after review (Stanton 97.1%, RG 165 97.7%) at 10.2 flagged per 100 pages (Stanton 12.8), 3 errors left in 363 pages (about 4 per 500, against the proposed 1); 87.0% with no review; C+W the same after review at 10.7 per 100, 88.8% with no review. Below the owner's 98% bar on the held-out boxes. Approach G (RG 165's End-segment marks): unknown — no recorded groups survive under Test Files/. Owner note: `execution-plans/segmentation/03-early-read.md` addendum 6.
   <!-- /W36.seg-ensemble -->
+- [x] **W40.e9 — layout guard in every UI suite [M]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-11 (this commit; checkpoint 18c7484).
+  One checker, `packages/UITestSupport/Runner/LayoutGuard.swift`, compiled into all three UI-test bundles; each
+  suite's `LayoutGuardUITests` sweeps its main screens (Reader: navigation window, preview sheet, document viewer;
+  Notes: note window, Extracts window; Processor: Process Files, Settings), light and dark, at typical and minimum
+  size, on open and once settled. It reads the window's accessibility tree in one snapshot and reports text or
+  controls leaving their row/cell or the window (scroll-view contents exempt, the scroll view and any sheet itself
+  not), single-line text under 13 pt, and overlapping sibling texts or rows.
+  - **Dark needs an app-side seam.** `-AppleInterfaceStyle Dark` left the apps light in the VM, so DEBUG builds
+    read `-ArchiveUITestAppearance dark|light` (`packages/UITestSupport/App/UITestAppearance.swift`, from process
+    arguments only, never UserDefaults) and set `NSApp.appearance` in each `App.init`.
+  - **The 13 pt floor is measured.** Legitimate labels are 13 pt and up; the clipped Notes cells are 12. The first
+    guess, 11, passed the clip. Do not lower it to admit a small label; exempt that label.
+  - **Known defects are strict `KnownIssue`s.** They are reported under `XCTExpectFailure`, so the suites are green,
+    and the sweep FAILS once one stops reproducing, so each fix must delete its entry. Matchers use type, identifier,
+    geometry and sweep state rather than message text: a reviewer found the first version's prefix matchers would
+    have swallowed new defects.
+  - **Shown to fail first.** The real Notes row clip (`W40.fix-notes-row-clip`), confirmed by screenshot, is the
+    clipped row the guard had to catch. Every suite also runs `testLayoutGuardCatchesPlantedDefects` on synthetic
+    trees, one per defect class.
+  - **Found and filed:** `W40.fix-reader-narrow-window` (S3), `W40.fix-reader-preview-sheet-oversize` (S4),
+    `W40.fix-notes-narrow-window` (S3). The Processor screens are clean.
+  - **Review fixes before shipping:** elements entirely off the window had been skipped (the visibility gate); a
+    missed first shrink could log the minimum as covered; the size restore went unverified; the sibling-overlap
+    clip was wrong inside scroll views. All four were fixed and re-run green in the VM.
+  - Evidence: `verification/evidence/{reader,notes,processor}/W40.e9-layout-guard.md` plus four screenshots.
+    Pitfalls: the Bash hook name-matches "open" even in a heredoc (edit via a script file); never edit the
+    worktree while a VM run builds from it (one run compiled a half-moved tree).
+  <!-- /W40.e9 -->

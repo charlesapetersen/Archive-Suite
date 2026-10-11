@@ -66,9 +66,23 @@ struct LayoutNode {
 struct LayoutViolation: CustomStringConvertible {
     enum Kind: String { case container, window, short, overlap }
     var kind: Kind
+    /// The offending element, so a `KnownIssue` can match on identity and geometry rather than on message text.
+    var type: XCUIElement.ElementType
+    var identifier: String
+    var label: String
+    var frame: CGRect
+    /// What `frame` was checked against: the row/cell, the window or sheet, or the overlapping sibling.
+    var bounds: CGRect
     var element: String
     var detail: String
+    /// The sweep state it was seen in ("minimum size, settled"); empty from `violations(in:)` alone.
+    var state = ""
     var description: String { "[\(kind.rawValue)] \(element): \(detail)" }
+
+    init(_ kind: Kind, _ node: LayoutNode, bounds: CGRect, detail: String) {
+        self.kind = kind; type = node.type; identifier = node.identifier; label = node.label
+        frame = node.frame; self.bounds = bounds; element = node.name; self.detail = detail
+    }
 }
 
 enum LayoutGuard {
@@ -118,39 +132,41 @@ enum LayoutGuard {
                              ignore: (LayoutNode) -> Bool, into out: inout [LayoutViolation]) {
         if ignore(node) { return }
         let f = node.frame
-        let visible = f.width >= degenerate && f.height >= degenerate && f.intersects(clip)
+        let solid = f.width >= degenerate && f.height >= degenerate
+        let visible = solid && f.intersects(clip)
         let isSheet = node.type == .sheet
         let isScroll = node.type == .scrollView
+        let isText = textTypes.contains(node.type)
+        let isControl = controlTypes.contains(node.type)
 
+        // Everything inside a scroll view may legitimately scroll past the window's edge, so it is exempt — but
+        // the scroll view itself is not: the Reader sidebar's whole scroll view sat 50 pt off the left edge, and
+        // its rows, being inside it, were never checked. A sheet is checked as a whole too: it is its own window,
+        // so its contents are checked against IT, and a sheet bigger than its parent is reported once rather than
+        // once per control. Not gated on `visible`: an element pushed ENTIRELY off the window is the worst case.
+        if solid, !inScroll, isText || isControl || isScroll || isSheet, !contains(window, f) {
+            out.append(.init(.window, node, bounds: window,
+                             detail: "frame \(fmt(f)) leaves the window \(fmt(window))"))
+        }
         if visible {
-            let isText = textTypes.contains(node.type)
-            if isText || controlTypes.contains(node.type) {
-                if let row, !contains(row.frame, f) {
-                    out.append(.init(kind: .container, element: node.name,
-                                     detail: "frame \(fmt(f)) leaves its \(row.type.layoutGuardName) "
-                                        + fmt(row.frame)))
-                }
-            }
-            // Everything inside a scroll view may legitimately scroll past the window's edge, so it is exempt —
-            // but the scroll view itself is not: the Reader sidebar's whole scroll view sat 50 pt off the left
-            // edge, and its rows, being inside it, were never checked. A sheet is checked as a whole too: it is
-            // its own window, so its contents are checked against IT, and a sheet bigger than its parent is
-            // reported once rather than once per control.
-            if (isText || controlTypes.contains(node.type) || isScroll || isSheet), !inScroll, !contains(window, f) {
-                out.append(.init(kind: .window, element: node.name,
-                                 detail: "frame \(fmt(f)) leaves the window \(fmt(window))"))
+            if isText || isControl, let row, !contains(row.frame, f) {
+                out.append(.init(.container, node, bounds: row.frame,
+                                 detail: "frame \(fmt(f)) leaves its \(row.type.layoutGuardName) \(fmt(row.frame))"))
             }
             if singleLineTextTypes.contains(node.type), !(node.label.isEmpty && node.value.isEmpty),
                f.height < minTextHeight {
-                out.append(.init(kind: .short, element: node.name,
+                out.append(.init(.short, node, bounds: f,
                                  detail: "\(Int(f.height.rounded())) pt tall — text this short is cut off "
                                     + "(minimum \(Int(minTextHeight)) pt)"))
             }
         }
 
-        // Siblings: two text elements, or two rows/cells, must not overlap. Only on-screen ones.
+        let childClip = isSheet ? f : isScroll ? clip.intersection(f) : clip
+
+        // Siblings: two text elements, or two rows/cells, must not overlap. Only ones that are on screen inside
+        // this node's own clip, so rows scrolled out of view are not compared.
         let kids = node.children.filter { k in
-            !ignore(k) && k.frame.width >= degenerate && k.frame.height >= degenerate && k.frame.intersects(clip)
+            !ignore(k) && k.frame.width >= degenerate && k.frame.height >= degenerate && k.frame.intersects(childClip)
         }
         for group in [kids.filter { textTypes.contains($0.type) }, kids.filter { rowTypes.contains($0.type) }] {
             guard group.count > 1 else { continue }
@@ -158,7 +174,7 @@ enum LayoutGuard {
                 for j in (i + 1)..<group.count {
                     let o = group[i].frame.intersection(group[j].frame)
                     if !o.isNull, o.width > tolerance, o.height > tolerance {
-                        out.append(.init(kind: .overlap, element: group[i].name,
+                        out.append(.init(.overlap, group[i], bounds: group[j].frame,
                                          detail: "overlaps \(group[j].name) by \(fmt(o))"))
                     }
                 }
@@ -172,7 +188,6 @@ enum LayoutGuard {
             return
         }
         let childRow = rowTypes.contains(node.type) ? node : row
-        let childClip = isScroll ? clip.intersection(f) : clip
         for child in node.children {
             walk(child, window: window, row: childRow, clip: childClip, inScroll: inScroll || isScroll,
                  ignore: ignore, into: &out)
@@ -279,7 +294,9 @@ enum LayoutGuard {
             guard let tree = capture(window) else {
                 report.append("\(state): could not read the accessibility tree"); return
             }
-            let found = violations(in: tree, ignore: ignore)
+            let found = violations(in: tree, ignore: ignore).map { v -> LayoutViolation in
+                var v = v; v.state = state; return v
+            }
             let unexpected = found.filter { v in !known.contains { $0.matches(v) } }
             var note = ""
             for k in known {
@@ -302,33 +319,55 @@ enum LayoutGuard {
             if !unexpected.isEmpty { report.append("\(state) (window \(fmt(tree.frame))):\n    " + list(unexpected)) }
         }
 
+        func checkMinimum() {
+            check("minimum size, on open")
+            if !waitUntilSettled(window) { print("[layout-guard] \(screen): minimum size never settled in 15 s") }
+            check("minimum size, settled")
+        }
+
         check("typical size, on open")
         if !waitUntilSettled(window) { print("[layout-guard] \(screen): typical size never settled in 15 s") }
         check("typical size, settled")
 
         let shrinkTo = CGPoint(x: typical.minX + 40, y: typical.minY + 40)
-        let minimum = resize ? dragCorner(of: window, to: shrinkTo) : typical
+        var resized = false
         if !resize {
             print("[layout-guard] \(screen): fixed size, minimum size not applicable")
-        } else if minimum.size == typical.size {
+        } else if dragCorner(of: window, to: shrinkTo).size != typical.size {
+            checkMinimum()
+            resized = true
+        } else {
             // Either the window already opened at its minimum, or the drag did nothing. Growing it tells the two
-            // apart: a window that grows and shrinks back to the same size was already at its minimum, which the
-            // checks above have covered.
+            // apart: a window that grows and then shrinks back to exactly its first size was already at its
+            // minimum, which the checks above have covered. If it shrinks further than that, the first drag had
+            // simply missed — check that minimum now rather than report it as covered.
             let grown = dragCorner(of: window, to: CGPoint(x: typical.maxX + 80, y: typical.maxY + 60))
             if grown.size == typical.size {
                 report.append("minimum size: the window would neither shrink nor grow, so the minimum size was NOT "
                               + "checked (pass resize: false if this window is fixed-size)")
             } else {
-                dragCorner(of: window, to: shrinkTo)
-                _ = waitUntilSettled(window, minimum: 1)
-                print("[layout-guard] \(screen): opened at its minimum size \(fmt(typical)); checked above")
+                resized = true
+                let minimum = dragCorner(of: window, to: shrinkTo)
+                if minimum.size == typical.size {
+                    _ = waitUntilSettled(window, minimum: 1)
+                    print("[layout-guard] \(screen): opened at its minimum size \(fmt(typical)); checked above")
+                } else if minimum.width <= typical.width, minimum.height <= typical.height {
+                    checkMinimum()
+                } else {
+                    report.append("minimum size: after growing, the window would not shrink back (stuck at "
+                                  + "\(fmt(minimum))), so the minimum size was NOT checked")
+                }
             }
-        } else {
-            check("minimum size, on open")
-            if !waitUntilSettled(window) { print("[layout-guard] \(screen): minimum size never settled in 15 s") }
-            check("minimum size, settled")
-            dragCorner(of: window, to: CGPoint(x: typical.maxX, y: typical.maxY))
+        }
+
+        // Put the window back, and say so if that failed: a later sweep of the same window would otherwise run at
+        // the wrong size without notice.
+        if resized, window.frame.size != typical.size {
+            let back = dragCorner(of: window, to: CGPoint(x: typical.maxX, y: typical.maxY))
             _ = waitUntilSettled(window, minimum: 1)
+            if abs(back.width - typical.width) > tolerance || abs(back.height - typical.height) > tolerance {
+                report.append("restore: the window ended at \(fmt(back)), not its typical \(fmt(typical))")
+            }
         }
 
         if !report.isEmpty {
@@ -426,6 +465,9 @@ enum LayoutGuardSelfTest {
                                                            label: "Off the edge")]),
                "a button past the window edge")
         expect(.overlap, tree([row(40), row(52)]), "two rows overlapping")
+        expect(.window, tree([row(40)], extra: [LayoutNode(.button, CGRect(x: 900, y: 560, width: 80, height: 24),
+                                                           label: "Gone")]),
+               "a button entirely outside the window")
         // The Reader sidebar at its minimum width: the whole scroll view starts off the window's left edge.
         expect(.window, LayoutNode(.window, win, children: [
             LayoutNode(.scrollView, CGRect(x: -50, y: 40, width: 210, height: 500), children: [row(40)]),
@@ -439,7 +481,7 @@ enum LayoutGuardSelfTest {
             ]),
         ])
         let sheetFound = LayoutGuard.violations(in: sheet)
-        XCTAssertEqual(sheetFound.map(\.element), ["sheet"],
+        XCTAssertEqual(sheetFound.map(\.type), [.sheet],
                        "an oversized sheet is reported once, as the sheet, got: \(sheetFound)", file: file, line: line)
         expect(.overlap, tree([], extra: [
             LayoutNode(.staticText, CGRect(x: 10, y: 560, width: 200, height: 16), label: "a"),
