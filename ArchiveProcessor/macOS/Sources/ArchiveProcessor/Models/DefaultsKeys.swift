@@ -68,6 +68,8 @@ enum DefaultsKeys {
 
     // Tagging & segmentation
     static let taggingModeRaw = "taggingModeRaw"
+    /// `SegmentationApproach` rawValue: who proposes the run's boundaries (W36.seg-opt-engine). Absent ⇒ manual.
+    static let segmentationApproach = "segmentationApproach"
     static let enableCollectionSegmentation = "enableCollectionSegmentation"
     static let confirmCollectionIDs = "confirmCollectionIDs"
     static let reviewDocumentSegmentation = "reviewDocumentSegmentation"

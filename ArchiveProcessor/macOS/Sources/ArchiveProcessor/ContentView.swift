@@ -67,6 +67,7 @@ struct ContentView: View {
             NetworkSessionTestDriver.runIfRequested()        // $0 injected HTTP retry/limiter safety test (env-gated)
             VisionHybridTestDriver.runIfRequested()          // $0 Vision OCR + text-only judgement request-shape contract
             RetryBackendTestDriver.runIfRequested()          // $0 Process Files retry backend-lock contract
+            SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             maybePresentKeyOnboarding()
         }
         .sheet(isPresented: $showKeyOnboarding) {

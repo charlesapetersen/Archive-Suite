@@ -34,6 +34,10 @@ targets:
     sources:
       - Sources/ArchiveProcessor
       - path: ../../packages/UITestSupport/App   # W40.e9 DEBUG appearance seam for the layout guard
+      # The segmentation figures, bundled straight from the bench's file (no copy), so a bench re-run reaches the
+      # app on its next build (W36.seg-opt-engine). Loaded as Bundle.main "options.json".
+      - path: ../segbench-results/options.json
+        buildPhase: resources
     dependencies:
       - package: ArchiveCore
     settings:
