@@ -91,6 +91,8 @@ per approach**, with the method and threshold fixed on the development boxes fir
   `ArchiveProcessor/segbench-results/options.md` and as data the app can read (`options.json`). Manual mode is a row
   with no cost and every boundary judged by the user. Paid spend for the item: at most $25, stated before each run;
   the Claude calls run on the subscription as before.
+  ✅ Shipped 2026-10-11: `ArchiveProcessor/segbench-results/options.md` and `options.json` (manual, Claude, Gemini,
+  Claude + Gemini; ChatGPT not measured, split to `W36.seg-opt-openai`). $2.73 spent.
 - **`W36.seg-opt-usage`** — can the subscription route work, and how is its cost shown [S-M · ~1 session] (uses:
   light). Answer the two open questions in Part 1 (technically possible, permitted by the terms), with the
   sources cited. If yes, specify the sample-and-meter calibration, the fallback by plan tier and how each is

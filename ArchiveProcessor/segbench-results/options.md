@@ -2,7 +2,9 @@
 
 W36.seg-opt-measure, run 2026-10-11. Data for the app: `options.json` beside this file. Method: `scripts/segbench/options.py`; the development-set detail is `options-dev.md`.
 
-**Measured on the locked boxes, Stanton and RG 165 (363 pages, 315 gaps between two document pages), scored once**, with each approach's flag level and the mix rule frozen on the development boxes (Dean, Deaver, Herrnstein) before those boxes' new calls were made (`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's test-box windows are new.
+**Measured on the locked boxes, Stanton and RG 165 (363 pages, 315 gaps between two document pages), scored once**, with each approach's flag level and the mix rule frozen on the development boxes (Dean, Deaver, Herrnstein) before the test boxes' new calls were made (`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's test-box windows are new.
+
+Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, box and folder photos included; 'pages in an exact document' counts document pages only.
 
 ## The five figures, per approach (test boxes)
 
@@ -35,7 +37,7 @@ W36.seg-opt-measure, run 2026-10-11. Data for the app: `options.json` beside thi
 
 ## Tokens and cost per 1,000 pages
 
-Measured over every box collected (all five), not tuned on anything. Gemini: the API's own usage figures. Claude: each window rebuilt as one Messages API request and counted with count_tokens (free); the bench itself ran through `claude -p`, whose notional list-price figure is shown for the subscription route. A mix pays for both models.
+Measured over every box collected (all five), not tuned on anything. Gemini: the API's own usage figures. Claude: each window rebuilt as one Messages API request and counted with count_tokens (free); the bench itself ran through `claude -p`, whose notional list-price figure is shown for the subscription route; its output count assumes no extended thinking on the API route. A mix pays for both models.
 
 | model | boxes | calls | input tokens | output tokens | list $ | batch $ | prices $/M in, out (read) |
 |---|---|---:|---:|---:|---:|---:|---|
@@ -54,6 +56,6 @@ Not measured: no OpenAI API key in the Keychain, and the Codex route answered 'Y
 
 - Manual asks about every gap between two document pages (87 per 100 pages on these boxes) and costs nothing; it is the floor the others are measured against.
 - On the test boxes the fewest checks were Claude only's (10.2 per 100 pages, 3 unflagged errors), and the fewest unflagged errors Gemini only's (0, at 24.2 checks per 100 pages). The trade-off is the level: a higher one flags more and leaves less.
-- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, Claude and Gemini together 2 on the test boxes, 2 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on five boxes of one archive.
+- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, Claude and Gemini together 2 on the test boxes, 2 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
 - The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took the same decision on every gap), which is why combining them adds little over Claude alone.
 

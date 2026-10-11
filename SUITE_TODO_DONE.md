@@ -10458,3 +10458,19 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   be stale for the instant an async write is in flight. No VM UITest run: the change is field rules and
   captions, pinned by the unit tests.
   <!-- /W24.cal1-validator -->
+- [x] **W36.seg-opt-measure — the figures for every approach [M · ~2 sessions]** · §Archive Processor — automatic segmentation · SHIPPED 2026-10-11 (lane: segbench) (uses: paid)
+  `ArchiveProcessor/scripts/segbench/options.py` (+ `test_options.py`); results `segbench-results/options.md`,
+  `options.json` (for the app), `options-dev.md`, `options-frozen.json`. Levels fitted leave-one-collection-out on
+  Dean/Deaver/Herrnstein exactly as `ensemble.py`, frozen and committed (`60cc437d`) before the test boxes' new
+  calls, then Stanton + RG 165 scored once. Test figures (no checking / checks per 100 pages / after checking /
+  unflagged errors): manual —/86.8/100%/0; Claude (Sonnet 5.5, ≤0.85) 87.0%/10.2/97.3%/3 (equals
+  `ensemble-final.json`'s C); Gemini 3.8 Flash low (≤0.965) 88.8%/24.2/100%/0; Claude+Gemini, min rule (beat the
+  mean rule on dev, 3 of 3 boxes against 2 of 3) 89.4%/10.7/97.9%/2. Per 1,000 pages: Claude 7.7M in + 148k out =
+  $16.93 list / $8.47 batch (count_tokens on each window rebuilt as one API request; `claude -p`'s notional
+  $50.29 shown for the subscription route); Gemini 3.9M + 174k = $3.61 / $1.81 at the intro price ($7.22 / $3.61
+  after 2026-12-31). The models share most mistakes (Dean: same decision on all 191 gaps), so the mix adds little.
+  Paid: Gemini dev $1.40 + test $1.33 = $2.73 of $25, each stated before its run. ChatGPT NOT measured: no OpenAI
+  key, Codex workspace out of credits → `W36.seg-opt-openai` (blocked-on its owner gate). Refute-verify (opus,
+  independent scorer from the caches): every test, token and cost figure reproduced; three wording fixes applied.
+  Python: `uv run -q --python 3.12 --with numpy --with requests python options.py …` (system python has no numpy).
+  <!-- /W36.seg-opt-measure -->

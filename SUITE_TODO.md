@@ -861,7 +861,8 @@ OWNER sit in the plan's HOLD QUEUE.
 
 The build, from `04-options-build.md` Part 2 (the Processor's `W40.b3` and `W40.d1`-`d4` wait for `W36.seg-opt-proof`):
 
-- [ ] **`W36.seg-opt-measure` — the figures for every approach [M · ~2 sessions]** (lane: segbench) (uses: paid). At most $25 paid.
+- [ ] **`W36.seg-opt-openai` — the ChatGPT figures, once a route exists [S · ~1 session]** (lane: segbench) (uses: paid) (blocked-on: W36.seg-opt-openai-owner-ok). Split from `W36.seg-opt-measure` 2026-10-11: no OpenAI API key in the Keychain, and the Codex workspace is out of credits. The OpenAI window voter on all five boxes through `scripts/segbench/options.py` (level frozen on the development boxes before the test calls; mix re-ranked with it), filling the `openai` row of `segbench-results/options.json`. Cost stated before the run.
+- [ ] **`W36.seg-opt-openai-owner-ok` — owner: a capped OpenAI key, Codex credits, or drop ChatGPT? — OWNER.** In the plan's HOLD QUEUE and Daemon Report.
 - [ ] **`W36.seg-opt-usage` — can the subscription route work, and how is its cost shown [S-M · ~1 session]** (lane: segbench) (uses: light).
 - [ ] **`W36.seg-opt-design` — the design note [S · ~1 session]** (lane: segbench) (uses: light) (blocked-on: W36.seg-opt-measure, W36.seg-opt-usage).
 - [ ] **`W36.seg-opt-engine` — a provider-neutral window segmenter [M · ~2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-design).

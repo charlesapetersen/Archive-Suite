@@ -515,10 +515,12 @@ def render(out: dict) -> str:
          "`scripts/segbench/options.py`; the development-set detail is `options-dev.md`.", "",
          f"**Measured on the locked boxes, Stanton and RG 165 ({t0['pages']} pages, {t0['gaps']} gaps between two "
          "document pages), scored once**, with each approach's flag level and the mix rule frozen on the "
-         "development boxes (Dean, Deaver, Herrnstein) before those boxes' new calls were made "
+         "development boxes (Dean, Deaver, Herrnstein) before the test boxes' new calls were made "
          "(`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected "
          "for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's "
          "test-box windows are new.", "",
+         "Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, "
+         "box and folder photos included; 'pages in an exact document' counts document pages only.", "",
          "## The five figures, per approach (test boxes)", "",
          "| approach | pages in an exact document, no checking | boundaries to check per 100 pages | pages right "
          "after checking | unflagged errors per 500 pages (count) | API cost per 1,000 pages, list / batch |",
@@ -544,7 +546,8 @@ def render(out: dict) -> str:
           "Measured over every box collected (all five), not tuned on anything. Gemini: the API's own usage "
           "figures. Claude: each window rebuilt as one Messages API request and counted with count_tokens (free); "
           "the bench itself ran through `claude -p`, whose notional list-price figure is shown for the "
-          "subscription route. A mix pays for both models.", "",
+          "subscription route; its output count assumes no extended thinking on the API route. A mix pays for both "
+          "models.", "",
           "| model | boxes | calls | input tokens | output tokens | list $ | batch $ | prices $/M in, out (read) |",
           "|---|---|---:|---:|---:|---:|---:|---|"]
     seen = {}
@@ -584,7 +587,7 @@ def render(out: dict) -> str:
         f"{lab[a]} {tf[a]['unflagged_errors']} on the test boxes, {df[a]['unflagged_errors']} held out on the "
         "development boxes" for a in tf) + "), so a difference of one or two errors is within noise, and a zero "
         "on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, "
-        "labelled as measured on five boxes of one archive.")
+        "labelled as measured on two locked boxes (363 pages) of one archive.")
     L.append("- The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took "
              "the same decision on every gap), which is why combining them adds little over Claude alone.")
     L.append("")
