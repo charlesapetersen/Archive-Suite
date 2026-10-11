@@ -255,14 +255,15 @@ class Fatal(RuntimeError):
     pass
 
 
-def post(verb: str, body: dict) -> dict:
-    """POST with back-off on 429/5xx/network errors. Errors name the status, never the key."""
+def post(verb: str, body: dict, model: str | None = None, timeout_s: int | None = None) -> dict:
+    """POST with back-off on 429/5xx/network errors. Errors name the status, never the key.
+    ``model``/``timeout_s`` default to this module's; method_whole passes its own."""
     import requests
-    url = API.format(model=MODEL, verb=verb)
+    url = API.format(model=model or MODEL, verb=verb)
     last = None
     for attempt in range(MAX_ATTEMPTS):
         try:
-            r = requests.post(url, json=body, timeout=TIMEOUT_S,
+            r = requests.post(url, json=body, timeout=timeout_s or TIMEOUT_S,
                               headers={"x-goog-api-key": api_key(), "Content-Type": "application/json"})
         except requests.RequestException as e:
             last = f"network: {type(e).__name__}"

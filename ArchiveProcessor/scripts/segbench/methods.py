@@ -227,3 +227,6 @@ import method_window  # noqa: E402,F401
 
 # W36.seg-second: approach B, Gemini Flash-Lite over the same windows; adds itself to METHODS.
 import method_gemini  # noqa: E402,F401
+
+# W36.seg-whole: approach C, one long-context Gemini call per folder; adds itself to METHODS.
+import method_whole  # noqa: E402,F401
