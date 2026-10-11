@@ -623,6 +623,10 @@ class NotesFixtureUITestCase: XCTestCase {
     func copyPassageOutcome(timeout: TimeInterval = 8) -> String {
         seamOutcome("an.editor.test.copyPassage", timeout: timeout)
     }
+    /// The image paste's verdict (W9.g4-flake) — "ok store=… sel=…" or "declined:<guard> …".
+    func pasteImageOutcome(timeout: TimeInterval = 8) -> String {
+        seamOutcome("an.editor.test.pasteImage", timeout: timeout)
+    }
 
     /// Read the DEBUG snapshot of note-passage chips from this window's rendered text storage. The
     /// attachment-view-provider chip is absent from the accessibility tree, so its label/tint cannot be
@@ -1186,13 +1190,20 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertTrue(pb.setData(png, forType: .png), "should seed the pasteboard with PNG bytes")
         XCTAssertTrue(pasteImageViaSeam(),
                       "the DEBUG image-paste seam must be drivable (an.editor.test.pasteImage)")
+        // The paste's own verdict (W9.g4-flake): a decline and a paste whose bytes never landed used to be
+        // one observation ("no asset within 10 s"). Every assertion below carries it.
+        let outcome = pasteImageOutcome()
+        let target = String(uuid.prefix(8)).uppercased()
+        XCTAssertTrue(outcome.hasPrefix("ok "), "the image paste should be handled — got \(outcome)")
+        XCTAssertTrue(outcome.contains("store=\(target)"),
+                      "the asset store should target the plain note (\(target)) — got \(outcome)")
 
         // The `![](…)` reference is flushed synchronously by the coordinator; the asset bytes land on a
         // background Task shortly after. Poll both on disk.
         XCTAssertTrue(pollUntil(timeout: 10) { newPastedAsset() != nil },
-                      "an assets/pasted-….png file should be written into the item")
+                      "an assets/pasted-….png file should be written into the item — paste said \(outcome)")
         XCTAssertTrue(pollUntil(timeout: 10) { referenceOnDisk() },
-                      "the note .md should gain an ![](assets/pasted-…) inline-image reference")
+                      "the note .md should gain an ![](assets/pasted-…) inline-image reference — paste said \(outcome)")
         // (Left on disk — the runner can't delete under /Users/; wiped by the next pre-run fixture rebuild.)
     }
 
@@ -2299,8 +2310,9 @@ final class NotesGUITests: NotesFixtureUITestCase {
         pb.clearContents()
         XCTAssertTrue(pb.setData(png, forType: .png), "should seed the pasteboard with PNG bytes")
         XCTAssertTrue(pasteImageViaSeam(), "the DEBUG image-paste seam must be drivable")
+        let imageOutcome = pasteImageOutcome()
         XCTAssertTrue(pollUntil(timeout: 12) { newAsset(in: Self.idPlain, since: sourceAssetsBefore) != nil },
-                      "the pasted image should land in the source note's assets/")
+                      "the pasted image should land in the source note's assets/ — paste said \(imageOutcome)")
         guard let sourceAsset = newAsset(in: Self.idPlain, since: sourceAssetsBefore),
               let sourceBytes = assetBytes(Self.idPlain, sourceAsset), !sourceBytes.isEmpty else {
             return XCTFail("should read the pasted asset's bytes back out of the source note")

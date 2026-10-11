@@ -59,6 +59,8 @@ struct NoteEditorPane: View {
     @State private var testPasteOutcome = "-"
     /// Same for the COPY half — it was the other silent seam (W21.vmgui-g13).
     @State private var testCopyOutcome = "-"
+    /// Same for the IMAGE paste (W9.g4-flake).
+    @State private var testPasteImageOutcome = "-"
 #endif
 
     var body: some View {
@@ -259,8 +261,9 @@ struct NoteEditorPane: View {
                     .accessibilityIdentifier("an.editor.test.select")
                 }
                 HStack(spacing: 2) {
-                    Button("pasteImg") { testBox.pasteImage?() }
+                    Button("pasteImg") { testPasteImageOutcome = testBox.pasteImage?() ?? "declined:seamNil" }
                         .accessibilityIdentifier("an.editor.test.pasteImage")
+                        .accessibilityValue(testPasteImageOutcome)
                     Button("jump") { testBox.jumpFirstPassage?() }
                         .accessibilityIdentifier("an.editor.test.jump")
                     Button("reveal") {

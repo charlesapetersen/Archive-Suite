@@ -21,7 +21,10 @@ final class EditorTestBox {
     var replaceMarkdown: ((String) -> Void)?
     var insertMarkdown: ((String) -> Void)?
     var setSelection: ((Int, Int) -> Void)?
-    var pasteImage: (() -> Void)?
+    /// Returns a DIAGNOSIS, not Void (W9.g4-flake) — the image paste has the same silent-decline shape as
+    /// `pastePassage`: `tryPasteImage` answers through a `Bool` this seam used to drop with `_ =`, so a G4
+    /// failure could not say whether the paste declined or the bytes never landed.
+    var pasteImage: (() -> String)?
     var jumpFirstPassage: (() -> Void)?
     var revealFirstSource: (() -> Void)?
     var openFirstZotero: (() -> Void)?
@@ -147,7 +150,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             coordinator?.uiTestSetSelection(loc, len)
         }
         testBox?.pasteImage = { [weak coordinator = context.coordinator] in
-            _ = coordinator?.uiTestPasteImage()
+            coordinator?.uiTestPasteImage() ?? "declined:noCoordinator"
         }
         testBox?.jumpFirstPassage = { [weak coordinator = context.coordinator] in
             _ = coordinator?.uiTestJumpFirstPassage()
@@ -787,13 +790,31 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         /// Drive the real image-paste path from the general pasteboard (G4) without ⌘V focus routing, then
         /// flush so the `![](…)` inline reference is on disk immediately (the asset bytes persist on a
-        /// background task, so the file lands shortly after). Returns whether an image was handled.
-        @discardableResult
-        func uiTestPasteImage() -> Bool {
-            guard let textView else { return false }
+        /// background task, so the file lands shortly after).
+        ///
+        /// Returns a DIAGNOSIS (W9.g4-flake), like `uiTestPastePassage`: the outcome, and on a decline which
+        /// of `tryPasteImage`'s guards said no, re-read afterwards from state the declining path did not
+        /// mutate. `store=` is the asset store's target item and `sel=` the pane's selected item — they must
+        /// agree, or the bytes went into another note's `assets/`.
+        func uiTestPasteImage() -> String {
+            guard let textView else { return "declined:noTextView" }
             let handled = textView.uiTestPasteImage()
-            if handled { flushWriteBack() }
-            return handled
+            let store = textView.assetStore
+            let target: String
+            if let item = store as? ItemAssetStore {
+                target = item.itemID.map { String($0.uuidString.prefix(8)) } ?? "noItem"
+            } else {
+                target = store == nil ? "nil" : "other"
+            }
+            let sel = formattingContext?.currentItemID.map { String($0.uuidString.prefix(8)) } ?? "nil"
+            let state = "store=\(target) sel=\(sel)"
+            if handled { flushWriteBack(); return "ok \(state)" }
+            if store == nil { return "declined:noAssetStore \(state)" }
+            let pb = NSPasteboard.general
+            if pb.data(forType: .png) == nil, pb.data(forType: .tiff) == nil {
+                return "declined:noImageOnPasteboard \(state)"
+            }
+            return "declined:addAssetFailed \(state)"
         }
 
         /// Fire the first note-passage chip's Jump-to-Source callback (G10) — read-only navigation, so no
