@@ -37,6 +37,7 @@ targets:
     platform: macOS
     sources:
       - Sources/ArchiveReader
+      - path: ../../packages/UITestSupport/App   # W40.e9 DEBUG appearance seam for the layout guard
     dependencies:
       - package: ArchiveCore
     settings:
@@ -75,6 +76,7 @@ targets:
     platform: macOS
     sources:
       - Tests/ArchiveReaderUITests
+      - path: ../../packages/UITestSupport/Runner   # W40.e9 layout guard, shared by every UI suite
     dependencies:
       - target: ArchiveReader
     settings:

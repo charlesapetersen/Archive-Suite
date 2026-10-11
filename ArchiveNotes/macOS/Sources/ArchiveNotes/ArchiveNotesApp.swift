@@ -19,7 +19,14 @@ struct ArchiveNotesApp: App {
 
     /// Demote the process when it is only acting as a unit-test host, so `xcodebuild test
     /// -only-testing:ArchiveNotesTests` never takes the owner's screen (→ `ArchiveTestHost`).
-    init() { MainActor.assumeIsolated { ArchiveTestHost.suppressWindowsIfUnitTestHost() } }
+    init() {
+        MainActor.assumeIsolated {
+            ArchiveTestHost.suppressWindowsIfUnitTestHost()
+#if DEBUG
+            UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
+#endif
+        }
+    }
 
     var body: some Scene {
         // Under a unit-test host both auto-opening windows render `HiddenWindowStub` instead of their

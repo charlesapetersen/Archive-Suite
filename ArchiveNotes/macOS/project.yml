@@ -29,6 +29,7 @@ targets:
     platform: macOS
     sources:
       - Sources/ArchiveNotes
+      - path: ../../packages/UITestSupport/App   # W40.e9 DEBUG appearance seam for the layout guard
     dependencies:
       - package: ArchiveCore
         product: ArchiveCore
@@ -66,6 +67,7 @@ targets:
     platform: macOS
     sources:
       - Tests/ArchiveNotesUITests
+      - path: ../../packages/UITestSupport/Runner   # W40.e9 layout guard, shared by every UI suite
     dependencies:
       - target: ArchiveNotes
     settings:
