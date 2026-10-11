@@ -49,10 +49,21 @@ them as exact numbers, so the app cannot carry one fixed conversion. The approac
   labelled as approximate.
 - The owner's own plan is one worked example in the results, never the rule.
 
-Two things are not yet known and are the first job of the work: whether the app can technically run segmentation
-through a user's installed `claude` or `codex` command-line tool, and whether the providers' terms allow an app
-to use a subscription that way. If either answer is no, the subscription route is dropped and the app shows API
-costs only. The bench's Claude calls already ran this way, on the owner's subscription.
+**Answered 2026-10-11** (`W36.seg-opt-usage`; detail and sources in
+`ArchiveProcessor/segbench-results/usage.md`):
+
+- **Claude: yes, on both counts.** Anthropic's terms allow a user to sign in to the unmodified `claude` tool with
+  their own plan, also inside another product. They forbid an app to offer its own Claude login or to touch the
+  user's credentials. So the Processor runs the user's own `claude`, never reads the login, and reads the meter
+  from the tool's own output.
+- **ChatGPT: yes, but by Sign in with ChatGPT, not the `codex` tool.** OpenAI offers ChatGPT-plan usage to
+  open-source apps that run locally. It gives no such grant for an app driving the user's `codex` login, and its
+  terms steer programmatic use to API keys. Sign in with ChatGPT has no usage meter an app can read, so the app
+  shows the token figure and the user's own "Manage usage" link.
+- **The meter is in whole percent.** A 20-page sample moves it about one point, which is too little to read. So the
+  first stretch of the real run is the measurement: about 50 pages, until the meter has moved 3 points.
+- **On your plan**, Claude windows used about **5% of a five-hour window and 0.5% of the week per 100 pages**
+  (Dean box, 202 pages: 27% → 37% and 75% → 76%). That is close to your own guess.
 
 ### What it will not do
 
@@ -98,6 +109,10 @@ per approach**, with the method and threshold fixed on the development boxes fir
   sources cited. If yes, specify the sample-and-meter calibration, the fallback by plan tier and how each is
   labelled, and give the owner's plan as a worked example from the measured tokens. If no, say so; the route is
   dropped and `W36.seg-opt-subscription` is closed as not possible.
+  ✅ Shipped 2026-10-11: `ArchiveProcessor/segbench-results/usage.md` (bench: `scripts/segbench/usage_calibrate.py`).
+  Claude permitted on four conditions, and ChatGPT by Sign in with ChatGPT only; ChatGPT split to
+  `W36.seg-opt-siwc`. The calibration spec and the owner's plan (5% of a five-hour window per 100 pages) are in that
+  file.
 - **`W36.seg-opt-design`** — the design note [S · ~1 session] (uses: light) (blocked-on: W36.seg-opt-measure,
   W36.seg-opt-usage). How the user chooses an approach in the Processor, how the figures are shown and scaled to
   the folder's page count, how the review of flagged boundaries works, and where the shipped figures live.
@@ -112,7 +127,15 @@ per approach**, with the method and threshold fixed on the development boxes fir
   W36.seg-opt-engine). Page n beside page n+1; keep, split or join; the unflagged boundaries stay in the review
   sheet.
 - **`W36.seg-opt-subscription`** — the subscription route [M · ~1-2 sessions] (uses: build) (blocked-on:
-  W36.seg-opt-usage, W36.seg-opt-engine). Only if `W36.seg-opt-usage` found it possible and permitted.
+  W36.seg-opt-usage, W36.seg-opt-engine). Claude only, through the user's installed `claude`, under the four
+  conditions and the calibration spec in `segbench-results/usage.md`. It switches `LocalAgentClient` to
+  `--output-format stream-json` so each call carries the meter (`rate_limit_event`). The app never reads the
+  Keychain login.
+- **`W36.seg-opt-siwc`** — ChatGPT by Sign in with ChatGPT [M · ~1-2 sessions] (uses: build) (blocked-on:
+  W36.seg-opt-openai, W36.seg-opt-engine). OpenAI's sanctioned route for open-source, locally run apps, never the
+  user's `codex` login. The app shows "Using ChatGPT plan" and a "Manage usage" link. With no app-readable meter,
+  the cost is the token figure and its notional API price, labelled approximate. The requirements to meet are in
+  `segbench-results/usage.md` and OpenAI's cookbook page. Not a prerequisite of `W36.seg-opt-proof`.
 - **`W36.seg-opt-proof`** — prove it end to end [S-M · ~1 session] (uses: build,vm,paid) (blocked-on:
   W36.seg-opt-chooser, W36.seg-opt-review, W36.seg-opt-subscription). The GUI proof in the VM, and one small real
   folder per provider (cents). Then `W40.b3` and `W40.d1`–`d4` may start.

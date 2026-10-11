@@ -10474,3 +10474,14 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   independent scorer from the caches): every test, token and cost figure reproduced; three wording fixes applied.
   Python: `uv run -q --python 3.12 --with numpy --with requests python options.py …` (system python has no numpy).
   <!-- /W36.seg-opt-measure -->
+- [x] **W36.seg-opt-usage — can the subscription route work, and how is its cost shown [S-M · ~1 session]** · §Archive Processor — automatic segmentation · SHIPPED 2026-10-11
+  `ArchiveProcessor/segbench-results/usage.md`, bench `scripts/segbench/usage_calibrate.py`. Possible and permitted:
+  Claude through the user's own unmodified `claude` (code.claude.com legal-and-compliance: end users may sign in to
+  the unmodified binary with their own plan; apps may not offer Claude login or collect/intermediate credentials →
+  the Processor must never read the Keychain login and reads the meter from `stream-json`'s `rate_limit_event`);
+  ChatGPT only by Sign in with ChatGPT (open-source local apps), not the user's `codex` login → `W36.seg-opt-siwc`.
+  Meter is whole-percent, so a 20-page sample is unreadable; calibration = the run's first stretch until the
+  five-hour meter moves 3 points (or 100 pages), as points per notional `total_cost_usd`, stored and refined per run.
+  Owner's plan, Dean (202 pages, 68 Sonnet 5.5 windows, idle control flat): five-hour 27→37%, weekly 75→76%,
+  $10.22 notional → ~5% of a five-hour window and ~0.5% of the week per 100 pages, ~1 point per $0.98.
+  <!-- /W36.seg-opt-usage -->

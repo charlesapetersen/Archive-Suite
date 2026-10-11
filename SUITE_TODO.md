@@ -863,12 +863,12 @@ The build, from `04-options-build.md` Part 2 (the Processor's `W40.b3` and `W40.
 
 - [ ] **`W36.seg-opt-openai` — the ChatGPT figures, once a route exists [S · ~1 session]** (lane: segbench) (uses: paid) (blocked-on: W36.seg-opt-openai-owner-ok). Split from `W36.seg-opt-measure` 2026-10-11: no OpenAI API key in the Keychain, and the Codex workspace is out of credits. The OpenAI window voter on all five boxes through `scripts/segbench/options.py` (level frozen on the development boxes before the test calls; mix re-ranked with it), filling the `openai` row of `segbench-results/options.json`. Cost stated before the run.
 - [ ] **`W36.seg-opt-openai-owner-ok` — owner: a capped OpenAI key, Codex credits, or drop ChatGPT? — OWNER.** In the plan's HOLD QUEUE and Daemon Report.
-- [ ] **`W36.seg-opt-usage` — can the subscription route work, and how is its cost shown [S-M · ~1 session]** (lane: segbench) (uses: light).
 - [ ] **`W36.seg-opt-design` — the design note [S · ~1 session]** (lane: segbench) (uses: light) (blocked-on: W36.seg-opt-measure, W36.seg-opt-usage).
 - [ ] **`W36.seg-opt-engine` — a provider-neutral window segmenter [M · ~2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-design).
 - [ ] **`W36.seg-opt-chooser` — the approach chooser [M · ~1-2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-engine).
 - [ ] **`W36.seg-opt-review` — the review of flagged boundaries [M · ~2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-engine).
 - [ ] **`W36.seg-opt-subscription` — the subscription route, only if possible and permitted [M · ~1-2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-usage, W36.seg-opt-engine).
+- [ ] **`W36.seg-opt-siwc` — ChatGPT by Sign in with ChatGPT [M · ~1-2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-openai, W36.seg-opt-engine). Filed by `W36.seg-opt-usage` 2026-10-11: OpenAI's sanctioned route for open-source local apps, never the user's `codex` login; requirements in `ArchiveProcessor/segbench-results/usage.md`.
 - [ ] **`W36.seg-opt-proof` — prove it end to end [S-M · ~1 session]** (lane: processor) (uses: build,vm,paid) (blocked-on: W36.seg-opt-chooser, W36.seg-opt-review, W36.seg-opt-subscription).
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
