@@ -7,6 +7,7 @@
     python options.py collect-test --final # those calls (cached); the paid step
     python options.py final --final        # score the frozen approaches on the test set, once; writes
                                            # segbench-results/options.md and options.json
+    python options.py render               # options.md again from options.json (no scoring)
 
 THE APPROACHES (owner, 2026-10-11; execution-plans/segmentation/04-options-build.md):
 - ``manual``: the Processor's modes today; nothing proposed, every boundary judged by the user.
@@ -61,7 +62,6 @@ import compare_gemini as CG
 import ensemble as E
 import method_gemini as G
 import method_window as W
-from score import score_labels
 
 # window-gemini at gemini-3.8-flash/low for the whole process (method_gemini's globals; W36.seg-second's
 # Flash-Lite voter L is therefore NOT available in this process and is not used)
@@ -465,13 +465,11 @@ def final() -> str:
         "note": "Nothing is proposed: the user judges every gap between two document pages. 'After review' "
                 "assumes the user's own judgement is right."})
     labels = {"claude": "Claude only", "gemini": "Gemini only", "mix": "Claude and Gemini together"}
-    rows = {}
     for a, f in fz["approaches"].items():
         S, v = tuple(f["voters"]), f["level"]
         with rule(f["rule"]):
             per = [E.evaluate(test[n], S, 2.0 if v is None else v) | {"name": n} for n in data.TEST]
         p = E.pooled(per)
-        rows[a] = (per, p)
         tok = {c: use[c] for c in S}
         cs = {c: cost(use[c]) for c in S}
         total = {"list_usd_per_1000_pages": sum(x["list_usd_per_1000_pages"] for x in cs.values()),
@@ -495,86 +493,108 @@ def final() -> str:
                   "with no review, level with Claude and Gemini on that box (cues-models-Deaver.md).",
         "figures": None, "tokens_per_1000_pages": None, "cost": None})
     OUT_JSON.write_text(json.dumps(out, indent=1) + "\n")
+    return render(out)
 
-    # markdown
-    def fig_row(a, f, c):
-        t = f["test"]
+
+def render(out: dict) -> str:
+    """options.md from options.json alone, so the page can be rebuilt without touching the test scoring."""
+    aps = {a["id"]: a for a in out["approaches"]}
+    model_aps = [a for a in out["approaches"] if a["available"] and a["id"] != "manual"]
+    t0 = aps["manual"]["figures"]["test"]
+
+    def fig_row(ap):
+        t, c = ap["figures"]["test"], ap["cost"]
         nr = "—" if t["pages_exact_no_review"] is None else E.pct(t["pages_exact_no_review"])
-        lc = "none" if c is None else f"{_money(c['total']['list_usd_per_1000_pages'])} / " \
-                                      f"{_money(c['total']['batch_usd_per_1000_pages'])}"
-        return (f"| {a} | {nr} | {t['flagged_per_100_pages']:.1f} | {E.pct(t['pages_exact_after_review'])} | "
+        lc = "none" if c is None else (f"{_money(c['total']['list_usd_per_1000_pages'])} / "
+                                       f"{_money(c['total']['batch_usd_per_1000_pages'])}")
+        return (f"| {ap['label']} | {nr} | {t['flagged_per_100_pages']:.1f} | {E.pct(t['pages_exact_after_review'])} | "
                 f"{t['unflagged_errors_per_500_pages']:.1f} ({t['unflagged_errors']}) | {lc} |")
 
     L = ["# Segmentation approaches — the figures the Processor will show", "",
          f"W36.seg-opt-measure, run {out['measured']}. Data for the app: `options.json` beside this file. Method: "
          "`scripts/segbench/options.py`; the development-set detail is `options-dev.md`.", "",
-         f"**Measured on the locked boxes, Stanton and RG 165 ({tpages} pages, {tgaps} gaps between two document "
-         "pages), scored once**, with each approach's flag level and the mix rule frozen on the development boxes "
-         "(Dean, Deaver, Herrnstein) before those boxes' new calls were made (`options-frozen.json`, committed "
-         "first). Truth photo labels. Claude's test-box answers were collected for W36.seg-ensemble and its level "
-         "(0.85) is the same one; Gemini 3.8 Flash's test-box windows are new.", "",
+         f"**Measured on the locked boxes, Stanton and RG 165 ({t0['pages']} pages, {t0['gaps']} gaps between two "
+         "document pages), scored once**, with each approach's flag level and the mix rule frozen on the "
+         "development boxes (Dean, Deaver, Herrnstein) before those boxes' new calls were made "
+         "(`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected "
+         "for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's "
+         "test-box windows are new.", "",
          "## The five figures, per approach (test boxes)", "",
          "| approach | pages in an exact document, no checking | boundaries to check per 100 pages | pages right "
          "after checking | unflagged errors per 500 pages (count) | API cost per 1,000 pages, list / batch |",
          "|---|---:|---:|---:|---:|---:|"]
     for ap in out["approaches"]:
-        if ap["available"]:
-            L.append(fig_row(ap["label"], ap["figures"], ap["cost"]))
-        else:
-            L.append(f"| {ap['label']} | not measured | | | | |")
+        L.append(fig_row(ap) if ap["available"] else f"| {ap['label']} | not measured | | | | |")
     L += ["", "## Held out on the development boxes (each box at the level fitted on the other two)", "",
           "| approach | rule, level for the test | no checking | to check per 100 pages | after checking | "
           "unflagged per 500 pages |", "|---|---|---:|---:|---:|---:|"]
-    for ap in out["approaches"]:
-        if ap["available"] and ap["id"] != "manual":
-            d = ap["figures"]["dev_held_out"]
-            L.append(f"| {ap['label']} | {ap['rule']}, {E.lv(ap['level'])} | {E.pct(d['pages_exact_no_review'])} | "
-                     f"{d['flagged_per_100_pages']:.1f} | {E.pct(d['pages_exact_after_review'])} | "
-                     f"{d['unflagged_errors_per_500_pages']:.1f} |")
+    for ap in model_aps:
+        d = ap["figures"]["dev_held_out"]
+        L.append(f"| {ap['label']} | {ap['rule']}, {E.lv(ap['level'])} | {E.pct(d['pages_exact_no_review'])} | "
+                 f"{d['flagged_per_100_pages']:.1f} | {E.pct(d['pages_exact_after_review'])} | "
+                 f"{d['unflagged_errors_per_500_pages']:.1f} |")
     L += ["", "## By test box", "", "| approach | box | pages | no checking | flagged | per 100 pages | "
           "after checking | unflagged errors |", "|---|---|---:|---:|---:|---:|---:|---:|"]
-    for a, (per, _) in rows.items():
-        for r in per:
-            L.append(f"| {labels[a]} | {r['name']} | {r['pages']} | {E.pct(E.pe(r['auto']))} | {r['flagged']} | "
-                     f"{100 * r['flagged'] / r['pages']:.1f} | {E.pct(E.pe(r['rev']))} | {r['acc_err']} |")
+    for ap in model_aps:
+        for n, r in ap["figures"]["test_by_box"].items():
+            L.append(f"| {ap['label']} | {n} | {r['pages']} | {E.pct(r['pages_exact_no_review'])} | {r['flagged']} | "
+                     f"{r['flagged_per_100_pages']:.1f} | {E.pct(r['pages_exact_after_review'])} | "
+                     f"{r['unflagged_errors']} |")
     L += ["", "## Tokens and cost per 1,000 pages", "",
           "Measured over every box collected (all five), not tuned on anything. Gemini: the API's own usage "
           "figures. Claude: each window rebuilt as one Messages API request and counted with count_tokens (free); "
           "the bench itself ran through `claude -p`, whose notional list-price figure is shown for the "
-          "subscription route.", "",
+          "subscription route. A mix pays for both models.", "",
           "| model | boxes | calls | input tokens | output tokens | list $ | batch $ | prices $/M in, out (read) |",
           "|---|---|---:|---:|---:|---:|---:|---|"]
-    for c in "CG":
-        u, k = use[c], cost(use[c])
+    seen = {}
+    for ap in model_aps:
+        for code, u in ap["tokens_per_1000_pages"].items():
+            seen.setdefault(code, (u, ap["cost"]["per_model"][code]))
+    for code, (u, k) in seen.items():
         L.append(f"| {u['model']}{'/' + u['thinking'] if 'thinking' in u else ''} | {', '.join(u['boxes'])} | "
                  f"{u['calls']} | {_k(u['input_per_1000_pages'])} | {_k(u['output_per_1000_pages'])} | "
-                 f"{_money(k.get('list_usd_per_1000_pages'))} | {_money(k.get('batch_usd_per_1000_pages'))} | "
+                 f"{_money(k['list_usd_per_1000_pages'])} | {_money(k['batch_usd_per_1000_pages'])} | "
                  f"{k['prices_usd_per_mtok']['in']}, {k['prices_usd_per_mtok']['out']} ({k['price_read']}) |")
-    g = cost(use["G"]).get("after_2026_12_31")
+    g = seen.get("G", (None, {}))[1].get("after_2026_12_31")
     if g:
-        L.append("")
-        L.append(f"Gemini 3.8 Flash is at its introductory price to 31 Dec 2026; at the later $1.50 / $7.50 the "
-                 f"Gemini figure becomes {_money(g['list_usd_per_1000_pages'])} list, "
-                 f"{_money(g['batch_usd_per_1000_pages'])} batch.")
-    n = use["C"].get("subscription_route_notional_usd_per_1000_pages")
+        L += ["", f"Gemini 3.8 Flash is at its introductory price to 31 Dec 2026; at the later $1.50 / $7.50 the "
+                  f"Gemini figure becomes {_money(g['list_usd_per_1000_pages'])} list, "
+                  f"{_money(g['batch_usd_per_1000_pages'])} batch."]
+    n = seen.get("C", ({}, None))[0].get("subscription_route_notional_usd_per_1000_pages")
     if n:
-        L.append("")
-        L.append(f"Claude through `claude -p` (the subscription route, about 8 agent turns a window as the images "
-                 f"are read with a tool): the CLI's notional list price is {_money(n)} per 1,000 pages. A "
-                 "subscription is not charged that; it is the size of the usage the route draws, which "
-                 "W36.seg-opt-usage turns into a share of a plan's windows.")
-    L += ["", "## Not measured: ChatGPT", "", next(a for a in out["approaches"] if a["id"] == "openai")["reason"],
-          "", "## Reading", "",
-          "Manual is the floor every other approach is measured against: no cost, every gap a decision for the user. "
-          "The model approaches are first drafts; 'unflagged errors' are the mistakes the user is never shown, and "
-          "no approach here reaches zero.", ""]
+        L += ["", f"Claude through `claude -p` (the subscription route, about 8 agent turns a window as the images "
+                  f"are read with a tool): the CLI's notional list price is {_money(n)} per 1,000 pages. A "
+                  "subscription is not charged that; it is the size of the usage the route draws, which "
+                  "W36.seg-opt-usage turns into a share of a plan's windows."]
+    L += ["", "## Not measured: ChatGPT", "", aps["openai"]["reason"], "", "## Reading", ""]
+    tf = {a["id"]: a["figures"]["test"] for a in model_aps}
+    df = {a["id"]: a["figures"]["dev_held_out"] for a in model_aps}
+    lab = {a["id"]: a["label"] for a in model_aps}
+    least_err = min(tf, key=lambda a: (tf[a]["unflagged_errors"], tf[a]["flagged_per_100_pages"]))
+    least_chk = min(tf, key=lambda a: (tf[a]["flagged_per_100_pages"], tf[a]["unflagged_errors"]))
+    L.append(f"- Manual asks about every gap between two document pages ({t0['flagged_per_100_pages']:.0f} per 100 "
+             "pages on these boxes) and costs nothing; it is the floor the others are measured against.")
+    L.append(f"- On the test boxes the fewest checks were {lab[least_chk]}'s "
+             f"({tf[least_chk]['flagged_per_100_pages']:.1f} per 100 pages, {tf[least_chk]['unflagged_errors']} "
+             f"unflagged errors), and the fewest unflagged errors {lab[least_err]}'s "
+             f"({tf[least_err]['unflagged_errors']}, at {tf[least_err]['flagged_per_100_pages']:.1f} checks per 100 "
+             "pages). The trade-off is the level: a higher one flags more and leaves less.")
+    L.append("- Every count here is small (" + ", ".join(
+        f"{lab[a]} {tf[a]['unflagged_errors']} on the test boxes, {df[a]['unflagged_errors']} held out on the "
+        "development boxes" for a in tf) + "), so a difference of one or two errors is within noise, and a zero "
+        "on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, "
+        "labelled as measured on five boxes of one archive.")
+    L.append("- The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took "
+             "the same decision on every gap), which is why combining them adds little over Claude alone.")
+    L.append("")
     text = "\n".join(L) + "\n"
     OUT_MD.write_text(text)
     return text
 
 
 def main(argv) -> int:
-    cmds = ("tokens-claude", "report", "estimate-test", "collect-test", "final")
+    cmds = ("tokens-claude", "report", "estimate-test", "collect-test", "final", "render")
     if not argv or argv[0] not in cmds:
         print(__doc__)
         return 2
@@ -591,6 +611,8 @@ def main(argv) -> int:
         estimate_test()
     elif cmd == "collect-test":
         collect_test()
+    elif cmd == "render":
+        print(render(json.loads(OUT_JSON.read_text())))
     else:
         print(final())
     return 0

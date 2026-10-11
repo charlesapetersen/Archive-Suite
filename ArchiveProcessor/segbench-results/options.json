@@ -1,0 +1,377 @@
+{
+ "version": 1,
+ "measured": "2026-10-11",
+ "item": "W36.seg-opt-measure",
+ "method": "ArchiveProcessor/scripts/segbench/options.py",
+ "bar_after_review": 0.98,
+ "window": {
+  "pages": 7,
+  "stride": 3,
+  "each_gap_judged": 2,
+  "thumbnail_long_edge_px": 1600,
+  "ocr_text_chars_per_page": 2500
+ },
+ "figures_note": "test = Stanton + RG 165, scored once with the level frozen on the development boxes (Dean, Deaver, Herrnstein); dev_held_out = each development box at the level fitted on the other two. Fractions, not percentages. Truth photo labels: only the gaps between two document pages are counted as boundaries the user may be asked about.",
+ "approaches": [
+  {
+   "id": "manual",
+   "label": "Full manual",
+   "available": true,
+   "voters": [],
+   "rule": null,
+   "level": null,
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 315,
+     "pages_exact_no_review": null,
+     "flagged_per_100_pages": 86.77685950413223,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 494,
+     "pages_exact_no_review": null,
+     "flagged_per_100_pages": 89.65517241379311,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
+    }
+   },
+   "tokens_per_1000_pages": null,
+   "cost": null,
+   "note": "Nothing is proposed: the user judges every gap between two document pages. 'After review' assumes the user's own judgement is right."
+  },
+  {
+   "id": "claude",
+   "label": "Claude only",
+   "available": true,
+   "voters": [
+    "window-claude (Claude Sonnet 5.5, prompt w1)"
+   ],
+   "rule": "min",
+   "level": 0.85,
+   "flag_rule": "flag a gap whose confidence is at or below the level",
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 37,
+     "pages_exact_no_review": 0.8696969696969697,
+     "flagged_per_100_pages": 10.192837465564738,
+     "pages_exact_after_review": 0.9727272727272728,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 4.132231404958677
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 32,
+      "pages_exact_no_review": 0.8683127572016461,
+      "flagged_per_100_pages": 12.8,
+      "pages_exact_after_review": 0.9711934156378601,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 5,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 4.424778761061947,
+      "pages_exact_after_review": 0.9770114942528736,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 4.424778761061947
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 32,
+     "pages_exact_no_review": 0.9073359073359073,
+     "flagged_per_100_pages": 5.807622504537205,
+     "pages_exact_after_review": 0.9903474903474904,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 1.8148820326678765
+    }
+   },
+   "tokens_per_1000_pages": {
+    "C": {
+     "model": "claude-sonnet-5-5",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 914,
+     "calls": 310,
+     "input_per_1000_pages": 7724080.962800875,
+     "output_per_1000_pages": 148419.03719912472,
+     "subscription_route_notional_usd_per_1000_pages": 50.28623719912472,
+     "how": "count_tokens on each window rebuilt as one Messages API request (images inline); output = the cached answer's token count"
+    }
+   },
+   "cost": {
+    "per_model": {
+     "C": {
+      "list_usd_per_1000_pages": 16.932352297593,
+      "batch_usd_per_1000_pages": 8.4661761487965,
+      "prices_usd_per_mtok": {
+       "in": 2.0,
+       "out": 10.0,
+       "batch_in": 1.0,
+       "batch_out": 5.0
+      },
+      "price_read": "2026-10-11",
+      "price_source": "https://platform.claude.com/docs/en/about-claude/pricing"
+     }
+    },
+    "total": {
+     "list_usd_per_1000_pages": 16.932352297593,
+     "batch_usd_per_1000_pages": 8.4661761487965
+    }
+   }
+  },
+  {
+   "id": "gemini",
+   "label": "Gemini only",
+   "available": true,
+   "voters": [
+    "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"
+   ],
+   "rule": "min",
+   "level": 0.965,
+   "flag_rule": "flag a gap whose confidence is at or below the level",
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 88,
+     "pages_exact_no_review": 0.8878787878787879,
+     "flagged_per_100_pages": 24.242424242424242,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 77,
+      "pages_exact_no_review": 0.8930041152263375,
+      "flagged_per_100_pages": 30.8,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 11,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 9.734513274336283,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 57,
+     "pages_exact_no_review": 0.9073359073359073,
+     "flagged_per_100_pages": 10.344827586206897,
+     "pages_exact_after_review": 0.9864864864864865,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 2.722323049001815
+    }
+   },
+   "tokens_per_1000_pages": {
+    "G": {
+     "model": "gemini-3.8-flash",
+     "thinking": "low",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 914,
+     "calls": 310,
+     "input_per_1000_pages": 3942084.2450765865,
+     "output_per_1000_pages": 174485.77680525163,
+     "spent_usd": 3.300349,
+     "how": "the usage the Gemini API returned on every logged call, retries and parse failures included; thinking tokens counted as output"
+    }
+   },
+   "cost": {
+    "per_model": {
+     "G": {
+      "list_usd_per_1000_pages": 3.6108848468271337,
+      "batch_usd_per_1000_pages": 1.8054424234135669,
+      "prices_usd_per_mtok": {
+       "in": 0.75,
+       "out": 3.75,
+       "batch_in": 0.375,
+       "batch_out": 1.875
+      },
+      "price_read": "2026-10-05",
+      "price_source": "Gemini API pricing page; introductory price to 2026-12-31, then $1.50 / $7.50",
+      "after_2026_12_31": {
+       "list_usd_per_1000_pages": 7.2217696936542675,
+       "batch_usd_per_1000_pages": 3.6108848468271337
+      }
+     }
+    },
+    "total": {
+     "list_usd_per_1000_pages": 3.6108848468271337,
+     "batch_usd_per_1000_pages": 1.8054424234135669
+    }
+   }
+  },
+  {
+   "id": "mix",
+   "label": "Claude and Gemini together",
+   "available": true,
+   "voters": [
+    "window-claude (Claude Sonnet 5.5, prompt w1)",
+    "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"
+   ],
+   "rule": "min",
+   "level": 0.85,
+   "flag_rule": "flag a gap unless every model agrees and the lowest confidence is above the level",
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 39,
+     "pages_exact_no_review": 0.8939393939393939,
+     "flagged_per_100_pages": 10.743801652892563,
+     "pages_exact_after_review": 0.9787878787878788,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 33,
+      "pages_exact_no_review": 0.9012345679012346,
+      "flagged_per_100_pages": 13.2,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 2.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 6,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 5.3097345132743365,
+      "pages_exact_after_review": 0.9770114942528736,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 4.424778761061947
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 33,
+     "pages_exact_no_review": 0.9073359073359073,
+     "flagged_per_100_pages": 5.9891107078039925,
+     "pages_exact_after_review": 0.9903474903474904,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 1.8148820326678765
+    }
+   },
+   "tokens_per_1000_pages": {
+    "C": {
+     "model": "claude-sonnet-5-5",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 914,
+     "calls": 310,
+     "input_per_1000_pages": 7724080.962800875,
+     "output_per_1000_pages": 148419.03719912472,
+     "subscription_route_notional_usd_per_1000_pages": 50.28623719912472,
+     "how": "count_tokens on each window rebuilt as one Messages API request (images inline); output = the cached answer's token count"
+    },
+    "G": {
+     "model": "gemini-3.8-flash",
+     "thinking": "low",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 914,
+     "calls": 310,
+     "input_per_1000_pages": 3942084.2450765865,
+     "output_per_1000_pages": 174485.77680525163,
+     "spent_usd": 3.300349,
+     "how": "the usage the Gemini API returned on every logged call, retries and parse failures included; thinking tokens counted as output"
+    }
+   },
+   "cost": {
+    "per_model": {
+     "C": {
+      "list_usd_per_1000_pages": 16.932352297593,
+      "batch_usd_per_1000_pages": 8.4661761487965,
+      "prices_usd_per_mtok": {
+       "in": 2.0,
+       "out": 10.0,
+       "batch_in": 1.0,
+       "batch_out": 5.0
+      },
+      "price_read": "2026-10-11",
+      "price_source": "https://platform.claude.com/docs/en/about-claude/pricing"
+     },
+     "G": {
+      "list_usd_per_1000_pages": 3.6108848468271337,
+      "batch_usd_per_1000_pages": 1.8054424234135669,
+      "prices_usd_per_mtok": {
+       "in": 0.75,
+       "out": 3.75,
+       "batch_in": 0.375,
+       "batch_out": 1.875
+      },
+      "price_read": "2026-10-05",
+      "price_source": "Gemini API pricing page; introductory price to 2026-12-31, then $1.50 / $7.50",
+      "after_2026_12_31": {
+       "list_usd_per_1000_pages": 7.2217696936542675,
+       "batch_usd_per_1000_pages": 3.6108848468271337
+      }
+     }
+    },
+    "total": {
+     "list_usd_per_1000_pages": 20.543237144420132,
+     "batch_usd_per_1000_pages": 10.271618572210066
+    }
+   }
+  },
+  {
+   "id": "openai",
+   "label": "ChatGPT only",
+   "available": false,
+   "reason": "Not measured: no OpenAI API key in the Keychain, and the Codex route answered 'Your workspace is out of credits' on 2026-10-11. Earlier, on one development box only (Deaver), Codex gpt-6.1-sol at reasoning low with the cues prompt put 97.9% of pages in an exact document with no review, level with Claude and Gemini on that box (cues-models-Deaver.md).",
+   "figures": null,
+   "tokens_per_1000_pages": null,
+   "cost": null
+  }
+ ]
+}
