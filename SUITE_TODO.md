@@ -866,7 +866,18 @@ the owner's decision, then a build only if the result is usable. The Processor l
 (`W40.b3`, `W40.d1`-`d4`) wait on `W36.seg-decision`; `W40.a1` no longer does (2026-10-07). Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (lane: segbench) (uses: light) (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
+- [x] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER.** ✅ ANSWERED 2026-10-11: build segmentation as a choice of approach (full manual, Claude, Gemini, ChatGPT if possible, a mix), each shown with rough accuracy, checking and cost figures, cost both in dollars by API key and as a share of the user's own subscription windows, generalized beyond the owner's plan. The on-device fine-tune is filed in `FUTURE_FEATURES.md`. Plan: `execution-plans/segmentation/04-options-build.md`.
+
+The build, from `04-options-build.md` Part 2 (the Processor's `W40.b3` and `W40.d1`-`d4` wait for `W36.seg-opt-proof`):
+
+- [ ] **`W36.seg-opt-measure` — the figures for every approach [M · ~2 sessions]** (lane: segbench) (uses: paid). At most $25 paid.
+- [ ] **`W36.seg-opt-usage` — can the subscription route work, and how is its cost shown [S-M · ~1 session]** (lane: segbench) (uses: light).
+- [ ] **`W36.seg-opt-design` — the design note [S · ~1 session]** (lane: segbench) (uses: light) (blocked-on: W36.seg-opt-measure, W36.seg-opt-usage).
+- [ ] **`W36.seg-opt-engine` — a provider-neutral window segmenter [M · ~2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-design).
+- [ ] **`W36.seg-opt-chooser` — the approach chooser [M · ~1-2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-engine).
+- [ ] **`W36.seg-opt-review` — the review of flagged boundaries [M · ~2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-engine).
+- [ ] **`W36.seg-opt-subscription` — the subscription route, only if possible and permitted [M · ~1-2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-usage, W36.seg-opt-engine).
+- [ ] **`W36.seg-opt-proof` — prove it end to end [S-M · ~1 session]** (lane: processor) (uses: build,vm,paid) (blocked-on: W36.seg-opt-chooser, W36.seg-opt-review, W36.seg-opt-subscription).
 
 ## Autonomous daemon — use both subscriptions (owner, 2026-10-04)
 
@@ -1087,7 +1098,8 @@ the Capture re-pass); this unit was verified **INLINE** by the main-loop model. 
 
 ## Owner ideas — deferred, NOT for the daemon queue (do not start unprompted)
 Design-level ideas the owner wants recorded but explicitly de-prioritised. An autonomous session must
-**skip** these: they need the owner's scoping before any code is written.
+**skip** these: they need the owner's scoping before any code is written. They are kept in
+[`FUTURE_FEATURES.md`](FUTURE_FEATURES.md) (from 2026-10-11).
 
 ### ⛔ DECLINED — settled, do NOT re-raise in Daemon Report
 - **The full re-run of the window method with the owner's cues (`W36.seg-window2`) — SKIPPED by the owner
