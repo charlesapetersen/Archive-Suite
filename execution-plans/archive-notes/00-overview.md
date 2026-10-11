@@ -534,3 +534,36 @@ form; any `archivenotes://note/uuid` phrasing is superseded.
 (`NotesModel`, `OrganizationStore`, views). Cross-actor payloads (`Item`, `Block`, `ItemSummary`,
 `DurableLink`, `RootMarker`, `NotesFilter`) are `Sendable` value types. No shared mutable state crosses an
 actor boundary except through these value types.
+
+## 17. Deferrals and deviations recorded by gap-closure (W9, closed 2026-10-11)
+
+The post-ship gap-closure plan (`09-gap-closure.md`) was deleted by `W9.e4` once every item in it shipped;
+its per-item E1 `file:line` result is in git (`git log --diff-filter=D -- execution-plans/archive-notes/09-gap-closure.md`,
+then `git show <sha>^:<path>`). These two lists outlive it, so a future reviewer does not re-flag them.
+
+**Out of scope (deliberate deferrals, not gaps).** Mirroring **author** into Finder tags (date already
+projects as date facets; see the A11 deviation below); a single merged unified-writer signature; unifying the
+page-2 header *builder*; a shared suite-wide storage path; page-within-merged-PDF scroll navigation; editor
+tables/footnotes/task-lists/strikethrough/HTML and undo-across-raw-toggle; per-block stable GUIDs and the
+reverse "N extracts derive from this note" index; Scrivener round-trip confirmation; extract
+re-snapshot/refresh; author inheritance; `zotero://open-pdf` page-anchored links; Zotero write-back;
+multi-root Reader; Universal-Clipboard cross-Mac confirmation (owner-eye, W8); and the GUI checks documented
+as owner-eye in `scripts/GUI-HARNESS.md` (G2 typing gesture, G6 real Reader launch, G11 real Zotero launch,
+chip-button click gestures — dispatch auto-asserted via spies/DEBUG seams). Wishlist entries for several of
+these are in `ArchiveNotes/POTENTIAL_FEATURES.md`.
+
+**Deviations (done differently, functionally sound — no work required).** `CoordinatedTagWriter` shared
+across all three apps (vs. "don't share in run 1"); `NotesFilter` dates as `Int?` not `SortDate?` (§16.3);
+`Item.sortDate` reimplements the SPEC formula under a parity test rather than calling
+`ArchiveCore.DocumentTags.sortDate`; `PDFThumbnailer` kept in ArchiveCore but rendered through
+CoreGraphics/ImageIO (no AppKit; W9.c3); the source block realized as an editor chip attachment +
+`ReaderPreviewPopover` rather than a standalone `SourceBlockView`; unit suites use swift-testing `@Test`
+rather than XCTest; and the `FolderGraph→OrganizationStore` / `SmartQuery→VFolder.queryJSON` renames (§16).
+
+**A11 — author/date/quality are not plain Finder tags.** The original spec wanted "author and date" in macOS
+tags and a quality ordering "akin to the priority tag in Reader". The build keeps `authors` in YAML
+front-matter only; `date` is authoritative in front-matter and also projected as date-facet Finder tags
+(`NotesTagProjector.dateFacetTokens`); quality projects as canonical `Q1`…`Q3` (D2, D4 "no `Author:` facet",
+D9; W19.q4). Front-matter still meets the "durable if this program stops being developed" intent. Mirroring
+author to a Finder tag for cross-app parity stays an open owner choice; adopting it is a Tier-2
+`NotesTagProjector` change plus a SPEC `Author:` facet.

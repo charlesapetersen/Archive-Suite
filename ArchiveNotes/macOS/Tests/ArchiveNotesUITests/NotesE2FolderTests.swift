@@ -1,6 +1,6 @@
 import XCTest
 
-/// W9.e2-folders — the folder part of the gap-closure runtime sweep (`09-gap-closure.md` §E2): create,
+/// W9.e2-folders — the folder part of the gap-closure runtime sweep (plan E2, record in `SUITE_TODO_DONE.md`): create,
 /// subfolder, rename, un-nest, reorder and delete, each asserted on `organization.json`, plus the two D1
 /// doubts E1 could not settle from source. Replicate is `NotesGUITests.testG7_…` and a drag onto a folder
 /// row re-parenting is `testG18_…`; neither is repeated here.

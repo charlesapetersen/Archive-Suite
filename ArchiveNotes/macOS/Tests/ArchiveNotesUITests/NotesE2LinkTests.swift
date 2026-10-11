@@ -1,7 +1,7 @@
 import XCTest
 import AppKit   // NSPasteboard / NSWorkspace — read what Copy Link wrote, and hand the URL back to the app
 
-/// W9.e2-links — the link part of the gap-closure runtime sweep (`09-gap-closure.md` §E2): Copy Link (B9)
+/// W9.e2-links — the link part of the gap-closure runtime sweep (plan E2, record in `SUITE_TODO_DONE.md`): Copy Link (B9)
 /// puts the item's `archivenotes://open` URL on the pasteboard, and opening that URL selects and loads the
 /// linked item (B5). Both Copy Link entry points are driven: Note ▸ Copy Link and the row context menu.
 ///

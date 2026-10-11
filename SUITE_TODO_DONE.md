@@ -10305,3 +10305,19 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
     Pitfalls: the Bash hook name-matches "open" even in a heredoc (edit via a script file); never edit the
     worktree while a VM run builds from it (one run compiled a half-moved tree).
   <!-- /W40.e9 -->
+- [x] **W9.e4 — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** · §W9 gap-closure — Phase E verification · SHIPPED 2026-10-11 (this commit)
+  Plan E4, the item that closes gap-closure. All prerequisites were already in DONE (`W9.e1`, `W9.e2` with its
+  six parts, `W9.e3`, `W9.b5-fu1`), and no other `W9.*` item was open. **Verified against the tree:** the
+  Notes `README.md`, `AGENTS.md`, and `SMOKE_TEST.md` exist; the root `README.md` describes three apps and
+  root `AGENTS.md:5` routes to `ArchiveNotes/AGENTS.md`; every file path named in the three app `CLAUDE.md`
+  Implementation Maps resolves to a tracked file (scripted basename check, no misses); only `00-overview.md`
+  and this plan remained under `execution-plans/archive-notes/` (A5); the SPEC marker clause is moot because
+  R13d removed A4; the doc-sync hook's coverage of `packages/` was proven by dry-run in W9.e1 (A10).
+  **Retired the plan:** `git rm` of `09-gap-closure.md`. Its out-of-scope list, deviations list, and A11
+  author/date/quality note were moved to `00-overview.md` §17, so `POTENTIAL_FEATURES.md` now cites §17. The
+  plan's per-item E1 `file:line` result stays in git (`git show <this-commit>^:execution-plans/archive-notes/09-gap-closure.md`),
+  and W40.b2's source list in `verification-phase/01-daemon-plan.md` now says so. Every live reference was
+  repointed: the active-plans index entry is struck through, the `SUITE_TODO.md` W9 section is cut to a closed
+  note, and the Notes README and the five `NotesE2*Tests.swift` header comments (comment-only edits) no longer
+  name the file. The Codex dedup record in `SUITE_TODO.md` still names the plan, which is accurate history.
+  <!-- /W9.e4 -->

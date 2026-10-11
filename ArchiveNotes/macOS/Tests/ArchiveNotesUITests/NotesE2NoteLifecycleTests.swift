@@ -1,6 +1,6 @@
 import XCTest
 
-/// W9.e2-notes — the note-lifecycle part of the gap-closure runtime sweep (`09-gap-closure.md` §E2).
+/// W9.e2-notes — the note-lifecycle part of the gap-closure runtime sweep (plan E2, record in `SUITE_TODO_DONE.md`).
 /// Most of that part is already driven elsewhere in this bundle: delete + the delete-last-instance guard
 /// (`testG8_…`, `testG19_…`), tag editing with the Finder-tag projection following (`testG17_…`), the
 /// inline quality edit (`testW9D4_…`) and the empty states (`testW9D8_…`). This class covers the two

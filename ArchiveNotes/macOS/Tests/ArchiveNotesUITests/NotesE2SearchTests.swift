@@ -1,6 +1,6 @@
 import XCTest
 
-/// W9.e2-search — the search part of the gap-closure runtime sweep (`09-gap-closure.md` §E2): keyword
+/// W9.e2-search — the search part of the gap-closure runtime sweep (plan E2, record in `SUITE_TODO_DONE.md`): keyword
 /// full-text search, each facet filter (quality, tag, date range), and a smart folder saved from them,
 /// then selected as the scope. `testW9D9_…` already proves a saved smart folder's badge COUNT; this class
 /// proves that selecting one actually narrows the list, and that the live keyword is folded into it.

@@ -13,7 +13,7 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
 ## Why this phase exists (the evidence, 2026-10-04 survey)
 
 - **Completion overstated, about fifteen recorded cases.** Notes W0–W8 ticked with whole features unreachable
-  (`archive-notes/09-gap-closure.md`); the GUI-VM lane printing ✓ for zero tests; the `tag-vocabulary` gate step
+  (`archive-notes/09-gap-closure.md`, deleted by W9.e4 once closed; in git); the GUI-VM lane printing ✓ for zero tests; the `tag-vocabulary` gate step
   never once passing; two KNOWN_ISSUES entries describing protections that do not exist (`SUITE_TODO.md` Wave 17);
   five Wave-26 harnesses with no caller; the E2E oracle's tag branch dead until `092adb9`.
 - **Gates lapsed.** No `health-gate.sh` run on the 58 commits after `862e305` (2026-09-24); Codex sessions never
@@ -130,7 +130,7 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
 - **`W40.b1` — Reader ledger [M].** Sources: `ArchiveReader/CLAUDE.md`, `README.md`, `SMOKE_TEST.md`, `SPEC/`,
   Reader done-records. Roughly 35 rows. Mark the dead `InlineEditCells` features `unreachable`; mark the §12 audit
   ledger as a promise with no implementation.
-- **`W40.b2` — Notes ledger [M].** Sources: `00-overview.md`, `09-gap-closure.md`, `ArchiveNotes/CLAUDE.md`,
+- **`W40.b2` — Notes ledger [M].** Sources: `00-overview.md` (§17 carries the gap-closure deferrals), the deleted `09-gap-closure.md` (`git show` its E1 result from the parent of the W9.e4 commit), `ArchiveNotes/CLAUDE.md`,
   `SMOKE_TEST.md`. Takes in the `W9.e1`/`W9.e2` results rather than repeating them. Roughly 40 rows.
 - **`W40.b3` — Processor ledger [M].** Sources: `ArchiveProcessor/CLAUDE.md`, `README.md`, `TESTING.md`,
   `LIVE_CAPTURE_ANDROID_TEST.md`, `SPEC/tag-format.md`. Roughly 37 rows.

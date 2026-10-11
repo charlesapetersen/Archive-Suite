@@ -113,12 +113,9 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   `SUITE_TODO_DONE.md` §"Wave 26 — DECLINED DESIGNS"; the completion audit is `./ops/despotlight-audit.sh`.
   The final follow-up, `W26.oracle-fu1`, shipped 2026-08-19; the completion record is under **Wave 26** in
   `SUITE_TODO_DONE.md`.
-- `archive-notes/09-gap-closure.md` — **IN PROGRESS (Archive Notes post-ship reconciliation; W9; mixed Tier-1/Tier-2)**:
-  closes the plan-vs-build + spec-vs-build deltas found after W0–W8 shipped (docs/tracker sync, wire built-but-dead
-  features, re-arm safety-net lint/smoke tooling, secondary UI polish), then a **Phase-E verification review** that
-  gates flipping the **W9** checkbox + deleting the plan. Phase A docs A1/A2/A3/A8 shipped `56360f7` (2026-07-18);
-  `00-overview.md` remains the retained interface contract alongside it. See **W9 (gap-closure)** in the Archive
-  Notes section below.
+- ~~`archive-notes/09-gap-closure.md`~~ — **SHIPPED 2026-10-11, plan deleted (W9.e4)** (Archive Notes post-ship
+  reconciliation, Phases A–E). Its deferrals and deviations moved to `archive-notes/00-overview.md` §17, which
+  remains the retained interface contract; completion records are under §W9 in `SUITE_TODO_DONE.md`.
 - ~~`autonomous-2wk-hardening.md`~~ — **SHIPPED 2026-07-16/17** (all 12 workstreams; see the DONE rollup above
   + `ops/autonomous/README.md` for the mechanisms, and `ops/autonomous/tests/prove-*.sh` for the proofs). Plan
   deleted per the "delete a shipped plan" convention — git history keeps the detailed Progress log.
@@ -816,53 +813,12 @@ the 3-pane browsing shell — everything else (note appearance, link/provenance 
 purpose-built for the historian's provenance-first workflow. **R13d removed the former `ArchiveSuite`
 marker/exclusion feature; no later convergence work remains for it.** **Confirmed (owner):** the FULL
 **ArchiveCore extraction + Reader/Processor migration is W0 — done FIRST** (`00a`), before any Notes-specific work.
-### W9 gap-closure — DECOMPOSED 2026-08-16 (was one checkbox hiding Phases A–E)
+### W9 gap-closure — CLOSED 2026-10-11 (W9.e4)
 
-⚠️ **`W9` as a single item is GONE.** It was one `- [ ]` standing for a 390-line, five-phase plan, and the
-daemon could not have done it: `resume-prompt.txt:9` calls an item that needs more than ~2 sessions mis-sized,
-`09-gap-closure.md` contains **zero checkboxes**, and `ARCHIVE_NOTES_PROGRESS.md` — the mechanism that made
-Wave 11's multi-phase build drainable one sub-task per session — was **retired 2026-08-01** with no
-replacement. So a session could do a whole phase, commit real work, and have nothing to flip; six of those and
-`MAX_NOCOMPLETE=6` parks the entire run (`archive-suite-autonomous.sh:134`). Its queue mirror also cited
-`execution-plans/09-gap-closure.md`, which does not exist — the file is at
-`execution-plans/archive-notes/09-gap-closure.md`.
-
-**Progress now lives in these tags, not in the plan file.** ⛔ Do **not** add checkboxes to
-`09-gap-closure.md` and do not resurrect a progress file — the 2026-08-01 tracker consolidation retired that
-pattern deliberately (`execution-plans/tracker-consolidation.md` finding F2). The plan stays the *detail*;
-these items are the *state*. Each maps 1:1 to a plan sub-item ID, so `W9.b4` is plan item **B4**, verbatim.
-
-**Phase A is done except one item, and one is now moot.** A1, A2, A3, A5, A6, A7, A8, A9 and A11 all shipped
-2026-07-18. **A4 is NOT recreated here:** R13d shipped the intended removal of the `ArchiveSuite` marker
-surface. ⛔ Do not file A4 again. **D5** also shipped (W14.4b,
-live-verified 2026-07-17).
-
-**Phase C — safety-net & regression tooling.** These re-arm guards, so they sort with the gate work rather
-than with Notes features.
-
-✅ **Phase C is complete.** W9.c6's scale-test result is recorded in `SUITE_TODO_DONE.md`.
-
-
-**Phase B — wire the built-but-dead features.** The high-value core: library code that shipped without a UI
-entry point. Mostly **Tier-2** (they write note front-matter or project Finder tags).
-
-✅ **`W9.b3` (plan B3 — note retitle + tag editing) shipped 2026-09-20.** Its completion record is in
-`SUITE_TODO_DONE.md`; that one work item covered the full list affordance, title→filename projection,
-inspector subjects, and audited Finder-tag sync. Do not re-file its former `W22.notes-rename` duplicate.
-
-**Phase D — secondary UI affordances & polish.** All LOW–MED, Tier-1 unless noted, each independently
-shippable. **D5 is already shipped** (W14.4b) and is not listed.
-
-**Phase E — verification review. Do LAST; it gates deleting the plan.** This phase exists because the W0–W8
-checkboxes overstated completion once already; do not repeat that on the fixes. Use the paced method in
-`REVIEW.md`, one subsystem per session, never a giant fan-out.
-
-✅ **`W9.e1` (plan E1) shipped 2026-10-06** — the per-item result is in the plan under *E1 result*; the
-completion record is in `SUITE_TODO_DONE.md`.
-
-- [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (lane: notes) (uses: light) (blocked-on: W9.e1,
-  W9.e2, W9.e3, W9.b5-fu1). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
-  convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
+Every Phase A–E item has shipped and `execution-plans/archive-notes/09-gap-closure.md` is deleted; the
+completion records are under §W9 in `SUITE_TODO_DONE.md`, and the plan's out-of-scope and deviation lists now
+live in `execution-plans/archive-notes/00-overview.md` §17. ⛔ Do not re-file A4 (R13d removed the
+`ArchiveSuite` marker on purpose). New Notes gaps are filed as their own items, not under W9.
 
 ## Cross-app date display — owner-promoted 2026-09-26
 

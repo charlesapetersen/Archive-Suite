@@ -3,7 +3,7 @@
 Forward-looking backlog for **Archive Notes**. The core roadmap + shipped state live in
 [`CLAUDE.md`](CLAUDE.md); near-term work lives in the root [`SUITE_TODO.md`](../SUITE_TODO.md). This file is
 the durable *wishlist* tier — long-term, deliberately-deferred design directions. Seeded 2026-07-18 from the
-Notes execution plans (`execution-plans/archive-notes/{00-overview,09-gap-closure}.md`), `KNOWN_ISSUES.md`
+Notes execution plans (`execution-plans/archive-notes/00-overview.md` and the since-deleted `09-gap-closure.md`), `KNOWN_ISSUES.md`
 deferred tails, and `CLAUDE.md` owner-decision notes. Several items overlap the sibling apps' backlogs —
 evidence these are one suite.
 
@@ -28,12 +28,12 @@ evidence these are one suite.
   Tier-2, separately gated. _(00-overview §15.1 / §2 deferred list; also noted in `SUITE_TODO.md` as a `(later)`
   behavior/data follow-on.)_
 - **Zotero write-back** — Notes currently only *reads* Zotero metadata (D8, read-only client). A future iteration
-  could create/update Zotero items from Notes. _(00-overview §15.5; 09-gap-closure out-of-scope.)_
+  could create/update Zotero items from Notes. _(00-overview §15.5, §17 out-of-scope.)_
 - **Extract re-snapshot / refresh from source** — extracts are snapshot+link (D7), so source edits deliberately
   don't touch them; an opt-in affordance could re-pull the latest source-note text into an existing extract on
-  demand. _(09-gap-closure out-of-scope.)_
+  demand. _(`00-overview` §17 out-of-scope.)_
 - **Multi-root Reader corpus support** — durable-link resolution currently resolves against a single granted
-  Reader root; supporting multiple corpus roots is deferred. _(00-overview §2 deferred list; 09-gap-closure.)_
+  Reader root; supporting multiple corpus roots is deferred. _(00-overview §2 deferred list, §17.)_
 - **Notes + Reader unified window / shared view** — an open architectural question of whether Notes and Reader
   should ever share one window (or a unified view) rather than remaining separate apps. _(00-overview §15.3.)_
 - **Source/passage chip buttons XCUITest-hittable (accessibility)** — the TextKit-2 attachment-view chip buttons
@@ -43,17 +43,17 @@ evidence these are one suite.
 ## Lower priority / long-term
 
 - **Richer Markdown editor** — tables, footnotes, task-lists, strikethrough, inline HTML, and preserving undo
-  history across the raw/styled toggle, beyond the shipped construct set. _(09-gap-closure out-of-scope.)_
+  history across the raw/styled toggle, beyond the shipped construct set. _(`00-overview` §17 out-of-scope.)_
 - **Per-block stable GUIDs + reverse back-index** — give blocks durable per-block identity and build the inverse
-  "N extracts derive from this note" index for a source note. _(09-gap-closure out-of-scope.)_
+  "N extracts derive from this note" index for a source note. _(`00-overview` §17 out-of-scope.)_
 - **Author inheritance** — auto-populate an extract's author from its source note instead of manual entry.
-  _(09-gap-closure out-of-scope.)_
+  _(`00-overview` §17 out-of-scope.)_
 - **`zotero://open-pdf` page-anchored links** — support page-anchored attachment links in addition to
-  `zotero://select` item/attachment links. _(09-gap-closure out-of-scope.)_
+  `zotero://select` item/attachment links. _(`00-overview` §17 out-of-scope.)_
 - **Page-within-merged-PDF scroll navigation** — from the source-block quick preview, scroll to a specific page
-  inside a merged/multi-doc PDF. _(09-gap-closure addendum.)_
+  inside a merged/multi-doc PDF. _(`00-overview` §17 out-of-scope.)_
 - **Front-matter whitespace-normalization tightening** — tighten `FrontMatterCodec.needsQuoting` so leading/
   trailing non-U+0020 whitespace (tab / NBSP) in a scalar survives a round-trip instead of being normalized away
   (marginal — regular edge-spaces already survive). _(KNOWN_ISSUES W8-S1.)_
 - **Unify the page-2 (OCR) PDF header *builder* across apps** — W0 unified the reader/parser side of the 2-page
-  PDF header; the *builder* is still per-app. Shared-code dedup. _(09-gap-closure out-of-scope.)_
+  PDF header; the *builder* is still per-app. Shared-code dedup. _(`00-overview` §17 out-of-scope.)_

@@ -1,7 +1,7 @@
 import XCTest
 import AppKit   // NSPasteboard — seed the PNG and the archive link the app pastes
 
-/// W9.e2-paste — the paste-and-extracts part of the gap-closure runtime sweep (`09-gap-closure.md` §E2):
+/// W9.e2-paste — the paste-and-extracts part of the gap-closure runtime sweep (plan E2, record in `SUITE_TODO_DONE.md`):
 /// a menu-created extract embeds its image bytes (B6), a root Notes holds no grant for re-grants in-app
 /// from the preview popover (B7), and a page link pasted once the root is granted shows a thumbnail that
 /// really drew. Source-block paste itself is G5 and the freshly pasted note-passage chip is G13.

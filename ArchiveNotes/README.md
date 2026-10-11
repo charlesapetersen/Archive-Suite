@@ -27,9 +27,10 @@ words**.
 ## What it does
 
 > **Status:** W0–W8 shipped — the app is built and **data-safe** (all five tag-safety invariants, the
-> delete-last-instance guard, atomic writes, and autosave/flush are verified). A post-ship
-> **gap-closure** pass (`../execution-plans/archive-notes/09-gap-closure.md`) is wiring the last
-> built-but-unexposed features. [CLAUDE.md](CLAUDE.md) is the authoritative record.
+> delete-last-instance guard, atomic writes, and autosave/flush are verified). The post-ship
+> **gap-closure** pass (W9) that wired the last built-but-unexposed features closed 2026-10-11; its
+> deferrals and deviations are in `../execution-plans/archive-notes/00-overview.md` §17.
+> [CLAUDE.md](CLAUDE.md) is the authoritative record.
 
 - **Notes** — a note is a single Markdown file with a title, date, author, quality rating, and
   subjects, all in durable YAML front-matter. Styled editor with a raw-Markdown toggle (⌘/).
