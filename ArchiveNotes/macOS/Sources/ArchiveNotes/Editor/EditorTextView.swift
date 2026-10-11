@@ -38,10 +38,58 @@ final class EditorTextView: NSTextView {
         }
         if let root = window?.contentView { visit(root) }
         states += uiTestHeaderSlots()
+        states.append(["inlineImages": uiTestInlineImages()])
         states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes,
                        "layoutPasses": layoutStrandedPasses])
         guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    /// One entry per inline image in the TEXT (W9.e2-paste): its `assets/…` path, whether it shows a
+    /// placeholder instead of loaded bytes, and how many of its pixels are dark once drawn into a bitmap.
+    /// The dark count is the pixel truth a UITest cannot get from the accessibility tree: a page thumbnail
+    /// that really drew has dark text on it, and both placeholders and a blank render have almost none.
+    private func uiTestInlineImages() -> [[String: Any]] {
+        guard let storage = textStorage else { return [] }
+        var images: [[String: Any]] = []
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard let inline = value as? InlineImageAttachment else { return }
+            images.append(["ref": inline.relativePath, "loc": range.location,
+                           "placeholder": inline.placeholder != nil,
+                           "width": Double(inline.bounds.width), "height": Double(inline.bounds.height),
+                           "darkPixels": inline.placeholder == nil ? inline.image.map(Self.uiTestDarkPixelCount) ?? 0 : 0])
+        }
+        return images
+    }
+
+    /// Pixels darker than mid-grey after drawing `image` at its display size over white, capped at 400 pt.
+    private static func uiTestDarkPixelCount(_ image: NSImage) -> Int {
+        let scale = min(1, 400 / max(image.size.width, image.size.height, 1))
+        let width = max(1, Int(image.size.width * scale)), height = max(1, Int(image.size.height * scale))
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8,
+            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0
+        ), let context = NSGraphicsContext(bitmapImageRep: rep) else { return 0 }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        NSColor.white.setFill()
+        NSRect(x: 0, y: 0, width: width, height: height).fill()
+        image.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
+        NSGraphicsContext.restoreGraphicsState()
+        // Raw bytes, not `colorAt(x:y:)`: this runs inside an AX getter on the main thread, and a colour object
+        // per pixel made one 440×570 thumbnail cost tens of milliseconds per probe read.
+        guard let bytes = rep.bitmapData else { return 0 }
+        let stride = rep.bytesPerRow, channels = rep.samplesPerPixel
+        var dark = 0
+        for y in 0..<height {
+            let row = bytes + y * stride
+            for x in 0..<width {
+                let pixel = row + x * channels
+                if 299 * Int(pixel[0]) + 587 * Int(pixel[1]) + 114 * Int(pixel[2]) < 127_500 { dark += 1 }
+            }
+        }
+        return dark
     }
 
     /// One entry per passage header in the TEXT, whether or not a view exists (W35.vm-mem-fu1 diagnostics):
@@ -924,6 +972,29 @@ final class EditorTextView: NSTextView {
                   chip.sourceBox.anchor.link != nil,
                   chip.sourceBox.anchor.notePassageTarget == nil else { return }
             chip.onReveal?(chip.sourceBox.anchor)
+            fired = true
+            stop.pointee = true
+        }
+        return fired
+    }
+
+    /// Open the preview popover of the FIRST reader-page source-block chip through the chip's own
+    /// `onPreview` callback (W9.e2-paste), anchored on the editor's scroll view. Like `uiTestRevealFirstSource`,
+    /// only the un-hit-testable chip-button click is bypassed; the popover, its root-grant button and the
+    /// re-resolve it runs are the production ones. Returns whether a previewable chip was found.
+    @discardableResult
+    func uiTestPreviewFirstSource() -> Bool {
+        guard let storage = textStorage else { return false }
+        var fired = false
+        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
+            guard let chip = value as? BlockHeaderAttachment,
+                  chip.sourceBox.anchor.link != nil,
+                  chip.sourceBox.anchor.notePassageTarget == nil,
+                  chip.sourceBox.anchor.zoteroSelect == nil,
+                  let preview = chip.onPreview else { return }
+            // Anchored on the scroll view, whose bounds are what is on screen: the text view's own bounds run
+            // past the visible pane, so a popover on its edge could open off-window.
+            preview(chip.sourceBox.anchor, enclosingScrollView ?? self)
             fired = true
             stop.pointee = true
         }

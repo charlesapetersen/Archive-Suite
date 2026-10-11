@@ -27,6 +27,7 @@ final class EditorTestBox {
     var pasteImage: (() -> String)?
     var jumpFirstPassage: (() -> Void)?
     var revealFirstSource: (() -> Void)?
+    var previewFirstSource: (() -> Void)?
     var openFirstZotero: (() -> Void)?
     /// The passage copy/paste pair (W14.3's live copy→paste check). ⌘C/⌘V route to the FIRST RESPONDER,
     /// and XCUITest cannot reliably make the styled TextKit-2 text view first responder — the same reason
@@ -157,6 +158,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         }
         testBox?.revealFirstSource = { [weak coordinator = context.coordinator] in
             _ = coordinator?.uiTestRevealFirstSource()
+        }
+        testBox?.previewFirstSource = { [weak coordinator = context.coordinator] in
+            _ = coordinator?.uiTestPreviewFirstSource()
         }
         testBox?.openFirstZotero = { [weak coordinator = context.coordinator] in
             _ = coordinator?.uiTestOpenFirstZotero()
@@ -637,9 +641,39 @@ struct MarkdownEditorView: NSViewRepresentable {
                         anchor: boundedEntries[index].anchor, thumbnailRef: thumbnailRef,
                         in: textView
                     )
+                    await self.showInlineImagesOnceWritten([thumbnailRef], itemID: targetItemID,
+                                                           assetStore: targetAssetStore, in: textView)
                 }
             }
             return true
+        }
+
+        /// Swap the "Missing" placeholder for the real image once its bytes are on disk (W9.e2-paste).
+        ///
+        /// `ItemAssetStore.addAsset` returns the reference before a background task writes the bytes, so a
+        /// chip built straight after it resolves a file that is not there yet and shows the placeholder.
+        /// Nothing re-read it before the note was reloaded: a pasted page link showed "Missing" beside its
+        /// chip although the thumbnail was on disk. Only placeholders for these references in this same
+        /// note are replaced; the markdown is unchanged, so there is nothing to write back.
+        private func showInlineImagesOnceWritten(_ refs: Set<String>, itemID: UUID?,
+                                                 assetStore store: EditorAssetStore,
+                                                 in textView: EditorTextView) async {
+            await store.awaitPendingWrites()
+            guard self.textView === textView, !currentIsRaw, self.assetStore === store,
+                  formattingContext?.currentItemID == itemID,
+                  let storage = textView.textStorage, storage.length > 0 else { return }
+            var loaded: [(NSRange, InlineImageAttachment)] = []
+            storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+                guard let image = value as? InlineImageAttachment, image.placeholder == .missing,
+                      refs.contains(image.relativePath),
+                      case .resolved(let url) = store.resolve(image.relativePath),
+                      let thumbnail = InlineImageAttachment.loadThumbnail(from: url) else { return }
+                loaded.append((range, InlineImageAttachment(relativePath: image.relativePath,
+                                                            altText: image.altText, thumbnail: thumbnail)))
+            }
+            for (range, image) in loaded {
+                storage.addAttribute(.attachment, value: image, range: range)
+            }
         }
 
         /// The synchronous mutation half of source-block paste. Kept separate from the async fallback
@@ -648,12 +682,14 @@ struct MarkdownEditorView: NSViewRepresentable {
         private func insertSourceBlocks(_ entries: [SourceBlockPaster.PasteEntry], into textView: EditorTextView,
                                         pendingThumbnailIDs: [Int: String] = [:]) {
             textView.undoManager?.beginUndoGrouping()
+            var importedRefs: Set<String> = []
             for (index, var entry) in entries.enumerated() {
                 if let thumbData = entry.thumbnailData, let store = assetStore {
                     if let ref = SourceBlockPaster.importThumbnail(
                         thumbData, page: entry.anchor.page, assetStore: store
                     ) {
                         entry.anchor.thumbRef = ref
+                        importedRefs.insert(ref)
                     }
                 }
                 // W3.notes-thumb-line-duplicates — the imported thumbnail's `![…](…)` line is written
@@ -671,6 +707,15 @@ struct MarkdownEditorView: NSViewRepresentable {
             }
             textView.undoManager?.endUndoGrouping()
             scheduleWriteBack()
+            // A Reader payload's own thumbnail has the same write-behind as a rendered one.
+            if !importedRefs.isEmpty, let store = assetStore {
+                let itemID = formattingContext?.currentItemID
+                Task { [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    await self.showInlineImagesOnceWritten(importedRefs, itemID: itemID,
+                                                           assetStore: store, in: textView)
+                }
+            }
         }
 
         /// Replace only the stable, already-inserted placeholder chip with its image-bearing form.
@@ -831,6 +876,12 @@ struct MarkdownEditorView: NSViewRepresentable {
         @discardableResult
         func uiTestRevealFirstSource() -> Bool {
             return textView?.uiTestRevealFirstSource() ?? false
+        }
+
+        /// Open the first reader-page chip's preview popover (W9.e2-paste) — read-only, so no write-back.
+        @discardableResult
+        func uiTestPreviewFirstSource() -> Bool {
+            return textView?.uiTestPreviewFirstSource() ?? false
         }
 
         /// Fire the first Zotero chip's Open-in-Zotero path (G11) — read-only dispatch, so no write-back.

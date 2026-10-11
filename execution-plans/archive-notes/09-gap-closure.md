@@ -62,6 +62,11 @@ imprecision is not fully ruled out), so they are recorded as candidates, not con
   **Action:** confirm on a clean paste; if real, the paste path should re-run the chip styling (or the pasted
   block's on-disk form differs from what `MarkdownBridge` chip-parses). Low data risk (bytes import correctly —
   W14.3 confirmed); this is a rendering gap. Fold into **D12** if confirmed.
+  ⛔ **RETIRED by W9.e2-paste (2026-10-11): not reproduced.** `NotesGUITests.testG13_LiveCopyPasteImportsInlineImageBytesIntoTheExtract`
+  runs exactly this copy→paste through the production handlers and asserts, immediately after the paste,
+  after ⌘Z/⇧⌘Z and after a reselect, that the editor text holds no `<!-- block:` and that the pasted
+  `note-passage` chip has an installed, visible, non-zero view; it was VM-green in W9.e2-paste's run. The
+  2026-07-18 observation predates the W21/W35 chip re-styling fixes and was made by host GUI driving.
 
 The rest of the systematic sweep (note delete + delete-last-instance guard, tag editing **B3**, quality
 quick-edit **D4**, manual author **B8**, keyword FTS + quality/tag/date filters, folder create/rename/delete +

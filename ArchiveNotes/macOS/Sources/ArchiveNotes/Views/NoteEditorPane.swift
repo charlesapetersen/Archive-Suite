@@ -261,6 +261,10 @@ struct NoteEditorPane: View {
                         }
                     }
                     .accessibilityIdentifier("an.editor.test.select")
+                    // W9.e2-paste: opens the first source chip's preview popover. In this row, whose text
+                    // fields give up width, so the full second row cannot be pushed off-window (W21.vmgui-c).
+                    Button("prev") { testBox.previewFirstSource?() }
+                        .accessibilityIdentifier("an.editor.test.preview")
                 }
                 HStack(spacing: 2) {
                     Button("pasteImg") { testPasteImageOutcome = testBox.pasteImage?() ?? "declined:seamNil" }

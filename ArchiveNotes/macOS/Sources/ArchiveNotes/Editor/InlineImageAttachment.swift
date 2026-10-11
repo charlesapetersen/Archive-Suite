@@ -11,9 +11,14 @@ protocol EditorAssetStore: AnyObject {
     /// `assets/` directory — see `AssetPathResolver`. The reference is untrusted (a note body is a
     /// hand-editable file), so an escape must come back as `.outOfBounds`, never as a URL (W23.m3).
     func resolve(_ relativePath: String) -> AssetResolution
+    /// Return once every byte write `addAsset` has started is on disk. A store that writes synchronously
+    /// has nothing to wait for; `ItemAssetStore` hands back the reference before its bytes land.
+    func awaitPendingWrites() async
 }
 
 extension EditorAssetStore {
+    func awaitPendingWrites() async {}
+
     /// Convenience for callers that only want a readable URL: a `missing` **or** refused reference is
     /// nil. On the passage/extract path that means no bytes are embedded — the Markdown reference still
     /// survives, so nothing is silently rewritten.
@@ -375,10 +380,13 @@ final class ItemAssetStore: EditorAssetStore {
 
     /// Await all in-flight asset byte-writes (used by tests; a natural flush seam for a future
     /// window-close / quit save, W7-S6).
+    ///
+    /// A task leaves the list only once it has finished, so two callers waiting at once (the editor
+    /// refreshing a pasted thumbnail, and a test flushing) both see every write still in flight.
     func awaitPendingWrites() async {
         let tasks = pendingWrites
-        pendingWrites.removeAll()
         for t in tasks { await t.value }
+        pendingWrites.removeAll { tasks.contains($0) }
     }
 
     /// Pick a filename not taken on disk or by an in-flight write, matching `NoteStore.disambiguateAsset`

@@ -382,10 +382,19 @@ final class SourceBlockPreviewState: ObservableObject {
     private let chooser: ReaderRootChooser
 
     init() {
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: Self.rootGrantDefaults)
         self.rootStore = store
         let resolver = ReaderLinkResolver(rootStore: store)
         let chooser = ReaderRootChooser(rootStore: store, resolver: resolver)
+#if DEBUG
+        // The NSOpenPanel is the one step of the in-app re-grant an XCUITest cannot drive (W9.e2-paste):
+        // under the harness, `-ANUITestRootPickPath` stands in for the folder the person would pick.
+        // Everything after the pick — marker check, bookmark, re-resolve — is the production path.
+        if Self.isUITestHarness,
+           let path = UserDefaults.standard.string(forKey: "ANUITestRootPickPath"), !path.isEmpty {
+            chooser.pickFolder = { URL(fileURLWithPath: path, isDirectory: true) }
+        }
+#endif
         self.chooser = chooser
         self.preview = ReaderPreviewPopover(resolver: resolver, chooser: chooser)
         self.thumbnailRenderer = SourceBlockThumbnailRenderer(
@@ -419,6 +428,30 @@ final class SourceBlockPreviewState: ObservableObject {
     func chooseArchiveFolder() {
         chooser.chooseRoot()
     }
+
+    /// Where Reader-root grants persist. A UITest launch gets its own suite, emptied once per launch, so a
+    /// grant one test makes is neither inherited by the next nor written into the app's real grants — the
+    /// in-memory-only rule `RootFolderStore.adoptTestStore` follows for the Notes store (W9.e2-paste).
+    private static let rootGrantDefaults: UserDefaults = {
+#if DEBUG
+        if isUITestHarness {
+            let suite = "com.archivenotes.app.uitest-reader-roots"
+            if let defaults = UserDefaults(suiteName: suite) {
+                defaults.removePersistentDomain(forName: suite)
+                return defaults
+            }
+        }
+#endif
+        return .standard
+    }()
+
+#if DEBUG
+    /// `-ANUITestStorePath`, the gate every UITest seam uses (`NoteEditorPane.isUITestHarness`).
+    private static var isUITestHarness: Bool {
+        if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty { return true }
+        return false
+    }
+#endif
 
     private static let thumbnailCacheDirectory: URL = {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first

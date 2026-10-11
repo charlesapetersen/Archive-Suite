@@ -1,4 +1,5 @@
 import Testing
+import AppKit
 import Foundation
 import SwiftUI
 @testable import ArchiveNotes
@@ -208,6 +209,78 @@ struct EditorBindingTests {
             return
         }
         #expect((try? Data(contentsOf: thumbnailURL)) == thumbnailData)
+    }
+
+    /// W9.e2-paste: `ItemAssetStore` writes a pasted thumbnail's bytes after it returns the reference, so
+    /// the chip built at once showed the "Missing" placeholder until the note was reloaded — caught in the
+    /// VM by `NotesE2PasteTests`. Both paste paths (a rendered thumbnail and a Reader payload's own) must
+    /// end with the real image in the editor, through the production write-behind store.
+    @Test(arguments: [false, true]) @MainActor
+    func pastedThumbnailShowsTheImageOnceItsWriteLands(payloadCarriesThumbnail: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EditorBindingTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let noteStore = NoteStore(root: root)
+        let item = Item(
+            id: UUID(), kind: .note, title: "Thumb host", authors: [], date: "1980", datePrecision: .year,
+            dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false, created: Date(),
+            modified: Date(), schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil
+        )
+        _ = try await noteStore.create(item)
+        let store = ItemAssetStore(store: noteStore, root: root, itemID: item.id)
+
+        let rep = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 32, pixelsHigh: 32, bitsPerSample: 8, samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ))
+        let png = try #require(rep.representation(using: .png, properties: [:]))
+
+        let holder = BindingHolder("Existing note text")
+        let formatting = FormattingContext()
+        formatting.currentItemID = item.id
+        formatting.currentItemKind = .note
+        let view = MarkdownEditorView(
+            markdown: Binding(get: { holder.markdown }, set: { holder.markdown = $0 }),
+            isRaw: Binding(get: { holder.isRaw }, set: { holder.isRaw = $0 }),
+            formatting: formatting,
+            assetStore: store,
+            missingThumbnailProvider: { _ in png }
+        )
+        let coordinator = view.makeCoordinator()
+        let textView = EditorTextView()
+        textView.textStorage?.setAttributedString(MarkdownBridge.parse(markdown: holder.markdown, assetStore: store))
+        coordinator.textView = textView
+        coordinator.parent = view
+        coordinator.formattingContext = formatting
+        coordinator.assetStore = store
+        coordinator.missingThumbnailProvider = view.missingThumbnailProvider
+
+        let anchor = SourceAnchor(
+            link: "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Scan.pdf&page=5",
+            display: "Scan — p. 5", page: 5
+        )
+        #expect(coordinator.handleSourceBlockPaste([
+            .init(kind: .readerPage, anchor: anchor, thumbnailData: payloadCarriesThumbnail ? png : nil)
+        ]))
+
+        func thumbnail() -> InlineImageAttachment? {
+            guard let storage = textView.textStorage else { return nil }
+            var found: InlineImageAttachment?
+            storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, _ in
+                if let image = value as? InlineImageAttachment, image.relativePath == "assets/p5-thumb.png" {
+                    found = image
+                }
+            }
+            return found
+        }
+        for _ in 0..<300 where thumbnail()?.placeholder != nil || thumbnail() == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        await store.awaitPendingWrites()
+        #expect(store.resolveAsset("assets/p5-thumb.png") != nil, "the thumbnail bytes should be on disk")
+        let shown = try #require(thumbnail(), "the pasted block should carry its thumbnail image")
+        #expect(shown.placeholder == nil, "the editor should show the written thumbnail, not the Missing placeholder")
     }
 
     // MARK: - Lint check (no .layoutManager in Editor/)

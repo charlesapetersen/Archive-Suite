@@ -56,6 +56,9 @@ class NotesFixtureUITestCase: XCTestCase {
 
     var app: XCUIApplication!
 
+    /// Launch arguments a subclass adds to every launch of its tests (W9.e2-paste's folder-pick stand-in).
+    var extraLaunchArguments: [String] { [] }
+
     /// Run one test's scratch-fixture lifecycle from its `@MainActor` test method. XCTest's macOS lifecycle
     /// overrides are nonisolated in the Swift 6 SDK, so putting this UI work in `setUpWithError` would
     /// weaken its actor checking. `defer` always shuts down the scratch app after the test body returns.
@@ -185,6 +188,7 @@ class NotesFixtureUITestCase: XCTestCase {
             "-an.noteWindow.kindFilter", "notes",
             "-an.extractWindow.kindFilter", "extracts",
         ]
+        app.launchArguments += extraLaunchArguments
         app.launch()
         app.activate()
 
