@@ -3,6 +3,19 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W9.e2-paste) — a pasted page link showed "Missing" beside its chip until the note was reloaded
+
+**2026-10-11.** `ItemAssetStore.addAsset` returns the `assets/…` reference before a background task writes
+the bytes (the W7-S5 sync↔async bridge). Source-block paste built the chip and its thumbnail line straight
+after importing the thumbnail, so the image resolved a file that was not there yet and drew the Missing
+placeholder; nothing re-read it until the note was loaded again. Both paths had it: a thumbnail rendered
+from a granted archive, and one a Reader payload carried. `showInlineImagesOnceWritten` now waits for the
+write and swaps only that note's placeholders for these references; the markdown was always right, so
+nothing is written back. Unit tests that use `ScratchAssetStore` could not see it, because that store writes
+synchronously; the regression test uses the production store. Found by `NotesE2PasteTests` in the VM, which
+also covers B6 (a menu-created extract embeds its image bytes) and B7 (re-granting a moved archive from the
+preview popover).
+
 ## ✅ FIXED (W9.d12d) — filename/title disagreement was invisible
 
 **2026-10-04.** Indexing logs a note filename that differs from the sanitized front-matter title

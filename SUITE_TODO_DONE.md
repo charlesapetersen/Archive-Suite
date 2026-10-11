@@ -10236,3 +10236,23 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   <!-- /W36.seg-whole -->
 - [x] **W36.seg-features — on-device feature model, timestamps one weak feature [M]** · §Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze) · SHIPPED 2026-10-11 (this commit; checkpoint d483edf). Numpy L2 logistic regression (lambda 1, standardised, threshold 0.5, nothing tuned) on per-boundary features, leave-one-collection-out on Dean/Deaver/Herrnstein (each predicted by a fit on the other two; tuning-marked, so Stanton and RG 165 are refused; photo labels from the truth). Checkpoint 1: 26 features — OCR rule cues, TF-IDF cosine, length, blank, paper colour, ink, aspect/orientation, and the capture-time gap as ONE feature (`features.py`, `method_features.py`). Checkpoint 2: embedding similarities through `embed.swift` — Apple Vision `VNGenerateImageFeaturePrintRequest` (768-d, on the 768 px thumbnail) and NaturalLanguage's English sentence embedding (512-d) of the whole page and of the seam (page n's last 400 chars against n+1's first 400); cached under the bench cache, outside git. Deviation from the plan, which named SigLIP/CLIP through MLX: none is in the lab's model cache, and the OS frameworks need no download and are callable from the Swift app itself. Four methods: `features-lr`, `features-lr-notime`, `features-emb-lr`, `features-emb-lr-notime`; the report adds ECE alongside Brier, risk-coverage, calibration bins and permutation importance. Pooled pages in an exact document on the final truth (8308b64; checkpoint 1's 59.3/52.5% were on the uncorrected truth): base 64.7% with the time gap / 56.0% without; with embeddings 63.7% / 66.2% — the embeddings replace the timestamps (false merges 88 → 57 without the gap) and improve calibration with it (ECE 0.106 → 0.084). Image feature print is the strong one (importance rank 3 of 30). Deaver (clippings) still 17.7–23.4%: two letter collections cannot teach a third document type. Far below the cloud windows (90–93%); at most a cheap extra voter for W36.seg-ensemble. Tests `test_features.py` (23, incl. compiling `embed.swift` on a generated image/text). Owner note: `execution-plans/segmentation/03-early-read.md` addendum 5; detail `segbench-results/features-lr-report.md`.
   <!-- /W36.seg-features -->
+- [x] **W9.e2-paste — runtime sweep, paste and extracts: source blocks, page-link thumbnails, image bytes, re-grant [S-M · gui]** · §W9 gap-closure · SHIPPED 2026-10-11 (this commit; checkpoint `0d3df02`) (lane: notes)
+  Part of `W9.e2` (plan E2). Each behaviour observed VM-green, 24/24 (`TEST_ITERATIONS=3`):
+  source-block paste is G5; a menu-created extract embeds its image bytes (B6) is the new
+  `NotesE2PasteTests.testE2_MenuCreatedExtractEmbedsTheImageBytes` (Extract ▸ Create Extract over a selection
+  holding a pasted image: the extract's own `assets/` holds byte-identical bytes, the source's assets are
+  unchanged); a moved source re-grants in-app (B7) is `testE2_MovedArchiveReGrantsFromThePreviewPopover` (the
+  fixture corpus is moved, the popover offers "Choose Archive Folder…", the pick re-resolves and the popover
+  shows the PDF); a pasted page link shows a thumbnail is `testE2_PastedPageLinkShowsARenderedThumbnail` (grant
+  from File ▸ Choose Archive Folder…, paste, then the editor's own inline image is checked: not a placeholder,
+  and its pixels are dark text). That last test FAILED first: `ItemAssetStore.addAsset` writes the bytes after
+  returning the reference, so the freshly pasted chip showed "Missing" until the note was reloaded, on both
+  the rendered-thumbnail and Reader-payload paths. Fixed in `MarkdownEditorView` (`showInlineImagesOnceWritten`)
+  with a unit regression on the production store that fails without it (`KNOWN_ISSUES.md` §W9.e2-paste).
+  DEBUG-only seams: `an.editor.test.preview`, an `inlineImages` entry in the chip-geometry probe,
+  `-ANUITestRootPickPath` in place of the NSOpenPanel, a reader-root defaults suite emptied per UITest launch.
+  The 09-gap-closure CANDIDATE (a fresh note-passage paste renders as a raw comment) is retired there: G13
+  asserts the opposite immediately, after undo/redo and after reselect, and passed 3/3. Notes unit bundle 933
+  Swift Testing + 220 XCTest green, no new warnings. Adversarial review: no blockers; its two should-fixes
+  (per-pixel cost in the AX getter, popover anchored off-screen) were applied before the VM run.
+  <!-- /W9.e2-paste -->

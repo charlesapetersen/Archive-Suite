@@ -880,13 +880,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.e2-paste` — runtime sweep, paste and extracts: source blocks, page-link thumbnails, image bytes, re-grant [S-M · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
-  Part of `W9.e2` (plan E2). Source-block paste; a pasted page-link shows a thumbnail (`RenderProbe` for pixel
-  truth); a menu-created extract embeds its image bytes; a moved source re-grants in-app. Also confirm or retire
-  the CANDIDATE in `execution-plans/archive-notes/09-gap-closure.md` that a freshly pasted note-passage block
-  renders as a raw `<!-- block: note-passage … -->` comment (fold into D12 if real).
-  DONE WHEN each behaviour is observed in a VM-green UITest or render-guard shot, and the CANDIDATE is settled
-  in writing. | ArchiveNotes | S-M | low | **needs:** gui
 - [ ] **`W9.e4` — prove docs/tracker match reality, then DELETE `09-gap-closure.md` [S]** (lane: notes) (uses: light) (blocked-on: W9.e1,
   W9.e2, W9.e3, W9.b5-fu1). Plan E4. Verify Phase A landed, then retire the plan per the delete-a-shipped-plan
   convention. **This is the item that closes gap-closure.** | execution-plans/archive-notes/ | S | low | none
