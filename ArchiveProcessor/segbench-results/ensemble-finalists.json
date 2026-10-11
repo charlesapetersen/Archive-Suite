@@ -1,0 +1,14 @@
+{
+ "finalists": [
+  "C",
+  "CW"
+ ],
+ "rule": "ensemble.py docstring",
+ "bar": 0.98,
+ "decided": "2026-10-11",
+ "on": [
+  "Dean",
+  "Deaver",
+  "Herrnstein"
+ ]
+}
