@@ -1,0 +1,47 @@
+{
+ "date": "2026-10-11",
+ "finalists": {
+  "C": {
+   "level": 0.85,
+   "Stanton": {
+    "flagged": 32,
+    "errors_left": 2,
+    "pe_auto": 0.8683127572016461,
+    "pe_review": 0.9711934156378601
+   },
+   "RG165": {
+    "flagged": 5,
+    "errors_left": 1,
+    "pe_auto": 0.8735632183908046,
+    "pe_review": 0.9770114942528736
+   },
+   "pooled": {
+    "flagged": 37,
+    "errors_left": 3,
+    "pe_auto": 0.8696969696969697,
+    "pe_review": 0.9727272727272728
+   }
+  },
+  "CW": {
+   "level": 0.85,
+   "Stanton": {
+    "flagged": 33,
+    "errors_left": 2,
+    "pe_auto": 0.8930041152263375,
+    "pe_review": 0.9711934156378601
+   },
+   "RG165": {
+    "flagged": 6,
+    "errors_left": 1,
+    "pe_auto": 0.8735632183908046,
+    "pe_review": 0.9770114942528736
+   },
+   "pooled": {
+    "flagged": 39,
+    "errors_left": 3,
+    "pe_auto": 0.8878787878787879,
+    "pe_review": 0.9727272727272728
+   }
+  }
+ }
+}

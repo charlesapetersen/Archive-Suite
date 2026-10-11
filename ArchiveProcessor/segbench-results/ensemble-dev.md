@@ -61,7 +61,7 @@ Finalists (the top 2 by the rule in the module docstring): **C** (window-claude)
 
 ## Risk–coverage, pooled development set
 
-The level swept over every value, pooled over the three collections. Coverage = share of the 494 document gaps auto-accepted. This is the trade-off itself, read in-sample; the held-out levels are the table above. Full curves: ensemble-curves-dev.tsv.
+The level swept over every value, pooled over the three collections. Coverage = share of the 494 document gaps auto-accepted. This is the trade-off itself, read in-sample; the held-out levels are the table above. Full curves: ensemble-curves-dev.csv.
 
 ### C (window-claude)
 

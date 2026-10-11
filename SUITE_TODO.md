@@ -941,7 +941,6 @@ the owner's decision, then a build only if the result is usable. The Processor l
 (`W40.b3`, `W40.d1`-`d4`) wait on `W36.seg-decision`; `W40.a1` no longer does (2026-10-07). Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-ensemble` — agreement plus review: risk-coverage, then the test collections once [S-M]** (lane: segbench) (uses: light,paid) (blocked-on: W36.seg-window, W36.seg-second, W36.seg-whole, W36.seg-features, W36.seg-localvlm, W36.seg-truth-owner-ok). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-report` — results for the owner and a Daemon Report entry [S]** (lane: segbench) (uses: light) (blocked-on: W36.seg-ensemble, W36.seg-corpus-survey). Include an overnight option (owner, 2026-10-05: "we may want to include an option for models that can basically only be used overnight when the computer is in limited use otherwise"): for each on-device method, its time and memory per 1,000 pages and whether it is usable only as an overnight run on a Mac left alone, put to the owner beside the cloud options at the decision. Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER** (lane: segbench) (uses: light) (blocked-on: W36.seg-report). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 

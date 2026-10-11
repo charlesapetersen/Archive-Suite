@@ -289,7 +289,7 @@ def report() -> str:
     L += ["## Risk–coverage, pooled development set", "",
           "The level swept over every value, pooled over the three collections. Coverage = share of the "
           f"{gaps} document gaps auto-accepted. This is the trade-off itself, read in-sample; the held-out "
-          "levels are the table above. Full curves: ensemble-curves-dev.tsv.", ""]
+          "levels are the table above. Full curves: ensemble-curves-dev.csv.", ""]
     curves = {S: curve(list(dev.values()), S) for S in SETS}
     for S in finalists + [s for s in (("C",), ("W",), ("C", "W")) if s not in finalists]:
         cv = curves[S]
@@ -311,8 +311,8 @@ def report() -> str:
                      f"{pct(x['acc_err'] / x['accepted']) if x['accepted'] else '—'} | {x['per100']:.1f} | "
                      f"{pct(x['rev'])} | {pct(x['worst'])} |")
         L.append("")
-    with open(RESULTS / "ensemble-curves-dev.tsv", "w", newline="") as fh:
-        w = csv.writer(fh, delimiter="\t", lineterminator="\n")
+    with open(RESULTS / "ensemble-curves-dev.csv", "w", newline="") as fh:
+        w = csv.writer(fh, lineterminator="\n")
         w.writerow(["voters", "level", "coverage", "accepted", "errors_among_accepted", "flagged",
                     "flagged_per_100_pages", "pages_in_exact_doc_after_review", "worst_collection_after_review"])
         for S in SETS:
@@ -322,6 +322,17 @@ def report() -> str:
     L += approach_g()
     text = "\n".join(L) + "\n"
     (RESULTS / "ensemble-dev.md").write_text(text)
+    sec = ["", "## W36.seg-ensemble — voters combined, thresholds fitted leave-one-collection-out", "",
+           "A gap is auto-accepted when the voters agree and their lowest confidence is above a level fitted on the "
+           "other development collections to reach 98% after review; the rest are flagged. Detail: ensemble-dev.md "
+           "(development) and ensemble-test.md (the test collections, scored once).", "",
+           "Development, held out per collection: " + "; ".join(
+               f"{short(S)} {pct(pe(res[S]['pooled']['rev']))} after review at "
+               f"{100 * res[S]['pooled']['flagged'] / res[S]['pooled']['pages']:.1f} flagged per 100 pages, "
+               f"{res[S]['pooled']['acc_err']} errors left" for S in finalists) + "."]
+    (RESULTS / "ensemble.summary-section.md").write_text("\n".join(sec) + "\n")
+    import run
+    run.write_summary()
     (RESULTS / "ensemble-finalists.json").write_text(json.dumps(
         {"finalists": [short(S) for S in finalists], "rule": "ensemble.py docstring", "bar": BAR,
          "decided": dt.date.today().isoformat(), "on": list(data.DEV)}, indent=1) + "\n")
@@ -465,6 +476,15 @@ def final() -> str:
     text = "\n".join(L) + "\n"
     (RESULTS / "ensemble-test.md").write_text(text)
     FINAL_RECORD.write_text(json.dumps(record, indent=1, default=float) + "\n")
+    sec = RESULTS / "ensemble.summary-section.md"
+    sec.write_text(sec.read_text().rstrip() + "\n\nTest (Stanton + RG 165, scored once, levels fitted on all three "
+                   "development collections): " + "; ".join(
+                       f"{k} {pct(f['pooled']['pe_review'])} after review at "
+                       f"{100 * f['pooled']['flagged'] / pages:.1f} flagged per 100 pages, "
+                       f"{f['pooled']['errors_left']} errors left, {pct(f['pooled']['pe_auto'])} with no review"
+                       for k, f in record["finalists"].items()) + ".\n")
+    import run
+    run.write_summary()
     return text
 
 

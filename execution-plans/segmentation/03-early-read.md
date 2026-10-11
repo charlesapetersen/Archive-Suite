@@ -176,3 +176,24 @@ because the two letter collections it learns from cannot teach it what a clippin
 is little data. At best it is a cheap extra voter for the ensemble, not a method on its own.
 
 Detail: `ArchiveProcessor/segbench-results/features-lr-report.md`; summary in `SUMMARY.md`.
+
+## Addendum 6, 2026-10-11 — the combination, and the two test boxes scored once (W36.seg-ensemble)
+
+**Combining the voters adds almost nothing over Claude alone.** Of 15 combinations of the four voters (Claude
+windows, Gemini Flash-Lite windows, Gemini one-call-per-folder, the on-device model), the best rule on Dean, Deaver
+and Herrnstein was simply Claude's own confidence: send every boundary it is 85% sure of or less to review. With
+the cut-off for each box set on the other two, all three development boxes reached 98% after review (99.0%
+pooled) at about 6 boundaries to check per 100 pages, with 2 unflagged errors in 551 pages. Adding the Gemini
+folder call gives the same result at a slightly higher review load; the on-device model only adds reviews.
+
+**On Stanton and RG 165, which nothing had been tuned on, it falls short of 98%.** Scored once, with the cut-off
+fixed on the development boxes: 97.3% of pages in an exact document after review (Stanton 97.1%, RG 165 97.7%),
+at 10 boundaries to check per 100 pages (Stanton 12.8, RG 165 4.4), and 3 errors that review would never see in
+363 pages — about 4 per 500 pages, against the proposed bar of 1. With no review at all it is 87–89%. The drop
+from the development boxes is the honest price of having chosen the method there.
+
+**The phone's "End segment" marks (RG 165) could not be measured:** that box's folder keeps only the photos and
+the CSV, not the groups recorded during capture.
+
+Detail: `ArchiveProcessor/segbench-results/ensemble-dev.md` and `ensemble-test.md`; summary in `SUMMARY.md`.
+The write-up for your decision is the next item, `W36.seg-report`.
