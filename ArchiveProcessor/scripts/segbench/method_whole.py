@@ -719,8 +719,13 @@ def report() -> str:
                  f"{100 * (len(rc) - len(acc)) / pages:.1f} |")
     _, curve = vote(cols, ["whole-gemini"])        # one voter: nothing flagged, review by confidence
     own98 = next((p for p in curve if p[1] >= 0.98), None)
+    below = [p for p in curve if p[1] < 0.98]
+    ties = max(sum(1 for r in rc if round(r[5], 3) == v) for v in {round(r[5], 3) for r in rc})
     L += ["", "Review load to 98% pooled by its own confidence alone: "
-          + (f"{own98[0]} boundaries ({100 * own98[0] / pages:.1f} per 100 pages)." if own98 else "not reached."), ""]
+          + (f"{own98[0]} boundaries ({100 * own98[0] / pages:.1f} per 100 pages)." if own98 else "not reached.")
+          + (f" The step before it is {below[-1][0]} boundaries at {_pct(below[-1][1])}: the confidences are "
+             f"coarse ({ties} of {len(rc)} gaps share one value), and a threshold cannot split a tie."
+             if below and own98 else ""), ""]
     V, vhead = vote_lines(cols, pages)
     L += V
     cs = calls()

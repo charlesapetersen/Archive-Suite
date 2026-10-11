@@ -968,7 +968,6 @@ the owner's decision, then a build only if the result is usable. The Processor l
 (`W40.b3`, `W40.d1`-`d4`) wait on `W36.seg-decision`; `W40.a1` no longer does (2026-10-07). Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [ ] **`W36.seg-whole` — one long-context call per folder as a third voter [S · paid]** (lane: segbench) (uses: light,paid) (blocked-on: W36.seg-window). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
 - [ ] **`W36.seg-features` — on-device feature model, timestamps one weak feature [M]** (lane: segbench) (uses: model:4) (blocked-on: W36.seg-base). Detail: `execution-plans/segmentation/00-plan.md` Part 2.
   Notes: `execution-plans/items/W36.seg-features.md` (checkpoint 1 of 2 landed; what remains).
 - [ ] **`W36.seg-ensemble` — agreement plus review: risk-coverage, then the test collections once [S-M]** (lane: segbench) (uses: light,paid) (blocked-on: W36.seg-window, W36.seg-second, W36.seg-whole, W36.seg-features, W36.seg-localvlm, W36.seg-truth-owner-ok). Detail: `execution-plans/segmentation/00-plan.md` Part 2.

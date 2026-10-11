@@ -18,6 +18,8 @@ Photos: "truth" means the method was given the box/folder photo labels from the 
 | spring-v1 | dev | 551 | 86.5% | 92.1% | 20 | 6 | 0.957 | 6.5 | own | NO: the prompts were tuned on all five collections |
 | spring-v1-oracle-photos | dev | 551 | 85.7% | 91.4% | 24 | 8 | 0.946 | 5.8 | truth | NO: the prompts were tuned on all five collections |
 | spring-v2 | dev | 551 | 80.9% | 86.3% | 16 | 17 | 0.943 | 7.4 | own | NO: the prompts were tuned on all five collections |
+| whole-gemini-c10 | dev | 551 | 89.4% | 93.4% | 6 | 8 | 0.976 | 2.5 | truth | no: prompt written after reading the owner's notes on dev pages, not tuned on its errors; no fitted parameters |
+| whole-gemini | dev | 551 | 93.1% | 95.0% | 7 | 7 | 0.976 | 2.5 | truth | no: prompt written after reading the owner's notes on dev pages, not tuned on its errors; no fitted parameters |
 | window-claude | dev | 551 | 90.3% | 94.9% | 5 | 6 | 0.981 | 2.0 | own | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
 | window-claude-truth-photos | dev | 551 | 90.3% | 94.9% | 5 | 6 | 0.981 | 2.0 | truth | no: prompt written after reading dev pages, not tuned on its errors; no fitted parameters |
 | window-gemini-lite | dev | 551 | 84.6% | 91.8% | 27 | 3 | 0.951 | 5.4 | own | no: prompt written after reading the owner's notes on dev pages, not tuned on its errors; no fitted parameters |
@@ -41,6 +43,14 @@ Logistic regression on rule cues, TF-IDF similarity, length, blank, paper colour
 With the time gap, it ranks 2 of 26 features by permutation importance; the strongest is next_salutation. Top features without the time gap: next_salutation, next_pn_top_ge2, tfidf_cosine, paper_diff, prev_closing.
 
 Reading (as of the 2026-10-05 run): the pooled figures are pulled down by Deaver, mostly newspaper clippings. Its boundaries carry none of the letter cues the other two collections teach (salutation, closing), and the features that do separate them there (TF-IDF similarity, a lower-case first line, orientation change) are flat in Dean and Herrnstein, so the model fitted on those two calls nearly every Deaver gap a continuation. Two collections per fit cannot teach a third document type. The 'best >=50% coverage' column picks its cut on the same held-out predictions, so it is optimistic; the threshold rows in the report are the fixed-cut view.
+
+## W36.seg-whole — one long-context call per folder, as a third voter (development set)
+
+Model gemini-3.8-flash, thinkingLevel low, temperature 0, prompt wh1; folders from the truth's label photos (truth photo labels). Detail: whole-gemini-report.md.
+
+Pages in an exact document, pooled: whole-gemini 93.1%, the same model and prompt over pieces of at most 10 pages 89.4%, window-claude 90.3%.
+
+Voting with window-claude: 7 boundaries flagged (1.3 per 100 pages), 9 errors left among the agreed, 94.2% after reviewing the flagged; 98% pooled after 30 reviews (5.4 per 100 pages). All three voters: 27 flagged, 6 errors left among the agreed, 96.3% after reviewing the flagged; 98% pooled after 44 reviews.
 
 ## W36.seg-window — Claude over overlapping page windows (development set)
 

@@ -125,3 +125,37 @@ much is the prompt. A stronger second model might do better. The confidences Fla
 coarse, mostly 0.95 or 1.0.
 
 Detail: `ArchiveProcessor/segbench-results/window-gemini-lite-report.md`; summary in `SUMMARY.md`.
+
+## Addendum 4, 2026-10-11 — one call per folder as a third voter (W36.seg-whole)
+
+What was run: Gemini 3.8 Flash through the paid API, thinking set to low. Each call got one whole folder:
+every document page between two of your folder or box photos, up to 82 pages in one call. The prompt carried
+your domain cues and the approved document rules. Because the folders come from your label photos, these
+figures assume the photos are labelled right. The window method already gets them all right on these boxes. As
+a control, the same model and prompt also judged the same folders cut into pieces of at most 10 pages. 82 calls
+cost $1.45 at the list price. The estimate before the run was $1.51.
+
+**The whole-folder call is the best single method so far:** 93.1% of pages in an exactly right document,
+against 90.3% for the Claude window method and 85.7% for the prompt the app ships. It made 7 false splits and 7
+false merges, more wrong boundaries than Claude (14 against 11), but its errors fell in shorter documents.
+
+**It does not degrade with length.** The plan expected trouble past about 10 pages. None showed. The error
+rate was 1.5% in folders over 40 pages, and no gap after the 40th page of a call was wrong. The 10-page pieces
+made exactly as many errors as the whole folders (14 each) but put fewer pages in exact documents (89.4%). On
+Deaver alone, the same model over the 7-page windows did better (97.9% against 93.6%). That is a difference of
+two or three boundaries on one box.
+
+**Its confidence is no better at pointing to its mistakes.** It gave 0.99 to 403 of 494 boundaries, and 3 of
+its 14 errors carry 0.99. Reviewing its 91 least-sure boundaries brings it to 97.9%, and 98% then needs the
+whole 0.99 group.
+
+**As a voter with Claude it helps a little.** The two disagree at only 7 boundaries (1.3 per 100 pages), and 9
+errors are shared, so voting accepts them unseen. Reaching 98% pooled takes 30 reviews (5.4 per 100 pages),
+against 34 with Claude's own confidence. 98% in every collection takes 35 reviews, against 147. All three
+voters together (adding Flash-Lite) leave only 6 shared errors, but Flash-Lite's false splits raise the reviews
+needed to 44.
+
+Caveats: development boxes only (Dean, Deaver, Herrnstein; Stanton and RG 165 untouched), a prompt written
+after reading your notes on them, and 14 errors in all, so a difference of a few boundaries is noise.
+
+Detail: `ArchiveProcessor/segbench-results/whole-gemini-report.md`; summary in `SUMMARY.md`.
