@@ -357,8 +357,18 @@ struct MarkdownEditorView: NSViewRepresentable {
                 }
                 guard let textView, coordinator.parent.contentID == contentID,
                       coordinator.parent.focusRequestToken == token,
-                      let window = textView.window, window.isKeyWindow,
-                      window.makeFirstResponder(textView) else { return }
+                      let window = textView.window, window.isKeyWindow else { return }
+                // W9.g16-flake: this one-shot request stays armed until it lands (it re-arms on every
+                // key-window change), so it can fire seconds after the selection, once the user is typing
+                // in another text input (an inspector field, the search field). Taking first responder
+                // then diverts the rest of their typing into the note body (seen in the VM: a Zotero link
+                // cut off after "zote", the rest in the body). Yield, and settle the request for good.
+                if let editing = window.firstResponder as? NSText, editing !== textView {
+                    coordinator.lastFocusToken = token
+                    coordinator.parent.onFocusApplied?()
+                    return
+                }
+                guard window.makeFirstResponder(textView) else { return }
                 coordinator.lastFocusToken = token
                 coordinator.parent.onFocusApplied?()
             }

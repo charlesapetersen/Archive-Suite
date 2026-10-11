@@ -10184,3 +10184,22 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   real Zotero install is untested: the local API answering, a real citation in the configured style, and
   `zotero://select/…` actually raising the item in Zotero.
   <!-- /W9.e2-zotero -->
+- [x] **W9.g16-flake — `testG16_NoteZoteroAttachmentChipsAndClipboardDedup` failed once in a full VM run [S · gui]** · §W9 gap-closure · SHIPPED 2026-10-10 (this commit)
+  Found by W9.e2-search, 2026-10-08: G16's chip `an.zotero.chip.NOTE1234` did not appear within 5 s after Attach,
+  intermittently. **Cause:** the note editor took keyboard focus while the Zotero link was being typed. The
+  editor's one-shot initial focus (`MarkdownEditorView` coordinator, deferred `makeFirstResponder`) stays armed
+  until it lands and re-arms on every key-window change, so it could fire seconds after the selection, mid-typing.
+  The rest of the link went into the note body, `ZoteroSelectLink.parse` failed, Attach stayed disabled, and the
+  failure surfaced only as a missing chip. A real user bug, not just a test one: typing in an inspector or search
+  field right after selecting a note could be diverted into the note body.
+  **Fix:** before taking first responder, the initial focus checks whether another text input (`NSText`, so any
+  field editor) already holds it; if so it yields and settles the request for good.
+  **Evidence:** a new `TEST_ITERATIONS=N` override on `ops/gui/vm-gui-runner.sh` (`-test-iterations N
+  -run-tests-until-failure`) plus three `yes` CPU hogs in the 4-core guest reproduced it: 2 failures in about 47
+  iterations unfixed, the field holding `"zoter"` / `"zote"`. G16 now asserts the whole link landed and otherwise
+  names the focused element: `an.editor.text`, editor body changed, one window. With the fix, 40/40 under the same
+  load. Full Notes VM suite: G16 green; 45 passed, 1 skipped (corrupt-index), and G4 failed once (8/8 alone, focus
+  not involved), filed as `W9.g4-flake`. Notes unit bundle green (932 Swift Testing + 220 XCTest), no new warnings.
+  Ruled out on the way: a late body load (G16 waits for the clipboard banner, which is set only after the body
+  load). A DEBUG 3 s load-delay test passed unfixed, so it was dropped.
+  <!-- /W9.g16-flake -->
