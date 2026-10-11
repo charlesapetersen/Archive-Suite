@@ -10521,3 +10521,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   full-bundle runs (Reader 420 green; Notes 959 + 220 XCTest green), and the next periodic gate re-checks them.
   `W40.b1`/`W40.b2` were blocked on this tag and are now unblocked on it.
   <!-- /W24.cal1 -->
+- [x] **W36.seg-opt-design — the design note [S · ~1 session]** · §Archive Processor — automatic segmentation · SHIPPED 2026-10-11
+  (lane: segbench) (uses: light) (blocked-on: W36.seg-opt-measure, W36.seg-opt-usage)
+  Docs only: `execution-plans/segmentation/04-options-build.md` Part 3. It decides the following:
+  - A new `SegmentationApproach` setting (manual / claude / gemini / openai / mix, ids = `options.json`), split out
+    of `TaggingMode`. No migration, because there is no production material. The split lands in `W36.seg-opt-engine`.
+  - The per-page classifier keeps only box and folder photos, behind `BoxFolderConfirmSheet`. Live Capture is out of
+    scope.
+  - The engine contract is the bench's windows and rules (`method_window.combine`, `ensemble.judge`), read from
+    `options.json`. A failed window's gaps are flagged, never guessed.
+  - The figures: `options.json` is bundled by path, and only `figures.test` is shown, scaled to the dropped page
+    count. A zero is shown as "none in N test pages".
+  - Costs: dollars per API key, and the Claude-plan share per `usage.md`.
+  - The flagged pass shows page n | n+1 with Keep / Split / Join, then the existing skim sheet.
+  - A per-item build table.
+  <!-- /W36.seg-opt-design -->
