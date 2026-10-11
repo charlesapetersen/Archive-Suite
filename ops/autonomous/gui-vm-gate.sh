@@ -132,7 +132,9 @@ boot_vm() {
   tart stop "$VM" >/dev/null 2>&1 || true
   local mounts=(--dir=repo:"$ROOT" --dir=out:"$ART")
   VM_BOOTED=1
-  tart run "$VM" --no-graphics "${mounts[@]}" >>"$GLOG" 2>&1 &
+  # --no-clipboard: a host copy otherwise overwrites the guest pasteboard mid-test (W9.g4-flake; see
+  # ops/gui/vm-gui-runner.sh at its own `tart run`).
+  tart run "$VM" --no-graphics --no-clipboard "${mounts[@]}" >>"$GLOG" 2>&1 &
   tart ip "$VM" --wait 120 >/dev/null 2>&1 || return 1
   tart_wait_agent "$VM" "$AGENTWAIT" || return 2
   echo "guest agent ready after ${TART_AGENT_WAITED}s" >>"$GLOG"

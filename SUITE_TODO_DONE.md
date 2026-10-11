@@ -10203,3 +10203,20 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Ruled out on the way: a late body load (G16 waits for the clipboard banner, which is set only after the body
   load). A DEBUG 3 s load-delay test passed unfixed, so it was dropped.
   <!-- /W9.g16-flake -->
+- [x] **W9.g4-flake — `testG4_PasteImageWritesAssetAndInlineReference` failed once in a full VM run [S · gui]** · §W9 gap-closure — SHIPPED 2026-10-11 (lane: notes)
+  Found by W9.g16-flake: in one full Notes VM run, no `assets/pasted-….png` appeared after the paste seam fired
+  (8/8 alone). **Cause: the test VM shared the HOST clipboard.** `tart run` shares it by default, and the guest
+  runs `tart-guest-agent --run-agent`, which serves it, so a copy anywhere on the owner's laptop replaced the
+  guest's general pasteboard. G4 seeds that pasteboard with PNG bytes and the app reads it a moment later. A host
+  copy in between turned the PNG into text, `tryPasteImage` declined silently, and no asset was written. Measured
+  by hand: a host `pbcopy` replaced the guest's own value. Not the asset store, its retarget, or the background
+  write: none of 30 G4 iterations alone under three guest `yes` hogs, nor a full `NotesGUITests` run under the
+  same load (32 passed, G18 included and green), reproduced it.
+  Fix: every VM boot passes `--no-clipboard` (`vm-gui-runner.sh`, `gui-vm-gate.sh`, `vm-seed-accessibility.sh`);
+  `prove-vm-lane.sh` checks the runner and the gate (76/76). The image-paste seam now returns a diagnosis on its
+  button's a11y value, like `pastePassage` (`ok`/`declined:<guard>` plus `store=` and `sel=`), and G4 asserts it
+  before polling the disk. That is what named this one.
+  Proof, with a host loop rewriting the clipboard every 0.5 s: OLD boot flags → G4 failed on the first iteration
+  with `declined:noImageOnPasteboard store=11111111 sel=11111111`; NEW → G4 10/10 and G5 10/10. Notes app and
+  unit bundle build clean, no new warnings. Commits: checkpoint 9f69f39 (seam diagnosis), then the fix.
+  <!-- /W9.g4-flake -->

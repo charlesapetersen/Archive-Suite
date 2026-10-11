@@ -140,6 +140,12 @@ all. So:
   `close_vm_viewer` remains as a guard in case a future tart reverts that behaviour; it only quits Screen
   Sharing if it was not already running before the boot, so a session of your own is never torn down.)
 
+**Every boot also passes `--no-clipboard` (W9.g4-flake, 2026-10-11).** `tart run` shares the clipboard by
+default, and the guest's `tart-guest-agent --run-agent` serves it, so a copy anywhere on the host replaces
+the guest's general pasteboard. Tests that seed it and read it back (Notes G4/G5/G13/G16) then see host
+text. G4 failed that way with `declined:noImageOnPasteboard`, reproduced on the first try with a host
+`pbcopy` loop. `prove-vm-lane.sh` checks the runner and the gate for the flag.
+
 Both verified end to end on 2026-07-30 with no window on the host at any point: `xcuitest` →
 ArchiveReaderUITests **15/15** in the VM; `sighted` → `sighted-reader.png`, a real 2048×1536 capture of the
 Reader on `AR-GUI-Fixture` (11 documents, tags, parsed dates, OCR-fail badges).

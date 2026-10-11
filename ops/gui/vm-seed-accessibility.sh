@@ -64,7 +64,9 @@ if ! tart exec "$VM" true >/dev/null 2>&1; then
   log "booting '$VM' (headless)…"
   # --no-graphics: this never needs pixels, and it is the flag that keeps a VM window off the owner's
   # screen (ops/gui/README.md §3). The repo share is required — the probe is read from it.
-  tart run "$VM" --no-graphics --dir=repo:"$(cd "$HERE/../.." && pwd)" >/dev/null 2>&1 &
+  # --no-clipboard matches the test lanes: a VM left up by this script must not share the host clipboard
+  # with the next test run (W9.g4-flake).
+  tart run "$VM" --no-graphics --no-clipboard --dir=repo:"$(cd "$HERE/../.." && pwd)" >/dev/null 2>&1 &
   BOOTED_BY_US=1
 fi
 

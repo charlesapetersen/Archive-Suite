@@ -880,18 +880,6 @@ completion record is in `SUITE_TODO_DONE.md`.
   the saved draft branches listed in its notes file (merged, superseded, or deleted, each named), and move all seven entries
   to `SUITE_TODO_DONE.md`. Est. a quarter of a session.
   Edges: (blocked-on: W9.e1, W9.b5-fu1, W9.e2-notes, W9.e2-search, W9.e2-folders, W9.e2-zotero, W9.e2-links, W9.e2-paste)
-- [ ] **`W9.g4-flake` — `testG4_PasteImageWritesAssetAndInlineReference` failed once in a full VM run [S · gui]** (lane: notes) (uses: vm)
-  Found by W9.g16-flake, 2026-10-10. A full `vm-gui-runner.sh notes xcuitest` run (47 executed, 1 skipped) failed
-  G4 at `NotesGUITests.swift:1192`: after the `an.editor.test.pasteImage` seam fired, no `assets/pasted-….png`
-  appeared in the plain note within 10 s. G4 then passed 8/8 alone (`TEST_ITERATIONS=8`). The seam calls
-  `EditorTextView.tryPasteImage` directly, so editor focus is not involved; suspect the asset store's
-  retarget-on-selection (`refreshAssetStore`) or its background byte write under VM load. The same session
-  saw `testG18_DragFolderOntoFolderReparentsIt` fail once ("should persist Ideas as its parent") in a run that
-  later wedged on the guest WindowServer (`wire_host_mapping` errors), then pass in the next full run; check
-  whether it recurs before treating it as a second flake. Reproduce with `TEST_ITERATIONS=N` plus guest CPU
-  load (three `yes` hogs over `tart exec`; that is what exposed W9.g16-flake), find the race, make it
-  deterministic. Do not just raise the timeout.
-  DONE WHEN the cause is fixed and G4 passes in repeated VM runs. | ArchiveNotes | S | low | **needs:** gui
 - [ ] **`W9.e2-links` — runtime sweep, Copy Link and the `archivenotes://open` round trip [S · gui · ~1 session]** (lane: notes) (uses: vm) (blocked-on: W9.e1, W9.b5-fu1, W35.vm-mem-fu1)
   Part of `W9.e2` (plan E2). Copy Link (B9) puts the item's `archivenotes://open?id=…` URL on the pasteboard, and
   opening it selects and raises that item (B5), the full round trip E2 asks for. `f4f39c4` on

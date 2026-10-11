@@ -180,6 +180,13 @@ grep -q 'SS_WAS_RUNNING' "$RUNNER" \
   && ok "…but only if it did not exist before the boot (never kills the owner's own session)" \
   || no "viewer close is unscoped — it would quit a screen-share the owner had open"
 grep -q 'tart run "\$VM" --no-graphics' "$GATEF" && ok "gate boots --no-graphics (always silent)" || no "gate is not booting --no-graphics"
+# W9.g4-flake: tart shares the host clipboard by default, and a host copy replaced the guest pasteboard
+# between a test seeding it and the app reading it. Every boot that runs tests must opt out.
+grep -q 'tart run "\$VM" "\${gfx\[@\]}" --no-clipboard' "$RUNNER" \
+  && ok "runner boots --no-clipboard (host copies cannot reach the guest pasteboard)" \
+  || no "runner shares the host clipboard — a host copy can clobber a pasteboard test"
+grep -q 'tart run "\$VM" --no-graphics --no-clipboard' "$GATEF" \
+  && ok "gate boots --no-clipboard" || no "gate shares the host clipboard with the guest"
 
 echo "== 9. FORWARD tripwire: any app-hosted test bundle must suppress its window =="
 # The window-suppression fix is per-app opt-in (each App calls ArchiveTestHost in init()), so it does NOT

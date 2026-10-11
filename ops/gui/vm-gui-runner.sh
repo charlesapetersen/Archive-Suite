@@ -155,9 +155,14 @@ ensure_vm() {
   # Better than opening a window and closing it, which flashes.
   local gfx=(--no-graphics)
   [ "$LANE" = "xcuitest" ] || gfx=(--no-graphics --vnc-experimental)
-  log "booting $VM (${gfx[*]}) + repo/artifact shares…"
+  # --no-clipboard, every lane (W9.g4-flake, measured 2026-10-11). `tart run` SHARES THE CLIPBOARD by
+  # default, and the guest runs tart-guest-agent, which serves it: a copy anywhere on the host replaced the
+  # guest's general pasteboard within seconds. G4/G5/G13/G16 seed that pasteboard and read it back moments
+  # later, so a host copy in between swapped G4's PNG for text, the paste declined, and no asset appeared.
+  # Tests need a pasteboard nothing outside the guest can write.
+  log "booting $VM (${gfx[*]} --no-clipboard) + repo/artifact shares…"
   VM_BOOTED=1
-  tart run "$VM" "${gfx[@]}" "${mounts[@]}" >>"$runlog" 2>&1 &
+  tart run "$VM" "${gfx[@]}" --no-clipboard "${mounts[@]}" >>"$runlog" 2>&1 &
   echo $! > "$APP_ART/tart-run.pid"
   if [ "$LANE" != "xcuitest" ]; then
     # Parse the one-shot VNC endpoint tart prints: vnc://:PASSWORD@127.0.0.1:PORT
