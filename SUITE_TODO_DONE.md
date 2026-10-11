@@ -10321,3 +10321,16 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   note, and the Notes README and the five `NotesE2*Tests.swift` header comments (comment-only edits) no longer
   name the file. The Codex dedup record in `SUITE_TODO.md` still names the plan, which is accurate history.
   <!-- /W9.e4 -->
+- [x] **W36.seg-report — results for the owner and a Daemon Report entry [S]** · §Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze) · SHIPPED 2026-10-11 (this commit)
+  `execution-plans/segmentation/01-results.md`, written from the saved bench results with no new model call: every
+  approach side by side (dev pages in an exact document, false splits/merges, cost per 1,000 pages), review load
+  per box, and the test result scored once (Claude windows, <=0.85 flagged: 97.3% after review, about 10 checks per
+  100 pages, 3 unflagged errors in 363 pages; the bar was 98% in every box and 1 per 500). The overnight option the
+  owner asked for: each on-device method's time and memory per 1,000 pages on this M3 Pro (18 GB). Feature model
+  about 2 min and 0.15 GB, from a timing of `segbench-embed` on 100 dev pages today (11 s, daemon-clamped, so an
+  upper figure). Local VLMs 3 to 5.5 h and 5.5 to 12.3 GB, from the recorded seconds per window x 339 windows.
+  None is accurate enough to be worth an overnight run. Corpus fine-tune costed as an estimate only. Recommendation:
+  not automatic; a review-first assistant only if the owner accepts 97%, and then measure Gemini 3.8 Flash windows
+  on Dean and Herrnstein (about $1.50) first, because the app can't use Claude through the subscription (about
+  $24-48 per 1,000 pages by API key). Daemon Report entry for `W36.seg-decision` filed.
+  <!-- /W36.seg-report -->
