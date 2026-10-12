@@ -885,8 +885,6 @@ on `a1` rather than `a3`. The freeze is now per area: only an app's ledger and j
 unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the Reader and Notes ledgers `b1`/`b2` on
 `W24.cal1` (their journeys follow through `b1`/`b2`). Rule 7 of the daemon plan says the same.
 
-- [ ] **`W40.a3` — every lane green in full, in any order [M]** (lane: suite) (uses: build,vm) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A. (blocked-on: W40.a3-owner-ok)
-- [ ] **W40.a3-owner-ok — OWNER GATE for W40.a3: Approve publishing the reviewed W40.a3 commits to origin https://github.com/charlesapetersen/Archive-Suite.git and fast-forwarding main? Automatic approval review rejected main and branch pushes for missing trusted destination authorization.** (lane: suite) (uses: light)
 - [ ] **`W40.a4` — remove tests that cannot fail [S]** (lane: reader,notes,processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.a5` — test drivers out of the Processor Release build [S · Tier-2]** (lane: processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
 - [ ] **`W40.i1` — iPhone companion builds again [S-M]** (lane: processor,ops) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.

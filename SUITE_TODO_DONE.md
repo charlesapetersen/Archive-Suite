@@ -10563,3 +10563,13 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   done before anything replaces the per-page classifier, the split would leave `automatic`/`autoDate` with no automated
   segmentation, and `automatic` + manual is undesigned).
   <!-- /W36.seg-opt-engine -->
+- [x] **W40.a3-owner-ok — ANSWERED by the owner 2026-10-11 (walkthrough):** yes, publish the reviewed W40.a3 commits to origin and fast-forward main. Codex's automatic approval review had refused the push because the project's written push permission is not authorization it trusts. The fix is a Codex execpolicy rule allowing `git push origin`, which the owner installs in `~/.codex/rules/`.
+- [x] **W40.a3 — every lane green in full, in any order [M]** · §W40 verification phase · SHIPPED 2026-10-11 (this commit; checkpoints 95e90e3b, 0511d85c, dc5e3d78, e7e313aa)
+  relay-golden is mandatory in `health-gate.sh` and its negative control detects a real mismatch. Notes G19→G3 and
+  G3→G19 pass in both orders (51.711/51.498 s); a no-restore mutant fails the next seeded-row setup. Full VM lanes at
+  HEAD: Reader 35 UI tests plus the VM snapshot, Notes 57 UI tests plus 1179 units, Processor 10 UI tests, both
+  corrupt-index fixtures, relay 4 Swift / 4 JVM. The real three-image Android↔Mac E2E produces three PDFs, passes every
+  token/year/PDF/tag assertion and exits unattended in 188.10 s; E2E overrides are volatile, so saved processing
+  settings are unchanged. Bounded owned-child cleanup: 44-check proof, and removing the production TERM unblock fails
+  the exact-launch probe. Counts, durations and evidence: `verification/README.md`, `verification/evidence/*/W40.a3-*.md`.
+  <!-- /W40.a3 -->

@@ -91,7 +91,7 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
   `health-gate.sh`. Prove it bites: plant a failing Core assertion, see the gate go red, revert.
 - **`W40.a3` — every lane green in full, in any order [M].** Run all three apps' full VM UI suites, the phone↔Mac
   E2E and `scripts/test-relay-golden.sh` at HEAD. Make the Notes suite order-independent (G19 deletes the fixture
-  note `setUpOnMainActor` needs). Put relay-golden in the gate. Record counts and durations in the ledger README.
+  note `setUpOnMainActor` needs). Put relay-golden in the gate. Record counts and durations in the ledger README. *(SHIPPED 2026-10-11, see SUITE_TODO_DONE.md.)*
 - **`W40.a4` — remove tests that cannot fail [S].** `SmokePlaceholderTests.testAppExists`
   (`XCTAssertTrue(true)`), assertion-free tests such as `SourceBlockViewTests.fitResetsAutoScale`, the
   `EditorBindingTests` lint that passes when its directory is missing, and fixture-missing `XCTSkipUnless` in the
