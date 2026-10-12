@@ -333,6 +333,7 @@ step archivecore bash "$ROOT/ops/autonomous/archivecore-tests.sh"
 # W40.a3: byte-identical iOS/Android relay JSON is a mandatory, free gate lane.
 # The harness takes the heavy lock for its Swift/JVM builds; missing fixtures fail closed.
 step relay-golden bash "$ROOT/ArchiveProcessor/scripts/test-relay-golden.sh"
+step e2e-cleanup-proof python3 "$ROOT/ArchiveProcessor/scripts/test-e2e-cleanup.py"
 step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -derivedDataPath ./build/gate-DD'
 step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
 # Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless

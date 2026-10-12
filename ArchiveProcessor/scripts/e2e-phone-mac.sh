@@ -16,6 +16,7 @@
 # Deterministic + unattended: emulator only (never a physical phone), known
 # fixtures, isolated output (never the real corpus), no skip-permissions.
 #
+# Cost: three synthetic images through gemini-2.5-flash-lite (a few cents).
 # Usage:  OCR_KEY=<gemini-key> scripts/e2e-phone-mac.sh
 #         (if OCR_KEY unset, falls back to the Keychain Gemini key)
 #   caffeinate -di scripts/e2e-phone-mac.sh     # keep the Mac awake for the run
@@ -60,12 +61,50 @@ redact_closed_maclog(){
   # diagnostics would continue into an unlinked inode and silently disappear from the retained mac.log.
   [ -f "$MACLOG" ] && sed -i '' -E 's/token=[^ ]+/token=[REDACTED]/g' "$MACLOG"
 }
-cleanup(){
-  if [ -n "$MAC_PID" ]; then
-    kill "$MAC_PID" 2>/dev/null || true
-    wait "$MAC_PID" 2>/dev/null || true
-    MAC_PID=""
+# Inspect only the captured direct child. A missing/zombie child can be reaped; a live nonchild
+# or an inspection failure must never authorize a signal. Do not match apps by name or kill a group.
+mac_child_state(){
+  local row parent state
+  if ! row="$(ps -p "$MAC_PID" -o ppid= -o stat= 2>/dev/null)"; then
+    if kill -0 "$MAC_PID" 2>/dev/null; then return 1; fi
+    printf '%s\n' exited; return 0
   fi
+  read -r parent state <<< "$row"
+  [ "$parent" = "$$" ] || return 1
+  case "$state" in *Z*) printf '%s\n' exited ;; *) printf '%s\n' running ;; esac
+}
+stop_mac_test_child(){
+  [ -n "$MAC_PID" ] || return 0
+  [[ "$MAC_PID" =~ ^[1-9][0-9]*$ ]] || return 1
+  local state n
+  state="$(mac_child_state)" || { log "FAIL: cannot verify Mac test-child ownership"; return 1; }
+  if [ "$state" = running ]; then
+    kill -TERM "$MAC_PID" 2>/dev/null || true
+    for n in $(seq 1 50); do
+      state="$(mac_child_state)" || return 1
+      [ "$state" = exited ] && break
+      sleep 0.1
+    done
+    if [ "$state" = running ]; then
+      # A TERM-resistant scratch child must not stall teardown after the OCR oracle passed.
+      state="$(mac_child_state)" || return 1
+      if [ "$state" = running ]; then
+        log "Mac test child did not stop after TERM; stopping the owned scratch child with KILL"
+        kill -KILL "$MAC_PID" 2>/dev/null || true
+      fi
+      for n in $(seq 1 50); do
+        state="$(mac_child_state)" || return 1
+        [ "$state" = exited ] && break
+        sleep 0.1
+      done
+    fi
+  fi
+  [ "$state" = exited ] || { log "FAIL: Mac test child survived shutdown; log left open"; return 1; }
+  wait "$MAC_PID" 2>/dev/null || true
+  MAC_PID=""
+}
+cleanup(){
+  stop_mac_test_child || return 1
   redact_ready_token
   redact_closed_maclog
 }
@@ -79,7 +118,14 @@ sanitize_artifacts(){
   [ -f "$REPORT" ] && sed -i '' -E 's/ \(token [^)]*\)/ (token [REDACTED])/g' "$REPORT"
   rm -f "$SHOTS/04-filled.png"
 }
-trap 'cleanup; sanitize_artifacts' EXIT
+finish_harness(){
+  local status=$?
+  trap - EXIT
+  cleanup || { [ "$status" != 0 ] || status=1; }
+  sanitize_artifacts || { [ "$status" != 0 ] || status=1; }
+  exit "$status"
+}
+trap finish_harness EXIT
 
 # --- 0. preflight ------------------------------------------------------------
 KEY="${OCR_KEY:-$(security find-generic-password -s com.archiveprocessor.app -a Gemini -w 2>/dev/null)}"
@@ -100,15 +146,29 @@ APP="$APPROOT/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/
 # --- 2. launch the REAL headless Mac session ---------------------------------
 log "launching headless Mac session (real OCR, auto-skip-tags, auto-finalize, isolated output)…"
 rm -f "$READYFILE" "$TESTOUT/DONE.txt"
+# The engine may mask TERM; unblock it only in this captured child, then exec preserves its PID.
+# NSArgumentDomain overrides are process-local: never rewrite the owner's saved settings.
+# AUTOSTART starts the receiver, but does NOT select live rather than stage-for-later.
+# Pin that choice and the cheap real OCR route so a saved Vision/local-agent/gateway profile,
+# custom prompt or paid rotation setting cannot silently change what this E2E proves or costs.
 ARCHIVEPROC_HEADLESS=1 \
 ARCHIVEPROC_TEST_BACKUP_ROOT="$RUN/backup" \
 LIVECAPTURE_AUTOSTART=1 \
+LIVECAPTURE_TRANSPORT=lan \
 LIVECAPTURE_READYFILE="$READYFILE" \
 LIVECAPTURE_OCRKEY="$KEY" \
 LIVECAPTURE_AUTOSKIPTAGS=1 \
 LIVECAPTURE_AUTOFINALIZE=1 \
 LIVECAPTURE_TESTOUT="$TESTOUT" \
-"$APP" >"$MACLOG" 2>&1 &
+python3 -c 'import os, signal, sys; signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM}); os.execv(sys.argv[1], sys.argv[1:])' \
+  "$APP" -liveProcessingMode live \
+  -selectedProvider Gemini -selectedModelId_Gemini gemini-2.5-flash-lite \
+  -selectedThinking Low -useAppleVision NO -visionUseLLMJudgment NO \
+  -useGateway NO -useLocalAgent NO -taggingModeRaw automatic \
+  -rotationModeRaw off -reviewRotation NO -mergeDocuments NO \
+  -imageResolutionPercent 100 -standardImageSizeMB 3 \
+  -customOCRPrompt '' -tagVocabulary '' -outputDirectory "$TESTOUT" \
+  >"$MACLOG" 2>&1 &
 MAC_PID=$!
 
 log "waiting for the Mac READY line…"
@@ -184,8 +244,9 @@ done
 # --- 7. verdict --------------------------------------------------------------
 echo | tee -a "$REPORT"
 if [ "$MAC_OK" = 0 ] && [ "$PHONE_OK" = 0 ]; then
+  cleanup || die "Mac test-child cleanup failed (output assertions passed; teardown did not)"
   log "RESULT: PASS ✅  (round-trip verified; artifacts in $RUN)"
-  cleanup; [ "$KEEP_EMU" != always ] && "$ADB" emu kill 2>/dev/null; exit 0
+  [ "$KEEP_EMU" != always ] && "$ADB" emu kill 2>/dev/null; exit 0
 else
   log "RESULT: FAIL ❌  (mac=$MAC_OK phone=$PHONE_OK; artifacts + logs in $RUN)"
   cleanup; [ "$KEEP_EMU" = never ] && "$ADB" emu kill 2>/dev/null; exit 1

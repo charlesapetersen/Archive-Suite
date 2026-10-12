@@ -2,6 +2,19 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED (W40.a3): E2E inherited processing preferences and a blocked shutdown signal
+
+The real phone↔Mac harness now selects live LAN processing, Gemini Flash-Lite, automatic tags,
+no paid rotation and full-size synthetic inputs through process-local launch arguments. Saved
+Vision, stage-for-later, local-agent, gateway or custom-prompt preferences cannot change its route;
+the owner's saved processing settings are not rewritten. Three-image runs cost a few cents.
+The engine's inherited signal mask blocked TERM, so the output oracle could pass while teardown
+waited indefinitely. The captured Mac child unblocks TERM before exec. Cleanup verifies direct-child
+ownership, bounds TERM/KILL waits, reaps before redacting logs and reports PASS only after cleanup.
+The scratch proof exercises graceful exit, ignored TERM, an exited child and foreign-process refusal,
+plus PID/parent, spaced/empty arguments and signal-mask preservation across the actual launcher.
+Runtime evidence and the final unattended rerun are under `verification/evidence/capture/`.
+
 ## ⚠️ LIMITATION (W37.dual-date, 2026-10-06): where enclosure dates are and are not produced
 
 - **Process Files PDFs carry no `Document date:` / `Sent with:` header lines.** Those PDFs are rendered at

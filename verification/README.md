@@ -147,3 +147,26 @@ One `###` section per suspect, newest at the bottom:
   re-check (`W40.h2`). `dropped` is the owner's.
 - Every change to a ledger, evidence file or suspect is committed with the item that made it, like any tracker
   edit (umbrella `CLAUDE.md` §*Docs & backlog convention*).
+
+## W40.a3 — full-lane baseline, 2026-10-11
+
+Debug builds at `a5ab9e3c`/`0511d85c`; Notes adds the tests shipped in `0511d85c`. All GUI runs used
+Tart off-screen; phone E2E used a headless Android emulator. Fixture-specific recovery tests ran
+separately so a default-fixture skip is not counted as a pass. No new compiler warnings were found.
+
+| Lane | Executed result | Test time | Wrapper wall | Evidence |
+|---|---|---:|---:|---|
+| Reader full VM UI + snapshot | 34 UI passed, one corrupt-fixture skip; 1 snapshot passed | 509.607 s + 0.013 s | 624 s log span | [Reader](evidence/reader/W40.a3-full-ui.md) |
+| Reader corrupt-index fixture | 1 passed, no skips | 15.901 s | 76.15 s | [Reader](evidence/reader/W40.a3-full-ui.md) |
+| Notes full VM UI | 56 passed, one corrupt-fixture skip | 1,563.305 s | 1,646.18 s | [Notes](evidence/notes/W40.a3-full-ui.md) |
+| Notes corrupt-index fixture | 1 passed, no skips | 25.061 s | 82.35 s | [Notes](evidence/notes/W40.a3-full-ui.md) |
+| Notes host headless units | 220 XCTest + 959 Swift Testing passed | 0.384 s + 45.189 s | 100.91 s | [Notes](evidence/notes/W40.a3-full-ui.md) |
+| Processor full VM UI | 10 passed, no skips | 114.309 s | 243.63 s | [Processor](evidence/processor/W40.a3-full-ui.md) |
+| Relay golden, spaced-path gate | 4 Swift byte comparisons + 4 Android JVM tests passed | — | 10.30 s | [Relay](evidence/capture/W40.a3-relay-golden.md) |
+
+All 35 Reader and 57 Notes distinct UI tests passed across their required fixtures. Notes' explicit
+G19→G3 and G3→G19 pairs pass; disabling fixture restoration fails the next seeded-row assertion
+([order proof](evidence/notes/W40.a3-order-regression.md)). A real golden mismatch makes the mandatory
+gate step red. Existing strict layout findings remain tracked (`W40.fix-reader-narrow-window`,
+`W40.fix-reader-preview-sheet-oversize`, `W40.fix-notes-row-clip`, `W40.fix-notes-narrow-window`);
+green suites do not close those issues or promote any feature ledger's status.
