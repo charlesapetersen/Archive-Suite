@@ -103,6 +103,24 @@ enum SegmentationReviewTestDriver {
                 && !SegmentationPlan.windows(.claude).usesPerPageClassifier
                 && !SegmentationPlan.manualWindow(autoDate: true).usesPerPageClassifier)
         eq("1 TaggingMode has no autoDateManualSeg", TaggingMode(rawValue: "autoDateManualSeg"), nil)
+        let human = SegmentationPlan.resolve(tagging: .human, approach: .claude)
+        eq("1 pre-grouped human keeps the combined window whatever the approach",
+           human.combinedWindow(tagging: .human, preGrouped: true), false)
+        eq("1 pre-grouped autoDate tags the phone's groups",
+           SegmentationPlan.manualWindow(autoDate: true).combinedWindow(tagging: .autoDate, preGrouped: true), nil)
+        eq("1 autoDate + manual → combined window with dates",
+           SegmentationPlan.manualWindow(autoDate: true).combinedWindow(tagging: .autoDate, preGrouped: false), true)
+        eq("1 windows → the per-document tagging sheet", human.combinedWindow(tagging: .human, preGrouped: false), nil)
+        let batch = OCRProcessor().makePendingBatchResumeConfig(
+            OCRProcessor.PendingBatch(batchId: "b", provider: .gemini, model: LLMProvider.gemini.models[0],
+                                      thinkingLevel: nil, fileURLs: [], outputDirectory: URL(fileURLWithPath: "/tmp"),
+                                      enableTagging: true, enableCollectionSegmentation: false,
+                                      sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: false,
+                                      confirmCollectionIDs: false, reviewDocumentSegmentation: false,
+                                      customPrompt: nil, taggingMode: .automatic, fingerprintVersion: nil,
+                                      runFingerprint: nil),
+            apiKey: "")
+        eq("1 a resumed batch segments as Manual", batch.segmentationApproach, .manual)
 
         // 2. The pure half.
         eq("2 keep follows the proposal", FlaggedGapAnswer.keep.decision(proposed: .continue), .continue)
@@ -277,6 +295,24 @@ enum SegmentationReviewTestDriver {
         u.cancel()
         check("7 cancel ends the stage", await waitFor { limitedOutcome.value == .stopped })
         check("7 cancel closes the pass", !u.awaitingFlaggedReview && u.flaggedReviewContinuation == nil)
+
+        // 7b. Stop with a manifest: resumable, the run ends, the answers so far are kept.
+        let s2 = makeProcessor(urls: urls)
+        s2.windowTransportOverride = limited
+        let keptBox = Box<OCRProcessor.PendingRun>()
+        s2.pendingRunSaveOverride = { keptBox.value = $0 }
+        s2.activePendingRun = pending.withoutProgress()
+        s2.isProcessing = true
+        let stopped = Box<WindowStageOutcome>()
+        Task { stopped.value = await s2.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil) }
+        if await waitFor({ s2.awaitingBoxFolderConfirmation }) { s2.confirmBoxFolderReview() }
+        check("7b the limit asks, resumable", await waitFor { s2.windowStopPrompt?.canResumeLater == true })
+        s2.answerWindowStop(.stop)
+        check("7b stop ends the stage", await waitFor { stopped.value == .stopped })
+        check("7b the run is no longer processing", !s2.isProcessing)
+        check("7b the status says so", s2.statusMessage.hasPrefix("Stopped before segmentation"), s2.statusMessage)
+        check("7b the manifest was saved before stopping", keptBox.value != nil)
+        check("7b the prompt is gone", s2.windowStopPrompt == nil && s2.windowStopContinuation == nil)
     }
 
     private static func makeProcessor(urls: [URL]) -> OCRProcessor {

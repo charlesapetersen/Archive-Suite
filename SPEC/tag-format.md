@@ -207,7 +207,7 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    cache — not Spotlight's `kMDItemUserTags` (the Reader's discovery mechanism until `W26.walk2`), and
    not the `LibraryIndex` rows that replaced it. Only a fresh per-file `.tagNamesKey` read.
 6. **`Unread` stamped last, once.** In real-tagging modes only (`.automatic`/`.autoDate`/
-   `.autoDateManualSeg`/`.human`), Processor drops any incoming `Unread`, writes all other tags,
+   `.human`; `autoDateManualSeg` was folded into `autoDate` by W36.seg-opt-review, 2026-10-11), Processor drops any incoming `Unread`, writes all other tags,
    then appends exactly one `Unread` as the final element (`MacOSTagger.applyTags`, lines 42–66).
    "No tagging" and "Copy source tags" modes stamp nothing and pass source tags through verbatim.
 7. **App-authoritative color.** In real-tagging modes Processor assigns exactly one of Red(box)/

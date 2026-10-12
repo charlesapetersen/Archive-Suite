@@ -136,6 +136,12 @@ per approach**, with the method and threshold fixed on the development boxes fir
 - **`W36.seg-opt-review`** — the review of flagged boundaries [M · ~2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-engine). Page n beside page n+1; keep, split or join; the unflagged boundaries stay in the review
   sheet. It also wires the engine into the pipeline and does the `TaggingMode` split (§6).
+  ✅ Shipped 2026-10-11: `Segmentation/RunSegmentation.swift`, `OCR/OCRProcessor+WindowSegmentation.swift`,
+  `Views/FlaggedBoundaryReviewSheet.swift`, `scripts/test-segmentation-review.sh` and the VM UITest
+  `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone`. `automatic` + `manual` keeps the per-page review sheet (§1).
+  On a usage limit or error the user chooses "check the rest myself" (every unanswered gap flagged at 0) or stop
+  (resumable; the window and gap answers ride `PendingRun`). A batch resume reads the live approach (its journal
+  carries none) and keeps no answers.
 - **`W36.seg-opt-subscription`** — the subscription route [M · ~1-2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-usage, W36.seg-opt-engine). Claude only, through the user's installed `claude`, under the four
   conditions and the calibration spec in `segbench-results/usage.md`. It switches `LocalAgentClient` to
@@ -190,6 +196,11 @@ Today, segmentation is half of `TaggingMode` (`Models/ProviderModels.swift`):
   (truth photo labels, `options.md`). The app therefore keeps `BoxFolderConfirmSheet` before the boundary review
   and treats a gap next to a box or folder photo as a boundary by construction, as the bench does
   (`method_window.py` `assemble`). Only gaps between two document pages go to the window segmenter.
+- **`automatic` + `manual`** (decided by `W36.seg-opt-review`, 2026-10-11): the full review sheet, starting from the
+  OCR model's own per-page tags, as `automatic` always had. No screen exists where the user segments and the model
+  then tags everything, so this is the one choice that removes no workflow. `autoDate`/`human` + `manual` is the
+  combined window (`ManualSegmentTagView`), the model filling dates for `autoDate`. Live Capture's pre-grouped runs
+  with `autoDate` tag the phone's groups as they are.
 - **`manual` is the app as it is today**: `ManualSegmentTagView` / `ManualTaggingSheet`, with nothing proposed. Its
   row in the chooser says "about 87 boundaries to judge per 100 pages, no cost".
 - **Default: `manual`.** An approach that spends money or plan usage is never on until the user picks it.

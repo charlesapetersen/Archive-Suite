@@ -159,7 +159,12 @@ extension OCRProcessor {
 
         // Interactive Review: document segmentation (rotation + classification) review. Manual
         // modes skip it — the combined segment+tag window owns rotation, box/folder, and segmentation.
-        if runOutputSettings.taggingMode.usesManualSegmentationUI {
+        let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
+        if case .windows(let approach) = plan {
+            // W36.seg-opt-review: the window segmenter proposes, the user checks the flagged gaps, then skims.
+            guard await runWindowSegmentationStage(files: files, approach: approach,
+                                                   runConfig: runConfig) == .done else { return }
+        } else if case .manualWindow = plan {
             // no-op: handled in the combined manual window
         } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
             await showFullSegmentationReview(files: files, runConfig: runConfig)
@@ -185,21 +190,23 @@ extension OCRProcessor {
                     enableSegmentJSON: enableSegmentJSON, files: files,
                     runConfig: runConfig
                 )
-            case .autoDate:
-                await performManualTaggingPhase(
-                    mode: runOutputSettings.taggingMode, provider: provider, model: model,
-                    thinkingLevel: thinkingLevel, apiKey: apiKey,
-                    outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
-                    runConfig: runConfig
-                )
-            case .human, .autoDateManualSeg:
-                await performManualSegmentAndTag(
-                    autoDate: runOutputSettings.taggingMode.autoFillsDate,
-                    provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
-                    outputDirectory: outputDirectory,
-                    enableSegmentJSON: enableSegmentJSON, preOCRed: true, files: files,
-                    runConfig: runConfig
-                )
+            case .autoDate, .human:
+                if case .manualWindow(let autoDate) = plan {
+                    await performManualSegmentAndTag(
+                        autoDate: autoDate,
+                        provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        outputDirectory: outputDirectory,
+                        enableSegmentJSON: enableSegmentJSON, preOCRed: true, files: files,
+                        runConfig: runConfig
+                    )
+                } else {
+                    await performManualTaggingPhase(
+                        mode: runOutputSettings.taggingMode, provider: provider, model: model,
+                        thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
+                        runConfig: runConfig
+                    )
+                }
             case .none, .copySource:
                 break
             }

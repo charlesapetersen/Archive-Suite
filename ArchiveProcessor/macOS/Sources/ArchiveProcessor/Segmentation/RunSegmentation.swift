@@ -35,6 +35,16 @@ enum SegmentationPlan: Equatable, Sendable {
         }
     }
 
+    /// Whether the user tags in the combined segment-and-tag window (and with auto dates when true), or nil when
+    /// the run is already segmented and goes to the per-document tagging sheet. Live Capture's pre-grouped runs
+    /// keep what they always did whatever the approach: `human` in the combined window, `autoDate` on the
+    /// phone's groups as they are.
+    func combinedWindow(tagging: TaggingMode, preGrouped: Bool) -> Bool? {
+        if preGrouped { return tagging == .human ? false : nil }
+        if case .manualWindow(let autoDate) = self { return autoDate }
+        return nil
+    }
+
     /// The OCR model's own per-page segmentation is what this plan starts from (only then do its context
     /// options, such as sending the previous page's image, matter).
     var usesPerPageClassifier: Bool { self == .perPageReview }

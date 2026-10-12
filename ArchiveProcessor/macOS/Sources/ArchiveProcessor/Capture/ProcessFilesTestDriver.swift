@@ -133,6 +133,7 @@ enum ProcessFilesTestDriver {
         processor.mergeDocuments = false       // 1 source image → 1 two-page PDF (stable paths)
         processor.exportOriginals = env["PROCESSFILES_EXPORTORIGINALS"] == "1"
         processor.preGroupedBoundaries = []    // force the LLM segmentation path
+        processor.segmentationApproach = .manual   // never a window model's call, whatever Settings holds
 
         // Clean up the durable resume-state the non-batch pipeline writes to Application Support
         // (pending_run.json) so a test run never leaves a stale, paid "Resume Run" prompt for a

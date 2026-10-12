@@ -98,7 +98,7 @@ extension OCRProcessor {
         }
         reviewCheckedFileIndices = Set(items.map { pages.fileIndices[$0.id + 1] })
         reviewSkimNote = FlaggedReview.skimNote(approach, options: SegmentationOptionsStore.shared)
-        await showFullSegmentationReview(files: files, runConfig: runConfig)
+        await showFullSegmentationReview(files: files, runConfig: runConfig, showsDocumentClasses: true)
         reviewCheckedFileIndices = []
         reviewSkimNote = nil
         guard !Task.isCancelled else { return .stopped }
@@ -120,7 +120,7 @@ extension OCRProcessor {
         }
         let prior = activePendingRun?.segmentationWindows ?? [:]
         let transport: any WindowTransport
-        switch WindowStageTransport.current(spec) {
+        switch windowTransportOverride.map({ .success($0) }) ?? WindowStageTransport.current(spec) {
         case .success(let t): transport = t
         case .failure(let missing):
             return await stopOrCheckAll(pages: pages, spec: spec, answered: prior, message: missing.description)
@@ -184,6 +184,9 @@ extension OCRProcessor {
     /// the run's manifest, so a resume asks the model only for the rest.
     private func stopOrCheckAll(pages: WindowStagePages, spec: ApproachSpec?,
                                 answered: [WindowKey: WindowAnswer], message: String) async -> [GapProposal]? {
+        // A Stop pressed during the last suspension has already released the continuations: arming a new one
+        // now would show a stale prompt and leak it.
+        guard !Task.isCancelled else { return nil }
         let canResume = activePendingRun != nil
         windowStopPrompt = WindowStopPrompt(message: message, canResumeLater: canResume)
         let choice = await withCheckedContinuation { continuation in
@@ -247,6 +250,11 @@ extension OCRProcessor {
     /// End the run after the user chose Stop: the OCR is done and saved, so a pending-run manifest stays on disk
     /// for the Resume control.
     private func stopRunAfterWindowStage(message: String, resumable: Bool) {
+        // Cancel the run's task so every caller's cancellation guard ends it here (the pre-OCRed path returns to
+        // a success tail that only those guards stop), and no completion is recorded.
+        processingTask?.cancel()
+        processingTask = nil
+        activeRunHistory = nil
         activePendingRun = nil
         isProcessing = false
         cleanupTempFiles()
@@ -255,3 +263,43 @@ extension OCRProcessor {
             + (resumable ? " Resume the run to continue where it stopped." : "")
     }
 }
+
+#if DEBUG
+extension OCRProcessor {
+    /// UI test only (`-APUITestFlaggedReview`): the flagged pass over two synthetic gaps among three drawn pages
+    /// in this app's own temporary directory. No run, OCR, model call, manifest or output is involved; the
+    /// answers are shown in `uiTestFlaggedResult` once Done is pressed.
+    func _uiTestShowFlaggedReview() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("APUITestFlagged-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let urls = (1...3).map { n -> URL in
+            let url = dir.appendingPathComponent("page-\(n).png")
+            let image = NSImage(size: NSSize(width: 300, height: 400), flipped: false) { r in
+                NSColor.white.setFill(); r.fill()
+                ("Synthetic page \(n)" as NSString).draw(at: NSPoint(x: 40, y: 200),
+                                                          withAttributes: [.font: NSFont.systemFont(ofSize: 28)])
+                return true
+            }
+            if let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?.write(to: url)
+            }
+            return url
+        }
+        flaggedGapItems = [
+            FlaggedGapItem(id: 0, leftURL: urls[0], rightURL: urls[1], leftRotation: 0, rightRotation: 0,
+                           proposal: .continue, confidence: 0.6, cue: "the letter seems to go on"),
+            FlaggedGapItem(id: 1, leftURL: urls[1], rightURL: urls[2], leftRotation: 0, rightRotation: 0,
+                           proposal: .new, confidence: 0.8, cue: "a new letterhead"),
+        ]
+        flaggedGapFocus = 0
+        flaggedReviewApproachName = "Claude"
+        awaitingFlaggedReview = true
+        Task { @MainActor in
+            let done = await withCheckedContinuation { flaggedReviewContinuation = $0 }
+            uiTestFlaggedResult = "flagged done=\(done) "
+                + flaggedGapItems.map { $0.answer?.rawValue ?? "-" }.joined(separator: ",")
+        }
+    }
+}
+#endif

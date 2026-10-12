@@ -79,14 +79,15 @@ enum DocumentClassification: String, Codable {
 
 // MARK: - Tagging Mode
 
-/// How tags are assigned to document segments.
+/// How tags are assigned to document segments. Who segments is the separate `SegmentationApproach`
+/// (W36.seg-opt-review; the two join in `SegmentationPlan`). The old `autoDateManualSeg` is `autoDate` with the
+/// approach `manual`; no migration is written because no run or setting has been kept (owner, 2026-08-01).
 enum TaggingMode: String, CaseIterable, Identifiable, Codable {
     case none              // No tagging
     case copySource        // Copy macOS Finder tags from source images to output PDFs
     case automatic         // LLM generates all tags (date + subjects) — the original behavior
-    case autoDate          // LLM segments + dates; the user enters subject tags
-    case autoDateManualSeg // The user segments + enters subjects; the LLM fills each date
-    case human             // The user segments and enters date + subject tags entirely
+    case autoDate          // LLM fills each date; the user enters subject tags
+    case human             // The user enters date + subject tags entirely
 
     var id: String { rawValue }
 
@@ -95,8 +96,7 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
         case .none: return "No tagging"
         case .copySource: return "Copy source file tags"
         case .automatic: return "Automatic (LLM)"
-        case .autoDate: return "Auto date and segmentation, manual subjects"
-        case .autoDateManualSeg: return "Auto date, manual segmentation & subjects"
+        case .autoDate: return "Auto date, manual subjects"
         case .human: return "Manual (human)"
         }
     }
@@ -105,10 +105,9 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .none: return "Skip tagging entirely."
         case .copySource: return "Read macOS Finder tags from each source image and apply them to the output PDF. No LLM tagging."
-        case .automatic: return "The model generates date and subject tags for every document segment."
-        case .autoDate: return "The model determines the segmentation and date; you enter subject tags for each document segment."
-        case .autoDateManualSeg: return "You group the images into segments and enter subject tags; the model fills in each document's date."
-        case .human: return "You group the images into segments and enter the date and subject tags."
+        case .automatic: return "The model generates date and subject tags for every document."
+        case .autoDate: return "The model fills in each document's date; you enter its subject tags."
+        case .human: return "You enter the date and subject tags for every document."
         }
     }
 
@@ -120,28 +119,11 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
     var stampsUnread: Bool { self != .none && self != .copySource }
 
     /// Whether the user manually tags each segment (any mode with a manual tagging UI).
-    var isManual: Bool { self == .autoDate || self == .autoDateManualSeg || self == .human }
-
-    /// Whether the user defines segments themselves in the full-window manual UI.
-    var usesManualSegmentationUI: Bool { self == .autoDateManualSeg || self == .human }
-
-    /// Whether the LLM performs document segmentation in this mode. Only then do segmentation-context
-    /// options (send previous page image, review segmentation) matter — otherwise the user segments
-    /// (or there's no segmentation), so those settings are irrelevant.
-    var llmSegments: Bool { self == .automatic || self == .autoDate }
+    var isManual: Bool { self == .autoDate || self == .human }
 
     /// Whether the LLM makes per-segment tagging/date calls (drives the tagging cost/time estimate).
     /// Excludes `.human` (user enters everything), `.copySource`, and `.none` (no LLM tagging calls).
-    var llmTags: Bool { self == .automatic || self == .autoDate || self == .autoDateManualSeg }
-
-    /// Whether the LLM fills in the date automatically.
-    var autoFillsDate: Bool { self == .autoDateManualSeg }
-
-    /// Whether document start/continuation segmentation is meaningful in the rotation review
-    /// (only the LLM-segmented modes; manual-segmentation modes own grouping in their own UI).
-    var showsDocumentClassesInReview: Bool {
-        self == .automatic || self == .autoDate
-    }
+    var llmTags: Bool { self == .automatic || self == .autoDate }
 }
 
 // MARK: - Rotation Mode

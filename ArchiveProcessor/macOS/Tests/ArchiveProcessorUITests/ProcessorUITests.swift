@@ -77,6 +77,43 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-multipage-auto-reocr")
     }
 
+    /// W36.seg-opt-review: one flagged pass, page n beside page n+1. Done waits for every gap's answer, an
+    /// answer moves to the next gap, and the answers come back in order. Synthetic pages, no run behind it.
+    func testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone() throws {
+        relaunch(extra: ["-APUITestFlaggedReview"])
+
+        let counter = element("flaggedReview.counter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10), "the flagged pass must open")
+        XCTAssertTrue(renderedText(of: counter).contains("1 of 2"), "the counter starts at the first gap")
+        XCTAssertTrue(renderedText(of: element("flaggedReview.proposal")).contains("Same document continues"),
+                      "the first gap shows its proposal")
+        let done = element("flaggedReview.done")
+        XCTAssertFalse(done.isEnabled, "Done must wait until every flagged gap is answered")
+        attachScreenshot("processor-flagged-review-first-gap")
+
+        element("flaggedReview.split").click()
+        XCTAssertTrue(waitUntil { self.renderedText(of: counter).contains("2 of 2") },
+                      "an answer moves on to the next unanswered gap")
+        XCTAssertFalse(done.isEnabled, "one gap is still unanswered")
+        element("flaggedReview.keep").click()
+        XCTAssertTrue(waitUntil { done.isEnabled }, "Done is enabled once every gap is answered")
+        done.click()
+
+        let result = element("ap.uitest.flaggedResult")
+        XCTAssertTrue(result.waitForExistence(timeout: 10), "Done must close the pass and return the answers")
+        XCTAssertTrue(renderedText(of: result).contains("done=true split,keep"),
+                      "the answers come back in gap order: \(renderedText(of: result))")
+    }
+
+    private func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return condition()
+    }
+
     func testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup() throws {
         relaunch(extra: ["-APUITestLocalAgent", "-APUITestSyntheticMultiPagePDF"])
 

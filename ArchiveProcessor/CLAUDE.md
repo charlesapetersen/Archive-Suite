@@ -162,7 +162,7 @@ Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or 
 **Special tags**
 - Photographs of **boxes** → macOS `Red` tag
 - Photographs of **folders** → macOS `Purple` tag
-- Every output (PDF **and** any exported original image) → a trailing **`Unread`** tag, applied **last**, for triage. Only in real-tagging modes (`.automatic`/`.autoDate`/`.autoDateManualSeg`/`.human`) — never for "No tagging" or "Copy source tags". Implemented via the **required** `stampUnread:` argument on `MacOSTagger.applyTags`, passed as `TaggingMode.stampsUnread` from the run's mode/config. There is no ambient flag — W16.cfg4 made the choice per-call and W16.cfg6-fu deleted the `MacOSTagger.stampUnread` global it replaced.
+- Every output (PDF **and** any exported original image) → a trailing **`Unread`** tag, applied **last**, for triage. Only in real-tagging modes (`.automatic`/`.autoDate`/`.human`) — never for "No tagging" or "Copy source tags". Implemented via the **required** `stampUnread:` argument on `MacOSTagger.applyTags`, passed as `TaggingMode.stampsUnread` from the run's mode/config. There is no ambient flag — W16.cfg4 made the choice per-call and W16.cfg6-fu deleted the `MacOSTagger.stampUnread` global it replaced.
 
 ### API Efficiency for Tagging
 - Minimize API calls — batch OCR results where possible before making tagging calls
@@ -266,7 +266,7 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
 - **macOS Views + Tagging** — `Sources/ArchiveProcessor/{Views, Tagging}`.
 
 **Shared hotspots that force cross-lane coordination:**
-- **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): all **`String`-backed, `Codable`, and persisted** (UserDefaults + encoded snapshots). **Never rename a case or change an explicit rawValue string** — that orphans users' saved settings. Appending new cases is safe; reordering cases is harmless (the persisted key is the string, not the position).
+- **`Models/ProviderModels.swift` enums** (`LLMProvider`, `ThinkingLevel`, `DocumentClassification`, `TaggingMode`, `RotationMode`): all **`String`-backed, `Codable`, and persisted** (UserDefaults + encoded snapshots). **Never rename a case or change an explicit rawValue string** — that orphans users' saved settings. Appending new cases is safe; reordering cases is harmless (the persisted key is the string, not the position). (Exception taken under the no-production-material directive, 2026-08-01: W36.seg-opt-review removed `TaggingMode.autoDateManualSeg`, now `autoDate` + the Segmentation approach Manual; a stale stored value reads as the default.)
 - **Phone↔Mac protocol:** `Net/CaptureServer.swift` (Bearer-authed routes `GET /ping`, `POST /photo`, `POST /segment/complete`, `POST /session/complete`, `POST /phone/status`, `POST /session/disconnect`) ↔ both companions' `MacClient` (`ArchiveCaptureiOS/.../Net/MacClient.swift` + Android `net/MacClient.kt`). The cloud-relay transport shares a second contract — the object format in [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md) (`Net/RelayObjectFormat.swift` ↔ the phones' mirror). Change all sides together. *(iOS is PARKED — still
   edit its mirror source when the contract changes; its app build-verify is deferred, but
   `scripts/test-relay-golden.sh` keeps checking the iOS `RelayObjectFormat.swift` for parity.)*
@@ -471,8 +471,19 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.
 Segmentation/                  W36 window segmenter (not Tier-2: proposes boundaries, writes nothing). Contract:
-                               `execution-plans/segmentation/04-options-build.md` Part 3 §2. Not yet wired into
-                               the pipeline (W36.seg-opt-review); `TaggingMode` still decides who segments.
+                               `execution-plans/segmentation/04-options-build.md` Part 3 §2. `TaggingMode` says who
+                               tags, `SegmentationApproach` who segments; `SegmentationPlan` joins them.
+  RunSegmentation.swift        `SegmentationPlan` (automatic+manual → the per-page review sheet as before;
+                               autoDate/human+manual → `ManualSegmentTagView`; any other approach → windows), the
+                               flagged-gap model (`FlaggedReview`: items, keep/split/join → classifications, count
+                               line, skim note), and the transport a run's keys / `claude` give.
+  (pipeline half)              `OCR/OCRProcessor+WindowSegmentation.swift` `runWindowSegmentationStage`: box/folder
+                               confirm → windows → `Views/FlaggedBoundaryReviewSheet` → the skim
+                               (`DocumentSegmentReviewSheet` with note + Checked marks). Called from startProcessing,
+                               the pre-OCRed path, resumeRun and resumeBatch. Limit/error → "check the rest myself"
+                               or stop (resumable: `PendingRun.segmentationWindows`/`segmentationAnswers`).
+                               Self-test: `SegmentationReviewTestDriver`, `scripts/test-segmentation-review.sh`;
+                               VM UITest `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone`.
   SegmentationApproach.swift   `SegmentationApproach` (manual/claude/gemini/openai/mix, `DefaultsKeys.segmentationApproach`,
                                default manual); `SegmentationOptions` decodes the bundled `segbench-results/options.json`
                                (window shape, rule, level, voters, figures); `WindowVoter.catalog` + prompt-id check.

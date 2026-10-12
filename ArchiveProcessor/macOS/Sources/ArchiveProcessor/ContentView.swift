@@ -48,6 +48,9 @@ struct ContentView: View {
             if ProcessorUITestConfiguration.showsLiveCaptureEmptyPaneClear {
                 capture.liveProcessor._uiTestShowEmptyPaneClear()
             }
+            if ProcessorUITestConfiguration.showsFlaggedReview {
+                processor._uiTestShowFlaggedReview()
+            }
 #endif
             LiveCaptureTestDriver.runIfRequested(session: capture)
             FileRelayTestDriver.runIfRequested(session: capture)
@@ -69,8 +72,16 @@ struct ContentView: View {
             RetryBackendTestDriver.runIfRequested()          // $0 Process Files retry backend-lock contract
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
+            SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
             maybePresentKeyOnboarding()
         }
+#if DEBUG
+        .overlay(alignment: .bottomLeading) {
+            if let result = processor.uiTestFlaggedResult {
+                Text(result).font(.caption).padding(4).accessibilityIdentifier("ap.uitest.flaggedResult")
+            }
+        }
+#endif
         .sheet(isPresented: $showKeyOnboarding) {
             ProviderKeyWizard { showKeyOnboarding = false; hasSeenKeyOnboarding = true }
         }

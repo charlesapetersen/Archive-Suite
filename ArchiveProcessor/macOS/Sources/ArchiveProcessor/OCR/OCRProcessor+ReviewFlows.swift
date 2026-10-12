@@ -434,7 +434,8 @@ extension OCRProcessor {
     /// already-chosen rotation is carried on each item purely so the thumbnails preview upright.
     func showFullSegmentationReview(
         files: [URL],
-        runConfig: SessionProcessingConfig? = nil
+        runConfig: SessionProcessingConfig? = nil,
+        showsDocumentClasses: Bool? = nil
     ) async {
         documentReviewItems = files.enumerated().map { (index, url) in
             let cls = index < jobs.count ? jobs[index].result?.classification : nil
@@ -453,8 +454,9 @@ extension OCRProcessor {
         // grouping UI owns segmentation, so the review shows only box/folder.
         reviewRotationOnly = false
         let effectiveRunConfig = runConfig ?? activeRunConfig
-        reviewShowsDocumentClasses = (effectiveRunConfig?.mergeDocuments ?? mergeDocuments)
-            || (effectiveRunConfig?.taggingMode ?? taggingMode).showsDocumentClassesInReview
+        reviewShowsDocumentClasses = showsDocumentClasses ?? (effectiveRunConfig?.mergeDocuments ?? mergeDocuments)
+            || segmentationPlan(tagging: effectiveRunConfig?.taggingMode ?? taggingMode,
+                                runConfig: effectiveRunConfig).reviewShowsDocumentClasses
         currentReviewCollectionName = "All Files"
         statusMessage = "Review document segmentation."
         awaitingDocumentReview = true

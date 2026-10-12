@@ -149,13 +149,41 @@ class OCRProcessor: ObservableObject {
     @Published var awaitingBoxFolderConfirmation = false
     var boxFolderConfirmContinuation: CheckedContinuation<Void, Never>?
 
+    /// The review of flagged boundaries (W36.seg-opt-review): one flagged gap at a time, page n beside page
+    /// n+1. Done resumes with true; a cancelled run resumes with false.
+    @Published var flaggedGapItems: [FlaggedGapItem] = []
+    @Published var flaggedGapFocus = 0
+    @Published var awaitingFlaggedReview = false
+    @Published var flaggedReviewApproachName = ""
+    var flaggedReviewContinuation: CheckedContinuation<Bool, Never>?
+    /// The skim after the flagged pass: the note at its top, and the files whose boundary before them the
+    /// user answered (marked as checked). Empty outside that skim.
+    @Published var reviewSkimNote: String? = nil
+    @Published var reviewCheckedFileIndices: Set<Int> = []
+    /// A window run that hit a usage limit or an error: check the rest yourself, or stop.
+    @Published var windowStopPrompt: WindowStopPrompt? = nil
+    var windowStopContinuation: CheckedContinuation<WindowStopChoice, Never>?
+    /// "37 boundaries checked, 6 changed", added to the run's closing status. Never sent anywhere.
+    var segmentationCheckSummary: String?
+#if DEBUG
+    /// The answers the UI test's flagged pass returned (`_uiTestShowFlaggedReview`).
+    @Published var uiTestFlaggedResult: String?
+#endif
+    /// A headless driver's approach for the next run, in place of the stored setting (which a run otherwise
+    /// takes, as Process Files does). Nil in normal use.
+    var segmentationApproach: SegmentationApproach?
+    /// Test seams for `SegmentationReviewTestDriver`: a recorded transport instead of the Keychain's keys, and a
+    /// manifest save that never reaches the operator's real pending-run file. Nil in normal use.
+    var windowTransportOverride: (any WindowTransport)?
+    var pendingRunSaveOverride: ((PendingRun) -> Void)?
+
     /// Manual (human) tagging review state — sequential, one segment at a time (autoDate mode)
     @Published var manualTagSegments: [ManualTagSegment] = []
     @Published var currentManualIndex = 0
     @Published var awaitingManualTagging = false
     var manualTaggingContinuation: CheckedContinuation<Void, Never>?
 
-    /// Fully-manual segmentation + tagging review state (human / autoDateManualSeg modes).
+    /// Fully-manual segmentation + tagging review state (the approach Manual, with tagging human or autoDate).
     /// Progressive "consume-as-you-go": the user reviews rotation + box/folder, identifies each
     /// document segment by marking where it ends, then tags it — the tagged pages then drop out.
     /// `manualSegImages` is the immutable ordered backing store; all session state below indexes
@@ -174,7 +202,7 @@ class OCRProcessor: ObservableObject {
     /// The editable tag data for the pending segment shown in the tag card.
     @Published var manualSegDraftTags = SegmentTagData()
     @Published var awaitingManualSegTag = false
-    /// When true (autoDateManualSeg mode), each segment's date is fetched from the LLM on demand.
+    /// When true (autoDate with the approach Manual), each segment's date is fetched from the LLM on demand.
     @Published var manualSegAutoDate = false
     /// True while the tag card's date fetch is in flight.
     @Published var manualSegDateFetching = false
@@ -549,6 +577,10 @@ class OCRProcessor: ObservableObject {
         /// Cost-history attribution for a gateway run. It does not affect requests, but persisting it
         /// keeps the resumed run's history consistent with the estimate shown when the run began.
         let gatewayUpstreamProvider: LLMProvider?
+
+        /// Who proposes this run's boundaries (W36.seg-opt-review), so a resumed run keeps its approach. Nil
+        /// reads as `manual`.
+        var segmentationApproach: SegmentationApproach? = nil
     }
 
     struct PendingRun: Codable {
@@ -604,6 +636,12 @@ class OCRProcessor: ObservableObject {
         /// never recorded and cannot be reconstructed.
         var runtimeConfig: PendingRunRuntimeConfig? = nil
         var mixedPDFOutcomes: [MixedPDFOutcome]? = nil
+        /// W36.seg-opt-review: the window answers and the flagged-gap answers (keyed by the path of the page
+        /// after the gap) so far, so a resume asks neither the model nor the user again. Outside the
+        /// fingerprint: they are the run's own progress after OCR, rewritten as it goes, and only ever a
+        /// proposal the user reviews before anything is written.
+        var segmentationWindows: [WindowKey: WindowAnswer]? = nil
+        var segmentationAnswers: [String: FlaggedGapAnswer]? = nil
     }
 
 

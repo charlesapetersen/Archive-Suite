@@ -15,6 +15,22 @@ The scratch proof exercises graceful exit, ignored TERM, an exited child and for
 plus PID/parent, spaced/empty arguments and signal-mask preservation across the actual launcher.
 Runtime evidence and the final unattended rerun are under `verification/evidence/capture/`.
 
+## ⚠️ LIMITATION (W36.seg-opt-review, 2026-10-11): where the window segmenter's run state is and is not kept
+
+- **A paid batch resumed after a relaunch segments as Manual does.** `PendingBatch` records no approach, so rather
+  than run the window segmenter on whatever Settings holds now, the resume pins `manual`. Its journal is also
+  retired before segmentation, so a batch run that hits a usage limit offers only "check the rest myself", not
+  Stop. A non-batch run keeps its approach and its answers (`PendingRunRuntimeConfig.segmentationApproach`,
+  `PendingRun.segmentationWindows`/`segmentationAnswers`) and can stop and resume.
+- **A window approach sends page images to its model even in an Apple Vision run** that has a judgment LLM. The
+  approach is an explicit opt-in with its cost shown, so this is by design, but it is not text-only.
+- **The window answers are saved when the segmenter returns or stops**, not one window at a time. A crash in the
+  middle of the windows asks the model for all of them again on resume.
+- **Every page's window image is held in memory for the run** (about 1,600 px JPEGs, so roughly 150 MB for 500
+  pages), as the engine takes the whole page list at once.
+- **A box or folder photo the OCR model missed** is added in the skim, after the windows ran, so the gaps on
+  either side of it keep the windows' decision rather than becoming a boundary by construction.
+
 ## ⚠️ LIMITATION (W37.dual-date, 2026-10-06): where enclosure dates are and are not produced
 
 - **Process Files PDFs carry no `Document date:` / `Sent with:` header lines.** Those PDFs are rendered at

@@ -33,6 +33,11 @@ enum ProcessorUITestConfiguration {
     static var showsLiveCaptureEmptyPaneClear: Bool {
         isActive && arguments.contains("-APUITestLiveCaptureEmptyPaneClear")
     }
+    /// Opens the review of flagged boundaries (W36.seg-opt-review) on two synthetic gaps, with no run, OCR,
+    /// model call or output behind it. The answers land in a DEBUG-only label once Done is pressed.
+    static var showsFlaggedReview: Bool {
+        isActive && arguments.contains("-APUITestFlaggedReview")
+    }
     static var droppedPDF: URL? {
         if let path = urlValue(after: "-APUITestDroppedPDFPath") { return path }
         guard arguments.contains("-APUITestSyntheticMultiPagePDF") else { return nil }

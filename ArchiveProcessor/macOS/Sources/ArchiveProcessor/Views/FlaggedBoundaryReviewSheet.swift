@@ -26,9 +26,6 @@ struct FlaggedBoundaryReviewSheet: View {
             footer
         }
         .frame(minWidth: 900, minHeight: 600)
-        .accessibilityIdentifier("flaggedReview.sheet")
-        .focusable()
-        .focusEffectDisabled()
         .onKeyPress(.return) { answer(.keep); return .handled }
         .onKeyPress(characters: ["s", "S"]) { _ in answer(.split); return .handled }
         .onKeyPress(characters: ["j", "J"]) { _ in answer(.join); return .handled }

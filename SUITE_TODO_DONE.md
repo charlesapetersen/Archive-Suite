@@ -10591,3 +10591,31 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Proof: `scripts/test-segmentation-chooser.sh` (headless, $0, 75/75) — row text for every approach, N and route, plus an
   offscreen `ImageRenderer` render guard; engine test still ALL PASS. Nothing runs the engine yet (`W36.seg-opt-review`).
   <!-- /W36.seg-opt-chooser -->
+- [x] **W36.seg-opt-review — the review of flagged boundaries [M · ~2 sessions]** · §Archive Processor — automatic segmentation (lane: processor) (uses: build) (blocked-on: W36.seg-opt-engine). Also carries, moved from `W36.seg-opt-engine` 2026-10-11: wiring the engine into the pipeline in place of the per-page classifier, the `TaggingMode` split (Part 3 §1, incl. deciding what `automatic` + manual does, which the design leaves open), and `segmentationApproach` in `PendingRunRuntimeConfig`. SHIPPED 2026-10-11, in one session (328d5d3e, 1a934579, 38201f50, and the completing commit).
+  **The split:** `TaggingMode` keeps only who tags (`none`, `copySource`, `automatic`, `autoDate`, `human`);
+  `autoDateManualSeg` is `autoDate` + approach `manual` (no migration: nothing to migrate). `SegmentationPlan`
+  (`Segmentation/RunSegmentation.swift`) joins the two. **Decided here** (§1 left it open): `automatic` + `manual`
+  keeps the full per-page review sheet the mode always had, as no screen exists where the user segments and the
+  model then tags everything; `autoDate`/`human` + `manual` is `ManualSegmentTagView`; Live Capture's pre-grouped runs
+  keep their old routing whatever the approach.
+  **The stage** (`OCR/OCRProcessor+WindowSegmentation.swift`), called from startProcessing, the pre-OCRed path,
+  resumeRun and resumeBatch: box/folder confirmation → the window segmenter (keys from the Keychain, else the user's
+  `claude`; pre-OCRed PDFs rendered from their first page) → `Views/FlaggedBoundaryReviewSheet` (page n beside n+1;
+  Keep/Split/Join on Return/S/J; Done only when all answered) → the skim (`DocumentSegmentReviewSheet` with the
+  figures' note and Checked marks, New/Continuation forced on) → the closing status gains "N checked, M changed".
+  A usage limit or error asks: check the rest yourself (every unanswered gap flagged at 0) or, when a manifest exists,
+  stop and resume later. `PendingRunRuntimeConfig.segmentationApproach` and `PendingRun.segmentationWindows` /
+  `segmentationAnswers` (outside the fingerprint) carry the run's approach and progress; a resume asks neither the
+  model nor the user again. A paid-batch resume pins `manual` (its journal records no approach).
+  `ProcessFilesTestDriver` pins `manual` so the smoke never makes a window call whatever Settings holds.
+  **Review:** an opus Tier-2 review found 4 defects, all fixed with tests: Stop on a pre-OCRed run fell through to the
+  success tail (now cancels the run's task); a batch resume used the live approach and Stop could strand a retired
+  batch (pinned `manual`; Stop offered only when resumable); the stop prompt could be armed after a cancel; pre-grouped
+  `human` routing depended on the hidden setting. Known limits in `ArchiveProcessor/KNOWN_ISSUES.md` (W36.seg-opt-review).
+  **Proof:** `scripts/test-segmentation-review.sh` (headless, $0, all pass) — the plan matrix, keep/split/join, partial
+  answers, the manifest through JSON with the fingerprint unchanged, the stage end to end on six synthetic pages
+  through a recorded transport (three windows, one flagged gap, skim, classifications), resume asking nothing, a
+  usage limit (check myself; stop and resume). VM XCUITest `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone` passed
+  off-screen (screenshot checked). Headless Process Files driver (2 images, Gemini Flash-Lite, under a cent) green;
+  engine and chooser tests still ALL PASS.
+  <!-- /W36.seg-opt-review -->

@@ -293,7 +293,8 @@ extension OCRProcessor {
             visionTextProvider: runConfig?.visionTextLLM?.provider,
             visionTextModel: runConfig?.visionTextLLM?.model,
             visionTextThinkingLevel: runConfig?.visionTextLLM?.thinkingLevel,
-            gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults()
+            gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults(),
+            segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored()
         )
     }
 
@@ -331,6 +332,7 @@ extension OCRProcessor {
             runConfig.exportedImageMB = runtime.exportedImageMB
             runConfig.textColumns = runtime.textColumns
             runConfig.visionSettings = runtime.visionSettings
+            runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
             if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
                 runConfig.visionTextLLM = LLMTextConfiguration(
                     provider: provider, model: model,
@@ -369,6 +371,9 @@ extension OCRProcessor {
         runConfig.enableSegmentJSON = pending.enableSegmentJSON
         runConfig.gateway = nil
         runConfig.localAgent = nil
+        // The batch journal records no Segmentation approach, so a resumed batch never runs the window
+        // segmenter on whatever Settings holds now (W36.seg-opt-review): it segments as Manual does.
+        runConfig.segmentationApproach = .manual
         if let exportOriginals = pending.exportOriginals {
             runConfig.outputImageFile = exportOriginals
         }
@@ -850,6 +855,17 @@ extension OCRProcessor {
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
     /// is what lets resume reuse the same source→output association verbatim instead of re-deriving it in
     /// index order, which would swap outputs for two sources that share a base filename (B7).
+    /// W36.seg-opt-review: keep the window answers and the flagged-gap answers in the run's manifest, so a
+    /// resume asks neither the model nor the user again. A no-op outside a non-batch run (a batch's journal is
+    /// retired before segmentation, and a pre-OCRed run has none).
+    func persistWindowSegmentationProgress(windows: [WindowKey: WindowAnswer]? = nil,
+                                           answers: [String: FlaggedGapAnswer]? = nil) {
+        guard var run = activePendingRun else { return }
+        if let windows { run.segmentationWindows = windows }
+        if let answers { run.segmentationAnswers = (run.segmentationAnswers ?? [:]).merging(answers) { $1 } }
+        activePendingRun = run
+        if let save = pendingRunSaveOverride { save(run) } else { Self.savePendingRun(run) }
+    }
     @discardableResult
     func saveResultToPendingRun(index: Int, result: OCRResult, outputURL: URL? = nil) -> Bool {
         // Paid batches have their own lifecycle journal. Persist every materialized result before a
@@ -1558,13 +1574,24 @@ extension OCRProcessor {
         // mode isn't silently downgraded to automatic tagging after a relaunch (and .none/.copySource
         // correctly skip LLM tagging).
         if pending.enableTagging && !passSourceTags {
-            statusMessage = "Segmenting documents…"
-            let segmenter = DocumentSegmenter()
-            let classifications = jobs.map { $0.result?.classification }
-            let texts = jobs.map { $0.result?.text ?? "" }
-            segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
-                                         enclosureFlags: jobs.map { $0.result?.enclosure == true },
-                                         expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
+            // W36.seg-opt-review: a window approach runs its stage (and its review) here too, reusing the
+            // answers the manifest kept; otherwise the stored per-page classifications segment, as before.
+            let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
+            let preGrouped = preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
+            if case .windows(let approach) = plan, !preGrouped {
+                guard await runWindowSegmentationStage(files: pending.fileURLs, approach: approach,
+                                                       runConfig: runConfig) == .done else {
+                    cleanupTempFiles(); return
+                }
+            } else {
+                statusMessage = "Segmenting documents…"
+                let segmenter = DocumentSegmenter()
+                let classifications = jobs.map { $0.result?.classification }
+                let texts = jobs.map { $0.result?.text ?? "" }
+                segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
+                                             enclosureFlags: jobs.map { $0.result?.enclosure == true },
+                                             expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
+            }
             statusMessage = "Found \(segments.count) segments. Generating tags…"
 
             switch runOutputSettings.taggingMode {
@@ -1579,21 +1606,23 @@ extension OCRProcessor {
                     enableSegmentJSON: pending.enableSegmentJSON,
                     runConfig: runConfig
                 )
-            case .autoDate:
-                await performManualTaggingPhase(
-                    mode: runOutputSettings.taggingMode, provider: pending.provider, model: pending.model,
-                    thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
-                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
-                    runConfig: runConfig
-                )
-            case .human, .autoDateManualSeg:
-                await performManualSegmentAndTag(
-                    autoDate: runOutputSettings.taggingMode.autoFillsDate,
-                    provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
-                    apiKey: apiKey, outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON, preOCRed: false, files: pending.fileURLs,
-                    runConfig: runConfig
-                )
+            case .autoDate, .human:
+                if let autoDate = plan.combinedWindow(tagging: runOutputSettings.taggingMode, preGrouped: preGrouped) {
+                    await performManualSegmentAndTag(
+                        autoDate: autoDate,
+                        provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
+                        apiKey: apiKey, outputDirectory: pending.outputDirectory,
+                        enableSegmentJSON: pending.enableSegmentJSON, preOCRed: false, files: pending.fileURLs,
+                        runConfig: runConfig
+                    )
+                } else {
+                    await performManualTaggingPhase(
+                        mode: runOutputSettings.taggingMode, provider: pending.provider, model: pending.model,
+                        thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
+                        outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
+                        runConfig: runConfig
+                    )
+                }
             case .none, .copySource:
                 break
             }
@@ -1667,6 +1696,7 @@ extension OCRProcessor {
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
+            if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
         }
         if passSourceTags {
             statusMessage += " Source tags copied."
@@ -1930,13 +1960,24 @@ extension OCRProcessor {
 
         // Tagging (mode-dependent), matching the main workflow — not always automatic.
         if pending.enableTagging && !passSourceTags {
-            statusMessage = "Segmenting documents…"
-            let segmenter = DocumentSegmenter()
-            let classifications = jobs.map { $0.result?.classification }
-            let texts = jobs.map { $0.result?.text ?? "" }
-            segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
-                                         enclosureFlags: jobs.map { $0.result?.enclosure == true },
-                                         expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
+            // W36.seg-opt-review: a window approach runs its stage (and its review) here too, reusing the
+            // answers the manifest kept; otherwise the stored per-page classifications segment, as before.
+            let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
+            let preGrouped = preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
+            if case .windows(let approach) = plan, !preGrouped {
+                guard await runWindowSegmentationStage(files: pending.fileURLs, approach: approach,
+                                                       runConfig: runConfig) == .done else {
+                    cleanupTempFiles(); return
+                }
+            } else {
+                statusMessage = "Segmenting documents…"
+                let segmenter = DocumentSegmenter()
+                let classifications = jobs.map { $0.result?.classification }
+                let texts = jobs.map { $0.result?.text ?? "" }
+                segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
+                                             enclosureFlags: jobs.map { $0.result?.enclosure == true },
+                                             expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
+            }
             statusMessage = "Found \(segments.count) segments. Tagging…"
 
             switch runOutputSettings.taggingMode {
@@ -1947,22 +1988,24 @@ extension OCRProcessor {
                     enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs,
                     runConfig: runConfig
                 )
-            case .autoDate:
-                await performManualTaggingPhase(
-                    mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
-                    thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
-                    outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
-                    runConfig: runConfig
-                )
-            case .human, .autoDateManualSeg:
-                await performManualSegmentAndTag(
-                    autoDate: runOutputSettings.taggingMode.autoFillsDate,
-                    provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
-                    apiKey: textAPIKey, outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON,
-                    preOCRed: pending.preOCRedInput, files: pending.fileURLs,
-                    runConfig: runConfig
-                )
+            case .autoDate, .human:
+                if let autoDate = plan.combinedWindow(tagging: runOutputSettings.taggingMode, preGrouped: preGrouped) {
+                    await performManualSegmentAndTag(
+                        autoDate: autoDate,
+                        provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
+                        apiKey: textAPIKey, outputDirectory: pending.outputDirectory,
+                        enableSegmentJSON: pending.enableSegmentJSON,
+                        preOCRed: pending.preOCRedInput, files: pending.fileURLs,
+                        runConfig: runConfig
+                    )
+                } else {
+                    await performManualTaggingPhase(
+                        mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
+                        thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
+                        outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
+                        runConfig: runConfig
+                    )
+                }
             case .none, .copySource:
                 break
             }
@@ -2041,6 +2084,7 @@ extension OCRProcessor {
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
+            if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
         }
         if passSourceTags {
             statusMessage += " Source tags copied."
@@ -2510,6 +2554,7 @@ extension OCRProcessor {
         awaitingBoxFolderConfirmation = false
         boxFolderConfirmContinuation?.resume()
         boxFolderConfirmContinuation = nil
+        releaseWindowStageContinuations()
         cleanupTempFiles()
 
         // Cancel server-side batch if active.
@@ -2731,6 +2776,7 @@ extension OCRProcessor {
         runConfig.thinkingLevel = thinkingLevel ?? .low
         runConfig.apiKey = apiKey
         runConfig.taggingMode = taggingMode
+        if let segmentationApproach { runConfig.segmentationApproach = segmentationApproach }
         runConfig.rotationMode = rotationMode
         runConfig.mergeDocuments = mergeDocuments
         runConfig.outputDirectory = outputDirectory
@@ -3049,12 +3095,20 @@ extension OCRProcessor {
                 guard !Task.isCancelled else { cleanupTempFiles(); return }
             }
 
-            // Segmentation: pre-grouped from Live Capture, else the interactive LLM review.
-            if preGroupedBoundaries.count == files.count && !files.isEmpty {
+            // Segmentation: pre-grouped from Live Capture, else the window segmenter and its review, else the
+            // per-page review (W36.seg-opt-review: `SegmentationPlan`).
+            let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
+            let preGrouped = preGroupedBoundaries.count == files.count && !files.isEmpty
+            if preGrouped {
                 // Groups were defined on the phone — apply them directly, skip LLM segmentation.
                 applyPreGroupedClassifications(files: files)
                 rebuildSegments(files: files)
-            } else if runOutputSettings.taggingMode.usesManualSegmentationUI {
+            } else if case .windows(let approach) = plan {
+                guard await runWindowSegmentationStage(files: files, approach: approach,
+                                                       runConfig: runConfig) == .done else {
+                    cleanupTempFiles(); return
+                }
+            } else if case .manualWindow = plan {
                 // Manual modes: the combined segment+tag window owns rotation, box/folder, and
                 // segmentation, so skip the separate review here (it rebuilds segments itself).
             } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
@@ -3087,21 +3141,24 @@ extension OCRProcessor {
                         enableSegmentJSON: enableSegmentJSON, files: files,
                         runConfig: runConfig
                     )
-                case .autoDate:
-                    await performManualTaggingPhase(
-                        mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
-                        thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
-                        outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
-                        runConfig: runConfig
-                    )
-                case .human, .autoDateManualSeg:
-                    await performManualSegmentAndTag(
-                        autoDate: runOutputSettings.taggingMode.autoFillsDate,
-                        provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
-                        outputDirectory: outputDirectory,
-                        enableSegmentJSON: enableSegmentJSON, preOCRed: false, files: files,
-                        runConfig: runConfig
-                    )
+                case .autoDate, .human:
+                    if let autoDate = plan.combinedWindow(tagging: runOutputSettings.taggingMode, preGrouped: preGrouped) {
+                        await performManualSegmentAndTag(
+                            autoDate: autoDate,
+                            provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
+                            outputDirectory: outputDirectory,
+                            enableSegmentJSON: enableSegmentJSON, preOCRed: false, files: files,
+                            runConfig: runConfig
+                        )
+                    } else {
+                        // The window segmenter (or Live Capture) segmented: the user tags each document.
+                        await performManualTaggingPhase(
+                            mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
+                            thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
+                            outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
+                            runConfig: runConfig
+                        )
+                    }
                 case .none, .copySource:
                     break
                 }
@@ -3198,6 +3255,7 @@ extension OCRProcessor {
         }
         if enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
+            if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
         }
         if passSourceTags {
             statusMessage += " Source tags copied."

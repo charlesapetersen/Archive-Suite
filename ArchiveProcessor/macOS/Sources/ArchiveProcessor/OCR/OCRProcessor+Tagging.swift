@@ -718,7 +718,7 @@ extension OCRProcessor {
         manualTaggingContinuation?.resume()
         manualTaggingContinuation = nil
     }
-    /// Present the progressive manual segmentation + tagging window (human / autoDateManualSeg).
+    /// Present the progressive manual segmentation + tagging window (the approach Manual, with tagging human or autoDate).
     /// The user reviews rotation + box/folder, walks the photos in order, marks where each document
     /// segment ends and tags it (the tagged pages then drop out of the viewer). On Finish, the
     /// identified segments are translated back into job classifications, corrected rotations are
@@ -994,7 +994,7 @@ extension OCRProcessor {
         manualSegContinuation?.resume()
         manualSegContinuation = nil
     }
-    /// UI (autoDateManualSeg mode): fetch the LLM date for the pending segment's pages and fill any
+    /// UI (autoDate with the approach Manual): fetch the LLM date for the pending segment's pages and fill any
     /// empty date fields in the draft. Idempotent — skips if a date is present or a fetch is in flight.
     func fetchManualSegDate(forIndices indices: [Int]) async {
         guard manualSegAutoDate, let model = manualSegModel else { return }

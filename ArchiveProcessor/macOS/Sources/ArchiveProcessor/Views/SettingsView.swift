@@ -127,6 +127,11 @@ struct SettingsView: View {
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
     @AppStorage(DefaultsKeys.segmentationApproach) private var segmentationApproachRaw: String =
         SegmentationApproach.defaultApproach.rawValue
+    /// Who segments with the current settings (W36.seg-opt-review).
+    private var segmentationPlan: SegmentationPlan {
+        SegmentationPlan.resolve(tagging: taggingMode,
+                                 approach: SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach)
+    }
     /// Which keys / `claude` the segmentation approaches can use; read in `reloadKeys`, never while rendering.
     @State private var segmentationRoutes = SegmentationRoutes.none
 
@@ -264,7 +269,7 @@ struct SettingsView: View {
                 let est = CostEstimator.estimate(
                     fileCount: 1000, model: model, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
-                    preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage && taggingMode.llmSegments,
+                    preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
                     contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
                     rotationMode: rotationMode, useGateway: useGateway,
                     imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil)
@@ -811,10 +816,10 @@ struct SettingsView: View {
                 Toggle(isOn: $reviewDocumentSegmentation) {
                     HStack {
                         Text("Review document segmentation")
-                        HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging. Only applies when the model does the segmentation (Automatic / Auto-date).")
+                        HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging. Only applies when a model proposes the segmentation (Automatic tagging, or any Segmentation approach other than Manual).")
                     }
                 }
-                .disabled(!taggingMode.llmSegments)
+                .disabled(!segmentationPlan.reviewShowsDocumentClasses)
             }
             if taggingMode.enablesTagging && taggingMode != .copySource {
                 Toggle(isOn: $enableSegmentJSON) {
@@ -826,10 +831,10 @@ struct SettingsView: View {
                 Toggle(isOn: $sendPreviousImage) {
                     HStack {
                         Text("Send previous page image")
-                        HelpButton(text: "Gives the model the previous page's full image as segmentation context (~2× image cost) while keeping OCR parallel. Only used when the model does the segmentation (Automatic / Auto-date); in manual-segmentation or pre-OCRed modes it's ignored, so it adds no cost. Gemini/Anthropic only.")
+                        HelpButton(text: "Gives the model the previous page's full image as segmentation context (~2× image cost) while keeping OCR parallel. Only used when the OCR model's own per-page tags segment the run (Automatic tagging with Manual segmentation); otherwise, and in pre-OCRed mode, it's ignored, so it adds no cost. Gemini/Anthropic only.")
                     }
                 }
-                .disabled(!taggingMode.llmSegments || preOCRedInput)
+                .disabled(!segmentationPlan.usesPerPageClassifier || preOCRedInput)
                 if taggingMode == .automatic {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {

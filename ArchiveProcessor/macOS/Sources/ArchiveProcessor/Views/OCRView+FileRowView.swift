@@ -20,13 +20,19 @@ struct FileRowView: View {
     /// Live Capture segmentation to show before a job exists (falls back to `job.classification`).
     var presetClassification: DocumentClassification? = nil
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+    @AppStorage(DefaultsKeys.segmentationApproach) private var segmentationApproachRaw: String =
+        SegmentationApproach.defaultApproach.rawValue
 
-    /// Document start/continuation only mean something when the LLM segments (Automatic / Auto-date).
-    /// In manual-segmentation, Human, No-tagging, and Copy-source modes those are user-defined or
-    /// unused, so they shouldn't clutter the file pane. Box/folder markers always show.
+    /// Document start/continuation only mean something when a model proposes the segmentation (per page in
+    /// Automatic + Manual, or the window segmenter). When the user segments in the combined window, or with
+    /// No-tagging / Copy-source, they are user-defined or unused, so they shouldn't clutter the file pane.
+    /// Box/folder markers always show.
     private func shows(_ c: DocumentClassification) -> Bool {
         if c == .documentStart || c == .documentContinuation {
-            return (TaggingMode(rawValue: taggingModeRaw) ?? .automatic).llmSegments
+            return SegmentationPlan.resolve(
+                tagging: TaggingMode(rawValue: taggingModeRaw) ?? .automatic,
+                approach: SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach
+            ).reviewShowsDocumentClasses
         }
         return true
     }

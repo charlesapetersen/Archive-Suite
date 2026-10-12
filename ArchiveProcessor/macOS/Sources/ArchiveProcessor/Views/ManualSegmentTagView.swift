@@ -15,7 +15,7 @@ func confirmDiscardRun(_ message: String, discard: () -> Void) {
     if alert.runModal() == .alertSecondButtonReturn { discard() }
 }
 
-/// Progressive manual segmentation + tagging (human / autoDateManualSeg modes). The user walks the
+/// Progressive manual segmentation + tagging (the approach Manual, with tagging human or autoDate). The user walks the
 /// photos in order, reviews box/folder identifications, marks where each document segment ends, and
 /// tags it — as a segment is tagged its pages drop out of the viewer. Box/folder photos stay as
 /// markers. When only boxes/folders remain, Finish resumes the pipeline. Keyboard-first. Rotation is

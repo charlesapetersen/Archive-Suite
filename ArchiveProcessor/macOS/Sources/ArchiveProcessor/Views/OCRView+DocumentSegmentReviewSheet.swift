@@ -85,6 +85,18 @@ struct DocumentSegmentReviewSheet: View {
 
             Divider()
 
+            // W36.seg-opt-review: after the flagged pass, how many errors a skim is for (from the figures).
+            if let note = processor.reviewSkimNote, !rotationOnly {
+                Label(note, systemImage: "info.circle")
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.vertical, 6)
+                    .background(Color.accentColor.opacity(0.08))
+                    .accessibilityIdentifier("segmentReview.skimNote")
+                Divider()
+            }
+
             // Document list
             ScrollViewReader { scrollProxy in
                 ScrollView {
@@ -95,7 +107,9 @@ struct DocumentSegmentReviewSheet: View {
                                 thumbnailSize: thumbnailSize,
                                 isFocused: idx == focusedIndex,
                                 showDocumentClasses: showDocClasses,
-                                rotationOnly: rotationOnly
+                                rotationOnly: rotationOnly,
+                                checked: processor.reviewCheckedFileIndices.contains(
+                                    processor.documentReviewItems[idx].fileIndex)
                             )
                             .id(idx)
                             .onTapGesture { focusedIndex = idx }
@@ -211,6 +225,8 @@ struct DocumentReviewRow: View {
     var showDocumentClasses: Bool = true
     /// Dedicated rotation-review pass: show only the rotation control, no classification/remove.
     var rotationOnly: Bool = false
+    /// The user answered the flagged boundary before this page (W36.seg-opt-review).
+    var checked: Bool = false
     @State private var loadedImage: NSImage?
 
     private var rowBackground: Color {
@@ -256,6 +272,12 @@ struct DocumentReviewRow: View {
                     }
                     radioButton(label: "4 Folder", selected: item.classification == .folderLabel, color: .purple) {
                         item.classification = .folderLabel
+                    }
+                    if checked {
+                        Label("Checked", systemImage: "checkmark.seal")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .help("You answered the flagged boundary before this page.")
                     }
                 }
                 .frame(width: 130)
