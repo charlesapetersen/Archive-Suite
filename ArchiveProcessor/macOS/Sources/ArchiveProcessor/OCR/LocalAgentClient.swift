@@ -529,9 +529,9 @@ struct LocalAgentClient: Sendable {
     /// concurrently (no pipe-buffer deadlock), and enforce a hard timeout (SIGTERM → SIGKILL).
     ///
     /// Kept behaviourally identical to `scripts/localagent-mechanism-test.swift`, the standalone $0
-    /// test that exercises this exact spawn/drain/timeout logic against the committed fake CLI. The cancel hook
-    /// and the no-SIGPIPE stdin (W36.seg-opt-subscription) are not in that copy; `SegmentationPlanTestDriver`
-    /// tests them against the same fake CLI.
+    /// test that exercises this exact spawn/drain/timeout logic against the committed fake CLI. The cancel hook,
+    /// the no-SIGPIPE stdin and the exit signalled by `terminationHandler` (W36.seg-opt-subscription) are not in
+    /// that copy; `SegmentationPlanTestDriver` tests them against the same fake CLI.
     static func runProcess(binaryPath: String, args: [String], stdinText: String,
                            timeout: TimeInterval, currentDirectory: URL? = nil,
                            canceller: ProcessCanceller? = nil) -> CLIRun {
@@ -555,6 +555,11 @@ struct LocalAgentClient: Sendable {
         proc.standardOutput = outPipe
         proc.standardError = errPipe
 
+        // Exit is signalled by the termination handler, set before the launch. `waitUntilExit()` on a GCD thread
+        // was measured missing an exit (1 call in 60, three at once: the child had exited with its full output and
+        // the wait ran on to the timeout), which cost a window its answer and a cancel its promptness.
+        let exitSem = DispatchSemaphore(value: 0)
+        proc.terminationHandler = { _ in exitSem.signal() }
         do {
             try proc.run()
         } catch {
@@ -583,8 +588,6 @@ struct LocalAgentClient: Sendable {
 
         // Wait for exit with a hard wall-clock timeout.
         var timedOut = false
-        let exitSem = DispatchSemaphore(value: 0)
-        DispatchQueue.global(qos: .userInitiated).async { proc.waitUntilExit(); exitSem.signal() }
         if exitSem.wait(timeout: .now() + timeout) == .timedOut {
             timedOut = true
             proc.terminate()                                  // SIGTERM

@@ -143,12 +143,17 @@ enum PlanCalibration {
             return pages >= maxPages ? .underThreshold(pages: pages) : .notYet
         }
         let ratio = Double(moved) / dollars
-        // Rule 7: a step faster than the calls explain is other use of the account. A step can include the calls
-        // still in flight, so it is allowed their cost too, and three times the ratio, and never less than 2.
+        // Rule 7: a step faster than the calls explain is other use of the account. Each step is judged by the
+        // rest of the run (so a jump cannot vouch for itself), with the rest's points taken as at least 1 for the
+        // meter's whole-percent resolution. A step can include the calls still in flight, so it is allowed their
+        // cost too, then three times that, and never less than 2 points.
         let meanCall = dollars / Double(max(1, last - first))
         for (a, b) in zip(read, read.dropFirst()) {
-            let expected = ratio * (usd(a, b) + inFlight * meanCall)
-            if Double(five(b) - five(a)) > max(2, 3 * expected) {
+            let step = five(b) - five(a)
+            let restUSD = dollars - usd(a, b)
+            guard step > 2, restUSD > 0 else { continue }
+            let restRatio = Double(max(1, moved - step)) / restUSD
+            if Double(step) > max(2, 3 * restRatio * (usd(a, b) + inFlight * meanCall)) {
                 return .discarded("the meter moved faster than these calls explain (other use of the account)")
             }
         }

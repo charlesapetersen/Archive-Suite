@@ -73,6 +73,7 @@ struct ContentView: View {
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
+            SegmentationPlanTestDriver.runIfRequested()      // $0 W36 Claude plan route: meter, calibration, cancel
             maybePresentKeyOnboarding()
         }
 #if DEBUG
