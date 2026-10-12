@@ -105,6 +105,48 @@ final class ProcessorUITests: XCTestCase {
                       "the answers come back in gap order: \(renderedText(of: result))")
     }
 
+    /// W36.seg-opt-proof: the Segmentation chooser in Process Files offers every approach, and picking one shows
+    /// its figures, its cost and, with no key (the UI test reads no Keychain), why it cannot run yet. Ends back
+    /// on Full manual, the default.
+    func testSegmentationChooserShowsEachApproachWithFiguresAndCost() throws {
+        let picker = element("ap.segmentation.picker")
+        XCTAssertTrue(picker.waitForExistence(timeout: 10), "Process Files must show the Segmentation chooser")
+        let row = element("ap.segmentation.row")
+
+        func choose(_ label: String) {
+            picker.click()
+            let item = app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", label)).firstMatch
+            XCTAssertTrue(item.waitForExistence(timeout: 5), "the chooser must offer \(label)")
+            item.click()
+        }
+
+        for label in ["Full manual", "Claude only", "Gemini only", "Claude and Gemini together", "ChatGPT only"] {
+            picker.click()
+            XCTAssertTrue(app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", label)).firstMatch
+                .waitForExistence(timeout: 5), "the chooser must offer \(label)")
+            app.typeKey(.escape, modifierFlags: [])
+        }
+
+        choose("Gemini only")
+        XCTAssertTrue(waitUntil { self.renderedText(of: row).contains("To check") },
+                      "Gemini's row shows its figures: \(renderedText(of: row))")
+        let gemini = renderedText(of: row)
+        XCTAssertTrue(gemini.contains("Right after checking") && gemini.contains("Cost"),
+                      "the row carries every figure and the cost: \(gemini)")
+        XCTAssertTrue(element("ap.segmentation.unavailable").exists,
+                      "with no Gemini key the row says why it cannot run")
+        attachScreenshot("processor-segmentation-chooser-gemini")
+
+        choose("ChatGPT only")
+        XCTAssertTrue(waitUntil { self.element("ap.segmentation.unavailable").exists },
+                      "ChatGPT is shown with the reason it is not measured")
+
+        choose("Full manual")
+        XCTAssertTrue(waitUntil { !self.element("ap.segmentation.unavailable").exists },
+                      "Full manual always runs")
+        attachScreenshot("processor-segmentation-chooser-manual")
+    }
+
     private func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
         let end = Date().addingTimeInterval(timeout)
         while Date() < end {

@@ -131,10 +131,6 @@ enum SegmentationProofDriver {
         // The stage records each plan run's ratio into the app's own defaults; this is a test, so put it back.
         let calibrationKey = DefaultsKeys.segmentationPlanCalibration
         let savedCalibration = UserDefaults.standard.object(forKey: calibrationKey)
-        defer {
-            if let savedCalibration { UserDefaults.standard.set(savedCalibration, forKey: calibrationKey) }
-            else { UserDefaults.standard.removeObject(forKey: calibrationKey) }
-        }
 
         for run in runs {
             let parts = run.split(separator: ":").map(String.init)
@@ -145,6 +141,10 @@ enum SegmentationProofDriver {
             }
             await prove(manifest: manifest, approach: approach, route: route, name: run, keys: keys, claude: claude)
         }
+        // The stage records its ratio from a task it starts as it ends; let that land before putting it back.
+        try? await Task.sleep(for: .seconds(3))
+        if let savedCalibration { UserDefaults.standard.set(savedCalibration, forKey: calibrationKey) }
+        else { UserDefaults.standard.removeObject(forKey: calibrationKey) }
     }
 
     private static func prove(manifest: Manifest, approach: SegmentationApproach, route: ClaudeRoute, name: String,
