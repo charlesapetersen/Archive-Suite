@@ -116,6 +116,7 @@ log() {{ printf '%s\n' "$*"; }}
             raise AssertionError(f"{name}: real cleanup exceeded its bound")
         check(time.monotonic() - started < 20, f"{name}: teardown is bounded")
         if peer is None:
+            check(marker.exists(), f"{name}: child reached launch invariants: {maclog.read_text()!r}")
             pid = marker.read_text().strip()
             alive = subprocess.run(["ps", "-p", pid, "-o", "pid="], capture_output=True, text=True)
             check(not alive.stdout.strip(), f"{name}: owned child is gone")

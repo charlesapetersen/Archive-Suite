@@ -163,6 +163,8 @@ separately so a default-fixture skip is not counted as a pass. No new compiler w
 | Notes host headless units | 220 XCTest + 959 Swift Testing passed | 0.384 s + 45.189 s | 100.91 s | [Notes](evidence/notes/W40.a3-full-ui.md) |
 | Processor full VM UI | 10 passed, no skips | 114.309 s | 243.63 s | [Processor](evidence/processor/W40.a3-full-ui.md) |
 | Relay golden, spaced-path gate | 4 Swift byte comparisons + 4 Android JVM tests passed | — | 10.30 s | [Relay](evidence/capture/W40.a3-relay-golden.md) |
+| Real Android↔Mac E2E | 3 synthetic docs → 3 PDFs; token/year/tag assertions passed | — | 188.10 s | [Phone E2E](evidence/capture/W40.a3-phone-e2e.md) |
+| E2E cleanup, spaced-path gate | 44 scratch checks passed; TERM-unblock mutant fails | — | 16.61 s | [Phone E2E](evidence/capture/W40.a3-phone-e2e.md) |
 
 All 35 Reader and 57 Notes distinct UI tests passed across their required fixtures. Notes' explicit
 G19→G3 and G3→G19 pairs pass; disabling fixture restoration fails the next seeded-row assertion
