@@ -10698,3 +10698,22 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   ("out of credits" on any ERROR line) stops the run instead of retrying; guard at 100% for Codex.
   Consequence: until `W36.seg-opt-siwc`, the shipped mix needs an OpenAI API key to run.
   <!-- /W36.seg-opt-openai -->
+- [x] **W40.b2 — Notes feature ledger [M]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-12 (this commit) (lane: notes) (uses: light)
+  `verification/notes.md`: 48 rows (N-01–N-48), each written from `ArchiveNotes/CLAUDE.md`, `SMOKE_TEST.md`,
+  `00-overview.md` (§17 deferrals listed, not rows), the deleted `09-gap-closure.md` (its E1 result, from the parent of
+  `74ab56eb`) and the Notes done-records before the code was opened, then traced to its entry point (`file:line`) and
+  its best real-path test. The `W9.e1`/`W9.e2` results are taken in under each row's tests and Notes. Sources and code
+  read at `9e8959ef`. Count: `unproven 47 · unreachable 1`. No row is `works`: a green suite is not runtime evidence.
+  **Unreachable:** N-48, split from N-01 — there is no File ▸ Choose Store Folder…; `RootFolderStore.setRoot` has no
+  caller, so a user-picked store and its relaunch bookmark cannot be reached. Wire-or-drop decision to the Daemon Report.
+  **Drift for `W40.b5`** (rows N-01, N-03, N-04, N-12, N-17, N-38, N-43, N-47): the default store is in the sandbox
+  container, not `~/Library/Application Support`; nothing but code stops an archive write (read-write grant); a
+  hand-applied `Q1`–`Q3` Finder tag is removed on save and Sent-With dates are mirrored too; indent/outdent is Tab only;
+  the tag Retry does not survive relaunch; a renamed source is named but not offered; block-level Zotero links get no
+  citation fetch; the Zotero host/port apply only after relaunch. Thirteen doc-against-doc drifts listed at the end of
+  the ledger (SMOKE_TEST's G0–G11 and "GUI mode", §5's tags-only mirror, §3.6's folder removal, …).
+  Nine suspects, S-006–S-014 in `verification/SUSPECTS.md`; S-009 (raw-mode image paste may save a stray U+FFFC) and
+  S-010 (multi-remove asks about only the last sole-instance note) touch the note-save path. Tracing used one
+  promise-drafting and three read-only tracing subagents; all 104 cited test methods and every `file:line` were
+  re-checked mechanically. Docs only, so no build.
+  <!-- /W40.b2 -->
