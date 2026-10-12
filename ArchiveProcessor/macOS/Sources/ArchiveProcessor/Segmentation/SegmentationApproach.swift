@@ -91,8 +91,69 @@ struct SegmentationOptions: Decodable, Sendable {
         }
     }
 
+    /// One model's price, as the bench read it. A scheduled price change is an `after_YYYY_MM_DD` key (Gemini's
+    /// introductory price ends on 2026-12-31); it is read by pattern so the date is never hard-coded.
+    struct ModelCost: Decodable, Sendable {
+        let listUSDPer1000Pages: Double
+        let batchUSDPer1000Pages: Double?
+        /// `yyyy-MM-dd`, the day the price was read off the provider's page.
+        let priceRead: String?
+        /// The day the price changes (`yyyy-MM-dd`) and the price from then on.
+        let priceChange: (date: String, total: CostTotal)?
+
+        private struct AnyKey: CodingKey {
+            let stringValue: String
+            var intValue: Int? { nil }
+            init(stringValue: String) { self.stringValue = stringValue }
+            init?(intValue: Int) { nil }
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: AnyKey.self)
+            listUSDPer1000Pages = try c.decode(Double.self, forKey: AnyKey(stringValue: "list_usd_per_1000_pages"))
+            batchUSDPer1000Pages = try c.decodeIfPresent(Double.self,
+                                                         forKey: AnyKey(stringValue: "batch_usd_per_1000_pages"))
+            priceRead = try c.decodeIfPresent(String.self, forKey: AnyKey(stringValue: "price_read"))
+            let after = c.allKeys.compactMap { key -> (String, AnyKey)? in
+                guard let r = key.stringValue.range(of: #"^after_\d{4}_\d{2}_\d{2}$"#, options: .regularExpression)
+                else { return nil }
+                return (String(key.stringValue[r].dropFirst("after_".count)).replacingOccurrences(of: "_", with: "-"),
+                        key)
+            }.min { $0.0 < $1.0 }
+            if let (date, key) = after {
+                priceChange = (date, try c.decode(CostTotal.self, forKey: key))
+            } else {
+                priceChange = nil
+            }
+        }
+    }
+
     struct Cost: Decodable, Sendable {
         let total: CostTotal
+        /// Keyed by the bench's voter letter (`C`, `G`), as `tokens_per_1000_pages` is.
+        let perModel: [String: ModelCost]?
+
+        enum CodingKeys: String, CodingKey {
+            case total
+            case perModel = "per_model"
+        }
+    }
+
+    /// What one voter's model uses per 1,000 pages, whatever the plan. The subscription route's notional
+    /// figure is what the same calls would cost at API list price, so the plan's share can be put in dollars
+    /// before the user's own account has been measured.
+    struct Tokens: Decodable, Sendable {
+        let model: String
+        let inputPer1000Pages: Double
+        let outputPer1000Pages: Double
+        let subscriptionRouteNotionalUSDPer1000Pages: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case model
+            case inputPer1000Pages = "input_per_1000_pages"
+            case outputPer1000Pages = "output_per_1000_pages"
+            case subscriptionRouteNotionalUSDPer1000Pages = "subscription_route_notional_usd_per_1000_pages"
+        }
     }
 
     struct Approach: Decodable, Sendable {
@@ -105,6 +166,12 @@ struct SegmentationOptions: Decodable, Sendable {
         let reason: String?
         let figures: FigureSets?
         let cost: Cost?
+        let tokensPer1000Pages: [String: Tokens]?
+
+        enum CodingKeys: String, CodingKey {
+            case id, label, available, voters, rule, level, reason, figures, cost
+            case tokensPer1000Pages = "tokens_per_1000_pages"
+        }
     }
 
     func approach(_ a: SegmentationApproach) -> Approach? {
@@ -147,7 +214,20 @@ struct SegmentationOptions: Decodable, Sendable {
             if a.figures?.test == nil { out.append("\(a.id): no figures.test") }
             guard approach.proposesBoundaries else { continue }
             if a.level == nil { out.append("\(a.id): no level") }
-            if a.cost == nil { out.append("\(a.id): no cost") }
+            if let cost = a.cost {
+                // The chooser prices each model on its own (a price change can reach one before another), so
+                // the per-model figures have to add up to the file's total, and each needs its model's tokens.
+                let models = cost.perModel ?? [:]
+                let sum = models.values.reduce(0) { $0 + $1.listUSDPer1000Pages }
+                if models.isEmpty || abs(sum - cost.total.listUSDPer1000Pages) > 1e-6 {
+                    out.append("\(a.id): per-model list prices do not add up to the total")
+                }
+                for key in models.keys where a.tokensPer1000Pages?[key] == nil {
+                    out.append("\(a.id): cost \(key) has no tokens_per_1000_pages entry")
+                }
+            } else {
+                out.append("\(a.id): no cost")
+            }
             if WindowCombineRule(rawValue: a.rule ?? "") == nil { out.append("\(a.id): rule \(a.rule ?? "nil")") }
             let voters = a.voters ?? []
             if voters.isEmpty { out.append("\(a.id): no voters") }

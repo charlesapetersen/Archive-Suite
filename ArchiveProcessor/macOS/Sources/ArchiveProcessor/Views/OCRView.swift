@@ -18,6 +18,11 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
+    @AppStorage(DefaultsKeys.segmentationApproach) private var segmentationApproachRaw: String =
+        SegmentationApproach.defaultApproach.rawValue
+    /// Which keys / `claude` the segmentation approaches can use; read on appear and on a key change, never
+    /// while rendering.
+    @State private var segmentationRoutes = SegmentationRoutes.none
     @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
     @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
@@ -189,6 +194,20 @@ struct OCRView: View {
             imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil)
     }
 
+    /// The pages the segmentation approach would segment: the image files. A multi-page PDF is rebuilt page by
+    /// page with no tagging, so its pages are never segmented (Part 3 §3 wrote `droppedFiles.count +
+    /// droppedPDFPageCount`, which also counts each such PDF once as a file and once per page).
+    private var segmentationPageCount: Int { imageFileCount }
+
+    /// The chosen approach's row for this run, or nil when there is nothing to segment.
+    private var segmentationRow: SegmentationRow? {
+        guard segmentationPageCount > 0, captureBoundaries.isEmpty,
+              let options = SegmentationOptionsStore.shared else { return nil }
+        let approach = SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach
+        return SegmentationRow.make(approach, options: options, pageCount: segmentationPageCount,
+                                    routes: segmentationRoutes)
+    }
+
     /// Processing-time estimate for the current batch (LLM/processing time only).
     private var timeEstimate: TimeEstimate? {
         guard !droppedFiles.isEmpty else { return nil }
@@ -204,6 +223,19 @@ struct OCRView: View {
         gatewayInputCost >= 0 && gatewayOutputCost >= 0
     }
 
+    /// The estimate's "Segmentation" line: $0 for manual, the approach's dollars by API key, or "your plan" when
+    /// only the user's own `claude` can run it. Its window calls are in addition to OCR.
+    @ViewBuilder private var segmentationCostLine: some View {
+        if let row = segmentationRow {
+            HStack {
+                Text("Segmentation (\(row.label)):").foregroundStyle(.secondary)
+                Spacer()
+                Text(row.costSummary)
+                    .accessibilityIdentifier("ap.ocr.segmentationCost")
+            }
+        }
+    }
+
     // MARK: - Body
     var body: some View {
         HSplitView {
@@ -216,6 +248,7 @@ struct OCRView: View {
         }
         .onAppear {
             reloadAPIKey()
+            segmentationRoutes = SegmentationRoutes.current()
             processor.checkForPendingBatch()
             if !keychainExplained {
                 showKeychainSheet = true
@@ -268,6 +301,7 @@ struct OCRView: View {
             processor.stagedCaptureFiles = []
         }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
+            segmentationRoutes = SegmentationRoutes.current()
             reloadAPIKey()
         }
         .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }
@@ -450,6 +484,22 @@ struct OCRView: View {
                 .accessibilityIdentifier("ap.ocr.taggingPanel")
                 .disabled(isPDFOnlyReOCR)
 
+                // Who proposes the boundaries (W36.seg-opt-chooser). Not for Live Capture: the phone already
+                // gave them. Linked to Settings → Segmentation.
+                if captureBoundaries.isEmpty {
+                    GroupBox("Segmentation") {
+                        SegmentationChooserView(
+                            pageCount: segmentationPageCount > 0 ? segmentationPageCount : 100,
+                            scaleCaption: segmentationPageCount > 0
+                                ? "for the \(segmentationPageCount) page\(segmentationPageCount == 1 ? "" : "s") dropped"
+                                : "per 100 pages",
+                            routes: $segmentationRoutes)
+                            .padding(4)
+                    }
+                    .accessibilityIdentifier("ap.ocr.segmentationPanel")
+                    .disabled(isPDFOnlyReOCR)
+                }
+
 
                 // Cost estimate
                 if useAppleVision && !droppedFiles.isEmpty {
@@ -496,6 +546,7 @@ struct OCRView: View {
                                     Text(est.totalStandardFormatted).fontWeight(.medium)
                                 }
                             }
+                            segmentationCostLine
                         }
                         .padding(4)
                     }
@@ -513,6 +564,7 @@ struct OCRView: View {
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 2)
                                 .accessibilityIdentifier("ap.ocr.localAgentPacing")
+                            segmentationCostLine
                         }
                         .padding(4)
                     }
@@ -584,12 +636,14 @@ struct OCRView: View {
                                     }
                                 }
                             }
+                            segmentationCostLine
                             Divider()
                             HStack {
                                 Text("Total (standard):").fontWeight(.medium)
                                 Spacer()
                                 Text(CostEstimate.money(CostEstimator.runTotal(
-                                    images: costEstimate, directPDFPages: pdfPageEstimate, batch: false)))
+                                    images: costEstimate, directPDFPages: pdfPageEstimate, batch: false)
+                                    + (segmentationRow?.apiDollars ?? 0)))
                                     .fontWeight(.medium)
                             }
                             if !useGateway && batchMode && !preOCRedInput && costEstimate != nil {
@@ -597,8 +651,10 @@ struct OCRView: View {
                                     Text(pdfPageEstimate == nil ? "Total (batch):" : "Total (batch images + direct PDF pages):")
                                         .foregroundStyle(.secondary)
                                     Spacer()
+                                    // Segmentation windows are never batched, so they add the same dollars.
                                     Text(CostEstimate.money(CostEstimator.runTotal(
-                                        images: costEstimate, directPDFPages: pdfPageEstimate, batch: true)))
+                                        images: costEstimate, directPDFPages: pdfPageEstimate, batch: true)
+                                        + (segmentationRow?.apiDollars ?? 0)))
                                         .accessibilityIdentifier("ap.ocr.batchTotal")
                                 }
                             }

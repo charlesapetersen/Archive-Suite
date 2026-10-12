@@ -125,6 +125,17 @@ struct SettingsView: View {
     }
 
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
+    @AppStorage(DefaultsKeys.segmentationApproach) private var segmentationApproachRaw: String =
+        SegmentationApproach.defaultApproach.rawValue
+    /// Which keys / `claude` the segmentation approaches can use; read in `reloadKeys`, never while rendering.
+    @State private var segmentationRoutes = SegmentationRoutes.none
+
+    /// The chosen approach's row at the cost pane's scale (1,000 files, read as 1,000 pages).
+    private var segmentationRow: SegmentationRow? {
+        guard let options = SegmentationOptionsStore.shared else { return nil }
+        let approach = SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach
+        return SegmentationRow.make(approach, options: options, pageCount: 1000, routes: segmentationRoutes)
+    }
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
 
     /// The steppers below must offer exactly the range the run-time clamps enforce, so both read one
@@ -148,6 +159,7 @@ struct SettingsView: View {
                 inputSection
                 rotationSection
                 taggingSection
+                segmentationSection
             }
             .formStyle(.grouped)
             .frame(minWidth: 400)
@@ -230,6 +242,7 @@ struct SettingsView: View {
         mistralKey = KeychainHelper.load(account: LLMProvider.mistral.rawValue) ?? ""
         openaiKey = KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? ""
         gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
+        segmentationRoutes = SegmentationRoutes.current()
     }
 
     // MARK: Fixed cost pane (stays put while the form scrolls)
@@ -242,8 +255,10 @@ struct SettingsView: View {
                 .font(.caption2).foregroundStyle(.secondary)
 
             if useAppleVision {
+                segmentationCostBlock
                 appleVisionCostPane
             } else if useLocalAgent {
+                segmentationCostBlock
                 localAgentCostPane
             } else if let model = useGateway ? gatewayModel : selectedModel {
                 let est = CostEstimator.estimate(
@@ -261,12 +276,18 @@ struct SettingsView: View {
 
                 Divider().padding(.vertical, 2)
                 Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
-                costRow("Total", est.totalStandardFormatted, bold: true)
-                if batchMode && !useGateway && !preOCRedInput { costRow("Batch", est.totalBatchFormatted) }
+                // Segmentation's window calls are in addition to OCR and are never batched (the engine sends
+                // each window interactively), so they add the same dollars to both totals.
+                let seg = segmentationRow?.apiDollars ?? 0
+                costRow("Total", CostEstimate.money(est.totalStandard + seg), bold: true)
+                if batchMode && !useGateway && !preOCRedInput {
+                    costRow("Batch", CostEstimate.money(est.totalBatch + seg))
+                }
                 if !preOCRedInput { costRow("· OCR", est.ocrFormatted) }
                 if est.rotationCost > 0 { costRow("· Rotation", est.rotationFormatted) }
                 if tagging { costRow("· Tagging", est.taggingFormatted) }
                 if enableCollectionSegmentation { costRow("· Collection", est.collectionFormatted) }
+                if let row = segmentationRow { costRow("· Segmentation", row.costSummary) }
 
                 Divider().padding(.vertical, 2)
                 Text("TIME (processing only)").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
@@ -350,6 +371,15 @@ struct SettingsView: View {
              : "This backend transcribes only. Enable Vision + LLM judgement below to classify, segment, date, or generate tags.")
             .font(.caption2).foregroundStyle(.secondary)
         Spacer()
+    }
+
+    /// The segmentation approach's own cost, for the backends whose pane has no dollar total to add it to.
+    @ViewBuilder private var segmentationCostBlock: some View {
+        if let row = segmentationRow, row.approach.proposesBoundaries {
+            Divider().padding(.vertical, 2)
+            Text("SEGMENTATION").font(.caption2).fontWeight(.bold).foregroundStyle(.secondary)
+            costRow(row.label, row.costSummary)
+        }
     }
 
     private func costRow(_ label: String, _ value: String, bold: Bool = false) -> some View {
@@ -746,6 +776,13 @@ struct SettingsView: View {
             }
             .disabled(rotationMode == .off || preOCRedInput)
         } header: { Text("Rotation Correction") }
+    }
+
+    @ViewBuilder private var segmentationSection: some View {
+        Section {
+            SegmentationChooserView(pageCount: 1000, scaleCaption: "per 1,000 pages",
+                                    routes: $segmentationRoutes)
+        } header: { Text("Segmentation") }
     }
 
     @ViewBuilder private var taggingSection: some View {
