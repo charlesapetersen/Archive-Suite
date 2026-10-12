@@ -341,7 +341,8 @@ struct WindowVoter: Sendable, Equatable {
     let name: String
     let provider: WindowProvider
     let modelID: String
-    /// Gemini `thinkingConfig.thinkingLevel`, as the bench sent it.
+    /// The model's thinking setting, as the bench sent it: Gemini `thinkingConfig.thinkingLevel`, OpenAI
+    /// `reasoning_effort` (Codex's `model_reasoning_effort` in the bench).
     let thinkingLevel: String?
     let prompt: WindowPromptID
 
@@ -352,6 +353,10 @@ struct WindowVoter: Sendable, Equatable {
                     thinkingLevel: nil, prompt: .w1),
         WindowVoter(name: "window-gemini-3.8-flash-low", provider: .gemini, modelID: "gemini-3.8-flash",
                     thinkingLevel: "low", prompt: .g1),
+        // Measured through `codex exec` on the ChatGPT subscription (W36.seg-opt-openai); the app's API route
+        // sends the same prompt with the images inline. `W36.seg-opt-siwc` owns the subscription route.
+        WindowVoter(name: "window-openai", provider: .openai, modelID: "gpt-6.1-sol",
+                    thinkingLevel: "low", prompt: .c1),
     ]
 
     struct ResolveError: Error, CustomStringConvertible {

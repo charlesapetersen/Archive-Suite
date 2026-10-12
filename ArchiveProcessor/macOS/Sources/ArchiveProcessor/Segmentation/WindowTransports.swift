@@ -85,8 +85,12 @@ struct APIWindowTransport: WindowTransport {
                                 "image_url": ["url": "data:image/jpeg;base64,\(img.base64EncodedString())"]])
             }
             content.append(["type": "text", "text": r.prompt])
-            body = ["model": r.voter.modelID, "max_completion_tokens": maxOutputTokens,
-                    "messages": [["role": "user", "content": content]]]
+            var o: [String: Any] = ["model": r.voter.modelID, "max_completion_tokens": maxOutputTokens,
+                                    "messages": [["role": "user", "content": content]]]
+            // The bench ran its ChatGPT voter at Codex's `model_reasoning_effort`; the same level here, or the
+            // shipped figures would not describe this request.
+            if let t = r.voter.thinkingLevel { o["reasoning_effort"] = t }
+            body = o
         }
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "POST"

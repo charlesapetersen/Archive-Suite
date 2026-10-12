@@ -367,7 +367,10 @@ enum SegmentationEngineTestDriver {
         func req(_ v: WindowVoter) -> WindowRequest {
             WindowRequest(voter: v, prompt: "PROMPT", images: imgs, pageNumbers: [8, 9, 10])
         }
-        let openaiVoter = WindowVoter(name: "window-openai", provider: .openai, modelID: "gpt-x", thinkingLevel: nil, prompt: .g1)
+        let openaiVoter = WindowVoter.catalog[2]
+        check("the openai voter is window-openai on gpt-6.1-sol at reasoning low, prompt c1",
+              openaiVoter.name == "window-openai" && openaiVoter.modelID == "gpt-6.1-sol"
+              && openaiVoter.thinkingLevel == "low" && openaiVoter.prompt == .c1)
 
         // Request shapes
         if let a = try? APIWindowTransport.request(req(claude), key: "K-A") {
@@ -401,9 +404,10 @@ enum SegmentationEngineTestDriver {
         if let o = try? APIWindowTransport.request(req(openaiVoter), key: "K-O") {
             let b = body(o)
             let content = ((b["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
-            check("openai: chat completions, bearer key, images as data URLs",
+            check("openai: chat completions, bearer key, gpt-6.1-sol at reasoning low, images as data URLs",
                   o.url?.absoluteString == "https://api.openai.com/v1/chat/completions"
                   && o.value(forHTTPHeaderField: "Authorization") == "Bearer K-O" && content.count == 7
+                  && b["model"] as? String == "gpt-6.1-sol" && b["reasoning_effort"] as? String == "low"
                   && ((content[1]["image_url"] as? [String: Any])?["url"] as? String)?.hasPrefix("data:image/jpeg;base64,") == true)
         } else { check("openai request builds", false) }
 

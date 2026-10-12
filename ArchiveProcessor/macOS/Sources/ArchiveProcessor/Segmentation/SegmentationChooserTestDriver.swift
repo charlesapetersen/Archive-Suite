@@ -145,10 +145,30 @@ enum SegmentationChooserTestDriver {
 
         // 4. Unavailable.
         let openai = row(.openai, 1000, all)
-        check("4 openai unmeasured shows the file's reason",
-              openai.unavailableReason == options.approach(.openai)?.reason && openai.unavailableReason != nil,
-              "\(openai.unavailableReason as Any)")
-        eq("4 openai has no figures", openai.toCheck, "")
+        if options.approach(.openai)?.available == true {
+            check("4 openai measured (W36.seg-opt-openai): figures and a cost, runnable with the key",
+                  openai.canRun && openai.toCheck.hasPrefix("about ") && openai.apiDollars != nil
+                  && openai.costLines.count == 1, "\(openai.toCheck) \(openai.costLines)")
+            let openaiNoKey = row(.openai, 1000, keysOnly)
+            eq("4 openai without key", openaiNoKey.unavailableReason, "Needs an OpenAI API key.")
+            eq("4 openai offers the OpenAI key", openaiNoKey.missingKeys, [.openai])
+        } else {
+            // Until W36.seg-opt-openai fills the row (its Codex calls span several five-hour windows).
+            check("4 openai unmeasured shows the file's reason",
+                  openai.unavailableReason == options.approach(.openai)?.reason && openai.unavailableReason != nil,
+                  "\(openai.unavailableReason as Any)")
+            eq("4 openai has no figures", openai.toCheck, "")
+        }
+        if let opts = mutateBundled({ approaches in
+            guard let i = approaches.firstIndex(where: { $0["id"] as? String == "openai" }) else { return false }
+            approaches[i] = ["id": "openai", "label": "ChatGPT only", "available": false, "reason": "Not measured: R."]
+            return true
+        }) {
+            let r = SegmentationRow.make(.openai, options: opts, pageCount: 1000, routes: all, today: today)
+            check("4 an unmeasured row shows the file's reason and no figures",
+                  r.unavailableReason == "Not measured: R." && r.toCheck == "" && opts.problems().isEmpty,
+                  "\(r.unavailableReason as Any) \(opts.problems())")
+        } else { check("4 an unmeasured row shows the file's reason and no figures", false, "could not rebuild the file") }
         let noClaude = row(.claude, 1000, .none)
         eq("4 claude without key or claude",
            noClaude.unavailableReason, "Needs an Anthropic API key, or the claude tool installed and signed in.")
