@@ -10657,3 +10657,25 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `SegmentationStagePresentations` modifier. The guest's `dd-processor` build database was then corrupt and was
   cleared (`XCBuildData`, VM scratch). `W40.b3` and `W40.d1`-`d4` may now start.
   <!-- /W36.seg-opt-proof -->
+- [x] **W40.b1 — Reader feature ledger [M]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-12 (this commit) (lane: reader) (uses: light)
+  `verification/reader.md`: 46 rows (R-01–R-46), each written from the Reader guide, README, SMOKE_TEST and done-records
+  before the code was opened, then traced to its entry point (`file:line`) and its best real-path test. Sources and code
+  read at `caefe33a`. Count: `unproven 43 · unreachable 3`. No row is `works`: the W40.a3 VM suite passes the named
+  UITests, but a suite run is not runtime evidence (README §Statuses), so the journeys (`W40.d*`) provide the evidence.
+  **Unreachable:** R-25 (single-click Read toggle) and R-26 (inline date editing). Both live only in the dead
+  `InlineEditCells.swift` views, which nothing has referenced since the AppKit table. Each went to the Daemon Report as a
+  wire-or-drop decision. R-46 (the §12 audit ledger) has no implementation: undo is an in-memory stack. Its decision is
+  `W40.f1`'s. **Drift for `W40.b5`**, marked "Drift" in Notes, in rows R-06, R-07, R-08, R-11, R-19, R-23, R-32 and R-35:
+  - no NOT subject filter;
+  - OCR search runs as you type, not on Return;
+  - no Mark-Read option and no Retry;
+  - `SubjectTokenField.swift` is dead too;
+  - Open in Default App has no menu-bar item;
+  - no ⏎-opens-viewer;
+  - the menu sort is not multi-level;
+  - No-read-state is absent from the filter bar.
+
+  Five suspects, S-001–S-005 in `verification/SUSPECTS.md`. S-001 is the irreversible-path one: ⌘Z may undo a tag
+  change while a text field has focus. Tracing used three read-only subagents. The two unreachable verdicts, the
+  missing ledger, the missing `.onSubmit` and the `undoLast` `try?` were re-checked by grep. Docs only, so no build.
+  <!-- /W40.b1 -->
