@@ -192,9 +192,19 @@ def used_pct(route) -> int:
     args = ["--raw"] + (["--codex-latest"] if route == "codex" else [str(CLAUDE_READING_LOG)])
     r = subprocess.run(["bash", str(USAGE_SH), *args], capture_output=True, text=True)
     try:
-        return int(float(r.stdout.split()[0]))
-    except (ValueError, IndexError):
+        pct, resets = r.stdout.split()[:2]
+    except ValueError:
         return 100  # no reading: stop rather than spend blind (the 16:55 run spent past its guard this way)
+    try:
+        # A reading from a window that has since reset describes nothing current, and nothing refreshes it
+        # until something calls Codex, which the guard would be refusing (W36.seg-opt-openai, 2026-10-11: 91%
+        # stood past the 20:42 reset until a probe call). The first call records a fresh reading, and the
+        # guard reads again six calls on.
+        if float(resets) <= time.time():
+            return 0
+        return int(float(pct))
+    except ValueError:
+        return 100
 
 
 def collect(route, names, allow_test=False):

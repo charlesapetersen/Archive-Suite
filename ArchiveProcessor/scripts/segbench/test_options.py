@@ -104,6 +104,29 @@ def test_cost_uses_input_without_the_harness():
         del O.PRICES["toy"]
 
 
+def test_usage_guard_ignores_a_reading_from_a_reset_window():
+    """A stale reading stood at 91% past its window's reset until something called Codex (W36.seg-opt-openai)."""
+    import subprocess, time
+    import method_window_cues as WC
+
+    class R:
+        def __init__(self, out): self.stdout = out  # noqa: E704
+    real = subprocess.run
+    outs = {}
+    subprocess.run = lambda *a, **k: R(outs["raw"])  # noqa: E731
+    try:
+        outs["raw"] = f"91 {int(time.time()) - 60}\n"      # the window reset a minute ago
+        assert WC.used_pct("codex") == 0
+        outs["raw"] = f"91 {int(time.time()) + 3600}\n"    # still inside its window
+        assert WC.used_pct("codex") == 91
+        outs["raw"] = ""                                   # no reading at all
+        assert WC.used_pct("codex") == 100
+        outs["raw"] = "junk\n"
+        assert WC.used_pct("codex") == 100
+    finally:
+        subprocess.run = real
+
+
 def main() -> int:
     tests = [v for k, v in globals().items() if k.startswith("test_")]
     for t in tests:
