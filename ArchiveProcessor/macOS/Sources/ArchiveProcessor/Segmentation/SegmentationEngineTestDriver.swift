@@ -9,7 +9,7 @@ import Foundation
 ///   1. The bundled options.json decodes and is fit to ship; every approach id has a case and back; each
 ///      approach resolves to its voters, rule and level, and the prompt ids the file names are the app's.
 ///   2. The window layout is the bench's (7 pages, stride 3, every gap judged twice from 5 pages up).
-///   3. Both prompts render byte for byte as the bench renders them.
+///   3. Every prompt (w1, g1, c1) renders byte for byte as the bench renders it.
 ///   4. The parser takes the bench's replies and refuses the malformed ones it refuses.
 ///   5. Reproducing the bench: on the recorded development box, every approach's decision, flag, agreement
 ///      and confidence match `ensemble.judge` gap for gap.
@@ -39,7 +39,7 @@ enum SegmentationEngineTestDriver {
         struct Expected: Decodable {
             let gap: Int; let decision: String; let flagged: Bool; let confidence: Double; let agreed: Bool
         }
-        struct Prompts: Decodable { let texts: [String]; let w1: String; let g1: String }
+        struct Prompts: Decodable { let texts: [String]; let w1: String; let g1: String; let c1: String }
         let box: String
         let pages: Int
         let photo_kinds: [String?]
@@ -166,6 +166,8 @@ enum SegmentationEngineTestDriver {
         let g1 = WindowPromptRenderer.render(.g1, pageNumbers: nums, texts: fx.prompts.texts, maxText: 2500)
         check("prompt w1 renders as the bench's", w1 == fx.prompts.w1)
         check("prompt g1 renders as the bench's", g1 == fx.prompts.g1)
+        let c1 = WindowPromptRenderer.render(.c1, pageNumbers: nums, texts: fx.prompts.texts, maxText: 2500)
+        check("prompt c1 renders as the bench's", c1 == fx.prompts.c1)
         check("format: literal braces, one pass",
               WindowPromptRenderer.format("{{x}} {a} {b}", ["a": "{b}", "b": "B"]) == "{x} {b} B")
 

@@ -20,6 +20,7 @@ import options as O  # noqa: F401  (sets the Gemini voter to 3.8 Flash / low and
 import ensemble as E
 import method_gemini as G
 import method_window as W
+import method_window_cues as MWC
 from score import PHOTO
 
 VOTER_JUDGE = {"C": W.judge_window, "G": G.judge_window}
@@ -34,7 +35,7 @@ def reply(j: dict, index: dict[int, int]) -> str:
 
 class _Synthetic:
     """A seven-page window with made-up text (one blank page, one past the truncation length), so the fixture
-    carries each prompt exactly as the bench renders it and nothing from the archive."""
+    carries each prompt (w1, g1 and the Codex route's c1) exactly as the bench renders it and nothing from the archive."""
     name = "synthetic"
 
     def __init__(self):
@@ -55,7 +56,9 @@ def prompts() -> dict:
     return {"texts": texts,
             "w1": W.PROMPT.format(k=7, files=files, texts=t, gaps=gaps, max_text=W.MAX_TEXT),
             "g1": G.PROMPT.format(k=7, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
-                                  pages=", ".join(str(n) for n in nums))}
+                                  pages=", ".join(str(n) for n in nums)),
+            "c1": MWC.prompt_template("codex").format(k=7, files=files, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
+                                                      pages=", ".join(str(n) for n in nums))}
 
 
 def main(argv) -> int:
