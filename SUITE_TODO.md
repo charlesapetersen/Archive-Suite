@@ -852,7 +852,7 @@ and segmentation's local runs stopped at 12B. The owner's three questions, which
 
 The API is OpenRouter: one key, Keychain service `com.archiveprocessor.app`, account `OpenRouter` (added by the owner
 2026-10-11); it reaches the open-weight models and the cloud leaders alike (prices checked 2026-10-11 on
-openrouter.ai/api/v1/models). Never write to the real corpus: sample pages are COPIED to scratch. Money: each item
+openrouter.ai/api/v1/models). Zero Data Retention is OFF by the owner's choice (2026-10-11: the images are not secret), so every listed model is reachable. OpenRouter routes each call to one of several providers, which serve open models at different precisions (bf16, fp8, fp4): pin one provider per model for a whole run and record the provider and precision in every row, or two rows of one model are not comparable. Never write to the real corpus: sample pages are COPIED to scratch. Money: each item
 states its cost before calling and stops at its cap; the $3 rule (root CLAUDE.md, "Spending money") applies to each
 item in total, and any item whose measured estimate passes it asks the owner first.
 
