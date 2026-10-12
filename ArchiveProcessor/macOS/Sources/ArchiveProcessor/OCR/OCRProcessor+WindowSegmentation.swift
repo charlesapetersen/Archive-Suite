@@ -133,7 +133,8 @@ extension OCRProcessor {
                 await self?.askPlanCheck(prompt) ?? false
             }
         let transport: any WindowTransport
-        switch windowTransportOverride.map({ .success($0) }) ?? WindowStageTransport.current(spec, gate: gate) {
+        switch windowTransportOverride.map({ .success($0) }) ?? windowTransportFactory?(spec, gate)
+            ?? WindowStageTransport.current(spec, gate: gate) {
         case .success(let t): transport = t
         case .failure(let missing):
             return await stopOrCheckAll(pages: pages, spec: spec, answered: prior, message: missing.description)

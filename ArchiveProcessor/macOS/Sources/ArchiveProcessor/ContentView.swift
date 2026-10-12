@@ -74,6 +74,7 @@ struct ContentView: View {
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
             SegmentationPlanTestDriver.runIfRequested()      // $0 W36 Claude plan route: meter, calibration, cancel
+            SegmentationProofDriver.runIfRequested()         // PAID (cents) W36 one real folder through real models
             maybePresentKeyOnboarding()
         }
 #if DEBUG

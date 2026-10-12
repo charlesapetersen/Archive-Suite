@@ -187,10 +187,11 @@ enum WindowStageTransport {
     /// through the user's own `claude`; with both, Claude goes the way `route` says (the chooser asks only then).
     /// `gate` meters and pauses the `claude` calls.
     static func make(_ spec: ApproachSpec, keys: [WindowProvider: String], claudeBinary: String?,
-                     route: ClaudeRoute = .apiKey, gate: PlanRunGate? = nil)
+                     route: ClaudeRoute = .apiKey, gate: PlanRunGate? = nil, http: APIWindowTransport.HTTP? = nil)
         -> Result<any WindowTransport, Missing> {
         var routes: [WindowProvider: any WindowTransport] = [:]
-        let api = APIWindowTransport(keys: keys.filter { !$0.value.isEmpty })
+        var api = APIWindowTransport(keys: keys.filter { !$0.value.isEmpty })
+        if let http { api.http = http }
         for p in Set(spec.voters.map(\.provider)) {
             let byPlan = p == .anthropic && claudeBinary != nil && (route == .plan || (keys[p] ?? "").isEmpty)
             if byPlan, let claudeBinary {

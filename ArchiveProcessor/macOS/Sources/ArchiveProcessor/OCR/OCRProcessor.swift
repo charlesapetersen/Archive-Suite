@@ -179,6 +179,9 @@ class OCRProcessor: ObservableObject {
     /// manifest save that never reaches the operator's real pending-run file. Nil in normal use.
     var windowTransportOverride: (any WindowTransport)?
     var pendingRunSaveOverride: ((PendingRun) -> Void)?
+    /// `SegmentationProofDriver`'s seam: the real transports from keys it was handed, given the stage's own plan
+    /// gate, instead of the Keychain read. Nil in normal use.
+    var windowTransportFactory: ((ApproachSpec, PlanRunGate) -> Result<any WindowTransport, WindowStageTransport.Missing>)?
 
     /// Manual (human) tagging review state — sequential, one segment at a time (autoDate mode)
     @Published var manualTagSegments: [ManualTagSegment] = []
