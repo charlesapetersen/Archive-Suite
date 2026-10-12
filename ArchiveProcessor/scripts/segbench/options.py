@@ -9,14 +9,24 @@
                                            # segbench-results/options.md and options.json
     python options.py render               # options.md again from options.json (no scoring)
 
+  W36.seg-opt-openai, the ChatGPT row, added after the rest was scored (the same steps, its own freeze):
+    python options.py collect-openai-dev   # codex exec on Dean, Deaver, Herrnstein (subscription, cached)
+    python options.py report-openai        # its level and the mix re-ranked with it, on the development set;
+                                           # writes options-openai-dev.md, freezes options-frozen-openai.json
+    python options.py estimate-openai-test # the uncached test-box windows
+    python options.py collect-openai-test --final  # those calls (subscription; refuses without the freeze)
+    python options.py final-openai --final # score the openai row (and a changed mix) once; rewrites
+                                           # options.json and options.md
+
 THE APPROACHES (owner, 2026-10-11; execution-plans/segmentation/04-options-build.md):
 - ``manual``: the Processor's modes today; nothing proposed, every boundary judged by the user.
 - ``claude`` (voter C): window-claude, Claude Sonnet 5.5 over 7-page windows, stride 3, prompt w1;
 - ``gemini`` (voter G): Gemini 3.8 Flash at thinkingLevel low over the same windows, prompt g1 (the owner's
   cues), compare_gemini's ``gemini-3.8-flash-low`` cache;
-- ``openai``: an OpenAI model over the same windows. NOT MEASURED in this run: no OpenAI API key is in the
-  Keychain and the Codex route answered "Your workspace is out of credits" (2026-10-11). The one box measured
-  earlier (Deaver, Codex gpt-6.1-sol, cues prompt c1) is reported as that and nothing more.
+- ``openai`` (voter O): method_window_cues's codex route, OpenAI gpt-6.1-sol at reasoning low through ``codex
+  exec`` on the ChatGPT subscription (owner, 2026-10-11: never an OpenAI API key), prompt c1 (g1 with the
+  image-delivery and answer lines changed for Codex). Not in the W36.seg-opt-measure run (the Codex workspace
+  was out of credits); measured afterwards by W36.seg-opt-openai with the ``*-openai`` commands above.
 - ``mix``: the window voters combined. Two combining rules are compared on the development set, and the one
   the ranking below prefers is the mix offered:
     MIN  (ensemble.py's rule) a gap is auto-accepted when every voter takes the same decision and the lowest
@@ -55,8 +65,10 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 import data
+import method_window_cues as WC
 from methods import METHODS  # noqa: F401  (imports the voter modules in order)
 import compare_gemini as CG
 import ensemble as E
@@ -70,6 +82,7 @@ CG.use(*GEMINI)
 
 RESULTS = E.RESULTS
 FROZEN = RESULTS / "options-frozen.json"
+FROZEN_OPENAI = RESULTS / "options-frozen-openai.json"
 OUT_MD, OUT_JSON = RESULTS / "options.md", RESULTS / "options.json"
 TOKENS_CLAUDE = data.CACHE_DIR / "tokens-claude.json"
 
@@ -82,12 +95,21 @@ PRICES = {
     "gemini-3.8-flash": {"in": 0.75, "out": 3.75, "batch_in": 0.375, "batch_out": 1.875, "read": "2026-10-05",
                          "source": "Gemini API pricing page; introductory price to 2026-12-31, then $1.50 / $7.50",
                          "after_2026_12_31": {"in": 1.50, "out": 7.50, "batch_in": 0.75, "batch_out": 3.75}},
+    # cached input ($0.10, batch $0.05) is not used: a window's API request is new each time
+    "gpt-6.1-sol": {"in": 2.00, "out": 10.00, "batch_in": 1.00, "batch_out": 5.00, "read": "2026-10-11",
+                    "source": "https://developers.openai.com/api/docs/pricing"},
 }
 
 APPROACHES = {"claude": ("C",), "gemini": ("G",)}
 VOTER_NAMES = {"C": "window-claude (Claude Sonnet 5.5, prompt w1)",
-               "G": "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"}
+               "G": "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)",
+               "O": f"window-openai (OpenAI {WC.CODEX_MODEL} through Codex, reasoning {WC.CODEX_EFFORT}, "
+                    f"prompt {WC.PROMPT_VERSION})"}
+MODEL_NAMES = {"C": "Claude", "G": "Gemini", "O": "ChatGPT"}
 MIX_CANDIDATES = [("C", "G")]
+# W36.seg-opt-openai: the mix re-ranked once O exists
+MIX_CANDIDATES_OPENAI = [("C", "G"), ("C", "O"), ("G", "O"), ("C", "G", "O")]
+OPENAI_JUDGE = WC.judge("codex")
 RULES = ("min", "mean")
 
 
@@ -99,6 +121,8 @@ _orig_voter_gaps = E.voter_gaps
 def voter_gaps(code, col):
     if code == "G":
         return E._from_bounds(col, W.assemble(col, W.combine(col, G.judge_window), True))
+    if code == "O":
+        return E._from_bounds(col, W.assemble(col, W.combine(col, OPENAI_JUDGE), True))
     if code == "L":
         raise KeyError("L (Flash-Lite) is not loaded in options.py; see the module docstring")
     return _orig_voter_gaps(code, col)
@@ -249,10 +273,14 @@ def usage_gemini(names) -> dict:
 
 
 def cost(u: dict) -> dict:
+    if u["model"] not in PRICES:
+        raise SystemExit(f"no price for {u['model']} in PRICES: read the provider's pricing page and add it, "
+                         "with the date read and the source")
     p = PRICES[u["model"]]
     if u["input_per_1000_pages"] is None:
         return {}
-    f = lambda a, b: (u["input_per_1000_pages"] * p[a] + u["output_per_1000_pages"] * p[b]) / 1e6  # noqa: E731
+    tin = u.get("input_excluding_harness_per_1000_pages", u["input_per_1000_pages"])
+    f = lambda a, b: (tin * p[a] + u["output_per_1000_pages"] * p[b]) / 1e6  # noqa: E731
     out = {"list_usd_per_1000_pages": f("in", "out"), "batch_usd_per_1000_pages": f("batch_in", "batch_out"),
            "prices_usd_per_mtok": {k: p[k] for k in ("in", "out", "batch_in", "batch_out")},
            "price_read": p["read"], "price_source": p["source"]}
@@ -265,8 +293,29 @@ def cost(u: dict) -> dict:
     return out
 
 
+def usage_openai(names) -> dict:
+    """Codex's own token totals per call (method_window_cues.codex_usage), over the calls that recorded them.
+    They include the Codex harness: its system prompt and tool list ride on every call (mostly as cached
+    input), which an API request of the same window would not carry."""
+    recs = [json.loads(l) for l in WC.LOGS["codex"].read_text().splitlines()] if WC.LOGS["codex"].exists() else []
+    recs = [r for r in recs if r.get("event") in ("call", "parse-failure") and r.get("usage")
+            and r.get("model") == WC.model_of("codex") and r.get("collection") in names]
+    got = sorted({r["collection"] for r in recs})
+    pages = sum(_pages(got).values())
+    s = lambda k: sum(r["usage"][k] for r in recs)  # noqa: E731
+    per = lambda x: 1000 * x / pages if pages else None  # noqa: E731
+    return {"model": WC.CODEX_MODEL, "reasoning": WC.CODEX_EFFORT, "route": "codex exec, ChatGPT subscription",
+            "boxes": got, "pages": pages, "calls": len(recs),
+            "input_per_1000_pages": per(s("input_tokens")),
+            "cached_input_per_1000_pages": per(s("cached_input_tokens")),
+            "output_per_1000_pages": per(s("output_tokens")),
+            "reasoning_per_1000_pages": per(s("reasoning_output_tokens")),
+            "how": "the token totals in each call's Codex session rollout, retries and parse failures included; "
+                   "input includes the cached part and the Codex harness; output includes reasoning"}
+
+
 def usage(code, names) -> dict:
-    return usage_claude(names) if code == "C" else usage_gemini(names)
+    return {"C": usage_claude, "G": usage_gemini, "O": usage_openai}[code](names)
 
 
 # --- development: levels, the mix rule, the freeze ------------------------------------------------
@@ -429,6 +478,36 @@ def _k(x) -> str:
     return "—" if x is None else f"{x / 1000:,.0f}k"
 
 
+def label_of(a: str, S) -> str:
+    if a == "mix":
+        names = [MODEL_NAMES[c] for c in S]
+        return ", ".join(names[:-1]) + " and " + names[-1] + " together"
+    return {"claude": "Claude only", "gemini": "Gemini only", "openai": "ChatGPT only"}[a]
+
+
+def approach_entry(a: str, f: dict, test: dict, use: dict, dev_held_out: dict) -> dict:
+    """One scored row of options.json: the frozen voters, rule and level applied to the test boxes."""
+    S, v = tuple(f["voters"]), f["level"]
+    with rule(f["rule"]):
+        per = [E.evaluate(test[n], S, 2.0 if v is None else v) | {"name": n} for n in data.TEST]
+    p = E.pooled(per)
+    tok = {c: use[c] for c in S}
+    cs = {c: cost(use[c]) for c in S}
+    total = {"list_usd_per_1000_pages": sum(x["list_usd_per_1000_pages"] for x in cs.values()),
+             "batch_usd_per_1000_pages": sum(x["batch_usd_per_1000_pages"] for x in cs.values())}
+    return {
+        "id": a, "label": label_of(a, S), "available": True, "voters": [VOTER_NAMES[c] for c in S],
+        "rule": f["rule"], "level": v,
+        "flag_rule": ("flag a gap whose confidence is at or below the level" if len(S) == 1 else
+                      {"min": "flag a gap unless every model agrees and the lowest confidence is above the level",
+                       "mean": "average the models' P(new); flag a gap whose combined confidence is at or "
+                               "below the level"}[f["rule"]]),
+        "figures": {"test": figures(p), "test_by_box": {r["name"]: figures(r) for r in per},
+                    "dev_held_out": dev_held_out},
+        "tokens_per_1000_pages": tok,
+        "cost": {"per_model": cs, "total": total}}
+
+
 def final() -> str:
     if OUT_JSON.exists():
         raise SystemExit(f"{OUT_JSON.name} exists: the test set is scored once; see {OUT_MD.name}")
@@ -464,27 +543,8 @@ def final() -> str:
         "tokens_per_1000_pages": None, "cost": None,
         "note": "Nothing is proposed: the user judges every gap between two document pages. 'After review' "
                 "assumes the user's own judgement is right."})
-    labels = {"claude": "Claude only", "gemini": "Gemini only", "mix": "Claude and Gemini together"}
     for a, f in fz["approaches"].items():
-        S, v = tuple(f["voters"]), f["level"]
-        with rule(f["rule"]):
-            per = [E.evaluate(test[n], S, 2.0 if v is None else v) | {"name": n} for n in data.TEST]
-        p = E.pooled(per)
-        tok = {c: use[c] for c in S}
-        cs = {c: cost(use[c]) for c in S}
-        total = {"list_usd_per_1000_pages": sum(x["list_usd_per_1000_pages"] for x in cs.values()),
-                 "batch_usd_per_1000_pages": sum(x["batch_usd_per_1000_pages"] for x in cs.values())}
-        out["approaches"].append({
-            "id": a, "label": labels[a], "available": True, "voters": [VOTER_NAMES[c] for c in S],
-            "rule": f["rule"], "level": v,
-            "flag_rule": ("flag a gap whose confidence is at or below the level" if len(S) == 1 else
-                          {"min": "flag a gap unless every model agrees and the lowest confidence is above the level",
-                           "mean": "average the models' P(new); flag a gap whose combined confidence is at or "
-                                   "below the level"}[f["rule"]]),
-            "figures": {"test": figures(p), "test_by_box": {r["name"]: figures(r) for r in per},
-                        "dev_held_out": fz["dev_held_out"][a]},
-            "tokens_per_1000_pages": tok,
-            "cost": {"per_model": cs, "total": total}})
+        out["approaches"].append(approach_entry(a, f, test, use, fz["dev_held_out"][a]))
     out["approaches"].append({
         "id": "openai", "label": "ChatGPT only", "available": False,
         "reason": "Not measured: no OpenAI API key in the Keychain, and the Codex route answered 'Your workspace "
@@ -492,6 +552,165 @@ def final() -> str:
                   "gpt-6.1-sol at reasoning low with the cues prompt put 97.9% of pages in an exact document "
                   "with no review, level with Claude and Gemini on that box (cues-models-Deaver.md).",
         "figures": None, "tokens_per_1000_pages": None, "cost": None})
+    OUT_JSON.write_text(json.dumps(out, indent=1) + "\n")
+    return render(out)
+
+
+# --- W36.seg-opt-openai: the ChatGPT row, after the rest was scored -------------------------------
+
+CODEX_BASELINE = data.CACHE_DIR / "codex-baseline.json"
+
+
+def openai_measured() -> bool:
+    return OUT_JSON.exists() and any(a["id"] == "openai" and a["available"]
+                                     for a in json.loads(OUT_JSON.read_text())["approaches"])
+
+
+def codex_baseline() -> dict:
+    """What the Codex harness alone costs a call: a one-word prompt with no image, three times (subscription,
+    no money). Subtracted per call to estimate what the same window would cost as one API request."""
+    if CODEX_BASELINE.exists():
+        return json.loads(CODEX_BASELINE.read_text())
+    import tempfile
+    runs = []
+    for _ in range(3):
+        with tempfile.TemporaryDirectory() as d:
+            u = WC.call_codex("Reply with the single word OK.", Path(d), [])["_usage"]
+        if not u:
+            raise SystemExit("codex baseline: the call's rollout was not found")
+        runs.append(u)
+    runs.sort(key=lambda u: u["input_tokens"])
+    b = {"measured": dt.date.today().isoformat(), "model": WC.CODEX_MODEL, "runs": runs, "median": runs[1]}
+    CODEX_BASELINE.write_text(json.dumps(b, indent=1))
+    return b
+
+
+def report_openai() -> str:
+    if openai_measured():
+        raise SystemExit("the openai row is already scored; its freeze is final")
+    fz0 = frozen()
+    dev = {n: E.Box(data.load(n), "CGO") for n in data.DEV}
+    pages = sum(b.pages for b in dev.values())
+    gaps = sum(len(b.gaps) for b in dev.values())
+    o = {"S": ("O",), "rule": "min", **E.loco(dev, ("O",))}
+    mix = {}
+    for S in MIX_CANDIDATES_OPENAI:
+        for r in RULES:
+            with rule(r):
+                mix[(S, r)] = {"S": S, "rule": r, **E.loco(dev, S)}
+    order = sorted(mix, key=lambda k: (-mix[k]["reached"], mix[k]["pooled"]["flagged"] / mix[k]["pooled"]["pages"],
+                                       mix[k]["pooled"]["acc_err"], -E.pe(mix[k]["pooled"]["rev"])))
+    res = {"openai": o, "mix": mix[order[0]]}
+    fz = {"decided": dt.date.today().isoformat(), "bar": E.BAR, "on": list(data.DEV), "item": "W36.seg-opt-openai",
+          "codex": {"model": WC.CODEX_MODEL, "reasoning": WC.CODEX_EFFORT, "prompt": WC.PROMPT_VERSION},
+          "approaches": {}}
+    for a, r in res.items():
+        with rule(r["rule"]):
+            v = E.fit_level(list(dev.values()), r["S"])
+        fz["approaches"][a] = {"voters": list(r["S"]), "rule": r["rule"], "level": v}
+    old = fz0["approaches"]["mix"]
+    fz["mix_changed"] = fz["approaches"]["mix"] != old
+    fz["dev_held_out"] = {a: figures(r["pooled"]) for a, r in res.items()}
+
+    L = ["# W36.seg-opt-openai — ChatGPT on the development set", "",
+         f"Run {dt.date.today().isoformat()} on Dean, Deaver and Herrnstein ({pages} pages, {gaps} gaps between two "
+         "document pages); the test collections are not touched. Truth photo labels. Held out per box, as in "
+         "`options-dev.md`. Method: `scripts/segbench/options.py`, the `*-openai` commands.", "",
+         "Voters: " + "; ".join(f"{c} = {VOTER_NAMES[c]}" for c in "CGO") + ".", "",
+         "## ChatGPT alone, held out per box", "",
+         "| approach | boxes at 98% after review | no review | flagged per 100 pages | after review | worst box | "
+         "unflagged errors (per 500 pages) | levels (Dean / Deaver / Herrnstein) |",
+         "|---|---:|---:|---:|---:|---:|---:|---|"]
+    p = o["pooled"]
+    L.append(f"| openai (O) | {o['reached']} of 3 | {E.pct(E.pe(p['auto']))} | {100 * p['flagged'] / p['pages']:.1f} | "
+             f"{E.pct(E.pe(p['rev']))} | {E.pct(min(E.pe(x['rev']) for x in o['rows']))} | {p['acc_err']} "
+             f"({500 * p['acc_err'] / p['pages']:.1f}) | " + " / ".join(E.lv(o["levels"][n]) for n in data.DEV) + " |")
+    L += ["", "## The mix re-ranked with ChatGPT", "",
+          "Same ranking as `options-dev.md`: boxes reaching 98% after review, then flagged per 100 pages, then "
+          "unflagged errors. The first is the mix offered.", "",
+          "| voters | rule | boxes at 98% | flagged per 100 pages | unflagged errors | no review | after review |",
+          "|---|---|---:|---:|---:|---:|---:|"]
+    for k in order:
+        r = mix[k]
+        q = r["pooled"]
+        L.append(f"| {''.join(r['S'])} | {r['rule']} | {r['reached']} of 3 | {100 * q['flagged'] / q['pages']:.1f} | "
+                 f"{q['acc_err']} | {E.pct(E.pe(q['auto']))} | {E.pct(E.pe(q['rev']))} |")
+    L += ["", "## By box (held out)", "", "| approach | box | level | flagged | unflagged errors | no review | "
+          "after review |", "|---|---|---|---:|---:|---:|---:|"]
+    for x in o["rows"]:
+        L.append(f"| openai | {x['name']} | {E.lv(o['levels'][x['name']])} | {x['flagged']} | {x['acc_err']} | "
+                 f"{E.pct(E.pe(x['auto']))} | {E.pct(E.pe(x['rev']))} |")
+    m = fz["approaches"]["mix"]
+    L += ["", "## Frozen for the test set", "",
+          f"- openai: level {E.lv(fz['approaches']['openai']['level'])} (fitted on all three development boxes).",
+          f"- mix: {''.join(m['voters'])}, {m['rule']}, level {E.lv(m['level'])}; "
+          + ("**changed** from the scored " if fz["mix_changed"] else "unchanged from the scored ")
+          + f"{''.join(old['voters'])}, {old['rule']}, {E.lv(old['level'])}"
+          + (", so the mix row is scored again on the test boxes." if fz["mix_changed"] else
+             ", so the mix row keeps its figures."), ""]
+    text = "\n".join(L) + "\n"
+    (RESULTS / "options-openai-dev.md").write_text(text)
+    FROZEN_OPENAI.write_text(json.dumps(fz, indent=1) + "\n")
+    return text
+
+
+def frozen_openai() -> dict:
+    if not FROZEN_OPENAI.exists():
+        raise SystemExit("no ChatGPT freeze yet: run `options.py report-openai` on the development set first")
+    return json.loads(FROZEN_OPENAI.read_text())
+
+
+def estimate_openai_test() -> int:
+    todo = sum(1 for n in data.TEST for col in [data.load(n, with_exif=False)]
+               for a, b in W.windows(len(col.pages)) if OPENAI_JUDGE(col, a, b, allow_call=False) is None)
+    print(f"  O {WC.model_of('codex')}: {todo} codex exec calls not cached (ChatGPT subscription: no money, "
+          f"plan usage; stops at {WC.GUARD['codex']}% of the five-hour window)")
+    return todo
+
+
+def collect_openai_test() -> None:
+    if openai_measured():
+        raise SystemExit("the openai row is already scored; nothing to collect")
+    frozen_openai()
+    git = lambda *a: subprocess.run(["git", *a, "--", str(FROZEN_OPENAI)], cwd=RESULTS,  # noqa: E731
+                                    capture_output=True, text=True)
+    if not git("log", "-1", "--format=%H").stdout.strip() or git("diff", "--quiet", "HEAD").returncode != 0:
+        raise SystemExit(f"commit {FROZEN_OPENAI.name} before the test calls, so the history shows the order")
+    estimate_openai_test()
+    WC.collect("codex", list(data.TEST), allow_test=True)
+
+
+def final_openai() -> str:
+    if openai_measured():
+        raise SystemExit("the openai row is scored once; see options.md")
+    if not OUT_JSON.exists():
+        raise SystemExit("options.json is missing: the openai row is added to the scored file")
+    fz = frozen_openai()
+    out = json.loads(OUT_JSON.read_text())
+    test = {n: E.Box(data.load(n), "CGO") for n in data.TEST}
+    all_boxes = data.DEV + data.TEST
+    use = {c: usage(c, all_boxes) for c in "CGO"}
+    base = codex_baseline()["median"]
+    u = use["O"]
+    if u["calls"]:
+        per_call = 1000 * u["calls"] / u["pages"]
+        u["harness_input_per_call"] = base["input_tokens"]
+        u["input_excluding_harness_per_1000_pages"] = u["input_per_1000_pages"] - per_call * base["input_tokens"]
+        u["how"] += (f"; the harness alone (a one-word prompt, median of three) is {base['input_tokens']} input "
+                     "tokens a call, subtracted for input_excluding_harness, which is what the cost is computed on")
+    rows = [a for a in out["approaches"] if a["id"] not in ("openai", "mix")]
+    entry = approach_entry("openai", fz["approaches"]["openai"], test, use, fz["dev_held_out"]["openai"])
+    old_mix = next(a for a in out["approaches"] if a["id"] == "mix")
+    if fz["mix_changed"]:
+        mix = approach_entry("mix", fz["approaches"]["mix"], test, use, fz["dev_held_out"]["mix"])
+        mix["replaces"] = {k: old_mix[k] for k in ("voters", "rule", "level")} | {
+            "test": old_mix["figures"]["test"], "why": "re-ranked with ChatGPT on the development set "
+                                                        "(options-openai-dev.md)"}
+    else:
+        mix = old_mix
+    out["approaches"] = rows + [entry, mix]
+    out["openai_measured"] = {"date": dt.date.today().isoformat(), "item": "W36.seg-opt-openai",
+                              "freeze": FROZEN_OPENAI.name}
     OUT_JSON.write_text(json.dumps(out, indent=1) + "\n")
     return render(out)
 
@@ -518,7 +737,10 @@ def render(out: dict) -> str:
          "development boxes (Dean, Deaver, Herrnstein) before the test boxes' new calls were made "
          "(`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected "
          "for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's "
-         "test-box windows are new.", "",
+         "test-box windows are new."
+         + (f" ChatGPT was measured afterwards ({out['openai_measured']['date']}, W36.seg-opt-openai) the same way, "
+            f"its level frozen first (`{out['openai_measured']['freeze']}`)." if out.get("openai_measured") else ""),
+         "",
          "Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, "
          "box and folder photos included; 'pages in an exact document' counts document pages only.", "",
          "## The five figures, per approach (test boxes)", "",
@@ -555,7 +777,8 @@ def render(out: dict) -> str:
         for code, u in ap["tokens_per_1000_pages"].items():
             seen.setdefault(code, (u, ap["cost"]["per_model"][code]))
     for code, (u, k) in seen.items():
-        L.append(f"| {u['model']}{'/' + u['thinking'] if 'thinking' in u else ''} | {', '.join(u['boxes'])} | "
+        effort = u.get("thinking") or u.get("reasoning")
+        L.append(f"| {u['model']}{'/' + effort if effort else ''} | {', '.join(u['boxes'])} | "
                  f"{u['calls']} | {_k(u['input_per_1000_pages'])} | {_k(u['output_per_1000_pages'])} | "
                  f"{_money(k['list_usd_per_1000_pages'])} | {_money(k['batch_usd_per_1000_pages'])} | "
                  f"{k['prices_usd_per_mtok']['in']}, {k['prices_usd_per_mtok']['out']} ({k['price_read']}) |")
@@ -570,7 +793,17 @@ def render(out: dict) -> str:
                   f"are read with a tool): the CLI's notional list price is {_money(n)} per 1,000 pages. A "
                   "subscription is not charged that; it is the size of the usage the route draws, which "
                   "W36.seg-opt-usage turns into a share of a plan's windows."]
-    L += ["", "## Not measured: ChatGPT", "", aps["openai"]["reason"], "", "## Reading", ""]
+    o = seen.get("O", (None, None))[0]
+    if o:
+        L += ["", f"ChatGPT through `codex exec` (the ChatGPT subscription; no money): Codex reported "
+                  f"{_k(o['input_per_1000_pages'])} input tokens per 1,000 pages, of which "
+                  f"{_k(o['cached_input_per_1000_pages'])} cached, and its harness alone is "
+                  f"{o['harness_input_per_call']:,} input tokens a call; the cost column is computed on the "
+                  f"{_k(o['input_excluding_harness_per_1000_pages'])} left once that is taken off, which is what "
+                  "one API request of each window would carry. Output includes reasoning."]
+    if not aps["openai"]["available"]:
+        L += ["", "## Not measured: ChatGPT", "", aps["openai"]["reason"]]
+    L += ["", "## Reading", ""]
     tf = {a["id"]: a["figures"]["test"] for a in model_aps}
     df = {a["id"]: a["figures"]["dev_held_out"] for a in model_aps}
     lab = {a["id"]: a["label"] for a in model_aps}
@@ -597,12 +830,13 @@ def render(out: dict) -> str:
 
 
 def main(argv) -> int:
-    cmds = ("tokens-claude", "report", "estimate-test", "collect-test", "final", "render")
+    cmds = ("tokens-claude", "report", "estimate-test", "collect-test", "final", "render", "collect-openai-dev",
+            "report-openai", "estimate-openai-test", "collect-openai-test", "final-openai")
     if not argv or argv[0] not in cmds:
         print(__doc__)
         return 2
     cmd = argv[0]
-    if cmd in ("collect-test", "final"):
+    if cmd in ("collect-test", "final", "collect-openai-test", "final-openai"):
         E.need_final(argv)
     if cmd == "tokens-claude":
         tokens_claude()
@@ -614,6 +848,17 @@ def main(argv) -> int:
         estimate_test()
     elif cmd == "collect-test":
         collect_test()
+    elif cmd == "collect-openai-dev":
+        codex_baseline()
+        WC.collect("codex", list(data.DEV))
+    elif cmd == "report-openai":
+        print(report_openai())
+    elif cmd == "estimate-openai-test":
+        estimate_openai_test()
+    elif cmd == "collect-openai-test":
+        collect_openai_test()
+    elif cmd == "final-openai":
+        print(final_openai())
     elif cmd == "render":
         print(render(json.loads(OUT_JSON.read_text())))
     else:

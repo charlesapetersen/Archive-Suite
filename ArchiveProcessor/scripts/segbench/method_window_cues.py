@@ -23,6 +23,7 @@ from __future__ import annotations
 import concurrent.futures as cf
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -112,7 +113,29 @@ def call_codex(prompt, wd: Path, files: list[Path]) -> dict:
         if any(s in msg.lower() for s in ("usage limit", "rate limit", "429")):
             raise W.UsageLimit(msg)
         raise RuntimeError(f"codex exit {r.returncode}: {msg}")
-    return {"result": out.read_text(), "_wall_s": time.time() - t0}
+    return {"result": out.read_text(), "_wall_s": time.time() - t0, "_usage": codex_usage(r.stdout + r.stderr)}
+
+
+def codex_usage(output: str) -> dict | None:
+    """The call's token totals, from the session rollout Codex writes (``codex exec`` prints only a rounded
+    "tokens used"): input (cached included), cached input, output (reasoning included) and reasoning. None when
+    the rollout cannot be found; the call is still used, it is only left out of the token figures."""
+    m = re.search(r"session id: ([0-9a-f-]{36})", output)
+    if not m:
+        return None
+    root = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "sessions"
+    usage = None
+    for f in root.rglob(f"rollout-*{m.group(1)}.jsonl"):
+        for line in f.read_text().splitlines():
+            try:
+                p = json.loads(line).get("payload")
+            except ValueError:
+                continue
+            if isinstance(p, dict) and p.get("type") == "token_count" and (p.get("info") or {}).get("total_token_usage"):
+                t = p["info"]["total_token_usage"]
+                usage = {k: int(t.get(k) or 0) for k in ("input_tokens", "cached_input_tokens", "output_tokens",
+                                                          "reasoning_output_tokens")}
+    return usage
 
 
 def judge(route):
@@ -146,6 +169,8 @@ def judge(route):
                 continue
             rec = {"collection": col.name, "window": nums, "event": "call", "attempt": attempt,
                    "model": model_of(route), "wall_s": round(out["_wall_s"], 1), "t": time.time()}
+            if out.get("_usage"):
+                rec["usage"] = out["_usage"]
             try:
                 parsed = W.parse_answer(out.get("result") or "", nums)
             except W.ParseError as e:
@@ -172,8 +197,10 @@ def used_pct(route) -> int:
         return 100  # no reading: stop rather than spend blind (the 16:55 run spent past its guard this way)
 
 
-def collect(route, names):
-    W.refuse_test(names)
+def collect(route, names, allow_test=False):
+    """``allow_test`` is for options.py's ``collect-openai-test --final`` only, which checks the freeze first."""
+    if not allow_test:
+        W.refuse_test(names)
     if route in CLAUDE_MODELS:
         W.MODEL = CLAUDE_MODELS[route]  # read by W.call_claude; one route per process
     jw = judge(route)

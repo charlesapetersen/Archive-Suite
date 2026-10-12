@@ -56,6 +56,54 @@ def test_figures_scale():
     assert abs(f["unflagged_errors_per_500_pages"] - 500 / 5) < 1e-9
 
 
+def test_mix_label_names_its_voters():
+    assert O.label_of("mix", ("C", "G")) == "Claude and Gemini together"
+    assert O.label_of("mix", ("C", "G", "O")) == "Claude, Gemini and ChatGPT together"
+    assert O.label_of("openai", ("O",)) == "ChatGPT only"
+
+
+def test_openai_voter_string_resolves_like_the_app():
+    # SegmentationApproach.swift WindowVoter.resolve: the name before " (" and a "prompt <id>" inside
+    v = O.VOTER_NAMES["O"]
+    assert v.split(" (")[0] == "window-openai" and "prompt c1" in v
+
+
+def test_codex_usage_reads_the_last_total(tmp=None):
+    import json, os, tempfile
+    import method_window_cues as WC
+    sid = "01a12d7b-db81-70e1-b772-0f1be915e3a5"
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "sessions", "2026", "10", "11")
+        os.makedirs(f)
+        ev = lambda i, o: json.dumps({"payload": {"type": "token_count", "info": {"total_token_usage": {  # noqa: E731
+            "input_tokens": i, "cached_input_tokens": 7, "output_tokens": o, "reasoning_output_tokens": 1}}}})
+        with open(os.path.join(f, f"rollout-2026-10-11T17-20-54-{sid}.jsonl"), "w") as fh:
+            fh.write("\n".join([ev(10, 2), json.dumps({"payload": {"type": "token_count", "info": None}}),
+                                 "not json", ev(30, 5)]) + "\n")
+        old = os.environ.get("CODEX_HOME")
+        os.environ["CODEX_HOME"] = d
+        try:
+            u = WC.codex_usage(f"header\nsession id: {sid}\n--------")
+            assert u == {"input_tokens": 30, "cached_input_tokens": 7, "output_tokens": 5,
+                         "reasoning_output_tokens": 1}, u
+            assert WC.codex_usage("no session line") is None
+        finally:
+            if old is None:
+                del os.environ["CODEX_HOME"]
+            else:
+                os.environ["CODEX_HOME"] = old
+
+
+def test_cost_uses_input_without_the_harness():
+    O.PRICES["toy"] = {"in": 1.0, "out": 10.0, "batch_in": .5, "batch_out": 5.0, "read": "x", "source": "y"}
+    try:
+        c = O.cost({"model": "toy", "input_per_1000_pages": 3e6, "input_excluding_harness_per_1000_pages": 1e6,
+                    "output_per_1000_pages": 1e5})
+        assert abs(c["list_usd_per_1000_pages"] - 2.0) < 1e-9
+    finally:
+        del O.PRICES["toy"]
+
+
 def main() -> int:
     tests = [v for k, v in globals().items() if k.startswith("test_")]
     for t in tests:
