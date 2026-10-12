@@ -16,7 +16,9 @@ test Claude on Opus as well. Use only the one box"). CODEX: ``codex exec`` with 
 cheapest Gemini 3.8 Flash setting matched its high one), images attached with ``-i``, read-only sandbox,
 run from a scratch folder outside git. Each route has its own response cache and call log. Both run on
 the owner's subscriptions: no money, but usage. USAGE GUARD: calls stop when the five-hour window passes
-70% (Claude; Vision OCR has priority on it) or 85% (Codex).
+70% (Claude; Vision OCR has priority on it) or reaches 100% (Codex). Owner, 2026-10-11: pacing caps are for
+starting sessions, not for a session measuring Codex, so Codex runs until its own window is full (a refusal
+before that is a UsageLimit, which stops the run the same way).
 """
 from __future__ import annotations
 
@@ -44,7 +46,7 @@ USAGE_SH = Path("/Users/cp1/Claude/Archive Suite/ops/autonomous/usage-window.sh"
 ROUTES = ("claude", "opus", "codex")
 CLAUDE_MODELS = {"claude": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
 CLAUDE_READING_LOG = Path.home() / ".local/state/visionocr-autonomous/last-session.log"
-GUARD = {"claude": 70, "opus": 70, "codex": 85}
+GUARD = {"claude": 70, "opus": 70, "codex": 100}
 CONCURRENCY = 3
 STAGGER_S = 4.0
 
