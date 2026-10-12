@@ -383,6 +383,10 @@ existing scratch, key-free, no-network execution remains unchanged.
   the bench's layout and prompts byte for byte, both combining rules, failure and usage-limit handling, the
   transports' request/response shapes (HTTP seam, fake `claude`), and the bench's verdict reproduced on every gap
   of one recorded development box. No model call.
+- **`test-segmentation-chooser.sh`** — the W36 approach chooser: each approach's figures and cost as the user reads
+  them at several page counts and routes (key, `claude` plan, mix), price-change and stale-price notes, unavailable
+  rows and the keys they offer, and a render guard that each row card draws non-blank pixels offscreen. No Keychain
+  read, no window.
 
 Counts drift as checks are added — treat the numbers above as a floor, not a contract, and read a script's
 header comment for what it actually covers. Related non-`test-*` drivers in the same directory:

@@ -12,7 +12,6 @@ struct SegmentationChooserView: View {
     let pageCount: Int
     /// Says what `pageCount` is, e.g. "per 1,000 pages" or "for the 42 pages dropped".
     let scaleCaption: String
-    var batch = false
     /// Read by the parent outside the view body (the Keychain is never read while rendering); refreshed here after
     /// the key wizard closes.
     @Binding var routes: SegmentationRoutes
@@ -26,7 +25,7 @@ struct SegmentationChooserView: View {
 
     private var rows: [SegmentationRow] {
         guard let options else { return [] }
-        return SegmentationRow.all(options: options, pageCount: pageCount, routes: routes, batch: batch)
+        return SegmentationRow.all(options: options, pageCount: pageCount, routes: routes)
     }
 
     var body: some View {
@@ -34,9 +33,10 @@ struct SegmentationChooserView: View {
         VStack(alignment: .leading, spacing: 6) {
             Picker(selection: $approachRaw) {
                 ForEach(rows, id: \.approach) { row in
-                    Text(row.label).tag(row.approach.rawValue)
-                        // An approach that cannot run stays listed, greyed out; its reason shows when selected.
-                        .disabled(!row.canRun && row.approach != approach)
+                    // Every approach is selectable, so its figures, cost and reason (and the key wizard) can be
+                    // read before it can run; the card greys out one that cannot. Running it is gated where the
+                    // run starts (W36.seg-opt-review).
+                    Text(row.canRun ? row.label : "\(row.label) (unavailable)").tag(row.approach.rawValue)
                 }
                 if rows.isEmpty { Text("Full manual").tag(SegmentationApproach.manual.rawValue) }
             } label: {

@@ -54,7 +54,8 @@ struct SegmentationRow: Equatable, Sendable {
     let costLines: [String]
     /// What qualifies the dollars: a scheduled price change, or prices read more than 90 days ago.
     let priceNotes: [String]
-    /// The dollars this approach adds to the run by API key (nil when it is paid by plan only, or manual = 0).
+    /// The dollars this approach adds to the run by API key: 0 for manual, nil when it is paid by the plan only
+    /// or cannot run (a run's total never includes an approach it cannot use).
     let apiDollars: Double?
     /// The same footnote on every row, built from the file.
     let footnote: String
@@ -77,10 +78,12 @@ struct SegmentationRow: Equatable, Sendable {
 
     /// - Parameters:
     ///   - pageCount: the pages the run will segment (`N`).
-    ///   - batch: the run goes by batch, so the batch price is shown beside the list price.
-    ///   - today: the day the prices are judged against (`yyyy-MM-dd` comparisons; tests pass a fixed day).
+    ///   - today: the day the prices are judged against, in the user's own time zone (tests pass a fixed day).
+    ///
+    /// There is no batch figure: the engine sends every window interactively, so §4's "batch beside list" has
+    /// nothing to describe until a batch route exists.
     static func make(_ approach: SegmentationApproach, options: SegmentationOptions, pageCount: Int,
-                     routes: SegmentationRoutes, batch: Bool = false, today: Date = Date()) -> SegmentationRow {
+                     routes: SegmentationRoutes, today: Date = Date()) -> SegmentationRow {
         let n = max(0, pageCount)
         let entry = options.approach(approach)
         let label = entry?.label ?? approach.rawValue
@@ -111,7 +114,7 @@ struct SegmentationRow: Equatable, Sendable {
         let reason: String? = missing.isEmpty ? nil : "Needs " + missing.map(needPhrase).joined(separator: " and ") + "."
 
         let (lines, notes, dollars) = approach.proposesBoundaries
-            ? costLines(entry, pageCount: n, routes: routes, batch: batch, today: today)
+            ? costLines(entry, pageCount: n, routes: routes, today: today)
             : (["No cost"], [], 0)
 
         return SegmentationRow(
@@ -119,67 +122,64 @@ struct SegmentationRow: Equatable, Sendable {
             rightWithNoChecking: fig.pagesExactNoReview.map { "about \(percent($0)) of pages" },
             toCheck: toCheck,
             rightAfterChecking: "about \(percent(fig.pagesExactAfterReview)) of pages",
-            unshownErrors: unshown, costLines: lines, priceNotes: notes, apiDollars: dollars, footnote: footnote,
+            unshownErrors: unshown, costLines: lines, priceNotes: notes,
+            // An approach that cannot run adds nothing to a run's total; its row still shows what it would cost.
+            apiDollars: reason == nil ? dollars : nil, footnote: footnote,
             unavailableReason: reason, missingKeys: missingKeys)
     }
 
     static func all(options: SegmentationOptions, pageCount: Int, routes: SegmentationRoutes,
-                    batch: Bool = false, today: Date = Date()) -> [SegmentationRow] {
+                    today: Date = Date()) -> [SegmentationRow] {
         SegmentationApproach.allCases.map {
-            make($0, options: options, pageCount: pageCount, routes: routes, batch: batch, today: today)
+            make($0, options: options, pageCount: pageCount, routes: routes, today: today)
         }
     }
 
     // MARK: Cost (Part 3 §4)
 
-    /// Each model priced on its own: dollars by API key when the user has that provider's key, else the Claude
-    /// plan's notional share when `claude` is installed. A model with neither contributes nothing (the row is
-    /// unavailable anyway).
+    /// Each model priced on its own. A Claude model goes by the Claude plan when `claude` is installed and there
+    /// is no Anthropic key; every other model is priced by API key at list price, including one whose key the
+    /// user does not have yet, so a greyed-out row still says what the key would cost.
     private static func costLines(_ entry: SegmentationOptions.Approach, pageCount n: Int,
-                                  routes: SegmentationRoutes, batch: Bool,
-                                  today: Date) -> ([String], [String], Double?) {
+                                  routes: SegmentationRoutes, today: Date) -> ([String], [String], Double?) {
         let models = (entry.cost?.perModel ?? [:]).sorted { $0.key < $1.key }
         let day = dayString(today)
-        var apiList = 0.0, apiBatch = 0.0, anyAPI = false, allBatch = true
+        var apiList = 0.0, anyAPI = false
         var notes: [String] = []
         var planNotional = 0.0, anyPlan = false
         for (key, cost) in models {
-            let modelID = entry.tokensPer1000Pages?[key]?.model
-            let provider = WindowVoter.catalog.first { $0.modelID == modelID }?.provider
-            guard let provider else { continue }
-            if routes.hasKey(provider) {
-                anyAPI = true
-                var list = cost.listUSDPer1000Pages, bat = cost.batchUSDPer1000Pages
-                if let change = cost.priceChange {
-                    if day >= change.date {
-                        list = change.total.listUSDPer1000Pages
-                        bat = change.total.batchUSDPer1000Pages
-                    } else {
-                        notes.append("\(providerName(provider)): introductory price until \(longDate(change.date))")
-                    }
-                }
-                apiList += list * Double(n) / 1000
-                if let bat { apiBatch += bat * Double(n) / 1000 } else { allBatch = false }
-                if let read = cost.priceRead, let age = daysBetween(read, day), age > 90 {
-                    notes.append("\(providerName(provider)) prices as of \(longDate(read))")
-                }
-            } else if provider == .anthropic, routes.hasClaudeCLI,
-                      let notional = entry.tokensPer1000Pages?[key]?.subscriptionRouteNotionalUSDPer1000Pages {
+            let tokens = entry.tokensPer1000Pages?[key]
+            // problems() refuses a model outside the catalog, so this never skips in a shipped file.
+            guard let provider = WindowVoter.catalog.first(where: { $0.modelID == tokens?.model })?.provider
+            else { continue }
+            if provider == .anthropic, !routes.hasKey(.anthropic), routes.hasClaudeCLI,
+               let notional = tokens?.subscriptionRouteNotionalUSDPer1000Pages {
                 anyPlan = true
                 planNotional += notional * Double(n) / 1000
+                continue
+            }
+            anyAPI = true
+            var list = cost.listUSDPer1000Pages
+            if let change = cost.priceChange {
+                // `after_2026_12_31`: the old price holds through that day, the new one from the next.
+                if day > change.date {
+                    list = change.total.listUSDPer1000Pages
+                } else {
+                    notes.append("\(providerName(provider)): introductory price until \(longDate(change.date))")
+                }
+            }
+            apiList += list * Double(n) / 1000
+            if let read = cost.priceRead, let age = daysBetween(read, day), age > 90 {
+                notes.append("\(providerName(provider)) prices as of \(longDate(read))")
             }
         }
         var lines: [String] = []
-        if anyAPI {
-            var line = "about \(dollars(apiList)) by API key at list price"
-            if batch && allBatch { line += " (\(dollars(apiBatch)) by batch)" }
-            lines.append(line)
-        }
+        if anyAPI { lines.append("about \(dollars(apiList)) by API key at list price") }
         if anyPlan {
             lines.append("Claude plan: uses about as much of your plan as \(dollars(planNotional)) of API calls "
                          + "at list price; measured on your account after the first run")
         }
-        return (lines, notes, anyAPI ? (batch && allBatch ? apiBatch : apiList) : nil)
+        return (lines, notes, anyAPI ? apiList : nil)
     }
 
     // MARK: Formatting
@@ -238,7 +238,14 @@ struct SegmentationRow: Equatable, Sendable {
         return f
     }()
 
-    static func dayString(_ d: Date) -> String { dayFormatter.string(from: d) }
+    /// The user's own calendar day, so a price changes at their midnight rather than UTC's.
+    static func dayString(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: d)
+    }
 
     static func daysBetween(_ from: String, _ to: String) -> Int? {
         guard let a = dayFormatter.date(from: from), let b = dayFormatter.date(from: to) else { return nil }

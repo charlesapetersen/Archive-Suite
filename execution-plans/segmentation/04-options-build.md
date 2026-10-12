@@ -129,6 +129,10 @@ per approach**, with the method and threshold fixed on the development boxes fir
   to `W36.seg-opt-review` (§6).
 - **`W36.seg-opt-chooser`** — the approach chooser [M · ~1-2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-engine). The setting, with each approach's figures and both kinds of cost.
+  ✅ Shipped 2026-10-11: `Segmentation/SegmentationChooser.swift`, `Views/SegmentationChooserView.swift`,
+  `scripts/test-segmentation-chooser.sh`. N in Process Files is the image pages (multi-page PDFs are rebuilt untagged,
+  so not segmented), not §3's `droppedFiles.count + droppedPDFPageCount`. With both a key and `claude`, the row
+  prices by key and shows the plan line only without one; the route choice itself is `W36.seg-opt-subscription`'s.
 - **`W36.seg-opt-review`** — the review of flagged boundaries [M · ~2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-engine). Page n beside page n+1; keep, split or join; the unflagged boundaries stay in the review
   sheet. It also wires the engine into the pipeline and does the `TaggingMode` split (§6).

@@ -10,8 +10,8 @@ import SwiftUI
 ///   2. Every approach's row text, at several page counts, is the figure the file holds, rounded as Part 3 §3 says:
 ///      whole percent, boundaries at least 1, errors as "1 in" two significant figures, a zero as "none in <test
 ///      pages> test pages", and the footnote built from the file.
-///   3. The cost is §4's: dollars by API key at list price (batch beside it when batched); a scheduled price change
-///      announced before its day and applied from it; "prices as of" past 90 days; the Claude plan's notional line
+///   3. The cost is §4's: dollars by API key at list price; a scheduled price change announced through its day
+///      and applied from the next; "prices as of" past 90 days; the Claude plan's notional line
 ///      when only `claude` can run it; a mix adding its Claude and Gemini parts by route.
 ///   4. An approach that cannot run says why: the file's reason when unmeasured, the missing key or `claude`
 ///      otherwise, with the keys the wizard should offer. Manual always runs, at no cost.
@@ -62,9 +62,9 @@ enum SegmentationChooserTestDriver {
         let keysOnly = SegmentationRoutes(hasAnthropicKey: true, hasGeminiKey: true, hasOpenAIKey: false,
                                           hasClaudeCLI: false)
         let today = day("2026-10-11")
-        func row(_ a: SegmentationApproach, _ n: Int, _ r: SegmentationRoutes = keysOnly, batch: Bool = false,
+        func row(_ a: SegmentationApproach, _ n: Int, _ r: SegmentationRoutes = keysOnly,
                  on d: Date? = nil) -> SegmentationRow {
-            SegmentationRow.make(a, options: options, pageCount: n, routes: r, batch: batch, today: d ?? today)
+            SegmentationRow.make(a, options: options, pageCount: n, routes: r, today: d ?? today)
         }
 
         // 2. Figures.
@@ -107,9 +107,6 @@ enum SegmentationChooserTestDriver {
         eq("3 claude list", claude.costLines, ["about $16.93 by API key at list price"])
         check("3 claude dollars", abs((claude.apiDollars ?? 0) - 16.932352297593) < 1e-9, "\(claude.apiDollars as Any)")
         eq("3 claude cost pane", claude.costSummary, CostEstimate.money(16.932352297593))
-        eq("3 claude batch beside list", row(.claude, 1000, batch: true).costLines,
-           ["about $16.93 by API key at list price ($8.47 by batch)"])
-        check("3 batch dollars", abs((row(.claude, 1000, batch: true).apiDollars ?? 0) - 8.4661761487965) < 1e-9)
         eq("3 claude scaled @363", row(.claude, 363).costLines, ["about $6.15 by API key at list price"])
         eq("3 tiny run", row(.gemini, 1).costLines.first, "about under $0.01 by API key at list price")
         eq("3 gemini intro price", gemini.costLines, ["about $3.61 by API key at list price"])
@@ -118,7 +115,9 @@ enum SegmentationChooserTestDriver {
         eq("3 gemini after the change", later.costLines, ["about $7.22 by API key at list price"])
         eq("3 gemini after the change: no intro note, stale price", later.priceNotes,
            ["Gemini prices as of 5 Oct 2026"])
-        eq("3 gemini on change day applies new price", row(.gemini, 1000, on: day("2026-12-31")).costLines.first,
+        eq("3 gemini on the last intro day keeps the intro price",
+           row(.gemini, 1000, on: day("2026-12-31")).costLines.first, "about $3.61 by API key at list price")
+        eq("3 gemini the day after applies the new price", row(.gemini, 1000, on: day("2027-01-01")).costLines.first,
            "about $7.22 by API key at list price")
         eq("3 claude stale after 90 days", row(.claude, 1000, on: day("2027-01-10")).priceNotes,
            ["Claude prices as of 11 Oct 2026"])
@@ -155,6 +154,15 @@ enum SegmentationChooserTestDriver {
            noClaude.unavailableReason, "Needs an Anthropic API key, or the claude tool installed and signed in.")
         eq("4 claude offers the Anthropic key", noClaude.missingKeys, [.anthropic])
         check("4 unavailable row still shows its figures", noClaude.toCheck == claude.toCheck)
+        eq("4 unavailable row still shows what the key would cost", noClaude.costLines, claude.costLines)
+        eq("4 unavailable row adds nothing to a total", noClaude.apiDollars, nil)
+        eq("4 unavailable cost pane", noClaude.costSummary, "—")
+        let geminiNoKey = row(.gemini, 1000, SegmentationRoutes(hasAnthropicKey: true))
+        eq("4 gemini without key: cost and intro note shown", geminiNoKey.costLines + geminiNoKey.priceNotes,
+           gemini.costLines + gemini.priceNotes)
+        let mixHalf = row(.mix, 1000, SegmentationRoutes(hasAnthropicKey: true))
+        eq("4 mix missing Gemini prices the whole mix", mixHalf.costLines, mix.costLines)
+        eq("4 mix missing Gemini adds no partial dollars", mixHalf.apiDollars, nil)
         let mixNoClaude = row(.mix, 1000, SegmentationRoutes(hasGeminiKey: true))
         eq("4 mix names only the missing provider", mixNoClaude.missingKeys, [.anthropic])
         let mixNothing = row(.mix, 1000, .none)
@@ -185,6 +193,34 @@ enum SegmentationChooserTestDriver {
             check("1 mismatched per-model prices are a problem", false, "could not rebuild the file")
         }
 
+        // A model no voter runs is refused; two scheduled price changes do not decode.
+        if let mutated = mutateBundled({ approaches in
+            guard let i = approaches.firstIndex(where: { $0["id"] as? String == "claude" }),
+                  var tokens = approaches[i]["tokens_per_1000_pages"] as? [String: Any],
+                  var c = tokens["C"] as? [String: Any] else { return false }
+            c["model"] = "claude-renamed-9"
+            tokens["C"] = c
+            approaches[i]["tokens_per_1000_pages"] = tokens
+            return true
+        }) {
+            check("1 a model no voter runs is a problem",
+                  mutated.problems().contains("claude: cost C is for claude-renamed-9, which no voter runs"),
+                  "\(mutated.problems())")
+        } else {
+            check("1 a model no voter runs is a problem", false, "could not rebuild the file")
+        }
+        let twoChanges = mutateBundledData { approaches in
+            guard let i = approaches.firstIndex(where: { $0["id"] as? String == "gemini" }),
+                  var cost = approaches[i]["cost"] as? [String: Any],
+                  var per = cost["per_model"] as? [String: Any],
+                  var g = per["G"] as? [String: Any] else { return false }
+            g["after_2027_06_30"] = g["after_2026_12_31"]
+            per["G"] = g; cost["per_model"] = per; approaches[i]["cost"] = cost
+            return true
+        }
+        check("1 two scheduled price changes are refused",
+              twoChanges != nil && (try? SegmentationOptions.decode(twoChanges!)) == nil)
+
         // 5. Render guard.
         for r in [claude, gemini, mix, manual, openai, noClaude, claudePlan] {
             let name = "\(r.approach.rawValue)\(r.canRun ? "" : "-unavailable")"
@@ -194,6 +230,21 @@ enum SegmentationChooserTestDriver {
     }
 
     /// Dark pixels in the card drawn offscreen on white at the Process Files panel's width. Blank → 0.
+    /// The bundled file with `change` applied to its approaches, re-encoded; nil when it cannot be rebuilt.
+    private static func mutateBundledData(_ change: (inout [[String: Any]]) -> Bool) -> Data? {
+        guard let url = Bundle.main.url(forResource: SegmentationOptions.resourceName, withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              var approaches = json["approaches"] as? [[String: Any]],
+              change(&approaches) else { return nil }
+        json["approaches"] = approaches
+        return try? JSONSerialization.data(withJSONObject: json)
+    }
+
+    private static func mutateBundled(_ change: (inout [[String: Any]]) -> Bool) -> SegmentationOptions? {
+        mutateBundledData(change).flatMap { try? SegmentationOptions.decode($0) }
+    }
+
     /// With `SEGMENTATION_CHOOSER_RENDER_DIR` set, each card is also saved there as a PNG to look at.
     private static func renderedInk(_ view: some View, saveAs name: String) -> Int {
         let content = view

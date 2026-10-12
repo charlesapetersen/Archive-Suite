@@ -486,6 +486,8 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                `scripts/test-segmentation-engine.sh`): reproduces the bench's verdict on every gap
                                of a recorded box (`scripts/segbench/engine-fixture-deaver.json`, from
                                `export_engine_fixture.py`), plus rules, failure, usage limit and transports.
+  SegmentationChooser.swift    The chooser's row text + cost (Part 3 §3-4); UI in `Views/SegmentationChooserView.swift`.
+                               Self-test: `SegmentationChooserTestDriver`, `scripts/test-segmentation-chooser.sh`.
 Capture/                       Live Capture core (Tier-2):
   CaptureSession.swift         Owns a live session: incoming folder, token, received photos, receiver
                                lifecycle, ingest(...) (durable-manifest-before-ack, idempotent (group,seq)),

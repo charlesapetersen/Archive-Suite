@@ -114,13 +114,18 @@ struct SegmentationOptions: Decodable, Sendable {
             batchUSDPer1000Pages = try c.decodeIfPresent(Double.self,
                                                          forKey: AnyKey(stringValue: "batch_usd_per_1000_pages"))
             priceRead = try c.decodeIfPresent(String.self, forKey: AnyKey(stringValue: "price_read"))
-            let after = c.allKeys.compactMap { key -> (String, AnyKey)? in
+            let changes = c.allKeys.compactMap { key -> (String, AnyKey)? in
                 guard let r = key.stringValue.range(of: #"^after_\d{4}_\d{2}_\d{2}$"#, options: .regularExpression)
                 else { return nil }
                 return (String(key.stringValue[r].dropFirst("after_".count)).replacingOccurrences(of: "_", with: "-"),
                         key)
-            }.min { $0.0 < $1.0 }
-            if let (date, key) = after {
+            }
+            // One scheduled change is all the chooser knows how to show; a second would be silently ignored.
+            guard changes.count <= 1 else {
+                throw DecodingError.dataCorruptedError(forKey: changes[1].1, in: c,
+                                                       debugDescription: "more than one after_ price change")
+            }
+            if let (date, key) = changes.first {
                 priceChange = (date, try c.decode(CostTotal.self, forKey: key))
             } else {
                 priceChange = nil
@@ -222,8 +227,14 @@ struct SegmentationOptions: Decodable, Sendable {
                 if models.isEmpty || abs(sum - cost.total.listUSDPer1000Pages) > 1e-6 {
                     out.append("\(a.id): per-model list prices do not add up to the total")
                 }
-                for key in models.keys where a.tokensPer1000Pages?[key] == nil {
-                    out.append("\(a.id): cost \(key) has no tokens_per_1000_pages entry")
+                for key in models.keys {
+                    guard let model = a.tokensPer1000Pages?[key]?.model else {
+                        out.append("\(a.id): cost \(key) has no tokens_per_1000_pages entry")
+                        continue
+                    }
+                    if !WindowVoter.catalog.contains(where: { $0.modelID == model }) {
+                        out.append("\(a.id): cost \(key) is for \(model), which no voter runs")
+                    }
                 }
             } else {
                 out.append("\(a.id): no cost")

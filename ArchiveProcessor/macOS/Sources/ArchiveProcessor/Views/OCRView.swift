@@ -248,7 +248,8 @@ struct OCRView: View {
         }
         .onAppear {
             reloadAPIKey()
-            segmentationRoutes = SegmentationRoutes.current()
+            // Not before the Keychain explainer: each read can prompt, and the sheet says to click Always Allow.
+            if keychainExplained { segmentationRoutes = SegmentationRoutes.current() }
             processor.checkForPendingBatch()
             if !keychainExplained {
                 showKeychainSheet = true
@@ -299,6 +300,9 @@ struct OCRView: View {
             captureMonths = processor.stagedCaptureMonths
             captureSubjects = processor.stagedCaptureSubjects
             processor.stagedCaptureFiles = []
+        }
+        .onChange(of: keychainExplained) { _, explained in
+            if explained { segmentationRoutes = SegmentationRoutes.current() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
             segmentationRoutes = SegmentationRoutes.current()
@@ -543,7 +547,8 @@ struct OCRView: View {
                                 HStack {
                                     Text("Total (text-only):").fontWeight(.medium)
                                     Spacer()
-                                    Text(est.totalStandardFormatted).fontWeight(.medium)
+                                    Text(CostEstimate.money(est.totalStandard + (segmentationRow?.apiDollars ?? 0)))
+                                        .fontWeight(.medium)
                                 }
                             }
                             segmentationCostLine
@@ -570,10 +575,13 @@ struct OCRView: View {
                     }
                 } else if useGateway && !gatewayHasCosts && !droppedFiles.isEmpty {
                     GroupBox("Cost Estimate") {
-                        Text("Enter model pricing in Gateway Configuration above to see cost estimates.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(4)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enter model pricing in Gateway Configuration above to see cost estimates.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            segmentationCostLine
+                        }
+                        .padding(4)
                     }
                 } else if costEstimate != nil || pdfPageEstimate != nil {
                     GroupBox("Cost Estimate") {

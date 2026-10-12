@@ -10573,3 +10573,21 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   settings are unchanged. Bounded owned-child cleanup: 44-check proof, and removing the production TERM unblock fails
   the exact-launch probe. Counts, durations and evidence: `verification/README.md`, `verification/evidence/*/W40.a3-*.md`.
   <!-- /W40.a3 -->
+- [x] **W36.seg-opt-chooser — the approach chooser [M · ~1-2 sessions]** · §W36 segmentation · SHIPPED 2026-10-11 (this commit; checkpoint f5d2f046)
+  The Segmentation setting (`04-options-build.md` Part 3 §1, §3, §4): `Segmentation/SegmentationChooser.swift`
+  (`SegmentationRow`, `SegmentationRoutes`), `Views/SegmentationChooserView.swift`, in Settings (per 1,000 pages) and
+  Process Files (scaled to the image pages dropped; not shown for Live Capture). Each approach shows the five figures
+  from `figures.test` only, and its cost by route: dollars by API key per model (Gemini's introductory price announced
+  through its day and the `after_YYYY_MM_DD` price applied from the next, in local time; "prices as of" past 90 days),
+  or the Claude plan's notional line when only `claude` is installed. Every approach is selectable; one that cannot
+  run is greyed with the file's reason or the missing key, still shows what it would cost, offers the key wizard, and
+  adds nothing to a total. Both cost panes gain a Segmentation line, added to every total (windows are never batched,
+  so there is no batch figure). Routes are read only after the Keychain explainer.
+  `options.json` decode gained per-model prices and tokens; `problems()` now refuses per-model prices that do not add
+  up to the total or name a model no voter runs, and a second `after_` price change fails to decode. An opus review
+  of the checkpoint found 8 defects (unreachable key wizard, partial mix dollars, price change a day early, …), all
+  fixed with tests. Two choices against the design's letter: N is the image pages, since multi-page PDFs are rebuilt
+  untagged; with both a key and `claude` the row prices by key, leaving the route choice to `W36.seg-opt-subscription`.
+  Proof: `scripts/test-segmentation-chooser.sh` (headless, $0, 75/75) — row text for every approach, N and route, plus an
+  offscreen `ImageRenderer` render guard; engine test still ALL PASS. Nothing runs the engine yet (`W36.seg-opt-review`).
+  <!-- /W36.seg-opt-chooser -->
