@@ -392,7 +392,16 @@ struct OCRView: View {
         .reviewWindow(isPresented: $processor.awaitingFlaggedReview) {
             FlaggedBoundaryReviewSheet(processor: processor)
         }
-        .alert("Segmentation could not finish",
+        // W36.seg-opt-subscription: the Claude plan's first measurement on this account.
+        .alert("Your Claude plan, measured",
+               isPresented: Binding(get: { processor.planCheckPrompt != nil }, set: { _ in })) {
+            Button("Go on") { processor.answerPlanCheck(goOn: true) }
+            Button("Stop here", role: .cancel) { processor.answerPlanCheck(goOn: false) }
+        } message: {
+            Text((processor.planCheckPrompt?.message ?? "")
+                 + "\n\nLater folders show this figure before they start. Go on with this folder?")
+        }
+        .alert(processor.windowStopPrompt?.title ?? WindowStopPrompt.defaultTitle,
                isPresented: Binding(get: { processor.windowStopPrompt != nil }, set: { _ in })) {
             Button("Check the rest myself") { processor.answerWindowStop(.checkMyself) }
             // Stop is offered only when the run can be resumed: a paid batch's journal is already retired here,

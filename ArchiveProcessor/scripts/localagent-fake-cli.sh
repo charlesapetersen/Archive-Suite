@@ -14,6 +14,15 @@
 #   entitlement a signed-in-but-not-authorized error (client → cli_entitlement_missing)         exit 1
 #   ratelimited a usage-limit error on stderr (client → cli_rate_limited)                        exit 1
 #   timeout    sleeps well past any test timeout (tests the client's SIGTERM/SIGKILL path)      exit 0
+#              (with $LOCALAGENT_FAKE_PID_DIR set, it writes its pid there and execs the sleep, so a test
+#              can check the child itself is gone after a cancel)
+#   stream     `--output-format stream-json --verbose` for a segmentation window: a rate_limit_event, then a
+#              result event whose .result answers every page-NNNN.jpg in the working directory (W36)  exit 0
+#              The five-hour and weekly meters are whole percents kept in $LOCALAGENT_FAKE_METER_DIR
+#              (files `five`, `week`): each call prints them, then adds $LOCALAGENT_FAKE_FIVE_STEP (default 1)
+#              and $LOCALAGENT_FAKE_WEEK_STEP (default 0). Each call costs $LOCALAGENT_FAKE_COST notional
+#              dollars (default 0.25). Not safe for concurrent calls (the tests run these one at a time).
+#   streamnometer  the same with no rate_limit_event (an older CLI, or an API-key login)          exit 0
 mode="${LOCALAGENT_FAKE_MODE:-ok}"
 
 # Always drain stdin first so the process exits cleanly on EOF and reports the prompt size.
@@ -42,8 +51,34 @@ case "$mode" in
     echo "Error: usage limit reached. Please try again later." >&2
     exit 1 ;;
   timeout)
+    if [ -n "${LOCALAGENT_FAKE_PID_DIR:-}" ]; then
+        echo $$ > "$LOCALAGENT_FAKE_PID_DIR/$$"
+        exec sleep 30
+    fi
     sleep 30
     printf '%s\n' '{"result":"too late"}'
+    exit 0 ;;
+  stream|streamnometer)
+    nums=$(ls page-*.jpg 2>/dev/null | sed -E 's/^page-0*([0-9]+)\.jpg$/\1/' | sort -n)
+    pages=""; gaps=""; prev=""
+    for n in $nums; do
+        pages="$pages${pages:+,}{\\\"page\\\":$n,\\\"kind\\\":\\\"document\\\"}"
+        if [ -n "$prev" ]; then
+            gaps="$gaps${gaps:+,}{\\\"between\\\":[$prev,$n],\\\"decision\\\":\\\"continue\\\",\\\"cue\\\":\\\"fake\\\",\\\"confidence\\\":0.9}"
+        fi
+        prev=$n
+    done
+    printf '%s\n' '{"type":"system","subtype":"init"}'
+    if [ "$mode" = stream ]; then
+        dir="${LOCALAGENT_FAKE_METER_DIR:?}"
+        five=$(cat "$dir/five" 2>/dev/null || echo 0); week=$(cat "$dir/week" 2>/dev/null || echo 0)
+        printf '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","unifiedWindows":{"five_hour":{"utilization":%s,"resetsAt":1791783000},"seven_day":{"utilization":%s,"resetsAt":1791943200}}}}\n' \
+            "$(awk -v v="$five" 'BEGIN{printf "%.2f", v/100}')" "$(awk -v v="$week" 'BEGIN{printf "%.2f", v/100}')"
+        echo $((five + ${LOCALAGENT_FAKE_FIVE_STEP:-1})) > "$dir/five"
+        echo $((week + ${LOCALAGENT_FAKE_WEEK_STEP:-0})) > "$dir/week"
+    fi
+    printf '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":%s,"result":"{\\"pages\\":[%s],\\"boundaries\\":[%s]}"}\n' \
+        "${LOCALAGENT_FAKE_COST:-0.25}" "$pages" "$gaps"
     exit 0 ;;
   *)
     echo "unknown LOCALAGENT_FAKE_MODE: $mode" >&2

@@ -171,15 +171,23 @@ struct APIWindowTransport: WindowTransport {
 
 /// Claude-plan route: the user's own installed `claude`, run as the bench ran it (`method_window.py`
 /// `call_claude`): the window's pages written as `page-NNNN.jpg` into a fresh temp dir that is the process's
-/// working directory, prompt w1 (here on stdin), `--output-format json`, the Read tool only, no session kept.
-/// The app never reads the CLI's login. The meter (`stream-json`'s `rate_limit_event`) and the calibration are
-/// W36.seg-opt-subscription's; this sends the window and maps a usage limit.
+/// working directory, prompt w1 (here on stdin), the Read tool only, no session kept. The output is
+/// `--output-format stream-json --verbose` (W36.seg-opt-subscription), whose `rate_limit_event` carries the
+/// account's meter; the final `result` event is the envelope `json` printed. The app never reads the CLI's login.
 struct LocalAgentWindowTransport: WindowTransport {
     let binaryPath: String
     /// Per window: the bench allowed 900 s for seven Read turns and the answer.
     var timeout: TimeInterval = 900
+    /// The run's meter and its two pauses (`PlanRunGate`); nil sends without them.
+    var gate: PlanRunGate? = nil
+
+    static func arguments(model: String) -> [String] {
+        ["-p", "--model", model, "--output-format", "stream-json", "--verbose", "--allowedTools", "Read",
+         "--permission-mode", "default", "--no-session-persistence"]
+    }
 
     func send(_ r: WindowRequest) async throws -> String {
+        try await gate?.beforeCall()
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appendingPathComponent("APSegWindow-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -187,19 +195,30 @@ struct LocalAgentWindowTransport: WindowTransport {
         for (n, img) in zip(r.pageNumbers, r.images) {
             try img.write(to: dir.appendingPathComponent(WindowPromptRenderer.fileName(n)))
         }
-        let args = ["-p", "--model", r.voter.modelID, "--output-format", "json", "--allowedTools", "Read",
-                    "--permission-mode", "default", "--no-session-persistence"]
-        let run = await LocalAgentClient.runAsync(binaryPath: binaryPath, args: args, stdinText: r.prompt,
-                                                  timeout: timeout, currentDirectory: dir)
-        return try Self.classify(run, now: Date())
+        let run = await LocalAgentClient.runAsync(binaryPath: binaryPath, args: Self.arguments(model: r.voter.modelID),
+                                                  stdinText: r.prompt, timeout: timeout, currentDirectory: dir)
+        if run.cancelled { throw CancellationError() }
+        let stream = ClaudeStreamOutput.parse(run.stdout)
+        let result = Result { try Self.classify(run, stream: stream, now: Date()) }
+        if let gate {
+            // A call counts toward the pages measured only if its answer parses; a retry covers the same pages.
+            let answered = (try? result.get()).flatMap { try? WindowAnswerParser.parse($0, pageNumbers: r.pageNumbers) } != nil
+            await gate.record(meter: stream.meter, notionalUSD: stream.notionalUSD ?? 0, answered: answered)
+        }
+        return try result.get()
     }
 
-    /// `call_claude`'s classification: the JSON envelope's `result` on success; a limit anywhere in the
-    /// output stops the run with the reset time the CLI printed, when it printed one.
+    /// `call_claude`'s classification: the envelope's `result` on success; a limit anywhere in the output stops
+    /// the run with the reset time the CLI printed, when it printed one.
     static func classify(_ run: LocalAgentClient.CLIRun, now: Date) throws -> String {
+        try classify(run, stream: ClaudeStreamOutput.parse(run.stdout), now: now)
+    }
+
+    static func classify(_ run: LocalAgentClient.CLIRun, stream: ClaudeStreamOutput, now: Date) throws -> String {
+        if run.cancelled { throw CancellationError() }
         if run.spawnFailed { throw WindowTransportError.fatal("could not launch claude") }
         if run.timedOut || run.exitCode == -2 { throw WindowTransportError.failed("claude timed out") }
-        let envelope = (try? JSONSerialization.jsonObject(with: Data(run.stdout.utf8))) as? [String: Any]
+        let envelope = stream.envelope
         if let envelope, envelope["is_error"] as? Bool != true, envelope["subtype"] as? String == "success",
            let result = envelope["result"] as? String {
             return result

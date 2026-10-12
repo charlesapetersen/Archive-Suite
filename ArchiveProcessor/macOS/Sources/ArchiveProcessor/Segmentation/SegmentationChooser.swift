@@ -11,8 +11,17 @@ struct SegmentationRoutes: Equatable, Sendable {
     /// The user's own `claude` is installed. Whether it is signed in is only known at the first call: the app
     /// never reads the login (`segbench-results/usage.md`).
     var hasClaudeCLI = false
+    /// Which way Claude goes when both an Anthropic key and `claude` exist (W36.seg-opt-subscription).
+    var claudeRoute: ClaudeRoute = .apiKey
+    /// The plan's share, measured on this account by earlier runs.
+    var planCalibration = PlanCalibrationStore()
 
     static let none = SegmentationRoutes()
+
+    /// Claude's windows go by the user's own plan: `claude` is there, and either no key or the user chose the plan.
+    var claudeByPlan: Bool { hasClaudeCLI && (!hasAnthropicKey || claudeRoute == .plan) }
+    /// The route is the user's to choose only when both exist.
+    var offersClaudeRouteChoice: Bool { hasClaudeCLI && hasAnthropicKey }
 
     /// Reads the Keychain and looks for `claude`. Never call it from a view body.
     static func current(_ defaults: UserDefaults = .standard) -> SegmentationRoutes {
@@ -23,7 +32,9 @@ struct SegmentationRoutes: Equatable, Sendable {
             hasAnthropicKey: !(KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? "").isEmpty,
             hasGeminiKey: !(KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? "").isEmpty,
             hasOpenAIKey: !(KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? "").isEmpty,
-            hasClaudeCLI: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override) != nil)
+            hasClaudeCLI: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override) != nil,
+            claudeRoute: ClaudeRoute.stored(defaults),
+            planCalibration: PlanCalibrationStore.load(defaults))
     }
 
     func hasKey(_ p: WindowProvider) -> Bool {
@@ -137,9 +148,22 @@ struct SegmentationRow: Equatable, Sendable {
 
     // MARK: Cost (Part 3 §4)
 
-    /// Each model priced on its own. A Claude model goes by the Claude plan when `claude` is installed and there
-    /// is no Anthropic key; every other model is priced by API key at list price, including one whose key the
-    /// user does not have yet, so a greyed-out row still says what the key would cost.
+    /// The notional dollars of an approach's Claude windows for `pageCount` pages: what the plan's share is
+    /// scaled by. nil when the approach has no Claude voter or the file has no figure.
+    static func planNotionalUSD(_ approach: SegmentationApproach, options: SegmentationOptions?,
+                                pageCount: Int) -> Double? {
+        guard let tokens = options?.approach(approach)?.tokensPer1000Pages else { return nil }
+        let claude = tokens.values.filter { t in
+            WindowVoter.catalog.first(where: { $0.modelID == t.model })?.provider == .anthropic
+        }.compactMap(\.subscriptionRouteNotionalUSDPer1000Pages)
+        guard !claude.isEmpty else { return nil }
+        return claude.reduce(0, +) * Double(max(0, pageCount)) / 1000
+    }
+
+    /// Each model priced on its own. A Claude model goes by the Claude plan when `claude` is installed and either
+    /// there is no Anthropic key or the user chose the plan; every other model is priced by API key at list
+    /// price, including one whose key the user does not have yet, so a greyed-out row still says what the key
+    /// would cost. The plan line is the notional figure until a run has measured this account, then the share.
     private static func costLines(_ entry: SegmentationOptions.Approach, pageCount n: Int,
                                   routes: SegmentationRoutes, today: Date) -> ([String], [String], Double?) {
         let models = (entry.cost?.perModel ?? [:]).sorted { $0.key < $1.key }
@@ -152,7 +176,7 @@ struct SegmentationRow: Equatable, Sendable {
             // problems() refuses a model outside the catalog, so this never skips in a shipped file.
             guard let provider = WindowVoter.catalog.first(where: { $0.modelID == tokens?.model })?.provider
             else { continue }
-            if provider == .anthropic, !routes.hasKey(.anthropic), routes.hasClaudeCLI,
+            if provider == .anthropic, routes.claudeByPlan,
                let notional = tokens?.subscriptionRouteNotionalUSDPer1000Pages {
                 anyPlan = true
                 planNotional += notional * Double(n) / 1000
@@ -176,8 +200,13 @@ struct SegmentationRow: Equatable, Sendable {
         var lines: [String] = []
         if anyAPI { lines.append("about \(dollars(apiList)) by API key at list price") }
         if anyPlan {
-            lines.append("Claude plan: uses about as much of your plan as \(dollars(planNotional)) of API calls "
-                         + "at list price; measured on your account after the first run")
+            if let share = routes.planCalibration.estimate(notionalUSD: planNotional),
+               let date = routes.planCalibration.lastMeasured {
+                lines.append("Claude plan: \(share); measured on your account, \(PlanShareText.measuredDate(date))")
+            } else {
+                lines.append("Claude plan: uses about as much of your plan as \(dollars(planNotional)) of API calls "
+                             + "at list price; measured on your account after the first run")
+            }
         }
         return (lines, notes, anyAPI ? apiList : nil)
     }

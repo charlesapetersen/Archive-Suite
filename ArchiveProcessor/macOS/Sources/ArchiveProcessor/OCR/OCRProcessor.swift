@@ -163,6 +163,9 @@ class OCRProcessor: ObservableObject {
     /// A window run that hit a usage limit or an error: check the rest yourself, or stop.
     @Published var windowStopPrompt: WindowStopPrompt? = nil
     var windowStopContinuation: CheckedContinuation<WindowStopChoice, Never>?
+    /// The Claude plan's first measurement on this account: the folder's share, and whether to go on.
+    @Published var planCheckPrompt: PlanCheckPrompt? = nil
+    var planCheckContinuation: CheckedContinuation<Bool, Never>?
     /// "37 boundaries checked, 6 changed", added to the run's closing status. Never sent anywhere.
     var segmentationCheckSummary: String?
 #if DEBUG

@@ -14,6 +14,9 @@ struct WindowStopPrompt: Equatable {
     let message: String
     /// A pending-run manifest exists, so stopping keeps the answers so far for a later resume.
     let canResumeLater: Bool
+    var title: String = defaultTitle
+
+    static let defaultTitle = "Segmentation could not finish"
 }
 
 enum WindowStopChoice {
@@ -119,14 +122,33 @@ extension OCRProcessor {
                                         message: error.localizedDescription)
         }
         let prior = activePendingRun?.segmentationWindows ?? [:]
+        // The Claude plan's meter and pauses (W36.seg-opt-subscription). Used only if Claude goes by the plan.
+        let calibration = PlanCalibrationStore.load()
+        let notional = SegmentationRow.planNotionalUSD(approach, options: SegmentationOptionsStore.shared,
+                                                       pageCount: pages.urls.count) ?? 0
+        let gate = PlanRunGate(
+            pagesPerCall: spec.windowStride, folderNotionalUSD: notional,
+            calibrated: calibration.fiveHourPointsPerUSD != nil) { [weak self] prompt in
+                await self?.askPlanCheck(prompt) ?? false
+            }
         let transport: any WindowTransport
-        switch windowTransportOverride.map({ .success($0) }) ?? WindowStageTransport.current(spec) {
+        switch windowTransportOverride.map({ .success($0) }) ?? WindowStageTransport.current(spec, gate: gate) {
         case .success(let t): transport = t
         case .failure(let missing):
             return await stopOrCheckAll(pages: pages, spec: spec, answered: prior, message: missing.description)
         }
 
         statusMessage = "Proposing boundaries for \(pages.urls.count) pages…"
+        if Self.usesPlan(transport), let share = calibration.estimate(notionalUSD: notional) {
+            statusMessage += " (Claude plan: \(share))"
+        }
+        // Keep this run's ratio for the next folder, however the windows end (usage.md step 5).
+        defer {
+            Task {
+                let records = await gate.records
+                if !records.isEmpty { PlanCalibrationStore.recordRun(records) }
+            }
+        }
         // A single-page PDF input was converted to a temporary JPEG for OCR; the windows read that image.
         let urls = pages.urls.map { pdfToImageMap[$0] ?? $0 }
         let texts = pages.fileIndices.map { jobs[$0].result?.text ?? "" }
@@ -150,6 +172,11 @@ extension OCRProcessor {
             let when = reset.map { " It resets \(Self.windowResetFormatter.string(from: $0))." } ?? ""
             return await stopOrCheckAll(pages: pages, spec: spec, answered: answered,
                                         message: "The model's usage limit was reached.\(when) \(message.suffix(200))")
+        } catch WindowSegmenterError.paused(let reset, let message, let answered) {
+            persistWindowSegmentationProgress(windows: answered)
+            let when = reset.map { " It resets \(Self.windowResetFormatter.string(from: $0))." } ?? ""
+            return await stopOrCheckAll(pages: pages, spec: spec, answered: answered, message: message + when,
+                                        title: "Segmentation paused")
         } catch WindowSegmenterError.fatal(let message, let answered) {
             persistWindowSegmentationProgress(windows: answered)
             return await stopOrCheckAll(pages: pages, spec: spec, answered: answered, message: message)
@@ -183,12 +210,13 @@ extension OCRProcessor {
     /// Ask the user (§2 Failure): check every unanswered gap now, or stop. Stopping keeps the answers so far in
     /// the run's manifest, so a resume asks the model only for the rest.
     private func stopOrCheckAll(pages: WindowStagePages, spec: ApproachSpec?,
-                                answered: [WindowKey: WindowAnswer], message: String) async -> [GapProposal]? {
+                                answered: [WindowKey: WindowAnswer], message: String,
+                                title: String = WindowStopPrompt.defaultTitle) async -> [GapProposal]? {
         // A Stop pressed during the last suspension has already released the continuations: arming a new one
         // now would show a stale prompt and leak it.
         guard !Task.isCancelled else { return nil }
         let canResume = activePendingRun != nil
-        windowStopPrompt = WindowStopPrompt(message: message, canResumeLater: canResume)
+        windowStopPrompt = WindowStopPrompt(message: message, canResumeLater: canResume, title: title)
         let choice = await withCheckedContinuation { continuation in
             windowStopContinuation = continuation
         }
@@ -228,6 +256,29 @@ extension OCRProcessor {
         windowStopContinuation = nil
     }
 
+    /// The plan route's first measurement on this account (usage.md step 3): show the folder's share and ask
+    /// whether to go on. False when the run is cancelled meanwhile.
+    func askPlanCheck(_ prompt: PlanCheckPrompt) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        planCheckContinuation?.resume(returning: false)
+        planCheckPrompt = prompt
+        let goOn = await withCheckedContinuation { planCheckContinuation = $0 }
+        planCheckPrompt = nil
+        return goOn
+    }
+
+    /// Called by the plan-check alert.
+    func answerPlanCheck(goOn: Bool) {
+        planCheckContinuation?.resume(returning: goOn)
+        planCheckContinuation = nil
+    }
+
+    /// Whether any of a run's Claude windows go by the plan.
+    nonisolated static func usesPlan(_ t: any WindowTransport) -> Bool {
+        if t is LocalAgentWindowTransport { return true }
+        return (t as? RoutingWindowTransport)?.routes.values.contains { $0 is LocalAgentWindowTransport } ?? false
+    }
+
     /// Called by the flagged pass's Done (only enabled when every gap is answered).
     func confirmFlaggedReview() {
         guard FlaggedReview.isComplete(flaggedGapItems) else { return }
@@ -244,6 +295,9 @@ extension OCRProcessor {
         windowStopPrompt = nil
         windowStopContinuation?.resume(returning: .stop)
         windowStopContinuation = nil
+        planCheckPrompt = nil
+        planCheckContinuation?.resume(returning: false)
+        planCheckContinuation = nil
         segmentationCheckSummary = nil
     }
 

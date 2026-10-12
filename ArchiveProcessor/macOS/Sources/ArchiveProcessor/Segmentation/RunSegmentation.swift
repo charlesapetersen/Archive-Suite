@@ -183,18 +183,20 @@ enum WindowStageTransport {
         let description: String
     }
 
-    /// The transport for an approach's voters, from what the user has: by API key where there is one (the route
-    /// the chooser prices), else Claude through the user's own `claude`. The route choice itself, when both
-    /// exist, is W36.seg-opt-subscription's.
-    static func make(_ spec: ApproachSpec, keys: [WindowProvider: String], claudeBinary: String?)
+    /// The transport for an approach's voters, from what the user has: by API key where there is one, else Claude
+    /// through the user's own `claude`; with both, Claude goes the way `route` says (the chooser asks only then).
+    /// `gate` meters and pauses the `claude` calls.
+    static func make(_ spec: ApproachSpec, keys: [WindowProvider: String], claudeBinary: String?,
+                     route: ClaudeRoute = .apiKey, gate: PlanRunGate? = nil)
         -> Result<any WindowTransport, Missing> {
         var routes: [WindowProvider: any WindowTransport] = [:]
         let api = APIWindowTransport(keys: keys.filter { !$0.value.isEmpty })
         for p in Set(spec.voters.map(\.provider)) {
-            if let k = keys[p], !k.isEmpty {
+            let byPlan = p == .anthropic && claudeBinary != nil && (route == .plan || (keys[p] ?? "").isEmpty)
+            if byPlan, let claudeBinary {
+                routes[p] = LocalAgentWindowTransport(binaryPath: claudeBinary, gate: gate)
+            } else if let k = keys[p], !k.isEmpty {
                 routes[p] = api
-            } else if p == .anthropic, let claudeBinary {
-                routes[p] = LocalAgentWindowTransport(binaryPath: claudeBinary)
             } else {
                 return .failure(Missing(description: p == .anthropic
                     ? "Claude needs an Anthropic API key or a signed-in claude."
@@ -205,7 +207,7 @@ enum WindowStageTransport {
     }
 
     /// Reads the Keychain and looks for `claude`. Never call it from a view body.
-    static func current(_ spec: ApproachSpec, defaults: UserDefaults = .standard)
+    static func current(_ spec: ApproachSpec, defaults: UserDefaults = .standard, gate: PlanRunGate? = nil)
         -> Result<any WindowTransport, Missing> {
         var keys: [WindowProvider: String] = [:]
         for p in Set(spec.voters.map(\.provider)) {
@@ -215,6 +217,7 @@ enum WindowStageTransport {
         let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
         let override = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""
         return make(spec, keys: keys,
-                    claudeBinary: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override))
+                    claudeBinary: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override),
+                    route: ClaudeRoute.stored(defaults), gate: gate)
     }
 }

@@ -333,6 +333,9 @@ struct WindowRequest: Sendable {
 enum WindowTransportError: Error, Equatable {
     /// The provider's usage window or rate limit: stop the run, keep what was answered.
     case usageLimit(reset: Date?, message: String)
+    /// The Claude plan route stopped the run itself (`PlanRunGate`): the five-hour meter at 90%, or the user chose
+    /// not to go on after the first measurement. Handled as a usage limit, with its own message.
+    case paused(reset: Date?, message: String)
     /// Anything else; the window is retried once, after a pause.
     case failed(String)
     /// No window can succeed (no key, a key refused, an unknown model, the CLI missing or signed out): stop the
@@ -369,6 +372,8 @@ enum WindowSegmenterError: Error {
     /// A voter hit its usage limit. `answered` holds every window answered so far; pass it back as
     /// `answered:` to resume without asking again.
     case usageLimit(reset: Date?, message: String, answered: [WindowKey: WindowAnswer])
+    /// The plan route paused the run (`WindowTransportError.paused`); resumable as a usage limit is.
+    case paused(reset: Date?, message: String, answered: [WindowKey: WindowAnswer])
     /// A transport cannot work at all (see `WindowTransportError.fatal`).
     case fatal(message: String, answered: [WindowKey: WindowAnswer])
     case pageCountMismatch(pages: Int, photoKinds: Int)
@@ -399,6 +404,7 @@ struct WindowSegmenter: Sendable {
         }
 
         var limit: (Date?, String)?
+        var pause: (Date?, String)?
         var fatal: String?
         let retryDelay = self.retryDelay
         try await withThrowingTaskGroup(of: (WindowKey, Result<WindowAnswer, Error>).self) { group in
@@ -420,6 +426,8 @@ struct WindowSegmenter: Sendable {
                     answered[k] = a
                 case .failure(WindowTransportError.usageLimit(let reset, let message)):
                     if limit == nil { limit = (reset, message) }
+                case .failure(WindowTransportError.paused(let reset, let message)):
+                    if pause == nil { pause = (reset, message) }
                 case .failure(WindowTransportError.fatal(let message)):
                     if fatal == nil { fatal = message }
                 case .failure(let e as CancellationError):
@@ -427,7 +435,7 @@ struct WindowSegmenter: Sendable {
                 case .failure:
                     failed.append(k)
                 }
-                if limit == nil && fatal == nil { launch() }
+                if limit == nil && pause == nil && fatal == nil { launch() }
             }
         }
         if let fatal {
@@ -435,6 +443,9 @@ struct WindowSegmenter: Sendable {
         }
         if let (reset, message) = limit {
             throw WindowSegmenterError.usageLimit(reset: reset, message: message, answered: answered)
+        }
+        if let (reset, message) = pause {
+            throw WindowSegmenterError.paused(reset: reset, message: message, answered: answered)
         }
         try Task.checkCancellation()
 
@@ -478,7 +489,7 @@ struct WindowSegmenter: Sendable {
                 return .success(try WindowAnswerParser.parse(text, pageNumbers: r.pageNumbers))
             } catch let e as WindowTransportError {
                 switch e {
-                case .usageLimit, .fatal: return .failure(e)
+                case .usageLimit, .paused, .fatal: return .failure(e)
                 case .failed: last = e
                 }
             } catch is CancellationError {

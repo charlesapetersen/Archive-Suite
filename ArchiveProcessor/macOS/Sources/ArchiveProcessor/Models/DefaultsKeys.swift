@@ -70,6 +70,11 @@ enum DefaultsKeys {
     static let taggingModeRaw = "taggingModeRaw"
     /// `SegmentationApproach` rawValue: who proposes the run's boundaries (W36.seg-opt-engine). Absent ⇒ manual.
     static let segmentationApproach = "segmentationApproach"
+    /// `ClaudeRoute` rawValue: Claude's windows by API key or by the user's own `claude` plan, asked only when both
+    /// exist (W36.seg-opt-subscription). Absent ⇒ API key.
+    static let segmentationClaudeRoute = "segmentationClaudeRoute"
+    /// `PlanCalibrationStore` JSON: the plan meter's points per notional dollar, measured on this account.
+    static let segmentationPlanCalibration = "segmentationPlanCalibration"
     static let enableCollectionSegmentation = "enableCollectionSegmentation"
     static let confirmCollectionIDs = "confirmCollectionIDs"
     static let reviewDocumentSegmentation = "reviewDocumentSegmentation"

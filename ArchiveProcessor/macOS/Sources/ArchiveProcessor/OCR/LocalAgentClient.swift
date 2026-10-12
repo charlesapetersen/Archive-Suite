@@ -222,6 +222,9 @@ struct LocalAgentClient: Sendable {
         let args = cliArguments(tool: tool, modelOverride: modelOverride)
         let cli = await runAsync(binaryPath: binary, args: args, stdinText: prompt, timeout: timeout)
 
+        if cli.cancelled {
+            return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
+        }
         if cli.exitCode == -2 || cli.timedOut {
             return .failure(code: "cli_timeout", message: "The \(tool.displayName) CLI timed out. Try again, or reduce concurrency.")
         }
@@ -455,6 +458,45 @@ struct LocalAgentClient: Sendable {
         let stderr: String
         let timedOut: Bool
         let spawnFailed: Bool
+        /// The calling task was cancelled: the child was stopped (or never started), so the output means nothing.
+        var cancelled = false
+    }
+
+    /// Lets a cancelled task stop the child it started (W36.seg-opt-subscription). Without it a cancelled run's
+    /// `claude -p` calls ran on to their timeout, spending the user's plan on answers nobody would read.
+    final class ProcessCanceller: @unchecked Sendable {
+        private let lock = NSLock()
+        private var process: Process?
+        private var cancelled = false
+
+        var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+
+        /// Called once the child is running. A cancel that came first stops it at once.
+        func attach(_ p: Process) {
+            lock.lock()
+            process = p
+            let stopNow = cancelled
+            lock.unlock()
+            if stopNow { Self.stop(p) }
+        }
+
+        func cancel() {
+            lock.lock()
+            cancelled = true
+            let p = process
+            lock.unlock()
+            if let p { Self.stop(p) }
+        }
+
+        /// SIGTERM, then SIGKILL after 3 s if the child is still there, as the timeout does.
+        static func stop(_ p: Process) {
+            guard p.isRunning else { return }
+            p.terminate()
+            let pid = p.processIdentifier
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 3) {
+                if p.isRunning { kill(pid, SIGKILL) }
+            }
+        }
     }
 
     /// Thread-safe accumulator so the concurrent pipe-drain closures are Swift-6 Sendable-clean.
@@ -465,15 +507,21 @@ struct LocalAgentClient: Sendable {
         var value: Data { lock.lock(); defer { lock.unlock() }; return buf }
     }
 
-    /// Async wrapper — the blocking `Process` work runs off the cooperative pool.
+    /// Async wrapper — the blocking `Process` work runs off the cooperative pool. Cancelling the calling task
+    /// stops the child (SIGTERM, then SIGKILL) and returns a run marked `cancelled`.
     static func runAsync(binaryPath: String, args: [String], stdinText: String,
                          timeout: TimeInterval, currentDirectory: URL? = nil) async -> CLIRun {
-        await withCheckedContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async {
-                cont.resume(returning: runProcess(binaryPath: binaryPath, args: args,
-                                                  stdinText: stdinText, timeout: timeout,
-                                                  currentDirectory: currentDirectory))
+        let canceller = ProcessCanceller()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { cont in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    cont.resume(returning: runProcess(binaryPath: binaryPath, args: args,
+                                                      stdinText: stdinText, timeout: timeout,
+                                                      currentDirectory: currentDirectory, canceller: canceller))
+                }
             }
+        } onCancel: {
+            canceller.cancel()
         }
     }
 
@@ -481,9 +529,15 @@ struct LocalAgentClient: Sendable {
     /// concurrently (no pipe-buffer deadlock), and enforce a hard timeout (SIGTERM → SIGKILL).
     ///
     /// Kept behaviourally identical to `scripts/localagent-mechanism-test.swift`, the standalone $0
-    /// test that exercises this exact spawn/drain/timeout logic against the committed fake CLI.
+    /// test that exercises this exact spawn/drain/timeout logic against the committed fake CLI. The cancel hook
+    /// and the no-SIGPIPE stdin (W36.seg-opt-subscription) are not in that copy; `SegmentationPlanTestDriver`
+    /// tests them against the same fake CLI.
     static func runProcess(binaryPath: String, args: [String], stdinText: String,
-                           timeout: TimeInterval, currentDirectory: URL? = nil) -> CLIRun {
+                           timeout: TimeInterval, currentDirectory: URL? = nil,
+                           canceller: ProcessCanceller? = nil) -> CLIRun {
+        if canceller?.isCancelled == true {
+            return CLIRun(exitCode: -1, stdout: "", stderr: "", timedOut: false, spawnFailed: false, cancelled: true)
+        }
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: binaryPath)
         proc.arguments = args
@@ -506,6 +560,7 @@ struct LocalAgentClient: Sendable {
         } catch {
             return CLIRun(exitCode: -1, stdout: "", stderr: "", timedOut: false, spawnFailed: true)
         }
+        canceller?.attach(proc)
 
         // Concurrent drains: read each pipe to EOF on its own queue so a full buffer never blocks the child.
         let outSink = PipeSink(), errSink = PipeSink()
@@ -520,6 +575,9 @@ struct LocalAgentClient: Sendable {
 
         // Feed the prompt on stdin, then close so the CLI sees EOF and starts working.
         let inHandle = inPipe.fileHandleForWriting
+        // A child stopped by a cancel (or one that dies before reading) closes the pipe: the write must fail with
+        // EPIPE, which `try?` drops, rather than raise SIGPIPE, which would end the app.
+        _ = fcntl(inHandle.fileDescriptor, F_SETNOSIGPIPE, 1)
         if let data = stdinText.data(using: .utf8) { try? inHandle.write(contentsOf: data) }
         try? inHandle.close()
 
@@ -544,7 +602,8 @@ struct LocalAgentClient: Sendable {
                       stdout: String(decoding: outSink.value, as: UTF8.self),
                       stderr: String(decoding: errSink.value, as: UTF8.self),
                       timedOut: timedOut,
-                      spawnFailed: false)
+                      spawnFailed: false,
+                      cancelled: canceller?.isCancelled == true)
     }
 
     // MARK: - Prompt helper

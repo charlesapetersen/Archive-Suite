@@ -7,6 +7,7 @@ import SwiftUI
 struct SegmentationChooserView: View {
     @AppStorage(DefaultsKeys.segmentationApproach) private var approachRaw =
         SegmentationApproach.defaultApproach.rawValue
+    @AppStorage(DefaultsKeys.segmentationClaudeRoute) private var claudeRouteRaw = ClaudeRoute.apiKey.rawValue
 
     /// The pages the figures are scaled to.
     let pageCount: Int
@@ -46,6 +47,20 @@ struct SegmentationChooserView: View {
                 }
             }
             .accessibilityIdentifier("ap.segmentation.picker")
+
+            // With both an Anthropic key and `claude`, the user chooses how Claude's windows are paid for.
+            if routes.offersClaudeRouteChoice, SegmentationRow.planNotionalUSD(approach, options: options, pageCount: 1) != nil {
+                Picker("Pay for Claude", selection: $claudeRouteRaw) {
+                    Text("By API key").tag(ClaudeRoute.apiKey.rawValue)
+                    Text("By your Claude plan").tag(ClaudeRoute.plan.rawValue)
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .accessibilityIdentifier("ap.segmentation.claudeRoute")
+                .onChange(of: claudeRouteRaw) { _, raw in
+                    routes.claudeRoute = ClaudeRoute(rawValue: raw) ?? .apiKey
+                }
+            }
 
             if let row = rows.first(where: { $0.approach == approach }) {
                 SegmentationRowCard(row: row, scaleCaption: scaleCaption) {
