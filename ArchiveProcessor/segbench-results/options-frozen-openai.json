@@ -1,0 +1,55 @@
+{
+ "decided": "2026-10-12",
+ "bar": 0.98,
+ "on": [
+  "Dean",
+  "Deaver",
+  "Herrnstein"
+ ],
+ "item": "W36.seg-opt-openai",
+ "codex": {
+  "model": "gpt-6.1-sol",
+  "reasoning": "low",
+  "prompt": "c1"
+ },
+ "approaches": {
+  "openai": {
+   "voters": [
+    "O"
+   ],
+   "rule": "min",
+   "level": 0.99
+  },
+  "mix": {
+   "voters": [
+    "C",
+    "O"
+   ],
+   "rule": "min",
+   "level": 0.85
+  }
+ },
+ "mix_changed": true,
+ "dev_held_out": {
+  "openai": {
+   "pages": 551,
+   "gaps": 494,
+   "flagged": 436,
+   "pages_exact_no_review": 0.9131274131274131,
+   "flagged_per_100_pages": 79.12885662431943,
+   "pages_exact_after_review": 1.0,
+   "unflagged_errors": 0,
+   "unflagged_errors_per_500_pages": 0.0
+  },
+  "mix": {
+   "pages": 551,
+   "gaps": 494,
+   "flagged": 32,
+   "pages_exact_no_review": 0.9111969111969112,
+   "flagged_per_100_pages": 5.807622504537205,
+   "pages_exact_after_review": 0.9903474903474904,
+   "unflagged_errors": 2,
+   "unflagged_errors_per_500_pages": 1.8148820326678765
+  }
+ }
+}
