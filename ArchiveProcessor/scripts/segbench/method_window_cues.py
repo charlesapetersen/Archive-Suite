@@ -112,6 +112,12 @@ def call_codex(prompt, wd: Path, files: list[Path]) -> dict:
                        timeout=W.CALL_TIMEOUT_S)
     msg = (r.stdout + r.stderr)[-600:]
     if r.returncode != 0 or not out.exists():
+        # The whole output, not the tail: enterprise-managed config warnings follow Codex's ERROR line and push
+        # it out of the last 600 chars. A full five-hour window answers "Your workspace is out of credits"
+        # (W36.seg-opt-openai, 2026-10-12 00:51, at 99%), which was retried as an error three times a window.
+        if m := re.search(r"^ERROR: .*(usage limit|rate limit|429|out of credits).*$", r.stdout + r.stderr,
+                          re.I | re.M):
+            raise W.UsageLimit(m.group(0))
         if any(s in msg.lower() for s in ("usage limit", "rate limit", "429")):
             raise W.UsageLimit(msg)
         raise RuntimeError(f"codex exit {r.returncode}: {msg}")
