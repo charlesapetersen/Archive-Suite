@@ -235,6 +235,12 @@ struct SegmentationOptions: Decodable, Sendable {
                     if !WindowVoter.catalog.contains(where: { $0.modelID == model }) {
                         out.append("\(a.id): cost \(key) is for \(model), which no voter runs")
                     }
+                    // A Claude model can always go by the plan (`WindowStageTransport.make`), so the chooser has to
+                    // be able to price it that way (W36.seg-opt-subscription).
+                    if WindowVoter.catalog.first(where: { $0.modelID == model })?.provider == .anthropic,
+                       a.tokensPer1000Pages?[key]?.subscriptionRouteNotionalUSDPer1000Pages == nil {
+                        out.append("\(a.id): Claude model \(model) has no subscription_route_notional_usd_per_1000_pages")
+                    }
                 }
             } else {
                 out.append("\(a.id): no cost")

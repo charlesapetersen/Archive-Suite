@@ -127,16 +127,27 @@ enum PlanCalibration {
     static func measure(_ records: [PlanCallRecord], now: Date = Date()) -> PlanMeasurement {
         let read = records.indices.filter { records[$0].meter?.fiveHour != nil }
         let pages = records.reduce(0) { $0 + $1.pages }
-        guard let first = read.first, let last = read.last else {
+        guard let first = read.first else {
             return records.count >= 3 ? .unreadable : .notYet
         }
-        func five(_ i: Int) -> Int { points(records[i].meter!.fiveHour!) }
+        func raw(_ i: Int) -> Int { points(records[i].meter!.fiveHour!) }
         func usd(_ a: Int, _ b: Int) -> Double { records[a..<b].reduce(0) { $0 + $1.notionalUSD } }
 
-        // Rule 7: a meter that went backwards is a window reset.
-        for (a, b) in zip(read, read.dropFirst()) where five(b) < five(a) {
-            return .discarded("the five-hour window reset during the measurement")
+        // Rule 7: a window reset. Records are in the order calls FINISHED, but each carries the meter as it stood
+        // while that call ran, so with calls in flight together a reading one point below the one before is
+        // ordinary. A reset is a new reset time, or a drop of 2 points or more below the highest reading so far.
+        var peak: [Int: Int] = [:]   // the running maximum, per reading
+        var high = raw(first)
+        for i in read {
+            if raw(i) <= high - 2 || resetMoved(records[first].meter?.fiveHourResetsAt, records[i].meter?.fiveHourResetsAt) {
+                return .discarded("the five-hour window reset during the measurement")
+            }
+            high = max(high, raw(i))
+            peak[i] = high
         }
+        func five(_ i: Int) -> Int { peak[i]! }
+        // The stretch ends at the first reading of the highest level, so its dollars are the calls before it.
+        let last = read.first { peak[$0] == high }!
         let moved = five(last) - five(first)
         let dollars = usd(first, last)
         guard moved >= crossPoints, dollars > 0 else {
@@ -157,13 +168,28 @@ enum PlanCalibration {
                 return .discarded("the meter moved faster than these calls explain (other use of the account)")
             }
         }
+        // The weekly meter over the same stretch, read the same way.
         var weekly = 0
-        if let w0 = records[first].meter?.sevenDay, let w1 = records[last].meter?.sevenDay {
-            weekly = points(w1) - points(w0)
-            if weekly < 0 { return .discarded("the weekly window reset during the measurement") }
+        if let w0 = records[first].meter?.sevenDay {
+            var weekHigh = points(w0)
+            for i in read where i <= last {
+                guard let w = records[i].meter?.sevenDay else { continue }
+                if points(w) <= weekHigh - 2
+                    || resetMoved(records[first].meter?.sevenDayResetsAt, records[i].meter?.sevenDayResetsAt) {
+                    return .discarded("the weekly window reset during the measurement")
+                }
+                weekHigh = max(weekHigh, points(w))
+            }
+            weekly = weekHigh - points(w0)
         }
         return .measured(PlanRunSample(fiveHourPointsPerUSD: ratio, sevenDayPoints: weekly, notionalUSD: dollars,
                                        pages: pages, measured: now))
+    }
+
+    /// A window's reset time moved on (by more than five minutes, which absorbs any rounding in the CLI's figure).
+    static func resetMoved(_ a: Date?, _ b: Date?) -> Bool {
+        guard let a, let b else { return false }
+        return abs(b.timeIntervalSince(a)) > 300
     }
 }
 
@@ -276,16 +302,29 @@ actor PlanRunGate {
     private var asking: Task<Bool, Never>?
     private var stopped: WindowTransportError?
 
-    init(pagesPerCall: Int, folderNotionalUSD: Double, calibrated: Bool,
+    /// The voter whose answered windows count the pages measured: with two Claude voters each window is sent twice,
+    /// and counting both would reach usage.md's 100 pages at 50. nil counts every call.
+    private let pageVoter: String?
+
+    init(pagesPerCall: Int, folderNotionalUSD: Double, calibrated: Bool, pageVoter: String? = nil,
          ask: @escaping @Sendable (PlanCheckPrompt) async -> Bool) {
         self.pagesPerCall = pagesPerCall
+        self.pageVoter = pageVoter
         self.folderNotionalUSD = folderNotionalUSD
         self.calibrated = calibrated
         self.ask = ask
     }
 
-    func record(meter: PlanMeterReading?, notionalUSD: Double, answered: Bool) {
-        records.append(PlanCallRecord(meter: meter, notionalUSD: notionalUSD, pages: answered ? pagesPerCall : 0))
+    func record(meter: PlanMeterReading?, notionalUSD: Double, answered: Bool, voter: String? = nil) {
+        let counts = answered && (pageVoter == nil || voter == pageVoter)
+        records.append(PlanCallRecord(meter: meter, notionalUSD: notionalUSD, pages: counts ? pagesPerCall : 0))
+    }
+
+    /// Waits for `task` (the question), cancelling it if the calling window is cancelled, so a run stopped while
+    /// the question is on its way never leaves the user a dialog for a run that is gone.
+    private func wait(_ task: Task<Bool, Never>) async throws {
+        _ = await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+        try Task.checkCancellation()
     }
 
     /// Before each call: throws `WindowTransportError.paused` when the run should stop here.
@@ -293,11 +332,12 @@ actor PlanRunGate {
         if let stopped { throw stopped }
         // While the user is being asked, no further window is sent.
         if let asking {
-            _ = await asking.value
+            try await wait(asking)
             if let stopped { throw stopped }
         }
-        if let m = records.last(where: { $0.meter?.fiveHour != nil })?.meter, let f = m.fiveHour,
-           PlanCalibration.points(f) >= PlanCalibration.pausePercent {
+        // The highest reading, not the latest: calls finish out of order, so the latest can be an older figure.
+        if let m = records.compactMap(\.meter).filter({ $0.fiveHour != nil }).max(by: { $0.fiveHour! < $1.fiveHour! }),
+           let f = m.fiveHour, PlanCalibration.points(f) >= PlanCalibration.pausePercent {
             let e = WindowTransportError.paused(
                 reset: m.fiveHourResetsAt,
                 message: "Your Claude plan's five-hour window is at \(PlanCalibration.points(f))%, so segmentation "
@@ -329,14 +369,14 @@ actor PlanRunGate {
         let ask = self.ask
         let task = Task { () -> Bool in
             let goOn = await ask(PlanCheckPrompt(message: message))
-            if !goOn {
+            if !goOn && !Task.isCancelled {
                 self.stopAfterCheck()
             }
             return goOn
         }
         asking = task
-        _ = await task.value
-        asking = nil
+        defer { asking = nil }
+        try await wait(task)
         if let stopped { throw stopped }
     }
 

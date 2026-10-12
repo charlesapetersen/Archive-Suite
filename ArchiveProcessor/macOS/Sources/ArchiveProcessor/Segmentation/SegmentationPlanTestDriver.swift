@@ -159,6 +159,19 @@ enum SegmentationPlanTestDriver {
             check("2 even steps are kept", s.fiveHourPointsPerUSD > 1 && s.fiveHourPointsPerUSD < 1.3,
                   "\(s.fiveHourPointsPerUSD)")
         } else { check("2 even steps are kept", false, "\(PlanCalibration.measure(dean))") }
+        // Calls finish out of order: a reading one point below the one before is not a reset.
+        let unordered = [record(0.30), record(0.31), record(0.30), record(0.32), record(0.33)]
+        if case .measured(let s) = PlanCalibration.measure(unordered) {
+            check("2 out-of-order readings are kept, measured to the first top reading",
+                  abs(s.fiveHourPointsPerUSD - 3 / 1.0) < 1e-9, "\(s.fiveHourPointsPerUSD)")
+        } else { check("2 out-of-order readings are kept", false, "\(PlanCalibration.measure(unordered))") }
+        let moved = [PlanCallRecord(meter: PlanMeterReading(fiveHour: 0.30, fiveHourResetsAt: day), notionalUSD: 0.25, pages: 3),
+                     PlanCallRecord(meter: PlanMeterReading(fiveHour: 0.31, fiveHourResetsAt: day), notionalUSD: 0.25, pages: 3),
+                     PlanCallRecord(meter: PlanMeterReading(fiveHour: 0.33, fiveHourResetsAt: day + 18_000),
+                                    notionalUSD: 0.25, pages: 3)]
+        if case .discarded = PlanCalibration.measure(moved) {
+            check("2 a new reset time is a reset", true)
+        } else { check("2 a new reset time is a reset", false, "\(PlanCalibration.measure(moved))") }
         let weekly = [record(0.10, 0.50), record(0.12, 0.53), record(0.14, 0.56), record(0.16, 0.59)]
         if case .measured(let s) = PlanCalibration.measure(weekly) {
             check("2 weekly read at 3 points or more", s.sevenDayPointsPerUSD.map { abs($0 - 12) < 1e-9 } == true,
@@ -278,6 +291,41 @@ enum SegmentationPlanTestDriver {
         }
         try? await calibrated.beforeCall()
         eq("5 a stored ratio: no question", await asked.prompts.count, 1)
+
+        // The pause reads the highest figure, not the last call to finish.
+        let unordered = PlanRunGate(pagesPerCall: 3, folderNotionalUSD: 10, calibrated: true) { _ in true }
+        await unordered.record(meter: PlanMeterReading(fiveHour: 0.90), notionalUSD: 0.25, answered: true)
+        await unordered.record(meter: PlanMeterReading(fiveHour: 0.89), notionalUSD: 0.25, answered: true)
+        check("5 90% read from the highest figure", (try? await unordered.beforeCall()) == nil)
+
+        // Two Claude voters: only one voter's windows count the pages.
+        let twoVoters = PlanRunGate(pagesPerCall: 3, folderNotionalUSD: 10, calibrated: true, pageVoter: "a") { _ in true }
+        await twoVoters.record(meter: nil, notionalUSD: 0.25, answered: true, voter: "a")
+        await twoVoters.record(meter: nil, notionalUSD: 0.25, answered: true, voter: "b")
+        eq("5 pages counted once per window", await twoVoters.records.map(\.pages), [3, 0])
+
+        // A window cancelled while the question is on its way cancels the question.
+        let cancelledAsk = Asked()
+        let slow = PlanRunGate(pagesPerCall: 3, folderNotionalUSD: 10, calibrated: false) { p in
+            do { try await Task.sleep(for: .seconds(60)); return true } catch { await cancelledAsk.add(p); return false }
+        }
+        for f in [0.27, 0.28, 0.29, 0.30] {
+            await slow.record(meter: PlanMeterReading(fiveHour: f), notionalUSD: 0.25, answered: true)
+        }
+        let waiting = Task { try await slow.beforeCall() }
+        try? await Task.sleep(for: .milliseconds(300))
+        let t0 = Date()
+        waiting.cancel()
+        let waited = await waiting.result
+        check("5 a cancelled window stops waiting for the answer",
+              { if case .failure(let e) = waited { return e is CancellationError }; return false }()
+              && Date().timeIntervalSince(t0) < 3, "\(waited)")
+        var questionCancelled = false
+        for _ in 0..<30 where !questionCancelled {
+            questionCancelled = await cancelledAsk.prompts.count == 1
+            if !questionCancelled { try? await Task.sleep(for: .milliseconds(100)) }
+        }
+        check("5 and the question is cancelled with it", questionCancelled)
 
         await calibrated.record(meter: PlanMeterReading(fiveHour: 0.9, fiveHourResetsAt: day), notionalUSD: 0.25,
                                 answered: true)
@@ -452,6 +500,14 @@ enum SegmentationPlanTestDriver {
         let never = LocalAgentClient.runProcess(binaryPath: fake, args: [], stdinText: "", timeout: 5,
                                                 canceller: canceller)
         check("6 a call cancelled first never spawns", never.cancelled && pids(in: pidDir).isEmpty)
+
+        // The plan route does not pass on an API key from the shell that launched the app.
+        setenv("ANTHROPIC_API_KEY", "sk-test-not-a-key", 1)
+        let env = LocalAgentClient.runProcess(binaryPath: "/usr/bin/env", args: [], stdinText: "", timeout: 10,
+                                              unsetEnvironment: LocalAgentWindowTransport.apiCredentialVariables)
+        unsetenv("ANTHROPIC_API_KEY")
+        check("6 no API key reaches claude on the plan route",
+              !env.stdout.contains("ANTHROPIC_API_KEY") && env.stdout.contains("PATH="), String(env.stdout.prefix(200)))
 
         // A child that exits without reading 2 MB of stdin: the write fails, the app lives on.
         let big = String(repeating: "x", count: 2_000_000)

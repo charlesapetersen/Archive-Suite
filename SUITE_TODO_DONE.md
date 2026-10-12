@@ -10619,3 +10619,25 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   off-screen (screenshot checked). Headless Process Files driver (2 images, Gemini Flash-Lite, under a cent) green;
   engine and chooser tests still ALL PASS.
   <!-- /W36.seg-opt-review -->
+- [x] **W36.seg-opt-subscription — the subscription route, only if possible and permitted [M · ~1-2 sessions]** · §Archive Processor — automatic segmentation (lane: processor) (uses: build) (blocked-on: W36.seg-opt-usage, W36.seg-opt-engine). SHIPPED 2026-10-11, in one session (9a083e4b, da49f2d8, and the completing commit).
+  `Segmentation/PlanUsage.swift`: Claude's windows through the user's own `claude` run with `--output-format
+  stream-json --verbose`; the `rate_limit_event` meter and each call's `total_cost_usd` feed `PlanCalibration`
+  (points per notional dollar, usage.md steps 1-7) and `PlanCalibrationStore` (median of the last five runs, unkeyed,
+  `DefaultsKeys.segmentationPlanCalibration`). `PlanRunGate` pauses at a 90% five-hour meter, giving the reset time,
+  and on an account with no stored ratio asks once, at 3 points or 100 pages, whether to go on; both stop the run
+  resumably, as a usage limit does. The chooser shows the notional line until a run is measured, then "about X% of a
+  five-hour window, about Y% of your week; measured on your account, <date>". "Pay for Claude" (API key or plan) is
+  offered only when both exist, and defaults to the key; the run's transport follows it. The plan route strips
+  `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN` from the child; the app never reads the CLI's login. Cancelling now stops
+  the `claude` children (`ProcessCanceller`); stdin cannot raise SIGPIPE.
+  **Found on the way:** `LocalAgentClient.runProcess`'s `waitUntilExit()` on a GCD thread missed an exit 12 times in
+  300 calls (three at once; standalone harness), so a finished call waited out its timeout. That also hit OCR.
+  Exit is now signalled by `terminationHandler`: 0 in 300.
+  Proof: `scripts/test-segmentation-plan.sh` ($0, 78 checks, ~5 s, 5 of 5 runs green), using the fake CLI's new
+  `stream`/`streamnometer` modes and its pid-recording `timeout`; engine, chooser, review and localagent tests ALL PASS.
+  Adversarial review (opus) found no HIGH defects. Its 2 MED findings are fixed: out-of-order meter readings were
+  read as a reset, and a stale question could appear after Stop. So are its 4 LOW findings: an inherited API key,
+  `problems()` now requires a Claude model's plan figure, pages are counted once with two Claude voters, and the pause
+  now reads the highest meter reading. Left open in `ArchiveProcessor/KNOWN_ISSUES.md`: the OCR Local CLI Agent
+  still inherits the key.
+  <!-- /W36.seg-opt-subscription -->

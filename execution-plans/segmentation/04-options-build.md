@@ -147,6 +147,11 @@ per approach**, with the method and threshold fixed on the development boxes fir
   conditions and the calibration spec in `segbench-results/usage.md`. It switches `LocalAgentClient` to
   `--output-format stream-json` so each call carries the meter (`rate_limit_event`). The app never reads the
   Keychain login.
+  ✅ Shipped 2026-10-11: `Segmentation/PlanUsage.swift`, `scripts/test-segmentation-plan.sh`. The route choice is a
+  "Pay for Claude" control under the approach, shown only with both a key and `claude`; it defaults to the key. The
+  first-run question comes at 3 points or 100 pages, and a decline stops the run resumably, as a usage limit does;
+  90% pauses the same way, with the reset time. The ratio is stored unkeyed (§4), as the median of the last five runs.
+  Cancelling a run now stops its `claude` children.
 - **`W36.seg-opt-siwc`** — ChatGPT by Sign in with ChatGPT [M · ~1-2 sessions] (uses: build) (blocked-on:
   W36.seg-opt-openai, W36.seg-opt-engine). OpenAI's sanctioned route for open-source, locally run apps, never the
   user's `codex` login. The app shows "Using ChatGPT plan" and a "Manage usage" link. With no app-readable meter,

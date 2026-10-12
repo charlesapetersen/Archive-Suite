@@ -15,6 +15,19 @@ The scratch proof exercises graceful exit, ignored TERM, an exited child and for
 plus PID/parent, spaced/empty arguments and signal-mask preservation across the actual launcher.
 Runtime evidence and the final unattended rerun are under `verification/evidence/capture/`.
 
+## ⚠️ LIMITATION (W36.seg-opt-subscription, 2026-10-11): the Claude plan route, as built
+
+- **The OCR Local CLI Agent still passes on an inherited `ANTHROPIC_API_KEY`.** The segmentation windows' plan
+  route strips `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` from the `claude` child
+  (`LocalAgentWindowTransport.apiCredentialVariables`), so a shell-launched app cannot bill an API key the user did
+  not choose. The OCR path (`LocalAgentClient.ocr/textCompletion/probe`) was left as it was: it is outside this item,
+  and stripping there would change what a user who signs `claude` in by key gets. If a shell exports the key, OCR
+  through the Local CLI Agent bills it, while its cost pane says the subscription covers it.
+- **The meter is account-wide and whole-percent.** Other use of the account during a run inflates the measured
+  share; rule 7 discards a run only when a step jumps by more than the calls explain, or when a window resets.
+- **The ratio is stored unkeyed.** A change of plan shows as a ratio that moves; the median of the last five runs
+  follows it after about three runs.
+
 ## ⚠️ LIMITATION (W36.seg-opt-review, 2026-10-11): where the window segmenter's run state is and is not kept
 
 - **A paid batch resumed after a relaunch segments as Manual does.** `PendingBatch` records no approach, so rather

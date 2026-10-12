@@ -128,7 +128,8 @@ extension OCRProcessor {
                                                        pageCount: pages.urls.count) ?? 0
         let gate = PlanRunGate(
             pagesPerCall: spec.windowStride, folderNotionalUSD: notional,
-            calibrated: calibration.fiveHourPointsPerUSD != nil) { [weak self] prompt in
+            calibrated: calibration.fiveHourPointsPerUSD != nil,
+            pageVoter: spec.voters.first { $0.provider == .anthropic }?.name) { [weak self] prompt in
                 await self?.askPlanCheck(prompt) ?? false
             }
         let transport: any WindowTransport
@@ -259,10 +260,16 @@ extension OCRProcessor {
     /// The plan route's first measurement on this account (usage.md step 3): show the folder's share and ask
     /// whether to go on. False when the run is cancelled meanwhile.
     func askPlanCheck(_ prompt: PlanCheckPrompt) async -> Bool {
+        // The gate cancels this call when the window waiting on it is cancelled (the run stopped), so a dialog
+        // already up is taken down, and one not yet shown never is.
         guard !Task.isCancelled else { return false }
         planCheckContinuation?.resume(returning: false)
         planCheckPrompt = prompt
-        let goOn = await withCheckedContinuation { planCheckContinuation = $0 }
+        let goOn = await withTaskCancellationHandler {
+            await withCheckedContinuation { planCheckContinuation = $0 }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.answerPlanCheck(goOn: false) }
+        }
         planCheckPrompt = nil
         return goOn
     }

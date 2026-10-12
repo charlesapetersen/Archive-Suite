@@ -181,6 +181,10 @@ struct LocalAgentWindowTransport: WindowTransport {
     /// The run's meter and its two pauses (`PlanRunGate`); nil sends without them.
     var gate: PlanRunGate? = nil
 
+    /// Inherited from a shell that launched the app, these would make `claude -p` bill an API key, not the plan the
+    /// user chose this route for (and the meter would then read as unreadable).
+    static let apiCredentialVariables = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
+
     static func arguments(model: String) -> [String] {
         ["-p", "--model", model, "--output-format", "stream-json", "--verbose", "--allowedTools", "Read",
          "--permission-mode", "default", "--no-session-persistence"]
@@ -196,14 +200,16 @@ struct LocalAgentWindowTransport: WindowTransport {
             try img.write(to: dir.appendingPathComponent(WindowPromptRenderer.fileName(n)))
         }
         let run = await LocalAgentClient.runAsync(binaryPath: binaryPath, args: Self.arguments(model: r.voter.modelID),
-                                                  stdinText: r.prompt, timeout: timeout, currentDirectory: dir)
+                                                  stdinText: r.prompt, timeout: timeout, currentDirectory: dir,
+                                                  unsetEnvironment: Self.apiCredentialVariables)
         if run.cancelled { throw CancellationError() }
         let stream = ClaudeStreamOutput.parse(run.stdout)
         let result = Result { try Self.classify(run, stream: stream, now: Date()) }
         if let gate {
             // A call counts toward the pages measured only if its answer parses; a retry covers the same pages.
             let answered = (try? result.get()).flatMap { try? WindowAnswerParser.parse($0, pageNumbers: r.pageNumbers) } != nil
-            await gate.record(meter: stream.meter, notionalUSD: stream.notionalUSD ?? 0, answered: answered)
+            await gate.record(meter: stream.meter, notionalUSD: stream.notionalUSD ?? 0, answered: answered,
+                              voter: r.voter.name)
         }
         return try result.get()
     }

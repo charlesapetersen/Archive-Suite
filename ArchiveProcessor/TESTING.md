@@ -387,6 +387,10 @@ existing scratch, key-free, no-network execution remains unchanged.
   them at several page counts and routes (key, `claude` plan, mix), price-change and stale-price notes, unavailable
   rows and the keys they offer, and a render guard that each row card draws non-blank pixels offscreen. No Keychain
   read, no window.
+- **`test-segmentation-plan.sh`** — the W36 Claude plan route: the `stream-json` meter, the calibration rules and
+  their store, the chooser's plan line and the API-key-or-plan route, and against the fake CLI the first-run
+  question, a decline, the 90% pause, no meter, and that cancelling a run stops every `claude` child. No model
+  call, no real plan use; the calibration goes to a scratch defaults suite.
 
 Counts drift as checks are added — treat the numbers above as a floor, not a contract, and read a script's
 header comment for what it actually covers. Related non-`test-*` drivers in the same directory:

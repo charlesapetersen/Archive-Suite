@@ -510,14 +510,16 @@ struct LocalAgentClient: Sendable {
     /// Async wrapper — the blocking `Process` work runs off the cooperative pool. Cancelling the calling task
     /// stops the child (SIGTERM, then SIGKILL) and returns a run marked `cancelled`.
     static func runAsync(binaryPath: String, args: [String], stdinText: String,
-                         timeout: TimeInterval, currentDirectory: URL? = nil) async -> CLIRun {
+                         timeout: TimeInterval, currentDirectory: URL? = nil,
+                         unsetEnvironment: [String] = []) async -> CLIRun {
         let canceller = ProcessCanceller()
         return await withTaskCancellationHandler {
             await withCheckedContinuation { cont in
                 DispatchQueue.global(qos: .userInitiated).async {
                     cont.resume(returning: runProcess(binaryPath: binaryPath, args: args,
                                                       stdinText: stdinText, timeout: timeout,
-                                                      currentDirectory: currentDirectory, canceller: canceller))
+                                                      currentDirectory: currentDirectory, canceller: canceller,
+                                                      unsetEnvironment: unsetEnvironment))
                 }
             }
         } onCancel: {
@@ -534,7 +536,7 @@ struct LocalAgentClient: Sendable {
     /// that copy; `SegmentationPlanTestDriver` tests them against the same fake CLI.
     static func runProcess(binaryPath: String, args: [String], stdinText: String,
                            timeout: TimeInterval, currentDirectory: URL? = nil,
-                           canceller: ProcessCanceller? = nil) -> CLIRun {
+                           canceller: ProcessCanceller? = nil, unsetEnvironment: [String] = []) -> CLIRun {
         if canceller?.isCancelled == true {
             return CLIRun(exitCode: -1, stdout: "", stderr: "", timedOut: false, spawnFailed: false, cancelled: true)
         }
@@ -548,6 +550,7 @@ struct LocalAgentClient: Sendable {
         // from inside a Claude Code session can still spawn `claude` (prod is unaffected — unset).
         var env = ProcessInfo.processInfo.environment
         env.removeValue(forKey: "CLAUDECODE")
+        for key in unsetEnvironment { env.removeValue(forKey: key) }
         proc.environment = env
 
         let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()
