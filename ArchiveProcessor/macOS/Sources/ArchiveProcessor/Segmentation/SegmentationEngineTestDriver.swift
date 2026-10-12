@@ -112,14 +112,14 @@ enum SegmentationEngineTestDriver {
                   gemini?.voters.first?.modelID == "gemini-3.8-flash" && gemini?.voters.first?.thinkingLevel == "low"
                   && gemini?.voters.first?.prompt == .g1 && gemini?.level == 0.965)
             let mix = try? options.spec(for: .mix)
-            check("mix: Claude then Gemini, rule read from the file",
-                  mix?.voters.map(\.provider) == [.anthropic, .gemini]
+            check("mix: Claude then ChatGPT, rule read from the file",
+                  mix?.voters.map(\.provider) == [.anthropic, .openai]
                   && mix?.rule.rawValue == options.approach(.mix)?.rule)
-            check("openai is unavailable with the file's reason", {
-                if case .unavailable(let id, let why)? = (Result { try options.spec(for: .openai) }).failureError,
-                   id == "openai", !why.isEmpty { return true }
-                return false
-            }())
+            let openai = try? options.spec(for: .openai)
+            check("openai: gpt-6.1-sol at thinking low, prompt c1, level 0.99",
+                  openai?.voters.map(\.name) == ["window-openai"] && openai?.voters.first?.modelID == "gpt-6.1-sol"
+                  && openai?.voters.first?.thinkingLevel == "low" && openai?.voters.first?.prompt == .c1
+                  && openai?.level == 0.99)
             check("manual proposes nothing", (Result { try options.spec(for: .manual) }).failureError == .manual)
         }
         check("a prompt id that differs from the app's is refused",
@@ -188,7 +188,7 @@ enum SegmentationEngineTestDriver {
         check("parser refuses a bad decision", refuses(good.replacingOccurrences(of: "\"new\"", with: "\"split\"")))
 
         // 5. Reproduce the bench on the recorded box.
-        let codes = ["C": "window-claude", "G": "window-gemini-3.8-flash-low"]
+        let codes = ["C": "window-claude", "G": "window-gemini-3.8-flash-low", "O": "window-openai"]
         var replies: [String: String] = [:]
         for (code, ws) in fx.windows {
             for w in ws { replies[FakeTransport.key(codes[code]!, w.start, w.end)] = w.reply }
@@ -462,10 +462,21 @@ enum SegmentationEngineTestDriver {
             check("a Gemini run through the HTTP seam flags the bench's \(expected.filter(\.flagged).count) gaps",
                   flagged == expected.filter(\.flagged).map(\.gap) && r?.failed.isEmpty == true)
         }
+        // The mix's ChatGPT voter through the same seam, as chat completions.
+        let openaiHTTP: APIWindowTransport.HTTP = { request in
+            let b = (request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let parts = ((b["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
+            let nums = parts.compactMap { ($0["text"] as? String).flatMap { t in
+                t.hasPrefix("Page ") && t.hasSuffix(":") ? Int(t.dropFirst(5).dropLast()) : nil } }
+            let text = replies[FakeTransport.key("window-openai", (nums.first ?? 1) - 1, nums.last ?? 0)] ?? ""
+            let obj: [String: Any] = ["choices": [["message": ["content": text]]]]
+            return (try JSONSerialization.data(withJSONObject: obj),
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
         if let spec = try? options.spec(for: .mix), let expected = fx.expected["mix"] {
             let routed = RoutingWindowTransport(routes: [
                 .anthropic: FakeTransport(replies: replies),
-                .gemini: APIWindowTransport(keys: [.gemini: "K"], http: geminiHTTP)])
+                .openai: APIWindowTransport(keys: [.openai: "K"], http: openaiHTTP)])
             let r = try? await WindowSegmenter.instant(routed).segment(pages: pages, photoKinds: photo, approach: spec)
             check("the mix routes each voter to its own transport",
                   r?.proposals.filter { !$0.fixed && $0.flagged }.map(\.gap) == expected.filter(\.flagged).map(\.gap))

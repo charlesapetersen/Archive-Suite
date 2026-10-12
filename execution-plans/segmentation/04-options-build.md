@@ -105,7 +105,9 @@ per approach**, with the method and threshold fixed on the development boxes fir
   and the owner is asked before the total passes $3 (the standing rule in `~/Claude/CLAUDE.md`). It spent $2.73,
   all on Gemini. The Claude and OpenAI calls run on the subscriptions and cost no money.
   ✅ Shipped 2026-10-11: `ArchiveProcessor/segbench-results/options.md` and `options.json` (manual, Claude, Gemini,
-  Claude + Gemini; ChatGPT not measured, split to `W36.seg-opt-openai`). $2.73 spent.
+  Claude + Gemini; ChatGPT not measured, split to `W36.seg-opt-openai`). $2.73 spent. ChatGPT measured 2026-10-12 by
+  `W36.seg-opt-openai` through Codex ($0): alone at <= 0.990, 92% exact with no checking but 79 checks per 100 pages;
+  the re-ranked mix became **Claude + ChatGPT**, min, <= 0.850 (92% / 10.2 checks / 3 unflagged on the test boxes).
 - **`W36.seg-opt-usage`** — can the subscription route work, and how is its cost shown [S-M · ~1 session] (uses:
   light). Answer the two open questions in Part 1 (technically possible, permitted by the terms), with the
   sources cited. If yes, specify the sample-and-meter calibration, the fallback by plan tier and how each is
@@ -175,9 +177,9 @@ Code names were read from the Processor on 2026-10-11 and cited as of that date.
 ### In short (for the owner)
 
 - **A new setting, "Segmentation", sits beside the tagging mode.** It appears in Settings and in the Process Files
-  window, and its choices are Manual, Claude, Gemini, ChatGPT and Claude + Gemini. Each choice shows its five
+  window, and its choices are Manual, Claude, Gemini, ChatGPT and a mix (Claude + ChatGPT since `W36.seg-opt-openai`). Each choice shows its five
   figures scaled to the files you dropped. Each also shows its cost: dollars when paid by API key, and a share of
-  your windows when paid by your Claude plan. ChatGPT is listed but greyed out until it has been measured.
+  your windows when paid by your Claude plan. ChatGPT runs by OpenAI API key until `W36.seg-opt-siwc` adds the plan route.
 - **Choosing it does not run anything without review.** After OCR, the doubtful boundaries are shown one at a
   time, page n beside page n+1, and you choose keep, split or join. After that, the existing review sheet
   shows every document for a skim.
@@ -313,7 +315,7 @@ Two honesty rules hold for the display:
 
 **An approach that cannot run** is shown greyed out, with the reason:
 
-- `available: false`. ChatGPT shows the file's `reason` until `W36.seg-opt-openai` fills its row.
+- `available: false`: the file's `reason`. (ChatGPT did until `W36.seg-opt-openai` filled its row on 2026-10-12.)
 - No key and no signed-in `claude` for the approach's provider. The row offers the key wizard
   (`ProviderKeyWizard`), or says how to sign in to `claude`.
 
@@ -342,7 +344,7 @@ An approach that uses Claude names its route in the row. The user chooses the ro
     CLI does not report one, so a change of plan shows up as a ratio that moves and is caught by rule 7.
 - **ChatGPT plan** (`W36.seg-opt-siwc`): the token figure, the notional API price labelled approximate, "Using
   ChatGPT plan", and the "Manage usage" link.
-- **Claude + Gemini** shows both: the Claude share or dollars, plus Gemini's dollars.
+- **The mix** (Claude + ChatGPT since `W36.seg-opt-openai`) shows both: the Claude share or dollars, plus ChatGPT's dollars.
 
 ### 5. The review of flagged boundaries (`W36.seg-opt-review`)
 

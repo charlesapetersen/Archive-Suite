@@ -12,7 +12,7 @@ import SwiftUI
 ///      pages> test pages", and the footnote built from the file.
 ///   3. The cost is §4's: dollars by API key at list price; a scheduled price change announced through its day
 ///      and applied from the next; "prices as of" past 90 days; the Claude plan's notional line
-///      when only `claude` can run it; a mix adding its Claude and Gemini parts by route.
+///      when only `claude` can run it; a mix adding its Claude and ChatGPT parts by route.
 ///   4. An approach that cannot run says why: the file's reason when unmeasured, the missing key or `claude`
 ///      otherwise, with the keys the wizard should offer. Manual always runs, at no cost.
 ///   5. Render guard: each row card draws non-blank pixels offscreen.
@@ -86,10 +86,10 @@ enum SegmentationChooserTestDriver {
         eq("2 gemini zero is not a promise", gemini.unshownErrors, "none in 363 test pages")
 
         let mix = row(.mix, 1000)
-        eq("2 mix no checking", mix.rightWithNoChecking, "about 89% of pages")
-        eq("2 mix to check", mix.toCheck, "about 107 boundaries to check")
-        eq("2 mix after checking", mix.rightAfterChecking, "about 98% of pages")
-        eq("2 mix unshown", mix.unshownErrors, "about 1 in 180 pages")
+        eq("2 mix no checking", mix.rightWithNoChecking, "about 92% of pages")
+        eq("2 mix to check", mix.toCheck, "about 102 boundaries to check")
+        eq("2 mix after checking", mix.rightAfterChecking, "about 97% of pages")
+        eq("2 mix unshown", mix.unshownErrors, "about 1 in 120 pages")
 
         let manual = row(.manual, 1000, .none)
         eq("2 manual proposes nothing", manual.rightWithNoChecking, nil)
@@ -123,8 +123,8 @@ enum SegmentationChooserTestDriver {
            ["Claude prices as of 11 Oct 2026"])
         eq("3 claude not stale at 90 days", row(.claude, 1000, on: day("2027-01-09")).priceNotes, [])
         eq("3 claude fresh price has no note", claude.priceNotes, [])
-        eq("3 mix by keys", mix.costLines, ["about $20.54 by API key at list price"])
-        eq("3 mix notes Gemini's intro price", mix.priceNotes, ["Gemini: introductory price until 31 Dec 2026"])
+        eq("3 mix by keys", mix.costLines, ["about $31.44 by API key at list price"])
+        eq("3 mix: both prices fresh, no note", mix.priceNotes, [])
 
         let cliOnly = SegmentationRoutes(hasClaudeCLI: true)
         let claudePlan = row(.claude, 1000, cliOnly)
@@ -134,31 +134,24 @@ enum SegmentationChooserTestDriver {
             + "measured on your account after the first run"])
         eq("3 claude plan has no dollars", claudePlan.apiDollars, nil)
         eq("3 claude plan cost pane", claudePlan.costSummary, "your plan")
-        let mixPlan = row(.mix, 1000, SegmentationRoutes(hasGeminiKey: true, hasClaudeCLI: true))
-        eq("3 mix = Claude plan + Gemini dollars", mixPlan.costLines,
-           ["about $3.61 by API key at list price",
+        let mixPlan = row(.mix, 1000, SegmentationRoutes(hasOpenAIKey: true, hasClaudeCLI: true))
+        eq("3 mix = Claude plan + ChatGPT dollars", mixPlan.costLines,
+           ["about $14.51 by API key at list price",
             "Claude plan: uses about as much of your plan as $50.29 of API calls at list price; "
             + "measured on your account after the first run"])
-        eq("3 mix plan: no Claude price note", mixPlan.priceNotes, ["Gemini: introductory price until 31 Dec 2026"])
-        check("3 mix dollars are Gemini's only", abs((mixPlan.apiDollars ?? 0) - 3.6108848468271337) < 1e-9)
+        eq("3 mix plan: no Claude price note", mixPlan.priceNotes, [])
+        check("3 mix dollars are ChatGPT's only", abs((mixPlan.apiDollars ?? 0) - 14.506758169934638) < 1e-9,
+              "\(mixPlan.apiDollars as Any)")
         eq("3 key wins over plan when both", row(.claude, 1000, all).costLines, claude.costLines)
 
         // 4. Unavailable.
         let openai = row(.openai, 1000, all)
-        if options.approach(.openai)?.available == true {
-            check("4 openai measured (W36.seg-opt-openai): figures and a cost, runnable with the key",
-                  openai.canRun && openai.toCheck.hasPrefix("about ") && openai.apiDollars != nil
-                  && openai.costLines.count == 1, "\(openai.toCheck) \(openai.costLines)")
-            let openaiNoKey = row(.openai, 1000, keysOnly)
-            eq("4 openai without key", openaiNoKey.unavailableReason, "Needs an OpenAI API key.")
-            eq("4 openai offers the OpenAI key", openaiNoKey.missingKeys, [.openai])
-        } else {
-            // Until W36.seg-opt-openai fills the row (its Codex calls span several five-hour windows).
-            check("4 openai unmeasured shows the file's reason",
-                  openai.unavailableReason == options.approach(.openai)?.reason && openai.unavailableReason != nil,
-                  "\(openai.unavailableReason as Any)")
-            eq("4 openai has no figures", openai.toCheck, "")
-        }
+        check("4 openai measured (W36.seg-opt-openai): figures and a cost, runnable with the key",
+              openai.canRun && openai.toCheck.hasPrefix("about ") && openai.apiDollars != nil
+              && openai.costLines.count == 1, "\(openai.toCheck) \(openai.costLines)")
+        let openaiNoKey = row(.openai, 1000, keysOnly)
+        eq("4 openai without key", openaiNoKey.unavailableReason, "Needs an OpenAI API key.")
+        eq("4 openai offers the OpenAI key", openaiNoKey.missingKeys, [.openai])
         if let opts = mutateBundled({ approaches in
             guard let i = approaches.firstIndex(where: { $0["id"] as? String == "openai" }) else { return false }
             approaches[i] = ["id": "openai", "label": "ChatGPT only", "available": false, "reason": "Not measured: R."]
@@ -181,14 +174,14 @@ enum SegmentationChooserTestDriver {
         eq("4 gemini without key: cost and intro note shown", geminiNoKey.costLines + geminiNoKey.priceNotes,
            gemini.costLines + gemini.priceNotes)
         let mixHalf = row(.mix, 1000, SegmentationRoutes(hasAnthropicKey: true))
-        eq("4 mix missing Gemini prices the whole mix", mixHalf.costLines, mix.costLines)
-        eq("4 mix missing Gemini adds no partial dollars", mixHalf.apiDollars, nil)
-        let mixNoClaude = row(.mix, 1000, SegmentationRoutes(hasGeminiKey: true))
+        eq("4 mix missing ChatGPT prices the whole mix", mixHalf.costLines, mix.costLines)
+        eq("4 mix missing ChatGPT adds no partial dollars", mixHalf.apiDollars, nil)
+        let mixNoClaude = row(.mix, 1000, SegmentationRoutes(hasOpenAIKey: true))
         eq("4 mix names only the missing provider", mixNoClaude.missingKeys, [.anthropic])
         let mixNothing = row(.mix, 1000, .none)
         eq("4 mix names both", mixNothing.unavailableReason,
-           "Needs an Anthropic API key, or the claude tool installed and signed in and a Gemini API key.")
-        eq("4 mix wizard offers both", mixNothing.missingKeys, [.anthropic, .gemini])
+           "Needs an Anthropic API key, or the claude tool installed and signed in and an OpenAI API key.")
+        eq("4 mix wizard offers both", mixNothing.missingKeys, [.anthropic, .openai])
         eq("4 gemini with only claude", row(.gemini, 1000, cliOnly).missingKeys, [.gemini])
         eq("4 all rows, one per case", SegmentationRow.all(options: options, pageCount: 10, routes: all).map(\.approach),
            SegmentationApproach.allCases)

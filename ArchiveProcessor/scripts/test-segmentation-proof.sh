@@ -9,8 +9,11 @@
 # (the script prints its estimate from options.json before it runs); the plan route uses the signed-in `claude`'s
 # plan (about 1% of a five-hour window) and no money. Without --paid it prints the estimate and stops.
 #
-#   scripts/test-segmentation-proof.sh [--paid] [--runs gemini:key,claude:key,claude:plan,mix:plan]
+#   scripts/test-segmentation-proof.sh [--paid] [--runs gemini:key,claude:key,claude:plan]
 #                                      [--box Herrnstein --from 19 --to 39]
+#
+# No ChatGPT run: since W36.seg-opt-openai the mix is Claude + ChatGPT, and the driver has no OpenAI route (an
+# OpenAI API key is not to be used; the subscription route is W36.seg-opt-siwc), so openai and mix are refused.
 #
 # Keys are read from the Keychain (service com.archiveprocessor.app, accounts Anthropic and Gemini) by
 # /usr/bin/security, as the bench reads them, and passed to the app in its environment only.
@@ -19,7 +22,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 paid=0
-runs="gemini:key,claude:key,claude:plan,mix:plan"
+runs="gemini:key,claude:key,claude:plan"
 box="Herrnstein"; from=19; to=39
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -32,6 +35,9 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+case ",$runs" in *,openai:*|*,mix:*)
+    echo "openai and mix need ChatGPT, which this proof has no route for (W36.seg-opt-siwc)." >&2; exit 64 ;;
+esac
 
 bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
 if [ ! -x "$bin" ]; then
@@ -86,8 +92,8 @@ if [ "$paid" != 1 ]; then
 fi
 
 key() { /usr/bin/security find-generic-password -s com.archiveprocessor.app -a "$1" -w 2>/dev/null || true; }
-case "$runs" in *gemini*|*mix*) gemini_key=$(key Gemini) ;; *) gemini_key="" ;; esac
-case "$runs" in *claude:key*|*mix:key*) anthropic_key=$(key Anthropic) ;; *) anthropic_key="" ;; esac
+case "$runs" in *gemini*) gemini_key=$(key Gemini) ;; *) gemini_key="" ;; esac
+case "$runs" in *claude:key*) anthropic_key=$(key Anthropic) ;; *) anthropic_key="" ;; esac
 
 report="$work/result.txt"
 json="${SEGMENTATION_PROOF_JSON:-$work/result.json}"

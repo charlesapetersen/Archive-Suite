@@ -16,14 +16,14 @@ import json
 import sys
 
 import data
-import options as O  # noqa: F401  (sets the Gemini voter to 3.8 Flash / low and patches ensemble.voter_gaps)
+import options as O  # sets the Gemini voter to 3.8 Flash / low, patches ensemble.voter_gaps, and has the Codex judge
 import ensemble as E
 import method_gemini as G
 import method_window as W
 import method_window_cues as MWC
 from score import PHOTO
 
-VOTER_JUDGE = {"C": W.judge_window, "G": G.judge_window}
+VOTER_JUDGE = {"C": W.judge_window, "G": G.judge_window, "O": O.OPENAI_JUDGE}
 
 
 def reply(j: dict, index: dict[int, int]) -> str:
@@ -76,7 +76,7 @@ def main(argv) -> int:
                 raise SystemExit(f"{name} {code}: window {a}-{b} is not in the cache")
             ws.append({"start": a, "end": b, "reply": reply(j, index)})
         voters[code] = ws
-    box = E.Box(col, ("C", "G"))
+    box = E.Box(col, tuple(VOTER_JUDGE))
     expected = {}
     for ap in spec["approaches"]:
         if not ap["available"] or not ap["voters"]:
@@ -93,8 +93,7 @@ def main(argv) -> int:
         "source": "ArchiveProcessor/scripts/segbench/export_engine_fixture.py (bench response caches; no call)",
         "pages": n,
         "photo_kinds": photo,
-        "voters": {"C": "window-claude (Claude Sonnet 5.5, prompt w1)",
-                   "G": "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"},
+        "voters": {c: O.VOTER_NAMES[c] for c in VOTER_JUDGE},
         "windows": voters,
         "expected": expected,
         "prompts": prompts(),

@@ -238,12 +238,109 @@
    }
   },
   {
+   "id": "openai",
+   "label": "ChatGPT only",
+   "available": true,
+   "voters": [
+    "window-openai (OpenAI gpt-6.1-sol through Codex, reasoning low, prompt c1)"
+   ],
+   "rule": "min",
+   "level": 0.99,
+   "flag_rule": "flag a gap whose confidence is at or below the level",
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 287,
+     "pages_exact_no_review": 0.9242424242424242,
+     "flagged_per_100_pages": 79.0633608815427,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 221,
+      "pages_exact_no_review": 0.9176954732510288,
+      "flagged_per_100_pages": 88.4,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 66,
+      "pages_exact_no_review": 0.9425287356321839,
+      "flagged_per_100_pages": 58.4070796460177,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 436,
+     "pages_exact_no_review": 0.9131274131274131,
+     "flagged_per_100_pages": 79.12885662431943,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
+    }
+   },
+   "tokens_per_1000_pages": {
+    "O": {
+     "model": "gpt-6.1-sol",
+     "reasoning": "low",
+     "route": "codex exec, ChatGPT subscription",
+     "boxes": [
+      "Dean",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 765,
+     "calls": 259,
+     "input_per_1000_pages": 12213150.326797385,
+     "cached_input_per_1000_pages": 4096000.0,
+     "output_per_1000_pages": 91444.44444444444,
+     "reasoning_per_1000_pages": 2694.1176470588234,
+     "how": "the token totals in each call's Codex session rollout, retries and parse failures included; input includes the cached part and the Codex harness; output includes reasoning; the harness alone (a one-word prompt, median of three) is 16000 input tokens a call, subtracted for input_excluding_harness, which is what the cost is computed on",
+     "harness_input_per_call": 16000,
+     "input_excluding_harness_per_1000_pages": 6796156.862745097
+    }
+   },
+   "cost": {
+    "per_model": {
+     "O": {
+      "list_usd_per_1000_pages": 14.506758169934638,
+      "batch_usd_per_1000_pages": 7.253379084967319,
+      "prices_usd_per_mtok": {
+       "in": 2.0,
+       "out": 10.0,
+       "batch_in": 1.0,
+       "batch_out": 5.0
+      },
+      "price_read": "2026-10-11",
+      "price_source": "https://developers.openai.com/api/docs/pricing"
+     }
+    },
+    "total": {
+     "list_usd_per_1000_pages": 14.506758169934638,
+     "batch_usd_per_1000_pages": 7.253379084967319
+    }
+   }
+  },
+  {
    "id": "mix",
-   "label": "Claude and Gemini together",
+   "label": "Claude and ChatGPT together",
    "available": true,
    "voters": [
     "window-claude (Claude Sonnet 5.5, prompt w1)",
-    "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"
+    "window-openai (OpenAI gpt-6.1-sol through Codex, reasoning low, prompt c1)"
    ],
    "rule": "min",
    "level": 0.85,
@@ -252,30 +349,30 @@
     "test": {
      "pages": 363,
      "gaps": 315,
-     "flagged": 39,
-     "pages_exact_no_review": 0.8939393939393939,
-     "flagged_per_100_pages": 10.743801652892563,
-     "pages_exact_after_review": 0.9787878787878788,
-     "unflagged_errors": 2,
-     "unflagged_errors_per_500_pages": 2.7548209366391183
+     "flagged": 37,
+     "pages_exact_no_review": 0.9242424242424242,
+     "flagged_per_100_pages": 10.192837465564738,
+     "pages_exact_after_review": 0.9727272727272728,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 4.132231404958677
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
-      "flagged": 33,
-      "pages_exact_no_review": 0.9012345679012346,
-      "flagged_per_100_pages": 13.2,
-      "pages_exact_after_review": 0.9794238683127572,
-      "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 2.0
+      "flagged": 32,
+      "pages_exact_no_review": 0.9176954732510288,
+      "flagged_per_100_pages": 12.8,
+      "pages_exact_after_review": 0.9711934156378601,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
-      "flagged": 6,
-      "pages_exact_no_review": 0.8735632183908046,
-      "flagged_per_100_pages": 5.3097345132743365,
+      "flagged": 5,
+      "pages_exact_no_review": 0.9425287356321839,
+      "flagged_per_100_pages": 4.424778761061947,
       "pages_exact_after_review": 0.9770114942528736,
       "unflagged_errors": 1,
       "unflagged_errors_per_500_pages": 4.424778761061947
@@ -284,9 +381,9 @@
     "dev_held_out": {
      "pages": 551,
      "gaps": 494,
-     "flagged": 33,
-     "pages_exact_no_review": 0.9073359073359073,
-     "flagged_per_100_pages": 5.9891107078039925,
+     "flagged": 32,
+     "pages_exact_no_review": 0.9111969111969112,
+     "flagged_per_100_pages": 5.807622504537205,
      "pages_exact_after_review": 0.9903474903474904,
      "unflagged_errors": 2,
      "unflagged_errors_per_500_pages": 1.8148820326678765
@@ -309,22 +406,25 @@
      "subscription_route_notional_usd_per_1000_pages": 50.28623719912472,
      "how": "count_tokens on each window rebuilt as one Messages API request (images inline); output = the cached answer's token count"
     },
-    "G": {
-     "model": "gemini-3.8-flash",
-     "thinking": "low",
+    "O": {
+     "model": "gpt-6.1-sol",
+     "reasoning": "low",
+     "route": "codex exec, ChatGPT subscription",
      "boxes": [
       "Dean",
-      "Deaver",
       "Herrnstein",
       "RG165",
       "Stanton"
      ],
-     "pages": 914,
-     "calls": 310,
-     "input_per_1000_pages": 3942084.2450765865,
-     "output_per_1000_pages": 174485.77680525163,
-     "spent_usd": 3.300349,
-     "how": "the usage the Gemini API returned on every logged call, retries and parse failures included; thinking tokens counted as output"
+     "pages": 765,
+     "calls": 259,
+     "input_per_1000_pages": 12213150.326797385,
+     "cached_input_per_1000_pages": 4096000.0,
+     "output_per_1000_pages": 91444.44444444444,
+     "reasoning_per_1000_pages": 2694.1176470588234,
+     "how": "the token totals in each call's Codex session rollout, retries and parse failures included; input includes the cached part and the Codex harness; output includes reasoning; the harness alone (a one-word prompt, median of three) is 16000 input tokens a call, subtracted for input_excluding_harness, which is what the cost is computed on",
+     "harness_input_per_call": 16000,
+     "input_excluding_harness_per_1000_pages": 6796156.862745097
     }
    },
    "cost": {
@@ -341,37 +441,48 @@
       "price_read": "2026-10-11",
       "price_source": "https://platform.claude.com/docs/en/about-claude/pricing"
      },
-     "G": {
-      "list_usd_per_1000_pages": 3.6108848468271337,
-      "batch_usd_per_1000_pages": 1.8054424234135669,
+     "O": {
+      "list_usd_per_1000_pages": 14.506758169934638,
+      "batch_usd_per_1000_pages": 7.253379084967319,
       "prices_usd_per_mtok": {
-       "in": 0.75,
-       "out": 3.75,
-       "batch_in": 0.375,
-       "batch_out": 1.875
+       "in": 2.0,
+       "out": 10.0,
+       "batch_in": 1.0,
+       "batch_out": 5.0
       },
-      "price_read": "2026-10-05",
-      "price_source": "Gemini API pricing page; introductory price to 2026-12-31, then $1.50 / $7.50",
-      "after_2026_12_31": {
-       "list_usd_per_1000_pages": 7.2217696936542675,
-       "batch_usd_per_1000_pages": 3.6108848468271337
-      }
+      "price_read": "2026-10-11",
+      "price_source": "https://developers.openai.com/api/docs/pricing"
      }
     },
     "total": {
-     "list_usd_per_1000_pages": 20.543237144420132,
-     "batch_usd_per_1000_pages": 10.271618572210066
+     "list_usd_per_1000_pages": 31.439110467527637,
+     "batch_usd_per_1000_pages": 15.719555233763819
     }
+   },
+   "replaces": {
+    "voters": [
+     "window-claude (Claude Sonnet 5.5, prompt w1)",
+     "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"
+    ],
+    "rule": "min",
+    "level": 0.85,
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 39,
+     "pages_exact_no_review": 0.8939393939393939,
+     "flagged_per_100_pages": 10.743801652892563,
+     "pages_exact_after_review": 0.9787878787878788,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183
+    },
+    "why": "re-ranked with ChatGPT on the development set (options-openai-dev.md)"
    }
-  },
-  {
-   "id": "openai",
-   "label": "ChatGPT only",
-   "available": false,
-   "reason": "Not measured: no OpenAI API key in the Keychain, and the Codex route answered 'Your workspace is out of credits' on 2026-10-11. Earlier, on one development box only (Deaver), Codex gpt-6.1-sol at reasoning low with the cues prompt put 97.9% of pages in an exact document with no review, level with Claude and Gemini on that box (cues-models-Deaver.md).",
-   "figures": null,
-   "tokens_per_1000_pages": null,
-   "cost": null
   }
- ]
+ ],
+ "openai_measured": {
+  "date": "2026-10-12",
+  "item": "W36.seg-opt-openai",
+  "freeze": "options-frozen-openai.json"
+ }
 }

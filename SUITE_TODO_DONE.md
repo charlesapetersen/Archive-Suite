@@ -10679,3 +10679,22 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   change while a text field has focus. Tracing used three read-only subagents. The two unreachable verdicts, the
   missing ledger, the missing `.onSubmit` and the `undoLast` `try?` were re-checked by grep. Docs only, so no build.
   <!-- /W40.b1 -->
+- [x] **W36.seg-opt-openai — the ChatGPT figures, once a route exists** · §Archive Processor — automatic segmentation · SHIPPED 2026-10-12
+  **`W36.seg-opt-openai` — the ChatGPT figures, once a route exists [S · ~1 session]** (lane: segbench) (uses: light) (blocked-on: W36.seg-opt-openai-owner-ok). Split from `W36.seg-opt-measure` 2026-10-11: no OpenAI API key in the Keychain, and the Codex workspace is out of credits. The OpenAI window voter on all five boxes through `scripts/segbench/options.py` (level frozen on the development boxes before the test calls; mix re-ranked with it), filling the `openai` row of `segbench-results/options.json`. Owner, 2026-10-11: run it through Codex on the ChatGPT subscription, never an OpenAI API key; it costs no money. Codex's week reset at 15:42 and Codex runs again; if it still refuses, ask the owner again rather than choosing another route.
+  Gate: **`W36.seg-opt-openai-owner-ok` — owner: a capped OpenAI key, Codex credits, or drop ChatGPT? — OWNER.** ✅ ANSWERED 2026-10-11: Codex, not an API key.
+  **Result.** Ten sessions over three Codex five-hour windows (2026-10-11 to 12), all on the ChatGPT subscription, $0.
+  Through `codex exec` (gpt-6.1-sol, reasoning low, prompt c1): about 36k input tokens a call, 16k of them the
+  Codex harness, which is subtracted for the cost; 129 calls took a window from 1% to 89%. ChatGPT alone froze at
+  <= 0.990 on the dev boxes; on the test boxes (363 pages) 92% exact with no checking, 79 checks per 100 pages,
+  100% after checking, 0 unflagged; $14.51 per 1,000 pages at list price by API key. The mix re-ranked to
+  **Claude + ChatGPT, min, <= 0.850** (was Claude + Gemini): 92% / 10.2 checks / 97% after / 3 unflagged, the
+  same flags as Claude alone with a better no-checking figure; $31.44 per 1,000 pages by keys.
+  App side: `WindowVoter.catalog` `window-openai` with `reasoning_effort` from the voter's level; prompt `c1` in
+  `WindowPrompts.swift`; `export_engine_fixture.py` now records the O voter (Deaver's 51 windows; C, G and their
+  verdicts byte-identical) and the engine test runs the mix through the OpenAI HTTP seam; the chooser's mix
+  figures, costs and missing-key checks follow the new mix. `test-segmentation-proof.sh` refuses openai/mix runs
+  (no OpenAI route without an API key; `W36.seg-opt-siwc` is the plan route) and dropped `mix:plan` from its
+  default. Bench fixes on the way: the usage guard ignores a reading from a reset window; a full window
+  ("out of credits" on any ERROR line) stops the run instead of retrying; guard at 100% for Codex.
+  Consequence: until `W36.seg-opt-siwc`, the shipped mix needs an OpenAI API key to run.
+  <!-- /W36.seg-opt-openai -->
