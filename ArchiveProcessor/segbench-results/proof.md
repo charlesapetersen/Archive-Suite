@@ -32,6 +32,8 @@ What it showed:
   3 points or 100 pages that ask (usage.md step 3), and the calibration was `notYet`. The driver puts the app's
   stored calibration back after its runs.
 
-The GUI half ran in the Tart VM: `testSegmentationChooserShowsEachApproachWithFiguresAndCost` (the chooser in
-Process Files) and `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone` (the flagged pass), in the full Processor
-UITest suite.
+The GUI half ran in the Tart VM: the full Processor UITest suite, with `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone`
+(the flagged pass) and the new `testSegmentationChooserShowsEachApproachWithFiguresAndCost` (the chooser in Process
+Files: every approach offered; Gemini's figures, cost and "Needs a Gemini API key."; ChatGPT's reason; back to Full
+manual). Getting there needed `OCRView.body` split: since `W36.seg-opt-subscription` added the plan alert, the VM's
+compiler could no longer type-check it, so the Processor VM lane had been red on main.

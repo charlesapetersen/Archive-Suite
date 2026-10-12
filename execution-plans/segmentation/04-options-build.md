@@ -160,6 +160,9 @@ per approach**, with the method and threshold fixed on the development boxes fir
 - **`W36.seg-opt-proof`** — prove it end to end [S-M · ~1 session] (uses: build,vm,paid) (blocked-on:
   W36.seg-opt-chooser, W36.seg-opt-review, W36.seg-opt-subscription). The GUI proof in the VM, and one small real
   folder per provider (cents). Then `W40.b3` and `W40.d1`–`d4` may start.
+  ✅ Shipped 2026-10-12: `scripts/test-segmentation-proof.sh` (`SegmentationProofDriver`), results in
+  `segbench-results/proof.md`: Gemini and Claude by key, Claude by plan and the mix, on two real Herrnstein folders
+  ($0.63); the chooser and flagged-pass UITests green in the VM.
 
 ---
 

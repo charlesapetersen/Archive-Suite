@@ -388,33 +388,7 @@ struct OCRView: View {
         .reviewWindow(isPresented: $processor.awaitingManualSegTag) {
             ManualSegmentTagView(processor: processor)
         }
-        // W36.seg-opt-review: the flagged pass, and the choice when a window run cannot finish.
-        .reviewWindow(isPresented: $processor.awaitingFlaggedReview) {
-            FlaggedBoundaryReviewSheet(processor: processor)
-        }
-        // W36.seg-opt-subscription: the Claude plan's first measurement on this account.
-        .alert("Your Claude plan, measured",
-               isPresented: Binding(get: { processor.planCheckPrompt != nil }, set: { _ in })) {
-            Button("Go on") { processor.answerPlanCheck(goOn: true) }
-            Button("Stop here", role: .cancel) { processor.answerPlanCheck(goOn: false) }
-        } message: {
-            Text((processor.planCheckPrompt?.message ?? "")
-                 + "\n\nLater folders show this figure before they start. Go on with this folder?")
-        }
-        .alert(processor.windowStopPrompt?.title ?? WindowStopPrompt.defaultTitle,
-               isPresented: Binding(get: { processor.windowStopPrompt != nil }, set: { _ in })) {
-            Button("Check the rest myself") { processor.answerWindowStop(.checkMyself) }
-            // Stop is offered only when the run can be resumed: a paid batch's journal is already retired here,
-            // so stopping would leave its finished OCR untagged with nothing to resume from.
-            if processor.windowStopPrompt?.canResumeLater == true {
-                Button("Stop and resume later", role: .cancel) { processor.answerWindowStop(.stop) }
-            }
-        } message: {
-            Text((processor.windowStopPrompt?.message ?? "")
-                 + (processor.windowStopPrompt?.canResumeLater == true
-                    ? "\n\nYou can check every boundary the model did not answer yourself, or stop and resume later."
-                    : "\n\nYou can check every boundary the model did not answer yourself."))
-        }
+        .modifier(SegmentationStagePresentations(processor: processor))
         .onChange(of: apiKey) { _, newKey in
             guard !useAppleVision else { return }
             let account = useGateway ? "Gateway" : selectedProvider.rawValue
@@ -1313,5 +1287,42 @@ struct OCRView: View {
                 localAgent: currentLocalAgentConfig
             )
         }
+    }
+}
+
+/// The window stage's presentations, kept out of `OCRView.body`: with them inline its modifier chain grew past what
+/// the Tart VM's compiler would type-check ("unable to type-check this expression in reasonable time").
+private struct SegmentationStagePresentations: ViewModifier {
+    @ObservedObject var processor: OCRProcessor
+
+    func body(content: Content) -> some View {
+        content
+            // W36.seg-opt-review: the flagged pass, and the choice when a window run cannot finish.
+            .reviewWindow(isPresented: $processor.awaitingFlaggedReview) {
+                FlaggedBoundaryReviewSheet(processor: processor)
+            }
+            // W36.seg-opt-subscription: the Claude plan's first measurement on this account.
+            .alert("Your Claude plan, measured",
+                   isPresented: Binding(get: { processor.planCheckPrompt != nil }, set: { _ in })) {
+                Button("Go on") { processor.answerPlanCheck(goOn: true) }
+                Button("Stop here", role: .cancel) { processor.answerPlanCheck(goOn: false) }
+            } message: {
+                Text((processor.planCheckPrompt?.message ?? "")
+                     + "\n\nLater folders show this figure before they start. Go on with this folder?")
+            }
+            .alert(processor.windowStopPrompt?.title ?? WindowStopPrompt.defaultTitle,
+                   isPresented: Binding(get: { processor.windowStopPrompt != nil }, set: { _ in })) {
+                Button("Check the rest myself") { processor.answerWindowStop(.checkMyself) }
+                // Stop is offered only when the run can be resumed: a paid batch's journal is already retired
+                // here, so stopping would leave its finished OCR untagged with nothing to resume from.
+                if processor.windowStopPrompt?.canResumeLater == true {
+                    Button("Stop and resume later", role: .cancel) { processor.answerWindowStop(.stop) }
+                }
+            } message: {
+                Text((processor.windowStopPrompt?.message ?? "")
+                     + (processor.windowStopPrompt?.canResumeLater == true
+                        ? "\n\nYou can check every boundary the model did not answer yourself, or stop and resume later."
+                        : "\n\nYou can check every boundary the model did not answer yourself."))
+            }
     }
 }

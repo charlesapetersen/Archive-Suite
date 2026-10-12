@@ -10641,3 +10641,19 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   now reads the highest meter reading. Left open in `ArchiveProcessor/KNOWN_ISSUES.md`: the OCR Local CLI Agent
   still inherits the key.
   <!-- /W36.seg-opt-subscription -->
+- [x] **W36.seg-opt-proof — prove it end to end [S-M · ~1 session]** · §Archive Processor — automatic segmentation (lane: processor) (uses: build,vm,paid) (blocked-on: W36.seg-opt-chooser, W36.seg-opt-review, W36.seg-opt-subscription) · SHIPPED 2026-10-12 (this commit; checkpoints af156d2d, c3a2e125)
+  `scripts/test-segmentation-proof.sh` (PAID, `--paid` required, cost stated from options.json first) runs
+  `SegmentationProofDriver` headless: a real folder copied out of `Test Files/`, through `runWindowSegmentationStage`
+  with the production `WindowStageTransport.make` and the stage's own plan gate (new `windowTransportFactory` seam;
+  `make` gained an `http` seam so API tokens are metered). The driver answers the flagged pass from truth, accepts the
+  skim, scores the folder, checks each provider went by the chosen route, and puts the app's plan calibration back.
+  Results in `ArchiveProcessor/segbench-results/proof.md`: Gemini by key, Claude by key, Claude by plan and the mix
+  (Claude by plan + Gemini by key) on Herrnstein 19-39 (18/21 exact, one confident unflagged error for every route),
+  and Gemini by key + Claude by plan on Herrnstein 76-105 (30/30, 6 and 2 gaps flagged and answered). $0.63 spent;
+  the plan runs moved the five-hour meter 1-2 points each. GUI: the full Processor UITest suite in the Tart VM, with
+  the new `testSegmentationChooserShowsEachApproachWithFiguresAndCost` (screenshot checked).
+  **Found on the way:** the Processor VM lane was red on main since `W36.seg-opt-subscription` — the VM's compiler
+  could not type-check `OCRView.body` once the plan alert joined it; the window stage's presentations moved into a
+  `SegmentationStagePresentations` modifier. The guest's `dd-processor` build database was then corrupt and was
+  cleared (`XCBuildData`, VM scratch). `W40.b3` and `W40.d1`-`d4` may now start.
+  <!-- /W36.seg-opt-proof -->

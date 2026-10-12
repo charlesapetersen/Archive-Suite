@@ -133,17 +133,17 @@ final class ProcessorUITests: XCTestCase {
         let gemini = renderedText(of: row)
         XCTAssertTrue(gemini.contains("Right after checking") && gemini.contains("Cost"),
                       "the row carries every figure and the cost: \(gemini)")
-        XCTAssertTrue(element("ap.segmentation.unavailable").exists,
-                      "with no Gemini key the row says why it cannot run")
+        // The card is one combined accessibility element, so its reason is read from the row's own text.
+        XCTAssertTrue(gemini.contains("Needs"), "with no Gemini key the row says why it cannot run: \(gemini)")
         attachScreenshot("processor-segmentation-chooser-gemini")
 
         choose("ChatGPT only")
-        XCTAssertTrue(waitUntil { self.element("ap.segmentation.unavailable").exists },
-                      "ChatGPT is shown with the reason it is not measured")
+        XCTAssertTrue(waitUntil { self.renderedText(of: row) != gemini && !self.renderedText(of: row).contains("To check") },
+                      "ChatGPT shows only the reason it is not measured: \(renderedText(of: row))")
 
         choose("Full manual")
-        XCTAssertTrue(waitUntil { !self.element("ap.segmentation.unavailable").exists },
-                      "Full manual always runs")
+        XCTAssertTrue(waitUntil { self.renderedText(of: row).contains("to judge") && !self.renderedText(of: row).contains("Needs") },
+                      "Full manual always runs, every boundary judged by the user: \(renderedText(of: row))")
         attachScreenshot("processor-segmentation-chooser-manual")
     }
 
