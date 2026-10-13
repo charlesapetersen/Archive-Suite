@@ -506,6 +506,12 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                meter; the one first-run question), `ClaudeRoute` (key or plan, asked only when both
                                exist). Never reads the CLI's login. Self-test: `SegmentationPlanTestDriver`,
                                `scripts/test-segmentation-plan.sh`.
+  ChatGPTPlanTransport.swift   The ChatGPT plan route (W36.seg-opt-siwc): the voter's windows through the Responses
+                               API with the Sign in with ChatGPT token (`store: false`, `stream: true`, SSE; only a
+                               completed response answers), OpenAI's subscription_sharing_* codes mapped to stop /
+                               fail / retry, `ChatGPTRoute` (key or plan, asked only when both exist). The account is
+                               `Net/ChatGPTAuth.swift`; the controls `Views/ChatGPTPlanControls.swift`. Self-test:
+                               `SegmentationChatGPTTestDriver`, `scripts/test-segmentation-chatgpt.sh` (fake server).
 Capture/                       Live Capture core (Tier-2):
   CaptureSession.swift         Owns a live session: incoming folder, token, received photos, receiver
                                lifecycle, ingest(...) (durable-manifest-before-ack, idempotent (group,seq)),
@@ -528,6 +534,10 @@ Capture/                       Live Capture core (Tier-2):
                                resume round-trips, PDF source-date header lines.
 Net/                           Phone↔Mac transports + cloud relay (Tier-2; the protocol is a SHARED HOTSPOT):
   CaptureServer.swift          LAN HTTP/NWListener receiver; Bearer-authed routes (see hotspot list).
+  ChatGPTAuth.swift            Sign in with ChatGPT, natively (OpenAI's devkit is JS): loopback `/callback` + PKCE,
+                               `dynamic_agent_client` registration (the issued client id kept for refresh/re-sign-in),
+                               RS256 ID-token check against the discovery JWKS, serialized rotating refresh, revoke on
+                               sign-out. Tokens in the Keychain (`ChatGPTPlanCredentials`), host id in defaults.
   CaptureReceiver.swift        The receiver role: accept phone pages → ingest, ack only on durable.
   CaptureValidation.swift      Shared group-id safety (path-traversal guard) for both receivers.
   USBBridge.swift              Keeps adb reverse asserted so a USB phone reaches 127.0.0.1:<port>.

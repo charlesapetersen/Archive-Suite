@@ -144,6 +144,8 @@ extension OCRProcessor {
         if Self.usesPlan(transport), let share = calibration.estimate(notionalUSD: notional) {
             statusMessage += " (Claude plan: \(share))"
         }
+        // OpenAI requires the app to say when the ChatGPT plan powers the requests (W36.seg-opt-siwc).
+        if Self.usesChatGPTPlan(transport) { statusMessage += " (Using ChatGPT plan)" }
         // Keep this run's ratio for the next folder, however the windows end (usage.md step 5).
         defer {
             Task {
@@ -285,6 +287,12 @@ extension OCRProcessor {
     nonisolated static func usesPlan(_ t: any WindowTransport) -> Bool {
         if t is LocalAgentWindowTransport { return true }
         return (t as? RoutingWindowTransport)?.routes.values.contains { $0 is LocalAgentWindowTransport } ?? false
+    }
+
+    /// Whether a run's ChatGPT windows go by the user's ChatGPT plan.
+    nonisolated static func usesChatGPTPlan(_ t: any WindowTransport) -> Bool {
+        if t is ChatGPTPlanWindowTransport { return true }
+        return (t as? RoutingWindowTransport)?.routes.values.contains { $0 is ChatGPTPlanWindowTransport } ?? false
     }
 
     /// Called by the flagged pass's Done (only enabled when every gap is answered).

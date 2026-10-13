@@ -831,9 +831,7 @@ OWNER sit in the plan's HOLD QUEUE.
 
 - [x] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER.** ✅ ANSWERED 2026-10-11: build segmentation as a choice of approach (full manual, Claude, Gemini, ChatGPT if possible, a mix), each shown with rough accuracy, checking and cost figures, cost both in dollars by API key and as a share of the user's own subscription windows, generalized beyond the owner's plan. The on-device fine-tune is filed in `FUTURE_FEATURES.md`. Plan: `execution-plans/segmentation/04-options-build.md`.
 
-The build, from `04-options-build.md` Part 2 (the Processor's `W40.b3` and `W40.d1`-`d4` wait for `W36.seg-opt-proof`):
-
-- [ ] **`W36.seg-opt-siwc` — ChatGPT by Sign in with ChatGPT [M · ~1-2 sessions]** (lane: processor) (uses: build) (blocked-on: W36.seg-opt-openai, W36.seg-opt-engine). Filed by `W36.seg-opt-usage` 2026-10-11: OpenAI's sanctioned route for open-source local apps, never the user's `codex` login; requirements in `ArchiveProcessor/segbench-results/usage.md`.
+The build, from `04-options-build.md` Part 2, has shipped: every `W36.seg-opt-*` item is in `SUITE_TODO_DONE.md`.
 
 ## Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11)
 

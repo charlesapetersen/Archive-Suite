@@ -13,6 +13,12 @@ struct SegmentationRoutes: Equatable, Sendable {
     var hasClaudeCLI = false
     /// Which way Claude goes when both an Anthropic key and `claude` exist (W36.seg-opt-subscription).
     var claudeRoute: ClaudeRoute = .apiKey
+    /// The signed-in ChatGPT account (Sign in with ChatGPT), or nil (W36.seg-opt-siwc).
+    var chatGPTAccount: String?
+    /// A ChatGPT registration is saved whose tokens went bad: offer to forget it, so another account can sign in.
+    var chatGPTStale = false
+    /// Which way ChatGPT goes when both an OpenAI key and a ChatGPT sign-in exist.
+    var chatGPTRoute: ChatGPTRoute = .apiKey
     /// The plan's share, measured on this account by earlier runs.
     var planCalibration = PlanCalibrationStore()
 
@@ -22,6 +28,10 @@ struct SegmentationRoutes: Equatable, Sendable {
     var claudeByPlan: Bool { hasClaudeCLI && (!hasAnthropicKey || claudeRoute == .plan) }
     /// The route is the user's to choose only when both exist.
     var offersClaudeRouteChoice: Bool { hasClaudeCLI && hasAnthropicKey }
+    var hasChatGPTPlan: Bool { chatGPTAccount != nil }
+    /// ChatGPT's windows go by the user's ChatGPT plan: signed in, and either no key or the user chose the plan.
+    var chatGPTByPlan: Bool { hasChatGPTPlan && (!hasOpenAIKey || chatGPTRoute == .plan) }
+    var offersChatGPTRouteChoice: Bool { hasChatGPTPlan && hasOpenAIKey }
 
     /// Reads the Keychain and looks for `claude`. Never call it from a view body.
     static func current(_ defaults: UserDefaults = .standard) -> SegmentationRoutes {
@@ -34,6 +44,9 @@ struct SegmentationRoutes: Equatable, Sendable {
             hasOpenAIKey: !(KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? "").isEmpty,
             hasClaudeCLI: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override) != nil,
             claudeRoute: ClaudeRoute.stored(defaults),
+            chatGPTAccount: ChatGPTAuth.shared.signedInAccount(),
+            chatGPTStale: ChatGPTAuth.shared.hasStaleRegistration,
+            chatGPTRoute: ChatGPTRoute.stored(defaults),
             planCalibration: PlanCalibrationStore.load(defaults))
     }
 
@@ -45,8 +58,10 @@ struct SegmentationRoutes: Equatable, Sendable {
         }
     }
 
-    /// A voter can run by API key, or (Claude only) through the user's own `claude`.
-    func canRun(_ p: WindowProvider) -> Bool { hasKey(p) || (p == .anthropic && hasClaudeCLI) }
+    /// A voter can run by API key, Claude through the user's own `claude`, ChatGPT through the user's ChatGPT plan.
+    func canRun(_ p: WindowProvider) -> Bool {
+        hasKey(p) || (p == .anthropic && hasClaudeCLI) || (p == .openai && hasChatGPTPlan)
+    }
 }
 
 /// One approach's row, scaled to the run: the five figures of Part 3 §3 and the cost of §4, as the user reads
@@ -61,7 +76,7 @@ struct SegmentationRow: Equatable, Sendable {
     let toCheck: String
     let rightAfterChecking: String
     let unshownErrors: String
-    /// One line per way of paying, in order: dollars by API key, then the share of the Claude plan.
+    /// One line per way of paying, in order: dollars by API key, the share of the Claude plan, the ChatGPT plan.
     let costLines: [String]
     /// What qualifies the dollars: a scheduled price change, or prices read more than 90 days ago.
     let priceNotes: [String]
@@ -164,6 +179,8 @@ struct SegmentationRow: Equatable, Sendable {
     /// there is no Anthropic key or the user chose the plan; every other model is priced by API key at list
     /// price, including one whose key the user does not have yet, so a greyed-out row still says what the key
     /// would cost. The plan line is the notional figure until a run has measured this account, then the share.
+    /// ChatGPT by its plan has no meter an app can read (usage.md), so its line is the token figure and the notional
+    /// API price of the same calls, labelled approximate, with "Using ChatGPT plan".
     private static func costLines(_ entry: SegmentationOptions.Approach, pageCount n: Int,
                                   routes: SegmentationRoutes, today: Date) -> ([String], [String], Double?) {
         let models = (entry.cost?.perModel ?? [:]).sorted { $0.key < $1.key }
@@ -171,6 +188,7 @@ struct SegmentationRow: Equatable, Sendable {
         var apiList = 0.0, anyAPI = false
         var notes: [String] = []
         var planNotional = 0.0, anyPlan = false
+        var chatGPTTokens = 0.0, chatGPTNotional = 0.0, anyChatGPTPlan = false
         for (key, cost) in models {
             let tokens = entry.tokensPer1000Pages?[key]
             // problems() refuses a model outside the catalog, so this never skips in a shipped file.
@@ -180,6 +198,12 @@ struct SegmentationRow: Equatable, Sendable {
                let notional = tokens?.subscriptionRouteNotionalUSDPer1000Pages {
                 anyPlan = true
                 planNotional += notional * Double(n) / 1000
+                continue
+            }
+            if provider == .openai, routes.chatGPTByPlan {
+                anyChatGPTPlan = true
+                chatGPTTokens += (tokens?.appTokensPer1000Pages ?? 0) * Double(n) / 1000
+                chatGPTNotional += cost.listUSDPer1000Pages * Double(n) / 1000
                 continue
             }
             anyAPI = true
@@ -208,6 +232,11 @@ struct SegmentationRow: Equatable, Sendable {
                              + "at list price; measured on your account after the first run")
             }
         }
+        if anyChatGPTPlan {
+            let tokenText = chatGPTTokens > 0 ? "about \(tokenCount(chatGPTTokens)) tokens, " : ""
+            lines.append("ChatGPT plan: \(tokenText)roughly \(dollars(chatGPTNotional)) "
+                         + "of API calls at list price (approximate). Using ChatGPT plan")
+        }
         return (lines, notes, anyAPI ? apiList : nil)
     }
 
@@ -230,9 +259,21 @@ struct SegmentationRow: Equatable, Sendable {
         return r >= 10 ? String(Int(r.rounded())) : String(format: "%.1f", r).replacingOccurrences(of: ".0", with: "")
     }
 
+    /// 6.9 million → "6.9M", 48,000 → "48K", 900 → "900".
+    static func tokenCount(_ v: Double) -> String {
+        if v >= 1_000_000 { return twoSignificant(v / 1_000_000) + "M" }
+        if v >= 1_000 { return twoSignificant(v / 1_000) + "K" }
+        return twoSignificant(v)
+    }
+
     static func dollars(_ v: Double) -> String {
         if v > 0 && v < 0.01 { return "under $0.01" }
         return "$" + String(format: "%.2f", v)
+    }
+
+    /// The providers an approach's voters are reached through, in voter order.
+    static func providers(_ approach: SegmentationApproach, options: SegmentationOptions?) -> [WindowProvider] {
+        options?.approach(approach).map(providerOrder) ?? []
     }
 
     private static func providerOrder(_ e: SegmentationOptions.Approach) -> [WindowProvider] {
@@ -255,7 +296,7 @@ struct SegmentationRow: Equatable, Sendable {
         switch p {
         case .anthropic: return "an Anthropic API key, or the claude tool installed and signed in"
         case .gemini: return "a Gemini API key"
-        case .openai: return "an OpenAI API key"
+        case .openai: return "an OpenAI API key, or Sign in with ChatGPT"
         }
     }
 

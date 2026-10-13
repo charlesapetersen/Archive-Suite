@@ -73,6 +73,14 @@ enum DefaultsKeys {
     /// `ClaudeRoute` rawValue: Claude's windows by API key or by the user's own `claude` plan, asked only when both
     /// exist (W36.seg-opt-subscription). Absent ⇒ API key.
     static let segmentationClaudeRoute = "segmentationClaudeRoute"
+    /// `ChatGPTRoute` rawValue: ChatGPT's windows by API key or by the user's ChatGPT plan (Sign in with ChatGPT),
+    /// asked only when both exist (W36.seg-opt-siwc). Absent ⇒ API key.
+    static let segmentationChatGPTRoute = "segmentationChatGPTRoute"
+    /// Sign in with ChatGPT's `ext_agent_host_id` for this installation: made once, reused on every sign-in. Not a
+    /// secret; the tokens are in the Keychain (`KeychainChatGPTCredentialStore`).
+    static let chatGPTHostID = "chatGPTHostID"
+    /// OpenAI's "You're using your ChatGPT plan" welcome has been shown (it is shown on the first sign-in only).
+    static let chatGPTPlanWelcomeShown = "chatGPTPlanWelcomeShown"
     /// `PlanCalibrationStore` JSON: the plan meter's points per notional dollar, measured on this account.
     static let segmentationPlanCalibration = "segmentationPlanCalibration"
     static let enableCollectionSegmentation = "enableCollectionSegmentation"

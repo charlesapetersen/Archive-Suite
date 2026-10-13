@@ -62,6 +62,11 @@ struct SegmentationChooserView: View {
                 }
             }
 
+            // A ChatGPT voter can also run on the user's ChatGPT plan, by Sign in with ChatGPT (W36.seg-opt-siwc).
+            if SegmentationRow.providers(approach, options: options).contains(.openai) {
+                ChatGPTPlanControls(routes: $routes)
+            }
+
             if let row = rows.first(where: { $0.approach == approach }) {
                 SegmentationRowCard(row: row, scaleCaption: scaleCaption) {
                     wizardSpecs = row.missingKeys.map(Self.keySpec)
@@ -100,6 +105,7 @@ struct SegmentationRowCard: View {
                 Label(reason, systemImage: "exclamationmark.circle")
                     .font(.caption).foregroundStyle(.orange)
                     .accessibilityIdentifier("ap.segmentation.unavailable")
+                // ChatGPT's alternative to a key, "Continue with ChatGPT", sits above the card.
                 if !row.missingKeys.isEmpty {
                     Button("Add API key…", action: onAddKeys).controlSize(.small)
                 }

@@ -152,12 +152,19 @@ struct SegmentationOptions: Decodable, Sendable {
         let inputPer1000Pages: Double
         let outputPer1000Pages: Double
         let subscriptionRouteNotionalUSDPer1000Pages: Double?
+        /// ChatGPT's input without the Codex harness the bench measured it through: what the app's own requests
+        /// send, and what the cost was computed on.
+        let inputExcludingHarnessPer1000Pages: Double?
+
+        /// The tokens the app's own requests use per 1,000 pages: input (without the bench's harness) and output.
+        var appTokensPer1000Pages: Double { (inputExcludingHarnessPer1000Pages ?? inputPer1000Pages) + outputPer1000Pages }
 
         enum CodingKeys: String, CodingKey {
             case model
             case inputPer1000Pages = "input_per_1000_pages"
             case outputPer1000Pages = "output_per_1000_pages"
             case subscriptionRouteNotionalUSDPer1000Pages = "subscription_route_notional_usd_per_1000_pages"
+            case inputExcludingHarnessPer1000Pages = "input_excluding_harness_per_1000_pages"
         }
     }
 

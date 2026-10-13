@@ -159,6 +159,9 @@ per approach**, with the method and threshold fixed on the development boxes fir
   user's `codex` login. The app shows "Using ChatGPT plan" and a "Manage usage" link. With no app-readable meter,
   the cost is the token figure and its notional API price, labelled approximate. The requirements to meet are in
   `segbench-results/usage.md` and OpenAI's cookbook page. Not a prerequisite of `W36.seg-opt-proof`.
+  ✅ Shipped 2026-10-12: `Net/ChatGPTAuth.swift` (the protocol written natively), `Segmentation/ChatGPTPlanTransport.swift`,
+  `Views/ChatGPTPlanControls.swift`, `scripts/test-segmentation-chatgpt.sh` ($0, fake server). Not yet run against
+  OpenAI's real servers (owner check; `ArchiveProcessor/KNOWN_ISSUES.md`).
 - **`W36.seg-opt-proof`** — prove it end to end [S-M · ~1 session] (uses: build,vm,paid) (blocked-on:
   W36.seg-opt-chooser, W36.seg-opt-review, W36.seg-opt-subscription). The GUI proof in the VM, and one small real
   folder per provider (cents). Then `W40.b3` and `W40.d1`–`d4` may start.
@@ -179,7 +182,7 @@ Code names were read from the Processor on 2026-10-11 and cited as of that date.
 - **A new setting, "Segmentation", sits beside the tagging mode.** It appears in Settings and in the Process Files
   window, and its choices are Manual, Claude, Gemini, ChatGPT and a mix (Claude + ChatGPT since `W36.seg-opt-openai`). Each choice shows its five
   figures scaled to the files you dropped. Each also shows its cost: dollars when paid by API key, and a share of
-  your windows when paid by your Claude plan. ChatGPT runs by OpenAI API key until `W36.seg-opt-siwc` adds the plan route.
+  your windows when paid by your Claude plan. ChatGPT runs by OpenAI API key, or by the user's ChatGPT plan through Sign in with ChatGPT (`W36.seg-opt-siwc`).
 - **Choosing it does not run anything without review.** After OCR, the doubtful boundaries are shown one at a
   time, page n beside page n+1, and you choose keep, split or join. After that, the existing review sheet
   shows every document for a skim.

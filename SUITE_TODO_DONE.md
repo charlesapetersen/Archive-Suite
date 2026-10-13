@@ -10717,3 +10717,32 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   promise-drafting and three read-only tracing subagents; all 104 cited test methods and every `file:line` were
   re-checked mechanically. Docs only, so no build.
   <!-- /W40.b2 -->
+- [x] **W36.seg-opt-siwc — ChatGPT by Sign in with ChatGPT [M · ~1-2 sessions]** · §Archive Processor — automatic segmentation · SHIPPED 2026-10-12, in one session (this commit) (lane: processor) (uses: build) (blocked-on: W36.seg-opt-openai, W36.seg-opt-engine)
+  OpenAI's sanctioned route for open-source local apps (`segbench-results/usage.md`), never the user's `codex` login.
+  OpenAI's devkit is JavaScript, so the protocol is written natively from its docs (developers.openai.com/siwc):
+  `Net/ChatGPTAuth.swift`: loopback `http://127.0.0.1:<port>/callback` + S256 PKCE, `dynamic_agent_client` with
+  `agent_name_hint` and a per-install `ext_agent_host_id` (defaults `chatGPTHostID`), the issued client id kept for
+  refresh and re-sign-in (`id_token_hint` + `login_hint`); RS256 ID-token check against the discovery JWKS (iss, aud,
+  nonce, exp, sub; the JWK built into PKCS#1 DER for `SecKeyCreateWithData`); refresh serialized in the actor, rotating,
+  guarded by a generation so a reply landing after sign-out or "sign in again" cannot revive the account; the four
+  refresh codes clear the tokens, `invalid_client` also drops the registration; sign-out revokes, then forgets
+  whatever the server said; a re-sign-in answered by another account revokes that grant and forgets the registration.
+  Tokens in the Keychain (`ChatGPTPlanCredentials`), never logged. `Segmentation/ChatGPTPlanTransport.swift`: the
+  Responses API with `store: false`, `stream: true`, the images inline and the bench's `reasoning.effort`; only
+  `response.completed` answers; usage limit → resumable stop with the Manage usage link, usage unavailable → resumable
+  stop (not the engine's quick retry, which would drop ChatGPT's votes through an outage), not eligible / unsupported /
+  invalid user → fatal; a 401 refreshes once and resends; no in-session retry (`maxRetries: 0`). `ChatGPTRoute`
+  (`DefaultsKeys.segmentationChatGPTRoute`) mirrors `ClaudeRoute`, asked only with both a key and a sign-in, and a
+  run set to the plan while signed out is refused rather than quietly billed to the key. Chooser: "ChatGPT plan:
+  about 6.9M tokens, roughly $14.51 of API calls at list price (approximate). Using ChatGPT plan" per 1,000 pages,
+  no dollars added to the run (tokens = `input_excluding_harness` + output, newly decoded); `Views/ChatGPTPlanControls.swift`
+  under the chooser for ChatGPT and the mix: "Continue with ChatGPT", "Using ChatGPT plan", "Manage usage", Sign out,
+  "Use a different account" for a stale registration, the one-time welcome; the run's status says "(Using ChatGPT plan)".
+  Self-test `SegmentationChatGPTTestDriver` / `scripts/test-segmentation-chatgpt.sh` ($0): an in-process fake of the
+  auth server and the Responses API, ID tokens signed by a run-made RSA key, the real loopback listener driven by
+  GETs (a favicon and a forged-state callback ignored); 120+ checks, green on repeated runs; chooser, plan, engine
+  and review self-tests still green. Tier-2 adversarial review (opus): no HIGH; its four MEDs (stale-registration
+  lockout, refresh-after-sign-out race, outage degrading the run, price vs route drift) and five LOWs fixed with tests.
+  ⚠️ Not yet run against OpenAI's real servers: the first real sign-in and window are the owner's check
+  (`ArchiveProcessor/KNOWN_ISSUES.md`, incl. whether plan requests accept inline images and `reasoning`).
+  <!-- /W36.seg-opt-siwc -->

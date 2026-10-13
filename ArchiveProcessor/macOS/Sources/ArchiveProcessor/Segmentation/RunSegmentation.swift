@@ -184,30 +184,43 @@ enum WindowStageTransport {
     }
 
     /// The transport for an approach's voters, from what the user has: by API key where there is one, else Claude
-    /// through the user's own `claude`; with both, Claude goes the way `route` says (the chooser asks only then).
-    /// `gate` meters and pauses the `claude` calls.
+    /// through the user's own `claude` and ChatGPT through the signed-in ChatGPT plan; with both, each goes the way
+    /// its route says (the chooser asks only then). `gate` meters and pauses the `claude` calls. `chatGPT` is the
+    /// signed-in account, or nil.
     static func make(_ spec: ApproachSpec, keys: [WindowProvider: String], claudeBinary: String?,
-                     route: ClaudeRoute = .apiKey, gate: PlanRunGate? = nil, http: APIWindowTransport.HTTP? = nil)
+                     route: ClaudeRoute = .apiKey, chatGPT: ChatGPTAuth? = nil, chatGPTRoute: ChatGPTRoute = .apiKey,
+                     gate: PlanRunGate? = nil, http: APIWindowTransport.HTTP? = nil)
         -> Result<any WindowTransport, Missing> {
         var routes: [WindowProvider: any WindowTransport] = [:]
         var api = APIWindowTransport(keys: keys.filter { !$0.value.isEmpty })
         if let http { api.http = http }
         for p in Set(spec.voters.map(\.provider)) {
-            let byPlan = p == .anthropic && claudeBinary != nil && (route == .plan || (keys[p] ?? "").isEmpty)
-            if byPlan, let claudeBinary {
+            let noKey = (keys[p] ?? "").isEmpty
+            let claudeByPlan = p == .anthropic && claudeBinary != nil && (route == .plan || noKey)
+            let chatGPTByPlan = p == .openai && chatGPT != nil && (chatGPTRoute == .plan || noKey)
+            if claudeByPlan, let claudeBinary {
                 routes[p] = LocalAgentWindowTransport(binaryPath: claudeBinary, gate: gate)
-            } else if let k = keys[p], !k.isEmpty {
+            } else if chatGPTByPlan, let chatGPT {
+                var t = ChatGPTPlanWindowTransport(auth: chatGPT)
+                if let http { t.http = http }
+                routes[p] = t
+            } else if p == .openai, chatGPTRoute == .plan, !noKey {
+                // The user chose the plan and the chooser priced it so; never quietly bill the key instead.
+                return .failure(Missing(description:
+                    "ChatGPT is set to go by your ChatGPT plan, but ChatGPT is not signed in. Sign in with ChatGPT, or choose By API key."))
+            } else if !noKey {
                 routes[p] = api
             } else {
                 return .failure(Missing(description: p == .anthropic
                     ? "Claude needs an Anthropic API key or a signed-in claude."
-                    : "\(p == .gemini ? "Gemini" : "ChatGPT") needs an API key."))
+                    : p == .gemini ? "Gemini needs an API key."
+                    : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
             }
         }
         return .success(RoutingWindowTransport(routes: routes))
     }
 
-    /// Reads the Keychain and looks for `claude`. Never call it from a view body.
+    /// Reads the Keychain (keys and the ChatGPT sign-in) and looks for `claude`. Never call it from a view body.
     static func current(_ spec: ApproachSpec, defaults: UserDefaults = .standard, gate: PlanRunGate? = nil)
         -> Result<any WindowTransport, Missing> {
         var keys: [WindowProvider: String] = [:]
@@ -219,6 +232,8 @@ enum WindowStageTransport {
         let override = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""
         return make(spec, keys: keys,
                     claudeBinary: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override),
-                    route: ClaudeRoute.stored(defaults), gate: gate)
+                    route: ClaudeRoute.stored(defaults),
+                    chatGPT: ChatGPTAuth.shared.isSignedIn ? ChatGPTAuth.shared : nil,
+                    chatGPTRoute: ChatGPTRoute.stored(defaults), gate: gate)
     }
 }

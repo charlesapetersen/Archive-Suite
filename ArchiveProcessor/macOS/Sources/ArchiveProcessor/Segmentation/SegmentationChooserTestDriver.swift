@@ -150,7 +150,7 @@ enum SegmentationChooserTestDriver {
               openai.canRun && openai.toCheck.hasPrefix("about ") && openai.apiDollars != nil
               && openai.costLines.count == 1, "\(openai.toCheck) \(openai.costLines)")
         let openaiNoKey = row(.openai, 1000, keysOnly)
-        eq("4 openai without key", openaiNoKey.unavailableReason, "Needs an OpenAI API key.")
+        eq("4 openai without key", openaiNoKey.unavailableReason, "Needs an OpenAI API key, or Sign in with ChatGPT.")
         eq("4 openai offers the OpenAI key", openaiNoKey.missingKeys, [.openai])
         if let opts = mutateBundled({ approaches in
             guard let i = approaches.firstIndex(where: { $0["id"] as? String == "openai" }) else { return false }
@@ -180,7 +180,7 @@ enum SegmentationChooserTestDriver {
         eq("4 mix names only the missing provider", mixNoClaude.missingKeys, [.anthropic])
         let mixNothing = row(.mix, 1000, .none)
         eq("4 mix names both", mixNothing.unavailableReason,
-           "Needs an Anthropic API key, or the claude tool installed and signed in and an OpenAI API key.")
+           "Needs an Anthropic API key, or the claude tool installed and signed in and an OpenAI API key, or Sign in with ChatGPT.")
         eq("4 mix wizard offers both", mixNothing.missingKeys, [.anthropic, .openai])
         eq("4 gemini with only claude", row(.gemini, 1000, cliOnly).missingKeys, [.gemini])
         eq("4 all rows, one per case", SegmentationRow.all(options: options, pageCount: 10, routes: all).map(\.approach),

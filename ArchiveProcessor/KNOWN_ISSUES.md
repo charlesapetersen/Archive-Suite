@@ -15,6 +15,23 @@ The scratch proof exercises graceful exit, ignored TERM, an exited child and for
 plus PID/parent, spaced/empty arguments and signal-mask preservation across the actual launcher.
 Runtime evidence and the final unattended rerun are under `verification/evidence/capture/`.
 
+## ⚠️ LIMITATION (W36.seg-opt-siwc, 2026-10-12): the ChatGPT plan route has not met OpenAI's real servers
+
+- **Built and tested against a fake only.** Sign in with ChatGPT needs a person in a browser with a ChatGPT
+  account, so the unattended build proved the protocol against an in-process fake (`scripts/test-segmentation-chatgpt.sh`:
+  the real loopback listener, signed ID tokens, refresh, revoke, the stream and every documented error code). The
+  first real sign-in and one real window are the owner's check. Three things only a real server can show: whether a
+  plan request takes inline `input_image` parts (if not, it fails with `subscription_sharing_unsupported_capability`,
+  which stops the run, and the window would have to be sent another way); whether it takes `reasoning.effort`; and
+  how the issued client id behaves when a different account signs in after a sign-out (the app starts a new
+  registration then, which OpenAI's docs allow).
+- **No meter, so no share.** OpenAI gives an app no usage figure, so the ChatGPT line is the bench's token figure
+  and its API list price, labelled approximate, never a share of the plan. A usage limit stops the run resumably
+  with the Manage usage link; there is no 90% pause as Claude's plan route has.
+- **The token figure is the bench's**, measured through Codex with its harness subtracted
+  (`input_excluding_harness_per_1000_pages`); the app's own requests have no harness, so it should be close, but it
+  was not measured on this route.
+
 ## ⚠️ LIMITATION (W36.seg-opt-subscription, 2026-10-11): the Claude plan route, as built
 
 - **The OCR Local CLI Agent still passes on an inherited `ANTHROPIC_API_KEY`.** The segmentation windows' plan
