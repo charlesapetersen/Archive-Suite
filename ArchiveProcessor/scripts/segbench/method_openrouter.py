@@ -1,8 +1,14 @@
 """W41.seg-large: open-weight 27B-122B vision models over Deaver's windows, through OpenRouter.
+W41.seg-cheap: the cheap cloud models over the same windows (the ``CHEAP`` set, below).
 
-    python method_openrouter.py endpoints                      # candidate ids, providers, precisions, prices
+    python method_openrouter.py endpoints [cheap]              # candidate ids, providers, precisions, prices
     python method_openrouter.py collect <model> [Deaver] [--limit N]
     python method_openrouter.py report [Deaver]                # rows into segbench-results/local-models-<box>.md
+    python method_openrouter.py report-cheap [Deaver]          # rows into segbench-results/cheap-models-<box>.md
+    python method_openrouter.py freeze-cheap <model>...        # the finalists, frozen BEFORE any test-box call
+    python method_openrouter.py estimate-five                  # what the finalists' uncached five-box windows cost
+    python method_openrouter.py collect-five <model> --final   # those calls (dev boxes, then the test boxes)
+    python method_openrouter.py report-five                    # each finalist on all five boxes, flagged at <= 0.85
 
 Owner, 2026-10-11 (SUITE_TODO W41): do the models a 64 GB Mac could hold segment any better than the 4B-12B
 ones did on device (method_local, 47-57% pages in exact doc), or come near the cloud's 97.9% on Deaver? So the
@@ -18,7 +24,22 @@ answer is cached by content hash in ``ResponseCache("window-or-<model>")``. A wi
 one retry at a longer token limit is recorded as failed and votes 0.5 "new" on its gaps, as method_local's do.
 
 MONEY. Each call's cost is read from OpenRouter's usage record and logged; ``collect`` stops before the item's
-spend (every model's log summed) would pass CAP_USD.
+spend (every model's log in the model's set summed) would pass that set's cap: CAP_USD for seg-large's,
+CHEAP_CAP_USD for seg-cheap's.
+
+THE CHEAP SET (owner, 2026-10-11, W41 question 3: do models cheaper than Gemini or Claude segment well enough?).
+These are the cloud models, so they get what the cloud runs of ``cues-models-Deaver.md`` got: the images at the
+bench's 1600 px (W.THUMB_PX), not the 1024 px the local-sized set was held to. Reasoning at each model's lowest
+setting (OpenRouter's ``effort``), since the cheapest Gemini 3.8 Flash setting matched its highest. The provider
+is the model's own maker where it serves it (precision unpublished), else one pinned build. Batch: OpenRouter's
+``:batch`` (or the maker's flex tier) price, applied to each call's logged tokens, beside the standard price paid.
+
+THE FINALISTS (``*-five``). Chosen on the Deaver screen alone and written to ``cheap-finalists.json``, committed
+before any test-box call: ``collect-five`` refuses Stanton and RG 165 without it, as ``options.py`` does. Then
+each finalist runs on all five boxes and is scored as ``ensemble-test.md`` scored its voters: truth photo labels,
+the development boxes and the test boxes reported apart, and review as option F did it, a lone model with every
+gap it is 85% sure of or less flagged and corrected (LEVEL, fixed in advance, not fitted). Gemini 3.8 Flash's
+cached windows (options.py's voter G) are scored the same way beside them, at no cost.
 """
 from __future__ import annotations
 
@@ -55,7 +76,41 @@ MODELS = {
     # The one 4-bit-class build offered for any of the four: the nearest a cloud run gets to a Mac's 4-bit.
     "qwen3.6-35b-a3b-fp4": ("qwen/qwen3.6-35b-a3b", "Qwen3.6 35B-A3B", "darkbloom", "fp4", "35B, 3B active", 21),
 }
+# key: (OpenRouter id, label, pinned provider, its precision or None, reasoning effort or None,
+#       batch price in and out per million tokens or None). Prices and providers from ``endpoints cheap``, 2026-10-13.
+CHEAP_CAP_USD = 2.00   # the Deaver screen
+ITEM_CAP_USD = 3.00    # seg-cheap in total, the five-box run included: past it the owner is asked first
+CHEAP = {
+    "gemini3.5-flash-lite": ("google/gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "google-ai-studio", None, "minimal", (0.15, 1.25)),
+    "gpt5.6-luna": ("openai/gpt-5.6-luna", "GPT-5.6 Luna", "openai", None, "minimal", (0.10, 0.60)),
+    "gpt5.4-nano": ("openai/gpt-5.4-nano", "GPT-5.4 Nano", "openai", None, "minimal", (0.10, 0.625)),
+    "gpt5.4-mini": ("openai/gpt-5.4-mini", "GPT-5.4 Mini", "openai", None, "minimal", (0.375, 2.25)),
+    "glm5.3-flash": ("z-ai/glm-5.3-flash", "GLM-5.3 Flash", "z-ai", "fp8", "minimal", (0.06, 0.20)),
+    "qwen3.5-flash": ("qwen/qwen3.5-flash-02-23", "Qwen3.5 Flash", "alibaba", None, "none", None),
+    "qwen3.6-flash": ("qwen/qwen3.6-flash", "Qwen3.6 Flash", "alibaba", None, "none", None),
+    "mistral-small": ("mistralai/mistral-small-2603", "Mistral Small (2603)", "mistral", None, "none", (0.075, 0.30)),
+    "gemma4-26b-a4b": ("google/gemma-4-26b-a4b-it", "Gemma 4 26B-A4B", "dekallm", "bf16", "none", None),
+    "llama4-maverick": ("meta-llama/llama-4-maverick", "Llama 4 Maverick", "novita", "fp8", None, None),
+    # the known point, re-run on this route to show what the route itself moves (72.3% through the Gemini API)
+    "gemini3.1-flash-lite": ("google/gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "google-ai-studio", None, "minimal", (0.125, 0.75)),
+}
 FAILED = L.FAILED
+
+
+def entry(key):
+    return MODELS.get(key) or CHEAP[key]
+
+
+def models_of(key):
+    return CHEAP if key in CHEAP else MODELS
+
+
+def cap_of(key):
+    return CHEAP_CAP_USD if key in CHEAP else CAP_USD
+
+
+def side_of(key):
+    return W.THUMB_PX if key in CHEAP else L.MAX_SIDE
 
 _key = None
 _key_lock = threading.Lock()
@@ -89,13 +144,16 @@ def records(key) -> list[dict]:
     return [json.loads(l) for l in p.read_text().splitlines()] if p.exists() else []
 
 
-def spent() -> float:
-    return sum(r.get("cost", 0) or 0 for k in MODELS for r in records(k))
+def spent(table=None) -> float:
+    return sum(r.get("cost", 0) or 0 for k in (MODELS if table is None else table) for r in records(k))
 
 
 def cache_key(key, prompt, thumbs):
-    m = MODELS[key]
-    return data.response_cache_key(m[0], m[2], PROMPT_VERSION, L.MAX_SIDE, prompt, [data.file_hash(t) for t in thumbs])
+    m = entry(key)
+    hashes = [data.file_hash(t) for t in thumbs]
+    if key in CHEAP:
+        return data.response_cache_key(m[0], m[2], m[3], m[4], PROMPT_VERSION, W.THUMB_PX, prompt, hashes)
+    return data.response_cache_key(m[0], m[2], PROMPT_VERSION, L.MAX_SIDE, prompt, hashes)
 
 
 def judge(key):
@@ -110,10 +168,10 @@ def judge(key):
     return judge_window
 
 
-def image_url(path) -> str:
+def image_url(path, side=L.MAX_SIDE) -> str:
     from PIL import Image
     im = Image.open(path).convert("RGB")
-    im.thumbnail((L.MAX_SIDE, L.MAX_SIDE), Image.LANCZOS)
+    im.thumbnail((side, side), Image.LANCZOS)
     buf = io.BytesIO()
     im.save(buf, "JPEG", quality=90)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
@@ -148,15 +206,23 @@ def post(body: dict) -> dict:
 
 
 def call(key, prompt, thumbs, max_tokens) -> tuple[str, dict]:
-    model, _, provider, precision, *_ = MODELS[key]
+    model, _, provider, precision, *rest = entry(key)
     content = []
     for t in thumbs:
-        content.append({"type": "image_url", "image_url": {"url": image_url(t)}})
+        content.append({"type": "image_url", "image_url": {"url": image_url(t, side_of(key))}})
     content.append({"type": "text", "text": prompt})
     body = {"model": model, "messages": [{"role": "user", "content": content}], "temperature": 0,
             "max_tokens": max_tokens, "reasoning": {"enabled": False}, "usage": {"include": True}}
+    if key in CHEAP:
+        effort = rest[0]
+        if effort is None:
+            body.pop("reasoning")
+        else:
+            body["reasoning"] = {"effort": effort, "exclude": True}
     if provider:
-        body["provider"] = {"order": [provider], "quantizations": [precision], "allow_fallbacks": False}
+        body["provider"] = {"order": [provider], "allow_fallbacks": False}
+        if precision:
+            body["provider"]["quantizations"] = [precision]
     t0 = time.time()
     j = post(body)
     msg = (j.get("choices") or [{}])[0].get("message") or {}
@@ -167,20 +233,25 @@ def call(key, prompt, thumbs, max_tokens) -> tuple[str, dict]:
                                       "cost": u.get("cost"), "finish": (j.get("choices") or [{}])[0].get("finish_reason")}
 
 
-def collect(key, names, limit=None):
-    W.refuse_test(names)
+def collect(key, names, limit=None, final=False):
+    if final:
+        if key not in finalists():
+            raise SystemExit(f"{key} is not a frozen finalist ({CHEAP_FROZEN.name})")
+    else:
+        W.refuse_test(names)
     jw = judge(key)
     jobs = [(c, a, b) for n in names for c in [data.load(n, with_exif=False)] for a, b in W.windows(len(c.pages))]
     todo = [j for j in jobs if jw(*j) is None][: limit or None]
-    print(f"{key}: {len(jobs)} windows, {len(todo)} to call; item spend so far ${spent():.3f}", flush=True)
+    table, cap = models_of(key), (ITEM_CAP_USD if final else cap_of(key))
+    print(f"{key}: {len(jobs)} windows, {len(todo)} to call; item spend so far ${spent(table):.3f}", flush=True)
     stop, done, t0 = threading.Event(), [0], time.time()
 
     def work(job):
         if stop.is_set():
             return
-        if spent() >= CAP_USD:
+        if spent(table) >= cap:
             stop.set()
-            print(f"COST CAP: ${spent():.3f} >= ${CAP_USD}, stopping", flush=True)
+            print(f"COST CAP: ${spent(table):.3f} >= ${cap}, stopping", flush=True)
             return
         col, a, b = job
         prompt, thumbs, nums = L.request(col, a, b)
@@ -196,7 +267,7 @@ def collect(key, names, limit=None):
                 print(f"FAILED {col.name} {nums[0]}-{nums[-1]}: {str(e)[:200]}", flush=True)
                 return
             text = L.strip_thinking(text)
-            rec = {"collection": col.name, "window": nums, "attempt": attempt, "model": MODELS[key][0], **meta,
+            rec = {"collection": col.name, "window": nums, "attempt": attempt, "model": entry(key)[0], **meta,
                    "t": time.time()}
             try:
                 W.parse_answer(text, nums)
@@ -209,7 +280,7 @@ def collect(key, names, limit=None):
                     fh.write(json.dumps(rec) + "\n")
             if status == "ok":
                 break
-        cache(key).put(cache_key(key, prompt, thumbs), {"status": status, "result": text, "model": MODELS[key][0],
+        cache(key).put(cache_key(key, prompt, thumbs), {"status": status, "result": text, "model": entry(key)[0],
                                                         "provider": rec.get("provider")})
         done[0] += 1
         print(f"[{done[0]}/{len(todo)} {time.time() - t0:.0f}s] {col.name} {nums[0]}-{nums[-1]} {status} "
@@ -218,12 +289,12 @@ def collect(key, names, limit=None):
     with cf.ThreadPoolExecutor(CONCURRENCY) as ex:
         for f in cf.as_completed([ex.submit(work, j) for j in todo]):
             f.result()
-    print(f"{key}: done in {time.time() - t0:.0f}s; item spend ${spent():.3f}", flush=True)
+    print(f"{key}: done in {time.time() - t0:.0f}s; item spend ${spent(table):.3f}", flush=True)
 
 
-def endpoints():
+def endpoints(table=MODELS):
     import requests
-    for key, (model, *_rest) in MODELS.items():
+    for key, (model, *_rest) in table.items():
         r = requests.get(f"{API}/models/{model}/endpoints", timeout=60)
         if r.status_code != 200:
             print(f"{key}: {model} HTTP {r.status_code}")
@@ -262,10 +333,146 @@ def rows(name) -> list[str]:
     return out
 
 
+RESULTS = data.HERE.parent.parent / "segbench-results"
+CHEAP_FROZEN = RESULTS / "cheap-finalists.json"
+LEVEL = 0.85
+FIVE = data.DEV + data.TEST
+
+
+def finalists() -> list[str]:
+    if not CHEAP_FROZEN.exists():
+        raise SystemExit("no freeze: run `freeze-cheap <model>...` and commit cheap-finalists.json first")
+    return json.loads(CHEAP_FROZEN.read_text())["finalists"]
+
+
+def freeze_cheap(keys) -> None:
+    bad = [k for k in keys if k not in CHEAP]
+    if bad or not keys:
+        raise SystemExit(f"not cheap-set models: {bad}")
+    if CHEAP_FROZEN.exists():
+        raise SystemExit(f"{CHEAP_FROZEN.name} exists; the freeze is written once")
+    CHEAP_FROZEN.write_text(json.dumps({"finalists": keys, "level": LEVEL, "chosen_on": "Deaver",
+                                        "frozen": time.strftime("%Y-%m-%d %H:%M"),
+                                        "rule": "within about two points of Gemini 3.8 Flash's 97.9% on Deaver "
+                                                "at a lower cost per 1,000 pages (SUITE_TODO W41.seg-cheap)"},
+                                       indent=1) + "\n")
+    print(f"wrote {CHEAP_FROZEN}")
+
+
+def five_jobs(key):
+    jw = judge(key)
+    return [(c, a, b) for n in FIVE for c in [data.load(n, with_exif=False)] for a, b in W.windows(len(c.pages))
+            if jw(c, a, b) is None]
+
+
+def estimate_five() -> float:
+    total = 0.0
+    for key in finalists():
+        recs = [r for r in records(key) if r["collection"] == "Deaver"]
+        per_window = sum(r.get("cost") or 0 for r in recs) / max(1, len({tuple(r["window"]) for r in recs}))
+        todo = five_jobs(key)
+        total += per_window * len(todo)
+        print(f"{key}: {len(todo)} uncached windows x ${per_window:.4f} (Deaver's mean) = ${per_window * len(todo):.2f}")
+    print(f"estimate ${total:.2f}; seg-cheap spent so far ${spent(CHEAP):.3f}; total ${total + spent(CHEAP):.2f}")
+    return total
+
+
+def five_box(codes):
+    """ensemble.Box per collection, with the cheap models as voters "X:<key>" beside options.py's G."""
+    import ensemble as E
+    import options  # noqa: F401  (installs voter G on E.voter_gaps)
+    base = E.voter_gaps
+
+    def voter_gaps(code, col):
+        if code.startswith("X:"):
+            return E._from_bounds(col, W.assemble(col, W.combine(col, judge(code[2:])), True))
+        return base(code, col)
+    E.voter_gaps = voter_gaps
+    try:
+        return E, {n: E.Box(data.load(n), codes) for n in FIVE}
+    finally:
+        E.voter_gaps = base
+
+
+def report_five() -> str:
+    keys = finalists()
+    codes = ["G"] + [f"X:{k}" for k in keys]
+    E, boxes = five_box(codes)
+    label = {"G": "Gemini 3.8 Flash (low), the bar", **{f"X:{k}": CHEAP[k][1] for k in keys}}
+    lines = ["| model | boxes | pages | no checking | flagged | per 100 pages | after checking | unflagged errors "
+             "| reaches 99% |", "|---|---|---:|---:|---:|---:|---:|---:|---|"]
+    for c in codes:
+        for split, names in (("dev", data.DEV), ("test", data.TEST)):
+            rows = [E.evaluate(boxes[n], (c,), LEVEL) for n in names]
+            for n, r in zip(names, rows):
+                lines.append(f"| {label[c]} | {n} | {r['pages']} | {100 * E.pe(r['auto']):.1f}% | {r['flagged']} "
+                             f"| {100 * r['flagged'] / r['pages']:.1f} | {100 * E.pe(r['rev']):.1f}% | {r['acc_err']} | |")
+            p = E.pooled(rows)
+            lines.append(f"| {label[c]} | **{split} pooled** | {p['pages']} | {100 * E.pe(p['auto']):.1f}% "
+                         f"| {p['flagged']} | {100 * p['flagged'] / p['pages']:.1f} | {100 * E.pe(p['rev']):.1f}% "
+                         f"| {p['acc_err']} | {'yes' if E.pe(p['rev']) >= 0.99 else 'no'} |")
+    cost = ["", "| model | pages | calls | cost paid | per 1,000 pages, standard | per 1,000 pages, batch |",
+            "|---|---:|---:|---:|---:|---:|"]
+    pages = sum(boxes[n].pages for n in FIVE)
+    for k in keys:
+        recs = [r for r in records(k) if r["collection"] in FIVE]
+        paid = sum(r.get("cost") or 0 for r in recs)
+        b = CHEAP[k][5]
+        bk = (f"${1000 * sum((r.get('prompt_tokens') or 0) * b[0] + (r.get('gen_tokens') or 0) * b[1] for r in recs) / 1e6 / pages:.2f}"
+              if b else "none offered")
+        cost.append(f"| {CHEAP[k][1]} | {pages} | {len(recs)} | ${paid:.3f} | ${1000 * paid / pages:.2f} | {bk} |")
+    return "\n".join(lines + cost)
+
+
+def cheap_rows(name) -> list[str]:
+    """One row per cheap model: score, cost paid, and cost per 1,000 pages at the standard and batch prices."""
+    col = data.load(name)
+    n_pages = len(col.pages)
+    out = []
+    for key, (model, label, provider, precision, effort, batch) in CHEAP.items():
+        recs = [r for r in records(key) if r["collection"] == name]
+        last = {}
+        for r in recs:
+            last[tuple(r["window"])] = r
+        route = f"{provider}{' ' + precision if precision else ''}, reasoning {effort or 'n/a'}"
+        try:
+            pred = W.assemble(col, W.combine(col, judge(key)), False)
+        except RuntimeError:
+            out.append(f"| {label} | {route} | not collected ({len(last)} windows run) | | | | | | | |")
+            continue
+        r = derived(score_labels(col.labels, pred.labels, name))
+        failed = sum(1 for x in last.values() if x["event"] == FAILED)
+        cost = sum(x.get("cost") or 0 for x in recs)
+        reasoning = sum(x.get("reasoning_tokens") or 0 for x in recs) / max(1, len(recs))
+        per_k = 1000 * cost / n_pages
+        if batch:
+            b = sum((x.get("prompt_tokens") or 0) * batch[0] + (x.get("gen_tokens") or 0) * batch[1] for x in recs) / 1e6
+            batch_k = f"${1000 * b / n_pages:.2f}"
+        else:
+            batch_k = "none offered"
+        out.append(f"| {label} | {route} | {100 * r['pages_in_exact_doc']:.1f}% | {r['false_splits']} "
+                   f"| {r['false_merges']} | {failed} | {reasoning:.0f} | ${cost:.3f} | ${per_k:.2f} | {batch_k} |")
+    return out
+
+
 def main(argv) -> int:
     if argv and argv[0] == "endpoints":
-        endpoints()
-    elif len(argv) >= 2 and argv[0] == "collect" and argv[1] in MODELS:
+        endpoints(CHEAP if argv[1:] == ["cheap"] else MODELS)
+    elif len(argv) >= 2 and argv[0] == "freeze-cheap":
+        freeze_cheap(argv[1:])
+    elif argv and argv[0] == "estimate-five":
+        estimate_five()
+    elif len(argv) >= 2 and argv[0] == "collect-five":
+        if "--final" not in argv:
+            raise SystemExit("collect-five calls the test boxes: pass --final once cheap-finalists.json is committed")
+        collect(argv[1], list(FIVE), final=True)
+    elif argv and argv[0] == "report-five":
+        print(report_five())
+    elif argv and argv[0] == "report-cheap":
+        for name in argv[1:] or ["Deaver"]:
+            W.refuse_test([name])
+            print("\n".join(cheap_rows(name)))
+    elif len(argv) >= 2 and argv[0] == "collect" and (argv[1] in MODELS or argv[1] in CHEAP):
         rest = argv[2:]
         limit = None
         if "--limit" in rest:
