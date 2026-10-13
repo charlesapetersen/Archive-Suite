@@ -120,7 +120,7 @@ final class ProcessorUITests: XCTestCase {
             item.click()
         }
 
-        for label in ["Full manual", "Claude only", "Gemini only", "Claude and Gemini together", "ChatGPT only"] {
+        for label in ["Full manual", "Claude only", "Gemini only", "ChatGPT only", "Claude and ChatGPT together"] {
             picker.click()
             XCTAssertTrue(app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", label)).firstMatch
                 .waitForExistence(timeout: 5), "the chooser must offer \(label)")
@@ -137,9 +137,14 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(gemini.contains("Needs"), "with no Gemini key the row says why it cannot run: \(gemini)")
         attachScreenshot("processor-segmentation-chooser-gemini")
 
+        // W36.seg-opt-openai measured ChatGPT, so its row now carries figures too; with no key and no ChatGPT
+        // sign-in it names both routes it could run by (W36.seg-opt-siwc).
         choose("ChatGPT only")
-        XCTAssertTrue(waitUntil { self.renderedText(of: row) != gemini && !self.renderedText(of: row).contains("To check") },
-                      "ChatGPT shows only the reason it is not measured: \(renderedText(of: row))")
+        XCTAssertTrue(waitUntil { self.renderedText(of: row) != gemini && self.renderedText(of: row).contains("To check") },
+                      "ChatGPT's row shows its own figures: \(renderedText(of: row))")
+        let chatGPT = renderedText(of: row)
+        XCTAssertTrue(chatGPT.contains("Cost") && chatGPT.contains("Needs") && chatGPT.contains("Sign in with ChatGPT"),
+                      "with no key and no sign-in the row says how ChatGPT could run: \(chatGPT)")
 
         choose("Full manual")
         XCTAssertTrue(waitUntil { self.renderedText(of: row).contains("to judge") && !self.renderedText(of: row).contains("Needs") },
