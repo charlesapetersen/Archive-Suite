@@ -272,8 +272,9 @@ def collect(key, names, limit=None, final=False):
             try:
                 W.parse_answer(text, nums)
                 status = "ok"
-            except W.ParseError as e:
-                rec["error"] = str(e)[:200]
+            except (W.ParseError, TypeError, ValueError, KeyError, AttributeError) as e:
+                # a malformed answer (e.g. a null confidence raises TypeError in parse_answer) is unparsed
+                rec["error"] = f"{type(e).__name__}: {e}"[:200]
             rec["event"] = status
             with _log_lock:
                 with open(log_path(key), "a") as fh:

@@ -1,0 +1,11 @@
+{
+ "finalists": [
+  "glm5.3-flash",
+  "gpt5.6-luna",
+  "qwen3.5-flash"
+ ],
+ "level": 0.85,
+ "chosen_on": "Deaver",
+ "frozen": "2026-10-13 04:09",
+ "rule": "within about two points of Gemini 3.8 Flash's 97.9% on Deaver at a lower cost per 1,000 pages (SUITE_TODO W41.seg-cheap)"
+}
