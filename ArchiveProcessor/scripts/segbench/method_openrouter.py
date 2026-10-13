@@ -395,8 +395,12 @@ def five_box(codes):
         E.voter_gaps = base
 
 
+def collected_everywhere(key) -> bool:
+    return not five_jobs(key)
+
+
 def report_five() -> str:
-    keys = finalists()
+    keys = [k for k in finalists() if collected_everywhere(k)]
     codes = ["G"] + [f"X:{k}" for k in keys]
     E, boxes = five_box(codes)
     label = {"G": "Gemini 3.8 Flash (low), the bar", **{f"X:{k}": CHEAP[k][1] for k in keys}}
@@ -422,7 +426,30 @@ def report_five() -> str:
         bk = (f"${1000 * sum((r.get('prompt_tokens') or 0) * b[0] + (r.get('gen_tokens') or 0) * b[1] for r in recs) / 1e6 / pages:.2f}"
               if b else "none offered")
         cost.append(f"| {CHEAP[k][1]} | {pages} | {len(recs)} | ${paid:.3f} | ${1000 * paid / pages:.2f} | {bk} |")
-    return "\n".join(lines + cost)
+    # The fixed 0.85 is Claude's fitted level; models whose confidences run higher flag little at it. So, as
+    # options.py fitted each approach: the level held out per development box (fitted on the other two), and
+    # for the test boxes the level fitted on all three, at the item's 99% and at options.py's 98% bar.
+    fit = ["", "| model | bar | dev, held out: after checking | flagged per 100 pages | level for the test boxes "
+           "| test: no checking | after checking | flagged per 100 pages | unflagged errors |",
+           "|---|---|---:|---:|---|---:|---:|---:|---:|"]
+    dev = {n: boxes[n] for n in data.DEV}
+    bar0 = E.BAR
+    try:
+        for c in codes:
+            for bar in (0.99, 0.98):
+                E.BAR = bar
+                lo = E.loco(dev, (c,))["pooled"]
+                v = E.fit_level(list(dev.values()), (c,))
+                t = E.pooled([E.evaluate(boxes[n], (c,), 2.0 if v is None else v) for n in data.TEST])
+                lv = "flag all" if v is None or v >= 1 else ("unanimity" if v < 0 else f"<= {v:.3f}")
+                fit.append(f"| {label[c]} | {100 * bar:.0f}% | {100 * E.pe(lo['rev']):.1f}% "
+                           f"| {100 * lo['flagged'] / lo['pages']:.1f} | {lv} | {100 * E.pe(t['auto']):.1f}% "
+                           f"| {100 * E.pe(t['rev']):.1f}% | {100 * t['flagged'] / t['pages']:.1f} | {t['acc_err']} |")
+    finally:
+        E.BAR = bar0
+    waiting = [CHEAP[k][1] for k in finalists() if k not in keys]
+    note = [f"", f"Not yet run on all five boxes: {', '.join(waiting)}."] if waiting else []
+    return "\n".join(lines + fit + cost + note)
 
 
 def cheap_rows(name) -> list[str]:

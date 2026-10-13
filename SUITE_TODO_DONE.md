@@ -10760,3 +10760,22 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   per-call usage cost, logged in `window-or-*-calls.jsonl` in the segbench cache). Gemma on Crusoe was rate-limited
   upstream (429s); its failed windows were rerun serially (`SEGBENCH_OR_CONCURRENCY=1`).
   <!-- /W41.seg-large -->
+- [x] **W41.seg-cheap — cheaper cloud models for segmentation** · §Archive Processor — transcription and segmentation bake-off on OpenRouter · SHIPPED 2026-10-13
+  (lane: segbench) (uses: light,paid). Question 3. A screen on Deaver, as `cues-models-Deaver.md` ran the cloud models: Gemini 3.5 Flash-Lite, GPT-5.6 Luna, GPT-5.4 Nano and Mini, GLM-5.3 Flash, Qwen3.5 Flash and Qwen3.6 Flash, Mistral Small, Gemma 4 26B-A4B, Llama 4 Maverick, with Gemini 3.8 Flash (97.9%) and Gemini 3.1 Flash-Lite (84.6%) as the known points, batch prices where offered. Then the finalists (any within about two points of 3.8 Flash at a lower cost per 1,000 pages) on all five boxes, dev and test as `ensemble-test.md` held them out, and whether a cheap model plus review (≤85% sure flagged, as option F) reaches 99%. Cost per 1,000 pages for each row. Screen cap $2; the five-box run states its estimate and asks the owner if the item's total would pass $3.
+  **Result** (`ArchiveProcessor/segbench-results/cheap-models.md`; the `CHEAP` set and `*-five` commands in
+  `scripts/segbench/method_openrouter.py`). Deaver screen, pages in exact doc, cost per 1,000 pages list/batch: GLM-5.3 Flash
+  (Z.AI fp8) **97.9%** $1.21/$0.49; GPT-5.6 Luna 96.5% $2.03/$0.84; Qwen3.5 Flash 95.7% $0.56; Qwen3.6 Flash 91.5%; Gemini 3.5
+  Flash-Lite 85.1%; GPT-5.4 Nano 83.7%; Llama 4 Maverick 80.9%; Gemma 4 26B-A4B 73.8% (DekaLLM bf16: its fp8 builds refuse
+  images). GPT-5.4 Mini not run (its probe projects to ~$6 per 1,000 pages, above 3.8 Flash's $3.61). Mistral Small not
+  collected (27/51 windows; "rate-limited upstream" 429s across three tries). Gemini 3.1 Flash-Lite re-run on this route scored
+  83.7%, against 72.3% through the Gemini API with g1, so the route and prompt variant alone move a weak model about 11 points.
+  Finalists frozen before any test-box call (`cheap-finalists.json`): GLM, Luna, Qwen3.5 Flash. Only GLM ran on five boxes
+  (the three together would have put the item at $4.57). **GLM did not hold up off Deaver:** on the test boxes it scored 82.1% with no checking,
+  against Gemini 3.8 Flash's 88.8%. At option F's fixed 0.85 neither reaches 99% (GLM 95.8% dev / 90.9% test). With its level fitted
+  as options.py did, GLM reaches 100% on test at 81 flagged per 100 pages for the 99% bar (Gemini: 51), and at the 98% bar
+  98.5% with 33 flagged and 1 unflagged error (Gemini: 100%, 24, 0, reproducing options.md exactly). **Verdict:** a budget
+  option for a user who checks everything flagged, at a third of the price ($1.16 vs $3.61 list), not a replacement for the
+  Gemini default. Luna and Qwen3.5 Flash on five boxes → `W41.seg-cheap-more` (owner-gated, ~$1.95). Spent **$2.57** (screen
+  $1.70 under its $2 cap, GLM's five boxes $0.88). Fixed on the way: a window answer with a null confidence raised TypeError in
+  parse_answer and ended a model's run; it now counts as unparsed.
+  <!-- /W41.seg-cheap -->
