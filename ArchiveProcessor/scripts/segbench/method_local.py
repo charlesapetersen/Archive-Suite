@@ -161,6 +161,24 @@ def report(name) -> str:
         peak = max((x["peak_gb"] for x in recs), default=0)
         lines.append(f"| {label} | {100 * r['pages_in_exact_doc']:.1f}% | {r['false_splits']} | {r['false_merges']} "
                      f"| {failed} | {mean:.0f} | {peak:.1f} |")
+    import method_openrouter as O  # W41.seg-large: the larger open models, the same request through OpenRouter
+    lines += ["", "## Larger open models through OpenRouter (W41.seg-large)", "",
+              "The same request, images at the same 1024 px, sent to OpenRouter (`method_openrouter.py`), one "
+              "provider and precision pinned per model; reasoning off, temperature 0. Seconds are the cloud's, "
+              "not a Mac's; the memory column is an estimate of the 4-bit weights alone, not measured.", "",
+              "| model, route | pages in exact doc | false splits | false merges | failed windows | mean s/window "
+              "| GB to hold | cost |", "|---|---|---|---|---|---|---|---|"]
+    lines += O.rows(name)
+    if name == "Deaver":
+        lines += ["", "**Verdict (2026-10-13).** Local segmentation is not closed. Qwen3.5 27B, which a 32 GB Mac "
+                  "could hold at 4-bit, reached 95.0% against the cloud models' 97.9% (two more false merges, no "
+                  "false splits), with smaller images than theirs (1024 px against 1600). That is near enough for "
+                  "a fine-tune, or a 4-bit run on a Mac, to be worth discussing; it is far from the 4B-12B models' "
+                  "47-57%. Three cautions. It is one box of 149 pages, where each mistake moves the figure by "
+                  "several points, and bigger did not mean better: the 122B scored below the 27B. These ran at fp8 "
+                  "or bf16, and a Mac runs 4-bit: the one fp4 build offered (Qwen3.6 35B-A3B) lost 3.6 points to "
+                  "its fp8 run, so expect a 4-bit 27B somewhat below 95%. And the seconds are the cloud's: a "
+                  "dense 27B on a Mac reads seven pages far slower than the 4B-12B rows above."]
     return "\n".join(lines) + "\n"
 
 
