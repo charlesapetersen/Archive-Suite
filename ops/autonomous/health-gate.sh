@@ -299,6 +299,9 @@ step todo-stubs-proof     bash "$ROOT/ops/autonomous/tests/prove-todo-stubs.sh"
 # prove-done-union.sh (~9 s) — W35.done-union: SUITE_TODO_DONE.md's append-only + merge=union rule, in scratch
 #   repos with the real .gitattributes. Shipped unwired, which turned gate-report red (gate-fix 2026-10-08).
 step done-union-proof     bash "$ROOT/ops/autonomous/tests/prove-done-union.sh"
+# ops/agent/tests (~25 s) — the Agent Manager hooks (queue, holds, status, gate, upkeep) against scratch fixture
+#   repos. Unwired until 2026-10-13, so Status.test_counts_and_health failed for a day with nothing to notice it.
+step agent-hooks-proof    /usr/bin/python3 -m unittest discover -s "$ROOT/ops/agent/tests"
 step housekeeping-proof   bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
 step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
