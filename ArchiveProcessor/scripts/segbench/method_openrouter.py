@@ -79,7 +79,7 @@ MODELS = {
 # key: (OpenRouter id, label, pinned provider, its precision or None, reasoning effort or None,
 #       batch price in and out per million tokens or None). Prices and providers from ``endpoints cheap``, 2026-10-13.
 CHEAP_CAP_USD = 2.00   # the Deaver screen
-ITEM_CAP_USD = 3.00    # seg-cheap in total, the five-box run included: past it the owner is asked first
+ITEM_CAP_USD = 4.57    # seg-cheap in total, the five-box run included; owner approved $4.57 on 2026-10-13, past it ask first
 CHEAP = {
     "gemini3.5-flash-lite": ("google/gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "google-ai-studio", None, "minimal", (0.15, 1.25)),
     "gpt5.6-luna": ("openai/gpt-5.6-luna", "GPT-5.6 Luna", "openai", None, "minimal", (0.10, 0.60)),
