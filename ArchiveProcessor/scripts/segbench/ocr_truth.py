@@ -216,10 +216,10 @@ def pdf_page(pdf: Path):
     rot = re.search(r"Page\s+1 rot:\s*(\d+)", info) or re.search(r"Page rot:\s*(\d+)", info)
     if rot and int(rot.group(1)) % 180:
         w, h = h, w
-    sides = [max(int(x.split()[3]), int(x.split()[4]))
-             for x in sh(["/opt/homebrew/bin/pdfimages", "-list", "-f", "1", "-l", "1", str(pdf)]).stdout.splitlines()[2:]
-             if len(x.split()) > 4 and x.split()[2] == "image"]
-    return w, h, max(sides, default=0)
+    rows = [x.split() for x in sh(["/opt/homebrew/bin/pdfimages", "-list", "-f", "1", "-l", "1", str(pdf)]).stdout.splitlines()[2:]]
+    rows = [r for r in rows if len(r) > 13 and r[2] in ("image", "stencil")]   # stencil: a bilevel scan's layers
+    ppi = max((int(r[12]) for r in rows if r[12].isdigit()), default=0)
+    return w, h, max((max(int(r[3]), int(r[4])) for r in rows), default=0), ppi
 
 
 def orient_like_pdf(im, pdf: Path, tmp: Path):
@@ -286,10 +286,11 @@ def extract(kind, src: Path, out: Path, pdf: Path | None = None):
             else:
                 im2.save(out, "JPEG", quality=92)
         else:
-            pw, ph, side = pdf_page(src)
+            pw, ph, side, ppi = pdf_page(src)
             if not pw or not side:
                 raise RuntimeError("pdf: no page size or no image")
-            dpi = max(72, min(600, round(side / (max(pw, ph) / 72))))
+            # the images' own resolution; a page of several small layers is not one image's size
+            dpi = max(72, min(600, ppi or round(side / (max(pw, ph) / 72))))
             r = sh(["/opt/homebrew/bin/pdftoppm", "-f", "1", "-l", "1", "-r", str(dpi), "-jpeg", "-jpegopt", "quality=92",
                     "-singlefile", str(src), str(tmp / "page")])
             if r.returncode or not (tmp / "page.jpg").exists():
@@ -329,7 +330,9 @@ def prepare(folder, name, tags, originals) -> dict:
     key = hashlib.sha256(f"{folder}/{name}".encode()).hexdigest()[:16]
     mpath = CACHE / "prep" / f"{key}.json"
     if mpath.exists():
-        return json.loads(mpath.read_text())
+        rec = json.loads(mpath.read_text())
+        if "error" not in rec:
+            return rec
     mpath.parent.mkdir(parents=True, exist_ok=True)
     kind, src = source_of(folder, name, originals)
     img = CACHE / "prep" / f"{key}.jpg"
@@ -556,7 +559,8 @@ def run_drafts(model, fn, concurrency):
     def work(p):
         for attempt in range(2):
             raw, meta = fn(p, attempt)
-            got = parse_draft(raw)
+            # a reply cut off by the provider (finish "error" or "length") still parses: it is a failed attempt
+            got = parse_draft(raw) if meta.get("finish") in (None, "stop") else None
             log(model, {"page": p, "attempt": attempt, "ok": bool(got), **meta, "t": time.time()})
             if got:
                 draft_path(model, p).write_text(json.dumps({**got, "raw": raw, "meta": meta}))
@@ -601,6 +605,10 @@ def gemini_call(page, attempt):
     if gemini_spent() >= CAP_USD - 0.03:
         raise SystemExit(f"cap: ${gemini_spent():.3f} spent of ${CAP_USD}")
     model, provider, effort = GEMINI_MODEL
+    if attempt:
+        # AI Studio ends some pages of reprinted published text with finish "error" and no tokens, every time
+        # (two of 100 on 2026-10-14); Google's Vertex endpoint serves the same model and answers them
+        provider = "google-vertex"
     body = {"model": model, "temperature": 0, "max_tokens": 16000 if attempt else 8000,
             "messages": [{"role": "user", "content": [
                 {"type": "image_url", "image_url": {"url": OR.image_url(draft_image(page), DRAFT_SIDE)}},
@@ -822,15 +830,21 @@ def write_summary(draw, pages):
             w = sum(p["words"]["claude"] for p in r)
             d = sum(p["disputed_words"] for p in r)
             L.append(f"| {k} | {len(r)} | {w:,} | {d:,} ({pct(d, w)}) | {sum(not p['n_disputes'] for p in r)} |")
-        L += ["", f"Gemini 3.8 Flash cost ${sum(r.get('cost') or 0 for r in g):.3f} over {len(g)} calls "
-              f"(provider {collections.Counter(str(r.get('provider')) for r in g).most_common(1)[0][0]}). Claude: $0 "
-              "(subscription).", "",
+        prov = collections.Counter(str(json.loads(draft_path("gemini", p["page"]).read_text())["meta"].get("provider"))
+                                   for p in done)
+        L += ["", f"Gemini 3.8 Flash cost ${sum(r.get('cost') or 0 for r in g):.3f} over {len(g)} calls, retries and "
+              "probes included. Its drafts by provider: " + ", ".join(f"{k} {v}" for k, v in prov.most_common()) +
+              " (AI Studio ended two pages of reprinted published text with an error and no tokens on every try; "
+              "Google's Vertex endpoint, the same model, answered them). Claude: $0 (subscription).", "",
               "## The review", "",
               f"The review sheet holds {nd} spans on {len(done)} pages, about **{review_minutes(pages):.0f} minutes** "
               f"at {SECONDS_PER_PAGE} s a page (the kind of writing), {SECONDS_PER_DISPUTE} s a span and "
               f"{SECONDS_PER_TYPED} s for the {TYPED_SHARE:.0%} assumed to need a typed correction (an estimate, not "
               "measured). One keystroke per choice; the answers are exported as JSON and applied with "
-              "`ocr_truth.py apply`, which writes `truth/<page>.txt` and the page table `pages.tsv` the panels group by."]
+              "`ocr_truth.py apply`, which writes `truth/<page>.txt` and the page table `pages.tsv` the panels group by "
+              "(a kind of writing the two models agree on and the owner leaves alone counts as confirmed). The truth "
+              "is a word sequence: line breaks and table bars are not kept, so a panel is scored on the words in "
+              "order, with whitespace normalised (as socOCRbench's NES and chrF do)."]
     RESULTS.write_text("\n".join(L) + "\n")
 
 

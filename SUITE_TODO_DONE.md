@@ -10789,3 +10789,26 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   but costs about 320 more checks per 1,000 pages. Verdict: question 3's answer stands. Gemini stays the
   default, and GLM-5.3 Flash is the only budget option. Qwen failed to parse 5 of the 259 new windows.
   <!-- /W41.seg-cheap-more -->
+- [x] **W41.ocr-truth — a transcription truth set for Archive Processor** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · (lane: segbench) (uses: light,paid) · SHIPPED 2026-10-14
+  `ArchiveProcessor/scripts/segbench/ocr_truth.py` (+ `test_ocr_truth.py`); numbers in `ArchiveProcessor/segbench-results/ocr-truth.md`;
+  pages, drafts, review sheet and (after apply) `pages.tsv` + `truth/` under `~/Library/Caches/ArchiveSuiteRehearsal/ocr-truth/`
+  (outside git: the repo is public). Draw (seed 41, rule in the script header): 100 pages from 33 collections, every stratum
+  at 12+, 19 replaced for <20 Vision words; 67 from the original photo, 33 from the PDF, and the originals under-cover
+  1900-1949 (36%), undated and clippings (46%), as the report must say. Resolution ladder: 20 pages at 1/2 and 1/4.
+  Drafts: Claude Opus 5.5 via `claude -p` ($0) and Gemini 3.8 Flash on OpenRouter (**$0.369**, cap $1). 33 pages agree
+  word for word; 416 disputed spans cover 1,000 of 31,184 words (handwriting 9%, typewriting 2%); the kind label agrees
+  on 87. Review sheet `review/index.html`, about 89 min (estimate), one keystroke per span; `ocr_truth.py apply` writes
+  the truth. Found on the way: some originals were photographed sideways or upside down and only the PDF rotated, so
+  each original is turned to match a small render of its PDF (Vision's word count picked upside-down turns); bilevel
+  scans list as pdfimages `stencil`; AI Studio returns finish "error" with no tokens on reprinted published text
+  (2 pages), which Google's Vertex endpoint answers, so retries go there. Truth is a word sequence (no line breaks).
+  The original brief:
+  - **From the collection folders, not the numbered workflow folders** (their tags are partial and many files are copies awaiting conversion).
+  - **Chosen by the PDF's tags, read from the original photograph** (owner, 2026-10-11). The tags live on the PDFs in `Archival Photos`; the original camera images, untagged but with their EXIF (camera, pixel size, date), are in `~/Desktop/Google Drive/Archival Photos JPEGS` (about 98,000 JPEG/HEIC, read only too), under the same file name (`00010 IMG — Seabury Papers.jpg` beside `….pdf`; collection folder names differ between the two trees). On 2026-10-11, 64,586 of the 91,152 PDFs in collection folders had an original of the same name, 63,717 exactly one. Use the original; where none matches, or more than one, take the image inside the PDF and mark the row, and report the match rate per stratum so a stratum the originals under-cover (likely multi-page documents) is visible rather than silently thinned.
+  - **One page per document**, a random page of a randomly chosen document; at most about 4 pages from one folder and 8 from one collection, and every collection with 30 or more files gives at least one.
+  - **Stratified by the tags**, with small strata oversampled so each has about 12 pages: before 1900, 1900-1949, 1950-1984, 1985 on, undated; Handwritten; Clippings; tables (Statistics, and forms found at drafting).
+  - **Stratified by the photograph, measured from the file, not tagged**: pixel size (tertiles), the year it was taken (file or EXIF date) and the camera where EXIF keeps it, and a sharpness figure, so old low-resolution photos and recent sharp ones are both in.
+  - **The kind of writing is labelled at drafting**, since tags note handwriting only sometimes and typewriting never: both drafting models label each page printed / typewritten / handwritten / mixed, and the owner confirms the label on the review sheet along with the text.
+  - **Pages with under about 20 words are replaced** (covers, photographs, blanks), as Vision OCR's truth set did.
+  Each page's tags, collection, measured photo attributes and confirmed kind go in one table the panels group by. Plus a resolution ladder: about 20 of the pages also at half and a quarter of their pixel size. The draw's rule, seed and tally written down. Draft truth from two strong readers: Claude through the subscription ($0) and Gemini 3.8 Flash (about $0.50). Where they agree, the agreed text; where they differ, a review sheet for the owner (page image beside both readings, the differing spans marked, one keystroke per choice or a typed correction), with an estimate of how long it takes. Record which two models drafted it, since the truth leans toward them. Cap $1.
+  <!-- /W41.ocr-truth -->
