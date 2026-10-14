@@ -99,6 +99,7 @@ class Fixture(unittest.TestCase):
         self.env = dict(os.environ, AGENT_REPO=self.repo, AGENT_STATE=self.state, AGENT_PROJECT="fixture",
                         HOME=self.tmp)
         self.env.pop("AUTONOMOUS_PLAN", None)
+        self.env["AGENT_GATE_PGREP"] = "no-such-gate-" + os.path.basename(self.tmp)   # never a real gate
 
     def write(self, rel, text, mode=None):
         p = os.path.join(self.repo, rel)

@@ -333,7 +333,10 @@ def health():
     """status-digest.sh's Health line: a RED in last-gate.log (unless a gate is running), else how far HEAD is
     past the last green sha."""
     gate_red = ""
-    running = subprocess.run(["pgrep", "-f", r"ops/autonomous/health-gate\.sh"], capture_output=True).returncode == 0
+    # AGENT_GATE_PGREP lets the tests point this at a pattern of their own: the real one matches any live gate on the
+    # Mac, so Status.test_counts_and_health failed whenever Archive Suite's own gate was running (2026-10-13).
+    pattern = os.environ.get("AGENT_GATE_PGREP") or r"ops/autonomous/health-gate\.sh"
+    running = subprocess.run(["pgrep", "-f", pattern], capture_output=True).returncode == 0
     if not running:
         for line in (read(os.path.join(STATE, "last-gate.log")) or "").splitlines():
             if line.startswith("HEALTH GATE: RED"):
