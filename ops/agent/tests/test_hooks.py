@@ -268,6 +268,33 @@ class Holds(Fixture):
         items = self.jsonl(self.hook("holds").stdout)
         self.assertEqual([d for d in items if d["source"] == "Daemon Report"], [])
 
+    def test_an_answer_recorded_only_in_suite_todo_is_flagged(self):
+        # 2026-10-13: W41.seg-cheap-more's approval went into SUITE_TODO.md alone; the gate stayed open.
+        self.write("SUITE_TODO.md", "- [ ] **A.two — waits on the owner** (blocked-on: H.ok)\n")
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertFalse(by["H.ok"]["text"].startswith("HALF-RECORDED"))
+        self.write("SUITE_TODO.md", "- [ ] **A.two — waits on the owner** OWNER APPROVED 2026-10-13\n")
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertTrue(by["H.ok"]["text"].startswith("HALF-RECORDED: SUITE_TODO.md no longer blocks A.two"),
+                        by["H.ok"]["text"])
+        self.assertIn("approve H.ok", by["H.ok"]["detail"])
+        self.assertFalse(by["H.two"]["text"].startswith("HALF-RECORDED"))   # A.three has no SUITE_TODO line
+
+    def test_approve_ticks_the_gate_and_unblocks_its_item(self):
+        shutil.copy2(os.path.join(AUTONOMOUS, "plan-edit.py"), os.path.join(self.repo, "ops", "autonomous"))
+        plan = os.path.join(self.repo, ".maintenance", "AUTONOMOUS_PLAN.md")
+        edit = ["/usr/bin/python3", os.path.join(self.repo, "ops", "autonomous", "plan-edit.py"), plan]
+        self.assertNotEqual(run(edit + ["approve", "H.done", "again"], check=False).returncode, 0)  # already ticked
+        self.assertNotEqual(run(edit + ["approve", "A.two", "x"], check=False).returncode, 0)   # not a gate
+        run(edit + ["approve", "H.ok", "walkthrough: yes"])
+        with open(plan) as f:
+            text = f.read()
+        self.assertRegex(text, r"- \[x\] \*\*H\.ok — owner says yes\*\* — OWNER ANSWERED 20\d\d-\d\d-\d\d: "
+                               r"walkthrough: yes\n")
+        self.assertNotIn("H.ok", [d["key"] for d in self.jsonl(self.hook("holds").stdout)])
+        items = {d["tag"]: d for d in self.jsonl(self.hook("queue").stdout)}
+        self.assertEqual(items["A.two"]["status"], "ok")
+
     def test_unblocking_the_other_prerequisite_makes_a_hold_pending(self):
         self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.one", "- [x] **A.one"))
         by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}

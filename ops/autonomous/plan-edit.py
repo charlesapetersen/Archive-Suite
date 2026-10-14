@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import time
 
 
 def section(text, heading):
@@ -120,6 +121,25 @@ def edit(plan, action, values):
                 text, n = re.subn(r"(?m)^RUN STATUS:.*$", "RUN STATUS: COMPLETE", text)
                 if n != 1:
                     raise ValueError("expected one RUN STATUS marker")
+        elif action == "approve":
+            # Record the owner's yes on a HOLD QUEUE gate. Ticking it is what unblocks the items that wait on it:
+            # next-queue-item.sh counts a prerequisite met once its tag is ticked and open nowhere. Editing only
+            # SUITE_TODO.md leaves the gate open and the item waiting (W41.seg-cheap-more, 2026-10-13).
+            tag, note = values
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag):
+                raise ValueError("invalid tag")
+            if "\n" in note or not note.strip():
+                raise ValueError("note must be one non-empty line")
+            start, end = section(text, "## HOLD QUEUE")
+            body = text[start:end]
+            matches = [(lo, hi) for t, lo, hi in pending_entries(body) if t == tag]
+            if len(matches) != 1:
+                raise ValueError("expected exactly one unchecked HOLD QUEUE gate")
+            lo, hi = matches[0]
+            line = re.sub(r"^(\s*[-*]\s+)\[ \]", r"\1[x]", body[lo:hi].rstrip("\n"))
+            line += " — OWNER ANSWERED " + time.strftime("%Y-%m-%d") + ": " + note.strip()
+            body = body[:lo] + line + "\n" + body[hi:]
+            text = text[:start] + body + text[end:]
         elif action == "add":
             # File new work into the WORK QUEUE after AFTER-TAG, so an item filed in SUITE_TODO reaches the resolver.
             tag, after, item = values

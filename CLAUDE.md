@@ -47,6 +47,11 @@ answer before moving to the next.** It is a conversation he steers. That is the 
    wait.** Use `AskUserQuestion` so the options are pickable.
 5. After the last one: a compact table of his calls, plus the "worth knowing, no decision" leftovers.
 6. **Only then** ask whether to record the outcomes in the plan. Recording is a separate, opt-in step.
+   An answered owner gate is recorded in the plan with
+   `ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md approve <GATE> '<the answer>'`; ticking the gate
+   is what unblocks the work. Editing only `SUITE_TODO.md` leaves the gate open and the item waiting, and the
+   holds hook then marks the gate `HALF-RECORDED` (W41.seg-cheap-more, 2026-10-13). Close the walked entries with
+   a `### ✅ <date> — walkthrough done (owner): …` heading above them (`plan-edit.sh PLAN report '<heading>'`).
 
 **Naming:** the section was `## Morning Review` until 2026-08-05, renamed because it happens at any hour.
 Scripts still match both spellings; new writing says **Daemon Report**.

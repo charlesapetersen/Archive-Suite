@@ -186,6 +186,26 @@ def own_prerequisites_met(text, states):
     return True
 
 
+def half_recorded(gate, rows):
+    """The plan items still blocked on GATE whose SUITE_TODO.md line no longer names it. That is an answer
+    written into the tracker of record but not into the plan, so the daemon still waits: W41.seg-cheap-more was
+    approved on 2026-10-13, SUITE_TODO.md lost its blocked-on, the HOLD QUEUE gate stayed open, and the manager
+    kept asking the owner a question he had answered. The fix is `plan-edit.sh PLAN approve GATE NOTE`."""
+    todo = {}
+    for line in (read(os.path.join(REPO, "SUITE_TODO.md")) or "").splitlines():
+        m = CHECKBOX.match(line)
+        if m and m.group(1) == " ":
+            todo.setdefault(tag_of(line[m.end():]), line)
+    out = []
+    for status, tag, text in rows:
+        mine = {t.replace("`", "").strip() for c in BLOCKED_ON.findall(text) for t in c.split(",")}
+        if gate in mine and tag in todo:
+            theirs = {t.replace("`", "").strip() for c in BLOCKED_ON.findall(todo[tag]) for t in c.split(",")}
+            if gate not in theirs:
+                out.append(tag)
+    return out
+
+
 def short_hash(s):
     return hashlib.sha1(s.strip().encode("utf-8")).hexdigest()[:8]
 
@@ -246,8 +266,14 @@ def holds():
             continue
         seen.add(tag)
         ready = tag in pending and own_prerequisites_met(line, states)
-        out.append({"key": tag, "text": clean(line[m.end():]), "permanent": not ready, "source": "HOLD QUEUE",
-                    "detail": clean(line[m.end():], DETAIL_MAX)})
+        text = clean(line[m.end():])
+        half = half_recorded(tag, rows)
+        if half:
+            text = ("HALF-RECORDED: SUITE_TODO.md no longer blocks %s on this gate but the plan still does; if the "
+                    "owner answered, run ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md approve %s "
+                    "NOTE. %s" % (", ".join(half), tag, text))
+        out.append({"key": tag, "text": text, "permanent": not ready, "source": "HOLD QUEUE",
+                    "detail": clean(text if half else line[m.end():], DETAIL_MAX)})
     for status, tag, text in rows:
         if HOLD_MARK.search(text) and tag not in seen:
             seen.add(tag)
