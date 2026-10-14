@@ -10779,3 +10779,13 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   $1.70 under its $2 cap, GLM's five boxes $0.88). Fixed on the way: a window answer with a null confidence raised TypeError in
   parse_answer and ended a model's run; it now counts as unparsed.
   <!-- /W41.seg-cheap -->
+- [x] **W41.seg-cheap-more — GPT-5.6 Luna and Qwen3.5 Flash on all five boxes** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · (lane: segbench) (uses: light,paid) · SHIPPED 2026-10-14
+  Owner approved $1.95 more on 2026-10-13 (item total ~$4.57, `ITEM_CAP_USD` 4.57). `collect-five` for both
+  frozen finalists, then `report-five` into `ArchiveProcessor/segbench-results/cheap-models.md`. Paid $1.79
+  (Luna $1.44, Qwen $0.35; estimate $1.96), so seg-cheap spent **$4.37** in all. Neither holds up off Deaver.
+  On the test boxes with no checking: Luna 84.5%, Qwen3.5 Flash 77.6%, Gemini 3.8 Flash 88.8%. At the 98% bar
+  they flag 86 (Luna) and 56 (Qwen) boundaries per 100 test pages, against Gemini's 24 and GLM-5.3 Flash's 33.
+  Luna's confidences sit so high that its fitted level is 0.990. Qwen saves $1.33 to $3.13 per 1,000 pages
+  but costs about 320 more checks per 1,000 pages. Verdict: question 3's answer stands. Gemini stays the
+  default, and GLM-5.3 Flash is the only budget option. Qwen failed to parse 5 of the 259 new windows.
+  <!-- /W41.seg-cheap-more -->
