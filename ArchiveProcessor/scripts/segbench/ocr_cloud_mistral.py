@@ -3,7 +3,8 @@
 Compile (under heavy-run.py), from the suite root:
  swiftc -parse-as-library -warnings-as-errors <segbench>/ocr-cloud-mistral.swift \
  <app>/OCR/{MistralClient,ImageEncoding,NetworkSession,OCRErrorMessages}.swift -o /tmp/w41-ocr-mistral
-Then: ocr_cloud_mistral.py /tmp/w41-ocr-mistral
+Then: ocr_cloud_mistral.py /tmp/w41-ocr-mistral        (the pilot's three pages)
+  or: ocr_cloud_mistral.py --full /tmp/w41-ocr-mistral (the owner-approved 99 originals, ocr_cloud_full's cache)
 No key is ever printed or persisted. Flat-page reservations survive interruption; never retry them.
 """
 import fcntl
@@ -38,24 +39,29 @@ def settle_rate_limited(root, job_id):
     return True
 
 
-def collect(binary):
+def collect(binary, full=False):
     if os.environ.get('OCR_CLOUD_MISTRAL_FIXTURE'):
         raise SystemExit('offline fixtures must not enter the paid ledger')
-    C.configure(); m=C.manifest(); C.validate_ledger()
-    with (C.CACHE/'run.lock').open('a') as lock:
+    if full:
+        import ocr_cloud_full as F
+        F.configure(); m=F.manifest(); cache, cap, reserve = F.CACHE, F.CAP, F.MISTRAL_RESERVE
+    else:
+        C.configure(); m=C.manifest(); cache, cap, reserve = C.CACHE, C.CAP, C.MISTRAL_RESERVE
+    C.validate_ledger()
+    with (cache/'run.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        if list((C.CACHE/'pending').glob('*.json')):
+        if list((cache/'pending').glob('*.json')):
             raise SystemExit('uncertain chat call: reconcile first')
-        root=C.CACHE/'mistral';root.mkdir(exist_ok=True)
+        root=cache/'mistral';root.mkdir(exist_ok=True)
         for j in m['jobs']:
             dest=root/(j['id']+'.json');pending=root/(j['id']+'.pending.json')
             if pending.exists() and not settle_rate_limited(root, j['id']):
                 raise SystemExit('uncertain OCR call: do not repurchase')
             if dest.exists(): continue
-            image=C.CACHE/'images'/(j['id']+'.jpg')
+            image=cache/'images'/(j['id']+'.jpg')
             if P.digest(image.read_bytes())!=j['sha256']: raise SystemExit('image changed')
-            # $0.012 was held apart from every chat reservation from the start.
-            if P.spent()+C.MISTRAL_RESERVE>C.CAP: raise SystemExit('combined cap')
+            # The whole OCR reserve was held apart from every chat reservation from the start.
+            if P.spent()+reserve>cap: raise SystemExit('combined cap')
             P.save(pending,{'reserve':.004,'job':j['id'],'model':'mistral-ocr-4-1'})
             env={**os.environ,'VISIONHYBRID_TEST':'1'}
             subprocess.run([str(Path(binary).resolve()),str(image),str(dest.with_suffix(''))],env=env,check=True)
@@ -71,10 +77,11 @@ def collect(binary):
             pending.unlink()
             print('mistral-ocr '+j['id']+' accounted $0.004',flush=True)
         bills=[json.loads(p.read_text()) for p in root.glob('*.billing.json')]
-        P.save(C.CACHE/'mistral-summary.json',{'completed':sum(r['status']=='ok' for r in bills),
+        P.save(cache/'mistral-summary.json',{'completed':sum(r['status']=='ok' for r in bills),
                                            'accounted_cost':sum(r['accounted_cost'] for r in bills)})
 
 
 if __name__=='__main__':
-    if len(sys.argv)!=2: raise SystemExit('usage: ocr_cloud_mistral.py COMPILED_DRIVER')
-    collect(sys.argv[1])
+    args=sys.argv[1:]; full=args[:1]==['--full']
+    if len(args)!=1+full: raise SystemExit('usage: ocr_cloud_mistral.py [--full] COMPILED_DRIVER')
+    collect(args[-1], full)
