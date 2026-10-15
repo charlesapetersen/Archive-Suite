@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-14",
+  "source": "https://openrouter.ai/api/v1/models",
+  "note": "Listed model minimum prices, not a provider pin or quotation. Freeze actual provider pricing in the next item before paid calls.",
+  "models": [
+    {
+      "model": "google/gemini-3.1-pro-preview",
+      "prompt_per_million": 2.0,
+      "completion_per_million": 12.0
+    },
+    {
+      "model": "google/gemini-3.5-flash",
+      "prompt_per_million": 1.5,
+      "completion_per_million": 9.0
+    },
+    {
+      "model": "google/gemini-3.8-flash",
+      "prompt_per_million": 0.75,
+      "completion_per_million": 3.75
+    },
+    {
+      "model": "google/gemini-3.5-flash-lite",
+      "prompt_per_million": 0.3,
+      "completion_per_million": 2.5
+    },
+    {
+      "model": "anthropic/claude-sonnet-5.5",
+      "prompt_per_million": 2.0,
+      "completion_per_million": 10.0
+    },
+    {
+      "model": "openai/gpt-5.6-sol",
+      "prompt_per_million": 4.0,
+      "completion_per_million": 20.0
+    },
+    {
+      "model": "openai/gpt-5.6-luna",
+      "prompt_per_million": 0.19999999999999998,
+      "completion_per_million": 1.2
+    },
+    {
+      "model": "openai/gpt-5.4-mini",
+      "prompt_per_million": 0.75,
+      "completion_per_million": 4.5
+    },
+    {
+      "model": "mistralai/mistral-medium-3-5",
+      "prompt_per_million": 1.5,
+      "completion_per_million": 7.5
+    },
+    {
+      "model": "mistralai/mistral-large-4-0",
+      "prompt_per_million": 0.6799999999999999,
+      "completion_per_million": 2.09
+    },
+    {
+      "model": "qwen/qwen3.5-397b-a17b",
+      "prompt_per_million": 0.5,
+      "completion_per_million": 3.5999999999999996
+    },
+    {
+      "model": "qwen/qwen3-vl-235b-a22b-instruct",
+      "prompt_per_million": 0.21,
+      "completion_per_million": 1.9
+    }
+  ]
+}

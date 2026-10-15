@@ -119,6 +119,44 @@ def write_csv(path, rr, fields):
         writer.writeheader(); writer.writerows(rr)
 
 
+def cloud_estimate(calls):
+    """Measured usage proxy, not an assertion that different image tokenizers have equal costs."""
+    usage = []
+    for k in P.MODELS:
+        rr = [r for r in calls if r['key'] == k and r['scale'] == 'original' and r['status'] == 'ok']
+        if rr:
+            usage.append((sum(r['prompt_tokens'] for r in rr)/len(rr),
+                          sum(r['completion_tokens'] for r in rr)/len(rr)))
+    if not usage:
+        return ['No completed local calls from which to estimate cloud usage.']
+    lo_in, hi_in = min(i for i,o in usage), max(i for i,o in usage)
+    lo_out, hi_out = min(o for i,o in usage), max(o for i,o in usage)
+    prices = json.loads(Path(__file__).with_name('ocr-panel-cloud-prices.json').read_text())
+    L = ['## Cloud-panel estimate for the owner (no cloud-panel calls made)', '',
+         f'Completed original-page routes average {lo_in:.0f}–{hi_in:.0f} input and '
+         f'{lo_out:.0f}–{hi_out:.0f} output tokens/page. The range below applies these measured '
+         'extremes to the current listed prices, **not** a measurement of the cloud models’ tokenizers. '
+         'Image token budgets and reasoning can change it. The high figure adds a 50% retry/tokenization '
+         'buffer. Pin actual providers and re-estimate from a three-page pilot before committing the rest. '
+         'Twelve chat models, 99 originals each; no ladder variants in this estimate.', '',
+         '| cloud model | listed $/M input/output | 99 pages, low proxy | 99 pages, high proxy +50% |',
+         '|---|---:|---:|---:|']
+    total_lo, total_hi = 0, 0
+    for r in prices['models']:
+        p, c = r['prompt_per_million'], r['completion_per_million']
+        lo = 99*(lo_in*p + lo_out*c)/1e6
+        hi = 1.5*99*(hi_in*p + hi_out*c)/1e6
+        total_lo += lo; total_hi += hi
+        L.append(f"| {r['model']} | {p:g}/{c:g} | ${lo:.2f} | ${hi:.2f} |")
+    L += ['', f'**Total chat-panel proxy: ${total_lo:.2f}–${total_hi:.2f}.** '
+          'Mistral’s dedicated OCR endpoint is additional and needs its own key and current per-page price check. '
+          'Its 99 pages and any ladder extension must be added before approval. The existing '
+          '`W41.ocr-panel-cloud-owner-ok` gate remains open; this is an estimate, not authorization to spend. '
+          f'Prices: [OpenRouter model catalog]({prices["source"]}), snapshot {prices["date"]}. '
+          'The snapshot is committed beside this scorer; listed minimum prices may differ from the pinned provider.', '']
+    return L
+
+
 def report():
     ss = all_scores()
     P.save(P.CACHE / 'scores.json', ss)  # every page score, no text, private
@@ -129,9 +167,11 @@ def report():
     for r in main:
         for g in r['groups']:
             by[(r['key'], *g)].append(r)
-    groups = [{'model': k, 'attribute': a, 'value': v, **aggregate(rr)} for (k, a, v), rr in sorted(by.items())]
+    groups = [{'model': k, 'provider': P.MODELS[k][1] if k in P.MODELS else 'Apple Vision',
+               'precision': P.MODELS[k][2] or 'unpublished' if k in P.MODELS else 'OS model',
+               'attribute': a, 'value': v, **aggregate(rr)} for (k, a, v), rr in sorted(by.items())]
     write_csv(P.RESULTS / 'ocr-panel-local-groups.csv', groups,
-              ['model', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words', 'cost'])
+              ['model', 'provider', 'precision', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words', 'cost'])
     L = ['# W41.ocr-panel-local — results', '',
          'Reproduce: `ocr_panel.py prepare`, `collect --probe`, `collect`, `vision` (under the heavy lock), then '
          '`ocr_panel_score.py`. Inputs, catalogs, raw responses, reservations and page scores: '
@@ -173,6 +213,14 @@ def report():
         rr = [r for r in main if r['key'] == k]; a = aggregate(rr)
         n = sum(r['attempted'] for r in rr)
         L.append(f"| {k} | {a['ok']}/{n}/{a['n']} | {100*a['nes']:.2f} | {100*a['chrf']:.2f} | {100*a['miss']:.2f} | {100*a['add']:.2f} | ${a['cost']/n if n else 0:.6f} |")
+    L += ['', '## Completed original responses only (coverage differs)', '',
+          'These conditional scores diagnose transcription quality apart from response failures. '
+          'Compare the coverage above; a small or selective successful subset can flatter a route.', '',
+          '| model | completed / 96 | NES % | chrF2 % | missed % | added % |',
+          '|---|---:|---:|---:|---:|---:|']
+    for k in [*P.MODELS, 'apple-vision']:
+        a = aggregate([r for r in main if r['key'] == k and r['ok']])
+        L.append(f"| {k} | {a['n']}/96 | {100*a['nes']:.2f} | {100*a['chrf']:.2f} | {100*a['miss']:.2f} | {100*a['add']:.2f} |")
     L += ['', '## All 99 pages, agreement-only letters, and the matched ladder', '',
           '| model | subset | completed / n | NES % | chrF2 % | missed % | added % |',
           '|---|---|---:|---:|---:|---:|---:|']
@@ -221,6 +269,7 @@ def report():
           'and an abandoned Qwen3.5-9B run (8 whole/6 crop readings). They use different images and scoring masks, '
           'so they provide no matched hosted-vs-Q4 comparison and cannot quantify a quantization penalty. '
           'Source: read-only `vision-ocr/OCR-BAKEOFF-2026-10-07.tsv` and `ops/ocrlab/score-bakeoff.py`.', '']
+    L += cloud_estimate(calls)
     (P.RESULTS / 'ocr-panel-local.md').write_text('\n'.join(L))
     print(f'report: {len(ss)} scored model-input pairs, ${P.spent():.6f} spent')
 

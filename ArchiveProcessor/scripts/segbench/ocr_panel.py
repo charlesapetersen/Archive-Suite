@@ -264,6 +264,9 @@ def collect(probe=False, only=None):
 
         todo = [(k, j) for j in m['jobs'] for k in keys
                 if not probe or (j['page'] in PROBE and j['scale'] == 'original')]
+        # Schedule largest reservations first, so cheap calls can use the final budget headroom.
+        todo.sort(key=lambda kj: -(int(endpoints[kj[0]]['context_length']) * float(endpoints[kj[0]]['pricing']['prompt'])
+                                  + MAX_TOKENS * float(endpoints[kj[0]]['pricing']['completion'])))
         with cf.ThreadPoolExecutor(max_workers=int(os.environ.get('OCR_PANEL_CONCURRENCY', 4))) as ex:
             futures = [ex.submit(one, k, j) for k, j in todo]
             # Settle in-flight reservations even after a failure; already-authorized calls may finish; queued calls are not authorized after stop.
