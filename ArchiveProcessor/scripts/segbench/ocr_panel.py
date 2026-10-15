@@ -196,6 +196,24 @@ def insured_empty_error(j):
             and ((j.get('usage') or {}).get('completion_tokens_details') or {}).get('reasoning_tokens') in (None, 0))
 
 
+def unbilled_error_reply(j):
+    """A 200 reply whose every choice ended in 'error' with no content, and no usage at all.
+
+    Its generation lookup has returned 404 every time (p003, p005, p080-quarter), so nothing can price it.
+    Such a call is charged its whole reservation as a ceiling and cached as failed; it does not stop the run.
+    """
+    ch = j.get('choices') if isinstance(j, dict) else None
+    return (isinstance(ch, list) and bool(ch) and 'usage' not in j and not j.get('error')
+            and all(isinstance(c, dict) and c.get('finish_reason') == 'error'
+                    and not (c.get('message') or {}).get('content') for c in ch))
+
+
+def ceiling_failure(rec, j):
+    return {**rec, 'cost': rec['reserve'], 'cost_upper_bound': True, 'status': 'failed', 'finish': 'error',
+            'provider': j.get('provider'), 'generation_id': j.get('id'), 'returned_model': j.get('model'),
+            'http': 200, 'cost_policy_zero': False}
+
+
 def collect(probe=False, only=None):
     import requests
     import method_openrouter as OR
@@ -259,6 +277,15 @@ def collect(probe=False, only=None):
                                 raise RuntimeError('authentication/credit failure')
                             return
                     raise RuntimeError(f'{key}: uncertain HTTP {r.status_code}; reservation retained')
+                if r.status_code == 200 and unbilled_error_reply(j):
+                    with mutex:
+                        meta = ceiling_failure(rec, j)
+                        append(meta)
+                        save(dest, {'meta': meta, 'parsed': None})
+                        pending.unlink()
+                        print(f"{key} {job['id']} failed, unbilled error reply; ceiling ${reserve:.5f} "
+                              f"total ${spent():.5f}", flush=True)
+                    return
                 u = j.get('usage') or {}; c = (j.get('choices') or [{}])[0]
                 cost = 0 if insured else u.get('cost')
                 if not isinstance(cost, (float, int)) or not math.isfinite(cost) or cost < 0:
@@ -341,8 +368,19 @@ def reconcile(usage=None, now=None):
     with (CACHE / 'run.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         now = time.time() if now is None else now
-        rr = records()
         pend = sorted((CACHE / 'pending').glob('*.json'))
+        for p in list(pend):
+            h = json.loads(p.read_text())
+            raw = CACHE / 'responses' / h['key'] / (h['job'] + '.raw.json')
+            j = json.loads(raw.read_text()) if raw.exists() else None
+            if j is not None and unbilled_error_reply(j):
+                # The runner's own rule for this reply, applied after an older runner stopped on it.
+                meta = ceiling_failure(h, j)
+                append(meta)
+                save(CACHE / 'responses' / h['key'] / (h['job'] + '.json'), {'meta': meta, 'parsed': None})
+                p.unlink(); pend.remove(p)
+                print(f"{h['key']} {h['job']}: unbilled error reply cached at its ${h['reserve']:.5f} ceiling")
+        rr = records()  # after the conversions above, so the ledger rewrite below keeps them
         held = [json.loads(p.read_text()) for p in pend]
         n = sum(bool(r.get('cost_upper_bound')) for r in rr) + len(held)
         if not n:

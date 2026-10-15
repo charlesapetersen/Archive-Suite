@@ -111,6 +111,27 @@ class Panel(unittest.TestCase):
                 self.collect(post);self.assertEqual(post.call_count,1)
         self.assertFalse(P.insured_empty_error({'choices':[], 'error':{'code':503},'usage':{'cost':.01}}))
 
+    def test_unbilled_error_reply_charged_its_whole_reservation_no_retry(self):
+        from unittest.mock import Mock
+        r = Mock(status_code=200)
+        r.json.return_value = {'id': 'gen-x', 'provider': 'SiliconFlow', 'choices': [
+            {'finish_reason': 'error', 'message': {'role': 'assistant', 'content': None}}]}
+        post = Mock(return_value=r)
+        self.collect(post)  # does not stop the run
+        reserve = 1000 * 0.000001 + P.MAX_TOKENS * 0.000002
+        self.assertAlmostEqual(P.spent(), reserve)
+        out = json.loads((self.cache / 'responses/qwen3.5-9b/p001-original.json').read_text())
+        self.assertTrue(out['meta']['cost_upper_bound']); self.assertEqual(out['meta']['status'], 'failed')
+        self.assertFalse(list((self.cache / 'pending').glob('*.json')))
+        self.collect(post); self.assertEqual(post.call_count, 1)
+        # Any usage, content or error object, or a non-error finish, keeps the old fail-closed path.
+        for j in [{'choices': [{'finish_reason': 'error', 'message': {'content': None}}], 'usage': {}},
+                  {'choices': [{'finish_reason': 'error', 'message': {'content': 'TEXT: x'}}]},
+                  {'choices': [{'finish_reason': 'stop', 'message': {'content': None}}]},
+                  {'choices': [{'finish_reason': 'error', 'message': {}}], 'error': {'code': 500}},
+                  {'choices': []}]:
+            self.assertFalse(P.unbilled_error_reply(j), j)
+
     def test_reported_charge_on_http_error_always_counts(self):
         from unittest.mock import Mock
         r=Mock(status_code=429)
@@ -248,6 +269,19 @@ class Reconcile(unittest.TestCase):
         self.assertTrue((self.cache / 'responses/qwen3.5-27b/p003-original.json').exists())  # never retried
         self.assertEqual(json.loads((self.cache / 'responses/qwen3.5-27b/p002-original.json').read_text())['meta']['cost'], rr[1]['cost'])
         self.assertEqual(len(list((self.cache / 'reconciliation').glob('key-usage-*.json'))), 1)
+
+    def test_reconcile_settles_a_pending_unbilled_error_reply_then_bounds_it(self):
+        now = 86400 * 20000 + 50000
+        self._uncertain(now)
+        P.save(self.cache / 'responses/qwen3.5-27b/p003-original.raw.json',
+               {'id': 'gen-y', 'choices': [{'finish_reason': 'error', 'message': {'content': None}}]})
+        P.reconcile(usage=0.3005, now=now)
+        rr = P.records()
+        self.assertEqual([r['job'] for r in rr], ['p001-original', 'p002-original', 'p003-original'])
+        self.assertTrue(all(r['cost_upper_bound'] and r['cost'] < 0.0006 for r in rr[1:]))
+        self.assertEqual(rr[2]['reserve_ceiling'], 0.08)
+        self.assertFalse(list((self.cache / 'pending').glob('*.json')))
+        self.assertIsNone(json.loads((self.cache / 'responses/qwen3.5-27b/p003-original.json').read_text())['parsed'])
 
     def test_reconcile_refuses_unsafe_evidence(self):
         now = 86400 * 20000 + 50000
