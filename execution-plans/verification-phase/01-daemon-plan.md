@@ -153,7 +153,9 @@ regenerable. It is never committed. Each set gets a `MANIFEST.txt` saying what i
 - **`W40.c2` — Reader sample of the real corpus [S].** Gated on `W40.c2-owner-ok`. Read-only copy of about 5,000
   PDFs and their JPEG partners with xattrs preserved (`ditto`), sampled across the tree, not the first 5,000.
   Before copying, list each sampled file's size, mtime and tag xattr; after, list them again and prove them
-  identical. That listing is the evidence the corpus was not touched.
+  identical. That listing is the evidence the corpus was not touched. *(SHIPPED 2026-10-14:
+  `ArchiveReader/scripts/rehearsal-sample.py`; evidence `verification/evidence/reader/W40.c2-sample.md`. The copy
+  is made with `cp -c -p` (APFS clones), not `ditto`, which wrote full copies on the same volume.)*
 - **No Google Drive sync test.** The corpus path contains `Google Drive`, but it is a plain local folder and Google
   Drive is not running on this machine (owner, 2026-10-04; also `SUITE_TODO.md` §Wave 26). There is no sync
   behaviour to test. Do not file one.

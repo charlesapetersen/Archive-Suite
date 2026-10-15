@@ -80,6 +80,17 @@ never mistakes it for the generated fixture.
 `organization.json` decodes whole. That run found a reproduced bug: a note with an unclosed block header gains a
 `<!-- block: freeform -->` line on every save (`W40.fix-notes-unclosed-header`).
 
+## Reader — a sample of the real corpus
+
+`ArchiveReader/scripts/rehearsal-sample.py make` copies 5,000 PDFs, spread across the corpus's 270 first-two-level
+folder groups by proportional share with a fixed seed, plus each one's JPEGS-tree partners by Reader's own rule and
+the main-tree images beside it: 8,743 files, 9 GiB. It reads the corpus only. Every sampled file is listed (size,
+mtime, ctime, inode, tag xattr, all xattrs) before and after the copy, and the two listings must be identical;
+`rehearsal-sample.py verify` re-checks them at any time. The copies are APFS clones (`cp -c -p`; `ditto` does not
+clone), so they take almost no disk, and a write to them never reaches the corpus. Grant Reader the
+`reader-sample/` folder itself: it holds `Archival Photos/` and `Archival Photos JPEGS/` as the real parent does.
+Evidence: [`evidence/reader/W40.c2-sample.md`](evidence/reader/W40.c2-sample.md).
+
 ## How a set reaches the Tart VM
 
 `ops/gui/vm-gui-runner.sh` boots the VM with the whole cache folder shared **read-only**:
@@ -97,7 +108,7 @@ never mistakes it for the generated fixture.
   over the share, and on the guest copy;
 - `ditto` of the RG 165 box took 1.2 s: 114 files, and the guest `Ground Truth.csv` sha256 matches the host
   (`02125e7a…`);
-- the guest had 23 GiB free, which matters for the 6.5 GiB Reader sample.
+- the guest had 23 GiB free, which matters for the 9 GiB Reader sample.
 
 **Copy onto the guest disk, then work there.** The share is read-only, so the app could not write to it anyway,
 and a journey that writes needs its own copy. Per set:
@@ -116,7 +127,7 @@ and a journey that writes needs its own copy. Per set:
 - **Processor** (`W40.d1`/`d5`): `ditto` the box from the share to a guest scratch folder and give the app that
   folder. Finished originals go to the guest's Trash, never the host's.
 - **Reader** (`W40.d7`/`d8`): `d7` only reads, so it may read the sample over the share. `d8` writes tags, so it
-  copies the folders it needs onto the guest disk first (23 GiB free; the whole sample is 6.5 GiB).
+  copies the folders it needs onto the guest disk first (23 GiB free; the whole sample is 9 GiB, 8,743 files).
 
 On the host, the Notes store can be read by the app-hosted unit bundle (the Debug entitlements allow `/Users/`),
 which is how it was checked. Nothing may launch an app on the host screen to use it (`.claude/hooks/no-host-gui.sh`).

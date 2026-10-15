@@ -10914,3 +10914,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   (`REHEARSAL_DIR` overrides it; skipped when absent). Proved in `archive-gui-runner`: a write is refused, `ditto`
   to the guest disk keeps file counts, sha256 and Finder-tag xattrs, and the guest has 23 GiB free.
   <!-- /W40.c1 -->
+- [x] **W40.c2 — Reader rehearsal sample copied from the real corpus [S]** · §W40 — verification phase · SHIPPED 2026-10-14
+  (lane: reader). `ArchiveReader/scripts/rehearsal-sample.py make` copies a read-only sample into
+  `~/Library/Caches/ArchiveSuiteRehearsal/reader-sample/` (owner decision 3, `W40.c2-owner-ok`): 5,000 PDFs, a
+  proportional share of each of the 270 first-two-level folder groups (seed 402), plus 3,571 JPEGS-tree partners by
+  `JPEGPartnerIndex.resolve`'s rule (43 ambiguous stems copied whole, so they stay ambiguous) and 172 main-tree images
+  beside them. 8,743 files, 8.97 GiB, 5,597 with a Finder-tag xattr; the two-tree layout is kept, so Reader is granted
+  `reader-sample/` itself. **Corpus untouched:** every sampled file is listed before and after the copy (size, mtime,
+  ctime, inode, tag xattr, hash of all xattrs), as are both tree roots and their first-level folders, and both pairs are
+  byte-identical; `verify` re-checked 8,743 of 8,743 afterwards. **Copy faithful:** distinct inode, same SHA-256,
+  size, mtime and tags, all 8,743. Evidence: `verification/evidence/reader/W40.c2-sample.md`.
+  **Found:** `ditto` does not clone on APFS (a trial used the full size), and a full copy would not have fit on this
+  99%-full disk above the 8 GiB floor. The script uses `cp -c -p` (clonefile) on the corpus's volume: 0.20 GiB of
+  disk for the 9 GiB sample. A killed earlier attempt's full-copy sample (6.5 GiB) was moved aside to
+  `reader-sample.stale-20261014/`, since deleting it was permission-denied; it can be deleted.
+  <!-- /W40.c2 -->
