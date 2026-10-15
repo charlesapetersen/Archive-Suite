@@ -108,11 +108,12 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesTests/NoteStoreTests.createBasic` and `.saveRetitle`;
   `ArchiveNotesTests/FrontMatterCodecTests.testUnknownKeysPreserved`;
   `ArchiveNotesUITests/NotesGUITests.testG1_CreateNoteWritesNewItemFile` (a `.md` lands in a new item directory).
-- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md) (`WritingJourneyUITests`, VM): after typing, ⌘Q and a relaunch the `.md` is byte-identical to what was saved and opening it rewrites nothing; front matter unchanged but `modified:`. An edit made to the `.md` outside the app while the note is open is overwritten by the next save, without a word.
+- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md) (`WritingJourneyUITests`, VM): after typing, ⌘Q and a relaunch the `.md` is byte-identical to what was saved and opening it rewrites nothing; front matter unchanged but `modified:`. An edit made to the `.md` outside the app while the note is open was overwritten by the next save, without a word; since W40.fix-notes-outside-edit-overwrite it is reloaded or kept beside a recovered draft, with a notice ([evidence](evidence/notes/W40.fix-notes-outside-edit-overwrite.md)).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — runtime evidence added; stays `unproven` (the store layout, unknown keys and source-block legibility were not checked). The outside-edit overwrite is not a stated N-02 promise but loses text; filed `W40.fix-notes-outside-edit-overwrite` (S1).
+  - 2026-10-15 W40.fix-notes-outside-edit-overwrite — the overwrite is fixed: a clean editor reloads an outside body edit and says so; a dirty one keeps the original untouched and saves the in-app text as a separate "Recovered draft" note ([evidence](evidence/notes/W40.fix-notes-outside-edit-overwrite.md), VM 5/5). Stays `unproven` for the same unchecked layout/unknown-key/source-block reasons.
 - **Notes:** "title = file name" holds after `NoteStore.sanitizedTitle` (`Store/NoteStore.swift:511-528`): illegal
   characters are replaced, the length is capped, and an empty title becomes `Untitled.md`. The `W9.d12d`
   divergence log is `NotesIndexer.filenameDivergence` (`Index/NotesIndexer.swift:117`, `:372`), pinned by

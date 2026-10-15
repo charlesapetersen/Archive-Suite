@@ -122,13 +122,63 @@ final class WritingJourneyUITests: NotesFixtureUITestCase {
                 + "alerts = \(app.alerts.count), sheets = \(app.sheets.count)")
             if !survived { log("[d9] body after the save:\n\(noteBody(uuid: id) ?? "<unreadable>")") }
             let warned = status != nil || app.alerts.count > 0 || app.sheets.count > 0
-            let known = XCTExpectedFailure.Options(); known.isStrict = false
-            XCTExpectFailure("W40.fix-notes-outside-edit-overwrite (S1): the next save writes the editor's older "
-                             + "copy over an edit made to the .md outside the app", options: known) {
-                XCTAssertTrue(survived || warned,
-                              "N-02: an edit made outside the app must not be overwritten without a word")
-            }
+            XCTAssertTrue(editorSawIt, "a clean editor must reload the outside paragraph")
+            XCTAssertTrue(survived, "N-02: the outside paragraph must survive the next autosave")
+            XCTAssertTrue(warned, "N-02: an outside change must be reported to the user")
+            let shot = XCTAttachment(screenshot: mainWindow.screenshot())
+            shot.name = "W40-outside-edit-reloaded"; shot.lifetime = .keepAlways
+            add(shot)
+            try saveOutsideEditShot("W40-outside-edit-reloaded", screenshot: mainWindow.screenshot())
         }
+    }
+
+    /// No clean-reload grace period: preserve a still-dirty draft separately. XCUITest's event delivery
+    /// may let autosave finish first; in that ordering append to its fresh bytes and require both lines.
+    /// OutsideEditTests deterministically exercises the dirty branch without automation delays.
+    func testOutsideEditWithDirtyDraftKeepsBothVersions() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            try loadNote(id)
+            let draft = "Localdrafttoken"
+            try typeIntoEditor("\n" + draft)
+            let externalBase = try noteFile(id)
+            let outside = "Externalconflicttoken"
+            let edited = externalBase.text + "\n\n" + outside + "\n"
+            try Data(edited.utf8).write(to: externalBase.url)
+            @MainActor func recovered() -> Bool {
+                recoveredDraftFiles().contains { (try? String(contentsOf: $0, encoding: .utf8))?.contains(draft) == true }
+            }
+            XCTAssertTrue(pollUntil(timeout: 15) { self.bodyLines(id).contains(draft) || recovered() },
+                          "the in-app text must be durable in the original or a separate recovered draft")
+            XCTAssertTrue(bodyLines(id).contains(outside), "the outside paragraph must survive")
+            if recovered() {
+                XCTAssertEqual(try Data(contentsOf: externalBase.url), Data(edited.utf8), "a conflict must leave the original byte-identical")
+            }
+            XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains(outside) }, "the original must reload")
+            XCTAssertNotNil(statusLine(), "the outside change must be reported")
+            let shot = XCTAttachment(screenshot: mainWindow.screenshot())
+            shot.name = "W40-outside-edit-recovered-draft"; shot.lifetime = .keepAlways
+            add(shot)
+            try saveOutsideEditShot("W40-outside-edit-recovered-draft", screenshot: mainWindow.screenshot())
+            log("[W40-outside] separate recovery draft = \(recovered()); status = \(statusLine() ?? "none")")
+            relaunch()
+            XCTAssertTrue(bodyLines(id).contains(draft) || recovered(), "the in-app text must survive relaunch")
+            XCTAssertTrue(bodyLines(id).contains(outside), "the outside paragraph must remain after relaunch")
+        }
+    }
+
+    private func saveOutsideEditShot(_ name: String, screenshot: XCUIScreenshot) throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(name + ".png")
+        try screenshot.pngRepresentation.write(to: path)
+        print("[shot] \(name): wrote \(path.path)")
+    }
+
+    private func recoveredDraftFiles() -> [URL] {
+        let root = URL(fileURLWithPath: itemsDir)
+        let dirs = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        return dirs.flatMap { (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? [] }
+            .filter { $0.pathExtension == "md" && $0.lastPathComponent.contains("Recovered draft") }
     }
 
     /// N-15 — a pasted image whose bytes cannot be written. The note then carries a reference to a file that
@@ -275,9 +325,10 @@ final class WritingJourneyUITests: NotesFixtureUITestCase {
 
     /// The sidebar's status line (`NotesModel.statusMessage`), if one is showing.
     private func statusLine() -> String? {
-        let el = mainWindow.descendants(matching: .any)["an.sidebar.status"]
-        guard el.exists else { return nil }
-        let texts = el.staticTexts.allElementsBoundByIndex.map(\.label).filter { !$0.isEmpty }
-        return texts.isEmpty ? el.label : texts.joined(separator: " ")
+        // SwiftUI propagates the container's identifier to both its icon and text. Select only
+        // static text so a real notice cannot make this query ambiguous (the old baseline had none).
+        let texts = mainWindow.staticTexts.matching(identifier: "an.sidebar.status")
+            .allElementsBoundByIndex.map { ($0.value as? String) ?? $0.label }.filter { !$0.isEmpty }
+        return texts.isEmpty ? nil : texts.joined(separator: " ")
     }
 }

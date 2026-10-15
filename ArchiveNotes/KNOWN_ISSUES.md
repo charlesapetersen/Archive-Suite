@@ -4,7 +4,7 @@ Running log of quirks, risks, and things verified/unverified for the Notes app. 
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
 
-## W40.fix-notes-outside-edit-overwrite — checked editor saves (GUI acceptance pending)
+## ✅ FIXED (W40.fix-notes-outside-edit-overwrite, 2026-10-15) — checked editor saves
 
 Open editors keep their own body baseline. A checked, coordinated save detects a newer body on disk;
 clean editors poll their selected note and reload it with a notice. On a conflict the original is left
@@ -12,19 +12,19 @@ untouched and the in-app body is saved as a separate “Recovered draft” note 
 its assets copied before reload. Metadata-only edits compose with body saves. Pending TextKit edits and
 asset writes are flushed before recovery, and retired editor bindings cannot restore the stale body.
 Scratch unit tests cover outside in-place/atomic writes, metadata, independent editors, assets/symlinks,
-late keystrokes and refused recovery/retry. A failed save still cannot veto close/quit: the pre-existing
+late keystrokes and refused recovery/retry; `WritingJourneyUITests` proves both the clean reload and the
+recovered-draft conflict in the VM (5/5). A failed save still cannot veto close/quit: the pre-existing
 lifecycle gap is queued as W40.fix-notes-failed-save-close. File coordination protects cooperating writers;
 an arbitrary uncoordinated process can still write during another process’s replacement operation.
 
 
-## 🔴 OPEN (W40.d9, 2026-10-15) — three writing-session defects, reproduced in the VM
+## 🔴 OPEN (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM
 
 `ArchiveNotesUITests/WritingJourneyUITests` types into the styled editor with real keystrokes. Autosave, ⌘Q
-within the debounce, relaunch (bytes, mtime and Finder tags unchanged) and window close all hold. Three things do
+within the debounce, relaunch (bytes, mtime and Finder tags unchanged) and window close all hold. Two things do
 not; each is carried in that class as a non-strict `XCTExpectFailure` naming its fix item. Evidence:
-`verification/evidence/notes/W40.d9-writing.md` at the suite root.
-- **An edit to the `.md` made outside the app while the note is open is overwritten by the next save, silently**
-  (`W40.fix-notes-outside-edit-overwrite`, S1). There is no file watcher, and `setBody` replaces the body wholesale.
+`verification/evidence/notes/W40.d9-writing.md` at the suite root. (The third, the outside-edit overwrite, is
+fixed: entry above.)
 - **A Return typed in the styled editor is saved as one newline**, so the typed paragraphs merge into one when the
   note is reopened (`W40.fix-notes-return-paragraph`, S2).
 - **A failed inline-image write is only logged** (`W40.fix-notes-asset-write-silent`, S3). This is residual (a) of
