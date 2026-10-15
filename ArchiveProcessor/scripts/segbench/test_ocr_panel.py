@@ -283,6 +283,23 @@ class Reconcile(unittest.TestCase):
         self.assertFalse(list((self.cache / 'pending').glob('*.json')))
         self.assertIsNone(json.loads((self.cache / 'responses/qwen3.5-27b/p003-original.json').read_text())['parsed'])
 
+    def test_reconcile_releases_a_pending_429_reply_at_no_cost_and_leaves_it_open(self):
+        now = 86400 * 20000 + 50000
+        self._uncertain(now)
+        P.save(self.cache / 'responses/qwen3.5-27b/p003-original.raw.json',
+               {'error': {'code': 429, 'metadata': {'limit_source': 'upstream_provider_shared_pool'}}})
+        P.reconcile(usage=0.3005, now=now)
+        rr = P.records()
+        self.assertEqual([(r['job'], r['status']) for r in rr],
+                         [('p001-original', 'ok'), ('p002-original', 'failed'), ('p003-original', 'http-rejected')])
+        self.assertEqual(rr[2]['cost'], 0)
+        self.assertLess(rr[1]['cost'], 0.08)  # the one remaining ceiling is still bounded by the key
+        self.assertFalse(list((self.cache / 'pending').glob('*.json')))
+        self.assertFalse((self.cache / 'responses/qwen3.5-27b/p003-original.json').exists())  # retried later
+        for j in [{'error': {'code': 429}, 'usage': {'cost': 0.001}}, {'error': {'code': 500}},
+                  {'error': {'code': 429}, 'choices': [{}]}, {'error': 'x'}]:
+            self.assertFalse(P.rejected_error_reply(j), j)
+
     def test_reconcile_refuses_unsafe_evidence(self):
         now = 86400 * 20000 + 50000
         self._uncertain(now)

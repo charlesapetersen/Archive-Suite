@@ -208,6 +208,17 @@ def unbilled_error_reply(j):
                     and not (c.get('message') or {}).get('content') for c in ch))
 
 
+def rejected_error_reply(j):
+    """A saved 4xx error body (a 429 from a shared upstream pool) with no choices and no usage at all.
+
+    The runner records such a reply as http-rejected at no cost and leaves the job for a later pass; a session
+    killed between saving the body and recording it leaves the same reply behind a pending reservation.
+    """
+    e = j.get('error') if isinstance(j, dict) else None
+    code = e.get('code') if isinstance(e, dict) else None
+    return (isinstance(code, int) and 400 <= code < 500 and not j.get('choices') and 'usage' not in j)
+
+
 def ceiling_failure(rec, j):
     return {**rec, 'cost': rec['reserve'], 'cost_upper_bound': True, 'status': 'failed', 'finish': 'error',
             'provider': j.get('provider'), 'generation_id': j.get('id'), 'returned_model': j.get('model'),
@@ -380,6 +391,11 @@ def reconcile(usage=None, now=None, after=None):
                 save(CACHE / 'responses' / h['key'] / (h['job'] + '.json'), {'meta': meta, 'parsed': None})
                 p.unlink(); pend.remove(p)
                 print(f"{h['key']} {h['job']}: unbilled error reply cached at its ${h['reserve']:.5f} ceiling")
+            elif j is not None and rejected_error_reply(j):
+                # The runner's rule for a 4xx with no generation: no charge, and the job stays open for a retry.
+                append({**h, 'cost': 0, 'status': 'http-rejected', 'http': j['error']['code']})
+                p.unlink(); pend.remove(p)
+                print(f"{h['key']} {h['job']}: HTTP {j['error']['code']} reply released at no cost")
         rr = records()  # after the conversions above, so the ledger rewrite below keeps them
         held = [json.loads(p.read_text()) for p in pend]
         n = sum(bool(r.get('cost_upper_bound')) for r in rr) + len(held)
