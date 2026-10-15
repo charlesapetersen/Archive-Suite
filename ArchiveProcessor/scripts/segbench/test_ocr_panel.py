@@ -93,6 +93,34 @@ class Panel(unittest.TestCase):
             self.collect(Mock(return_value=response))
         self.assertTrue(list((self.cache / 'pending').glob('*.json')))
 
+    def test_explicit_empty_provider_error_preserves_evidence_and_no_retry(self):
+        from unittest.mock import Mock
+        for http in (200, 503):
+            with self.subTest(http=http):
+                r = Mock(status_code=http)
+                r.json.return_value={'id':'error-generation', 'error':{'code':503,'message':'overloaded'}}
+                post=Mock(return_value=r)
+                # Different job per subtest, preserving each failed response.
+                self.job['id']=f'p{http}-original'
+                (self.cache/'images'/(self.job['id']+'.jpg')).write_bytes(b'image')
+                self.collect(post)
+                out=json.loads((self.cache/'responses/qwen3.5-9b'/(self.job['id']+'.json')).read_text())
+                self.assertIsNone(out['parsed']);self.assertEqual(out['meta']['cost'],0)
+                self.assertTrue(out['meta']['cost_policy_zero'])
+                self.assertTrue((self.cache/'responses/qwen3.5-9b'/(self.job['id']+'.raw.json')).exists())
+                self.collect(post);self.assertEqual(post.call_count,1)
+        self.assertFalse(P.insured_empty_error({'choices':[], 'error':{'code':503},'usage':{'cost':.01}}))
+
+    def test_reported_charge_on_http_error_always_counts(self):
+        from unittest.mock import Mock
+        r=Mock(status_code=429)
+        r.json.return_value={'error':{'code':429}, 'usage':{'cost':.005}}
+        self.collect(Mock(return_value=r))
+        self.assertEqual(P.spent(),.005)
+        out=json.loads((self.cache/'responses/qwen3.5-9b/p001-original.json').read_text())
+        self.assertEqual(out['meta']['status'],'failed')
+        self.assertFalse(out['meta']['cost_policy_zero'])
+
     def test_changed_image_refused(self):
         (self.cache / 'images/p001-original.jpg').write_bytes(b'changed')
         with self.assertRaisesRegex(SystemExit, 'image changed'):

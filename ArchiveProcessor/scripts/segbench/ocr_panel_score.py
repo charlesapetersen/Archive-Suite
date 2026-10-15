@@ -90,6 +90,7 @@ def group_values(r, cal):
 def all_scores():
     m = P.manifest(); by_page = {r['page']: r for r in P.rows()}
     cal = json.loads((P.TRUTH / 'calibrate.json').read_text())
+    attempted_jobs = {(r['key'],r['job']) for r in P.records()}
     out = []
     for key in [*P.MODELS, 'apple-vision']:
         for job in m['jobs']:
@@ -103,7 +104,7 @@ def all_scores():
                 f = P.CACHE / 'responses' / key / (job['id'] + '.json')
                 got = json.loads(f.read_text()) if f.exists() else {}
                 meta = got.get('meta') or {}; parsed = got.get('parsed')
-                ok = bool(parsed); text = parsed['text'] if ok else ''; attempted = f.exists()
+                ok = bool(parsed); text = parsed['text'] if ok else ''; attempted = f.exists() or (key, job['id']) in attempted_jobs
             s = score(truth, text)
             out.append({**job, **s, 'key': key, 'ok': ok, 'attempted': attempted, 'cost': meta.get('cost', 0),
                         'agreement': page in P.AGREEMENT, 'groups': group_values(row, cal),
@@ -237,18 +238,25 @@ def report():
           'owner-confirmed kind, tag strata, table/form flag, camera, capture year, pixel/sharpness/year tertiles, '
           'ladder membership and every tag (overlapping groups). Small groups are descriptive, not reliable rankings. '
           'Page/folder/file identity fields are private; the per-page table allows any further grouping.', '',
-          '## Pinned routes and measured costs', '',
-          '| model | endpoint | precision | accounted calls | failures | $/call (charges + uncertain ceilings) | mean input/output tokens |',
-          '|---|---|---|---:|---:|---:|---:|']
+          '## Pinned routes and measured costs', '']
     calls = P.records()
+    policy_zero = sum(bool(r.get('cost_policy_zero')) for r in calls)
+    if policy_zero:
+        L += ['', f'{policy_zero} explicit empty provider errors are accounted at $0 under '
+              '[OpenRouter’s zero-completion insurance](https://openrouter.ai/blog/announcements/never-pay-for-empty-ai-responses-again/). '
+              'These are policy-covered failures, not successful free readings; raw error bodies are saved.']
     uncertain = [r for r in calls if r.get('cost_upper_bound')]
     if uncertain:
         upper = sum(r['cost'] for r in uncertain)
-        L += ['', f'**Billing uncertainty:** {len(uncertain)} provider errors had no usage; generation lookups returned 404. '
+        L += ['', f'**Billing uncertainty:** {len(uncertain)} provider errors had no usable billing record. '
+              f'{sum(r.get("billing_lookup_http")==404 for r in uncertain)} generation lookups returned 404; '
+              'other failures had no retained generation ID. '
               f'Reported charges are ${P.spent()-upper:.6f}; an additional ${upper:.6f} (their full pre-call reservations) '
               'is counted as a conservative ceiling against the cap. Cost columns include these ceilings and are not '
               'all measured charges. These failed calls are cached and never retried. Raw errors and lookup evidence '
               'remain in the private cache.']
+    L += ['', '| model | endpoint | precision | accounted calls | failures | $/call (charges + uncertain ceilings) | mean input/output tokens |',
+          '|---|---|---|---:|---:|---:|---:|']
     for k, spec in P.MODELS.items():
         rr = [r for r in calls if r['key'] == k and r['status'] in ('ok', 'failed')]; n = len(rr)
         L.append(f"| {k} | {spec[1]} | {spec[2] or 'unpublished'} | {n} | {sum(r['status']=='failed' for r in rr)} | "
@@ -279,7 +287,7 @@ def report():
           'Source: read-only `vision-ocr/OCR-BAKEOFF-2026-10-07.tsv` and `ops/ocrlab/score-bakeoff.py`.', '']
     L += cloud_estimate(calls)
     (P.RESULTS / 'ocr-panel-local.md').write_text('\n'.join(L))
-    print(f'report: {len(ss)} scored model-input pairs, ${P.spent():.6f} spent')
+    print(f'report: {len(ss)} scored model-input pairs, ${P.spent():.6f} accounted')
 
 if __name__ == '__main__':
     report()

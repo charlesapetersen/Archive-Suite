@@ -182,6 +182,19 @@ def body(key, job, prices):
     return b
 
 
+def insured_empty_error(j):
+    """OpenRouter's zero-completion insurance covers explicit empty provider errors.
+
+    https://openrouter.ai/blog/announcements/never-pay-for-empty-ai-responses-again/
+    Unknown/malformed replies and network timeouts still retain their full reservations.
+    A reported cost always takes precedence over this policy inference.
+    """
+    return (isinstance(j, dict) and (j.get('error') or {}).get('code') in (502, 503)
+            and not j.get('choices') and (j.get('usage') or {}).get('cost') is None
+            and (j.get('usage') or {}).get('completion_tokens') in (None, 0)
+            and ((j.get('usage') or {}).get('completion_tokens_details') or {}).get('reasoning_tokens') in (None, 0))
+
+
 def collect(probe=False, only=None):
     import requests
     import method_openrouter as OR
@@ -225,29 +238,39 @@ def collect(probe=False, only=None):
             try:
                 r = requests.post(API + '/chat/completions', json=b, timeout=300,
                       headers={'Authorization': 'Bearer ' + key_secret, 'Content-Type': 'application/json'})
-                if r.status_code != 200:
+                try:
+                    j = r.json()
+                except ValueError:
+                    save(dest.with_suffix('.raw.json'), {'http': r.status_code, 'body': r.text})
+                    raise RuntimeError('unparseable reply; reservation and raw body retained')
+                save(dest.with_suffix('.raw.json'), j)
+                insured = insured_empty_error(j)
+                reported_cost = (j.get('usage') or {}).get('cost')
+                completion_evidence = bool(j.get('choices') or (j.get('usage') or {}).get('completion_tokens'))
+                if r.status_code != 200 and not insured and reported_cost is None:
                     with mutex:
-                        if 400 <= r.status_code < 500:
+                        if 400 <= r.status_code < 500 and not completion_evidence:
                             append({**rec, 'cost': 0, 'status': 'http-rejected', 'http': r.status_code})
                             pending.unlink()
-                            unavailable.add(key)  # one rejected route must not prevent the others being tested
+                            unavailable.add(key)
                             print(f'{key}: HTTP {r.status_code}; route deferred, no generated response', flush=True)
                             if r.status_code in (401, 402):
                                 raise RuntimeError('authentication/credit failure')
                             return
                     raise RuntimeError(f'{key}: uncertain HTTP {r.status_code}; reservation retained')
-                j = r.json(); save(dest.with_suffix('.raw.json'), j)
                 u = j.get('usage') or {}; c = (j.get('choices') or [{}])[0]
-                cost = u.get('cost')
-                if not isinstance(cost, (float, int)) or not math.isfinite(cost) or cost < 0 or 'error' in j:
+                cost = 0 if insured else u.get('cost')
+                if not isinstance(cost, (float, int)) or not math.isfinite(cost) or cost < 0:
                     raise RuntimeError('uncertain cost/body error; raw response and reservation retained')
                 got = T.parse_draft((c.get('message') or {}).get('content') or '')
-                ok = bool(got) and c.get('finish_reason') == 'stop'
+                ok = bool(got) and c.get('finish_reason') == 'stop' and not j.get('error') and r.status_code == 200
                 meta = {**rec, 'cost': cost, 'status': 'ok' if ok else 'failed', 'provider': j.get('provider'),
                         'generation_id': j.get('id'), 'returned_model': j.get('model'),
                         'prompt_tokens': u.get('prompt_tokens'), 'completion_tokens': u.get('completion_tokens'),
                         'reasoning_tokens': (u.get('completion_tokens_details') or {}).get('reasoning_tokens'),
-                        'finish': c.get('finish_reason'), 'wall_s': round(time.time() - start, 3)}
+                        'finish': c.get('finish_reason'), 'wall_s': round(time.time() - start, 3),
+                        'cost_policy_zero': insured, 'http': r.status_code,
+                        'error_code': (j.get('error') or {}).get('code')}
                 with mutex:
                     append(meta)
                     save(dest, {'meta': meta, 'parsed': got if ok else None})
