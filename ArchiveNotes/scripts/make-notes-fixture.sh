@@ -302,7 +302,7 @@ else
   xattr -wx com.apple.metadata:_kMDItemUserTags \
     "$(python3 -c 'import plistlib; print(plistlib.dumps(["Unread"], fmt=plistlib.FMT_BINARY).hex())')" \
     "$DST/reader-corpus/pages.pdf"
-  echo "make-notes-fixture: generated $N_PDFS text-bearing PDFs in reader-corpus/ (+ sample.pdf; no corpus required)" >&2
+  echo "make-notes-fixture: generated $N_PDFS text-bearing PDFs in reader-corpus/ (+ sample.pdf and pages.pdf; no corpus required)" >&2
 fi
 
 # --- Initial Finder-tag projection (title-cased subjects) ---------------------

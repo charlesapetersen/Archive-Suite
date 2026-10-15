@@ -236,12 +236,19 @@ if [ "$last" = "$NDST" ]; then ok "Notes fixture emits its scratch path on stdou
 else bad "Notes fixture stdout is not its scratch path" "got: $last"; fi
 
 n_notes_pdfs="$(find "$NDST/reader-corpus" -type f -name '*.pdf' 2>/dev/null | wc -l | tr -d ' ')"
-expected_notes_pdfs=$((8 + 1)) # N_PDFS generated PDFs + sample.pdf
+expected_notes_pdfs=$((8 + 2)) # N_PDFS generated PDFs + sample.pdf + pages.pdf (W40.d10)
 if [ "$n_notes_pdfs" -eq "$expected_notes_pdfs" ]; then
-  ok "Notes fixture has 8 generated reader PDFs plus sample.pdf"
+  ok "Notes fixture has 8 generated reader PDFs plus sample.pdf and pages.pdf"
 else
   bad "Notes fixture PDF count is wrong" "expected $expected_notes_pdfs, got $n_notes_pdfs"
 fi
+# pages.pdf is the integration journey's link target: Reader lists it only with a read state, and it
+# names a page only when there is more than one image/text pair.
+tj=$(/opt/homebrew/bin/tag -lN "$NDST/reader-corpus/pages.pdf" 2>/dev/null || true)
+case ",$tj," in
+  *,Unread,*) ok "Notes journey pages.pdf carries the Unread tag" ;;
+  *) bad "Notes journey pages.pdf lacks the Unread tag" "tags: $tj" ;;
+esac
 if grep -aqF "Notes synthetic fixture page 1" "$NDST/reader-corpus/sample.pdf"; then
   ok "Notes durable-link sample is a text-bearing synthetic PDF"
 else
@@ -251,6 +258,9 @@ if command -v pdfinfo >/dev/null 2>&1; then
   notes_pages="$(pdfinfo "$NDST/reader-corpus/sample.pdf" 2>/dev/null | awk '/^Pages:/ {print $2}')"
   if [ "$notes_pages" = 2 ]; then ok "Notes durable-link sample keeps the standard two-page shape"
   else bad "Notes durable-link sample is not two pages" "pdfinfo Pages: ${notes_pages:-unreadable}"; fi
+  journey_pages="$(pdfinfo "$NDST/reader-corpus/pages.pdf" 2>/dev/null | awk '/^Pages:/ {print $2}')"
+  if [ "$journey_pages" = 6 ]; then ok "Notes journey pages.pdf holds three image/text pairs"
+  else bad "Notes journey pages.pdf is not six pages" "pdfinfo Pages: ${journey_pages:-unreadable}"; fi
 else
   echo "⊘ pdfinfo unavailable — skipped the optional Notes PDF page-count parse"
 fi
