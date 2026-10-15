@@ -52,7 +52,7 @@ enum OCRRefusalFallback {
         let available = SegmentationRoutes.current(defaults)
         var routes: [Route] = []
         let anthropicKey = KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? ""
-        let claudeModel = LLMModel.anthropicModels[0]
+        let claudeModel = keyedModels[0]
         if available.claudeByPlan {
             let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
             let path = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""
@@ -64,13 +64,27 @@ enum OCRRefusalFallback {
             routes.append(Route(provider: .anthropic, model: claudeModel, apiKey: anthropicKey, localAgent: nil))
         }
         if let key = KeychainHelper.load(account: LLMProvider.openai.rawValue), !key.isEmpty {
-            let model = LLMModel.openaiModels.first { $0.id == "gpt-5.4-mini" } ?? LLMModel.openaiModels[0]
-            routes.append(Route(provider: .openai, model: model, apiKey: key, localAgent: nil))
+            routes.append(Route(provider: .openai, model: keyedModels[1], apiKey: key, localAgent: nil))
         }
         if let key = KeychainHelper.load(account: LLMProvider.mistral.rawValue), !key.isEmpty {
-            routes.append(Route(provider: .mistral, model: LLMModel.mistralModels[0], apiKey: key, localAgent: nil))
+            routes.append(Route(provider: .mistral, model: keyedModels[2], apiKey: key, localAgent: nil))
         }
         return routes
+    }
+
+    /// The model each keyed route uses, in `availableRoutes` order: Claude, GPT-5.4 mini, Mistral OCR.
+    static var keyedModels: [LLMModel] {
+        [LLMModel.anthropicModels[0],
+         LLMModel.openaiModels.first { $0.id == "gpt-5.4-mini" } ?? LLMModel.openaiModels[0],
+         LLMModel.mistralModels[0]]
+    }
+
+    /// What one refused page costs a keyed second reader, cheapest to dearest, for the pre-run estimate
+    /// (W41.app-ocr-default-fu1). Reads no Keychain, so it can run on every redraw; which route a refused page
+    /// actually takes depends on the keys present then, and claude by plan costs nothing.
+    static func pageCostRange(imageScale: Double) -> ClosedRange<Double> {
+        let costs = keyedModels.map { CostEstimator.secondReaderPageCost(model: $0, imageScale: imageScale) }
+        return (costs.min() ?? 0)...(costs.max() ?? 0)
     }
 
     /// Reads a page Gemini refused with each available route in turn, returning the first that gives text,
@@ -100,8 +114,10 @@ enum OCRRefusalFallback {
                 continue
             }
             if result.text != nil {
+                let cost = route.localAgent == nil
+                    ? CostEstimator.secondReaderPageCost(model: route.model, imageScale: imageScale) : 0
                 let reader = SecondReader(provider: route.provenanceProvider, model: route.provenanceModel,
-                                          geminiCode: refused.errorCode ?? "?")
+                                          geminiCode: refused.errorCode ?? "?", estimatedCost: cost)
                 NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(reader.summary)")
                 return OCRResult(text: result.text, classification: result.classification,
                                  rotationDegrees: result.rotationDegrees, errorMessage: nil, errorCode: nil,
@@ -113,6 +129,20 @@ enum OCRRefusalFallback {
         return OCRResult(text: nil, classification: nil,
                          errorMessage: "\(why) Second readers failed too — " + reasons.joined(separator: "; "),
                          errorCode: exhaustedCode)
+    }
+
+    /// A Gemini BATCH page as collected (W41.app-ocr-default-fu1): a refusal goes to `readRefusedPage`, anything
+    /// else is returned untouched. `enabled` is false off the direct-Gemini route (gateway, Local Agent, other
+    /// providers' batches). Batch pages carry no previous text; `previousImageURL` is set only when the batch
+    /// itself sent one.
+    static func readIfRefused(
+        _ result: OCRResult, enabled: Bool, imageURL: URL, previousImageURL: URL?,
+        customPrompt: String?, imageScale: Double
+    ) async -> OCRResult {
+        guard enabled, isRefusal(result) else { return result }
+        return await readRefusedPage(result, imageURL: imageURL, previousText: nil,
+                                     previousImageURL: previousImageURL, customPrompt: customPrompt,
+                                     imageScale: imageScale)
     }
 
     private static func read(

@@ -672,6 +672,15 @@ struct OCRView: View {
                                         .accessibilityIdentifier("ap.ocr.batchTotal")
                                 }
                             }
+                            if !useGateway && !useLocalAgent && !useAppleVision && !preOCRedInput
+                                && effectiveModel.provider == .gemini {
+                                // W41.app-ocr-default-fu1 — a refused page is read again, outside the totals above.
+                                let range = OCRRefusalFallback.pageCostRange(imageScale: imageScale / 100.0)
+                                Text("Pages Gemini refuses are read by a second reader: \(CostEstimate.money(range.lowerBound))–\(CostEstimate.money(range.upperBound)) a page with a key, free with claude by plan. Not in the totals.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("ap.ocr.secondReaderCost")
+                            }
                             Text(useGateway ? "Estimates based on user-provided pricing. Actual gateway costs may differ." : "Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)

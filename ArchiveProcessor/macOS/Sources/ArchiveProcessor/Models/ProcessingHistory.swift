@@ -32,7 +32,11 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     /// Short human label for the pipeline path: "Standard" / "Batch" / "Pre-OCRed" / "Re-OCR PDF".
     var modeLabel: String
     /// USD, estimator-derived on the run's actual parameters (see file header). A close estimate, not billed.
+    /// Includes what second readers spent on pages Gemini refused (W41.app-ocr-default-fu1).
     var cost: Double
+    /// Pages Gemini refused that a second reader read (`OCRRefusalFallback`). Optional so a run recorded
+    /// before this field still decodes.
+    var secondReaderPages: Int? = nil
 }
 
 /// Parameters captured at the START of a Process-Files run so the pipeline's completion tails can
@@ -123,8 +127,10 @@ struct RunHistorySnapshot {
 
     /// Build the persisted record for this run given its final success count. `failed` is derived so
     /// succeeded + failed always equals the file count (a run either produces output or is a failure).
-    func makeRun(succeeded: Int) -> ProcessingRun {
+    /// `secondReaders` are the run's pages a second reader read; their own estimated cost is added to the run's.
+    func makeRun(succeeded: Int, secondReaders: [SecondReader] = []) -> ProcessingRun {
         let ok = max(0, min(succeeded, fileCount))
+        let secondReaderCost = secondReaders.reduce(0) { $0 + ($1.estimatedCost ?? 0) }
         return ProcessingRun(
             date: startedAt,
             providerLabel: providerLabel,
@@ -134,7 +140,8 @@ struct RunHistorySnapshot {
             failed: fileCount - ok,
             batchMode: batchMode,
             modeLabel: modeLabel,
-            cost: estimatedCost
+            cost: estimatedCost + secondReaderCost,
+            secondReaderPages: secondReaders.isEmpty ? nil : secondReaders.count
         )
     }
 }

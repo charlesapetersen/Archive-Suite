@@ -1201,12 +1201,13 @@ extension OCRProcessor {
         // than a filter, because an entry whose index is past `jobs` must keep reporting "not persisted" the
         // way today's bounds guard does (a silent drop would let the poll call the batch clean and retire a
         // paid journal).
-        let entries: [(index: Int, url: URL, jobID: OCRJob.ID?, result: OCRResult)]
+        let entries: [(index: Int, url: URL, previousURL: URL?, jobID: OCRJob.ID?, result: OCRResult)]
             = results.compactMap { (customId, result) in
             let indexStr = customId.replacingOccurrences(of: "file-", with: "")
             guard !alreadyCompleted.contains(indexStr),
                   let index = Int(indexStr), index >= 0, index < fileURLs.count else { return nil }
-            return (index, fileURLs[index], jobs.indices.contains(index) ? jobs[index].id : nil, result)
+            return (index, fileURLs[index], index > 0 ? fileURLs[index - 1] : nil,
+                    jobs.indices.contains(index) ? jobs[index].id : nil, result)
         }
         guard !entries.isEmpty else { return true }
 
@@ -1217,6 +1218,14 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
+        // W41.app-ocr-default-fu1 — a page Gemini's batch refused goes to a second reader here, once, as the
+        // synchronous path does in `performOCRCall`. The request matches the batch's own: its prompt, its
+        // previous-image setting, and the live size fraction a batch resume also uses. A page already in
+        // `completedResults` was filtered out above, so a re-fetched chunk never buys a second read twice.
+        let secondReaderFallback = model.provider == .gemini && gateway == nil && localAgent == nil
+        let fallbackPrompt = activePendingBatch?.customPrompt
+        let fallbackPreviousImage = activePendingBatch?.sendPreviousImage ?? false
+        let fallbackScale = Self.liveImageScaleFraction()
         var allPersisted = true
         await withTaskGroup(of: (Int, URL, OCRJob.ID?, OCRResult).self) { group in
             var iter = entries.makeIterator()
@@ -1224,12 +1233,16 @@ extension OCRProcessor {
             func addNext() -> Bool {
                 guard let entry = iter.next() else { return false }
                 group.addTask {
+                    let read = await OCRRefusalFallback.readIfRefused(
+                        entry.result, enabled: secondReaderFallback, imageURL: entry.url,
+                        previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
+                        customPrompt: fallbackPrompt, imageScale: fallbackScale)
                     let correction = await Self.detectRotation(
                         imageURL: entry.url, provider: model.provider, apiKey: apiKey,
                         mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
                     )
                     return (entry.index, entry.url, entry.jobID,
-                            Self.mergeRotation(into: entry.result, correction: correction))
+                            Self.mergeRotation(into: read, correction: correction))
                 }
                 return true
             }

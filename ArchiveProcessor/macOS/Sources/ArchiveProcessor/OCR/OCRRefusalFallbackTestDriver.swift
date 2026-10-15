@@ -104,8 +104,12 @@ enum OCRRefusalFallbackTestDriver {
         check("the refused page went to Gemini first, then to Anthropic",
               calls.first?.contains("generativelanguage") == true && calls.contains { $0.contains("anthropic") })
         check("the result names its second reader and Gemini's reason",
-              r.secondReader == SecondReader(provider: "Anthropic", model: LLMModel.anthropicModels[0].displayName,
-                                             geminiCode: "Recitation"))
+              r.secondReader?.provider == "Anthropic" && r.secondReader?.model == LLMModel.anthropicModels[0].displayName
+              && r.secondReader?.geminiCode == "Recitation")
+        // W41.app-ocr-default-fu1 — the page carries what the keyed reader spent, for the run summary.
+        let claudePage = CostEstimator.secondReaderPageCost(model: LLMModel.anthropicModels[0], imageScale: 1)
+        check("a keyed second read carries its estimated cost", claudePage > 0
+              && r.secondReader?.estimatedCost.map { abs($0 - claudePage) < 1e-12 } == true)
         check("a second-read page is a success: no error left on it", r.errorMessage == nil && r.errorCode == nil)
 
         // The mark survives what the run does to a result: persistence and reclassification.
@@ -194,6 +198,72 @@ enum OCRRefusalFallbackTestDriver {
         let batchNoParts = GeminiBatchClient.parseSingleResponse(["candidates": [["finishReason": "OTHER"]]])
         check("a batch page refused with OTHER fails with that code",
               batchOther.text == nil && batchOther.errorCode == "OTHER" && batchNoParts.errorCode == "OTHER")
+
+        // 8. W41.app-ocr-default-fu1 — a refused batch page, as collected, is read by the second reader once.
+        useRoutes([claude])
+        await script.set(gemini: (200, geminiText), anthropic: (200, claudeText))
+        func collect(_ page: OCRResult, enabled: Bool = true) async -> OCRResult {
+            await OCRRefusalFallback.readIfRefused(page, enabled: enabled, imageURL: image, previousImageURL: nil,
+                                                   customPrompt: nil, imageScale: 1)
+        }
+        r = await collect(batchOther)
+        calls = await script.calls()
+        check("a batch page refused with OTHER is read by the second reader, marked, with one call",
+              r.text?.contains("CLAUDE-TEXT") == true && r.secondReader?.geminiCode == "OTHER"
+              && calls.filter { $0.contains("anthropic") }.count == 1 && !calls.contains { $0.contains("generativelanguage") })
+        let batchRecitation = GeminiBatchClient.parseSingleResponse(["candidates": [["finishReason": "RECITATION"]]])
+        r = await collect(batchRecitation)
+        check("a batch RECITATION page is read by the second reader", r.secondReader?.geminiCode == "Recitation")
+        await script.set(gemini: (200, geminiText), anthropic: (200, claudeText))
+        let batchOK = OCRResult(text: "BATCH-TEXT", classification: nil, errorMessage: nil, errorCode: nil)
+        r = await collect(batchOK)
+        let offRoute = await collect(batchOther, enabled: false)
+        calls = await script.calls()
+        check("a batch success, and a refusal off the direct-Gemini route, spend no second call",
+              r.text == "BATCH-TEXT" && r.secondReader == nil && offRoute.errorCode == "OTHER"
+              && offRoute.secondReader == nil && calls.isEmpty)
+        useRoutes([])
+        let batchNoReader = await collect(batchOther)
+        check("a refused batch page with no second reader fails as exhausted (never auto-retried)",
+              batchNoReader.text == nil && batchNoReader.errorCode == OCRRefusalFallback.exhaustedCode)
+
+        // 9. Spend: thinking tokens in the estimate, second readers in the run's history and summary.
+        let flash = gemini[0]
+        let est = CostEstimator.estimate(fileCount: 1000, model: flash, enableTagging: false,
+                                         sendPreviousImage: false, contextCharCount: 0)
+        let expectedOCR = 1000 * (CostEstimator.estimatedPromptTokens + CostEstimator.estimatedImageTokens(for: .gemini))
+            / 1_000_000 * flash.inputCostPer1M
+            + 1000 * (CostEstimator.estimatedOutputTokens + 117) / 1_000_000 * flash.outputCostPer1M
+        check("3.8 Flash's ~117 thinking tokens a page are in the estimate, at the output rate",
+              abs(est.ocrCost - expectedOCR) < 1e-9
+              && lite.map { CostEstimator.estimatedThinkingTokens(for: $0) } == 0)
+        let range = OCRRefusalFallback.pageCostRange(imageScale: 1)
+        check("the pre-run second-reader price range is positive and ordered",
+              range.lowerBound > 0 && range.lowerBound <= range.upperBound)
+        let snapshot = RunHistorySnapshot(
+            startedAt: Date(), provider: .gemini, gatewayConfig: nil, localAgent: nil, imageTokenProvider: nil,
+            model: flash, visionTextProvider: nil, visionTextModel: nil, batchMode: true, enableTagging: false,
+            enableCollectionSegmentation: false, preOCRedInput: false, reOCRMultiPagePDF: false, mixedReOCR: false,
+            sendPreviousImage: false, contextCharCount: 0, imageScale: 1, rotationMode: .off, fileCount: 3)
+        let readers = [SecondReader(provider: "Anthropic", model: "m", geminiCode: "OTHER", estimatedCost: 0.01),
+                       SecondReader(provider: "claude", model: "m", geminiCode: "OTHER", estimatedCost: 0)]
+        let recorded = snapshot.makeRun(succeeded: 3, secondReaders: readers)
+        check("the run's history counts the second-read pages and adds their cost",
+              recorded.secondReaderPages == 2 && abs(recorded.cost - (snapshot.estimatedCost + 0.01)) < 1e-12)
+        check("a run with no second reader records none", snapshot.makeRun(succeeded: 3).secondReaderPages == nil)
+        let oldRun = #"{"id":"\#(UUID().uuidString)","date":0,"providerLabel":"Gemini","modelName":"m","fileCount":1,"succeeded":1,"failed":0,"batchMode":false,"modeLabel":"Standard","cost":0.1}"#
+        check("a history run recorded before the field still decodes",
+              (try? JSONDecoder().decode(ProcessingRun.self, from: Data(oldRun.utf8)))?.secondReaderPages == nil
+              && (try? JSONDecoder().decode(ProcessingRun.self, from: Data(oldRun.utf8))) != nil)
+        let processor = OCRProcessor()
+        processor.jobs = [OCRJob(sourceURL: image), OCRJob(sourceURL: image)]
+        processor.jobs[0].result = OCRResult(text: "t", classification: nil, errorMessage: nil, errorCode: nil,
+                                             secondReader: readers[0])
+        check("the run summary says how many pages a second reader read",
+              processor.runDoneMessage(succeeded: 2, failed: 0) == "Done. 2 succeeded, 0 failed. 1 page read by a second reader.")
+        processor.jobs[0].result = nil
+        check("the run summary is unchanged with no second reader",
+              processor.runDoneMessage(succeeded: 2, failed: 0) == "Done. 2 succeeded, 0 failed.")
 
         finish(results)
     }

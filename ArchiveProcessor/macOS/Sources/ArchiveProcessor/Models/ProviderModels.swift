@@ -479,6 +479,8 @@ struct SecondReader: Codable, Equatable {
     let model: String
     /// Gemini's code for the refusal (`Recitation`, `OTHER`, `500`, …).
     let geminiCode: String
+    /// USD, `CostEstimator.secondReaderPageCost` for the route that read the page (0 for claude by plan).
+    var estimatedCost: Double? = nil
 
     var summary: String { "\(provider) · \(model), after Gemini returned no text (\(geminiCode))" }
 }

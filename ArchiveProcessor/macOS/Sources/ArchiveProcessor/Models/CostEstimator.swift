@@ -42,6 +42,19 @@ struct CostEstimator {
         }
     }
 
+    /// Thinking tokens a model spends per OCR page, billed at its output rate. Gemini 3.8 Flash thinks even
+    /// with no thinking level set: ~117 a page in the W41 pilot (W41.app-ocr-default-fu1).
+    static func estimatedThinkingTokens(for model: LLMModel) -> Double {
+        model.id == "gemini-3.8-flash" ? 117 : 0
+    }
+
+    /// One page read by a second reader (`OCRRefusalFallback`) at that model's standard rate: image, prompt
+    /// and output, no context, no previous image. A claude-by-plan route is not money and is never priced here.
+    static func secondReaderPageCost(model: LLMModel, imageScale: Double) -> Double {
+        estimate(fileCount: 1, model: model, enableTagging: false, sendPreviousImage: false,
+                 contextCharCount: 0, imageScale: imageScale).ocrCost
+    }
+
     // Tagging: text-only, ~1 call per segment (~3 files/segment average)
     static let estimatedTaggingInputTokens: Double = 1500
     static let estimatedTaggingOutputTokens: Double = 200
@@ -118,7 +131,7 @@ struct CostEstimator {
             let inputPerFile = estimatedPromptTokens + imgTokens + contextTokens
                 + (sendPreviousImage ? imgTokens : 0)
             let totalOcrInput = Double(fileCount) * inputPerFile
-            let totalOcrOutput = Double(fileCount) * estimatedOutputTokens
+            let totalOcrOutput = Double(fileCount) * (estimatedOutputTokens + estimatedThinkingTokens(for: model))
             ocrCost = (totalOcrInput / 1_000_000) * model.inputCostPer1M
                     + (totalOcrOutput / 1_000_000) * model.outputCostPer1M
             batchOcrCost = ocrCost * model.batchDiscount

@@ -848,8 +848,16 @@ extension OCRProcessor {
     /// Called only from genuine success tails, never on cancel/interruption.
     func recordRunHistory(succeeded: Int) {
         guard let snapshot = activeRunHistory else { return }
-        ProcessingHistoryStore.shared.record(snapshot.makeRun(succeeded: succeeded))
+        ProcessingHistoryStore.shared.record(snapshot.makeRun(
+            succeeded: succeeded, secondReaders: jobs.compactMap { $0.result?.secondReader }))
         activeRunHistory = nil
+    }
+
+    /// The run summary's last line: the counts, and how many pages a second reader read (W41.app-ocr-default-fu1).
+    func runDoneMessage(succeeded: Int, failed: Int) -> String {
+        let secondRead = jobs.filter { $0.result?.secondReader != nil }.count
+        return "Done. \(succeeded) succeeded, \(failed) failed."
+            + (secondRead == 0 ? "" : " \(secondRead) \(secondRead == 1 ? "page" : "pages") read by a second reader.")
     }
     /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
@@ -1689,7 +1697,7 @@ extension OCRProcessor {
         progress = 1.0
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
-        statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
         // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
@@ -1909,7 +1917,7 @@ extension OCRProcessor {
                 progress = 1.0
                 let succeeded = jobs.filter { $0.status == .succeeded }.count
                 recordRunHistory(succeeded: succeeded)
-                statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+                statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
                 // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
                 // placeholder instead of the scan. Both are silent failures otherwise: the file is
                 // there and looks processed, but tag search will not find it / the scan is missing.
@@ -2077,7 +2085,7 @@ extension OCRProcessor {
         progress = 1.0
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
-        statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
         // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
@@ -3245,7 +3253,7 @@ extension OCRProcessor {
         progress = 1.0   // fill the bar on completion (later phases don't drive the 0.7→1.0 band)
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         recordRunHistory(succeeded: succeeded)
-        statusMessage = "Done. \(succeeded) succeeded, \(failedFiles.count) failed."
+        statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
         // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.

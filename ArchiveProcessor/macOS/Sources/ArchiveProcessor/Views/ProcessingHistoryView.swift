@@ -116,6 +116,9 @@ private struct ProcessingHistoryRow: View {
             if run.failed > 0 {
                 Text("· \(run.succeeded) ✓  \(run.failed) ✗").foregroundStyle(.orange)
             }
+            if let n = run.secondReaderPages, n > 0 {
+                Text("· \(n) read by a second reader")
+            }
         }
         .font(.caption).foregroundStyle(.secondary)
     }
