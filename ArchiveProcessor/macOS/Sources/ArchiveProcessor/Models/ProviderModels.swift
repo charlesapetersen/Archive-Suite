@@ -213,7 +213,35 @@ struct LLMModel: Identifiable, Hashable, Codable {
         ),
     ]
 
+    // The FIRST entry is the default OCR model (`ModelSelectionStore.model(for:)` falls back to `models[0]`).
+    // W41.app-ocr-default (2026-10-15), from the W41 OCR panel (`segbench-results/W41-answers.md` §2, NES on 96
+    // pages of one corpus): 3.8 Flash 94.47 at $3.22 per 1,000 pages, best of any route on handwriting (96.0) —
+    // but it is one of the truth's two drafters, so its lead may be partly flattery; say so wherever the figure is
+    // shown. 3.5 Flash-Lite 93.13 at $1.57, the budget choice; 3.1 Flash-Lite (the old default) 91.61 at $1.17.
+    // Prices checked 2026-10-15 on ai.google.dev/gemini-api/docs/pricing. 3.8 Flash's are INTRODUCTORY to
+    // 31 Dec 2026 ($1.50/$7.50 from 1 Jan 2027) — update this entry then.
+    // Every Gemini route refuses some reprinted printed text; `OCRRefusalFallback` reads those pages.
     static let geminiModels: [LLMModel] = [
+        LLMModel(
+            id: "gemini-3.8-flash",
+            displayName: "Gemini 3.8 Flash",
+            provider: .gemini,
+            supportsThinking: true,
+            returnsMd: false,
+            inputCostPer1M: 0.75,
+            outputCostPer1M: 3.75,
+            batchDiscount: 0.5
+        ),
+        LLMModel(
+            id: "gemini-3.5-flash-lite",
+            displayName: "Gemini 3.5 Flash Lite",
+            provider: .gemini,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 0.30,
+            outputCostPer1M: 2.50,
+            batchDiscount: 0.5
+        ),
         LLMModel(
             id: "gemini-3.1-flash-lite",
             displayName: "Gemini 3.1 Flash Lite",
@@ -405,9 +433,14 @@ struct OCRResult: Codable {
     /// whole: with a reclassified enclosure's flag missing, its page would read as a new letter and move
     /// the recorded cover of every later enclosure that shares the same letter.
     let ocrEnclosure: Bool?
+    /// W41.app-ocr-default — set when Gemini refused the page and a second route read it
+    /// (`OCRRefusalFallback`): names that reader and Gemini's reason. `nil` = read by the run's own model.
+    let secondReader: String?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
-         enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil) {
+         enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
+         secondReader: String? = nil) {
+        self.secondReader = secondReader
         self.text = text
         self.classification = classification
         self.rotationDegrees = rotationDegrees
@@ -433,7 +466,8 @@ struct OCRResult: Codable {
         OCRResult(text: text, classification: classification, rotationDegrees: rotationDegrees,
                   errorMessage: errorMessage, errorCode: errorCode,
                   enclosure: classification == self.classification ? enclosure : nil,
-                  ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure))
+                  ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
+                  secondReader: secondReader)
     }
 }
 

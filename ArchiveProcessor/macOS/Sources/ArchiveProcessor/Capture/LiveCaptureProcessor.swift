@@ -1125,7 +1125,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 r = OCRResult(text: r.text, classification: r.classification,
                               rotationDegrees: ((rot % 360) + 360) % 360,
                               errorMessage: r.errorMessage, errorCode: r.errorCode,
-                              enclosure: r.enclosure, ocrClassification: .some(r.ocrClassification), ocrEnclosure: .some(r.ocrEnclosure))
+                              enclosure: r.enclosure, ocrClassification: .some(r.ocrClassification), ocrEnclosure: .some(r.ocrEnclosure),
+                              secondReader: r.secondReader)
             }
             results.append(r)
             texts.append(r.text ?? "")

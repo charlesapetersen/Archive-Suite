@@ -805,7 +805,8 @@ extension OCRProcessor {
                                         rotationDegrees: img.rotationDegrees,
                                         errorMessage: existing.errorMessage, errorCode: nil,
                                         enclosure: existing.enclosure,
-                                        ocrClassification: .some(existing.ocrClassification), ocrEnclosure: .some(existing.ocrEnclosure))
+                                        ocrClassification: .some(existing.ocrClassification), ocrEnclosure: .some(existing.ocrEnclosure),
+                                        secondReader: existing.secondReader)
                 jobs[fileIndex].result = updated
                 if let outputURL = outputURLMap[jobs[fileIndex].sourceURL] {
                     let imageURL = pdfToImageMap[img.url] ?? img.url
@@ -847,7 +848,8 @@ extension OCRProcessor {
             if let r = jobs[fileIndex].result {
                 jobs[fileIndex].result = OCRResult(text: r.text, classification: newCls,
                                                    rotationDegrees: r.rotationDegrees,
-                                                   errorMessage: r.errorMessage, errorCode: nil)
+                                                   errorMessage: r.errorMessage, errorCode: nil,
+                                                   secondReader: r.secondReader)
             }
         }
 

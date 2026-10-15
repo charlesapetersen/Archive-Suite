@@ -1640,7 +1640,7 @@ extension OCRProcessor {
         // a resume regenerates the PDF from the real OCR text rather than inheriting this write-failure note.
         return saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
-    static func isTimeoutError(_ result: OCRResult) -> Bool {
+    nonisolated static func isTimeoutError(_ result: OCRResult) -> Bool {
         if result.errorMessage?.lowercased().contains("timed out") == true
             || result.errorCode?.lowercased().contains("timeout") == true { return true }
         // Providers also surface timeouts as HTTP 408 (Request Timeout) / 504 (Gateway Timeout)
@@ -1701,7 +1701,13 @@ extension OCRProcessor {
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 case .gemini:
                     let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
+                    let geminiResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
+                    // W41.app-ocr-default: a page Gemini refuses goes to a second reader, never an empty success.
+                    networkResult = OCRRefusalFallback.isRefusal(geminiResult)
+                        ? await OCRRefusalFallback.readRefusedPage(
+                            geminiResult, imageURL: imageURL, previousText: previousText,
+                            previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
+                        : geminiResult
                 case .mistral:
                     let client = MistralClient(apiKey: apiKey, model: model)
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: scale)

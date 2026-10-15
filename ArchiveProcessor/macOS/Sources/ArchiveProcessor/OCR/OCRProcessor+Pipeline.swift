@@ -3373,7 +3373,8 @@ extension OCRProcessor {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode,
-                               enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure))
+                               enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure),
+                               secondReader: result.secondReader)
         }
         result = await Self.applyingVisionTextClassification(
             to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,

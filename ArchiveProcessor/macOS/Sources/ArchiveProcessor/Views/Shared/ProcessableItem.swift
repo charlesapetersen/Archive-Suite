@@ -99,7 +99,7 @@ protocol ProcessableItem: Identifiable {
     var ocrText: String? { get }
     var errorMessage: String? { get }
     var errorCode: String? { get }
-    var providerModel: String? { get }         // "Gemini · gemini-3.1-flash-lite"
+    var providerModel: String? { get }         // "Gemini · gemini-3.8-flash"
     var availableActions: [ItemAction] { get }
     /// Finder tags applied to the output (Files pane). Defaulted empty so Live's `SegmentItem` can omit it.
     var appliedTags: [String] { get }
