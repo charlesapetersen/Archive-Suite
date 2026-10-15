@@ -10,8 +10,16 @@ MISTRAL = 'mistral-ocr-4-1'
 LOCAL_SCORES = F.C.LOCAL / 'scores.json'
 
 
+def is_sub(key):
+    """Planned for a subscription and not moved to OpenRouter as the owner's fallback (Luna was)."""
+    return key in F.SUB and key not in F.PAID
+
+
+KEYS = list(dict.fromkeys([*F.PAID, *F.SUB, MISTRAL]))
+
+
 def route_label(key):
-    if key in F.SUB:
+    if is_sub(key):
         return f'{key} · `{F.SUB[key][0]} -p`, subscription' if F.SUB[key][0] == 'claude' else \
             f'{key} · `codex exec` ({F.SUB[key][2]}), subscription'
     if key == MISTRAL:
@@ -26,7 +34,7 @@ def reading(key, job):
         got = json.loads(f.read_text()) if f.exists() else {}
         text = got.get('text') or ''
         return f.exists(), ({'text': text, 'kind': None} if text else None), {'cost': .004 if f.exists() else 0}
-    f = (F.sub_path(key, job) if key in F.SUB else F.CACHE / 'responses' / key / (job['id'] + '.json'))
+    f = (F.sub_path(key, job) if is_sub(key) else F.CACHE / 'responses' / key / (job['id'] + '.json'))
     got = json.loads(f.read_text()) if f.exists() else {}
     return f.exists(), got.get('parsed'), got.get('meta') or {}
 
@@ -35,14 +43,14 @@ def all_scores():
     m = F.manifest(); by_page = {r['page']: r for r in P.rows()}
     cal = json.loads((P.TRUTH / 'calibrate.json').read_text())
     out = []
-    for key in [*F.PAID, *F.SUB, MISTRAL]:
+    for key in KEYS:
         for job in m['jobs']:
             page = job['page']; row = by_page[page]
             attempted, parsed, meta = reading(key, job)
             truth = (P.TRUTH / 'truth' / (page + '.txt')).read_text()
             s = score(truth, parsed['text'] if parsed else '')
             out.append({**job, **s, 'key': key, 'ok': bool(parsed), 'attempted': attempted,
-                        'cost': meta.get('cost', 0) if key not in F.SUB else 0,
+                        'cost': 0 if is_sub(key) else meta.get('cost', 0),
                         'agreement': page in P.AGREEMENT, 'groups': group_values(row, cal),
                         'kind_correct': (parsed['kind'] == row['kind']) if parsed and parsed.get('kind') else None,
                         'prompt_tokens': meta.get('prompt_tokens'), 'completion_tokens': meta.get('completion_tokens')})
@@ -55,7 +63,7 @@ def report():
     write_csv(F.CACHE / 'scores.csv', ss, ['key', 'page', 'ok', 'attempted', 'nes', 'chrf', 'words', 'missed',
                                           'added', 'cost', 'agreement', 'kind_correct'])
     main = [r for r in ss if not r['agreement']]
-    keys = [*F.PAID, *F.SUB, MISTRAL]
+    keys = KEYS
     by = collections.defaultdict(list)
     for r in main:
         for g in r['groups']:
@@ -105,12 +113,29 @@ def report():
          '| route | completed / attempted / 96 | NES % | chrF2 % | words missed % | words added % | kind right % | '
          'cost / page |', '|---|---:|---:|---:|---:|---:|---:|---:|']
     order = sorted(keys, key=lambda k: -aggregate([r for r in main if r['key'] == k])['nes'])
+    order = [k for k in order if any(r['attempted'] for r in main if r['key'] == k)]
+    nes = {k: 100 * aggregate([r for r in main if r['key'] == k])['nes'] for k in order}
+    per = {k: sum(r['cost'] for r in ss if r['key'] == k and r['attempted'])
+           / max(1, sum(r['attempted'] for r in ss if r['key'] == k)) for k in order if not is_sub(k)}
+    best_paid = max(per, key=nes.get)
+    near = min((k for k in per if nes[k] >= nes[best_paid] - 1.5), key=per.get)
+    open_w = max((k for k in per if k.startswith('qwen')), key=nes.get)
+    findings = ['## Findings', '',
+                f'- Highest on the 96 accuracy pages: **{order[0]}** ({nes[order[0]]:.2f} NES'
+                + (', subscription route' if is_sub(order[0]) else '') + ').',
+                f'- Best paid route: **{best_paid}**, {nes[best_paid]:.2f} NES at ${per[best_paid]:.5f} a page. '
+                f'Cheapest paid route within 1.5 points of it: **{near}**, {nes[near]:.2f} at ${per[near]:.5f}.',
+                f'- Best open-weight route (the FarmShare-scale ceiling): **{open_w}**, {nes[open_w]:.2f} NES at '
+                f'${per[open_w]:.5f} a page, against the local panel’s best, qwen3.6-27b, at 94.28.',
+                '- The spread among the paid leaders is about two points on one corpus of 96 pages; the truth leans '
+                'toward Gemini 3.8 Flash and Claude (its drafters), so read the order of close rows as provisional.', '']
+    L[L.index('## Routes'):L.index('## Routes')] = findings
     for k in order:
         rr = [r for r in main if r['key'] == k]; a = aggregate(rr); n = sum(r['attempted'] for r in rr)
         if not n:
             continue
         kc = [r['kind_correct'] for r in rr if r['kind_correct'] is not None]
-        cost = ('subscription' if k in F.SUB else
+        cost = ('subscription' if is_sub(k) else
                 f"${sum(r['cost'] for r in ss if r['key'] == k and r['attempted']) / sum(r['attempted'] for r in ss if r['key'] == k):.5f}")
         L.append(f"| {route_label(k)} | {a['ok']}/{n}/{a['n']} | {100*a['nes']:.2f} | {100*a['chrf']:.2f} | "
                  f"{100*a['miss']:.2f} | {100*a['add']:.2f} | {f'{100*sum(kc)/len(kc):.0f}' if kc else '—'} | {cost} |")
@@ -140,6 +165,17 @@ def report():
         toks = '/'.join(f"{sum(r.get(f) or 0 for r in rr) / n:.0f}" if n else '—'
                         for f in ('prompt_tokens', 'completion_tokens', 'reasoning_tokens'))
         L.append(f"| {k} | {n} | {sum(r['status'] == 'failed' for r in rr)} | ${sum(r['cost'] for r in rr):.4f} | {toks} |")
+    for k, (harness, model, effort) in F.SUB.items():
+        if not is_sub(k):
+            continue
+        ms = [json.loads(F.sub_path(k, j).read_text())['meta'] for j in F.manifest()['jobs'] if F.sub_path(k, j).exists()]
+        if ms and harness == 'claude':
+            tin = sum(sum(m.get(f) or 0 for f in ('input_tokens', 'cache_read_tokens', 'cache_write_tokens')) for m in ms)
+            L += ['', f'{k} through `claude -p`: {len(ms)} pages, {sum(bool(m["harness_errors"]) for m in ms)} harness '
+                  f'retries, mean {tin / len(ms):.0f} input tokens (Claude Code’s system prompt and tools included, '
+                  f'mostly cached) and {sum(m.get("output_tokens") or 0 for m in ms) / len(ms):.0f} output tokens a '
+                  f'page, mean {sum(m.get("wall_s") or 0 for m in ms) / len(ms):.0f} s a page at three at once. '
+                  'Subscription usage, not money.']
     L += ['', f'Mistral OCR: {sum(b["status"] == "ok" for b in bills)}/{len(bills)} pages returned text.', '',
           'Per-attribute scores (collection, period, kind, table/form, camera, tertiles, every tag; overlapping, '
           'small groups descriptive only): [ocr-panel-cloud-groups.csv](ocr-panel-cloud-groups.csv).', '',

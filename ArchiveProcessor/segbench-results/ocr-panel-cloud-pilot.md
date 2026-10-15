@@ -1,5 +1,7 @@
 # W41.ocr-panel-cloud — three-page pilot
 
+**Superseded (2026-10-15): the owner approved the full panel and it ran; results in [ocr-panel-cloud.md](ocr-panel-cloud.md).** This page is the pilot as it stood.
+
 Owner authorization, 2026-10-15: three pages per route, well under $1, then ask again. **The full panel has not run and is not approved.**
 
 Frozen pages: p010 (clipping), p062 (typescript/bullets), p086 (difficult handwriting). These are the local panel’s original, byte-identical JPEGs (2400 px ceiling) and owner-ruled transcription prompt. No ladder variants. p086 is agreement with the drafting models, not adjudicated accuracy. Two accuracy pages cannot establish a ranking.

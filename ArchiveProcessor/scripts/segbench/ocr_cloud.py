@@ -2,7 +2,7 @@
 """W41.ocr-panel-cloud: ONLY the owner's three-page pilot, never the full panel.
 
 prepare -> pilot -> report. Raw material stays in OCR_CLOUD_CACHE (default /tmp).
-The full 99-page run requires a new owner answer and deliberately has no command here.
+The full 99-page run (owner-approved later the same day) is ocr_cloud_full.py, not this file.
 """
 from __future__ import annotations
 import argparse
