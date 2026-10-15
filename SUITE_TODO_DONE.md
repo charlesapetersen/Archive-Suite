@@ -11078,3 +11078,17 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   stay `unproven` with evidence. Not covered: links arriving while Notes or Reader is not running.
   Commits: 82707df0 (checkpoint 1) and this one.
   <!-- /W40.d10 -->
+- [x] **W40.e2 — crash, hang and leak harvest from VM runs [S-M]** · §W40 verification phase · SHIPPED 2026-10-15 (this commit; checkpoints 7b0fadd2, a30419cd)
+  Crash/hang: both VM entry points mark the guest before each run and copy every new DiagnosticReports file to
+  `vm-artifacts/<app>/crashes*/` (`tart_crash_mark`/`tart_crash_harvest`, ops/gui/tart-lib.sh). A crash or hang
+  report from the tested app's process, its UITests-Runner or xctest fails the run even under TEST SUCCEEDED; the
+  gate counts it as a failed attempt (retry-once applies; crash-only + inconclusive retry = SKIP). Other reports
+  and `.diag` are named, never fatal; an unreadable listing or missing mark is UNKNOWN. Proof:
+  prove-vm-lane.sh §13 (95/95), ops/gui/vm-crash-harvest-probe.sh on the real guest (6/6), a real Processor gate
+  run GREEN with the harvest line. Leaks: ops/verify/leaks-harvest.sh (core via `leaks -atExit`; Reader/Notes via
+  a principal-class LeakHarvestHold, because -atExit's DYLD_INSERT_LIBRARIES breaks hosted runners) +
+  leaks-classify.py (ours vs framework). Core 0 ours, Reader 0 ours (30 AppIntents linkd cycles = framework),
+  Notes 18 roots of ours, all test hygiene (named pasteboards never released, closures capturing their model),
+  fixed here → 0. Adversarial review acted on (per-app attribution, SKIP rule, NOMARK). Evidence:
+  `verification/evidence/core/W40.e2-crash-leak-harvest.md`. Not covered: Processor has no unit target.
+  <!-- /W40.e2 -->

@@ -207,7 +207,9 @@ where it can.
 - **`W40.e1` — sanitizers [M].** Thread Sanitizer and Address Sanitizer configurations (separate runs) for
   ArchiveCore and the Reader and Notes unit suites; Processor drivers under TSan. Triage every report under rule 5.
 - **`W40.e2` — crash, hang and leak harvest [S-M].** After each VM run, copy new `.ips` files out of the guest's
-  `DiagnosticReports` and fail the run on any new one; `leaks --atExit` on the unit suites.
+  `DiagnosticReports` and fail the run on any new one; `leaks --atExit` on the unit suites. *(SHIPPED 2026-10-15:
+  `tart_crash_mark`/`tart_crash_harvest` in both VM entry points; `ops/verify/leaks-harvest.sh`. Evidence
+  `verification/evidence/core/W40.e2-crash-leak-harvest.md`; 18 Notes test leaks found and fixed, 0 of ours left.)*
 - **`W40.e3` — accessibility audit [S-M].** `performAccessibilityAudit` on each main screen in each UI suite;
   findings are `S2`–`S4`.
 - **`W40.e4` — never-executed code [M].** `xccov` over unit, UI and journey runs. List functions no run reached;
