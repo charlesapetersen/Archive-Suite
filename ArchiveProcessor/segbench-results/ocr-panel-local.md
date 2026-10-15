@@ -2,7 +2,7 @@
 
 Reproduce: `ocr_panel.py prepare`, `collect --probe`, `collect`, `vision` (under the heavy lock), then `ocr_panel_score.py`. Inputs, catalogs, raw responses, reservations and page scores: `~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-local/` (outside git).
 
-Conservative OpenRouter budget accounting, every attempt: **$1.527792 / $2.00 cap**. Each row pins one endpoint and precision; temperature 0, reasoning off (Flash-Lite minimal; the VL Instruct/Mistral endpoints have no reasoning control). No paid retries.
+Conservative OpenRouter budget accounting, every attempt: **$1.533384 / $2.00 cap**. Each row pins one endpoint and precision; temperature 0, reasoning off (Flash-Lite minimal; the VL Instruct/Mistral endpoints have no reasoning control). No paid retries.
 
 ## Scoring and limits
 
@@ -20,7 +20,7 @@ Every source is converted to JPEG quality 90 and capped at 2400 pixels on its lo
 
 | model | completed / attempted / 96 | NES % | chrF2 % | words missed % | words added % | cost/original |
 |---|---:|---:|---:|---:|---:|---:|
-| qwen3.5-9b | 83/87/96 | 80.29 | 82.05 | 19.98 | 3.13 | $0.000239 |
+| qwen3.5-9b | 92/96/96 | 89.43 | 91.32 | 9.42 | 3.26 | $0.000250 |
 | qwen3.5-27b | 82/96/96 | 81.80 | 82.61 | 15.39 | 1.72 | $0.001796 |
 | qwen3.5-35b-a3b | 94/96/96 | 90.83 | 93.61 | 3.91 | 3.30 | $0.000829 |
 | qwen3.6-27b | 95/96/96 | 94.28 | 95.55 | 3.36 | 2.73 | $0.001940 |
@@ -39,7 +39,7 @@ These conditional scores diagnose transcription quality apart from response fail
 
 | model | completed / 96 | NES % | chrF2 % | missed % | added % |
 |---|---:|---:|---:|---:|---:|
-| qwen3.5-9b | 83/96 | 92.86 | 94.90 | 3.26 | 3.79 |
+| qwen3.5-9b | 92/96 | 93.32 | 95.29 | 3.10 | 3.49 |
 | qwen3.5-27b | 82/96 | 95.76 | 96.71 | 2.46 | 1.98 |
 | qwen3.5-35b-a3b | 94/96 | 92.76 | 95.60 | 2.33 | 3.35 |
 | qwen3.6-27b | 95/96 | 95.27 | 96.56 | 2.90 | 2.75 |
@@ -56,11 +56,11 @@ These conditional scores diagnose transcription quality apart from response fail
 
 | model | subset | completed / n | NES % | chrF2 % | missed % | added % |
 |---|---|---:|---:|---:|---:|---:|
-| qwen3.5-9b | all-99 | 84/99 | 78.67 | 80.26 | 20.84 | 3.30 |
-| qwen3.5-9b | agreement-only | 1/3 | 26.81 | 23.18 | 61.12 | 10.89 |
-| qwen3.5-9b | ladder-original | 16/20 | 74.28 | 75.80 | 26.16 | 3.38 |
-| qwen3.5-9b | ladder-half | 16/20 | 74.90 | 76.09 | 28.28 | 3.06 |
-| qwen3.5-9b | ladder-quarter | 13/20 | 60.82 | 61.29 | 51.72 | 1.30 |
+| qwen3.5-9b | all-99 | 95/99 | 88.84 | 90.33 | 9.67 | 3.84 |
+| qwen3.5-9b | agreement-only | 3/3 | 69.85 | 58.65 | 21.31 | 31.10 |
+| qwen3.5-9b | ladder-original | 19/20 | 89.23 | 90.73 | 7.69 | 3.46 |
+| qwen3.5-9b | ladder-half | 19/20 | 89.78 | 90.91 | 10.05 | 3.34 |
+| qwen3.5-9b | ladder-quarter | 15/20 | 69.13 | 69.43 | 45.17 | 2.09 |
 | qwen3.5-27b | all-99 | 85/99 | 81.62 | 82.11 | 15.37 | 2.25 |
 | qwen3.5-27b | agreement-only | 3/3 | 75.79 | 66.14 | 14.62 | 27.22 |
 | qwen3.5-27b | ladder-original | 18/20 | 85.46 | 87.36 | 8.88 | 2.44 |
@@ -124,11 +124,11 @@ The [attribute table](ocr-panel-local-groups.csv) includes collection, source, h
 
 5 explicit empty provider errors are accounted at $0 under [OpenRouter’s zero-completion insurance](https://openrouter.ai/blog/announcements/never-pay-for-empty-ai-responses-again/). These are policy-covered failures, not successful free readings; raw error bodies are saved.
 
-**Billing uncertainty:** 11 provider errors or interrupted calls had no usable billing record. 2 generation lookups returned 404; other failures had no retained generation ID. Reported charges are $1.510951; an additional $0.016841 (11 bounded by the API key’s own billing for the UTC day, which exceeded the measured charges by at most $0.001531; each such call carries that whole difference) is counted as a conservative ceiling against the cap. Cost columns include these ceilings and are not all measured charges. These failed calls are cached and never retried. Raw errors and lookup evidence remain in the private cache.
+**Billing uncertainty:** 11 provider errors or interrupted calls had no usable billing record. 2 generation lookups returned 404; other failures had no retained generation ID. Reported charges are $1.516543; an additional $0.016841 (11 bounded by the API key’s own billing for the UTC day, which exceeded the measured charges by at most $0.001531; each such call carries that whole difference) is counted as a conservative ceiling against the cap. Cost columns include these ceilings and are not all measured charges. These failed calls are cached and never retried. Raw errors and lookup evidence remain in the private cache.
 
 | model | endpoint | precision | accounted calls | failures | $/call (charges + uncertain ceilings) | mean input/output tokens |
 |---|---|---|---:|---:|---:|---:|
-| qwen3.5-9b | deepinfra/bf16 | bf16 | 121 | 8 | $0.000257 | 1242/929 |
+| qwen3.5-9b | deepinfra/bf16 | bf16 | 139 | 10 | $0.000264 | 1228/979 |
 | qwen3.5-27b | siliconflow/fp8 | fp8 | 139 | 22 | $0.001954 | 2983/560 |
 | qwen3.5-35b-a3b | deepinfra/fp8 | fp8 | 139 | 6 | $0.000973 | 1229/801 |
 | qwen3.6-27b | chutes/fp8 | fp8 | 139 | 4 | $0.002055 | 3265/614 |

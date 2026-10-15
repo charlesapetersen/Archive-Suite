@@ -11043,3 +11043,20 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Ledger: N-12 → `broken`; runtime evidence on N-02, N-14, N-15 (stay `unproven`: switching notes, a successful
   paste and a drag were not driven). Evidence `verification/evidence/notes/W40.d9-writing.md`.
   <!-- /W40.d9 -->
+- [x] **W41.ocr-panel-local-rest — the four throttled routes [XS · <1 session]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light,paid) · SHIPPED 2026-10-15
+  The four routes W41.ocr-panel-local left partial, because DeepInfra, DekaLLM and Crusoe answered with HTTP 429
+  `upstream_provider_shared_pool` all evening on 2026-10-14, are now complete, on the same pinned providers and
+  precisions: qwen3.6-35b-a3b, gemma4-26b-a4b, gemma4-31b and qwen3.5-9b each 139/139 response files (failures
+  included). `ocr_panel.py collect --only <route>` ran at `OCR_PANEL_CONCURRENCY=2` in repeated passes about 4 min
+  apart across three sessions, about 40 passes in all. A 429 defers a route for the rest of a pass. No `timeout`
+  wrapper. OpenRouter holds some calls open for 20+ minutes, and their keep-alives defeat the 300 s read timeout.
+  A pass loop must check that `pending/` is empty. It must not use `pgrep -f`, which matches the loop's own shell.
+  Fix on the way (be2d07d2): `reconcile` refused to run when a killed pass left a pending reservation whose 4xx body
+  had already been saved. It now releases that reservation at no cost, as the runner does.
+  Result: with all of its inputs, qwen3.5-9b goes from 83/96 completed (NES 80.29) to 92/96 (NES 89.43, chrF2 91.32,
+  9.42% words missed), at $0.000250 per original. Final reconcile on 2026-10-15: the key's day usage gave nothing
+  tighter than the reservations. 11 uncertain calls are bounded at $0.001531 each. Accounted spend is **$1.533384
+  of the $2 cap**. That figure covers W41.ocr-panel-local too, so the whole piece of work is under the $3 rule.
+  Report and groups CSV regenerated: `ArchiveProcessor/segbench-results/ocr-panel-local.md` + `-groups.csv`.
+  Commits: e573d4a2, be2d07d2, 945fd859, a51ae484 and this one.
+  <!-- /W41.ocr-panel-local-rest -->
