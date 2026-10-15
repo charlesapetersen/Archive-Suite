@@ -2,7 +2,7 @@
 
 Reproduce: `ocr_panel.py prepare`, `collect --probe`, `collect`, `vision` (under the heavy lock), then `ocr_panel_score.py`. Inputs, catalogs, raw responses, reservations and page scores: `~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-local/` (outside git).
 
-Conservative OpenRouter budget accounting, every attempt: **$1.489702 / $2.00 cap**. Each row pins one endpoint and precision; temperature 0, reasoning off (Flash-Lite minimal; the VL Instruct/Mistral endpoints have no reasoning control). No paid retries.
+Conservative OpenRouter budget accounting, every attempt: **$1.527792 / $2.00 cap**. Each row pins one endpoint and precision; temperature 0, reasoning off (Flash-Lite minimal; the VL Instruct/Mistral endpoints have no reasoning control). No paid retries.
 
 ## Scoring and limits
 
@@ -20,13 +20,13 @@ Every source is converted to JPEG quality 90 and capped at 2400 pixels on its lo
 
 | model | completed / attempted / 96 | NES % | chrF2 % | words missed % | words added % | cost/original |
 |---|---:|---:|---:|---:|---:|---:|
-| qwen3.5-9b | 66/69/96 | 64.24 | 64.97 | 43.16 | 2.19 | $0.000226 |
-| qwen3.5-27b | 82/96/96 | 81.80 | 82.61 | 15.39 | 1.72 | $0.001759 |
+| qwen3.5-9b | 83/87/96 | 80.29 | 82.05 | 19.98 | 3.13 | $0.000239 |
+| qwen3.5-27b | 82/96/96 | 81.80 | 82.61 | 15.39 | 1.72 | $0.001796 |
 | qwen3.5-35b-a3b | 94/96/96 | 90.83 | 93.61 | 3.91 | 3.30 | $0.000829 |
-| qwen3.6-27b | 95/96/96 | 94.28 | 95.55 | 3.36 | 2.73 | $0.001933 |
+| qwen3.6-27b | 95/96/96 | 94.28 | 95.55 | 3.36 | 2.73 | $0.001940 |
 | qwen3.6-35b-a3b | 96/96/96 | 93.02 | 95.65 | 2.07 | 3.82 | $0.000599 |
-| gemma4-26b-a4b | 86/96/96 | 82.73 | 84.41 | 19.64 | 3.74 | $0.000404 |
-| gemma4-31b | 70/73/96 | 67.87 | 68.60 | 37.47 | 2.81 | $0.000349 |
+| gemma4-26b-a4b | 86/96/96 | 82.73 | 84.41 | 19.64 | 3.74 | $0.000412 |
+| gemma4-31b | 93/96/96 | 90.55 | 91.51 | 7.72 | 4.61 | $0.000379 |
 | qwen3-vl-8b | 94/96/96 | 91.81 | 93.33 | 3.65 | 2.62 | $0.001492 |
 | qwen3-vl-30b-a3b | 94/96/96 | 89.82 | 92.68 | 5.78 | 3.40 | $0.000984 |
 | mistral-small-24b | 94/96/96 | 89.34 | 90.86 | 6.16 | 4.00 | $0.000316 |
@@ -39,13 +39,13 @@ These conditional scores diagnose transcription quality apart from response fail
 
 | model | completed / 96 | NES % | chrF2 % | missed % | added % |
 |---|---:|---:|---:|---:|---:|
-| qwen3.5-9b | 66/96 | 93.44 | 94.51 | 3.12 | 3.73 |
+| qwen3.5-9b | 83/96 | 92.86 | 94.90 | 3.26 | 3.79 |
 | qwen3.5-27b | 82/96 | 95.76 | 96.71 | 2.46 | 1.98 |
 | qwen3.5-35b-a3b | 94/96 | 92.76 | 95.60 | 2.33 | 3.35 |
 | qwen3.6-27b | 95/96 | 95.27 | 96.56 | 2.90 | 2.75 |
 | qwen3.6-35b-a3b | 96/96 | 93.02 | 95.65 | 2.07 | 3.82 |
 | gemma4-26b-a4b | 86/96 | 92.35 | 94.23 | 3.93 | 4.47 |
-| gemma4-31b | 70/96 | 93.08 | 94.08 | 4.19 | 4.30 |
+| gemma4-31b | 93/96 | 93.47 | 94.46 | 4.34 | 4.78 |
 | qwen3-vl-8b | 94/96 | 93.76 | 95.32 | 2.30 | 2.66 |
 | qwen3-vl-30b-a3b | 94/96 | 91.73 | 94.65 | 3.15 | 3.50 |
 | mistral-small-24b | 94/96 | 91.24 | 92.80 | 5.00 | 4.05 |
@@ -56,11 +56,11 @@ These conditional scores diagnose transcription quality apart from response fail
 
 | model | subset | completed / n | NES % | chrF2 % | missed % | added % |
 |---|---|---:|---:|---:|---:|---:|
-| qwen3.5-9b | all-99 | 66/99 | 62.30 | 63.00 | 44.35 | 2.14 |
-| qwen3.5-9b | agreement-only | 0/3 | 0.00 | 0.00 | 100.00 | 0.00 |
-| qwen3.5-9b | ladder-original | 10/20 | 45.62 | 47.45 | 70.96 | 1.30 |
-| qwen3.5-9b | ladder-half | 10/20 | 46.41 | 47.89 | 71.11 | 0.85 |
-| qwen3.5-9b | ladder-quarter | 10/20 | 46.75 | 47.45 | 71.18 | 0.59 |
+| qwen3.5-9b | all-99 | 84/99 | 78.67 | 80.26 | 20.84 | 3.30 |
+| qwen3.5-9b | agreement-only | 1/3 | 26.81 | 23.18 | 61.12 | 10.89 |
+| qwen3.5-9b | ladder-original | 16/20 | 74.28 | 75.80 | 26.16 | 3.38 |
+| qwen3.5-9b | ladder-half | 16/20 | 74.90 | 76.09 | 28.28 | 3.06 |
+| qwen3.5-9b | ladder-quarter | 13/20 | 60.82 | 61.29 | 51.72 | 1.30 |
 | qwen3.5-27b | all-99 | 85/99 | 81.62 | 82.11 | 15.37 | 2.25 |
 | qwen3.5-27b | agreement-only | 3/3 | 75.79 | 66.14 | 14.62 | 27.22 |
 | qwen3.5-27b | ladder-original | 18/20 | 85.46 | 87.36 | 8.88 | 2.44 |
@@ -86,11 +86,11 @@ These conditional scores diagnose transcription quality apart from response fail
 | gemma4-26b-a4b | ladder-original | 16/20 | 77.84 | 77.85 | 29.82 | 2.14 |
 | gemma4-26b-a4b | ladder-half | 18/20 | 84.86 | 86.38 | 21.28 | 3.61 |
 | gemma4-26b-a4b | ladder-quarter | 17/20 | 81.90 | 81.94 | 24.42 | 3.54 |
-| gemma4-31b | all-99 | 71/99 | 66.58 | 67.18 | 37.99 | 2.98 |
-| gemma4-31b | agreement-only | 1/3 | 25.42 | 21.57 | 61.90 | 11.20 |
-| gemma4-31b | ladder-original | 11/20 | 52.40 | 53.16 | 66.18 | 0.87 |
-| gemma4-31b | ladder-half | 11/20 | 52.27 | 52.89 | 66.52 | 1.02 |
-| gemma4-31b | ladder-quarter | 11/20 | 51.02 | 53.19 | 65.98 | 1.34 |
+| gemma4-31b | all-99 | 96/99 | 89.90 | 90.47 | 8.10 | 5.28 |
+| gemma4-31b | agreement-only | 3/3 | 69.10 | 57.33 | 25.82 | 36.55 |
+| gemma4-31b | ladder-original | 19/20 | 90.27 | 90.83 | 15.45 | 4.28 |
+| gemma4-31b | ladder-half | 20/20 | 92.61 | 94.15 | 7.47 | 7.05 |
+| gemma4-31b | ladder-quarter | 19/20 | 86.02 | 88.58 | 12.77 | 8.81 |
 | qwen3-vl-8b | all-99 | 97/99 | 91.26 | 92.39 | 3.91 | 3.16 |
 | qwen3-vl-8b | agreement-only | 3/3 | 73.70 | 62.32 | 16.02 | 28.30 |
 | qwen3-vl-8b | ladder-original | 20/20 | 95.14 | 97.22 | 1.74 | 2.42 |
@@ -124,17 +124,17 @@ The [attribute table](ocr-panel-local-groups.csv) includes collection, source, h
 
 5 explicit empty provider errors are accounted at $0 under [OpenRouter’s zero-completion insurance](https://openrouter.ai/blog/announcements/never-pay-for-empty-ai-responses-again/). These are policy-covered failures, not successful free readings; raw error bodies are saved.
 
-**Billing uncertainty:** 10 provider errors or interrupted calls had no usable billing record. 2 generation lookups returned 404; other failures had no retained generation ID. Reported charges are $1.481332; an additional $0.008370 (10 bounded by the API key’s own billing for the UTC day, which exceeded the measured charges by at most $0.000837; each such call carries that whole difference) is counted as a conservative ceiling against the cap. Cost columns include these ceilings and are not all measured charges. These failed calls are cached and never retried. Raw errors and lookup evidence remain in the private cache.
+**Billing uncertainty:** 11 provider errors or interrupted calls had no usable billing record. 2 generation lookups returned 404; other failures had no retained generation ID. Reported charges are $1.510951; an additional $0.016841 (11 bounded by the API key’s own billing for the UTC day, which exceeded the measured charges by at most $0.001531; each such call carries that whole difference) is counted as a conservative ceiling against the cap. Cost columns include these ceilings and are not all measured charges. These failed calls are cached and never retried. Raw errors and lookup evidence remain in the private cache.
 
 | model | endpoint | precision | accounted calls | failures | $/call (charges + uncertain ceilings) | mean input/output tokens |
 |---|---|---|---:|---:|---:|---:|
-| qwen3.5-9b | deepinfra/bf16 | bf16 | 88 | 2 | $0.000213 | 1283/568 |
-| qwen3.5-27b | siliconflow/fp8 | fp8 | 139 | 22 | $0.001914 | 2983/560 |
+| qwen3.5-9b | deepinfra/bf16 | bf16 | 121 | 8 | $0.000257 | 1242/929 |
+| qwen3.5-27b | siliconflow/fp8 | fp8 | 139 | 22 | $0.001954 | 2983/560 |
 | qwen3.5-35b-a3b | deepinfra/fp8 | fp8 | 139 | 6 | $0.000973 | 1229/801 |
-| qwen3.6-27b | chutes/fp8 | fp8 | 139 | 4 | $0.002050 | 3265/614 |
+| qwen3.6-27b | chutes/fp8 | fp8 | 139 | 4 | $0.002055 | 3265/614 |
 | qwen3.6-35b-a3b | deepinfra/fp8 | fp8 | 139 | 5 | $0.000836 | 1228/751 |
-| gemma4-26b-a4b | dekallm/bf16 | bf16 | 139 | 16 | $0.000427 | 649/1168 |
-| gemma4-31b | crusoe/bf16 | bf16 | 95 | 2 | $0.000324 | 636/587 |
+| gemma4-26b-a4b | dekallm/bf16 | bf16 | 139 | 16 | $0.000432 | 649/1168 |
+| gemma4-31b | crusoe/bf16 | bf16 | 139 | 4 | $0.000357 | 632/643 |
 | qwen3-vl-8b | parasail/bf16 | bf16 | 139 | 8 | $0.001496 | 3281/901 |
 | qwen3-vl-30b-a3b | deepinfra/fp8 | fp8 | 139 | 8 | $0.001030 | 3281/897 |
 | mistral-small-24b | deepinfra/fp8 | fp8 | 139 | 7 | $0.000334 | 2256/826 |
@@ -165,21 +165,21 @@ Vision OCR’s separate lab has Qwen3-VL-8B MLX4 results (65 newspaper pages; wh
 
 ## Cloud-panel estimate for the owner (no cloud-panel calls made)
 
-Completed original-page routes average 636–4104 input and 412–485 output tokens/page. The range below applies these measured extremes to the current listed prices, **not** a measurement of the cloud models’ tokenizers. Image token budgets and reasoning can change it. The high figure adds a 50% retry/tokenization buffer. Pin actual providers and re-estimate from a three-page pilot before committing the rest. Twelve chat models, 99 originals each; no ladder variants in this estimate.
+Completed original-page routes average 636–4104 input and 443–485 output tokens/page. The range below applies these measured extremes to the current listed prices, **not** a measurement of the cloud models’ tokenizers. Image token budgets and reasoning can change it. The high figure adds a 50% retry/tokenization buffer. Pin actual providers and re-estimate from a three-page pilot before committing the rest. Twelve chat models, 99 originals each; no ladder variants in this estimate.
 
 | cloud model | listed $/M input/output | 99 pages, low proxy | 99 pages, high proxy +50% |
 |---|---:|---:|---:|
-| google/gemini-3.1-pro-preview | 2/12 | $0.61 | $2.08 |
-| google/gemini-3.5-flash | 1.5/9 | $0.46 | $1.56 |
-| google/gemini-3.8-flash | 0.75/3.75 | $0.20 | $0.73 |
-| google/gemini-3.5-flash-lite | 0.3/2.5 | $0.12 | $0.36 |
-| anthropic/claude-sonnet-5.5 | 2/10 | $0.53 | $1.94 |
-| openai/gpt-5.6-sol | 4/20 | $1.07 | $3.88 |
-| openai/gpt-5.6-luna | 0.2/1.2 | $0.06 | $0.21 |
-| openai/gpt-5.4-mini | 0.75/4.5 | $0.23 | $0.78 |
-| mistralai/mistral-medium-3-5 | 1.5/7.5 | $0.40 | $1.45 |
+| google/gemini-3.1-pro-preview | 2/12 | $0.65 | $2.08 |
+| google/gemini-3.5-flash | 1.5/9 | $0.49 | $1.56 |
+| google/gemini-3.8-flash | 0.75/3.75 | $0.21 | $0.73 |
+| google/gemini-3.5-flash-lite | 0.3/2.5 | $0.13 | $0.36 |
+| anthropic/claude-sonnet-5.5 | 2/10 | $0.56 | $1.94 |
+| openai/gpt-5.6-sol | 4/20 | $1.13 | $3.88 |
+| openai/gpt-5.6-luna | 0.2/1.2 | $0.07 | $0.21 |
+| openai/gpt-5.4-mini | 0.75/4.5 | $0.24 | $0.78 |
+| mistralai/mistral-medium-3-5 | 1.5/7.5 | $0.42 | $1.45 |
 | mistralai/mistral-large-4-0 | 0.68/2.09 | $0.13 | $0.56 |
-| qwen/qwen3.5-397b-a17b | 0.5/3.6 | $0.18 | $0.56 |
-| qwen/qwen3-vl-235b-a22b-instruct | 0.21/1.9 | $0.09 | $0.26 |
+| qwen/qwen3.5-397b-a17b | 0.5/3.6 | $0.19 | $0.56 |
+| qwen/qwen3-vl-235b-a22b-instruct | 0.21/1.9 | $0.10 | $0.26 |
 
-**Total chat-panel proxy: $4.09–$14.39.** Mistral’s dedicated OCR endpoint is additional and needs its own key and current per-page price check. Its 99 pages and any ladder extension must be added before approval. The existing `W41.ocr-panel-cloud-owner-ok` gate remains open; this is an estimate, not authorization to spend. Prices: [OpenRouter model catalog](https://openrouter.ai/api/v1/models), snapshot 2026-10-14. The snapshot is committed beside this scorer; listed minimum prices may differ from the pinned provider.
+**Total chat-panel proxy: $4.33–$14.39.** Mistral’s dedicated OCR endpoint is additional and needs its own key and current per-page price check. Its 99 pages and any ladder extension must be added before approval. The existing `W41.ocr-panel-cloud-owner-ok` gate remains open; this is an estimate, not authorization to spend. Prices: [OpenRouter model catalog](https://openrouter.ai/api/v1/models), snapshot 2026-10-14. The snapshot is committed beside this scorer; listed minimum prices may differ from the pinned provider.
