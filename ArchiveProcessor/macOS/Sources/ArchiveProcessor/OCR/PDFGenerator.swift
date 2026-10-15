@@ -265,7 +265,10 @@ struct PDFGenerator {
         if let fileName = originalFileName {
             headerLine += "\n\(fileName)"
         }
-        if let localName = localAgentDisplayName {
+        if let reader = result.secondReader {
+            // W41.app-ocr-default: Gemini refused this page and another model wrote the text — name that model.
+            headerLine += "\n\(reader.provider) \u{00B7} \(reader.model) \u{00B7} \(dateStr)"
+        } else if let localName = localAgentDisplayName {
             headerLine += "\n\(localName) \u{00B7} \(localAgentModelName ?? "CLI default") \u{00B7} \(dateStr)"
         } else if let gwName = gatewayDisplayName {
             headerLine += "\n\(gwName) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"

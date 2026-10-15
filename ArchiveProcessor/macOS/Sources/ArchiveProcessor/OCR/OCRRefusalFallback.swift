@@ -20,12 +20,16 @@ enum OCRRefusalFallback {
         /// Set for the user's own `claude` (subscription, no key); the direct client otherwise.
         let localAgent: LocalAgentConfig?
 
-        /// What the run's record names as the page's reader.
-        var label: String {
-            if let localAgent { return localAgent.provenanceDisplayName }
-            return "\(model.displayName) (\(provider.rawValue))"
-        }
+        /// The PDF header's provider/model positions for a page this route read (as the run's own backend would).
+        var provenanceProvider: String { localAgent?.provenanceDisplayName ?? provider.rawValue }
+        var provenanceModel: String { localAgent?.provenanceModelName ?? model.displayName }
+        var label: String { "\(provenanceProvider) · \(provenanceModel)" }
     }
+
+    /// The code on a refused page no second reader could read. `isTimeoutError`/`isRetryableError` never retry it:
+    /// the message may quote a reader's "timed out" or "overloaded", and a re-run would buy the refusal and every
+    /// reader again. The operator's explicit per-item Retry still can.
+    static let exhaustedCode = "GeminiRefused"
 
     /// Test seam: replaces the Keychain/CLI lookup (headless tests have no Keychain). nil in production.
     nonisolated(unsafe) static var routesOverride: (@Sendable () -> [Route])?
@@ -70,7 +74,7 @@ enum OCRRefusalFallback {
     }
 
     /// Reads a page Gemini refused with each available route in turn, returning the first that gives text,
-    /// marked with `secondReader`. Otherwise a failure carrying Gemini's code and every route's reason.
+    /// marked with `secondReader`. Otherwise a failure (`exhaustedCode`) naming Gemini's reason and every route's.
     static func readRefusedPage(
         _ refused: OCRResult, imageURL: URL, previousText: String?, previousImageURL: URL?,
         customPrompt: String?, imageScale: Double
@@ -82,7 +86,7 @@ enum OCRRefusalFallback {
             return OCRResult(text: nil, classification: nil,
                              errorMessage: "\(why) No second reader is set up: add an Anthropic, OpenAI or "
                                  + "Mistral key, or install claude, to read pages Gemini refuses.",
-                             errorCode: refused.errorCode)
+                             errorCode: exhaustedCode)
         }
         var reasons: [String] = []
         for route in routes {
@@ -96,18 +100,19 @@ enum OCRRefusalFallback {
                 continue
             }
             if result.text != nil {
-                let note = "\(route.label) — Gemini returned no text (\(refused.errorCode ?? "?"))"
-                NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(route.label)")
+                let reader = SecondReader(provider: route.provenanceProvider, model: route.provenanceModel,
+                                          geminiCode: refused.errorCode ?? "?")
+                NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(reader.summary)")
                 return OCRResult(text: result.text, classification: result.classification,
                                  rotationDegrees: result.rotationDegrees, errorMessage: nil, errorCode: nil,
-                                 enclosure: result.enclosure, secondReader: note)
+                                 enclosure: result.enclosure, secondReader: reader)
             }
             reasons.append("\(route.label): \(result.errorMessage ?? "no text")")
         }
         NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); every second reader failed")
         return OCRResult(text: nil, classification: nil,
                          errorMessage: "\(why) Second readers failed too — " + reasons.joined(separator: "; "),
-                         errorCode: refused.errorCode)
+                         errorCode: exhaustedCode)
     }
 
     private static func read(

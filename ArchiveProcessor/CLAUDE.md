@@ -46,7 +46,9 @@ Dropdown menus for provider and model. The **built-in** models are those listed 
 - claude-opus-4-6
 
 **Google Gemini**
-- gemini-3.1-flash-lite (default)
+- gemini-3.8-flash (default, W41.app-ocr-default; a page it refuses goes to a second reader — `OCR/OCRRefusalFallback.swift`)
+- gemini-3.5-flash-lite
+- gemini-3.1-flash-lite
 - gemini-3.5-flash
 - gemini-3.1-pro
 - gemini-3-flash-preview

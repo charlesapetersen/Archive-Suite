@@ -288,7 +288,13 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-retry-backend.sh`** — retry backend-lock contract: the real Process Files retry seam runs against
   an injected no-network HTTP transport and committed fake Local Agent CLI. It proves direct, gateway-only,
   and Local Agent retries keep the immutable run snapshot despite contradictory mutable Settings, and checks
-  the generated PDF provenance too. No API key, network, corpus, or spend.
+  the generated PDF provenance too. No API key, network, corpus, or spend. ⚠️ Hangs on main as of
+  2026-10-15 (`W25.retry-backend-fu1`).
+- **`test-ocr-refusal.sh`** — W41.app-ocr-default: the default Gemini model and its prices, and the second
+  reader for pages Gemini refuses, through the real `performOCRCall` over an injected transport: refusal codes
+  that reach the second route and those that never do, the `secondReader` record and PDF header, fail-loud with
+  no route, no auto-retry of an exhausted refusal, Tools diagnostics opting out, the batch parser's codes. No
+  API key, network, corpus, or spend.
 - **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests, **and** (W16.bat1) the three paid
   batch clients' provider **response-shape contract** — every status/result body shape Anthropic, Gemini and
   Mistral are accepted in, from literal fixtures through the pure parse seams in `BatchOCR.swift`

@@ -686,16 +686,25 @@ struct GeminiBatchClient: Sendable {
             return OCRResult(text: nil, classification: nil, errorMessage: "No candidates in response", errorCode: nil)
         }
 
-        if let finishReason = first["finishReason"] as? String, finishReason == "RECITATION" {
+        let finishReason = first["finishReason"] as? String
+        if finishReason == "RECITATION" {
             return OCRResult(text: nil, classification: nil, errorMessage: "Gemini refused to OCR this content (Recitation — likely copyrighted material).", errorCode: "Recitation")
         }
 
+        // W41.app-ocr-default: as `GeminiClient` — a refusal keeps its finish reason, so the page fails visibly
+        // and a retry (which runs synchronously, through `OCRRefusalFallback`) can send it to a second reader.
         guard let content = first["content"] as? [String: Any],
               let parts = content["parts"] as? [[String: Any]] else {
+            if let fr = finishReason, fr != "STOP" {
+                return OCRResult(text: nil, classification: nil, errorMessage: "Gemini stopped without returning text (\(fr)).", errorCode: fr)
+            }
             return OCRResult(text: nil, classification: nil, errorMessage: "No content parts in response", errorCode: nil)
         }
 
         let rawText = parts.compactMap { $0["text"] as? String }.joined(separator: "\n")
+        if rawText.isEmpty, let fr = finishReason, fr != "STOP" {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Gemini returned no text (\(fr)).", errorCode: fr)
+        }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(rawText))
     }

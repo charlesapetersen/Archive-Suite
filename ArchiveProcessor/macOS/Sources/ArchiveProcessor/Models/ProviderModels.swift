@@ -434,12 +434,12 @@ struct OCRResult: Codable {
     /// the recorded cover of every later enclosure that shares the same letter.
     let ocrEnclosure: Bool?
     /// W41.app-ocr-default — set when Gemini refused the page and a second route read it
-    /// (`OCRRefusalFallback`): names that reader and Gemini's reason. `nil` = read by the run's own model.
-    let secondReader: String?
+    /// (`OCRRefusalFallback`). `nil` = read by the run's own model.
+    let secondReader: SecondReader?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
-         secondReader: String? = nil) {
+         secondReader: SecondReader? = nil) {
         self.secondReader = secondReader
         self.text = text
         self.classification = classification
@@ -469,6 +469,18 @@ struct OCRResult: Codable {
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
                   secondReader: secondReader)
     }
+}
+
+/// W41.app-ocr-default — who read a page Gemini refused, and why. `provider`/`model` fill the PDF page-2 header's
+/// provenance positions in place of the run's Gemini model, so the header names the model that wrote the text
+/// without changing the header's shape (`SPEC/tag-format.md`).
+struct SecondReader: Codable, Equatable {
+    let provider: String
+    let model: String
+    /// Gemini's code for the refusal (`Recitation`, `OTHER`, `500`, …).
+    let geminiCode: String
+
+    var summary: String { "\(provider) · \(model), after Gemini returned no text (\(geminiCode))" }
 }
 
 // MARK: - Live Processing Mode

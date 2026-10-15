@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W41.app-ocr-default, 2026-10-15): Gemini refuses some printed text; a second reader covers it
+
+Every Gemini model ends some reprinted published pages with no text (in the W41 panel, the same two printed 1900-1949 pages on every
+Gemini route). On the synchronous path `OCRRefusalFallback` reads such a page with the user's Claude (plan or key), OpenAI or Mistral
+route and records it in `OCRResult.secondReader` and the PDF header. Not covered yet: a Gemini **batch** run fails those pages with
+Gemini's code and leaves them to the operator's Retry (`W41.app-ocr-default-fu1`), and no estimate counts the second reader's spend.
+With no second route the page fails, saying how to add one.
+
 ## ✅ FIXED (W41.ocr-smoke-term): the smoke hung under a blocked TERM and passed failed jobs
 
 `test-smoke.sh` launched the driver with the engine's inherited signal mask, so its `kill; wait` cleanup

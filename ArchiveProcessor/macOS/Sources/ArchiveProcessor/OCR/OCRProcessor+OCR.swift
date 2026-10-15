@@ -1641,6 +1641,8 @@ extension OCRProcessor {
         return saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
     nonisolated static func isTimeoutError(_ result: OCRResult) -> Bool {
+        // A refused page whose second readers failed: re-running would buy the refusal and every reader again.
+        if result.errorCode == OCRRefusalFallback.exhaustedCode { return false }
         if result.errorMessage?.lowercased().contains("timed out") == true
             || result.errorCode?.lowercased().contains("timeout") == true { return true }
         // Providers also surface timeouts as HTTP 408 (Request Timeout) / 504 (Gateway Timeout)
@@ -1667,7 +1669,8 @@ extension OCRProcessor {
         localAgent: LocalAgentConfig? = nil,
         rotationMode: RotationMode,
         standardImageMB: Double,
-        visionSettings: VisionOCRSettings = .default
+        visionSettings: VisionOCRSettings = .default,
+        refusalFallback: Bool = true
     ) async -> OCRResult {
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
@@ -1703,7 +1706,7 @@ extension OCRProcessor {
                     let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
                     let geminiResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                     // W41.app-ocr-default: a page Gemini refuses goes to a second reader, never an empty success.
-                    networkResult = OCRRefusalFallback.isRefusal(geminiResult)
+                    networkResult = refusalFallback && OCRRefusalFallback.isRefusal(geminiResult)
                         ? await OCRRefusalFallback.readRefusedPage(
                             geminiResult, imageURL: imageURL, previousText: previousText,
                             previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
@@ -1765,7 +1768,8 @@ extension OCRProcessor {
         return result.with(classification: result.classification, rotationDegrees: rot)
     }
     private func isRetryableError(_ result: OCRResult?) -> Bool {
-        guard let result = result, result.text == nil else { return false }
+        guard let result = result, result.text == nil,
+              result.errorCode != OCRRefusalFallback.exhaustedCode else { return false }
         let code = result.errorCode ?? ""
         let msg = (result.errorMessage ?? "").lowercased()
         return code == "503" || code == "429" || code == "529"
@@ -1859,7 +1863,8 @@ extension OCRProcessor {
             localAgent: localAgent,
             rotationMode: rotationMode,
             standardImageMB: standardImageMB,
-            visionSettings: visionSettings
+            visionSettings: visionSettings,
+            refusalFallback: false   // a diagnostic measures the chosen model; never report a second reader's text as its
         )
     }
 }

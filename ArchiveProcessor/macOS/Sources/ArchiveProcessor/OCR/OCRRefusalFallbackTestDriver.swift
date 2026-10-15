@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import PDFKit
 
 /// Key-free, no-network contract for W41.app-ocr-default. Drives the REAL `OCRProcessor.performOCRCall` with
 /// the default Gemini model through the injected HTTP transport: Gemini answers each page with a canned
@@ -103,7 +104,8 @@ enum OCRRefusalFallbackTestDriver {
         check("the refused page went to Gemini first, then to Anthropic",
               calls.first?.contains("generativelanguage") == true && calls.contains { $0.contains("anthropic") })
         check("the result names its second reader and Gemini's reason",
-              r.secondReader?.contains("Claude") == true && r.secondReader?.contains("Recitation") == true)
+              r.secondReader == SecondReader(provider: "Anthropic", model: LLMModel.anthropicModels[0].displayName,
+                                             geminiCode: "Recitation"))
         check("a second-read page is a success: no error left on it", r.errorMessage == nil && r.errorCode == nil)
 
         // The mark survives what the run does to a result: persistence and reclassification.
@@ -114,6 +116,13 @@ enum OCRRefusalFallbackTestDriver {
         }
         check("secondReader survives a reclassification (`with`)",
               r.with(classification: .documentContinuation, rotationDegrees: 90).secondReader == r.secondReader)
+        // The PDF's page-2 header names the model that wrote the text, in the header's usual provenance line.
+        let pdfURL = root.appendingPathComponent("page.pdf")
+        _ = try? PDFGenerator().generate(imageURL: image, result: r, model: gemini[0], outputURL: pdfURL)
+        let header = PDFDocument(url: pdfURL)?.page(at: 1)?.string ?? ""
+        check("the PDF header credits the second reader, not Gemini",
+              header.contains("Anthropic \u{00B7} \(LLMModel.anthropicModels[0].displayName)")
+              && !header.contains(gemini[0].displayName))
         let legacy = #"{"text":"x","rotationDegrees":0}"#
         check("a result recorded before the field existed still decodes, unmarked",
               (try? JSONDecoder().decode(OCRResult.self, from: Data(legacy.utf8)))?.secondReader == nil)
@@ -132,19 +141,27 @@ enum OCRRefusalFallbackTestDriver {
                          openai: (200, gptText))
         r = await ocr()
         check("when Claude fails, the next route (OpenAI) reads the page",
-              r.text?.contains("GPT-TEXT") == true && r.secondReader?.contains(LLMModel.openaiModels[0].displayName) == true)
+              r.text?.contains("GPT-TEXT") == true && r.secondReader?.provider == "OpenAI"
+              && r.secondReader?.model == LLMModel.openaiModels[0].displayName)
 
         // 4. Never a silent failure: every route fails, or there is none.
         await script.set(gemini: (200, recitation), anthropic: (401, #"{"error":{"message":"bad key"}}"#),
                          openai: (401, #"{"error":{"message":"bad key"}}"#))
         r = await ocr()
-        check("every second reader failing fails the page, keeping Gemini's code",
-              r.text == nil && r.errorCode == "Recitation" && r.errorMessage?.contains("Second readers failed") == true)
+        check("every second reader failing fails the page, naming Gemini's reason",
+              r.text == nil && r.errorCode == OCRRefusalFallback.exhaustedCode
+              && r.errorMessage?.contains("Recitation") == true && r.errorMessage?.contains("Second readers failed") == true)
+        let quotedTimeout = OCRResult(text: nil, classification: nil,
+                                      errorMessage: "Gemini returned no text. Second readers failed too — claude: timed out",
+                                      errorCode: OCRRefusalFallback.exhaustedCode)
+        check("an exhausted refusal is never auto-retried, even when a reader's reason says \"timed out\"",
+              !OCRProcessor.isTimeoutError(quotedTimeout))
         useRoutes([])
         await script.set(gemini: (200, recitation))
         r = await ocr()
         check("with no second route the page fails and says how to add one",
-              r.text == nil && r.errorCode == "Recitation" && r.errorMessage?.contains("No second reader") == true)
+              r.text == nil && r.errorCode == OCRRefusalFallback.exhaustedCode
+              && r.errorMessage?.contains("No second reader") == true)
 
         // 5. What is not a refusal never spends a second call.
         useRoutes([claude])
@@ -161,6 +178,22 @@ enum OCRRefusalFallbackTestDriver {
         check("isRefusal: a transport failure (no code) and a timeout are not refusals",
               !OCRRefusalFallback.isRefusal(OCRResult(text: nil, classification: nil, errorMessage: "offline", errorCode: nil))
               && !OCRRefusalFallback.isRefusal(OCRResult(text: nil, classification: nil, errorMessage: "x", errorCode: "504")))
+
+        // 6. A diagnostic (Tools: Compare Models, Test Resolution) measures Gemini itself.
+        await script.set(gemini: (200, recitation), anthropic: (200, claudeText))
+        r = await OCRProcessor.performResolutionTestCall(
+            imageURL: image, provider: .gemini, model: gemini[0], thinkingLevel: nil, apiKey: "test-gemini",
+            imageScale: 1, rotationMode: .off, standardImageMB: 4)
+        calls = await script.calls()
+        check("the Tools resolution test reports Gemini's refusal and calls no second route",
+              r.text == nil && r.errorCode == "Recitation" && !calls.contains { $0.contains("anthropic") })
+
+        // 7. The batch parser keeps the refusal's finish reason instead of an uncoded blank.
+        let batchOther = GeminiBatchClient.parseSingleResponse(
+            ["candidates": [["finishReason": "OTHER", "content": ["parts": [[String: Any]]()]]]])
+        let batchNoParts = GeminiBatchClient.parseSingleResponse(["candidates": [["finishReason": "OTHER"]]])
+        check("a batch page refused with OTHER fails with that code",
+              batchOther.text == nil && batchOther.errorCode == "OTHER" && batchNoParts.errorCode == "OTHER")
 
         finish(results)
     }
