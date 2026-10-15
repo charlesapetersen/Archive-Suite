@@ -226,6 +226,16 @@ enum OCRRefusalFallbackTestDriver {
         let batchNoReader = await collect(batchOther)
         check("a refused batch page with no second reader fails as exhausted (never auto-retried)",
               batchNoReader.text == nil && batchNoReader.errorCode == OCRRefusalFallback.exhaustedCode)
+        // Stop mid-collection: no route is called, and the exhausted verdict is what `processBatchResults` refuses
+        // to persist while cancelled (the journal brings the page back on resume).
+        useRoutes([claude])
+        await script.set(gemini: (200, geminiText), anthropic: (200, claudeText))
+        let stopped = Task { await collect(batchOther) }
+        stopped.cancel()
+        r = await stopped.value
+        calls = await script.calls()
+        check("a Stop during a batch second read spends nothing and leaves no text",
+              r.text == nil && r.errorCode == OCRRefusalFallback.exhaustedCode && calls.isEmpty)
 
         // 9. Spend: thinking tokens in the estimate, second readers in the run's history and summary.
         let flash = gemini[0]

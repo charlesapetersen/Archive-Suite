@@ -104,6 +104,8 @@ enum OCRRefusalFallback {
         }
         var reasons: [String] = []
         for route in routes {
+            // Stopped: spend nothing more. The caller sees the exhausted code and, in a batch, does not persist it.
+            if Task.isCancelled { reasons.append("stopped before \(route.label)"); break }
             let result: OCRResult
             do {
                 result = try await read(route, imageURL: imageURL, previousText: previousText,

@@ -5,10 +5,13 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 ## ⚠️ LIMITATION (W41.app-ocr-default, 2026-10-15): Gemini refuses some printed text; a second reader covers it
 
 Every Gemini model ends some reprinted published pages with no text (in the W41 panel, the same two printed 1900-1949 pages on every
-Gemini route). On the synchronous path `OCRRefusalFallback` reads such a page with the user's Claude (plan or key), OpenAI or Mistral
-route and records it in `OCRResult.secondReader` and the PDF header. Not covered yet: a Gemini **batch** run fails those pages with
-Gemini's code and leaves them to the operator's Retry (`W41.app-ocr-default-fu1`), and no estimate counts the second reader's spend.
-With no second route the page fails, saying how to add one.
+Gemini route). `OCRRefusalFallback` reads such a page with the user's Claude (plan or key), OpenAI or Mistral route, on the
+synchronous path and as Gemini batch results are collected (W41.app-ocr-default-fu1), and records it in `OCRResult.secondReader` and
+the PDF header. The run summary and history count those pages and add their estimated cost; the pre-run pane gives only a per-page
+price range, because how many pages Gemini will refuse is not known in advance. With no second route the page fails, saying how to
+add one. Residual limits: a batch chunk's refused pages are second-read concurrently (up to cores − 2), so a chunk with many refusals
+can hit the second provider's rate limit, and such a page then fails `GeminiRefused` until the operator's Retry; a second read done by
+a per-item Retry after the run was recorded is not added to its history; thinking tokens are counted only for 3.8 Flash (~117 a page).
 
 ## ✅ FIXED (W41.ocr-smoke-term): the smoke hung under a blocked TERM and passed failed jobs
 

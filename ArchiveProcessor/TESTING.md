@@ -293,8 +293,9 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-ocr-refusal.sh`** — W41.app-ocr-default: the default Gemini model and its prices, and the second
   reader for pages Gemini refuses, through the real `performOCRCall` over an injected transport: refusal codes
   that reach the second route and those that never do, the `secondReader` record and PDF header, fail-loud with
-  no route, no auto-retry of an exhausted refusal, Tools diagnostics opting out, the batch parser's codes. No
-  API key, network, corpus, or spend.
+  no route, no auto-retry of an exhausted refusal, Tools diagnostics opting out, the batch parser's codes; and
+  (W41.app-ocr-default-fu1) refused batch pages read once at collection, 3.8 Flash's thinking tokens in the
+  estimate, second-reader pages and cost in the run history and summary. No API key, network, corpus, or spend.
 - **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests, **and** (W16.bat1) the three paid
   batch clients' provider **response-shape contract** — every status/result body shape Anthropic, Gemini and
   Mistral are accepted in, from literal fixtures through the pure parse seams in `BatchOCR.swift`

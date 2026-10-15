@@ -1227,7 +1227,7 @@ extension OCRProcessor {
         let fallbackPreviousImage = activePendingBatch?.sendPreviousImage ?? false
         let fallbackScale = Self.liveImageScaleFraction()
         var allPersisted = true
-        await withTaskGroup(of: (Int, URL, OCRJob.ID?, OCRResult).self) { group in
+        await withTaskGroup(of: (Int, URL, OCRJob.ID?, OCRResult, Bool).self) { group in
             var iter = entries.makeIterator()
 
             func addNext() -> Bool {
@@ -1241,18 +1241,22 @@ extension OCRProcessor {
                         imageURL: entry.url, provider: model.provider, apiKey: apiKey,
                         mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
                     )
+                    // A Stop cancels the routes mid-read, so "every second reader failed" is not true: never
+                    // persist that verdict; the kept journal brings the page back on resume.
+                    let abandoned = Task.isCancelled && read.errorCode == OCRRefusalFallback.exhaustedCode
                     return (entry.index, entry.url, entry.jobID,
-                            Self.mergeRotation(into: read, correction: correction))
+                            Self.mergeRotation(into: read, correction: correction), abandoned)
                 }
                 return true
             }
 
             for _ in 0..<min(maxConcurrent, entries.count) { _ = addNext() }
 
-            for await (index, url, jobID, resolved) in group {
+            for await (index, url, jobID, resolved, abandoned) in group {
                 // No job at that index when the chunk was parsed — the same verdict the bounds guard inside
-                // `handleOCRResult` gives today, reached one frame earlier.
-                guard let jobID else {
+                // `handleOCRResult` gives today, reached one frame earlier. A second read cut short by Stop is
+                // not persisted either (W41.app-ocr-default-fu1).
+                guard let jobID, !abandoned else {
                     allPersisted = false
                     group.cancelAll()
                     return
