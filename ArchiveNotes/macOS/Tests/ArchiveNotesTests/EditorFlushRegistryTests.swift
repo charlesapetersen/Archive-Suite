@@ -26,8 +26,8 @@ struct EditorFlushRegistryTests {
     func flushAllRunsAll() async {
         let reg = EditorFlushRegistry()
         let a = Counter(), b = Counter()
-        reg.register(UUID()) { a.bump() }
-        reg.register(UUID()) { b.bump() }
+        reg.register(UUID()) { a.bump(); return true }
+        reg.register(UUID()) { b.bump(); return true }
         #expect(!reg.isEmpty)
         await reg.flushAll()
         #expect(a.n == 1)
@@ -39,7 +39,7 @@ struct EditorFlushRegistryTests {
         let reg = EditorFlushRegistry()
         let id = UUID()
         let a = Counter()
-        reg.register(id) { a.bump() }
+        reg.register(id) { a.bump(); return true }
         reg.deregister(id)
         #expect(reg.isEmpty)
         await reg.flushAll()
@@ -51,8 +51,8 @@ struct EditorFlushRegistryTests {
         let reg = EditorFlushRegistry()
         let id = UUID()
         let first = Counter(), second = Counter()
-        reg.register(id) { first.bump() }
-        reg.register(id) { second.bump() }
+        reg.register(id) { first.bump(); return true }
+        reg.register(id) { second.bump(); return true }
         await reg.flushAll()
         #expect(first.n == 0)    // replaced
         #expect(second.n == 1)   // only the latest, once
@@ -73,8 +73,8 @@ struct TerminateFlushCoordinatorTests {
     @Test("a fast flush replies exactly once, well before the timeout")
     func fastReplyOnce() async {
         let replies = Counter(), ran = Counter()
-        let coord = TerminateFlushCoordinator { replies.bump() }
-        coord.begin(flush: { ran.bump() }, timeout: .seconds(5))
+        let coord = TerminateFlushCoordinator(reply: { _ in replies.bump() })
+        coord.begin(flush: { ran.bump(); return true }, timeout: .seconds(5))
         try? await Task.sleep(for: .milliseconds(120))   // << the 5 s timeout
         #expect(ran.n == 1)       // flush ran
         #expect(replies.n == 1)   // replied once, via the flush path (not the far-off timeout)
@@ -83,11 +83,11 @@ struct TerminateFlushCoordinatorTests {
     @Test("BOUNDED: a wedged flush does not block the reply past the timeout")
     func boundedReplyOnTimeout() async {
         let replies = Counter()
-        let coord = TerminateFlushCoordinator { replies.bump() }
+        let coord = TerminateFlushCoordinator(reply: { _ in replies.bump() })
         // The flush "hangs" far longer than the timeout; the reply must still fire via the timeout path.
-        coord.begin(flush: { try? await Task.sleep(for: .seconds(3)) }, timeout: .milliseconds(30))
+        coord.begin(flush: { try? await Task.sleep(for: .seconds(3)); return true }, timeout: .milliseconds(30))
         try? await Task.sleep(for: .milliseconds(250))   // >> timeout (30 ms), << wedged flush (3 s)
-        #expect(replies.n == 1)   // quit proceeds after the bound, exactly once — never deadlocks
+        #expect(replies.n == 1)   // the bound settles it exactly once — never deadlocks (default: don't quit)
     }
 }
 

@@ -13,8 +13,10 @@ its assets copied before reload. Metadata-only edits compose with body saves. Pe
 asset writes are flushed before recovery, and retired editor bindings cannot restore the stale body.
 Scratch unit tests cover outside in-place/atomic writes, metadata, independent editors, assets/symlinks,
 late keystrokes and refused recovery/retry; `WritingJourneyUITests` proves both the clean reload and the
-recovered-draft conflict in the VM (5/5). A failed save still cannot veto close/quit: the pre-existing
-lifecycle gap is queued as W40.fix-notes-failed-save-close. File coordination protects cooperating writers;
+recovered-draft conflict in the VM (5/5). A save the store refuses no longer loses the draft on close or
+quit (W40.fix-notes-failed-save-close, fixed 2026-10-15): a closed editor's draft is kept in memory, copied
+to Application Support/Archive Notes/Unsaved Drafts, and offered a Retry; quit is refused behind a
+Retry / Don't Quit / Quit alert until it saves. Templates' own save seam is not covered by this. File coordination protects cooperating writers;
 an arbitrary uncoordinated process can still write during another process’s replacement operation.
 
 

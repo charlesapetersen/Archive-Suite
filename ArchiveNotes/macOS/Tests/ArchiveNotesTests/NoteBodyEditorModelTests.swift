@@ -127,8 +127,8 @@ struct NoteBodyEditorModelTests {
         for _ in 0..<10 { await Task.yield() }
         #expect(calls == 1)
         release?.resume()
-        await first.value
-        await second.value
+        _ = await first.value
+        _ = await second.value
         #expect(calls == 1)
     }
 
@@ -178,7 +178,7 @@ struct NoteBodyEditorModelTests {
         let forced = Task { await model.flushPending() }
         await Task.yield()
         releaseOld?.resume()
-        await forced.value
+        _ = await forced.value
         #expect(writes == ["older", "newer"])
     }
 

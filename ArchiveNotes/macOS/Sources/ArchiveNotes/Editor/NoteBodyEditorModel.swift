@@ -105,8 +105,10 @@ final class NoteBodyEditorModel: ObservableObject {
 
     /// Persist any pending edit for the currently-loaded item **now** (cancel the debounce and await the
     /// write). Called on selection switch and when the editor disappears (pane teardown / window close)
-    /// so no dirty buffer is dropped.
-    func flush() async {
+    /// so no dirty buffer is dropped. Returns false when the draft is still unsaved afterwards (the store
+    /// refused the content or recovery write), so close and quit can keep it instead of dropping it.
+    @discardableResult
+    func flush() async -> Bool {
         // Keep the tail published while waiting: another flush or a newly scheduled save must also
         // wait for it. If typing extends the chain during the await, drain that newer tail as well.
         while let pending = saveTask {
@@ -116,7 +118,7 @@ final class NoteBodyEditorModel: ObservableObject {
             guard generation == saveGeneration else { continue }
             saveTask = nil
         }
-        guard dirty else { return }
+        guard dirty else { return true }
         // Publish the forced save too: typing during its awaits must queue BEHIND it, just as it
         // does behind an idle autosave. Otherwise a new debounce can start a parallel stale save.
         let forced = Task { @MainActor [weak self] in
@@ -129,6 +131,7 @@ final class NoteBodyEditorModel: ObservableObject {
         saveGeneration &+= 1
         saveTask = forced
         await forced.value
+        return !dirty
     }
 
     /// Flush BOTH debounces then await the write: first `flushEditor()` (synchronously push the live
@@ -138,10 +141,17 @@ final class NoteBodyEditorModel: ObservableObject {
     /// keystrokes instead of dropping them. It mirrors the sequence `select` runs before a selection
     /// switch, but is a distinct method: `select` keeps that sequence *inline* on purpose — the extra
     /// async frame of calling through here perturbs the actor scheduling its superseded-load race relies
-    /// on, so the two intentionally do not share a call.
-    func flushPending() async {
+    /// on, so the two intentionally do not share a call. Returns false while a draft remains unsaved.
+    @discardableResult
+    func flushPending() async -> Bool {
         flushEditor()
-        await flush()
+        return await flush()
+    }
+
+    /// The unsaved body and its item, for an emergency copy when the store refuses it (nil when clean).
+    var unsavedDraft: (id: UUID, markdown: String)? {
+        guard dirty, let loadedID else { return nil }
+        return (loadedID, markdown)
     }
 
     /// The view polls only its open note, and cancels this work on teardown. Flush TextKit's first

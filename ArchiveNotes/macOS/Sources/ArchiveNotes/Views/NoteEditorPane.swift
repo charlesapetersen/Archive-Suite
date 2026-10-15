@@ -130,7 +130,14 @@ struct NoteEditorPane: View {
             refreshZotero()
             // W7-S6: register this pane's flush so app-terminate persists its pending edit (idempotent —
             // onAppear may fire more than once, and the same paneID just overwrites its own entry).
-            flushRegistry.register(paneID) { [bodyEditor] in await bodyEditor.flushPending() }
+            // W40.fix-notes-failed-save-close: the draft closure names an unsaved body for an emergency copy.
+            let model = nav.model
+            flushRegistry.register(paneID, flush: { [bodyEditor] in await bodyEditor.flushPending() },
+                                   draft: { [bodyEditor] in
+                guard let draft = bodyEditor.unsavedDraft else { return nil }
+                let title = model.allItems.first { $0.id == draft.id }?.title ?? "Untitled"
+                return EditorDraft(itemID: draft.id, title: title, markdown: draft.markdown)
+            })
             // W9.b5-fu1: a window opened FOR an open request (`.openFeaturingWindow`) can get that request
             // as `onReceive`'s initial value, before this `onAppear` has wired the body seams above.
             // Selecting then would load through the default `load` (returns nil): the item would be marked
@@ -160,10 +167,13 @@ struct NoteEditorPane: View {
             }
         }
         .onDisappear {
-            // Persist the in-flight edit before the pane/window tears down (never drop a dirty buffer),
-            // and drop this pane from the terminate registry so a later quit doesn't flush a dead editor.
-            flushRegistry.deregister(paneID)
-            Task { await bodyEditor.flushPending() }
+            // Persist the in-flight edit before the pane/window tears down. The registry drops this pane
+            // only once that save succeeds; a refused save keeps the draft, copies it, and offers a retry
+            // (W40.fix-notes-failed-save-close), so a later quit retries it instead of losing it.
+            // Pull TextKit's own pending serialize now, while the text view still exists.
+            bodyEditor.flushEditor()
+            let registry = flushRegistry, id = paneID
+            Task { await registry.paneClosed(id) }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // Frontmost-only: re-read the clipboard when the app becomes active
@@ -604,11 +614,11 @@ struct TemplateBodyEditorPane: View {
             bodyEditor.load = { [model] id in await model.loadTemplateBody(for: id) }
             bodyEditor.save = { [model] id, markdown in await model.setTemplateBody(markdown, for: id) }
             bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
-            flushRegistry.register(paneID) {
+            flushRegistry.register(paneID, flush: {
                 await transition?.value
                 await teardown?.value
-                await bodyEditor.flushPending()
-            }
+                return await bodyEditor.flushPending()
+            })
             switchToTemplate(templateID)
         }
         .onChange(of: templateID) { _, id in switchToTemplate(id) }

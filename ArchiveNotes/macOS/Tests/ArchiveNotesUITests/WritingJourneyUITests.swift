@@ -168,6 +168,77 @@ final class WritingJourneyUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.fix-notes-failed-save-close — the store refuses the write, the window closes: the draft is copied,
+    /// a Retry is offered, and once writes work again Retry saves every typed line.
+    func testFailedSaveThenCloseKeepsDraftAndRetries() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            try loadNote(id)
+            let before = try noteFile(id)
+            let dir = itemsDir + "/" + id
+            XCTAssertEqual(chmod(dir, 0o555), 0, "should make the scratch note folder read-only")
+            defer { _ = chmod(dir, 0o755) }
+            let line = "Failedsavecloseline"
+            try typeIntoEditor("\n" + line)
+            RunLoop.current.run(until: Date().addingTimeInterval(2))   // the autosave is refused
+            XCTAssertEqual(try Data(contentsOf: before.url), before.data, "precondition: the write was refused")
+            mainWindow.buttons[XCUIIdentifierCloseWindow].click()
+
+            let retry = app.buttons["Retry"].firstMatch
+            XCTAssertTrue(retry.waitForExistence(timeout: 10), "a refused save on close must offer a Retry")
+            XCTAssertTrue(pollUntil(timeout: 5) { self.unsavedDraftCopies().contains { $0.contains(line) } },
+                          "the closed editor's draft must be copied outside the store")
+            try saveOutsideEditShot("W40-failed-save-close-alert", screenshot: XCUIScreen.main.screenshot())
+            XCTAssertEqual(chmod(dir, 0o755), 0)
+            retry.click()
+            XCTAssertTrue(pollUntil(timeout: 10) { self.bodyLines(id).contains(line) },
+                          "Retry must save the draft once writes work again")
+            XCTAssertTrue(pollUntil(timeout: 5) { !self.unsavedDraftCopies().contains { $0.contains(line) } },
+                          "the copy is removed once the draft is saved")
+            log("[W40-failed-close] saved after retry = \(bodyLines(id).contains(line))")
+        }
+    }
+
+    /// W40.fix-notes-failed-save-close — ⌘Q while the store refuses the write is stopped behind an alert;
+    /// Don't Quit keeps the app and the draft; after writes work again, Retry saves and quits.
+    func testFailedSaveBlocksQuitUntilRetrySaves() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            try loadNote(id)
+            let dir = itemsDir + "/" + id
+            XCTAssertEqual(chmod(dir, 0o555), 0, "should make the scratch note folder read-only")
+            defer { _ = chmod(dir, 0o755) }
+            let line = "Failedsavequitline"
+            try typeIntoEditor("\n" + line)
+            RunLoop.current.run(until: Date().addingTimeInterval(2))
+            app.typeKey("q", modifierFlags: .command)
+
+            let dontQuit = app.buttons["Don't Quit"].firstMatch
+            XCTAssertTrue(dontQuit.waitForExistence(timeout: 10), "a refused save must stop quit with an alert")
+            try saveOutsideEditShot("W40-failed-save-quit-alert", screenshot: XCUIScreen.main.screenshot())
+            XCTAssertTrue(unsavedDraftCopies().contains { $0.contains(line) }, "the draft is copied before asking")
+            dontQuit.click()
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            XCTAssertNotEqual(app.state, .notRunning, "Don't Quit must keep the app running")
+            XCTAssertTrue(editorText.contains(line), "the draft stays in the editor")
+
+            XCTAssertEqual(chmod(dir, 0o755), 0)
+            app.typeKey("q", modifierFlags: .command)
+            XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "once the save succeeds, quit proceeds")
+            XCTAssertTrue(bodyLines(id).contains(line), "every typed line is on disk after the quit")
+            log("[W40-failed-quit] saved at quit = \(bodyLines(id).contains(line))")
+        }
+    }
+
+    /// The text of every emergency copy the app wrote beside the scratch store.
+    private func unsavedDraftCopies() -> [String] {
+        let dir = URL(fileURLWithPath: Self.fixturePath + " Unsaved Drafts")
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        return files.compactMap { try? String(contentsOf: $0, encoding: .utf8) }
+    }
+
     private func saveOutsideEditShot(_ name: String, screenshot: XCUIScreenshot) throws {
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(name + ".png")
         try screenshot.pngRepresentation.write(to: path)

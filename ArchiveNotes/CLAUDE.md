@@ -298,10 +298,11 @@ macOS/Sources/ArchiveNotes/
                                    loadedID @Published so the pane gates a jump-to-source scroll (W7-S3);
                                    flushPending() (both-debounce flush) for the app-terminate path (W7-S6)
     EditorFlushRegistry.swift      App-level per-pane flush registry (EditorFlushRegistry — each
-                                   NoteEditorPane registers its flushPending on appear, deregisters on
-                                   disappear) + TerminateFlushCoordinator (bounded reply — flush-complete
-                                   OR timeout, whichever first). Backs NotesAppDelegate's terminate flush
-                                   so a force-quit within the autosave debounce can't lose an edit (W7-S6)
+                                   NoteEditorPane registers its flushPending on appear; paneClosed drops
+                                   it only once saved, else keeps it + UnsavedDraftVault copy + Retry) +
+                                   TerminateFlushCoordinator (flush OR timeout; failure → copies + Retry /
+                                   Don't Quit / Quit alert). Backs NotesAppDelegate's terminate flush (W7-S6,
+                                   W40.fix-notes-failed-save-close)
     MarkdownBridge.swift           Parse (Markdown→styled NSAttributedString) + serialize (back to
                                    CommonMark), both main-actor-bound by AppKit styling and attachments
                                    (W9.d11); block-header chips (<!-- block: --> → chip attachments);

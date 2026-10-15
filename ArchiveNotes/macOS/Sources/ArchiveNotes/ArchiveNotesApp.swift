@@ -95,25 +95,107 @@ struct ArchiveNotesApp: App {
 /// App delegate hosting the W7-S6 terminate-flush. Owns the `EditorFlushRegistry` (app-lifetime, not a
 /// SwiftUI `@StateObject`, so `applicationShouldTerminate` can reach it directly) which each open
 /// `NoteEditorPane` registers its flush into. On quit, every pending editor edit is persisted first —
-/// but under a bounded timeout, so a wedged store write can never deadlock quit.
+/// but under a bounded timeout, so a wedged store write can never deadlock quit. A save the store
+/// refuses (or one still stuck at the bound) cancels quit behind an alert instead of dropping the draft
+/// (W40.fix-notes-failed-save-close); the drafts are first copied into `UnsavedDraftVault`.
 @MainActor
 final class NotesAppDelegate: NSObject, NSApplicationDelegate {
     /// Registered into both windows' environments by the App; flushed here on terminate.
-    let flushRegistry = EditorFlushRegistry()
+    let flushRegistry = EditorFlushRegistry(vault: NotesAppDelegate.draftVault())
 
-    /// Upper bound on how long quit waits for the flush. A note-body write is tiny (atomic local file),
-    /// so the flush path essentially always wins this race; the bound only guards a pathological hang.
-    static let terminateFlushTimeout: Duration = .seconds(2)
+    /// Upper bound on how long quit waits for the flush before asking. A note-body write is tiny
+    /// (atomic local file), so the flush path essentially always wins this race; the bound only guards a
+    /// pathological hang, and since passing it now stops quit with an alert, it leaves room for a save
+    /// that also re-indexes a large store.
+    static let terminateFlushTimeout: Duration = .seconds(5)
+
+    override init() {
+        super.init()
+        flushRegistry.presentCloseFailure = { title, copy in Self.askAfterFailedClose(title: title, copy: copy) }
+    }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        // Nothing editing → quit immediately. Otherwise flush every open editor's pending edit first, but
-        // reply as soon as the flush finishes OR the bounded timeout elapses (never block quit forever).
+        // Nothing editing → quit immediately. Otherwise flush every open editor's pending edit first, and
+        // reply as soon as it succeeds; a failure or the bound asks the user instead of quitting.
         guard !flushRegistry.isEmpty else { return .terminateNow }
         let registry = flushRegistry
-        TerminateFlushCoordinator {
-            NSApp.reply(toApplicationShouldTerminate: true)
-        }.begin(flush: { await registry.flushAll() }, timeout: Self.terminateFlushTimeout)
+        TerminateFlushCoordinator(
+            reply: { NSApp.reply(toApplicationShouldTerminate: $0) },
+            writeCopies: { registry.writeEmergencyCopies() },
+            prompt: { copies, timedOut in
+                Self.askAfterFailedQuit(drafts: registry.unsavedDrafts(), copies: copies, timedOut: timedOut)
+            }
+        ).begin(flush: { await registry.flushAll() }, timeout: Self.terminateFlushTimeout)
         return .terminateLater
+    }
+
+    /// The emergency-copy folder. A UITest store keeps its copies beside the scratch store, never in the
+    /// owner's real Application Support.
+    private static func draftVault() -> UnsavedDraftVault? {
+#if DEBUG
+        if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty {
+            return UnsavedDraftVault(directory: URL(fileURLWithPath: p + " Unsaved Drafts", isDirectory: true))
+        }
+#endif
+        return UnsavedDraftVault.standard()
+    }
+
+    private static func askAfterFailedQuit(drafts: [EditorDraft], copies: [URL]?, timedOut: Bool) -> QuitFailureChoice {
+        let alert = NSAlert()
+        if drafts.isEmpty {
+            // The bound passed, but every editor's text is already saved or still being written.
+            alert.messageText = "Archive Notes is still saving."
+            alert.informativeText = "A save hasn't finished yet. Choose Retry to wait for it."
+            alert.addButton(withTitle: "Retry")
+            alert.addButton(withTitle: "Don't Quit")
+            alert.addButton(withTitle: "Quit")
+            switch alert.runModal() {
+            case .alertFirstButtonReturn: return .retry
+            case .alertThirdButtonReturn: return .quit
+            default: return .cancel
+            }
+        }
+        alert.alertStyle = .critical
+        let what = drafts.count == 1 ? "\u{201C}\(drafts[0].title)\u{201D}" : "\(drafts.count) notes"
+        alert.messageText = timedOut ? "Archive Notes hasn't finished saving \(what)."
+            : "Archive Notes couldn't save \(what)."
+        let cause = timedOut ? "The save is taking longer than expected." : "The note store refused the write."
+        if let copies, !copies.isEmpty {
+            alert.informativeText = cause + " A copy of the unsaved text is in "
+                + "\(copies[0].deletingLastPathComponent().path). Fix the problem and choose Retry, or keep "
+                + "Archive Notes open."
+        } else {
+            alert.informativeText = cause + " A backup copy could not be written for every note "
+                + "either. Quitting now loses unsaved text."
+        }
+        alert.addButton(withTitle: "Retry")
+        alert.addButton(withTitle: "Don't Quit")
+        let quit = alert.addButton(withTitle: copies == nil ? "Quit and Lose Changes" : "Quit")
+        quit.hasDestructiveAction = copies == nil
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .retry
+        case .alertThirdButtonReturn: return .quit
+        default: return .cancel
+        }
+    }
+
+    private static func askAfterFailedClose(title: String, copy: URL?) -> CloseFailureChoice {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Archive Notes couldn't save \u{201C}\(title)\u{201D}."
+        alert.informativeText = "Its editor closed, but the note store refused the write. The unsaved text "
+            + "is kept and will be retried when you quit"
+            + (copy.map { "; a copy is in \($0.deletingLastPathComponent().path)." } ?? ".")
+        alert.addButton(withTitle: "Retry")
+        alert.addButton(withTitle: "OK")
+        if copy != nil { alert.addButton(withTitle: "Show Copy in Finder") }
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .retry
+        case .alertThirdButtonReturn:
+            if let copy { NSWorkspace.shared.activateFileViewerSelecting([copy]) }
+            return .keep
+        default: return .keep
+        }
     }
 }
 
