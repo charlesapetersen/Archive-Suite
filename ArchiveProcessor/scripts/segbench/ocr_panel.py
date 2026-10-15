@@ -225,6 +225,12 @@ def ceiling_failure(rec, j):
             'http': 200, 'cost_policy_zero': False}
 
 
+def reservation(endpoint):
+    """Whole-context bound; the cloud pilot supplies documented image bounds separately."""
+    return (int(endpoint['context_length']) * float(endpoint['pricing']['prompt'])
+            + MAX_TOKENS * float(endpoint['pricing']['completion']))
+
+
 def collect(probe=False, only=None):
     import requests
     import method_openrouter as OR
@@ -247,7 +253,7 @@ def collect(probe=False, only=None):
                 return
             e = endpoints[key]; prices = e['pricing']
             # Entire endpoint context bounds input even when its image tokenizer is unpublished.
-            reserve = int(e['context_length']) * float(prices['prompt']) + MAX_TOKENS * float(prices['completion'])
+            reserve = reservation(e)
             if not math.isfinite(reserve) or reserve <= 0:
                 raise RuntimeError('invalid price reservation: ' + key)
             b = body(key, job, prices)
@@ -314,7 +320,8 @@ def collect(probe=False, only=None):
                     append(meta)
                     save(dest, {'meta': meta, 'parsed': got if ok else None})
                     pending.unlink()
-                    if cost > reserve or spent() > CAP:
+                    if (cost > reserve or spent() > CAP
+                            or (e.get('_input_bound') and u.get('prompt_tokens', 0) > e['_input_bound'])):
                         raise RuntimeError('provider exceeded price/context reservation; stop')
                     print(f"{key} {job['id']} {meta['status']} ${cost:.5f} total ${spent():.5f}", flush=True)
             except requests.RequestException:
@@ -327,8 +334,7 @@ def collect(probe=False, only=None):
         todo = [(k, j) for j in m['jobs'] for k in keys
                 if not probe or (j['page'] in PROBE and j['scale'] == 'original')]
         # Schedule largest reservations first, so cheap calls can use the final budget headroom.
-        todo.sort(key=lambda kj: -(int(endpoints[kj[0]]['context_length']) * float(endpoints[kj[0]]['pricing']['prompt'])
-                                  + MAX_TOKENS * float(endpoints[kj[0]]['pricing']['completion'])))
+        todo.sort(key=lambda kj: -reservation(endpoints[kj[0]]))
         with cf.ThreadPoolExecutor(max_workers=int(os.environ.get('OCR_PANEL_CONCURRENCY', 4))) as ex:
             futures = [ex.submit(one, k, j) for k, j in todo]
             # Settle in-flight reservations even after a failure; already-authorized calls may finish; queued calls are not authorized after stop.
