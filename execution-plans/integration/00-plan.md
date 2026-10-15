@@ -1,7 +1,7 @@
 # One app: Vision OCR's engine inside Archive Processor
 
-Written 14 October 2026 for the owner's review. Status: **draft, decisions of 14 October recorded below; the build
-has not been approved.** Part 1 is for the owner. Part 2 is the detail a session works from.
+Written 14 October 2026 for the owner's review. Status: **approved (owner, 14 October 2026); decisions of 14 October
+recorded below.** Building starts when Vision OCR's current queue is finished and its release is cut. Part 1 is for the owner. Part 2 is the detail a session works from.
 
 ## Part 1 — the plan in brief
 
