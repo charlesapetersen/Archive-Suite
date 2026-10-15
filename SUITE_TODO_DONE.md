@@ -10891,3 +10891,26 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `ContentIndexTests`, `UITestLaunchSiteLintTests` and the three router tests green (33), with the UITest target
   compiling; Core `swift test --filter PDFThumbnailer` 18/18; Processor build-for-testing clean.
   <!-- /W40.a4 -->
+- [x] **W40.c1 — Processor and Notes rehearsal sets [S-M]** · §W40 — verification phase · SHIPPED 2026-10-14
+  (lane: processor,notes). Two regenerable sets under `~/Library/Caches/ArchiveSuiteRehearsal/`, each with a
+  `MANIFEST.txt`, and a read-only share that carries every set into the Tart VM. Guide: `verification/rehearsal.md`.
+  **Processor:** `ArchiveProcessor/scripts/make-processor-rehearsal.py` catalogues `Test Files/` (1,079 photos in
+  twelve collections, five with a Box/Folder/New/Cont truth CSV; `CATALOGUE.tsv` notes the Deaver CSV's 102 unlabelled
+  trailing rows and Stanton's one) and copies the pick for `W40.d1` with `ditto`: **RG 165 — War Department**, the
+  smallest truth box (113 photos, all labelled, 26 box/folder photos, the only live-capture box). It is a bench TEST
+  collection, so a journey may score on it but never tune on it (Dean is the fallback for that). Source listed
+  before and after by size+mtime+sha256: untouched, and the copy is faithful.
+  **Notes:** `ArchiveNotes/scripts/make-notes-rehearsal.py`, stdlib, deterministic per `--seed`: 400 items, 1,348
+  blocks of every kind (including dangling and unclosed ones), every date shape, odd titles and line endings, a 1.2 MB
+  note, 27 folders with 6 smart, replication, ghost memberships, templates, out-of-step Finder tags, an embedded
+  scratch Reader root, and 17 hazards listed in `hazards.tsv` with their expected behaviour. The store folder is named
+  `AN-GUI-Fixture` (the DEBUG projector guard and the VM sandbox exception match that component) but carries its own
+  marker guid/name. Loaded with the app's own `NoteStore`/`OrganizationFile` in the hosted unit bundle: every
+  ordinary item loads, and only the five hazards built to fail do
+  (`verification/evidence/notes/W40.c1-rehearsal-store-load.md`).
+  **Found:** `W40.fix-notes-unclosed-header` (S3): every save of a note with an unclosed block header adds a
+  `<!-- block: freeform -->` line.
+  **VM:** `ops/gui/vm-gui-runner.sh` mounts the cache read-only at `/Volumes/My Shared Files/rehearsal`
+  (`REHEARSAL_DIR` overrides it; skipped when absent). Proved in `archive-gui-runner`: a write is refused, `ditto`
+  to the guest disk keeps file counts, sha256 and Finder-tag xattrs, and the guest has 23 GiB free.
+  <!-- /W40.c1 -->

@@ -148,7 +148,8 @@ regenerable. It is never committed. Each set gets a `MANIFEST.txt` saying what i
 
 - **`W40.c1` — Processor and Notes sets [S-M].** Catalogue `ArchiveProcessor/Test Files/` (about 1,000 images
   with five ground-truth segmentation CSVs) and pick the smallest ground-truth collection for `W40.d1`. Build a
-  Notes rehearsal store larger and messier than `AN-GUI-Fixture`. Work out and document how sets reach the Tart VM.
+  Notes rehearsal store larger and messier than `AN-GUI-Fixture`. Work out and document how sets reach the Tart VM. *(SHIPPED
+  2026-10-14: `verification/rehearsal.md`; the `W40.d1` pick is RG 165 — War Department.)*
 - **`W40.c2` — Reader sample of the real corpus [S].** Gated on `W40.c2-owner-ok`. Read-only copy of about 5,000
   PDFs and their JPEG partners with xattrs preserved (`ditto`), sampled across the tree, not the first 5,000.
   Before copying, list each sampled file's size, mtime and tag xattr; after, list them again and prove them
@@ -164,7 +165,7 @@ Every journey runs in the VM or headless, on rehearsal material, writes its evid
 where it can.
 
 - **`W40.d1` — bulk OCR on a ground-truth collection [M].** Process Files through the real app with the
-  cheapest capable provider; state the cost first. Score the split into documents against the CSV. Check every
+  cheapest capable provider; state the cost first. Collection: RG 165 (`W40.c1`, `verification/rehearsal.md`). Score the split into documents against the CSV. Check every
   output PDF with `qpdf --check` and `pdfcpu validate`, decode every Finder-tag xattr (`xattr -px` → `plutil`),
   and compare page 2 and the tags against `SPEC/tag-format.md`.
 - **`W40.d2` — Processor review dialogs by hand [M].** In the VM, drive segmentation review, box/folder confirm,

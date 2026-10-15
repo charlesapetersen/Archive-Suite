@@ -31,6 +31,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 VM="${VM_NAME:-archive-gui-runner}"
 REPO="${REPO_PATH:-$(cd "$HERE/../.." && pwd)}"                  # suite root (this worktree)
 ART="${ART_DIR:-$HOME/.tart-mirror/vm-artifacts}"
+REHEARSAL="${REHEARSAL_DIR:-$HOME/Library/Caches/ArchiveSuiteRehearsal}"   # W40.c1 sets, shared read-only
 VNCDOTOOL="${VNCDOTOOL:-$HOME/.tart-mirror/vncenv/bin/vncdotool}"
 AGENT_WAIT="${AGENT_WAIT:-240}"
 
@@ -136,6 +137,10 @@ ensure_vm() {
   # not ours to close (see close_vm_viewer).
   SS_WAS_RUNNING=0; pgrep -x "Screen Sharing" >/dev/null 2>&1 && SS_WAS_RUNNING=1
   local mounts=(--dir=repo:"$REPO" --dir=out:"$ART")
+  # W40.c1: the regenerable rehearsal sets, READ-ONLY, at /Volumes/My Shared Files/rehearsal. A journey
+  # copies the set it needs onto the guest disk first (verification/rehearsal.md says how), so nothing the
+  # app does in the guest can reach the host copy. Absent on a machine that never built a set; then no share.
+  [ -d "$REHEARSAL" ] && mounts+=(--dir=rehearsal:"$REHEARSAL":ro)
 
   # BOOT MODE IS PER LANE, and this is not cosmetic (owner reported a visible window, 2026-07-30).
   #   xcuitest — needs NO display at all: it only shells into the guest over the agent. `--no-graphics`

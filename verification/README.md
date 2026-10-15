@@ -12,6 +12,7 @@ verification/
 ├── processor.md         Processor ledger                   (W40.b3)
 ├── capture.md           capture companions, Android + iOS  (W40.i2, extended by W40.b4)
 ├── SUSPECTS.md          suspected bugs not yet reproduced
+├── rehearsal.md         the rehearsal sets: what, how rebuilt, how they reach the VM  (W40.c1)
 ├── evidence/<app>/      kept run artifacts that ledger rows cite
 └── sessions/            the owner's guided-session packs and returned forms (W40.g*)
 ```
