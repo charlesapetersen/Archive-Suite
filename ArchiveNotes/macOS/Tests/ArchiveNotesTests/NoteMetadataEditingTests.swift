@@ -151,6 +151,7 @@ extension NotesTagProjectorSafetyTests {
     func copyOpenLinkWritesPlainTextURL() async throws {
         try await withMetadataScratch { env in
             let pasteboard = NSPasteboard(name: .init("notes-link-test-\(UUID().uuidString)"))
+            defer { pasteboard.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
             #expect(pasteboard.setString("old clipboard value", forType: .string))
 
             #expect(env.model.copyOpenLink(for: env.id, to: pasteboard))

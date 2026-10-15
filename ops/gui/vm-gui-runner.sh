@@ -443,7 +443,7 @@ collect_snapshot_reference() {
 # named, never fatal.
 collect_crashes() {   # $1 = artifact subdir name under $APP_ART (default: crashes)
   local sub="${1:-crashes}" rc=0 f
-  tart_crash_harvest "$VM" "$APP/$sub" || rc=$?
+  tart_crash_harvest "$VM" "$APP/$sub" "$APP" || rc=$?
   case "$rc" in
     0) log "crash harvest: no new crash or hang report from a suite process${TART_CRASH_FOREIGN:+ (reports from other processes kept in $APP_ART/$sub)}" ;;
     1) while IFS= read -r f; do [ -n "$f" ] && warn "CRASH REPORT from a suite process: $APP_ART/$sub/$f"; done <<< "$TART_CRASH_SUITE"

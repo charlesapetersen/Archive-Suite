@@ -72,6 +72,15 @@ runner's own temp dir and prints `[shot] <name>: wrote <path>`; `collect_shots` 
 over the *unsandboxed* `tart exec`. Don't route this through the result bundle instead: a failed or killed run
 leaves the `.xcresult` **unfinalized**, and `xcresulttool` refuses one with no `Info.plist`.
 
+**Crash and hang reports** (W40.e2). Every VM run — both lanes here and the health gate's — marks the guest
+before the run and afterwards copies every `DiagnosticReports` file newer than the mark (user and system) to
+`vm-artifacts/<app>/crashes/` (`crashes-sighted/`, or `crashes-attempt<n>/` for the gate). A crash or hang report
+from one of our processes (`Archive*`, `xctest`) fails the run **even under `TEST SUCCEEDED`** — an app that dies
+after its last assertion is exactly what the marker cannot see; the gate treats it as a failed attempt and retries
+once like any other. Other processes' reports and `.diag` resource reports are copied and named, never fatal.
+Helpers: `tart_crash_mark` / `tart_crash_harvest` in `tart-lib.sh`; real-guest proof: `vm-crash-harvest-probe.sh`.
+Leaks are not a VM job: `ops/verify/leaks-harvest.sh` runs the unit suites under `leaks` on the host.
+
 **Reader's committed snapshot reference** is also guest-rendered. `SnapshotTests` is included in the default
 Reader VM selector and compares there; it intentionally skips on the host because the two renderers differ.
 For an intended visual change only, temporarily set its `recordMode` to `.all` and run the Reader VM lane.

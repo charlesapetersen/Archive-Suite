@@ -316,6 +316,7 @@ final class SourceBlockPasterTests: XCTestCase {
     @MainActor
     func testPasteboardHasArchiveLinksCustomUTI() {
         let pb = NSPasteboard(name: .init("test-has-uti-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         pb.clearContents()
         let item = NSPasteboardItem()
         let payload = ArchiveLinkPayload(entries: [
@@ -334,6 +335,7 @@ final class SourceBlockPasterTests: XCTestCase {
     @MainActor
     func testPasteboardHasArchiveLinksPlainText() {
         let pb = NSPasteboard(name: .init("test-has-text-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         pb.clearContents()
         pb.setString("archivereader://reveal?root=X&rel=y.pdf", forType: .string)
 
@@ -343,6 +345,7 @@ final class SourceBlockPasterTests: XCTestCase {
     @MainActor
     func testPasteboardNoArchiveLinks() {
         let pb = NSPasteboard(name: .init("test-no-links-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         pb.clearContents()
         pb.setString("Just regular text", forType: .string)
 
@@ -354,6 +357,7 @@ final class SourceBlockPasterTests: XCTestCase {
     @MainActor
     func testReadPasteboardCustomUTI() {
         let pb = NSPasteboard(name: .init("test-read-uti-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         pb.clearContents()
         let item = NSPasteboardItem()
         let payload = ArchiveLinkPayload(entries: [
@@ -377,6 +381,7 @@ final class SourceBlockPasterTests: XCTestCase {
     @MainActor
     func testReadPasteboardPlainTextFallback() {
         let pb = NSPasteboard(name: .init("test-read-text-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         pb.clearContents()
         pb.setString(
             "archivereader://reveal?root=7F3A1B2C-4D5E-6F78-9A0B-CDEF01234567&rel=Note.pdf&jpeg=&page=2",
@@ -392,6 +397,7 @@ final class SourceBlockPasterTests: XCTestCase {
     @MainActor
     func testReadPasteboardEmpty() {
         let pb = NSPasteboard(name: .init("test-empty-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         pb.clearContents()
 
         let entries = SourceBlockPaster.readPasteboard(from: pb)

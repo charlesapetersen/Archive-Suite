@@ -40,6 +40,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testWriteThenReadRoundTrip() {
         let pb = namedPasteboard("roundtrip")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         let payload = samplePayload()
 
         XCTAssertTrue(PassagePasteboard.write(payload, to: pb))
@@ -51,6 +52,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testWriteRoundTripPreservesAssetBytes() {
         let pb = namedPasteboard("assets")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         let payload = samplePayload()
 
         PassagePasteboard.write(payload, to: pb)
@@ -66,6 +68,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testWriteSetsPlainTextFallback() {
         let pb = namedPasteboard("plain")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         PassagePasteboard.write(samplePayload(), to: pb)
 
         let expected = """
@@ -94,6 +97,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testReadPrefersPassageUTIWhenBothPresent() {
         let pb = namedPasteboard("prefer")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         PassagePasteboard.write(samplePayload(), to: pb)
         // Both the custom UTI and .string are present; read must return the rich payload.
         XCTAssertNotNil(PassagePasteboard.read(from: pb))
@@ -103,6 +107,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testReadReturnsNilForPlainTextOnly() {
         let pb = namedPasteboard("textonly")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         pb.setString("Just some copied text with no provenance.", forType: .string)
 
         XCTAssertNil(PassagePasteboard.read(from: pb),
@@ -113,6 +118,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testReadReturnsNilForMalformedPayload() {
         let pb = namedPasteboard("malformed")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         let item = NSPasteboardItem()
         item.setData(Data("not json".utf8), forType: PassagePasteboard.type)
         pb.writeObjects([item])
@@ -125,6 +131,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testReadReturnsNilForEmptyPasteboard() {
         let pb = namedPasteboard("empty")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         XCTAssertNil(PassagePasteboard.read(from: pb))
         XCTAssertFalse(PassagePasteboard.hasPassage(pb))
     }
@@ -134,6 +141,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testPasteboardPayloadBuildsNotePassageBlocks() throws {
         let pb = namedPasteboard("bridge")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         let id = UUID(uuidString: "B1D4E0F7-1111-2222-3333-444455556666")!
         PassagePasteboard.write(samplePayload(id: id), to: pb)
 
@@ -224,6 +232,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testCopyPastePayloadRoundTripPreservesProvenance() throws {
         let pb = namedPasteboard("copypaste")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         let nid = UUID()
         let src = FakeSelectionSource(sourceNoteId: nid, sourceTitle: "Src", sourceDateDisplay: "1968",
                                       fullText: "Hello there",
@@ -262,6 +271,7 @@ final class PasteboardPassageTests: XCTestCase {
     @MainActor
     func testWriteWithRTFIncludesAllThreeRepresentations() throws {
         let pb = namedPasteboard("rtf")
+        defer { pb.releaseGlobally() }   // a named pasteboard outlives its test otherwise (W40.e2 leaks)
         let styled = NSAttributedString(string: "Hello", attributes: [.font: NSFont.systemFont(ofSize: 12)])
         let rtf = try styled.data(from: NSRange(location: 0, length: styled.length),
                                   documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])

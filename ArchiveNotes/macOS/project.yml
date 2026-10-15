@@ -61,6 +61,8 @@ targets:
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.archivenotes.tests
+        # W40.e2: the leak-harvest hold (Tests/ArchiveNotesTests/LeakHarvestHold.swift), inert unless asked for.
+        INFOPLIST_KEY_NSPrincipalClass: ANLeakHarvestHold
 
   ArchiveNotesUITests:
     type: bundle.ui-testing

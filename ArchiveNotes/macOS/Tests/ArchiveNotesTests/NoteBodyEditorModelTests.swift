@@ -57,8 +57,8 @@ struct NoteBodyEditorModelTests {
             if drafts.count == 1 { lateText = "draft with last keystroke" }
             return "outside body"
         }
-        model.flushEditor = {
-            if let text = lateText { lateText = nil; model.markdown = text }
+        model.flushEditor = { [weak model] in   // weak: a strong capture is a retain cycle (W40.e2 leaks)
+            if let text = lateText { lateText = nil; model?.markdown = text }
         }
         await model.select(id)
         model.markdown = "draft"
@@ -86,8 +86,8 @@ struct NoteBodyEditorModelTests {
         }
         model.checkedSave = { _, _, _ in "outside" }
         model.saveDebounce = .seconds(60)
-        model.flushEditor = {
-            if let text = textKitPending { textKitPending = nil; model.markdown = text }
+        model.flushEditor = { [weak model] in   // weak: a strong capture is a retain cycle (W40.e2 leaks)
+            if let text = textKitPending { textKitPending = nil; model?.markdown = text }
         }
         await model.select(id)
         await model.refreshFromDisk()

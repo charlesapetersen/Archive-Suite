@@ -49,6 +49,8 @@ struct HardDeleteWindowTests {
     }
 
     private func cleanup(_ env: Env) async {
+        // The hook closures capture `env.nav`, which holds `env.model`: a retain cycle until cleared (W40.e2 leaks).
+        env.model.hardDeleteWindowHookForTesting = nil
         await env.index.close()
         try? FileManager.default.removeItem(at: env.root)
     }

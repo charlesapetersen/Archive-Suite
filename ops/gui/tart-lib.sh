@@ -303,14 +303,18 @@ tart_kill_app() {
 #
 #   tart_crash_mark    — sets TART_CRASH_TOKEN (empty if the marker could not be written; the harvest then
 #                        reports UNKNOWN rather than "no crashes", which would be a false green).
-#   tart_crash_harvest — returns 0 none · 1 a SUITE process crashed or hung · 2 unknown (no marker, or the
+#   tart_crash_harvest VM ART_SUBDIR [APP]
+#                      — returns 0 none · 1 a SUITE process crashed or hung · 2 unknown (no marker, or the
 #                        listing never came back intact — tart's transport, not the guest).
 #                        Leaves TART_CRASH_SUITE / TART_CRASH_FOREIGN (newline-separated file names) and
 #                        copies every new report to $ART/<ART_SUBDIR>/ via the `out` share.
 #
 # What FAILS the run: a crash (.ips/.crash) or hang (.hang/.spin) report whose process is one of ours —
-# the file name starts with Archive (the three apps and their *UITests-Runner hosts) or xctest. Everything
-# else is copied and named but does not fail: the guest also runs Zotero, Spotlight workers and Apple's
+# the file name starts with Archive (the three apps and their *UITests-Runner hosts) or xctest. Given APP,
+# only THAT app's process name (which also prefixes its <App>UITests-Runner) and xctest are fatal: another
+# suite app's report is named but does not fail, because the guest reopens whatever was running at its last
+# stop and the gate kills only the app it tests — a stale Notes crashing during a Reader run is not Reader's
+# defect (adversarial review, 2026-10-15). Everything else is copied and named but does not fail: the guest also runs Zotero, Spotlight workers and Apple's
 # daemons, and a lane that goes red for a crash in mdworker cries wolf. `.diag` resource reports (CPU or
 # wakeups over budget) are harvested but never fail: a Debug build under XCUITest trips them for reasons
 # that are not defects. Both report directories, user and system, are read: hangs land in the system one.
@@ -328,19 +332,24 @@ tart_crash_mark() {
   return 0
 }
 
-# tart_crash_is_suite NAME — 0 if a report file NAME is a crash/hang of one of our processes.
+# tart_crash_is_suite NAME [APP] — 0 if a report file NAME is a crash/hang of one of our processes (of APP's
+# process, or xctest, when APP is given).
 tart_crash_is_suite() {
-  case "$1" in
-    *.diag) return 1 ;;
+  local name="$1" proc="Archive"
+  [ -n "${2:-}" ] && proc="$(archive_app_field "$2" procname)"
+  [ -n "$proc" ] || proc="Archive"
+  case "$name" in
+    *.ips|*.crash|*.hang|*.spin) : ;;
+    *) return 1 ;;
   esac
-  case "$1" in
-    Archive*.ips|Archive*.crash|Archive*.hang|Archive*.spin|xctest*.ips|xctest*.crash|xctest*.hang|xctest*.spin) return 0 ;;
+  case "$name" in
+    "$proc"*|xctest*) return 0 ;;
   esac
   return 1
 }
 
 tart_crash_harvest() {
-  local vm="$1" sub="$2" raw list f
+  local vm="$1" sub="$2" app="${3:-}" raw list f
   TART_CRASH_SUITE=""; TART_CRASH_FOREIGN=""
   [ -n "${TART_CRASH_TOKEN:-}" ] || return 2
   [ -n "$sub" ] || return 2   # never `rm -rf` the share root
@@ -351,6 +360,8 @@ tart_crash_harvest() {
     mark='$TART_FIXTURE_TMP/$TART_CRASH_TOKEN'
     dest='$TART_GUEST_OUT/$sub'
     rm -rf \"\$dest\"
+    # No marker means no baseline: find -newer would fail quietly and read as 'no crashes'.
+    [ -f \"\$mark\" ] || { echo 'NOMARK $TART_CRASH_TOKEN'; exit 0; }
     for d in $TART_CRASH_DIRS; do
       [ -d \"\$d\" ] || continue
       find \"\$d\" -maxdepth 1 -type f -newer \"\$mark\" 2>/dev/null
@@ -366,7 +377,7 @@ tart_crash_harvest() {
   list="$(printf '%s\n' "$raw" | sed -n 's/^REPORT //p')"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    if tart_crash_is_suite "$f"; then
+    if tart_crash_is_suite "$f" "$app"; then
       TART_CRASH_SUITE="${TART_CRASH_SUITE:+$TART_CRASH_SUITE
 }$f"
     else

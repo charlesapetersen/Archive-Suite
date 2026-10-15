@@ -171,6 +171,7 @@ applog()     { echo "$(app_art "$1")/xcuitest-attempt$2.log"; }
 # It goes through the same retry, so a one-off crash is a flake and a repeated one is RED.
 is_fail()    { grep -qE '\*\* TEST FAILED \*\*|^CRASH_REPORT\[' "$(applog "$1" "$2")" 2>/dev/null; }
 is_success() { grep -q '\*\* TEST SUCCEEDED \*\*' "$(applog "$1" "$2")" 2>/dev/null; }
+tests_failed() { grep -q '\*\* TEST FAILED \*\*' "$(applog "$1" "$2")" 2>/dev/null; }
 # A missing Processor window can mean a guest keychain/unlock/modal failure, not an app regression. The
 # test itself saves a rendered screenshot before emitting this marker; classify it as infrastructure.
 is_processor_no_window() { [ "$1" = processor ] && grep -q '^PROCESSOR_UI_NO_WINDOW$' "$(applog "$1" "$2")" 2>/dev/null; }
@@ -307,7 +308,7 @@ collect_shots() { # $1 = app, $2 = attempt, $3 = host log
 # logged as unknown and changes nothing: transport trouble must never turn into a RED.
 collect_crashes() { # $1 = app, $2 = attempt, $3 = host log
   local app="$1" attempt="$2" log="$3" rc=0 f
-  tart_crash_harvest "$VM" "$app/crashes-attempt$attempt" || rc=$?
+  tart_crash_harvest "$VM" "$app/crashes-attempt$attempt" "$app" || rc=$?
   case "$rc" in
     0) echo "crash-harvest[$app]: no new crash or hang report from a suite process" >>"$log" ;;
     1) while IFS= read -r f; do [ -n "$f" ] && echo "CRASH_REPORT[$app]: $(app_art "$app")/crashes-attempt$attempt/$f" >>"$log"; done <<< "$TART_CRASH_SUITE" ;;
@@ -356,6 +357,12 @@ for app in $APPS; do
     fi
     # A retry that produced NEITHER marker cannot clear a failure that DID reproduce as a marker on
     # attempt 1 — that would let an infra hiccup on the retry launder a real RED into a skip.
+    # …but a crash report alone is not that marker (W40.e2 review): one crash then an infra-dead retry
+    # proves nothing reproducible, so it stays inconclusive rather than parking the daemon.
+    if ! is_fail "$app" 2 && ! is_success "$app" 2 && ! tests_failed "$app" 1; then
+      echo "GUI-VM gate: $app attempt 1 left a crash report and the retry ran nothing conclusive — SKIPPED, not RED (evidence: $(applog "$app" 1))."
+      skipped="$skipped $app"; continue
+    fi
     if is_fail "$app" 2 || ! is_success "$app" 2; then
       if is_warn_only "$app"; then warned="$warned $app"; else red="$red $app"; fi
       continue

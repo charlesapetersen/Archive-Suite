@@ -392,6 +392,31 @@ harvest reader/crashes
 { [ -z "$TART_CRASH_TOKEN" ] && [ "$hrc" = 2 ]; } \
   && ok "a mark that never lands is UNKNOWN too (no false green from a missing baseline)" \
   || no "a missing mark harvested as $hrc"
+# Per-app attribution (adversarial review): during a READER run, a stale Notes instance's crash is named
+# but is not Reader's failure; Reader's own runner and xctest still are.
+rm -f "$CR"/user/*2026-10-15* "$CR"/sys/*2026-10-15*
+tart_crash_mark stub-vm
+later "$CR/user/ArchiveNotes-2026-10-15-140000.ips"
+later "$CR/user/ArchiveReaderUITests-Runner-2026-10-15-140001.ips"
+hrc=0; tart_crash_harvest stub-vm reader/crashes reader || hrc=$?
+{ [ "$hrc" = 1 ] && [ "$TART_CRASH_SUITE" = "ArchiveReaderUITests-Runner-2026-10-15-140001.ips" ]; } \
+  && ok "given the app, only its own process (and its UITests-Runner) is fatal" \
+  || no "per-app attribution wrong (rc=$hrc suite='$TART_CRASH_SUITE')"
+case "$TART_CRASH_FOREIGN" in *ArchiveNotes-2026-10-15-140000.ips*) ok "…and another suite app's crash is named, not blamed" ;;
+  *) no "another app's crash went missing (foreign='$TART_CRASH_FOREIGN')" ;; esac
+rm -f "$CR"/user/*2026-10-15* "$CR"/sys/*2026-10-15*
+tart_crash_is_suite xctest-2026-10-15-1.ips notes && ok "xctest stays fatal under any app" || no "xctest crash not fatal"
+
+# A marker that has vanished is no baseline: find -newer fails quietly, which must not read as "none".
+tart_crash_mark stub-vm
+rm -f "$TART_FIXTURE_TMP/$TART_CRASH_TOKEN"
+harvest notes/crashes
+[ "$hrc" = 2 ] && ok "a vanished marker is UNKNOWN (2), not 'no crashes'" || no "a vanished marker harvested as $hrc"
+
+grep -q 'tests_failed "\$app" 1; then' "$GATEF" \
+  && ok "gate: a crash-only attempt 1 with an inconclusive retry is SKIPPED, not RED" \
+  || no "gate lost the crash-only/inconclusive-retry skip"
+
 TART_CRASH_TOKEN=x; hrc=0; tart_crash_harvest stub-vm "" || hrc=$?
 [ "$hrc" = 2 ] && ok "an empty artifact subdir is refused (never rm -rf the share root)" || no "empty subdir accepted"
 PATH="${PATH#"$STUB_BIN":}"
