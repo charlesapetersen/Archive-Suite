@@ -118,8 +118,10 @@ can run in parallel once 2 is done, and so can 5 and 6.
 - W41 finishes. Its report should give its figures by the kinds of page in Stage 3, so they drop into the table in
   Stage 4 without re-grouping. W41.ocr-prompt-app brings the app's instruction into line with the owner's
   transcription rulings; Stage 2 keeps that instruction for every paid and local model that takes one.
-- The W40 order changes as decided: Archive Processor's W40 items (a5, b3, b4, c1 for Processor, d1-d5, e8, e12,
-  g3, i1-i5) are held behind Stage 7. Reader, Notes and the suite-wide checks continue.
+- The W40 order changed as decided (done 14 October): Archive Processor's W40 items (a5, b3, b4, d1-d5, e8, e12,
+  g3, i1-i5) are `(blocked-on: W42.int-done)`, a HOLD QUEUE gate ticked when Stage 7 is done. Reader, Notes and the
+  suite-wide checks continue. c1 is not held, because Notes needs it; b5, d11, e4 and h2 wait through their existing
+  edges.
 
 ### Stage 1 — the engine as a package
 

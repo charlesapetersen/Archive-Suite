@@ -918,6 +918,13 @@ Order lives in the plan's `### TIER 7` block. The owner approved it on 2026-10-0
 never auto-picked; an `-owner-ok` line ticked `DECLINED` sends its dependant to the fallback in rule 11 of the
 daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>` with a severity (rule 8).
 
+**Archive Processor's items wait for the integration (owner, 2026-10-14).** Vision OCR's engine is to be brought into
+Archive Processor (plan: `execution-plans/integration/00-plan.md`), so Archive Processor is verified once, on the
+integrated app. Its items (a5, b3, b4, d1-d5, e8, e12, g3, i1-i5) are `(blocked-on: W42.int-done)`, a HOLD QUEUE gate
+ticked when the integration is built. Reader, Notes and the suite-wide checks carry on. Knock-on waits through their
+existing edges: b5 (on b3), d11 and e4 (on d1), and h2. c1 is not held, because Notes' d9 needs it. The suite-wide
+checks that run now (e1-e3, e5-e7, e13) also cover today's Archive Processor; its part of them is re-run at h2.
+
 **Order loosened 2026-10-07 (owner: "Start the independent parts now").** The edges that encoded the feature
 freeze rather than a real order are gone: `W40.a1` no longer waits on `W36.seg-decision`, `W24.cal1`,
 `W22.mixed-batch-fu2` or `W12.dedup-fu1`; `W40.b0`, `d6`, `e5`, `f1` and `f2` wait on nothing; `e1`, `e6` and `e7` wait
@@ -926,22 +933,22 @@ unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the 
 `W24.cal1` (their journeys follow through `b1`/`b2`). Rule 7 of the daemon plan says the same.
 
 - [ ] **`W40.a4` — remove tests that cannot fail [S]** (lane: reader,notes,processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
-- [ ] **`W40.a5` — test drivers out of the Processor Release build [S · Tier-2]** (lane: processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
-- [ ] **`W40.i1` — iPhone companion builds again [S-M]** (lane: processor,ops) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i2` — iPhone companion parity with Android [M]** (lane: processor) (uses: build) (blocked-on: W40.i1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (lane: processor) (uses: build) (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i5` — borrowed-iPhone session pack [S]** (lane: docs) (uses: light) (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
-- [ ] **`W40.i4` — real-iPhone pass on a borrowed phone — OWNER** (lane: processor) (uses: light) (blocked-on: W40.i5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
-- [ ] **`W40.b3` — Processor feature ledger [M]** (lane: processor) (uses: light) (blocked-on: W40.b0, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
-- [ ] **`W40.b4` — capture feature ledger, Android and iOS [S]** (lane: processor) (uses: light) (blocked-on: W40.b0, W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.a5` — test drivers out of the Processor Release build [S · Tier-2]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §A.
+- [ ] **`W40.i1` — iPhone companion builds again [S-M]** (blocked-on: W42.int-done) (lane: processor,ops) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i2` — iPhone companion parity with Android [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.i1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i3` — iPhone companion in the phone↔Mac E2E [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i5` — borrowed-iPhone session pack [S]** (blocked-on: W42.int-done) (lane: docs) (uses: light) (blocked-on: W40.i3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §I.
+- [ ] **`W40.i4` — real-iPhone pass on a borrowed phone — OWNER** (blocked-on: W42.int-done) (lane: processor) (uses: light) (blocked-on: W40.i5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
+- [ ] **`W40.b3` — Processor feature ledger [M]** (blocked-on: W42.int-done) (lane: processor) (uses: light) (blocked-on: W40.b0, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
+- [ ] **`W40.b4` — capture feature ledger, Android and iOS [S]** (blocked-on: W42.int-done) (lane: processor) (uses: light) (blocked-on: W40.b0, W40.i2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.b5` — correct the doc drift the ledgers found [S-M]** (lane: reader,notes,processor) (uses: light) (blocked-on: W40.b1, W40.b2, W40.b3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §B.
 - [ ] **`W40.c1` — Processor and Notes rehearsal sets [S-M]** (lane: processor,notes) (uses: light) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
 - [ ] **`W40.c2` — Reader rehearsal sample copied from the real corpus [S]** (lane: reader) (uses: light) (blocked-on: W40.c2-owner-ok, W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §C.
-- [ ] **`W40.d1` — bulk OCR on a ground-truth collection [M]** (lane: processor) (uses: build,vm,paid) (blocked-on: W40.b3, W40.c1, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d2` — Processor review dialogs driven by hand [M]** (lane: processor) (uses: vm) (blocked-on: W40.d1, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d3` — every OCR provider through the app's own client [S-M]** (lane: processor) (uses: build,paid) (blocked-on: W40.b3, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d4` — one tiny real batch job per batch provider [S-M]** (lane: processor) (uses: build,paid) (blocked-on: W40.d3, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
-- [ ] **`W40.d5` — live capture with hand-driven review [M]** (lane: processor) (uses: build) (blocked-on: W40.b4, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d1` — bulk OCR on a ground-truth collection [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build,vm,paid) (blocked-on: W40.b3, W40.c1, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d2` — Processor review dialogs driven by hand [M]** (blocked-on: W42.int-done) (lane: processor) (uses: vm) (blocked-on: W40.d1, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d3` — every OCR provider through the app's own client [S-M]** (blocked-on: W42.int-done) (lane: processor) (uses: build,paid) (blocked-on: W40.b3, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d4` — one tiny real batch job per batch provider [S-M]** (blocked-on: W42.int-done) (lane: processor) (uses: build,paid) (blocked-on: W40.d3, W36.seg-decision). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
+- [ ] **`W40.d5` — live capture with hand-driven review [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.b4, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d7` — Reader at corpus size [M]** (lane: reader) (uses: machine) (blocked-on: W40.b1, W40.c2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d8` — Reader triage writes, checked per step [M]** (lane: reader) (uses: vm) (blocked-on: W40.b1, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.d9` — Notes writing session with real keystrokes [M]** (lane: notes) (uses: vm) (blocked-on: W40.b2, W40.c1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
@@ -954,16 +961,16 @@ unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the 
 - [ ] **`W40.e5` — dead-code scan [S-M]** (lane: suite) (uses: build). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e6` — parser robustness: fuzz loops and round-trip properties [M]** (lane: suite) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e7` — mutation sample on the irreversible paths [M]** (lane: suite) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e8` — Android screen tests without an emulator [M]** (lane: processor) (uses: build) (blocked-on: W40.e8-owner-ok, W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e8` — Android screen tests without an emulator [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.e8-owner-ok, W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e10` — Reader screen-by-screen visual review in the VM [S-M]** (lane: reader) (uses: vm). Owner-requested 2026-10-11. Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e11` — Notes screen-by-screen visual review in the VM [S-M]** (lane: notes) (uses: vm). Owner-requested 2026-10-11. Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e12` — Processor screen-by-screen visual review in the VM [S-M]** (lane: processor) (uses: vm). Owner-requested 2026-10-11. Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
+- [ ] **`W40.e12` — Processor screen-by-screen visual review in the VM [S-M]** (blocked-on: W42.int-done) (lane: processor) (uses: vm). Owner-requested 2026-10-11. Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e13` — catch transient states between two settled screens, all three apps [M]** (lane: reader,notes,processor) (uses: build,vm). Owner-requested 2026-10-11 after a Notes inspector flicker too fast to screenshot. Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.f1` — Reader undo durability and the missing audit ledger [S]** (lane: reader) (uses: build). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
 - [ ] **`W40.f2` — the Reader's undisclosed root-marker write [S]** (lane: reader) (uses: build). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
 - [ ] **`W40.g1` — Reader guided-session pack [S]** (lane: reader) (uses: light) (blocked-on: W40.d7, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
 - [ ] **`W40.g2` — Notes guided-session pack [S]** (lane: notes) (uses: light) (blocked-on: W40.d9, W40.d10). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
-- [ ] **`W40.g3` — Processor and capture guided-session pack [S]** (lane: processor) (uses: light) (blocked-on: W40.d1, W40.d2, W40.d5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
+- [ ] **`W40.g3` — Processor and capture guided-session pack [S]** (blocked-on: W42.int-done) (lane: processor) (uses: light) (blocked-on: W40.d1, W40.d2, W40.d5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
 - [ ] **`W40.g-sessions` — owner runs the guided sessions — OWNER** (lane: suite) (uses: light) (blocked-on: W40.g1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
 - [ ] **`W40.h2` — re-run every journey at HEAD [M]** (lane: suite) (uses: build,vm) (blocked-on: W40.d1, W40.d2, W40.d3, W40.d4, W40.d5, W40.d6, W40.d7, W40.d8, W40.d9, W40.d10, W40.d11, W40.e1, W40.e2, W40.e3, W40.e4, W40.e5, W40.e6, W40.e7, W40.e9, W40.e10, W40.e11, W40.e12, W40.e13, W40.f1, W40.f2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §H.
 - [ ] **`W40.h3` — release candidate — OWNER (Tier-3)** (lane: suite) (uses: build) (blocked-on: W40.h2). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
