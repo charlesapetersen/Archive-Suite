@@ -49,6 +49,33 @@ class Limits(unittest.TestCase):
         # Slurm would not list the user's QOS: name none rather than guess one sbatch may refuse.
         self.assertEqual(L.choose(parts, q, set())['FS_QOS'], '')
 
+    # What FarmShare itself reported on 2026-10-15: GPU nodes in BOTH `normal` and `gpu`, listed normal first, and
+    # `normal` refusing the `gpu` QOS. The first run paired normal + gpu and sbatch said "Invalid qos specification".
+    CLUSTER_SINFO = ('normal*|(null)|2-00:00:00|14\nnormal*|gpu:4(S:0-1)|2-00:00:00|6\n'
+                     'bigmem|(null)|2-00:00:00|2\ngpu|gpu:4(S:0-1)|2-00:00:00|6\n')
+    CLUSTER_QOS = ('normal||cpu=512,gres/gpu=1|128|1024\ninteractive||cpu=16,mem=64G|4|4\n'
+                   'dev|08:00:00|cpu=8,mem=32G|1|1\nlong|7-00:00:00|cpu=128|4|32\ngpu||gres/gpu=4|4|32\n')
+    CLUSTER_PARTS = ('PartitionName=normal AllowGroups=ALL AllowAccounts=ALL AllowQos=normal,long,interactive,dev '
+                     'Default=YES QoS=normal\nPartitionName=bigmem AllowQos=ALL QoS=bigmem\n'
+                     'PartitionName=gpu AllowGroups=ALL AllowAccounts=ALL AllowQos=ALL Default=NO QoS=gpu\n')
+    CLUSTER_ALLOWED = {'bigmem', 'caddyshack', 'dev', 'gpu', 'interactive', 'long', 'normal'}
+
+    def test_cluster_pairs_the_gpu_qos_with_a_partition_that_allows_it(self):
+        parts = L.gpu_partitions(self.CLUSTER_SINFO)
+        self.assertEqual(sorted(parts), [('gpu', 4, 2880), ('normal', 4, 2880)])
+        allow = L.partition_qos(self.CLUSTER_PARTS)
+        self.assertEqual(allow['normal'], {'normal', 'long', 'interactive', 'dev'})
+        self.assertIsNone(allow['gpu'])
+        s = L.choose(parts, L.qos_table(self.CLUSTER_QOS), self.CLUSTER_ALLOWED, allow)
+        self.assertEqual((s['FS_PARTITION'], s['FS_QOS'], s['FS_MAXGPU_PU'], s['FS_MAXJOBS_PU'], s['FS_MAXWALL_MIN']),
+                         ('gpu', 'gpu', 4, 4, 2880))
+        # Without the gpu QOS the user gets normal's one GPU, on the normal partition that allows it.
+        s = L.choose(parts, L.qos_table(self.CLUSTER_QOS), self.CLUSTER_ALLOWED - {'gpu'}, allow)
+        self.assertEqual((s['FS_PARTITION'], s['FS_QOS'], s['FS_MAXGPU_PU']), ('normal', 'normal', 1))
+        # If only `normal` had GPUs, its allow-list alone must keep the 4-GPU `gpu` QOS off it.
+        s = L.choose([('normal', 4, 2880)], L.qos_table(self.CLUSTER_QOS), self.CLUSTER_ALLOWED, allow)
+        self.assertEqual((s['FS_PARTITION'], s['FS_QOS']), ('normal', 'normal'))
+
     def test_no_gpu_partition_is_an_error(self):
         with self.assertRaises(SystemExit):
             L.choose(L.gpu_partitions('normal*|(null)|1:00:00|2\n'), {}, set())

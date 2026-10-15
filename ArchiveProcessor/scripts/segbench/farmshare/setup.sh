@@ -28,6 +28,16 @@ fi
 "$ROOT/venv/bin/pip" install -q "vllm${FS_VLLM_VERSION:+==$FS_VLLM_VERSION}" "huggingface_hub[cli]" \
   -r ../ocr-panel-requirements.txt
 
+# FlashInfer compiles kernels at start-up with the venv's own CUDA toolkit (job.sbatch points CUDA_HOME at it). pip
+# brought the 13.4 compiler (nvcc, crt and nvvm's cicc) beside torch's 13.0 runtime headers and ptxas, and the
+# compile stopped first at "CUDA compiler and CUDA toolkit headers are incompatible", then at "Unsupported .version
+# 9.4" (2026-10-15). Pin all three to torch's CUDA version. Do this with no job queued: a job that starts mid-swap
+# mixes the two versions.
+cu="$("$ROOT/venv/bin/python" -c 'import torch; print(torch.version.cuda or "")')"
+if [ -n "$cu" ]; then
+  "$ROOT/venv/bin/pip" install -q "nvidia-cuda-nvcc==$cu.*" "nvidia-cuda-crt==$cu.*" "nvidia-nvvm==$cu.*"
+fi
+
 cat > fs.env <<EOF
 FS_ROOT=$ROOT
 HF_HOME=$ROOT/hf

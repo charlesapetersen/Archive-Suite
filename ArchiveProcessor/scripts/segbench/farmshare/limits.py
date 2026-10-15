@@ -4,10 +4,11 @@
   limits.py [--out limits.env]
 
 Asks Slurm, never the docs: `sinfo` for GPU partitions and their time limits, `sacctmgr` for the QOS limits
-(MaxWall, MaxTRESPU gres/gpu, MaxJobsPU, MaxSubmitPU) and the user's associations, then `df`/`quota` for space.
-The docs read on 2026-10-15 (docs.farmshare.stanford.edu/slurm, through a fetch summary) gave a `gpu` partition and
-QOS, gres/gpu=6 and 4 running jobs per user on that QOS, gres/gpu=3 on `normal`; none of that has been seen on the
-cluster, which is why this reads Slurm instead. Parsing is pure functions so it is tested offline (test_limits.py).
+(MaxWall, MaxTRESPU gres/gpu, MaxJobsPU, MaxSubmitPU) and the user's associations, `scontrol` for which QOS each
+partition allows, then `df`/`quota` for space. The docs (docs.farmshare.stanford.edu/slurm, 2026-10-15) and the
+cluster disagree: the cluster reported the `gpu` QOS at gres/gpu=4 and 4 running jobs per user and `normal` at
+gres/gpu=1, and GPU nodes in both the `normal` and `gpu` partitions, with `normal` refusing the `gpu` QOS. That is
+why this reads Slurm. Parsing is pure functions, tested offline in test_farmshare.py.
 """
 from __future__ import annotations
 import argparse
@@ -84,18 +85,42 @@ def user_qos(assoc: str):
     return names
 
 
-def choose(parts, qos, allowed):
-    """Pick the GPU partition with the most GPUs per node, and the QOS that allows the most GPUs for it.
-    Preference for a QOS named like the partition ('gpu') when it ties. Returns a dict of FS_* settings."""
+def partition_qos(scontrol: str):
+    """`scontrol -o show partition` -> {partition: set of QOS it allows, or None for ALL}."""
+    out = {}
+    for line in scontrol.splitlines():
+        name = re.search(r'PartitionName=(\S+)', line)
+        allow = re.search(r'AllowQos=(\S+)', line)
+        if name:
+            v = allow.group(1) if allow else 'ALL'
+            out[name.group(1)] = None if v.upper() == 'ALL' else {x for x in v.split(',') if x}
+    return out
+
+
+def choose(parts, qos, allowed, allow_qos=None):
+    """Pick the GPU partition and QOS PAIR that lets one user run the most GPUs, counting only a QOS the user's
+    associations list AND the partition allows (FarmShare's `normal` partition has GPU nodes too, but allows only
+    the normal/long/interactive/dev QOS, so `normal` + `gpu` is refused with "Invalid qos specification").
+    Ties go to more GPUs per node, a QOS named like the partition, then the longer wall time.
+    `allow_qos` is partition_qos()'s map; a partition missing from it is taken to allow every QOS."""
     if not parts:
         raise SystemExit('no partition with GPUs in sinfo; is this the FarmShare login node?')
-    part = max(parts, key=lambda p: (p[1], p[2] or 0))
-    # Only a QOS the user's associations list. If Slurm would not say, name none: sbatch then uses the default
-    # QOS, which is always allowed, where guessing one could be refused ("Invalid qos specification").
-    cands = [n for n in qos if n in allowed and (qos[n]['gpus_pu'] or 0) > 0]
-    best = max(cands, key=lambda n: (qos[n]['gpus_pu'] or 0, n == part[0], qos[n]['maxwall'] or 0), default=None)
+    allow_qos = allow_qos or {}
     if not allowed:
         print('WARNING: no QOS list for this user from sacctmgr; submitting without --qos')
+    pairs = []
+    for part in parts:
+        ok = allow_qos.get(part[0])
+        for n in qos:
+            if n in allowed and (qos[n]['gpus_pu'] or 0) > 0 and (ok is None or n in ok):
+                pairs.append((part, n))
+    if pairs:
+        part, best = max(pairs, key=lambda pn: (qos[pn[1]]['gpus_pu'] or 0, pn[0][1], pn[1] == pn[0][0],
+                                                 min(w for w in (pn[0][2], qos[pn[1]]['maxwall'], 10**9) if w)))
+    else:
+        # If Slurm would not say, name no QOS: sbatch then uses the partition's default, which is always allowed,
+        # where guessing one could be refused.
+        part, best = max(parts, key=lambda p: (p[1], p[2] or 0)), None
     q = qos.get(best, {})
     walls = [w for w in (part[2], q.get('maxwall')) if w]
     gpus_pu = q.get('gpus_pu') or part[1]
@@ -117,8 +142,9 @@ def main():
     sinfo = run(['sinfo', '-h', '-o', '%P|%G|%l|%D'])
     qos = run(['sacctmgr', '-nP', 'show', 'qos', 'format=Name,MaxWall,MaxTRESPU,MaxJobsPU,MaxSubmitPU'])
     assoc = run(['sacctmgr', '-nP', 'show', 'assoc', f"user={os.environ.get('USER', '')}", 'format=Partition,QOS'])
-    print('--- sinfo\n' + sinfo + '--- qos\n' + qos + '--- associations\n' + assoc)
-    s = choose(gpu_partitions(sinfo), qos_table(qos), user_qos(assoc))
+    parts_qos = run(['scontrol', '-o', 'show', 'partition'])
+    print('--- sinfo\n' + sinfo + '--- qos\n' + qos + '--- associations\n' + assoc + '--- partitions\n' + parts_qos)
+    s = choose(gpu_partitions(sinfo), qos_table(qos), user_qos(assoc), partition_qos(parts_qos))
     s['FS_SCRATCH'] = scratch_dir()
     for d in (os.environ.get('HOME'), s['FS_SCRATCH']):
         if d:

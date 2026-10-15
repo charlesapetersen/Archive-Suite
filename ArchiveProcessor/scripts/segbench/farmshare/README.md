@@ -2,9 +2,40 @@
 
 Question 4 of the W41 bake-off: could Stanford's FarmShare GPUs read the whole corpus with an open-weight model,
 and how long would it take? This folder holds the answer from the panels and a Slurm job that is ready to run.
-**Nothing here has run on FarmShare.** Logging in needs the owner's SUNet ID and two-step authentication, so
-the run is `W41.farmshare-run`, the owner's step. Every pages-an-hour figure below is an **estimate**. The job
-measures the real one.
+The owner ran it on 2026-10-15 (`W41.farmshare-run`); the measured figures are in the next section, and the
+sections after it are the plan as written before the run, with its estimates.
+
+## Measured on FarmShare (2026-10-15)
+
+One L40S per run, vLLM 0.31.0, the 99 frozen truth pages from `fs_ocr.py pack`, scored as the panel scores.
+Results: [`segbench-results/farmshare/`](../../../segbench-results/farmshare/) (`summary.json` and `pages.csv` per
+run, no transcript text).
+
+| run | NES, 96 accuracy pages | answered | NES, 13 clippings | photos an hour per GPU |
+|---|---:|---:|---:|---:|
+| **`qwen3.6-27b`, fp8 KV cache (the default)** | **95.25** | 96/96 | 93.51 | **1,055** |
+| `qwen3.6-27b`, `FS_KV_DTYPE=auto` (bf16 KV cache) | 94.97 | 96/96 | | 903 |
+| `qwen3.6-27b-dyn`, fp8 KV cache | 93.17 | 94/96 | 93.60 | 649 |
+| the panel's hosted run (Chutes fp8, for comparison) | 94.28 | 95/96 | 93.71 | |
+
+- **The default is the one to use.** It answered every page and reads as well as the hosted run did on the pages
+  that one answered (95.27 completed-only). The bf16 KV cache is 14% slower for no gain. The `-dyn` preset is
+  slower still, and two pages (p053, p054) ran to the 8,192-token cap, which looks like looping; on the pages it
+  answered it scored about 95.2.
+- **At corpus scale:** 1,055 photos an hour is about 95 GPU-hours per 100,000 photos, inside the estimate of
+  55-132. The cluster allows 4 GPUs at once per user, so about a day of wall time.
+- **Newspapers, whole page** (`news`, NewsBench's 15 scored pages, its own `score.py`): **0.967 overall** (0.994
+  broadsheet, 0.949 page), against 0.970 for the best layout pipelines (`ll-doclayout-pvl`, `glm-ocr-doclayout`)
+  and 0.20-0.50 for the other whole-page models in the lab's table. Panel NES on the same pages 95.91. Two of the
+  19 pages ran to the 16,384-token cap (neither is among the 15 scored), and a page takes about 55 seconds:
+  65 newspaper pages an hour per GPU. Full table: `segbench-results/farmshare/news/newsbench-score.txt`.
+
+What it took to get there, all fixed in this folder: `limits.py` paired the `normal` partition with the `gpu` QOS,
+which `normal` refuses; `download.sh` passed three patterns to one `--exclude`, which `hf` 1.x reads as file
+names, so it fetched nothing; and FlashInfer compiles attention kernels at start-up with `nvcc`, which the GPU
+nodes lack. FarmShare's `cuda/12.9.0` module is the wrong one, since vLLM's torch is built for CUDA 13, so the job
+uses the CUDA 13 toolkit in the venv (`setup.sh` pins its compiler to torch's version; `job.sbatch` sets
+`CUDA_HOME` and the link paths).
 
 ## The candidate: Qwen3.6 27B at fp8 on one L40S
 
@@ -93,6 +124,11 @@ Whole-page vision-language models land around 0.75-0.82 overall: Qwen3-VL 8B at 
 route is probably layout-first, not a bigger whole-page model.** That pipeline is not in this job. It is filed as
 `W41.farmshare-news-layout`, and it waits on the run, because it is only worth building if the owner uses FarmShare.
 
+**The run changed this (2026-10-15).** Qwen3.6 27B whole-page scored 0.967 overall, level with layout-first (0.970)
+and well above every whole-page model in the lab's table. Layout-first still leads on the "page" measure (0.968
+against 0.949) and cannot run into the output cap that cost two pages here, so it remains worth measuring, as a
+comparison rather than a presumed win.
+
 ## FarmShare's limits (read on the cluster, not assumed)
 
 This is what the docs said on 2026-10-15 (docs.farmshare.stanford.edu, read through a fetch summary):
@@ -104,8 +140,10 @@ This is what the docs said on 2026-10-15 (docs.farmshare.stanford.edu, read thro
 - **Terms:** FarmShare is for coursework and research, *not for sponsored research or high-risk data*. Whether this
   project qualifies is the owner's call (W41.farmshare-run).
 
-The docs give no wall-time limit for the GPU QOS and no scratch quota. `limits.py` asks Slurm (`sinfo`,
-`sacctmgr`), `df` and `quota` instead. It writes `limits.env`, and `submit.sh` fits every job to it: partition,
+The docs give no wall-time limit for the GPU QOS and no scratch quota. The cluster itself reported, on 2026-10-15:
+the `gpu` QOS at 4 GPUs and 4 running jobs per user, `normal` at 1 GPU, a 2-day partition limit, and GPU nodes in
+both the `normal` and `gpu` partitions, with `normal` refusing the `gpu` QOS. `limits.py` asks Slurm (`sinfo`,
+`sacctmgr`, `scontrol` for each partition's allowed QOS), `df` and `quota` instead. It writes `limits.env`, and `submit.sh` fits every job to it: partition,
 QOS, GPUs, `--time`, and the number of bulk shards.
 
 ## Running it (W41.farmshare-run, the owner)
@@ -129,7 +167,12 @@ QOS, GPUs, `--time`, and the number of bulk shards.
    measured figure that replaces the estimate. Its `env` records the vLLM version, the node and the GPU.
 5. **If the FP8 checkpoint will not load on Ada** (an error about block-quantised fp8 kernels), use the
    `qwen3.6-27b-dyn` preset. It loads bf16 weights (56 GB) and quantises them to fp8 at load time. If vLLM will
-   not use an fp8 KV cache with Qwen3.5/3.6's hybrid attention, run with `FS_KV_DTYPE=auto`.
+   not use an fp8 KV cache with Qwen3.5/3.6's hybrid attention, run with `FS_KV_DTYPE=auto`. Neither was needed on
+   2026-10-15: the FP8 checkpoint loaded (weight-only fp8 through Marlin, since Ada has no block-fp8 kernels), and
+   both measured slower than the default. A start-up failure that names `nvcc`, `libcudart.so.12`, "headers are
+   incompatible" or "Unsupported .version" is the CUDA toolkit, not these; see the paragraph above the plan.
+   Don't run `setup.sh` again while a job is queued: a job that starts while pip is swapping the compiler mixes
+   two CUDA versions and fails.
 
 **Bulk:** `bash submit.sh bulk qwen3.6-27b --in DIR --out DIR`.
 

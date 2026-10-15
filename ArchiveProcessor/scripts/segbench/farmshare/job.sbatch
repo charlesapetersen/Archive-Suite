@@ -5,6 +5,20 @@
 set -euo pipefail
 cd "$FS_DIR"
 source fs.env; source models.sh; preset "$FS_PRESET_NAME"
+# FlashInfer compiles attention kernels (prefill, and the fp8 KV cache's) at start-up and needs nvcc. The GPU nodes
+# have none in /usr/local/cuda, and FarmShare's cuda/12.9.0 module is the wrong one: vLLM's torch is built for
+# CUDA 13, so a kernel built by 12.9 links libcudart.so.12 and fails to load (2026-10-15). The venv already holds
+# the CUDA 13 toolkit torch came with (nvidia/cu13: nvcc, headers, libcudart.so.13), so compile with that.
+FS_CUDA="$("$FS_PY" -c 'import nvidia, os; print(os.path.join(list(nvidia.__path__)[0], "cu13"))' 2>/dev/null || true)"
+if [ -x "$FS_CUDA/bin/nvcc" ]; then
+  export CUDA_HOME="$FS_CUDA" PATH="$FS_CUDA/bin:$PATH"; nvcc --version | tail -1
+  # FlashInfer links with -L$CUDA_HOME/lib64 -lcudart, but the pip toolkit keeps its libraries in lib/ and has only
+  # libcudart.so.13. GNU ld applies every -L to every -l, so add lib/ and a folder holding a libcudart.so link.
+  mkdir -p "$FS_ROOT/cuda-link"; ln -sf "$FS_CUDA/lib/libcudart.so.13" "$FS_ROOT/cuda-link/libcudart.so"
+  export FLASHINFER_EXTRA_LDFLAGS="-L$FS_CUDA/lib -L$FS_ROOT/cuda-link"
+else
+  echo "WARNING: no CUDA 13 nvcc in the venv ($FS_CUDA); FlashInfer's start-up compile will fail"
+fi
 export HF_HOME HF_HUB_OFFLINE=1 FS_GPUS   # weights were fetched on the login node; compute nodes stay offline
 start=$(date +%s)
 port=$((8100 + ${SLURM_JOB_ID:-0} % 800))

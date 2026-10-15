@@ -11159,3 +11159,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **W41.app-ocr-default-fu1 — the second reader on Gemini BATCH pages, and its spend counted [S · ~1 session]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) (lane: processor) (uses: build). From W41.app-ocr-default's adversarial review. The synchronous path sends a page Gemini refuses to a second reader (`OCRRefusalFallback`); the batch path now fails such a page WITH Gemini's finish reason (`GeminiBatchClient.parseSingleResponse`), and the operator's per-item Retry reaches the second reader, but nothing sends it automatically when batch results are collected. Do that, once per refused page. Also count what second readers spend: the pre-run estimate and the run summary leave it out (and the default 3.8 Flash's thinking tokens, ~117 a page in the W41 pilot, are not in `CostEstimator` either). Show "N pages read by a second reader" in the run summary.
   SHIPPED 2026-10-15 (checkpoint c8ff6661 + final). Gemini batch results: a refused page goes to `OCRRefusalFallback.readIfRefused` as it is collected in `processBatchResults` (direct Gemini only; the batch's prompt and previous-image setting; completed pages filtered first, so once per page); a Stop mid-read is never persisted as "second readers failed" (the kept journal brings the page back). Spend: `CostEstimator` adds 3.8 Flash's ~117 thinking tokens a page; `SecondReader.estimatedCost`; `ProcessingRun.secondReaderPages` and cost; the run summary says "N pages read by a second reader"; the pre-run pane gives the per-page price range (not in totals: the refusal count is unknown in advance). Proof: `scripts/test-ocr-refusal.sh` 37/37; batch-resume, processing-history green. Adversarial review: no blocker; Stop-cancel fix applied; rate-limit burst, Retry-after-record, thinking scope in KNOWN_ISSUES.
   <!-- /W41.app-ocr-default-fu1 -->
+- [x] **W41.farmshare-run — run it on FarmShare — OWNER** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light) (blocked-on: W41.farmshare-plan, W41.farmshare-run-owner-ok). SHIPPED 2026-10-15.
+  The owner logged in (a shared SSH connection) and an interactive Claude session drove the README's steps on one
+  L40S each, vLLM 0.31.0. Truth set, 96 accuracy pages: `qwen3.6-27b` with the fp8 KV cache 95.25 NES, 96/96
+  answered, 1,055 photos an hour per GPU (about 95 GPU-hours per 100,000 photos, inside the 55-132 estimate); bf16
+  KV cache 94.97 at 903 an hour; `qwen3.6-27b-dyn` 93.17, 94/96 (p053 and p054 ran to the 8,192-token cap) at 649.
+  The hosted panel run of the same model was 94.28, 95/96 (95.27 on the pages it answered). NewsBench whole-page:
+  0.967 overall (0.994 broadsheet, 0.949 page) on its 15 scored pages against 0.970 for layout-first; two of 19
+  pages hit the 16,384-token cap; 65 newspaper pages an hour. Four kit bugs found and fixed with this commit:
+  `limits.py` paired the `normal` partition with the `gpu` QOS (refused; it now reads each partition's AllowQos,
+  with a test from the cluster's own output that fails on the old pairing), `download.sh`'s three-pattern
+  `--exclude` fetched nothing under `hf` 1.33, and FlashInfer's start-up compile needed `nvcc` matched to torch's
+  CUDA 13.0 (the `cuda/12.9.0` module built kernels needing libcudart.so.12; pip's 13.4 nvcc, crt and nvvm clashed
+  with the 13.0 headers and ptxas), now pinned by `setup.sh` and pointed to by `job.sbatch`. Results:
+  `ArchiveProcessor/segbench-results/farmshare/`; detail: the kit README §"Measured on FarmShare". No money spent.
+  <!-- /W41.farmshare-run -->

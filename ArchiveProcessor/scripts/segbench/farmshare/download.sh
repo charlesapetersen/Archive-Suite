@@ -12,5 +12,7 @@ fi
 # Public Apache-2.0 repos: no Hugging Face token needed.
 bin="$(dirname "$FS_PY")"
 cli="$bin/hf"; [ -x "$cli" ] || cli="$bin/huggingface-cli"   # huggingface_hub 1.x renamed the CLI to hf
-"$cli" download "$FS_MODEL" --exclude '*.gguf' '*.pth' 'original/*'
+# One pattern per --exclude: hf 1.x takes a single value per flag and reads any further words as FILE NAMES, so
+# "--exclude a b c" downloaded nothing at all on 2026-10-15 ("Fetching 0 files").
+"$cli" download "$FS_MODEL" --exclude '*.gguf' --exclude '*.pth' --exclude 'original/*'
 du -sh "$HF_HOME"
