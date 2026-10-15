@@ -15,11 +15,12 @@ enum DocumentClassification: String, CaseIterable {
             if !condition { failed += 1; print("FAIL: \(name)") }
         }
 
-        // These are the owner's panel rulings, applied to TASK 3 in every context variant.
+        // These are the owner's panel rulings, applied to TASK 3 in every context variant. The ruling to leave
+        // out other sheets and folders is the existing foreground paragraph, checked below: a separate TASK 3
+        // sentence for it moved the default model's p062 classification (segbench-results/ocr-prompt-app.md).
         let rules = [
             "Transcribe everything on this sheet of paper, including headers, footers, citations, stamps and copyright lines that a database or archive added to the page.",
-            "Leave out only text on a different sheet that shows in the photograph: a page underneath or beside this one, or a folder behind it.",
-            "Write each bullet point as \"*\". Leave out empty checkboxes and other symbols that are not text.",
+            "Leave out empty checkboxes and other symbols that are not text.",
             "Write [illegible] for a word that cannot be read."
         ]
         for previous in [nil, "", "Earlier page ended here."] as [String?] {
@@ -31,8 +32,11 @@ enum DocumentClassification: String, CaseIterable {
                         .components(separatedBy: "FORMAT —").first ?? ""
                     for rule in rules { check("TASK 3 includes: \(rule)", task3.contains(rule)) }
                     check("foreground labels still transcribed", task3.contains("For a box-label or folder-label photograph, transcribe the foreground box or folder label."))
-                    check("foreground scope retained", prompt.contains("focus ONLY on the foreground page"))
+                    check("foreground scope retained", prompt.contains("For classification and transcription, focus ONLY on the foreground page — ignore any background pages or partially visible documents."))
+                    check("no separate other-sheet sentence", !task3.contains("different sheet"))
                     check("no KIND field", !prompt.contains("KIND"))
+                    // Owner, 2026-10-14 walkthrough: bullets are not worth a rule in this prompt.
+                    check("no bullet rule", !prompt.lowercased().contains("bullet"))
                     check("response shape retained", prompt.contains("[classification_tag]\n[rotate_N]\n(transcribed text)"))
                     check("custom context retained", prompt.contains("ADDITIONAL CONTEXT") == (custom == "Collection context."))
                     check("previous text retained", prompt.contains("Previous page's text ended with:") == (previous == "Earlier page ended here."))

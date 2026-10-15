@@ -44,8 +44,7 @@ struct OCRPrompt {
         TASK 3 — TRANSCRIBE all visible text exactly as it appears, preserving formatting and layout. No commentary.
         For a box-label or folder-label photograph, transcribe the foreground box or folder label.
         Transcribe everything on this sheet of paper, including headers, footers, citations, stamps and copyright lines that a database or archive added to the page.
-        Leave out only text on a different sheet that shows in the photograph: a page underneath or beside this one, or a folder behind it.
-        Write each bullet point as "*". Leave out empty checkboxes and other symbols that are not text.
+        Leave out empty checkboxes and other symbols that are not text.
         Write [illegible] for a word that cannot be read.
 
         FORMAT — Your response MUST begin with the classification tag on line 1, rotation tag on line 2, then the transcribed text:

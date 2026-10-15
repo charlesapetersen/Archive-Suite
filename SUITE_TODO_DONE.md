@@ -10837,3 +10837,29 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   that names it.
   The original brief: **W41.ocr-smoke-term — Processor smoke exits when TERM is inherited blocked [S]** (lane: processor) (uses: build). Confirmed on baseline `7f3e66a7` during W41.ocr-prompt-app: `ArchiveProcessor/test-smoke.sh` launches its headless child with the engine's inherited signal mask, then its `{ kill "$pid"; wait "$pid"; }` cleanup waits forever even after `ProcessFilesTestDriver` writes TEST_DONE (2 succeeded, 0 failed; two PDFs). W40.a3 fixed the same inherited-TERM problem in the phone E2E launcher, but this script still has it. Unblock TERM in the smoke child before exec and bound cleanup of the verified owned child; prove both graceful and ignored-TERM teardown on scratch, then run smoke from a blocked-TERM parent and require it to exit by itself with its marker/PDF assertions. No weakening the assertions or blanket process cleanup. W41.ocr-prompt-app's first two completed smoke children needed an ownership-checked KILL; a signal-normalized invocation verifies that item's final change without altering this harness's semantics. A second confirmed defect in the same script's assertion block: the marker "Done. 1 succeeded, 1 failed" and an API-502 placeholder PDF still report PASS (it checks only a marker not prefixed ERROR and ≥1 PDF). Require zero failed jobs and the expected successful outputs, with a deliberately failed-job fixture proving the check goes red.
   <!-- /W41.ocr-smoke-term -->
+- [x] **W41.ocr-prompt-app — the app's transcription instruction follows the owner's rulings** · §Archive Processor — transcription and segmentation bake-off on OpenRouter … SHIPPED 2026-10-14
+  `OCRPrompt.build` TASK 3, after its original opening: foreground box/folder labels; everything on the sheet incl.
+  headers, footers, citations, stamps and database/archive copyright lines; empty checkboxes and non-text symbols
+  left out; `[illegible]`. The other-sheet ruling is the existing foreground paragraph. TASK 1/2, FORMAT, context and
+  parser unchanged; no KIND. Checkpoint 1 (`50157846`) also had a bullet rule and a separate other-sheet sentence;
+  its p062 continuation→start drift went to the owner (W41.ocr-prompt-app-owner-ok), who rejected it: resolve it or
+  show it is noise without touching TASK 1, and drop the bullet rule.
+  Stability work (app-faithful Gemini request at default temperature; corpus neighbours copied read-only): p062
+  (page 4 of an *Inteleads* issue whose cover is `00292`) is a fence page. Read alone, the separate other-sheet
+  sentence pushed it to start (0/6 vs baseline 3/6); dropping it gives 7/12. With the previous image every prompt
+  says continuation 4/4. With only the cover's 200-char text, ANY TASK 3 addition tips it to start (final 0/12,
+  each single line 0/6, vs baseline 8/12). The deciding test is a real folder sequence (20 consecutive photos,
+  chained context, each prompt twice): before-vs-final disagreement 3–5 pages, the same as run-to-run (4 and 4),
+  final slightly fewer continuations (9, 9 vs 10, 14) — within noise at this size. p062 is continuation in all four runs. 16 further truth pages alone: 16/16 identical classification and
+  rotation. Headers/footers kept on p010/p081; p048's neighbouring sheet excluded.
+  Regression `scripts/test-ocr-prompt.sh` 314/314; baseline 218/314 and checkpoint 1 266/314, both exit 1.
+  Processor Debug build clean; `scripts/test-dual-date.sh` passes. The app's whole-scheme smoke script is denied by
+  the unattended no-host-gui hook and was not run for checkpoint 2 (checkpoint 1's scratch smoke passed; this
+  checkpoint only deletes two prompt sentences). An adversarial review caught a mislabelled comparison row
+  (fixed before shipping). Cost: $0.4418 for 326 calls + $0.0172 in checkpoint 1, item ≈$0.46 token-derived.
+  Evidence: `ArchiveProcessor/segbench-results/ocr-prompt-app.md`; private data `/tmp/w41-ocr-prompt-app/`.
+  The original brief: **W41.ocr-prompt-app** (lane: processor) (uses: build). Owner, 2026-10-14: the rulings in
+  W41.ocr-panel-local's prompt are for the app too. DONE WHEN (as written, bullets later dropped by the owner):
+  each ruling stated; a check red without them; a before/after on p010, p081, p062 and a handwritten letter keeps
+  headers/footers and leaves classification and rotation unchanged; the suite passes; a CHANGELOG entry.
+  <!-- /W41.ocr-prompt-app -->

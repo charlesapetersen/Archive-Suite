@@ -15,10 +15,14 @@ PDF per input to agree that every input succeeded. Proof: `scripts/test-smoke-te
 ## ✅ FIXED (W41.ocr-prompt-app): transcription scope was underspecified
 
 `OCRPrompt.build` TASK 3 now states the owner's rules for the whole foreground sheet, including archive
-and database additions, `*` bullets and `[illegible]`; background sheets and non-text symbols are excluded.
+and database additions and `[illegible]`; background sheets and non-text symbols are excluded.
 Foreground box/folder labels remain transcribed. The classification/orientation tasks and response parser
 are unchanged. Regression: `scripts/test-ocr-prompt.sh` (also in the app's smoke test); live comparison:
 `segbench-results/ocr-prompt-app.md`. This changes the instruction, not a guarantee of every model's recall.
+The other-sheet ruling lives in the existing foreground paragraph only: a separate TASK 3 sentence for it
+moved the default model's start/continuation call on p062 read alone (measured, same file). That call is
+sensitive to any TASK 3 wording on such a page, and run-to-run noise in a real folder sequence is ~4 pages in
+20 for every prompt, old and new alike. With the previous image, every version gets p062 right.
 
 ## ✅ FIXED (W40.a3): E2E inherited processing preferences and a blocked shutdown signal
 

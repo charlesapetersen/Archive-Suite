@@ -380,7 +380,7 @@ existing scratch, key-free, no-network execution remains unchanged.
 
 - **`test-ocr-prompt.sh`** — $0 standalone check of the production `OCRPrompt.build` and response parser:
   the owner's foreground-sheet transcription rules in every context variant, all classification/rotation
-  tags, and verbatim preservation of headers, footers, bullets and `[illegible]`. Included in the app's
+  tags, and verbatim preservation of headers, footers and `[illegible]`, and that no bullet rule is present. Included in the app's
   `test-smoke.sh`; no app launch, key, network or corpus is needed.
 - **`test-smoke-teardown.py`** — $0 proof of the app-dir `test-smoke.sh`'s own teardown and pass/fail oracle,
   run from a parent that blocks TERM as the engine does: graceful, TERM-ignoring and exited children, the
