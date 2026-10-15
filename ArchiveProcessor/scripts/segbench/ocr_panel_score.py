@@ -176,7 +176,7 @@ def report():
          'Reproduce: `ocr_panel.py prepare`, `collect --probe`, `collect`, `vision` (under the heavy lock), then '
          '`ocr_panel_score.py`. Inputs, catalogs, raw responses, reservations and page scores: '
          '`~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-local/` (outside git).', '',
-         f'Total measured OpenRouter spend, every attempt: **${P.spent():.6f} / $2.00 cap**. '
+         f'Conservative OpenRouter budget accounting, every attempt: **${P.spent():.6f} / $2.00 cap**. '
          'Each row pins one endpoint and precision; temperature 0, reasoning off (Flash-Lite minimal; '
          'the VL Instruct/Mistral endpoints have no reasoning control). No paid retries.', '',
          '## Scoring and limits', '',
@@ -238,9 +238,17 @@ def report():
           'ladder membership and every tag (overlapping groups). Small groups are descriptive, not reliable rankings. '
           'Page/folder/file identity fields are private; the per-page table allows any further grouping.', '',
           '## Pinned routes and measured costs', '',
-          '| model | endpoint | precision | charged calls | failures | $/call (all charged calls) | mean input/output tokens |',
+          '| model | endpoint | precision | accounted calls | failures | $/call (charges + uncertain ceilings) | mean input/output tokens |',
           '|---|---|---|---:|---:|---:|---:|']
     calls = P.records()
+    uncertain = [r for r in calls if r.get('cost_upper_bound')]
+    if uncertain:
+        upper = sum(r['cost'] for r in uncertain)
+        L += ['', f'**Billing uncertainty:** {len(uncertain)} provider errors had no usage; generation lookups returned 404. '
+              f'Reported charges are ${P.spent()-upper:.6f}; an additional ${upper:.6f} (their full pre-call reservations) '
+              'is counted as a conservative ceiling against the cap. Cost columns include these ceilings and are not '
+              'all measured charges. These failed calls are cached and never retried. Raw errors and lookup evidence '
+              'remain in the private cache.']
     for k, spec in P.MODELS.items():
         rr = [r for r in calls if r['key'] == k and r['status'] in ('ok', 'failed')]; n = len(rr)
         L.append(f"| {k} | {spec[1]} | {spec[2] or 'unpublished'} | {n} | {sum(r['status']=='failed' for r in rr)} | "
