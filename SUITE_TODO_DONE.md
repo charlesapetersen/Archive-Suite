@@ -11133,3 +11133,21 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   a guessed QOS, fractional --hours) and the `hf` CLI rename; all fixed with tests. Nothing ran on FarmShare and no
   money was spent. Commits: 4a1ff46d and this one.
   <!-- /W41.farmshare-plan -->
+- [x] **W41.report — the answers** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · (lane: docs) (uses: light) · SHIPPED 2026-10-15
+  `ArchiveProcessor/segbench-results/W41-answers.md`: the four questions in order, from the shipped result files, no new
+  runs and no money. (1) By memory: 18 GB Qwen3-VL 8B 4-bit (91.81 hosted bf16); 32 GB Qwen3.6 27B 4-bit (94.28 hosted
+  fp8; 4-bit penalty unmeasured); 48-64 GB the 27B at 8-bit; bigger models did not read better; speed is bandwidth
+  arithmetic only. (2) Paid order: Claude Sonnet 5.5 (96.47, subscription), Gemini 3.8 Flash as the paid default (94.47,
+  $3.22/1,000; a drafter of the truth), Qwen3-VL 235B as best value (93.95, $1.22), Gemini 3.5 Flash-Lite as budget;
+  by kind: handwriting Gemini 3.8 Flash, printed and forms Claude or Qwen, typewriting any; every Gemini route refused
+  the same two printed pages, which explains its printed/1900-1949/table dips; at quarter resolution only Gemini held.
+  (3) Segmentation: Gemini 3.8 Flash only stays best; GLM-5.3 Flash is the one budget option; open-weight Qwen3.5 27B
+  95.0% on Deaver only, not offered yet. (4) Whole corpus: paid photos $122 (Qwen 235B) to $322 (Gemini 3.8 Flash),
+  newspapers about $1,100-2,600 (estimate); subscription about five weeks of the owner's weekly Claude window for the
+  photos (inferred from the OCR token counts and `usage.md`'s ratio); FarmShare $0 and 55-132 GPU-h per 100k photos
+  (the plan's estimate: W41.farmshare-run has not run), with the six things that run must confirm.
+  Subscription OCR notional price computed from the 99 `claude -p` replies' token counts: $0.051 a page.
+  Filed, each its own item: W41.app-ocr-default, W41.app-ocr-hierarchy, W41.app-openrouter, W41.mac-local-measure,
+  W41.app-local-models (blocked-on W41.mac-local-measure), W41.app-seg-default, W41.app-farmshare-import (blocked-on
+  W41.farmshare-run). An independent fact-check of every figure against its source file preceded the commit.
+  <!-- /W41.report -->
