@@ -23,7 +23,9 @@ answer before moving to the next.** It is a conversation he steers. That is the 
 **❌ Do NOT do any of these — each one has actually happened and is a failure, not a variation:**
 - ❌ **Do not write a new entry into the plan.** Being asked for the report is not a cue to author one.
   Nothing is added to any doc *during* the walkthrough.
-- ❌ **Do not dump a summary** of everything that happened, however well organised. A recap is not a report.
+- ❌ **Do not let the account of the work replace the decisions.** The full account of the work comes first
+  (`~/Claude/CLAUDE.md` step 3, owner 2026-10-15: detailed, read from the commit bodies), then the decisions
+  one at a time. A recap with no decisions walked is not a report.
 - ❌ **Do not batch the decisions** into one message with a numbered list and a single "what do you think?".
   One decision per message. Stop. Wait.
 - ❌ **Do not re-raise settled items.** Anything under a `### ✅ … walkthrough` heading, or in
@@ -38,7 +40,7 @@ answer before moving to the next.** It is a conversation he steers. That is the 
    through the holds hook. For the detail of each entry, read `## Daemon Report` in
    `.maintenance/AUTONOMOUS_PLAN.md` (newest-first). It is the **input** to the walkthrough, never the output. Stop
    at the newest `### ✅ … walkthrough` heading — everything below it is already settled. The full cross-project
-   procedure (a brief description of the work first, usage as a share of the weekly window, `walkthrough --mark`
+   procedure (a full account of the work first, read from the commit bodies, usage as a share of the weekly window, `walkthrough --mark`
    when the owner opts in to recording) is in `~/Claude/CLAUDE.md`, section "The walkthrough".
 2. Add anything from the current session that genuinely needs his call.
 3. Say up front how many open decisions there are ("three, walking them one at a time").
