@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 46 · broken 1 · unreachable 1` (broken: N-12; unreachable: N-48). Updated by `W40.d9`, 2026-10-15.
+- **Count:** `unproven 43 · works 2 · broken 2 · unreachable 1` (works: N-34, N-45; broken: N-12, N-44; unreachable: N-48). Updated by `W40.d10`, 2026-10-15.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -1017,10 +1017,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   (seeds a plain-text link, clicks the real Edit-menu item, reads the `.md` back);
   `ArchiveNotesTests/SourceBlockPasterTests.testScanURLsMultipleLines` and `.testPayloadMultipleEntries`
   (parser only).
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): a page link copied with Document ▸ Copy Archive Link to This Page in the real Reader (string plus the Reader UTI payload) and pasted with Edit ▸ Paste as Source Block(s) became one `reader-page` block with its link, `display: "pages — p.3"` and `page: 3`. 2 of 2 VM runs. The plain-text route (G5) passed in the `W40.a3` full suite.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d10 — runtime evidence with the real Reader; `works`. The plain ⌘V route and a multi-link paste are still untested.
 - **Notes:** `W9.e2-paste`: `testG5_…` ran 24/24 VM-green (`TEST_ITERATIONS=3`), commit `7ae8f24` (checkpoint
   `0d3df02`). No test covers the plain-⌘V route or a Reader UTI payload pasted in the GUI. In an extract the
   paste is declined and the text goes in as plain text (`Editor/MarkdownEditorView.swift:601`, §D7). That is by
@@ -1040,10 +1041,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `showInlineImagesOnceWritten` (`Editor/MarkdownEditorView.swift:640-650`).
 - **Real-path test:** `ArchiveNotesUITests/NotesE2PasteTests.testE2_PastedPageLinkShowsARenderedThumbnail`;
   `ArchiveNotesTests/SourceBlockThumbnailRendererTests.rendersInkyPageToPNG` and `.skipsRenamedCandidate`.
-- **Runtime evidence:** none
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): the block pasted from the real Reader stored `assets/p3-thumb.png`, and the thumbnail drew the page. 2 of 2 VM runs.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d10 — thumbnail drawn for a link pasted from the real Reader; stays `unproven`: that paste carried Reader's own thumbnail payload, so the link-only render was not isolated.
 - **Notes:** in `W9.e2-paste`, `testE2_PastedPageLinkShowsARenderedThumbnail` failed first: a fresh chip showed
   "Missing" until the note was reloaded. It was fixed in the same item (`showInlineImagesOnceWritten`) and then
   passed. A thumbnail embedded in a Reader UTI payload skips the renderer. It is size-capped at 5 MB of base64
@@ -1064,10 +1066,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   drives the same `onReveal` closure through a DEBUG seam rather than the chip button, and under a UITest launch
   the URL is recorded, not opened. `ArchiveNotesUITests/NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover`
   reaches Preview, also through the seam (`an.editor.test.preview`).
-- **Runtime evidence:** none
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): Reveal on a block pasted from the real Reader brought Reader forward and opened `pages.pdf` at "page 2 of 3", the pair holding the linked PDF page 3. Driven through the `an.editor.test.reveal` seam (same `onReveal` closure), with `-ANUITestRealWorkspaceOpen` so the URL went to the OS. 2 of 2 VM runs.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d10 — Reveal reaches the real Reader at the page; stays `unproven`: Preview was not driven, and Reveal with Reader not running was not covered.
 - **Notes:** W9.e2 had no Reveal result. Preview showing the PDF is part of
   `NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover` (`W9.e2-paste`). Clicking the chip buttons
   and a real Reader launch (G6) are left to the owner per §17. Notes only hands Reader the URL. Whether Reader
@@ -1261,10 +1264,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG16_NoteZoteroAttachmentChipsAndClipboardDedup`;
   `ArchiveNotesUITests/NotesGUITests.testG11_ZoteroChipDispatchesSelectLink`;
   `ArchiveNotesTests/ZoteroClipboardDetectTests.dedupCanonical`.
-- **Runtime evidence:** none
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): a note-level attachment fetched its citation from the real Zotero 10.0.6 local API (APA: `Lovelace, A. (1843). Notes on the Analytical Engine (W40.d10 seed). Richard and John E. Taylor.`), and the chip's open raised Zotero with the item selected. 2 of 2 VM runs.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d10 — real Zotero citation and Open in Zotero shown; stays `unproven`: the clipboard offer and Zotero-not-running were not driven against the real Zotero.
 - **Notes:** **Drift:** the citation fetch, spinner and Retry exist only on the note-level inspector path. A
   block attached through Note ▸ Attach Zotero Link… (or the clipboard banner's Attach) shows `ref.citation ??
   itemKey` (`Editor/EditorFormatting.swift:217-218`). Nothing fetches a citation for it except Auto-fill (N-44):
@@ -1290,10 +1294,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG15_AutoFillFromZoteroShowsDiffCancelNoOpAndWritesAcceptedFields`;
   `ArchiveNotesTests/ZoteroAutoFillTests.modelCancelWritesNothing`, `.planFillEmpty` and
   `.attachedReferenceResolverRejectsAmbiguousNote`.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): against the real Zotero, Note ▸ Auto-fill from Zotero… crashes Notes (SIGABRT in `ZoteroClient.fetchCSLviaLocalAPI`; Zotero returns `csljson` as a string holding an array). 2 of 2 VM runs, plus the crash report.
+- **Status:** `broken` — `W40.fix-notes-zotero-csljson-crash` (S2)
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d10 — reproduced against the real Zotero; `broken`, filed `W40.fix-notes-zotero-csljson-crash` (S2).
 - **Notes:** `W9.e2-zotero` ran `testG15_AutoFill…` (attach → Cancel writes nothing → Apply writes only the
   accepted date plus the configured-style citation) through the DEBUG in-process transport. There are two
   `testG15_…` tests; this row means the AutoFill one. A citation fetch that fails does not block Auto-fill
@@ -1315,10 +1320,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `ArchiveNotesUITests/NotesE2LinkTests.testE2_ContextMenuCopyLinkNamesTheClickedRow`;
   `ArchiveNotesTests/NotesTagProjectorSafetyTests.copyOpenLinkWritesPlainTextURL` (declared in
   `NoteMetadataEditingTests.swift`).
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): Note ▸ Copy Link wrote `archivenotes://open?id=22222222-…` as plain text, and that URL opened the note. 2 of 2 VM runs. The row-menu Copy Link test passed in the `W40.a3` full suite ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d10 — runtime evidence; `works`. Scrivener taking the link stays with the owner (§17).
 - **Notes:** `W9.e2-links` found Note ▸ Copy Link disabled with a note selected (`W9.e2-fu2`) and fixed it in that
   item. `NotesE2LinkTests` (menu and row-menu Copy Link) then passed 10/10, commit `83a117c` (checkpoint
   `b8c596d`). W9.e1 had rated B9 PARTIAL (the closed-window case), which led to `W9.b5-fu1`. Whether Scrivener
@@ -1339,10 +1345,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesE2LinkTests.testE2_CopyLinkRoundTripSelectsTheLinkedNote` (hands the
   URL to the running app through Launch Services, with the Notes window open);
   `ArchiveNotesTests/NotesDeepLinkRouterTests.forwardsAfterIndexReady` (declared in `ReaderLinkResolverTests.swift`).
-- **Runtime evidence:** none
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): the copied URL handed to the OS with no app named (Launch Services picks the app by scheme) selected and loaded the note with the Notes window open, with every window closed, and with only Extracts open. 2 of 2 VM runs. Suspect `S-013` cleared.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d10 — OS-dispatched link shown in three window states, `S-013` cleared; stays `unproven`: a link arriving while Notes is not running, and `#block-n`, were not driven.
 - **Notes:** W9.e1 rated this PARTIAL, which led to `W9.b5-fu1` (`testG15_OpenRequestOpensTheClosedFeaturingWindow`).
   That test covers the in-app open request, not an external URL. In `W9.e2-links`, `NotesE2LinkTests` handed the
   copied URL to the running app through Launch Services, and it re-selected and loaded the note. Only the Notes

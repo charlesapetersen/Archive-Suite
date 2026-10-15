@@ -193,6 +193,9 @@ final class IntegrationJourneyUITests: NotesFixtureUITestCase {
                 return raw.contains("rel=pages.pdf") && raw.contains("page=\(page)")
             }, "the pasted link should be saved as a source block; got \(raw)")
             print("[d10] note after paste:\n\(raw)")
+            let thumb = Self.fixturePath + "/items/\(Self.idPlain)/assets/p\(page)-thumb.png"
+            XCTAssertTrue(pollUntil(timeout: 8) { FileManager.default.fileExists(atPath: thumb) },
+                          "the pasted page's thumbnail should be stored beside the note")
             shot(app.windows["Archive Notes"], "d10-reader-link-pasted")
 
             // Notes → Reader: Reveal that block. Reader is running, so Launch Services hands it the link.

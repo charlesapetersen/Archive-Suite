@@ -30,6 +30,16 @@ fixed: entry above.)
 - **A failed inline-image write is only logged** (`W40.fix-notes-asset-write-silent`, S3). This is residual (a) of
   the W7-S5 entry below, now confirmed in the running app.
 
+## 🔴 OPEN (W40.d10, 2026-10-15) — Auto-fill from Zotero crashes Notes against a real Zotero
+
+With a real Zotero (10.0.6, local API on, no Better BibTeX), Note ▸ Auto-fill from Zotero… aborts the app: Zotero
+returns `csljson` as a string holding an array, and `ZoteroClient.fetchCSLviaLocalAPI` passes it to
+`JSONSerialization.data(withJSONObject:)`, which raises (`W40.fix-notes-zotero-csljson-crash`, S2). Until it is
+fixed, do not use Auto-fill. Attaching a reference, its citation and Open in Zotero all work against the real
+Zotero. Reproduced by `ArchiveNotesUITests/IntegrationJourneyUITests.testD10_2_AutoFillFromRealZotero` in
+`NOTES_JOURNEY=integrations ops/gui/vm-gui-runner.sh notes xcuitest`, carried there as a non-strict
+`XCTExpectFailure`. Evidence: `verification/evidence/notes/W40.d10-integrations.md` at the suite root.
+
 ## GUI fixture order — regression coverage (W40.a3, 2026-10-11)
 
 `W35.vm-mem-fu1` already restores `AN-GUI-Fixture.pristine` before every test; G19's Trash operation

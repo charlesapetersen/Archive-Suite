@@ -196,7 +196,9 @@ where it can.
   `WritingJourneyUITests`, evidence `verification/evidence/notes/W40.d9-writing.md`; filed
   `W40.fix-notes-outside-edit-overwrite` (S1), `W40.fix-notes-return-paragraph`, `W40.fix-notes-asset-write-silent`.)*
 - **`W40.d10` — Notes integrations [M].** Real Zotero installed in the VM, auto-fill and attach; real Reader
-  launch and deep links both ways; Copy Link; an inbound `archivenotes://` URL dispatched by the OS.
+  launch and deep links both ways; Copy Link; an inbound `archivenotes://` URL dispatched by the OS. *(SHIPPED
+  2026-10-15: `IntegrationJourneyUITests` in `NOTES_JOURNEY=integrations ops/gui/vm-gui-runner.sh notes xcuitest`,
+  evidence `verification/evidence/notes/W40.d10-integrations.md`; filed `W40.fix-notes-zotero-csljson-crash`.)*
 - **`W40.d11` — the shared contract across apps [S-M].** Open `W40.d1`'s output in the Reader; tags, dates,
   quality and classification must read as written. Make a Notes source block from one of them.
 

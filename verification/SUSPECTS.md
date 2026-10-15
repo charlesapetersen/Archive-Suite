@@ -275,9 +275,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   Confirmed if within 15 s the Notes window does not exist or its editor does not show the linked note. Run it a
   second time with both windows closed.
 - **Would clear it:** in both runs the Notes window opens with the linked note loaded.
-- **Status:** `open`
+- **Status:** `cleared` — `W40.d10`, [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md)
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-10-15 W40.d10 — cleared: `IntegrationJourneyUITests.testD10_4_CopyLinkOpenedByTheOS` handed the copied link to the OS (no app named) with every window closed and again with only Extracts open; both times the Notes window opened on the linked note. 2 of 2 VM runs.
 
 ### S-014 · A recorded archive root that is no longer at its path reports "Source file not found"
 
