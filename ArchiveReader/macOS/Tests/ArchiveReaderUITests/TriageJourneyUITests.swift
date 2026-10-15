@@ -54,6 +54,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
         if let name = smartFolderName, app != nil, app.state == .runningForeground {
             deleteSmartFolder(named: name)
         }
+        if app != nil, app.state == .runningForeground { restoreMinimumWindowSize() }
         app?.terminate()
         restoreBaseline()
         try await super.tearDown()
@@ -292,8 +293,25 @@ final class TriageJourneyUITests: FixtureUITestCase {
         return focused
     }
 
+    /// The window frame PERSISTS in the app's defaults, also in UI-test mode, and `LayoutGuardUITests` is
+    /// written against the window the app opens by default: its 900×612 minimum. Leaving it zoomed made the
+    /// next run's layout guard measure a full-screen window. So shrink it back to its minimum before quitting:
+    /// drag the bottom-right corner onto the top-left, and the window clamps at its minimum size.
+    private func restoreMinimumWindowSize() {
+        let window = app.windows["Archive Reader"]
+        guard window.exists else { return }
+        let before = window.frame.size
+        app.activate()
+        let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -3, dy: -3))
+        corner.press(forDuration: 0.3, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)))
+        _ = waitFor(timeout: 3) { window.frame.width < before.width }
+        let after = window.frame.size
+        log("[d8] window restored to its minimum: \(Int(before.width))×\(Int(before.height)) → \(Int(after.width))×\(Int(after.height))")
+        XCTAssertLessThanOrEqual(after.width, 960, "teardown should leave the window at its minimum width for the next class")
+    }
+
     /// The window opens at about 900 pt wide, which clips the Tags column at its right edge; a click on a
-    /// tag cell's centre then lands outside the window. Zoom it to the screen.
+    /// tag cell's centre then lands outside the window. Zoom it to the screen (tearDown shrinks it back).
     private func zoomMainWindow() {
         let window = app.windows["Archive Reader"]
         let before = window.frame.width
