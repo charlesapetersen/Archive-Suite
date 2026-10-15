@@ -302,3 +302,20 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+
+### S-015 · The list's `[`, `]` and `\` keys may fire inside the inline tag editor, and `\` would mark a file Read
+
+- **Raised:** 2026-10-14 · W40.d8 · journey observation plus code reading.
+- **Suspected behaviour:** while typing in a row's inline tag editor, `]`/`[` move the selection and `\` runs Mark
+  Read & Advance, which writes the Read tag to the selected file. A tag write from a key typed into a text field
+  is on an irreversible path. The same handler block's Space key was reproduced firing there (`W40.fix-reader-inline-keys`).
+- **Where:** `ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift:149-157` (the
+  `.onKeyPress` cluster on the `AppKitTableView`, beside the Space handler at `:140`); ledger `R-20`, `R-23`.
+- **Would confirm it:** in `TriageJourneyUITests`, focus a row's tag editor with the row already selected, type
+  `]`, and check the selection moved. W40.d8 tried it once from an unselected row and the editor never took
+  focus, so that run proves nothing either way.
+- **Would clear it:** the editor keeps focus and the `]` lands in the field. Fixing
+  `W40.fix-reader-inline-keys` should clear it at the same time, because it is the same handler path.
+- **Status:** `open`
+- **History:**
+  - 2026-10-14 W40.d8 — raised.

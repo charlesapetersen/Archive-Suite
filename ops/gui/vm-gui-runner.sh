@@ -251,6 +251,12 @@ ensure_fixture() {
     *) warn "could not read the fixture build's exit status back from the guest — that is tart's transport,
     NOT necessarily the build. The presence check below is the real verdict." ;;
   esac
+  # A journey root is real-corpus sample material: never run the journey on a root whose copy check failed.
+  # The builder writes its note last, after that check, so its absence is the verdict (W40.d8).
+  if [ "${READER_JOURNEY:-}" = "rehearsal" ]; then
+    tart exec "$VM" bash -lc "[ -f '$GUEST_FIXTURE/.w40-journey-set.txt' ]" >/dev/null 2>&1 \
+      || die "the journey root was not built (make-journey-fixture.sh failed; output above) — not running the journey."
+  fi
   tart exec "$VM" bash -lc "[ -d '$GUEST_FIXTURE' ]" >/dev/null 2>&1 \
     || warn "fixture STILL absent after the build attempt — fixtured UITests will FAIL in setUp (W40.a4: they no longer skip)."
 }

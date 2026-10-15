@@ -98,21 +98,37 @@ final class TriageJourneyUITests: FixtureUITestCase {
         }
         let cell = table.tableRows.element(boundBy: bRow).descendants(matching: .any)["ar.cell.tags.\(b.name)"]
         XCTAssertTrue(cell.waitForExistence(timeout: 5), "row \(bRow) should expose its tag token field")
-        clickRow(bRow)
-        // A click in a SELECTED row's token field starts editing. It must come after the double-click
-        // interval, or the table reads the two clicks as a double-click and opens the document instead.
-        var focused = false
-        for _ in 0..<3 where !focused {
-            RunLoop.current.run(until: Date().addingTimeInterval(1.2))
-            cell.click()
-            captureScreenshot("w40-d8-inline-click")
-            focused = waitFor(timeout: 2) {
-                (cell.value(forKey: "hasKeyboardFocus") as? Bool) == true
-                    || cell.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).count > 0
+        // (2a) First, a Space typed into the editor must type a space, not open the Preview sheet (R-20: the
+        // list's bare keys never fire inside a text field; R-23: subjects are often two words). Reproduced
+        // broken 2026-10-14. If the field kept the space, a Backspace takes it back, so a fixed app ends
+        // this step with the tags unchanged.
+        let focusedA = focusInlineEditor(row: bRow, name: b.name)
+        captureScreenshot("w40-d8-step2-focus")
+        XCTAssertTrue(focusedA, "a click in the row's Tags cell should start editing it")
+        log("[d8]   inline editor took keyboard focus: \(focusedA ? "yes" : "NO")")
+        if focusedA {
+            app.typeKey(.rightArrow, modifierFlags: .command)
+            app.typeText(" ")
+            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+            // The Preview sheet is the only place a "1 of N" page counter appears.
+            let previewOpened = app.staticTexts.matching(
+                NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", "1 of ", "1 of ")).count > 0
+            log("[d8] step 2a Space typed in the inline editor opened the Preview sheet: \(previewOpened ? "YES (broken)" : "no")")
+            captureScreenshot("w40-d8-inline-space")
+            let known = XCTExpectedFailure.Options(); known.isStrict = false
+            XCTExpectFailure("W40.fix-reader-inline-keys (S2): the list's Space handler fires inside the inline tag editor",
+                             options: known) {
+                XCTAssertFalse(previewOpened, "R-20/R-23: Space in the inline tag editor must not open the Preview sheet")
             }
+            if previewOpened { app.buttons["Done"].firstMatch.click() } else { app.typeKey(.delete, modifierFlags: []) }
+            app.typeKey(.escape, modifierFlags: [])
+            RunLoop.current.run(until: Date().addingTimeInterval(1.0))
+            before = check("2a Space in the inline editor writes nothing", from: before, expect: [:])
         }
-        XCTAssertTrue(focused, "a click in the row's Tags cell should start editing it")
-        log("[d8]   inline editor took keyboard focus: \(focused ? "yes" : "NO")")
+
+        // (2) The edit itself, with the row still selected.
+        let focused = focusInlineEditor(row: bRow, name: b.name)
+        XCTAssertTrue(focused, "a second click in the row's Tags cell should start editing it again")
         // Move the insertion point to the end, so the typed token cannot replace a selected one.
         app.typeKey(.rightArrow, modifierFlags: .command)
         // One character at a time, at a human pace, so the token field's completion handling sees what
@@ -140,13 +156,16 @@ final class TriageJourneyUITests: FixtureUITestCase {
 
         // (3) Group edit in the ⌘I sheet: three consecutive rows, one coloured if any is visible.
         let start = groupStart()
-        let group = (start..<(start + 3)).compactMap { fileForRow($0) }
-        XCTAssertEqual(group.count, 3, "three rows from \(start) should resolve to files")
         clickRow(start)
-        XCTAssertTrue(waitFor { self.selectedNames() == [group.first?.name ?? ""] }, "a click should select row \(start)")
         app.typeKey(.downArrow, modifierFlags: .shift)
         app.typeKey(.downArrow, modifierFlags: .shift)
-        XCTAssertTrue(waitFor { self.selectedNames().count == 3 }, "shift-click should select three rows")
+        XCTAssertTrue(waitFor { self.selectedNames().count == 3 }, "a click and Shift+↓ twice should select three rows")
+        // The group is what the table actually selected, read back by name, not what row indices predict.
+        let selected = selectedNames()
+        let group = selected.compactMap { n in baseline.values.first { $0.name == n } }
+        XCTAssertEqual(group.count, 3, "the three selected rows should map to files: \(selected)")
+        log("[d8]   group selected: \(group.map { alias[$0.path] ?? "?" }), \(group.filter { !$0.colours.isEmpty }.count) with a colour")
+        captureScreenshot("w40-d8-step3-selection")
         pressKey("i", modifiers: .command)
         addSubjectInEditor(groupTag)
         before = check("3 group edit, ⌘I on 3 files", from: before,
@@ -162,7 +181,11 @@ final class TriageJourneyUITests: FixtureUITestCase {
         XCTAssertTrue(renameField.waitForExistence(timeout: 5), "Rename Tag should present its field")
         renameField.click()
         renameField.typeText(renamedTag)
-        app.buttons["ar.renameTag.commit"].click()
+        let renameCommit = app.buttons["ar.renameTag.commit"]
+        XCTAssertEqual(renameCommit.title.isEmpty ? renameCommit.label : renameCommit.title, "Rename 3 Files",
+                       "R-28: the sheet should show how many files the rename affects")
+        log("[d8]   rename sheet button: \(renameCommit.title.isEmpty ? renameCommit.label : renameCommit.title)")
+        renameCommit.click()
         before = check("4 Rename Tag across 3 files", from: before,
                        expect: Dictionary(uniqueKeysWithValues: group.map {
                            ($0.path, Delta(remove: [groupTag], add: [renamedTag])) }))
@@ -232,56 +255,42 @@ final class TriageJourneyUITests: FixtureUITestCase {
             + "\([keepFile.path, variantFile.path].map { alias[$0] ?? "?" }.sorted())")
         captureScreenshot("w40-d8-after-relaunch")
 
-        // (9) A space typed into the inline editor must type a space, not open the Preview sheet (R-20:
-        // the list's bare keys never fire inside a text field). Reproduced broken on 2026-10-14.
-        clearFilters()
-        if let (row, f) = firstRow(where: { _ in true }, preferColour: false) {
-            let field = table.tableRows.element(boundBy: row).descendants(matching: .any)["ar.cell.tags.\(f.name)"]
-            clickRow(row)
-            var focused = false
-            for _ in 0..<3 where !focused {
-                RunLoop.current.run(until: Date().addingTimeInterval(1.2))
-                field.click()
-                focused = waitFor(timeout: 2) {
-                    (field.value(forKey: "hasKeyboardFocus") as? Bool) == true
-                        || field.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).count > 0
-                }
-            }
-            app.typeKey(.rightArrow, modifierFlags: .command)
-            app.typeText("x")
-            app.typeText(" ")
-            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-            // The Preview sheet is the only place a "1 of N" page counter appears.
-            let previewOpened = app.staticTexts.matching(
-                NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", "1 of ", "1 of ")).count > 0
-            log("[d8] step 9 space typed in the inline editor opened the Preview sheet: \(previewOpened ? "YES (broken)" : "no")")
-            captureScreenshot("w40-d8-inline-space")
-            let known = XCTExpectedFailure.Options(); known.isStrict = false
-            XCTExpectFailure("W40.fix-reader-inline-keys (S2): the list's Space/[/]/\\ handlers fire inside the inline tag editor",
-                             options: known) {
-                XCTAssertFalse(previewOpened, "R-20/R-23: Space in the inline tag editor must not open the Preview sheet")
-            }
-            // Leave without committing anything: dismiss the sheet if it came up, then cancel the edit.
-            if previewOpened { app.buttons["Done"].firstMatch.click() }
-            app.typeKey(.escape, modifierFlags: [])
-            clickRow(row == 0 ? 1 : 0)
-            RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-            let now = (try? snapshot()) ?? before
-            let stray = now[f.path]?.names.filter { $0.hasPrefix("x") && !(before[f.path]?.names.contains($0) ?? false) } ?? []
-            log("[d8]   step 9 left a stray token on \(alias[f.path] ?? "?"): \(stray.isEmpty ? "no" : "YES \(stray)")")
-            if stray.isEmpty { before = now }
-            else { before = check("9 stray inline token (not expected)", from: before, expect: [f.path: Delta(add: stray)]) }
-        }
-
         // Net effect against the start: exactly A read, B's inline tag, the merged tag on two files.
         var net: [String: Delta] = [a: Delta(remove: ["Unread"], add: ["Read"])]
         net[b.path, default: Delta()].add.append(inlineTag)
         net[keepFile.path, default: Delta()].add.append(mergeKeep)
         net[variantFile.path, default: Delta()].add.append(mergeKeep)
-        _ = check("net change from the start", from: baseline, expect: net, current: before)
+        _ = check("net change from the start", from: baseline, expect: net, current: before, canonicalUntouched: true)
     }
 
     // MARK: - UI steps
+
+    /// Start editing a row's tag token field. A click in a SELECTED row's field starts editing; it must
+    /// come after the double-click interval, or the table reads the two clicks as a double-click.
+    private func focusInlineEditor(row: Int, name: String) -> Bool {
+        // Found by file name, not row index: a write reloads the table, and the index may then name another row.
+        let id = "ar.cell.tags.\(name)"
+        let field = app.descendants(matching: .any)[id]
+        let rowElement = table.tableRows.containing(NSPredicate(format: "identifier == %@", id)).firstMatch
+        if rowElement.waitForExistence(timeout: 5) {
+            app.activate()
+            rowElement.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).click()
+        } else {
+            clickRow(row)
+        }
+        var focused = false
+        for _ in 0..<3 where !focused {
+            RunLoop.current.run(until: Date().addingTimeInterval(1.2))
+            // The field's empty right end: on a real archive the tokens fill the middle, and a click on a
+            // token does not start editing.
+            field.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).click()
+            focused = waitFor(timeout: 2) {
+                (field.value(forKey: "hasKeyboardFocus") as? Bool) == true
+                    || field.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).count > 0
+            }
+        }
+        return focused
+    }
 
     /// The window opens at about 900 pt wide, which clips the Tags column at its right edge; a click on a
     /// tag cell's centre then lands outside the window. Zoom it to the screen.
@@ -384,26 +393,35 @@ final class TriageJourneyUITests: FixtureUITestCase {
         let item = smartFolder(named: name)
         guard item.waitForExistence(timeout: 3) else { return true }
         item.rightClick()
-        // Scoped to the context menu: Edit ▸ Delete matches an unscoped "Delete" too.
-        let inMenu = item.menuItems["Delete"]
-        let delete = inMenu.waitForExistence(timeout: 2) ? inMenu : app.menus.menuItems["Delete"].firstMatch
-        if delete.exists && delete.isHittable { delete.click() } else { app.typeKey(.escape, modifierFlags: []) }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        let offered = app.menuItems.allElementsBoundByIndex.filter { $0.isHittable }.map { $0.title }
+        log("[d8] smart folder context menu offers: \(offered)")
+        // The open context menu's item is the hittable one; Edit ▸ Delete matches "Delete" too.
+        let candidates = app.menuItems.matching(NSPredicate(format: "title == %@", "Delete"))
+        let delete = candidates.allElementsBoundByIndex.first { $0.isHittable }
+        if let delete { delete.click() } else { app.typeKey(.escape, modifierFlags: []) }
         let gone = !smartFolder(named: name).waitForExistence(timeout: 1)
         log("[d8] smart folder \(name) deleted: \(gone ? "yes" : "NO")")
         return gone
     }
 
     /// Smart folders persist in the app's defaults, also in UI-test mode, so a run that died before its
-    /// tearDown leaves one behind. Remove those before starting.
+    /// tearDown leaves one behind. Remove those before starting; never asserts.
     private func removeLeftoverJourneyFolders() {
         let leftovers = app.descendants(matching: .any).matching(identifier: "ar.sidebar.smart")
             .matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@", "W40d8 Journey", "W40d8 Journey"))
-        var guardCount = 0
-        while leftovers.count > 0 && guardCount < 10 {
-            let label = leftovers.firstMatch.label
-            guard deleteSmartFolder(named: label.isEmpty ? "W40d8 Journey" : label) else { break }
-            guardCount += 1
+        let start = leftovers.count
+        var tries = 0
+        while leftovers.count > 0 && tries < 10 {
+            leftovers.firstMatch.rightClick()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+            let delete = app.menuItems.matching(NSPredicate(format: "title == %@", "Delete"))
+                .allElementsBoundByIndex.first { $0.isHittable }
+            if let delete { delete.click() } else { app.typeKey(.escape, modifierFlags: []) }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            tries += 1
         }
+        if start > 0 { log("[d8] removed leftover journey smart folders: \(start - leftovers.count) of \(start)") }
     }
 
     private func clearFilters() {
@@ -488,6 +506,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
         var tagBytes: Data?         // the raw Finder-tag xattr
         var tags: [String]          // decoded, colour suffix kept ("Red\n6")
         var otherXattrs: [String: String]   // name → SHA-256 of the value
+        var quarantine: String?     // com.apple.quarantine's text, to show what a write did to it
         var size: Int
         var contentHash: String
         var names: [String] { tags.map { String($0.split(separator: "\n", omittingEmptySubsequences: false).first ?? "") } }
@@ -515,16 +534,19 @@ final class TriageJourneyUITests: FixtureUITestCase {
             let tags = tagBytes.flatMap {
                 (try? PropertyListSerialization.propertyList(from: $0, format: nil)) as? [String]
             } ?? []
+            let q = Self.xattr(full, "com.apple.quarantine").map { String(decoding: $0.prefix(120), as: UTF8.self) }
             out[rel] = FileState(path: rel, name: url.lastPathComponent, tagBytes: tagBytes, tags: tags,
-                                 otherXattrs: other, size: data.count, contentHash: Self.sha(data))
+                                 otherXattrs: other, quarantine: q, size: data.count, contentHash: Self.sha(data))
         }
         return out
     }
 
     /// Wait for the expected change to land, then check it and that nothing else moved.
     @discardableResult
+    /// `canonicalUntouched`: compare files outside `expect` by tag meaning rather than bytes. Only the net
+    /// check uses it: a file written and then undone is back to its tags, but in macOS's re-encoded form.
     private func check(_ step: String, from before: [String: FileState], expect: [String: Delta],
-                       current: [String: FileState]? = nil) -> [String: FileState] {
+                       current: [String: FileState]? = nil, canonicalUntouched: Bool = false) -> [String: FileState] {
         var after = current ?? [:]
         if current == nil {
             // Poll only the expected files' tag xattrs (a full snapshot hashes every file), then take one.
@@ -541,6 +563,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
             after = (try? snapshot()) ?? [:]
         }
         var problems: [String] = []
+        var quarantine: [String] = []   // the filed W40.fix-reader-tag-quarantine defect, kept apart
         var notes: [String] = []
         if Set(after.keys) != Set(before.keys) { problems.append("the set of files changed") }
         for path in before.keys.sorted() {
@@ -548,32 +571,37 @@ final class TriageJourneyUITests: FixtureUITestCase {
             let id = alias[path] ?? path
             if a.contentHash != b.contentHash || a.size != b.size { problems.append("\(id): CONTENT changed") }
             if a.otherXattrs != b.otherXattrs {
-                let full = root.appendingPathComponent(path).path
                 let changed = Set(a.otherXattrs.keys).union(b.otherXattrs.keys)
                     .filter { b.otherXattrs[$0] != a.otherXattrs[$0] }.sorted()
-                let shown = changed.map { n in
-                    n + "=" + (Self.xattr(full, n).map { String(decoding: $0.prefix(120), as: UTF8.self) } ?? "(gone)")
-                }
-                // Only an ADDED quarantine xattr is the known defect; anything else fails outright.
-                if changed == ["com.apple.quarantine"] && b.otherXattrs["com.apple.quarantine"] == nil {
-                    problems.append("\(id): com.apple.quarantine added (\(shown.joined()))")
+                // Only a quarantine xattr added or rewritten is the filed defect; anything else fails outright.
+                if changed == ["com.apple.quarantine"] && a.quarantine != nil {
+                    quarantine.append("\(id): com.apple.quarantine \(b.quarantine == nil ? "added" : "rewritten") "
+                                      + "(\(b.quarantine ?? "none") → \(a.quarantine ?? "none"))")
                 } else {
-                    problems.append("\(id): other xattrs changed: \(shown.joined(separator: ", "))")
+                    problems.append("\(id): other xattrs changed: \(changed)")
                 }
             }
             guard let d = expect[path] else {
-                if a.tagBytes != b.tagBytes { problems.append("\(id): tags changed but should not: \(b.tags) → \(a.tags)") }
+                let same = canonicalUntouched ? a.tags.map(Self.canonical) == b.tags.map(Self.canonical)
+                                              : a.tagBytes == b.tagBytes
+                if !same { problems.append("\(id): tags changed but should not: \(b.tags) → \(a.tags)") }
                 continue
             }
             // Expected: every tag of `before` not named in `remove` survives with its colour; each `add`
             // name is present; nothing else appears.
-            let survivors = b.tags.filter { t in !d.remove.contains(Self.name(t)) }
-            let added = a.tags.filter { t in d.add.contains(Self.name(t)) && !survivors.contains(t) }
-            let rest = a.tags.filter { t in !added.contains(t) }
+            // A bare "Read" and "Read\n0" are the same tag with no colour; macOS writes every tag of a
+            // written file in the second form. Compare in that form, and note when the bytes were rewritten.
+            let survivors = b.tags.filter { t in !d.remove.contains(Self.name(t)) }.map(Self.canonical)
+            let after = a.tags.map(Self.canonical)
+            let added = after.filter { t in d.add.contains(Self.name(t)) && !survivors.contains(t) }
+            let rest = after.filter { t in !added.contains(t) }
             if rest.sorted() != survivors.sorted() {
                 problems.append("\(id): unrelated tags or colours changed: expected \(survivors), got \(rest)")
             } else if rest != survivors {
                 notes.append("\(id): tags kept but reordered")
+            }
+            if b.tags.contains(where: { !$0.contains("\n") }) {
+                notes.append("\(id): bare tags rewritten with an explicit no-colour suffix")
             }
             for n in d.add where !a.names.contains(n) { problems.append("\(id): \(n) was not added") }
             for n in d.remove where a.names.contains(n) { problems.append("\(id): \(n) was not removed") }
@@ -582,14 +610,15 @@ final class TriageJourneyUITests: FixtureUITestCase {
         }
         let untouched = before.count - expect.count
         if app.state != .notRunning { notes.append("\(app.windows.count) window(s) open") }
-        log("[d8] step \(step): \(problems.isEmpty ? "PASS" : "FAIL") — \(expect.count) file(s) changed as "
-            + "expected, \(untouched) untouched file(s) byte-identical in tags, other xattrs and content"
+        log("[d8] step \(step): \(problems.isEmpty ? "PASS" : "FAIL")\(quarantine.isEmpty ? "" : " (known: quarantine)") — "
+            + "\(expect.count) file(s) changed as expected, \(untouched) untouched file(s) byte-identical in tags, "
+            + "other xattrs and content"
             + (problems.isEmpty ? "" : "; problems: \(problems.joined(separator: "; "))")
+            + (quarantine.isEmpty ? "" : "; known defect: \(quarantine.joined(separator: "; "))")
             + (notes.isEmpty ? "" : "; notes: \(notes.joined(separator: "; "))"))
         // A known, filed defect is recorded as an expected failure naming its fix item, so the journey can
         // sit in the gate's lane without hiding anything else. Every other problem fails outright.
-        let quarantine = problems.filter { $0.contains(": com.apple.quarantine added (") }
-        for p in problems where !quarantine.contains(p) { XCTFail("[\(step)] \(p)") }
+        for p in problems { XCTFail("[\(step)] \(p)") }
         if !quarantine.isEmpty {
             let known = XCTExpectedFailure.Options(); known.isStrict = false
             XCTExpectFailure("W40.fix-reader-tag-quarantine (S3): a Reader tag write adds com.apple.quarantine",
@@ -608,7 +637,10 @@ final class TriageJourneyUITests: FixtureUITestCase {
 
     /// Put back every tag xattr the journey changed, after the app has quit.
     private func restoreBaseline() {
-        guard !baseline.isEmpty, let now = try? snapshot() else { return }
+        guard !baseline.isEmpty else { return }
+        guard let now = try? snapshot() else {
+            return XCTFail("teardown could not read the root to restore it; later test classes may see a changed fixture")
+        }
         var restored = 0
         for (path, b) in baseline where now[path]?.tagBytes != b.tagBytes {
             let full = root.appendingPathComponent(path).path
@@ -621,6 +653,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
         }
         let clean = (try? snapshot()).map { s in baseline.allSatisfy { s[$0.key]?.tagBytes == $0.value.tagBytes } } ?? false
         log("[d8] teardown: restored the tag xattr on \(restored) file(s); root back to its start: \(clean ? "yes" : "NO")")
+        XCTAssertTrue(clean, "teardown should put every tag xattr back as it was")
     }
 
     // MARK: - Helpers
@@ -632,6 +665,8 @@ final class TriageJourneyUITests: FixtureUITestCase {
             .flatMap { (try? PropertyListSerialization.propertyList(from: $0, format: nil)) as? [String] }?
             .map(Self.name) ?? []
     }
+
+    private static func canonical(_ tag: String) -> String { tag.contains("\n") ? tag : tag + "\n0" }
 
     private static func name(_ tag: String) -> String {
         String(tag.split(separator: "\n", omittingEmptySubsequences: false).first ?? "")
