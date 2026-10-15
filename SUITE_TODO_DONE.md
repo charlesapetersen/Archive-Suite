@@ -10929,3 +10929,40 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   disk for the 9 GiB sample. A killed earlier attempt's full-copy sample (6.5 GiB) was moved aside to
   `reader-sample.stale-20261014/`, since deleting it was permission-denied; it can be deleted.
   <!-- /W40.c2 -->
+- [x] **W41.ocr-panel-local — local-sized models on the truth set [S-M · ~1 session]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light,paid) (blocked-on: W41.ocr-adjudicate). Question 1. Through OpenRouter: Qwen3.5 9B, 27B and 35B-A3B; Qwen3.6 27B and 35B-A3B; Gemma 4 26B-A4B and 31B; Qwen3-VL 8B and 30B-A3B; Mistral Small 24B. Apple Vision (the app's on-device route) as the floor and Gemini 3.1 Flash-Lite (the app's default) as the bar. Scored as socOCRbench does (NES and chrF) and as Vision OCR's bake-off does (words missed, words added), overall and by every attribute in the truth table, the resolution ladder included. Reasoning off or minimal. Measured cost per page for each model, for W41.ocr-panel-cloud's estimate. For each row: the memory it needs locally at 4-bit and 8-bit, so 18, 32, 48 and 64 GB Macs can each be told what they could run. Note the gap: OpenRouter serves full-precision or provider-chosen builds, so local 4-bit quality is inferred, not measured, unless the Vision OCR lab's 8-9B runs give a comparison. Cap $2. SHIPPED 2026-10-14.
+  - **The panel prompt: what to transcribe (owner rulings, 2026-10-14, at W41.ocr-adjudicate).** The truth set follows
+    these, so every model on the panel, Apple Vision aside, gets this wording in place of the drafting prompt's lines on
+    what to leave out and on symbols (`ocr_truth.py` `PROMPT`, which stays as it was for the drafts). Reuse the rest of
+    `PROMPT` (reading order, spelling as written, `[illegible]`, tables, the KIND and TABLE lines):
+    - "Transcribe everything on this sheet of paper, including headers, footers, citations, stamps and copyright lines
+      that a database or archive added to the page."
+    - "Leave out only text on a different sheet that shows in the photograph: a page underneath or beside this one, or a
+      folder behind it."
+    - "Write each bullet point as \"*\". Leave out empty checkboxes and other symbols that are not text."
+    - For KIND: "the writing of the page's main text. A handwritten or typed letter on printed letterhead is handwritten
+      or typewritten, not mixed. Text from a computer printer or word processor is typewritten; printed means typeset,
+      as in books, journals, newspapers and printed forms."
+  - **Scoring notes from the review.** 99 pages are settled (`truth/`, `pages.tsv`); p038 is out (the owner found it too
+    hard). The three Michael Young letters (p086, p094, p096) are in, but most of their truth is the two drafting models
+    agreeing (645 words agreed, 95 the owner left as `[illegible]`), so report them as agreement with Claude and Gemini,
+    not accuracy. `[illegible]` appears in the truth 46 times by the owner's choice and more from the drafts: say how
+    the scorer treats it. A model writing "•" or "-" for a bullet against the truth's "*" is the session's call, stated.
+  - **Result** (`ArchiveProcessor/segbench-results/ocr-panel-local.md` + `ocr-panel-local-groups.csv`; runner
+    `scripts/segbench/ocr_panel.py`, scorer `ocr_panel_score.py`, 19 offline tests). Original pages, availability-inclusive
+    NES: Qwen3.6 27B 94.3 (95/96 completed), Qwen3-VL 8B 91.8, Flash-Lite (the app's default) 91.6, Qwen3.5 35B-A3B
+    90.8, Qwen3-VL 30B-A3B 89.8, Mistral Small 24B 89.3 (cheapest, $0.00032/page), Qwen3.5 27B 81.8 (only 82/96
+    completed on SiliconFlow fp8; 95.8 on what it completed), Apple Vision 81.3 (the floor). Completed-only, Qwen3.5 27B,
+    Qwen3.6 27B and Flash-Lite lead at about 95-96 NES. **Incomplete:** Qwen3.5 9B (1/96), Gemma 4 26B-A4B (16/96),
+    Gemma 4 31B (22/96), Qwen3.6 35B-A3B (85/96): their pinned providers answered HTTP 429 all evening; finishing them is
+    `W41.ocr-panel-local-rest`. Memory table at Q4/Q8 for 18/32/48/64 GB Macs, and the Vision OCR lab's no-matched-
+    comparison caveat, are in the report. Cloud-panel estimate from measured token usage: $4.32-$16.69 for twelve chat
+    models on 99 pages (plus Mistral's OCR endpoint), which is the figure `W41.ocr-panel-cloud-owner-ok` asks about.
+  - **Money:** $1.387 accounted of the $2 cap (the key's own day billing: $1.37). Ten calls with no usable billing
+    (HTTP-200 'error' replies with 404 generation lookups, interrupted calls) were first charged their full reservations
+    ($0.082 each) and then bounded jointly by the key's UTC-day usage (`ocr_panel.py reconcile`, $0.0008 each). Checkpoint
+    6 stopped such a reply from halting the run; checkpoint 7 (from an adversarial review) refuses a key total read after
+    UTC midnight. A session's `timeout` wrapper killed gemma4-26b p008 mid-call: it is a cached, never-retried failure.
+  - **Private cache** (outside git): `~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-local/` — frozen 139 inputs, raw
+    replies, ledger `calls.jsonl`, reconciliation evidence, page scores. Deps: `/usr/local/bin/python3` + `PYTHONPATH` with
+    sacrebleu 2.5.1 and numpy. Commits: fb891672, f66576a8, 8923c5df, 10083941, 81b2cdb5, 88031353, feedda51 and this one.
+  <!-- /W41.ocr-panel-local -->
