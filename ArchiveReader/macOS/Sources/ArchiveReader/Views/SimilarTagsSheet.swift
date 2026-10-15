@@ -74,6 +74,8 @@ struct SimilarTagsSheet: View {
                     Label("Merge…", systemImage: "arrow.triangle.merge")
                 }
                 .disabled(cluster.count < 2)
+                // Per-cluster id (its tags sorted, "|"-joined) so a UITest can merge one cluster (W40.d8).
+                .accessibilityIdentifier("ar.similarTags.merge." + cluster.map(\.tag).sorted().joined(separator: "|"))
                 .help("Rename the other variant(s) to “\(chosen)” across the whole corpus — you confirm the file count first.")
             }
         }

@@ -18,7 +18,8 @@
 #         The app argument is optional, so the old call form still works: a bare
 #         `vm-gui-runner.sh xcuitest` still means "reader, xcuitest".
 # ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, TEST_ITERATIONS, AGENT_WAIT,
-#                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test).
+#                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test),
+#                READER_JOURNEY=rehearsal (W40.d8 triage journey on the real-corpus sample).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
@@ -86,6 +87,21 @@ if [ "${CORRUPT_INDEX_FIXTURE:-0}" = "1" ]; then
   if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
     die "corrupt-index fixtures require ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
   fi
+fi
+# READER_JOURNEY=rehearsal (W40.d8): the Reader triage journey on folders of the W40.c2 real-corpus sample,
+# copied from the read-only rehearsal share onto the guest disk at the fixture path (make-journey-fixture.sh).
+# Only the journey runs: the other UITests assert on the synthetic fixture's files.
+if [ "${READER_JOURNEY:-}" = "rehearsal" ]; then
+  [ "$APP" = reader ] || die "READER_JOURNEY is supported only for reader."
+  [ -n "$CORRUPT_TEST_SELECTOR" ] && die "READER_JOURNEY and CORRUPT_INDEX_FIXTURE cannot be combined."
+  [ -d "$REHEARSAL/reader-sample" ] || die "no Reader rehearsal sample at $REHEARSAL/reader-sample (ArchiveReader/scripts/rehearsal-sample.py make)"
+  MKFIXTURE='bash "$GR/ArchiveReader/scripts/make-journey-fixture.sh"'
+  CORRUPT_TEST_SELECTOR="ArchiveReaderUITests/TriageJourneyUITests"
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
+    die "READER_JOURNEY=rehearsal runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+  fi
+elif [ -n "${READER_JOURNEY:-}" ]; then
+  die "unknown READER_JOURNEY '$READER_JOURNEY' (use: rehearsal)"
 fi
 ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
