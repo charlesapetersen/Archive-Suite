@@ -253,6 +253,12 @@ Three tiers, so nothing sprawls or goes stale:
 
 Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). **Owner grants on gated paths live in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md)** — committed on purpose (moved out of the gitignored maintenance plan 2026-08-01) because a grant plus its ⛔ constraints is durable policy that needs history and recoverability; entries there are a permanent record, marked discharged when the item ships rather than deleted. Don't keep a doc "just because" — fold durable bits into these and drop the rest. Untracked scratch docs that are done/superseded (e.g. completed-run review reports) are archived under the gitignored **`old/`** folder (see `old/README.md`) rather than deleted — recoverable, out of the way.
 
+**Owner review sessions.** Owner, 2026-10-15: before any session the owner runs by hand (a guided session, an acceptance pass, a review
+sheet), judge whether it is the right time, by reading the open work rather than checking that the blockers are
+ticked. It is not time while a known defect would get in the way, or while queued work is about to change what
+the review looks at. If it is not time, name what it waits for, block the item on that, and report it (no
+decision). Authority: `~/Claude/CLAUDE.md`, "Owner review sessions"; this project's detail is `execution-plans/verification-phase/01-daemon-plan.md` §G "Is it time?".
+
 ## Working directive — token-efficient feature-add & maintenance
 
 Treat context/token cost as a real budget alongside speed and correctness. Applies to every change in

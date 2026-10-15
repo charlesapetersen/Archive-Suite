@@ -275,6 +275,17 @@ where it can.
   mattered). After the owner returns a form, the next session files each note as a reproduced bug, a design
   question for the Daemon Report, or a `SUSPECTS.md` entry. Repeat packs (`-2`, `-3`) after fix batches.
 - The sessions themselves are the owner's (`W40.g-sessions`, HOLD QUEUE).
+- **Is it time? (owner, 2026-10-15).** The owner's time in a session is for finding what nobody knows yet. Before a
+  pack is handed over, and again before a repeat pack, the session preparing it judges whether this is the right
+  time, by reading the open items against each task rather than by checking that its blockers are ticked. It is
+  not time while a known defect would get in the way of a task (it wastes the minutes and can hide an unknown
+  problem behind it), or while queued work is about to change what a task reviews. Known problems a pack still
+  lists are only those that will stay open for a while, each with the tasks it touches. If it is not time, the
+  session names what the pack waits for, blocks the item on it, and reports that (no decision) instead of handing
+  the pack over. This holds for every owner session in this phase: the guided sessions (`W40.g1`-`W40.g3` and
+  their repeats), the borrowed-iPhone pack (`W40.i5`) and the acceptance pass (`W40.h4`). The cross-project rule is
+  in `~/Claude/CLAUDE.md`, "Owner review sessions". It was written after `reader-1.md` asked the owner to work
+  around eight known Reader bugs that were all queued to be fixed within a day or two (`W40.g1-refresh`).
 
 ## H — re-check and release
 
