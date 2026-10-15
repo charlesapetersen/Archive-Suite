@@ -172,13 +172,15 @@ struct EditorPerfTests {
             .appendingPathComponent("Sources/ArchiveNotes/Editor")
 
         let fm = FileManager.default
-        guard fm.fileExists(atPath: editorDir) else {
-            // If we can't find the source, skip gracefully (e.g. CI with different layout)
-            return
-        }
+        // W40.a4: a missing directory used to `return` — a lint that passes when it can't see its input.
+        // The one legitimate miss is a build from the GUI VM's `/Volumes` mount, which the sandboxed test
+        // host cannot read (the Reader's `UITestLaunchSiteLintTests` documents the same case).
+        if editorDir.hasPrefix("/Volumes/"), !fm.isReadableFile(atPath: editorDir) { return }
+        try #require(fm.fileExists(atPath: editorDir), "Editor/ sources not found at \(editorDir)")
 
         let files = try fm.contentsOfDirectory(atPath: editorDir)
             .filter { $0.hasSuffix(".swift") }
+        try #require(!files.isEmpty, "the lint found no Swift files in \(editorDir) — it would pass vacuously")
 
         for file in files {
             let path = (editorDir as NSString).appendingPathComponent(file)

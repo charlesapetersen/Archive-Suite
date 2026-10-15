@@ -10863,3 +10863,31 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   each ruling stated; a check red without them; a before/after on p010, p081, p062 and a handwritten letter keeps
   headers/footers and leaves classification and rotation unchanged; the suite passes; a CHANGELOG entry.
   <!-- /W41.ocr-prompt-app -->
+- [x] **W40.a4 — remove tests that cannot fail [S]** · §W40 — verification phase · SHIPPED 2026-10-14
+  (lane: reader,notes,processor). Every test that could not fail now either asserts or reports a skip.
+  **Removed:** Notes `SmokePlaceholderTests` (`XCTAssertTrue(true)`) and the duplicate `.layoutManager` lint in
+  `EditorBindingTests`, which searched from the working directory and returned when it found nothing.
+  **Now asserting:** Notes `SourceBlockViewTests.fitResetsAutoScale` drives a real `PDFView` (zoom ×1.25, zoom back,
+  fit restores auto-scale), plus a new detached-controller test that proves no scale is saved;
+  `NotesIndexTests.sanitizerNeverThrowsOnAdversarialQuery` expects every adversarial query to be empty and the index
+  to answer afterwards; Reader `ContentIndexTests.testArbitraryQueryDoesNotCrashFTS` does the same; Reader
+  `DeepLinkTests` router tests assert the non-Reader URLs do not parse as `.readerReveal` (the router's only dispatch
+  condition); Core `PDFThumbnailerTests.evictsWhenOverBudget` requires both renders to succeed, so `count <= 1`
+  is not met by a cache that was never written. **Silent passes made loud:** Notes
+  `EditorPerfTests.noLayoutManagerInEditorSources` `#require`s its directory and a non-empty file list (its only
+  allowed miss is the VM's unreadable `/Volumes` mount); `NotesScalePerfTests` uses `.enabled(if:)`, so an ordinary
+  run reports SKIPPED rather than a pass (`verification/notes.md` updated). **Fixture-missing skips → failures** in the
+  VM UI lanes: Reader `FixtureUITestCase`, Notes `NotesGUITests` and `SmokeUITest` throw the new shared
+  `packages/UITestSupport/Runner/FixtureMissing` error from setup (the VM runner rebuilds the fixture before every
+  run, and its own warning said a missing fixture made a green run meaningless). Reader `UITestLaunchSiteLintTests`
+  now skips only on the `/Volumes` mount; an unreadable host checkout fails.
+  **Deliberately kept (each skip has a checkable reason and a lane that runs the test):** the scale suites'
+  `ARCHIVE_SCALE_ROOT` skips (opt-in, `ops/scale/run-scale-verify.sh`); `SnapshotTests` host skip (its reference
+  renderer is the VM, where it runs); the corrupt-index UI tests' content checks (the runner seeds a corrupt index only
+  under `ONLY_TESTING=` that selector); the `getuid() == 0` permission skips; Core's premise skips
+  (`DuplicateTagPremiseTests` fails if the premise breaks). The sweep (all four test trees plus the Kotlin
+  `ArchiveCapture` unit tests) found no other case; Processor has no unit bundle and its UITests all assert.
+  Verified: Notes unit bundle 959 tests green, 0 warnings, the scale suite reported skipped; Reader
+  `ContentIndexTests`, `UITestLaunchSiteLintTests` and the three router tests green (33), with the UITest target
+  compiling; Core `swift test --filter PDFThumbnailer` 18/18; Processor build-for-testing clean.
+  <!-- /W40.a4 -->

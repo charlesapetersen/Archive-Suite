@@ -47,10 +47,9 @@ final class SmokeUITest: XCTestCase {
 
     func testAppLaunchesAndShowsMainWindow() throws {
         continueAfterFailure = false
-        try XCTSkipUnless(
-            FileManager.default.fileExists(atPath: Self.fixturePath),
-            "GUI fixture not found — run scripts/make-notes-fixture.sh first"
-        )
+        guard FileManager.default.fileExists(atPath: Self.fixturePath) else {   // fails, never skips (W40.a4)
+            throw FixtureMissing(path: Self.fixturePath, builder: "scripts/make-notes-fixture.sh")
+        }
 
         let app = XCUIApplication.archiveUITestApp()   // never a bare init — see UITestLaunch
         // Open the SCRATCH fixture store (in-memory override — never persists / touches the real store).

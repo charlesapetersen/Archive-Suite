@@ -95,7 +95,8 @@ out larger splits itself: file `<tag>a`, `<tag>b` … with `(blocked-on:)` chain
 - **`W40.a4` — remove tests that cannot fail [S].** `SmokePlaceholderTests.testAppExists`
   (`XCTAssertTrue(true)`), assertion-free tests such as `SourceBlockViewTests.fitResetsAutoScale`, the
   `EditorBindingTests` lint that passes when its directory is missing, and fixture-missing `XCTSkipUnless` in the
-  gate lanes (a skipped suite in the gate is a failure there). Sweep each app for the same shapes.
+  gate lanes (a skipped suite in the gate is a failure there). Sweep each app for the same shapes. *(SHIPPED
+  2026-10-14, see SUITE_TODO_DONE.md.)*
 - **`W40.a5` — test drivers out of Release [S].** Processor's 17 env-gated drivers and their `*Contract.swift`
   seams compile into Release (`ContentView.swift` dispatch). Put them behind `#if DEBUG` or a build flag, or prove
   why a script needs them in Release. Prove absence with `nm` on the Release binary. Tier-2.

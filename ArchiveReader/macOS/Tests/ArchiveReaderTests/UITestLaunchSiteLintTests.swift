@@ -37,9 +37,12 @@ final class UITestLaunchSiteLintTests: XCTestCase {
         // A build from a mounted repo (the VM) cannot read its own sources from a sandboxed test host.
         // Skip on that specific, checkable condition — never on a read error, which would let a genuine
         // regression pass as "unreadable".
-        try XCTSkipUnless(FileManager.default.isReadableFile(atPath: dir.path),
-                          "UITest sources not readable at \(dir.path) — this lint only runs on a host "
-                          + "checkout, not on a build from the /Volumes mount inside the GUI VM")
+        // W40.a4: the skip is gated on the `/Volumes` mount itself, so an unreadable HOST checkout fails.
+        let readable = FileManager.default.isReadableFile(atPath: dir.path)
+        try XCTSkipIf(!readable && dir.path.hasPrefix("/Volumes/"),
+                      "UITest sources not readable at \(dir.path) — this lint only runs on a host "
+                      + "checkout, not on a build from the /Volumes mount inside the GUI VM")
+        XCTAssertTrue(readable, "UITest sources not readable at \(dir.path) on a host checkout")
         let all = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
         return all.filter { $0.pathExtension == "swift" }.sorted { $0.path < $1.path }
     }

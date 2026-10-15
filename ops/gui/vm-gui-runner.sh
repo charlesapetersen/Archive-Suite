@@ -231,7 +231,7 @@ ensure_fixture() {
     NOT necessarily the build. The presence check below is the real verdict." ;;
   esac
   tart exec "$VM" bash -lc "[ -d '$GUEST_FIXTURE' ]" >/dev/null 2>&1 \
-    || warn "fixture STILL absent after the build attempt — fixtured UITests will XCTSkip, so a green run would not mean what you think."
+    || warn "fixture STILL absent after the build attempt — fixtured UITests will FAIL in setUp (W40.a4: they no longer skip)."
 }
 
 # --- PREFLIGHT: is the guest's accessibility tree actually being served? -----------------------------

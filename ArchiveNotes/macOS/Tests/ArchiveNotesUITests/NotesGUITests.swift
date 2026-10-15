@@ -167,10 +167,9 @@ class NotesFixtureUITestCase: XCTestCase {
 
     private func setUpOnMainActor() throws {
         continueAfterFailure = false
-        try XCTSkipUnless(
-            FileManager.default.fileExists(atPath: Self.fixturePath),
-            "GUI fixture not found — run scripts/make-notes-fixture.sh first"
-        )
+        guard FileManager.default.fileExists(atPath: Self.fixturePath) else {   // fails, never skips (W40.a4)
+            throw FixtureMissing(path: Self.fixturePath, builder: "scripts/make-notes-fixture.sh")
+        }
 
         try restoreCanonicalFixtureFromPristine()
 

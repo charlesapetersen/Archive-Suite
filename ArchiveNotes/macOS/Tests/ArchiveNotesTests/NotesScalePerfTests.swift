@@ -3,8 +3,10 @@ import Testing
 @testable import ArchiveNotes
 
 /// Opt-in corpus-scale acceptance check. The runner flag enables a guarded fixture under the test host's
-/// temporary directory; ordinary unit runs return immediately.
-@Suite("NotesScalePerfTests — 100k notes / 2M words")
+/// temporary directory; ordinary unit runs report it SKIPPED (W40.a4: it used to `return` and report a pass).
+@Suite("NotesScalePerfTests — 100k notes / 2M words",
+       .enabled(if: ProcessInfo.processInfo.environment["ARCHIVE_NOTES_SCALE_ACCEPTANCE"] == "1",
+                "opt-in: set ARCHIVE_NOTES_SCALE_ACCEPTANCE=1"))
 @MainActor
 struct NotesScalePerfTests {
     private struct Manifest {
@@ -16,9 +18,6 @@ struct NotesScalePerfTests {
     }
 
     @Test func fullIndexSearchSummariesAndNavigationStayBoundedAtCorpusScale() async throws {
-        guard ProcessInfo.processInfo.environment["ARCHIVE_NOTES_SCALE_ACCEPTANCE"] == "1" else {
-            return
-        }
         let root = try makeScaleFixture()
         defer { try? FileManager.default.removeItem(at: root) }
         let manifest = Manifest(itemCount: 100_000, wordsPerItem: 20, wordCount: 2_000_000,

@@ -332,14 +332,16 @@ struct PDFThumbnailerTests {
         // Tiny budget so one thumbnail should trigger eviction of the other
         let thumbnailer = PDFThumbnailer(cacheDirectory: cacheDir, diskBudgetBytes: 1)
 
-        let _ = await thumbnailer.png(
+        // Both renders must succeed, or the count below holds with nothing ever written (W40.a4).
+        let first = await thumbnailer.png(
             fileURL: pdfURL, page: 1,
             linkKey: "test://evict1", mtime: Date()
         )
-        let _ = await thumbnailer.png(
+        let second = await thumbnailer.png(
             fileURL: pdfURL, page: 2,
             linkKey: "test://evict2", mtime: Date()
         )
+        #expect(first != nil && second != nil, "both thumbnails should render")
 
         // With a 1-byte budget, after the second write eviction should have pruned
         // down to at most 1 file (the most recent)

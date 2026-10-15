@@ -242,8 +242,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   through `NotesModel.search` (`:497`), and the list recomputes through `NotesNavigationModel.recompute`.
 - **Real-path test:** `ArchiveNotesTests/NotesScalePerfTests.fullIndexSearchSummariesAndNavigationStayBoundedAtCorpusScale`.
   It drives the real `buildIndexFromDisk`, indexer search, `allSummaries` and `NotesNavigationModel.recompute` on
-  a generated 100k / 2M-word store. It returns at once unless `ARCHIVE_NOTES_SCALE_ACCEPTANCE=1`, so an ordinary
-  unit run passes it without measuring anything.
+  a generated 100k / 2M-word store. It is disabled unless `ARCHIVE_NOTES_SCALE_ACCEPTANCE=1`, so an ordinary
+  unit run reports it skipped (until W40.a4 it returned early and reported a pass).
 - **Runtime evidence:** none.
 - **Status:** `unproven`
 - **History:**

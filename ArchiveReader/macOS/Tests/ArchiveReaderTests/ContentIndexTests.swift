@@ -70,7 +70,10 @@ final class ContentIndexTests: XCTestCase {
         try await idx.open()
         try await idx.upsert(path: "/a.pdf", mtime: 1, name: "a", classification: nil, body: "hello")
         // Punctuation that would be invalid raw FTS5 syntax must be handled safely.
-        _ = await idx.search("\"unbalanced ( quote * AND")
+        let odd = await idx.search("\"unbalanced ( quote * AND")
+        XCTAssertEqual(odd, [], "none of the query's terms are in the index")
+        let hello = await idx.search("hello")
+        XCTAssertEqual(hello, ["/a.pdf"], "the index still answers after the malformed query")
         await idx.close()
     }
 

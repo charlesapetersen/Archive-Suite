@@ -139,7 +139,8 @@ import Foundation
         defer { cleanup(tmp) }
 
         // Insert one row so the table isn't empty.
-        try await index.upsertBatch([makeRow(title: "Test note", body: "Some body text")])
+        let id = UUID()
+        try await index.upsertBatch([makeRow(id: id, title: "Test note", body: "Some body text")])
 
         let adversarial = [
             "\"", "\"\"", "\" OR 1=1 --", "'; DROP TABLE fts; --",
@@ -150,10 +151,12 @@ import Foundation
         ]
 
         for query in adversarial {
-            // Must not throw or crash — empty results are fine.
+            // Must not throw or crash. None of these contain a word of the one row.
             let results = await index.search(query)
-            _ = results // just needs to not crash
+            #expect(results.isEmpty, "query \(query.debugDescription) matched \(results)")
         }
+        // W40.a4: the loop alone could not fail; prove the index still answers afterwards.
+        #expect(await index.search("body") == [id])
     }
 
     // MARK: - Incremental mtime skip

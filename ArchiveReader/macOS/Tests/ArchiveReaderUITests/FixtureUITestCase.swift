@@ -5,7 +5,7 @@ import Darwin   // getpwuid / getuid — resolve the REAL home from the password
 ///
 /// Launches Archive Reader with `-ARUITestRootPath` pointing to the pre-built
 /// fixture at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`.
-/// If the fixture directory is absent, every test in the subclass is skipped
+/// If the fixture directory is absent, every test in the subclass FAILS
 /// (the fixture is built by `scripts/make-gui-fixture.sh`).
 /// `@MainActor` because XCUIApplication / XCUIElement are main-actor-isolated in the Swift 6 SDK;
 /// UI tests drive the UI and belong on the main actor. Subclasses inherit this isolation.
@@ -54,10 +54,11 @@ class FixtureUITestCase: XCTestCase {
     // must override `setUp() async throws` and call `super` — not `setUpWithError()`.
     override func setUp() async throws {
         continueAfterFailure = false
-        try XCTSkipUnless(
-            FileManager.default.fileExists(atPath: Self.fixturePath),
-            "GUI fixture not found — run scripts/make-gui-fixture.sh first"
-        )
+        // W40.a4: a missing fixture FAILS. It used to XCTSkip, so a lane whose fixture build broke went
+        // green having tested nothing (the VM runner rebuilds the fixture before every run).
+        guard FileManager.default.fileExists(atPath: Self.fixturePath) else {
+            throw FixtureMissing(path: Self.fixturePath, builder: "scripts/make-gui-fixture.sh")
+        }
 
         app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launchArguments += ["-ARUITestRootPath", Self.fixturePath]

@@ -7,17 +7,21 @@ final class DeepLinkTests: XCTestCase {
 
     // MARK: - DeepLinkRouter
 
+    // The router dispatches exactly when `DurableLink(url:)` parses a `.readerReveal`, so that parse is
+    // what these assert (W40.a4: they used to call `handle` and assert nothing).
+    private func assertRouterIgnores(_ url: URL, file: StaticString = #filePath, line: UInt = #line) {
+        if case .readerReveal = DurableLink(url: url) {
+            XCTFail("\(url) parsed as a Reader reveal; the router would navigate on it", file: file, line: line)
+        }
+        DeepLinkRouter().handle(url)   // no nav wired: must not crash
+    }
+
     func testRouterIgnoresNonReaderScheme() {
-        let router = DeepLinkRouter()
-        // No nav wired — just verify no crash on a non-reader URL.
-        let url = URL(string: "https://example.com")!
-        router.handle(url)
+        assertRouterIgnores(URL(string: "https://example.com")!)
     }
 
     func testRouterIgnoresNotesScheme() {
-        let router = DeepLinkRouter()
-        let url = URL(string: "archivenotes://open?id=\(UUID().uuidString.lowercased())")!
-        router.handle(url)
+        assertRouterIgnores(URL(string: "archivenotes://open?id=\(UUID().uuidString.lowercased())")!)
     }
 
     func testRouterParsesReaderRevealURL() {

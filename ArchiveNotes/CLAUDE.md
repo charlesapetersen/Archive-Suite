@@ -464,7 +464,6 @@ macOS/Sources/ArchiveNotes/
                                    render for text-only pasted page links; no prompt, scan, or root mutation
 
 macOS/Tests/ArchiveNotesTests/
-  SmokePlaceholderTests.swift      Trivial test for the smoke gate
   ArchiveCoreWiringTests.swift     DurableLink/RootMarker from Notes target
   NotesAppSettingsTests.swift      20 tests: isolated-defaults layout persistence/clamping, including
                                    harness-close suppression + ordinary-close write-through (W21)

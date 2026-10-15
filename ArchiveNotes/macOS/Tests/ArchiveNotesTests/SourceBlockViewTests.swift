@@ -1,5 +1,6 @@
 import Testing
 import AppKit
+import PDFKit
 @testable import ArchiveNotes
 
 // MARK: - ThumbnailImageCache
@@ -39,11 +40,39 @@ struct NotesPDFPaneControllerTests {
 
     @MainActor @Test("fit resets to auto-scale")
     func fitResetsAutoScale() {
+        // W40.a4: this used to call fit/zoom with no PDFView and assert nothing, so it could not fail.
+        let view = PDFView(frame: NSRect(x: 0, y: 0, width: 400, height: 600))
+        let doc = PDFDocument()
+        doc.insert(PDFPage(), at: 0)
+        view.document = doc
         let controller = NotesPDFPaneController()
-        // Without a PDFView attached, operations should be no-ops (not crash)
+        controller.pdfView = view
+
+        view.autoScales = false
+        view.scaleFactor = 1
+        controller.zoomIn()
+        #expect(view.autoScales == false, "zooming takes the view off auto-scale")
+        #expect(abs(view.scaleFactor - 1.25) < 0.001, "zoomIn scales by 1.25, got \(view.scaleFactor)")
+        controller.zoomOut()
+        #expect(abs(view.scaleFactor - 1) < 0.001, "zoomOut undoes zoomIn, got \(view.scaleFactor)")
+
+        controller.zoomIn()
+        controller.fit()
+        #expect(view.autoScales, "fit returns the view to auto-scale")
+    }
+
+    @MainActor @Test("with no PDFView attached, fit and zoom are no-ops")
+    func detachedControllerIsInert() {
+        let controller = NotesPDFPaneController()
         controller.fit()
         controller.zoomIn()
         controller.zoomOut()
+        // Had the detached zoom saved a scale, applyToView would restore it instead of auto-scaling.
+        let view = PDFView(frame: NSRect(x: 0, y: 0, width: 400, height: 600))
+        view.autoScales = false
+        controller.pdfView = view
+        controller.applyToView()
+        #expect(view.autoScales, "detached zoom calls must leave no saved scale behind")
     }
 }
 

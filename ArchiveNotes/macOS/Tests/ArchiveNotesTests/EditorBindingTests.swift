@@ -283,26 +283,8 @@ struct EditorBindingTests {
         #expect(shown.placeholder == nil, "the editor should show the written thumbnail, not the Missing placeholder")
     }
 
-    // MARK: - Lint check (no .layoutManager in Editor/)
-
-    @Test
-    func lintEditorNoLayoutManager() throws {
-        // Verify none of the Editor/ Swift files reference .layoutManager
-        let editorDir = findEditorDir()
-        guard let dir = editorDir else {
-            // If we can't find the dir (e.g. running from Xcode with a different working dir),
-            // skip gracefully — the shell lint script is the real gate.
-            return
-        }
-        let fm = FileManager.default
-        let files = try fm.contentsOfDirectory(atPath: dir)
-            .filter { $0.hasSuffix(".swift") }
-        for file in files {
-            let content = try String(contentsOfFile: "\(dir)/\(file)", encoding: .utf8)
-            #expect(!content.contains(".layoutManager"),
-                    "Editor/\(file) must not reference .layoutManager (TextKit 1 downgrade risk)")
-        }
-    }
+    // The `.layoutManager` lint lives in `EditorPerfTests.noLayoutManagerInEditorSources` (W40.a4 removed
+    // this file's copy, which searched from the working directory and passed when it found nothing).
 
     // MARK: - Helpers
 
@@ -349,19 +331,5 @@ struct EditorBindingTests {
         coordinator.textView = textView
         coordinator.parent = view
         return coordinator
-    }
-
-    private func findEditorDir() -> String? {
-        // Walk up from the test bundle to find the source tree.
-        // In a worktree: .../ArchiveNotes/macOS/Sources/ArchiveNotes/Editor
-        let fm = FileManager.default
-        var dir = fm.currentDirectoryPath
-        for _ in 0..<10 {
-            let candidate = "\(dir)/ArchiveNotes/macOS/Sources/ArchiveNotes/Editor"
-            if fm.fileExists(atPath: candidate) { return candidate }
-            dir = (dir as NSString).deletingLastPathComponent
-            if dir == "/" { break }
-        }
-        return nil
     }
 }
