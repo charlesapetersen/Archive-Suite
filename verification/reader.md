@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 38 · works 3 · broken 2 · unreachable 3` (works: R-21, R-28, R-29; broken: R-23, R-45; unreachable: R-25, R-26, R-46). Updated by `W40.d8`, 2026-10-15.
+- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 3` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-26, R-46). Updated by `W40.d7`, 2026-10-15.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -61,11 +61,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/WarmStartUITests.testWarmRowsPaintAsRevalidatingBeforeTheyPaintAsSettled`;
   `ArchiveReaderTests/LibraryWarmStartTests.testColdQuitWarmPublishesCacheBeforeWalkThenCorrectsAClosedAppTagChange`;
   `ArchiveReaderUITests/ArchiveReaderUITests.testAnUntaggedFolderShowsTheScannedDenominator`.
-- **Runtime evidence:** none. The 10 s figure is the corpus measurement in `W26.walk2`, taken before this phase.
-  `W40.d7` (corpus size) re-measures it.
+- **Runtime evidence:** the timing clause only. [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md): 150,000 synthetic files (115,999 listed) walk cold in
+  6.98 s (43.8 µs/file, `.utility`), warm start 0.48 s; the `W40.c2` sample's 8,750 real files walk in 0.45–1.3 s.
+  "About 102k in about 10 s" holds. Warm paint, progress and tagged non-PDF images were not exercised here.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d7 — walk timing measured at 150k and on the real sample; holds. Status unchanged (the rest of the promise is not exercised).
 - **Notes:** no test lists a tagged non-PDF image. The code reading says it would be listed.
 
 ### R-03 · Live updates from FSEvents
@@ -226,10 +228,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `refreshFullTextSearchIfActive` (`NavigationModel.swift:697`, wired at `:184`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testOCRSearchShowsKeywordInContextSnippet`,
   `.testOCRSearchFieldExists`; `ArchiveReaderTests/ContentIndexTests.testBm25RankedSearch`.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md). On the `W40.c2` sample's real OCR text, and on that text replicated to 102,478
+  rows: single distinctive terms answer in 11–146 ms at 102k, `the` in 0.7 s, but `Bureau of the Budget` takes
+  2.2 s on the sample and **41.7 s** at 102k (`-O`). Index build: 5,268 PDFs in 9.2 s, one pass.
+- **Status:** `broken` — `W40.fix-reader-fts-snippet-stall` (S2)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d7 — `unproven` → `broken`: a multi-word query with common words takes 42 s at corpus size; filed `W40.fix-reader-fts-snippet-stall` (S2).
 - **Notes:** **Drift.** The search runs as you type, after 150 ms. There is no `.onSubmit` on the field, so
   `SMOKE_TEST.md` step G's "Submit-on-Return" is out of date. The behaviour is arguably better, but the record
   is wrong.
@@ -267,10 +272,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderTests/ProvenanceColumnTests.testProvenanceColumnIsPresentAndHiddenOnlyByDefault`,
   `.testNavigationModelPublishesIndexedClassificationForTheTable`; `ArchiveReaderUITests/NavigationUITests.testColumnHeadersExist`.
   No test uses the header picker.
-- **Runtime evidence:** none. Smoothness at scale is `W40.d7`'s to measure.
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md), 115,999 rows, `-O`, main thread: one tag edit → list 1,561 ms; `recompute()`
+  1,021 ms; a sort change 0.96–5.5 s; the table's per-change refresh 107 ms. Scrolling's cell work is 2.7 ms a row
+  (no frame rate measured; the unit host draws nothing).
+- **Status:** `broken` — `W40.fix-reader-list-recompute-at-size` (S2)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d7 — `unproven` → `broken`: every tag edit stalls the main thread ~1.6 s and a sort change 1–5.5 s at 116k rows; filed `W40.fix-reader-list-recompute-at-size` (S2).
 - **Notes:** the headers read "Type" and "Read". There are also flag (⚑) and warning (⚠︎) columns that no
   guide lists.
 
@@ -793,10 +801,12 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** the status-bar `ar.status.health` button (`Views/NavigationWindowView.swift:636`) opens
   `DataQualityView` (`:703`), fed by `NavigationModel.dataQuality` (`Views/NavigationModel.swift:1334`).
 - **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Runtime evidence:** the cost only. [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md): `dataQuality`, recomputed on every access, takes 30 ms over
+  115,999 rows and 4 ms over the sample (`-O`). The popover was not opened.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d7 — popover data cost measured at 116k rows (30 ms). Status unchanged: the popover itself was not driven.
 - **Notes:** no current guide describes the popover. Its only record is the SMOKE_TEST step. It also has a
   Non-standard PDFs row.
 

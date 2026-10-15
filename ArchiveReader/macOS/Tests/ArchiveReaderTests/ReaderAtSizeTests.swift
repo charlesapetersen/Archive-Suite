@@ -271,7 +271,10 @@ final class ReaderAtSizeTests: XCTestCase {
                 samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9)
             }
             samples.sort()
-            print("D7 search@102k \"\(query)\" hits=\(hits) median \(ms(samples[1])) max \(ms(samples[2]))")
+            // The same MATCH without snippets, to say which half of `searchRanked` the time is in.
+            let pathsOnly = await timeAsync { await corpusIndex.search(query) }.1
+            print("D7 search@102k \"\(query)\" hits=\(hits) median \(ms(samples[1])) max \(ms(samples[2])) "
+                  + "| paths-only search() \(ms(pathsOnly))")
         }
         await corpusIndex.close()
 
@@ -331,8 +334,35 @@ final class ReaderAtSizeTests: XCTestCase {
         _ = await waitUntil(timeout: 900) { indexer.progress == nil && indexer.completedPassesForTesting >= 1 }
         let recompute = repeated(3) { navigation.recompute() }
         print("D7 model recompute rows=\(rows.count) median \(ms(recompute.median)) max \(ms(recompute.max))")
+        // One tag edit, as `ArchiveLibrary.applyVerifiedWrites` makes it after Mark Read, an inline or
+        // group edit, a rename or an undo: the whole `files` array reassigned with one row rebuilt.
+        // `libraryDidChange` then runs again in full on the main thread. Paths are unchanged, so the
+        // folder tree is not rebuilt, which is what makes this cheaper than the first publish above.
+        var editSamples: [Double] = []
+        for k in 0..<3 {
+            var edited = navigation.library.files
+            let i = (edited.count / 3) * k
+            let f = edited[i]
+            let flipped = f.tags.raw.map { $0 == "Unread" ? "Read" : ($0 == "Read" ? "Unread" : $0) }
+            edited[i] = ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
+                                    tags: DocumentTags.parse(raw: flipped, labelNumber: nil),
+                                    contentModified: f.contentModified, isDataless: f.isDataless,
+                                    provenance: f.provenance)
+            let before = navigation.displayedGeneration
+            let start = DispatchTime.now().uptimeNanoseconds
+            navigation.library.replaceFilesForTesting(edited)
+            _ = await waitUntil(timeout: 60) { navigation.displayedGeneration != before }
+            editSamples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9)
+            _ = await waitUntil(timeout: 300) { indexer.progress == nil }
+        }
+        editSamples.sort()
+        print("D7 model one tag edit -> list (files reassigned, libraryDidChange) median \(ms(editSamples[1])) "
+              + "max \(ms(editSamples[2]))")
+
         let health = repeated { _ = navigation.dataQuality }
         print("D7 synthetic health total=\(navigation.dataQuality.total) median \(ms(health.median)) max \(ms(health.max))")
+
+        print(String(format: "D7 synthetic footprint with model %.0f MiB", footprintMiB()))
 
         // ── The table, as `AppKitTableView.makeNSView` builds it, minus the window.
         // In a scroll view of a window's size, as the app has it: a bare NSTableView grows to fit every
@@ -389,14 +419,14 @@ final class ReaderAtSizeTests: XCTestCase {
         var screenTimes: [Double] = []
         for step in 0..<200 {
             let top = (ids.count - screenRows) * step / 199
-            let (_, t) = time {
+            let (_, t) = time { autoreleasepool {
                 for row in top..<(top + screenRows) {
                     for column in tableView.tableColumns {
                         let cell = coordinator.makeCell(tableView: tableView, column: column, row: row, itemID: ids[row])
                         _ = cell.fittingSize
                     }
                 }
-            }
+            } }
             screenTimes.append(t)
         }
         screenTimes.sort()

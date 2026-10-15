@@ -10991,3 +10991,29 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
     persist in the guest's defaults even in UI-test mode, and so does the window frame: a journey left zoomed made the next `LayoutGuardUITests` measure a 1920-pt window and fail (tearDown now drags it back to its 900×612 minimum and quits with ⌘Q, since `terminate()` can kill the app before it saves the frame); the real folder `SC0308 —\u00a0Clebsch papers` has a no-break
     space. SimilarTagsSheet gained a per-cluster accessibility id (test tooling). Commits: 916e815d, f5c31a95, fff94777 and this one. Full lane at f5c31a95: every other class green with the journey in it.
   <!-- /W40.d8 -->
+- [x] **W40.d7 — Reader at corpus size [M]** · §W40 — verification phase · SHIPPED 2026-10-15 (lane: reader) (uses: machine)
+  - **What:** `ArchiveReaderTests/ReaderAtSizeTests` (handshake-gated, skips by default) and
+    `ops/scale/run-reader-at-size.sh [--optimized] [--only sample|synthetic]`. On the W40.c2 sample: the content index
+    built through the real path (`libraryDidChange` → `ContentIndexer`), search latency, and the same queries over the
+    sample's own text replicated to 102,478 rows. On the 150k synthetic tree: sort, filter, `recompute()`, a first
+    publish and a single tag edit through the model, the table's real coordinator and diffable data source without a
+    window, the health popover, memory. The harness lists the sample (size, mtime, ctime, inode, every xattr) before
+    and after from its own process; identical on every run (9,397 paths). `--optimized` builds with
+    `SWIFT_OPTIMIZATION_LEVEL=-O`; quote that run as the shipped cost.
+  - **Result** (`verification/evidence/reader/W40.d7-at-size.md`; summary in Reader `KNOWN_ISSUES.md` §MEASURED
+    W40.d7): discovery within ~10% of the 2026-08-10 numbers (re-run `run-scale-verify.sh --keep`, green). R-02's walk
+    timing holds. Index build 1.7 ms per real PDF. At 116k rows `-O`: one tag edit costs 1,561 ms of main-thread work,
+    a sort change 0.96–5.5 s; `Bureau of the Budget` takes 41.7 s at 102k rows, all of it in `snippet()` (paths-only
+    24 ms). Filters, the popover (30 ms) and scrolling's cell work (2.7 ms a row) are fine. Ledger: R-11 and R-13
+    `broken`; R-02 and R-40 gain runtime evidence and stay `unproven`.
+  - **Filed:** `W40.fix-reader-list-recompute-at-size` (S2) and `W40.fix-reader-fts-snippet-stall` (S2).
+  - **Gotchas for the next lane:** in a `@MainActor` async XCTest, never spin `RunLoop.current` to wait: the body is a
+    main-queue job, so the model's `.receive(on: DispatchQueue.main)` sinks never fire (the first run sat at 2% CPU);
+    poll with `Task.sleep`. Publish rows only after the model's first `$files` delivery has landed, or one publish
+    yields two index passes. A bare `NSTableView` (no scroll view) lays out every row when a snapshot is applied;
+    at 116k rows it overflowed SwiftUI's AttributeGraph and aborted the host. Wrap cell-making loops in
+    `autoreleasepool`, or 63k retained views inflate every later timing. Python's `os.listxattr` does not exist on
+    macOS (the harness calls libc through `ctypes`). The unattended host-GUI hook matches the text
+    `xcodebuild test -scheme` without `-only-testing` anywhere in a Bash command, including inside a heredoc; edit
+    such scripts through a file. Commits: f6793865 and this one.
+  <!-- /W40.d7 -->

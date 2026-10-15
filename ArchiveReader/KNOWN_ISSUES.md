@@ -94,6 +94,23 @@ the plan is being deleted. Synthetic **scratch** corpus, 150,000 files / 124,647
   the background clamp alone that costs ~6×, so a shipping change that moved discovery to `.utility` from a
   higher band would cost nothing, and one that let it fall to `.background` would cost everything.
 
+## 📏 MEASURED (`W40.d7`, 2026-10-15) — the Reader at corpus size: two open S2 stalls
+
+Full numbers, method and caveats: `verification/evidence/reader/W40.d7-at-size.md`. Harness:
+`ops/scale/run-reader-at-size.sh [--optimized]`. Quote its `-O` run as the shipped cost; the unit bundle is
+Debug otherwise, and Swift-side sorting is 1.5–3× slower there.
+
+- **Discovery** re-measured against the section above: within ~10% (cold walk 6.98 s, warm start 0.48 s, steady
+  revalidation 3.70 s at 150k). The Reader lane's footprint rose to +409 MiB from +277 MiB; not explained.
+- **Open, S2 — `W40.fix-reader-list-recompute-at-size`.** At 115,999 rows every tag edit reassigns
+  `ArchiveLibrary.files` and `libraryDidChange` re-sorts everything on the main thread: **1.56 s per edit**,
+  0.96–5.5 s per sort change (`localizedStandardCompare`, and a path-string tiebreak on every tied comparison).
+- **Open, S2 — `W40.fix-reader-fts-snippet-stall`.** `searchRanked("Bureau of the Budget")` takes **41.7 s** over
+  102k rows (the sample's real text, replicated); distinctive single terms take 11–146 ms. It runs on the
+  `ContentIndex` actor, so later queries queue behind it.
+- **Fine at size:** filters 7–33 ms, the health popover's `dataQuality` 30 ms, scrolling's cell work 2.7 ms a
+  row, index build 1.7 ms per real PDF (5,268 in 9.2 s; ~3 min projected for the corpus [I]).
+
 ## ✅ FIXED (`W26.previewzoom`) — the preview sheet's zoom/fit shortcuts did nothing; `⌘0` never reached it
 
 **Found 2026-08-09** by `W26.docs-fu1`, the item that finally ran a GUI check deferred since the feature

@@ -183,7 +183,9 @@ where it can.
   `unreachable` and goes to the owner.
 - **`W40.d7` — Reader at size [M].** On the `W40.c2` sample, and on the 150k synthetic tree for list length:
   FTS index build time, search latency, list scrolling, health-popover cost, memory. Compare with the 2026-08-10
-  scale numbers in Reader `KNOWN_ISSUES.md`.
+  scale numbers in Reader `KNOWN_ISSUES.md`. *(SHIPPED 2026-10-15: `ReaderAtSizeTests` + `ops/scale/run-reader-at-size.sh`,
+  evidence `verification/evidence/reader/W40.d7-at-size.md`; filed `W40.fix-reader-list-recompute-at-size`,
+  `W40.fix-reader-fts-snippet-stall`.)*
 - **`W40.d8` — Reader triage writes [M].** Mark Read & Next, inline subject edit, group edit, rename across
   files, merge similar tags, undo, smart folders. Decode the xattrs after every step; quit and relaunch; check
   unrelated tags and colours survive. *(SHIPPED 2026-10-15: `TriageJourneyUITests`, evidence
