@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED (W41.ocr-prompt-app): transcription scope was underspecified
+
+`OCRPrompt.build` TASK 3 now states the owner's rules for the whole foreground sheet, including archive
+and database additions, `*` bullets and `[illegible]`; background sheets and non-text symbols are excluded.
+Foreground box/folder labels remain transcribed. The classification/orientation tasks and response parser
+are unchanged. Regression: `scripts/test-ocr-prompt.sh` (also in the app's smoke test); live comparison:
+`segbench-results/ocr-prompt-app.md`. This changes the instruction, not a guarantee of every model's recall.
+
 ## ✅ FIXED (W40.a3): E2E inherited processing preferences and a blocked shutdown signal
 
 The real phone↔Mac harness now selects live LAN processing, Gemini Flash-Lite, automatic tags,

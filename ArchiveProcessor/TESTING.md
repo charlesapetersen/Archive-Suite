@@ -377,6 +377,11 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-controlled-vocabulary.sh`** — post-parse controlled-vocabulary enforcement.
 
 **Providers**
+
+- **`test-ocr-prompt.sh`** — $0 standalone check of the production `OCRPrompt.build` and response parser:
+  the owner's foreground-sheet transcription rules in every context variant, all classification/rotation
+  tags, and verbatim preservation of headers, footers, bullets and `[illegible]`. Included in the app's
+  `test-smoke.sh`; no app launch, key, network or corpus is needed.
 - **`test-localagent.sh`** — drives the real `LocalAgentClient` against a fake CLI
   (`scripts/localagent-fake-cli.sh`), so the Local Agent path is provable with no account and no spend.
 - **`test-segmentation-engine.sh`** — the W36 window segmenter on recorded answers: the bundled options.json,

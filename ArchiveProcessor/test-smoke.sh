@@ -43,6 +43,9 @@ IN="$WORK/in"; OUT="$WORK/out"; mkdir -p "$IN" "$OUT"
 echo "=== Archive Processor smoke test · $TS ==="
 echo "  scratch: $WORK"
 
+# Keep the shared transcription instruction and response parser under the normal OCR smoke gate.
+bash "$ROOT/scripts/test-ocr-prompt.sh" || fail "OCR prompt contract failed"
+
 # ---------- 1. Gemini key (from Keychain; never printed/persisted) ----------
 KEY=$(security find-generic-password -s "$KC_SERVICE" -a Gemini -w 2>/dev/null || true)
 [ -n "$KEY" ] || fail "no Gemini key in Keychain (service '$KC_SERVICE', account 'Gemini') — add it or approve the Keychain prompt"
