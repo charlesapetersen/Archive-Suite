@@ -45,6 +45,15 @@ final class NoteBodyEditorModel: ObservableObject {
     var load: (UUID) async -> String? = { _ in nil }
     /// Persist edited body markdown for the item (→ `NotesModel.setBody`).
     var save: (UUID, String) async -> Void = { _, _ in }
+    /// Production note editors use this seam: expected body in, actual durable body out; nil means
+    /// failure. Templates retain their lease/draft-aware save seam above.
+    var checkedSave: ((UUID, String, String) async -> String?)?
+    /// Inline asset tasks must land before a recovery snapshot copies the item's assets.
+    var prepareSave: () async -> Void = {}
+    var onExternalChange: () -> Void = {}
+    @Published private(set) var externalChangeMessage: String?
+    /// Recreate TextKit after a conflict reload so old undo/serialization cannot restore stale text.
+    @Published private(set) var reloadGeneration = 0
     /// Push any text still inside the live editor's own debounce into `markdown` **synchronously**, so a
     /// flush-on-switch captures the last keystrokes (→ the editor coordinator's `flushWriteBack`). A
     /// no-op in tests (which set `markdown` directly to simulate the editor having pushed).
@@ -56,16 +65,19 @@ final class NoteBodyEditorModel: ObservableObject {
 
     // MARK: Private state
 
+    private var baseline = ""
     private var dirty = false
     private var suppressAutosave = false
     private var saveTask: Task<Void, Never>?
+    private var saveGeneration = 0
     private var loadGeneration = 0
 
     init() {}
 
     /// A retired editor may finish a delayed serialize after another item has loaded.
-    func acceptEditorMarkdown(_ body: String, for editorItemID: UUID?) {
-        guard loadedID == editorItemID else { return }
+    func acceptEditorMarkdown(_ body: String, for editorItemID: UUID?, generation: Int? = nil) {
+        guard loadedID == editorItemID,
+              generation == nil || generation == reloadGeneration else { return }
         markdown = body
     }
 
@@ -80,11 +92,13 @@ final class NoteBodyEditorModel: ObservableObject {
         flushEditor()
         await flush()                       // persist the outgoing item (targets the OLD loadedID)
 
+        // A refused content/recovery write must not discard the outgoing draft on a switch.
+        guard !dirty else { return }
         loadGeneration &+= 1
         let generation = loadGeneration
         guard let id else { setLoaded(nil, body: "") ; return }
 
-        let body = await load(id) ?? ""
+        guard let body = await load(id) else { return }
         guard generation == loadGeneration else { return }   // a newer select() superseded this load
         setLoaded(id, body: body)
     }
@@ -93,16 +107,28 @@ final class NoteBodyEditorModel: ObservableObject {
     /// write). Called on selection switch and when the editor disappears (pane teardown / window close)
     /// so no dirty buffer is dropped.
     func flush() async {
-        let pending = saveTask
-        pending?.cancel()
-        saveTask = nil
-        // Cancellation cannot undo a store write already in progress. Wait for it so an older
-        // debounced save cannot finish after this forced save and replace the newer body.
-        await pending?.value
-        guard dirty, let id = loadedID else { return }
-        let body = markdown
-        await save(id, body)
-        if loadedID == id, markdown == body { dirty = false }
+        // Keep the tail published while waiting: another flush or a newly scheduled save must also
+        // wait for it. If typing extends the chain during the await, drain that newer tail as well.
+        while let pending = saveTask {
+            let generation = saveGeneration
+            pending.cancel()
+            await pending.value
+            guard generation == saveGeneration else { continue }
+            saveTask = nil
+        }
+        guard dirty else { return }
+        // Publish the forced save too: typing during its awaits must queue BEHIND it, just as it
+        // does behind an idle autosave. Otherwise a new debounce can start a parallel stale save.
+        let forced = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while self.dirty, let id = self.loadedID {
+                let body = self.markdown
+                guard await self.persist(body, for: id) else { return }
+            }
+        }
+        saveGeneration &+= 1
+        saveTask = forced
+        await forced.value
     }
 
     /// Flush BOTH debounces then await the write: first `flushEditor()` (synchronously push the live
@@ -118,34 +144,92 @@ final class NoteBodyEditorModel: ObservableObject {
         await flush()
     }
 
+    /// The view polls only its open note, and cancels this work on teardown. Flush TextKit's first
+    /// debounce before AND after the read: an apparently clean model may still have live keystrokes.
+    /// Dirty buffers are never replaced; the checked save will preserve their draft separately.
+    func refreshFromDisk() async {
+        guard checkedSave != nil, let id = loadedID else { return }
+        flushEditor()
+        guard !dirty else { return }
+        let expected = baseline
+        let generation = loadGeneration
+        guard let body = await load(id) else { return }
+        flushEditor()
+        guard loadedID == id, generation == loadGeneration, !dirty, baseline == expected,
+              body != expected else { return }
+        suppressAutosave = true
+        markdown = body
+        suppressAutosave = false
+        baseline = body
+        reloadGeneration &+= 1
+        externalChangeMessage = "This note changed outside this editor and was reloaded."
+        onExternalChange()
+    }
+
+    @discardableResult
+    private func persist(_ body: String, for id: UUID) async -> Bool {
+        let expected = baseline
+        await prepareSave()
+        let saved: String
+        if let checkedSave {
+            guard let actual = await checkedSave(id, body, expected) else { return false }
+            saved = actual
+        } else {
+            await save(id, body)
+            saved = body
+        }
+        // A save may suspend while TextKit receives more keystrokes in its own debounce. Serialize
+        // those before deciding the buffer is clean or replacing it with a conflict reload.
+        flushEditor()
+        guard loadedID == id else { return true }
+        // New keystrokes may have arrived during the save. If this was a conflict, those still
+        // derive from the OLD baseline and must themselves go through recovery on the next save.
+        if markdown == body {
+            baseline = saved
+            dirty = false
+            if saved != body {
+                suppressAutosave = true
+                markdown = saved
+                suppressAutosave = false
+                reloadGeneration &+= 1
+                externalChangeMessage = "This note changed outside this editor. Your in-app draft was kept separately; the original was reloaded."
+            }
+        } else if saved == body {
+            baseline = saved
+        }
+        return true
+    }
+
     // MARK: Private
 
     /// Install a freshly-loaded body without tripping autosave, and reset per-item state.
     private func setLoaded(_ id: UUID?, body: String) {
         saveTask?.cancel()
         saveTask = nil
+        saveGeneration &+= 1
         suppressAutosave = true
         markdown = body
         suppressAutosave = false
         loadedID = id
+        baseline = body
         dirty = false
+        externalChangeMessage = nil
     }
 
-    /// (Re)schedule the debounced idle save, capturing the target id + body at schedule time so a later
+    /// (Re)schedule the debounced idle save, capturing the target id at schedule time so a later
     /// selection switch cannot redirect this write to a different item.
     private func scheduleSave() {
         let previous = saveTask
         previous?.cancel()
         let id = loadedID
-        let body = markdown
+        saveGeneration &+= 1
         saveTask = Task { @MainActor [weak self] in
             // A previous task may already be inside the store despite cancellation. Preserve
             // edit order even when typing resumes while that write is still in flight.
             await previous?.value
             try? await Task.sleep(for: self?.saveDebounce ?? .milliseconds(600))
-            guard !Task.isCancelled, let self, let id else { return }
-            await self.save(id, body)
-            if self.loadedID == id, self.markdown == body { self.dirty = false }
+            guard !Task.isCancelled, let self, let id, self.loadedID == id, self.dirty else { return }
+            await self.persist(self.markdown, for: id)
         }
     }
 }

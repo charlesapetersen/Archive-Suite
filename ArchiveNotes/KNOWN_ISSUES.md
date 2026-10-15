@@ -3,6 +3,20 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+
+## W40.fix-notes-outside-edit-overwrite — checked editor saves (GUI acceptance pending)
+
+Open editors keep their own body baseline. A checked, coordinated save detects a newer body on disk;
+clean editors poll their selected note and reload it with a notice. On a conflict the original is left
+untouched and the in-app body is saved as a separate “Recovered draft” note in Inbox (or Extracts), with
+its assets copied before reload. Metadata-only edits compose with body saves. Pending TextKit edits and
+asset writes are flushed before recovery, and retired editor bindings cannot restore the stale body.
+Scratch unit tests cover outside in-place/atomic writes, metadata, independent editors, assets/symlinks,
+late keystrokes and refused recovery/retry. A failed save still cannot veto close/quit: the pre-existing
+lifecycle gap is queued as W40.fix-notes-failed-save-close. File coordination protects cooperating writers;
+an arbitrary uncoordinated process can still write during another process’s replacement operation.
+
+
 ## 🔴 OPEN (W40.d9, 2026-10-15) — three writing-session defects, reproduced in the VM
 
 `ArchiveNotesUITests/WritingJourneyUITests` types into the styled editor with real keystrokes. Autosave, ⌘Q

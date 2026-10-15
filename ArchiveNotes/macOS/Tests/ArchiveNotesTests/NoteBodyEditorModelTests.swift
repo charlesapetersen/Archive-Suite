@@ -42,6 +42,96 @@ private func makeModel(_ rec: Recorder, debounce: Duration = .milliseconds(40)) 
 @MainActor
 struct NoteBodyEditorModelTests {
 
+    @Test("conflict completion flushes TextKit and preserves keystrokes received during the save")
+    func lateTextKitEditSurvivesConflict() async {
+        let id = UUID()
+        let model = NoteBodyEditorModel()
+        model.load = { _ in "initial" }
+        model.saveDebounce = .seconds(60)
+        var lateText: String?
+        var drafts: [String] = []
+        var baselines: [String] = []
+        model.checkedSave = { _, draft, baseline in
+            drafts.append(draft)
+            baselines.append(baseline)
+            if drafts.count == 1 { lateText = "draft with last keystroke" }
+            return "outside body"
+        }
+        model.flushEditor = {
+            if let text = lateText { lateText = nil; model.markdown = text }
+        }
+        await model.select(id)
+        model.markdown = "draft"
+        await model.flushPending()
+        #expect(drafts == ["draft", "draft with last keystroke"])
+        #expect(baselines == ["initial", "initial"])
+        #expect(model.markdown == "outside body")
+        await model.flushPending()
+        #expect(drafts.count == 2, "no stale debounced save may follow the flush")
+        model.acceptEditorMarkdown("retired TextKit serialization", for: id, generation: 0)
+        #expect(model.markdown == "outside body", "same-ID reloads retire the old binding generation")
+    }
+
+    @Test("refresh rechecks TextKit after its disk read before replacing a clean buffer")
+    func refreshDoesNotDropLateKeystrokes() async {
+        let id = UUID()
+        let model = NoteBodyEditorModel()
+        var reads = 0
+        var textKitPending: String?
+        model.load = { _ in
+            reads += 1
+            if reads == 1 { return "initial" }
+            textKitPending = "latest keystroke"
+            return "outside"
+        }
+        model.checkedSave = { _, _, _ in "outside" }
+        model.saveDebounce = .seconds(60)
+        model.flushEditor = {
+            if let text = textKitPending { textKitPending = nil; model.markdown = text }
+        }
+        await model.select(id)
+        await model.refreshFromDisk()
+        #expect(model.markdown == "latest keystroke")
+        #expect(model.reloadGeneration == 0)
+        await model.flushPending()
+    }
+
+    @Test("overlapping forced flushes share the in-flight save instead of saving concurrently")
+    func forcedFlushesSerialize() async {
+        let model = NoteBodyEditorModel()
+        let id = UUID()
+        model.saveDebounce = .seconds(60)
+        model.load = { _ in "initial" }
+        var began: AsyncStream<Void>.Continuation!
+        let started = AsyncStream<Void> { began = $0 }
+        var events = started.makeAsyncIterator()
+        var release: CheckedContinuation<Void, Never>?
+        var active = 0
+        var calls = 0
+        model.checkedSave = { _, body, _ in
+            active += 1
+            calls += 1
+            #expect(active == 1)
+            if calls == 1 {
+                _ = began.yield(())
+                await withCheckedContinuation { release = $0 }
+            }
+            active -= 1
+            return body
+        }
+        await model.select(id)
+        model.markdown = "draft"
+        let first = Task { await model.flushPending() }
+        _ = await events.next()
+        let second = Task { await model.flushPending() }
+        for _ in 0..<10 { await Task.yield() }
+        #expect(calls == 1)
+        release?.resume()
+        await first.value
+        await second.value
+        #expect(calls == 1)
+    }
+
     @Test("a retired editor cannot save its passage into the newly selected item")
     func rejectsRetiredEditorWriteBack() async {
         let a = UUID(), b = UUID()

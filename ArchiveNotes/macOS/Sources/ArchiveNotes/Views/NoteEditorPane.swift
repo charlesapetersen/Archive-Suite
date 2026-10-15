@@ -83,10 +83,18 @@ struct NoteEditorPane: View {
                     .padding(8)
                     .accessibilityIdentifier("an.editor.parseFailure")
             }
+            if let message = bodyEditor.externalChangeMessage {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .accessibilityIdentifier("an.editor.externalChange")
+            }
             bodyEditorView
+                .id(bodyEditor.reloadGeneration)
                 .id(bodyEditor.loadedID)
                 .id(extractEditorGeneration)
-                .disabled(nav.selectedItemID == nil)   // nothing single-selected → no editable target
+                .disabled(nav.selectedItemID == nil || bodyEditor.loadedID != nav.selectedItemID)   // nothing single-selected → no editable target
 #if DEBUG
             uiTestControlStrip
 #endif
@@ -109,11 +117,13 @@ struct NoteEditorPane: View {
         }
         .onAppear {
             wireBodySeams()
+            refreshAssetStore(for: bodyEditor.loadedID)
             syncFormattingIdentity()
-            refreshAssetStore(for: nav.selectedItemID)
             formatting.clearZoteroAutoFillReference()
             Task {
                 await bodyEditor.select(nav.selectedItemID)
+                refreshAssetStore(for: bodyEditor.loadedID)
+                syncFormattingIdentity()
                 refreshZoteroAutoFillReference(for: nav.selectedItemID)
                 requestInitialEditorFocusIfReady()
             }
@@ -131,13 +141,20 @@ struct NoteEditorPane: View {
                 DispatchQueue.main.async { handleOpen(nav.model.pendingOpen) }
             }
         }
+        .task {
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                await bodyEditor.refreshFromDisk()
+            }
+        }
         .onChange(of: nav.selectedItemID) { _, newID in
             parseFailureMessage = nil
             syncFormattingIdentity()
-            refreshAssetStore(for: newID)
             formatting.clearZoteroAutoFillReference()
             Task {
                 await bodyEditor.select(newID)
+                refreshAssetStore(for: bodyEditor.loadedID)
+                syncFormattingIdentity()
                 refreshZoteroAutoFillReference(for: newID)
                 requestInitialEditorFocusIfReady()
             }
@@ -169,10 +186,11 @@ struct NoteEditorPane: View {
     /// is byte-identical to the previous inline construction).
     private var bodyEditorView: MarkdownEditorView {
         let editorItemID = bodyEditor.loadedID
+        let editorGeneration = bodyEditor.reloadGeneration
         var view = MarkdownEditorView(
             markdown: Binding(
                 get: { bodyEditor.markdown },
-                set: { bodyEditor.acceptEditorMarkdown($0, for: editorItemID) }
+                set: { bodyEditor.acceptEditorMarkdown($0, for: editorItemID, generation: editorGeneration) }
             ),
             isRaw: $isRaw,
             formatting: formatting,
@@ -377,7 +395,12 @@ struct NoteEditorPane: View {
         // does not reference this pane), and strong capture avoids `String??` / `Void?` seam types.
         let model = nav.model
         bodyEditor.load = { id in await model.loadBody(for: id) }
-        bodyEditor.save = { id, markdown in await model.setBody(markdown, for: id) }
+        bodyEditor.checkedSave = { id, markdown, expected in
+            await model.saveEditorBody(markdown, basedOn: expected, for: id)
+        }
+        bodyEditor.onExternalChange = {
+            model.statusMessage = "This note changed outside this editor and was reloaded."
+        }
         bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
         // W7-S2: give the formatting context the shared model so Create/Append Extract can persist.
         formatting.notesModel = model
@@ -392,6 +415,7 @@ struct NoteEditorPane: View {
     private func refreshAssetStore(for id: UUID?) {
         if assetStore == nil { assetStore = nav.model.makeAssetStore() }
         assetStore?.itemID = id
+        bodyEditor.prepareSave = { [weak store = assetStore] in await store?.awaitPendingWrites() }
         formatting.assetStore = assetStore
     }
 
@@ -426,10 +450,11 @@ struct NoteEditorPane: View {
     /// Publish the selected item's identity to the formatting context so W7's Create-Extract can anchor
     /// a passage's provenance (source id + snapshot title/date).
     private func syncFormattingIdentity() {
-        formatting.currentItemID = nav.selectedItemID
+        let matches = bodyEditor.loadedID == nav.selectedItemID
+        formatting.currentItemID = matches ? bodyEditor.loadedID : nil
         formatting.currentItemTitle = nav.selectedSummary?.title ?? ""
         formatting.currentItemDateDisplay = nav.selectedSummary?.displayDate ?? ""
-        formatting.currentItemKind = nav.selectedSummary?.kind   // W7-S2: gate Create/Append Extract to notes
+        formatting.currentItemKind = matches ? nav.selectedSummary?.kind : nil   // W7-S2: gate Create/Append Extract to notes
     }
 
     /// "Zotero link on clipboard — Attach" affordance (00-overview §D.5).

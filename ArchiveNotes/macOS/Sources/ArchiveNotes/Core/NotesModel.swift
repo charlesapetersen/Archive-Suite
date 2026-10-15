@@ -1126,6 +1126,43 @@ final class NotesModel: ObservableObject {
         }
     }
 
+    /// Editor-only optimistic save. The per-pane baseline is explicit, never shared by UUID. Once a
+    /// conflict draft is on disk, return the original's latest body so the pane can safely reload it.
+    /// A failed content/recovery write returns nil; the editor must retain its dirty buffer.
+    func saveEditorBody(_ markdown: String, basedOn expectedBody: String, for id: UUID) async -> String? {
+        guard let noteStore else { return nil }
+        do {
+            let saved = try await noteStore.saveBody(markdown, basedOn: expectedBody, for: id)
+            var transactions = [saved.current]
+            if let recovery = saved.recoveredDraft {
+                transactions.append(recovery)
+                do {
+                    let folder = recovery.item.kind == .extract ? organization.extractsHomeFolderId
+                        : OrganizationStore.inboxFolderId
+                    try await organization.addMembership(item: recovery.item.id, folder: folder)
+                } catch { report(error, "file the recovered draft (it is saved in the store)") }
+            }
+            // Cache/projection failures cannot turn a successful content save into a failed one:
+            // retrying an old baseline after that would manufacture another conflict draft.
+            for tx in transactions {
+                do {
+                    var indexed = tx
+                    // A conflict leaves the original entirely alone, including its Finder metadata.
+                    if tx.item.id != id || saved.recoveredDraft == nil {
+                        indexed = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
+                    }
+                    if let index { try await index.upsertBatch([NoteIndexRow(item: indexed.item, mtime: indexed.ref.mtime)]) }
+                } catch { report(error, "index the saved note") }
+            }
+            await reloadItems()
+            rebuild()
+            if let recovery = saved.recoveredDraft {
+                statusMessage = "This note changed outside this editor. Your in-app version was saved as \"\(recovery.item.title)\"; the original was reloaded."
+            }
+            return saved.body
+        } catch { report(error, "save the note; keep this editor open and retry"); return nil }
+    }
+
     /// W7-S5 — an item-scoped inline-image asset store over the audited `NoteStore`, or nil before
     /// bootstrap / for an injected (store-less) test model. The editor pane creates one and retargets it
     /// to the selected item so pasted/dropped images persist into that item's `assets/`.

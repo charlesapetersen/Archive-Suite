@@ -122,6 +122,95 @@ actor NoteStore {
     /// primitive is for callers that already hold the authoritative item (tests, a full re-write).
     func save(_ item: Item) throws -> ItemRef { recordRevision(try saveEntry(item, in: itemDir(item.id))) }
 
+    /// Result of an editor save. A conflict never rewrites the original: its current body is returned
+    /// and the complete in-app draft (including its assets) is durable in a separate UUID folder.
+    struct BodySave: Sendable {
+        let current: ItemTransaction
+        let recoveredDraft: ItemTransaction?
+
+        var body: String {
+            BlockParser.serialize(leadingText: current.item.trailingBodyRaw, blocks: current.item.blocks)
+        }
+    }
+
+    /// Compare the editor's own loaded/saved body inside the read→write boundary. File coordination
+    /// extends the actor's serialization to cooperating external editors/sync clients. Metadata-only
+    /// edits do not conflict. No suspension is allowed between the comparison and replacement.
+    func saveBody(_ markdown: String, basedOn expectedBody: String, for id: UUID) throws -> BodySave {
+        let url = try mdURL(for: id, in: itemDir(id))
+        var coordinationError: NSError?
+        var result: Result<BodySave, Error>?
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing,
+                                                       error: &coordinationError) { _ in
+            result = Result {
+                let current = try currentItemTransaction(id)
+                let body = BlockParser.serialize(leadingText: current.item.trailingBodyRaw,
+                                                 blocks: current.item.blocks)
+                let parsed = BlockParser.parse(markdown)
+                if body != expectedBody && body != markdown {
+                    var draft = current.item
+                    draft.id = UUID()
+                    draft.title += " — Recovered draft"
+                    draft.created = Date()
+                    draft.modified = draft.created
+                    draft.trailingBodyRaw = parsed.leadingText
+                    draft.blocks = parsed.blocks
+                    // Copy before writing the recovery .md: a successful result guarantees that every
+                    // relative asset in the draft still resolves in its new item folder. A failure
+                    // leaves the original untouched and the editor's buffer dirty for retry.
+                    let sourceAssets = assetsDir(id)
+                    let draftDir = itemDir(draft.id)
+                    try FileManager.default.createDirectory(at: draftDir, withIntermediateDirectories: true)
+                    if FileManager.default.fileExists(atPath: sourceAssets.path) {
+                        try copyRecoveryAssets(from: sourceAssets, to: assetsDir(draft.id),
+                                               itemRoot: itemDir(id).resolvingSymlinksInPath())
+                    }
+                    let ref = try create(draft)
+                    return BodySave(current: current, recoveredDraft: ItemTransaction(
+                        ownedDateFacetTokens: [], item: draft, ref: ref))
+                }
+                // An identical already-landed body needs no replacement (or modified-time change).
+                if body == markdown { return BodySave(current: current, recoveredDraft: nil) }
+                let tx = try withItem(id) { item in
+                    item.trailingBodyRaw = parsed.leadingText
+                    item.blocks = parsed.blocks
+                    item.modified = Date()
+                }
+                return BodySave(current: tx, recoveredDraft: nil)
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw StoreError.writeFailed("Note save was not coordinated") }
+        return try result.get()
+    }
+
+    /// Materialize contained symlinks: an absolute link back into the original item would otherwise
+    /// stop resolving under the recovery item's containment boundary. Escaping links stay links (and
+    /// stay blocked by AssetPathResolver); never follow one into the corpus or another item.
+    private func copyRecoveryAssets(from source: URL, to destination: URL, itemRoot: URL,
+                                    ancestors: Set<URL> = []) throws {
+        let fm = FileManager.default
+        let resolved = source.resolvingSymlinksInPath().standardizedFileURL
+        let root = itemRoot.standardizedFileURL
+        guard resolved == root || resolved.path.hasPrefix(root.path + "/") else {
+            try fm.copyItem(at: source, to: destination)
+            return
+        }
+        let values = try resolved.resourceValues(forKeys: [.isDirectoryKey])
+        guard values.isDirectory == true else {
+            try fm.copyItem(at: resolved, to: destination)
+            return
+        }
+        guard !ancestors.contains(resolved) else {
+            throw StoreError.assetWriteFailed("Cannot copy cyclic assets into a recovered draft")
+        }
+        try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+        for child in try fm.contentsOfDirectory(at: resolved, includingPropertiesForKeys: nil) {
+            try copyRecoveryAssets(from: child, to: destination.appendingPathComponent(child.lastPathComponent),
+                                   itemRoot: root, ancestors: ancestors.union([resolved]))
+        }
+    }
+
     /// Move the item directory to the Trash (recoverable). Never `removeItem`.
     ///
     /// Throws `StoreError.notFound` when the directory is **already** absent, and whatever
