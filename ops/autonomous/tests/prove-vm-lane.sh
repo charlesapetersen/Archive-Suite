@@ -332,10 +332,77 @@ grep -q 'XCUITEST_FAILED=1' "$RUNNER" \
 grep -q '\[ "\$XCUITEST_FAILED" = 0 \] || die' "$RUNNER" \
   && ok "runner exits non-zero at the end when the XCUITest run failed" \
   || no "runner still exits 0 after a failed XCUITest run"
-# The gate keys on the markers itself and never calls the runner; its RED rule must be untouched.
-grep -qF "is_fail()    { grep -q '\*\* TEST FAILED \*\*'" "$GATEF" \
-  && ok "gate still keys RED on its own '** TEST FAILED **' check" \
+# The gate keys on the markers itself and never calls the runner. Its RED rule is the TEST FAILED marker,
+# plus (W40.e2) a CRASH_REPORT line from the crash harvest — never anything weaker.
+grep -qF "is_fail()    { grep -qE '\*\* TEST FAILED \*\*|^CRASH_REPORT\['" "$GATEF" \
+  && ok "gate keys a failed attempt on '** TEST FAILED **' or a suite crash report, nothing else" \
   || no "gate's TEST FAILED check changed"
+
+echo "== 13. the crash and hang harvest (W40.e2) =="
+# Same stub `tart` as section 11: the guest body runs on the host, against scratch report directories.
+PATH="$STUB_BIN:$PATH"; export PATH
+CR="$TMP/crash"; mkdir -p "$CR/user" "$CR/sys" "$CR/out"
+TART_CRASH_DIRS="$CR/user $CR/sys"; TART_CRASH_SETTLE=0; TART_GUEST_OUT="$CR/out"
+later() { touch -t "$(date -v+2M +%Y%m%d%H%M.%S)" "$1"; }
+harvest() { hrc=0; tart_crash_harvest stub-vm "$1" || hrc=$?; }
+
+touch -t 202001010000 "$CR/user/ArchiveNotes-2020-01-01-000000.ips"    # before the mark: not this run's
+tart_crash_mark stub-vm
+[ -n "$TART_CRASH_TOKEN" ] && ok "the mark is written and its token kept" || no "tart_crash_mark wrote no marker"
+harvest notes/crashes
+[ "$hrc" = 0 ] && ok "no new report -> 0 (an old report from before the mark is not this run's)" \
+               || no "a clean run harvested as $hrc (old report counted?)"
+
+tart_crash_mark stub-vm
+later "$CR/user/ArchiveNotes-2026-10-15-120000.ips"
+later "$CR/sys/ArchiveReaderUITests-Runner_2026-10-15-120001_vm.hang"
+later "$CR/user/mdworker_shared-2026-10-15-120002.ips"
+later "$CR/sys/ArchiveNotes_2026-10-15-120003_vm.cpu_resource.diag"
+harvest notes/crashes
+[ "$hrc" = 1 ] && ok "a suite crash makes the harvest return 1" || no "a suite crash harvested as $hrc"
+case "$TART_CRASH_SUITE" in
+  *ArchiveNotes-2026-10-15-120000.ips*ArchiveReaderUITests-Runner*|*ArchiveReaderUITests-Runner*ArchiveNotes-2026-10-15-120000.ips*)
+    ok "…naming both our crash (.ips) and our hang (.hang)" ;;
+  *) no "suite list is wrong: '$TART_CRASH_SUITE'" ;;
+esac
+case "$TART_CRASH_SUITE" in *mdworker*|*cpu_resource*) no "a foreign crash or a .diag counted as ours" ;;
+  *) ok "a foreign process's crash and our own .diag resource report do not fail the run" ;; esac
+case "$TART_CRASH_FOREIGN" in *mdworker*cpu_resource*|*cpu_resource*mdworker*) ok "…but both are named" ;;
+  *) no "foreign list is wrong: '$TART_CRASH_FOREIGN'" ;; esac
+[ "$(ls "$CR/out/notes/crashes" 2>/dev/null | wc -l | tr -d ' ')" = 4 ] \
+  && ok "all four new reports are copied to the artifact share" || no "reports were not all copied out"
+
+rm -f "$CR"/user/*2026-10-15* "$CR"/sys/*2026-10-15*   # planted with future mtimes; a real report is not
+tart_crash_mark stub-vm
+harvest notes/crashes
+{ [ "$hrc" = 0 ] && [ ! -d "$CR/out/notes/crashes" ]; } \
+  && ok "the next clean run clears the previous run's copies (an absent dir means none this run)" \
+  || no "a clean run left stale reports in the artifact dir (rc=$hrc)"
+
+tart_crash_mark stub-vm
+later "$CR/user/ArchiveReader-2026-10-15-130000.ips"
+STUB_SKIP_MATCH="END crashmark"; export STUB_SKIP_MATCH
+harvest reader/crashes
+[ "$hrc" = 2 ] && ok "a listing that never comes back is UNKNOWN (2), never 'no crashes'" \
+               || no "a dropped listing classified as $hrc"
+STUB_SKIP_MATCH="touch "
+tart_crash_mark stub-vm
+unset STUB_SKIP_MATCH
+harvest reader/crashes
+{ [ -z "$TART_CRASH_TOKEN" ] && [ "$hrc" = 2 ]; } \
+  && ok "a mark that never lands is UNKNOWN too (no false green from a missing baseline)" \
+  || no "a missing mark harvested as $hrc"
+TART_CRASH_TOKEN=x; hrc=0; tart_crash_harvest stub-vm "" || hrc=$?
+[ "$hrc" = 2 ] && ok "an empty artifact subdir is refused (never rm -rf the share root)" || no "empty subdir accepted"
+PATH="${PATH#"$STUB_BIN":}"
+
+for f in ops/gui/vm-gui-runner.sh ops/autonomous/gui-vm-gate.sh; do
+  { grep -q 'tart_crash_mark' "$ROOT/$f" && grep -q 'tart_crash_harvest' "$ROOT/$f"; } \
+    && ok "$f marks before the run and harvests after it" || no "$f does not harvest crash reports"
+done
+grep -q '\[ "\$CRASH_FOUND" = 0 \] || die' "$RUNNER" \
+  && ok "runner exits non-zero when a suite process left a crash report" \
+  || no "runner does not fail on a suite crash report"
 
 echo
 echo "prove-vm-lane: $PASS passed, $FAIL failed"

@@ -166,7 +166,10 @@ boot_vm() {
 # what actually failed — the retry is a flake guard, not a reason to lose evidence.
 app_art()    { echo "$ART/$1"; }
 applog()     { echo "$(app_art "$1")/xcuitest-attempt$2.log"; }
-is_fail()    { grep -q '\*\* TEST FAILED \*\*'    "$(applog "$1" "$2")" 2>/dev/null; }
+# A crash/hang report from one of our processes (W40.e2, → tart_crash_harvest) fails the attempt even
+# under TEST SUCCEEDED: an app that dies after its last assertion is exactly what the marker cannot see.
+# It goes through the same retry, so a one-off crash is a flake and a repeated one is RED.
+is_fail()    { grep -qE '\*\* TEST FAILED \*\*|^CRASH_REPORT\[' "$(applog "$1" "$2")" 2>/dev/null; }
 is_success() { grep -q '\*\* TEST SUCCEEDED \*\*' "$(applog "$1" "$2")" 2>/dev/null; }
 # A missing Processor window can mean a guest keychain/unlock/modal failure, not an app regression. The
 # test itself saves a rendered screenshot before emitting this marker; classify it as infrastructure.
@@ -257,6 +260,7 @@ run_app_once() {   # $1 = app, $2 = attempt number
   # which is the ONLY reason the cert exists. So the guest stays ad-hoc — exactly the configuration this
   # lane was green on before — and the host keeps the cert. Do NOT "fix" this by provisioning the cert
   # into the VM: that couples a throwaway image to host secrets and breaks again on every VM rebuild.
+  tart_crash_mark "$VM"
   "${TO[@]}" tart exec "$VM" bash -lc "
     rm -rf '$bundle'
     xcodebuild test -project '$GUEST_REPO/$proj' -scheme '$scheme' \
@@ -265,6 +269,7 @@ run_app_once() {   # $1 = app, $2 = attempt number
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " >>"$log" 2>&1
   collect_shots "$app" "$attempt" "$log"
+  collect_crashes "$app" "$attempt" "$log"
   # Preserve the finalized result bundle beside this attempt's log. A failed/interrupted Xcode run may
   # not finalize one; that is evidence about the infrastructure, never a reason to replace the log.
   result_art="$(app_art "$app")/uitest-attempt$attempt.xcresult"
@@ -295,6 +300,23 @@ collect_shots() { # $1 = app, $2 = attempt, $3 = host log
     fi
   done <<< "$paths"
   echo "artifact[$app]: $copied UI-test screenshot(s) in $dest" >>"$log"
+}
+
+# W40.e2: every crash/hang report the attempt left in the guest is copied to crashes-attempt<n>. One of
+# OUR processes' reports writes a CRASH_REPORT[app] line, which is_fail reads. An unreadable listing is
+# logged as unknown and changes nothing: transport trouble must never turn into a RED.
+collect_crashes() { # $1 = app, $2 = attempt, $3 = host log
+  local app="$1" attempt="$2" log="$3" rc=0 f
+  tart_crash_harvest "$VM" "$app/crashes-attempt$attempt" || rc=$?
+  case "$rc" in
+    0) echo "crash-harvest[$app]: no new crash or hang report from a suite process" >>"$log" ;;
+    1) while IFS= read -r f; do [ -n "$f" ] && echo "CRASH_REPORT[$app]: $(app_art "$app")/crashes-attempt$attempt/$f" >>"$log"; done <<< "$TART_CRASH_SUITE" ;;
+    *) echo "WARN[$app]: crash harvest UNKNOWN (the guest's report listing did not come back intact)" >>"$log" ;;
+  esac
+  if [ -n "$TART_CRASH_FOREIGN" ]; then
+    while IFS= read -r f; do [ -n "$f" ] && echo "crash-harvest[$app]: report from another process, not fatal: $f" >>"$log"; done <<< "$TART_CRASH_FOREIGN"
+  fi
+  return 0
 }
 
 # ---- main ---------------------------------------------------------------------------------------
@@ -396,6 +418,12 @@ show_failures() {   # $1 = app
     echo "  (attempt 2 ran no tests — cannot separate flake from reproducible; showing attempt 1 only)"
     printf '%s\n' "$a1" | grep -v '^$' | sed 's/^/      /'
   fi
+  # Crash/hang reports from our own processes (W40.e2) — a RED can rest on these alone.
+  local n
+  for n in 1 2; do
+    [ -f "$(applog "$1" "$n")" ] || continue
+    grep -E '^CRASH_REPORT\[' "$(applog "$1" "$n")" | sed "s/^/  attempt $n: /"
+  done
   # The assertion messages, for whichever tests are above — the "why", kept unpartitioned on purpose.
   echo "  --- assertion detail (both attempts) ---"
   for n in 1 2; do

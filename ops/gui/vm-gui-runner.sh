@@ -340,6 +340,7 @@ run_xcuitest() {
     1) die "the VM guest is too full for a safe $APP build — ${TART_GUI_DD_NOTE:-no free-space report}. Free space, then rerun." ;;
     *) die "could not prepare the VM's $APP DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed}." ;;
   esac
+  tart_crash_mark "$VM"
   log "building + running $ONLY_TESTING for $APP in the VM…"
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
   # before executing a single test. Remove it first.
@@ -359,6 +360,7 @@ run_xcuitest() {
   log "XCUITest log: $APP_ART/xcuitest.log"
   collect_shots
   collect_xcresult
+  collect_crashes
   if grep -q '\*\* TEST SUCCEEDED \*\*' "$APP_ART/xcuitest.log" 2>/dev/null; then
     collect_snapshot_reference
   else
@@ -435,6 +437,25 @@ collect_snapshot_reference() {
   fi
 }
 
+# W40.e2: copy out every crash/hang report the run left in the guest (→ tart_crash_harvest). A crash or
+# hang of one of OUR processes fails the run even when xcodebuild printed TEST SUCCEEDED — that is the
+# case it exists for: an app that dies after its last assertion. Other processes' reports are kept and
+# named, never fatal.
+collect_crashes() {   # $1 = artifact subdir name under $APP_ART (default: crashes)
+  local sub="${1:-crashes}" rc=0 f
+  tart_crash_harvest "$VM" "$APP/$sub" || rc=$?
+  case "$rc" in
+    0) log "crash harvest: no new crash or hang report from a suite process${TART_CRASH_FOREIGN:+ (reports from other processes kept in $APP_ART/$sub)}" ;;
+    1) while IFS= read -r f; do [ -n "$f" ] && warn "CRASH REPORT from a suite process: $APP_ART/$sub/$f"; done <<< "$TART_CRASH_SUITE"
+       CRASH_FOUND=1 ;;
+    *) warn "crash harvest UNKNOWN — the guest's report listing did not come back intact (tart transport), so this run says nothing about crashes either way." ;;
+  esac
+  if [ -n "$TART_CRASH_FOREIGN" ]; then
+    while IFS= read -r f; do [ -n "$f" ] && log "  report from another process (not fatal): $f"; done <<< "$TART_CRASH_FOREIGN"
+  fi
+  return 0
+}
+
 # Keep the result bundle beside the textual log and screenshots. It is useful when Xcode finalized it,
 # but never the only screenshot channel: an interrupted test leaves its bundle unreadable.
 collect_xcresult() {
@@ -469,6 +490,7 @@ run_sighted() {
   # `pkill` (this lane's inline copy was the only one that ever did it — → tart_kill_app).
   tart_kill_app "$VM" "$APP"
   [ -n "$PRERUN" ] && tart exec "$VM" bash -lc "$PRERUN" >/dev/null 2>&1
+  tart_crash_mark "$VM"
   log "launching $APP in the VM against its scratch fixture…"
   tart exec "$VM" bash -lc "
     GUEST_APP_PATH='$GUEST_APP'
@@ -480,6 +502,7 @@ run_sighted() {
   log "capturing $APP off-screen over VNC…"
   "${vnc[@]}" capture "$APP_ART/sighted.png"
   log "artifact: $APP_ART/sighted.png  (Read it to eyeball the render)"
+  collect_crashes crashes-sighted
   # Example off-screen interaction (framebuffer coords): adapt as needed.
   # "${vnc[@]}" move 765 269 click 1 pause 1 capture "$APP_ART/sighted-after-click.png"
 }
@@ -495,6 +518,7 @@ log "app=$APP  lane=$LANE  vm=$VM"
 # has always generated every app's project before `boot_vm`, which is why this only ever bit the
 # interactive lane — the same one-entry-point-fixed asymmetry `tart-lib.sh`'s header exists to prevent.
 XCUITEST_FAILED=0
+CRASH_FOUND=0
 gen_project
 ensure_vm
 ensure_fixture
@@ -505,4 +529,5 @@ case "$LANE" in
   both)     run_xcuitest; build_for_sighted; run_sighted ;;
 esac
 log "done. Artifacts in $APP_ART"
+[ "$CRASH_FOUND" = 0 ] || die "$APP left a crash or hang report in the guest — exiting non-zero (reports: $APP_ART/crashes*)"
 [ "$XCUITEST_FAILED" = 0 ] || die "$APP XCUITest run did not succeed — exiting non-zero (log: $APP_ART/xcuitest.log)"

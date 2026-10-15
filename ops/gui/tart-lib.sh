@@ -293,6 +293,92 @@ tart_kill_app() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# tart_crash_mark VM / tart_crash_harvest VM ART_SUBDIR — the crash and hang harvest (W40.e2).
+#
+# A crash the test runner does not attribute to a test is invisible to both VM entry points: an app that
+# dies AFTER its last assertion (a crash on quit, in a deinit, in a late autosave flush) still ends in
+# `** TEST SUCCEEDED **`, and the only trace is a report in the guest's DiagnosticReports that nobody
+# reads and the next boot buries. So: drop a run-unique marker file in the guest before the run, and
+# afterwards copy every report NEWER than it out to the artifact share.
+#
+#   tart_crash_mark    — sets TART_CRASH_TOKEN (empty if the marker could not be written; the harvest then
+#                        reports UNKNOWN rather than "no crashes", which would be a false green).
+#   tart_crash_harvest — returns 0 none · 1 a SUITE process crashed or hung · 2 unknown (no marker, or the
+#                        listing never came back intact — tart's transport, not the guest).
+#                        Leaves TART_CRASH_SUITE / TART_CRASH_FOREIGN (newline-separated file names) and
+#                        copies every new report to $ART/<ART_SUBDIR>/ via the `out` share.
+#
+# What FAILS the run: a crash (.ips/.crash) or hang (.hang/.spin) report whose process is one of ours —
+# the file name starts with Archive (the three apps and their *UITests-Runner hosts) or xctest. Everything
+# else is copied and named but does not fail: the guest also runs Zotero, Spotlight workers and Apple's
+# daemons, and a lane that goes red for a crash in mdworker cries wolf. `.diag` resource reports (CPU or
+# wakeups over budget) are harvested but never fail: a Debug build under XCUITest trips them for reasons
+# that are not defects. Both report directories, user and system, are read: hangs land in the system one.
+TART_CRASH_DIRS="${TART_CRASH_DIRS:-\$HOME/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports}"
+TART_CRASH_SETTLE="${TART_CRASH_SETTLE:-5}"   # seconds for ReportCrash to finish writing the last report
+TART_GUEST_OUT="${TART_GUEST_OUT:-/Volumes/My Shared Files/out}"   # the guest's view of --dir=out:
+
+tart_crash_mark() {
+  local vm="$1" tok
+  tok="crashmark-$$-$(date +%s)-${RANDOM:-0}"
+  TART_CRASH_TOKEN=""
+  if tart exec "$vm" bash -lc "mkdir -p '$TART_FIXTURE_TMP' && touch '$TART_FIXTURE_TMP/$tok'" >/dev/null 2>&1; then
+    TART_CRASH_TOKEN="$tok"
+  fi
+  return 0
+}
+
+# tart_crash_is_suite NAME — 0 if a report file NAME is a crash/hang of one of our processes.
+tart_crash_is_suite() {
+  case "$1" in
+    *.diag) return 1 ;;
+  esac
+  case "$1" in
+    Archive*.ips|Archive*.crash|Archive*.hang|Archive*.spin|xctest*.ips|xctest*.crash|xctest*.hang|xctest*.spin) return 0 ;;
+  esac
+  return 1
+}
+
+tart_crash_harvest() {
+  local vm="$1" sub="$2" raw list f
+  TART_CRASH_SUITE=""; TART_CRASH_FOREIGN=""
+  [ -n "${TART_CRASH_TOKEN:-}" ] || return 2
+  [ -n "$sub" ] || return 2   # never `rm -rf` the share root
+  # One exec lists AND copies, and ends with the token, so a listing cut short by the transport is never
+  # read as "nothing crashed": only output whose last line is END <token> counts.
+  raw="$(tart exec "$vm" bash -lc "
+    sleep '$TART_CRASH_SETTLE'
+    mark='$TART_FIXTURE_TMP/$TART_CRASH_TOKEN'
+    dest='$TART_GUEST_OUT/$sub'
+    rm -rf \"\$dest\"
+    for d in $TART_CRASH_DIRS; do
+      [ -d \"\$d\" ] || continue
+      find \"\$d\" -maxdepth 1 -type f -newer \"\$mark\" 2>/dev/null
+    done | while IFS= read -r p; do
+      mkdir -p \"\$dest\"
+      cp \"\$p\" \"\$dest/\" 2>/dev/null || echo \"UNCOPIED \$p\"
+      echo \"REPORT \${p##*/}\"
+    done
+    rm -f \"\$mark\"
+    echo 'END $TART_CRASH_TOKEN'
+  " 2>/dev/null || true)"
+  [ "$(printf '%s\n' "$raw" | tail -n 1)" = "END $TART_CRASH_TOKEN" ] || return 2
+  list="$(printf '%s\n' "$raw" | sed -n 's/^REPORT //p')"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if tart_crash_is_suite "$f"; then
+      TART_CRASH_SUITE="${TART_CRASH_SUITE:+$TART_CRASH_SUITE
+}$f"
+    else
+      TART_CRASH_FOREIGN="${TART_CRASH_FOREIGN:+$TART_CRASH_FOREIGN
+}$f"
+    fi
+  done <<< "$list"
+  [ -z "$TART_CRASH_SUITE" ] && return 0
+  return 1
+}
+
+# ---------------------------------------------------------------------------------------------------
 # tart_lock_acquire [WAIT_SECONDS] / tart_lock_release — one writer at a time for the shared VM.
 #
 # There is ONE VM name and ONE artifact dir, and both entry points (the health gate and the interactive
