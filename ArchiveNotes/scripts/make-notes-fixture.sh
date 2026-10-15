@@ -99,23 +99,30 @@ mkdir -p "$DST/items" "$DST/Templates" "$DST/reader-corpus"
 # A small uncompressed two-page text PDF. The default fixture must not depend on
 # a gitignored corpus or a third mount in the VM; these pages are enough for the
 # durable-link reveal and make the fixture's text-bearing premise inspectable.
-write_text_pdf() {  # write_text_pdf <path> <visible text>
-  python3 - "$1" "$2" <<'PY'
+write_text_pdf() {  # write_text_pdf <path> <visible text> [image/text page pairs, default 1]
+  python3 - "$1" "$2" "${3:-1}" <<'PY'
 import sys
 
-path, text = sys.argv[1:]
+path, text, pairs = sys.argv[1], sys.argv[2], int(sys.argv[3])
 text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-stream1 = ("BT\n/F1 20 Tf\n72 720 Td\n(" + text + " - image page) Tj\nET\n").encode("ascii")
-stream2 = ("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text: " + text + ") Tj\nET\n").encode("ascii")
+streams = []
+for n in range(1, pairs + 1):
+    suffix = "" if pairs == 1 else " (pair %d)" % n
+    streams.append(("BT\n/F1 20 Tf\n72 720 Td\n(" + text + suffix + " - image page) Tj\nET\n").encode("ascii"))
+    streams.append(("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text: " + text + suffix + ") Tj\nET\n").encode("ascii"))
+pages = len(streams)
+font = 3 + 2 * pages                      # 1 catalog, 2 pages, then the page objects, then their streams
 objects = [
     b"<< /Type /Catalog /Pages 2 0 R >>",
-    b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
-    b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 5 0 R >>",
-    b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>",
-    b"<< /Length %d >>\nstream\n" % len(stream1) + stream1 + b"endstream",
-    b"<< /Length %d >>\nstream\n" % len(stream2) + stream2 + b"endstream",
-    b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ("<< /Type /Pages /Kids [%s] /Count %d >>"
+     % (" ".join("%d 0 R" % (3 + i) for i in range(pages)), pages)).encode("ascii"),
 ]
+for i in range(pages):
+    objects.append(("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 %d 0 R >> >> /Contents %d 0 R >>"
+                    % (font, 3 + pages + i)).encode("ascii"))
+for stream in streams:
+    objects.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"endstream")
+objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
 pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
 offsets = [0]
 for number, obj in enumerate(objects, 1):
@@ -288,6 +295,13 @@ else
     write_text_pdf "$DST/reader-corpus/$name" "Notes synthetic fixture page $i"
   done
   ditto "$DST/reader-corpus/fixture-01.pdf" "$DST/reader-corpus/sample.pdf"
+  # Three image/text pairs, so Reader's status bar names the page a link opened at ("page 2 of 3"); a
+  # one-pair PDF shows no page there. The integration journey (W40.d10) links into it.
+  write_text_pdf "$DST/reader-corpus/pages.pdf" "Notes integration journey" 3
+  # Reader lists only files with a Read or Unread tag (SPEC/tag-format.md), so give this one `Unread`.
+  xattr -wx com.apple.metadata:_kMDItemUserTags \
+    "$(python3 -c 'import plistlib; print(plistlib.dumps(["Unread"], fmt=plistlib.FMT_BINARY).hex())')" \
+    "$DST/reader-corpus/pages.pdf"
   echo "make-notes-fixture: generated $N_PDFS text-bearing PDFs in reader-corpus/ (+ sample.pdf; no corpus required)" >&2
 fi
 

@@ -38,7 +38,10 @@ final class WorkspaceOpenSpy: ObservableObject {
     @Published private(set) var lastOpenedURL: String?
 
     /// True only in a UITest harness launch. Same gate as `NoteEditorPane.isUITestHarness`.
+    /// `-ANUITestRealWorkspaceOpen YES` turns the recorder off for a harness launch, so the integration
+    /// journey (W40.d10) can hand its links to the real Reader and Zotero installed in the VM.
     var isActive: Bool {
+        if UserDefaults.standard.bool(forKey: "ANUITestRealWorkspaceOpen") { return false }
         if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty { return true }
         return false
     }

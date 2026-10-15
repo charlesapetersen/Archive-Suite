@@ -59,6 +59,14 @@ class NotesFixtureUITestCase: XCTestCase {
     /// Launch arguments a subclass adds to every launch of its tests (W9.e2-paste's folder-pick stand-in).
     var extraLaunchArguments: [String] { [] }
 
+    /// The Zotero arguments of every launch. In-process only by default — `ZoteroUITestTransport` never
+    /// opens a socket. The style value is deliberately non-default so G15 proves the production command
+    /// forwards Settings' styleID into `fetchCitation`, rather than merely receiving a canned citation.
+    /// The integration journey (W40.d10) replaces them to talk to a real Zotero.
+    var zoteroLaunchArguments: [String] {
+        ["-ANUITestZoteroStub", "YES", "-notes.zotero.cslStyleID", "archive-notes-ui-test"]
+    }
+
     /// Run one test's scratch-fixture lifecycle from its `@MainActor` test method. XCTest's macOS lifecycle
     /// overrides are nonisolated in the Swift 6 SDK, so putting this UI work in `setUpWithError` would
     /// weaken its actor checking. `defer` always shuts down the scratch app after the test body returns.
@@ -176,11 +184,7 @@ class NotesFixtureUITestCase: XCTestCase {
         app = .archiveUITestApp()   // never a bare XCUIApplication() — see UITestLaunch
         app.launchArguments += [
             "-ANUITestStorePath", Self.fixturePath,
-            // In-process only — `ZoteroUITestTransport` never opens a socket. The style value is
-            // deliberately non-default so G15 proves the production command forwards Settings' styleID
-            // into `fetchCitation`, rather than merely receiving a canned citation.
-            "-ANUITestZoteroStub", "YES",
-            "-notes.zotero.cslStyleID", "archive-notes-ui-test",
+        ] + zoteroLaunchArguments + [
             // Each window's kind filter persists in the app's defaults, which the per-test fixture restore
             // does not reach: G10/G13 leave the Note window on "Both", and W9D9 then saved its smart folder
             // as kind .both and counted the extract too (W35.vm-mem-fu1). Pin both windows' defaults.

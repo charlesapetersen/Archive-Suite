@@ -20,6 +20,7 @@
 # ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, TEST_ITERATIONS, AGENT_WAIT,
 #                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test),
 #                READER_JOURNEY=rehearsal (W40.d8 triage journey on the real-corpus sample).
+#                NOTES_JOURNEY=integrations (W40.d10: Notes with the real Zotero and Reader in the VM).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
@@ -102,6 +103,23 @@ if [ "${READER_JOURNEY:-}" = "rehearsal" ]; then
   fi
 elif [ -n "${READER_JOURNEY:-}" ]; then
   die "unknown READER_JOURNEY '$READER_JOURNEY' (use: rehearsal)"
+fi
+# NOTES_JOURNEY=integrations (W40.d10): Notes against a REAL Zotero and the REAL Reader. The lane builds
+# Reader at this commit in the guest (so Launch Services routes archivereader:// to it), starts Zotero with
+# its local API on and a seeded item (ArchiveNotes/scripts/vm-zotero.sh), then runs only the journey class,
+# which skips itself in every other run because nothing else prepares those apps.
+NOTES_INTEGRATIONS=0
+if [ "${NOTES_JOURNEY:-}" = "integrations" ]; then
+  [ "$APP" = notes ] || die "NOTES_JOURNEY is supported only for notes."
+  [ -n "$CORRUPT_TEST_SELECTOR" ] && die "NOTES_JOURNEY and CORRUPT_INDEX_FIXTURE cannot be combined."
+  NOTES_INTEGRATIONS=1
+  CORRUPT_TEST_SELECTOR="${ONLY_TESTING:-ArchiveNotesUITests/IntegrationJourneyUITests}"
+  case "$CORRUPT_TEST_SELECTOR" in
+    ArchiveNotesUITests/IntegrationJourneyUITests|ArchiveNotesUITests/IntegrationJourneyUITests/*) : ;;
+    *) die "NOTES_JOURNEY=integrations runs only ArchiveNotesUITests/IntegrationJourneyUITests[/<test>]" ;;
+  esac
+elif [ -n "${NOTES_JOURNEY:-}" ]; then
+  die "unknown NOTES_JOURNEY '$NOTES_JOURNEY' (use: integrations)"
 fi
 ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
@@ -227,6 +245,34 @@ gen_project() {
   command -v xcodegen >/dev/null || die "xcodegen not on the host PATH (brew install xcodegen) — the VM builds the project it generates."
   log "xcodegen generate ($APP)…"
   xcodegen generate --spec "$REPO/$SPEC_REL" >/dev/null
+  if [ "$NOTES_INTEGRATIONS" = 1 ]; then
+    log "xcodegen generate (reader, for the integration journey)…"
+    xcodegen generate --spec "$REPO/$(archive_app_field reader spec)" >/dev/null
+  fi
+}
+
+# --- NOTES_JOURNEY=integrations: the real Reader and the real Zotero, in the guest ---
+prepare_integrations() {
+  [ "$NOTES_INTEGRATIONS" = 1 ] || return 0
+  local rdd rapp rc=0
+  rdd="$(archive_app_field reader dd)"; rapp="$(archive_app_field reader appbundle)"
+  tart_kill_app "$VM" reader
+  tart_prepare_gui_dd "$VM" reader || rc=$?
+  [ "$rc" = 0 ] || die "could not prepare the VM's Reader DerivedData — ${TART_GUI_DD_NOTE:-no report}"
+  log "building Reader in the VM for the integration journey…"
+  tart exec "$VM" bash -lc "
+    xcodebuild build -project '$GUEST_REPO/$(archive_app_field reader proj)' -scheme ArchiveReader \
+      -destination 'platform=macOS' -derivedDataPath '$rdd' CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
+  " > "$APP_ART/reader-build.log" 2>&1 || true
+  grep -q '\*\* BUILD SUCCEEDED \*\*' "$APP_ART/reader-build.log" || die "the Reader build failed in the VM (log: $APP_ART/reader-build.log)"
+  tart exec "$VM" bash -lc "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f '$rapp'" \
+    || die "could not register the built Reader with Launch Services"
+  log "starting Zotero in the VM…"
+  tart exec "$VM" bash "$GUEST_REPO/ArchiveNotes/scripts/vm-zotero.sh" start | tee "$APP_ART/zotero.log" \
+    | grep -q '^ZOTERO_KEY=' || die "Zotero did not start with its seeded item (log: $APP_ART/zotero.log)"
+  # The journey class runs only where this marker is; the fixture restore copies it from the pristine copy.
+  tart exec "$VM" bash -lc "touch '$GUEST_FIXTURE.pristine/.w40-d10-lane' '$GUEST_FIXTURE/.w40-d10-lane'" \
+    || die "could not mark the fixture for the integration journey"
 }
 
 # --- the scratch GUI fixture, built INSIDE the guest (idempotent; persists on the VM disk) ---
@@ -452,6 +498,7 @@ XCUITEST_FAILED=0
 gen_project
 ensure_vm
 ensure_fixture
+prepare_integrations
 case "$LANE" in
   xcuitest) run_xcuitest ;;
   sighted)  build_for_sighted; run_sighted ;;
