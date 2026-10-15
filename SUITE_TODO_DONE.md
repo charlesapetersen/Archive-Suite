@@ -10812,3 +10812,14 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   - **Pages with under about 20 words are replaced** (covers, photographs, blanks), as Vision OCR's truth set did.
   Each page's tags, collection, measured photo attributes and confirmed kind go in one table the panels group by. Plus a resolution ladder: about 20 of the pages also at half and a quarter of their pixel size. The draw's rule, seed and tally written down. Draft truth from two strong readers: Claude through the subscription ($0) and Gemini 3.8 Flash (about $0.50). Where they agree, the agreed text; where they differ, a review sheet for the owner (page image beside both readings, the differing spans marked, one keystroke per choice or a typed correction), with an estimate of how long it takes. Record which two models drafted it, since the truth leans toward them. Cap $1.
   <!-- /W41.ocr-truth -->
+- [x] **W41.ocr-adjudicate — the owner settles the disagreements — OWNER** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · (lane: segbench) (uses: light) · DONE 2026-10-14
+  The owner reviewed a shortened sheet, not the 416-span one: 164 spans that differ only in case, punctuation, spacing,
+  hyphenation or placement, or where one reading is misspelled and the other is not (macOS spell checker), were settled
+  by rule; a box from Apple Vision's word positions marked each remaining span on the image (391 of 416 placed); key 4
+  recorded "unreadable or undecidable" as `[illegible]`. Typed comments were resolved as they asked (p013 placement,
+  p062 bullets). Applied with `ocr_truth.py apply`: 99 pages settled, p038 out. The four rulings on what to transcribe
+  are written into W41.ocr-panel-local as the panel prompt's wording. The sheet builder, the rules and their log are
+  outside git beside the truth (`finalize-log.txt`, `answers-applied.json`, `vision-words.json`).
+  The original brief:
+  **`W41.ocr-adjudicate` — the owner settles the disagreements — OWNER** (lane: segbench) (uses: light) (blocked-on: W41.ocr-truth). The owner works through W41.ocr-truth's review sheet: open `~/Library/Caches/ArchiveSuiteRehearsal/ocr-truth/review/index.html`, 416 spans on 100 pages, about 89 minutes (an estimate), resumable (answers kept in the browser); press Export answers, then `/usr/local/bin/python3 ArchiveProcessor/scripts/segbench/ocr_truth.py apply <the exported json>` writes the truth and `pages.tsv`.
+  <!-- /W41.ocr-adjudicate -->
