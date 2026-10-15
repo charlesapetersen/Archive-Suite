@@ -51,6 +51,18 @@ class MacLocal(unittest.TestCase):
         self.assertIn('p002 (typewritten): hosted 100.0 → local 0.0 (local reading failed: length)', out)
         self.assertNotIn('quick brown', out)  # no page text in the public report
 
+    def test_format_slip_has_a_lenient_figure(self):
+        for p in ('p001', 'p002'):
+            self.reading('hosted', p, 'the quick brown fox')
+        self.reading('local', 'p001', 'the quick brown fox')
+        self.reading('local', 'p002', None, status='failed', finish='stop')
+        P.save(M.OUT / 'p002-original.raw.json', {'text': 'KIND: typewritten with notes\nTABLE: no\nTEXT:\nthe quick brown fox'})
+        M.report()
+        out = (self.root / 'out/r.md').read_text()
+        self.assertIn('-50.00 points** over 2 pages', out)  # strict: the panel's parser scores it empty
+        self.assertIn('1 local reading(s) ended normally but broke the reply format', out)
+        self.assertIn('the penalty is **+0.00 points**', out)
+
     def test_incomplete_run_says_so(self):
         for p in ('p001', 'p002'):
             self.reading('hosted', p, 'the quick brown fox')

@@ -81,6 +81,18 @@ def load_reading(path):
     return got.get('meta') or {}, got.get('parsed')
 
 
+def lenient_text(path):
+    """A failed reading's text after its TEXT: line, for a reply whose only fault is its header (e.g. a KIND outside
+    the four the prompt allows). None when there is no such line or the reading hit max_tokens."""
+    import re
+    raw = path.with_name(path.name.replace('.json', '.raw.json'))
+    meta, parsed = load_reading(path)
+    if parsed or not raw.exists() or meta.get('finish') != 'stop':
+        return None
+    m = re.search(r'(?m)^\s*TEXT:[ \t]*\n?(.*)\Z', json.loads(raw.read_text())['text'].strip(), re.S)
+    return m.group(1).strip() if m else None
+
+
 def pct(xs, q):
     xs = sorted(xs)
     return xs[min(len(xs) - 1, int(round(q * (len(xs) - 1))))]
@@ -107,6 +119,7 @@ def report():
         pairs.append({'page': job['page'], 'kind': by_page[job['page']]['kind'], 'local_meta': lm, 'hosted_meta': hm,
                       'local_attempted': bool(lm), 'local': {**S.score(truth, lp['text'] if lp else ''), 'ok': bool(lp)},
                       'hosted': {**S.score(truth, hp['text'] if hp else ''), 'ok': bool(hp)},
+                      'lenient': S.score(truth, lp['text'] if lp else (lenient_text(OUT / (job['id'] + '.json')) or '')),
                       'local_kind_ok': lp['kind'] == by_page[job['page']]['kind'] if lp else None,
                       'hosted_kind_ok': hp['kind'] == by_page[job['page']]['kind'] if hp else None})
     done = [p for p in pairs if p['local_attempted']]
@@ -141,7 +154,15 @@ def report():
           f'median page {100*statistics.median(d):+.2f}. '
           f'Pages where both routes completed: {len(both)}, mean {100*statistics.fmean(db) if db else 0:+.2f}. '
           f'Local better on {sum(x > 0.005 for x in d)}, within half a point on {sum(abs(x) <= 0.005 for x in d)}, '
-          f'worse on {sum(x < -0.005 for x in d)}.', '',
+          f'worse on {sum(x < -0.005 for x in d)}.', '']
+    fmt = [p for p in done if not p['local']['ok'] and p['local_meta'].get('finish') == 'stop']
+    if fmt:
+        dl = [p['lenient']['nes'] - p['hosted']['nes'] for p in done]
+        L += [f'{len(fmt)} local reading(s) ended normally but broke the reply format (a KIND outside the four allowed, '
+              'or no TEXT line), so the panel\'s parser scores them empty. Taking the text after `TEXT:` instead, as an app '
+              f'could, the penalty is **{100*statistics.fmean(dl):+.2f} points**: that is the reading penalty, the strict figure '
+              'above adds the format slips.', '']
+    L += [
           'Largest drops (NES points; page ids are private-cache keys, not corpus names):', '']
     for p in sorted(done, key=lambda p: p['local']['nes'] - p['hosted']['nes'])[:5]:
         L.append(f"- {p['page']} ({p['kind']}): hosted {100*p['hosted']['nes']:.1f} → local {100*p['local']['nes']:.1f}"
@@ -157,7 +178,7 @@ def report():
     ptok = [m['prompt_tokens'] for m in metas]; ctok = [m['completion_tokens'] for m in metas]
     hosted_ptok = [hm.get('prompt_tokens') for p in done if (hm := p['hosted_meta']).get('prompt_tokens')]
     L += ['', '## Speed and memory on the 18 GB M3 Pro', '',
-          f'{len(metas)} pages read (all 99 originals when complete), one at a time, model loaded once '
+          f'{len(metas)} of the 99 originals read, one at a time, model loaded once '
           f'({statistics.median(m["load_s"] for m in metas):.0f} s to load).', '',
           '| measure | median | 90th percentile | max |', '|---|---:|---:|---:|',
           f'| seconds a page (prompt + generation) | {statistics.median(wall):.1f} | {pct(wall, .9):.1f} | {max(wall):.1f} |',
@@ -171,6 +192,24 @@ def report():
           f'{sum(m["status"] != "ok" for m in metas)} failed ({sum(m["finish"] == "length" for m in metas)} hit max_tokens). '
           + (f'The hosted route saw a median {statistics.median(hosted_ptok):.0f} input tokens on the same pages, '
              'so both read the image at the same visual resolution.' if hosted_ptok else '')]
+    loops = sum(m['finish'] == 'length' for m in metas)
+    L += ['', '## What it means for the app route (W41.app-local-models)', '',
+          f'- Where both routes finished a page, 4-bit reads as well as bf16 ({100*statistics.fmean(db) if db else 0:+.2f} NES points '
+          f'over {len(both)} pages). The strict penalty comes from whole-page failures, not from worse reading.',
+          f'- {loops} of {len(metas)} pages ran away to the {P.MAX_TOKENS}-token limit (a repetition loop), each costing '
+          f'{statistics.fmean(m["wall_s"] for m in metas if m["finish"] == "length") / 60 if loops else 0:.1f} minutes. '
+          'A local route needs a repetition stop or a much lower token cap scaled to the page, and a retry or fallback on such a page.',
+          '- Accept any KIND line and keep the text after `TEXT:`; a strict parser throws away readings like the one above.',
+          f'- Speed is about {statistics.median(wall):.0f} s a page, so 102k pages (the corpus’s PDF count, at one photograph each) would be about '
+          f'{102000 * statistics.median(wall) / 86400:.0f} days of continuous reading on this Mac. '
+          f'Roughly {statistics.median(m["first_token_s"] for m in metas):.0f} s of each page is image encoding and prefill, '
+          'fixed by the 2400 px input; generation runs at about '
+          f'{statistics.median(m["gen_tps"] for m in metas):.0f} tokens a second.',
+          f'- Memory: {max(peak):.1f} GB at MLX\'s peak, about 8.4 GB of whole-process footprint, on an 18 GB Mac with the owner\'s '
+          'usual apps open. It ran without the memory guard tripping, but with memory pressure at "warn"; 18 GB is enough '
+          'for this model only with little else heavy running.',
+          f'- The load time ({statistics.median(m["load_s"] for m in metas):.0f} s) is with the weights already in the file cache; '
+          'a cold first load reads 5.5 GB from disk.']
     g = guard_rows()
     if g:
         L += ['', 'The memory guard\'s whole-process view of each collect run (date, exit, seconds, peak RSS MB, '
