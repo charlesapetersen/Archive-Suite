@@ -163,7 +163,7 @@ Archive-Suite/
 │   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
 ├── ArchiveNotes/           # provenance-first note-taking app
 │   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
-└── ArchiveOCRBench/        # PARKED: the W41 OCR panel as a price/accuracy chart page; build.py reads segbench-results
+└── ArchiveOCRBench/        # the bench's measured OCR, segmentation and handwriting results as one page; kept current (below)
 ```
 
 The inner XcodeGen project dirs are named `macOS/` (de-nested from the old `App/App/` layout that
@@ -259,6 +259,17 @@ sheet), judge whether it is the right time, by reading the open work rather than
 ticked. It is not time while a known defect would get in the way, or while queued work is about to change what
 the review looks at. If it is not time, name what it waits for, block the item on that, and report it (no
 decision). Authority: `~/Claude/CLAUDE.md`, "Owner review sessions"; this project's detail is `execution-plans/verification-phase/01-daemon-plan.md` §G "Is it time?".
+
+**ArchiveOCRBench stays current (owner, 2026-10-15).** `ArchiveOCRBench/` is the readable record of what the
+bench has measured. A change that commits a measured OCR or segmentation result updates it in the same commit.
+That covers a new or rerun panel, a new route or model, a measured price, speed or memory figure, a segmentation
+approach scored on the locked boxes, and results such as the Mac-local and FarmShare runs. Point `build.py` at the
+result file, or put hand-entered figures in `ArchiveOCRBench/data/` with their source, extending `build.py` and the
+page where a new kind of result needs it; then run `python3 ArchiveOCRBench/build.py` and commit the built files.
+An estimate goes in only labelled as one, as Sonnet's API price is. Figures from the Vision OCR lab, a separate
+repository, go in by hand with its file and commit when an item or the owner points at them
+(`data/vision-ocr-handwriting.json` is the pattern). The published copy of the page is republished only by an
+interactive session; an unattended one says in its commit body that the published copy is now behind. How to rebuild and read it: [`ArchiveOCRBench/README.md`](ArchiveOCRBench/README.md).
 
 ## Working directive — token-efficient feature-add & maintenance
 

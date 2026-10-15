@@ -1,9 +1,10 @@
-<title>OCR Panel Price and Accuracy</title>
+<title>Archive OCR Bench</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Public+Sans:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
 <style>
-/* Layout: one reading column; four stacked chart panels sharing one numbered route key. */
+/* Layout: one reading column. Part 1, four OCR chart panels sharing one numbered route key; part 2, segmentation
+   (one chart and its table); part 3, the Vision OCR lab's on-device handwriting readers (a table). */
 :root {
   --bg: #fbfbfa; --panel: #ffffff; --fg: #1b1d22; --fg-2: #4d525c; --muted: #8a8f99;
   --rule: #e3e4e8; --grid: #ececef; --accent: #2457c5; --other: #8f939c;
@@ -48,6 +49,9 @@ th { font-weight: 600; color: var(--fg); }
 .key { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 3px 18px; font-size: 13px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
 .key b { display: inline-block; min-width: 24px; font: 12px var(--mono); color: var(--muted); font-weight: 400; }
 .key .front { color: var(--fg); }
+.part { display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 22px; }
+.part h2 { font-size: 1.6rem; }
+tr.pick td { color: var(--fg); font-weight: 600; }
 footer { display: grid; gap: 8px; border-top: 1px solid var(--rule); padding-top: 18px; }
 footer p { font-size: 13px; }
 @media (max-width: 520px) { .plot { height: 360px; } h1 { font-size: 1.6rem; } section.panel { padding: 16px 12px 12px; } }
@@ -55,8 +59,14 @@ footer p { font-size: 13px; }
 
 <main>
   <header class="lede">
-    <div class="eyebrow">Archive Suite · W41 OCR panel · 96 truth pages</div>
-    <h1>OCR panel price and accuracy</h1>
+    <div class="eyebrow">Archive Suite · what the bench has measured</div>
+    <h1>Archive OCR bench</h1>
+    <p>Three parts: the W41 OCR panel (24 routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), and the on-device handwriting readers the Vision OCR lab measured. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
+  </header>
+
+  <header class="part" id="ocr">
+    <div class="eyebrow">Part 1 · OCR panel · 96 truth pages</div>
+    <h2>OCR price and accuracy</h2>
     <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line.</p>
   </header>
 
@@ -74,8 +84,35 @@ footer p { font-size: 13px; }
     <div class="key" id="key"></div>
   </section>
 
+  <header class="part" id="segmentation">
+    <div class="eyebrow">Part 2 · Segmentation · two locked test boxes, 363 pages</div>
+    <h2>Segmentation: splitting a box into documents</h2>
+    <p>A box is photographed page by page, and the app has to say where one document ends and the next begins. Each approach is scored on two test boxes (Stanton and RG 165) held out until its settings were frozen on three development boxes. "No checking" is the share of document pages that land in exactly the right document if nobody checks anything. Each approach also flags the boundaries it is unsure of. Checking those flags costs the owner's time, so the table counts them per 100 pages and says how many pages end up right after checking.</p>
+  </header>
+  <section class="panel" id="seg-chart">
+    <div class="head"><h2>Without checking</h2><span class="meta">363 pages · 315 boundaries</span></div>
+    <p class="note" id="seg-note"></p>
+    <div class="plot"><canvas role="img" aria-label="Segmentation: pages in the exact document with no checking, against dollars per 1,000 pages"></canvas></div>
+  </section>
+  <section class="panel" id="seg-table">
+    <div class="head"><h2>With checking</h2><span class="meta">each approach at its flag level frozen for the 98% bar</span></div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>Approach</th><th>No checking</th><th>Checks per 100 pages</th><th>Right after checking</th><th>Unflagged errors</th><th>Per 1,000</th><th>Batch</th></tr></thead><tbody id="seg-rows"></tbody></table></div>
+    <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. Sources: <code>options.md</code> and <code>cheap-models.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
+  </section>
+
+  <header class="part" id="handwriting">
+    <div class="eyebrow">Part 3 · Handwriting on the Mac · Vision OCR lab</div>
+    <h2>Handwriting readers that run on the device</h2>
+    <p id="hw-lede"></p>
+  </header>
+  <section class="panel" id="hw-table">
+    <div class="head"><h2>Missed and added words</h2><span class="meta" id="hw-meta"></span></div>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th></th><th>Missed per 1,000</th><th>Added words</th><th>Passes the bar</th><th>Seconds a page</th><th>Peak memory</th><th>Download</th></tr></thead><tbody id="hw-rows"></tbody></table></div>
+    <p class="note">A different truth set and a different score from part 1, so these numbers do not compare with NES. Missed words are truth words the reader did not produce; added words are words it produced that match no truth word. The pick rule was set before the run: of the readers that pass, take the fewest missed, but where two are within 20 per 1,000, take the smaller and faster. Qwen3.5-9B and LightOnOCR-3-4B are 5 apart, so LightOnOCR-3-4B, which is nearly twice as fast, is the pick (owner confirmed 2026-10-15, Vision OCR commit 168af14). Churro's added words come from one page that looped. As read, neither model returns word positions, and the app's alignment places only 65% of their words, so handwritten pages will get a separate text page. <span id="hw-source"></span></p>
+  </section>
+
   <footer>
-    <p><strong>Costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
+    <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
     <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
     <p><strong>Limits.</strong> One corpus of about 100 pages. Claude Opus 5.5 and Gemini 3.8 Flash drafted the truth before it was adjudicated, so it may lean toward those families. The "local panel" was chosen for models that could run on a Mac, but every route here ran hosted; Mac quality is unmeasured. Differences of a point or two are not a ranking, and the handwritten chart rests on about 2,200 words.</p>
   </footer>
@@ -126,7 +163,7 @@ DATA.charts.forEach((c, ci) => {
 document.getElementById('key').innerHTML = routes.map(r =>
   '<span class="' + (frontIds.has(r.id) ? 'front' : '') + '"><b>' + r.num + '</b>' + r.name + (r.panel === 'local' ? ' ▵' : '') + '</span>').join('');
 
-function labelPlugin(P) {
+function labelPlugin(P, freeSep = true) {
   return { id: 'lbl', afterDatasetsDraw(ch) {
     const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, ink = css('--fg'), sec = css('--fg-2');
     g.save(); g.font = '11px ' + css('--mono'); g.textBaseline = 'middle';
@@ -144,7 +181,7 @@ function labelPlugin(P) {
     beforeDatasetsDraw(ch) {
       const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, acc = css('--accent'), oth = css('--other');
       g.save(); g.strokeStyle = css('--rule'); g.lineWidth = 1; g.setLineDash([3, 3]);
-      const sx = x.getPixelForValue(0.21); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke();
+      if (freeSep) { const sx = x.getPixelForValue(0.21); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke(); }
       g.setLineDash([2, 4]); g.lineWidth = 2;
       P.filter(p => p.b).forEach(b => { const s = P.find(q => q.r === b.r && !q.b); g.strokeStyle = (s.front || b.front) ? acc : oth;
         g.beginPath(); g.moveTo(x.getPixelForValue(s.x), y.getPixelForValue(s.y)); g.lineTo(x.getPixelForValue(b.x), y.getPixelForValue(b.y)); g.stroke(); });
@@ -170,19 +207,52 @@ function render() {
       options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 18, top: 6 } },
         plugins: { legend: { display: false }, tooltip: { filter: i => i.datasetIndex === 1, callbacks: {
           title: i => i[0].raw.r.num + '. ' + i[0].raw.r.name,
-          label: i => { const p = i.raw, r = p.r; return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
+          label: i => { const p = i.raw, r = p.r; if (o.seg) return [p.y.toFixed(1) + '% of pages in the exact document, no checking',
+            money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' at list price' : '')), r.checks.toFixed(1) + ' checks per 100 pages to reach ' + pct1(r.after)];
+            return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
             r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
             r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
-          x: { type: 'logarithmic', min: 0.14, max: 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
+          x: { type: 'logarithmic', min: o.seg ? 0.35 : 0.14, max: o.seg ? 40 : 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
             grid: { color: grid }, border: { color: grid },
-            afterBuildTicks: a => { a.ticks = [0.17, 0.25, 0.5, 1, 2, 5, 10, 20].map(v => ({ value: v })); },
+            afterBuildTicks: a => { a.ticks = (o.seg ? [0.5, 1, 2, 5, 10, 20] : [0.17, 0.25, 0.5, 1, 2, 5, 10, 20]).map(v => ({ value: v })); },
             ticks: { color: mut, autoSkip: false, callback: v => v === 0.17 ? 'free' : '$' + v } },
-          y: { min: lo, max: hi, title: { display: true, text: 'NES %', color: sec }, grid: { color: grid }, border: { display: false },
+          y: { min: lo, max: hi, title: { display: true, text: o.seg ? 'Pages in the exact document, no checking (%)' : 'NES %', color: sec }, grid: { color: grid }, border: { display: false },
             ticks: { color: mut, stepSize: 5 } } } },
-      plugins: [labelPlugin(o.P)] });
+      plugins: [labelPlugin(o.P, !o.seg)] });
   });
 }
+// Part 2: segmentation. Numbered by no-checking score; Full manual has no such score and is listed last.
+const SEG = DATA.segmentation.slice().sort((a, b) => (b.nocheck ?? -1) - (a.nocheck ?? -1));
+SEG.forEach((a, i) => { a.num = i + 1; a.id = 'seg' + i; });
+const pct1 = v => v === null ? '—' : v.toFixed(1) + '%';
+const segP = [];
+SEG.filter(a => a.nocheck !== null).forEach(a => {
+  const s = [a.nocheck];
+  segP.push({ x: a.std, y: a.nocheck, r: a, b: false, s });
+  if (a.batch) segP.push({ x: a.batch, y: a.nocheck, r: a, b: true, s });
+});
+segP.forEach(p => { p.front = !segP.some(q => q !== p && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y)); });
+const segTop = SEG.filter(a => a.nocheck === SEG[0].nocheck).map(a => a.name);
+document.getElementById('seg-note').textContent = 'Highest: ' + segTop.join(' and ') + (segTop.length > 1 ? ', tied' : '') + ' at ' + SEG[0].nocheck.toFixed(1) + '%. Best-value points: ' +
+  segP.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '. ' + (f => f ? 'With checking, ' + f.name + ' reaches 100% with the fewest checks (' + f.checks.toFixed(1) + ' per 100 pages).' : '')(SEG.filter(a => a.nocheck !== null && a.after === 100).sort((a, b) => a.checks - b.checks)[0]);
+document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + '</td><td>' + a.checks.toFixed(1) +
+  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
+charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
+
+// Part 3: handwriting.
+const HW = DATA.handwriting;
+document.getElementById('hw-lede').textContent = 'Readers that run on the Mac, measured on the Vision OCR lab\'s ' + HW.pages + ' handwritten truth pages (' +
+  HW.words.toLocaleString() + ' words). The bar: at most ' + HW.bar.missed + ' missed words per 1,000 and at most ' + HW.bar.added.toLocaleString() +
+  ' added words, which is half of Falcon-OCR\'s misses and no more additions than it makes. Falcon-OCR is the best handwriting reader the app has today.';
+document.getElementById('hw-meta').textContent = HW.pages + ' pages · ' + HW.words.toLocaleString() + ' words';
+const gb = v => v === undefined ? '—' : v.toFixed(2) + ' GB';
+document.getElementById('hw-rows').innerHTML = HW.readers.map(r => '<tr class="' + (r.picked ? 'pick' : '') + '"><td>' + r.name + '</td><td>' + (r.picked ? 'picked' : '') +
+  '</td><td>' + r.missed + '</td><td>' + r.added.toLocaleString() + '</td><td>' + (r.passes ? 'yes' : 'no') + '</td><td>' + r.seconds.toFixed(1) + '</td><td>' + gb(r.peak_gb) +
+  '</td><td>' + gb(r.download_gb) + '</td></tr>').join('') +
+  HW.reference.map(r => '<tr><td>' + r.name + '</td><td>today</td><td>' + r.missed + '</td><td>' + r.added.toLocaleString() + '</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>').join('');
+document.getElementById('hw-source').innerHTML = 'Source: <a href="' + HW.source.url + '">' + HW.source.file + '</a> (Vision OCR, commit ' + HW.source.commit + ').';
+
 Chart.defaults.font.family = css('--body');
 render();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render); } catch (e) {}

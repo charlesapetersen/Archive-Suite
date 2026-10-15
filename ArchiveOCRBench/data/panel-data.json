@@ -682,5 +682,170 @@
     ]
    }
   }
- ]
+ ],
+ "segmentation": [
+  {
+   "name": "Full manual",
+   "nocheck": null,
+   "checks": 86.8,
+   "after": 100.0,
+   "unflagged": 0,
+   "std": 0.0,
+   "batch": null,
+   "source": "options.md"
+  },
+  {
+   "name": "Claude only",
+   "nocheck": 87.0,
+   "checks": 10.2,
+   "after": 97.3,
+   "unflagged": 3,
+   "std": 16.93,
+   "batch": 8.47,
+   "source": "options.md"
+  },
+  {
+   "name": "Gemini only",
+   "nocheck": 88.8,
+   "checks": 24.2,
+   "after": 100.0,
+   "unflagged": 0,
+   "std": 3.61,
+   "batch": 1.81,
+   "source": "options.md"
+  },
+  {
+   "name": "ChatGPT only",
+   "nocheck": 92.4,
+   "checks": 79.1,
+   "after": 100.0,
+   "unflagged": 0,
+   "std": 14.51,
+   "batch": 7.25,
+   "source": "options.md"
+  },
+  {
+   "name": "Claude and ChatGPT together",
+   "nocheck": 92.4,
+   "checks": 10.2,
+   "after": 97.3,
+   "unflagged": 3,
+   "std": 31.44,
+   "batch": 15.72,
+   "source": "options.md"
+  },
+  {
+   "name": "GLM-5.3 Flash",
+   "nocheck": 82.1,
+   "after": 98.5,
+   "checks": 33.1,
+   "unflagged": 1,
+   "std": 1.16,
+   "batch": 0.46,
+   "source": "cheap-models.md"
+  },
+  {
+   "name": "GPT-5.6 Luna",
+   "nocheck": 84.5,
+   "after": 100.0,
+   "checks": 86.2,
+   "unflagged": 0,
+   "std": 1.9,
+   "batch": 0.78,
+   "source": "cheap-models.md"
+  },
+  {
+   "name": "Qwen3.5 Flash",
+   "nocheck": 77.6,
+   "after": 100.0,
+   "checks": 55.9,
+   "unflagged": 0,
+   "std": 0.48,
+   "batch": null,
+   "source": "cheap-models.md"
+  }
+ ],
+ "handwriting": {
+  "pages": 19,
+  "words": 2825,
+  "bar": {
+   "missed": 204,
+   "added": 793,
+   "why": "At most half of Falcon-OCR's missed words, and no more added words than Falcon-OCR adds. Set before the run."
+  },
+  "source": {
+   "repo": "https://github.com/charlesapetersen/vision-ocr",
+   "file": "HW-PANEL-2026-10-15.tsv",
+   "commit": "bbf4370",
+   "url": "https://github.com/charlesapetersen/vision-ocr/blob/bbf4370/HW-PANEL-2026-10-15.tsv",
+   "notes": "ops/autonomous/notes/hw-qwen.md in the same commit",
+   "owner_confirmed": "vision-ocr commit 168af14 (ops/autonomous/QUEUE.md, hw-qwen): LightOnOCR-3-4B and the text page, owner 2026-10-15"
+  },
+  "readers": [
+   {
+    "name": "Qwen3.5-9B (4-bit)",
+    "missed": 91,
+    "added": 312,
+    "seconds": 31.8,
+    "peak_gb": 8.74,
+    "download_gb": 5.98,
+    "passes": true
+   },
+   {
+    "name": "LightOnOCR-3-4B (8-bit)",
+    "missed": 96,
+    "added": 264,
+    "seconds": 17.8,
+    "peak_gb": 7.61,
+    "download_gb": 5.16,
+    "picked": true,
+    "passes": true
+   },
+   {
+    "name": "LightOnOCR-3-4B, NARA prompt",
+    "missed": 92,
+    "added": 359,
+    "seconds": 19.7,
+    "peak_gb": 7.62,
+    "download_gb": 5.16,
+    "passes": true
+   },
+   {
+    "name": "Churro 3B (8-bit)",
+    "missed": 152,
+    "added": 6602,
+    "seconds": 23.1,
+    "peak_gb": 6.09,
+    "download_gb": 4.63,
+    "note": "one page looped to 12,000 tokens",
+    "passes": false
+   },
+   {
+    "name": "Kraken PP-OCRv6 on Vision's lines",
+    "missed": 666,
+    "added": 1277,
+    "seconds": 2.7,
+    "peak_gb": 3.79,
+    "download_gb": 0.06,
+    "passes": false
+   }
+  ],
+  "reference": [
+   {
+    "name": "Falcon-OCR (through the app)",
+    "missed": 409,
+    "added": 793
+   },
+   {
+    "name": "PaddleOCR-VL (through the app)",
+    "missed": 454,
+    "added": 906
+   },
+   {
+    "name": "Apple Vision (through the app)",
+    "missed": 561,
+    "added": 1189
+   }
+  ]
+ }
 }

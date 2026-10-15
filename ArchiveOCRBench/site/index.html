@@ -1,9 +1,10 @@
-<title>OCR Panel Price and Accuracy</title>
+<title>Archive OCR Bench</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Public+Sans:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
 <style>
-/* Layout: one reading column; four stacked chart panels sharing one numbered route key. */
+/* Layout: one reading column. Part 1, four OCR chart panels sharing one numbered route key; part 2, segmentation
+   (one chart and its table); part 3, the Vision OCR lab's on-device handwriting readers (a table). */
 :root {
   --bg: #fbfbfa; --panel: #ffffff; --fg: #1b1d22; --fg-2: #4d525c; --muted: #8a8f99;
   --rule: #e3e4e8; --grid: #ececef; --accent: #2457c5; --other: #8f939c;
@@ -48,6 +49,9 @@ th { font-weight: 600; color: var(--fg); }
 .key { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 3px 18px; font-size: 13px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
 .key b { display: inline-block; min-width: 24px; font: 12px var(--mono); color: var(--muted); font-weight: 400; }
 .key .front { color: var(--fg); }
+.part { display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 22px; }
+.part h2 { font-size: 1.6rem; }
+tr.pick td { color: var(--fg); font-weight: 600; }
 footer { display: grid; gap: 8px; border-top: 1px solid var(--rule); padding-top: 18px; }
 footer p { font-size: 13px; }
 @media (max-width: 520px) { .plot { height: 360px; } h1 { font-size: 1.6rem; } section.panel { padding: 16px 12px 12px; } }
@@ -55,8 +59,14 @@ footer p { font-size: 13px; }
 
 <main>
   <header class="lede">
-    <div class="eyebrow">Archive Suite · W41 OCR panel · 96 truth pages</div>
-    <h1>OCR panel price and accuracy</h1>
+    <div class="eyebrow">Archive Suite · what the bench has measured</div>
+    <h1>Archive OCR bench</h1>
+    <p>Three parts: the W41 OCR panel (24 routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), and the on-device handwriting readers the Vision OCR lab measured. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
+  </header>
+
+  <header class="part" id="ocr">
+    <div class="eyebrow">Part 1 · OCR panel · 96 truth pages</div>
+    <h2>OCR price and accuracy</h2>
     <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line.</p>
   </header>
 
@@ -74,8 +84,35 @@ footer p { font-size: 13px; }
     <div class="key" id="key"></div>
   </section>
 
+  <header class="part" id="segmentation">
+    <div class="eyebrow">Part 2 · Segmentation · two locked test boxes, 363 pages</div>
+    <h2>Segmentation: splitting a box into documents</h2>
+    <p>A box is photographed page by page, and the app has to say where one document ends and the next begins. Each approach is scored on two test boxes (Stanton and RG 165) held out until its settings were frozen on three development boxes. "No checking" is the share of document pages that land in exactly the right document if nobody checks anything. Each approach also flags the boundaries it is unsure of. Checking those flags costs the owner's time, so the table counts them per 100 pages and says how many pages end up right after checking.</p>
+  </header>
+  <section class="panel" id="seg-chart">
+    <div class="head"><h2>Without checking</h2><span class="meta">363 pages · 315 boundaries</span></div>
+    <p class="note" id="seg-note"></p>
+    <div class="plot"><canvas role="img" aria-label="Segmentation: pages in the exact document with no checking, against dollars per 1,000 pages"></canvas></div>
+  </section>
+  <section class="panel" id="seg-table">
+    <div class="head"><h2>With checking</h2><span class="meta">each approach at its flag level frozen for the 98% bar</span></div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>Approach</th><th>No checking</th><th>Checks per 100 pages</th><th>Right after checking</th><th>Unflagged errors</th><th>Per 1,000</th><th>Batch</th></tr></thead><tbody id="seg-rows"></tbody></table></div>
+    <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. Sources: <code>options.md</code> and <code>cheap-models.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
+  </section>
+
+  <header class="part" id="handwriting">
+    <div class="eyebrow">Part 3 · Handwriting on the Mac · Vision OCR lab</div>
+    <h2>Handwriting readers that run on the device</h2>
+    <p id="hw-lede"></p>
+  </header>
+  <section class="panel" id="hw-table">
+    <div class="head"><h2>Missed and added words</h2><span class="meta" id="hw-meta"></span></div>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th></th><th>Missed per 1,000</th><th>Added words</th><th>Passes the bar</th><th>Seconds a page</th><th>Peak memory</th><th>Download</th></tr></thead><tbody id="hw-rows"></tbody></table></div>
+    <p class="note">A different truth set and a different score from part 1, so these numbers do not compare with NES. Missed words are truth words the reader did not produce; added words are words it produced that match no truth word. The pick rule was set before the run: of the readers that pass, take the fewest missed, but where two are within 20 per 1,000, take the smaller and faster. Qwen3.5-9B and LightOnOCR-3-4B are 5 apart, so LightOnOCR-3-4B, which is nearly twice as fast, is the pick (owner confirmed 2026-10-15, Vision OCR commit 168af14). Churro's added words come from one page that looped. As read, neither model returns word positions, and the app's alignment places only 65% of their words, so handwritten pages will get a separate text page. <span id="hw-source"></span></p>
+  </section>
+
   <footer>
-    <p><strong>Costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
+    <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
     <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
     <p><strong>Limits.</strong> One corpus of about 100 pages. Claude Opus 5.5 and Gemini 3.8 Flash drafted the truth before it was adjudicated, so it may lean toward those families. The "local panel" was chosen for models that could run on a Mac, but every route here ran hosted; Mac quality is unmeasured. Differences of a point or two are not a ranking, and the handwritten chart rests on about 2,200 words.</p>
   </footer>
@@ -83,7 +120,7 @@ footer p { font-size: 13px; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-const DATA = {"routes":[{"id":"claude-sonnet5.5","name":"Claude Sonnet 5.5","panel":"cloud","std":11.5,"batch":5.75},{"id":"gemini3.1-pro","name":"Gemini 3.1 Pro","panel":"cloud","std":21.92,"batch":10.96},{"id":"gemini3.8-flash","name":"Gemini 3.8 Flash","panel":"cloud","std":3.22,"batch":1.61},{"id":"qwen3.5-397b","name":"Qwen3.5 397B","panel":"cloud","std":2.02,"batch":null},{"id":"qwen3-vl-235b","name":"Qwen3-VL 235B","panel":"cloud","std":1.22,"batch":null},{"id":"gpt5.4-mini","name":"GPT-5.4 Mini","panel":"cloud","std":5.55,"batch":2.78},{"id":"gemini3.5-flash","name":"Gemini 3.5 Flash","panel":"cloud","std":6.23,"batch":3.12},{"id":"mistral-large4","name":"Mistral Large 4","panel":"cloud","std":2.69,"batch":null},{"id":"gemini3.5-flash-lite","name":"Gemini 3.5 Flash Lite","panel":"cloud","std":1.57,"batch":0.79},{"id":"mistral-ocr-4-1","name":"Mistral OCR 4.1","panel":"cloud","std":4.0,"batch":2.0},{"id":"gpt5.6-luna","name":"GPT-5.6 Luna","panel":"cloud","std":1.41,"batch":0.71},{"id":"mistral-medium3.5","name":"Mistral Medium 3.5","panel":"cloud","std":7.29,"batch":3.65},{"id":"qwen3.6-27b","name":"Qwen3.6 27B","panel":"local","std":1.94,"batch":null},{"id":"qwen3.6-35b-a3b","name":"Qwen3.6 35B-A3B","panel":"local","std":0.6,"batch":null},{"id":"qwen3-vl-8b","name":"Qwen3-VL 8B","panel":"local","std":1.49,"batch":null},{"id":"gemini3.1-flash-lite","name":"Gemini 3.1 Flash Lite","panel":"local","std":1.17,"batch":0.58},{"id":"qwen3.5-35b-a3b","name":"Qwen3.5 35B-A3B","panel":"local","std":0.83,"batch":null},{"id":"gemma4-31b","name":"Gemma 4 31B","panel":"local","std":0.38,"batch":null},{"id":"qwen3-vl-30b-a3b","name":"Qwen3-VL 30B-A3B","panel":"local","std":0.98,"batch":null},{"id":"qwen3.5-9b","name":"Qwen3.5 9B","panel":"local","std":0.25,"batch":null},{"id":"mistral-small-24b","name":"Mistral Small 24B","panel":"local","std":0.32,"batch":null},{"id":"gemma4-26b-a4b","name":"Gemma 4 26B-A4B","panel":"local","std":0.41,"batch":null},{"id":"qwen3.5-27b","name":"Qwen3.5 27B","panel":"local","std":1.8,"batch":null},{"id":"apple-vision","name":"Apple Vision","panel":"local","std":0.0,"batch":null}],"charts":[{"key":"overall","title":"All page kinds","n":96,"words":null,"scores":{"claude-sonnet5.5":[96.47,96,96],"gemini3.1-pro":[94.85,94,96],"gemini3.8-flash":[94.47,94,96],"qwen3.5-397b":[93.98,96,96],"qwen3-vl-235b":[93.95,96,96],"gpt5.4-mini":[93.55,95,96],"gemini3.5-flash":[93.48,94,96],"mistral-large4":[93.15,96,96],"gemini3.5-flash-lite":[93.13,94,96],"mistral-ocr-4-1":[92.91,96,96],"gpt5.6-luna":[92.13,95,96],"mistral-medium3.5":[90.65,96,96],"qwen3.5-9b":[89.43,92,96],"qwen3.5-27b":[81.8,82,96],"qwen3.5-35b-a3b":[90.83,94,96],"qwen3.6-27b":[94.28,95,96],"qwen3.6-35b-a3b":[93.02,96,96],"gemma4-26b-a4b":[82.73,86,96],"gemma4-31b":[90.55,93,96],"qwen3-vl-8b":[91.81,94,96],"qwen3-vl-30b-a3b":[89.82,94,96],"mistral-small-24b":[89.34,94,96],"gemini3.1-flash-lite":[91.61,93,96],"apple-vision":[81.34,96,96]}},{"key":"typewritten","title":"Typewritten","n":50,"words":15042,"scores":{"claude-sonnet5.5":[98.59,50,50],"gemini3.1-pro":[98.75,50,50],"gemini3.8-flash":[98.74,50,50],"qwen3.5-397b":[96.18,50,50],"qwen3-vl-235b":[96.09,50,50],"gpt5.4-mini":[95.51,49,50],"gemini3.5-flash":[97.32,50,50],"mistral-large4":[95.46,50,50],"gemini3.5-flash-lite":[97.56,50,50],"mistral-ocr-4-1":[95.7,50,50],"gpt5.6-luna":[94.98,49,50],"mistral-medium3.5":[94.67,50,50],"qwen3.6-27b":[95.55,49,50],"qwen3.6-35b-a3b":[95.69,50,50],"qwen3-vl-8b":[95.56,50,50],"gemini3.1-flash-lite":[96.38,50,50],"qwen3.5-35b-a3b":[92.25,48,50],"gemma4-31b":[94.74,49,50],"qwen3-vl-30b-a3b":[95.56,50,50],"qwen3.5-9b":[89.62,47,50],"mistral-small-24b":[93.53,49,50],"gemma4-26b-a4b":[89.7,47,50],"qwen3.5-27b":[86.23,44,50],"apple-vision":[91.92,50,50]}},{"key":"printed","title":"Printed","n":28,"words":12569,"scores":{"claude-sonnet5.5":[96.31,28,28],"gemini3.1-pro":[89.21,26,28],"gemini3.8-flash":[87.21,26,28],"qwen3.5-397b":[93.72,28,28],"qwen3-vl-235b":[93.25,28,28],"gpt5.4-mini":[93.32,28,28],"gemini3.5-flash":[88.18,26,28],"mistral-large4":[92.46,28,28],"gemini3.5-flash-lite":[87.92,26,28],"mistral-ocr-4-1":[91.49,28,28],"gpt5.6-luna":[92.61,28,28],"mistral-medium3.5":[87.98,28,28],"qwen3.6-27b":[94.82,28,28],"qwen3.6-35b-a3b":[92.34,28,28],"qwen3-vl-8b":[91.23,27,28],"gemini3.1-flash-lite":[86.85,26,28],"qwen3.5-35b-a3b":[91.09,28,28],"gemma4-31b":[83.29,26,28],"qwen3-vl-30b-a3b":[88.17,27,28],"qwen3.5-9b":[89.65,27,28],"mistral-small-24b":[89.33,28,28],"gemma4-26b-a4b":[71.59,22,28],"qwen3.5-27b":[82.03,24,28],"apple-vision":[76.43,28,28]}},{"key":"handwritten","title":"Handwritten","n":16,"words":2182,"scores":{"claude-sonnet5.5":[92.43,16,16],"gemini3.1-pro":[94.06,16,16],"gemini3.8-flash":[95.97,16,16],"qwen3.5-397b":[90.57,16,16],"qwen3-vl-235b":[91.38,16,16],"gpt5.4-mini":[89.48,16,16],"gemini3.5-flash":[92.93,16,16],"mistral-large4":[92.03,16,16],"gemini3.5-flash-lite":[91.98,16,16],"mistral-ocr-4-1":[89.01,16,16],"gpt5.6-luna":[85.44,16,16],"mistral-medium3.5":[85.04,16,16],"qwen3.6-27b":[92.15,16,16],"qwen3.6-35b-a3b":[88.82,16,16],"qwen3-vl-8b":[84.83,15,16],"gemini3.1-flash-lite":[86.64,15,16],"qwen3.5-35b-a3b":[88.31,16,16],"gemma4-31b":[90.84,16,16],"qwen3-vl-30b-a3b":[77.58,15,16],"qwen3.5-9b":[90.92,16,16],"mistral-small-24b":[79.83,15,16],"gemma4-26b-a4b":[86.6,16,16],"qwen3.5-27b":[69.14,12,16],"apple-vision":[57.87,16,16]}}]};
+const DATA = {"routes":[{"id":"claude-sonnet5.5","name":"Claude Sonnet 5.5","panel":"cloud","std":11.5,"batch":5.75},{"id":"gemini3.1-pro","name":"Gemini 3.1 Pro","panel":"cloud","std":21.92,"batch":10.96},{"id":"gemini3.8-flash","name":"Gemini 3.8 Flash","panel":"cloud","std":3.22,"batch":1.61},{"id":"qwen3.5-397b","name":"Qwen3.5 397B","panel":"cloud","std":2.02,"batch":null},{"id":"qwen3-vl-235b","name":"Qwen3-VL 235B","panel":"cloud","std":1.22,"batch":null},{"id":"gpt5.4-mini","name":"GPT-5.4 Mini","panel":"cloud","std":5.55,"batch":2.78},{"id":"gemini3.5-flash","name":"Gemini 3.5 Flash","panel":"cloud","std":6.23,"batch":3.12},{"id":"mistral-large4","name":"Mistral Large 4","panel":"cloud","std":2.69,"batch":null},{"id":"gemini3.5-flash-lite","name":"Gemini 3.5 Flash Lite","panel":"cloud","std":1.57,"batch":0.79},{"id":"mistral-ocr-4-1","name":"Mistral OCR 4.1","panel":"cloud","std":4.0,"batch":2.0},{"id":"gpt5.6-luna","name":"GPT-5.6 Luna","panel":"cloud","std":1.41,"batch":0.71},{"id":"mistral-medium3.5","name":"Mistral Medium 3.5","panel":"cloud","std":7.29,"batch":3.65},{"id":"qwen3.6-27b","name":"Qwen3.6 27B","panel":"local","std":1.94,"batch":null},{"id":"qwen3.6-35b-a3b","name":"Qwen3.6 35B-A3B","panel":"local","std":0.6,"batch":null},{"id":"qwen3-vl-8b","name":"Qwen3-VL 8B","panel":"local","std":1.49,"batch":null},{"id":"gemini3.1-flash-lite","name":"Gemini 3.1 Flash Lite","panel":"local","std":1.17,"batch":0.58},{"id":"qwen3.5-35b-a3b","name":"Qwen3.5 35B-A3B","panel":"local","std":0.83,"batch":null},{"id":"gemma4-31b","name":"Gemma 4 31B","panel":"local","std":0.38,"batch":null},{"id":"qwen3-vl-30b-a3b","name":"Qwen3-VL 30B-A3B","panel":"local","std":0.98,"batch":null},{"id":"qwen3.5-9b","name":"Qwen3.5 9B","panel":"local","std":0.25,"batch":null},{"id":"mistral-small-24b","name":"Mistral Small 24B","panel":"local","std":0.32,"batch":null},{"id":"gemma4-26b-a4b","name":"Gemma 4 26B-A4B","panel":"local","std":0.41,"batch":null},{"id":"qwen3.5-27b","name":"Qwen3.5 27B","panel":"local","std":1.8,"batch":null},{"id":"apple-vision","name":"Apple Vision","panel":"local","std":0.0,"batch":null}],"charts":[{"key":"overall","title":"All page kinds","n":96,"words":null,"scores":{"claude-sonnet5.5":[96.47,96,96],"gemini3.1-pro":[94.85,94,96],"gemini3.8-flash":[94.47,94,96],"qwen3.5-397b":[93.98,96,96],"qwen3-vl-235b":[93.95,96,96],"gpt5.4-mini":[93.55,95,96],"gemini3.5-flash":[93.48,94,96],"mistral-large4":[93.15,96,96],"gemini3.5-flash-lite":[93.13,94,96],"mistral-ocr-4-1":[92.91,96,96],"gpt5.6-luna":[92.13,95,96],"mistral-medium3.5":[90.65,96,96],"qwen3.5-9b":[89.43,92,96],"qwen3.5-27b":[81.8,82,96],"qwen3.5-35b-a3b":[90.83,94,96],"qwen3.6-27b":[94.28,95,96],"qwen3.6-35b-a3b":[93.02,96,96],"gemma4-26b-a4b":[82.73,86,96],"gemma4-31b":[90.55,93,96],"qwen3-vl-8b":[91.81,94,96],"qwen3-vl-30b-a3b":[89.82,94,96],"mistral-small-24b":[89.34,94,96],"gemini3.1-flash-lite":[91.61,93,96],"apple-vision":[81.34,96,96]}},{"key":"typewritten","title":"Typewritten","n":50,"words":15042,"scores":{"claude-sonnet5.5":[98.59,50,50],"gemini3.1-pro":[98.75,50,50],"gemini3.8-flash":[98.74,50,50],"qwen3.5-397b":[96.18,50,50],"qwen3-vl-235b":[96.09,50,50],"gpt5.4-mini":[95.51,49,50],"gemini3.5-flash":[97.32,50,50],"mistral-large4":[95.46,50,50],"gemini3.5-flash-lite":[97.56,50,50],"mistral-ocr-4-1":[95.7,50,50],"gpt5.6-luna":[94.98,49,50],"mistral-medium3.5":[94.67,50,50],"qwen3.6-27b":[95.55,49,50],"qwen3.6-35b-a3b":[95.69,50,50],"qwen3-vl-8b":[95.56,50,50],"gemini3.1-flash-lite":[96.38,50,50],"qwen3.5-35b-a3b":[92.25,48,50],"gemma4-31b":[94.74,49,50],"qwen3-vl-30b-a3b":[95.56,50,50],"qwen3.5-9b":[89.62,47,50],"mistral-small-24b":[93.53,49,50],"gemma4-26b-a4b":[89.7,47,50],"qwen3.5-27b":[86.23,44,50],"apple-vision":[91.92,50,50]}},{"key":"printed","title":"Printed","n":28,"words":12569,"scores":{"claude-sonnet5.5":[96.31,28,28],"gemini3.1-pro":[89.21,26,28],"gemini3.8-flash":[87.21,26,28],"qwen3.5-397b":[93.72,28,28],"qwen3-vl-235b":[93.25,28,28],"gpt5.4-mini":[93.32,28,28],"gemini3.5-flash":[88.18,26,28],"mistral-large4":[92.46,28,28],"gemini3.5-flash-lite":[87.92,26,28],"mistral-ocr-4-1":[91.49,28,28],"gpt5.6-luna":[92.61,28,28],"mistral-medium3.5":[87.98,28,28],"qwen3.6-27b":[94.82,28,28],"qwen3.6-35b-a3b":[92.34,28,28],"qwen3-vl-8b":[91.23,27,28],"gemini3.1-flash-lite":[86.85,26,28],"qwen3.5-35b-a3b":[91.09,28,28],"gemma4-31b":[83.29,26,28],"qwen3-vl-30b-a3b":[88.17,27,28],"qwen3.5-9b":[89.65,27,28],"mistral-small-24b":[89.33,28,28],"gemma4-26b-a4b":[71.59,22,28],"qwen3.5-27b":[82.03,24,28],"apple-vision":[76.43,28,28]}},{"key":"handwritten","title":"Handwritten","n":16,"words":2182,"scores":{"claude-sonnet5.5":[92.43,16,16],"gemini3.1-pro":[94.06,16,16],"gemini3.8-flash":[95.97,16,16],"qwen3.5-397b":[90.57,16,16],"qwen3-vl-235b":[91.38,16,16],"gpt5.4-mini":[89.48,16,16],"gemini3.5-flash":[92.93,16,16],"mistral-large4":[92.03,16,16],"gemini3.5-flash-lite":[91.98,16,16],"mistral-ocr-4-1":[89.01,16,16],"gpt5.6-luna":[85.44,16,16],"mistral-medium3.5":[85.04,16,16],"qwen3.6-27b":[92.15,16,16],"qwen3.6-35b-a3b":[88.82,16,16],"qwen3-vl-8b":[84.83,15,16],"gemini3.1-flash-lite":[86.64,15,16],"qwen3.5-35b-a3b":[88.31,16,16],"gemma4-31b":[90.84,16,16],"qwen3-vl-30b-a3b":[77.58,15,16],"qwen3.5-9b":[90.92,16,16],"mistral-small-24b":[79.83,15,16],"gemma4-26b-a4b":[86.6,16,16],"qwen3.5-27b":[69.14,12,16],"apple-vision":[57.87,16,16]}}],"segmentation":[{"name":"Full manual","nocheck":null,"checks":86.8,"after":100.0,"unflagged":0,"std":0.0,"batch":null,"source":"options.md"},{"name":"Claude only","nocheck":87.0,"checks":10.2,"after":97.3,"unflagged":3,"std":16.93,"batch":8.47,"source":"options.md"},{"name":"Gemini only","nocheck":88.8,"checks":24.2,"after":100.0,"unflagged":0,"std":3.61,"batch":1.81,"source":"options.md"},{"name":"ChatGPT only","nocheck":92.4,"checks":79.1,"after":100.0,"unflagged":0,"std":14.51,"batch":7.25,"source":"options.md"},{"name":"Claude and ChatGPT together","nocheck":92.4,"checks":10.2,"after":97.3,"unflagged":3,"std":31.44,"batch":15.72,"source":"options.md"},{"name":"GLM-5.3 Flash","nocheck":82.1,"after":98.5,"checks":33.1,"unflagged":1,"std":1.16,"batch":0.46,"source":"cheap-models.md"},{"name":"GPT-5.6 Luna","nocheck":84.5,"after":100.0,"checks":86.2,"unflagged":0,"std":1.9,"batch":0.78,"source":"cheap-models.md"},{"name":"Qwen3.5 Flash","nocheck":77.6,"after":100.0,"checks":55.9,"unflagged":0,"std":0.48,"batch":null,"source":"cheap-models.md"}],"handwriting":{"pages":19,"words":2825,"bar":{"missed":204,"added":793,"why":"At most half of Falcon-OCR's missed words, and no more added words than Falcon-OCR adds. Set before the run."},"source":{"repo":"https://github.com/charlesapetersen/vision-ocr","file":"HW-PANEL-2026-10-15.tsv","commit":"bbf4370","url":"https://github.com/charlesapetersen/vision-ocr/blob/bbf4370/HW-PANEL-2026-10-15.tsv","notes":"ops/autonomous/notes/hw-qwen.md in the same commit","owner_confirmed":"vision-ocr commit 168af14 (ops/autonomous/QUEUE.md, hw-qwen): LightOnOCR-3-4B and the text page, owner 2026-10-15"},"readers":[{"name":"Qwen3.5-9B (4-bit)","missed":91,"added":312,"seconds":31.8,"peak_gb":8.74,"download_gb":5.98,"passes":true},{"name":"LightOnOCR-3-4B (8-bit)","missed":96,"added":264,"seconds":17.8,"peak_gb":7.61,"download_gb":5.16,"picked":true,"passes":true},{"name":"LightOnOCR-3-4B, NARA prompt","missed":92,"added":359,"seconds":19.7,"peak_gb":7.62,"download_gb":5.16,"passes":true},{"name":"Churro 3B (8-bit)","missed":152,"added":6602,"seconds":23.1,"peak_gb":6.09,"download_gb":4.63,"note":"one page looped to 12,000 tokens","passes":false},{"name":"Kraken PP-OCRv6 on Vision's lines","missed":666,"added":1277,"seconds":2.7,"peak_gb":3.79,"download_gb":0.06,"passes":false}],"reference":[{"name":"Falcon-OCR (through the app)","missed":409,"added":793},{"name":"PaddleOCR-VL (through the app)","missed":454,"added":906},{"name":"Apple Vision (through the app)","missed":561,"added":1189}]}};
 const FREE = 0.17;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const money = v => v === 0 ? 'free' : '$' + v.toFixed(2);
@@ -126,7 +163,7 @@ DATA.charts.forEach((c, ci) => {
 document.getElementById('key').innerHTML = routes.map(r =>
   '<span class="' + (frontIds.has(r.id) ? 'front' : '') + '"><b>' + r.num + '</b>' + r.name + (r.panel === 'local' ? ' ▵' : '') + '</span>').join('');
 
-function labelPlugin(P) {
+function labelPlugin(P, freeSep = true) {
   return { id: 'lbl', afterDatasetsDraw(ch) {
     const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, ink = css('--fg'), sec = css('--fg-2');
     g.save(); g.font = '11px ' + css('--mono'); g.textBaseline = 'middle';
@@ -144,7 +181,7 @@ function labelPlugin(P) {
     beforeDatasetsDraw(ch) {
       const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, acc = css('--accent'), oth = css('--other');
       g.save(); g.strokeStyle = css('--rule'); g.lineWidth = 1; g.setLineDash([3, 3]);
-      const sx = x.getPixelForValue(0.21); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke();
+      if (freeSep) { const sx = x.getPixelForValue(0.21); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke(); }
       g.setLineDash([2, 4]); g.lineWidth = 2;
       P.filter(p => p.b).forEach(b => { const s = P.find(q => q.r === b.r && !q.b); g.strokeStyle = (s.front || b.front) ? acc : oth;
         g.beginPath(); g.moveTo(x.getPixelForValue(s.x), y.getPixelForValue(s.y)); g.lineTo(x.getPixelForValue(b.x), y.getPixelForValue(b.y)); g.stroke(); });
@@ -170,19 +207,52 @@ function render() {
       options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 18, top: 6 } },
         plugins: { legend: { display: false }, tooltip: { filter: i => i.datasetIndex === 1, callbacks: {
           title: i => i[0].raw.r.num + '. ' + i[0].raw.r.name,
-          label: i => { const p = i.raw, r = p.r; return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
+          label: i => { const p = i.raw, r = p.r; if (o.seg) return [p.y.toFixed(1) + '% of pages in the exact document, no checking',
+            money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' at list price' : '')), r.checks.toFixed(1) + ' checks per 100 pages to reach ' + pct1(r.after)];
+            return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
             r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
             r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
-          x: { type: 'logarithmic', min: 0.14, max: 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
+          x: { type: 'logarithmic', min: o.seg ? 0.35 : 0.14, max: o.seg ? 40 : 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
             grid: { color: grid }, border: { color: grid },
-            afterBuildTicks: a => { a.ticks = [0.17, 0.25, 0.5, 1, 2, 5, 10, 20].map(v => ({ value: v })); },
+            afterBuildTicks: a => { a.ticks = (o.seg ? [0.5, 1, 2, 5, 10, 20] : [0.17, 0.25, 0.5, 1, 2, 5, 10, 20]).map(v => ({ value: v })); },
             ticks: { color: mut, autoSkip: false, callback: v => v === 0.17 ? 'free' : '$' + v } },
-          y: { min: lo, max: hi, title: { display: true, text: 'NES %', color: sec }, grid: { color: grid }, border: { display: false },
+          y: { min: lo, max: hi, title: { display: true, text: o.seg ? 'Pages in the exact document, no checking (%)' : 'NES %', color: sec }, grid: { color: grid }, border: { display: false },
             ticks: { color: mut, stepSize: 5 } } } },
-      plugins: [labelPlugin(o.P)] });
+      plugins: [labelPlugin(o.P, !o.seg)] });
   });
 }
+// Part 2: segmentation. Numbered by no-checking score; Full manual has no such score and is listed last.
+const SEG = DATA.segmentation.slice().sort((a, b) => (b.nocheck ?? -1) - (a.nocheck ?? -1));
+SEG.forEach((a, i) => { a.num = i + 1; a.id = 'seg' + i; });
+const pct1 = v => v === null ? '—' : v.toFixed(1) + '%';
+const segP = [];
+SEG.filter(a => a.nocheck !== null).forEach(a => {
+  const s = [a.nocheck];
+  segP.push({ x: a.std, y: a.nocheck, r: a, b: false, s });
+  if (a.batch) segP.push({ x: a.batch, y: a.nocheck, r: a, b: true, s });
+});
+segP.forEach(p => { p.front = !segP.some(q => q !== p && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y)); });
+const segTop = SEG.filter(a => a.nocheck === SEG[0].nocheck).map(a => a.name);
+document.getElementById('seg-note').textContent = 'Highest: ' + segTop.join(' and ') + (segTop.length > 1 ? ', tied' : '') + ' at ' + SEG[0].nocheck.toFixed(1) + '%. Best-value points: ' +
+  segP.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '. ' + (f => f ? 'With checking, ' + f.name + ' reaches 100% with the fewest checks (' + f.checks.toFixed(1) + ' per 100 pages).' : '')(SEG.filter(a => a.nocheck !== null && a.after === 100).sort((a, b) => a.checks - b.checks)[0]);
+document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + '</td><td>' + a.checks.toFixed(1) +
+  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
+charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
+
+// Part 3: handwriting.
+const HW = DATA.handwriting;
+document.getElementById('hw-lede').textContent = 'Readers that run on the Mac, measured on the Vision OCR lab\'s ' + HW.pages + ' handwritten truth pages (' +
+  HW.words.toLocaleString() + ' words). The bar: at most ' + HW.bar.missed + ' missed words per 1,000 and at most ' + HW.bar.added.toLocaleString() +
+  ' added words, which is half of Falcon-OCR\'s misses and no more additions than it makes. Falcon-OCR is the best handwriting reader the app has today.';
+document.getElementById('hw-meta').textContent = HW.pages + ' pages · ' + HW.words.toLocaleString() + ' words';
+const gb = v => v === undefined ? '—' : v.toFixed(2) + ' GB';
+document.getElementById('hw-rows').innerHTML = HW.readers.map(r => '<tr class="' + (r.picked ? 'pick' : '') + '"><td>' + r.name + '</td><td>' + (r.picked ? 'picked' : '') +
+  '</td><td>' + r.missed + '</td><td>' + r.added.toLocaleString() + '</td><td>' + (r.passes ? 'yes' : 'no') + '</td><td>' + r.seconds.toFixed(1) + '</td><td>' + gb(r.peak_gb) +
+  '</td><td>' + gb(r.download_gb) + '</td></tr>').join('') +
+  HW.reference.map(r => '<tr><td>' + r.name + '</td><td>today</td><td>' + r.missed + '</td><td>' + r.added.toLocaleString() + '</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>').join('');
+document.getElementById('hw-source').innerHTML = 'Source: <a href="' + HW.source.url + '">' + HW.source.file + '</a> (Vision OCR, commit ' + HW.source.commit + ').';
+
 Chart.defaults.font.family = css('--body');
 render();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render); } catch (e) {}

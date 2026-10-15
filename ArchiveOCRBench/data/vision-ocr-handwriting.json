@@ -1,0 +1,30 @@
+{
+  "_about": "On-device handwriting readers measured by the Vision OCR lab (the Vision OCR project, a separate repository), entered by hand because build.py cannot read another repository. Every figure is from the source below; re-enter them if that file is rerun.",
+  "source": {
+    "repo": "https://github.com/charlesapetersen/vision-ocr",
+    "file": "HW-PANEL-2026-10-15.tsv",
+    "commit": "bbf4370",
+    "url": "https://github.com/charlesapetersen/vision-ocr/blob/bbf4370/HW-PANEL-2026-10-15.tsv",
+    "notes": "ops/autonomous/notes/hw-qwen.md in the same commit",
+    "owner_confirmed": "vision-ocr commit 168af14 (ops/autonomous/QUEUE.md, hw-qwen): LightOnOCR-3-4B and the text page, owner 2026-10-15"
+  },
+  "pages": 19,
+  "words": 2825,
+  "bar": {
+    "missed": 204,
+    "added": 793,
+    "why": "At most half of Falcon-OCR's missed words, and no more added words than Falcon-OCR adds. Set before the run."
+  },
+  "readers": [
+    {"name": "Qwen3.5-9B (4-bit)", "missed": 91, "added": 312, "seconds": 31.8, "peak_gb": 8.74, "download_gb": 5.98},
+    {"name": "LightOnOCR-3-4B (8-bit)", "missed": 96, "added": 264, "seconds": 17.8, "peak_gb": 7.61, "download_gb": 5.16, "picked": true},
+    {"name": "LightOnOCR-3-4B, NARA prompt", "missed": 92, "added": 359, "seconds": 19.7, "peak_gb": 7.62, "download_gb": 5.16},
+    {"name": "Churro 3B (8-bit)", "missed": 152, "added": 6602, "seconds": 23.1, "peak_gb": 6.09, "download_gb": 4.63, "note": "one page looped to 12,000 tokens"},
+    {"name": "Kraken PP-OCRv6 on Vision's lines", "missed": 666, "added": 1277, "seconds": 2.7, "peak_gb": 3.79, "download_gb": 0.06}
+  ],
+  "reference": [
+    {"name": "Falcon-OCR (through the app)", "missed": 409, "added": 793},
+    {"name": "PaddleOCR-VL (through the app)", "missed": 454, "added": 906},
+    {"name": "Apple Vision (through the app)", "missed": 561, "added": 1189}
+  ]
+}

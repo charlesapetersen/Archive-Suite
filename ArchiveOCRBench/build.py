@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Build ArchiveOCRBench's data file and chart page from the W41 OCR panel results.
+"""Build ArchiveOCRBench's data file and chart page from the bench's committed results.
 
-Reads the panel's committed results in ../ArchiveProcessor/segbench-results/ (the reports and the
-per-attribute CSVs) plus the hand-entered figures in data/inputs.json, and writes:
+Reads, in ../ArchiveProcessor/segbench-results/, the W41 OCR panel's reports and per-attribute CSVs and the
+segmentation reports (options.md, cheap-models.md), plus the hand-entered figures in data/inputs.json and
+the Vision OCR lab's handwriting figures in data/vision-ocr-handwriting.json, and writes:
 
-  data/panel-data.json   every route's score per chart, its answered pages and its price
+  data/panel-data.json   every OCR route's score per chart, its answered pages and its price; every
+                         segmentation approach's test-box figures; the handwriting readers
   site/index.html        the chart page (site/template.html with the data filled in)
 
 Run from anywhere:  python3 ArchiveOCRBench/build.py
@@ -23,17 +25,20 @@ CLOUD_MD = RESULTS / "ocr-panel-cloud.md"
 LOCAL_MD = RESULTS / "ocr-panel-local.md"
 CLOUD_CSV = RESULTS / "ocr-panel-cloud-groups.csv"
 LOCAL_CSV = RESULTS / "ocr-panel-local-groups.csv"
+OPTIONS_MD = RESULTS / "options.md"
+CHEAP_MD = RESULTS / "cheap-models.md"
 INPUTS = HERE / "data" / "inputs.json"
+HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
 
 
-def table_after(md, heading):
-    """Rows of the first Markdown table after a heading line, as lists of stripped cells."""
+def table_after(md, heading, nth=0):
+    """Rows of the nth Markdown table (0 = the first) after a heading line, as lists of stripped cells."""
     lines = md.splitlines()
     start = next(i for i, l in enumerate(lines) if l.startswith(heading))
-    rows, seen = [], False
+    tables, rows, seen = [], [], False
     for l in lines[start + 1:]:
         if l.startswith("|"):
             seen = True
@@ -41,8 +46,13 @@ def table_after(md, heading):
             if not set("".join(cells)) <= set("-: "):
                 rows.append(cells)
         elif seen:
-            break
-    return rows[1:]  # drop the header row
+            tables.append(rows[1:])  # drop the header row
+            if len(tables) > nth:
+                break
+            rows, seen = [], False
+    if seen:
+        tables.append(rows[1:])
+    return tables[nth]
 
 
 def route_id(cell):
@@ -58,6 +68,50 @@ def dollars_per_1000(cell):
 def cents(v):
     """Round half up to the cent, so half of $5.55 shows as $2.78 rather than float rounding's $2.77."""
     return float(Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def money_cells(cell):
+    """'$16.93 / $8.47' or '$0.48' or 'none' -> (standard, batch) in dollars per 1,000 pages."""
+    vals = [float(v) for v in re.findall(r"\$([0-9.]+)", cell)]
+    return (vals[0] if vals else 0.0), (vals[1] if len(vals) > 1 else None)
+
+
+def pct(cell):
+    return None if cell in ("—", "") else float(cell.rstrip("%"))
+
+
+def segmentation():
+    """Test-box figures (Stanton and RG 165, 363 pages) for every segmentation approach, each at the flag
+    level frozen on the development boxes for the 98% bar: options.md's five, then cheap-models.md's finalists."""
+    seg = []
+    for c in table_after(OPTIONS_MD.read_text(), "## The five figures"):
+        std, batch = money_cells(c[5])
+        seg.append({"name": c[0], "nocheck": pct(c[1]), "checks": float(c[2]), "after": pct(c[3]),
+                    "unflagged": int(re.search(r"\((\d+)\)", c[4]).group(1)), "std": std, "batch": batch,
+                    "source": "options.md"})
+    cheap = CHEAP_MD.read_text()
+    costs = {c[0]: c for c in table_after(cheap, "### The level fitted per model", 1)}
+    gemini = next(a for a in seg if a["name"] == "Gemini only")
+    for c in table_after(cheap, "### The level fitted per model"):
+        if c[1] != "98%":
+            continue
+        row = {"nocheck": pct(c[5]), "after": pct(c[6]), "checks": float(c[7]), "unflagged": int(c[8])}
+        if c[0].startswith("Gemini 3.8 Flash"):
+            # cheap-models.md says its Gemini row reproduces options.md at this bar; fail if they ever part
+            if any(row[k] != gemini[k] for k in row):
+                sys.exit(f"cheap-models.md's Gemini row at 98% no longer matches options.md: {row}")
+            continue
+        std, batch = money_cells(costs[c[0]][4] + " " + costs[c[0]][5])
+        seg.append({"name": c[0], **row, "std": std, "batch": batch, "source": "cheap-models.md"})
+    return seg
+
+
+def handwriting():
+    hw = json.loads(HANDWRITING.read_text())
+    bar = hw["bar"]
+    for r in hw["readers"]:
+        r["passes"] = r["missed"] <= bar["missed"] and r["added"] <= bar["added"]
+    return {k: hw[k] for k in ("pages", "words", "bar", "source", "readers", "reference")}
 
 
 def main():
@@ -108,9 +162,9 @@ def main():
         charts.append({"key": kind, "title": kind.capitalize(), "n": first[2], "words": first[3],
                        "scores": {rid: list(d[rid][:3]) for rid in names}})
 
-    data = json.dumps({"routes": routes, "charts": charts}, separators=(",", ":"))
-    page = TEMPLATE.read_text().replace("__DATA__", data)
-    outputs = {OUT_DATA: json.dumps({"routes": routes, "charts": charts}, indent=1) + "\n", OUT_PAGE: page}
+    built = {"routes": routes, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting()}
+    page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
+    outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page}
 
     stale = [p for p, text in outputs.items() if not p.exists() or p.read_text() != text]
     if check:
@@ -121,7 +175,8 @@ def main():
     for p, text in outputs.items():
         p.write_text(text)
     print(f"wrote {OUT_DATA.relative_to(HERE)} and {OUT_PAGE.relative_to(HERE)}: "
-          f"{len(routes)} routes, {len(charts)} charts")
+          f"{len(routes)} routes, {len(charts)} charts, {len(built['segmentation'])} segmentation approaches, "
+          f"{len(built['handwriting']['readers'])} handwriting readers")
 
 
 if __name__ == "__main__":
