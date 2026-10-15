@@ -357,7 +357,7 @@ def key_usage_daily():
     return r.json()['data']['usage_daily']
 
 
-def reconcile(usage=None, now=None):
+def reconcile(usage=None, now=None, after=None):
     """Bound every uncertain charge by the key's own billing for the current UTC day.
 
     The key's usage_daily covers the whole ledger only when every call is in this UTC day; anything else on
@@ -393,7 +393,13 @@ def reconcile(usage=None, now=None):
             raise SystemExit('ledger spans UTC days; usage_daily cannot bound it')
         if now - max(ts) < SETTLE_S:
             raise SystemExit(f'newest call is under {SETTLE_S}s old; billing may not have settled')
-        usage = key_usage_daily() if usage is None else usage
+        fetched = usage is None
+        usage = key_usage_daily() if fetched else usage
+        # usage_daily resets at UTC midnight: a fetch that lands in the next day bounds nothing.
+        if after is None:
+            after = time.time() if fetched else now
+        if after >= midnight + 86400:
+            raise SystemExit('UTC day ended before the key usage was read; run reconcile again')
         if not isinstance(usage, (int, float)) or not math.isfinite(usage):
             raise SystemExit('unusable key usage')
         measured = sum(r.get('cost', 0) for r in rr if not r.get('cost_upper_bound'))

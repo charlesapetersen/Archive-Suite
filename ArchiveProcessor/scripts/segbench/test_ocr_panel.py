@@ -289,7 +289,8 @@ class Reconcile(unittest.TestCase):
         before = (self.cache / 'calls.jsonl').read_text()
         for kwargs, msg in [({'usage': 0.29, 'now': now}, 'below measured'),
                             ({'usage': 0.3005, 'now': now - 300}, 'settled'),
-                            ({'usage': 0.3005, 'now': now + 86400}, 'spans UTC days')]:
+                            ({'usage': 0.3005, 'now': now + 86400}, 'spans UTC days'),
+                            ({'usage': 0.0, 'now': now, 'after': now + 86400}, 'UTC day ended')]:
             with self.assertRaisesRegex(SystemExit, msg):
                 P.reconcile(**kwargs)
         P.save(self.cache / 'responses/qwen3.5-27b/p003-original.raw.json', {'usage': {'cost': 0.001}})
