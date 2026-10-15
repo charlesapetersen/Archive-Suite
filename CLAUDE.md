@@ -161,8 +161,9 @@ Archive-Suite/
 │   └── ArchiveCaptureiOS/  #   iOS capture companion
 ├── ArchiveReader/          # outer = relocated app repo
 │   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
-└── ArchiveNotes/           # provenance-first note-taking app
-    └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
+├── ArchiveNotes/           # provenance-first note-taking app
+│   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
+└── ArchiveOCRBench/        # PARKED: the W41 OCR panel as a price/accuracy chart page; build.py reads segbench-results
 ```
 
 The inner XcodeGen project dirs are named `macOS/` (de-nested from the old `App/App/` layout that

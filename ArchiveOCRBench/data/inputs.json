@@ -1,0 +1,56 @@
+{
+  "_about": "The figures the panel reports do not contain. build.py reads every score and measured cost from ../ArchiveProcessor/segbench-results/; only what is below is entered by hand. Each entry says where it came from.",
+  "checked": "2026-10-15",
+  "routes": {
+    "claude-sonnet5.5": {"name": "Claude Sonnet 5.5"},
+    "gemini3.1-pro": {"name": "Gemini 3.1 Pro"},
+    "gemini3.8-flash": {"name": "Gemini 3.8 Flash"},
+    "qwen3.5-397b": {"name": "Qwen3.5 397B"},
+    "qwen3-vl-235b": {"name": "Qwen3-VL 235B"},
+    "gpt5.4-mini": {"name": "GPT-5.4 Mini"},
+    "gemini3.5-flash": {"name": "Gemini 3.5 Flash"},
+    "mistral-large4": {"name": "Mistral Large 4"},
+    "gemini3.5-flash-lite": {"name": "Gemini 3.5 Flash Lite"},
+    "mistral-ocr-4-1": {"name": "Mistral OCR 4.1"},
+    "gpt5.6-luna": {"name": "GPT-5.6 Luna"},
+    "mistral-medium3.5": {"name": "Mistral Medium 3.5"},
+    "qwen3.6-27b": {"name": "Qwen3.6 27B"},
+    "qwen3.6-35b-a3b": {"name": "Qwen3.6 35B-A3B"},
+    "qwen3-vl-8b": {"name": "Qwen3-VL 8B"},
+    "gemini3.1-flash-lite": {"name": "Gemini 3.1 Flash Lite"},
+    "qwen3.5-35b-a3b": {"name": "Qwen3.5 35B-A3B"},
+    "gemma4-31b": {"name": "Gemma 4 31B"},
+    "qwen3-vl-30b-a3b": {"name": "Qwen3-VL 30B-A3B"},
+    "qwen3.5-9b": {"name": "Qwen3.5 9B"},
+    "mistral-small-24b": {"name": "Mistral Small 24B"},
+    "gemma4-26b-a4b": {"name": "Gemma 4 26B-A4B"},
+    "qwen3.5-27b": {"name": "Qwen3.5 27B"},
+    "apple-vision": {"name": "Apple Vision"}
+  },
+  "sonnet_api_estimate": {
+    "route": "claude-sonnet5.5",
+    "source": "The panel ran Sonnet through the subscription (claude -p), so it has no measured price. Estimate: (image tokens + prompt tokens) x $2/M input + output tokens x $10/M output, at the Claude API list price for claude-sonnet-5-5 (claude-api skill, cached 2026-10-06). Image tokens = w x h / 750 over the 99 panel images (long side 999-2400 px): mean 1,522 if the API downsizes to 1568 px / 1.15 MP, 4,505 at 2576 px / 3.75 MP. Prompt about 150 tokens (the Gemini and Qwen routes report 1,337-1,404 input tokens including the image). Output 816 tokens a page, the claude -p mean in ocr-panel-cloud.md, which may include some harness overhead. Not measured: token counting needs an API key this Mac does not have.",
+    "input_usd_per_mtok": 2.0,
+    "output_usd_per_mtok": 10.0,
+    "image_tokens_standard": 1522,
+    "image_tokens_high_res": 4505,
+    "prompt_tokens": 150,
+    "output_tokens": 816
+  },
+  "batch": {
+    "source": "OpenRouter's model catalogue (https://openrouter.ai/api/v1/models, read 2026-10-15) lists a ':batch' variant of these models at half the standard price per input and output token. Gemini 3.8 Flash's catalogue price has risen to $0.825/$4.125 since the run, which paid $0.75/$3.75; its batch price $0.375/$1.875 is half the run's price. Mistral OCR's 50% batch discount is Mistral's own (https://mistral.ai/pricing/api/); third-party pages confirm $2 per 1,000 pages for OCR 4, not yet for 4.1. Routes not listed had no batch variant in the catalogue (DeepInfra's own batch API is 20% off, but the panel did not use it).",
+    "ratio": {
+      "claude-sonnet5.5": 0.5,
+      "gemini3.1-pro": 0.5,
+      "gemini3.8-flash": 0.5,
+      "gemini3.5-flash": 0.5,
+      "gemini3.5-flash-lite": 0.5,
+      "gemini3.1-flash-lite": 0.5,
+      "gpt5.4-mini": 0.5,
+      "gpt5.6-luna": 0.5,
+      "mistral-medium3.5": 0.5,
+      "mistral-ocr-4-1": 0.5
+    }
+  },
+  "kinds": ["typewritten", "printed", "handwritten"]
+}

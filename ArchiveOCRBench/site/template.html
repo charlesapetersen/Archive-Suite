@@ -1,0 +1,190 @@
+<title>OCR Panel Price and Accuracy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Public+Sans:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: one reading column; four stacked chart panels sharing one numbered route key. */
+:root {
+  --bg: #fbfbfa; --panel: #ffffff; --fg: #1b1d22; --fg-2: #4d525c; --muted: #8a8f99;
+  --rule: #e3e4e8; --grid: #ececef; --accent: #2457c5; --other: #8f939c;
+  --display: "Newsreader", Georgia, "Times New Roman", serif;
+  --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15171b; --panel: #1c1f24; --fg: #eceef2; --fg-2: #b9bec8; --muted: #8a909b;
+  --rule: #2c3038; --grid: #262a31; --accent: #6f9bff; --other: #7c818b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15171b; --panel: #1c1f24; --fg: #eceef2; --fg-2: #b9bec8; --muted: #8a909b;
+  --rule: #2c3038; --grid: #262a31; --accent: #6f9bff; --other: #7c818b; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 56px; }
+main { max-width: 980px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); font-weight: 500; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 2rem; line-height: 1.15; }
+h2 { font-size: 1.35rem; }
+p { margin: 0; max-width: 68ch; color: var(--fg-2); }
+.lede { display: grid; gap: 10px; }
+.eyebrow { font: 12px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--fg-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.tri { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid var(--other); display: inline-block; }
+.hollow { width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--other); display: inline-block; }
+.dots { width: 18px; border-top: 2px dotted var(--other); display: inline-block; }
+section.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 20px 20px 16px; display: grid; gap: 12px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.meta { font: 12px/1.4 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.plot { position: relative; height: 440px; }
+.note { font-size: 13px; color: var(--fg-2); }
+details { font-size: 13px; color: var(--fg-2); }
+summary { cursor: pointer; color: var(--accent); width: fit-content; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.tbl { overflow-x: auto; margin-top: 8px; }
+table { border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 520px; width: 100%; }
+th, td { text-align: right; padding: 4px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+th { font-weight: 600; color: var(--fg); }
+.key { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 3px 18px; font-size: 13px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
+.key b { display: inline-block; min-width: 24px; font: 12px var(--mono); color: var(--muted); font-weight: 400; }
+.key .front { color: var(--fg); }
+footer { display: grid; gap: 8px; border-top: 1px solid var(--rule); padding-top: 18px; }
+footer p { font-size: 13px; }
+@media (max-width: 520px) { .plot { height: 360px; } h1 { font-size: 1.6rem; } section.panel { padding: 16px 12px 12px; } }
+</style>
+
+<main>
+  <header class="lede">
+    <div class="eyebrow">Archive Suite · W41 OCR panel · 96 truth pages</div>
+    <h1>OCR panel price and accuracy</h1>
+    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line.</p>
+  </header>
+
+  <div class="legend" aria-label="Chart legend">
+    <span><i class="sw" style="background:var(--accent)"></i>Best value: nothing cheaper scores higher</span>
+    <span><i class="sw" style="background:var(--other)"></i>Cloud panel</span>
+    <span><i class="tri"></i>Local panel (small models, run hosted)</span>
+    <span><i class="hollow"></i><i class="dots"></i>Batch price</span>
+  </div>
+
+  <div id="panels" style="display:grid;gap:28px"></div>
+
+  <section class="panel" aria-labelledby="keyhead">
+    <div class="head"><h2 id="keyhead">Route key</h2><span class="meta">numbered by overall score</span></div>
+    <div class="key" id="key"></div>
+  </section>
+
+  <footer>
+    <p><strong>Costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
+    <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
+    <p><strong>Limits.</strong> One corpus of about 100 pages. Claude Opus 5.5 and Gemini 3.8 Flash drafted the truth before it was adjudicated, so it may lean toward those families. The "local panel" was chosen for models that could run on a Mac, but every route here ran hosted; Mac quality is unmeasured. Differences of a point or two are not a ranking, and the handwritten chart rests on about 2,200 words.</p>
+  </footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DATA = __DATA__;
+const FREE = 0.17;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const money = v => v === 0 ? 'free' : '$' + v.toFixed(2);
+const overallRank = DATA.charts[0].scores;
+const routes = DATA.routes.slice().sort((a, b) => overallRank[b.id][0] - overallRank[a.id][0]);
+routes.forEach((r, i) => r.num = i + 1);
+
+function pointsFor(chart) {
+  const P = [];
+  routes.forEach(r => {
+    const s = chart.scores[r.id];
+    P.push({ x: r.std || FREE, y: s[0], r, b: false, s });
+    if (r.batch) P.push({ x: r.batch, y: s[0], r, b: true, s });
+  });
+  P.forEach(p => { p.front = !P.some(q => q !== p && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y)); });
+  return P;
+}
+
+const charts = [];
+const frontIds = new Set();
+const host = document.getElementById('panels');
+DATA.charts.forEach((c, ci) => {
+  const P = pointsFor(c);
+  P.filter(p => p.front).forEach(p => { if (ci === 0) frontIds.add(p.r.id); });
+  const best = P.filter(p => !p.b).sort((a, b) => b.y - a.y)[0];
+  const sec = document.createElement('section');
+  sec.className = 'panel';
+  sec.id = c.key;
+  const meta = c.key === 'overall' ? '96 pages' : c.n + ' pages · ' + c.words.toLocaleString() + ' words';
+  const rows = routes.map(r => { const s = c.scores[r.id]; return '<tr><td>' + r.num + '</td><td>' + r.name + '</td><td>' + s[0].toFixed(2) + '</td><td>' + s[1] + '/' + s[2] + '</td><td>' + money(r.std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : '') + '</td><td>' + (r.batch ? money(r.batch) : '—') + '</td></tr>'; }).join('');
+  sec.innerHTML = '<div class="head"><h2>' + c.title + '</h2><span class="meta">' + meta + '</span></div>' +
+    '<p class="note">Highest: ' + best.r.name + ' at ' + best.y.toFixed(1) + '. Best-value points: ' +
+    P.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '.</p>' +
+    '<div class="plot"><canvas role="img" aria-label="' + c.title + ': NES against dollars per 1,000 pages for 24 routes"></canvas></div>' +
+    '<details><summary>Show the numbers</summary><div class="tbl"><table><thead><tr><th>#</th><th>Route</th><th>NES %</th><th>Answered</th><th>Per 1,000</th><th>Batch</th></tr></thead><tbody>' + rows + '</tbody></table></div></details>';
+  host.appendChild(sec);
+  charts.push({ c, P, canvas: sec.querySelector('canvas') });
+});
+
+document.getElementById('key').innerHTML = routes.map(r =>
+  '<span class="' + (frontIds.has(r.id) ? 'front' : '') + '"><b>' + r.num + '</b>' + r.name + (r.panel === 'local' ? ' ▵' : '') + '</span>').join('');
+
+function labelPlugin(P) {
+  return { id: 'lbl', afterDatasetsDraw(ch) {
+    const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, ink = css('--fg'), sec = css('--fg-2');
+    g.save(); g.font = '11px ' + css('--mono'); g.textBaseline = 'middle';
+    const boxes = P.map(p => { const px = x.getPixelForValue(p.x), py = y.getPixelForValue(p.y); return { x0: px - 6, x1: px + 6, y0: py - 6, y1: py + 6 }; });
+    const hit = b => boxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
+    P.filter(p => !p.b).sort((a, b) => b.front - a.front).forEach(p => {
+      const px = x.getPixelForValue(p.x), py = y.getPixelForValue(p.y), t = String(p.r.num), w = g.measureText(t).width;
+      const tries = [[8, -8], [8, 8], [-8 - w, -8], [-8 - w, 8], [-w / 2, -15], [-w / 2, 15], [12, 0], [-12 - w, 0]];
+      let pick = tries[0];
+      for (const [dx, dy] of tries) { const b = { x0: px + dx - 1, x1: px + dx + w + 1, y0: py + dy - 6, y1: py + dy + 6 }; if (!hit(b) && b.x1 < x.right + 14 && b.x0 > x.left - 4) { pick = [dx, dy]; break; } }
+      boxes.push({ x0: px + pick[0] - 1, x1: px + pick[0] + w + 1, y0: py + pick[1] - 6, y1: py + pick[1] + 6 });
+      g.fillStyle = p.front ? ink : sec; g.textAlign = 'left'; g.fillText(t, px + pick[0], py + pick[1]);
+    });
+    g.restore(); },
+    beforeDatasetsDraw(ch) {
+      const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, acc = css('--accent'), oth = css('--other');
+      g.save(); g.strokeStyle = css('--rule'); g.lineWidth = 1; g.setLineDash([3, 3]);
+      const sx = x.getPixelForValue(0.21); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke();
+      g.setLineDash([2, 4]); g.lineWidth = 2;
+      P.filter(p => p.b).forEach(b => { const s = P.find(q => q.r === b.r && !q.b); g.strokeStyle = (s.front || b.front) ? acc : oth;
+        g.beginPath(); g.moveTo(x.getPixelForValue(s.x), y.getPixelForValue(s.y)); g.lineTo(x.getPixelForValue(b.x), y.getPixelForValue(b.y)); g.stroke(); });
+      g.restore(); } };
+}
+
+function render() {
+  const acc = css('--accent'), oth = css('--other'), surf = css('--panel'), grid = css('--grid'), mut = css('--muted'), sec = css('--fg-2');
+  charts.forEach(o => {
+    if (o.chart) o.chart.destroy();
+    const ys = o.P.map(p => p.y), lo = Math.floor((Math.min(...ys) - 2) / 5) * 5, hi = Math.min(100, Math.ceil((Math.max(...ys) + 1) / 5) * 5);
+    const front = o.P.filter(p => p.front).sort((a, b) => a.x - b.x);
+    const col = p => p.front ? acc : oth;
+    o.chart = new Chart(o.canvas, { type: 'scatter',
+      data: { datasets: [
+        { data: front, showLine: true, borderColor: acc, borderWidth: 1.5, pointRadius: 0, pointHitRadius: 0, order: 3 },
+        { data: o.P, order: 1, pointHoverRadius: 8,
+          pointRadius: c => c.raw && c.raw.b ? 4.5 : 6,
+          pointStyle: c => c.raw && c.raw.r.panel === 'local' ? 'triangle' : 'circle',
+          backgroundColor: c => c.raw ? (c.raw.b ? surf : col(c.raw)) : oth,
+          borderColor: c => c.raw ? (c.raw.b ? col(c.raw) : surf) : surf,
+          pointBorderWidth: c => c.raw && c.raw.b ? 2 : 1.5 } ] },
+      options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 18, top: 6 } },
+        plugins: { legend: { display: false }, tooltip: { filter: i => i.datasetIndex === 1, callbacks: {
+          title: i => i[0].raw.r.num + '. ' + i[0].raw.r.name,
+          label: i => { const p = i.raw, r = p.r; return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
+            r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
+            r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
+        scales: {
+          x: { type: 'logarithmic', min: 0.14, max: 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
+            grid: { color: grid }, border: { color: grid },
+            afterBuildTicks: a => { a.ticks = [0.17, 0.25, 0.5, 1, 2, 5, 10, 20].map(v => ({ value: v })); },
+            ticks: { color: mut, autoSkip: false, callback: v => v === 0.17 ? 'free' : '$' + v } },
+          y: { min: lo, max: hi, title: { display: true, text: 'NES %', color: sec }, grid: { color: grid }, border: { display: false },
+            ticks: { color: mut, stepSize: 5 } } } },
+      plugins: [labelPlugin(o.P)] });
+  });
+}
+Chart.defaults.font.family = css('--body');
+render();
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render); } catch (e) {}
+new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>

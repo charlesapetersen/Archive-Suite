@@ -1,0 +1,686 @@
+{
+ "routes": [
+  {
+   "id": "claude-sonnet5.5",
+   "name": "Claude Sonnet 5.5",
+   "panel": "cloud",
+   "std": 11.5,
+   "batch": 5.75
+  },
+  {
+   "id": "gemini3.1-pro",
+   "name": "Gemini 3.1 Pro",
+   "panel": "cloud",
+   "std": 21.92,
+   "batch": 10.96
+  },
+  {
+   "id": "gemini3.8-flash",
+   "name": "Gemini 3.8 Flash",
+   "panel": "cloud",
+   "std": 3.22,
+   "batch": 1.61
+  },
+  {
+   "id": "qwen3.5-397b",
+   "name": "Qwen3.5 397B",
+   "panel": "cloud",
+   "std": 2.02,
+   "batch": null
+  },
+  {
+   "id": "qwen3-vl-235b",
+   "name": "Qwen3-VL 235B",
+   "panel": "cloud",
+   "std": 1.22,
+   "batch": null
+  },
+  {
+   "id": "gpt5.4-mini",
+   "name": "GPT-5.4 Mini",
+   "panel": "cloud",
+   "std": 5.55,
+   "batch": 2.78
+  },
+  {
+   "id": "gemini3.5-flash",
+   "name": "Gemini 3.5 Flash",
+   "panel": "cloud",
+   "std": 6.23,
+   "batch": 3.12
+  },
+  {
+   "id": "mistral-large4",
+   "name": "Mistral Large 4",
+   "panel": "cloud",
+   "std": 2.69,
+   "batch": null
+  },
+  {
+   "id": "gemini3.5-flash-lite",
+   "name": "Gemini 3.5 Flash Lite",
+   "panel": "cloud",
+   "std": 1.57,
+   "batch": 0.79
+  },
+  {
+   "id": "mistral-ocr-4-1",
+   "name": "Mistral OCR 4.1",
+   "panel": "cloud",
+   "std": 4.0,
+   "batch": 2.0
+  },
+  {
+   "id": "gpt5.6-luna",
+   "name": "GPT-5.6 Luna",
+   "panel": "cloud",
+   "std": 1.41,
+   "batch": 0.71
+  },
+  {
+   "id": "mistral-medium3.5",
+   "name": "Mistral Medium 3.5",
+   "panel": "cloud",
+   "std": 7.29,
+   "batch": 3.65
+  },
+  {
+   "id": "qwen3.6-27b",
+   "name": "Qwen3.6 27B",
+   "panel": "local",
+   "std": 1.94,
+   "batch": null
+  },
+  {
+   "id": "qwen3.6-35b-a3b",
+   "name": "Qwen3.6 35B-A3B",
+   "panel": "local",
+   "std": 0.6,
+   "batch": null
+  },
+  {
+   "id": "qwen3-vl-8b",
+   "name": "Qwen3-VL 8B",
+   "panel": "local",
+   "std": 1.49,
+   "batch": null
+  },
+  {
+   "id": "gemini3.1-flash-lite",
+   "name": "Gemini 3.1 Flash Lite",
+   "panel": "local",
+   "std": 1.17,
+   "batch": 0.58
+  },
+  {
+   "id": "qwen3.5-35b-a3b",
+   "name": "Qwen3.5 35B-A3B",
+   "panel": "local",
+   "std": 0.83,
+   "batch": null
+  },
+  {
+   "id": "gemma4-31b",
+   "name": "Gemma 4 31B",
+   "panel": "local",
+   "std": 0.38,
+   "batch": null
+  },
+  {
+   "id": "qwen3-vl-30b-a3b",
+   "name": "Qwen3-VL 30B-A3B",
+   "panel": "local",
+   "std": 0.98,
+   "batch": null
+  },
+  {
+   "id": "qwen3.5-9b",
+   "name": "Qwen3.5 9B",
+   "panel": "local",
+   "std": 0.25,
+   "batch": null
+  },
+  {
+   "id": "mistral-small-24b",
+   "name": "Mistral Small 24B",
+   "panel": "local",
+   "std": 0.32,
+   "batch": null
+  },
+  {
+   "id": "gemma4-26b-a4b",
+   "name": "Gemma 4 26B-A4B",
+   "panel": "local",
+   "std": 0.41,
+   "batch": null
+  },
+  {
+   "id": "qwen3.5-27b",
+   "name": "Qwen3.5 27B",
+   "panel": "local",
+   "std": 1.8,
+   "batch": null
+  },
+  {
+   "id": "apple-vision",
+   "name": "Apple Vision",
+   "panel": "local",
+   "std": 0.0,
+   "batch": null
+  }
+ ],
+ "charts": [
+  {
+   "key": "overall",
+   "title": "All page kinds",
+   "n": 96,
+   "words": null,
+   "scores": {
+    "claude-sonnet5.5": [
+     96.47,
+     96,
+     96
+    ],
+    "gemini3.1-pro": [
+     94.85,
+     94,
+     96
+    ],
+    "gemini3.8-flash": [
+     94.47,
+     94,
+     96
+    ],
+    "qwen3.5-397b": [
+     93.98,
+     96,
+     96
+    ],
+    "qwen3-vl-235b": [
+     93.95,
+     96,
+     96
+    ],
+    "gpt5.4-mini": [
+     93.55,
+     95,
+     96
+    ],
+    "gemini3.5-flash": [
+     93.48,
+     94,
+     96
+    ],
+    "mistral-large4": [
+     93.15,
+     96,
+     96
+    ],
+    "gemini3.5-flash-lite": [
+     93.13,
+     94,
+     96
+    ],
+    "mistral-ocr-4-1": [
+     92.91,
+     96,
+     96
+    ],
+    "gpt5.6-luna": [
+     92.13,
+     95,
+     96
+    ],
+    "mistral-medium3.5": [
+     90.65,
+     96,
+     96
+    ],
+    "qwen3.5-9b": [
+     89.43,
+     92,
+     96
+    ],
+    "qwen3.5-27b": [
+     81.8,
+     82,
+     96
+    ],
+    "qwen3.5-35b-a3b": [
+     90.83,
+     94,
+     96
+    ],
+    "qwen3.6-27b": [
+     94.28,
+     95,
+     96
+    ],
+    "qwen3.6-35b-a3b": [
+     93.02,
+     96,
+     96
+    ],
+    "gemma4-26b-a4b": [
+     82.73,
+     86,
+     96
+    ],
+    "gemma4-31b": [
+     90.55,
+     93,
+     96
+    ],
+    "qwen3-vl-8b": [
+     91.81,
+     94,
+     96
+    ],
+    "qwen3-vl-30b-a3b": [
+     89.82,
+     94,
+     96
+    ],
+    "mistral-small-24b": [
+     89.34,
+     94,
+     96
+    ],
+    "gemini3.1-flash-lite": [
+     91.61,
+     93,
+     96
+    ],
+    "apple-vision": [
+     81.34,
+     96,
+     96
+    ]
+   }
+  },
+  {
+   "key": "typewritten",
+   "title": "Typewritten",
+   "n": 50,
+   "words": 15042,
+   "scores": {
+    "claude-sonnet5.5": [
+     98.59,
+     50,
+     50
+    ],
+    "gemini3.1-pro": [
+     98.75,
+     50,
+     50
+    ],
+    "gemini3.8-flash": [
+     98.74,
+     50,
+     50
+    ],
+    "qwen3.5-397b": [
+     96.18,
+     50,
+     50
+    ],
+    "qwen3-vl-235b": [
+     96.09,
+     50,
+     50
+    ],
+    "gpt5.4-mini": [
+     95.51,
+     49,
+     50
+    ],
+    "gemini3.5-flash": [
+     97.32,
+     50,
+     50
+    ],
+    "mistral-large4": [
+     95.46,
+     50,
+     50
+    ],
+    "gemini3.5-flash-lite": [
+     97.56,
+     50,
+     50
+    ],
+    "mistral-ocr-4-1": [
+     95.7,
+     50,
+     50
+    ],
+    "gpt5.6-luna": [
+     94.98,
+     49,
+     50
+    ],
+    "mistral-medium3.5": [
+     94.67,
+     50,
+     50
+    ],
+    "qwen3.6-27b": [
+     95.55,
+     49,
+     50
+    ],
+    "qwen3.6-35b-a3b": [
+     95.69,
+     50,
+     50
+    ],
+    "qwen3-vl-8b": [
+     95.56,
+     50,
+     50
+    ],
+    "gemini3.1-flash-lite": [
+     96.38,
+     50,
+     50
+    ],
+    "qwen3.5-35b-a3b": [
+     92.25,
+     48,
+     50
+    ],
+    "gemma4-31b": [
+     94.74,
+     49,
+     50
+    ],
+    "qwen3-vl-30b-a3b": [
+     95.56,
+     50,
+     50
+    ],
+    "qwen3.5-9b": [
+     89.62,
+     47,
+     50
+    ],
+    "mistral-small-24b": [
+     93.53,
+     49,
+     50
+    ],
+    "gemma4-26b-a4b": [
+     89.7,
+     47,
+     50
+    ],
+    "qwen3.5-27b": [
+     86.23,
+     44,
+     50
+    ],
+    "apple-vision": [
+     91.92,
+     50,
+     50
+    ]
+   }
+  },
+  {
+   "key": "printed",
+   "title": "Printed",
+   "n": 28,
+   "words": 12569,
+   "scores": {
+    "claude-sonnet5.5": [
+     96.31,
+     28,
+     28
+    ],
+    "gemini3.1-pro": [
+     89.21,
+     26,
+     28
+    ],
+    "gemini3.8-flash": [
+     87.21,
+     26,
+     28
+    ],
+    "qwen3.5-397b": [
+     93.72,
+     28,
+     28
+    ],
+    "qwen3-vl-235b": [
+     93.25,
+     28,
+     28
+    ],
+    "gpt5.4-mini": [
+     93.32,
+     28,
+     28
+    ],
+    "gemini3.5-flash": [
+     88.18,
+     26,
+     28
+    ],
+    "mistral-large4": [
+     92.46,
+     28,
+     28
+    ],
+    "gemini3.5-flash-lite": [
+     87.92,
+     26,
+     28
+    ],
+    "mistral-ocr-4-1": [
+     91.49,
+     28,
+     28
+    ],
+    "gpt5.6-luna": [
+     92.61,
+     28,
+     28
+    ],
+    "mistral-medium3.5": [
+     87.98,
+     28,
+     28
+    ],
+    "qwen3.6-27b": [
+     94.82,
+     28,
+     28
+    ],
+    "qwen3.6-35b-a3b": [
+     92.34,
+     28,
+     28
+    ],
+    "qwen3-vl-8b": [
+     91.23,
+     27,
+     28
+    ],
+    "gemini3.1-flash-lite": [
+     86.85,
+     26,
+     28
+    ],
+    "qwen3.5-35b-a3b": [
+     91.09,
+     28,
+     28
+    ],
+    "gemma4-31b": [
+     83.29,
+     26,
+     28
+    ],
+    "qwen3-vl-30b-a3b": [
+     88.17,
+     27,
+     28
+    ],
+    "qwen3.5-9b": [
+     89.65,
+     27,
+     28
+    ],
+    "mistral-small-24b": [
+     89.33,
+     28,
+     28
+    ],
+    "gemma4-26b-a4b": [
+     71.59,
+     22,
+     28
+    ],
+    "qwen3.5-27b": [
+     82.03,
+     24,
+     28
+    ],
+    "apple-vision": [
+     76.43,
+     28,
+     28
+    ]
+   }
+  },
+  {
+   "key": "handwritten",
+   "title": "Handwritten",
+   "n": 16,
+   "words": 2182,
+   "scores": {
+    "claude-sonnet5.5": [
+     92.43,
+     16,
+     16
+    ],
+    "gemini3.1-pro": [
+     94.06,
+     16,
+     16
+    ],
+    "gemini3.8-flash": [
+     95.97,
+     16,
+     16
+    ],
+    "qwen3.5-397b": [
+     90.57,
+     16,
+     16
+    ],
+    "qwen3-vl-235b": [
+     91.38,
+     16,
+     16
+    ],
+    "gpt5.4-mini": [
+     89.48,
+     16,
+     16
+    ],
+    "gemini3.5-flash": [
+     92.93,
+     16,
+     16
+    ],
+    "mistral-large4": [
+     92.03,
+     16,
+     16
+    ],
+    "gemini3.5-flash-lite": [
+     91.98,
+     16,
+     16
+    ],
+    "mistral-ocr-4-1": [
+     89.01,
+     16,
+     16
+    ],
+    "gpt5.6-luna": [
+     85.44,
+     16,
+     16
+    ],
+    "mistral-medium3.5": [
+     85.04,
+     16,
+     16
+    ],
+    "qwen3.6-27b": [
+     92.15,
+     16,
+     16
+    ],
+    "qwen3.6-35b-a3b": [
+     88.82,
+     16,
+     16
+    ],
+    "qwen3-vl-8b": [
+     84.83,
+     15,
+     16
+    ],
+    "gemini3.1-flash-lite": [
+     86.64,
+     15,
+     16
+    ],
+    "qwen3.5-35b-a3b": [
+     88.31,
+     16,
+     16
+    ],
+    "gemma4-31b": [
+     90.84,
+     16,
+     16
+    ],
+    "qwen3-vl-30b-a3b": [
+     77.58,
+     15,
+     16
+    ],
+    "qwen3.5-9b": [
+     90.92,
+     16,
+     16
+    ],
+    "mistral-small-24b": [
+     79.83,
+     15,
+     16
+    ],
+    "gemma4-26b-a4b": [
+     86.6,
+     16,
+     16
+    ],
+    "qwen3.5-27b": [
+     69.14,
+     12,
+     16
+    ],
+    "apple-vision": [
+     57.87,
+     16,
+     16
+    ]
+   }
+  }
+ ]
+}
