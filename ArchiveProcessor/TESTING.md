@@ -382,6 +382,11 @@ existing scratch, key-free, no-network execution remains unchanged.
   the owner's foreground-sheet transcription rules in every context variant, all classification/rotation
   tags, and verbatim preservation of headers, footers, bullets and `[illegible]`. Included in the app's
   `test-smoke.sh`; no app launch, key, network or corpus is needed.
+- **`test-smoke-teardown.py`** — $0 proof of the app-dir `test-smoke.sh`'s own teardown and pass/fail oracle,
+  run from a parent that blocks TERM as the engine does: graceful, TERM-ignoring and exited children, the
+  exact launch line, refusal to signal a nonchild, and fixtures (including a real API-502 run) that must go
+  red. In the health gate. `--real <binary> <input dir> [mixed]` drives the built app the same way for a
+  few tiny Flash-Lite calls.
 - **`test-localagent.sh`** — drives the real `LocalAgentClient` against a fake CLI
   (`scripts/localagent-fake-cli.sh`), so the Local Agent path is provable with no account and no spend.
 - **`test-segmentation-engine.sh`** — the W36 window segmenter on recorded answers: the bundled options.json,

@@ -337,6 +337,8 @@ step archivecore bash "$ROOT/ops/autonomous/archivecore-tests.sh"
 # The harness takes the heavy lock for its Swift/JVM builds; missing fixtures fail closed.
 step relay-golden bash "$ROOT/ArchiveProcessor/scripts/test-relay-golden.sh"
 step e2e-cleanup-proof python3 "$ROOT/ArchiveProcessor/scripts/test-e2e-cleanup.py"
+# W41.ocr-smoke-term: the Processor smoke's teardown and pass/fail oracle on scratch children and fixtures; free.
+step smoke-teardown-proof python3 "$ROOT/ArchiveProcessor/scripts/test-smoke-teardown.py"
 step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -derivedDataPath ./build/gate-DD'
 step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
 # Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless

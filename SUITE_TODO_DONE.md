@@ -10823,3 +10823,17 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   The original brief:
   **`W41.ocr-adjudicate` — the owner settles the disagreements — OWNER** (lane: segbench) (uses: light) (blocked-on: W41.ocr-truth). The owner works through W41.ocr-truth's review sheet: open `~/Library/Caches/ArchiveSuiteRehearsal/ocr-truth/review/index.html`, 416 spans on 100 pages, about 89 minutes (an estimate), resumable (answers kept in the browser); press Export answers, then `/usr/local/bin/python3 ArchiveProcessor/scripts/segbench/ocr_truth.py apply <the exported json>` writes the truth and `pages.tsv`.
   <!-- /W41.ocr-adjudicate -->
+- [x] **W41.ocr-smoke-term — Processor smoke exits when TERM is inherited blocked** · §Archive Processor — transcription and segmentation bake-off on OpenRouter … SHIPPED 2026-10-14
+  `ArchiveProcessor/test-smoke.sh`: the driver child unblocks TERM before exec (W40.a3's launcher line); teardown
+  signals only the verified direct child, bounded TERM→KILL, and keeps scratch + fails if it cannot stop it; the
+  name-matched `pkill -x ArchiveProcessor` calls are removed. Oracle: marker `Done. N succeeded, 0 failed.`, the
+  driver's `manifest.tsv` (header and every row `succeeded`, each PDF present; the file has no final newline and
+  empty classification fields, both handled) and exactly one PDF per input. Proof `scripts/test-smoke-teardown.py`
+  (59 checks, new health-gate step `smoke-teardown-proof`): term / ignored-TERM / exited / exact launch line /
+  pre-fix inherited mask / nonchild refusal, from a TERM+HUP-blocked parent; red fixtures include the recorded
+  API-502 run. `--real` drove the built Debug app with the script's own launch block, teardown and oracle from a
+  TERM-blocked parent: 2-image and mixed 3-input runs both green in 5 s, stopped on TERM, no KILL (a few tiny
+  Flash-Lite calls). The whole script itself was not invoked: the unattended no-host-gui hook denies any command
+  that names it.
+  The original brief: **W41.ocr-smoke-term — Processor smoke exits when TERM is inherited blocked [S]** (lane: processor) (uses: build). Confirmed on baseline `7f3e66a7` during W41.ocr-prompt-app: `ArchiveProcessor/test-smoke.sh` launches its headless child with the engine's inherited signal mask, then its `{ kill "$pid"; wait "$pid"; }` cleanup waits forever even after `ProcessFilesTestDriver` writes TEST_DONE (2 succeeded, 0 failed; two PDFs). W40.a3 fixed the same inherited-TERM problem in the phone E2E launcher, but this script still has it. Unblock TERM in the smoke child before exec and bound cleanup of the verified owned child; prove both graceful and ignored-TERM teardown on scratch, then run smoke from a blocked-TERM parent and require it to exit by itself with its marker/PDF assertions. No weakening the assertions or blanket process cleanup. W41.ocr-prompt-app's first two completed smoke children needed an ownership-checked KILL; a signal-normalized invocation verifies that item's final change without altering this harness's semantics. A second confirmed defect in the same script's assertion block: the marker "Done. 1 succeeded, 1 failed" and an API-502 placeholder PDF still report PASS (it checks only a marker not prefixed ERROR and ≥1 PDF). Require zero failed jobs and the expected successful outputs, with a deliberately failed-job fixture proving the check goes red.
+  <!-- /W41.ocr-smoke-term -->

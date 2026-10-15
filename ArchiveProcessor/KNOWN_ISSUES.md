@@ -2,6 +2,16 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ FIXED (W41.ocr-smoke-term): the smoke hung under a blocked TERM and passed failed jobs
+
+`test-smoke.sh` launched the driver with the engine's inherited signal mask, so its `kill; wait` cleanup
+waited forever after TEST_DONE. The child now unblocks TERM before exec (as W40.a3's E2E launcher does);
+teardown signals only the verified direct child, bounds TERM then KILL, and keeps the scratch dir and fails
+if the child cannot be stopped. The name-matched `pkill -x ArchiveProcessor` calls are gone, so the smoke no
+longer kills an owner's running Processor. The oracle passed a run with "1 succeeded, 1 failed" because a
+failed job still leaves a placeholder PDF; it now requires the marker, the driver's `manifest.tsv` and one
+PDF per input to agree that every input succeeded. Proof: `scripts/test-smoke-teardown.py` (gate step).
+
 ## ✅ FIXED (W41.ocr-prompt-app): transcription scope was underspecified
 
 `OCRPrompt.build` TASK 3 now states the owner's rules for the whole foreground sheet, including archive
