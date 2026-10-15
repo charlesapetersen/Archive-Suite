@@ -217,5 +217,53 @@ class ConcurrentMoney(unittest.TestCase):
                 self.assertFalse(list((c/'pending').glob('*.json')))
 
 
+class Reconcile(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cache = Path(self.tmp.name)
+        self.patcher = patch.object(P, 'CACHE', self.cache)
+        self.patcher.start(); self.addCleanup(self.patcher.stop)
+
+    def _uncertain(self, now):
+        P.append({'key': 'qwen3.5-27b', 'job': 'p001-original', 't': now - 900, 'cost': 0.3, 'status': 'ok'})
+        P.append({'key': 'qwen3.5-27b', 'job': 'p002-original', 't': now - 800, 'cost': 0.08,
+                  'cost_upper_bound': True, 'status': 'failed'})
+        P.save(self.cache / 'responses/qwen3.5-27b/p002-original.json', {'meta': {'cost': 0.08}, 'parsed': None})
+        P.save(self.cache / 'pending/qwen3.5-27b-p003-original.json',
+               {'key': 'qwen3.5-27b', 'job': 'p003-original', 't': now - 700, 'reserve': 0.08})
+
+    def test_reconcile_bounds_uncertain_calls_by_key_day_usage(self):
+        now = 86400 * 20000 + 50000
+        self._uncertain(now)
+        P.reconcile(usage=0.3005, now=now)
+        rr = P.records()
+        self.assertEqual([r['job'] for r in rr], ['p001-original', 'p002-original', 'p003-original'])
+        self.assertEqual(rr[0]['cost'], 0.3)
+        for r in rr[1:]:  # each carries the whole joint bound, still flagged as a ceiling
+            self.assertTrue(r['cost_upper_bound']); self.assertGreaterEqual(r['cost'], 0.0005)
+            self.assertLess(r['cost'], 0.0006); self.assertEqual(r['cost_basis'], 'key-usage-daily')
+        self.assertEqual(rr[2]['status'], 'failed')
+        self.assertFalse(list((self.cache / 'pending').glob('*.json')))
+        self.assertTrue((self.cache / 'responses/qwen3.5-27b/p003-original.json').exists())  # never retried
+        self.assertEqual(json.loads((self.cache / 'responses/qwen3.5-27b/p002-original.json').read_text())['meta']['cost'], rr[1]['cost'])
+        self.assertEqual(len(list((self.cache / 'reconciliation').glob('key-usage-*.json'))), 1)
+
+    def test_reconcile_refuses_unsafe_evidence(self):
+        now = 86400 * 20000 + 50000
+        self._uncertain(now)
+        before = (self.cache / 'calls.jsonl').read_text()
+        for kwargs, msg in [({'usage': 0.29, 'now': now}, 'below measured'),
+                            ({'usage': 0.3005, 'now': now - 300}, 'settled'),
+                            ({'usage': 0.3005, 'now': now + 86400}, 'spans UTC days')]:
+            with self.assertRaisesRegex(SystemExit, msg):
+                P.reconcile(**kwargs)
+        P.save(self.cache / 'responses/qwen3.5-27b/p003-original.raw.json', {'usage': {'cost': 0.001}})
+        with self.assertRaisesRegex(SystemExit, 'saved a reply'):
+            P.reconcile(usage=0.3005, now=now)
+        self.assertEqual((self.cache / 'calls.jsonl').read_text(), before)
+        self.assertTrue((self.cache / 'pending/qwen3.5-27b-p003-original.json').exists())
+
+
 if __name__ == '__main__':
     unittest.main()

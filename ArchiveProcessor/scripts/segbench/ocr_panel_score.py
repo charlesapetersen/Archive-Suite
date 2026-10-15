@@ -248,10 +248,16 @@ def report():
     uncertain = [r for r in calls if r.get('cost_upper_bound')]
     if uncertain:
         upper = sum(r['cost'] for r in uncertain)
-        L += ['', f'**Billing uncertainty:** {len(uncertain)} provider errors had no usable billing record. '
+        keyed = sum(r.get('cost_basis') == 'key-usage-daily' for r in uncertain)
+        basis = ('their full pre-call reservations' if not keyed else
+                 f'{keyed} bounded by the API key’s own billing for the UTC day, which exceeded the measured charges '
+                 f"by at most ${max(r['cost'] for r in uncertain if r.get('cost_basis') == 'key-usage-daily'):.6f}; "
+                 'each such call carries that whole difference'
+                 + ('' if keyed == len(uncertain) else '; the rest at their full pre-call reservations'))
+        L += ['', f'**Billing uncertainty:** {len(uncertain)} provider errors or interrupted calls had no usable billing record. '
               f'{sum(r.get("billing_lookup_http")==404 for r in uncertain)} generation lookups returned 404; '
               'other failures had no retained generation ID. '
-              f'Reported charges are ${P.spent()-upper:.6f}; an additional ${upper:.6f} (their full pre-call reservations) '
+              f'Reported charges are ${P.spent()-upper:.6f}; an additional ${upper:.6f} ({basis}) '
               'is counted as a conservative ceiling against the cap. Cost columns include these ceilings and are not '
               'all measured charges. These failed calls are cached and never retried. Raw errors and lookup evidence '
               'remain in the private cache.']

@@ -5,6 +5,7 @@
   ocr_panel.py collect --probe      # three fixed pages per model, then stop and estimate
   ocr_panel.py collect              # remaining calls, total item cap $2 (all attempts count)
   ocr_panel.py vision               # existing Vision helper, under heavy-run.py
+  ocr_panel.py reconcile            # bound uncertain charges by the key's UTC-day billing
   ocr_panel.py report               # aggregate results only, safe for the public repo
 
 Source truth is read-only. Raw page text/usage/catalog live outside git in PANEL_CACHE.
@@ -318,6 +319,79 @@ def estimate():
     print(f'projection all paid routes ${total:.3f} (sample estimate, not a spend authorization)')
 
 
+SETTLE_S = 600
+
+
+def key_usage_daily():
+    import requests
+    import method_openrouter as OR
+    r = requests.get(API + '/key', headers={'Authorization': 'Bearer ' + OR.api_key()}, timeout=60)
+    r.raise_for_status()
+    return r.json()['data']['usage_daily']
+
+
+def reconcile(usage=None, now=None):
+    """Bound every uncertain charge by the key's own billing for the current UTC day.
+
+    The key's usage_daily covers the whole ledger only when every call is in this UTC day; anything else on
+    the key only raises it, so usage_daily minus the measured charges bounds ALL uncertain calls together.
+    Each uncertain call is then charged that whole bound (n times a joint ceiling). Interrupted pending
+    reservations become cached failures, never retried.
+    """
+    with (CACHE / 'run.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        now = time.time() if now is None else now
+        rr = records()
+        pend = sorted((CACHE / 'pending').glob('*.json'))
+        held = [json.loads(p.read_text()) for p in pend]
+        n = sum(bool(r.get('cost_upper_bound')) for r in rr) + len(held)
+        if not n:
+            print('nothing uncertain'); return
+        if any((CACHE / 'responses' / h['key'] / (h['job'] + '.raw.json')).exists() for h in held):
+            raise SystemExit('a pending call saved a reply; reconcile it from that body, not the key total')
+        midnight = (now // 86400) * 86400  # epoch days are UTC days
+        ts = [r['t'] for r in rr + held]
+        if min(ts) < midnight:
+            raise SystemExit('ledger spans UTC days; usage_daily cannot bound it')
+        if now - max(ts) < SETTLE_S:
+            raise SystemExit(f'newest call is under {SETTLE_S}s old; billing may not have settled')
+        usage = key_usage_daily() if usage is None else usage
+        if not isinstance(usage, (int, float)) or not math.isfinite(usage):
+            raise SystemExit('unusable key usage')
+        measured = sum(r.get('cost', 0) for r in rr if not r.get('cost_upper_bound'))
+        bound = usage - measured
+        if bound < -1e-6:
+            raise SystemExit(f'key usage ${usage:.6f} is below measured charges ${measured:.6f}; refusing')
+        bound = math.ceil(max(bound, 0) * 1e6 + 1) / 1e6
+        if n * bound >= sum(r['cost'] for r in rr if r.get('cost_upper_bound')) + sum(h['reserve'] for h in held):
+            print('key bound is no tighter than the reservations; unchanged'); return
+        stamp = time.strftime('%Y%m%dT%H%M%S', time.gmtime(now))
+        basis = {'cost_basis': 'key-usage-daily', 'key_usage_daily': usage, 'reconciled_t': now}
+        save(CACHE / 'reconciliation' / ('key-usage-' + stamp + '.json'),
+             {'usage_daily': usage, 'measured': measured, 'bound_each': bound, 'uncertain': n,
+              'prior_ledger': rr, 'pending': held})
+        out = []
+        for r in rr:
+            if r.get('cost_upper_bound'):
+                r = {**r, **basis, 'reserve_ceiling': r.get('reserve_ceiling', r['cost']), 'cost': bound}
+                dest = CACHE / 'responses' / r['key'] / (r['job'] + '.json')
+                if dest.exists():
+                    save(dest, {**json.loads(dest.read_text()), 'meta': r})
+            out.append(r)
+        for h in held:
+            r = {**h, **basis, 'cost': bound, 'cost_upper_bound': True, 'reserve_ceiling': h['reserve'],
+                 'status': 'failed', 'finish': 'interrupted'}
+            save(CACHE / 'responses' / r['key'] / (r['job'] + '.json'), {'meta': r, 'parsed': None})
+            out.append(r)
+        tmp = CACHE / 'calls.jsonl.tmp'
+        with tmp.open('w') as f:
+            f.write(''.join(json.dumps(r) + '\n' for r in out)); f.flush(); os.fsync(f.fileno())
+        tmp.replace(CACHE / 'calls.jsonl')
+        for p in pend:
+            p.unlink()
+        print(f'{n} uncertain calls bounded at ${bound:.6f} each (key ${usage:.6f} - measured ${measured:.6f})')
+
+
 def vision():
     m = manifest(); paths = []
     for j in m['jobs']:
@@ -328,11 +402,11 @@ def vision():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command', choices=['prepare', 'collect', 'estimate', 'vision'])
+    ap.add_argument('command', choices=['prepare', 'collect', 'estimate', 'vision', 'reconcile'])
     ap.add_argument('--probe', action='store_true')
     ap.add_argument('--only', choices=list(MODELS))
     a = ap.parse_args()
-    {'prepare': prepare, 'collect': lambda: collect(a.probe, a.only), 'estimate': estimate, 'vision': vision}[a.command]()
+    {'prepare': prepare, 'collect': lambda: collect(a.probe, a.only), 'estimate': estimate, 'vision': vision, 'reconcile': reconcile}[a.command]()
 
 if __name__ == '__main__':
     main()
