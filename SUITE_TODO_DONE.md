@@ -11017,3 +11017,16 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
     `xcodebuild test -scheme` without `-only-testing` anywhere in a Bash command, including inside a heredoc; edit
     such scripts through a file. Commits: f6793865 and this one.
   <!-- /W40.d7 -->
+- [x] **W40.g1 — Reader guided-session pack [S]** · §W40 — verification phase: prove the Suite works · SHIPPED 2026-10-15
+  `verification/sessions/reader-1.md`: a 45-minute session of eight tasks in the owner's terms, covering 32 of the
+  46 Reader ledger rows (each task names its rows for whoever files the notes). It sets up a per-session APFS clone,
+  `reader-session-1/` (`cp -c -R -p` of the `W40.c2` sample's two trees; xattrs and mtimes checked to survive on a
+  scratch file), so the owner's tag writes never disturb the sample the journeys re-check. It lists the eight
+  known Reader defects from `W40.d7`/`W40.d8`/`W40.e9` and the R-25/R-26 rulings so the session isn't spent
+  rediscovering them, and asks how much each one got in the way, since that orders the fix queue. It also has a
+  one-page form (task · expected · happened · B/A/C/?) and the filing rules for the session that takes the
+  returned form: fix item with rule-8 severity, Daemon Report question, or `SUSPECTS.md` entry. Caveat: the Reader
+  keeps one archive root in shared defaults, so the pack tells the owner to re-choose his real folder afterwards.
+  The DEBUG `-ARUITestRootPath` override was not used because it also switches the app into UI-test behaviour.
+  No code changed. The session itself is `W40.g-sessions` (owner).
+  <!-- /W40.g1 -->

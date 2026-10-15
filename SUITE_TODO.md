@@ -945,7 +945,6 @@ unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the 
 - [ ] **`W40.e13` — catch transient states between two settled screens, all three apps [M]** (lane: reader,notes,processor) (uses: build,vm). Owner-requested 2026-10-11 after a Notes inspector flicker too fast to screenshot. Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.f1` — Reader undo durability and the missing audit ledger [S]** (lane: reader) (uses: build). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
 - [ ] **`W40.f2` — the Reader's undisclosed root-marker write [S]** (lane: reader) (uses: build). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §F.
-- [ ] **`W40.g1` — Reader guided-session pack [S]** (lane: reader) (uses: light) (blocked-on: W40.d7, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
 - [ ] **`W40.g2` — Notes guided-session pack [S]** (lane: notes) (uses: light) (blocked-on: W40.d9, W40.d10). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
 - [ ] **`W40.g3` — Processor and capture guided-session pack [S]** (blocked-on: W42.int-done) (lane: processor) (uses: light) (blocked-on: W40.d1, W40.d2, W40.d5). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §G.
 - [ ] **`W40.g-sessions` — owner runs the guided sessions — OWNER** (lane: suite) (uses: light) (blocked-on: W40.g1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` and `00-owner-plan.md` §Decisions.
