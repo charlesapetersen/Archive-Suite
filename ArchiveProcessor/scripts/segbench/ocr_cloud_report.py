@@ -49,9 +49,16 @@ def report():
         if mistral['completed']!=3: complete=False
         total+=.396;high+=.396
     else:
-        lines+=['','Dedicated Mistral OCR not yet collected; add $0.396 for 99 single-page calls.']
+        limited=sorted((P.CACHE/'mistral'/'rate-limited').glob('*/'))
+        lines+=['',(f'Dedicated Mistral OCR not collected: {len(limited)} attempt(s) at the first page, each answered '
+                    'only by HTTP 429 `rate_limited` (nothing processed, nothing billed; the replies are kept in the '
+                    'private cache). Add ' if limited else 'Dedicated Mistral OCR not yet collected; add ')
+                + '$0.396 for 99 single-page calls.']
         complete=False;total+=.396;high+=.396
     held=sum(json.loads(p.read_text())['reserve'] for p in (P.CACHE/'pending').glob('*.json'))
+    # Every chat route settled three attempts; only the dedicated OCR row is unmeasured (flat published price).
+    chat_complete=all(len([r for r in calls if r['key']==k and r['status'] in ('ok','failed')])==3
+                      for k in C.MODELS) and not held
     held+=sum(json.loads(p.read_text())['reserve'] for p in (P.CACHE/'mistral').glob('*.pending.json'))
     complete=complete and not held
     lines+=['',f'**Pilot accounted: ${P.spent()+mistral_cost:.6f} / $0.75 combined ceiling; '
@@ -62,6 +69,14 @@ def report():
           f'A further 50% planning buffer on the mean gives **${1.5*total:.2f}**. '
           'These are sample estimates, not guaranteed prices or authorization. '
           'The estimate includes the three already-bought pages; the remaining 96 are 96/99 of it. '
+          'No retries, resolution ladder, batch discount, or corpus-wide extrapolation is included. '
+          'Three deliberately varied pages are not a random cost sample.']
+    elif chat_complete:
+        lines += [f'Dedicated Mistral OCR did not complete (see above), so its row is at the published '
+          f'$4/1000 pages, not measured. Full 99-original panel (all twelve chat models measured, plus that '
+          f'dedicated OCR row), mean-cost extrapolation: **${total:.2f}**; using each chat route’s dearest pilot '
+          f'page: **${high:.2f}**. A further 50% planning buffer on the mean gives **${1.5*total:.2f}**. '
+          'These are sample estimates, not guaranteed prices or authorization. '
           'No retries, resolution ladder, batch discount, or corpus-wide extrapolation is included. '
           'Three deliberately varied pages are not a random cost sample.']
     else:
@@ -95,7 +110,7 @@ def report():
       'The manifest permits exactly three originals; there is no full-run command. Requests are serial, '
       'provider-pinned, fallbacks disabled, max 8192 output tokens; failures are never repurchased. '
       'Unknown network/billing outcomes retain their full write-ahead reservations and block continuation.', '',
-      'Gemini 3.1 Pro/3.8 Flash request low reasoning; Gemini 3.5 Flash/Flash-Lite and GPT-5.4 Mini request minimal; the other reasoning-capable routes request off; '
+      'Gemini 3.1 Pro/3.8 Flash and Claude Sonnet 5.5 request low reasoning (Claude’s endpoint refused reasoning off with a free HTTP 400, so it was re-run at low; its usage reports 0 reasoning tokens, so any thinking is inside the billed output count); Gemini 3.5 Flash/Flash-Lite and GPT-5.4 Mini request minimal; the other reasoning-capable routes request off; '
       'Qwen3-VL Instruct has none. Temperature is zero except Claude/OpenAI, whose catalog does not '
       'advertise it; it is omitted there. OpenAI detail is explicitly high. Actual reasoning tokens '
       'above show whether the providers still used internal tokens.', '',
@@ -112,8 +127,11 @@ def report():
       'on 2026-10-15; full snapshots in the private cache. '
       '[Mistral OCR pricing](https://docs.mistral.ai/inference/pricing): $4/1000 pages standard; batch is not used.', '']
     out=P.RESULTS/'ocr-panel-cloud-pilot.md';out.write_text('\n'.join(lines))
-    P.save(P.CACHE/'pilot-estimate.json',{'complete':complete,'pilot_cost':P.spent()+mistral_cost,
-      'held':held,'mean_99':total if complete else None,'worst_99':high if complete else None,
-      'buffered_99':1.5*total if complete else None})
-    detail=f'99-page mean ${total:.2f}, buffered ${1.5*total:.2f}' if complete else 'full-panel projection withheld (incomplete pilot)'
+    projected=complete or chat_complete
+    P.save(P.CACHE/'pilot-estimate.json',{'complete':complete,'chat_complete':chat_complete,
+      'pilot_cost':P.spent()+mistral_cost,'held':held,'mean_99':total if projected else None,
+      'worst_99':high if projected else None,'buffered_99':1.5*total if projected else None})
+    detail=(f'99-page mean ${total:.2f}, buffered ${1.5*total:.2f}'
+            + ('' if complete else ' (dedicated OCR at published price)')) if projected \
+        else 'full-panel projection withheld (incomplete pilot)'
     print(f'{out}: pilot ${P.spent()+mistral_cost:.6f}; {detail}')

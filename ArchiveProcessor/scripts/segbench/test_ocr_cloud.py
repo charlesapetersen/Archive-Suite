@@ -192,4 +192,19 @@ class Pilot(unittest.TestCase):
         self.assertIn('projection withheld',(self.cache/'ocr-panel-cloud-pilot.md').read_text())
 
 
+    def test_report_projects_when_only_dedicated_ocr_is_missing(self):
+        import ocr_cloud_report as R
+        import io, contextlib
+        truth=self.cache/'truth';truth.mkdir()
+        for j in self.jobs: (truth/(j['page']+'.txt')).write_text('synthetic truth')
+        (self.cache/'pending').mkdir();(self.cache/'mistral').mkdir()
+        for key in C.MODELS:
+            for j in self.jobs: P.append({'key':key,'job':j['id'],'status':'ok','cost':.001})
+        with patch.object(C,'manifest',return_value=self.m),patch.object(P,'TRUTH',self.cache),\
+             patch.object(P,'RESULTS',self.cache),contextlib.redirect_stdout(io.StringIO()):
+            R.report()
+        text=(self.cache/'ocr-panel-cloud-pilot.md').read_text()
+        self.assertIn('not measured',text);self.assertIn('$1.58',text)  # 12 x 99 x $0.001 + $0.396
+        self.assertNotIn('projection withheld',text)
+
 if __name__=='__main__': unittest.main()
