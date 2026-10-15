@@ -24,7 +24,8 @@ MODELS = {
  'gemini3.5-flash': ('google/gemini-3.5-flash', 'google-ai-studio', None, 'minimal', None),
  'gemini3.8-flash': ('google/gemini-3.8-flash', 'google-ai-studio', None, 'low', None),
  'gemini3.5-flash-lite': ('google/gemini-3.5-flash-lite', 'google-ai-studio', None, 'minimal', None),
- 'claude-sonnet5.5': ('anthropic/claude-sonnet-5.5', 'anthropic', None, 'off', None),
+ # Reasoning cannot be disabled on this endpoint (HTTP 400 in the pilot, 2026-10-15): lowest effort instead.
+ 'claude-sonnet5.5': ('anthropic/claude-sonnet-5.5', 'anthropic', None, 'low', None),
  'gpt5.6-sol': ('openai/gpt-5.6-sol', 'openai', None, 'off', None),
  'gpt5.6-luna': ('openai/gpt-5.6-luna', 'openai', None, 'off', None),
  'gpt5.4-mini': ('openai/gpt-5.4-mini', 'openai', None, 'minimal', None),
@@ -109,6 +110,15 @@ def configure():
     os.environ['OCR_PANEL_CONCURRENCY'] = '1'
 
 
+def reconfigurable(old, new):
+    """Only a route's settings may change, and only while nothing was bought for it (every call a free 4xx)."""
+    changed = {k for k in set(old['models']) | set(new['models'])
+               if old['models'].get(k) != new['models'].get(k)}
+    bought = {r['key'] for r in P.records() if r.get('status') != 'http-rejected' or r.get('cost')}
+    return ({**old, 'models': None} == {**new, 'models': None} and not changed & bought
+            and changed <= set(old['models']) & set(new['models']))
+
+
 def prepare():
     # Reuse the exact local-panel JPEG bytes; do not open the corpus or re-encode them.
     local = json.loads((LOCAL / 'manifest.json').read_text())
@@ -117,7 +127,7 @@ def prepare():
     jobs = [j for j in local['jobs'] if j['page'] in P.PROBE and j['scale'] == 'original']
     m = {**local, 'jobs': jobs, 'models': MODELS, 'pilot_pages': sorted(P.PROBE), 'cap': CAP}
     dest = CACHE / 'manifest.json'
-    if dest.exists() and json.loads(dest.read_text()) != json.loads(json.dumps(m)):
+    if dest.exists() and not reconfigurable(json.loads(dest.read_text()), json.loads(json.dumps(m))):
         raise SystemExit('cloud manifest changed; preserve existing run')
     for j in jobs:
         src = LOCAL / 'images' / (j['id'] + '.jpg')

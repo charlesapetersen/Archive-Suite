@@ -12,8 +12,30 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 import ocr_cloud as C
 import ocr_panel as P
+
+
+def settle_rate_limited(root, job_id):
+    """Release a page whose every recorded reply was a 429 and whose client finished on that 429.
+
+    Mistral bills processed pages, and a 429 processed none. The replies are moved aside, never deleted,
+    so the page can be tried again later. Anything else (no result, a 200, another status) stays uncertain.
+    """
+    pending, dest = root/(job_id+'.pending.json'), root/(job_id+'.json')
+    http = sorted(root.glob(job_id+'.http-*.json'))
+    if not (pending.exists() and dest.exists() and http):
+        return False
+    if (str(json.loads(dest.read_text()).get('errorCode')) != '429'
+            or any(json.loads(h.read_text()).get('http') != 429 for h in http)):
+        return False
+    aside = root/'rate-limited'/(job_id+'-'+str(int(time.time()*1000)))
+    aside.mkdir(parents=True)
+    for f in http + [dest]:
+        f.rename(aside/f.name)
+    pending.unlink()
+    return True
 
 
 def collect(binary):
@@ -27,7 +49,8 @@ def collect(binary):
         root=C.CACHE/'mistral';root.mkdir(exist_ok=True)
         for j in m['jobs']:
             dest=root/(j['id']+'.json');pending=root/(j['id']+'.pending.json')
-            if pending.exists(): raise SystemExit('uncertain OCR call: do not repurchase')
+            if pending.exists() and not settle_rate_limited(root, j['id']):
+                raise SystemExit('uncertain OCR call: do not repurchase')
             if dest.exists(): continue
             image=C.CACHE/'images'/(j['id']+'.jpg')
             if P.digest(image.read_bytes())!=j['sha256']: raise SystemExit('image changed')
@@ -36,6 +59,8 @@ def collect(binary):
             P.save(pending,{'reserve':.004,'job':j['id'],'model':'mistral-ocr-4-1'})
             env={**os.environ,'VISIONHYBRID_TEST':'1'}
             subprocess.run([str(Path(binary).resolve()),str(image),str(dest.with_suffix(''))],env=env,check=True)
+            if settle_rate_limited(root, j['id']):
+                raise SystemExit('Mistral rate limit (429, nothing billed); try again later')
             result=json.loads(dest.read_text())
             http=[json.loads(p.read_text()) for p in root.glob(j['id']+'.http-*.json')]
             accepted=[r for r in http if r['http']==200]

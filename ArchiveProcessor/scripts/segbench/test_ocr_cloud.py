@@ -63,6 +63,23 @@ class Pilot(unittest.TestCase):
         e['pricing'].pop('request');e['pricing']['image']='1'
         with self.assertRaisesRegex(SystemExit,'image price'): C.reservation(e)
 
+    def test_only_unbought_routes_may_be_reconfigured(self):
+        old={'jobs':self.jobs,'cap':C.CAP,'models':{'a':['m','p',None,'off',None],'b':['n','p',None,'off',None]}}
+        new=copy.deepcopy(old); new['models']['a'][3]='low'
+        self.assertTrue(C.reconfigurable(old,new))
+        P.append({'key':'a','status':'http-rejected','cost':0})
+        self.assertTrue(C.reconfigurable(old,new))
+        P.append({'key':'b','status':'ok','cost':.01})
+        self.assertTrue(C.reconfigurable(old,new))
+        bought=copy.deepcopy(old); bought['models']['b'][3]='low'
+        self.assertFalse(C.reconfigurable(old,bought))
+        added=copy.deepcopy(old); added['models']['c']=['x','p',None,'off',None]
+        self.assertFalse(C.reconfigurable(old,added))
+        capped=copy.deepcopy(new); capped['cap']=3
+        self.assertFalse(C.reconfigurable(old,capped))
+        P.append({'key':'a','status':'ok','cost':.02})
+        self.assertFalse(C.reconfigurable(old,new))
+
     def test_approved_pilot_cap_and_serial_execution(self):
         import os
         self.assertEqual(P.CAP+C.MISTRAL_RESERVE,.75)
@@ -121,6 +138,33 @@ class Pilot(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit,'uncertain OCR'): M.collect('/tmp/fake-driver')
             self.assertEqual(run.call_count,1)
             self.assertEqual(len(list((self.cache/'mistral').glob('*.pending.json'))),1)
+
+    def test_mistral_rate_limit_releases_page_but_other_failures_do_not(self):
+        import ocr_cloud_mistral as M
+        calls=[]
+        def fake_run(argv, **kwargs):
+            prefix=Path(argv[-1]);calls.append(prefix.name)
+            if len(calls)==1:
+                P.save(prefix.with_suffix('.json'),{'errorMessage':'Rate limit exceeded.','errorCode':'429'})
+                for n in range(2): P.save(Path(str(prefix)+f'.http-{n}.json'),{'http':429,'body':{'type':'rate_limited'}})
+            else:
+                P.save(prefix.with_suffix('.json'),{'text':'synthetic'})
+                P.save(Path(str(prefix)+'.http-ok.json'),{'http':200,'body':{'model':'mistral-ocr-4-1','usage_info':{'pages_processed':1}}})
+        with patch.object(C,'configure'),patch.object(C,'CACHE',self.cache),\
+             patch.object(C,'manifest',return_value=self.m),patch('subprocess.run',side_effect=fake_run):
+            with self.assertRaisesRegex(SystemExit,'rate limit'): M.collect('/tmp/fake-driver')
+            root=self.cache/'mistral'
+            self.assertEqual(list(root.glob('*.pending.json')),[])
+            self.assertEqual(len(list((root/'rate-limited').glob('*/*.json'))),3)  # kept, not deleted
+            M.collect('/tmp/fake-driver')
+            self.assertEqual(calls[0],calls[1]);self.assertEqual(len(calls),4)
+            self.assertEqual(json.loads((self.cache/'mistral-summary.json').read_text())['accounted_cost'],.012)
+            # A pending page with a 200 among its replies, or no client result, is never released.
+            pend=root/'x.pending.json';P.save(pend,{'reserve':.004})
+            self.assertFalse(M.settle_rate_limited(root,'x'))
+            P.save(root/'x.json',{'errorCode':'429'});P.save(root/'x.http-a.json',{'http':429})
+            P.save(root/'x.http-b.json',{'http':200})
+            self.assertFalse(M.settle_rate_limited(root,'x'));self.assertTrue(pend.exists())
 
     def test_mistral_unexpected_model_stops_before_another_page(self):
         import ocr_cloud_mistral as M
