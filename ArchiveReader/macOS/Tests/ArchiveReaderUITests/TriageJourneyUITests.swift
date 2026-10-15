@@ -54,7 +54,10 @@ final class TriageJourneyUITests: FixtureUITestCase {
         if let name = smartFolderName, app != nil, app.state == .runningForeground {
             deleteSmartFolder(named: name)
         }
-        if app != nil, app.state == .runningForeground { restoreMinimumWindowSize() }
+        if app != nil, app.state == .runningForeground {
+            restoreMinimumWindowSize()
+            quitWithCommandQ()   // a real quit saves the window frame; terminate() can kill it first
+        }
         app?.terminate()
         restoreBaseline()
         try await super.tearDown()
@@ -235,8 +238,8 @@ final class TriageJourneyUITests: FixtureUITestCase {
         before = check("7 save and open a smart folder", from: before, expect: [:])
 
         // (8) Quit and relaunch: nothing is written by either, and the state reads back.
-        app.terminate()
-        before = check("8a quit (⌘Q equivalent: terminate)", from: before, expect: [:])
+        quitWithCommandQ()
+        before = check("8a quit (⌘Q)", from: before, expect: [:])
         app.launch()
         app.activate()
         XCTAssertTrue(table.waitForExistence(timeout: 15), "the table should return after relaunch")
@@ -291,6 +294,15 @@ final class TriageJourneyUITests: FixtureUITestCase {
             }
         }
         return focused
+    }
+
+    /// ⌘Q, as a user quits, then wait for the process to end. Falls back to terminate() after 15 s.
+    private func quitWithCommandQ() {
+        app.activate()
+        app.typeKey("q", modifierFlags: .command)
+        let quit = waitFor(timeout: 15) { self.app.state == .notRunning }
+        log("[d8] ⌘Q ended the app: \(quit ? "yes" : "NO, terminated")")
+        if !quit { app.terminate() }
     }
 
     /// The window frame PERSISTS in the app's defaults, also in UI-test mode, and `LayoutGuardUITests` is

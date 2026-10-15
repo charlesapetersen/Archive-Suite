@@ -128,6 +128,10 @@ and a journey that writes needs its own copy. Per set:
   folder. Finished originals go to the guest's Trash, never the host's.
 - **Reader** (`W40.d7`/`d8`): `d7` only reads, so it may read the sample over the share. `d8` writes tags, so it
   copies the folders it needs onto the guest disk first (23 GiB free; the whole sample is 9 GiB, 8,743 files).
+  That is `READER_JOURNEY=rehearsal ops/gui/vm-gui-runner.sh reader xcuitest`: `ArchiveReader/scripts/make-journey-fixture.sh`
+  `ditto`s two sample folders (76 files) to the generated fixture path, checks every tag xattr against the share,
+  writes the root marker last, and the runner then runs only `TriageJourneyUITests`. Folder names are spelled as
+  on disk: one has a no-break space after its em dash.
 
 On the host, the Notes store can be read by the app-hosted unit bundle (the Debug entitlements allow `/Users/`),
 which is how it was checked. Nothing may launch an app on the host screen to use it (`.claude/hooks/no-host-gui.sh`).

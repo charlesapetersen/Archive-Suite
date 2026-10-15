@@ -10966,3 +10966,28 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
     replies, ledger `calls.jsonl`, reconciliation evidence, page scores. Deps: `/usr/local/bin/python3` + `PYTHONPATH` with
     sacrebleu 2.5.1 and numpy. Commits: fb891672, f66576a8, 8923c5df, 10083941, 81b2cdb5, 88031353, feedda51 and this one.
   <!-- /W41.ocr-panel-local -->
+- [x] **W40.d8 — Reader triage writes, checked per step [M]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-15 (this commit) (lane: reader) (uses: vm)
+  - **What:** `ArchiveReaderUITests/TriageJourneyUITests` drives Mark Read & Next (⌘⇧M), the inline tag editor, a ⌘I
+    group edit, Rename Tag, two ⌘Z, Find Similar Tags ▸ Merge, a smart folder, quit and relaunch. After every step it
+    decodes every file's Finder-tag xattr with colours, hashes every other xattr and every file's content, and requires
+    that exactly the named files and tags changed. Data-driven: it runs on the synthetic fixture in the ordinary Reader VM
+    lane (so the health gate now runs it), and on two folders of the W40.c2 real-corpus sample (76 files, 45 coloured) via
+    `READER_JOURNEY=rehearsal ops/gui/vm-gui-runner.sh reader xcuitest` (`ArchiveReader/scripts/make-journey-fixture.sh`,
+    which refuses unsafe destinations and writes the root marker only after checking every tag xattr against the share).
+    It restores every tag it changed and deletes its smart folder, so later classes see their fixture.
+  - **Result** (`verification/evidence/reader/W40.d8-triage.md`, both runs green at `f5c31a95`): rename, undo, merge,
+    smart folder, quit/relaunch all hold; no step touched content, another file, an unrelated tag or a colour. Ledger:
+    R-21, R-28, R-29 `works`; R-23, R-45 `broken`; R-16, R-19, R-20, R-22, R-27 gain runtime evidence and stay `unproven`
+    (what is still unshown is in each row).
+  - **Filed:** `W40.fix-reader-inline-keys` (S2: the list's Space key opens Preview from inside the inline tag editor,
+    which cut a two-word tag to its first word; Return does not commit there) and `W40.fix-reader-tag-quarantine` (S3:
+    every tag write adds `com.apple.quarantine`, or rewrites another app's stamp `0082`→`0086`). Both are carried in the
+    journey as non-strict `XCTExpectFailure`s naming the fix; removing them is each fix's test. Suspect `S-015` (`[ ] \`
+    in the inline editor). Observation: macOS rewrites bare corpus tags (`Read`) as `Read\n0` on any written file; same
+    tag, no loss.
+  - **Gotchas for the next journey:** the VM window opens 900 pt wide and clips the Tags column (zoom it); a click on a
+    token does not start editing (click the field's empty end, and only on an already-selected row, after the
+    double-click interval); an unscoped `Save`/`Delete` also matches the Touch Bar / Edit menu copy; smart folders
+    persist in the guest's defaults even in UI-test mode, and so does the window frame: a journey left zoomed made the next `LayoutGuardUITests` measure a 1920-pt window and fail (tearDown now drags it back to its 900×612 minimum and quits with ⌘Q, since `terminate()` can kill the app before it saves the frame); the real folder `SC0308 —\u00a0Clebsch papers` has a no-break
+    space. SimilarTagsSheet gained a per-cluster accessibility id (test tooling). Commits: 916e815d, f5c31a95, fff94777 and this one. Full lane at f5c31a95: every other class green with the journey in it.
+  <!-- /W40.d8 -->

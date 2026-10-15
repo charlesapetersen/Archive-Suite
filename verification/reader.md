@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 43 · unreachable 3` (R-25, R-26, R-46).
+- **Count:** `unproven 38 · works 3 · broken 2 · unreachable 3` (works: R-21, R-28, R-29; broken: R-23, R-45; unreachable: R-25, R-26, R-46). Updated by `W40.d8`, 2026-10-15.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -321,14 +321,15 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   save dialog. `NavigationModel.saveCurrentSearch` (`Views/NavigationModel.swift:272`) saves; `applyScope`
   (`:342`) enters the scope. Rename and delete are in the sidebar context menu. Persistence is
   `persistViewState` and `restoreViewState` (`:603-627`).
-- **Real-path test:** `ArchiveReaderTests/SavedSearchTests.testSaveApplyRoundTripReloads`, `.testRenamePersists`
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 7, 8); `ArchiveReaderTests/SavedSearchTests.testSaveApplyRoundTripReloads`, `.testRenamePersists`
   (store only); `ArchiveReaderTests/LibrarySortFilterTests.testEffectiveSubjectsUnion`. No test goes through
   `applyScope` or a restored scope. View-state persistence is off in UI-test mode, so no UITest can cover the
   relaunch half.
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md) (synthetic fixture and the real-corpus sample): Save Current Search… from a tag filter, the scope lists the two tagged files, Clear restores the full list, the smart folder survives a relaunch, and its context-menu Delete removes it. No file was written by any of it.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — runtime evidence added; stays `unproven`: rename, the count badge, the pre-filled name and a restored scope after relaunch were not shown (view-state restore is off in UI-test mode).
 - **Notes:** a smart folder that includes an OCR query shows no count badge.
 
 ### R-17 · View state survives a relaunch
@@ -379,13 +380,14 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   (`Views/NavigationWindowView.swift:171-172`) and the editor sheet. All call `NavigationModel.mark(_:)`
   (`Views/NavigationModel.swift:1064`), which calls `TagWriter.setReadState` (`Core/TagWriter.swift:132`).
   Only verified results reach `library.applyVerifiedWrites` (`NavigationModel.swift:1084`).
-- **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 1); `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
   (clicks Mark Read, reads the tags back from disk); `ArchiveReaderTests/TagWriterTests.testMarkReadIsNoOpOnFileWithoutReadState`;
   `ArchiveReaderTests/TriageTests.testMarkReadRemovesOnlyUnreadAndPreservesOtherTags`.
-- **Runtime evidence:** none. `W40.d8` checks each triage write.
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): Mark Read on an Unread file removed only `Unread` and added `Read`; every other tag, colour and content byte held. It also stamped the file with `com.apple.quarantine` (R-45).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — runtime evidence added; stays `unproven`: the Unread-view exit after verify and the partial-failure message were not shown.
 - **Notes:** **Drift.**
   - "Option, off" is not an option. The default is hard-coded (`TagWriter.swift:132`), and `OptionsView` has no
     toggle for it.
@@ -401,13 +403,14 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** ⌘] and ⌘[ (`ArchiveReaderCommands.swift:87-90`) and ⌘⇧M (`:101-102`). The bare keys are
   `.onKeyPress` handlers on the table (`Views/NavigationWindowView.swift:149-156`). They call `selectNextUnread`
   (`Views/NavigationModel.swift:1132`), `selectPreviousUnread` (`:1134`) and `markReadAndAdvance` (`:1160`).
-- **Real-path test:** none through the model. `ArchiveReaderTests/TriageTests.testNextUnreadSkipsReadRows`,
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 1), ⌘⇧M only. For the pure helper, `ArchiveReaderTests/TriageTests.testNextUnreadSkipsReadRows`,
   `.testNextUnreadWrapsAround` and `.testPreviousUnreadSkipsReadRowsAndWraps` test the pure `TriageNavigation`.
   Nothing calls `markReadAndAdvance` or presses a key.
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): ⌘⇧M marked the file Read and selected the next Unread file in the list.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — runtime evidence for ⌘⇧M; stays `unproven`: ⌘]/⌘[ and the bare keys were not pressed. Whether the bare keys fire inside the inline editor is `S-015` (the Space key there does: `W40.fix-reader-inline-keys`).
 
 ### R-21 · Undo a tag change
 
@@ -418,12 +421,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** ⌘Z (`ArchiveReaderCommands.swift:112-114`, enabled only while `undoDepth > 0`) or the toolbar
   Undo button. Both call `NavigationModel.undoLast()` (`Views/NavigationModel.swift:1096`), which pops one batch
   and applies `TagWriter.applyOccurrence` to each entry (`:1108`).
-- **Real-path test:** none through `undoLast`. `ArchiveReaderTests/TagWriterTests.testOccurrenceUndoPreservesConcurrentUnrelatedTag`
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 5a, 5b), through `undoLast`. At the writer level, `ArchiveReaderTests/TagWriterTests.testOccurrenceUndoPreservesConcurrentUnrelatedTag`
   and `.testOccurrenceInverseRestoresDuplicateTag` test the writer's inverse.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): one ⌘Z undid a three-file rename as one step, a second ⌘Z undid the three-file group edit, and the tags after the first undo equalled those before the rename. Every other file stayed byte-identical.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — `works` (both runs).
 - **Notes:**
   - The undo stack is memory-only (R-46).
   - `undoLast` drops a file whose undo fails (`try?`, `:1108`), and its count reports only the files it undid.
@@ -440,14 +444,15 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** ⌘I (`ArchiveReaderCommands.swift:103-104`), the toolbar `ar.toolbar.editTags` button or the
   context menu set `showingEditor`, which presents `TagEditorView` (`Views/NavigationWindowView.swift:56`). The
   sheet calls `NavigationModel.applyEdit(_:)` (`Views/NavigationModel.swift:1186`).
-- **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 3, 6a); `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
   (adds a subject in the sheet, reads it back from disk); `ArchiveReaderTests/TagEditingIntegrationTests.testApplySetYearOnDisk`,
   `.testApplySetQualityWritesCanonicalTokenAndPreservesBytes` (writer level). Nothing tests Month, Day, color
   or group tri-state.
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): ⌘I on three selected files added a subject to all three and nothing else; ⌘I on one file did the same.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — runtime evidence for subjects (single and group); stays `unproven`: Year/Month/Day, Quality, colour and tri-state were not shown.
 - **Notes:** each control writes as soon as it changes (`Views/TagEditorView.swift:4-5`), so one sheet session
   makes several writes and several undo steps. Tri-state is real for subjects. For Quality, Color and Read it
   is only a "(mixed)" label. The sheet also holds Read state, Note and Flag.
@@ -462,12 +467,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** a click in the Tags column opens the AppKit `TagTokenCellView` (`Views/AppKitTableView.swift:262`,
   `:521-541`). Autocomplete is `tokenField(_:completionsForSubstring…)` (`:544`). `controlTextDidEndEditing`
   (`:566-581`) calls `NavigationModel.commitSubjectEdit` (`Views/NavigationModel.swift:1290`).
-- **Real-path test:** none through the cell. `ArchiveReaderTests/SubjectTokenEditIntegrationTests.testInlineEditPreservesFacetTokensAndBytes`
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 2a, 2), through the cell. At the writer level, `ArchiveReaderTests/SubjectTokenEditIntegrationTests.testInlineEditPreservesFacetTokensAndBytes`
   and `.testInlineEditInverseRoundTrips` test `TagEditing.subjectDelta` and `TagWriter` directly.
-- **Runtime evidence:** none. The 2026-07-08 owner check predates the AppKit table.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): a Space typed in the focused token field opened the Preview sheet instead (an earlier run's two-word tag was written as its first word), and Return did not commit; the tag was written only on leaving the field. Leaving the field kept every other tag and colour.
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-inline-keys` (S2).
 - **Notes:** **Drift.** The live editor is the AppKit cell. `Views/SubjectTokenField.swift`, which the guide
   names, is referenced only by the dead `TagsCell` (R-25), so it is dead too. Autocomplete returns at most 20
   and leaves out an exact match. There is no case-duplicate warning here (R-27).
@@ -535,11 +541,12 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** the ⌘I sheet's Add-subject field (`Views/TagEditorView.swift:66-70`) and `RenameTagSheet`
   both call `NavigationModel.nearDuplicateSubjects(of:)` (`Views/NavigationModel.swift:1357`), which checks
   `AppSettings.warnNearDuplicateTags` (default true, `Core/AppSettings.swift:92`; toggle at `Views/OptionsView.swift:71`).
-- **Real-path test:** none. No test names `nearDuplicateSubjects` or `warnNearDuplicate`.
-- **Runtime evidence:** none.
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 6a), the warning at its default; no test turns the option off.
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): typing a case variant of an existing subject into the ⌘I sheet showed the warning, with the option at its default.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — runtime evidence added; stays `unproven`: the Options toggle was not turned off.
 - **Notes:** the inline token editor (R-23) adds subjects with no warning.
 
 ### R-28 · Rename a tag across the archive
@@ -551,12 +558,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** Tags ▸ Rename Tag… (`ArchiveReaderCommands.swift:105-106`) calls `NavigationModel.beginRenameTag()`
   (`Views/NavigationModel.swift:1229`). The sheet (`Views/NavigationWindowView.swift:57-59`) commits through
   `renameTag` (`:1234`), which loops `TagWriter.renameToken` and pushes one undo batch (`:1264`).
-- **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 4); `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`
   (drives the menu item and the sheet, reads the tag back from disk); `ArchiveReaderTests/TagWriterTests.testConditionalRenameChangesOnlyAStillPresentOldToken`.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): Tags ▸ Rename Tag… with the tag selected showed "Rename 3 Files", renamed it on exactly those three files (other tags and colours intact), and undid as one step (R-21).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — `works` (both runs).
 - **Notes:** it is also in the tag cloud's context menu, so it is not menu-only. With no tag filter, the sheet
   starts on the most-used tag.
 
@@ -569,12 +577,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** Tags ▸ Find Similar Tags… (`ArchiveReaderCommands.swift:107-108`) presents `SimilarTagsSheet`
   (`Views/NavigationWindowView.swift:61`), which calls `TagSimilarity.clusters`. Merge calls `startMerge`, which
   opens `RenameTagSheet` with the chosen tag.
-- **Real-path test:** none through the sheet. `ArchiveReaderTests/TagSimilarityTests.testCaseVariantsCluster`,
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 6b), through the sheet. For the clustering, `ArchiveReaderTests/TagSimilarityTests.testCaseVariantsCluster`,
   `.testLongTagTypoClusters` and `.testCanonicalIsMaxCountAndClustersSortedByTotalFiles` test the clustering.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): two case variants on two files formed one cluster; with the kept spelling picked, Merge opened the rename sheet seeded with it and renamed only the variant's file. Opening the finder wrote nothing.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — `works` (both runs).
 - **Notes:** a Merge renames one variant, the most-used one that is not kept. A group of N tags needs N−1
   merges. It is also in the tag cloud's context menu.
 
@@ -897,15 +906,16 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   coordinated write is at `:236`, the identity check `:243-250`, the abort on an unreadable read `:262-268`,
   exact matching `:353-355` and the re-read check `:284-299`. The write surface is enforced by
   `ArchiveReader/scripts/lint-write-surface.sh`.
-- **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`;
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (every step); `ArchiveReaderUITests/NavigationUITests.testMatchedIdentityWritesSucceedOnScratchFixture`;
   `ArchiveReaderTests/TagWriterTests.testUnreadableFileIsRefusedNotWiped`,
   `.testApplyWithMismatchedIdentityAbortsAndLeavesReplacementUntouched`;
   `ArchiveReaderTests/TriageTests.testMarkReadRemovesOnlyUnreadAndPreservesOtherTags` (checks the bytes are
   unchanged); `ArchiveCoreTests/TagWriterPrimitiveTests.testReplacedFileAbortsAndLeavesReplacementUntouched`.
-- **Runtime evidence:** none. `W40.d8` checks each triage write on scratch.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): no write changed content, location, another file, an unrelated tag or a colour, on the synthetic fixture or on 76 real-corpus sample files. But every write added `com.apple.quarantine` (`0086;…;ArchiveReader;`) or rewrote an existing one (`0082` → `0086`), an xattr outside "only Finder tags".
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-tag-quarantine` (S3).
 - **Notes:**
   - The identity is captured when an edit starts (`ArchiveFile.liveIdentity()`), not at discovery. It guards
     the moment between the start of an edit and its write, not a file moved since the list was built.

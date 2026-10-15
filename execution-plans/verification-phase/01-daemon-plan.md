@@ -186,7 +186,8 @@ where it can.
   scale numbers in Reader `KNOWN_ISSUES.md`.
 - **`W40.d8` — Reader triage writes [M].** Mark Read & Next, inline subject edit, group edit, rename across
   files, merge similar tags, undo, smart folders. Decode the xattrs after every step; quit and relaunch; check
-  unrelated tags and colours survive.
+  unrelated tags and colours survive. *(SHIPPED 2026-10-15: `TriageJourneyUITests`, evidence
+  `verification/evidence/reader/W40.d8-triage.md`; filed `W40.fix-reader-inline-keys`, `W40.fix-reader-tag-quarantine`.)*
 - **`W40.d9` — Notes writing session [M].** Real keystrokes (`typeText`), autosave, ⌘Q, relaunch, bytes match;
   window close; a note's `.md` edited outside the app while open (suspected silent overwrite); a forced
   asset-write failure (`ArchiveNotes/KNOWN_ISSUES.md`: logged, never shown).
