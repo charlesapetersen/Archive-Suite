@@ -192,7 +192,9 @@ where it can.
   `verification/evidence/reader/W40.d8-triage.md`; filed `W40.fix-reader-inline-keys`, `W40.fix-reader-tag-quarantine`.)*
 - **`W40.d9` — Notes writing session [M].** Real keystrokes (`typeText`), autosave, ⌘Q, relaunch, bytes match;
   window close; a note's `.md` edited outside the app while open (suspected silent overwrite); a forced
-  asset-write failure (`ArchiveNotes/KNOWN_ISSUES.md`: logged, never shown).
+  asset-write failure (`ArchiveNotes/KNOWN_ISSUES.md`: logged, never shown). *(SHIPPED 2026-10-15:
+  `WritingJourneyUITests`, evidence `verification/evidence/notes/W40.d9-writing.md`; filed
+  `W40.fix-notes-outside-edit-overwrite` (S1), `W40.fix-notes-return-paragraph`, `W40.fix-notes-asset-write-silent`.)*
 - **`W40.d10` — Notes integrations [M].** Real Zotero installed in the VM, auto-fill and attach; real Reader
   launch and deep links both ways; Copy Link; an inbound `archivenotes://` URL dispatched by the OS.
 - **`W40.d11` — the shared contract across apps [S-M].** Open `W40.d1`'s output in the Reader; tags, dates,

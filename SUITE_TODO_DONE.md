@@ -11030,3 +11030,16 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   The DEBUG `-ARUITestRootPath` override was not used because it also switches the app into UI-test behaviour.
   No code changed. The session itself is `W40.g-sessions` (owner).
   <!-- /W40.g1 -->
+- [x] **W40.d9 — Notes writing session with real keystrokes [M]** · §W40 — verification phase · SHIPPED 2026-10-15 (lane: notes) (uses: vm)
+  `ArchiveNotesUITests/WritingJourneyUITests` (4 tests) types into the styled editor with `typeText` (it took focus
+  on the first click every run, so the "XCUITest cannot focus the styled view" belief does not hold for typing),
+  in the Tart VM on the scratch `AN-GUI-Fixture`: 8/8 green over 2 iterations, 0 unexpected. Holds: idle autosave
+  (on disk after 1.3 s), ⌘Q inside both debounces, relaunch (file byte-identical, mtime unchanged, Finder-tag xattr
+  identical, opening rewrites nothing), window close (the app stays running with no window). Three defects
+  reproduced and filed, each carried as a non-strict `XCTExpectFailure` naming it:
+  `W40.fix-notes-outside-edit-overwrite` (S1 — an outside edit to the open note's `.md` is overwritten by the next
+  save, silently; 6/6), `W40.fix-notes-return-paragraph` (S2 — a typed Return saves as one newline, paragraphs
+  merge on reopen), `W40.fix-notes-asset-write-silent` (S3 — confirms KNOWN_ISSUES residual (a) in the app).
+  Ledger: N-12 → `broken`; runtime evidence on N-02, N-14, N-15 (stay `unproven`: switching notes, a successful
+  paste and a drag were not driven). Evidence `verification/evidence/notes/W40.d9-writing.md`.
+  <!-- /W40.d9 -->

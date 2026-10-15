@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 47 · unreachable 1` (N-48).
+- **Count:** `unproven 46 · broken 1 · unreachable 1` (broken: N-12; unreachable: N-48). Updated by `W40.d9`, 2026-10-15.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -108,10 +108,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesTests/NoteStoreTests.createBasic` and `.saveRetitle`;
   `ArchiveNotesTests/FrontMatterCodecTests.testUnknownKeysPreserved`;
   `ArchiveNotesUITests/NotesGUITests.testG1_CreateNoteWritesNewItemFile` (a `.md` lands in a new item directory).
-- **Runtime evidence:** none.
+- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md) (`WritingJourneyUITests`, VM): after typing, ⌘Q and a relaunch the `.md` is byte-identical to what was saved and opening it rewrites nothing; front matter unchanged but `modified:`. An edit made to the `.md` outside the app while the note is open is overwritten by the next save, without a word.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d9 — runtime evidence added; stays `unproven` (the store layout, unknown keys and source-block legibility were not checked). The outside-edit overwrite is not a stated N-02 promise but loses text; filed `W40.fix-notes-outside-edit-overwrite` (S1).
 - **Notes:** "title = file name" holds after `NoteStore.sanitizedTitle` (`Store/NoteStore.swift:511-528`): illegal
   characters are replaced, the length is capped, and an empty title becomes `Untitled.md`. The `W9.d12d`
   divergence log is `NotesIndexer.filenameDivergence` (`Index/NotesIndexer.swift:117`, `:372`), pinned by
@@ -419,10 +420,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   toolbar reach, but they skip `FormattingContext`. Also `ArchiveNotesTests/MarkdownBridgeTests.orderedListRenumbersFromFirst`
   and `ArchiveNotesTests/EditorBindingTests.textViewFindBarEnabled`. No test presses Tab, Shift-Tab, Return or
   Backspace in a list.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): text typed with `typeText` into the styled editor saves; but each Return typed there is saved as one newline, so typed paragraphs merge into one when the note is reopened.
+- **Status:** `broken`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d9 — `unproven` → `broken`: typed paragraph breaks are lost on reopen; filed `W40.fix-notes-return-paragraph` (S2).
 - **Notes:** **Drift.**
   - There is no indent or outdent button on the toolbar and no Indent/Outdent item in the Format menu.
     `indentList` and `outdentList` are reached only from Tab and Shift-Tab, and `outdentList` also from Return or
@@ -478,10 +480,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `NoteBodyEditorModel` → `NotesModel.setBody` → a scratch `NoteStore`, flushed through `EditorFlushRegistry`; it
   calls `flushAll` itself, not the app delegate); `ArchiveNotesTests/NoteBodyEditorModelTests.editThenSwitchSavesOutgoingOnly`
   (the real switch logic, with closure stubs for load/save); `ArchiveNotesTests/TerminateFlushCoordinatorTests.boundedReplyOnTimeout`.
-- **Runtime evidence:** none.
+- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): typing autosaves with no other action (on disk after 1.3 s); ⌘Q pressed straight after typing, inside both debounces, saved the edit; closing the window straight after typing saved it. Held in every VM run.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d9 — runtime evidence for idle autosave, quit and window close; stays `unproven`: switching notes with an unsaved edit was not driven.
 - **Notes:**
   - No test quits the real app within the debounce.
   - On quit, a store write that takes longer than 2 s is abandoned, by design.
@@ -508,10 +511,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   the DEBUG seam `an.editor.test.pasteImage`, which calls the real `tryPasteImage` but bypasses the ⌘V gesture);
   `ArchiveNotesTests/InlineImageReadSeamTests.rendererRefusesEscapingReference` and `.rendererKeepsMissingDistinctFromBlocked`;
   `ArchiveNotesTests/ItemAssetStoreTests.addPersistsAndSurvivesReload`. No test drags an image.
-- **Runtime evidence:** none.
+- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): with the note's `assets/` read-only, a pasted PNG reports `ok`, the note gains the `![](assets/pasted-…)` reference, no file lands, and nothing tells the user.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-10-15 W40.d9 — runtime evidence for the failed-write path; stays `unproven` (a successful paste and a drag were not driven here). The silent failure is filed `W40.fix-notes-asset-write-silent` (S3).
 - **Notes:**
   - Every image is stored as PNG named `pasted-<yyyyMMdd-HHmmss>.png` (TIFF, JPEG and HEIC are converted,
     `Editor/EditorTextView.swift:712-735`).

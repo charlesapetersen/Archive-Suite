@@ -3,6 +3,19 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## 🔴 OPEN (W40.d9, 2026-10-15) — three writing-session defects, reproduced in the VM
+
+`ArchiveNotesUITests/WritingJourneyUITests` types into the styled editor with real keystrokes. Autosave, ⌘Q
+within the debounce, relaunch (bytes, mtime and Finder tags unchanged) and window close all hold. Three things do
+not; each is carried in that class as a non-strict `XCTExpectFailure` naming its fix item. Evidence:
+`verification/evidence/notes/W40.d9-writing.md` at the suite root.
+- **An edit to the `.md` made outside the app while the note is open is overwritten by the next save, silently**
+  (`W40.fix-notes-outside-edit-overwrite`, S1). There is no file watcher, and `setBody` replaces the body wholesale.
+- **A Return typed in the styled editor is saved as one newline**, so the typed paragraphs merge into one when the
+  note is reopened (`W40.fix-notes-return-paragraph`, S2).
+- **A failed inline-image write is only logged** (`W40.fix-notes-asset-write-silent`, S3). This is residual (a) of
+  the W7-S5 entry below, now confirmed in the running app.
+
 ## GUI fixture order — regression coverage (W40.a3, 2026-10-11)
 
 `W35.vm-mem-fu1` already restores `AN-GUI-Fixture.pristine` before every test; G19's Trash operation
