@@ -128,18 +128,23 @@ QOS, GPUs, `--time`, and the number of bulk shards.
    token counts and timings, and no transcript text. `summary.json` → `throughput.pages_per_hour_per_gpu` is the
    measured figure that replaces the estimate. Its `env` records the vLLM version, the node and the GPU.
 5. **If the FP8 checkpoint will not load on Ada** (an error about block-quantised fp8 kernels), use the
-   `qwen3.6-27b-dyn` preset. It loads bf16 weights (56 GB) and quantises them to fp8 at load time.
+   `qwen3.6-27b-dyn` preset. It loads bf16 weights (56 GB) and quantises them to fp8 at load time. If vLLM will
+   not use an fp8 KV cache with Qwen3.5/3.6's hybrid attention, run with `FS_KV_DTYPE=auto`.
 
 **Bulk:** `bash submit.sh bulk qwen3.6-27b --in DIR --out DIR`.
 
 - **Input:** a directory tree of images. Exporting page images from the corpus PDFs is a separate step.
-- **Output:** one `.txt` per page, mirroring the input tree. Each page also gets `_meta/<page>.json` with kind,
-  table, tokens and timing.
-- **Shards:** one shard per allowed GPU job.
+- **Output:** one text file per page, named after the image (`box1/a.jpg` → `box1/a.jpg.txt`), mirroring the
+  input tree. Each page also gets `_meta/<image>.json` with kind, table, tokens and timing.
+- **Shards:** one shard per allowed GPU job. Pages are assigned by a hash of their path, so adding files mid-run
+  cannot leave a page in no shard.
+- **A dead server:** if eight reads in a row get no answer (vLLM crashed, say), the job stops and queues itself
+  again. Pages that got no answer count as still to do.
 - **Ending a job:** each job stops sending pages 15 minutes before its wall limit. It then queues its own shard
   again, up to 30 times.
 - **Done pages** (their `.txt` exists) are never read twice.
-- **Failures** go to `failed-<shard>.jsonl`. Running `submit.sh` again retries them.
+- **Failures** go to `failed-<shard>.jsonl`: a reply cut off or unparseable, a request the server refused, or an
+  image Pillow cannot open. They never stop the run. Running `submit.sh` again retries them.
 - `--out` must be outside `--in`. The input is only ever read.
 
 ## Files
@@ -151,4 +156,4 @@ QOS, GPUs, `--time`, and the number of bulk shards.
 | `models.sh` | presets: Hugging Face repo, GPUs, download size, vLLM flags |
 | `setup.sh`, `download.sh`, `submit.sh`, `job.sbatch` | environment, weights, fitted submission, and the GPU job that serves vLLM on localhost and runs one mode |
 | `estimate.py` | the estimate table above |
-| `test_farmshare.py` | offline tests: Slurm parsing, and the driver against a fake vLLM server |
+| `test_farmshare.py` | 16 offline tests: Slurm parsing, presets, and the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring) |

@@ -46,6 +46,8 @@ class Limits(unittest.TestCase):
         # A user not associated with the gpu QOS falls back to what they are allowed.
         s = L.choose(parts, q, {'normal'})
         self.assertEqual((s['FS_QOS'], s['FS_MAXGPU_PU']), ('normal', 3))
+        # Slurm would not list the user's QOS: name none rather than guess one sbatch may refuse.
+        self.assertEqual(L.choose(parts, q, set())['FS_QOS'], '')
 
     def test_no_gpu_partition_is_an_error(self):
         with self.assertRaises(SystemExit):
@@ -124,12 +126,12 @@ class Driver(unittest.TestCase):
         r = self.bulk()
         self.assertEqual(r.returncode, 0, r.stderr)
         out = self.tmp / 'out'
-        self.assertEqual((out / 'box1/a.txt').read_text(), 'The quick brown fox')
-        self.assertTrue((out / 'box1/b.txt').exists())
-        self.assertFalse((out / 'c.txt').exists())          # cut off at max_tokens: a failure, not text
+        self.assertEqual((out / 'box1/a.jpg.txt').read_text(), 'The quick brown fox')
+        self.assertTrue((out / 'box1/b.png.txt').exists())
+        self.assertFalse((out / 'c.jpg.txt').exists())      # cut off at max_tokens: a failure, not text
         fails = [json.loads(x) for x in (out / 'failed-0.jsonl').read_text().splitlines()]
         self.assertEqual([f['image'] for f in fails], ['c.jpg'])
-        self.assertEqual(json.loads((out / '_meta/box1/a.json').read_text())['kind'], 'printed')
+        self.assertEqual(json.loads((out / '_meta/box1/a.jpg.json').read_text())['kind'], 'printed')
         self.assertEqual(list(out.rglob('*.tmp*')), [])
         n = len(Fake.seen)
         r = self.bulk()                                      # rerun: only the failed page is asked again
@@ -143,6 +145,35 @@ class Driver(unittest.TestCase):
             self.assertEqual(self.bulk('--shard', f'{i}/2').returncode, 0)
         self.assertEqual(len(list((self.tmp / 'out').glob('p*.txt'))), 5)
         self.assertEqual(len(Fake.seen), 5)                  # no page read twice across shards
+
+    def test_same_stem_different_format_both_read(self):
+        self.mk('a.jpg', (0, 0, 0)); self.mk('a.png', (0, 0, 0))
+        self.assertEqual(self.bulk().returncode, 0)
+        self.assertEqual(sorted(p.name for p in (self.tmp / 'out').glob('a.*.txt')), ['a.jpg.txt', 'a.png.txt'])
+
+    def test_unreadable_image_is_that_page_failure_only(self):
+        self.mk('good.jpg', (0, 0, 0))
+        (self.tmp / 'in' / 'broken.jpg').write_bytes(b'not a jpeg')
+        r = self.bulk()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.tmp / 'out' / 'good.jpg.txt').exists())
+        fails = [json.loads(x) for x in (self.tmp / 'out' / 'failed-0.jsonl').read_text().splitlines()]
+        self.assertEqual([(f['image'], f['status']) for f in fails], [('broken.jpg', 'unreadable')])
+
+    def test_dead_server_stops_and_asks_for_a_resubmit(self):
+        for k in range(20):
+            self.mk(f'p{k:02}.jpg', (0, 0, 0))
+        import socket
+        with socket.socket() as sk:                          # a port nobody listens on: every read is 'error'
+            sk.bind(('127.0.0.1', 0)); port = sk.getsockname()[1]
+        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'bulk', '--url', f'http://127.0.0.1:{port}',
+                            '--model', 'm', '--in', str(self.tmp / 'in'), '--out', str(self.tmp / 'out'),
+                            '--concurrency', '1'], capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout.strip().splitlines()[-1])['left'], 20)
+        self.assertEqual(len((self.tmp / 'out' / 'failed-0.jsonl').read_text().splitlines()), F.DEAD_SERVER)
+        self.assertEqual(self.bulk().returncode, 0)           # server back: the rerun reads all 20
+        self.assertEqual(len(list((self.tmp / 'out').glob('p*.jpg.txt'))), 20)
 
     def test_bulk_deadline_stops_and_exits_75(self):
         self.mk('a.jpg', (0, 0, 0))
@@ -213,7 +244,8 @@ class Shell(unittest.TestCase):
         for f in ('setup.sh', 'download.sh', 'job.sbatch', 'submit.sh', 'models.sh'):
             self.assertEqual(subprocess.run(['bash', '-n', str(HERE / f)]).returncode, 0, f)
         out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; preset qwen3.6-27b-dyn; echo "$FS_VLLM_ARGS"; '
-                              'preset qwen3.6-27b; echo "$FS_MODEL|$FS_VLLM_ARGS"; preset nope'],
+                              'preset qwen3.6-27b; echo "$FS_MODEL|$FS_VLLM_ARGS"; preset nope; '
+                              'FS_MAX_LEN=12288 preset qwen3.6-35b-a3b'],
                              capture_output=True, text=True)
         first, second = out.stdout.splitlines()[:2]
         self.assertIn('--quantization fp8', first)
@@ -221,6 +253,8 @@ class Shell(unittest.TestCase):
         self.assertNotIn('--quantization', second)          # the fallback's flag does not leak into the next preset
         self.assertIn('{"image":1}', second)
         self.assertIn('unknown preset', out.stderr)
+        self.assertIn('below prompt + max_tokens', out.stderr)
+        self.assertIn('--max-model-len 16384', second)
 
 
 if __name__ == '__main__':

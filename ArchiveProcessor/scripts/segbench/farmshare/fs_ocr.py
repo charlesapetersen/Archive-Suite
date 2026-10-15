@@ -10,8 +10,9 @@ The server is started by job.sbatch (`vllm serve`, OpenAI-compatible, localhost 
 API or the network beyond that server. The prompt, image cap and max_tokens are imported from ocr_panel.py, so a
 FarmShare score is the same measurement as the OpenRouter rows, at FarmShare's precision.
 
-Bulk is resumable: a page whose .txt exists is skipped, every file is written to a temporary name and renamed,
-and a page that fails is logged to failed.jsonl (never retried in the same run; a rerun retries it).
+Bulk is resumable: a page whose <image name>.txt exists is skipped, every file is written to a temporary name and
+renamed, and a page that fails is logged to failed-<shard>.jsonl (not retried in the same run; a rerun retries it).
+A page the server never answered counts as still to do, and eight such in a row stop the run with exit 75.
 """
 from __future__ import annotations
 import argparse
@@ -74,7 +75,9 @@ class Server:
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 j = json.loads(r.read())
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
+        except urllib.error.HTTPError as e:  # the server answered and refused this page (e.g. 400): the page failed
+            return None, {'status': 'rejected', 'error': f'{e.code} {e.read()[:300]!r}', 'wall_s': time.time() - t0}
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:  # no answer: transient, not the page
             return None, {'status': 'error', 'error': repr(e)[:300], 'wall_s': time.time() - t0}
         c = j['choices'][0]; u = j.get('usage') or {}
         raw = (c.get('message') or {}).get('content') or ''
@@ -86,17 +89,31 @@ class Server:
         return {'raw': raw, 'parsed': parsed}, meta
 
 
+DEAD_SERVER = 8  # this many 'error' replies in a row: the server is gone, stop instead of failing every page
+
+
 def run_all(server, items, concurrency, deadline=None, on_done=None):
-    """items: (id, image-bytes-thunk). Returns {id: (reply, meta)} and the wall time from first send to last reply."""
-    out, lock, stop = {}, threading.Lock(), threading.Event()
+    """items: (id, image-bytes-thunk). Returns {id: (reply, meta)} and the wall time from first send to last reply.
+    An image that cannot be opened is that page's failure ('unreadable'); it never stops the run."""
+    out, lock, stop, streak = {}, threading.Lock(), threading.Event(), [0]
 
     def work(item):
         if stop.is_set() or (deadline and time.time() > deadline):
             stop.set(); return
         key, load = item
-        reply, meta = server.read(load())
+        try:
+            image = load()
+        except Exception as e:  # corrupt file, unsupported format, Pillow's decompression-bomb limit
+            reply, meta = None, {'status': 'unreadable', 'error': repr(e)[:300]}
+        else:
+            # An in-flight read may run past the deadline by at most 10 min (job.sbatch leaves 15).
+            timeout = 1800 if not deadline else max(60, min(1800, deadline - time.time() + 600))
+            reply, meta = server.read(image, timeout)
         with lock:
             out[key] = (reply, meta)
+            streak[0] = streak[0] + 1 if meta['status'] == 'error' else 0
+            if streak[0] >= DEAD_SERVER:
+                stop.set()
         if on_done:
             on_done(key, reply, meta)
 
@@ -233,8 +250,10 @@ def cmd_bulk(a):
         raise SystemExit('--out must be outside --in (the input directory is never written)')
     files = sorted(p for p in src.rglob('*') if p.suffix.lower() in IMAGES and p.is_file())
     i, n = (int(x) for x in a.shard.split('/'))
-    mine = [p for k, p in enumerate(files) if k % n == i]
-    target = lambda p: out / p.relative_to(src).with_suffix('.txt')  # noqa: E731
+    # By a hash of the path, not by position: a file added mid-run cannot shift others out of every shard.
+    mine = [p for p in files if int(hashlib.sha1(p.relative_to(src).as_posix().encode()).hexdigest(), 16) % n == i]
+    # The image's own name plus .txt (a.jpg -> a.jpg.txt), so a.jpg and a.tif never share an output.
+    target = lambda p: out / (p.relative_to(src).as_posix() + '.txt')  # noqa: E731
     todo = [p for p in mine if not target(p).exists()]
     print(f'{len(files)} images, shard {i}/{n}: {len(mine)}, {len(mine) - len(todo)} already done, {len(todo)} to read',
           flush=True)
@@ -243,12 +262,11 @@ def cmd_bulk(a):
     done = [0]
 
     def on_done(key, reply, meta):
-        rel = Path(key)
-        side = out / '_meta' / rel.with_suffix('.json')
+        side = out / '_meta' / (key + '.json')
         with log_lock:
             done[0] += 1
             if reply and reply['parsed']:
-                atomic_write(out / rel.with_suffix('.txt'), reply['parsed']['text'].encode())
+                atomic_write(out / (key + '.txt'), reply['parsed']['text'].encode())
                 atomic_write(side, json.dumps({'kind': reply['parsed']['kind'], 'table': reply['parsed']['table'],
                                                **meta}).encode())
             else:
@@ -258,14 +276,15 @@ def cmd_bulk(a):
                 print(f'{done[0]}/{len(todo)}', flush=True)
 
     out.mkdir(parents=True, exist_ok=True)
-    items = [(str(p.relative_to(src)), (lambda p=p: jpeg(p, a.side or P.SIDE))) for p in todo]
+    items = [(p.relative_to(src).as_posix(), (lambda p=p: jpeg(p, a.side or P.SIDE))) for p in todo]
     replies, wall = run_all(server, items, a.concurrency, a.deadline, on_done)
     t = throughput(replies, wall, a.gpus)
-    t['left'] = len(todo) - len(replies)
+    # A page the server never answered ('error': a crash, a timeout) is still to do; resubmitting retries it.
+    t['left'] = len(todo) - sum(1 for _, m in replies.values() if m['status'] != 'error')
     with (out / 'throughput.jsonl').open('a') as f:
         f.write(json.dumps({'shard': a.shard, 'env': env_info(), **t, 't': time.time()}) + '\n')
     print(json.dumps(t))
-    sys.exit(0 if t['left'] == 0 else 75)  # 75 (EX_TEMPFAIL): stopped at the deadline, resubmit to continue
+    sys.exit(0 if t['left'] == 0 else 75)  # 75 (EX_TEMPFAIL): deadline or dead server, resubmit to continue
 
 
 def main():

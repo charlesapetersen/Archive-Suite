@@ -10,5 +10,7 @@ if [ "$free_gb" -lt $((FS_DISK_GB + 5)) ]; then
   echo "need ~${FS_DISK_GB} GB for $FS_MODEL, $free_gb GB free under $HF_HOME"; exit 1
 fi
 # Public Apache-2.0 repos: no Hugging Face token needed.
-"$(dirname "$FS_PY")/huggingface-cli" download "$FS_MODEL" --exclude '*.gguf' '*.pth' 'original/*'
+bin="$(dirname "$FS_PY")"
+cli="$bin/hf"; [ -x "$cli" ] || cli="$bin/huggingface-cli"   # huggingface_hub 1.x renamed the CLI to hf
+"$cli" download "$FS_MODEL" --exclude '*.gguf' '*.pth' 'original/*'
 du -sh "$HF_HOME"

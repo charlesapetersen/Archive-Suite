@@ -46,7 +46,7 @@ case "$FS_MODE" in
          FS_SHARDS="${FS_SHARDS:-$cap}" ;;
   *) echo "mode must be truth, news or bulk"; exit 2 ;;
 esac
-want=$(( ${hours:-0} * 60 )); [ "$want" -gt 0 ] || want="$default_min"
+want=$(awk -v h="${hours:-0}" 'BEGIN { printf "%d", h * 60 }'); [ "$want" -gt 0 ] || want="$default_min"
 FS_WALL_MIN=$(( want < FS_MAXWALL_MIN ? want : FS_MAXWALL_MIN ))
 
 FS_SBATCH_ARGS="--partition=$FS_PARTITION ${FS_QOS:+--qos=$FS_QOS} --gres=gpu:$FS_GPUS --cpus-per-task=$(( 8 * FS_GPUS )) \

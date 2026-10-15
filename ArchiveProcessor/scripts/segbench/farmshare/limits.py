@@ -90,10 +90,12 @@ def choose(parts, qos, allowed):
     if not parts:
         raise SystemExit('no partition with GPUs in sinfo; is this the FarmShare login node?')
     part = max(parts, key=lambda p: (p[1], p[2] or 0))
-    cands = [n for n in qos if (not allowed or n in allowed) and (qos[n]['gpus_pu'] or 0) > 0]
-    if not cands:
-        cands = [part[0]] if part[0] in qos else []
+    # Only a QOS the user's associations list. If Slurm would not say, name none: sbatch then uses the default
+    # QOS, which is always allowed, where guessing one could be refused ("Invalid qos specification").
+    cands = [n for n in qos if n in allowed and (qos[n]['gpus_pu'] or 0) > 0]
     best = max(cands, key=lambda n: (qos[n]['gpus_pu'] or 0, n == part[0], qos[n]['maxwall'] or 0), default=None)
+    if not allowed:
+        print('WARNING: no QOS list for this user from sacctmgr; submitting without --qos')
     q = qos.get(best, {})
     walls = [w for w in (part[2], q.get('maxwall')) if w]
     gpus_pu = q.get('gpus_pu') or part[1]

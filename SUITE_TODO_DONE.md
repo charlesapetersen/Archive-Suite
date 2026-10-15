@@ -11108,3 +11108,28 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   those families may be flattered. Private cache `~/Library/Caches/ArchiveSuiteRehearsal/ocr-panel-cloud/`.
   Commits: e5864a06, adedc625, 467b39d9 (pilot), 3b2d0d01 (full-run driver) and this one.
   <!-- /W41.ocr-panel-cloud -->
+- [x] **W41.farmshare-plan — the FarmShare candidate and a ready job [S-M · ~1 session]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light) (blocked-on: W41.ocr-panel-local, W41.ocr-panel-local-rest, W41.ocr-panel-cloud). Question 4. From the panels, the best open-weight readers that fit FarmShare: one L40S (48 GB) for a 27B-35B model at fp8 or 4-bit, or a whole four-card node (192 GB) for Qwen3.5 122B-A10B or Qwen3-VL 235B at fp8 or below, with segmentation's best open model from W41.seg-large if one is good enough. Newspapers as well as archival photos: the clippings stratum, and Vision OCR's newspaper truth pages (`~/Claude/vision-ocr`, read only) if their transcripts can be scored the same way. For each candidate: the build to use (vLLM or llama.cpp; the quantisation), the expected pages an hour per card from its parameter count and OpenRouter's measured output lengths (an estimate, said so), and the GPU-hours for 100,000 photos and for 100,000 newspaper pages. Then a ready-to-run Slurm job in the repo (`ArchiveProcessor/scripts/segbench/farmshare/`): environment setup, the model download, the truth-set run that scores it at FarmShare's precision and measures throughput, and a resumable bulk mode that reads a directory of images and writes one text file per page. FarmShare's own limits (partitions, time limits, per-user GPUs, storage quota) are not public in the docs read on 2026-10-11; the job reads them on the cluster (`sinfo`, `sacctmgr`, quota) and fits itself to them. Nothing here logs in: FarmShare needs the owner's SUNet login and two-step authentication. SHIPPED 2026-10-15.
+  **Result** (`ArchiveProcessor/scripts/segbench/farmshare/`, `README.md` there is the write-up). Candidate: **Qwen3.6
+  27B at fp8 on one L40S** (`Qwen/Qwen3.6-27B-FP8`, ~29 GB): panel NES 94.28, above both open cloud giants (Qwen3-VL
+  235B 93.95, Qwen3.5 397B 93.98) and Flash-Lite 91.61; clippings 93.71. Speed option Qwen3.6 35B-A3B fp8 (93.02, est.
+  2.5-3x faster); floor Qwen3-VL 8B bf16 (91.81, the exact measured precision). Segmentation: Qwen3.5 27B fp8 (95.0% on
+  Deaver) fits the same card; its windows are not yet wired to a local server (filed `W41.farmshare-seg`). The
+  four-card node is not worth it: 235B fp8 and 397B even at 4 bits do not fit 192 GB, the 235B 4-bit GGUF needs
+  llama.cpp and scored below the 27B on the cloud panel, and 122B-A10B (fits at fp8) is unmeasured on OCR and lost
+  segmentation to the 27B; a preset is kept so one run can settle it. **Estimates** (`estimate.py`, parameter counts x
+  L40S datasheet x the panels' measured token counts, 20-40% MFU, said to be estimates): Qwen3.6 27B 760-1,816
+  photos/h/GPU, **55-132 GPU-h per 100k photos** (~14-33 h wall at 4 GPU jobs); broadsheet newspaper pages 171-461
+  GPU-h per 100k (unmeasured token counts). Newspapers: the Vision OCR lab's newspaper truth is NewsBench (15 scored
+  LoC pages, public domain + CC0, volunteer gold); its table already shows whole-page VLMs at 0.75-0.82 and
+  layout + GLM-OCR at 0.970, so layout-first is filed as `W41.farmshare-news-layout`. FarmShare docs (2026-10-15):
+  6 nodes x 4 L40S, `gpu` partition/QOS (6 GPUs, 4 running jobs a user), not for sponsored research or high-risk data;
+  the job reads the real limits (`limits.py`: sinfo, sacctmgr, df, quota) and `submit.sh` fits partition, QOS, GPUs,
+  time and shards to them. Kit: `fs_ocr.py` pack (Mac: the 99 frozen images byte-identical to the panel's, 74 MB)
+  / truth / news / bulk (resumable, hash-sharded, self-resubmitting at its deadline or a dead server, failures
+  logged never fatal), `setup.sh`, `download.sh`, `models.sh`, `job.sbatch` (vLLM on localhost). 16 offline tests
+  against a fake vLLM server; a fake-server truth run on the real pack split 96/3/13 as the panel does. An
+  adversarial review found 8 defects (35B preset's max-model-len below prompt + max_tokens, unreadable image killing
+  bulk, dead server marking a shard done, positional sharding, same-stem collisions, in-flight timeout past the wall,
+  a guessed QOS, fractional --hours) and the `hf` CLI rename; all fixed with tests. Nothing ran on FarmShare and no
+  money was spent. Commits: 4a1ff46d and this one.
+  <!-- /W41.farmshare-plan -->
