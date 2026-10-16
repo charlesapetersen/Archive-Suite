@@ -372,15 +372,27 @@ def cmd_bulk(a):
     load = load or (lambda p: jpeg(p, a.side or P.SIDE))
     log_lock = threading.Lock()
     done = [0]
+    # What the Processor's import (W41.app-farmshare-import) records with each page's text: who read it, at which
+    # precision (the preset's checkpoint and vLLM arguments), in which Slurm job.
+    run = {'model': getattr(server, 'model', None), 'preset': os.environ.get('FS_PRESET'),
+           'vllm_args': os.environ.get('FS_VLLM_ARGS'), 'job': os.environ.get('SLURM_JOB_ID')}
 
     def on_done(key, reply, meta):
         side = out / '_meta' / (key + '.json')
+        # The input file's own bytes, so the import matches a page by content and never by a name two images share.
+        # A file gone or unreadable since it was read gets no hash (the import then skips it); it never stops the run.
+        digest = None
+        if reply and reply['parsed']:
+            try:
+                digest = hashlib.sha256((src / key).read_bytes()).hexdigest()
+            except OSError:
+                pass
         with log_lock:
             done[0] += 1
             if reply and reply['parsed']:
                 atomic_write(out / (key + '.txt'), reply['parsed']['text'].encode())
                 atomic_write(side, json.dumps({'kind': reply['parsed']['kind'], 'table': reply['parsed']['table'],
-                                               **meta}).encode())
+                                               **meta, 'sha256': digest, **run}).encode())
             else:
                 with (out / f'failed-{i}.jsonl').open('a') as f:
                     f.write(json.dumps({'image': key, **meta, 'raw': (reply or {}).get('raw', '')[:500]}) + '\n')

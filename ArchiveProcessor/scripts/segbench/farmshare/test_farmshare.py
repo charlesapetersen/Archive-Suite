@@ -1,6 +1,7 @@
 """W41.farmshare-plan offline tests: Slurm-limit parsing, and fs_ocr.py and fs_seg.py against a fake vLLM server on
 localhost.
 No cluster, GPU, corpus or paid API. Run: python3 -m unittest test_farmshare (from this directory)."""
+import hashlib
 import http.server
 import io
 import json
@@ -188,7 +189,12 @@ class Driver(unittest.TestCase):
         self.assertFalse((out / 'c.jpg.txt').exists())      # cut off at max_tokens: a failure, not text
         fails = [json.loads(x) for x in (out / 'failed-0.jsonl').read_text().splitlines()]
         self.assertEqual([(f['image'], f['attempts']) for f in fails], [('c.jpg', 2)])
-        self.assertEqual(json.loads((out / '_meta/box1/a.jpg.json').read_text())['kind'], 'printed')
+        side = json.loads((out / '_meta/box1/a.jpg.json').read_text())
+        self.assertEqual(side['kind'], 'printed')
+        # W41.app-farmshare-import matches by the input's bytes and records the reader.
+        self.assertEqual(side['sha256'], hashlib.sha256((self.tmp / 'in/box1/a.jpg').read_bytes()).hexdigest())
+        self.assertEqual(side['model'], 'm')
+        self.assertTrue({'preset', 'vllm_args', 'job'} <= side.keys())
         self.assertEqual(list(out.rglob('*.tmp*')), [])
         n = len(Fake.seen)
         r = self.bulk()                                      # rerun: the escalated page is not asked again

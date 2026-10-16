@@ -45,6 +45,9 @@ struct SessionProcessingConfig: Sendable {
     /// The reader each page's kind chose (W41.app-page-kind), from the file list at Start. Empty = every page is read
     /// by the run's model. Frozen with the run, like the cascade, so a resumed run reads each page as it began.
     var pageReaders: PageReaderPlan = .empty
+    /// A FarmShare bulk run's text for this run's pages (W41.app-farmshare-import), set at Start where the page
+    /// readers apply; nil = every page is read by the run. A resumed run reloads it from `farmShareFolder`.
+    var farmShareImport: FarmShareImport? = nil
     /// Optional direct LLM used only after Apple Vision has produced text. The image OCR provider
     /// remains `.appleVision`; this value is deliberately never handed to `performOCRCall`.
     var visionTextLLM: LLMTextConfiguration? = nil

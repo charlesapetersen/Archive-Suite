@@ -35,6 +35,27 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
 (`segbench-results/kind-classifier.md` §6). The classifier's inputs are measured exactly as the bench's
 `kind-signals.swift` measures them — change the two together.
 
+## ⚠️ LIMITATION (W41.app-farmshare-import, 2026-10-16): what the FarmShare import leaves open
+
+`FarmShareImport` takes a FarmShare bulk run's text for the pages whose image bytes it read. What it does not do:
+- **The estimates count every page.** The cost and time lines do not know which pages will match until each is
+  hashed during the run, so they overstate a run with FarmShare text (a matched page costs one short text-only
+  classification call).
+- **Rotation is 0** on an imported page: asking the run's provider would be a paid call per page, and FarmShare read
+  the file as stored. A sideways scan stays sideways in the PDF.
+- **FarmShare's text follows the bench panel's prompt**, not the Processor's: the custom OCR prompt and the
+  previous-page context do not apply to imported pages (the classification call does get the custom prompt).
+- **Only image inputs match.** A PDF input's pages are drawn to temporary JPEGs whose bytes FarmShare never saw.
+  Paid batches, the gateway, the Local Agent and Apple Vision runs ignore the import.
+- **A resumed run reloads the folder on the main actor** (every `_meta` file); a very large run may pause the resume
+  for some seconds. A folder moved or deleted since gives no import, so its pages go to the run's model.
+- **A resumed run whose folder is gone says nothing**: its remaining pages are read (and paid for) by the run's
+  model, within the estimate but beyond what Start led the user to expect.
+- **Every imported page gets a classification call**, even when tagging, merging and segmentation are off:
+  `performOCRCall` cannot see the run's tagging mode. One short text call a page, inside the estimate.
+- **Every page is hashed** once more than it is read (one extra read of each input), the price of matching by
+  content rather than by name.
+
 ## ⚠️ LIMITATION (W41.app-ocr-cascade, 2026-10-16): what the cheap-first cascade does not yet cover
 
 `OCRCascade` (off by default) re-reads a failed page with the user's escalation model. What it leaves open, from its

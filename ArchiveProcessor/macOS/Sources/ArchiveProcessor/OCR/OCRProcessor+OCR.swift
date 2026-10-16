@@ -37,15 +37,15 @@ extension OCRProcessor {
     nonisolated static func ocrCallValues(
         for runConfig: SessionProcessingConfig?
     ) -> (rotationMode: RotationMode, standardImageMB: Double, visionSettings: VisionOCRSettings, cascade: OCRCascade,
-          readers: PageReaderPlan) {
+          readers: PageReaderPlan, imported: FarmShareImport?) {
         guard let runConfig else {
             return (SessionProcessingConfig.defaultRotationMode(),
                     SessionProcessingConfig.runSizing().standardImageMB,
                     VisionOCRSettings.fromDefaults(),
-                    OCRCascade.fromDefaults(), .empty)
+                    OCRCascade.fromDefaults(), .empty, nil)
         }
         return (runConfig.rotationMode, runConfig.standardImageMB, runConfig.visionSettings, runConfig.cascade,
-                runConfig.pageReaders)
+                runConfig.pageReaders, runConfig.farmShareImport)
     }
 
     /// Convert any PDF files in the input list to temporary JPEG images.
@@ -403,7 +403,7 @@ extension OCRProcessor {
                         customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
                     )
                     }
                     if activePendingMixedPDF != nil &&
@@ -1385,7 +1385,7 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
             )
 
             // If timed out, retry once without context
@@ -1404,7 +1404,7 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
                 )
             }
 
@@ -1471,7 +1471,7 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
                     )
                     let result = await Self.applyingVisionTextClassification(
                         to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1511,7 +1511,7 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1667,7 +1667,7 @@ extension OCRProcessor {
                     rotationDegrees: result.rotationDegrees,
                     errorMessage: "OCR succeeded but the output PDF could not be written. Check that the "
                                 + "output folder exists and is writable, and that there is free disk space.",
-                    errorCode: "pdf_write_failed", secondReader: result.secondReader, pageReader: result.pageReader)
+                    errorCode: "pdf_write_failed", secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported)
                 jobs[index].status = .failed
             }
             let name = sourceURL.lastPathComponent
@@ -1713,8 +1713,19 @@ extension OCRProcessor {
         visionSettings: VisionOCRSettings = .default,
         cascade: OCRCascade,
         refusalFallback: Bool = true,
-        readers: PageReaderPlan = .empty
+        readers: PageReaderPlan = .empty,
+        imported: FarmShareImport? = nil
     ) async -> OCRResult {
+        // W41.app-farmshare-import: a page a FarmShare bulk run already read is not bought again. Before the rotation
+        // task, which would be a paid call too. Direct providers only, as for the page readers (the run start clears
+        // the import elsewhere); its classification comes from the run's model on the text alone.
+        if let imported, localAgent == nil, gatewayConfig == nil, provider != .appleVision,
+           let reading = imported.result(for: imageURL) {
+            return await applyingVisionTextClassification(
+                to: reading, previousText: previousText, customPrompt: customPrompt,
+                configuration: LLMTextConfiguration(provider: provider, model: model, thinkingLevel: thinkingLevel,
+                                                    apiKey: apiKey))
+        }
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
         // The detected correction overrides the OCR prompt's own rotation guess.
@@ -1900,7 +1911,7 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
             )
 
             // W16.bat11 — there is deliberately NO `jobs[index]` read here.

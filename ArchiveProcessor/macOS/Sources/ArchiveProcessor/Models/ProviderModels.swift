@@ -522,12 +522,16 @@ struct OCRResult: Codable {
     /// W41.app-page-kind — the page's kind and the reader its kind chose (`PageReaderPlan`). `nil` = the page was
     /// not classified; set by `performOCRCall` on every page the run's plan names, routed or not.
     var pageReader: PageReaderRecord?
+    /// W41.app-farmshare-import — set when the text came in from a FarmShare bulk run instead of the run's model
+    /// (`FarmShareImport`). `nil` = read in this run.
+    let imported: ImportedReading?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
-         secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil) {
+         secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil, imported: ImportedReading? = nil) {
         self.secondReader = secondReader
         self.pageReader = pageReader
+        self.imported = imported
         self.text = text
         self.classification = classification
         self.rotationDegrees = rotationDegrees
@@ -559,7 +563,7 @@ struct OCRResult: Codable {
                   errorMessage: errorMessage, errorCode: errorCode,
                   enclosure: classification == self.classification ? enclosure : nil,
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
-                  secondReader: secondReader, pageReader: pageReader)
+                  secondReader: secondReader, pageReader: pageReader, imported: imported)
     }
 }
 

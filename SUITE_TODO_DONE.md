@@ -11538,3 +11538,22 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `-ANUITestIndexPath` is honoured only at the fixture's own `notes-index-v1.sqlite3`. Repeat after a fix batch
   and before `W40.h3`.
   <!-- /W40.e11 -->
+- [x] **W41.app-farmshare-import — take in a FarmShare bulk run's text [S-M · ~1 session · Tier-2]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (lane: processor) (uses: build) (blocked-on: W41.farmshare-run). SHIPPED 2026-10-16.
+  The condition held: FarmShare's truth run measured 95.25 NES against the panel's 94.28. The kit (`fs_ocr.py bulk`)
+  now writes each input file's `sha256`, the served `model`, `preset`, `vllm_args` and Slurm `job` into its `_meta`.
+  The Files tab's **Use FarmShare text…** loads a bulk `--out` folder (`OCR/FarmShareImport.swift`,
+  `Views/OCRView+FarmShare.swift`); `performOCRCall` hashes each page and on a match takes FarmShare's text
+  (`OCRResult.imported` = `ImportedReading`: model, preset, precision, job, kind), rotation 0 and a classification
+  from one text-only call to the run's model. The PDF header reads `FarmShare · Qwen3.6-27B-FP8 (FP8 weights, fp8 KV
+  cache, job N)`; SPEC lists the new free-form provider. Matching is by bytes, never by name (two boxes' `001.jpg`).
+  Unmatched, escalated and failed pages go to the run's model. Applies where the page readers do (direct provider,
+  not batch, gateway, Local Agent, Apple Vision or pre-OCRed); frozen in the run; `PendingRunRuntimeConfig.
+  farmShareFolder` reloads it on resume. Read-only. Tier-2 review (opus): no HIGH; fixed Retry re-importing the
+  same text (`retryOne` now never imports), a `_meta` replaced mid-run (the hash is re-checked at read), the kit's
+  hash raising on an unreadable file and its key order, `--flag=value` and newlines in the header. Left open, in
+  KNOWN_ISSUES: estimates count every page, rotation 0, the panel prompt rather than the Processor's, resume
+  reloading on the main actor, a vanished folder going silently to the model, a classification call per imported
+  page. Tests: `scripts/test-farmshare-import.sh` 28/28; cascade, page-kind, refusal, openrouter, local-models,
+  batch-resume, processing-history, retry-backend all pass; farmshare kit 31 (10 skip). No money; no migration, as
+  there is nothing to migrate.
+  <!-- /W41.app-farmshare-import -->

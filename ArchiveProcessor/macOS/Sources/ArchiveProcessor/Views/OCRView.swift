@@ -73,6 +73,8 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
     /// W41.app-page-kind — each dropped image's kind and the reader it chose.
     @StateObject private var pageKinds = PageKindStore()
+    /// W41.app-farmshare-import — the FarmShare bulk folder the next run takes text from; chosen per run.
+    @State private var farmShareImport: FarmShareImport?
 
     /// The model for the current provider, read live from the shared store so a change made in the
     /// Settings window updates this window's cost estimate — and the model a run launches with —
@@ -167,6 +169,10 @@ struct OCRView: View {
     }
     private var pageKindRunDefault: PageKindRouting.Candidate {
         .init(provider: effectiveModel.provider, modelID: effectiveModel.id)
+    }
+    /// Where a FarmShare import applies: the page readers' runs (a direct provider, not a paid batch).
+    private var farmShareActive: Bool {
+        !useGateway && !useLocalAgent && !useAppleVision && !batchMode && !preOCRedInput
     }
     private var pageReaderPlan: PageReaderPlan {
         pageKindsActive ? pageKinds.plan(droppedFiles, guidance: .bundled, runDefault: pageKindRunDefault) : .empty
@@ -716,6 +722,9 @@ struct OCRView: View {
                             if pageKindsActive && !droppedFiles.isEmpty {
                                 PageKindBatchControl(store: pageKinds, plan: pageReaderPlan,
                                                      runDefault: pageKindRunDefault, runModel: effectiveModel)
+                            }
+                            if farmShareActive && !droppedFiles.isEmpty {
+                                FarmShareImportControl(imported: $farmShareImport)
                             }
                             let cascade = OCRCascade(routeID: ocrCascadeRoute, onDisagreement: ocrCascadeOnDisagreement)
                             if (!useGateway || currentGatewayConfig?.localEscalates == true) && !useLocalAgent && !preOCRedInput,
@@ -1326,6 +1335,7 @@ struct OCRView: View {
         }
         processor.mergeDocuments = mergeDocuments
         processor.pageReaders = pageReaderPlan   // W41.app-page-kind; the run ignores it where it does not apply
+        processor.farmShareImport = farmShareActive ? farmShareImport : nil   // W41.app-farmshare-import
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }

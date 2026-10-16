@@ -162,7 +162,9 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OCRPageKindTestDriver.envKey])
                || testTransportIsEnabled(
-                flag: ProcessInfo.processInfo.environment[LocalModelsTestDriver.envKey]))
+                flag: ProcessInfo.processInfo.environment[LocalModelsTestDriver.envKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[FarmShareImportTestDriver.envKey]))
         else { return nil }
         return stub
     }

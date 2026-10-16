@@ -265,7 +265,10 @@ struct PDFGenerator {
         if let fileName = originalFileName {
             headerLine += "\n\(fileName)"
         }
-        if let reader = result.secondReader {
+        if let imported = result.imported {
+            // W41.app-farmshare-import: a FarmShare bulk run wrote the text — name it, its model, precision and job.
+            headerLine += "\n\(imported.source) \u{00B7} \(imported.headerModel) \u{00B7} \(dateStr)"
+        } else if let reader = result.secondReader {
             // W41.app-ocr-default: Gemini refused this page and another model wrote the text — name that model.
             headerLine += "\n\(reader.provider) \u{00B7} \(reader.model) \u{00B7} \(dateStr)"
         } else if let routed = result.pageReader, routed.isRouted {

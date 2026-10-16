@@ -77,6 +77,9 @@ class OCRProcessor: ObservableObject {
     /// The next run's per-page readers (W41.app-page-kind), set by the file list just before Start; frozen into the
     /// run's config and cleared there. Ignored by batch runs, the gateway and the Local Agent.
     var pageReaders: PageReaderPlan = .empty
+    /// The next run's FarmShare import (W41.app-farmshare-import), set by the Files tab just before Start; frozen
+    /// into the run's config and cleared there, where the page readers apply.
+    var farmShareImport: FarmShareImport? = nil
     /// When true (and rotation detection is on), pause for a dedicated rotation-review pass — separate
     /// from the tagging/segmentation review, and run in every tagging mode. Set from the UI before a run.
     var reviewRotation = false
@@ -602,6 +605,10 @@ class OCRProcessor: ObservableObject {
         /// The run's per-page readers (W41.app-page-kind), so a resumed run reads each page with the reader it was
         /// planned for. Nil reads as none.
         var pageReaders: PageReaderPlan? = nil
+
+        /// The FarmShare bulk folder the run imports text from (W41.app-farmshare-import), reloaded on resume.
+        /// Nil reads as none.
+        var farmShareFolder: String? = nil
     }
 
     struct PendingRun: Codable {

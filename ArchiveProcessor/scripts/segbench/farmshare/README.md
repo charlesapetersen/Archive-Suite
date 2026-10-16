@@ -292,7 +292,14 @@ QOS, GPUs, `--time`, and the number of bulk shards.
 
 - **Input:** a directory tree of images. Exporting page images from the corpus PDFs is a separate step.
 - **Output:** one text file per page, named after the image (`box1/a.jpg` → `box1/a.jpg.txt`), mirroring the
-  input tree. Each page also gets `_meta/<image>.json` with kind, table, tokens and timing.
+  input tree. Each page also gets `_meta/<image>.json` with kind, table, tokens and timing, and (since
+  W41.app-farmshare-import) the input file's `sha256`, the served `model`, the `preset`, its `vllm_args` (the
+  precision) and the Slurm `job`.
+- **Bringing the text into the Processor:** copy the `--out` folder back to the Mac, then in the Files tab choose
+  **Use FarmShare text…** and pick it. A page whose image file has the same bytes as one FarmShare read takes that
+  text (matched by `sha256`, never by name); every other page, escalated ones included, is read by the run's model.
+  So `--in` must hold the very files the Processor will be given (copy them, don't re-encode them). A run from before
+  the hashes were recorded matches nothing. Detail: `ArchiveProcessor/CLAUDE.md` §FarmShare import.
 - **Shards:** one shard per allowed GPU job. Pages are assigned by a hash of their path, so adding files mid-run
   cannot leave a page in no shard.
 - **A dead server:** if eight reads in a row get no answer (vLLM crashed, say), the job stops and queues itself

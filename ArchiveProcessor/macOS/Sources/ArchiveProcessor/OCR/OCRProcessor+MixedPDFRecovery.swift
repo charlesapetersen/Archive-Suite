@@ -230,6 +230,7 @@ extension OCRProcessor {
         config.visionSettings = runtime.visionSettings
         config.cascade = runtime.cascade ?? .off
         config.pageReaders = runtime.pageReaders ?? .empty
+        config.farmShareImport = runtime.farmShareFolder.flatMap { Self.reloadFarmShareImport($0) }
         if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
             config.visionTextLLM = LLMTextConfiguration(
                 provider: provider, model: model,

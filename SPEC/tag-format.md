@@ -157,7 +157,9 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
 
 - `<Provider>` is `model.provider.rawValue` (`Anthropic`/`Google Gemini`/`Mistral`/`OpenAI`/`Apple Vision`/`OpenRouter`; an OpenRouter model's
   name carries its pinned provider and precision, e.g. `Qwen3-VL 235B (deepinfra fp8)`),
-  a custom gateway display name, **or** `Local CLI Agent (<tool>)` for a subscription-authenticated CLI —
+  a custom gateway display name, `FarmShare` for text taken in from a FarmShare bulk run (W41.app-farmshare-import;
+  its model position reads like `Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739)`),
+  **or** `Local CLI Agent (<tool>)` for a subscription-authenticated CLI —
   treat as free-form. A Local Agent's model position is its explicit CLI override or `CLI default`, never
   the selected direct-provider fallback. For example, the on-device backend writes
   `Apple Vision · macOS Vision` in the header's provider/model positions.
