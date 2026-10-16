@@ -1,0 +1,70 @@
+{
+ "pages": 2000,
+ "ok": 1987,
+ "failed": 13,
+ "gpus": 4,
+ "shards": [
+  {
+   "pages": 504,
+   "ok": 503,
+   "wall_s": 2144.5,
+   "pages_per_hour_per_gpu": 846.1
+  },
+  {
+   "pages": 470,
+   "ok": 464,
+   "wall_s": 2142.4,
+   "pages_per_hour_per_gpu": 789.8
+  },
+  {
+   "pages": 504,
+   "ok": 498,
+   "wall_s": 2300.7,
+   "pages_per_hour_per_gpu": 788.6
+  },
+  {
+   "pages": 522,
+   "ok": 520,
+   "wall_s": 2299.0,
+   "pages_per_hour_per_gpu": 817.4
+  },
+  {
+   "pages": 6,
+   "ok": 2,
+   "wall_s": 369.4,
+   "pages_per_hour_per_gpu": 58.5
+  }
+ ],
+ "per_hour_per_gpu": 780.2,
+ "per_hour_total": 3120.8,
+ "failures": {
+  "unparsed (length)": 13
+ },
+ "by_kind": {
+  "typewritten": {
+   "pages": 1202,
+   "failed": 5,
+   "tables": 79,
+   "mean_tokens_out": 473
+  },
+  "printed": {
+   "pages": 487,
+   "failed": 5,
+   "tables": 16,
+   "mean_tokens_out": 792
+  },
+  "mixed": {
+   "pages": 167,
+   "failed": 2,
+   "tables": 10,
+   "mean_tokens_out": 409
+  },
+  "handwritten": {
+   "pages": 144,
+   "failed": 1,
+   "tables": 2,
+   "mean_tokens_out": 223
+  }
+ },
+ "note": "Model: qwen3.6-27b, fp8 KV cache, one L40S per shard, 32 requests in flight per server. wall_s per page is with 32 in flight, so it ranks pages but is not a page time. Kind is the model's own label (90% right on the truth set)."
+}

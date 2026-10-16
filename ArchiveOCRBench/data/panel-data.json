@@ -36,6 +36,13 @@
    "batch": null
   },
   {
+   "id": "qwen3.8-flash",
+   "name": "Qwen3.8 Flash",
+   "panel": "cloud",
+   "std": 0.6,
+   "batch": null
+  },
+  {
    "id": "gpt5.4-mini",
    "name": "GPT-5.4 Mini",
    "panel": "cloud",
@@ -325,6 +332,11 @@
      95,
      96
     ],
+    "qwen3.8-flash": [
+     91.88,
+     93,
+     96
+    ],
     "mistral-medium3.5": [
      90.65,
      96,
@@ -431,6 +443,11 @@
     "qwen3-vl-235b": [
      96.09,
      50,
+     50
+    ],
+    "qwen3.8-flash": [
+     93.42,
+     48,
      50
     ],
     "gpt5.4-mini": [
@@ -571,6 +588,11 @@
      28,
      28
     ],
+    "qwen3.8-flash": [
+     91.27,
+     27,
+     28
+    ],
     "gpt5.4-mini": [
      93.32,
      28,
@@ -706,6 +728,11 @@
     ],
     "qwen3-vl-235b": [
      91.38,
+     16,
+     16
+    ],
+    "qwen3.8-flash": [
+     91.03,
      16,
      16
     ],
@@ -981,5 +1008,233 @@
     "added": 1189
    }
   ]
+ },
+ "farmshare": {
+  "truth": [
+   {
+    "label": "qwen3.6-27b-1849739",
+    "name": "Qwen3.6 27B",
+    "kv": "fp8",
+    "gpus": 1,
+    "nes": 95.25,
+    "ok": 96,
+    "n": 96,
+    "clippings": 93.51,
+    "per_hour": 1054.7,
+    "gpu_hours_100k": 95
+   },
+   {
+    "label": "qwen3.6-27b-1849744",
+    "name": "Qwen3.6 27B",
+    "kv": "bf16",
+    "gpus": 1,
+    "nes": 94.97,
+    "ok": 96,
+    "n": 96,
+    "clippings": 93.6,
+    "per_hour": 903.0,
+    "gpu_hours_100k": 111
+   },
+   {
+    "label": "qwen3.6-35b-a3b-1850004",
+    "name": "Qwen3.6 35B-A3B",
+    "kv": "fp8",
+    "gpus": 1,
+    "nes": 94.51,
+    "ok": 96,
+    "n": 96,
+    "clippings": 94.08,
+    "per_hour": 3327.0,
+    "gpu_hours_100k": 30
+   },
+   {
+    "label": "qwen3.6-27b-dyn-1849745",
+    "name": "Qwen3.6 27B, fp8 at load time",
+    "kv": "fp8",
+    "gpus": 1,
+    "nes": 93.17,
+    "ok": 94,
+    "n": 96,
+    "clippings": 93.6,
+    "per_hour": 649.2,
+    "gpu_hours_100k": 154
+   },
+   {
+    "label": "qwen3.8-27b-1850053",
+    "name": "Qwen3.8 27B",
+    "kv": "fp8",
+    "gpus": 1,
+    "nes": 93.1,
+    "ok": 96,
+    "n": 96,
+    "clippings": 94.45,
+    "per_hour": 1063.2,
+    "gpu_hours_100k": 94
+   }
+  ],
+  "news": [
+   {
+    "label": "qwen3.6-27b-1849746",
+    "how": "whole page",
+    "per_hour": 65.2,
+    "answered": "17/19",
+    "name": "Qwen3.6 27B",
+    "overall": 0.967,
+    "broadsheet": 0.994,
+    "page": 0.949
+   },
+   {
+    "label": "qwen3.6-27b-1850148-doclayout_yolo",
+    "how": "DocLayout-YOLO regions",
+    "per_hour": 58.0,
+    "answered": "19/19",
+    "name": "Qwen3.6 27B",
+    "overall": 0.965,
+    "broadsheet": 0.98,
+    "page": 0.954
+   },
+   {
+    "label": "glm-ocr-1849949-doclayout_yolo",
+    "how": "DocLayout-YOLO regions",
+    "per_hour": 483.8,
+    "answered": "19/19",
+    "name": "GLM-OCR",
+    "overall": 0.959,
+    "broadsheet": 0.973,
+    "page": 0.949
+   },
+   {
+    "label": "glm-ocr-1849949-paddlex",
+    "how": "PP-DocLayout regions",
+    "per_hour": 478.3,
+    "answered": "19/19",
+    "name": "GLM-OCR",
+    "overall": 0.938,
+    "broadsheet": 0.966,
+    "page": 0.92
+   },
+   {
+    "label": "qwen3.6-27b-1850112-paddlex",
+    "how": "PP-DocLayout regions",
+    "per_hour": 64.6,
+    "answered": "19/19",
+    "name": "Qwen3.6 27B",
+    "overall": 0.936,
+    "broadsheet": 0.97,
+    "page": 0.914
+   },
+   {
+    "label": "qwen3.8-27b-1850054",
+    "how": "whole page",
+    "per_hour": 67.4,
+    "answered": "15/19",
+    "name": "Qwen3.8 27B",
+    "overall": 0.893,
+    "broadsheet": 0.827,
+    "page": 0.937
+   }
+  ],
+  "news_reference": [
+   {
+    "label": "ll-doclayout-pvl",
+    "overall": 0.97,
+    "broadsheet": 0.972,
+    "page": 0.968
+   },
+   {
+    "label": "glm-ocr-doclayout",
+    "overall": 0.97,
+    "broadsheet": 0.976,
+    "page": 0.967
+   },
+   {
+    "label": "ll-doclayout-glm",
+    "overall": 0.959,
+    "broadsheet": 0.974,
+    "page": 0.949
+   },
+   {
+    "label": "gpt-5.6-luna-paddlex",
+    "overall": 0.921,
+    "broadsheet": 0.974,
+    "page": 0.885
+   },
+   {
+    "label": "gpt-5.6-luna-wholepage",
+    "overall": 0.503,
+    "broadsheet": 0.378,
+    "page": 0.587
+   }
+  ],
+  "bulk": {
+   "pages": 2000,
+   "ok": 1987,
+   "failed": 13,
+   "gpus": 4,
+   "shards": [
+    {
+     "pages": 504,
+     "ok": 503,
+     "wall_s": 2144.5,
+     "pages_per_hour_per_gpu": 846.1
+    },
+    {
+     "pages": 470,
+     "ok": 464,
+     "wall_s": 2142.4,
+     "pages_per_hour_per_gpu": 789.8
+    },
+    {
+     "pages": 504,
+     "ok": 498,
+     "wall_s": 2300.7,
+     "pages_per_hour_per_gpu": 788.6
+    },
+    {
+     "pages": 522,
+     "ok": 520,
+     "wall_s": 2299.0,
+     "pages_per_hour_per_gpu": 817.4
+    },
+    {
+     "pages": 6,
+     "ok": 2,
+     "wall_s": 369.4,
+     "pages_per_hour_per_gpu": 58.5
+    }
+   ],
+   "per_hour_per_gpu": 780.2,
+   "per_hour_total": 3120.8,
+   "failures": {
+    "unparsed (length)": 13
+   },
+   "by_kind": {
+    "typewritten": {
+     "pages": 1202,
+     "failed": 5,
+     "tables": 79,
+     "mean_tokens_out": 473
+    },
+    "printed": {
+     "pages": 487,
+     "failed": 5,
+     "tables": 16,
+     "mean_tokens_out": 792
+    },
+    "mixed": {
+     "pages": 167,
+     "failed": 2,
+     "tables": 10,
+     "mean_tokens_out": 409
+    },
+    "handwritten": {
+     "pages": 144,
+     "failed": 1,
+     "tables": 2,
+     "mean_tokens_out": 223
+    }
+   },
+   "note": "Model: qwen3.6-27b, fp8 KV cache, one L40S per shard, 32 requests in flight per server. wall_s per page is with 32 in flight, so it ranks pages but is not a page time. Kind is the model's own label (90% right on the truth set)."
+  }
  }
 }

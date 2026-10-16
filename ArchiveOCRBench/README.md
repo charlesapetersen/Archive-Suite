@@ -1,8 +1,8 @@
 # ArchiveOCRBench
 
-What the bench has measured, as one page you can read and share. It has three parts:
+What the bench has measured, as one page you can read and share. It has four parts:
 
-1. **OCR.** The W41 OCR panel: twenty-four hosted routes read the same 96 adjudicated truth pages, and each is
+1. **OCR.** The W41 OCR panel: twenty-five hosted routes read the same 96 adjudicated truth pages, and each is
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
    handwritten pages. Two more routes ran the same pages on our own hardware and are drawn in the free column:
    Qwen3-VL 8B at 4-bit on the owner's Mac, and Qwen3.6 27B at fp8 on one L40S on Stanford FarmShare.
@@ -11,6 +11,10 @@ What the bench has measured, as one page you can read and share. It has three pa
    table, the checks per 100 pages each needs, the pages right after checking, and the errors left unflagged.
 3. **Handwriting on the Mac.** The on-device handwriting readers the Vision OCR lab measured on its own 19
    handwritten truth pages, as missed and added words. A different truth set and score from part 1.
+4. **FarmShare.** Open-weight models served on Stanford's FarmShare GPUs, one L40S each: the same 96 truth pages
+   scored as part 1 scores them, with photos an hour in place of price (FarmShare costs nothing); NewsBench's
+   newspaper pages read whole and through a layout detector, scored by NewsBench; and a 2,000-page run on the real
+   corpus. Read from `ArchiveProcessor/segbench-results/farmshare/` (`build.py` → `farmshare()`).
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet

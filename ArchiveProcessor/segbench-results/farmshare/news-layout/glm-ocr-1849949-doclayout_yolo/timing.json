@@ -1,0 +1,127 @@
+{
+ "label": "glm-ocr-1849949-doclayout_yolo",
+ "detector": "doclayout_yolo",
+ "reader": "glm",
+ "model": "zai-org/GLM-OCR",
+ "workers": 8,
+ "pages": 19,
+ "ok": 19,
+ "wall_s": 141.4,
+ "pages_per_hour_per_gpu": 483.8,
+ "per_page": [
+  {
+   "page": "mss3413200223-28",
+   "seconds": 44.4,
+   "chars": 30009,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201283-24",
+   "seconds": 25.9,
+   "chars": 12672,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201309-4",
+   "seconds": 29.6,
+   "chars": 17505,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201315-4",
+   "seconds": 23.6,
+   "chars": 15056,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201322-4",
+   "seconds": 26.2,
+   "chars": 16750,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201323-27",
+   "seconds": 27.8,
+   "chars": 18788,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201417-17",
+   "seconds": 42.7,
+   "chars": 30852,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201417-20",
+   "seconds": 40.8,
+   "chars": 22728,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201417-25",
+   "seconds": 40.6,
+   "chars": 30114,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201417-29",
+   "seconds": 40.8,
+   "chars": 28261,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201573-36",
+   "seconds": 25.4,
+   "chars": 17967,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201628-41",
+   "seconds": 41.9,
+   "chars": 27378,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201776-3",
+   "seconds": 65.7,
+   "chars": 51914,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201819-6",
+   "seconds": 25.1,
+   "chars": 15647,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201856-23",
+   "seconds": 93.1,
+   "chars": 60823,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201856-40",
+   "seconds": 91.6,
+   "chars": 63147,
+   "status": "ok"
+  },
+  {
+   "page": "mss3413201879-7",
+   "seconds": 21.6,
+   "chars": 14733,
+   "status": "ok"
+  },
+  {
+   "page": "mss425490669-55",
+   "seconds": 20.7,
+   "chars": 10701,
+   "status": "ok"
+  },
+  {
+   "page": "mss83434402-9",
+   "seconds": 42.0,
+   "chars": 26608,
+   "status": "ok"
+  }
+ ]
+}

@@ -7,11 +7,14 @@
 
 preset() {
   FS_PRESET="$1"
-  local len="${FS_MAX_LEN:-16384}" FS_EXTRA="" kv="${FS_KV_DTYPE:-fp8}" util=0.92 seqs="${FS_MAX_SEQS:-32}"
+  local len="${FS_MAX_LEN:-16384}" FS_EXTRA="" kv="${FS_KV_DTYPE:-fp8}" util="${FS_GPU_UTIL:-0.92}" seqs="${FS_MAX_SEQS:-32}"
   FS_LAYOUT=0 FS_DET_REPO="" FS_DET_FILE=""
   case "$1" in
     qwen3.6-27b)       # first choice. Panel 94.28 (Chutes fp8). Official block-FP8 checkpoint.
       FS_MODEL=Qwen/Qwen3.6-27B-FP8; FS_GPUS=1; FS_DISK_GB=31 ;;
+    qwen3.8-27b)       # Qwen3.6 27B's successor (Aug 2026), same Qwen3.5 architecture and block-FP8 checkpoint.
+                       # Measured 2026-10-15: 93.10 NES (Qwen3.6 27B 95.25) at the same speed; weaker on newspapers.
+      FS_MODEL=Qwen/Qwen3.8-27B-FP8; FS_GPUS=1; FS_DISK_GB=31 ;;
     qwen3.6-27b-dyn)   # fallback if this vLLM cannot run block-FP8 on Ada: bf16 weights, fp8 at load time.
       FS_MODEL=Qwen/Qwen3.6-27B; FS_GPUS=1; FS_DISK_GB=56; FS_EXTRA="--quantization fp8" ;;
     qwen3.6-35b-a3b)   # fast MoE (3B active). Panel 93.02 (DeepInfra fp8), 96/96 completed.
@@ -31,7 +34,7 @@ preset() {
       FS_DET_REPO=juliozhao/DocLayout-YOLO-DocStructBench-imgsz1280-2501   # newspaper-ocr 0.11.0's default variant
       FS_DET_FILE=doclayout_yolo_docstructbench_imgsz1280_2501.pt
       [ "${FS_GLM_MTP:-1}" = 0 ] || FS_EXTRA='--speculative-config {"method":"mtp","num_speculative_tokens":1}' ;;
-    *) echo "unknown preset '$1' (qwen3.6-27b qwen3.6-27b-dyn qwen3.6-35b-a3b qwen3-vl-8b qwen3.5-27b qwen3.5-122b-a10b glm-ocr)" >&2
+    *) echo "unknown preset '$1' (qwen3.6-27b qwen3.8-27b qwen3.6-27b-dyn qwen3.6-35b-a3b qwen3-vl-8b qwen3.5-27b qwen3.5-122b-a10b glm-ocr)" >&2
        return 2 ;;
   esac
   # max-model-len must hold the prompt (~4,900 tokens) plus max_tokens (8192), or vLLM refuses every page.

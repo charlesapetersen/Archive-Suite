@@ -2,7 +2,7 @@
 
 Question 2 of the W41 bake-off: how the paid and subscription leaders read the 99 frozen truth pages, with the [local panel](ocr-panel-local.md)’s images, prompt and scoring unchanged. Owner approval, second walkthrough 2026-10-15: the full panel, with Claude and OpenAI on the subscriptions, a $9 paid cap on top of the $0.312 pilot ([pilot report](ocr-panel-cloud-pilot.md)).
 
-**Item spend: $5.798787** of the $9.31 item cap: the pilot’s $0.312211, $5.090576 of OpenRouter calls in the full run, and $0.396 of Mistral OCR (99 pages at the published $4/1000). Outstanding reservations $0.000000. The owner’s own interactive Mistral check (one synthetic page, about $0.004) is outside this ledger.
+**Item spend: $5.858600** of the $9.31 item cap: the pilot’s $0.312211, $5.150389 of OpenRouter calls in the full run, and $0.396 of Mistral OCR (99 pages at the published $4/1000). Outstanding reservations $0.000000. The owner’s own interactive Mistral check (one synthetic page, about $0.004) is outside this ledger.
 
 ## Findings
 
@@ -37,6 +37,7 @@ The local panel’s [normalization, NES, chrF2 and word rates](ocr-panel-local.m
 | gemini3.5-flash-lite · OpenRouter google-ai-studio | 94/96/96 | 93.13 | 94.85 | 4.38 | 2.09 | 82 | $0.00157 |
 | mistral-ocr-4-1 · Mistral OCR API, app client | 96/96/96 | 92.91 | 94.50 | 4.07 | 4.09 | — | $0.00400 |
 | gpt5.6-luna · OpenRouter openai | 95/96/96 | 92.13 | 93.21 | 4.80 | 2.73 | 73 | $0.00141 |
+| qwen3.8-flash · OpenRouter alibaba | 93/96/96 | 91.88 | 92.69 | 6.74 | 2.42 | 92 | $0.00060 |
 | mistral-medium3.5 · OpenRouter mistral | 96/96/96 | 90.65 | 92.56 | 5.60 | 5.13 | 94 | $0.00729 |
 
 The local panel on the same 96 pages, for comparison (its own report has the detail):
@@ -71,6 +72,7 @@ The local panel on the same 96 pages, for comparison (its own report has the det
 | gemini3.5-flash-lite | 94/96 | 95.11 | 78.18 (3/3) |
 | mistral-ocr-4-1 | 96/96 | 92.91 | 72.39 (3/3) |
 | gpt5.6-luna | 95/96 | 93.10 | 31.85 (2/3) |
+| qwen3.8-flash | 93/96 | 94.84 | 75.93 (3/3) |
 | mistral-medium3.5 | 96/96 | 90.65 | 46.51 (3/3) |
 
 ## Measured paid calls (full run, pilot pages reused)
@@ -87,6 +89,7 @@ The local panel on the same 96 pages, for comparison (its own report has the det
 | qwen3.5-397b | 96 | 0 | $0.1918 | 1337/466/0 |
 | qwen3-vl-235b | 96 | 0 | $0.1168 | 4099/451/0 |
 | gpt5.6-luna | 96 | 2 | $0.1347 | 3072/530/0 |
+| qwen3.8-flash | 99 | 3 | $0.0598 | 2691/458/0 |
 
 claude-sonnet5.5 through `claude -p`: 99 pages, 0 harness retries, mean 47907 input tokens (Claude Code’s system prompt and tools included, mostly cached) and 816 output tokens a page, mean 10 s a page at three at once. Subscription usage, not money.
 

@@ -4,7 +4,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Public+Sans:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
 <style>
 /* Layout: one reading column. Part 1, four OCR chart panels sharing one numbered route key; part 2, segmentation
-   (one chart and its table); part 3, the Vision OCR lab's on-device handwriting readers (a table). */
+   (one chart and its table); part 3, the Vision OCR lab's on-device handwriting readers (a table); part 4, the
+   same truth pages and NewsBench read on Stanford's FarmShare GPUs (two tables). */
 :root {
   --bg: #fbfbfa; --panel: #ffffff; --fg: #1b1d22; --fg-2: #4d525c; --muted: #8a8f99;
   --rule: #e3e4e8; --grid: #ececef; --accent: #2457c5; --other: #8f939c;
@@ -63,7 +64,7 @@ footer p { font-size: 13px; }
   <header class="lede">
     <div class="eyebrow">Archive Suite · what the bench has measured</div>
     <h1>Archive OCR bench</h1>
-    <p>Three parts: the W41 OCR panel (<span id="nroutes"></span> routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), and the on-device handwriting readers the Vision OCR lab measured. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
+    <p>Four parts: the W41 OCR panel (<span id="nroutes"></span> routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), the on-device handwriting readers the Vision OCR lab measured, and open-weight models run on Stanford's FarmShare GPUs. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
   </header>
 
   <header class="part" id="ocr">
@@ -113,6 +114,22 @@ footer p { font-size: 13px; }
     <div class="head"><h2>Missed and added words</h2><span class="meta" id="hw-meta"></span></div>
     <div class="tbl"><table><thead><tr><th>Reader</th><th></th><th>Missed per 1,000</th><th>Added words</th><th>Passes the bar</th><th>Seconds a page</th><th>Peak memory</th><th>Download</th></tr></thead><tbody id="hw-rows"></tbody></table></div>
     <p class="note">A different truth set and a different score from part 1, so these numbers do not compare with NES. Missed words are truth words the reader did not produce; added words are words it produced that match no truth word. The pick rule was set before the run: of the readers that pass, take the fewest missed, but where two are within 20 per 1,000, take the smaller and faster. Qwen3.5-9B and LightOnOCR-3-4B are 5 apart, so LightOnOCR-3-4B, which is nearly twice as fast, is the pick (owner confirmed 2026-10-15, Vision OCR commit 168af14). Churro's added words come from one page that looped. As read, neither model returns word positions, and the app's alignment places only 65% of their words, so handwritten pages will get a separate text page. <span id="hw-source"></span></p>
+  </section>
+
+  <header class="part" id="farmshare">
+    <div class="eyebrow">Part 4 · Open-weight models on FarmShare · one L40S each</div>
+    <h2>The same pages on Stanford's GPUs</h2>
+    <p id="fs-lede"></p>
+  </header>
+  <section class="panel" id="fs-truth">
+    <div class="head"><h2>Archive photos: the 96 truth pages</h2><span class="meta">vLLM 0.31 · no money spent</span></div>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>KV cache</th><th>NES %</th><th>Answered</th><th>Clippings NES %</th><th>Photos an hour per GPU</th><th>GPU-hours per 100,000 photos</th></tr></thead><tbody id="fs-truth-rows"></tbody></table></div>
+    <p class="note">Scored exactly as part 1 scores the panel: the frozen panel images, its prompt and its NES. FarmShare costs nothing, so speed stands where price stands in part 1; your account may run 4 GPUs at once. Source: <code>ArchiveProcessor/segbench-results/farmshare/truth/</code>.</p>
+  </section>
+  <section class="panel" id="fs-news">
+    <div class="head"><h2>Newspapers: NewsBench's 15 scored broadsheet pages</h2><span class="meta">NewsBench score.py · overall = 1 − CER</span></div>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>How the page is read</th><th>Overall</th><th>Broadsheet</th><th>Page</th><th>Pages answered</th><th>Pages an hour per GPU</th></tr></thead><tbody id="fs-news-rows"></tbody></table></div>
+    <p class="note">Full Library of Congress newspaper pages, scored by NewsBench's own scorer, not NES, so these do not compare with the tables above. "Regions" means newspaper-ocr's layout detector cut the page first and each region was read alone. Reference rows are NewsBench's published results, made elsewhere. Source: <code>ArchiveProcessor/segbench-results/farmshare/news/</code>.</p>
   </section>
 
   <footer>
@@ -268,6 +285,21 @@ document.getElementById('hw-rows').innerHTML = HW.readers.map(r => '<tr class="'
   '</td><td>' + gb(r.download_gb) + '</td></tr>').join('') +
   HW.reference.map(r => '<tr><td>' + r.name + '</td><td>today</td><td>' + r.missed + '</td><td>' + r.added.toLocaleString() + '</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>').join('');
 document.getElementById('hw-source').innerHTML = 'Source: <a href="' + HW.source.url + '">' + HW.source.file + '</a> (Vision OCR, commit ' + HW.source.commit + ').';
+
+// Part 4: FarmShare.
+const FS = DATA.farmshare;
+const n0 = v => Math.round(v).toLocaleString();
+const best = FS.truth[0];
+document.getElementById('fs-lede').textContent = 'Open-weight models served on one FarmShare L40S each. The best, ' + best.name + ', scored ' +
+  best.nes.toFixed(2) + ' NES with every page answered, at ' + n0(best.per_hour) + ' photos an hour, which is about ' + n0(best.gpu_hours_100k) +
+  ' GPU-hours for 100,000 photos.' + (FS.bulk ? ' On ' + FS.bulk.pages.toLocaleString() + ' real corpus pages across ' + FS.bulk.gpus + ' GPUs it read ' +
+  n0(FS.bulk.per_hour_total) + ' pages an hour in all, with ' + FS.bulk.failed + ' failed.' : '');
+document.getElementById('fs-truth-rows').innerHTML = FS.truth.map(r => '<tr><td>' + r.name + '</td><td>' + r.kv + '</td><td>' + r.nes.toFixed(2) +
+  '</td><td>' + r.ok + '/' + r.n + '</td><td>' + r.clippings.toFixed(2) + '</td><td>' + n0(r.per_hour) + '</td><td>' + n0(r.gpu_hours_100k) + '</td></tr>').join('');
+document.getElementById('fs-news-rows').innerHTML = FS.news.map(r => '<tr><td>' + r.name + '</td><td>' + r.how + '</td><td>' + r.overall.toFixed(3) +
+  '</td><td>' + r.broadsheet.toFixed(3) + '</td><td>' + r.page.toFixed(3) + '</td><td>' + r.answered + '</td><td>' + n0(r.per_hour) + '</td></tr>').join('') +
+  FS.news_reference.map(r => '<tr><td>' + r.label + '</td><td>reference</td><td>' + r.overall.toFixed(3) + '</td><td>' + r.broadsheet.toFixed(3) +
+  '</td><td>' + r.page.toFixed(3) + '</td><td>—</td><td>—</td></tr>').join('');
 
 Chart.defaults.font.family = css('--body');
 render();

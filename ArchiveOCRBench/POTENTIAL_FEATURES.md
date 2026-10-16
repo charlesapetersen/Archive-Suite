@@ -1,6 +1,7 @@
 # ArchiveOCRBench — potential features
 
-Presentation ideas not yet built. None is queued. New measured results are not on this list: the standing rule
+Presentation ideas not yet built. None is queued, except where noted: page difficulty, failures apart from
+accuracy and a routing rule are queued as `W41.bench-difficulty` in `SUITE_TODO.md`. New measured results are not on this list: the standing rule
 in the root `CLAUDE.md` (owner, 2026-10-15) adds those as they land. That includes the FarmShare run (priced from
 its measured pages per hour per GPU) and the Mac-local 4-bit run.
 - **Measure Sonnet's API price.** Replace the estimate in `data/inputs.json` with a token count from the API's

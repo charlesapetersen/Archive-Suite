@@ -4,6 +4,7 @@
 #   bash submit.sh seg   qwen3.5-27b --pack ~/fs-segpack    # segmentation's Deaver windows (fs_seg.py pack)
 #   bash submit.sh news  PRESET                              # NewsBench's 19 Library of Congress pages
 #   bash submit.sh bulk  PRESET --in DIR --out DIR [--shards N]
+#   bash submit.sh news-layout PRESET                        # NewsBench by regions for a general model (fs_news_layout.py)
 # PRESET glm-ocr reads layout-first (DocLayout-YOLO + GLM-OCR per region) in any mode; it needs setup.sh --layout.
 # Options: --hours H (capped at the cluster's limit), --dry-run (print the sbatch line only).
 set -euo pipefail
@@ -12,7 +13,7 @@ FS_DIR="$(pwd)"
 [ -f limits.env ] && [ -f fs.env ] || { echo "run setup.sh first"; exit 1; }
 source limits.env; source fs.env; source models.sh
 
-FS_MODE="${1:?mode: truth|seg|news|bulk}"; FS_PRESET_NAME="${2:?preset (see models.sh)}"; shift 2
+FS_MODE="${1:?mode: truth|seg|news|news-layout|bulk}"; FS_PRESET_NAME="${2:?preset (see models.sh)}"; shift 2
 hours="" dry="" FS_PACK="" FS_IN="" FS_OUT="" FS_SHARDS=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -28,6 +29,9 @@ done
 [ "$FS_MODE" = news ] && export FS_MAX_LEN="${FS_MAX_LEN:-32768}"  # 10k image tokens + up to 16k of text
 # A segmentation window is up to seven pages (method_window.WINDOW) in one prompt: at most 11,734 prompt tokens on
 # OpenRouter, plus 3,000 for the retry. 16,384 would leave too little room if vLLM counts the images higher.
+# A detector beside vLLM on the same GPU (DocLayout-YOLO took 3.95 GB): at 92% vLLM ran out of memory partway and the
+# later regions came back blank (2026-10-15), so news-layout serves at 80%, as the glm-ocr preset does.
+[ "$FS_MODE" = news-layout ] && export FS_GPU_UTIL="${FS_GPU_UTIL:-0.80}"
 [ "$FS_MODE" = seg ] && export FS_MM_IMAGES=7 FS_MAX_LEN="${FS_MAX_LEN:-20480}"
 preset "$FS_PRESET_NAME"
 
@@ -42,7 +46,11 @@ case "$FS_MODE" in
          want_model="$("$FS_PY" -c 'import json, sys; print(json.load(open(sys.argv[1]))["model"])' "$FS_PACK/pack.json")"
          [ "$want_model" = "$FS_MODEL" ] || { echo "the pack is for $want_model; preset $FS_PRESET_NAME serves $FS_MODEL"; exit 2; }
          default_min=60 ;;
-  news)  if [ ! -d "$FS_ROOT/newsbench" ]; then  # public domain scans + CC0 text; the commit the Vision OCR lab scored
+  news|news-layout)
+         if [ "$FS_MODE" = news-layout ] && [ ! -x "$FS_ROOT/npo-venv/bin/python" ]; then
+           echo "news-layout needs its newspaper-ocr venv: bash setup-layout.sh"; exit 2
+         fi
+         if [ ! -d "$FS_ROOT/newsbench" ]; then  # public domain scans + CC0 text; the commit the Vision OCR lab scored
            git clone -q https://github.com/nealcaren/newsbench.git "$FS_ROOT/newsbench"
            git -C "$FS_ROOT/newsbench" checkout -q 2372b6b6c63e71c7eb43e34ef655c8f5c4f1620b
          fi
@@ -53,7 +61,7 @@ case "$FS_MODE" in
          cap=$(( FS_MAXGPU_PU / FS_GPUS )); [ "$FS_MAXJOBS_PU" -lt "$cap" ] && cap="$FS_MAXJOBS_PU"
          [ "$FS_MAXSUBMIT_PU" -lt "$cap" ] && cap="$FS_MAXSUBMIT_PU"
          FS_SHARDS="${FS_SHARDS:-$cap}" ;;
-  *) echo "mode must be truth, seg, news or bulk"; exit 2 ;;
+  *) echo "mode must be truth, seg, news, news-layout or bulk"; exit 2 ;;
 esac
 want=$(awk -v h="${hours:-0}" 'BEGIN { printf "%d", h * 60 }'); [ "$want" -gt 0 ] || want="$default_min"
 FS_WALL_MIN=$(( want < FS_MAXWALL_MIN ? want : FS_MAXWALL_MIN ))

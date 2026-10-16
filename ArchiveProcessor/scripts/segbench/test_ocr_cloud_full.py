@@ -37,7 +37,10 @@ class Full(unittest.TestCase):
         self.assertNotIn('gpt5.6-sol', F.PAID)  # Sol runs only by subscription (owner)
         self.assertNotIn('claude-sonnet5.5', F.PAID)
         for k in F.PAID:
-            self.assertEqual(F.PAID[k], C.MODELS[k])  # the pilot's exact routes
+            # the pilot's exact routes, plus the one route added to the full panel alone (never the pilot)
+            self.assertEqual(F.PAID[k], F.ADDED[k] if k in F.ADDED else C.MODELS[k])
+        self.assertEqual(set(F.ADDED), {'qwen3.8-flash'})
+        self.assertFalse(set(F.ADDED) & set(C.MODELS))
 
     def test_manifest_refuses_anything_but_99_originals_and_the_approved_routes(self):
         for alter in ('short', 'dup', 'ladder', 'cap', 'sub'):

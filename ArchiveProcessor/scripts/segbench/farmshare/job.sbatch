@@ -45,6 +45,14 @@ case "$FS_MODE" in
   # One folder per preset, not per job: a resubmission after exit 75 sends only the windows still unanswered.
   seg)   "$FS_PY" fs_seg.py run --pack "$FS_PACK" --out "$FS_ROOT/runs/seg" --label "$FS_PRESET_NAME" --warmup ;;
   news)  "$FS_PY" fs_ocr.py news --newsbench "$FS_ROOT/newsbench" --out "$FS_ROOT/runs/news" --label "$label" ;;
+  news-layout)  # a general model (served here) reading newspaper-ocr's regions, in its own venv (fs_news_layout.py)
+    "$FS_ROOT/npo-venv/bin/python" fs_news_layout.py --newsbench "$FS_ROOT/newsbench" --out "$FS_ROOT/runs/news-layout" \
+      --label "$label" --base-url "$FS_URL/v1" --model "$FS_MODEL" --reader openai \
+      --detectors ${FS_DETECTORS:-doclayout_yolo paddlex} --workers "${FS_LAYOUT_WORKERS:-8}"
+    # newspaper-ocr leaves a region blank when its request fails, so a page can look read while most of it is missing
+    # (a vLLM crash did that on 2026-10-15). vLLM's own log says how many requests failed.
+    echo "vLLM: $(grep -c 'chat/completions HTTP/1.1" 200' "$log") requests answered, $(grep -c 'chat/completions HTTP/1.1" [45]' "$log") refused"
+    if grep -q "EngineDeadError" "$log"; then echo "vLLM's engine died during the run: regions after that came back blank"; exit 1; fi ;;
   bulk)
     # Stop sending new pages 15 min before the wall limit, so the job ends itself instead of being killed.
     deadline=$(( start + FS_WALL_MIN * 60 - 900 ))
@@ -59,5 +67,5 @@ case "$FS_MODE" in
       exit 0
     fi
     exit $rc ;;
-  *) echo "FS_MODE must be truth, seg, news or bulk"; exit 2 ;;
+  *) echo "FS_MODE must be truth, seg, news, news-layout or bulk"; exit 2 ;;
 esac

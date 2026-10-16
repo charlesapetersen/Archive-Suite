@@ -40,6 +40,10 @@ MISTRAL_RESERVE = PAGES * .004  # held apart from every chat reservation, as in 
 PAID = {k: C.MODELS[k] for k in ('gemini3.1-pro', 'gemini3.5-flash', 'gemini3.8-flash', 'gemini3.5-flash-lite',
                                  'gpt5.4-mini', 'mistral-medium3.5', 'mistral-large4', 'qwen3.5-397b',
                                  'qwen3-vl-235b', 'gpt5.6-luna')}
+# Added to the full panel only, never the pilot (owner, 2026-10-15): Qwen3.8 Flash-Next, whose 185 GB of weights cannot
+# fit a FarmShare node. Alibaba is its one provider (precision unpublished); reasoning off. Called once, 2026-10-15.
+ADDED = {'qwen3.8-flash': ('qwen/qwen3.8-flash', 'alibaba', None, 'off', None)}
+PAID.update(ADDED)
 CODEX_BIN = '/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'
 CLAUDE_BIN = '/Users/cp1/.local/bin/claude'
 USAGE_SH = Path(__file__).resolve().parents[3] / 'ops/autonomous/usage-window.sh'
@@ -135,7 +139,7 @@ def fallback_added(old, new):
     called = {r['key'] for r in P.records() if not r.get('pilot')}
     return ({**old, 'models': None} == {**new, 'models': None}
             and all(old['models'][k] == new['models'].get(k) for k in old['models'])
-            and all(k in C.MODELS and new['models'][k] == json.loads(json.dumps(C.MODELS[k])) for k in added)
+            and all(new['models'][k] == json.loads(json.dumps({**C.MODELS, **ADDED}.get(k))) for k in added)
             and not added & called)
 
 

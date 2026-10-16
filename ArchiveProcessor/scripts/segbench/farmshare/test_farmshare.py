@@ -559,5 +559,44 @@ class Seg(unittest.TestCase):
         self.assertIn('--limit-mm-per-prompt {"image":1}', ocr)
 
 
+
+class NewsLayout(unittest.TestCase):
+    """fs_news_layout.py with a stand-in pipeline: one file per page where NewsBench's score.py looks, failures kept."""
+
+    def test_writes_each_page_and_records_failures(self):
+        import fs_news_layout as N
+
+        class Pipe:
+            def ocr(self, path):
+                if 'bad' in path:
+                    raise RuntimeError('detector fell over')
+                if 'blank' in path:
+                    return '  \n'
+                return 'text of ' + Path(path).stem
+
+        with tempfile.TemporaryDirectory() as d:
+            nb = Path(d) / 'newsbench'
+            (nb / 'images').mkdir(parents=True)
+            for stem in ('a', 'b', 'bad', 'blank'):
+                (nb / 'images' / f'{stem}.jpg').write_bytes(b'x')
+            orig = N.build_pipeline
+            N.build_pipeline = lambda *a: Pipe()
+            try:
+                args = type('A', (), {'newsbench': str(nb), 'out': str(Path(d) / 'runs'), 'label': 'L', 'reader': 'openai',
+                                      'base_url': 'http://x/v1', 'model': 'M', 'workers': 2})()
+                s = N.run_detector(args, 'paddlex', sorted((nb / 'images').glob('*.jpg')))
+            finally:
+                N.build_pipeline = orig
+            self.assertEqual((s['pages'], s['ok'], s['empty']), (4, 2, 1))
+            txt = nb / 'ocr-results' / 'L-paddlex'
+            self.assertEqual((txt / 'a.txt').read_text(), 'text of a')
+            self.assertEqual((txt / 'bad.txt').read_text(), '')          # scored as an empty reading
+            timing = json.loads((Path(d) / 'runs' / 'L-paddlex' / 'timing.json').read_text())
+            status = {p['page']: p['status'] for p in timing['per_page']}
+            self.assertTrue(status['bad'].startswith('error: RuntimeError'))
+            self.assertEqual(status['blank'], 'empty')
+            self.assertNotIn('text of', json.dumps(timing))               # no transcript text in what comes back
+
+
 if __name__ == '__main__':
     unittest.main()

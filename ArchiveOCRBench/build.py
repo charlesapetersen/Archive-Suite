@@ -159,6 +159,63 @@ def handwriting():
     return {k: hw[k] for k in ("pages", "words", "bar", "source", "readers", "reference")}
 
 
+FARMSHARE_ROOT = RESULTS / "farmshare"
+PRESET_NAMES = {"qwen3.6-27b": "Qwen3.6 27B", "qwen3.6-27b-dyn": "Qwen3.6 27B, fp8 at load time",
+                "qwen3.6-35b-a3b": "Qwen3.6 35B-A3B", "qwen3.8-27b": "Qwen3.8 27B", "glm-ocr": "GLM-OCR",
+                "qwen3.5-122b-a10b": "Qwen3.5 122B-A10B"}
+
+
+def newsbench_table():
+    """NewsBench's own score.py table as the run left it: {label: (overall, broadsheet, page)}."""
+    out = {}
+    for line in (FARMSHARE_ROOT / "news" / "newsbench-score.txt").read_text().splitlines():
+        f = line.split()
+        if len(f) == 8 and f[-1] == "15":
+            out[f[0]] = tuple(float(x) for x in f[1:4])
+    return out
+
+
+def farmshare():
+    """The FarmShare runs (W41.farmshare-run and after): one L40S each unless noted, no money spent. Truth runs
+    from their summary.json; newspaper runs from NewsBench's own scores of what each run wrote."""
+    truth = []
+    for f in sorted((FARMSHARE_ROOT / "truth").glob("*/summary.json")):
+        s = json.loads(f.read_text())
+        env, t = s["env"], s["throughput"]
+        kv = re.search(r"--kv-cache-dtype (\S+)", env.get("FS_VLLM_ARGS", ""))
+        a = s["accuracy_96"]
+        truth.append({"label": s["label"], "name": PRESET_NAMES.get(env["FS_PRESET"], env["FS_PRESET"]),
+                      "kv": "bf16" if kv and kv.group(1) == "auto" else (kv.group(1) if kv else "?"),
+                      "gpus": t["gpus"], "nes": round(100 * a["nes"], 2), "ok": a["ok"], "n": a["n"],
+                      "clippings": round(100 * s["clippings"]["nes"], 2), "per_hour": t["pages_per_hour_per_gpu"],
+                      "gpu_hours_100k": round(100000 / t["pages_per_hour_per_gpu"] * t["gpus"])})
+    truth.sort(key=lambda r: -r["nes"])
+    nb = newsbench_table()
+    news = []
+    for f in sorted((FARMSHARE_ROOT / "news").glob("*/summary.json")):
+        s = json.loads(f.read_text())
+        news.append({"label": s["label"], "how": "whole page", "per_hour": s["throughput"]["pages_per_hour_per_gpu"],
+                     "answered": f"{s['throughput']['ok']}/{s['throughput']['pages']}"})
+    for f in sorted((FARMSHARE_ROOT / "news-layout").glob("*/timing.json")):
+        s = json.loads(f.read_text())
+        news.append({"label": s["label"], "how": {"doclayout_yolo": "DocLayout-YOLO regions",
+                                                   "paddlex": "PP-DocLayout regions"}[s["detector"]],
+                     "per_hour": s["pages_per_hour_per_gpu"], "answered": f"{s['ok']}/{s['pages']}"})
+    for r in news:
+        preset = re.sub(r"-\d+(-(doclayout_yolo|paddlex))?$", "", r["label"])
+        r["name"] = PRESET_NAMES.get(preset, preset)
+        if r["label"] not in nb:
+            sys.exit(f"no NewsBench score for {r['label']}: rerun score.py into newsbench-score.txt")
+        r["overall"], r["broadsheet"], r["page"] = nb[r["label"]]
+    news.sort(key=lambda r: -r["overall"])
+    refs = [{"label": k, "overall": nb[k][0], "broadsheet": nb[k][1], "page": nb[k][2]}
+            for k in ("ll-doclayout-pvl", "glm-ocr-doclayout", "ll-doclayout-glm", "gpt-5.6-luna-paddlex",
+                      "gpt-5.6-luna-wholepage") if k in nb]
+    bulk_f = FARMSHARE_ROOT / "bulk" / "summary.json"
+    return {"truth": truth, "news": news, "news_reference": refs,
+            "bulk": json.loads(bulk_f.read_text()) if bulk_f.exists() else None}
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -227,7 +284,8 @@ def main():
                 or any(e["scores"][c["key"]][2] != c["n"] for e in extra):
             sys.exit(f"a FarmShare run's {c['key']} page count differs from the panel's {c['n']}")
 
-    built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting()}
+    built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting(),
+             "farmshare": farmshare()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page}
 

@@ -16,26 +16,48 @@ run, no transcript text).
 | **`qwen3.6-27b`, fp8 KV cache (the default)** | **95.25** | 96/96 | 93.51 | **1,055** |
 | `qwen3.6-27b`, `FS_KV_DTYPE=auto` (bf16 KV cache) | 94.97 | 96/96 | | 903 |
 | `qwen3.6-27b-dyn`, fp8 KV cache | 93.17 | 94/96 | 93.60 | 649 |
+| `qwen3.6-35b-a3b`, fp8 KV cache (the speed option) | 94.51 | 96/96 | 94.08 | **3,327** |
+| `qwen3.8-27b`, fp8 KV cache (Qwen3.6 27B's successor) | 93.10 | 96/96 | 94.45 | 1,063 |
 | the panel's hosted run (Chutes fp8, for comparison) | 94.28 | 95/96 | 93.71 | |
 
 - **The default is the one to use.** It answered every page and reads as well as the hosted run did on the pages
   that one answered (95.27 completed-only). The bf16 KV cache is 14% slower for no gain. The `-dyn` preset is
   slower still, and two pages (p053, p054) ran to the 8,192-token cap, which looks like looping; on the pages it
   answered it scored about 95.2.
-- **At corpus scale:** 1,055 photos an hour is about 95 GPU-hours per 100,000 photos, inside the estimate of
-  55-132. The cluster allows 4 GPUs at once per user, so about a day of wall time.
+- **The speed option is real.** Qwen3.6 35B-A3B (3B active) reads 3.2 times as fast for 0.7 points of NES, and is
+  slightly better on clippings: about 30 GPU-hours per 100,000 photos. Qwen3.8 27B, the newer model, is no better:
+  2.2 points below Qwen3.6 27B at the same speed, and weaker on newspapers too (below).
+- **On the real corpus** (`bulk`, 2,000 pages drawn at random from 91,152 PDFs in 33 collections, 4 shards of one
+  L40S): 1,987 answered, 13 failed, every failure a reply that ran to the 8,192-token cap. 780 pages an hour per
+  GPU, 3,121 an hour on four: about 128 GPU-hours or 32 hours of wall time per 100,000 photos, slower than the
+  truth set's 1,055 an hour. By the model's own kind label (right on 90% of the truth set, its errors leaning to
+  "mixed"): typewritten 1,202 pages (5 failed), printed 487 (5), mixed 167 (2), handwritten 144 (1); printed pages
+  write the most, 792 tokens on average. `segbench-results/farmshare/bulk/` (`summary.json`, `pages.csv`; no text;
+  page names are neutral, the map to the corpus stays on the Mac). Summarised by `bulk_summary.py` on FarmShare.
 - **Newspapers, whole page** (`news`, NewsBench's 15 scored pages, its own `score.py`): **0.967 overall** (0.994
   broadsheet, 0.949 page), against 0.970 for the best layout pipelines (`ll-doclayout-pvl`, `glm-ocr-doclayout`)
   and 0.20-0.50 for the other whole-page models in the lab's table. Panel NES on the same pages 95.91. Two of the
   19 pages ran to the 16,384-token cap (neither is among the 15 scored), and a page takes about 55 seconds:
   65 newspaper pages an hour per GPU. Full table: `segbench-results/farmshare/news/newsbench-score.txt`.
+- **Newspapers, layout first** (`news-layout`, below): Qwen3.6 27B on DocLayout-YOLO regions 0.965 (0.980 / 0.954),
+  so cutting the page first changes little for it, at 58 pages an hour. GLM-OCR (0.9B) on the same regions 0.959,
+  exactly NewsBench's own `ll-doclayout-glm`, at **484 pages an hour**: 8 times faster for 0.6 points. PP-DocLayout
+  regions are worse for both (0.936 Qwen, 0.938 GLM-OCR). Qwen3.8 27B whole page 0.893 (0.827 broadsheet), with 4 of
+  19 pages at the token cap.
+- **Segmentation** (`seg`, Qwen3.5 27B on the Deaver box): run with `fs_seg.py` below; its row is in
+  `segbench-results/local-models-Deaver.md` beside OpenRouter's 95.0%.
 
 What it took to get there, all fixed in this folder: `limits.py` paired the `normal` partition with the `gpu` QOS,
 which `normal` refuses; `download.sh` passed three patterns to one `--exclude`, which `hf` 1.x reads as file
 names, so it fetched nothing; and FlashInfer compiles attention kernels at start-up with `nvcc`, which the GPU
 nodes lack. FarmShare's `cuda/12.9.0` module is the wrong one, since vLLM's torch is built for CUDA 13, so the job
 uses the CUDA 13 toolkit in the venv (`setup.sh` pins its compiler to torch's version; `job.sbatch` sets
-`CUDA_HOME` and the link paths).
+`CUDA_HOME` and the link paths). Later the same day: vLLM took one image a prompt, too few for a seven-page
+segmentation window (`FS_MM_IMAGES`); newspaper-ocr's recognizer left Qwen's thinking on, so every
+region came back with working notes (`fs_news_layout.py` turns it off); DocLayout-YOLO ran its detector on the
+job's GPU beside vLLM at 92%, which ran out of memory partway and left most regions blank (`FS_GPU_UTIL`, 0.80 for
+`news-layout`, and the job now prints vLLM's failed requests and fails when its engine dies); and paddlepaddle
+3.3.1 cannot run PP-DocLayout on the CPU (pinned to 3.2).
 
 ## The candidate: Qwen3.6 27B at fp8 on one L40S
 
@@ -123,10 +145,12 @@ Whole-page vision-language models land around 0.75-0.82 overall: Qwen3-VL 8B at 
 route is probably layout-first, not a bigger whole-page model.** That was the plan as written; the next two
 paragraphs are what the run measured and the layout route that was built after it.
 
-**The run changed this (2026-10-15).** Qwen3.6 27B whole-page scored 0.967 overall, level with layout-first (0.970)
-and well above every whole-page model in the lab's table. Layout-first still leads on the "page" measure (0.968
-against 0.949) and cannot run into the output cap that cost two pages here, so it remains worth measuring, as a
-comparison rather than a presumed win.
+**The run changed this (2026-10-15).** Qwen3.6 27B whole-page scored 0.967 overall, level with NewsBench's best
+layout-first rows (0.970) and well above every whole-page model in the lab's table. Measured layout-first on FarmShare
+the same day (`news-layout`): Qwen3.6 27B on DocLayout-YOLO regions 0.965, GLM-OCR 0.959 (the reference's own
+`ll-doclayout-glm` figure, reproduced), both PP-DocLayout rows about 0.937. So for Qwen the layout pass adds nothing
+here; its case is GLM-OCR's speed, 484 pages an hour against Qwen's 58-65, and a page can no longer run one reply
+into the output cap. NewsBench's 0.970 rows used settings beyond the library defaults run here.
 
 ### The layout-first route (`glm-ocr` preset, W41.farmshare-news-layout)
 
@@ -267,6 +291,22 @@ QOS, GPUs, `--time`, and the number of bulk shards.
   image Pillow cannot open. They never stop the run. Running `submit.sh` again retries them.
 - `--out` must be outside `--in`. The input is only ever read.
 
+## General models on the layout regions (`news-layout`)
+
+The comparison beside the `glm-ocr` route above: any model vLLM serves, reading newspaper-ocr's regions through the
+library's OpenAI-compatible recognizer, as NewsBench's `*-paddlex` rows were made (`fs_news_layout.py`, its own venv
+from `setup-layout.sh`, paddlepaddle pinned to 3.2 because 3.3.1 fails PP-DocLayout on the CPU).
+
+```bash
+bash setup-layout.sh                                   # once: newspaper-ocr's venv, and the detectors' weights
+FS_DETECTORS=doclayout_yolo FS_LAYOUT_WORKERS=19 bash submit.sh news-layout qwen3.6-27b
+cd $FS_ROOT/newsbench && python score.py               # every <label>-<detector> folder beside the references
+```
+
+It turns Qwen's thinking off, serves vLLM at 80% of the card for the detector beside it, and prints vLLM's failed
+requests, because the library leaves a failed region blank. Per detector it writes
+`ocr-results/<label>-<detector>/` for NewsBench and `runs/news-layout/<label>-<detector>/timing.json`.
+
 ## Files
 
 | file | what |
@@ -276,6 +316,8 @@ QOS, GPUs, `--time`, and the number of bulk shards.
 | `news_layout.py` | the layout-first reader: `newspaper-ocr`'s DocLayout-YOLO + GLM-OCR pipeline against the local vLLM server |
 | `limits.py` | reads the cluster's limits and writes `limits.env` |
 | `models.sh` | presets: Hugging Face repo, GPUs, download size, vLLM flags |
-| `setup.sh`, `download.sh`, `submit.sh`, `job.sbatch` | environment, weights, fitted submission, and the GPU job that serves vLLM on localhost and runs one mode |
+| `setup.sh`, `download.sh`, `submit.sh`, `job.sbatch` | environment, weights, fitted submission, and the GPU job that serves vLLM on localhost and runs one mode (`truth`, `news`, `news-layout`, `seg`, `bulk`) |
+| `fs_news_layout.py`, `setup-layout.sh` | `news-layout`: newspaper-ocr's regions read by a general served model, for comparison with `news_layout.py`; its own venv |
+| `bulk_summary.py` | a bulk run's summary for the repo, by page and by the model's kind label, with no transcript text |
 | `estimate.py` | the estimate table above |
 | `test_farmshare.py` | 25 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring), segmentation's windows (the request, the retry, failed and refused windows, resume), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |
