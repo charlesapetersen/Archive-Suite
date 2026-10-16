@@ -28,6 +28,7 @@ REPO = 'mlx-community/Qwen3-VL-8B-Instruct-4bit'
 os.environ.setdefault('HF_HOME', str(Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/mlx-hf'))
 OUT = P.CACHE / 'local' / KEY
 REPORT = P.RESULTS / 'ocr-mac-local.md'
+GROUPS = P.RESULTS / 'ocr-mac-local-groups.csv'  # aggregates by kind, read by ArchiveOCRBench/build.py
 
 
 def jobs():
@@ -172,6 +173,15 @@ def report():
         rr = [p for p in done if p['kind'] == kind]
         h, l = agg('hosted', rr)['nes'], agg('local', rr)['nes']
         L.append(f'| {kind} | {len(rr)} | {100*h:.2f} | {100*l:.2f} | {100*(l-h):+.2f} |')
+    import csv
+    with GROUPS.open('w', newline='') as f:
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(['model', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words'])
+        for model, side in ((KEY, 'local'), (HOSTED, 'hosted')):
+            for attr, value, rr in [('all', 'accuracy-96', done)] + [
+                    ('kind', k, [p for p in done if p['kind'] == k]) for k in sorted({p['kind'] for p in done})]:
+                a = agg(side, rr)
+                w.writerow([model, attr, value, a['n'], a['ok']] + [repr(a[k]) for k in ('nes', 'chrf', 'miss', 'add')] + [a['words']])
 
     metas = [m for job in jobs() if (m := load_reading(OUT / (job['id'] + '.json'))[0])]
     wall = [m['wall_s'] for m in metas]; peak = [m['mlx_peak_gb'] for m in metas]

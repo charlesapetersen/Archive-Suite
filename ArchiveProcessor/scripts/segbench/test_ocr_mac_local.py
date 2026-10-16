@@ -23,7 +23,7 @@ class MacLocal(unittest.TestCase):
         rows = [{'page': p, 'kind': 'typewritten'} for p in pages]
         self.patches = [patch.object(P, 'CACHE', root / 'cache'), patch.object(P, 'TRUTH', root / 'truth'),
                         patch.object(P, 'RESULTS', root / 'out'), patch.object(M, 'OUT', root / 'cache/local/k'),
-                        patch.object(M, 'REPORT', root / 'out/r.md'), patch.object(P, 'rows', return_value=rows),
+                        patch.object(M, 'REPORT', root / 'out/r.md'), patch.object(M, 'GROUPS', root / 'out/ocr-mac-local-groups.csv'), patch.object(P, 'rows', return_value=rows),
                         patch.object(P, 'manifest', return_value={'jobs': jobs}),
                         patch.dict('os.environ', {'OCRLAB': str(root / 'lab')})]
         for p in self.patches:
@@ -50,6 +50,9 @@ class MacLocal(unittest.TestCase):
         self.assertIn('1 failed (1 hit max_tokens)', out)
         self.assertIn('p002 (typewritten): hosted 100.0 → local 0.0 (local reading failed: length)', out)
         self.assertNotIn('quick brown', out)  # no page text in the public report
+        groups = (self.root / 'out/ocr-mac-local-groups.csv').read_text().splitlines()
+        self.assertIn('qwen3-vl-8b-mlx4,kind,typewritten,2,1,0.5,', '\n'.join(groups))
+        self.assertNotIn('quick brown', '\n'.join(groups))
 
     def test_format_slip_has_a_lenient_figure(self):
         for p in ('p001', 'p002'):
