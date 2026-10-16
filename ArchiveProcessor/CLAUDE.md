@@ -553,6 +553,7 @@ Views/                         SwiftUI (+ AppKit where needed):
                                in OCRView+*.swift (see god-file note).
   LiveCaptureView.swift        Live Capture tab: pairing QR, session status, tag cards, Backup Folder reveal.
   SettingsView.swift           The ⌘, Settings scene (grouped Form + pinned live cost-estimate pane).
+                               Page-kind note under the model picker: `OCR/OCRPageGuidance.swift` (W41.app-ocr-hierarchy).
   ToolsView.swift              Tools tab: Compare Models + Test Resolution.
   CollectionFinalizeSheet.swift  End-of-session: name each collection or append to an existing folder.
   BoxFolderConfirmSheet.swift  Confirm/reclassify every box/folder identification.

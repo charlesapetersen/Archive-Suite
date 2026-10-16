@@ -11205,3 +11205,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `ARCHIVEPROC_TEST_BINARY` like test-recovery.sh). Verified: 7/7 ALL PASS in 3 s (was a 120 s timeout); with
   the flag removed again the driver reports `FAIL: the injected transport is not active` and exits. No money.
   <!-- /W25.retry-backend-fu1 -->
+- [x] **W41.app-ocr-hierarchy — measured guidance by kind of page in the OCR model picker [S · ~1 session]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · SHIPPED 2026-10-15
+  (lane: processor) From W41.report §2. Under the Direct API model picker in Settings, a "What reads which pages best"
+  note: handwriting Gemini 3.8 Flash 96.0 then Gemini 3.1 Pro 94.1 (16 pages); printed or typeset Claude Sonnet 5.5
+  96.3 then Qwen3.6 27B 94.8 (28; Gemini's two refused pages noted); forms and tables Qwen3.6 27B 96.2 then GPT-5.4
+  mini 95.8 (4 pages, "a hint"); typewriting Gemini 3.8 Flash 98.7, Claude 98.6, any leader 95+ (50); low-resolution
+  photographs Gemini 3.1 Flash Lite 89.7 at a quarter resolution, tentative (20-page ladder). Footnote: one corpus,
+  about 100 pages, reference text drafted by Claude and Gemini. A model the list lacks reads "(not in this list yet)",
+  decided from the built-in catalog, so it clears itself when W41.app-openrouter adds the Qwens. Deviation from the
+  item text, on purpose: it grouped forms with printed under Claude; the fact-checked report puts Claude at 92.5 on
+  forms, so forms is its own line. One table: `segbench-results/ocr-page-guidance.json`, bundled straight from the
+  bench like options.json, each figure naming its source row. `OCR/OCRPageGuidance.swift` (table + note view),
+  `OCRPageGuidanceTestDriver`, `scripts/test-ocr-page-guidance.sh`: every figure checked against its CSV/markdown row
+  (NES and page count; a figure changed by 0.1 fails), table checks, the lines, and a render guard (note ~10k dark px,
+  every kind adds a line; PNG eyeballed). Build clean, no new warnings. No money, no key, no window.
+  <!-- /W41.app-ocr-hierarchy -->

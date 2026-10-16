@@ -480,6 +480,9 @@ struct SettingsView: View {
                         HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
                     }
                 }
+                if let guidance = OCRPageGuidance.bundled {
+                    OCRPageGuidanceNote(guidance: guidance)   // W41.app-ocr-hierarchy
+                }
                 if selectedModel.supportsThinking {
                     Picker(selection: $selectedThinking) {
                         ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }

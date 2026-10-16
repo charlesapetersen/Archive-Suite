@@ -71,6 +71,7 @@ struct ContentView: View {
             VisionHybridTestDriver.runIfRequested()          // $0 Vision OCR + text-only judgement request-shape contract
             RetryBackendTestDriver.runIfRequested()          // $0 Process Files retry backend-lock contract
             OCRRefusalFallbackTestDriver.runIfRequested()    // $0 W41 second reader for pages Gemini refuses
+            OCRPageGuidanceTestDriver.runIfRequested()       // $0 W41 picker note: which model reads which pages
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage

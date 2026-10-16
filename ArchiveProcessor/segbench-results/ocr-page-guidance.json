@@ -1,0 +1,64 @@
+{
+  "_about": "Which OCR model reads which kind of page best, shown under the Processor's OCR model picker (W41.app-ocr-hierarchy). Every figure is copied from the file named in its source, and scripts/test-ocr-page-guidance.sh checks it against that file. From W41-answers.md section 2. app_model is the Processor's LLMModel id when the app offers that model; omit it when it does not.",
+  "measured": "2026-10-15",
+  "footnote": "Measured on one corpus, about 100 pages; the reference text was drafted by Claude and Gemini, which may flatter both. Scores are NES out of 100.",
+  "kinds": [
+    {
+      "id": "handwritten",
+      "label": "Handwriting",
+      "pages": 16,
+      "picks": [
+        {"name": "Gemini 3.8 Flash", "nes": 96.0, "app_model": "gemini-3.8-flash",
+         "source": {"file": "ocr-panel-cloud-groups.csv", "route": "gemini3.8-flash", "attribute": "kind", "value": "handwritten"}},
+        {"name": "Gemini 3.1 Pro", "nes": 94.1, "app_model": "gemini-3.1-pro",
+         "source": {"file": "ocr-panel-cloud-groups.csv", "route": "gemini3.1-pro", "attribute": "kind", "value": "handwritten"}}
+      ]
+    },
+    {
+      "id": "printed",
+      "label": "Printed or typeset",
+      "pages": 28,
+      "picks": [
+        {"name": "Claude Sonnet 5.5", "nes": 96.3,
+         "source": {"file": "ocr-panel-cloud-groups.csv", "route": "claude-sonnet5.5", "attribute": "kind", "value": "printed"}},
+        {"name": "Qwen3.6 27B (open)", "nes": 94.8,
+         "source": {"file": "ocr-panel-local-groups.csv", "route": "qwen3.6-27b", "attribute": "kind", "value": "printed"}}
+      ],
+      "note": "Gemini refused two of these pages; the app sends a refused page to a second model."
+    },
+    {
+      "id": "forms",
+      "label": "Forms and tables",
+      "pages": 4,
+      "picks": [
+        {"name": "Qwen3.6 27B (open)", "nes": 96.2,
+         "source": {"file": "ocr-panel-local-groups.csv", "route": "qwen3.6-27b", "attribute": "table_form", "value": "yes"}},
+        {"name": "GPT-5.4 mini", "nes": 95.8, "app_model": "gpt-5.4-mini",
+         "source": {"file": "ocr-panel-cloud-groups.csv", "route": "gpt5.4-mini", "attribute": "table_form", "value": "yes"}}
+      ],
+      "note": "Only 4 pages, so treat this as a hint."
+    },
+    {
+      "id": "typewritten",
+      "label": "Typewriting",
+      "pages": 50,
+      "picks": [
+        {"name": "Gemini 3.8 Flash", "nes": 98.7, "app_model": "gemini-3.8-flash",
+         "source": {"file": "ocr-panel-cloud-groups.csv", "route": "gemini3.8-flash", "attribute": "kind", "value": "typewritten"}},
+        {"name": "Claude Sonnet 5.5", "nes": 98.6,
+         "source": {"file": "ocr-panel-cloud-groups.csv", "route": "claude-sonnet5.5", "attribute": "kind", "value": "typewritten"}}
+      ],
+      "note": "Any of the leading models scores 95 or more."
+    },
+    {
+      "id": "low-resolution",
+      "label": "Low-resolution photographs",
+      "pages": 20,
+      "picks": [
+        {"name": "Gemini 3.1 Flash Lite", "nes": 89.7, "app_model": "gemini-3.1-flash-lite",
+         "source": {"file": "ocr-panel-local.md", "route": "gemini3.1-flash-lite", "attribute": "ladder", "value": "ladder-quarter"}}
+      ],
+      "note": "Tentative: at a quarter of the resolution every Qwen fell to about 58-72, and no other Gemini was tested."
+    }
+  ]
+}

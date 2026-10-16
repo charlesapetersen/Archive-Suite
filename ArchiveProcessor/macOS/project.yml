@@ -38,6 +38,9 @@ targets:
       # app on its next build (W36.seg-opt-engine). Loaded as Bundle.main "options.json".
       - path: ../segbench-results/options.json
         buildPhase: resources
+      # Which OCR model reads which kind of page best, under the model picker (W41.app-ocr-hierarchy).
+      - path: ../segbench-results/ocr-page-guidance.json
+        buildPhase: resources
     dependencies:
       - package: ArchiveCore
     settings:

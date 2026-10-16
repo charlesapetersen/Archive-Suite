@@ -292,6 +292,11 @@ existing scratch, key-free, no-network execution remains unchanged.
   one of those `NetworkSession.activeTestTransport` honours; without it the stub went unused and the direct
   retry waited on the wire (`W25.retry-backend-fu1`), so the driver now fails at once if the seam is
   inactive. A free gate step (`processor-retry-backend`) runs it on the gate-DD binary.
+- **`test-ocr-page-guidance.sh`** — W41.app-ocr-hierarchy: the "what reads which pages best" note under the
+  Settings model picker. Checks every figure in `segbench-results/ocr-page-guidance.json` against the bench result
+  file it names (NES and page count), then the table's own checks (best first, NES in range, every `app_model` a
+  built-in id), the lines as the user reads them, and a render guard that the note draws offscreen. No Keychain
+  read, no window.
 - **`test-ocr-refusal.sh`** — W41.app-ocr-default: the default Gemini model and its prices, and the second
   reader for pages Gemini refuses, through the real `performOCRCall` over an injected transport: refusal codes
   that reach the second route and those that never do, the `secondReader` record and PDF header, fail-loud with
