@@ -344,6 +344,7 @@ struct OCRView: View {
         .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }
         .onChange(of: useAppleVision) { _, _ in syncForProviderChange() }
         .onChange(of: gatewayLocalModel) { _, _ in reloadAPIKey() }   // W41.app-local-models: the stand-in key
+        .onChange(of: useGateway) { _, _ in reloadAPIKey() }
         .onChange(of: visionUseLLMJudgment) { _, _ in syncForProviderChange() }
         .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
             // An applied profile may change the model for the *current* provider (no provider change), so
@@ -717,7 +718,7 @@ struct OCRView: View {
                                                      runDefault: pageKindRunDefault, runModel: effectiveModel)
                             }
                             let cascade = OCRCascade(routeID: ocrCascadeRoute, onDisagreement: ocrCascadeOnDisagreement)
-                            if (!useGateway || currentGatewayConfig?.isLocalModel == true) && !useLocalAgent && !preOCRedInput,
+                            if (!useGateway || currentGatewayConfig?.localEscalates == true) && !useLocalAgent && !preOCRedInput,
                                cascade.applies(to: effectiveModel.provider, model: effectiveModel),
                                let target = cascade.escalationModel,
                                let page = cascade.pageCost(imageScale: imageScale / 100.0) {

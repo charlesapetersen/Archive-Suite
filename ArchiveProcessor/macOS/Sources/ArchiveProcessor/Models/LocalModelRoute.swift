@@ -148,8 +148,9 @@ enum LocalModelRoute {
     /// Whether a reply ends in a loop: its tail repeats one span of 4 to 400 characters, back to back, at least
     /// `minRepeats` times and over at least `minLoopChars` characters. Set well above what a page legitimately
     /// repeats — a form's blank rows or a column of dot leaders runs to a few hundred characters, while a runaway
-    /// reply repeats for thousands. Spans under 4 characters (".....", "____") are never counted.
-    static func isRepetitionLoop(_ text: String, minLoopChars: Int = 1200, minRepeats: Int = 8) -> Bool {
+    /// reply repeats for thousands (a 4,096-token reply is about 15,000 characters). A span needs at least three different visible characters, so leaders, rules and
+    /// empty table rows ("......", "____", "|   |   |") never count, however long.
+    static func isRepetitionLoop(_ text: String, minLoopChars: Int = 2000, minRepeats: Int = 8) -> Bool {
         let chars = Array(text.unicodeScalars.suffix(6000))
         let n = chars.count
         guard n >= minLoopChars else { return false }
@@ -161,7 +162,9 @@ enum LocalModelRoute {
                 i -= 1
             }
             let looped = run + period   // the first copy plus every character that matched the one before it
-            if looped >= minLoopChars, looped >= period * minRepeats { return true }
+            guard looped >= minLoopChars, looped >= period * minRepeats else { continue }
+            let visible = Set(chars[(n - period)...].filter { !CharacterSet.whitespacesAndNewlines.contains($0) })
+            if visible.count >= 3 { return true }
         }
         return false
     }
@@ -170,6 +173,18 @@ enum LocalModelRoute {
         text: nil, classification: nil,
         errorMessage: "The local model's reply repeated itself; the page was not read",
         errorCode: OCRFailureCode.cutOff)
+
+    static let timedOutReply = OCRResult(
+        text: nil, classification: nil,
+        errorMessage: "The local model did not finish within \(Int(requestTimeout)) s (most likely a reply repeating itself)",
+        errorCode: OCRFailureCode.cutOff)
+
+    /// Whether the address is this Mac (the presets' 127.0.0.1, `localhost`, `::1`); Settings warns otherwise, since
+    /// the local route's single worker, cap and escalation are wrong for a remote paid gateway.
+    static func isLoopback(_ baseURL: String) -> Bool {
+        guard let host = URL(string: baseURL)?.host?.lowercased() else { return false }
+        return host == "localhost" || host == "::1" || host.hasPrefix("127.")
+    }
 
     // MARK: Server check
 

@@ -1785,9 +1785,9 @@ extension OCRProcessor {
         // W41.app-ocr-default: a page Gemini refuses goes to a second reader, never an empty success. W41.app-ocr-
         // cascade: a page the run's own model fails (or, opted in, disagrees with Vision on) goes to the user's
         // escalation route. Direct providers only: the gateway and the Local Agent are the user's single route —
-        // except a model on this Mac (W41.app-local-models), whose looped or cut pages need the fallback the
-        // measurement asked for. It is never a Gemini refusal, so it goes in as its own model.
-        let localGateway = gatewayConfig.flatMap { $0.isLocalModel ? $0 : nil }
+        // except a model on this Mac whose user allowed it (W41.app-local-models): its looped or cut pages need the
+        // fallback the measurement asked for. It is never a Gemini refusal, so it goes in as its own model.
+        let localGateway = gatewayConfig.flatMap { $0.isLocalModel && $0.localEscalates == true ? $0 : nil }
         let resolved: OCRResult
         if localAgent == nil, gatewayConfig == nil {
             resolved = await OCRCascade.resolve(

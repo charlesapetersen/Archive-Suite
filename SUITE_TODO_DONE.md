@@ -11489,3 +11489,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   read again with the guard (job 1850822, 2.5 minutes): 5 answered (2 first time, 3 on the retry), 8 looped twice and
   were escalated, none capped. README updated. No money.
   <!-- /W41.farmshare-loop-guard -->
+- [x] **W41.app-local-models — a local open-weight model route, recommended by memory size [M · ~2 sessions]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (lane: processor) (uses: build) (blocked-on: W41.mac-local-measure). From W41.report §1. A local OpenAI-compatible server (LM Studio, Ollama or `mlx_vlm.server`; `OpenAICompatibleClient` already takes a base URL) as an OCR route, with the model recommended by the Mac's memory: 18 GB Qwen3-VL 8B 4-bit; 32 GB Qwen3.6 27B 4-bit (35B-A3B for speed); 48-64 GB Qwen3.6 27B 8-bit. Figures shown are W41's, with W41.mac-local-measure's measured 4-bit penalty and speed. Measured (`segbench-results/ocr-mac-local.md`): 4-bit reads as well as bf16 where both finish (−0.17 NES), but 3 of 99 pages looped to the 8192-token cap (7 min each) and one wrote a KIND outside the four, so the route needs a repetition stop or page-scaled token cap with a fallback, and a parser that keeps the text after `TEXT:` whatever the KIND line says; about 41 s a page and 8.4 GB of footprint on the 18 GB M3 Pro. Local segmentation is NOT part of this (Qwen3.5 27B's 95.0% is one box, unmeasured at 4-bit). — SHIPPED 2026-10-16
+  Built on the gateway rather than a new provider: Settings → API Gateway → **A model on this Mac**
+  (`GatewayConfig.localModel`) with LM Studio / Ollama / mlx-vlm presets, the model recommended by this Mac's memory and
+  W41's figures for it (`Models/LocalModelRoute.swift`, `Views/LocalModelSettingsView.swift`), a $0 fill and a Check
+  server button (`GET /models`). The measurement's asks, each met: a 4,096-token cap (a loop fails as `length` at about
+  half the time) plus a repetition check on a reply that ended by itself (`isRepetitionLoop`: three or more visible
+  characters in the repeating span, 2,000+ characters, 8+ copies, so leaders and blank rows never trip it); the fallback
+  is the cheap-first cascade, which applies to a local gateway's failed page only behind its own opt-in (Send pages it
+  fails to the escalation model, off by default: a local model may be chosen to keep pages off the cloud) and names the
+  local model as first reader; a timeout and an all-reasoning reply fail the same way; the app's parser already keeps the text when the header tag is missing or unknown (checked). Also one page at
+  a time, temperature 0, 600 s timeout, `<think>` stripped, always a stand-in key (never a saved gateway key, never saved to the Keychain), and a time
+  estimate at the pick's seconds a page. Open limits (no streamed stop, unverified server model names, reasoning not
+  switched off, Live Capture concurrency, 2,048 px pages): `ArchiveProcessor/KNOWN_ISSUES.md`. Contract
+  `scripts/test-local-models.sh`. No money; no migration (the new field is optional, and there is nothing to migrate).
+  <!-- /W41.app-local-models -->

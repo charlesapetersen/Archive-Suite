@@ -621,6 +621,9 @@ struct GatewayConfig: Codable, Equatable {
     /// W41.app-local-models: the endpoint is an open-weight model on this Mac (`LocalModelRoute`). nil (the
     /// field absent) is a remote gateway.
     var localModel: Bool? = nil
+    /// A local model's failed page may go to the cloud escalation model (`OCRCascade`). Off unless the user says so:
+    /// someone who chose a local model may have chosen it to keep the pages on this Mac.
+    var localEscalates: Bool? = nil
 
     var isLocalModel: Bool { localModel == true }
 
@@ -628,10 +631,10 @@ struct GatewayConfig: Codable, Equatable {
         Self.storedKey(localModel: isLocalModel)
     }
 
-    /// The gateway key from the Keychain; a local model needs none, so it gets a placeholder when none is saved.
+    /// The gateway key from the Keychain. A local model always gets the placeholder: a saved key belongs to a remote
+    /// gateway, and is never sent in plain http to whatever listens on this Mac's port.
     static func storedKey(localModel: Bool) -> String {
-        let saved = KeychainHelper.load(account: "Gateway") ?? ""
-        return saved.isEmpty && localModel ? LocalModelRoute.placeholderKey : saved
+        localModel ? LocalModelRoute.placeholderKey : (KeychainHelper.load(account: "Gateway") ?? "")
     }
 
     static func storedKey(_ d: UserDefaults = .standard) -> String {
@@ -667,7 +670,9 @@ struct GatewayConfig: Codable, Equatable {
                              displayName: name.isEmpty ? "API Gateway" : name,
                              inputCostPer1M: inCost >= 0 ? inCost : nil,
                              outputCostPer1M: outCost >= 0 ? outCost : nil,
-                             localModel: d.bool(forKey: DefaultsKeys.gatewayLocalModel) ? true : nil)
+                             localModel: d.bool(forKey: DefaultsKeys.gatewayLocalModel) ? true : nil,
+                             localEscalates: d.bool(forKey: DefaultsKeys.gatewayLocalModel)
+                                && d.bool(forKey: DefaultsKeys.gatewayLocalEscalates) ? true : nil)
     }
 }
 

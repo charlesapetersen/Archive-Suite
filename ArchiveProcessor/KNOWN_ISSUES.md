@@ -2,6 +2,22 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W41.app-local-models, 2026-10-16): what the local open-weight model route does not yet cover
+
+Settings → API Gateway → **A model on this Mac** (`LocalModelRoute`). Open: **only Qwen3-VL 8B at 4-bit is measured on
+a Mac** (`segbench-results/ocr-mac-local.md`); every Qwen3.6 figure shown is a hosted fp8 score or a bandwidth
+estimate, and labelled so. The **model names** filled for Ollama and LM Studio, and every Qwen3.6 MLX name, are those
+servers' usual naming, not checked against a live server; **Check server** shows the real list. The **loop stop is
+not streamed**: a looping reply runs to the 4,096-token cap before it fails (about 200 s on the 8B, against 7.3
+minutes at 8,192), and a page that legitimately needs more (FarmShare's longest, a 5,766-token newspaper) is cut and
+escalated rather than read. A model whose **reasoning is on** (a Qwen3.6 template that thinks by default) spends that
+budget thinking; the route strips `<think>` text but sends no switch to turn reasoning off, because the servers spell
+it differently. A slow Mac running a big pick may reach the 600 s timeout before the cap; that fails as `length` too, after up to ten minutes. The loop check needs 2,000+ characters of one 4-400-character span with three or more visible characters, so a blank form of more than about 55 identical rows is failed as a loop, and a repeated paragraph over 400 characters, or a loop with a counter in it, is left to the cap. A local server that **requires a key** gets only the stand-in `local` (a saved gateway key is never sent to it). Pages are sent at the app's 2,048 px cap, where the bench used 2,400 px (its half-resolution ladder
+stayed within about two points). **Live Capture** does not go through `schedulingWorkerCount`, so it can have up to
+five requests waiting in the server at once, each on its 600 s timeout. Text calls (classification, tags,
+segmentation) go to the local model too, up to six at once (tagging's own concurrency), uncapped beyond their own budgets, and are not timed in the estimate. A
+local run's escalated pages are priced in the pre-run cascade line, but the estimate's own total stays $0.
+
 ## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
 
 Settings → **Choose each page's reader by its kind** (off by default; `PageKindRouting`) classifies dropped photos

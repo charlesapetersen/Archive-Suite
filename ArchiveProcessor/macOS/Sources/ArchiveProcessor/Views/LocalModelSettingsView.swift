@@ -24,11 +24,16 @@ struct LocalModelSettingsView: View {
         Toggle(isOn: $gatewayLocalModel) {
             HStack {
                 Text("A model on this Mac")
-                HelpButton(text: "The gateway is an open-weight model served on this Mac by LM Studio, Ollama or mlx-vlm. Pages are read one at a time with no key and no charge. A reply is capped at \(LocalModelRoute.maxTokens) tokens and one that repeats itself is stopped: on our Mac 3 of 99 pages looped, 7 minutes each. Such a page fails, and goes to the escalation model below if you pick one.")
+                HelpButton(text: "The gateway is an open-weight model served on this Mac by LM Studio, Ollama or mlx-vlm. Pages are read one at a time with no key and no charge. A reply is capped at \(LocalModelRoute.maxTokens) tokens and one that repeats itself is stopped: on our Mac 3 of 99 pages looped, 7 minutes each. Such a page fails, and goes to a cloud escalation model only if you allow it below.")
             }
         }
         .accessibilityIdentifier("ap.settings.localModel")
         if gatewayLocalModel {
+            if !gatewayBaseURL.isEmpty, !LocalModelRoute.isLoopback(gatewayBaseURL) {
+                Text("The Gateway URL is not on this Mac. A remote gateway reads pages faster in parallel, and is not free: turn this off for it.")
+                    .font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(LocalModelRoute.recommendationNote(memoryGB: memoryGB))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

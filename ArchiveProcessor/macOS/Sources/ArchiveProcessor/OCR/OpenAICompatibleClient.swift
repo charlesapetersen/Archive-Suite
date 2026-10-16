@@ -65,7 +65,14 @@ struct OpenAICompatibleClient {
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
         applyOpenRouterRoute(&body)
 
-        let (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
+        let data: Data, response: URLResponse
+        do {
+            (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
+        } catch let error as URLError where localModel && error.code == .timedOut {
+            // A bigger local model can loop for longer than the timeout before reaching the cap. Same failure as a cut
+            // reply: not retried (another 10 minutes), escalated when the user allowed it.
+            return LocalModelRoute.timedOutReply
+        }
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {
@@ -108,6 +115,11 @@ struct OpenAICompatibleClient {
         // A local model that looped but stopped by itself (W41.mac-local-measure) is a failed page like a cut one.
         if localModel, LocalModelRoute.isRepetitionLoop(content) { return LocalModelRoute.loopedReply }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(content)
+        // A local reply that was all reasoning (`<think>` only) answered nothing: unparsable, so it can escalate.
+        if localModel, ocrText == nil {
+            return OCRResult(text: nil, classification: nil, errorMessage: "The local model's reply held no transcription",
+                             errorCode: OCRFailureCode.unparsable)
+        }
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(content))
     }
 

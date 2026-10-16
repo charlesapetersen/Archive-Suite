@@ -46,6 +46,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
     @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
     @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel: Bool = false
+    @AppStorage(DefaultsKeys.gatewayLocalEscalates) private var gatewayLocalEscalates: Bool = false
     // Local Agent CLI backend (opt-in; mutually exclusive with the gateway — see `backendMode`).
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
@@ -461,7 +462,16 @@ struct SettingsView: View {
                         HelpButton(text: "Which provider's per-image token cost to assume for the cost/time estimate. Set this to the model family your gateway actually fronts — a Gemini-class model uses ~6.7× more image tokens than Anthropic, so the wrong profile makes the estimate far off. Estimate only; does not affect the actual request.")
                     }
                 }
-                if gatewayLocalModel { cascadeControls }   // a local model's looped page needs a fallback
+                if gatewayLocalModel {   // a local model's looped page needs a fallback, if the user allows the cloud
+                    Toggle(isOn: $gatewayLocalEscalates) {
+                        HStack {
+                            Text("Send pages it fails to the escalation model")
+                            HelpButton(text: "A page the local model loops on, cuts off or cannot answer is read again by the model you pick below, in the cloud, at that model's price. Off, such a page fails and stays on this Mac.")
+                        }
+                    }
+                    .accessibilityIdentifier("ap.settings.localModelEscalates")
+                    if gatewayLocalEscalates { cascadeControls }
+                }
             } else if useLocalAgent {
                 localAgentControls
             } else if useAppleVision {
