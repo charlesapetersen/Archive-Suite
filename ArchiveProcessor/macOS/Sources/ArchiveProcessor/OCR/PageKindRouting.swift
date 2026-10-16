@@ -54,6 +54,68 @@ enum PageKindRouting {
         return keep(.noPick)
     }
 
+    /// Every built-in model of a provider the user has a key for, as candidates. Reads the Keychain: call it off a
+    /// view body (once per refresh), never per render. Custom models are left out, as the cascade leaves them out:
+    /// the guide names built-in ids, and a routed page needs a known price for the estimate.
+    static func keyedCandidates(key: (LLMProvider) -> String? = { KeychainHelper.load(account: $0.rawValue) })
+        -> Set<Candidate> {
+        var keyed: [LLMProvider: Bool] = [:]
+        var out = Set<Candidate>()
+        for m in OCRCascade.candidates {
+            let has = keyed[m.provider] ?? { let k = key(m.provider); return k.map { !$0.isEmpty } ?? false }()
+            keyed[m.provider] = has
+            if has { out.insert(Candidate(provider: m.provider, modelID: m.id)) }
+        }
+        return out
+    }
+
+    /// The reader `performOCRCall` uses for one planned page, and what the page's record says. A routed page whose
+    /// model is no longer built in, or whose provider has no key now, keeps the run's model and records `.noPick`. A
+    /// routed model reads at its own default thinking (nil): the run's level was chosen for the run's model.
+    struct Reader {
+        let provider: LLMProvider
+        let model: LLMModel
+        let apiKey: String
+        let thinkingLevel: ThinkingLevel?
+        let record: PageReaderRecord
+    }
+
+    static func reader(_ entry: PageReaderPlan.Entry, provider: LLMProvider, model: LLMModel, apiKey: String,
+                       thinkingLevel: ThinkingLevel?, imageScale: Double) -> Reader {
+        func record(_ reason: Reason, _ p: LLMProvider, _ m: LLMModel, cost: Double? = nil) -> PageReaderRecord {
+            PageReaderRecord(kind: entry.kind?.kind, confidence: entry.kind?.confidence, reason: reason,
+                             provider: p.rawValue, model: m.displayName, estimatedCost: cost,
+                             replacedCost: cost == nil ? nil
+                                : CostEstimator.secondReaderPageCost(model: model, imageScale: imageScale))
+        }
+        let c = entry.choice
+        let differs = c.provider != provider || c.modelID != model.id
+        guard c.reason == .kind || c.reason == .override, differs else {
+            return Reader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
+                          record: record(c.reason, provider, model))
+        }
+        guard let target = Self.model(Candidate(provider: c.provider, modelID: c.modelID)),
+              let key = c.provider == provider && !apiKey.isEmpty ? apiKey : runKey(for: c.provider), !key.isEmpty
+        else {
+            return Reader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
+                          record: record(.noPick, provider, model))
+        }
+        return Reader(provider: target.provider, model: target, apiKey: key, thinkingLevel: nil,
+                      record: record(c.reason, target.provider, target,
+                                     cost: CostEstimator.secondReaderPageCost(model: target, imageScale: imageScale)))
+    }
+
+    /// A provider's key at read time; the cascade's test seam replaces the Keychain in the headless tests.
+    static func runKey(for provider: LLMProvider) -> String? {
+        if let o = OCRCascade.keyOverride { return o(provider) }
+        return KeychainHelper.load(account: provider.rawValue)
+    }
+
+    /// The built-in model a candidate names, or nil.
+    static func model(_ c: Candidate) -> LLMModel? {
+        OCRCascade.candidates.first { $0.provider == c.provider && $0.id == c.modelID }
+    }
+
     /// How the page's reader reads in the run history and the file list: "Typewritten (93%) → Gemini 3.8 Flash".
     static func summary(kind: PageKind?, choice: Choice, modelName: String) -> String {
         let k = kind.map { "\(PageKind.label($0.kind)) (\(Int(($0.confidence * 100).rounded()))%)" } ?? "Kind not told"
@@ -66,4 +128,70 @@ enum PageKindRouting {
         case .override: return "\(k) → \(modelName), chosen by you"
         }
     }
+}
+
+/// The readers frozen into one run (W41.app-page-kind): for each page the user saw in the file list, its kind and the
+/// reader chosen for it. Keyed by the source file's standardized path, which is the image URL `performOCRCall`
+/// receives for an image file; a multi-page PDF's pages are temporary images and are not in the plan, so they keep
+/// the run's model. Empty = every page is read by the run's model, as before this item.
+struct PageReaderPlan: Codable, Equatable, Sendable {
+    struct Entry: Codable, Equatable, Sendable {
+        let kind: PageKind?
+        let choice: PageKindRouting.Choice
+    }
+
+    var pages: [String: Entry] = [:]
+
+    static let empty = PageReaderPlan()
+
+    var isEmpty: Bool { pages.isEmpty }
+
+    static func key(_ url: URL) -> String { url.standardizedFileURL.path }
+
+    func entry(for url: URL) -> Entry? { pages[Self.key(url)] }
+
+    /// What the plan adds to the run model's OCR estimate: for each page read by another model, that model's page
+    /// price less the run model's (`CostEstimator.secondReaderPageCost`, the same rate the cascade line uses).
+    /// Negative when the guide sends pages to a cheaper model.
+    func ocrCostDelta(runModel: LLMModel, imageScale: Double) -> Double {
+        let base = CostEstimator.secondReaderPageCost(model: runModel, imageScale: imageScale)
+        var prices: [PageKindRouting.Candidate: Double] = [:]
+        var delta = 0.0
+        for entry in pages.values where entry.choice.modelID != runModel.id || entry.choice.provider != runModel.provider {
+            let c = PageKindRouting.Candidate(provider: entry.choice.provider, modelID: entry.choice.modelID)
+            guard let price = prices[c] ?? PageKindRouting.model(c).map({
+                CostEstimator.secondReaderPageCost(model: $0, imageScale: imageScale) }) else { continue }
+            prices[c] = price
+            delta += price - base
+        }
+        return delta
+    }
+
+    /// Pages per reader the plan sends away from the run's model, for the cost caption: [(model, pages)], most first.
+    func routedCounts(runModel: LLMModel) -> [(LLMModel, Int)] {
+        var counts: [PageKindRouting.Candidate: Int] = [:]
+        for entry in pages.values where entry.choice.modelID != runModel.id || entry.choice.provider != runModel.provider {
+            counts[PageKindRouting.Candidate(provider: entry.choice.provider, modelID: entry.choice.modelID), default: 0] += 1
+        }
+        return counts.compactMap { c, n in PageKindRouting.model(c).map { ($0, n) } }
+            .sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.displayName < $1.0.displayName }
+    }
+}
+
+/// What a page's record says about its reader (W41.app-page-kind): the kind, how sure, why this reader, and the
+/// reader that read it first. Set only on a page the run's plan named; `nil` = the page was not classified.
+struct PageReaderRecord: Codable, Equatable, Sendable {
+    let kind: String?
+    let confidence: Double?
+    let reason: PageKindRouting.Reason
+    /// The first reader, as the PDF header names it: provider rawValue and model display name.
+    let provider: String
+    let model: String
+    /// USD at the reader's standard page rate, and the run model's rate it replaced; set only when the page went to
+    /// a model other than the run's. The run history adds the difference to the run's estimate.
+    var estimatedCost: Double? = nil
+    var replacedCost: Double? = nil
+
+    /// True when the page was read by a model other than the run's (the guide's pick or the user's choice).
+    var isRouted: Bool { reason == .kind || reason == .override }
 }

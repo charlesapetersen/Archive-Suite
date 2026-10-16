@@ -295,7 +295,8 @@ extension OCRProcessor {
             visionTextThinkingLevel: runConfig?.visionTextLLM?.thinkingLevel,
             gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults(),
             segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored(),
-            cascade: runConfig?.cascade ?? OCRCascade.fromDefaults()
+            cascade: runConfig?.cascade ?? OCRCascade.fromDefaults(),
+            pageReaders: runConfig.map { $0.pageReaders.isEmpty ? nil : $0.pageReaders } ?? nil
         )
     }
 
@@ -334,6 +335,7 @@ extension OCRProcessor {
             runConfig.textColumns = runtime.textColumns
             runConfig.visionSettings = runtime.visionSettings
             runConfig.cascade = runtime.cascade ?? .off
+            runConfig.pageReaders = runtime.pageReaders ?? .empty
             runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
             if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
                 runConfig.visionTextLLM = LLMTextConfiguration(
@@ -853,15 +855,18 @@ extension OCRProcessor {
     func recordRunHistory(succeeded: Int) {
         guard let snapshot = activeRunHistory else { return }
         ProcessingHistoryStore.shared.record(snapshot.makeRun(
-            succeeded: succeeded, secondReaders: jobs.compactMap { $0.result?.secondReader }))
+            succeeded: succeeded, secondReaders: jobs.compactMap { $0.result?.secondReader },
+            pageReaders: jobs.compactMap { $0.result?.pageReader }))
         activeRunHistory = nil
     }
 
     /// The run summary's last line: the counts, and how many pages a second reader read (W41.app-ocr-default-fu1).
     func runDoneMessage(succeeded: Int, failed: Int) -> String {
         let secondRead = jobs.filter { $0.result?.secondReader != nil }.count
+        let routed = jobs.filter { $0.result?.pageReader?.isRouted == true }.count
         return "Done. \(succeeded) succeeded, \(failed) failed."
             + (secondRead == 0 ? "" : " \(secondRead) \(secondRead == 1 ? "page" : "pages") read by a second reader.")
+            + (routed == 0 ? "" : " \(routed) \(routed == 1 ? "page" : "pages") read by the reader \(routed == 1 ? "its" : "their") kind chose.")
     }
     /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
@@ -2159,7 +2164,7 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil,
@@ -2198,7 +2203,7 @@ extension OCRProcessor {
                                 gatewayConfig: gateway, localAgent: localAgent,
                                 rotationMode: ocrRun.rotationMode,
                                 standardImageMB: ocrRun.standardImageMB,
-                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
+                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
                             )
                             let result = await Self.applyingVisionTextClassification(
                                 to: ocrResult, previousText: nil,
@@ -2236,7 +2241,7 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
                 )
 
                 if Self.isTimeoutError(result) {
@@ -2250,7 +2255,7 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers
                     )
                 }
 
@@ -2801,6 +2806,9 @@ extension OCRProcessor {
         runConfig.gateway = gatewayConfig
         runConfig.outputImageFile = exportOriginals
         runConfig.localAgent = localAgent
+        // W41.app-page-kind: per-page readers apply to a direct, non-batch run only (a paid batch is one model).
+        runConfig.pageReaders = batchMode || gatewayConfig != nil || localAgent != nil ? .empty : pageReaders
+        pageReaders = .empty
         if let resumingMixedPDF {
             applyMixedPDFRuntimeConfig(resumingMixedPDF.runtimeConfig, to: &runConfig, apiKey: apiKey)
             activePendingMixedPDF = resumingMixedPDF
@@ -3380,13 +3388,13 @@ extension OCRProcessor {
             previousText: nil, previousImageURL: nil, gatewayConfig: effectiveRunConfig.gateway,
             localAgent: effectiveRunConfig.localAgent, rotationMode: ocrRun.rotationMode,
             standardImageMB: ocrRun.standardImageMB,
-            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade)
+            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode,
                                enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure),
-                               secondReader: result.secondReader)
+                               secondReader: result.secondReader, pageReader: result.pageReader)
         }
         result = await Self.applyingVisionTextClassification(
             to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,

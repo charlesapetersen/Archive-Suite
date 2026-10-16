@@ -74,6 +74,9 @@ class OCRProcessor: ObservableObject {
     var taggingMode: TaggingMode = .automatic
     /// How image rotation is detected. Set from the UI before a run.
     var rotationMode: RotationMode = .llmSingle
+    /// The next run's per-page readers (W41.app-page-kind), set by the file list just before Start; frozen into the
+    /// run's config and cleared there. Ignored by batch runs, the gateway and the Local Agent.
+    var pageReaders: PageReaderPlan = .empty
     /// When true (and rotation detection is on), pause for a dedicated rotation-review pass — separate
     /// from the tagging/segmentation review, and run in every tagging mode. Set from the UI before a run.
     var reviewRotation = false
@@ -595,6 +598,10 @@ class OCRProcessor: ObservableObject {
         /// The run's OCR cascade (W41.app-ocr-cascade), so a resumed run escalates to the route it began with.
         /// Nil reads as off.
         var cascade: OCRCascade? = nil
+
+        /// The run's per-page readers (W41.app-page-kind), so a resumed run reads each page with the reader it was
+        /// planned for. Nil reads as none.
+        var pageReaders: PageReaderPlan? = nil
     }
 
     struct PendingRun: Codable {

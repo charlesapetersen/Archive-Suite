@@ -519,11 +519,15 @@ struct OCRResult: Codable {
     /// W41.app-ocr-default — set when Gemini refused the page and a second route read it
     /// (`OCRRefusalFallback`). `nil` = read by the run's own model.
     let secondReader: SecondReader?
+    /// W41.app-page-kind — the page's kind and the reader its kind chose (`PageReaderPlan`). `nil` = the page was
+    /// not classified; set by `performOCRCall` on every page the run's plan names, routed or not.
+    var pageReader: PageReaderRecord?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
-         secondReader: SecondReader? = nil) {
+         secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil) {
         self.secondReader = secondReader
+        self.pageReader = pageReader
         self.text = text
         self.classification = classification
         self.rotationDegrees = rotationDegrees
@@ -555,7 +559,7 @@ struct OCRResult: Codable {
                   errorMessage: errorMessage, errorCode: errorCode,
                   enclosure: classification == self.classification ? enclosure : nil,
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
-                  secondReader: secondReader)
+                  secondReader: secondReader, pageReader: pageReader)
     }
 }
 

@@ -268,6 +268,9 @@ struct PDFGenerator {
         if let reader = result.secondReader {
             // W41.app-ocr-default: Gemini refused this page and another model wrote the text — name that model.
             headerLine += "\n\(reader.provider) \u{00B7} \(reader.model) \u{00B7} \(dateStr)"
+        } else if let routed = result.pageReader, routed.isRouted {
+            // W41.app-page-kind: the page's kind (or the user) chose another model than the run's — name that model.
+            headerLine += "\n\(routed.provider) \u{00B7} \(routed.model) \u{00B7} \(dateStr)"
         } else if let localName = localAgentDisplayName {
             headerLine += "\n\(localName) \u{00B7} \(localAgentModelName ?? "CLI default") \u{00B7} \(dateStr)"
         } else if let gwName = gatewayDisplayName {

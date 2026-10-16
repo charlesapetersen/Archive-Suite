@@ -119,6 +119,9 @@ private struct ProcessingHistoryRow: View {
             if let n = run.secondReaderPages, n > 0 {
                 Text("· \(n) read by a second reader")
             }
+            if let n = run.kindRoutedPages, n > 0 {
+                Text("· \(n) read by the reader their kind chose")
+            }
         }
         .font(.caption).foregroundStyle(.secondary)
     }

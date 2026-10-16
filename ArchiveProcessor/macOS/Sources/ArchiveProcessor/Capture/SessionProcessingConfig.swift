@@ -42,6 +42,9 @@ struct SessionProcessingConfig: Sendable {
     /// The cheap-first OCR cascade (W41.app-ocr-cascade): where a page the run's model fails goes. Frozen with the
     /// run so a settings change mid-run cannot send later pages to a different, dearer route.
     var cascade: OCRCascade = .off
+    /// The reader each page's kind chose (W41.app-page-kind), from the file list at Start. Empty = every page is read
+    /// by the run's model. Frozen with the run, like the cascade, so a resumed run reads each page as it began.
+    var pageReaders: PageReaderPlan = .empty
     /// Optional direct LLM used only after Apple Vision has produced text. The image OCR provider
     /// remains `.appleVision`; this value is deliberately never handed to `performOCRCall`.
     var visionTextLLM: LLMTextConfiguration? = nil
