@@ -109,21 +109,38 @@ final class NotesAppDelegate: NSObject, NSApplicationDelegate {
     /// that also re-indexes a large store.
     static let terminateFlushTimeout: Duration = .seconds(5)
 
+    /// True while the closed-window alert is modal. Its `runModal` runs inside a main-queue job, and a
+    /// nested run loop started there does not drain the main queue, so a terminate arriving meanwhile
+    /// (Dock Quit, logout) would start coordinator tasks that cannot run until the alert is dismissed.
+    /// Cancelling the terminate instead keeps the user in the one dialog they are already answering.
+    private var isAskingAfterFailedClose = false
+
     override init() {
         super.init()
-        flushRegistry.presentCloseFailure = { title, copy in Self.askAfterFailedClose(title: title, copy: copy) }
+        flushRegistry.presentCloseFailure = { [weak self] title, copy in
+            self?.isAskingAfterFailedClose = true
+            defer { self?.isAskingAfterFailedClose = false }
+            return Self.askAfterFailedClose(title: title, copy: copy)
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Nothing editing → quit immediately. Otherwise flush every open editor's pending edit first, and
         // reply as soon as it succeeds; a failure or the bound asks the user instead of quitting.
+        guard !isAskingAfterFailedClose else { return .terminateCancel }
         guard !flushRegistry.isEmpty else { return .terminateNow }
         let registry = flushRegistry
+        var retriedSilently = false
         TerminateFlushCoordinator(
             reply: { NSApp.reply(toApplicationShouldTerminate: $0) },
             writeCopies: { registry.writeEmergencyCopies() },
             prompt: { copies, timedOut in
-                Self.askAfterFailedQuit(drafts: registry.unsavedDrafts(), copies: copies, timedOut: timedOut)
+                let drafts = registry.unsavedDrafts()
+                // A refusal that resolved meanwhile (a closed window's own Retry saved it while this
+                // attempt's flush had already failed): nothing is unsaved, so one silent retry saves
+                // nothing and quits. Once only — a flush that keeps failing with no draft is asked about.
+                if drafts.isEmpty, !timedOut, !retriedSilently { retriedSilently = true; return .retry }
+                return Self.askAfterFailedQuit(drafts: drafts, copies: copies, timedOut: timedOut)
             }
         ).begin(flush: { await registry.flushAll() }, timeout: Self.terminateFlushTimeout)
         return .terminateLater

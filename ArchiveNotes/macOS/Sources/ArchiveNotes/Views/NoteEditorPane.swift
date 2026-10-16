@@ -138,6 +138,12 @@ struct NoteEditorPane: View {
                 let title = model.allItems.first { $0.id == draft.id }?.title ?? "Untitled"
                 return EditorDraft(itemID: draft.id, title: title, markdown: draft.markdown)
             })
+            // A refused autosave copies the draft at once (a crash before close/quit must not lose it);
+            // the copy goes once a save lands. The registry weak-captured: it outlives every pane anyway.
+            let registry = flushRegistry
+            bodyEditor.onSaveResult = { [weak registry, paneID] saved in
+                if saved { registry?.discardCopy(for: paneID) } else { registry?.copyDraft(for: paneID) }
+            }
             // W9.b5-fu1: a window opened FOR an open request (`.openFeaturingWindow`) can get that request
             // as `onReceive`'s initial value, before this `onAppear` has wired the body seams above.
             // Selecting then would load through the default `load` (returns nil): the item would be marked

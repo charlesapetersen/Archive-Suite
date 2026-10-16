@@ -41,8 +41,9 @@ final class EditorFlushRegistry: ObservableObject {
     /// finally saves — unless the user has since edited that file, which then is theirs to keep.
     private var copies: [UUID: (url: URL, markdown: String)] = [:]
 
-    /// Closed panes whose draft is still unsaved (kept in memory, retried on quit).
-    @Published private(set) var retainedPaneIDs: Set<UUID> = []
+    /// Closed panes whose draft is still unsaved (kept in memory, retried on quit). A plain property:
+    /// nothing observes it, and a published change here would re-render every pane in both windows.
+    private(set) var retainedPaneIDs: Set<UUID> = []
 
     /// Where emergency copies go. Nil (unit tests that don't exercise it) = no copy.
     var vault: UnsavedDraftVault?
@@ -129,6 +130,16 @@ final class EditorFlushRegistry: ObservableObject {
         return covered ? written : nil
     }
 
+    /// A live pane's autosave was refused: copy its draft NOW, so a crash or force-kill before the window
+    /// closes or the app quits still leaves the text on disk (the copy is otherwise written only then).
+    /// Reuses the previous copy while the text is unchanged, so steady typing against a refusing store
+    /// rewrites one file rather than piling up copies.
+    @discardableResult
+    func copyDraft(for id: UUID) -> URL? { writeCopy(for: id) }
+
+    /// A live pane's save landed: its emergency copy is no longer needed (kept if the user edited it).
+    func discardCopy(for id: UUID) { removeCopy(for: id) }
+
     /// A copy of the pane's current draft. The previous copy is reused if it already holds exactly
     /// this text, and otherwise replaced only after the newer one is safely written.
     private func writeCopy(for id: UUID) -> URL? {
@@ -157,18 +168,20 @@ enum QuitFailureChoice: Sendable { case retry, cancel, quit }
 struct UnsavedDraftVault: Sendable {
     let directory: URL
 
-    /// `~/Library/Application Support/Archive Notes/Unsaved Drafts` (inside the sandbox container).
+    /// `~/Library/Application Support/ArchiveNotes/Unsaved Drafts` (inside the sandbox container) — the
+    /// same `ArchiveNotes` folder the index, Zotero cache and root-folder bookmarks already use.
     static func standard() -> UnsavedDraftVault? {
         guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         else { return nil }
-        return UnsavedDraftVault(directory: support.appendingPathComponent("Archive Notes/Unsaved Drafts", isDirectory: true))
+        return UnsavedDraftVault(directory: support.appendingPathComponent("ArchiveNotes/Unsaved Drafts", isDirectory: true))
     }
 
     func write(_ draft: EditorDraft, now: Date = Date()) throws -> URL {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let stamp = Self.stampFormatter.string(from: now)
         let safe = String(draft.title.map { "/:\\".contains($0) || $0.isNewline ? "-" : $0 })
-        let name = Self.truncated(safe.trimmingCharacters(in: .whitespaces), maxBytes: 120)
+        var name = Self.truncated(safe.trimmingCharacters(in: .whitespaces), maxBytes: 120)
+        if name.hasPrefix(".") { name = "-" + name.dropFirst() }   // never a hidden copy
         let base = "\(name.isEmpty ? "Untitled" : name) — unsaved \(stamp) \(draft.itemID.uuidString.prefix(8))"
         var url = directory.appendingPathComponent(base + ".md")
         var n = 2

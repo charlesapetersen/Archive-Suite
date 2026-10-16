@@ -14,10 +14,17 @@ asset writes are flushed before recovery, and retired editor bindings cannot res
 Scratch unit tests cover outside in-place/atomic writes, metadata, independent editors, assets/symlinks,
 late keystrokes and refused recovery/retry; `WritingJourneyUITests` proves both the clean reload and the
 recovered-draft conflict in the VM (5/5). A save the store refuses no longer loses the draft on close or
-quit (W40.fix-notes-failed-save-close, fixed 2026-10-15): a closed editor's draft is kept in memory, copied
-to Application Support/Archive Notes/Unsaved Drafts, and offered a Retry; quit is refused behind a
-Retry / Don't Quit / Quit alert until it saves. Templates' own save seam is not covered by this. File coordination protects cooperating writers;
-an arbitrary uncoordinated process can still write during another process’s replacement operation.
+quit (W40.fix-notes-failed-save-close, fixed 2026-10-15): the first refused autosave copies the draft to
+`Application Support/ArchiveNotes/Unsaved Drafts` (inside the sandbox container), a closed editor's draft is
+kept in memory and offered a Retry, and quit is refused behind a Retry / Don't Quit / Quit alert until it
+saves (`WritingJourneyUITests` 7/7 in the VM). Residuals, none lossy: a retained draft is not shown when the
+same note is opened again (switching to Templates and back, or a new window) — the new editor loads the
+on-disk body, and if it is edited and saved first the retained draft lands at quit as a “Recovered draft”
+note; a retained draft for a note trashed meanwhile fails every quit flush until Quit is chosen (its copy
+stands); copies written on the slow-save path stay behind. Templates' own save seam cannot report a refusal,
+so a refused template body is still lost on quit: `W40.fix-notes-failed-save-close-fu1`. File coordination
+protects cooperating writers; an arbitrary uncoordinated process can still write during another process’s
+replacement operation.
 
 
 ## 🔴 OPEN (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM

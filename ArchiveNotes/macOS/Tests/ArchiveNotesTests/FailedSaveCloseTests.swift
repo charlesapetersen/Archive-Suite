@@ -115,6 +115,34 @@ struct FailedSaveCloseTests {
         #expect(vaultFiles(env).isEmpty, "the copy is removed once the draft is saved")
     }
 
+    @Test("LIVE pane: the first refused autosave copies the draft at once; the copy follows the text and goes when it saves")
+    func refusedAutosaveCopiesImmediately() async throws {
+        let env = try await makeEnv(); defer { restore(env); Task { await cleanup(env) } }
+        let editor = editor(env)
+        await editor.select(env.item.id)
+        let registry = EditorFlushRegistry(vault: env.vault)
+        let pane = UUID()
+        register(editor, pane, in: registry)
+        // Exactly the pane's wiring: refused → copy now, landed → drop the copy.
+        editor.onSaveResult = { saved in
+            if saved { registry.discardCopy(for: pane) } else { registry.copyDraft(for: pane) }
+        }
+        setWritable(itemDir(env), false)
+        editor.markdown = "First"
+        #expect(await editor.flushPending() == false)
+        #expect(try vaultFiles(env).map { try String(contentsOf: $0, encoding: .utf8) } == ["First"],
+                "the draft is on disk before any close or quit")
+        editor.markdown = "First, then more."
+        #expect(await editor.flushPending() == false)
+        #expect(try vaultFiles(env).map { try String(contentsOf: $0, encoding: .utf8) } == ["First, then more."],
+                "one copy, following the text")
+        #expect(!registry.isEmpty && registry.retainedPaneIDs.isEmpty, "still a live pane, not a retained one")
+        setWritable(itemDir(env), true)
+        #expect(await editor.flushPending())
+        #expect(vaultFiles(env).isEmpty, "the copy goes once the save lands")
+        #expect(await env.model.loadBody(for: env.item.id) == "First, then more.")
+    }
+
     @Test("CLOSE retry: Retry after the problem is fixed saves the draft and drops the pane")
     func closeRetrySaves() async throws {
         let env = try await makeEnv(); defer { restore(env); Task { await cleanup(env) } }
@@ -210,6 +238,8 @@ struct FailedSaveCloseTests {
         #expect(FileManager.default.fileExists(atPath: outside.path))
         let url = try vault.write(EditorDraft(itemID: UUID(), title: "a/b:c", markdown: "body"))
         #expect(url.lastPathComponent.hasPrefix("a-b-c — unsaved "))
+        let hidden = try vault.write(EditorDraft(itemID: UUID(), title: ".profile", markdown: "x"))
+        #expect(hidden.lastPathComponent.hasPrefix("-profile — unsaved "), "a dot title must not make a hidden copy")
         let second = try vault.write(EditorDraft(itemID: UUID(), title: "a/b:c", markdown: "other"))
         #expect(second != url)
         vault.remove(url, ifItHolds: "changed by the user")

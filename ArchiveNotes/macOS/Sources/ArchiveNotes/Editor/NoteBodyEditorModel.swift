@@ -51,6 +51,10 @@ final class NoteBodyEditorModel: ObservableObject {
     /// Inline asset tasks must land before a recovery snapshot copies the item's assets.
     var prepareSave: () async -> Void = {}
     var onExternalChange: () -> Void = {}
+    /// Each checked save's outcome: false when the store refused it (the host copies the draft to the
+    /// emergency vault at once), true when it landed (the host drops that copy). Not called for the
+    /// template `save` seam, which cannot report a refusal.
+    var onSaveResult: (Bool) -> Void = { _ in }
     @Published private(set) var externalChangeMessage: String?
     /// Recreate TextKit after a conflict reload so old undo/serialization cannot restore stale text.
     @Published private(set) var reloadGeneration = 0
@@ -182,8 +186,12 @@ final class NoteBodyEditorModel: ObservableObject {
         await prepareSave()
         let saved: String
         if let checkedSave {
-            guard let actual = await checkedSave(id, body, expected) else { return false }
+            guard let actual = await checkedSave(id, body, expected) else {
+                if loadedID == id { onSaveResult(false) }
+                return false
+            }
             saved = actual
+            if loadedID == id { onSaveResult(true) }
         } else {
             await save(id, body)
             saved = body

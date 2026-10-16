@@ -11415,3 +11415,26 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   spend); `test-ocr-refusal` 44, `test-openrouter` 138, `test-batch-resume` 393 all pass. No money; no migration
   written, since there is nothing to migrate.
   <!-- /W41.app-ocr-cascade -->
+
+- [x] **W40.fix-notes-failed-save-close — closing a note window or quitting after a failed save discards its unsaved draft [S-M · S1 · Tier-2]** · §W40 — SHIPPED 2026-10-16 (eb3725ad checkpoint 1 → this commit). (lane: notes) (uses: build,vm). Confirmed during W40.fix-notes-outside-edit-overwrite review against baseline `de1f98dd`: `NoteBodyEditorModel.flush` has no success result, `NoteEditorPane.onDisappear` deregisters the pane before awaiting it, and `NotesAppDelegate.applicationShouldTerminate` / `TerminateFlushCoordinator` always allow termination after the flush or timeout. A content write refused by the disk therefore loses the in-app draft when that pane/process goes away. The outside-edit fix retains a failed recovery draft while its editor lives and refuses selection switches, but cannot protect it from close/quit under this existing lifecycle. Make failed flushes cancel close/quit or retain a durable recovery before allowing them; include a user-visible retry route. Scratch functional test: force the store write/recovery to fail, type, close/quit, restore writes, and prove every keystroke remains recoverable. Test both a normal save and an outside-edit conflict.
+  **Shipped:** `NoteBodyEditorModel.flush`/`flushPending` report whether the draft is saved; `EditorFlushRegistry.paneClosed` keeps a
+  closed pane whose flush failed (model and all), writes an emergency Markdown copy through `UnsavedDraftVault`
+  (`Application Support/ArchiveNotes/Unsaved Drafts`, inside the container; the vault deletes only files it wrote and only while they
+  still hold what it wrote) and shows Retry / OK / Show Copy in Finder; the first refused autosave of a LIVE pane copies the draft at
+  once (`onSaveResult`), so a crash before close or quit does not lose it either; `flushAll` reports success so quit retries retained
+  panes; `TerminateFlushCoordinator` writes copies and asks Retry / Don't Quit / Quit on a failed flush or at the bound (2 s → 5 s),
+  replying with the answer — a draft that resolved meanwhile is retried once silently; a terminate that arrives while the close alert
+  is modal is cancelled (its `runModal` sits in a main-queue job, so coordinator tasks could not run). Evidence:
+  `verification/evidence/notes/W40.fix-notes-failed-save-close-{close,quit}-alert.jpg`.
+  **Verified:** Notes unit bundle TEST SUCCEEDED; `FailedSaveCloseTests` + `FailedSaveQuitTests` (real scratch store, refusal by chmod):
+  refused normal save keeps every keystroke, copies it, saves on retry at quit; refused outside-edit recovery keeps the draft and
+  writes the recovery note once writes return; close Retry loop; live-pane immediate copy; reappearing pane; vault containment,
+  collision suffix, 255-byte names, dot titles; coordinator cancel / retry / quit / wedged / late success; real-store quit end to end.
+  VM `WritingJourneyUITests` 7/7 including `testFailedSaveThenCloseKeepsDraftAndRetries` and `testFailedSaveBlocksQuitUntilRetrySaves`.
+  Re-run 2026-10-16 after the review fixes, rebased on main: unit bundle TEST SUCCEEDED with no warnings, VM 7/7.
+  **Review (Tier-2, adversarial):** no remaining loss path, no double write (concurrent close+quit flushes serialize on the published
+  save task), reply fires exactly once, no retain cycle. Taken: cancel-terminate-during-close-alert, silent retry when the drafts
+  resolved, immediate copy on refusal, plain (not `@Published`) retained set, vault folder aligned with the app's, dot-title guard.
+  Residuals recorded in `ArchiveNotes/KNOWN_ISSUES.md` (retained draft not shown on reopening the note; trashed-note retained draft
+  blocks quit until Quit; slow-path copies linger). Templates' seam cannot report a refusal → `W40.fix-notes-failed-save-close-fu1`.
+  <!-- /W40.fix-notes-failed-save-close -->
