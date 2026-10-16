@@ -60,9 +60,8 @@ the cloud panel, at 96.47.
 - **Qwen3-VL 8B is the floor.** It is the only candidate the job runs at exactly the precision OpenRouter measured
   (bf16).
 - **Segmentation:** `Qwen/Qwen3.5-27B-FP8` (preset `qwen3.5-27b`). It got 95.0% of pages into the exact document on
-  Deaver at fp8 (W41.seg-large), and it fits the same card. The preset serves it, but the segmentation windows and
-  their assembly (`method_openrouter.py`) are not wired to a local server yet. That is the only part of the item
-  that is not ready to run. Its OCR row reads 81.80 only because SiliconFlow failed 14 pages. On the pages it
+  Deaver at fp8 (W41.seg-large), and it fits the same card. `submit.sh seg` runs those windows on the node
+  (§Segmentation, below). Its OCR row reads 81.80 only because SiliconFlow failed 14 pages. On the pages it
   completed it scored 95.76.
 
 ### Why not the whole four-card node (192 GB)
@@ -164,6 +163,49 @@ vLLM or stops with a conflict; it never changes what the measured runs used. If 
 venv for the reader (vLLM is only reached over HTTP), not loosening the pins. Untried on the cluster, and so open:
 whether vLLM 0.31.0 serves GLM-OCR with MTP, and whether the detector fits in the 20% of the card the preset leaves.
 
+## Segmentation (`seg` mode, W41.farmshare-seg)
+
+Built 2026-10-15; **not yet run on FarmShare** (`W41.farmshare-seg-run`, the owner's login). It measures
+segmentation's best open model, Qwen3.5 27B at fp8 (`Qwen/Qwen3.5-27B-FP8`, preset `qwen3.5-27b`), on Deaver's 51
+windows, the request W41.seg-large sent through OpenRouter unchanged: method_window_cues's codex prompt, seven pages a
+window at 1024 px, temperature 0, thinking off (vLLM takes it as the chat template's `enable_thinking`), one retry
+at twice the token limit. The OpenRouter run scored 95.0% of pages in the exact document (0 false splits, 3 false
+merges), so the FarmShare row says what FarmShare's build and vLLM give against that, and how many pages an hour.
+
+A window's request needs the bench's `sips` thumbnails and its OCR text, neither of which is on the node, so
+`fs_seg.py` works in three steps:
+
+```bash
+# on the Mac, in ArchiveProcessor/scripts/segbench (the bench's Python: numpy, Pillow)
+python farmshare/fs_seg.py pack --out /tmp/fs-segpack      # 51 windows, 149 page images, 34 MB
+scp -r /tmp/fs-segpack <sunet>@login.farmshare.stanford.edu:
+# on FarmShare, in this folder
+bash download.sh qwen3.5-27b                              # ~31 GB
+bash submit.sh seg qwen3.5-27b --pack ~/fs-segpack        # vLLM with 7 images a prompt, 20,480 tokens
+# back on the Mac: copy $FS_ROOT/runs/seg/qwen3.5-27b/ here, then
+python farmshare/fs_seg.py import --run qwen3.5-27b
+python method_openrouter.py report Deaver                 # the FarmShare row beside the OpenRouter one
+```
+
+- **The pack** is what OpenRouter received in W41.seg-large: Deaver's page images and OCR text. Deaver is a
+  development box; `pack` refuses the test boxes.
+- **The run** writes `answers.jsonl` (one line per window, with the model's reply) and a `summary-<time>.json`
+  with windows ok and failed, the wall time and pages an hour per GPU (the box's 149 pages over the wall time).
+  A window that never parses is recorded as failed and votes 0.5 on its gaps, as `collect` does. A request the
+  server refuses stops the run with exit 1, since it means the server is set up wrong, and the window is not
+  recorded. Windows the server never answered are left to do (exit 75), and submitting again sends only those:
+  every submission writes to the preset's one folder, `runs/seg/qwen3.5-27b/`.
+- **The import** checks every answer is for a request this checkout still makes, then puts each one into
+  `window-or-fs-qwen3.5-27b` and rewrites that key's call log from the run. `answers.jsonl` quotes page text in
+  its cues, so it stays out of git, like the cache.
+- **Without the pack:** `SEGBENCH_OR_API=<server>/v1 python method_openrouter.py collect fs-qwen3.5-27b` sends
+  the same requests from the Mac to any OpenAI-compatible server it can reach. Only the FarmShare key goes to a
+  server set this way; every other key and every other caller stays on OpenRouter, and the API key is sent to
+  OpenRouter alone.
+
+Tested offline with the real Deaver requests and a fake server that replays the OpenRouter answers: the imported
+row reads 95.0%, 0 false splits, 3 false merges, the same as the OpenRouter row.
+
 ## FarmShare's limits (read on the cluster, not assumed)
 
 This is what the docs said on 2026-10-15 (docs.farmshare.stanford.edu, read through a fetch summary):
@@ -229,10 +271,11 @@ QOS, GPUs, `--time`, and the number of bulk shards.
 
 | file | what |
 |---|---|
+| `fs_seg.py` | segmentation: `pack` (Mac), `run` (node), `import` (Mac), the seg-large request against the local server |
 | `fs_ocr.py` | `pack` (Mac), `truth`, `news`, `bulk`. Imports the panel's `PROMPT`, image cap and `max_tokens`, so a FarmShare row is the panel's measurement at FarmShare's precision. `--layout` reads with `news_layout.py` instead |
 | `news_layout.py` | the layout-first reader: `newspaper-ocr`'s DocLayout-YOLO + GLM-OCR pipeline against the local vLLM server |
 | `limits.py` | reads the cluster's limits and writes `limits.env` |
 | `models.sh` | presets: Hugging Face repo, GPUs, download size, vLLM flags |
 | `setup.sh`, `download.sh`, `submit.sh`, `job.sbatch` | environment, weights, fitted submission, and the GPU job that serves vLLM on localhost and runs one mode |
 | `estimate.py` | the estimate table above |
-| `test_farmshare.py` | 20 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |
+| `test_farmshare.py` | 25 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring), segmentation's windows (the request, the retry, failed and refused windows, resume), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |

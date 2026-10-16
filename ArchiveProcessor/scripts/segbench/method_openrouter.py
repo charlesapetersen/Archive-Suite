@@ -9,6 +9,7 @@ W41.seg-cheap: the cheap cloud models over the same windows (the ``CHEAP`` set, 
     python method_openrouter.py estimate-five                  # what the finalists' uncached five-box windows cost
     python method_openrouter.py collect-five <model> --final   # those calls (dev boxes, then the test boxes)
     python method_openrouter.py report-five                    # each finalist on all five boxes, flagged at <= 0.85
+    SEGBENCH_OR_API=http://127.0.0.1:8000/v1 python method_openrouter.py collect fs-qwen3.5-27b   # a local server
 
 Owner, 2026-10-11 (SUITE_TODO W41): do the models a 64 GB Mac could hold segment any better than the 4B-12B
 ones did on device (method_local, 47-57% pages in exact doc), or come near the cloud's 97.9% on Deaver? So the
@@ -59,6 +60,7 @@ import method_local as L
 from score import derived, score_labels
 
 API = "https://openrouter.ai/api/v1"
+LOCAL_API = __import__("os").environ.get("SEGBENCH_OR_API", "").rstrip("/")  # FARMSHARE keys only (below)
 CAP_USD = 1.00
 MAX_TOKENS = L.MAX_TOKENS
 PROMPT_VERSION = "o1"
@@ -95,14 +97,24 @@ CHEAP = {
     "gemini3.1-flash-lite": ("google/gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "google-ai-studio", None, "minimal", (0.125, 0.75)),
 }
 FAILED = L.FAILED
+# W41.farmshare-seg: the same windows against a local OpenAI-compatible server (vLLM on a FarmShare L40S), the
+# seg-large request otherwise unchanged: 1024 px images, temperature 0, thinking off through the chat template
+# (vLLM has no OpenRouter ``reasoning`` field), no provider, no key, no money. ``SEGBENCH_OR_API`` is where these
+# keys' requests go, and only theirs: every other key, and every other caller of ``post``, stays on OpenRouter. On
+# FarmShare the node cannot reach the Mac's thumbnails, so farmshare/fs_seg.py packs these exact requests on the
+# Mac, sends them on the node and imports the answers into this key's cache and log.
+# key: (served model name, label, where, precision, parameters, local 4-bit GB)
+FARMSHARE = {
+    "fs-qwen3.5-27b": ("Qwen/Qwen3.5-27B-FP8", "Qwen3.5 27B", "FarmShare L40S vLLM", "fp8", "27B dense", 17),
+}
 
 
 def entry(key):
-    return MODELS.get(key) or CHEAP[key]
+    return MODELS.get(key) or FARMSHARE.get(key) or CHEAP[key]
 
 
 def models_of(key):
-    return CHEAP if key in CHEAP else MODELS
+    return CHEAP if key in CHEAP else FARMSHARE if key in FARMSHARE else MODELS
 
 
 def cap_of(key):
@@ -153,6 +165,8 @@ def cache_key(key, prompt, thumbs):
     hashes = [data.file_hash(t) for t in thumbs]
     if key in CHEAP:
         return data.response_cache_key(m[0], m[2], m[3], m[4], PROMPT_VERSION, W.THUMB_PX, prompt, hashes)
+    if key in FARMSHARE:
+        return data.response_cache_key(m[0], "farmshare", PROMPT_VERSION, L.MAX_SIDE, prompt, hashes)
     return data.response_cache_key(m[0], m[2], PROMPT_VERSION, L.MAX_SIDE, prompt, hashes)
 
 
@@ -168,27 +182,47 @@ def judge(key):
     return judge_window
 
 
-def image_url(path, side=L.MAX_SIDE) -> str:
+def image_jpeg(path, side=L.MAX_SIDE) -> bytes:
     from PIL import Image
     im = Image.open(path).convert("RGB")
     im.thumbnail((side, side), Image.LANCZOS)
     buf = io.BytesIO()
     im.save(buf, "JPEG", quality=90)
-    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+    return buf.getvalue()
+
+
+def data_url(jpeg: bytes) -> str:
+    return "data:image/jpeg;base64," + base64.b64encode(jpeg).decode()
+
+
+def image_url(path, side=L.MAX_SIDE) -> str:
+    return data_url(image_jpeg(path, side))
 
 
 class Fatal(RuntimeError):
     pass
 
 
-def post(body: dict) -> dict:
-    """POST with back-off on 429/5xx/network errors. Errors name the status, never the key."""
+def api_of(key) -> str:
+    """A FarmShare key goes to the local server and only there; every other key to OpenRouter."""
+    if key not in FARMSHARE:
+        return API
+    if not LOCAL_API:
+        raise SystemExit(f"{key} needs SEGBENCH_OR_API=<an OpenAI-compatible server>/v1")
+    return LOCAL_API
+
+
+def post(body: dict, api=API) -> dict:
+    """POST with back-off on 429/5xx/network errors. Errors name the status, never the key, which is sent to
+    OpenRouter alone."""
     import requests
     last = None
+    headers = {"Content-Type": "application/json"}
+    if api == API:
+        headers["Authorization"] = f"Bearer {api_key()}"
     for attempt in range(5):
         try:
-            r = requests.post(f"{API}/chat/completions", json=body, timeout=TIMEOUT_S,
-                              headers={"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"})
+            r = requests.post(f"{api}/chat/completions", json=body, timeout=TIMEOUT_S, headers=headers)
         except requests.RequestException as e:
             last = f"network: {type(e).__name__}"
         else:
@@ -205,14 +239,17 @@ def post(body: dict) -> dict:
     raise RuntimeError(f"gave up after 5 attempts: {last}")
 
 
-def call(key, prompt, thumbs, max_tokens) -> tuple[str, dict]:
+def request_body(key, prompt, urls, max_tokens) -> dict:
+    """The chat request for one window; ``urls`` are the images' data URLs in page order."""
     model, _, provider, precision, *rest = entry(key)
-    content = []
-    for t in thumbs:
-        content.append({"type": "image_url", "image_url": {"url": image_url(t, side_of(key))}})
+    content = [{"type": "image_url", "image_url": {"url": u}} for u in urls]
     content.append({"type": "text", "text": prompt})
     body = {"model": model, "messages": [{"role": "user", "content": content}], "temperature": 0,
             "max_tokens": max_tokens, "reasoning": {"enabled": False}, "usage": {"include": True}}
+    if key in FARMSHARE:
+        del body["reasoning"], body["usage"]
+        body["chat_template_kwargs"] = {"enable_thinking": False}  # Qwen3.5's template honours the switch
+        return body
     if key in CHEAP:
         effort = rest[0]
         if effort is None:
@@ -223,8 +260,13 @@ def call(key, prompt, thumbs, max_tokens) -> tuple[str, dict]:
         body["provider"] = {"order": [provider], "allow_fallbacks": False}
         if precision:
             body["provider"]["quantizations"] = [precision]
+    return body
+
+
+def call(key, prompt, thumbs, max_tokens) -> tuple[str, dict]:
+    body = request_body(key, prompt, [image_url(t, side_of(key)) for t in thumbs], max_tokens)
     t0 = time.time()
-    j = post(body)
+    j = post(body, api_of(key))
     msg = (j.get("choices") or [{}])[0].get("message") or {}
     u = j.get("usage") or {}
     return msg.get("content") or "", {"wall_s": round(time.time() - t0, 1), "provider": j.get("provider"),
@@ -239,6 +281,7 @@ def collect(key, names, limit=None, final=False):
             raise SystemExit(f"{key} is not a frozen finalist ({CHEAP_FROZEN.name})")
     else:
         W.refuse_test(names)
+    api_of(key)
     jw = judge(key)
     jobs = [(c, a, b) for n in names for c in [data.load(n, with_exif=False)] for a, b in W.windows(len(c.pages))]
     todo = [j for j in jobs if jw(*j) is None][: limit or None]
@@ -313,23 +356,26 @@ def endpoints(table=MODELS):
 def rows(name) -> list[str]:
     col = data.load(name)
     out = []
-    for key, (model, label, provider, precision, params, gb) in MODELS.items():
+    for key, (model, label, provider, precision, params, gb) in {**MODELS, **FARMSHARE}.items():
+        route, where = (provider, "L40S") if key in FARMSHARE else (f"OpenRouter {provider}", "cloud")
         recs = [r for r in records(key) if r["collection"] == name]
+        if key in FARMSHARE and not recs:
+            continue  # not run on FarmShare: no row, rather than a "not collected" one in every report
         last = {}
         for r in recs:
             last[tuple(r["window"])] = r
         try:
             pred = W.assemble(col, W.combine(col, judge(key)), False)
         except RuntimeError:
-            out.append(f"| {label} ({params}), OpenRouter {provider or '?'} {precision or '?'} | not collected "
+            out.append(f"| {label} ({params}), {route} {precision or '?'} | not collected "
                        f"({len(last)} windows run) | | | | | ~{gb} |")
             continue
         r = derived(score_labels(col.labels, pred.labels, name))
         failed = sum(1 for x in last.values() if x["event"] == FAILED)
         mean = sum(x["wall_s"] for x in recs) / max(1, len(recs))
         cost = sum(x.get("cost") or 0 for x in recs)
-        out.append(f"| {label} ({params}), OpenRouter {provider} {precision} | {100 * r['pages_in_exact_doc']:.1f}% "
-                   f"| {r['false_splits']} | {r['false_merges']} | {failed} | {mean:.0f} (cloud) | ~{gb} (4-bit, est.) "
+        out.append(f"| {label} ({params}), {route} {precision} | {100 * r['pages_in_exact_doc']:.1f}% "
+                   f"| {r['false_splits']} | {r['false_merges']} | {failed} | {mean:.0f} ({where}) | ~{gb} (4-bit, est.) "
                    f"| ${cost:.3f} |")
     return out
 
@@ -500,7 +546,7 @@ def main(argv) -> int:
         for name in argv[1:] or ["Deaver"]:
             W.refuse_test([name])
             print("\n".join(cheap_rows(name)))
-    elif len(argv) >= 2 and argv[0] == "collect" and (argv[1] in MODELS or argv[1] in CHEAP):
+    elif len(argv) >= 2 and argv[0] == "collect" and (argv[1] in MODELS or argv[1] in CHEAP or argv[1] in FARMSHARE):
         rest = argv[2:]
         limit = None
         if "--limit" in rest:

@@ -1,4 +1,5 @@
-"""W41.farmshare-plan offline tests: Slurm-limit parsing, and fs_ocr.py against a fake vLLM server on localhost.
+"""W41.farmshare-plan offline tests: Slurm-limit parsing, and fs_ocr.py and fs_seg.py against a fake vLLM server on
+localhost.
 No cluster, GPU, corpus or paid API. Run: python3 -m unittest test_farmshare (from this directory)."""
 import http.server
 import io
@@ -24,6 +25,11 @@ try:
     SCORING = True
 except ImportError:
     SCORING = False
+try:
+    import numpy  # noqa: F401
+    NUMPY = True
+except ImportError:
+    NUMPY = False
 
 
 class Limits(unittest.TestCase):
@@ -428,6 +434,129 @@ class Shell(unittest.TestCase):
                      '--speculative-config {"method":"mtp","num_speculative_tokens":1}'):
             self.assertIn(flag, glm)
         self.assertEqual(after, '0|')                          # the layout route does not leak into the next preset
+
+
+def seg_answer(nums, conf=0.9):
+    return json.dumps({'pages': [{'page': n, 'kind': 'document'} for n in nums],
+                       'boundaries': [{'between': [n, n + 1], 'decision': 'continue', 'confidence': conf, 'cue': 'same'}
+                                      for n in nums[:-1]]})
+
+
+class FakeSeg(http.server.BaseHTTPRequestHandler):
+    """vLLM's /v1/chat/completions for segmentation windows. Window 1-3's first answer is unparseable, window 4-6
+    never parses, and a window starting at page 7 is refused (400), so the retry, failure and stop paths all run."""
+    seen = []
+
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        b = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        FakeSeg.seen.append(b)
+        prompt = b['messages'][0]['content'][-1]['text']
+        nums = json.loads(prompt)
+        if nums[0] == 7:
+            self.send_response(400); self.send_header('Content-Length', '4'); self.end_headers(); self.wfile.write(b'nope')
+            return
+        bad = nums[0] == 4 or (nums[0] == 1 and b['max_tokens'] == 1500)
+        out = json.dumps({'choices': [{'message': {'content': '<think>x</think>not json' if bad else seg_answer(nums)},
+                                       'finish_reason': 'stop'}],
+                          'usage': {'prompt_tokens': 5000, 'completion_tokens': 200}}).encode()
+        self.send_response(200); self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(out))); self.end_headers(); self.wfile.write(out)
+
+
+@unittest.skipUnless(NUMPY, 'fs_seg imports the bench (numpy)')
+class Seg(unittest.TestCase):
+    """fs_seg.py run on a synthetic pack (the prompt is the window's page list, so the fake can answer it)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), FakeSeg)
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+        cls.url = f'http://127.0.0.1:{cls.httpd.server_port}'
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+
+    def setUp(self):
+        FakeSeg.seen.clear()
+        self.tmp = Path(tempfile.mkdtemp(prefix='fs-seg-test-'))
+
+    def pack(self, windows, model='Qwen/Qwen3.5-27B-FP8'):
+        from PIL import Image
+        pack = self.tmp / 'pack'
+        pages = sorted({n for w in windows for n in w})
+        for n in pages:
+            (pack / 'images' / 'Deaver').mkdir(parents=True, exist_ok=True)
+            Image.new('RGB', (64, 48), (n, 0, 0)).save(pack / 'images' / 'Deaver' / f'{n}.jpg', quality=90)
+        (pack / 'windows.jsonl').write_text(''.join(json.dumps({'box': 'Deaver', 'window': w, 'cache_key': f'k{w[0]}',
+                                                                'prompt': json.dumps(w)}) + '\n' for w in windows))
+        (pack / 'pack.json').write_text(json.dumps({'key': 'fs-qwen3.5-27b', 'model': model, 'box': 'Deaver',
+                                                    'pages': len(pages), 'windows': len(windows)}))
+        return pack
+
+    def run_seg(self, pack, model='Qwen/Qwen3.5-27B-FP8'):
+        cmd = [sys.executable, str(HERE / 'fs_seg.py'), 'run', '--pack', str(pack), '--out', str(self.tmp / 'out'),
+               '--label', 'L', '--url', self.url, '--model', model, '--concurrency', '2']
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+    def answers(self):
+        return {r['cache_key']: r for r in map(json.loads, (self.tmp / 'out/L/answers.jsonl').read_text().splitlines())}
+
+    def test_request_is_the_seg_large_request_without_openrouter_fields(self):
+        out = self.run_seg(self.pack([[10, 11, 12]]))
+        self.assertEqual(out.returncode, 0, out.stderr)
+        b = FakeSeg.seen[0]
+        self.assertEqual(b['model'], 'Qwen/Qwen3.5-27B-FP8')
+        self.assertEqual((b['temperature'], b['max_tokens']), (0, 1500))
+        self.assertEqual(b['chat_template_kwargs'], {'enable_thinking': False})
+        for k in ('provider', 'reasoning', 'usage'):
+            self.assertNotIn(k, b)
+        parts = b['messages'][0]['content']
+        self.assertEqual([p['type'] for p in parts], ['image_url'] * 3 + ['text'])
+        import base64
+        sent = [base64.b64decode(p['image_url']['url'].split(',', 1)[1]) for p in parts[:3]]
+        self.assertEqual(sent, [(self.tmp / f'pack/images/Deaver/{n}.jpg').read_bytes() for n in (10, 11, 12)])
+        r = self.answers()['k10']
+        self.assertEqual((r['status'], r['attempt'], r['prompt_tokens']), ('ok', 0, 5000))
+        s = json.loads(next((self.tmp / 'out/L').glob('summary-*.json')).read_text())
+        self.assertEqual((s['ok'], s['failed'], s['left'], s['rejected']), (1, 0, 0, []))
+        self.assertGreater(s['pages_per_hour_per_gpu'], 0)
+
+    def test_retry_at_twice_the_limit_then_failed_then_resume(self):
+        pack = self.pack([[1, 2, 3], [4, 5, 6], [10, 11]])
+        out = self.run_seg(pack)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        a = self.answers()
+        self.assertEqual((a['k1']['status'], a['k1']['attempt']), ('ok', 1))      # the retry at 3,000 tokens parsed
+        self.assertEqual(a['k4']['status'], 'failed')                            # neither parsed: votes 0.5 later
+        self.assertNotIn('<think>', a['k4']['result'])
+        self.assertEqual(sorted(b['max_tokens'] for b in FakeSeg.seen if json.loads(b['messages'][0]['content'][-1]['text'])[0] == 4),
+                         [1500, 3000])
+        FakeSeg.seen.clear()
+        out = self.run_seg(pack)                                                 # everything answered: nothing sent
+        self.assertEqual((out.returncode, FakeSeg.seen), (0, []))
+
+    def test_refused_request_stops_the_run_and_is_not_an_answer(self):
+        out = self.run_seg(self.pack([[7, 8, 9]]))
+        self.assertEqual(out.returncode, 1, out.stderr)
+        self.assertFalse((self.tmp / 'out/L/answers.jsonl').exists())
+
+    def test_pack_for_another_model_is_refused(self):
+        out = self.run_seg(self.pack([[10, 11]], model='Qwen/Qwen3.6-27B-FP8'))
+        self.assertNotEqual(out.returncode, 0)
+        self.assertIn('the pack is for', out.stderr)
+        self.assertEqual(FakeSeg.seen, [])
+
+    def test_seg_preset_takes_seven_images(self):
+        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; FS_MM_IMAGES=7 preset qwen3.5-27b; '
+                              'echo "$FS_VLLM_ARGS"; unset FS_MM_IMAGES; preset qwen3.5-27b; echo "$FS_VLLM_ARGS"'],
+                             capture_output=True, text=True)
+        seg, ocr = out.stdout.splitlines()
+        self.assertIn('--limit-mm-per-prompt {"image":7}', seg)
+        self.assertIn('--limit-mm-per-prompt {"image":1}', ocr)
 
 
 if __name__ == '__main__':

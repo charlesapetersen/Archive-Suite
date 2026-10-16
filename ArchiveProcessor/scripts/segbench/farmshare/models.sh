@@ -18,7 +18,7 @@ preset() {
       FS_MODEL=Qwen/Qwen3.6-35B-A3B-FP8; FS_GPUS=1; FS_DISK_GB=38 ;;
     qwen3-vl-8b)       # cheap floor that ran at the precision measured (bf16). Panel 91.81; clippings 93.47.
       FS_MODEL=Qwen/Qwen3-VL-8B-Instruct; FS_GPUS=1; FS_DISK_GB=18 ;;
-    qwen3.5-27b)       # segmentation's best open model (W41.seg-large: 95.0% on Deaver at fp8). OCR 95.76 completed-only.
+    qwen3.5-27b)       # segmentation's best open model (W41.seg-large: 95.0% on Deaver at fp8; submit.sh seg). OCR 95.76 completed-only.
       FS_MODEL=Qwen/Qwen3.5-27B-FP8; FS_GPUS=1; FS_DISK_GB=31 ;;
     qwen3.5-122b-a10b) # whole-node option, OCR unmeasured anywhere; segmentation 84.4% (< 27B). Only to settle "bigger?".
       FS_MODEL=Qwen/Qwen3.5-122B-A10B-FP8; FS_GPUS=4; FS_DISK_GB=126 ;;
@@ -35,10 +35,11 @@ preset() {
        return 2 ;;
   esac
   # max-model-len must hold the prompt (~4,900 tokens) plus max_tokens (8192), or vLLM refuses every page.
-  # One image a prompt. An fp8 KV cache doubles the batch beside the weights; FS_KV_DTYPE=auto if this vLLM
-  # will not take fp8 KV for the Qwen3.5/3.6 hybrid-attention layers (the start-up log says so).
+  # One image a prompt (FS_MM_IMAGES=7 for segmentation's windows: submit.sh seg). An fp8 KV cache doubles the
+  # batch beside the weights; FS_KV_DTYPE=auto if this vLLM will not take fp8 KV for the Qwen3.5/3.6
+  # hybrid-attention layers (the start-up log says so).
   if [ "$len" -lt 13312 ]; then echo "FS_MAX_LEN=$len is below prompt + max_tokens (13312)" >&2; return 2; fi
   FS_VLLM_ARGS="--tensor-parallel-size $FS_GPUS --max-model-len $len --kv-cache-dtype $kv \
---gpu-memory-utilization $util --max-num-seqs $seqs --limit-mm-per-prompt {\"image\":1} ${FS_EXTRA:-}"
+--gpu-memory-utilization $util --max-num-seqs $seqs --limit-mm-per-prompt {\"image\":${FS_MM_IMAGES:-1}} ${FS_EXTRA:-}"
   export FS_PRESET FS_MODEL FS_GPUS FS_DISK_GB FS_VLLM_ARGS FS_LAYOUT FS_DET_REPO FS_DET_FILE
 }

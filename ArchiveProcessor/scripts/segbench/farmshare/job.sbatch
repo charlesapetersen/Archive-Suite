@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# W41.farmshare-plan — one GPU job: start vLLM on this node, run one fs_ocr.py mode against it, stop it.
+# W41.farmshare-plan — one GPU job: start vLLM on this node, run one fs_ocr.py (or fs_seg.py) mode against it, stop it.
 # Submitted by submit.sh, which passes partition/QOS/GPUs/time fitted to limits.env; do not sbatch it by hand.
 # Env from submit.sh: FS_DIR FS_MODE FS_PRESET_NAME FS_WALL_MIN [FS_PACK | FS_IN FS_OUT FS_SHARDS FS_CHAIN ...]
 set -euo pipefail
@@ -42,6 +42,8 @@ label="${FS_PRESET_NAME}-${SLURM_JOB_ID:-local}"
 
 case "$FS_MODE" in
   truth) "$FS_PY" fs_ocr.py truth --pack "$FS_PACK" --out "$FS_ROOT/runs/truth" --label "$label" --warmup ;;
+  # One folder per preset, not per job: a resubmission after exit 75 sends only the windows still unanswered.
+  seg)   "$FS_PY" fs_seg.py run --pack "$FS_PACK" --out "$FS_ROOT/runs/seg" --label "$FS_PRESET_NAME" --warmup ;;
   news)  "$FS_PY" fs_ocr.py news --newsbench "$FS_ROOT/newsbench" --out "$FS_ROOT/runs/news" --label "$label" ;;
   bulk)
     # Stop sending new pages 15 min before the wall limit, so the job ends itself instead of being killed.
@@ -57,5 +59,5 @@ case "$FS_MODE" in
       exit 0
     fi
     exit $rc ;;
-  *) echo "FS_MODE must be truth, news or bulk"; exit 2 ;;
+  *) echo "FS_MODE must be truth, seg, news or bulk"; exit 2 ;;
 esac

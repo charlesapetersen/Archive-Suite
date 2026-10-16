@@ -162,7 +162,7 @@ def report(name) -> str:
         lines.append(f"| {label} | {100 * r['pages_in_exact_doc']:.1f}% | {r['false_splits']} | {r['false_merges']} "
                      f"| {failed} | {mean:.0f} | {peak:.1f} |")
     import method_openrouter as O  # W41.seg-large: the larger open models, the same request through OpenRouter
-    lines += ["", "## Larger open models through OpenRouter (W41.seg-large)", "",
+    lines += ["", "## Larger open models through OpenRouter (W41.seg-large), and on FarmShare (W41.farmshare-seg)", "",
               "The same request, images at the same 1024 px, sent to OpenRouter (`method_openrouter.py`), one "
               "provider and precision pinned per model; reasoning off, temperature 0. Seconds are the cloud's, "
               "not a Mac's; the memory column is an estimate of the 4-bit weights alone, not measured.", "",
