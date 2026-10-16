@@ -639,6 +639,27 @@ class Seg(unittest.TestCase):
         self.assertEqual(out.returncode, 1, out.stderr)
         self.assertFalse((self.tmp / 'out/L/answers.jsonl').exists())
 
+    def test_test_boxes_need_the_committed_teacher_freeze(self):
+        import fs_seg as S
+        R = S.R
+        args = lambda **k: type('A', (), {'out': str(self.tmp / 'p'), 'box': None, 'final': False, **k})  # noqa: E731
+        with self.assertRaisesRegex(SystemExit, 'not development'):
+            S.cmd_pack(args(box=['Stanton']))
+        saved = R.TEACHER_FROZEN
+        try:
+            R.TEACHER_FROZEN = saved.with_name('seg-teacher-absent.json')
+            with self.assertRaisesRegex(SystemExit, 'no freeze'):
+                S.cmd_pack(args(final=True))
+            R.TEACHER_FROZEN = saved.with_name(f'seg-teacher-untracked-{os.getpid()}.json')
+            R.TEACHER_FROZEN.write_text(json.dumps({'teacher': S.KEY}))
+            with self.assertRaisesRegex(SystemExit, 'not committed'):
+                S.cmd_pack(args(final=True))
+        finally:
+            if R.TEACHER_FROZEN != saved:
+                R.TEACHER_FROZEN.unlink(missing_ok=True)
+            R.TEACHER_FROZEN = saved
+        self.assertFalse((self.tmp / 'p').exists())          # refused before a single image was written
+
     def test_pack_for_another_model_is_refused(self):
         out = self.run_seg(self.pack([[10, 11]], model='Qwen/Qwen3.6-27B-FP8'))
         self.assertNotEqual(out.returncode, 0)

@@ -11358,3 +11358,14 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `build.py`: GPU-hours per 100,000 photos multiplied the per-GPU rate by the GPU count again (548 for this run, 137
   right); single-GPU rows were unaffected.
   <!-- /W41.farmshare-122b -->
+- [x] **W41.seg-27b-test — Qwen3.5 27B on the locked test boxes, through FarmShare — OWNER login [S · ~0.5 session]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light). SHIPPED 2026-10-16 (this commit).
+  Frozen first in `segbench-results/seg-teacher.json` (b7b1024e, before any test-box call); `fs_seg.py pack --final`
+  packs all five boxes for that key only while the freeze is committed unchanged (test in `test_farmshare.py`).
+  FarmShare job 1850707 (one L40S, 259 windows, Deaver's 51 reused, 23 min), `fs_seg.py import`, then
+  `method_openrouter.py report-teacher` (report-five's scoring for any key list). Results `seg-teacher.md`: unchecked
+  90.2% of development pages in the exact document (Gemini 3.8 Flash 90.7%) but 83.0% of test pages (Gemini 88.8%),
+  17 unflagged errors to 6, Stanton most of the gap (81.9%). Its confidences do not separate right from wrong: every
+  fitted level is "flag all", the same 86.8 checks per 100 pages as Full manual. So it is a check on the tags for
+  W41.seg-label-clean, not a truth, and about 83-90% unchecked is the ceiling the student chases. ArchiveOCRBench's
+  segmentation table shows it (off the price chart: no price per page); published copy behind.
+  <!-- /W41.seg-27b-test -->

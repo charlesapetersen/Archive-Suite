@@ -992,6 +992,17 @@
    "std": 0.48,
    "batch": null,
    "source": "cheap-models.md"
+  },
+  {
+   "name": "Qwen3.5 27B on FarmShare (the corpus teacher)",
+   "nocheck": 83.0,
+   "after": 100.0,
+   "checks": 86.8,
+   "unflagged": 0,
+   "std": null,
+   "batch": null,
+   "farmshare": true,
+   "source": "seg-teacher.md"
   }
  ],
  "handwriting": {

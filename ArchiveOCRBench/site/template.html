@@ -107,7 +107,7 @@ footer p { font-size: 13px; }
   <section class="panel" id="seg-table">
     <div class="head"><h2>With checking</h2><span class="meta">each approach at its flag level frozen for the 98% bar</span></div>
     <div class="tbl"><table><thead><tr><th>#</th><th>Approach</th><th>No checking</th><th>Checks per 100 pages</th><th>Right after checking</th><th>Unflagged errors</th><th>Per 1,000</th><th>Batch</th></tr></thead><tbody id="seg-rows"></tbody></table></div>
-    <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. Sources: <code>options.md</code> and <code>cheap-models.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
+    <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Qwen3.5 27B on FarmShare is the open-weight model that cleans the corpus labels a small Mac model will be trained on; it runs on Stanford's GPUs, so it has no price per page and is not on the chart, and its confidences are too even to flag on, so reaching 98% means checking every gap, as Full manual does. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. Sources: <code>options.md</code>, <code>cheap-models.md</code> and <code>seg-teacher.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
   </section>
 
   <header class="part" id="handwriting">
@@ -303,7 +303,7 @@ const SEG = DATA.segmentation.slice().sort((a, b) => (b.nocheck ?? -1) - (a.noch
 SEG.forEach((a, i) => { a.num = i + 1; a.id = 'seg' + i; });
 const pct1 = v => v === null ? '—' : v.toFixed(1) + '%';
 const segP = [];
-SEG.filter(a => a.nocheck !== null).forEach(a => {
+SEG.filter(a => a.nocheck !== null && !a.farmshare).forEach(a => {
   const s = [a.nocheck];
   segP.push({ x: a.std, y: a.nocheck, r: a, b: false, s });
   if (a.batch) segP.push({ x: a.batch, y: a.nocheck, r: a, b: true, s });
@@ -313,7 +313,7 @@ const segTop = SEG.filter(a => a.nocheck === SEG[0].nocheck).map(a => a.name);
 document.getElementById('seg-note').textContent = 'Highest: ' + segTop.join(' and ') + (segTop.length > 1 ? ', tied' : '') + ' at ' + SEG[0].nocheck.toFixed(1) + '%. Best-value points: ' +
   segP.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '. ' + (f => f ? 'With checking, ' + f.name + ' reaches 100% with the fewest checks (' + f.checks.toFixed(1) + ' per 100 pages).' : '')(SEG.filter(a => a.nocheck !== null && a.after === 100).sort((a, b) => a.checks - b.checks)[0]);
 document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + '</td><td>' + a.checks.toFixed(1) +
-  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
+  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? 'FarmShare GPUs' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
 charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
 
 // Part 3: handwriting.
