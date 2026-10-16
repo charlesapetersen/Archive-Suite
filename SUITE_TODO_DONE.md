@@ -11570,3 +11570,19 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   has no new warnings; five capture drivers pass on it. Not covered: UI/VM lanes, Processor ASan, the four key or
   paid drivers; not in the gate (about 25 minutes). Evidence `verification/evidence/core/W40.e1-sanitizers.md`.
   <!-- /W40.e1 -->
+- [x] **W40.e5 — dead-code scan [S-M]** · §W40 verification phase · SHIPPED 2026-10-16 (this commit; checkpoints `3e43e94e`, `ba57c671`, `8766bd23`)
+  `ops/verify/dead-code-scan.sh [reader|notes|processor|core]` (Periphery 3.8): each app built once with
+  `build-for-testing` so its index store holds the app and its tests, then scanned; ArchiveCore scanned against
+  all three apps' stores at once. Hits: Core 29, Reader 67, Notes 121, Processor 144 (the per-app counts include
+  Core rows, judged once in the combined scan). 80 declarations deleted: Core 6, Reader 13 (incl.
+  `SubjectTokenField.swift`, the dead SwiftUI `TagsCell`/`WarningBadgeCell`), Notes 28, Processor 33 (incl. the
+  unused Drive changes feed and two never-read `SessionProcessingConfig` fields). Kept with reasons: synthesized
+  Equatable/Hashable fields (Periphery's main false positive), AppKit-fixed signatures, symbols used by
+  `ArchiveProcessor/scripts/*.swift` (not indexed), re-render `@AppStorage`, formats. Found: ledger row `R-47`
+  (`unreachable`: the "flag ambiguous" promise for two same-facet date tags is not shown anywhere); suspects
+  `S-016` (Notes header click probably does not sort), `S-017` (pre-OCRed run ignores document-segmentation
+  review), `S-018` (OCR path never paces to the usage window it tells the user about). Tier-2 on the Processor's
+  `Capture/`/`Net/` hunks: adversarial review found no blocker. Verified: Core `swift test`, Reader 422 tests,
+  Notes 219+984, 27 Processor drivers, Debug and Release builds of all three apps, no new warnings. Evidence
+  `verification/evidence/core/W40.e5-dead-code.md`.
+  <!-- /W40.e5 -->

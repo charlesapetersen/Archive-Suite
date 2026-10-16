@@ -156,7 +156,7 @@ enum RetryBackendTestDriver {
         SessionProcessingConfig(
             provider: provider, model: model, thinkingLevel: .low, apiKey: apiKey,
             taggingMode: .none, rotationMode: .off, mergeDocuments: false, outputDirectory: output,
-            contextCharCount: 0, sendPreviousImage: false, customOCRPrompt: "", imageScale: 1,
+            customOCRPrompt: "", imageScale: 1,
             enableSegmentJSON: false, tagVocabulary: [], gateway: gateway, outputImageFile: false,
             pdfImageMB: 1, exportedImageMB: 1, textColumns: 1, localAgent: localAgent)
     }

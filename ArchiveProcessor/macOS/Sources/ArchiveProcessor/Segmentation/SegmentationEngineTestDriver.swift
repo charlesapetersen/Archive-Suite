@@ -345,7 +345,7 @@ enum SegmentationEngineTestDriver {
         do {
             _ = try await WindowSegmenter.instant(FakeTransport(replies: [:])).segment(
                 pages: [PageInput(jpeg: Data(), text: "")], photoKinds: [], approach: ApproachSpec(
-                    approach: .claude, voters: [WindowVoter.catalog[0]], rule: .min, level: 0.85,
+                    voters: [WindowVoter.catalog[0]], rule: .min, level: 0.85,
                     windowPages: 7, windowStride: 3, thumbnailLongEdgePx: 1600, ocrTextChars: 2500))
         } catch WindowSegmenterError.pageCountMismatch {
             mismatchRefused = true

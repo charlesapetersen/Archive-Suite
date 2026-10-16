@@ -370,8 +370,8 @@ enum BatchPollPersistFailureContract {
         SessionProcessingConfig(
             provider: provider, model: model(provider), thinkingLevel: .low,
             apiKey: "poll-persist-not-a-key", taggingMode: .none, rotationMode: .off,
-            mergeDocuments: false, outputDirectory: outputDirectory, contextCharCount: 0,
-            sendPreviousImage: false, customOCRPrompt: "", imageScale: 1.0,
+            mergeDocuments: false, outputDirectory: outputDirectory,
+            customOCRPrompt: "", imageScale: 1.0,
             enableSegmentJSON: false, tagVocabulary: [], gateway: nil,
             outputImageFile: false, pdfImageMB: 1.0, exportedImageMB: 1.0, textColumns: 1)
     }

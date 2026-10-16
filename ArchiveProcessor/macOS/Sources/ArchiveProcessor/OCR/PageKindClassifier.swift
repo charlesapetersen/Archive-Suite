@@ -100,8 +100,6 @@ struct PageKind: Codable, Sendable, Equatable {
     /// The probability of the call that decided it: the form regression's when it calls a form, else the hand's.
     let confidence: Double
 
-    static let kinds = ["handwritten", "typewritten", "printed", "forms"]
-
     /// The bench's routing rule: a form goes to the form pick, else the page goes to its hand's.
     static func decide(hand: [Double], form: [Double], handClasses: [String]) -> PageKind? {
         guard form.count == 2, hand.count == handClasses.count,

@@ -16,7 +16,7 @@ struct ScanReport: Sendable {
 }
 
 /// Storage backend the receiver drains — a seam so the Google Drive backend reuses `FileRelayReceiver`'s
-/// loop verbatim (`DriveObjectStore` over `changes.list`/`files.get`/`files.delete`/`appProperties`).
+/// loop verbatim (`DriveObjectStore` over `files.list`/`files.get`/`files.delete`/`appProperties`).
 protocol RelayObjectStore: Sendable {
     func ensureSessionFolder() throws
     func publishEpoch(_ data: Data)                 // atomic write of _epoch.json (A2)

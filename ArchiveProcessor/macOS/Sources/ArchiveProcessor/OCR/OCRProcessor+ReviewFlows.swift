@@ -154,7 +154,6 @@ extension OCRProcessor {
                 fileURL: url,
                 classification: cls,
                 collectionName: collection,
-                isBoxLabel: true,
                 rotationDegrees: index < jobs.count ? (jobs[index].result?.rotationDegrees ?? 0) : 0
             )
         }
@@ -287,8 +286,7 @@ extension OCRProcessor {
             guard !Task.isCancelled else { return }
 
             // Apply changes from review
-            let changed = applyDocumentReviewEdits(
-                outputDirectory: outputDirectory, runConfig: runConfig)
+            let changed = applyDocumentReviewEdits(runConfig: runConfig)
             if changed { needsCollectionRebuild = true }
         }
 
@@ -600,7 +598,6 @@ extension OCRProcessor {
     /// exercises this site directly; the UI reaches it only through `confirmDocumentReview`.
     @discardableResult
     func applyDocumentReviewEdits(
-        outputDirectory: URL,
         runConfig: SessionProcessingConfig?
     ) -> Bool {
         var collectionChanged = false

@@ -467,7 +467,6 @@ extension OCRProcessor {
             await performTaggingPhase(
                 provider: provider,
                 model: model,
-                thinkingLevel: thinkingLevel,
                 apiKey: apiKey,
                 outputDirectory: outputDirectory,
                 enableSegmentJSON: enableSegmentJSON,
@@ -560,7 +559,7 @@ extension OCRProcessor {
             dateTask = Task { [weak self] in
                 await self?.prefetchManualDates(
                     provider: provider, model: model,
-                    thinkingLevel: thinkingLevel, apiKey: apiKey
+                    apiKey: apiKey
                 )
             }
         }
@@ -631,7 +630,6 @@ extension OCRProcessor {
     private func prefetchManualDates(
         provider: LLMProvider,
         model: LLMModel,
-        thinkingLevel: ThinkingLevel?,
         apiKey: String
     ) async {
         let generator = TagGenerator()
@@ -1030,7 +1028,6 @@ extension OCRProcessor {
     func performTaggingPhase(
         provider: LLMProvider,
         model: LLMModel,
-        thinkingLevel: ThinkingLevel?,
         apiKey: String,
         outputDirectory: URL,
         enableSegmentJSON: Bool = true,

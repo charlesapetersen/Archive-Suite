@@ -14,7 +14,6 @@ struct ProviderKeySpec: Identifiable, Sendable {
     let blurb: String                 // plain-language what/why, shown on the intro step
     let signInURL: URL                // deep link to create a key
     let billingURL: URL?              // enable billing / add card (region or plan)
-    let privacyURL: URL?              // data-use / training opt-out
     let steps: [String]               // on-screen numbered instructions mirroring the live site
     let costNote: String
     let privacyNote: String
@@ -33,7 +32,6 @@ struct ProviderKeySpec: Identifiable, Sendable {
         blurb: "Archive Processor uses Google Gemini to read your archive photos. You'll make your own free key so you control cost and privacy. Takes about 3 minutes — no credit card needed for typical use.",
         signInURL: URL(string: "https://aistudio.google.com/apikey")!,
         billingURL: URL(string: "https://ai.google.dev/gemini-api/docs/billing")!,
-        privacyURL: URL(string: "https://ai.google.dev/gemini-api/terms")!,
         steps: [
             "Sign in with any Google account (a free Gmail works).",
             "Click “Create API key”, then choose “Create API key in new project”.",
@@ -53,7 +51,6 @@ struct ProviderKeySpec: Identifiable, Sendable {
         blurb: "Archive Processor can also use Mistral to read your archive photos. You'll make your own key — free to create, and OCR works on the free tier (no credit card needed to start). Very heavy use may later need a paid plan; any charges then go to Mistral, never to this app.",
         signInURL: URL(string: "https://console.mistral.ai/api-keys")!,
         billingURL: URL(string: "https://admin.mistral.ai/")!,
-        privacyURL: URL(string: "https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training")!,
         steps: [
             "Sign up (Google / Microsoft / Apple sign-in is easiest).",
             "Verify your email, then your phone by SMS (Mistral requires this).",
@@ -77,7 +74,6 @@ struct ProviderKeySpec: Identifiable, Sendable {
         blurb: "Archive Processor can also use OpenAI (ChatGPT) to read your archive photos. You'll make your own key so you control cost and privacy. OpenAI's API has no free tier, so you'll add a small amount of prepaid credit — any charges go to OpenAI, never to this app.",
         signInURL: URL(string: "https://platform.openai.com/api-keys")!,
         billingURL: URL(string: "https://platform.openai.com/settings/organization/billing/overview")!,
-        privacyURL: URL(string: "https://platform.openai.com/docs/guides/your-data")!,
         steps: [
             "Sign in at platform.openai.com (create an account if you don't have one).",
             "Open “Billing” and add a payment method or a little prepaid credit — the API won't run without it.",
@@ -101,7 +97,6 @@ struct ProviderKeySpec: Identifiable, Sendable {
         blurb: "Archive Processor can also use Anthropic's Claude to read your archive photos. You'll make your own key so you control cost and privacy. New API accounts may receive a small amount of test credits; after those run out, usage is billed by Anthropic, never by this app.",
         signInURL: URL(string: "https://platform.claude.com/settings/keys")!,
         billingURL: URL(string: "https://platform.claude.com/settings/billing")!,
-        privacyURL: URL(string: "https://privacy.claude.com/en/")!,
         steps: [
             "Sign in to Claude Console at platform.claude.com (create an account if you don't have one).",
             "Open “Billing” to check for test credits and set up payment for later use (a card, invoicing, or prepaid credits, depending on your account).",
@@ -123,7 +118,6 @@ struct ProviderKeySpec: Identifiable, Sendable {
         blurb: "Archive Processor can use open-weight models (Qwen, GLM) through OpenRouter, each on one fixed provider so the price and quality are the ones measured. You'll make your own key; OpenRouter is prepaid, and charges go to OpenRouter, never to this app.",
         signInURL: URL(string: "https://openrouter.ai/settings/keys")!,
         billingURL: URL(string: "https://openrouter.ai/settings/credits")!,
-        privacyURL: URL(string: "https://openrouter.ai/settings/privacy")!,
         steps: [
             "Sign in at openrouter.ai (create an account if you don't have one).",
             "Open “Credits” and add a small amount — requests fail without credit.",

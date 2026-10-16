@@ -90,7 +90,6 @@ enum BatchInterruptTailContract {
         let tempConversionsSurvived: [URL]
         /// Unregistered files sitting in the SAME directory — including two named exactly like the durable
         /// recovery manifests. Must all still be there.
-        let bystanders: [URL]
         let bystandersExistedBefore: Bool
         let bystandersRemoved: [URL]
 
@@ -216,7 +215,6 @@ enum BatchInterruptTailContract {
             tempConversions: temps,
             tempConversionsExistedBefore: tempsExisted && (conversions == 0 || !temps.isEmpty),
             tempConversionsSurvived: temps.filter { fm.fileExists(atPath: $0.path) },
-            bystanders: bystanders,
             bystandersExistedBefore: bystandersExisted,
             bystandersRemoved: bystanders.filter { !fm.fileExists(atPath: $0.path) },
             activeBatchCleared: processor.activeBatch == nil,

@@ -304,7 +304,7 @@ struct SegmentationOptions: Decodable, Sendable {
             }
         }
         guard !voters.isEmpty else { throw SegmentationOptionsError.incomplete(a.rawValue) }
-        return ApproachSpec(approach: a, voters: voters, rule: rule, level: level,
+        return ApproachSpec(voters: voters, rule: rule, level: level,
                             windowPages: window.pages, windowStride: window.stride,
                             thumbnailLongEdgePx: window.thumbnailLongEdgePx,
                             ocrTextChars: window.ocrTextCharsPerPage)
@@ -345,7 +345,6 @@ enum WindowCombineRule: String, Sendable {
 
 /// One approach, fully resolved: its voters, its rule and level, and the bench's window shape.
 struct ApproachSpec: Sendable {
-    let approach: SegmentationApproach
     let voters: [WindowVoter]
     let rule: WindowCombineRule
     let level: Double

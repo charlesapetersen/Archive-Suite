@@ -11,8 +11,6 @@ struct CollectionReviewItem: Identifiable {
     let fileURL: URL
     var classification: DocumentClassification?
     var collectionName: String
-    /// Whether this item was identified as a box label (and thus defines a collection boundary)
-    var isBoxLabel: Bool
     /// Clockwise degrees to correct the image's orientation (from OCR / rotation review), for display.
     var rotationDegrees: Int = 0
 }
@@ -46,9 +44,7 @@ struct ManualTagImage: Identifiable {
 
 /// The kind of a photo in the manual segmentation UI. Box/folder photos are dividers that
 /// receive only a color tag; documents are grouped into tagged segments.
-enum ManualPhotoKind: Hashable { case document, box, folder
-    var isBoxOrFolder: Bool { self != .document }
-}
+enum ManualPhotoKind: Hashable { case document, box, folder }
 
 /// One image in the fully-manual segmentation UI. Rotation and kind are user-editable.
 struct ManualSegImage: Identifiable {

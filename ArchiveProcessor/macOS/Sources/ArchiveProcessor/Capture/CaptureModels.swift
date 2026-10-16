@@ -25,7 +25,6 @@ struct CapturedPhoto: Identifiable, Equatable {
     let groupId: String      // phone-assigned group identifier
     let seq: Int             // phone capture sequence (global order)
     let type: CaptureGroupType
-    let receivedAt: Date
     /// Minimal on-phone tagging. Quality is per-photo ("Q1"…"Q3"; a page can override its
     /// group's default). Year/month are the group's date, repeated on each of its photos. Mutable:
     /// pages stream in as shot (before tagging), then `markSegmentComplete` attaches the segment's

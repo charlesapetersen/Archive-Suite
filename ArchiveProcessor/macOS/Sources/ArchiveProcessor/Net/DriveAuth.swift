@@ -32,7 +32,6 @@ final class DriveAuth: @unchecked Sendable {
         self.http = http
     }
 
-    var isSignedIn: Bool { KeychainHelper.load(account: Self.keychainAccount) != nil }
     func signOut() { KeychainHelper.delete(account: Self.keychainAccount); lock.lock(); cached = nil; lock.unlock() }
 
     /// A valid access token, refreshed as needed. Throws `.notSignedIn` if there's no stored refresh token.

@@ -445,7 +445,7 @@ enum ProcessFilesTagWarningTestDriver {
         let exportRunConfig = SessionProcessingConfig(
             provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: .low, apiKey: "",
             taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
-            outputDirectory: colourDir, contextCharCount: 0, sendPreviousImage: false,
+            outputDirectory: colourDir,
             customOCRPrompt: "", imageScale: 1, standardImageMB: 3,
             enableSegmentJSON: false, tagVocabulary: [], gateway: nil,
             outputImageFile: true,        // → exportOriginals
@@ -625,7 +625,7 @@ enum ProcessFilesTagWarningTestDriver {
         collection.collectionReviewItems = [
             CollectionReviewItem(fileIndex: 0, fileName: collectionSrc.lastPathComponent,
                                  fileURL: collectionSrc, classification: .boxLabel,
-                                 collectionName: "Box 12", isBoxLabel: true)
+                                 collectionName: "Box 12")
         ]
         collection.applyReviewEdits(files: [collectionSrc], runConfig: nil)
         check("the collection review KEEPS a subject tag that is merely the word \"Folder\"",
@@ -647,7 +647,7 @@ enum ProcessFilesTagWarningTestDriver {
             DocumentReviewItem(fileIndex: 0, fileName: docSrc.lastPathComponent,
                                fileURL: docSrc, classification: .documentStart)
         ]
-        docReview.applyDocumentReviewEdits(outputDirectory: reclassDir, runConfig: nil)
+        docReview.applyDocumentReviewEdits(runConfig: nil)
         check("the document review takes back the folder label's own \"Folder\" and \"Purple\"",
               !tagsOf(docPDF).contains("Folder") && !tagsOf(docPDF).contains("Purple"))
         check("...without touching the operator's subject tag \"Red\"",

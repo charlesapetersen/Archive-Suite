@@ -1020,7 +1020,6 @@ unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the 
 - [ ] **`W40.d11` — the shared tag contract across apps [S-M]** (lane: suite) (uses: build,vm) (blocked-on: W40.d1, W40.d8). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §D.
 - [ ] **`W40.e3` — accessibility audit of every main screen [S-M]** (lane: reader,notes,processor) (uses: vm) (blocked-on: W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e4` — never-executed code from coverage [M]** (lane: reader,notes,processor) (uses: build) (blocked-on: W40.d1, W40.d8, W40.d9). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
-- [ ] **`W40.e5` — dead-code scan [S-M]** (lane: suite) (uses: build). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e6` — parser robustness: fuzz loops and round-trip properties [M]** (lane: suite) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e7` — mutation sample on the irreversible paths [M]** (lane: suite) (uses: build) (blocked-on: W40.a1). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.
 - [ ] **`W40.e8` — Android screen tests without an emulator [M]** (blocked-on: W42.int-done) (lane: processor) (uses: build) (blocked-on: W40.e8-owner-ok, W40.a3). Detail: `execution-plans/verification-phase/01-daemon-plan.md` §E.

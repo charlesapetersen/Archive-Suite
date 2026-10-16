@@ -86,11 +86,6 @@ final class DriveClient: @unchecked Sendable {
     struct DriveFile: Decodable { let id: String; let name: String?; let appProperties: [String: String]?; let modifiedTime: String? }
     private struct FileList: Decodable { let files: [DriveFile]?; let nextPageToken: String? }
     private struct CreatedFile: Decodable { let id: String }
-    private struct StartToken: Decodable { let startPageToken: String }
-    private struct ChangeList: Decodable {
-        struct Change: Decodable { let fileId: String?; let removed: Bool?; let file: DriveFile? }
-        let changes: [Change]?; let nextPageToken: String?; let newStartPageToken: String?
-    }
 
     private func send(_ method: String, _ url: String, headers: [String: String] = [:], body: Data? = nil) throws -> Data {
         var h = headers
@@ -165,24 +160,6 @@ final class DriveClient: @unchecked Sendable {
                                                  headers: ["Authorization": "Bearer " + (try token())], body: nil)
         guard (200..<300).contains(status) || status == 404 else {   // 404 = already gone (idempotent)
             throw DriveError.http(status: status, body: String(data: data, encoding: .utf8) ?? "")
-        }
-    }
-
-    // MARK: Changes feed (the reliable way to detect new objects; §8)
-    func startPageToken() throws -> String {
-        try decode(StartToken.self, send("GET", "\(Self.api)/changes/startPageToken")).startPageToken
-    }
-    /// Returns (changed files, next page token to poll from). `newStartPageToken` (end of a page run) is
-    /// returned as `next` when there are no more pages.
-    func listChanges(pageToken: String) throws -> (files: [DriveFile], next: String) {
-        var token = pageToken
-        var files: [DriveFile] = []
-        while true {
-            let url = "\(Self.api)/changes?pageToken=\(enc(token))&fields=\(enc("changes(fileId,removed,file(id,name,appProperties,modifiedTime)),nextPageToken,newStartPageToken"))&pageSize=1000&spaces=drive"
-            let cl = try decode(ChangeList.self, send("GET", url))
-            for c in cl.changes ?? [] where c.removed != true { if let f = c.file { files.append(f) } }
-            if let np = cl.nextPageToken { token = np; continue }
-            return (files, cl.newStartPageToken ?? token)
         }
     }
 

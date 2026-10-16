@@ -191,7 +191,7 @@ enum DualDateTestDriver {
               && processor.segments[1].enclosureOf == 0 && processor.segments[2].enclosureOf == 0)
         let model = LLMModel(id: "test", displayName: "Test", provider: .anthropic, supportsThinking: false,
                              returnsMd: false, inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
-        await processor.performTaggingPhase(provider: .anthropic, model: model, thinkingLevel: nil, apiKey: "",
+        await processor.performTaggingPhase(provider: .anthropic, model: model, apiKey: "",
                                             outputDirectory: outDir, enableSegmentJSON: true)
         func out(_ n: String) -> URL { outputs[u(n)]! }
         func json(_ n: String) -> [String: Any] { jsonOf(out(n).deletingPathExtension().appendingPathExtension("json")) }

@@ -75,7 +75,7 @@ enum ManifestPersistenceTestDriver {
             taggingMode: unlike(b8TaggingBefore, .automatic, .none),
             rotationMode: unlike(b8RotationBefore, .llmSingle, .off),
             mergeDocuments: false,
-            outputDirectory: tmp, contextCharCount: 200, sendPreviousImage: false,
+            outputDirectory: tmp,
             customOCRPrompt: "", imageScale: 1,
             standardImageMB: unlike(b8SizingBefore.standardImageMB,
                                     Bounds.imageMB.lowerBound, Bounds.imageMB.upperBound),

@@ -616,7 +616,7 @@ final class CaptureSession: ObservableObject {
             try? FileManager.default.removeItem(at: tempURL)
             return nil
         }
-        let photo = CapturedPhoto(url: finalURL, groupId: groupId, seq: seq, type: type, receivedAt: Date(),
+        let photo = CapturedPhoto(url: finalURL, groupId: groupId, seq: seq, type: type,
                                   quality: quality, year: year, month: month)
         // Idempotent re-upload (phone resume after a crash): replace an existing same-group+seq
         // photo instead of duplicating it. Otherwise keep the list ordered by seq.
@@ -1075,7 +1075,7 @@ final class CaptureSession: ObservableObject {
                 restored.append(CapturedPhoto(
                     url: url, groupId: e.groupId, seq: e.seq,
                     type: CaptureGroupType(rawValue: e.type) ?? .document,
-                    receivedAt: Date(), quality: e.quality, year: e.year, month: e.month))
+                    quality: e.quality, year: e.year, month: e.month))
             }
             // With no surviving sources, the durable ledger still marks this as the active session. Restore
             // its epoch so a late phone retry is checked against the same set after relaunch.

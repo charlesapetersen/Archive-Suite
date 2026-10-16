@@ -15,8 +15,6 @@ struct SessionProcessingConfig: Sendable {
     var rotationMode: RotationMode
     var mergeDocuments: Bool
     var outputDirectory: URL
-    var contextCharCount: Int
-    var sendPreviousImage: Bool
     var customOCRPrompt: String
     var imageScale: Double            // 0…1 (fraction of full resolution)
     var standardImageMB: Double = 3.0 // size target used to translate imageScale into dimensions
@@ -302,10 +300,6 @@ struct SessionProcessingConfig: Sendable {
             rotationMode: defaultRotationMode(d),
             mergeDocuments: d.bool(forKey: DefaultsKeys.mergeDocuments),
             outputDirectory: outURL,
-            contextCharCount: Int(d.object(forKey: DefaultsKeys.contextCharCount) as? Double ?? 200),
-            // Vision never sends a previous image anywhere. Its optional judgment model receives text
-            // only, so this source-image context control cannot apply to either hybrid leg.
-            sendPreviousImage: useAppleVision ? false : d.bool(forKey: DefaultsKeys.sendPreviousImage),
             customOCRPrompt: d.string(forKey: DefaultsKeys.customOCRPrompt) ?? "",
             imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
             standardImageMB: sizing.standardImageMB,
@@ -340,9 +334,6 @@ struct SessionProcessingConfig: Sendable {
     static func fromProcessFilesRunStart(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
         fromDefaults(d)
     }
-
-    /// The effective model for OCR calls (gateway model when a gateway is configured).
-    var effectiveModel: LLMModel { gateway?.asLLMModel() ?? model }
 
     /// The backend name a retry may truthfully show. A Local Agent wins over a gateway for the same reason
     /// it wins at the client construction sites; the direct provider/model is only a fallback on that path.

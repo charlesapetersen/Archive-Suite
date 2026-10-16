@@ -315,8 +315,6 @@ extension OCRProcessor {
         runConfig.thinkingLevel = pending.thinkingLevel ?? .low
         runConfig.apiKey = apiKey
         runConfig.outputDirectory = pending.outputDirectory
-        runConfig.contextCharCount = pending.previousTextCharCount
-        runConfig.sendPreviousImage = pending.sendPreviousImage
         runConfig.customOCRPrompt = pending.customPrompt ?? ""
         runConfig.enableSegmentJSON = pending.enableSegmentJSON
         runConfig.gateway = pending.gatewayConfig
@@ -370,8 +368,6 @@ extension OCRProcessor {
         runConfig.apiKey = apiKey
         runConfig.taggingMode = pending.taggingMode
         runConfig.outputDirectory = pending.outputDirectory
-        runConfig.contextCharCount = 0
-        runConfig.sendPreviousImage = pending.sendPreviousImage
         runConfig.customOCRPrompt = pending.customPrompt ?? ""
         runConfig.imageScale = Self.liveImageScaleFraction(defaults)
         runConfig.enableSegmentJSON = pending.enableSegmentJSON
@@ -1419,41 +1415,6 @@ extension OCRProcessor {
         activePendingRun = nil
         pendingRunInfo = nil
     }
-    /// Whether the persisted incomplete run is the SAME job as the current input+output+settings —
-    /// i.e. resuming it would continue *this* selection, not a different one. Lets a caller auto-resume
-    /// on a match and treat a non-match as a distinct (stale) run to ignore (Tier-2 rule e). Returns
-    /// false when there is no pending run or it is self-inconsistent.
-    func pendingRunMatches(files: [URL], outputDirectory: URL) -> Bool {
-        guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending),
-              let fp = pending.runFingerprint else { return false }
-        if pending.runtimeConfig != nil {
-            let selectedPaths = files.map { $0.standardizedFileURL.path }
-            let persistedPaths = Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes)?
-                .map { $0.standardizedFileURL.path }
-            return selectedPaths == persistedPaths
-                && outputDirectory.standardizedFileURL.path == pending.outputDirectory.standardizedFileURL.path
-        }
-        return fp == Self.runFingerprint(
-            files: files, outputDirectory: outputDirectory,
-            taggingMode: nil, enableTagging: pending.enableTagging, batchMode: false)
-    }
-    /// Batch counterpart of `pendingRunMatches`.
-    func pendingBatchMatches(files: [URL], outputDirectory: URL) -> Bool {
-        guard let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending),
-              let fp = pending.runFingerprint else { return false }
-        if pending.mixedPDFOutcomes != nil {
-            let selected = files.map { $0.standardizedFileURL.path }
-            let persisted = Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes)?
-                .map { $0.standardizedFileURL.path }
-            return selected == persisted
-                && outputDirectory.standardizedFileURL.path == pending.outputDirectory.standardizedFileURL.path
-        }
-        let preserveOrder = pending.fingerprintVersion == 2
-        return fp == Self.runFingerprint(
-            files: files, outputDirectory: outputDirectory,
-            taggingMode: pending.taggingMode, enableTagging: pending.enableTagging, batchMode: true,
-            preserveInputOrder: preserveOrder)
-    }
     /// Resume polling a previously submitted batch.
     func resumeBatch(apiKey: String) async {
         // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e).
@@ -1620,7 +1581,7 @@ extension OCRProcessor {
                 // through. (The interactive run path uses the review loop; this divergence is deliberate.)
                 await performTaggingPhase(
                     provider: pending.provider, model: pending.model,
-                    thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
+                    apiKey: apiKey,
                     outputDirectory: pending.outputDirectory,
                     enableSegmentJSON: pending.enableSegmentJSON,
                     runConfig: runConfig
@@ -1729,8 +1690,7 @@ extension OCRProcessor {
     func resumeRun(apiKey: String) async {
         // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e). `resumeRun` replays
         // the manifest's OWN persisted input set + output dir (never the current UI selection), so a
-        // stale manifest can never cross-contaminate a different job; `pendingRunMatches(...)` lets a
-        // caller confirm the two are the same run before auto-resuming.
+        // stale manifest can never cross-contaminate a different job.
         guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) else { return }
 
         isProcessing = true
@@ -2805,8 +2765,6 @@ extension OCRProcessor {
         runConfig.rotationMode = rotationMode
         runConfig.mergeDocuments = mergeDocuments
         runConfig.outputDirectory = outputDirectory
-        runConfig.contextCharCount = segmentationContext.previousTextCharCount
-        runConfig.sendPreviousImage = segmentationContext.sendPreviousImage
         runConfig.customOCRPrompt = segmentationContext.customPrompt ?? ""
         runConfig.imageScale = segmentationContext.imageScale
         runConfig.enableSegmentJSON = enableSegmentJSON

@@ -7,7 +7,6 @@ struct RotationRetrySheet: View {
     let title: String
     let subtitle: String?
     let backendDescription: String
-    let initialRotation: Int
     let onApply: (Int) -> Void
     let onCancel: () -> Void
 
@@ -19,7 +18,6 @@ struct RotationRetrySheet: View {
         self.title = title
         self.subtitle = subtitle
         self.backendDescription = backendDescription
-        self.initialRotation = initialRotation
         self.onApply = onApply
         self.onCancel = onCancel
         _rotation = State(initialValue: ((initialRotation % 360) + 360) % 360)

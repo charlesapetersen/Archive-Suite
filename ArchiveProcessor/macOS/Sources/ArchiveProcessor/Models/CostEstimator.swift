@@ -20,7 +20,6 @@ struct CostEstimate {
     var collectionFormatted: String { Self.money(collectionCost) }
     var rotationFormatted: String { Self.money(rotationCost) }
     var totalStandardFormatted: String { Self.money(totalStandard) }
-    var totalBatchFormatted: String { Self.money(totalBatch) }
 }
 
 struct CostEstimator {

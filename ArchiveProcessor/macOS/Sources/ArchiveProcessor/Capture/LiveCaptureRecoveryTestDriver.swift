@@ -646,7 +646,7 @@ enum LiveCaptureRecoveryTestDriver {
                 SessionProcessingConfig(
                     provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                     taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: out, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: out,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1)
@@ -757,7 +757,7 @@ enum LiveCaptureRecoveryTestDriver {
                 config: SessionProcessingConfig(
                     provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                     taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: r2Out, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: r2Out,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -822,7 +822,7 @@ enum LiveCaptureRecoveryTestDriver {
                     // automatic mode, and a box/folder short-circuits to a colour tag inside `TagGenerator`.
                     // So this test finalizes real segments for $0 and never touches the network.
                     taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: r5Out, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: r5Out,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -923,7 +923,7 @@ enum LiveCaptureRecoveryTestDriver {
                 config: SessionProcessingConfig(
                     provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                     taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: r4Out, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: r4Out,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -1022,7 +1022,7 @@ enum LiveCaptureRecoveryTestDriver {
                     // `.human` — see Test 15: a document only reaches the LLM in `.automatic`, so the
                     // mid-finalize case below finalizes for real, for $0, with no network.
                     taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: r3Out, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: r3Out,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -1262,7 +1262,7 @@ enum LiveCaptureRecoveryTestDriver {
                     // `.human` — a document only reaches the LLM in `.automatic`, so every finalize below
                     // runs for real, for $0, with no network.
                     taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: fuOut, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: fuOut,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -1438,7 +1438,7 @@ enum LiveCaptureRecoveryTestDriver {
                     // `.human` — a document only reaches the LLM in `.automatic`, so the re-finalize the
                     // retry triggers runs for real, for $0, with no network.
                     taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: ruOut, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: ruOut,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -1619,7 +1619,7 @@ enum LiveCaptureRecoveryTestDriver {
                     // `.human` — a document only reaches the LLM in `.automatic`, so both finalizes below run
                     // for real, for $0, with no network.
                     taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                    outputDirectory: fvOut, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: fvOut,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -1824,7 +1824,7 @@ enum LiveCaptureRecoveryTestDriver {
                     taggingMode: .human, rotationMode: .off,
                     // Load-bearing, not incidental: see the merge note above.
                     mergeDocuments: true,
-                    outputDirectory: bwOut, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: bwOut,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -2057,7 +2057,7 @@ enum LiveCaptureRecoveryTestDriver {
                     // No merge here (unlike Test 20): this section wants the regeneration to SUCCEED, so the
                     // per-page PDFs it rewrites may stay exactly where the first write put them.
                     mergeDocuments: false,
-                    outputDirectory: rfOut, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: rfOut,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -2330,7 +2330,7 @@ enum LiveCaptureRecoveryTestDriver {
                     // No merge: the regeneration has to SUCCEED here, so its per-page PDFs may stay exactly
                     // where the first write put them (same reasoning as Test 21).
                     mergeDocuments: false,
-                    outputDirectory: clOut, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: clOut,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1)
@@ -2604,7 +2604,7 @@ enum LiveCaptureRecoveryTestDriver {
                     taggingMode: .human, rotationMode: .off,
                     // No merge: the regeneration has to SUCCEED here (same reasoning as Tests 21/22).
                     mergeDocuments: false,
-                    outputDirectory: psOut, contextCharCount: 0, sendPreviousImage: false,
+                    outputDirectory: psOut,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                     gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                     textColumns: 1),
@@ -2895,7 +2895,7 @@ enum LiveCaptureRecoveryTestDriver {
             let cfConfig = SessionProcessingConfig(
                 provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                 taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                outputDirectory: cfOut, contextCharCount: 0, sendPreviousImage: false,
+                outputDirectory: cfOut,
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                 gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                 textColumns: 1)
@@ -3226,7 +3226,7 @@ enum LiveCaptureRecoveryTestDriver {
                 // `.human` — a document only reaches the LLM in `.automatic`, so every finalize below runs
                 // for real, for $0, with no network.
                 taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                outputDirectory: uwOut, contextCharCount: 0, sendPreviousImage: false,
+                outputDirectory: uwOut,
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                 gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                 textColumns: 1)
@@ -3535,7 +3535,7 @@ enum LiveCaptureRecoveryTestDriver {
                 provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                 // `.human` — no document reaches the tag LLM; all calls below are the $0 OCR stub.
                 taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                outputDirectory: rsOut, contextCharCount: 0, sendPreviousImage: false,
+                outputDirectory: rsOut,
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                 gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                 textColumns: 1)
@@ -3741,7 +3741,7 @@ enum LiveCaptureRecoveryTestDriver {
             let p29Config = SessionProcessingConfig(
                 provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                 taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                outputDirectory: p29Out, contextCharCount: 0, sendPreviousImage: false,
+                outputDirectory: p29Out,
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                 gateway: p29Gateway, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
                 textColumns: 1, localAgent: p29Agent)
@@ -3850,7 +3850,7 @@ enum LiveCaptureRecoveryTestDriver {
             let fu4Config = SessionProcessingConfig(
                 provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                 taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                outputDirectory: fu4Output, contextCharCount: 0, sendPreviousImage: false,
+                outputDirectory: fu4Output,
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                 gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
             LiveCaptureProcessor._recoveryTestOCRStub =
@@ -3900,7 +3900,7 @@ enum LiveCaptureRecoveryTestDriver {
             failSession._recoveryTestBeginLive(config: SessionProcessingConfig(
                 provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                 taggingMode: .human, rotationMode: .off, mergeDocuments: false,
-                outputDirectory: failOut, contextCharCount: 0, sendPreviousImage: false,
+                outputDirectory: failOut,
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                 gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1),
                 stagingDir: failStaging)

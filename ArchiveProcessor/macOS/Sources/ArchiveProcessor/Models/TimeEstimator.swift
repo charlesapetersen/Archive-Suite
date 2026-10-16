@@ -36,7 +36,6 @@ struct TimeEstimator {
     static let outputTokensPerSecond: Double = 140   // generation rate
     static let rotationAskSeconds: Double = 3.0      // one 4-image comparison (upload-bound), ~measured
 
-    static let ocrParallelWorkers: Double = 4        // when no previous-text context
     static let tagParallelWorkers: Double = 6
 
     /// Per-LLM-call seconds: first-token latency + generation of `outputTokens`, scaled by model speed.

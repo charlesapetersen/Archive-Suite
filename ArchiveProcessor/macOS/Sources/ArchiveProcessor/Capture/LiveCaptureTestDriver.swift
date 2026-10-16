@@ -44,7 +44,7 @@ enum LiveCaptureTestDriver {
         let config = SessionProcessingConfig(
             provider: .gemini, model: model, thinkingLevel: .low, apiKey: key,
             taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
-            outputDirectory: outDir, contextCharCount: 0, sendPreviousImage: false,
+            outputDirectory: outDir,
             customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
             outputImageFile: true, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
         session.beginLiveSession(config: config)

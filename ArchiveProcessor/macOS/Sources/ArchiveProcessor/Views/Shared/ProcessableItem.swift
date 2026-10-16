@@ -26,14 +26,6 @@ enum ItemState: Equatable {
     case succeededPlaceholderImage      // filed, but a page's PDF holds a placeholder, not the scan — WARN
     case failed(FailureKind)            // needs attention: nothing usable landed
     case removed                        // user-dropped page
-
-    /// Whether this item is in a terminal-but-attention state the operator may want to act on.
-    var needsAttention: Bool {
-        switch self {
-        case .failed, .succeededNoText, .succeededPlaceholderImage: return true
-        default: return false
-        }
-    }
 }
 
 /// Why an item is `.failed`. Distinguishes the three causes Live Capture previously collapsed into a

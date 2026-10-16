@@ -340,3 +340,41 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
+
+### S-017 · A pre-OCRed Processor run drops the operator's per-document segmentation review
+
+- **Raised:** 2026-10-16 · W40.e5 · Periphery reported the parameter unused; confirmed by reading the code.
+- **Suspected behaviour:** `performPreOCRedProcessing` takes `reviewDocumentSegmentation`
+  (`ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift:92`) but never uses it, and passes
+  a literal `reviewDocumentSegmentation: false` to `performCollectionSegmentation` (`:246`). Its callers, a fresh run
+  and a resume from PendingRun (`OCR/OCRProcessor+Pipeline.swift:1866`, `:2931`), pass the operator's persisted
+  choice. So on a pre-OCRed input the "review document segmentation" step would be skipped even when it is on.
+  It may be deliberate (pre-OCRed input has no images), but nothing says so. Git history traces it to the
+  de-nest refactor or earlier.
+- **Where:** `OCR/OCRProcessor+OCR.swift:81-92`, `:246`.
+- **Would confirm it:** a headless driver run of a pre-OCRed scratch input with collection segmentation and
+  document-segmentation review on. Confirmed if no review is requested.
+- **Would clear it:** the review is requested, or a design note shows pre-OCRed runs are meant to skip it (then it
+  is a doc and signature fix, not a bug).
+- **Status:** `open`
+- **History:**
+  - 2026-10-16 W40.e5 — raised.
+
+### S-018 · The Processor tells the user it paces to the subscription window, but OCR does not
+
+- **Raised:** 2026-10-16 · W40.e5 · Periphery reported `LocalAgentClient.lastUsageWindowResetAt` written and never
+  read.
+- **Suspected behaviour:** on a CLI rate limit the app says "The app paces to your subscription window and
+  retries" (`ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentClient.swift:329`), and
+  `ArchiveProcessor/CLAUDE.md` (lines 90 and 473) promises "usage-window pacing" for the local-agent OCR path. The
+  parsed reset time is stored in `lastUsageWindowResetAt` (`:54`, written at `:239`), whose comment says the OCR
+  loop consumes it in `W13.cli-4`, but nothing reads it. Only segmentation (`Segmentation/WindowTransports.swift:285`)
+  uses the parsed reset.
+- **Where:** `OCR/LocalAgentClient.swift:54`, `:239`, `:329`.
+- **Would confirm it:** a headless run of the local-agent OCR path against a stub CLI that reports a rate limit
+  with a reset time. Confirmed if the run does not wait for that time before retrying. Kept until then (a
+  promised feature, so not deleted); the Processor ledger (`W40.b3`) should carry it as a row.
+- **Would clear it:** the run waits for the reset.
+- **Status:** `open`
+- **History:**
+  - 2026-10-16 W40.e5 — raised.

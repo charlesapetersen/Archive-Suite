@@ -217,7 +217,9 @@ where it can.
 - **`W40.e4` — never-executed code [M].** `xccov` over unit, UI and journey runs. List functions no run reached;
   each goes to its ledger as a question (dead, unreachable, or untested).
 - **`W40.e5` — dead-code scan [S-M].** Periphery per app. Each hit is deleted (library code with no promise), or
-  goes to its ledger (a promised feature with no entry point).
+  goes to its ledger (a promised feature with no entry point). *(SHIPPED 2026-10-16: `ops/verify/dead-code-scan.sh`,
+  evidence `verification/evidence/core/W40.e5-dead-code.md`; 80 deletions across Core and the three apps, ledger
+  row `R-47`, suspects `S-016`–`S-018`.)*
 - **`W40.e6` — parser robustness [M].** In-suite fuzz loops (truncate, flip bytes, nest) over the tag format, note
   front-matter, the relay object format, the staging manifest and page-2 metadata; property tests for tag
   write-then-read round trips. A crash or a silent wrong value is a bug; a clean error is a pass.
