@@ -168,8 +168,9 @@ enum OCRRefusalFallback {
         case .mistral:
             return try await MistralClient(apiKey: route.apiKey, model: route.model).ocr(
                 imageURL: imageURL, previousText: previousText, imageScale: imageScale)
-        case .gemini, .appleVision:
-            // Never a second reader: Gemini is the refuser, and Vision's text is not a transcription.
+        case .gemini, .appleVision, .openrouter:
+            // Never a second reader: Gemini is the refuser, and Vision's text is not a transcription. OpenRouter
+            // is not one yet (W41.app-openrouter-fu1 would add Qwen3.6 27B, second on printed pages).
             return OCRResult(text: nil, classification: nil, errorMessage: "not a second reader", errorCode: nil)
         }
     }

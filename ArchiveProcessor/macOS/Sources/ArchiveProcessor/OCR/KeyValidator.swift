@@ -135,6 +135,33 @@ enum KeyValidator {
         }
     }
 
+    // MARK: - OpenRouter
+
+    /// Cheap auth check: GET /api/v1/key (the key's own record, no generation cost). 200 means the key
+    /// authenticates, not that it has credit; a run with none fails with 402.
+    static func validateOpenRouter(key: String) async -> KeyStatus {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .invalidKey }
+        guard let url = URL(string: "\(OpenAICompatibleClient.openRouterBaseURL)/key") else { return .unknown("bad-url") }
+        var req = URLRequest(url: url, timeoutInterval: timeout)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(trimmed)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return .providerBusy }
+            switch http.statusCode {
+            case 200: return .works
+            case 401, 403: return .invalidKey
+            case 402: return .needsBilling
+            case 429: return .rateLimited
+            case 500...599: return .providerBusy
+            default: return .unknown("HTTP \(http.statusCode)")
+            }
+        } catch {
+            return .offline
+        }
+    }
+
     // MARK: - Anthropic
 
     /// Cheap auth check: GET /v1/models with the `x-api-key` header (no generation cost). Like OpenAI,

@@ -14,6 +14,9 @@ struct OpenAICompatibleClient {
     /// models only). Set by the `openAI(model:apiKey:thinkingLevel:)` factory from the caller's
     /// `ThinkingLevel` (see `ThinkingLevel.openAIReasoningEffort`); left nil for gateway callers.
     var reasoningEffort: String? = nil
+    /// W41.app-openrouter: the pinned provider, precision and reasoning setting for an OpenRouter model. nil for
+    /// every other caller, whose requests stay byte-identical.
+    var openRouterRoute: OpenRouterRoute? = nil
 
     private var chatEndpoint: URL? {
         let base = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
@@ -48,6 +51,7 @@ struct OpenAICompatibleClient {
         ]
         body[maxTokensParam] = 8192
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
+        applyOpenRouterRoute(&body)
 
         let (data, response) = try await sendRequest(body: body, timeoutInterval: 120)
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
@@ -61,9 +65,27 @@ struct OpenAICompatibleClient {
               let choices = json["choices"] as? [[String: Any]],
               let message = choices.first?["message"] as? [String: Any],
               let content = message["content"] as? String else {
+            // OpenRouter reports a provider's failure as a 200 with an `error` object in the body.
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? [String: Any] {
+                let code = (error["code"] as? Int).map(String.init) ?? (error["code"] as? String)
+                return OCRResult(text: nil, classification: nil,
+                                 errorMessage: (error["message"] as? String) ?? "Provider error",
+                                 errorCode: Self.openRouterRetryCode(code))
+            }
             return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: nil)
         }
 
+        // OpenRouter reports a provider failure mid-stream as finish_reason "error", and a reply cut at the token
+        // limit as "length": neither is a transcription (W41.app-openrouter review). The failure is 503, which
+        // `isRetryableError` retries; a cut reply is not retried, since the same budget would cut it again.
+        if openRouterRoute != nil, let finish = choices.first?["finish_reason"] as? String,
+           finish == "error" || finish == "length" {
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: finish == "error" ? "The provider failed while answering"
+                                 : "The reply was cut off at the token limit",
+                             errorCode: finish == "error" ? "503" : "length")
+        }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(content)
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(content))
     }
@@ -75,14 +97,26 @@ struct OpenAICompatibleClient {
         ]
         body[maxTokensParam] = maxTokens
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
+        applyOpenRouterRoute(&body)
 
-        let (data, _) = try await sendRequest(body: body, timeoutInterval: 120)
+        let (data, response) = try await sendRequest(body: body, timeoutInterval: 120)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let message = choices.first?["message"] as? [String: Any],
               let content = message["content"] as? String else {
+            if openRouterRoute != nil {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 200
+                throw OCRError.networkError(Self.parseErrorResponse(data: data, statusCode: status))
+            }
             throw OCRError.networkError("bad response")
+        }
+        // An OpenRouter reply with no answer (a provider failure, or reasoning that used the budget) is an error,
+        // never an empty tag or classification.
+        if openRouterRoute != nil,
+           (choices.first?["finish_reason"] as? String) == "error"
+            || content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw OCRError.networkError("OpenRouter returned no answer")
         }
 
         return content
@@ -141,5 +175,57 @@ extension OpenAICompatibleClient {
             maxTokensParam: model.supportsThinking ? "max_completion_tokens" : "max_tokens",
             reasoningEffort: model.supportsThinking ? thinkingLevel?.openAIReasoningEffort : nil
         )
+    }
+}
+
+// MARK: - OpenRouter provider (W41.app-openrouter)
+
+extension OpenAICompatibleClient {
+    static let openRouterBaseURL = "https://openrouter.ai/api/v1"
+    /// Tokens added to max_tokens for a model that reasons: GLM-5.3 Flash averaged 153 at minimal (cheap-models.md).
+    static let openRouterReasoningAllowance = 1024
+
+    /// A client for one of `OpenRouterRoute.catalog`'s models, or nil for a model the catalog lacks: an unpinned
+    /// OpenRouter call would read with weights and at a price the bench never measured, so there is none.
+    static func openRouter(model: LLMModel, apiKey: String) -> OpenAICompatibleClient? {
+        guard let route = OpenRouterRoute.forModel(model.id) else { return nil }
+        return OpenAICompatibleClient(baseURL: openRouterBaseURL, apiKey: apiKey, modelID: route.model.id,
+                                      openRouterRoute: route)
+    }
+
+    /// OpenRouter's in-body error codes: a provider failure or timeout (502, 503, 408) reads as 503, the code the
+    /// pipeline retries (`isRetryableError`); anything else (429, 402, 401…) is kept as sent.
+    static func openRouterRetryCode(_ code: String?) -> String? {
+        ["502", "503", "408"].contains(code ?? "") ? "503" : code
+    }
+
+    /// `openRouter(model:apiKey:)`, throwing for a model with no pinned route (a stale saved selection).
+    static func pinnedOpenRouter(model: LLMModel, apiKey: String) throws -> OpenAICompatibleClient {
+        guard let client = openRouter(model: model, apiKey: apiKey) else {
+            throw OCRError.networkError("\(model.id) has no pinned OpenRouter provider. Choose one of the listed OpenRouter models.")
+        }
+        return client
+    }
+
+    /// The bench's request fields (`ocr_panel.py` `body`, `method_openrouter.py` `request_body`): the provider
+    /// pinned with fallbacks off, its precision, a price ceiling at the pinned price (so a provider that raised its
+    /// price fails the call instead of billing more than the estimate), temperature 0 and the reasoning setting.
+    func applyOpenRouterRoute(_ body: inout [String: Any]) {
+        guard let route = openRouterRoute else { return }
+        body["provider"] = Self.openRouterProviderField(route)
+        body["temperature"] = 0
+        if let reasoning = route.reasoning.body { body["reasoning"] = reasoning }
+        // Excluded reasoning still counts against max_tokens: give a reasoning model room above the answer's
+        // budget, or a short call (classification asks for 64) can come back empty.
+        if case .effort = route.reasoning, let limit = body["max_tokens"] as? Int {
+            body["max_tokens"] = limit + Self.openRouterReasoningAllowance
+        }
+    }
+
+    static func openRouterProviderField(_ route: OpenRouterRoute) -> [String: Any] {
+        ["order": [route.providerTag],
+         "allow_fallbacks": false,
+         "quantizations": [route.precision],
+         "max_price": ["prompt": route.model.inputCostPer1M, "completion": route.model.outputCostPer1M]]
     }
 }

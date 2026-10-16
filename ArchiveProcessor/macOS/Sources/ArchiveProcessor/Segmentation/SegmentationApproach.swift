@@ -15,6 +15,7 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
     case gemini   // Gemini 3.8 Flash over the same windows
     case openai   // an OpenAI model over the same windows; offered only once options.json measures it
     case mix      // the window voters combined by the rule options.json names
+    case glm      // GLM-5.3 Flash through OpenRouter, the budget approach (W41.app-openrouter)
 
     var id: String { rawValue }
 
@@ -337,7 +338,17 @@ struct ApproachSpec: Sendable {
 
 /// The provider a voter's model is reached through.
 enum WindowProvider: String, Sendable {
-    case anthropic, gemini, openai
+    case anthropic, gemini, openai, openrouter
+
+    /// The Keychain account holding this provider's key (the OCR providers' accounts).
+    var keychainAccount: LLMProvider {
+        switch self {
+        case .anthropic: return .anthropic
+        case .gemini: return .gemini
+        case .openai: return .openai
+        case .openrouter: return .openrouter
+        }
+    }
 }
 
 /// A window voter: one model with one fixed prompt, exactly as the bench ran it. The app does not use the
@@ -364,6 +375,10 @@ struct WindowVoter: Sendable, Equatable {
         // sends the same prompt with the images inline. `W36.seg-opt-siwc` owns the subscription route.
         WindowVoter(name: "window-openai", provider: .openai, modelID: "gpt-6.1-sol",
                     thinkingLevel: "low", prompt: .c1),
+        // W41.seg-cheap's GLM-5.3 Flash (`method_openrouter.py` CHEAP `glm5.3-flash`): prompt c1 as
+        // `method_local.request` builds it, pinned to z-ai fp8 at reasoning minimal (`OpenRouterRoute`).
+        WindowVoter(name: "window-openrouter-glm-5.3-flash", provider: .openrouter, modelID: "z-ai/glm-5.3-flash",
+                    thinkingLevel: "minimal", prompt: .c1),
     ]
 
     struct ResolveError: Error, CustomStringConvertible {

@@ -115,6 +115,28 @@ struct ProviderKeySpec: Identifiable, Sendable {
         validate: { await KeyValidator.validateAnthropic(key: $0) }
     )
 
+    // W41.app-openrouter. Not in `onboardable`: its on-screen steps have not been checked against the live site.
+    // Reached from the segmentation chooser's "add a key" for the GLM approach, and pasted in Settings.
+    static let openrouter = ProviderKeySpec(
+        provider: .openrouter,
+        account: LLMProvider.openrouter.rawValue,
+        blurb: "Archive Processor can use open-weight models (Qwen, GLM) through OpenRouter, each on one fixed provider so the price and quality are the ones measured. You'll make your own key; OpenRouter is prepaid, and charges go to OpenRouter, never to this app.",
+        signInURL: URL(string: "https://openrouter.ai/settings/keys")!,
+        billingURL: URL(string: "https://openrouter.ai/settings/credits")!,
+        privacyURL: URL(string: "https://openrouter.ai/settings/privacy")!,
+        steps: [
+            "Sign in at openrouter.ai (create an account if you don't have one).",
+            "Open “Credits” and add a small amount — requests fail without credit.",
+            "Open “Keys” → “Create Key”, then copy it (it starts with “sk-or-”).",
+            "Come back here and paste it below."
+        ],
+        costNote: "Prepaid, pay-as-you-go. The models offered here cost about $1.20–$1.75 per 1,000 pages to read.",
+        privacyNote: "OpenRouter passes each page to the one provider named for its model. Check OpenRouter's privacy settings for whether providers that keep or train on data are allowed for your account.",
+        cardNote: "Have a payment method ready to buy credits.",
+        keyPrecheck: { $0.hasPrefix("sk-or-") && $0.count >= 20 && !$0.contains(" ") },
+        validate: { await KeyValidator.validateOpenRouter(key: $0) }
+    )
+
     /// The providers offered in the guided wizard (each also still supports manual key entry).
     static let onboardable: [ProviderKeySpec] = [.anthropic, .gemini, .mistral, .openai]
 }

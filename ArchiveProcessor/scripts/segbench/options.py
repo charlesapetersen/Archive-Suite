@@ -724,8 +724,9 @@ def render(out: dict) -> str:
     def fig_row(ap):
         t, c = ap["figures"]["test"], ap["cost"]
         nr = "—" if t["pages_exact_no_review"] is None else E.pct(t["pages_exact_no_review"])
+        batch = c and c["total"]["batch_usd_per_1000_pages"]
         lc = "none" if c is None else (f"{_money(c['total']['list_usd_per_1000_pages'])} / "
-                                       f"{_money(c['total']['batch_usd_per_1000_pages'])}")
+                                       f"{'none' if batch is None else _money(batch)}")
         return (f"| {ap['label']} | {nr} | {t['flagged_per_100_pages']:.1f} | {E.pct(t['pages_exact_after_review'])} | "
                 f"{t['unflagged_errors_per_500_pages']:.1f} ({t['unflagged_errors']}) | {lc} |")
 

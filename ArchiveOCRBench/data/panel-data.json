@@ -964,14 +964,14 @@
    "source": "options.md"
   },
   {
-   "name": "GLM-5.3 Flash",
+   "name": "GLM-5.3 Flash only (budget)",
    "nocheck": 82.1,
-   "after": 98.5,
    "checks": 33.1,
+   "after": 98.5,
    "unflagged": 1,
    "std": 1.16,
    "batch": 0.46,
-   "source": "cheap-models.md"
+   "source": "options.md"
   },
   {
    "name": "GPT-5.6 Luna",

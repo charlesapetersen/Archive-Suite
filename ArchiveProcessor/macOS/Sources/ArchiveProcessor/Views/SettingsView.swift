@@ -92,6 +92,7 @@ struct SettingsView: View {
     @State private var geminiKey = ""
     @State private var mistralKey = ""
     @State private var openaiKey = ""
+    @State private var openrouterKey = ""
     @State private var gatewayKey = ""
     @State private var localAgentStatus = ""       // Detect & Verify result message (empty = not yet run)
     @State private var localAgentChecking = false
@@ -246,6 +247,7 @@ struct SettingsView: View {
         geminiKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? ""
         mistralKey = KeychainHelper.load(account: LLMProvider.mistral.rawValue) ?? ""
         openaiKey = KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? ""
+        openrouterKey = KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? ""
         gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
         segmentationRoutes = SegmentationRoutes.current()
     }
@@ -480,6 +482,12 @@ struct SettingsView: View {
                         HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
                     }
                 }
+                if let route = OpenRouterRoute.forModel(selectedModel.id), selectedProvider == .openrouter {
+                    Text(route.settingsNote)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ap.settings.openRouterRoute")
+                }
                 if let guidance = OCRPageGuidance.bundled {
                     OCRPageGuidanceNote(guidance: guidance)   // W41.app-ocr-hierarchy
                 }
@@ -610,6 +618,7 @@ struct SettingsView: View {
             keyField("Gemini", account: LLMProvider.gemini.rawValue, text: $geminiKey)
             keyField("Mistral", account: LLMProvider.mistral.rawValue, text: $mistralKey)
             keyField("OpenAI", account: LLMProvider.openai.rawValue, text: $openaiKey)
+            keyField("OpenRouter", account: LLMProvider.openrouter.rawValue, text: $openrouterKey)
             if useGateway { keyField("Gateway", account: "Gateway", text: $gatewayKey) }
         } header: {
             HStack {

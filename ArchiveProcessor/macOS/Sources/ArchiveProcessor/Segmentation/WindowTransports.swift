@@ -91,6 +91,24 @@ struct APIWindowTransport: WindowTransport {
             // shipped figures would not describe this request.
             if let t = r.voter.thinkingLevel { o["reasoning_effort"] = t }
             body = o
+        case .openrouter:
+            // `method_openrouter.py` `request_body` for a CHEAP model: the images alone in page order (no "Page n:"
+            // lines; the c1 prompt names the pages), then the prompt; temperature 0; reasoning at the voter's level,
+            // excluded from the reply; the provider pinned, fallbacks off, at the price the cost figure used.
+            guard let route = OpenRouterRoute.forModel(r.voter.modelID) else {
+                throw WindowTransportError.fatal("\(r.voter.modelID) has no pinned OpenRouter provider")
+            }
+            url = URL(string: "\(OpenAICompatibleClient.openRouterBaseURL)/chat/completions")!
+            headers["Authorization"] = "Bearer \(key)"
+            var content: [[String: Any]] = r.images.map {
+                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\($0.base64EncodedString())"]]
+            }
+            content.append(["type": "text", "text": r.prompt])
+            var o: [String: Any] = ["model": route.model.id, "max_tokens": maxOutputTokens, "temperature": 0,
+                                    "messages": [["role": "user", "content": content]],
+                                    "provider": OpenAICompatibleClient.openRouterProviderField(route)]
+            if let t = r.voter.thinkingLevel { o["reasoning"] = ["effort": t, "exclude": true] }
+            body = o
         }
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "POST"
@@ -160,6 +178,19 @@ struct APIWindowTransport: WindowTransport {
             text = ((c["content"] as? [String: Any])?["parts"] as? [[String: Any]] ?? [])
                 .filter { ($0["thought"] as? Bool) != true }.compactMap { $0["text"] as? String }.joined()
         case .openai:
+            text = (((json["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any])?["content"] as? String) ?? ""
+        case .openrouter:
+            // A provider's failure comes back as a 200 with an `error` object; it is one window's failure.
+            if let err = json["error"] as? [String: Any] {
+                let message = (err["message"] as? String) ?? "provider error"
+                let code = (err["code"] as? Int) ?? Int((err["code"] as? String) ?? "")
+                // As for an HTTP status: a rate limit stops the run, a refused key or no credit fails every window.
+                if code == 429 { throw WindowTransportError.usageLimit(reset: nil, message: message) }
+                if let code, [401, 402, 403].contains(code) {
+                    throw WindowTransportError.fatal("openrouter \(code): \(message)")
+                }
+                throw WindowTransportError.failed("openrouter: \(message)")
+            }
             text = (((json["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any])?["content"] as? String) ?? ""
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

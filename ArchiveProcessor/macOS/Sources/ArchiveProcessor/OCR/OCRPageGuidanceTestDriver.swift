@@ -64,8 +64,8 @@ enum OCRPageGuidanceTestDriver {
         eq("2 handwriting", by["handwritten"],
            "Handwriting (16 pages): Gemini 3.8 Flash 96.0, then Gemini 3.1 Pro 94.1.")
         eq("2 printed", by["printed"],
-           "Printed or typeset (28 pages): Claude Sonnet 5.5 96.3 (not in this list yet), then Qwen3.6 27B (open) 94.8 "
-           + "(not in this list yet). Gemini refused two of these pages; the app sends a refused page to a second model.")
+           "Printed or typeset (28 pages): Claude Sonnet 5.5 96.3 (not in this list yet), then Qwen3.6 27B (open) 94.8. "
+           + "Gemini refused two of these pages; the app sends a refused page to a second model.")
         check("2 forms says it is only 4 pages", by["forms"]?.contains("(4 pages)") == true
               && by["forms"]?.contains("hint") == true, by["forms"] ?? "nil")
         check("2 typewriting says any leader", by["typewritten"]?.contains("95 or more") == true, by["typewritten"] ?? "nil")

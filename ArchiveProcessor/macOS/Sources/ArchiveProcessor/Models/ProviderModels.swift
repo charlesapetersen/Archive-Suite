@@ -14,6 +14,7 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     case mistral = "Mistral"
     case openai = "OpenAI"   // append-only (persisted rawValue) — never reorder/rename existing cases
     case appleVision = "Apple Vision" // on-device transcription backend; append-only like the API providers
+    case openrouter = "OpenRouter"    // W41.app-openrouter: open-weight models, each on one pinned provider
 
     var id: String { rawValue }
 
@@ -25,6 +26,8 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
         case .mistral: builtIn = LLMModel.mistralModels
         case .openai: builtIn = LLMModel.openaiModels
         case .appleVision: builtIn = LLMModel.appleVisionModels
+        // No custom models: a custom id would have no pinned provider, and OpenRouter would route it anywhere.
+        case .openrouter: return LLMModel.openrouterModels
         }
         let custom = CustomModelStore.shared.models(for: self)
         return builtIn + custom
@@ -33,8 +36,8 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
     var supportsBatch: Bool {
         switch self {
         case .anthropic, .gemini, .mistral: return true
-        case .openai, .appleVision:
-            return false   // Apple Vision is local; OpenAI Batch API is Phase 4 — neither has this path.
+        case .openai, .appleVision, .openrouter:
+            return false   // Apple Vision is local; OpenAI Batch API is Phase 4; OpenRouter has no batch endpoint.
         }
     }
 }
@@ -392,6 +395,86 @@ struct LLMModel: Identifiable, Hashable, Codable {
             batchDiscount: 0.5
         ),
     ]
+
+    // W41.app-openrouter, from the W41 OCR panel (`segbench-results/W41-answers.md` §2, NES on one corpus). Each
+    // model runs on ONE provider at ONE precision with fallbacks off (`OpenRouterRoute`), as the bench's
+    // `ocr_panel.py` / `ocr_cloud.py` routes did, so the price here is that provider's and the figure is the
+    // bench's. Prices are the pinned endpoint's, from the panel's frozen OpenRouter catalogs (2026-10-11/13).
+    // The first entry is the provider's default: the best value of the panel, and not one of the truth's drafters.
+    static let openrouterModels: [LLMModel] = OpenRouterRoute.catalog.map(\.model)
+}
+
+// MARK: - OpenRouter routes
+
+/// One OpenRouter model as the bench measured it: the provider it was pinned to, at the precision that provider
+/// served, and whether reasoning was switched off. OpenRouter serves an open model through several providers at
+/// bf16, fp8 or fp4; a call that let it choose would read with weights the bench never scored and bill at another
+/// provider's price, so every request names the provider, its precision, `allow_fallbacks: false` and a
+/// `max_price` of the pinned price (`OpenAICompatibleClient.openRouter`).
+struct OpenRouterRoute: Sendable, Equatable {
+    let model: LLMModel
+    /// OpenRouter's endpoint tag (`deepinfra/fp8`), the value of `provider.order`.
+    let providerTag: String
+    /// The precision OpenRouter lists for that endpoint, sent as `provider.quantizations`.
+    let precision: String
+    /// OpenRouter's `reasoning` object as the bench sent it.
+    let reasoning: Reasoning
+    /// What the bench measured for it, shown under the Settings model picker.
+    let measured: String
+
+    enum Reasoning: Sendable, Equatable {
+        /// Send no `reasoning` field (a non-reasoning instruct model).
+        case none
+        /// `{"enabled": false}`.
+        case off
+        /// `{"effort": <level>, "exclude": true}`.
+        case effort(String)
+
+        var body: [String: Any]? {
+            switch self {
+            case .none: return nil
+            case .off: return ["enabled": false]
+            case .effort(let level): return ["effort": level, "exclude": true]
+            }
+        }
+    }
+
+    static let catalog: [OpenRouterRoute] = [
+        // Panel NES 93.95, $1.22 per 1,000 pages (ocr_cloud.py `qwen3-vl-235b`). Non-reasoning instruct.
+        OpenRouterRoute(
+            model: LLMModel(id: "qwen/qwen3-vl-235b-a22b-instruct", displayName: "Qwen3-VL 235B (deepinfra fp8)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.20, outputCostPer1M: 0.88, batchDiscount: 1),
+            providerTag: "deepinfra/fp8", precision: "fp8", reasoning: .none,
+            measured: "OCR panel (its prompt, close to the app's): 93.95 NES, $1.22 per 1,000 pages. The best value measured."),
+        // Panel NES 94.28 (ocr_panel.py `qwen3.6-27b`), reasoning off as the panel ran it.
+        OpenRouterRoute(
+            model: LLMModel(id: "qwen/qwen3.6-27b", displayName: "Qwen3.6 27B (chutes fp8)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.25, outputCostPer1M: 2.00, batchDiscount: 1),
+            providerTag: "chutes/fp8", precision: "fp8", reasoning: .off,
+            measured: "OCR panel (its prompt, close to the app's): 94.28 NES, $1.74 per 1,000 pages; second on printed pages, first on forms."),
+        // The budget segmentation voter (`cheap-models.md`, method_openrouter.py `glm5.3-flash`); offered for OCR
+        // too, unmeasured there. Price worked out from the seg-cheap call log (cost against tokens, 2026-10-13).
+        OpenRouterRoute(
+            model: LLMModel(id: "z-ai/glm-5.3-flash", displayName: "GLM-5.3 Flash (z-ai fp8)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.15, outputCostPer1M: 0.50, batchDiscount: 1),
+            providerTag: "z-ai", precision: "fp8", reasoning: .effort("minimal"),
+            measured: "Measured for segmentation only (the budget option); its OCR has not been measured."),
+    ]
+
+    static func forModel(_ id: String) -> OpenRouterRoute? { catalog.first { $0.model.id == id } }
+
+    /// Under the Settings model picker: where the model runs, so the user knows the price and the precision.
+    var settingsNote: String {
+        let provider = providerTag.split(separator: "/").first.map(String.init) ?? providerTag
+        return measured + " Runs on \(provider) only, at \(precision), with OpenRouter's fallbacks off: the provider the bench "
+            + "measured, at its price ($\(Self.price(model.inputCostPer1M)) in, $\(Self.price(model.outputCostPer1M)) out "
+            + "per million tokens). If that provider is down the page fails rather than going elsewhere."
+    }
+
+    private static func price(_ v: Double) -> String { String(format: "%.2f", v) }
 }
 
 // MARK: - OCR Job

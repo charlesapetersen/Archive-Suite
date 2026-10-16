@@ -9,6 +9,7 @@ W41.seg-cheap: the cheap cloud models over the same windows (the ``CHEAP`` set, 
     python method_openrouter.py estimate-five                  # what the finalists' uncached five-box windows cost
     python method_openrouter.py collect-five <model> --final   # those calls (dev boxes, then the test boxes)
     python method_openrouter.py report-five                    # each finalist on all five boxes, flagged at <= 0.85
+    python method_openrouter.py option-glm                     # GLM-5.3 Flash as an approach in options.json
     SEGBENCH_OR_API=http://127.0.0.1:8000/v1 python method_openrouter.py collect fs-qwen3.5-27b   # a local server
 
 Owner, 2026-10-11 (SUITE_TODO W41): do the models a 64 GB Mac could hold segment any better than the 4B-12B
@@ -498,6 +499,71 @@ def report_five() -> str:
     return "\n".join(lines + fit + cost + note)
 
 
+# W41.app-openrouter: GLM-5.3 Flash offered by the Processor as the budget approach, so options.json carries it
+# the way options.py carries every approach. No new calls: the cached five-box windows, the level fitted on the
+# development boxes at options.py's 98% bar (report-five's "fitted per model" table, which reproduced Gemini's
+# options.md row), the test boxes scored at it. Tokens and dollars from the logged calls at the pinned endpoint's
+# price; no batch price, because the app has no OpenRouter batch route.
+GLM_KEY = "glm5.3-flash"
+GLM_CODE = "Z"
+GLM_VOTER = "window-openrouter-glm-5.3-flash (GLM-5.3 Flash on OpenRouter, z-ai fp8, reasoning minimal, prompt c1)"
+GLM_PRICE = {"in": 0.15, "out": 0.50, "read": "2026-10-13",
+             "source": "OpenRouter z-ai endpoint; 312 of the 313 logged five-box calls cost exactly this"}
+
+
+def option_glm() -> dict:
+    import options as O
+    E, boxes = five_box(["G", f"X:{GLM_KEY}"])
+    code = (f"X:{GLM_KEY}",)
+    dev = {n: boxes[n] for n in data.DEV}
+    out = json.loads(O.OUT_JSON.read_text())
+    bar0 = E.BAR
+    try:
+        E.BAR = out["bar_after_review"]
+        # The check on this path: Gemini's row, fitted and scored here, must equal the one options.py wrote.
+        gv = E.fit_level(list(dev.values()), ("G",))
+        g = O.figures(E.pooled([E.evaluate(boxes[n], ("G",), gv) for n in data.TEST]))
+        shipped = next(a for a in out["approaches"] if a["id"] == "gemini")
+        if round(gv, 6) != round(shipped["level"], 6) or g != shipped["figures"]["test"]:
+            raise SystemExit(f"this path does not reproduce options.json's gemini row: {gv} {g}")
+        v = E.fit_level(list(dev.values()), code)
+        if v is None or not 0 < v < 1:
+            raise SystemExit(f"no usable level for GLM at the {out['bar_after_review']} bar: {v}")
+        lo = E.loco(dev, code)["pooled"]
+        per = [E.evaluate(boxes[n], code, v) | {"name": n} for n in data.TEST]
+    finally:
+        E.BAR = bar0
+    p = E.pooled(per)
+    recs = [r for r in records(GLM_KEY) if r["collection"] in FIVE]
+    pages = sum(boxes[n].pages for n in FIVE)
+    tin = 1000 * sum(r.get("prompt_tokens") or 0 for r in recs) / pages
+    tout = 1000 * sum(r.get("gen_tokens") or 0 for r in recs) / pages
+    usd = (tin * GLM_PRICE["in"] + tout * GLM_PRICE["out"]) / 1e6
+    entry = {
+        "id": "glm", "label": "GLM-5.3 Flash only (budget)", "available": True, "voters": [GLM_VOTER],
+        "rule": "min", "level": v, "flag_rule": "flag a gap whose confidence is at or below the level",
+        "figures": {"test": O.figures(p), "test_by_box": {r["name"]: O.figures(r) for r in per},
+                    "dev_held_out": O.figures(lo)},
+        "tokens_per_1000_pages": {GLM_CODE: {
+            "model": CHEAP[GLM_KEY][0], "provider": CHEAP[GLM_KEY][2], "precision": CHEAP[GLM_KEY][3],
+            "reasoning": CHEAP[GLM_KEY][4], "boxes": sorted(FIVE), "pages": pages, "calls": len(recs),
+            "input_per_1000_pages": tin, "output_per_1000_pages": tout,
+            "spent_usd": sum(r.get("cost") or 0 for r in recs),
+            "how": "the usage OpenRouter returned on every logged call, retries and parse failures included"}},
+        "cost": {"per_model": {GLM_CODE: {"list_usd_per_1000_pages": usd, "batch_usd_per_1000_pages": None,
+                                          "prices_usd_per_mtok": {"in": GLM_PRICE["in"], "out": GLM_PRICE["out"]},
+                                          "price_read": GLM_PRICE["read"], "price_source": GLM_PRICE["source"]}},
+                 "total": {"list_usd_per_1000_pages": usd, "batch_usd_per_1000_pages": None}},
+        "note": "W41.seg-cheap (cheap-models.md): the budget option for a user who checks everything flagged; "
+                "Gemini 3.8 Flash stays the better approach. Measured through method_openrouter.py, scored here "
+                "by `option-glm`."}
+    out["approaches"] = [a for a in out["approaches"] if a["id"] != "glm"] + [entry]
+    out["glm_measured"] = {"date": "2026-10-14", "item": "W41.seg-cheap-more", "added": "W41.app-openrouter"}
+    O.OUT_JSON.write_text(json.dumps(out, indent=1) + "\n")
+    O.OUT_MD.write_text(O.render(out))
+    return entry
+
+
 def cheap_rows(name) -> list[str]:
     """One row per cheap model: score, cost paid, and cost per 1,000 pages at the standard and batch prices."""
     col = data.load(name)
@@ -542,6 +608,12 @@ def main(argv) -> int:
         collect(argv[1], list(FIVE), final=True)
     elif argv and argv[0] == "report-five":
         print(report_five())
+    elif argv and argv[0] == "option-glm":
+        e = option_glm()
+        t = e["figures"]["test"]
+        print(f"glm: level {e['level']:.3f}, test {100 * t['pages_exact_no_review']:.1f}% no checking, "
+              f"{t['flagged_per_100_pages']:.1f} per 100 pages, {100 * t['pages_exact_after_review']:.1f}% after, "
+              f"{t['unflagged_errors']} unflagged, ${e['cost']['total']['list_usd_per_1000_pages']:.2f} per 1,000")
     elif argv and argv[0] == "report-cheap":
         for name in argv[1:] or ["Deaver"]:
             W.refuse_test([name])

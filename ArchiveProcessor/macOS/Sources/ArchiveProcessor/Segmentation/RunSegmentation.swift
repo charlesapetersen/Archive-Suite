@@ -214,6 +214,7 @@ enum WindowStageTransport {
                 return .failure(Missing(description: p == .anthropic
                     ? "Claude needs an Anthropic API key or a signed-in claude."
                     : p == .gemini ? "Gemini needs an API key."
+                    : p == .openrouter ? "GLM-5.3 Flash needs an OpenRouter API key."
                     : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
             }
         }
@@ -225,8 +226,7 @@ enum WindowStageTransport {
         -> Result<any WindowTransport, Missing> {
         var keys: [WindowProvider: String] = [:]
         for p in Set(spec.voters.map(\.provider)) {
-            let account: LLMProvider = p == .anthropic ? .anthropic : p == .gemini ? .gemini : .openai
-            keys[p] = KeychainHelper.load(account: account.rawValue) ?? ""
+            keys[p] = KeychainHelper.load(account: p.keychainAccount.rawValue) ?? ""
         }
         let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
         let override = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""

@@ -608,6 +608,9 @@ extension OCRProcessor {
                     response = try await classifyCallMistral(prompt: prompt, apiKey: apiKey)
                 case .openai:
                     response = try await classifyCallOpenAI(prompt: prompt, model: model, apiKey: apiKey)
+                case .openrouter:
+                    response = try await OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey)
+                        .textCompletion(prompt: prompt, maxTokens: 64)
                 case .appleVision:
                     throw OCRError.networkError("Apple Vision is transcription-only. Choose an LLM backend for classification.")
                 }
@@ -803,6 +806,9 @@ extension OCRProcessor {
                 throw OCRError.networkError("OpenAI batch is not supported in this version")
             case .appleVision:
                 throw OCRError.networkError("Apple Vision runs on this Mac and does not support batch submission")
+            case .openrouter:
+                // Unreachable for the same reason as OpenAI: `supportsBatch == false`.
+                throw OCRError.networkError("OpenRouter has no batch submission")
             }
             // `performBatchOCR`'s FIFTH interrupted exit (W16.bat3-fu). The batch is PAID by the time
             // control reaches here and every acknowledged chunk ID is already journaled — only the
@@ -1084,8 +1090,8 @@ extension OCRProcessor {
                     // Unreachable: OpenAI never enters the batch path (`supportsBatch == false`, and
                     // submitBatch throws for it). Keeps the switch exhaustive; Phase 4 adds a real poll.
                     batchComplete = true
-                case .appleVision:
-                    // Vision never creates a server-side batch. Treat a malformed/programmatic call as
+                case .appleVision, .openrouter:
+                    // Neither creates a server-side batch. Treat a malformed/programmatic call as
                     // interrupted so its journal is preserved rather than falsely marked completed.
                     batchPollInterrupted = true
                     return
@@ -1733,6 +1739,9 @@ extension OCRProcessor {
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: scale)
                 case .openai:
                     let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel)
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
+                case .openrouter:
+                    let client = try OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey)
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 case .appleVision:
                     networkResult = try await VisionClient(settings: visionSettings).ocr(

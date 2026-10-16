@@ -478,11 +478,111 @@
     },
     "why": "re-ranked with ChatGPT on the development set (options-openai-dev.md)"
    }
+  },
+  {
+   "id": "glm",
+   "label": "GLM-5.3 Flash only (budget)",
+   "available": true,
+   "voters": [
+    "window-openrouter-glm-5.3-flash (GLM-5.3 Flash on OpenRouter, z-ai fp8, reasoning minimal, prompt c1)"
+   ],
+   "rule": "min",
+   "level": 0.925,
+   "flag_rule": "flag a gap whose confidence is at or below the level",
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 120,
+     "pages_exact_no_review": 0.8212121212121212,
+     "flagged_per_100_pages": 33.05785123966942,
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 1.3774104683195592
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 93,
+      "pages_exact_no_review": 0.8148148148148148,
+      "flagged_per_100_pages": 37.2,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 2.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 27,
+      "pages_exact_no_review": 0.8390804597701149,
+      "flagged_per_100_pages": 23.893805309734514,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 94,
+     "pages_exact_no_review": 0.9015444015444015,
+     "flagged_per_100_pages": 17.05989110707804,
+     "pages_exact_after_review": 0.972972972972973,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 2.722323049001815
+    }
+   },
+   "tokens_per_1000_pages": {
+    "Z": {
+     "model": "z-ai/glm-5.3-flash",
+     "provider": "z-ai",
+     "precision": "fp8",
+     "reasoning": "minimal",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 914,
+     "calls": 313,
+     "input_per_1000_pages": 7226847.921225383,
+     "output_per_1000_pages": 148969.36542669585,
+     "spent_usd": 1.05628401,
+     "how": "the usage OpenRouter returned on every logged call, retries and parse failures included"
+    }
+   },
+   "cost": {
+    "per_model": {
+     "Z": {
+      "list_usd_per_1000_pages": 1.1585118708971553,
+      "batch_usd_per_1000_pages": null,
+      "prices_usd_per_mtok": {
+       "in": 0.15,
+       "out": 0.5
+      },
+      "price_read": "2026-10-13",
+      "price_source": "OpenRouter z-ai endpoint; 312 of the 313 logged five-box calls cost exactly this"
+     }
+    },
+    "total": {
+     "list_usd_per_1000_pages": 1.1585118708971553,
+     "batch_usd_per_1000_pages": null
+    }
+   },
+   "note": "W41.seg-cheap (cheap-models.md): the budget option for a user who checks everything flagged; Gemini 3.8 Flash stays the better approach. Measured through method_openrouter.py, scored here by `option-glm`."
   }
  ],
  "openai_measured": {
   "date": "2026-10-12",
   "item": "W36.seg-opt-openai",
   "freeze": "options-frozen-openai.json"
+ },
+ "glm_measured": {
+  "date": "2026-10-14",
+  "item": "W41.seg-cheap-more",
+  "added": "W41.app-openrouter"
  }
 }

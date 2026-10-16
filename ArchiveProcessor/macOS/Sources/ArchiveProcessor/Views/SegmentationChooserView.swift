@@ -89,6 +89,7 @@ struct SegmentationChooserView: View {
         case .anthropic: return .anthropic
         case .gemini: return .gemini
         case .openai: return .openai
+        case .openrouter: return .openrouter
         }
     }
 }

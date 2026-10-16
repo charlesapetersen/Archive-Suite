@@ -8,6 +8,7 @@ struct SegmentationRoutes: Equatable, Sendable {
     var hasAnthropicKey = false
     var hasGeminiKey = false
     var hasOpenAIKey = false
+    var hasOpenRouterKey = false
     /// The user's own `claude` is installed. Whether it is signed in is only known at the first call: the app
     /// never reads the login (`segbench-results/usage.md`).
     var hasClaudeCLI = false
@@ -42,6 +43,7 @@ struct SegmentationRoutes: Equatable, Sendable {
             hasAnthropicKey: !(KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? "").isEmpty,
             hasGeminiKey: !(KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? "").isEmpty,
             hasOpenAIKey: !(KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? "").isEmpty,
+            hasOpenRouterKey: !(KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? "").isEmpty,
             hasClaudeCLI: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override) != nil,
             claudeRoute: ClaudeRoute.stored(defaults),
             chatGPTAccount: ChatGPTAuth.shared.signedInAccount(),
@@ -55,6 +57,7 @@ struct SegmentationRoutes: Equatable, Sendable {
         case .anthropic: return hasAnthropicKey
         case .gemini: return hasGeminiKey
         case .openai: return hasOpenAIKey
+        case .openrouter: return hasOpenRouterKey
         }
     }
 
@@ -289,6 +292,7 @@ struct SegmentationRow: Equatable, Sendable {
         case .anthropic: return "Claude"
         case .gemini: return "Gemini"
         case .openai: return "ChatGPT"
+        case .openrouter: return "GLM-5.3 Flash"
         }
     }
 
@@ -297,6 +301,7 @@ struct SegmentationRow: Equatable, Sendable {
         case .anthropic: return "an Anthropic API key, or the claude tool installed and signed in"
         case .gemini: return "a Gemini API key"
         case .openai: return "an OpenAI API key, or Sign in with ChatGPT"
+        case .openrouter: return "an OpenRouter API key"
         }
     }
 

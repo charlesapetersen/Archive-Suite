@@ -39,13 +39,21 @@ struct CostEstimator {
         case .mistral: return 1_000
         case .openai: return 1_500   // OpenAI bills images as tokens via tiling; ~1.5k ≈ a full-page high-detail scan. Refine if the keyed live smoke shows drift.
         case .appleVision: return 0   // runs in-process; it has no billable image-token accounting
+        // W41.app-openrouter: the OCR panel's logged prompt tokens on its pinned providers, less the ~400-token
+        // prompt: Qwen3-VL 235B 4,091 a page, Qwen3.6 27B 3,351 (99 and 135 calls, 2,400 px pages). The larger.
+        case .openrouter: return 3_700
         }
     }
 
     /// Thinking tokens a model spends per OCR page, billed at its output rate. Gemini 3.8 Flash thinks even
     /// with no thinking level set: ~117 a page in the W41 pilot (W41.app-ocr-default-fu1).
+    /// GLM-5.3 Flash reasons at minimal on OpenRouter: 153 tokens a call over the Deaver windows (cheap-models.md).
     static func estimatedThinkingTokens(for model: LLMModel) -> Double {
-        model.id == "gemini-3.8-flash" ? 117 : 0
+        switch model.id {
+        case "gemini-3.8-flash": return 117
+        case "z-ai/glm-5.3-flash": return 153
+        default: return 0
+        }
     }
 
     /// One page read by a second reader (`OCRRefusalFallback`) at that model's standard rate: image, prompt
@@ -91,6 +99,7 @@ struct CostEstimator {
         case .mistral: return nil               // no LLM rotation path → local Vision (free)
         case .openai: return (0.75, 4.50)       // gpt-5.4-mini; verified 2026-09-26 against OpenAI's model page.
         case .appleVision: return nil
+        case .openrouter: return nil            // no LLM rotation route measured → local Vision (free)
         }
     }
 

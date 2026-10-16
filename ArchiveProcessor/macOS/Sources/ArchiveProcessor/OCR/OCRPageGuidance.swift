@@ -52,8 +52,8 @@ struct OCRPageGuidance: Decodable, Equatable {
     /// Every built-in model id, for `appModel` checks. Built-in only: a custom model that happens to share an id is
     /// not the model that was measured.
     static var builtInModelIDs: Set<String> {
-        Set((LLMModel.anthropicModels + LLMModel.geminiModels + LLMModel.mistralModels + LLMModel.openaiModels)
-            .map(\.id))
+        Set((LLMModel.anthropicModels + LLMModel.geminiModels + LLMModel.mistralModels + LLMModel.openaiModels
+             + LLMModel.openrouterModels).map(\.id))
     }
 
     /// What is wrong with the table, so a bad bench edit fails the self-test instead of reaching the picker.

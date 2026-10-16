@@ -151,6 +151,16 @@ def segmentation():
             if any(row[k] != gemini[k] for k in row):
                 sys.exit(f"cheap-models.md's Gemini row at 98% no longer matches options.md: {row}")
             continue
+        # A finalist the app offers is an approach in options.md (GLM-5.3 Flash, W41.app-openrouter): shown once,
+        # from there, and the two files must agree.
+        shipped = next((a for a in seg if a["name"].startswith(c[0] + " only")), None)
+        if shipped:
+            if any(row[k] != shipped[k] for k in row):
+                sys.exit(f"cheap-models.md's {c[0]} row at 98% no longer matches options.md: {row}")
+            # options.json has no batch price for it (the app has no OpenRouter batch route); the bench measured one
+            if shipped["batch"] is None:
+                shipped["batch"] = money_cells(costs[c[0]][4] + " " + costs[c[0]][5])[1]
+            continue
         std, batch = money_cells(costs[c[0]][4] + " " + costs[c[0]][5])
         seg.append({"name": c[0], **row, "std": std, "batch": batch, "source": "cheap-models.md"})
     return seg

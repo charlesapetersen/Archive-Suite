@@ -155,7 +155,8 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
 <body text…>                   ← or "No text returned by model." (+ error) on OCR failure
 ```
 
-- `<Provider>` is `model.provider.rawValue` (`Anthropic`/`Google Gemini`/`Mistral`/`OpenAI`/`Apple Vision`),
+- `<Provider>` is `model.provider.rawValue` (`Anthropic`/`Google Gemini`/`Mistral`/`OpenAI`/`Apple Vision`/`OpenRouter`; an OpenRouter model's
+  name carries its pinned provider and precision, e.g. `Qwen3-VL 235B (deepinfra fp8)`),
   a custom gateway display name, **or** `Local CLI Agent (<tool>)` for a subscription-authenticated CLI —
   treat as free-form. A Local Agent's model position is its explicit CLI override or `CLI default`, never
   the selected direct-provider fallback. For example, the on-device backend writes

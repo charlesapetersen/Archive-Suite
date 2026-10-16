@@ -2324,8 +2324,8 @@ extension OCRProcessor {
         case .openai:
             cancelChunk = { _ in false }   // never called; OpenAI has no batch path in v1.
             clientTypeName = "none"
-        case .appleVision:
-            cancelChunk = { _ in false }   // Vision has no server-side batch path.
+        case .appleVision, .openrouter:
+            cancelChunk = { _ in false }   // neither has a server-side batch path.
             clientTypeName = "none"
         }
         return BatchChunkCanceller(provider: batch.provider, cancelChunk: cancelChunk,
@@ -2494,8 +2494,8 @@ extension OCRProcessor {
             confirmed = allConfirmed
         case .openai:
             confirmed = false   // OpenAI has no batch path in v1 (`supportsBatch == false`).
-        case .appleVision:
-            confirmed = false   // Apple Vision has no server-side batch path.
+        case .appleVision, .openrouter:
+            confirmed = false   // neither has a server-side batch path.
         }
         // Keep-on-doubt, and the doubt outranks confirmation. An unfinished submission means the chunk
         // list may be short; a materialization in flight means a just-written PDF may not yet have a

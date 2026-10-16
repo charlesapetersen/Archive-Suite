@@ -51,6 +51,9 @@ enum LLMTextClient {
         case .openai:
             let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel)
             return try await client.textCompletion(prompt: prompt, maxTokens: maxTokens)
+        case .openrouter:
+            return try await OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey)
+                .textCompletion(prompt: prompt, maxTokens: maxTokens)
         case .appleVision:
             throw OCRError.networkError("Apple Vision is transcription-only. Choose an LLM backend for text completion.")
         }

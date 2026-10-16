@@ -87,7 +87,8 @@ struct TimeEstimator {
         // Rotation — concurrent with each page's OCR (per image: `orderings` sequential comparisons).
         var rotation = 0.0
         let rotCalls = rotationMode.orderings
-        if rotCalls > 0, !preOCRedInput, !useGateway, model.provider != .mistral {
+        // Mistral and OpenRouter have no LLM rotation route; local Vision does it (`LLMRotationDetector`).
+        if rotCalls > 0, !preOCRedInput, !useGateway, model.provider != .mistral, model.provider != .openrouter {
             let rotSpeed = model.provider == .anthropic ? 1.6 : 1.0   // gemini rotation uses flash-lite
             rotation = ceil(n / w) * Double(rotCalls) * (rotationAskSeconds * rotSpeed)
         }

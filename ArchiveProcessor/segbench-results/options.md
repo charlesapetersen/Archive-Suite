@@ -15,6 +15,7 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 | Gemini only | 88.8% | 24.2 | 100.0% | 0.0 (0) | $3.61 / $1.81 |
 | ChatGPT only | 92.4% | 79.1 | 100.0% | 0.0 (0) | $14.51 / $7.25 |
 | Claude and ChatGPT together | 92.4% | 10.2 | 97.3% | 4.1 (3) | $31.44 / $15.72 |
+| GLM-5.3 Flash only (budget) | 82.1% | 33.1 | 98.5% | 1.4 (1) | $1.16 / none |
 
 ## Held out on the development boxes (each box at the level fitted on the other two)
 
@@ -24,6 +25,7 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 | Gemini only | min, <= 0.965 | 90.7% | 10.3 | 98.6% | 2.7 |
 | ChatGPT only | min, <= 0.990 | 91.3% | 79.1 | 100.0% | 0.0 |
 | Claude and ChatGPT together | min, <= 0.850 | 91.1% | 5.8 | 99.0% | 1.8 |
+| GLM-5.3 Flash only (budget) | min, <= 0.925 | 90.2% | 17.1 | 97.3% | 2.7 |
 
 ## By test box
 
@@ -37,6 +39,8 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 | ChatGPT only | RG165 | 113 | 94.3% | 66 | 58.4 | 100.0% | 0 |
 | Claude and ChatGPT together | Stanton | 250 | 91.8% | 32 | 12.8 | 97.1% | 2 |
 | Claude and ChatGPT together | RG165 | 113 | 94.3% | 5 | 4.4 | 97.7% | 1 |
+| GLM-5.3 Flash only (budget) | Stanton | 250 | 81.5% | 93 | 37.2 | 97.9% | 1 |
+| GLM-5.3 Flash only (budget) | RG165 | 113 | 83.9% | 27 | 23.9 | 100.0% | 0 |
 
 ## Tokens and cost per 1,000 pages
 
@@ -47,6 +51,7 @@ Measured over every box collected (all five), not tuned on anything. Gemini: the
 | claude-sonnet-5-5 | Dean, Deaver, Herrnstein, RG165, Stanton | 310 | 7,724k | 148k | $16.93 | $8.47 | 2.0, 10.0 (2026-10-11) |
 | gemini-3.8-flash/low | Dean, Deaver, Herrnstein, RG165, Stanton | 310 | 3,942k | 174k | $3.61 | $1.81 | 0.75, 3.75 (2026-10-05) |
 | gpt-6.1-sol/low | Dean, Herrnstein, RG165, Stanton | 259 | 12,213k | 91k | $14.51 | $7.25 | 2.0, 10.0 (2026-10-11) |
+| z-ai/glm-5.3-flash/minimal | Dean, Deaver, Herrnstein, RG165, Stanton | 313 | 7,227k | 149k | $1.16 | — | 0.15, 0.5 (2026-10-13) |
 
 Gemini 3.8 Flash is at its introductory price to 31 Dec 2026; at the later $1.50 / $7.50 the Gemini figure becomes $7.22 list, $3.61 batch.
 
@@ -58,6 +63,6 @@ ChatGPT through `codex exec` (the ChatGPT subscription; no money): Codex reporte
 
 - Manual asks about every gap between two document pages (87 per 100 pages on these boxes) and costs nothing; it is the floor the others are measured against.
 - On the test boxes the fewest checks were Claude only's (10.2 per 100 pages, 3 unflagged errors), and the fewest unflagged errors Gemini only's (0, at 24.2 checks per 100 pages). The trade-off is the level: a higher one flags more and leaves less.
-- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
+- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 1 on the test boxes, 3 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
 - The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took the same decision on every gap), which is why combining them adds little over Claude alone.
 

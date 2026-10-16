@@ -132,7 +132,8 @@ enum NetworkSession {
     /// The Vision hybrid drives the real `LLMTextClient` through this same no-wire seam. Separate from the
     /// batch flag so running its small request-shape contract cannot accidentally run the whole batch suite.
     /// The W41 refusal-fallback contract (`OCRRefusalFallbackTestDriver.envKey`) and the W25 retry-backend
-    /// contract (`RetryBackendTestDriver.envKey`) have their own flags for the same reason.
+    /// contract (`RetryBackendTestDriver.envKey`) have their own flags for the same reason, as does the W41
+    /// OpenRouter request contract (`OpenRouterTestDriver.envKey`).
     nonisolated static func visionHybridTestTransportIsEnabled(flag: String?) -> Bool { flag == "1" }
 
     /// The stand-in transport for THIS process, or nil when the wire is what a request takes. Resolved in
@@ -151,7 +152,9 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OCRRefusalFallbackTestDriver.envKey])
                || testTransportIsEnabled(
-                flag: ProcessInfo.processInfo.environment[RetryBackendTestDriver.envKey]))
+                flag: ProcessInfo.processInfo.environment[RetryBackendTestDriver.envKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[OpenRouterTestDriver.envKey]))
         else { return nil }
         return stub
     }
