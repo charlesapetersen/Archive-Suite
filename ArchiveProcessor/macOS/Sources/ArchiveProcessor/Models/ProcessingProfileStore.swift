@@ -84,6 +84,7 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
         .init(key: DefaultsKeys.gatewayInputCost, def: .double(-1)),
         .init(key: DefaultsKeys.gatewayOutputCost, def: .double(-1)),
         .init(key: DefaultsKeys.gatewayUpstreamProvider, def: .string(LLMProvider.anthropic.rawValue)),
+        .init(key: DefaultsKeys.gatewayLocalModel, def: .bool(false)),
 
         .init(key: DefaultsKeys.batchMode, def: .bool(false)),
         .init(key: DefaultsKeys.preOCRedInput, def: .bool(false)),

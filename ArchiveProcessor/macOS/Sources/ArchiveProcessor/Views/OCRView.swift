@@ -54,6 +54,7 @@ struct OCRView: View {
 
     // Gateway mode (persisted)
     @AppStorage(DefaultsKeys.useGateway) private var useGateway: Bool = false
+    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel: Bool = false
     @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL: String = ""
     @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID: String = ""
     @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName: String = ""
@@ -179,7 +180,7 @@ struct OCRView: View {
     private func reloadAPIKey() {
         apiKey = useAppleVision
             ? (visionUseLLMJudgment ? (KeychainHelper.load(account: selectedProvider.rawValue) ?? "") : "")
-            : (KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? "")
+            : (useGateway ? GatewayConfig.storedKey() : (KeychainHelper.load(account: selectedProvider.rawValue) ?? ""))
     }
 
     /// Dropped files that go down the image path; multi-page PDFs are re-OCR'd page by page instead.
@@ -242,7 +243,9 @@ struct OCRView: View {
             fileCount: droppedFiles.count, model: model, rotationMode: rotationMode,
             sequentialOCR: contextCharCount > 0, enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
-            preOCRedInput: preOCRedInput, useGateway: useGateway || useAppleVision, ocrWorkers: ocrWorkerCount)
+            preOCRedInput: preOCRedInput, useGateway: useGateway || useAppleVision, ocrWorkers: ocrWorkerCount,
+            localSecondsPerPage: currentGatewayConfig.flatMap {
+                $0.isLocalModel ? LocalModelRoute.secondsPerPage(modelID: $0.modelID) : nil })
     }
 
     private var gatewayHasCosts: Bool {
@@ -340,6 +343,7 @@ struct OCRView: View {
         }
         .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }
         .onChange(of: useAppleVision) { _, _ in syncForProviderChange() }
+        .onChange(of: gatewayLocalModel) { _, _ in reloadAPIKey() }   // W41.app-local-models: the stand-in key
         .onChange(of: visionUseLLMJudgment) { _, _ in syncForProviderChange() }
         .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
             // An applied profile may change the model for the *current* provider (no provider change), so
@@ -416,6 +420,8 @@ struct OCRView: View {
         .modifier(SegmentationStagePresentations(processor: processor))
         .onChange(of: apiKey) { _, newKey in
             guard !useAppleVision else { return }
+            // A local model's stand-in key (W41.app-local-models) is never saved over the gateway's real one.
+            if useGateway, gatewayLocalModel, newKey == LocalModelRoute.placeholderKey { return }
             let account = useGateway ? "Gateway" : selectedProvider.rawValue
             if newKey.isEmpty {
                 KeychainHelper.delete(account: account)
@@ -711,7 +717,7 @@ struct OCRView: View {
                                                      runDefault: pageKindRunDefault, runModel: effectiveModel)
                             }
                             let cascade = OCRCascade(routeID: ocrCascadeRoute, onDisagreement: ocrCascadeOnDisagreement)
-                            if !useGateway && !useLocalAgent && !preOCRedInput,
+                            if (!useGateway || currentGatewayConfig?.isLocalModel == true) && !useLocalAgent && !preOCRedInput,
                                cascade.applies(to: effectiveModel.provider, model: effectiveModel),
                                let target = cascade.escalationModel,
                                let page = cascade.pageCost(imageScale: imageScale / 100.0) {

@@ -17,6 +17,17 @@ struct OpenAICompatibleClient {
     /// W41.app-openrouter: the pinned provider, precision and reasoning setting for an OpenRouter model. nil for
     /// every other caller, whose requests stay byte-identical.
     var openRouterRoute: OpenRouterRoute? = nil
+    /// W41.app-local-models: a model on this Mac (`LocalModelRoute`): a lower token cap, temperature 0, a long
+    /// timeout, reasoning text stripped and a looping reply failed. false for every other caller.
+    var localModel = false
+
+    /// The client for the user's gateway, local or remote.
+    static func gateway(_ config: GatewayConfig) -> OpenAICompatibleClient {
+        OpenAICompatibleClient(baseURL: config.baseURL, apiKey: config.apiKey, modelID: config.modelID,
+                               localModel: config.isLocalModel)
+    }
+
+    private var requestTimeout: TimeInterval { localModel ? LocalModelRoute.requestTimeout : 120 }
 
     private var chatEndpoint: URL? {
         let base = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
@@ -49,11 +60,12 @@ struct OpenAICompatibleClient {
             "model": modelID,
             "messages": [["role": "user", "content": contentParts]]
         ]
-        body[maxTokensParam] = 8192
+        body[maxTokensParam] = localModel ? LocalModelRoute.maxTokens : 8192
+        if localModel { body["temperature"] = 0 }
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
         applyOpenRouterRoute(&body)
 
-        let (data, response) = try await sendRequest(body: body, timeoutInterval: 120)
+        let (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {
@@ -64,7 +76,7 @@ struct OpenAICompatibleClient {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let message = choices.first?["message"] as? [String: Any],
-              let content = message["content"] as? String else {
+              let rawContent = message["content"] as? String else {
             // OpenRouter reports a provider's failure as a 200 with an `error` object in the body.
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let error = json["error"] as? [String: Any] {
@@ -92,6 +104,9 @@ struct OpenAICompatibleClient {
             return OCRResult(text: nil, classification: nil, errorMessage: "The provider failed while answering",
                              errorCode: "503")
         }
+        let content = localModel ? LocalModelRoute.strippingReasoning(rawContent) : rawContent
+        // A local model that looped but stopped by itself (W41.mac-local-measure) is a failed page like a cut one.
+        if localModel, LocalModelRoute.isRepetitionLoop(content) { return LocalModelRoute.loopedReply }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(content)
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(content))
     }
@@ -102,10 +117,11 @@ struct OpenAICompatibleClient {
             "messages": [["role": "user", "content": prompt]]
         ]
         body[maxTokensParam] = maxTokens
+        if localModel { body["temperature"] = 0 }
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
         applyOpenRouterRoute(&body)
 
-        let (data, response) = try await sendRequest(body: body, timeoutInterval: 120)
+        let (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
@@ -125,7 +141,7 @@ struct OpenAICompatibleClient {
             throw OCRError.networkError("OpenRouter returned no answer")
         }
 
-        return content
+        return localModel ? LocalModelRoute.strippingReasoning(content) : content
     }
 
     private func sendRequest(body: [String: Any], timeoutInterval: TimeInterval) async throws -> (Data, URLResponse) {

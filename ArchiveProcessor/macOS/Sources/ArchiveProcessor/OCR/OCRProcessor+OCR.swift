@@ -20,8 +20,12 @@ extension OCRProcessor {
 
     /// Resolve the bounded worker count for OCR scheduling. Same W16.cfg6 rule as above: injected
     /// snapshot first, then a pure defaults read — never a process-global left over from another run.
-    nonisolated static func schedulingWorkerCount(for runConfig: SessionProcessingConfig?) -> Int {
-        SessionProcessingConfig.clampOCRWorkers(
+    /// W41.app-local-models: a model on this Mac reads one page at a time — one model on one GPU, where parallel
+    /// requests only queue in the server and run each page's timeout against the others' time.
+    nonisolated static func schedulingWorkerCount(for runConfig: SessionProcessingConfig?,
+                                                  gateway: GatewayConfig? = nil) -> Int {
+        if gateway?.isLocalModel == true || runConfig?.gateway?.isLocalModel == true { return 1 }
+        return SessionProcessingConfig.clampOCRWorkers(
             runConfig?.ocrWorkerCount ?? SessionProcessingConfig.runSizing().ocrWorkerCount)
     }
 
@@ -625,7 +629,7 @@ extension OCRProcessor {
         }
     }
     private nonisolated func classifyCallGateway(prompt: String, gateway: GatewayConfig) async throws -> String {
-        let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
+        let client = OpenAICompatibleClient.gateway(gateway)
         return try await client.textCompletion(prompt: prompt, maxTokens: 64)
     }
     private nonisolated func classifyCallLocalAgent(prompt: String, config: LocalAgentConfig) async throws -> String {
@@ -1437,7 +1441,7 @@ extension OCRProcessor {
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
         let concurrency = model.provider == .appleVision
             ? VisionClient.recommendedConcurrency
-            : Self.schedulingWorkerCount(for: runConfig)
+            : Self.schedulingWorkerCount(for: runConfig, gateway: gateway)
         var completed = 0
 
         // Mark all as processing
@@ -1747,7 +1751,7 @@ extension OCRProcessor {
             if let localAgent {
                 networkResult = try await LocalAgentClient(config: localAgent).ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
             } else if let gateway = gatewayConfig {
-                let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
+                let client = OpenAICompatibleClient.gateway(gateway)
                 networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
             } else {
                 switch provider {
@@ -1780,13 +1784,26 @@ extension OCRProcessor {
 
         // W41.app-ocr-default: a page Gemini refuses goes to a second reader, never an empty success. W41.app-ocr-
         // cascade: a page the run's own model fails (or, opted in, disagrees with Vision on) goes to the user's
-        // escalation route. Direct providers only: the gateway and the Local Agent are the user's single route.
-        let resolved = localAgent == nil && gatewayConfig == nil
-            ? await OCRCascade.resolve(
+        // escalation route. Direct providers only: the gateway and the Local Agent are the user's single route —
+        // except a model on this Mac (W41.app-local-models), whose looped or cut pages need the fallback the
+        // measurement asked for. It is never a Gemini refusal, so it goes in as its own model.
+        let localGateway = gatewayConfig.flatMap { $0.isLocalModel ? $0 : nil }
+        let resolved: OCRResult
+        if localAgent == nil, gatewayConfig == nil {
+            resolved = await OCRCascade.resolve(
                 networkResult, cascade: cascade, provider: provider, model: model, refusalFallback: refusalFallback,
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
                 customPrompt: customPrompt, imageScale: scale, visionSettings: visionSettings)
-            : networkResult
+        } else if localAgent == nil, let localGateway {
+            let local = localGateway.asLLMModel()
+            resolved = await OCRCascade.resolve(
+                networkResult, cascade: cascade, provider: local.provider, model: local, refusalFallback: false,
+                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+                customPrompt: customPrompt, imageScale: scale, visionSettings: visionSettings,
+                firstReaderLabel: localGateway.displayName)
+        } else {
+            resolved = networkResult
+        }
 
         // Override rotation with the detected correction when OCR produced text and a
         // correction was found; otherwise keep the LLM prompt's parsed rotation.

@@ -263,7 +263,8 @@ struct SessionProcessingConfig: Sendable {
         // back to the LIVECAPTURE_OCRKEY env var — this lets the LIVE phone-driven pipeline OCR headlessly.
         // The key stays in the environment only (never written to disk or logged). PROD: env unset (or a
         // real Keychain key present) → the Keychain value, exactly as before.
-        let keychainKey = useAppleVision ? "" : (KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? "")
+        let keychainKey = useAppleVision ? ""
+            : (useGateway ? GatewayConfig.storedKey(d) : (KeychainHelper.load(account: provider.rawValue) ?? ""))
         let apiKey: String = {
             if !keychainKey.isEmpty { return keychainKey }
             let env = ProcessInfo.processInfo.environment

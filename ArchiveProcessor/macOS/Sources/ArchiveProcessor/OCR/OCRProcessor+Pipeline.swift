@@ -2135,7 +2135,7 @@ extension OCRProcessor {
             // Parallel: OCR only the remaining indices
             var completed = 0
             let concurrency = model.provider == .appleVision
-                ? VisionClient.recommendedConcurrency : Self.schedulingWorkerCount(for: runConfig)
+                ? VisionClient.recommendedConcurrency : Self.schedulingWorkerCount(for: runConfig, gateway: gateway)
             for i in indices { jobs[i].status = .processing }
             // W16.bat10 — the identity of every slot this resume is for, snapshotted before the group can
             // suspend; the refill site below runs after a `handleOCRResult` that may have awaited a detached

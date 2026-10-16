@@ -618,9 +618,24 @@ struct GatewayConfig: Codable, Equatable {
     var displayName: String
     var inputCostPer1M: Double?
     var outputCostPer1M: Double?
+    /// W41.app-local-models: the endpoint is an open-weight model on this Mac (`LocalModelRoute`). nil (the
+    /// field absent) is a remote gateway.
+    var localModel: Bool? = nil
+
+    var isLocalModel: Bool { localModel == true }
 
     var apiKey: String {
-        KeychainHelper.load(account: "Gateway") ?? ""
+        Self.storedKey(localModel: isLocalModel)
+    }
+
+    /// The gateway key from the Keychain; a local model needs none, so it gets a placeholder when none is saved.
+    static func storedKey(localModel: Bool) -> String {
+        let saved = KeychainHelper.load(account: "Gateway") ?? ""
+        return saved.isEmpty && localModel ? LocalModelRoute.placeholderKey : saved
+    }
+
+    static func storedKey(_ d: UserDefaults = .standard) -> String {
+        storedKey(localModel: d.bool(forKey: DefaultsKeys.gatewayLocalModel))
     }
 
     func asLLMModel() -> LLMModel {
@@ -651,7 +666,8 @@ struct GatewayConfig: Codable, Equatable {
         return GatewayConfig(baseURL: baseURL, modelID: modelID,
                              displayName: name.isEmpty ? "API Gateway" : name,
                              inputCostPer1M: inCost >= 0 ? inCost : nil,
-                             outputCostPer1M: outCost >= 0 ? outCost : nil)
+                             outputCostPer1M: outCost >= 0 ? outCost : nil,
+                             localModel: d.bool(forKey: DefaultsKeys.gatewayLocalModel) ? true : nil)
     }
 }
 

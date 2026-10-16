@@ -56,7 +56,7 @@ struct ToolsView: View {
     /// Re-read the Keychain key for the current provider/gateway. The model needs no reload — it is read
     /// live from `ModelSelectionStore`, keyed by the current provider.
     private func reloadKey() {
-        apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : selectedProvider.rawValue) ?? ""
+        apiKey = useGateway ? GatewayConfig.storedKey() : (KeychainHelper.load(account: selectedProvider.rawValue) ?? "")
     }
 
     var body: some View {
@@ -158,7 +158,7 @@ struct ToolsView: View {
                     // keyed on the @AppStorage provider that may not have landed yet) so the choice can't
                     // be filed under the previous provider.
                     ModelSelectionStore.saveModel(model, for: provider)
-                    apiKey = KeychainHelper.load(account: useGateway ? "Gateway" : provider.rawValue) ?? ""
+                    apiKey = useGateway ? GatewayConfig.storedKey() : (KeychainHelper.load(account: provider.rawValue) ?? "")
                     showModelTestResults = false
                 },
                 onDismiss: { showModelTestResults = false })

@@ -27,6 +27,7 @@ enum DefaultsKeys {
     static let gatewayInputCost = "gatewayInputCost"
     static let gatewayOutputCost = "gatewayOutputCost"
     static let gatewayUpstreamProvider = "gatewayUpstreamProvider"
+    static let gatewayLocalModel = "gatewayLocalModel"   // W41.app-local-models: the gateway is a model on this Mac
 
     // Local Agent CLI backend (a locally installed, subscription-authenticated CLI — no API key).
     // Additive + opt-in; mutually exclusive with useGateway (the XOR is enforced in SettingsView).

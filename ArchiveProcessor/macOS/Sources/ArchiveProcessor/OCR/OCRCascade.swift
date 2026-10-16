@@ -14,7 +14,8 @@ import Foundation
 /// ranks poor readings well (AUC 0.78-0.89 against Vision's count, §5), but its gain over failure-only escalation
 /// was not consistent on unseen pages, so it stays off until a larger test.
 ///
-/// Applies on the direct-provider path only. The gateway and the Local Agent are the user's explicit single
+/// Applies on the direct-provider path, and on a gateway that is a model on this Mac (W41.app-local-models: its
+/// looped or cut pages need a fallback). A remote gateway and the Local Agent are the user's explicit single
 /// route, Apple Vision is the comparator rather than a first reader, and the Tools diagnostics measure the
 /// chosen model, so none of them is ever escalated.
 struct OCRCascade: Codable, Equatable, Sendable {
@@ -151,7 +152,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
     static func resolve(
         _ first: OCRResult, cascade: OCRCascade, provider: LLMProvider, model: LLMModel, refusalFallback: Bool,
         imageURL: URL, previousText: String?, previousImageURL: URL?, customPrompt: String?, imageScale: Double,
-        visionSettings: VisionOCRSettings
+        visionSettings: VisionOCRSettings, firstReaderLabel: String? = nil
     ) async -> OCRResult {
         let refused = refusalFallback && provider == .gemini && OCRRefusalFallback.isRefusal(first)
         guard cascade.applies(to: provider, model: model), let target = cascade.escalationModel else {
@@ -194,7 +195,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
                              errorCode: first.errorCode)
         }
 
-        let firstLabel = "\(model.provider.rawValue) · \(model.displayName)"
+        let firstLabel = firstReaderLabel ?? "\(model.provider.rawValue) · \(model.displayName)"
         let targetLabel = "\(target.provider.rawValue) · \(target.displayName)"
         var why: String
         if Task.isCancelled {

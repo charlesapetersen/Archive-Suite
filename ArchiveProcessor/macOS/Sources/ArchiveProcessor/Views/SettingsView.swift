@@ -45,6 +45,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.gatewayInputCost) private var gatewayInputCost: Double = -1
     @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
     @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
+    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel: Bool = false
     // Local Agent CLI backend (opt-in; mutually exclusive with the gateway — see `backendMode`).
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
@@ -438,6 +439,7 @@ struct SettingsView: View {
             .accessibilityIdentifier("ap.settings.backendPicker")
 
             if useGateway {
+                LocalModelSettingsView()   // W41.app-local-models
                 HStack {
                     Button {
                         applyOpenAIGatewayPreset()
@@ -459,6 +461,7 @@ struct SettingsView: View {
                         HelpButton(text: "Which provider's per-image token cost to assume for the cost/time estimate. Set this to the model family your gateway actually fronts — a Gemini-class model uses ~6.7× more image tokens than Anthropic, so the wrong profile makes the estimate far off. Estimate only; does not affect the actual request.")
                     }
                 }
+                if gatewayLocalModel { cascadeControls }   // a local model's looped page needs a fallback
             } else if useLocalAgent {
                 localAgentControls
             } else if useAppleVision {
@@ -1046,6 +1049,7 @@ struct SettingsView: View {
     /// reasoning models reject `max_tokens`. So this defaults to the cheapest **non-reasoning** OpenAI model,
     /// which the gateway request works with as-is; GPT-5 reasoning models go through the Direct API provider.
     private func applyOpenAIGatewayPreset() {
+        gatewayLocalModel = false   // OpenAI is remote
         gatewayBaseURL = "https://api.openai.com/v1"
         gatewayDisplayName = "OpenAI"
         gatewayUpstreamProvider = .openai

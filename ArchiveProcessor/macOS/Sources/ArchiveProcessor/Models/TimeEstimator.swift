@@ -65,7 +65,8 @@ struct TimeEstimator {
         enableCollectionSegmentation: Bool = false,
         preOCRedInput: Bool = false,
         useGateway: Bool = false,
-        ocrWorkers: Int = 4
+        ocrWorkers: Int = 4,
+        localSecondsPerPage: Double? = nil
     ) -> TimeEstimate {
         let n = Double(fileCount)
         let speed = speedFactor(for: model)
@@ -80,6 +81,9 @@ struct TimeEstimator {
             if enableTagging || enableCollectionSegmentation {
                 ocr = ceil(n / w) * callSeconds(outputTokens: CostEstimator.estimatedClassificationOutputTokens, speed: speed)
             }
+        } else if let localSecondsPerPage {
+            // W41.app-local-models: a model on this Mac reads one page at a time, at its own measured pace.
+            ocr = n * localSecondsPerPage
         } else {
             ocr = ceil(n / w) * callSeconds(outputTokens: CostEstimator.estimatedOutputTokens, speed: speed)
         }

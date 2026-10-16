@@ -38,7 +38,7 @@ enum LLMTextClient {
             return try await LocalAgentClient(config: localAgent).textCompletion(prompt: prompt, maxTokens: maxTokens)
         }
         if let gateway = gatewayConfig {
-            let client = OpenAICompatibleClient(baseURL: gateway.baseURL, apiKey: gateway.apiKey, modelID: gateway.modelID)
+            let client = OpenAICompatibleClient.gateway(gateway)
             return try await client.textCompletion(prompt: prompt, maxTokens: maxTokens)
         }
         switch provider {
