@@ -1,9 +1,24 @@
 #!/usr/bin/env bash
 # W41.farmshare-plan — one-time environment on a FarmShare login node (no GPU needed to install).
 #   bash setup.sh            # reads the cluster's limits, then builds the venv on scratch
+#   bash setup.sh --layout   # afterwards, for the glm-ocr preset: adds newspaper-ocr + DocLayout-YOLO to that venv
 # Writes: ./limits.env (from limits.py) and ./fs.env (paths every later step sources).
 set -euo pipefail
 cd "$(dirname "$0")"
+
+if [ "${1:-}" = --layout ]; then
+  # W41.farmshare-news-layout. The library NewsBench's 0.970 row came from (news_layout.py), at the version whose
+  # docstring states it, with its DocLayout-YOLO and API extras. Constrained to the torch, torchvision, numpy and
+  # transformers vLLM installed, so pip either fits around vLLM or stops with a conflict; it never swaps them.
+  # Like the plain run, do this with no job queued.
+  [ -f fs.env ] || { echo "run bash setup.sh first"; exit 1; }
+  source fs.env
+  pins="$FS_ROOT/vllm-pins.txt"
+  "$FS_PY" -m pip freeze | grep -iE '^(torch|torchvision|numpy|transformers)==' > "$pins"
+  "$FS_PY" -m pip install -q -c "$pins" "newspaper-ocr[api,doclayout]==0.11.0"
+  "$FS_PY" -c 'import news_layout as N, newspaper_ocr.detectors.doclayout, vllm; print(N.versions(), "vllm", vllm.__version__)'
+  exit 0
+fi
 
 python3 limits.py --out limits.env
 source limits.env

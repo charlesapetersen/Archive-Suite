@@ -38,6 +38,7 @@ curl -sf "http://127.0.0.1:$port/health" >/dev/null || { echo "vLLM not healthy 
 echo "vLLM up after $(( $(date +%s) - start )) s"
 export FS_URL="http://127.0.0.1:$port"
 label="${FS_PRESET_NAME}-${SLURM_JOB_ID:-local}"
+# FS_LAYOUT=1 (the glm-ocr preset) makes every mode below layout-first: fs_ocr.py reads it as --layout.
 
 case "$FS_MODE" in
   truth) "$FS_PY" fs_ocr.py truth --pack "$FS_PACK" --out "$FS_ROOT/runs/truth" --label "$label" --warmup ;;

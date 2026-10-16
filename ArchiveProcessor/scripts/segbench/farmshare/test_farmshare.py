@@ -9,7 +9,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
+import unittest.mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import limits as L  # noqa: E402
@@ -255,6 +257,141 @@ class Driver(unittest.TestCase):
         self.assertEqual(Fake.seen, [])
 
 
+try:
+    import newspaper_ocr  # noqa: F401
+    import news_layout as NL
+    LAYOUT = True
+except ImportError:
+    LAYOUT = False
+
+# A crop's top-left colour picks GLM-OCR's reply: black and blue are text (green wrapped in a code fence, as GLM-OCR
+# sometimes does), red is a request the server fails, so the library retries it and then gives up.
+GLM = {(0, 0, 0): 'Column one', (0, 0, 255): 'Column two', (0, 255, 0): '```markdown\nColumn three\n```'}
+
+
+class FakeGlm(http.server.BaseHTTPRequestHandler):
+    seen, delay = [], 0.0
+
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        b = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        FakeGlm.seen.append(b)
+        import base64
+        from PIL import Image
+        img = Image.open(io.BytesIO(base64.b64decode(b['messages'][0]['content'][0]['image_url']['url'].split(',', 1)[1])))
+        text = GLM.get(tuple(255 if v > 127 else 0 for v in img.getpixel((0, 0))[:3]))  # JPEG shifts colours a little
+        time.sleep(FakeGlm.delay)
+        if text is None:
+            self.send_response(500); self.send_header('Content-Length', '0'); self.end_headers(); return
+        out = json.dumps({'choices': [{'message': {'content': text}, 'finish_reason': 'stop'}]}).encode()
+        self.send_response(200); self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(out))); self.end_headers(); self.wfile.write(out)
+
+
+class ColumnDetector:
+    """Stands in for DocLayout-YOLO: one region per vertical third of the page (none on an all-white page)."""
+    def __init__(self, fail=False):
+        self.fail = fail
+
+    def detect(self, image):
+        from newspaper_ocr.models import BBox, PageLayout, Region
+        if self.fail:
+            raise RuntimeError('CUDA out of memory')
+        w, h = image.size
+        rs = []
+        if image.getextrema() != ((255, 255),) * 3:
+            for i in range(3):
+                bb = BBox(i * w // 3 + 5, 5, (i + 1) * w // 3 - 5, h - 5)
+                rs.append(Region(bbox=bb, image=image.crop((bb.x0, bb.y0, bb.x1, bb.y1)), label='plain_text',
+                                 confidence=0.9))
+        return PageLayout(image=image, regions=rs, width=w, height=h)
+
+
+@unittest.skipUnless(LAYOUT, 'needs newspaper-ocr (setup.sh --layout; offline: pip install --no-deps newspaper-ocr==0.11.0 '
+                     'plus pillow numpy httpx opencv-python-headless onnxruntime torch torchvision)')
+class Layout(unittest.TestCase):
+    """news_layout.py with the real newspaper-ocr Pipeline and GLM-OCR client; only the detector and server are fake."""
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), FakeGlm)
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+        cls.url = f'http://127.0.0.1:{cls.httpd.server_port}'
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+
+    def setUp(self):
+        FakeGlm.seen.clear(); FakeGlm.delay = 0.0
+        self.tmp = Path(tempfile.mkdtemp(prefix='fs-layout-test-'))
+
+    def page(self, colours, path=None):
+        from PIL import Image
+        im = Image.new('RGB', (900, 1200), 'white')
+        for i, c in enumerate(colours):
+            im.paste(Image.new('RGB', (300, 1200), c), (i * 300, 0))
+        if path:
+            path.parent.mkdir(parents=True, exist_ok=True); im.save(path)
+        return im
+
+    def reader(self, url=None, **kw):
+        return NL.LayoutReader(NL.build_pipeline(url or self.url, 'zai-org/GLM-OCR', detector=ColumnDetector(**kw)))
+
+    def test_regions_read_at_once_in_reading_order_with_the_librarys_request(self):
+        FakeGlm.delay = 0.6
+        t0 = time.time()
+        reply, meta = self.reader().read(self.page([(0, 0, 0), (0, 0, 255), (0, 255, 0)]))
+        self.assertLess(time.time() - t0, 1.5)                # three 0.6 s regions together, not one after another
+        self.assertEqual(reply['parsed']['text'], 'Column one\n\nColumn two\n\nColumn three')  # fence stripped
+        self.assertEqual((meta['status'], meta['regions'], meta['region_status']), ('ok', 3, {'ok': 3}))
+        b = FakeGlm.seen[0]
+        self.assertEqual((b['model'], b['messages'][0]['content'][1]['text']), ('zai-org/GLM-OCR', 'Text Recognition:'))
+
+    def test_page_status_tells_a_gone_server_from_a_bad_page(self):
+        reply, meta = self.reader().read(self.page([(0, 0, 0), (255, 0, 0), (0, 0, 255)]))
+        self.assertEqual((meta['status'], meta['region_status']), ('partial', {'ok': 2, 'error': 1}))
+        self.assertIsNone(reply['parsed'])                     # not written as done: a rerun reads it again
+        self.assertEqual(len(FakeGlm.seen), 2 + 3)             # the failing region was tried three times
+        import socket
+        with socket.socket() as sk:
+            sk.bind(('127.0.0.1', 0)); port = sk.getsockname()[1]
+        _, meta = self.reader(f'http://127.0.0.1:{port}').read(self.page([(0, 0, 0)] * 3))
+        self.assertEqual(meta['status'], 'error')              # counts toward fs_ocr's dead-server stop
+        _, meta = self.reader().read(self.page([]))
+        self.assertEqual((meta['status'], meta['regions']), ('empty', 0))
+        reply, meta = self.reader(fail=True).read(self.page([(0, 0, 0)]))
+        self.assertEqual((reply, meta['status']), (None, 'failed')); self.assertIn('out of memory', meta['error'])
+
+    def test_bulk_layout_writes_done_pages_and_rereads_only_the_partial_one(self):
+        self.page([(0, 0, 0), (0, 0, 255), (0, 255, 0)], self.tmp / 'in/1890/p1.jpg')
+        self.page([(0, 0, 0), (255, 0, 0), (0, 0, 255)], self.tmp / 'in/1890/p2.png')
+        real = NL.build_pipeline
+
+        def bulk():
+            argv = ['fs_ocr.py', 'bulk', '--layout', '--url', self.url, '--model', 'zai-org/GLM-OCR',
+                    '--in', str(self.tmp / 'in'), '--out', str(self.tmp / 'out')]
+            with unittest.mock.patch.object(sys, 'argv', argv), \
+                    unittest.mock.patch.object(NL, 'build_pipeline', lambda u, m: real(u, m, detector=ColumnDetector())):
+                with self.assertRaises(SystemExit) as e:
+                    F.main()
+            return e.exception.code
+
+        self.assertEqual(bulk(), 0)
+        out = self.tmp / 'out'
+        self.assertEqual((out / '1890/p1.jpg.txt').read_text(), 'Column one\n\nColumn two\n\nColumn three')
+        self.assertFalse((out / '1890/p2.png.txt').exists())
+        fails = [json.loads(x) for x in (out / 'failed-0.jsonl').read_text().splitlines()]
+        self.assertEqual([(f['image'], f['status']) for f in fails], [('1890/p2.png', 'partial')])
+        side = json.loads((out / '_meta/1890/p1.jpg.json').read_text())
+        self.assertEqual((side['kind'], side['regions']), ('newspaper', 3))
+        self.assertTrue(json.loads((out / 'throughput.jsonl').read_text().splitlines()[-1])['layout'])
+        n = len(FakeGlm.seen)
+        self.assertEqual(bulk(), 0)
+        self.assertEqual(len(FakeGlm.seen) - n, 2 + 3)          # only p2's three regions (one tried three times)
+
+
 class Estimate(unittest.TestCase):
     def test_table_has_every_candidate_and_ranges_are_ordered(self):
         t = E.table()
@@ -282,6 +419,15 @@ class Shell(unittest.TestCase):
         self.assertIn('unknown preset', out.stderr)
         self.assertIn('below prompt + max_tokens', out.stderr)
         self.assertIn('--max-model-len 16384', second)
+        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; FS_MAX_LEN=32768 preset glm-ocr; '
+                              'echo "$FS_LAYOUT|$FS_DET_FILE|$FS_VLLM_ARGS"; preset qwen3.6-27b; echo "$FS_LAYOUT|$FS_DET_REPO"'],
+                             capture_output=True, text=True)
+        glm, after = out.stdout.splitlines()
+        self.assertTrue(glm.startswith('1|doclayout_yolo_docstructbench_imgsz1280_2501.pt|'), glm)
+        for flag in ('--max-model-len 16384', '--kv-cache-dtype auto', '--gpu-memory-utilization 0.80',
+                     '--speculative-config {"method":"mtp","num_speculative_tokens":1}'):
+            self.assertIn(flag, glm)
+        self.assertEqual(after, '0|')                          # the layout route does not leak into the next preset
 
 
 if __name__ == '__main__':

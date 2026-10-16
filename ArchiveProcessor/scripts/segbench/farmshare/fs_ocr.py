@@ -5,6 +5,7 @@
   fs_ocr.py truth --pack DIR --out DIR --label L     # on a GPU node: read, score as the panel does, time it
   fs_ocr.py news  --newsbench DIR --out DIR --label L
   fs_ocr.py bulk  --in DIR --out DIR [--shard I/N] [--deadline EPOCH]
+  ... --layout   (any of truth/news/bulk) layout-first instead: DocLayout-YOLO + GLM-OCR per region (news_layout.py)
 
 The server is started by job.sbatch (`vllm serve`, OpenAI-compatible, localhost only). Nothing here calls a paid
 API or the network beyond that server. The prompt, image cap and max_tokens are imported from ocr_panel.py, so a
@@ -131,7 +132,7 @@ def throughput(results, wall, gpus):
             'mean_completion_tokens': sum(m['completion_tokens'] or 0 for m in ok) / len(ok) if ok else None}
 
 
-def env_info():
+def env_info(layout=False):
     keys = ('SLURM_JOB_ID', 'SLURM_JOB_PARTITION', 'SLURM_JOB_QOS', 'SLURMD_NODENAME', 'CUDA_VISIBLE_DEVICES',
             'FS_MODEL', 'FS_PRESET', 'FS_VLLM_ARGS')
     from importlib import metadata
@@ -139,7 +140,11 @@ def env_info():
         vllm = metadata.version('vllm')
     except metadata.PackageNotFoundError:
         vllm = None
-    return {**{k: os.environ.get(k) for k in keys}, 'vllm': vllm}
+    out = {**{k: os.environ.get(k) for k in keys}, 'vllm': vllm}
+    if layout:
+        import news_layout
+        out.update(news_layout.versions())
+    return out
 
 
 def cmd_pack(a):
@@ -184,7 +189,13 @@ def write_rows(path, rr):
 
 
 def server_from(a, max_tokens):
-    return Server(a.url, a.model or os.environ['FS_MODEL'], max_tokens, not a.thinking_on)
+    """The reader and how it wants a page loaded: the panel's Server takes JPEG bytes, the layout pipeline a
+    full-resolution image (it crops regions from the original). load(src) takes a path or the frozen bytes."""
+    model = a.model or os.environ['FS_MODEL']
+    if a.layout:
+        import news_layout as NL  # needs setup.sh --layout
+        return NL.LayoutReader(NL.build_pipeline(a.url, model)), NL.open_rgb
+    return Server(a.url, model, max_tokens, not a.thinking_on), None
 
 
 def cmd_truth(a):
@@ -198,9 +209,10 @@ def cmd_truth(a):
     for j in jobs:
         if hashlib.sha256((pack / 'images' / (j['page'] + '.jpg')).read_bytes()).hexdigest() != j['sha256']:
             raise SystemExit('pack image differs from the frozen panel input: ' + j['page'])
-    server = server_from(a, P.MAX_TOKENS)
+    server, load = server_from(a, P.MAX_TOKENS)
+    load = load or (lambda b: b)
     # The frozen bytes go as they are: no re-encoding, so the image is the one OpenRouter's providers got.
-    items = [(j['page'], (lambda p=j['page']: (pack / 'images' / (p + '.jpg')).read_bytes())) for j in jobs]
+    items = [(j['page'], (lambda p=j['page']: load((pack / 'images' / (p + '.jpg')).read_bytes()))) for j in jobs]
     if a.warmup:
         run_all(server, items[:2], 2)
     replies, wall = run_all(server, items, a.concurrency)
@@ -212,7 +224,8 @@ def cmd_truth(a):
     rr, agg = score_pages(pages, replies)
     write_rows(out / 'pages.csv', rr)
     acc = [r for r in rr if r['page'] not in meta['agreement']]
-    summary = {'label': a.label, 'env': env_info(), 'throughput': throughput(replies, wall, a.gpus),
+    summary = {'label': a.label, 'layout': a.layout, 'env': env_info(a.layout),
+               'throughput': throughput(replies, wall, a.gpus),
                'accuracy_96': agg(acc), 'agreement_3': agg([r for r in rr if r['page'] in meta['agreement']]),
                'clippings': agg([r for r in acc if (r['clippings'] or 'no') != 'no']), 'all_99': agg(rr)}
     atomic_write(out / 'summary.json', json.dumps(summary, indent=1).encode())
@@ -223,8 +236,9 @@ def cmd_news(a):
     nb, out = Path(a.newsbench), Path(a.out) / a.label
     with (nb / 'newsbench.csv').open() as f:
         rows = list(csv.DictReader(f))
-    server = server_from(a, a.max_tokens or NEWS_MAX_TOKENS)
-    items = [(Path(r['image_name']).stem, (lambda n=r['image_name']: jpeg(nb / 'images' / n, a.side))) for r in rows]
+    server, load = server_from(a, a.max_tokens or NEWS_MAX_TOKENS)
+    load = load or (lambda p: jpeg(p, a.side))
+    items = [(Path(r['image_name']).stem, (lambda n=r['image_name']: load(nb / 'images' / n))) for r in rows]
     replies, wall = run_all(server, items, a.concurrency)
     # NewsBench's own score.py discovers ocr-results/<label>/<id>.txt; write there too so its numbers are comparable
     # with the Vision OCR lab's OCR-NEWSBENCH table.
@@ -236,7 +250,8 @@ def cmd_news(a):
               {'tier': r['tier'], 'exclude': r['exclude']}) for r in rows]
     rr, agg = score_pages(pages, replies)
     write_rows(out / 'pages.csv', rr)
-    summary = {'label': a.label, 'side': a.side, 'env': env_info(), 'throughput': throughput(replies, wall, a.gpus),
+    summary = {'label': a.label, 'layout': a.layout, 'side': None if a.layout else a.side, 'env': env_info(a.layout),
+               'throughput': throughput(replies, wall, a.gpus),
                'scored_15_panel_normalisation': agg([r for r in rr if not r['exclude']])}
     atomic_write(out / 'summary.json', json.dumps(summary, indent=1).encode())
     print(json.dumps(summary, indent=1))
@@ -257,7 +272,8 @@ def cmd_bulk(a):
     todo = [p for p in mine if not target(p).exists()]
     print(f'{len(files)} images, shard {i}/{n}: {len(mine)}, {len(mine) - len(todo)} already done, {len(todo)} to read',
           flush=True)
-    server = server_from(a, a.max_tokens or P.MAX_TOKENS)
+    server, load = server_from(a, a.max_tokens or P.MAX_TOKENS)
+    load = load or (lambda p: jpeg(p, a.side or P.SIDE))
     log_lock = threading.Lock()
     done = [0]
 
@@ -276,13 +292,13 @@ def cmd_bulk(a):
                 print(f'{done[0]}/{len(todo)}', flush=True)
 
     out.mkdir(parents=True, exist_ok=True)
-    items = [(p.relative_to(src).as_posix(), (lambda p=p: jpeg(p, a.side or P.SIDE))) for p in todo]
+    items = [(p.relative_to(src).as_posix(), (lambda p=p: load(p))) for p in todo]
     replies, wall = run_all(server, items, a.concurrency, a.deadline, on_done)
     t = throughput(replies, wall, a.gpus)
     # A page the server never answered ('error': a crash, a timeout) is still to do; resubmitting retries it.
     t['left'] = len(todo) - sum(1 for _, m in replies.values() if m['status'] != 'error')
     with (out / 'throughput.jsonl').open('a') as f:
-        f.write(json.dumps({'shard': a.shard, 'env': env_info(), **t, 't': time.time()}) + '\n')
+        f.write(json.dumps({'shard': a.shard, 'layout': a.layout, 'env': env_info(a.layout), **t, 't': time.time()}) + '\n')
     print(json.dumps(t))
     sys.exit(0 if t['left'] == 0 else 75)  # 75 (EX_TEMPFAIL): deadline or dead server, resubmit to continue
 
@@ -294,10 +310,13 @@ def main():
         p = sub.add_parser(name)
         p.add_argument('--url', default=os.environ.get('FS_URL', 'http://127.0.0.1:8000'))
         p.add_argument('--model', help='served model name (default $FS_MODEL)')
-        p.add_argument('--concurrency', type=int, default=int(os.environ.get('FS_CONCURRENCY', 32)))
+        p.add_argument('--concurrency', type=int, help='pages in flight (default $FS_CONCURRENCY, else 32; 4 '
+                       'with --layout, whose regions are what fill the server: news_layout.REGION_WORKERS)')
         p.add_argument('--gpus', type=int, default=int(os.environ.get('FS_GPUS', 1)), help='for pages/hour/GPU')
         p.add_argument('--thinking-on', action='store_true', help='leave the chat template thinking switch alone')
         p.add_argument('--max-tokens', type=int)
+        p.add_argument('--layout', action='store_true', default=os.environ.get('FS_LAYOUT') == '1',
+                       help='layout-first: DocLayout-YOLO + GLM-OCR per region (default from $FS_LAYOUT=1)')
         p.add_argument('--out', required=True)
         if name == 'truth':
             p.add_argument('--pack', required=True); p.add_argument('--label', required=True)
@@ -310,6 +329,8 @@ def main():
             p.add_argument('--shard', default='0/1'); p.add_argument('--deadline', type=float)
             p.add_argument('--side', type=int)
     a = ap.parse_args()
+    if a.cmd != 'pack' and a.concurrency is None:
+        a.concurrency = int(os.environ.get('FS_CONCURRENCY') or (4 if a.layout else 32))
     {'pack': cmd_pack, 'truth': cmd_truth, 'news': cmd_news, 'bulk': cmd_bulk}[a.cmd](a)
 
 

@@ -3,6 +3,7 @@
 #   bash submit.sh truth PRESET --pack ~/fs-truthpack       # the 99 truth pages: score + pages/hour
 #   bash submit.sh news  PRESET                              # NewsBench's 19 Library of Congress pages
 #   bash submit.sh bulk  PRESET --in DIR --out DIR [--shards N]
+# PRESET glm-ocr reads layout-first (DocLayout-YOLO + GLM-OCR per region) in any mode; it needs setup.sh --layout.
 # Options: --hours H (capped at the cluster's limit), --dry-run (print the sbatch line only).
 set -euo pipefail
 cd "$(dirname "$0")"
