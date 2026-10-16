@@ -1,0 +1,64 @@
+{
+ "label": "qwen3.5-122b-a10b-1850212",
+ "layout": false,
+ "env": {
+  "SLURM_JOB_ID": "1850212",
+  "SLURM_JOB_PARTITION": "gpu",
+  "SLURM_JOB_QOS": "gpu",
+  "SLURMD_NODENAME": "oat-04",
+  "CUDA_VISIBLE_DEVICES": "0,1,2,3",
+  "FS_MODEL": "Qwen/Qwen3.5-122B-A10B-FP8",
+  "FS_PRESET": "qwen3.5-122b-a10b",
+  "FS_VLLM_ARGS": "--tensor-parallel-size 4 --max-model-len 16384 --kv-cache-dtype fp8 --gpu-memory-utilization 0.92 --max-num-seqs 32 --limit-mm-per-prompt {\"image\":1} ",
+  "vllm": "0.31.0"
+ },
+ "throughput": {
+  "pages": 99,
+  "ok": 99,
+  "wall_s": 122.2,
+  "gpus": 4,
+  "pages_per_hour_per_gpu": 729.4,
+  "mean_prompt_tokens": 4108.292929292929,
+  "mean_completion_tokens": 459.90909090909093
+ },
+ "accuracy_96": {
+  "n": 96,
+  "ok": 96,
+  "nes": 0.9463376262994915,
+  "chrf": 0.9633666543711481,
+  "miss": 0.025464120254641204,
+  "add": 0.029397060293970604,
+  "cost": 0,
+  "words": 30003
+ },
+ "agreement_3": {
+  "n": 3,
+  "ok": 3,
+  "nes": 0.7776413377424626,
+  "chrf": 0.6905160573889878,
+  "miss": 0.08553654743390357,
+  "add": 0.2130637636080871,
+  "cost": 0,
+  "words": 643
+ },
+ "clippings": {
+  "n": 13,
+  "ok": 13,
+  "nes": 0.9373713048330219,
+  "chrf": 0.9704148607520648,
+  "miss": 0.04672430994346525,
+  "add": 0.040239441303624876,
+  "cost": 0,
+  "words": 6014
+ },
+ "all_99": {
+  "n": 99,
+  "ok": 99,
+  "nes": 0.941225617555339,
+  "chrf": 0.9550984544625977,
+  "miss": 0.026724531749657377,
+  "add": 0.03325066892906089,
+  "cost": 0,
+  "words": 30646
+ }
+}

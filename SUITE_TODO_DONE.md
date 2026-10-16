@@ -11349,3 +11349,12 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   (opus) found no HIGH or MED issues; its LOWs (the recorded cost leaves out a previous image, which was already true
   of every route; the range check holds by construction) were left as they are. Cost $0, with no live call made.
   <!-- /W41.app-openrouter-fu1 -->
+- [x] **W41.farmshare-122b — bring back the 122B full-node truth run — OWNER login [XS · minutes]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light). SHIPPED 2026-10-16 (this commit).
+  Job 1850212 waited about ten hours for a whole node, then ran on oat-04 (4 L40S, tensor parallel, fp8). Qwen3.5
+  122B-A10B answered all 99 truth pages: NES 94.63 on the 96 accuracy pages (Qwen3.6 27B on one card: 95.25), 93.74 on
+  the 13 clippings, 729 photos an hour per GPU (2,918 on the node; the 27B reads 1,055 a card). Bigger is not better
+  here, and not worth a whole node. Results in `segbench-results/farmshare/truth/qwen3.5-122b-a10b-1850212/`, a row and
+  a note in `farmshare/README.md` §Measured, ArchiveOCRBench rebuilt (published copy behind). It also found a bug in
+  `build.py`: GPU-hours per 100,000 photos multiplied the per-GPU rate by the GPU count again (548 for this run, 137
+  right); single-GPU rows were unaffected.
+  <!-- /W41.farmshare-122b -->

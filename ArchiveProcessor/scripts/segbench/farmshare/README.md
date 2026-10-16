@@ -18,6 +18,7 @@ run, no transcript text).
 | `qwen3.6-27b-dyn`, fp8 KV cache | 93.17 | 94/96 | 93.60 | 649 |
 | `qwen3.6-35b-a3b`, fp8 KV cache (the speed option) | 94.51 | 96/96 | 94.08 | **3,327** |
 | `qwen3.8-27b`, fp8 KV cache (Qwen3.6 27B's successor) | 93.10 | 96/96 | 94.45 | 1,063 |
+| `qwen3.5-122b-a10b`, fp8, a whole node (4 L40S, tensor parallel; 2026-10-16) | 94.63 | 96/96 | 93.74 | 729 |
 | the panel's hosted run (Chutes fp8, for comparison) | 94.28 | 95/96 | 93.71 | |
 
 - **The default is the one to use.** It answered every page and reads as well as the hosted run did on the pages
@@ -27,6 +28,9 @@ run, no transcript text).
 - **The speed option is real.** Qwen3.6 35B-A3B (3B active) reads 3.2 times as fast for 0.7 points of NES, and is
   slightly better on clippings: about 30 GPU-hours per 100,000 photos. Qwen3.8 27B, the newer model, is no better:
   2.2 points below Qwen3.6 27B at the same speed, and weaker on newspapers too (below).
+- **Bigger is not better.** Qwen3.5 122B-A10B on a whole four-card node answered every page but scored 0.6 points
+  below Qwen3.6 27B on one card, and reads 729 photos an hour per GPU (2,918 on the node) against the 27B's 1,055 on
+  each card. It is no reason to take a whole node.
 - **On the real corpus** (`bulk`, 2,000 pages drawn at random from 91,152 PDFs in 33 collections, 4 shards of one
   L40S): 1,987 answered, 13 failed, every failure a reply that ran to the 8,192-token cap. 780 pages an hour per
   GPU, 3,121 an hour on four: about 128 GPU-hours or 32 hours of wall time per 100,000 photos, slower than the

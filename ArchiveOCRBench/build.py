@@ -203,7 +203,7 @@ def farmshare():
                       "kv": "bf16" if kv and kv.group(1) == "auto" else (kv.group(1) if kv else "?"),
                       "gpus": t["gpus"], "nes": round(100 * a["nes"], 2), "ok": a["ok"], "n": a["n"],
                       "clippings": round(100 * s["clippings"]["nes"], 2), "per_hour": t["pages_per_hour_per_gpu"],
-                      "gpu_hours_100k": round(100000 / t["pages_per_hour_per_gpu"] * t["gpus"])})
+                      "gpu_hours_100k": round(100000 / t["pages_per_hour_per_gpu"])})  # already per GPU
     truth.sort(key=lambda r: -r["nes"])
     nb = newsbench_table()
     news = []
