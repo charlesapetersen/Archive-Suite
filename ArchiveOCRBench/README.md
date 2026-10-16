@@ -23,7 +23,10 @@ What the bench has measured, as one page you can read and share. It has five par
    answered page that is wrong (W41.bench-difficulty). With it, the Vision OCR lab's page sorter (newspaper,
    photograph, handwriting, other, from Apple Vision's reading; no model, no paid call) on the panel's pages and the
    bulk pilot's, as a label that does not depend on the route being judged and as a routing rule
-   (W41.bench-vision-kind). The full report is `difficulty.md`.
+   (W41.bench-vision-kind). The full report is `difficulty.md`. Beside it, a page-kind classifier for the Processor
+   (hand, forms and tables, low resolution) measured on 184 labelled page images, with the reading accuracy a wrong
+   kind costs under the model guide, read from `ArchiveProcessor/segbench-results/kind-classifier.json`
+   (W41.bench-kind-classifier; the full report is `kind-classifier.md` there).
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet

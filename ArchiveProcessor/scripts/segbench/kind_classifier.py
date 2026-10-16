@@ -312,14 +312,15 @@ def loo_lr(X, y, k, groups, lam=0.05):
 
 def loo_threshold(xs, ys, groups, below=True):
     """Leave-one-group-out: the cut that best separates the other groups' pages, applied to this group's."""
-    cands = sorted(set(xs))
     def best(idx):
-        top, cut = -1, cands[0]
-        for c in cands:
-            acc = sum((xs[i] <= c if below else xs[i] >= c) == ys[i] for i in idx)
-            if acc > top:
-                top, cut = acc, c
-        return cut
+        """Cuts sit halfway between neighbouring values of the given pages (and past both ends); of those tied for
+        most right, the middle of their range."""
+        v = sorted({xs[i] for i in idx})
+        cands = [v[0] - 1] + [(a + b) / 2 for a, b in zip(v, v[1:])] + [v[-1] + 1]
+        scored = [(sum((xs[i] <= c if below else xs[i] >= c) == ys[i] for i in idx), c) for c in cands]
+        top = max(a for a, _ in scored)
+        tied = [c for a, c in scored if a == top]
+        return (tied[0] + tied[-1]) / 2
     preds = [None] * len(xs)
     for g in set(groups):
         rest = [i for i in range(len(xs)) if groups[i] != g]
@@ -360,8 +361,11 @@ def report():
     vlms = {}
     for key in VLMS:
         p = CACHE / 'vlm' / f'{key}.jsonl'
-        if p.exists():
-            vlms[key] = {r['id']: r for r in map(json.loads, open(p))}
+        rows = {r['id']: r for r in map(json.loads, open(p))} if p.exists() else {}
+        if rows and all(r['id'] in rows for r in lab):
+            vlms[key] = rows
+        elif rows:
+            print(f'{key}: {len(rows)} of {len(lab)} pages read, left out until finished', file=sys.stderr)
     missing = [r['id'] for r in lab if r['id'] not in sig or 'text_px' not in sig[r['id']] or r['id'] not in vk]
     if missing:
         raise SystemExit(f'no signals for {missing[:5]}… run signals first')
@@ -383,19 +387,21 @@ def report():
                  ('typewritten' if harm_loo.get(i, harm[i] >= harm_cut if harm[i] == harm[i] else True) else 'printed')
                  for i in range(len(orig))]
     scal = ['harmonic', 'periodic', 'conf', 'text_px', 'lines']
-    def feats(r, with_fp=True):
+    def feats(r, with_fp=True, sorter=True):
         s = sig[r['id']]
-        x = [num(s[c]) for c in scal] + [1.0 if vk[r['id']]['vision_kind'] == 'handwriting' else 0.0]
+        x = [num(s[c]) for c in scal] + ([1.0 if vk[r['id']]['vision_kind'] == 'handwriting' else 0.0] if sorter else [])
         x = [0.0 if v != v else v for v in x]
         return np.concatenate([x, fp[r['id']]]) if with_fp else np.array(x)
     y3 = np.array([KINDS3.index(h) if h in KINDS3 else KINDS3.index('handwritten') for h in truth_h])  # mixed -> hand
     folders = [r['group'] for r in orig]
     lr_fp = [KINDS3[k] for k in loo_lr(np.array([feats(r) for r in orig]), y3, 3, folders)]
     lr_sc = [KINDS3[k] for k in loo_lr(np.array([feats(r, False) for r in orig]), y3, 3, folders, lam=0.01)]
+    lr_nos = [KINDS3[k] for k in loo_lr(np.array([feats(r, sorter=False) for r in orig]), y3, 3, folders)]
     hand_methods = {'Vision OCR sorter (handwriting, else typewritten)': vision_h,
                     'Vision sorter + ink periodicity (cut chosen leave-one-out)': vision_hp,
                     'Vision signals, logistic regression (leave-one-folder-out)': lr_sc,
-                    'Vision signals + feature print, logistic regression (leave-one-folder-out)': lr_fp}
+                    'Vision signals + feature print, logistic regression (leave-one-folder-out)': lr_fp,
+                    'The same without Vision OCR\'s sorter as an input (leave-one-folder-out)': lr_nos}
     for key, rows in vlms.items():
         hand_methods[f'{key} (mlx-vlm, {VLM_SIDE} px, two-word answer)'] = [rows[r['id']]['hand'] or '?' for r in orig]
     classes = list(HANDS)
@@ -430,7 +436,7 @@ def report():
                     'Vision table share of the page (cut chosen leave-one-out)': sp}
     yf = np.array([int(t) for t in truth_f])
     form_methods['Vision signals + feature print, logistic regression (leave-one-folder-out)'] = [
-        bool(k) for k in loo_lr(np.array([np.concatenate([[share[i], num(sig[r['id']]['table_cells'])], feats(r)])
+        bool(k) for k in loo_lr(np.array([np.concatenate([[share[i], num(sig[r['id']]['table_cells'])], feats(r, sorter=False)])
                                           for i, r in enumerate(orig)]), yf, 2, folders)]
     for key, rows in vlms.items():
         form_methods[f'{key}'] = [rows[r['id']]['form'] == 'yes' for r in orig]
@@ -529,8 +535,8 @@ def report():
     combos = {'Labels for hand and form, image size for low resolution': (truth_h, truth_f, lowflag),
               'Vision sorter + periodicity + table share + image size': (vision_hp, share_f, lowflag),
               'Vision sorter + periodicity + table share, no low-resolution flag': (vision_hp, share_f, nolow),
-              'Feature-print LR for hand and form + image size': (lr_fp, lr_f, lowflag),
-              'Feature-print LR for hand and form, no low-resolution flag': (lr_fp, lr_f, nolow)}
+              'Feature-print LR for hand and form + image size': (lr_nos, lr_f, lowflag),
+              'Feature-print LR for hand and form, no low-resolution flag': (lr_nos, lr_f, nolow)}
     for key in vlms:
         combos[f'{key} hand and form, no low-resolution flag'] = (
             hand_methods[next(k for k in hand_methods if k.startswith(key))], form_methods[key], nolow)
@@ -582,6 +588,55 @@ def report():
                            'peak_gb': round(foot or peak_mlx, 1)})
         L.append(f'| {key} | {med([r["wall_s"] for r in rows.values()]):.2f} (load {next(iter(rows.values()))["load_s"]} s) | '
                  f'MLX {peak_mlx:.2f} GB{foot_s} |')
+    # ---- 6. the recommendation, and the fitted model W41.app-page-kind can load
+    Xh = np.array([feats(r, sorter=False) for r in orig])
+    Xf = np.array([np.concatenate([[share[i], num(sig[r['id']]['table_cells'])], feats(r, sorter=False)])
+                   for i, r in enumerate(orig)])
+    model = {'_about': 'W41.bench-kind-classifier: logistic regressions on Apple Vision signals and the image feature '
+                       'print (VNGenerateImageFeaturePrintRequest, default revision, macOS 26), fitted on every labelled '
+                       'page at its own resolution. x = (features - mean) / sd; scores = x @ W + b; softmax. Features '
+                       'in order; kind-signals.swift measures them all.',
+             'measured': time.strftime('%Y-%m-%d')}
+    for name, X, y, classes, lam in (('hand', Xh, y3, list(KINDS3), 0.05), ('form', Xf, yf, ['no', 'yes'], 0.05)):
+        mu, sd = X.mean(0), X.std(0) + 1e-6
+        W, b = lr_fit((X - mu) / sd, y, len(classes), lam)
+        model[name] = {'classes': classes, 'features': (['table_share', 'table_cells'] if name == 'form' else []) + scal +
+                       [f'print{j}' for j in range(len(fp[orig[0]['id']]))],
+                       'mean': [round(float(v), 6) for v in mu], 'sd': [round(float(v), 6) for v in sd],
+                       'W': [[round(float(v), 6) for v in row] for row in W], 'b': [round(float(v), 6) for v in b]}
+    (RESULTS / 'kind-classifier-model.json').write_text(json.dumps(model, separators=(',', ':')) + '\n')
+    rt = {r['classifier']: r for r in J['routing']}
+    best = rt['Feature-print LR for hand and form, no low-resolution flag']
+    L.append('## 6. Recommended for W41.app-page-kind\n')
+    L.append(f'**Apple Vision\'s signals and its image feature print, with a logistic regression for the hand and one for '
+             f'forms** (`kind-classifier-model.json`, fitted on all {len(orig)} pages; `kind-signals.swift` measures '
+             f'its inputs), and **no low-resolution flag yet**. It needs no model download and runs in about '
+             f'{sum(x["s_page"] for x in J["speed"][:3]):.1f} s a page on the M3 Pro with the OS\'s own models; Vision '
+             f'OCR\'s sorter adds nothing to it as an input (the same {J["hand"][4]["right"]} of {len(orig)} either way) '
+             'and costs about 4 s a page, so it is left out. Scored with each folder left out of the '
+             f'fitting, it gets the hand right on {J["hand"][4]["right"]} of {len(orig)} pages and finds '
+             f'{J["form"][2]["found"]} of {J["form"][2]["forms"]} forms with {J["form"][2]["false"]} false calls; routed by '
+             f'the guide it reads {best["mean_nes"]:.2f} NES on the 96 accuracy pages, {best["lost"]:.2f} points below '
+             f'routing by the true kinds ({oracle:.2f}) and above the best single reader. Its weights come from these '
+             'pages and folders, so the app should keep the user\'s default when its top probability is low, and '
+             'refit as labelled pages grow.\n')
+    L.append('The small vision-language models are slower and worse at the distinction that matters most for the '
+             'guide, typewritten against printed (the printed pick is a different reader), though they find '
+             'handwriting. Low resolution is left out because neither definition is caught well: image size finds '
+             'the quarter rung but also flags small originals the readers read well, which cost NES when routed to '
+             'the low-resolution pick, and text height does not predict which pages actually fall. Every corpus photo '
+             'is 2,592 px or more, and 12 of 1,500 sampled PDFs with no JPEG have a page image under 1,100 px (3 of '
+             'them born-digital), so the case is rare.\n')
+    L.append('## Limits\n')
+    L.append(f'{len(orig)} pages from one corpus, with few forms ({sum(truth_f)}) and few mixed pages ({n["mixed"]}). The '
+             'drawn pages were labelled by one reader looking at contact sheets, not blind; the truth set\'s kinds are '
+             'its own. The 15 held-out handwriting photos come from one collection, and the drawn forms from nine folders, most of '
+             'them one university\'s admissions records, so leaving a folder out may still flatter the learned rows. The '
+             'learned rows owe nearly everything to the feature print: on Vision\'s scalar signals alone the hand is right on '
+             f'{J["hand"][2]["right"]} of {len(orig)}. The Vision OCR sorter judged the '
+             'panel originals at vision-ocr f8f97d2 (W41.bench-vision-kind) and the other pages at ff798aa. NES lost is '
+             'measured only on the 96 truth pages; a missed low-resolution page is unmeasured for most readers. '
+             'Seconds a page are medians from one run.\n')
     head = ['# Page-kind classifier (W41.bench-kind-classifier)\n',
             f'Measured {time.strftime("%Y-%m-%d")} on {len(lab)} labelled page images: the OCR truth set\'s 99, the '
             'resolution ladder\'s half and quarter copies of 20 of them, 27 Statistics-tagged corpus photos and 3 '

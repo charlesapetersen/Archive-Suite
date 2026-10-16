@@ -11369,3 +11369,29 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   W41.seg-label-clean, not a truth, and about 83-90% unchecked is the ceiling the student chases. ArchiveOCRBench's
   segmentation table shows it (off the price chart: no price per page); published copy behind.
   <!-- /W41.seg-27b-test -->
+- [x] **W41.bench-kind-classifier — a fast, cheap local page-kind classifier, measured on labelled pages [S-M · ~1-2 sessions]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) (lane: segbench) (uses: build). SHIPPED 2026-10-16 (244eb609, 493bc9da and the final commit).
+  Owner, 2026-10-15: nothing told the Processor what kind each page is. `scripts/segbench/kind_classifier.py` (draw,
+  labels, signals, vlm, report) and `kind_signals/kind-signals.swift` (Apple Vision only: text-line height in pixels,
+  ink periodicity along each line for a typewriter's fixed pitch, tables from macOS 26's RecognizeDocumentsRequest,
+  the image feature print). Labels, 184 images (private cache `kind-classifier/`): the truth set's 99 (its kinds and
+  table_form), the ladder's half and quarter copies of 20, 27 Statistics-tagged corpus photos (seeded, three a
+  folder) and 3 small no-JPEG PDFs labelled by looking (`looked.tsv`; 10 of the 27 are tables, so the tag is a weak
+  proxy), Vision OCR's 15 held-out handwriting photos. Found: every corpus photo is 2,592 px or more; 12 of 1,500
+  sampled no-JPEG PDFs have a page image under 1,100 px (3 born-digital). Vision's own word and line boxes do not
+  separate typewritten from printed (a word's box is interpolated). Measured, learned rows fitted leave-one-folder-out,
+  144 pages at their own size: hand right Vision OCR sorter 102, + ink periodicity 117, Vision signals + feature print
+  LR 139 (printed 34/35, typewritten 70/72, handwritten 33/34; the same without the sorter as an input), Qwen3.5 2B
+  104 (printed 7/35), Qwen3.5 4B 127; forms (14) found: Vision tables 7 (3 false), feature-print LR 13 (2 false),
+  4B 11 (3). Low resolution: image long side catches the quarter rung (21/21, 7 false), text height does not, and
+  Qwen3.6 27B's 10-point falls are page by page (7 of 20 quarter pages). Routed by the guide's first picks on the 96
+  accuracy pages: true kinds 97.26 NES, feature-print LR with no low-resolution flag 96.26 (−1.00; best single reader
+  Claude 96.47), Vision rules 93.51, 4B 95.21, 2B 94.24. Speed on the M3 Pro: Vision steps about 0.6 s a page (OS
+  models), 2B 1.3 s / 3.6 GB footprint, 4B 2.2 s / 4.9 GB (run-guarded, one at a time), Vision OCR's sorter about
+  4.3 s. Recommended for W41.app-page-kind: the feature-print logistic regressions, weights in
+  `segbench-results/kind-classifier-model.json`, no low-resolution flag yet, user's default kept when unsure.
+  Reports `segbench-results/kind-classifier.md` and `.json`; ArchiveOCRBench carries it as a panel beside the Vision
+  sorter's (build.py reads the JSON; page script checked under Node stubs, no browser render unattended); the
+  published copy of the page is now behind. Tests: `test_kind_classifier.py` (6 synthetic), build.py --check. Vision
+  OCR read, not changed (its sorter built at ff798aa for the new pages, f8f97d2 for the panel's). No money; no
+  download (both Qwens were already in the lab's cache).
+  <!-- /W41.bench-kind-classifier -->

@@ -6331,5 +6331,316 @@
     "photo_signal": 1674
    }
   }
+ },
+ "kind_classifier": {
+  "pages": 184,
+  "hand": [
+   {
+    "method": "Vision OCR sorter (handwriting, else typewritten)",
+    "right": 102,
+    "n": 144,
+    "per_kind": {
+     "handwritten": [
+      31,
+      34
+     ],
+     "typewritten": [
+      70,
+      72
+     ],
+     "printed": [
+      0,
+      35
+     ]
+    },
+    "false_hand": 2
+   },
+   {
+    "method": "Vision sorter + ink periodicity (cut chosen leave-one-out)",
+    "right": 117,
+    "n": 144,
+    "per_kind": {
+     "handwritten": [
+      31,
+      34
+     ],
+     "typewritten": [
+      64,
+      72
+     ],
+     "printed": [
+      21,
+      35
+     ]
+    },
+    "false_hand": 2
+   },
+   {
+    "method": "Vision signals, logistic regression (leave-one-folder-out)",
+    "right": 116,
+    "n": 144,
+    "per_kind": {
+     "handwritten": [
+      32,
+      34
+     ],
+     "typewritten": [
+      64,
+      72
+     ],
+     "printed": [
+      19,
+      35
+     ]
+    },
+    "false_hand": 3
+   },
+   {
+    "method": "Vision signals + feature print, logistic regression (leave-one-folder-out)",
+    "right": 139,
+    "n": 144,
+    "per_kind": {
+     "handwritten": [
+      33,
+      34
+     ],
+     "typewritten": [
+      70,
+      72
+     ],
+     "printed": [
+      34,
+      35
+     ]
+    },
+    "false_hand": 1
+   },
+   {
+    "method": "The same without Vision OCR's sorter as an input (leave-one-folder-out)",
+    "right": 139,
+    "n": 144,
+    "per_kind": {
+     "handwritten": [
+      33,
+      34
+     ],
+     "typewritten": [
+      70,
+      72
+     ],
+     "printed": [
+      34,
+      35
+     ]
+    },
+    "false_hand": 1
+   },
+   {
+    "method": "qwen3.5-2b-mlx4 (mlx-vlm, 1024 px, two-word answer)",
+    "right": 104,
+    "n": 144,
+    "per_kind": {
+     "handwritten": [
+      34,
+      34
+     ],
+     "typewritten": [
+      60,
+      72
+     ],
+     "printed": [
+      7,
+      35
+     ]
+    },
+    "false_hand": 3
+   },
+   {
+    "method": "qwen3.5-4b-mlx4 (mlx-vlm, 1024 px, two-word answer)",
+    "right": 127,
+    "n": 144,
+    "per_kind": {
+     "handwritten": [
+      30,
+      34
+     ],
+     "typewritten": [
+      65,
+      72
+     ],
+     "printed": [
+      29,
+      35
+     ]
+    },
+    "false_hand": 0
+   }
+  ],
+  "form": [
+   {
+    "method": "Vision document request finds any table",
+    "right": 134,
+    "n": 144,
+    "found": 7,
+    "forms": 14,
+    "false": 3
+   },
+   {
+    "method": "Vision table share of the page (cut chosen leave-one-out)",
+    "right": 132,
+    "n": 144,
+    "found": 5,
+    "forms": 14,
+    "false": 3
+   },
+   {
+    "method": "Vision signals + feature print, logistic regression (leave-one-folder-out)",
+    "right": 141,
+    "n": 144,
+    "found": 13,
+    "forms": 14,
+    "false": 2
+   },
+   {
+    "method": "qwen3.5-2b-mlx4",
+    "right": 132,
+    "n": 144,
+    "found": 8,
+    "forms": 14,
+    "false": 6
+   },
+   {
+    "method": "qwen3.5-4b-mlx4",
+    "right": 138,
+    "n": 144,
+    "found": 11,
+    "forms": 14,
+    "false": 3
+   }
+  ],
+  "lowres": [
+   {
+    "method": "median text line height in pixels",
+    "label": "quarter rung",
+    "cut": "\u2264 13.2 px",
+    "found": 10,
+    "low": 21,
+    "false": 6,
+    "n": 63
+   },
+   {
+    "method": "long side of the image in pixels",
+    "label": "quarter rung",
+    "cut": "\u2264 1024 px",
+    "found": 21,
+    "low": 21,
+    "false": 7,
+    "n": 63
+   },
+   {
+    "method": "median text line height in pixels",
+    "label": "Qwen3.6 27B drops 10+ points",
+    "cut": "\u2264 7.0 px",
+    "found": 2,
+    "low": 8,
+    "false": 1,
+    "n": 60
+   },
+   {
+    "method": "long side of the image in pixels",
+    "label": "Qwen3.6 27B drops 10+ points",
+    "cut": "\u2264 585 px",
+    "found": 5,
+    "low": 8,
+    "false": 1,
+    "n": 60
+   }
+  ],
+  "routing": [
+   {
+    "classifier": "Labels for hand and form, image size for low resolution",
+    "as_labelled": 95,
+    "n": 96,
+    "mean_nes": 96.5,
+    "lost": 0.76,
+    "worst": 73.4
+   },
+   {
+    "classifier": "Vision sorter + periodicity + table share + image size",
+    "as_labelled": 79,
+    "n": 96,
+    "mean_nes": 92.74,
+    "lost": 4.52,
+    "worst": 100.0
+   },
+   {
+    "classifier": "Vision sorter + periodicity + table share, no low-resolution flag",
+    "as_labelled": 80,
+    "n": 96,
+    "mean_nes": 93.51,
+    "lost": 3.76,
+    "worst": 100.0
+   },
+   {
+    "classifier": "Feature-print LR for hand and form + image size",
+    "as_labelled": 91,
+    "n": 96,
+    "mean_nes": 95.49,
+    "lost": 1.77,
+    "worst": 97.2
+   },
+   {
+    "classifier": "Feature-print LR for hand and form, no low-resolution flag",
+    "as_labelled": 92,
+    "n": 96,
+    "mean_nes": 96.26,
+    "lost": 1.0,
+    "worst": 97.2
+   },
+   {
+    "classifier": "qwen3.5-2b-mlx4 hand and form, no low-resolution flag",
+    "as_labelled": 72,
+    "n": 96,
+    "mean_nes": 94.24,
+    "lost": 3.03,
+    "worst": 100.0
+   },
+   {
+    "classifier": "qwen3.5-4b-mlx4 hand and form, no low-resolution flag",
+    "as_labelled": 90,
+    "n": 96,
+    "mean_nes": 95.21,
+    "lost": 2.05,
+    "worst": 100.0
+   }
+  ],
+  "speed": [
+   {
+    "step": "Vision text lines (accurate) + ink periodicity",
+    "s_page": 0.21,
+    "peak_gb": null
+   },
+   {
+    "step": "Vision document request (tables)",
+    "s_page": 0.38,
+    "peak_gb": null
+   },
+   {
+    "step": "Vision feature print",
+    "s_page": 0.01,
+    "peak_gb": null
+   },
+   {
+    "step": "qwen3.5-2b-mlx4",
+    "s_page": 1.31,
+    "peak_gb": 3.6
+   },
+   {
+    "step": "qwen3.5-4b-mlx4",
+    "s_page": 2.23,
+    "peak_gb": 4.9
+   }
+  ],
+  "oracle_nes": 97.26
  }
 }

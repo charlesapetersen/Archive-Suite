@@ -174,6 +174,15 @@ footer p { font-size: 13px; }
     <p class="note" id="dif-vision-bulk-note"></p>
     <div class="tbl"><table><thead id="dif-vision-bulk-head"></thead><tbody id="dif-vision-bulk-rows"></tbody></table></div>
   </section>
+  <section class="panel" id="kind-clf">
+    <div class="head"><h2>Telling a page's kind before reading it</h2><span class="meta">free, on the Mac (W41.bench-kind-classifier)</span></div>
+    <p class="note" id="kind-clf-note"></p>
+    <div class="tbl"><table><thead><tr><th>Hand by</th><th>Right</th><th>Handwritten</th><th>Typewritten</th><th>Printed</th><th>Handwriting called on typed or printed</th></tr></thead><tbody id="kind-clf-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Forms and tables by</th><th>Right</th><th>Forms found</th><th>False calls</th></tr></thead><tbody id="kind-clf-forms"></tbody></table></div>
+    <p class="note">Routed by the model guide's first pick for the kind each classifier says, on the 96 accuracy pages; lost is the mean NES below routing by the true kind:</p>
+    <div class="tbl"><table><thead><tr><th>Classifier</th><th>Routed as labelled</th><th>Mean NES</th><th>Lost</th></tr></thead><tbody id="kind-clf-route"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
+  </section>
 
   <footer>
     <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B on FarmShare is priced at $0 because the cluster bills nothing; what it costs is GPU time, shown in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
@@ -390,6 +399,14 @@ if (VK) {
     document.getElementById('dif-vision-bulk-rows').innerHTML = Object.entries(B.by_kind).map(([k, r]) => '<tr><td>' + k + '</td><td>' + r.pages.toLocaleString() + '</td>' + B.labels.map(l => '<td>' + r.labels[l].toLocaleString() + '</td>').join('') + '<td>' + r.failed + '</td></tr>').join('');
   }
 } else document.getElementById('dif-vision').hidden = true;
+const KC = DATA.kind_classifier;
+if (KC) {
+  document.getElementById('kind-clf-note').textContent = 'Which kind a page is decides which reader the guide picks. Measured on ' + KC.pages + ' labelled page images (the truth set, its resolution ladder, corpus photos drawn and labelled by looking, and Vision OCR\'s held-out handwriting); learned rows are scored with every page of a folder left out of their fitting. Pages at their own resolution:';
+  document.getElementById('kind-clf-rows').innerHTML = KC.hand.map(h => '<tr><td>' + h.method + '</td><td>' + h.right + ' of ' + h.n + '</td>' + ['handwritten', 'typewritten', 'printed'].map(k => '<td>' + h.per_kind[k][0] + ' of ' + h.per_kind[k][1] + '</td>').join('') + '<td>' + h.false_hand + '</td></tr>').join('');
+  document.getElementById('kind-clf-forms').innerHTML = KC.form.map(f => '<tr><td>' + f.method + '</td><td>' + f.right + ' of ' + f.n + '</td><td>' + f.found + ' of ' + f.forms + '</td><td>' + f.false + '</td></tr>').join('');
+  document.getElementById('kind-clf-route').innerHTML = '<tr><td>True kinds</td><td>—</td><td>' + f2(KC.oracle_nes) + '</td><td>—</td></tr>' + KC.routing.map(r => '<tr><td>' + r.classifier + '</td><td>' + r.as_labelled + ' of ' + r.n + '</td><td>' + f2(r.mean_nes) + '</td><td>' + (r.lost >= 0 ? '−' : '+') + Math.abs(r.lost).toFixed(2) + '</td></tr>').join('');
+  document.getElementById('kind-clf-speed').innerHTML = KC.speed.map(s => '<tr><td>' + s.step + '</td><td>' + s.s_page.toFixed(2) + '</td><td>' + (s.peak_gb ? s.peak_gb.toFixed(1) + ' GB' : 'OS model') + '</td></tr>').join('');
+} else document.getElementById('kind-clf').hidden = true;
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;
 function renderDifficulty() {
