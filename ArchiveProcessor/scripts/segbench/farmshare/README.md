@@ -121,13 +121,48 @@ There are two kinds of newspaper material, and they are scored differently:
 The Vision OCR lab's table (`~/Claude/vision-ocr/OCR-NEWSBENCH-2026-10-07.tsv`) already gives the expected picture.
 Whole-page vision-language models land around 0.75-0.82 overall: Qwen3-VL 8B at 4-bit 0.752, Gemini 3.5 Flash-Lite
 0.820. Layout detection followed by GLM-OCR on each region scores 0.970. **So for broadsheets the strongest FarmShare
-route is probably layout-first, not a bigger whole-page model.** That pipeline is not in this job. It is filed as
-`W41.farmshare-news-layout`, and it waits on the run, because it is only worth building if the owner uses FarmShare.
+route is probably layout-first, not a bigger whole-page model.** That was the plan as written; the next two
+paragraphs are what the run measured and the layout route that was built after it.
 
 **The run changed this (2026-10-15).** Qwen3.6 27B whole-page scored 0.967 overall, level with layout-first (0.970)
 and well above every whole-page model in the lab's table. Layout-first still leads on the "page" measure (0.968
 against 0.949) and cannot run into the output cap that cost two pages here, so it remains worth measuring, as a
 comparison rather than a presumed win.
+
+### The layout-first route (`glm-ocr` preset, W41.farmshare-news-layout)
+
+Built 2026-10-15; **not yet run on FarmShare** (that needs the owner's login, `W41.farmshare-news-layout-run`).
+`news_layout.py` runs the pipeline behind NewsBench's 0.970 row (`glm-ocr-doclayout`): the
+[`newspaper-ocr`](https://github.com/nealcaren/newspaper-ocr) library, version 0.11.0, with its defaults,
+DocLayout-YOLO (the 1280 DocStructBench checkpoint) finding the regions and GLM-OCR (0.9B) reading each one, in the
+library's reading order. The library's own docstring gives the figure: DocLayout-YOLO + GLM-OCR 0.970, PaddleX +
+GLM-OCR 0.937. Two things differ from the measured run, and both are about speed:
+
+- **GLM-OCR is served by vLLM** on the same GPU (the library's `api` mode), instead of loaded into transformers.
+  NewsBench's notes give about 90 s a page that way on an L40S. vLLM applies the checkpoint's own generation
+  defaults, as `generate()` did, and the preset turns on the MTP speculative decoding the vLLM recipe for GLM-OCR
+  gives (`FS_GLM_MTP=0` turns it off if it will not start).
+- **A page's regions go to the server at once** (about 67 a page on NewsBench), through the library's
+  `recognize_regions` hook, up to 48 in flight; 4 pages are in flight, and detection takes one page at a time.
+  Each region still goes through the library's own retries, code-fence strip and repetition check.
+
+The preset sets `FS_LAYOUT=1`, so every mode reads layout-first: `news` scores it on NewsBench as above,
+`bulk` reads a tree of newspaper page images at full resolution (the same resume, shards, deadline and dead-server
+rules; a page where some regions got no answer is logged as `partial` and read again by the next run), and `truth`
+works too, which gives a clippings figure beside the whole-page one. Pages an hour come out of `summary.json` as
+before; the token counts are empty, since the library does not report them.
+
+```bash
+bash setup.sh --layout                # once, no job queued: newspaper-ocr + DocLayout-YOLO into the venv
+bash download.sh glm-ocr              # ~3 GB: GLM-OCR and the detector checkpoint
+bash submit.sh news glm-ocr           # NewsBench: then its score.py, as for the whole-page run
+bash submit.sh bulk glm-ocr --in DIR --out DIR
+```
+
+`setup.sh --layout` pins every package already in the venv at its installed version, so it adds the library around
+vLLM or stops with a conflict; it never changes what the measured runs used. If it stops, the fix is a separate
+venv for the reader (vLLM is only reached over HTTP), not loosening the pins. Untried on the cluster, and so open:
+whether vLLM 0.31.0 serves GLM-OCR with MTP, and whether the detector fits in the 20% of the card the preset leaves.
 
 ## FarmShare's limits (read on the cluster, not assumed)
 
@@ -174,7 +209,7 @@ QOS, GPUs, `--time`, and the number of bulk shards.
    Don't run `setup.sh` again while a job is queued: a job that starts while pip is swapping the compiler mixes
    two CUDA versions and fails.
 
-**Bulk:** `bash submit.sh bulk qwen3.6-27b --in DIR --out DIR`.
+**Bulk:** `bash submit.sh bulk qwen3.6-27b --in DIR --out DIR` (newspaper pages: the `glm-ocr` preset, above).
 
 - **Input:** a directory tree of images. Exporting page images from the corpus PDFs is a separate step.
 - **Output:** one text file per page, named after the image (`box1/a.jpg` → `box1/a.jpg.txt`), mirroring the
@@ -194,9 +229,10 @@ QOS, GPUs, `--time`, and the number of bulk shards.
 
 | file | what |
 |---|---|
-| `fs_ocr.py` | `pack` (Mac), `truth`, `news`, `bulk`. Imports the panel's `PROMPT`, image cap and `max_tokens`, so a FarmShare row is the panel's measurement at FarmShare's precision |
+| `fs_ocr.py` | `pack` (Mac), `truth`, `news`, `bulk`. Imports the panel's `PROMPT`, image cap and `max_tokens`, so a FarmShare row is the panel's measurement at FarmShare's precision. `--layout` reads with `news_layout.py` instead |
+| `news_layout.py` | the layout-first reader: `newspaper-ocr`'s DocLayout-YOLO + GLM-OCR pipeline against the local vLLM server |
 | `limits.py` | reads the cluster's limits and writes `limits.env` |
 | `models.sh` | presets: Hugging Face repo, GPUs, download size, vLLM flags |
 | `setup.sh`, `download.sh`, `submit.sh`, `job.sbatch` | environment, weights, fitted submission, and the GPU job that serves vLLM on localhost and runs one mode |
 | `estimate.py` | the estimate table above |
-| `test_farmshare.py` | 16 offline tests: Slurm parsing, presets, and the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring) |
+| `test_farmshare.py` | 20 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |
