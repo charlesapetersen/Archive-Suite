@@ -41,6 +41,9 @@ targets:
       # Which OCR model reads which kind of page best, under the model picker (W41.app-ocr-hierarchy).
       - path: ../segbench-results/ocr-page-guidance.json
         buildPhase: resources
+      # The page-kind classifier's weights, which preselect each page's reader (W41.app-page-kind).
+      - path: ../segbench-results/kind-classifier-model.json
+        buildPhase: resources
     dependencies:
       - package: ArchiveCore
     settings:
