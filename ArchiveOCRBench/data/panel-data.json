@@ -190,6 +190,34 @@
    }
   },
   {
+   "id": "lightonocr-3-4b-mlx8",
+   "name": "LightOnOCR-3-4B 8-bit (Mac)",
+   "panel": "mac",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "machine": "Apple M3 Pro, 18 GB",
+   "hw": {
+    "seconds": 23.8,
+    "peak_gb": 6.44,
+    "peak_max_gb": 6.45
+   }
+  },
+  {
+   "id": "qwen3.5-9b-mlx4",
+   "name": "Qwen3.5-9B 4-bit (Mac)",
+   "panel": "mac",
+   "pair": "qwen3.5-9b",
+   "std": 0.0,
+   "batch": null,
+   "machine": "Apple M3 Pro, 18 GB",
+   "hw": {
+    "seconds": 37.6,
+    "peak_gb": 7.48,
+    "peak_max_gb": 7.48
+   }
+  },
+  {
    "id": "qwen3.6-27b-farmshare",
    "name": "Qwen3.6 27B fp8 (FarmShare)",
    "panel": "farmshare",
@@ -407,6 +435,16 @@
      92,
      96
     ],
+    "lightonocr-3-4b-mlx8": [
+     89.13,
+     96,
+     96
+    ],
+    "qwen3.5-9b-mlx4": [
+     91.91,
+     95,
+     96
+    ],
     "qwen3.6-27b-farmshare": [
      95.25,
      96,
@@ -548,6 +586,16 @@
     "qwen3-vl-8b-mlx4": [
      91.59,
      48,
+     50
+    ],
+    "lightonocr-3-4b-mlx8": [
+     90.81,
+     50,
+     50
+    ],
+    "qwen3.5-9b-mlx4": [
+     93.33,
+     49,
      50
     ],
     "qwen3.6-27b-farmshare": [
@@ -693,6 +741,16 @@
      27,
      28
     ],
+    "lightonocr-3-4b-mlx8": [
+     87.98,
+     28,
+     28
+    ],
+    "qwen3.5-9b-mlx4": [
+     92.78,
+     28,
+     28
+    ],
     "qwen3.6-27b-farmshare": [
      94.93,
      28,
@@ -833,6 +891,16 @@
     ],
     "qwen3-vl-8b-mlx4": [
      89.16,
+     16,
+     16
+    ],
+    "lightonocr-3-4b-mlx8": [
+     89.67,
+     16,
+     16
+    ],
+    "qwen3.5-9b-mlx4": [
+     87.92,
      16,
      16
     ],

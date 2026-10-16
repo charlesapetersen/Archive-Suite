@@ -4,13 +4,15 @@ What the bench has measured, as one page you can read and share. It has four par
 
 1. **OCR.** The W41 OCR panel: twenty-five hosted routes read the same 96 adjudicated truth pages, and each is
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
-   handwritten pages. Two more routes ran the same pages on our own hardware and are drawn in the free column:
-   Qwen3-VL 8B at 4-bit on the owner's Mac, and Qwen3.6 27B at fp8 on one L40S on Stanford FarmShare.
+   handwritten pages. Four more routes ran the same pages on our own hardware and are drawn in the free column:
+   Qwen3-VL 8B at 4-bit, LightOnOCR-3-4B at 8-bit and Qwen3.5-9B at 4-bit on the owner's Mac, and Qwen3.6 27B at
+   fp8 on one L40S on Stanford FarmShare.
 2. **Segmentation.** How well each approach splits a box of photographs into documents, on the two locked test
    boxes (Stanton and RG 165, 363 pages): pages in the exact document with no checking, against price; and, in a
    table, the checks per 100 pages each needs, the pages right after checking, and the errors left unflagged.
 3. **Handwriting on the Mac.** The on-device handwriting readers the Vision OCR lab measured on its own 19
-   handwritten truth pages, as missed and added words. A different truth set and score from part 1.
+   handwritten truth pages, as missed and added words. A different truth set and score from part 1; the pick and
+   runner-up are also on part 1's charts as Mac routes, scored by NES (W41.mac-local-hw).
 4. **FarmShare.** Open-weight models served on Stanford's FarmShare GPUs, one L40S each: the same 96 truth pages
    scored as part 1 scores them, with photos an hour in place of price (FarmShare costs nothing); NewsBench's
    newspaper pages read whole and through a layout detector, scored by NewsBench; and a 2,000-page run on the real
@@ -44,6 +46,9 @@ record:
 - `ocr-mac-local.md` and `ocr-mac-local-groups.csv`: Qwen3-VL 8B at 4-bit through MLX on the 18 GB M3 Pro
   (W41.mac-local-measure). The CSV holds its scores overall and per kind; the report's speed table gives the
   seconds a page and peak memory shown in the tables.
+- `ocr-mac-local-hw.md`: LightOnOCR-3-4B (8-bit, its card's settings) and Qwen3.5-9B (4-bit, the panel's prompt)
+  on the same Mac (W41.mac-local-hw). Their scores are in the same groups CSV; each has its own speed table,
+  named in `data/inputs.json` (`report`, `speed`).
 - `farmshare/truth/<run>/summary.json` and `pages.csv`: Qwen3.6 27B on Stanford FarmShare. The charts use the
   fp8-KV run (`qwen3.6-27b-1849739`); the bf16-KV and fp8-at-load (`dyn`) runs are in the tables only. Scores
   per kind are averaged from `pages.csv` over the 96 accuracy pages (the agreement-only letters are read from
@@ -83,7 +88,7 @@ Python standard library.
 - **Prices** are the measured charge per page, times 1,000: OpenRouter's on the panel's pinned endpoint, and
   Mistral's published rate for Mistral OCR. The local panel's costs include its reports' conservative ceilings
   for calls with no billing record. Apple
-  Vision runs on the device and is drawn in a "free" column, as is Qwen3-VL 8B on our Mac (◇). The FarmShare route
+  Vision runs on the device and is drawn in a "free" column, as are the three routes on our Mac (◇). The FarmShare route
   (□) is priced at $0, since the cluster bills nothing, with its GPU-hours per 100,000 photos beside it. Claude Sonnet 5.5 ran on the subscription, so its
   price is an estimate (`data/inputs.json` → `sonnet_api_estimate`).
 - **Batch points** sit at half the measured cost, for routes whose batch price is half their standard price.
@@ -106,8 +111,9 @@ Python standard library.
 
 For the OCR panel, from its reports. One corpus of about 100 pages. Claude Opus 5.5 and Gemini 3.8
 Flash drafted the truth before it was adjudicated, so it may lean toward those families. The "local panel"
-chose models small enough to run on a Mac, and ran hosted on OpenRouter; of those, only Qwen3-VL 8B has been
-measured on the Mac itself (−2.15 NES strict, −0.17 on the pages both finished). A difference of a point or two is not a ranking, and the handwritten chart rests on about 2,200 words.
+chose models small enough to run on a Mac, and ran hosted on OpenRouter; of those, Qwen3-VL 8B and Qwen3.5-9B have
+been measured on the Mac itself (Qwen3-VL 8B −2.15 NES strict, −0.17 on the pages both finished; Qwen3.5-9B +2.48,
+because the hosted route failed four pages, and −3.00 on handwritten pages). A difference of a point or two is not a ranking, and the handwritten chart rests on about 2,200 words.
 Segmentation's error counts are small (zero to three on the test boxes for most approaches), so one or two either
 way is noise, and the boxes are from one archive. The handwriting part rests on 19 pages and one archive's hands.
 

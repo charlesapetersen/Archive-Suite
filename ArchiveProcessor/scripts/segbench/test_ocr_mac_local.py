@@ -94,7 +94,7 @@ class MacLocal(unittest.TestCase):
         self.assertIn('**Incomplete: 1 of 2 accuracy pages read.**', out)
         self.assertIn('| Mac MLX (lightonocr-3-4b-mlx8) | 1/1 | 100.00 |', out)
         self.assertIn('| hosted bf16 (qwen3.5-9b) | 1/1 | 100.00 |', out)
-        self.assertIn('4-bit-on-a-Mac penalty', out)
+        self.assertIn('**Mac 4-bit − hosted bf16 NES: -21.05 points** over 1 pages', out)
         self.assertNotIn('quick brown', out)
         groups = (self.root / 'out/ocr-mac-local-groups.csv').read_text()
         self.assertIn('lightonocr-3-4b-mlx8,all,accuracy-96,1,1,1.0,', groups)

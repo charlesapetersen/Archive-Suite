@@ -353,14 +353,15 @@ def report_hw():
             both = [p for p in done if p['local']['ok'] and p['hosted']['ok']]
             db = [p['local']['nes'] - p['hosted']['nes'] for p in both]
             sd = statistics.stdev(d) if len(d) > 1 else 0
-            L += ['', f'**4-bit-on-a-Mac penalty (local − hosted NES): {100*statistics.fmean(d):+.2f} points** over {len(d)} pages '
-                  f'(standard error about {100*sd/len(d)**.5:.2f}); pages where both completed: {len(both)}, '
-                  f'mean {100*statistics.fmean(db) if db else 0:+.2f}.']
+            L += ['', f'**Mac 4-bit − hosted bf16 NES: {100*statistics.fmean(d):+.2f} points** over {len(d)} pages '
+                  f'(standard error about {100*sd/len(d)**.5:.2f}; a negative figure is a 4-bit-on-a-Mac penalty); '
+                  f'pages where both completed: {len(both)}, mean {100*statistics.fmean(db) if db else 0:+.2f}. '
+                  f"Failed: hosted {sum(not p['hosted']['ok'] for p in done)}, Mac {sum(not p['local']['ok'] for p in done)}."]
             fmt = [p for p in done if not p['local']['ok'] and p['local_meta'].get('finish') == 'stop']
             if fmt:
                 dl = [p['lenient']['nes'] - p['hosted']['nes'] for p in done]
                 L += ['', f'{len(fmt)} local reading(s) ended normally but broke the reply format, so the panel\'s parser scores '
-                      f'them empty; taking the text after `TEXT:` instead, the penalty is {100*statistics.fmean(dl):+.2f} points.']
+                      f'them empty; taking the text after `TEXT:` instead, the difference is {100*statistics.fmean(dl):+.2f} points.']
         L += ['', '| kind | n | ' + ' | '.join(f'{lab.split(" (")[0]} NES %' for lab, _ in sides) + ' |',
               '|---|---:|' + '---:|' * len(sides)]
         for kind in sorted({p['kind'] for p in done}):

@@ -11220,3 +11220,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   (NES and page count; a figure changed by 0.1 fails), table checks, the lines, and a render guard (note ~10k dark px,
   every kind adds a line; PNG eyeballed). Build clean, no new warnings. No money, no key, no window.
   <!-- /W41.app-ocr-hierarchy -->
+- [x] **W41.mac-local-hw — LightOnOCR-3-4B and Qwen3.5-9B on our Mac, on the truth set, into the bench [S · ~1 session]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · SHIPPED 2026-10-15 (lane: segbench) (uses: machine) (blocked-on: W41.mac-local-measure). Owner, 2026-10-15: the Vision OCR lab's handwriting pick and runner-up were measured on this truth set's handwritten pages, but with a bag-of-words score, so ArchiveOCRBench shows them in a separate table. Run both with W41.mac-local-measure's runner (`ocr_mac_local.py`) over the 99 frozen truth images and score them with the panel's scorer (`ocr_panel_score.py`), so they sit on the same NES scale as every route. Weights from the lab's cache, read only (`~/.local/share/visionocr-ocrlab/hf`: `prithivMLmods/LightOnOCR-3-4B-MLX` files under `8bit/`, `mlx-community/Qwen3.5-9B-4bit`); download nothing. LightOnOCR-3-4B with its card's settings (empty prompt, longest side 2048 px, 4096 tokens), since other prompts are out of its distribution; Qwen3.5-9B with the panel's prompt, so its row also measures the 4-bit-on-a-Mac penalty against the hosted `qwen3.5-9b` (89.43 overall, 90.92 handwritten). One model at a time, never beside another model run; peaks were 7.6 and 8.7 GB, about 18 and 32 s a page in the lab. Then add both to ArchiveOCRBench as on-device routes: free, drawn in the free column beside Apple Vision with their own marker, on all four charts, with seconds a page and peak memory in the table. Keep part 3 (the lab's missed and added words) and point its note at the handwritten chart. No money. Images stay in the private cache; the repo is public.
+  **Shipped 2026-10-15.** `ocr_mac_local.py collect --model lightonocr-3-4b-mlx8|qwen3.5-9b-mlx4` reads the 99 frozen
+  originals from the lab's cache by local path, offline (`HF_HUB_OFFLINE`), under the lab's `run-guarded.sh`, one model
+  at a time; `report` writes `ArchiveProcessor/segbench-results/ocr-mac-local-hw.md` and both models' rows into
+  `ocr-mac-local-groups.csv` (ocr-mac-local.md regenerates byte-identical). LightOnOCR-3-4B 8-bit, card settings
+  (empty prompt, 2048 px, 4096 tokens), scored whole: NES 89.13 (96/96), handwritten 89.67, typewritten 90.81,
+  printed 87.98; 24 s a page (9 s prefill), MLX peak 6.44 GB, 7.9 GB footprint, no failure or loop. Qwen3.5-9B 4-bit,
+  panel prompt, thinking off (`enable_thinking=False`, as the hosted reasoning: off; the lab's run left it on):
+  NES 91.91 (95/96) against hosted 89.43 (92/96), so +2.48 overall, from the hosted route's four failures (−0.66 on
+  the 91 pages both finished); handwritten 87.92 against 90.92 hosted (−3.00); 38 s a page (24 s prefill), MLX peak
+  7.48 GB, 9.1 GB footprint, pressure at warn; one KIND/format slip, no loop. ArchiveOCRBench: both as Mac routes (◇)
+  in the free column on all four charts with seconds a page and peak memory in the tables (`inputs.json` routes name
+  their own `report`/`speed` heading; build.py reads them); part 3 kept, its note links the handwritten chart. Tests:
+  `test_ocr_mac_local.py` 5 synthetic checks. No money; no download; no page text in the public files.
+  <!-- /W41.mac-local-hw -->
