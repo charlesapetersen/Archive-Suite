@@ -137,7 +137,7 @@ final class CorpusWalkerTests: XCTestCase {
         try makeFile("bare.pdf", in: root)
 
         let library = CorpusWalker.scan(root: root)
-        let vocabulary = CorpusWalker.scan(root: root, predicate: CorpusWalker.hasAnyTag)
+        let vocabulary = CorpusWalker.scan(root: root, predicate: { !$0.isEmpty })
 
         XCTAssertEqual(relativePaths(library, root: root), ["read.pdf"])
         XCTAssertEqual(relativePaths(vocabulary, root: root), ["read.pdf", "subject-only.pdf"])
@@ -230,7 +230,7 @@ final class CorpusWalkerTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(before.count, 8, "the snapshot must actually cover the fixture")
 
         _ = CorpusWalker.scan(root: root)
-        _ = CorpusWalker.scan(root: root, predicate: CorpusWalker.hasAnyTag)
+        _ = CorpusWalker.scan(root: root, predicate: { !$0.isEmpty })
 
         let after = snapshot(root)
         XCTAssertEqual(after, before,

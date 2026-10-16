@@ -118,7 +118,6 @@ final class TagWriterPrimitiveTests: XCTestCase {
     func testTagReadingReadFailure() {
         let ghost = tempDir.appendingPathComponent("ghost.pdf")
         let result = TagReading.read(ghost)
-        XCTAssertFalse(result.isReadable)
         XCTAssertNil(result.tagNames)
     }
 
@@ -266,7 +265,7 @@ final class TagWriterPrimitiveTests: XCTestCase {
         let url = try makeFile("occ-noop.pdf", tags: ["A", "A", "B"])
         let r = try CoordinatedTagWriter.write(url) { _, _ in nil }
         XCTAssertTrue(r.isNoOp)
-        XCTAssertTrue(r.occurrenceInverse.isEmpty)
+        XCTAssertEqual(r.occurrenceInverse, TagOccurrenceDelta())
     }
 
     // MARK: §10 In-process per-resolved-path serialization — no lost update on concurrent same-path writes

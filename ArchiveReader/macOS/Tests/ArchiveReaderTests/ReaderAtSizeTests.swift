@@ -383,7 +383,7 @@ final class ReaderAtSizeTests: XCTestCase {
             onDoubleClick: {}, buildContextMenu: { _ in nil }))
         coordinator.tableView = tableView
         let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
-            coordinator.makeCell(tableView: tv, column: column, row: row, itemID: itemID)
+            coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
         }
         coordinator.dataSource = dataSource
         tableView.delegate = coordinator
@@ -422,7 +422,7 @@ final class ReaderAtSizeTests: XCTestCase {
             let (_, t) = time { autoreleasepool {
                 for row in top..<(top + screenRows) {
                     for column in tableView.tableColumns {
-                        let cell = coordinator.makeCell(tableView: tableView, column: column, row: row, itemID: ids[row])
+                        let cell = coordinator.makeCell(tableView: tableView, column: column, itemID: ids[row])
                         _ = cell.fittingSize
                     }
                 }

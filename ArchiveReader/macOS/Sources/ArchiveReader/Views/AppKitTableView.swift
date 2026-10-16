@@ -112,7 +112,7 @@ struct AppKitTableView: NSViewRepresentable {
         coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
 
         let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
-            coordinator.makeCell(tableView: tv, column: column, row: row, itemID: itemID)
+            coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
         }
         // Header-click sorting: `sortDescriptorsDidChange` is an NSTableViewDataSource callback, so it
         // must live on the DATA SOURCE (the diffable source is the real dataSource) — not the coordinator,
@@ -250,7 +250,7 @@ struct AppKitTableView: NSViewRepresentable {
 
         // MARK: Cell factory
 
-        func makeCell(tableView: NSTableView, column: NSTableColumn, row: Int, itemID: ArchiveFile.ID) -> NSView {
+        func makeCell(tableView: NSTableView, column: NSTableColumn, itemID: ArchiveFile.ID) -> NSView {
             let colID = column.identifier.rawValue
             let file = displayedByID[itemID]
 
@@ -529,7 +529,6 @@ struct AppKitTableView: NSViewRepresentable {
                 tagCell.tokenField.delegate = self
             }
             // Freeze during edit: don't clobber the in-progress token field or its target file.
-            // Mirrors SubjectTokenField.updateNSView's currentEditor() guard.
             if tagCell.tokenField.currentEditor() == nil {
                 tagCell.tokenField.objectValue = file?.subjects ?? []
                 tagCell.itemID = itemID

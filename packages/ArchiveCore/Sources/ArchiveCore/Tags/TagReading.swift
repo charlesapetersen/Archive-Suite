@@ -15,10 +15,6 @@ public enum TagReadResult: Sendable, Equatable {
         if case let .success(tagNames, _) = self { return tagNames }
         return nil
     }
-    public var isReadable: Bool {
-        if case .success = self { return true }
-        return false
-    }
 }
 
 /// The extended attribute macOS keeps Finder tags in.

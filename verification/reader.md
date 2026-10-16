@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 3` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-26, R-46). Updated by `W40.d7`, 2026-10-15.
+- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 4` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-26, R-46, R-47). Updated by `W40.e5`, 2026-10-16.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -484,7 +484,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-inline-keys` (S2).
 - **Notes:** **Drift.** The live editor is the AppKit cell. `Views/SubjectTokenField.swift`, which the guide
   names, is referenced only by the dead `TagsCell` (R-25), so it is dead too. Autocomplete returns at most 20
-  and leaves out an exact match. There is no case-duplicate warning here (R-27).
+  and leaves out an exact match. There is no case-duplicate warning here (R-27). 2026-10-16 `W40.e5` deleted
+  `SubjectTokenField.swift` and `TagsCell` as dead code; the guide's Implementation map now names
+  `TagTokenCellView`.
 
 ### R-24 · Quality pop-up in the list
 
@@ -521,7 +523,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-12 W40.b1 — row written, `unreachable`.
 - **Notes:** a Daemon Report decision (2026-10-12): wire it into the AppKit table or drop it. ⌘R and ⌘U do the
   same state change for the selection, but they are not the promised gesture. "Clear read state" has no live
-  entry point at all.
+  entry point at all. 2026-10-16 `W40.e5` (Periphery) also found `ReadStateCell`, `toggleReadState` and
+  `clearReadState` unused and kept them for `W40.fix-reader-read-toggle`; it deleted the other dead SwiftUI cells
+  (`TagsCell`, `WarningBadgeCell`). `DateCell` was not flagged and stays for `W40.fix-reader-sent-with-date`.
 
 ### R-26 · Inline date editing in the list
 
@@ -953,3 +957,23 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Notes:** `unreachable` is used because there is no path to it, and this time no code either. The decision,
   build it or withdraw the promise, belongs to `W40.f1`, which demonstrates the memory-only undo first.
   `W40.b5` leaves §12 in place until then, marked as unimplemented.
+
+### R-47 · Two same-facet date tags are flagged as ambiguous
+
+- **Promise:** a file with two tags of the same date facet (two Years, two Months, two `Sent With` values) is
+  read by a deterministic rule and flagged as ambiguous, so the user can see it needs review.
+- **Promised in:** `CLAUDE.md` §Edge cases ("Multiple same-facet date tags … deterministic rule + flag
+  ambiguous"); `SPEC/tag-format.md` facet table, Sent With row ("last wins, the earlier is demoted to a subject
+  (`sentWithIsAmbiguous`)").
+- **Reached by:** **none found.** The deterministic rule exists. For Sent With the flag exists too:
+  `DocumentTags.sentWithIsAmbiguous` (`packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift:125`).
+  No app reads it; Periphery reported it unused across all three apps' index stores (`W40.e5`), and only
+  `ArchiveCoreTests/DualDateTests` touches it. No flag exists for two Years or two Months. Searched:
+  `ambiguous` in `ArchiveReader/macOS/Sources` and `packages/ArchiveCore/Sources`.
+- **Real-path test:** none.
+- **Runtime evidence:** none.
+- **Status:** `unreachable`
+- **History:**
+  - 2026-10-16 W40.e5 — row written, `unreachable` (found by the dead-code scan).
+- **Notes:** a Daemon Report decision (2026-10-16): show the flag in the Reader, or drop "flag ambiguous" from
+  the guide and the SPEC.

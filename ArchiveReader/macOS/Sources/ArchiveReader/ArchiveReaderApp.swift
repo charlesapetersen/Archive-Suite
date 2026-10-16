@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import ArchiveCore
 
 /// Archive Reader — a native macOS app for reading & triaging tagged historical-document PDFs.
 ///

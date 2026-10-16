@@ -22,13 +22,6 @@ public enum PDFFormatStatus: Sendable, Equatable {
         return hasText ? .standard : .noTextLayer
     }
 
-    /// Convenience over an extraction result: `nil` (open failed) → `.unreadable`; otherwise text
-    /// presence is decided by a non-empty fullBody.
-    public static func classify(_ content: ExtractedContent?) -> PDFFormatStatus {
-        guard let content else { return .unreadable }
-        return classify(readable: true, hasText: !content.fullBody.isEmpty)
-    }
-
     /// True for anything a human should look at (unreadable or text-less); `.standard` is fine.
     public var needsAttention: Bool { self != .standard }
 

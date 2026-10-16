@@ -267,9 +267,6 @@ public enum CorpusWalker {
         }
     }
 
-    /// Everything with at least one tag — for a vocabulary harvest rather than a library.
-    public static let hasAnyTag: @Sendable ([String]) -> Bool = { !$0.isEmpty }
-
     // MARK: - The walk
 
     /// The path the walk must actually enumerate for `root` — or `nil` when this root cannot be opened

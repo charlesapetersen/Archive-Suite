@@ -178,7 +178,7 @@ final class CorpusWalkerScaleTests: XCTestCase {
             throw XCTSkip("ARCHIVE_SCALE_HOSTILE_ROOT unset — run ops/scale/run-scale-verify.sh")
         }
         let root = URL(fileURLWithPath: path, isDirectory: true)
-        let result = CorpusWalker.scan(root: root, predicate: CorpusWalker.hasAnyTag)
+        let result = CorpusWalker.scan(root: root, predicate: { !$0.isEmpty })
 
         XCTAssertFalse(result.rootUnreadable, "the hostile root itself is readable")
         XCTAssertTrue(result.completed, "it completed; it just could not read everything")

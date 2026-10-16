@@ -12,7 +12,6 @@ final class DocumentFindTests: XCTestCase {
     // MARK: FindNavigator — pure navigation over the flat match list
 
     private typealias Loc = FindMatchLocation
-    private typealias Pane = DocumentViewerModel.Pane
 
     func testEmptyNavigatorHasNoMatches() {
         var nav = FindNavigator()

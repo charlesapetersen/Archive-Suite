@@ -34,7 +34,7 @@ struct TagEditorView: View {
                     Divider()
                     readStateSection(s)
                     Divider()
-                    notesSection(s)
+                    notesSection()
                 }
                 .padding()
             }
@@ -108,7 +108,7 @@ struct TagEditorView: View {
             }
             HStack {
                 Text("Month").frame(width: 52, alignment: .leading)
-                Menu(monthLabel(s)) {
+                Menu(monthLabel()) {
                     Button("None") { model.applyEdit(.setMonth(nil)) }
                     ForEach(1...12, id: \.self) { m in
                         Button(TagEditing.monthToken(m)) { model.applyEdit(.setMonth(m)) }
@@ -174,7 +174,7 @@ struct TagEditorView: View {
 
     // MARK: Notes & flag (app-side, never written to the file)
 
-    @ViewBuilder private func notesSection(_ s: GroupTagSummary) -> some View {
+    @ViewBuilder private func notesSection() -> some View {
         VStack(alignment: .leading, spacing: 8) {
             title("Notes & flag")
             Text("Stored in the app — never written to the file.").font(.caption).foregroundStyle(.secondary)
@@ -209,7 +209,7 @@ struct TagEditorView: View {
         }
     }
 
-    private func monthLabel(_ s: GroupTagSummary) -> String {
+    private func monthLabel() -> String {
         // commonYear-style is not tracked for month; show a neutral prompt.
         "Set month…"
     }

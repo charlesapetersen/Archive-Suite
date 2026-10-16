@@ -75,8 +75,6 @@ public struct TagOccurrenceDelta: Sendable, Equatable {
         self.remove = remove
         self.color = color
     }
-
-    public var isEmpty: Bool { add.isEmpty && remove.isEmpty && color == nil }
 }
 
 /// The outcome of a successful write, including the inverse delta needed to undo it safely.

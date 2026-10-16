@@ -409,11 +409,12 @@ Views/
                               (List(selection:)+OutlineGroup). Durable smart-folder highlight; folder
                               selection exits the scope.
   InlineEditCells.swift       Supporting SwiftUI cell views retained from the pre-AppKit table: ReadStateCell,
-                              DateCell / TagsCell. Multi-file edits use the ⌘I editor.
-  SubjectTokenField.swift     Inline NSTokenField subject editor per row: autocomplete from the corpus;
-                              edit-start-base diff → ONE TagWriter delta; commits the field's tokens on
-                              blur — WYSIWYG, so a typed-but-not-Return'd word sticks (owner 2026-07-08;
-                              GUI-verified). Adds only route through TagWriter, so existing tags never lost.
+                              DateCell. Multi-file edits use the ⌘I editor.
+                              The inline per-row subject editor is AppKitTableView's TagTokenCellView
+                              (NSTokenField): autocomplete from the corpus; edit-start-base diff → ONE
+                              TagWriter delta; commits the field's tokens on blur — WYSIWYG, so a
+                              typed-but-not-Return'd word sticks (owner 2026-07-08). Adds only route
+                              through TagWriter, so existing tags never lost.
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.

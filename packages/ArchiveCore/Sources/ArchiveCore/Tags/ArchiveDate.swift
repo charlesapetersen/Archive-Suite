@@ -122,8 +122,6 @@ public struct ArchiveDate: Sendable, Hashable, Codable {
 public enum DateRole: String, Sendable, Codable, CaseIterable {
     case own
     case sentWith = "sent_with"
-
-    public var label: String { self == .own ? "Date" : "Sent with" }
 }
 
 /// The wire spelling of the sent-with date: `Sent With <wireValue>` plus the independent

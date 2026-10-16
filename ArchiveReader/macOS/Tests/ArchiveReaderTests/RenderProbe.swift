@@ -23,7 +23,6 @@ import UniformTypeIdentifiers
 struct PixelStats {
     let width: Int
     let height: Int
-    var pixelCount: Int { width * height }
 
     /// Fraction of pixels that are NOT near-white and NOT transparent. ~0 ⇒ a blank white page.
     let nonWhiteFraction: Double

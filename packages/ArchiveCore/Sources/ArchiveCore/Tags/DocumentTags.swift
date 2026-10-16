@@ -13,8 +13,6 @@ import Foundation
 public enum ReadState: String, Sendable, CaseIterable {
     case read = "Read"
     case unread = "Unread"
-
-    public var opposite: ReadState { self == .read ? .unread : .read }
 }
 
 /// Finder color-label meanings assigned by Archive Processor.

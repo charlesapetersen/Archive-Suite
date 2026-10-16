@@ -330,12 +330,6 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
 
     deinit { stop() }
 
-    /// Internal injection point for the flag reducer. It enters through the same method as the C
-    /// callback; tests use it for recovery flags the kernel cannot be forced to emit deterministically.
-    func receiveForTesting(paths: [String], flags: [FSEventStreamEventFlags]) {
-        receive(paths: paths, flags: flags)
-    }
-
     private func receive(paths: [String], flags: [FSEventStreamEventFlags]) {
         let request = CorpusWatchRequest.reduce(root: root, paths: paths, flags: flags)
         if !request.isEmpty { handler(request) }

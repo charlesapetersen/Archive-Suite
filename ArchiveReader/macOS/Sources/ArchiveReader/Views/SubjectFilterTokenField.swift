@@ -48,7 +48,7 @@ struct SubjectFilterTokenField: NSViewRepresentable {
     func updateNSView(_ tf: NSTokenField, context: Context) {
         context.coordinator.parent = self
         tf.placeholderString = placeholder
-        // Freeze while the user is editing (mirrors SubjectTokenField): a re-render must not clobber an
+        // Freeze while the user is editing (as the list's tag cell does): a re-render must not clobber an
         // in-progress edit. When idle, re-sync from the model so an external change — a tag-cloud click,
         // "Clear", or a smart-folder scope — shows up as tokens here.
         if tf.currentEditor() == nil {

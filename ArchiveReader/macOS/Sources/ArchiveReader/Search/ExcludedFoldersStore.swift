@@ -62,11 +62,6 @@ final class ExcludedFoldersStore: ObservableObject {
         return excludedRelativePaths.map { root + "/" + $0 }
     }
 
-    /// Re-read the persisted list (e.g. after UserDefaults is cleared in tests).
-    func reload() {
-        excludedRelativePaths = defaults.stringArray(forKey: key) ?? []
-    }
-
     // MARK: - Private
 
     private func persist() {
