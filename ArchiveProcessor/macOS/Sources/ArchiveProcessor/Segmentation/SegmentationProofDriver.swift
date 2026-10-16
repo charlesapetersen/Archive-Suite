@@ -90,6 +90,11 @@ enum SegmentationProofDriver {
 
         var snapshot: [String: (input: Int, output: Int, calls: Int)] { lock.withLock { tokens } }
 
+        private var served: Set<String> = []
+        func addProvider(_ p: String) { _ = lock.withLock { served.insert(p) } }
+        /// The OpenRouter providers that answered, as OpenRouter named them (`Z.AI`).
+        var servedProviders: Set<String> { lock.withLock { served } }
+
         var http: APIWindowTransport.HTTP {
             { [self] request in
                 let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
@@ -103,6 +108,11 @@ enum SegmentationProofDriver {
                     let u = obj?["usageMetadata"] as? [String: Any]
                     add("gemini", input: int(u?["promptTokenCount"]),
                         output: int(u?["candidatesTokenCount"]) + int(u?["thoughtsTokenCount"]))
+                case "openrouter.ai":
+                    // W41.app-openrouter: the GLM approach. Which provider answered is checked per run.
+                    let u = obj?["usage"] as? [String: Any]
+                    add("openrouter", input: int(u?["prompt_tokens"]), output: int(u?["completion_tokens"]))
+                    if let served = obj?["provider"] as? String { addProvider(served) }
                 default:
                     add(request.url?.host ?? "?", input: 0, output: 0)
                 }
@@ -126,6 +136,7 @@ enum SegmentationProofDriver {
         var keys: [WindowProvider: String] = [:]
         if let k = env["SEGMENTATION_PROOF_ANTHROPIC_KEY"], !k.isEmpty { keys[.anthropic] = k }
         if let k = env["SEGMENTATION_PROOF_GEMINI_KEY"], !k.isEmpty { keys[.gemini] = k }
+        if let k = env["SEGMENTATION_PROOF_OPENROUTER_KEY"], !k.isEmpty { keys[.openrouter] = k }
         let claude = LocalAgentClient.resolveBinaryPath(tool: .claude, override: env["SEGMENTATION_PROOF_CLAUDE"] ?? "")
 
         // The stage records each plan run's ratio into the app's own defaults; this is a test, so put it back.
@@ -253,6 +264,11 @@ enum SegmentationProofDriver {
         }
         if providers.contains(.gemini) {
             check("\(name) Gemini went by key", (tokens["gemini"]?.calls ?? 0) > 0)
+        }
+        if providers.contains(.openrouter) {
+            check("\(name) GLM went by the OpenRouter key", (tokens["openrouter"]?.calls ?? 0) > 0)
+            check("\(name) only the pinned provider answered", meter.servedProviders == ["Z.AI"],
+                  meter.servedProviders.sorted().joined(separator: ", "))
         }
 
         var result: [String: Any] = [

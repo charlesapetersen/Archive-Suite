@@ -9,7 +9,8 @@
 # (the script prints its estimate from options.json before it runs); the plan route uses the signed-in `claude`'s
 # plan (about 1% of a five-hour window) and no money. Without --paid it prints the estimate and stops.
 #
-#   scripts/test-segmentation-proof.sh [--paid] [--runs gemini:key,claude:key,claude:plan]
+#   scripts/test-segmentation-proof.sh [--paid] [--runs gemini:key,claude:key,claude:plan]   (also glm:key, the
+#                                      OpenRouter GLM-5.3 Flash approach, ~$0.03 for the folder; W41.app-openrouter)
 #                                      [--box Herrnstein --from 19 --to 39]
 #
 # No ChatGPT run: since W36.seg-opt-openai the mix is Claude + ChatGPT, and the driver has no OpenAI route (an
@@ -94,6 +95,7 @@ fi
 key() { /usr/bin/security find-generic-password -s com.archiveprocessor.app -a "$1" -w 2>/dev/null || true; }
 case "$runs" in *gemini*) gemini_key=$(key Gemini) ;; *) gemini_key="" ;; esac
 case "$runs" in *claude:key*) anthropic_key=$(key Anthropic) ;; *) anthropic_key="" ;; esac
+case "$runs" in *glm:*) openrouter_key=$(key OpenRouter) ;; *) openrouter_key="" ;; esac
 
 report="$work/result.txt"
 json="${SEGMENTATION_PROOF_JSON:-$work/result.json}"
@@ -102,9 +104,10 @@ ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     SEGMENTATION_PROOF=1 SEGMENTATION_PROOF_MANIFEST="$work/manifest.json" SEGMENTATION_PROOF_RUNS="$runs" \
     SEGMENTATION_PROOF_OUT="$report" SEGMENTATION_PROOF_JSON="$json" \
     SEGMENTATION_PROOF_ANTHROPIC_KEY="$anthropic_key" SEGMENTATION_PROOF_GEMINI_KEY="$gemini_key" \
+    SEGMENTATION_PROOF_OPENROUTER_KEY="$openrouter_key" \
     "$bin" >"$log" 2>&1 &
 pid=$!
-unset anthropic_key gemini_key
+unset anthropic_key gemini_key openrouter_key
 
 # Each run is a few minutes; the plan route's windows are the slowest (seven Read turns each).
 for _ in $(seq 1 3600); do

@@ -297,6 +297,18 @@ existing scratch, key-free, no-network execution remains unchanged.
   file it names (NES and page count), then the table's own checks (best first, NES in range, every `app_model` a
   built-in id), the lines as the user reads them, and a render guard that the note draws offscreen. No Keychain
   read, no window.
+- **`test-openrouter.sh`** — W41.app-openrouter: the OpenRouter provider through the real clients over the no-wire
+  seam (`OPENROUTER_TEST`, one of the flags `NetworkSession.activeTestTransport` honours; the driver stops if the
+  seam is inactive). The catalog (ids, pinned provider, precision, prices), the request on the wire for OCR and
+  text calls (provider order, fallbacks off as a JSON false, quantizations, max_price, temperature, reasoning,
+  max_tokens), no client for an uncatalogued model, failed-page handling (in-body errors, finish_reason
+  error/length, empty text answers, HTTP errors keeping OpenRouter's message), the estimate against what the panel
+  paid, and the GLM segmentation approach (options.json figures, the window request, its error mapping). No key,
+  network, corpus, or spend; not in the health gate.
+- **`live-openrouter.sh`** — PAID (about $0.03): each catalog model reads two synthetic pages through the real
+  Process Files pipeline (`ProcessFilesTestDriver`, `PROCESSFILES_PROVIDER=OpenRouter`); asserts success, the PDF
+  header naming the pinned route, and Finder tags. Without `--paid` it prints the estimate. `test-segmentation-proof.sh
+  --paid --runs glm:key` is the segmentation counterpart (~$0.02; checks only Z.AI answered).
 - **`test-ocr-refusal.sh`** — W41.app-ocr-default: the default Gemini model and its prices, and the second
   reader for pages Gemini refuses, through the real `performOCRCall` over an injected transport: refusal codes
   that reach the second route and those that never do, the `secondReader` record and PDF header, fail-loud with

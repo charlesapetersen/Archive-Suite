@@ -144,13 +144,23 @@ struct APIWindowTransport: WindowTransport {
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         if status != 200 {
             let err = json?["error"] as? [String: Any]
-            let message = (err?["message"] as? String) ?? transientStatusMessage(status) ?? "HTTP \(status)"
+            var message = (err?["message"] as? String) ?? transientStatusMessage(status) ?? "HTTP \(status)"
+            // OpenRouter wraps the provider's own words in metadata.raw ("Provider returned error" says nothing).
+            if provider == .openrouter, let raw = (err?["metadata"] as? [String: Any])?["raw"] as? String {
+                message += ": " + String(raw.prefix(300))
+            }
             let kind = ((err?["type"] as? String) ?? (err?["status"] as? String) ?? (err?["code"] as? String) ?? "")
             // NetworkSession has already retried a 429 with back-off; one still standing is the account's
             // quota or rate limit, so the run stops rather than burning through every window.
             if status == 429 || kind == "rate_limit_error" || kind == "RESOURCE_EXHAUSTED" || kind == "insufficient_quota" {
                 let reset = response.flatMap(retryAfter).map { Date().addingTimeInterval($0) }
                 throw WindowTransportError.usageLimit(reset: reset, message: message)
+            }
+            // OpenRouter relays an upstream provider's passing failure as a 400 "Provider returned error" (seen on
+            // z-ai in the W41.app-openrouter proof, then fine on the next run): that is this window's failure, retried
+            // once, not a bad request.
+            if provider == .openrouter, status == 400, (err?["message"] as? String) == "Provider returned error" {
+                throw WindowTransportError.failed("openrouter 400: \(message)")
             }
             // A refused key, a bad request or an unknown model fails every window alike (the bench's Fatal).
             if [400, 401, 403, 404].contains(status) {

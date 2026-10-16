@@ -11272,3 +11272,27 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   script under Node stubs (seven charts built, every callback exercised); no browser render was possible unattended,
   and the published copy of the page is now behind.
   <!-- /W41.bench-difficulty -->
+
+- [x] **W41.app-openrouter — OpenRouter as an OCR and segmentation provider [M · ~2 sessions · Tier-2]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · SHIPPED 2026-10-15 (lane: processor) (uses: build,paid). From W41.report §2-3. One key (Keychain service `com.archiveprocessor.app`, account `OpenRouter`, which already exists), a pinned provider and precision per model, fallbacks off, as the bench's `ocr_panel.py` routes do. Models: Qwen3-VL 235B (93.95 NES, $1.22 per 1,000 pages, the best value and not a truth drafter), Qwen3.6 27B (94.28), and GLM-5.3 Flash as the budget segmentation option (82.1% unchecked on the test boxes, 33 checks per 100 pages at the 98% bar, $1.16 per 1,000 against Gemini's $3.61; `cheap-models.md`). Tier-2: a new paid network path; the cost estimator must use the pinned provider's price. Live check under the $3 rule, a few pages only.
+  **Shipped 2026-10-15** (checkpoint e9d05e38, then this commit). OCR: `LLMProvider.openrouter` (account OpenRouter), its
+  models exactly `OpenRouterRoute.catalog`: Qwen3-VL 235B deepinfra fp8 (default), Qwen3.6 27B chutes fp8 reasoning off,
+  GLM-5.3 Flash z-ai fp8 reasoning minimal (OCR unmeasured, said in Settings). Each request: provider.order,
+  allow_fallbacks false, quantizations, max_price at the pinned price, temperature 0; no client for an uncatalogued
+  model, no custom models. Prices from the panel's frozen catalogs (GLM: 312 of 313 logged calls at exactly
+  $0.15/$0.50). Estimate: 3,700 image tokens a page (panel logged 4,091 / 3,351 prompt tokens), GLM's 153 reasoning
+  tokens; 1.3x and 1.57x what the panel paid (the app assumes 850 output tokens). No batch, rotation by local Vision.
+  PDF header `OpenRouter · Qwen3-VL 235B (deepinfra fp8) · <date>` (SPEC note). The page-guidance note now finds
+  Qwen3.6 27B. Segmentation: approach `glm` ("GLM-5.3 Flash only (budget)"), voter window-openrouter-glm-5.3-flash,
+  APIWindowTransport's OpenRouter arm as method_openrouter.py request_body (images alone, then c1). options.json
+  entry from the new `method_openrouter.py option-glm`, scored as options.py scores the rest (level <= 0.925 at the 98%
+  bar, refuses unless it reproduces Gemini's row): 82.1% unchecked, 33.1 checks per 100 pages, 98.5% after, 1
+  unflagged, $1.16 per 1,000, no batch in the app. ArchiveOCRBench shows it once, from options.md, checked against
+  cheap-models.md (published copy behind). Tier-2: two adversarial reviews, no HIGH; fixed from them: finish_reason
+  error/length and in-body errors are failed pages (provider failures as 503, retried); an empty text answer throws;
+  +1024 tokens for a reasoning route; in-body 429 stops a segmentation run, 401/402 fail it; an upstream 400 "Provider
+  returned error" fails one window (retried) instead of the run (seen once live on z-ai); the time estimate drops LLM
+  rotation. Tests: `scripts/test-openrouter.sh` 138 checks, $0. Live: `scripts/live-openrouter.sh --paid` (each model,
+  2 synthetic pages, real pipeline: exact text, header, tags) and `test-segmentation-proof.sh --paid --runs glm:key`
+  (Herrnstein 19-39, 8 windows, only Z.AI answered, 18 pages exact, 1 unflagged). Spent about $0.09. Not in the
+  health gate. Follow-up filed: W41.app-openrouter-fu1 (Qwen3.6 27B as a refusal second reader).
+  <!-- /W41.app-openrouter -->

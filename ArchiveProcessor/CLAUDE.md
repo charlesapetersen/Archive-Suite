@@ -68,6 +68,12 @@ Dropdown menus for provider and model. The **built-in** models are those listed 
 - gpt-5.5
   - Note: model IDs + per-1M pricing are the current GPT-5 generation from the owner-provided SoCOCRbench source (2026-07-16), ordered cheapest→flagship; a **live-key OCR smoke** is the final ID confirmation (Daemon Report). Reasoning models (nano/mini/5.4/5.5) accept `reasoning_effort` (from the Thinking level); gpt-5.4-mini does not. No batch or LLM-rotation path in v1 (like Mistral) — local Vision handles rotation; OpenAI Batch API is a later phase.
 
+**OpenRouter** — first-class provider (`LLMProvider.openrouter`, W41.app-openrouter), through `OCR/OpenAICompatibleClient.swift` `openRouter(model:apiKey:)`; BYO key (Keychain account `OpenRouter`). Its models are exactly `OpenRouterRoute.catalog` (`Models/ProviderModels.swift`), no custom models, each pinned as the bench ran it (`provider.order`, `allow_fallbacks: false`, `quantizations`, a `max_price` at the pinned price, temperature 0):
+- qwen/qwen3-vl-235b-a22b-instruct, deepinfra fp8 (default; panel 93.95 NES, $1.22 per 1,000 pages)
+- qwen/qwen3.6-27b, chutes fp8, reasoning off (94.28)
+- z-ai/glm-5.3-flash, z-ai fp8, reasoning minimal (measured for segmentation; its OCR is not)
+  - Note: a model outside the catalog gets no client, so no call goes unpinned. No batch, no LLM rotation (local Vision), not a refusal second reader yet (`W41.app-openrouter-fu1`). A 200 whose `finish_reason` is error, or an in-body provider error, is a failed page (code 503, retried), never a transcription. GLM-5.3 Flash is also the segmentation approach `glm` (`Segmentation/WindowTransports.swift` OpenRouter arm; `segbench-results/options.json`, written by `method_openrouter.py option-glm`).
+
 **Apple Vision (on-device)** — first-class local transcription backend (`LLMProvider.appleVision`, W13.vision-1/2) using `VNRecognizeTextRequest`; model `macOS Vision`. It has no API key, network request, or per-page cost. The Settings backend picker exposes language, fast-recognition, minimum-confidence, and custom-vocabulary controls; the run snapshot carries them through Process Files and Live Capture. With **Use an LLM for text-only judgement** off, Vision runs entirely offline and supports **No tagging** or **Copy source file tags**. With it on, Vision still performs image OCR locally, then a separately selected **direct** LLM receives only the extracted text for classification, segmentation, date extraction, and generated tags — no image bytes, image URL, gateway, or Local Agent route enters that second call. Batch and LLM rotation remain off; CPU-bound Vision work uses the Mac's performance-core count. Vision is best on clean typescript and weaker on handwriting or heavy skew, where a cloud VLM can be stronger; it is additive and never the default.
 
 ### Custom models, OpenAI-compatible gateway & Local Agent CLI (shipped)
@@ -445,7 +451,8 @@ OCR/                           OCR pipeline + provider clients:
   OCRProcessor.swift           @MainActor Process-Files pipeline controller — stored state here; methods
                                in +Pipeline/+OCR/+Tagging/+ReviewFlows, types in +Types (see god-file note).
   AnthropicClient·GeminiClient·MistralClient.swift   Single-shot OCR client per provider.
-  OpenAICompatibleClient.swift OCR via any OpenAI-compatible gateway endpoint.
+  OpenAICompatibleClient.swift OCR via any OpenAI-compatible gateway endpoint; also native OpenAI and the pinned
+                               OpenRouter provider (`openRouter`; routes in ProviderModels `OpenRouterRoute`).
   BatchOCR.swift               Batch (discounted, async) OCR clients + shared error-body parsing.
   OCRPrompt.swift              Shared OCR prompt builder (all providers except Mistral OCR).
   ImageEncoding.swift          Shared image→JPEG downscale/encode (byte-identical across providers).

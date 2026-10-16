@@ -189,6 +189,15 @@ enum OpenRouterTestDriver {
         do { _ = try APIWindowTransport.replyText(.openrouter, data: limited, status: 200) }
         catch let e as WindowTransportError { if case .usageLimit = e { stopped = true } } catch {}
         check("6 an in-body 429 stops the run", stopped)
+        func kind(_ body: String, _ status: Int) -> String {
+            do { _ = try APIWindowTransport.replyText(.openrouter, data: Data(body.utf8), status: status); return "ok" }
+            catch let e as WindowTransportError {
+                switch e { case .fatal: return "fatal"; case .failed: return "failed"; default: return "other" }
+            } catch { return "other" }
+        }
+        eq("6 an upstream 400 is one window's failure, retried",
+           kind(#"{"error":{"code":400,"message":"Provider returned error","metadata":{"raw":"busy"}}}"#, 400), "failed")
+        eq("6 OpenRouter's own 400 is fatal", kind(#"{"error":{"code":400,"message":"Invalid model"}}"#, 400), "fatal")
         let ok = Data(#"{"choices":[{"message":{"content":"{\"pages\":[]}"}}]}"#.utf8)
         eq("6 a window answer is read", try? APIWindowTransport.replyText(.openrouter, data: ok, status: 200), #"{"pages":[]}"#)
         let stray = WindowVoter(name: "x", provider: .openrouter, modelID: "z-ai/other", thinkingLevel: nil, prompt: .c1)
