@@ -11296,3 +11296,27 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   (Herrnstein 19-39, 8 windows, only Z.AI answered, 18 pages exact, 1 unflagged). Spent about $0.09. Not in the
   health gate. Follow-up filed: W41.app-openrouter-fu1 (Qwen3.6 27B as a refusal second reader).
   <!-- /W41.app-openrouter -->
+- [x] **W41.bench-vision-kind — a model-independent page kind from Vision OCR's page sorter, on the panel and the bulk pages [S · ~1 session]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) (lane: segbench) (uses: build). SHIPPED 2026-10-15 (af3a08d0, e69dfa24 and the final commit).
+  From W41.bench-difficulty: the models' own kind labels flag poor readings only weakly and depend on the model being
+  judged. `scripts/segbench/vision_kind/` (`vision-page-kind.swift`, `run.sh`) builds against a vision-ocr checkout's
+  `Sources/` (read, never edited; f8f97d2 here) and judges a page as the app does: the image wrapped as
+  `makeSearchablePDF` wraps it, `Flattener.photographed` and `mosaic`, Vision's no-rebuild reading, `isHandwritten`
+  on that render (always looked for). Differences from the app are in the tool's header. Run over the panel's 99
+  originals and the bulk pilot's 2,000 renders (an earlier session's scratchpad copy, in /tmp) into the private cache's
+  `vision-kind/`, none unread, about 30 minutes with five processes on the M3 Pro. `ocr_pages_export.py` adds
+  `vision_kind` to `ocr-pages.csv` (every other cell unchanged, row for row) and writes
+  `farmshare/bulk/vision-kind.csv` (kind and signals, neutral names, no paths). Measured, on the 96 accuracy pages:
+  Vision calls 15 pages handwriting, 14 of them handwritten in the truth and 1 mixed, and finds 14 of the 16 handwritten
+  pages; no typed or printed page is called handwriting; typed and printed pages are photograph (54) or other (24),
+  so it does not separate typewritten from printed. 10 of its 15 handwriting pages are in the hard third. As a flag
+  for a poor reading its handwriting call has AUC 0.51-0.68 across the cheap readers (their own labels 0.57-0.70). As
+  a routing rule (a fifth cascade family, `fail+vision`: Vision's handwriting pages straight to the second route,
+  unpaid at the first), chosen on half the pages and scored on the other half against escalation on failure alone:
+  +0.45 at $0.5, -0.13 at $1, +1.41 at $2, +0.11 at $5, so it is not added to the proposed rule (the sentence is
+  chosen by `vision_verdict`, tested). On the bulk pages: newspaper 12, photograph 1,532, handwriting 151, other 305;
+  Vision and Qwen3.6 27B's label agree on handwriting for 111 pages (Vision 151, the model 144); 13 failures, too few
+  to say anything by kind. Part 6 of difficulty.md, a section and a Vision column on the page (checked by running its
+  script under Node stubs; no browser render unattended); the published copy of the page is now behind. For
+  W41.bench-kind-classifier, which starts from this: 14/16 here against the lab's 18/19 in HW-DETECT-2026-10-15.tsv.
+  No money.
+  <!-- /W41.bench-vision-kind -->

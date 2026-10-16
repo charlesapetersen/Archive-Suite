@@ -400,8 +400,8 @@ VISION_RULE = {
             "route: it needs no model and no paid call, and on unseen pages it added to escalation on failure at "
             "every paid budget up to $5 (part 6).",
     "none": "Vision OCR's page sorter (part 6) is not part of the rule: sending its handwriting pages straight to the "
-            "stronger route made no reliable difference on unseen pages, so it stays a free label rather than a "
-            "routing step.",
+            "stronger route did not gain at every paid budget on unseen pages, so on these 96 pages it is a free "
+            "label and a predictor of difficulty rather than a routing step.",
 }
 
 
@@ -427,15 +427,19 @@ def vision_report(d):
         L.append(f"| {k} | {r['n']} | " + " | ".join(str(r["truth"][t]) for t in tk) + " | "
                  + " | ".join(str(r["tiers"][t]) for t in TIERS) + f" | {f2(r['mean_nes'])} | {r['route_failures']} |")
     h, mh = v["hand"], v["model_hand"]
+    typed = lambda k: sum(P[k]["truth"].get(t, 0) for t in ("typewritten", "printed")) if k in P else 0  # noqa: E731
     L += ["", f"It calls {h['called']} pages handwriting, {h['both']} of them handwritten in the truth "
           f"({', '.join(f'{n} {k}' for k, n in h['called_kinds'].items() if n and k != 'handwritten') or 'no others'}), "
           f"and finds {h['both']} of the truth's {h['truth']} handwritten pages. "
           + (f"The models' own labels, for comparison: the {mh['routes']} routes that label a page say handwritten on "
              f"{mh['recall'][0]} to {mh['recall'][1]} of those {h['truth']} pages, and are right {100 * mh['precision'][0]:.0f}% "
              f"to {100 * mh['precision'][1]:.0f}% of the times they say it. " if mh["recall"] else "")
-          + "Most of the panel's pages are photographs of paper, so *photograph* is the sorter's call for nearly "
-          "every typed or printed page; it separates handwriting and newspapers from the rest and says nothing about "
-          "typewritten against printed.", ""]
+          + f"Typed and printed pages are photograph ({typed('photograph')}) or other ({typed('other')}, a page whose "
+          "light reads as a scan's): the sorter separates handwriting and newspapers from the rest and says nothing "
+          "about typewritten against printed."
+          + (f" The pages it calls handwriting are hard ones, {P['handwriting']['tiers']['hard']} of "
+             f"{P['handwriting']['n']} in the hard third, so it predicts difficulty before anything reads the page."
+             if "handwriting" in P else ""), ""]
     out = {b["budget"]: b["families"] for b in d["cascades"]["budgets"]}
     paid = [b for b in out if 0 < b <= 5 and "fail+vision" in out[b]]
     vis = [s for f in d["flags"] for k, s in f["signals"].items() if k == "Vision: handwriting"]
@@ -463,8 +467,14 @@ def vision_report(d):
         for k, r in b["by_kind"].items():
             L.append(f"| {k} | {r['pages']:,} | " + " | ".join(f"{r['labels'][x]:,}" for x in labels)
                      + f" | {r['failed']} | {100 * r['failed'] / r['pages']:.1f}% |")
-        L += ["", f"{b['photo_signal']:,} of the {b['pages']:,} pages read as photographs by their light and colour, and "
-              f"{b['hand_signal']:,} have a hand's ink."
+        mh_ = sum(r["labels"].get("handwritten", 0) for r in b["by_kind"].values())
+        both = b["by_kind"].get("handwriting", {}).get("labels", {}).get("handwritten", 0)
+        vh = b["by_kind"].get("handwriting", {}).get("pages", 0)
+        L += ["", f"Vision calls {vh:,} pages handwriting and the model says handwritten on {mh_:,}; they agree on "
+              f"{both:,}. {b['photo_signal']:,} of the {b['pages']:,} pages read as photographs by their light and "
+              "colour (a handwritten or newspaper page is counted under its own kind above). Failures are too few "
+              "(one page in about 150) to say whether any kind fails more often. Vision's pass took about 30 minutes "
+              "for the 2,000 pages and the panel's 99 together, five processes at once on the 18 GB M3 Pro."
               + (f" {b['unread']:,} pages Vision could not read are left out." if b["unread"] else ""), ""]
     return L
 

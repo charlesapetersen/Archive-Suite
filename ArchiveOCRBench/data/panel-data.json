@@ -3962,7 +3962,7 @@
    }
   },
   "cascades": {
-   "n": 18214,
+   "n": 18538,
    "frontier": [
     {
      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5-9B 4-bit (Mac)",
@@ -4056,72 +4056,29 @@
      "failed": 0
     },
     {
-     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 LightOnOCR-3-4B 8-bit (Mac)",
+     "label": "Qwen3.8 Flash \u2192 Qwen3.5 9B (Vision's handwriting pages straight to Qwen3.5 9B)",
      "stages": [
       "qwen3.8-flash",
-      "qwen3.5-9b-mlx4",
-      "lightonocr-3-4b-mlx8"
+      "qwen3.5-9b"
      ],
-     "trigger": "fail",
-     "nes": 94.99,
-     "family": "fail",
-     "usd": 0.6,
-     "escalated": 3,
-     "failed": 0
-    },
-    {
-     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Gemma 4 26B-A4B",
-     "stages": [
-      "qwen3.8-flash",
-      "qwen3.5-9b-mlx4",
-      "gemma4-26b-a4b"
-     ],
-     "trigger": "fail",
+     "trigger": "fail+vision",
      "nes": 95.0,
-     "family": "fail",
-     "usd": 0.6,
-     "escalated": 3,
+     "family": "fail+vision",
+     "usd": 0.55,
+     "escalated": 18,
      "failed": 0
     },
     {
-     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Qwen3.6 35B-A3B",
+     "label": "Qwen3.8 Flash \u2192 Qwen3.6 35B-A3B (Vision's handwriting pages straight to Qwen3.6 35B-A3B)",
      "stages": [
       "qwen3.8-flash",
-      "qwen3.5-9b-mlx4",
       "qwen3.6-35b-a3b"
      ],
-     "trigger": "fail",
-     "nes": 95.0,
-     "family": "fail",
-     "usd": 0.61,
-     "escalated": 3,
-     "failed": 0
-    },
-    {
-     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Gemini 3.1 Flash Lite",
-     "stages": [
-      "qwen3.8-flash",
-      "qwen3.5-9b-mlx4",
-      "gemini3.1-flash-lite"
-     ],
-     "trigger": "fail",
-     "nes": 95.0,
-     "family": "fail",
-     "usd": 0.61,
-     "escalated": 3,
-     "failed": 0
-    },
-    {
-     "label": "Qwen3.8 Flash \u2192 Gemini 3.1 Flash Lite",
-     "stages": [
-      "qwen3.8-flash",
-      "gemini3.1-flash-lite"
-     ],
-     "trigger": "fail",
-     "nes": 95.0,
-     "family": "fail",
-     "usd": 0.64,
-     "escalated": 3,
+     "trigger": "fail+vision",
+     "nes": 95.11,
+     "family": "fail+vision",
+     "usd": 0.59,
+     "escalated": 18,
      "failed": 0
     },
     {
@@ -4174,6 +4131,19 @@
      "family": "disagree",
      "usd": 1.22,
      "escalated": 12,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash \u2192 Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash)",
+     "stages": [
+      "qwen3.8-flash",
+      "gemini3.8-flash"
+     ],
+     "trigger": "fail+vision",
+     "nes": 95.83,
+     "family": "fail+vision",
+     "usd": 1.25,
+     "escalated": 18,
      "failed": 0
     },
     {
@@ -4409,6 +4379,23 @@
        "split_in": 93.5,
        "split_out": 92.27
       },
+      "fail+vision": {
+       "best": {
+        "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5-9B 4-bit (Mac) (Vision's handwriting pages straight to Qwen3.5-9B 4-bit (Mac))",
+        "stages": [
+         "qwen3-vl-8b-mlx4",
+         "qwen3.5-9b-mlx4"
+        ],
+        "trigger": "fail+vision",
+        "nes": 93.41,
+        "family": "fail+vision",
+        "usd": 0.0,
+        "escalated": 18,
+        "failed": 0
+       },
+       "split_in": 93.63,
+       "split_out": 92.88
+      },
       "disagree": {
        "best": {
         "label": "Qwen3-VL 8B 4-bit (Mac), checked against Apple Vision at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
@@ -4479,6 +4466,23 @@
         "failed": 0
        },
        "split_in": 94.48,
+       "split_out": 92.57
+      },
+      "fail+vision": {
+       "best": {
+        "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B)",
+        "stages": [
+         "qwen3-vl-8b-mlx4",
+         "qwen3.6-27b"
+        ],
+        "trigger": "fail+vision",
+        "nes": 93.91,
+        "family": "fail+vision",
+        "usd": 0.32,
+        "escalated": 18,
+        "failed": 0
+       },
+       "split_in": 94.43,
        "split_out": 92.57
       },
       "disagree": {
@@ -4553,6 +4557,23 @@
        "split_in": 95.43,
        "split_out": 93.45
       },
+      "fail+vision": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B)",
+        "stages": [
+         "qwen3.8-flash",
+         "qwen3.6-27b"
+        ],
+        "trigger": "fail+vision",
+        "nes": 95.22,
+        "family": "fail+vision",
+        "usd": 0.83,
+        "escalated": 18,
+        "failed": 0
+       },
+       "split_in": 95.42,
+       "split_out": 93.87
+      },
       "disagree": {
        "best": {
         "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 \u2192 Qwen3.8 Flash",
@@ -4624,6 +4645,23 @@
        },
        "split_in": 95.77,
        "split_out": 93.83
+      },
+      "fail+vision": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash)",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.8-flash"
+        ],
+        "trigger": "fail+vision",
+        "nes": 95.83,
+        "family": "fail+vision",
+        "usd": 1.25,
+        "escalated": 18,
+        "failed": 0
+       },
+       "split_in": 95.88,
+       "split_out": 95.06
       },
       "disagree": {
        "best": {
@@ -4697,6 +4735,23 @@
        "split_in": 95.92,
        "split_out": 94.02
       },
+      "fail+vision": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash)",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.8-flash"
+        ],
+        "trigger": "fail+vision",
+        "nes": 95.83,
+        "family": "fail+vision",
+        "usd": 1.25,
+        "escalated": 18,
+        "failed": 0
+       },
+       "split_in": 95.88,
+       "split_out": 94.98
+      },
       "disagree": {
        "best": {
         "label": "Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 \u2192 Claude Sonnet 5.5",
@@ -4768,6 +4823,23 @@
        },
        "split_in": 95.99,
        "split_out": 94.28
+      },
+      "fail+vision": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash)",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.8-flash"
+        ],
+        "trigger": "fail+vision",
+        "nes": 95.83,
+        "family": "fail+vision",
+        "usd": 1.25,
+        "escalated": 18,
+        "failed": 0
+       },
+       "split_in": 95.88,
+       "split_out": 94.98
       },
       "disagree": {
        "best": {
@@ -5327,6 +5399,151 @@
       "failed": 0
      }
     ],
+    "fail+vision": [
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5-9B 4-bit (Mac) (Vision's handwriting pages straight to Qwen3.5-9B 4-bit (Mac))",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "fail+vision",
+      "nes": 93.41,
+      "family": "fail+vision",
+      "usd": 0.0,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5 9B (Vision's handwriting pages straight to Qwen3.5 9B)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.5-9b"
+      ],
+      "trigger": "fail+vision",
+      "nes": 93.58,
+      "family": "fail+vision",
+      "usd": 0.03,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.6 35B-A3B (Vision's handwriting pages straight to Qwen3.6 35B-A3B)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.6-35b-a3b"
+      ],
+      "trigger": "fail+vision",
+      "nes": 93.71,
+      "family": "fail+vision",
+      "usd": 0.07,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.8 Flash (Vision's handwriting pages straight to Qwen3.8 Flash)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.8-flash"
+      ],
+      "trigger": "fail+vision",
+      "nes": 93.82,
+      "family": "fail+vision",
+      "usd": 0.1,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.6-27b"
+      ],
+      "trigger": "fail+vision",
+      "nes": 93.91,
+      "family": "fail+vision",
+      "usd": 0.32,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 LightOnOCR-3-4B 8-bit (Mac) (Vision's handwriting pages straight to LightOnOCR-3-4B 8-bit (Mac))",
+      "stages": [
+       "qwen3.8-flash",
+       "lightonocr-3-4b-mlx8"
+      ],
+      "trigger": "fail+vision",
+      "nes": 94.76,
+      "family": "fail+vision",
+      "usd": 0.52,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.5 9B (Vision's handwriting pages straight to Qwen3.5 9B)",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.5-9b"
+      ],
+      "trigger": "fail+vision",
+      "nes": 95.0,
+      "family": "fail+vision",
+      "usd": 0.55,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.6 35B-A3B (Vision's handwriting pages straight to Qwen3.6 35B-A3B)",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.6-35b-a3b"
+      ],
+      "trigger": "fail+vision",
+      "nes": 95.11,
+      "family": "fail+vision",
+      "usd": 0.59,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Gemini 3.5 Flash Lite (Vision's handwriting pages straight to Gemini 3.5 Flash Lite)",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.5-flash-lite"
+      ],
+      "trigger": "fail+vision",
+      "nes": 95.2,
+      "family": "fail+vision",
+      "usd": 0.72,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B)",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.6-27b"
+      ],
+      "trigger": "fail+vision",
+      "nes": 95.22,
+      "family": "fail+vision",
+      "usd": 0.83,
+      "escalated": 18,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash)",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.8-flash"
+      ],
+      "trigger": "fail+vision",
+      "nes": 95.83,
+      "family": "fail+vision",
+      "usd": 1.25,
+      "escalated": 18,
+      "failed": 0
+     }
+    ],
     "disagree": [
      {
       "label": "Qwen3-VL 8B 4-bit (Mac), checked against Apple Vision at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
@@ -5582,6 +5799,10 @@
       "auc": 0.664,
       "caught_at_20": 6
      },
+     "Vision: handwriting": {
+      "auc": 0.599,
+      "caught_at_20": 4
+     },
      "length against Apple Vision's": {
       "auc": 0.87,
       "caught_at_20": 9
@@ -5607,6 +5828,10 @@
      "said handwritten or mixed": {
       "auc": 0.628,
       "caught_at_20": 7
+     },
+     "Vision: handwriting": {
+      "auc": 0.512,
+      "caught_at_20": 3
      },
      "length against Apple Vision's": {
       "auc": 0.854,
@@ -5634,6 +5859,10 @@
       "auc": 0.637,
       "caught_at_20": 8
      },
+     "Vision: handwriting": {
+      "auc": 0.598,
+      "caught_at_20": 6
+     },
      "length against Apple Vision's": {
       "auc": 0.885,
       "caught_at_20": 14
@@ -5658,6 +5887,10 @@
     "signals": {
      "said handwritten or mixed": {
       "auc": 0.575,
+      "caught_at_20": 6
+     },
+     "Vision: handwriting": {
+      "auc": 0.55,
       "caught_at_20": 6
      },
      "length against Apple Vision's": {
@@ -5686,6 +5919,10 @@
       "auc": 0.675,
       "caught_at_20": 12
      },
+     "Vision: handwriting": {
+      "auc": 0.644,
+      "caught_at_20": 9
+     },
      "length against Apple Vision's": {
       "auc": 0.873,
       "caught_at_20": 16
@@ -5711,6 +5948,10 @@
      "said handwritten or mixed": {
       "auc": 0.656,
       "caught_at_20": 9
+     },
+     "Vision: handwriting": {
+      "auc": 0.556,
+      "caught_at_20": 6
      },
      "length against Apple Vision's": {
       "auc": 0.794,
@@ -5738,6 +5979,10 @@
       "auc": 0.672,
       "caught_at_20": 11
      },
+     "Vision: handwriting": {
+      "auc": 0.596,
+      "caught_at_20": 9
+     },
      "length against Apple Vision's": {
       "auc": 0.893,
       "caught_at_20": 15
@@ -5764,6 +6009,10 @@
       "auc": 0.703,
       "caught_at_20": 11
      },
+     "Vision: handwriting": {
+      "auc": 0.618,
+      "caught_at_20": 8
+     },
      "length against Apple Vision's": {
       "auc": 0.854,
       "caught_at_20": 14
@@ -5786,6 +6035,10 @@
      "typewritten": 10
     },
     "signals": {
+     "Vision: handwriting": {
+      "auc": 0.683,
+      "caught_at_20": 15
+     },
      "disagrees with Qwen3.6 35B-A3B": {
       "auc": 0.973,
       "caught_at_20": 19
@@ -5807,6 +6060,10 @@
      "said handwritten or mixed": {
       "auc": 0.651,
       "caught_at_20": 9
+     },
+     "Vision: handwriting": {
+      "auc": 0.617,
+      "caught_at_20": 8
      },
      "length against Apple Vision's": {
       "auc": 0.825,
@@ -5830,6 +6087,10 @@
      "typewritten": 9
     },
     "signals": {
+     "Vision: handwriting": {
+      "auc": 0.546,
+      "caught_at_20": 7
+     },
      "length against Apple Vision's": {
       "auc": 0.777,
       "caught_at_20": 14
@@ -5855,6 +6116,10 @@
      "said handwritten or mixed": {
       "auc": 0.704,
       "caught_at_20": 10
+     },
+     "Vision: handwriting": {
+      "auc": 0.599,
+      "caught_at_20": 6
      },
      "length against Apple Vision's": {
       "auc": 0.848,
@@ -5900,6 +6165,148 @@
   "bulk_failures": {
    "unparsed (length)": 13
   },
-  "vision_kind": null
+  "vision_kind": {
+   "panel": {
+    "photograph": {
+     "n": 57,
+     "truth": {
+      "handwritten": 2,
+      "mixed": 1,
+      "printed": 15,
+      "typewritten": 39
+     },
+     "tiers": {
+      "easy": 24,
+      "middle": 17,
+      "hard": 16
+     },
+     "mean_nes": 93.76,
+     "route_failures": 46
+    },
+    "handwriting": {
+     "n": 15,
+     "truth": {
+      "handwritten": 14,
+      "mixed": 1,
+      "printed": 0,
+      "typewritten": 0
+     },
+     "tiers": {
+      "easy": 0,
+      "middle": 5,
+      "hard": 10
+     },
+     "mean_nes": 90.13,
+     "route_failures": 8
+    },
+    "other": {
+     "n": 24,
+     "truth": {
+      "handwritten": 0,
+      "mixed": 0,
+      "printed": 13,
+      "typewritten": 11
+     },
+     "tiers": {
+      "easy": 8,
+      "middle": 10,
+      "hard": 6
+     },
+     "mean_nes": 93.75,
+     "route_failures": 7
+    }
+   },
+   "present": [
+    "photograph",
+    "handwriting",
+    "other"
+   ],
+   "truth_kinds": [
+    "handwritten",
+    "mixed",
+    "printed",
+    "typewritten"
+   ],
+   "hand": {
+    "truth": 16,
+    "called": 15,
+    "both": 14,
+    "called_kinds": {
+     "handwritten": 14,
+     "mixed": 1,
+     "printed": 0,
+     "typewritten": 0
+    }
+   },
+   "model_hand": {
+    "routes": 25,
+    "recall": [
+     7,
+     16
+    ],
+    "precision": [
+     0.9,
+     1.0
+    ]
+   },
+   "bulk": {
+    "pages": 2000,
+    "unread": 0,
+    "by_kind": {
+     "newspaper": {
+      "pages": 12,
+      "failed": 0,
+      "labels": {
+       "handwritten": 1,
+       "mixed": 0,
+       "printed": 9,
+       "typewritten": 2
+      },
+      "unlabelled": 0
+     },
+     "photograph": {
+      "pages": 1532,
+      "failed": 12,
+      "labels": {
+       "handwritten": 31,
+       "mixed": 141,
+       "printed": 366,
+       "typewritten": 994
+      },
+      "unlabelled": 0
+     },
+     "handwriting": {
+      "pages": 151,
+      "failed": 1,
+      "labels": {
+       "handwritten": 111,
+       "mixed": 9,
+       "printed": 8,
+       "typewritten": 23
+      },
+      "unlabelled": 0
+     },
+     "other": {
+      "pages": 305,
+      "failed": 0,
+      "labels": {
+       "handwritten": 1,
+       "mixed": 17,
+       "printed": 104,
+       "typewritten": 183
+      },
+      "unlabelled": 0
+     }
+    },
+    "labels": [
+     "handwritten",
+     "mixed",
+     "printed",
+     "typewritten"
+    ],
+    "hand_signal": 151,
+    "photo_signal": 1674
+   }
+  }
  }
 }
