@@ -866,6 +866,56 @@ item in total, and any item whose measured estimate passes it asks the owner fir
 - [ ] **`W41.seg-mac-model` — the trained segmenters on the Mac, through the app's local route [M · ~1 session]** (lane: segbench) (uses: machine) (blocked-on: W41.seg-finetune). Owner, 2026-10-15: the end product is a segmentation model that runs on an ordinary Mac, because the app is built for other researchers too and most will have no FarmShare or server. Fuse the LoRA, convert to 4-bit MLX, and measure on the Mac what a user would see: pages in the exact document on the development boxes, seconds a window, peak memory, download size (the 4B and the 2B). Write it so W41.app-local-models (the local model route chosen by memory size) can offer it, filed as its own app item; the weights ship under the base model's licence (Qwen is Apache 2.0). Into ArchiveOCRBench's segmentation part.
 - [ ] **`W41.app-institutional-compute` — generalise the FarmShare route to any institution's computing cluster [M · ~2 sessions · Tier-2]** (lane: processor,segbench) (uses: build). Owner, 2026-10-16: make the FarmShare setup usable by scholars at other institutions, as an "institutional computing" route. FarmShare is Stanford's cluster; most universities run a similar one (Slurm, GPU nodes), usually through a research computing office. **App.** The FarmShare import (`FarmShareImport.swift`, `OCRView+FarmShare.swift`, the `OCRResult.imported` path, about 15 source files) becomes an institutional-computing import: neutral names in the UI, types and settings, with the cluster's name taken from each page's `_meta` and shown in the PDF header (`<cluster> · <model> (<precision>, job N)`). Matching stays by image SHA-256. SPEC/tag-format.md's provider label changes with it, so this is Tier-2. No migration: nothing has been produced. **Kit.** `scripts/segbench/farmshare/` becomes a cluster-neutral kit with FarmShare as its first profile: one profile file per cluster for the scheduler settings (partition, QOS, account, wall-time limit), the GPU type and memory per card, the modules or CUDA set-up, and the scratch and storage paths. Presets are chosen by GPU memory (24, 48 and 80 GB cards), not by FarmShare's L40S. The README tells a scholar elsewhere what to ask their research computing office for, how to make a profile, and how to run the truth check before a bulk run. Slurm only: say so and name what another scheduler (PBS, LSF) would need, without building it. **Hosted endpoints.** Some institutions serve open models behind an OpenAI-compatible endpoint. Check whether the app's existing gateway route already reaches one, and document it beside the kit, building nothing new if it does. **Out of scope:** the FarmShare runs the owner does himself, and Stanford-specific terms (settled). Tests: the import's existing scratch-folder tests under the new names plus a second, non-FarmShare profile in the kit's dry-run (`submit.sh --dry-run`).
 
+## Reader ↔ Processor — flag poor OCR and read it again with a better reader (owner, 2026-10-16)
+
+The owner wants a reader of the archive to be able to say "this file's transcription is not good enough" and get it
+read again by a better model, picked from a ranked list. The ranking depends on the kind of document, and it changes if
+the user corrects the kind, for example from typewritten to handwritten. He called it an important integration between
+the two apps, outlined the features, and left the design to us.
+
+**What exists (checked 2026-10-16).**
+- **No link between the apps.** The Reader and the Processor share only the files, with their Finder tags and PDF
+  headers. Reader has a URL scheme (`archivereader://`, used by Notes' citations). Processor has none.
+- **No OCR quality in the Reader.** Its "Quality" is your Q1-Q3 importance rating, not OCR quality. The only
+  OCR-related tag is the Subject `OCR Failed`.
+- **Ranked readers already exist in the Processor.** The page-kind classifier (`OCR/PageKindClassifier.swift`: handwritten,
+  typewritten, printed, forms) and the ranked picks per kind (`OCR/OCRPageGuidance.swift`, reading
+  `segbench-results/ocr-page-guidance.json`, best first by NES) supply the ranked list.
+- **The page kind is not stored.** It is kept only in run history (`PageReaderRecord`), not in the PDF or the tags.
+- **Re-OCR mode would read the wrong page.** The Processor's "Re-OCR multi-page PDF" mode reads every page of a PDF, so
+  on a processed two-page file (image plus text) it would also read the text page.
+
+**The design (decided here, per the owner's "do it however seems best").**
+- **The dialog lives in the Processor.** The Processor holds the API keys, the model catalogue, the ranked guidance,
+  prices and the OCR engine. The Reader gets the easy way in: flag a file, and "Improve OCR…", which opens the Processor
+  at that dialog with the files selected.
+- **A flag the user sets** is stored with the file, so it survives without either app open. It can be set in a moment
+  while reading, filtered on in the Reader, and dealt with in a batch later.
+
+Four items, in order. Each later one waits on the one before.
+
+- [ ] **`W44.reocr-plan` — design the flag, the hand-off and the rewrite of a file's text page [S · ~1 session]** (lane: suite) (uses: light). Owner, 2026-10-16. Write `execution-plans/reocr/00-plan.md` and index it above. Settle each of these with the reason:
+  - **The flag.** A new Finder tag (proposed `OCR Poor`, a Subject like `OCR Failed`) in SPEC/tag-format.md, set by a person and never by a model, and cleared when a re-read is accepted.
+  - **The page kind.** Record it in the page-2 header, as a `Kind:` line beside `Classification:`, so a user's correction persists and the Reader can show it. Give its values and how the shared `PDFHeaderParser` reads it. Add a provider/model parse to `PDFHeaderParser`, so either app can say which reader made the current text.
+  - **The hand-off.** A Processor URL scheme (`archiveprocessor://improve-ocr?…`) for one or a few files. For a larger selection, a hand-off file in a shared app-group or Application Support location. Say which, and how a sandbox or TCC limit affects it. The Processor must already be installed; say what the Reader shows if it is not.
+  - **The rewrite.** Replace only the text page and keep everything else: the image page byte for byte, the file's path (Notes' `archivereader://` citations and the Reader's durable links depend on it), its Finder tags and dates. Keep the previous version recoverable (a sibling backup, or the app's own versions folder with an undo) until the user accepts the new text. Use the same write path as the tag writer's atomic, crash-safe replace. This is a write to the user's files and is Tier-2 throughout; tests run on scratch copies only, never the real corpus.
+  - **Which pages are read.** For a processed two-page PDF, only the image page is read, not the old text page. Name how a multi-page original is handled.
+  - **The record.** Keep each flag and re-read (old reader, new reader, kind before and after, the user's verdict) as a local record. These are pages a person judged bad, and a later bench can use them as a difficulty signal.
+
+  End with an owner gate only if a choice is genuinely his, for example in-place replacement against writing a new file. Otherwise the plan decides.
+- [ ] **`W44.reocr-spec` — the flag, the Kind line and the header parse in SPEC and ArchiveCore [S-M · ~1 session · Tier-2]** (lane: suite) (uses: build) (blocked-on: W44.reocr-plan). Change SPEC/tag-format.md and `packages/ArchiveCore` as the plan says, so both apps read and write the same thing: the `OCR Poor` tag, the header's `Kind:` line, and provider/model parsing. The Processor writes `Kind:` on every new text page from the classifier, or from the user's choice. No migration: nothing has been produced. Tests in ArchiveCore and both apps' tag and header round trips.
+- [ ] **`W44.reocr-processor` — "Improve OCR" in the Processor: the ranked choice and the rewrite [M-L · ~2-3 sessions · Tier-2]** (lane: processor) (uses: build) (blocked-on: W44.reocr-spec). Build it as the plan says.
+  - **The dialog** opens from the URL scheme or hand-off, from the Files tab, and from a "files flagged OCR Poor" picker over a chosen folder. It shows each file: its current reader (from the header), its kind (from the header, else the classifier on the image page), and a kind picker the user can change.
+  - **The ranked list** comes from `OCRPageGuidance` for the chosen kind and re-ranks when the kind changes. Each row shows the model's NES for that kind, its price per 1,000 pages and the estimated cost for these pages. It also says whether the model is ready (keyed, a local model on this Mac, an institutional computing run). The current reader is marked as such, and models the app cannot offer are left out. Mixed selections are grouped by kind.
+  - **The result.** Read the image pages, rewrite the text pages as specified, and show the old and new text side by side to accept or roll back. Accepting clears the flag and records the re-read.
+  - **Tests.** Scratch PDFs only. Cover a two-page file keeping its image page and tags byte for byte, a crash mid-rewrite leaving the old file intact, and a kind change re-ranking the list. Then the adversarial review.
+- [ ] **`W44.reocr-reader` — flag poor OCR in the Reader and hand it to the Processor [M · ~1-2 sessions · Tier-2]** (lane: reader) (uses: build,vm) (blocked-on: W44.reocr-processor). Put it in the row menu, the document window and the menu bar with a keyboard shortcut, for one or many selected files:
+  - **Flag as poor OCR, and unflag.** This writes the tag through the shared tag writer, under the Reader's file-safety Core Directive.
+  - **A filter for flagged files.**
+  - **The page kind,** shown where the provider is shown.
+  - **"Improve OCR…",** which hands the selection to the Processor's dialog. When the Processor rewrites a file, the Reader picks up the new text through its existing re-scan, with the document window refreshed if it is open.
+  - **Tests.** VM UI tests for flag, filter and hand-off, on the fixture only.
+
 ## Archive Processor — a broader benchmark corpus and the pre-release model sweep (owner, 2026-10-16)
 
 The owner asked for two things. The first is a model sweep and more benchmarking near the end of the queue, so
