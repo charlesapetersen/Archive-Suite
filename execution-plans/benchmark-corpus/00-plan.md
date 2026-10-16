@@ -107,6 +107,16 @@ and corpus-build will change the material. Corpus-build judges that again when i
    transcribed public strata as a contamination check. The figures to decide on are how many pages, which kinds
    and scripts, and the owner's adjudication time. If yes, corpus-build first prices that time on a small sample.
 
+**Owner decision, 2026-10-16 walkthrough (`W43.corpus-plan-owner-ok` ticked).** (1) The strata and sources as
+proposed: the frozen 96 plus the fifteen public strata. (2) Size A, 960 new pages, about $5.10 for corpus-build; the
+owner's yes is corpus-build's cap. (3) Scores only: no third-party page images on the published ArchiveOCRBench,
+whatever the licence. (4) Do not ask socOCRbench's author for now. (5) No clean strata. The owner can adjudicate
+only English, so he declined untranscribed pages; for other languages the existing transcribed sets are relied on.
+S0 stays the one unpublished reference, and the public strata are reported as possibly contaminated, as above.
+Segmentation, asked after the decision: the owner suggested public digital collections already split into one file
+per document (a letter, a memo) as segmentation truth. `W43.seg-corpus-plan` researches it; it is not part of this
+decision.
+
 ---
 
 ## Part 2 — detail
