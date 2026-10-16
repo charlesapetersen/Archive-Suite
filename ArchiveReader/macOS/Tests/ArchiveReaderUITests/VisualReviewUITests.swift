@@ -130,7 +130,9 @@ final class VisualReviewUITests: FixtureUITestCase {
         popover(trigger: "ar.filter.dates", proof: app.textFields["ar.filter.dateFrom"], name: "dates-popover")
         popover(trigger: "ar.status.health", proof: app.staticTexts["Library health"], name: "health-popover")
 
-        let saved = toolbarButton("ar.toolbar.saved")
+        // A SwiftUI `Menu` in the toolbar is a menu button, not a button, so `toolbarButton` cannot see it.
+        let saved = app.windows["Archive Reader"].descendants(matching: .any)
+            .matching(identifier: "ar.toolbar.saved").firstMatch
         if saved.waitForExistence(timeout: 3) {
             saved.click()
             if app.menuItems.firstMatch.waitForExistence(timeout: 3) { shoot("saved-menu", menu: true) }
@@ -240,8 +242,14 @@ final class VisualReviewUITests: FixtureUITestCase {
         openDocument(row: 0, name: "document")
         if app.windows.count >= 2 {
             app.typeKey("f", modifierFlags: .command)
-            if app.textFields["ar.doc.findField"].waitForExistence(timeout: 3) {
-                app.textFields["ar.doc.findField"].typeText("California")
+            let find = app.textFields["ar.doc.findField"]
+            if find.waitForExistence(timeout: 3) {
+                pause(0.5)
+                // ⌘F should leave the caret in the field; record whether it did, then click so the tour goes on.
+                let focused = (find.value(forKey: "hasKeyboardFocus") as? Bool) ?? false
+                print("[visual] \(prefix) find field focused after ⌘F: \(focused)")
+                if !focused { find.click() }
+                find.typeText("California\r")   // Return runs the find (onSubmit)
                 pause(1)
                 shoot("document-find")
             } else { missing.append("document find bar") }
@@ -315,14 +323,19 @@ final class VisualReviewUITests: FixtureUITestCase {
         popover(trigger: "ar.status.health", proof: app.staticTexts["Library health"], name: "health-popover")
 
         // The many-chip file sorts first by name ("0000 …").
-        app.menuBars.element(boundBy: 0).menuBarItems["Sort & Filter"].click()
-        if app.menuItems["Sort by File Name"].waitForExistence(timeout: 2) { app.menuItems["Sort by File Name"].click() }
-        else { escape() }
-        pause(1)
+        if menu("Sort & Filter", "Sort by File Name") { pause(1) }
+        // Back to the top: the swipe above scrolled row 0 off screen, and `clickRow` then falls back to a
+        // coordinate tap above the window — which lands in the menu bar and leaves a menu open.
+        for _ in 0..<4 { table.swipeDown() }
+        pause(0.5)
+        // By name, "0000 … Many subjects" is row 0 and "00001 … Memorandum …" (a long name) row 1. Ask only
+        // those rows: `rowIndex` walks every row, a second each with 301 of them.
+        if !rowContains(0, "Many subjects") { missing.append("many-subjects row first by name") }
         clickRow(0)
         shoot("selected-manychips")
         tagEditor(name: "tag-editor-manychips")
-        preview(row: 0, name: "preview-longname")
+        if rowContains(1, "Memorandum") { preview(row: 1, name: "preview-longname") }
+        else { missing.append("long-name row second by name") }
         resizeMainWindow(to: WindowSize.min.main)
         shoot("main-min")
         reportMissing()
@@ -394,10 +407,10 @@ final class VisualReviewUITests: FixtureUITestCase {
                 shoot("\(name)-\(size.rawValue)")
             }
         }
-        // Held revalidation: the "Finding tagged documents…" / scanning state on the fixture.
+        // Held revalidation on the fixture: the warm-start list from the content index while the scan is held.
         relaunch(root: Self.fixturePath, dark: dark, size: .typical, waitForRows: false,
                  extra: ["-ARUITestScanHoldSeconds", "8"])
-        shootOnce("scanning", menu: false)
+        shootOnce("revalidating", menu: false)
         reportMissing()
     }
 
@@ -412,7 +425,8 @@ final class VisualReviewUITests: FixtureUITestCase {
         if root == Self.canonicalFixturePath {
             args += ["-ARUITestContentIndexPath", Self.canonicalFixturePath + "/content-index-v2.sqlite3"]
         }
-        if dark { args += ["-AppleInterfaceStyle", "Dark"] }
+        // The app's DEBUG appearance seam (W40.e9); `-AppleInterfaceStyle Dark` leaves a modern AppKit app light.
+        args += dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments
         app.launchArguments = UITestLaunch.arguments(args + extra)
         app.launch()
         app.activate()
@@ -518,6 +532,11 @@ final class VisualReviewUITests: FixtureUITestCase {
             pause(1.5)
         }
         return done()
+    }
+
+    private func rowContains(_ index: Int, _ text: String) -> Bool {
+        table.tableRows.element(boundBy: index).staticTexts
+            .matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", text, text)).count > 0
     }
 
     private func rowIndex(containing text: String) -> Int? {
