@@ -120,6 +120,10 @@ final class EditorTextView: NSTextView {
 
     override func accessibilityChildren() -> [Any]? {
         var children = super.accessibilityChildren() ?? []
+        // Xcode's contrast audit never finishes while these two 1×1 probes are in the tree, and every audit
+        // after it in that launch then times out too (W40.e3, measured in the VM 2026-10-16: a 15 s timeout
+        // with them, 1.2 s without). The accessibility audit has no use for them, so it launches without them.
+        if UserDefaults.standard.bool(forKey: "ANUITestNoEditorProbes") { return children }
         children.append(passageChipStateProbe)
         children.append(chipGeometryProbe)
         return children

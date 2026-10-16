@@ -48,13 +48,15 @@ final class AccessibilityAuditUITests: XCTestCase {
             print("PROCESSOR_UI_NO_WINDOW")   // the gate's VM/keychain-launch marker (see ProcessorUITests)
             XCTFail("the Process Files window should appear within 10 seconds"); return
         }
+        let sweep = AccessibilityAudit(app, appearance: appearance, in: self)
         LayoutGuard.waitUntilSettled(main)
-        AccessibilityAudit.audit(app, screen: "process files, \(appearance)", in: self)
+        sweep.audit(main, screen: "process files")
 
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
         LayoutGuard.waitUntilSettled(settings)
-        AccessibilityAudit.audit(app, screen: "settings, \(appearance)", in: self)
+        sweep.audit(settings, screen: "settings")
+        sweep.finish()
     }
 }

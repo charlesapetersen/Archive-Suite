@@ -8,7 +8,10 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
 
     private var dark = false
     override var extraLaunchArguments: [String] {
-        dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments
+        // Without the editor's two 1×1 test probes: with them Xcode's contrast audit never finishes
+        // (`EditorTextView.accessibilityChildren`).
+        ["-ANUITestNoEditorProbes", "YES"]
+            + (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments)
     }
 
     func testMainScreensPassAuditInLightMode() throws {
@@ -22,9 +25,10 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
 
     private func auditMainScreens(appearance: String) {
         continueAfterFailure = true   // an issue on one screen must not hide the next screen's
+        let sweep = AccessibilityAudit(app, appearance: appearance, in: self, exempt: [harness])
         open(Self.idPlain, in: mainWindow)
         LayoutGuard.waitUntilSettled(mainWindow)
-        AccessibilityAudit.audit(app, screen: "note window, \(appearance)", in: self, exempt: [harness])
+        sweep.audit(mainWindow, screen: "note window")
 
         let windowMenu = app.menuBars.menuBarItems["Window"]
         XCTAssertTrue(windowMenu.waitForExistence(timeout: 10), "the Window menu should exist")
@@ -36,7 +40,7 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
         XCTAssertTrue(extracts.waitForExistence(timeout: 15), "the Extracts window should be open")
         open(Self.idExtract, in: extracts)
         LayoutGuard.waitUntilSettled(extracts)
-        AccessibilityAudit.audit(app, screen: "extracts window, \(appearance)", in: self, exempt: [harness])
+        sweep.audit(extracts, screen: "extracts window")
         extracts.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(extracts.waitForNonExistence(timeout: 5), "the Extracts window should close")
 
@@ -45,11 +49,12 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
                                                         "Archive Notes", "Extracts")).firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
         LayoutGuard.waitUntilSettled(settings)
-        AccessibilityAudit.audit(app, screen: "settings, \(appearance)", in: self, exempt: [harness])
+        sweep.audit(settings, screen: "settings")
+        sweep.finish()
     }
 
-    /// UI-test-only harness elements (`ArchiveNotesApp` adds them only under the UITest launch arguments): the
-    /// 1-line status probes drawn behind the panes, and the editor's test-button strip. Not the product.
+    /// UI-test-only harness elements (added only under the UITest launch arguments): the 1-line status probes
+    /// drawn behind the panes, and the editor's test-button strip. Not the product.
     private let harness = AccessibilityAudit.Exemption(reason: "UI-test harness element, not shipped") {
         $0.identifier.hasPrefix("an.status.") || $0.identifier.hasPrefix("an.editor.test.")
     }
