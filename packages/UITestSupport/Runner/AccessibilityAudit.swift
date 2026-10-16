@@ -23,6 +23,8 @@
 // pixel farthest from it in luminance is the text). Measured at or above WCAG AA — 4.5:1, or 3:1 for text 24 pt
 // tall or more — it is printed as not reproduced and does not fail; below, it stays a finding, with its ratio.
 // Anti-aliasing can only pull the text pixel towards the background, so the measure errs towards failing.
+// Under 1.1:1 nothing is drawn under the frame at all — text a sheet covers (the Reader's "Tags in view" behind
+// its preview sheet measured 1.01:1) — so it is counted as covered, not failed.
 //
 // ONE REPORT PER ISSUE. A sweep reports each distinct issue (audit type, element type, identifier, label, size)
 // once, on the first screen it shows up on, so a sheet over the window does not repeat the window's findings.
@@ -90,14 +92,15 @@ final class AccessibilityAudit {
 
     /// Exemptions every suite shares. Each one added here must name what it was seen on, and why.
     static let shared: [Exemption] = [
-        // Seen 2026-10-16 on the main window of the Reader and the Processor: the 14×14 group AppKit wraps
+        // Seen 2026-10-16 on the main window of all three apps: the 14×14 group AppKit wraps
         // around the close, minimise and zoom buttons. AppKit draws it; the app has no handle on it.
         Exemption(reason: "AppKit's title-bar button group") {
             $0.audit == .parentChild && $0.type == .group && $0.identifier.isEmpty
                 && Int($0.frame.width) == 14 && Int($0.frame.height) == 14
         },
-        // Seen 2026-10-16 on every SwiftUI `Picker` in the Processor and the Reader — ten of them, including
-        // plain ones with nothing custom about them — and on the Reader's toolbar `Menu`: "Action is missing".
+        // Seen 2026-10-16 on every SwiftUI `Picker` in the three apps — eleven of them, plain ones with nothing
+        // custom about them included — and on three `Menu`s (the Reader's Saved Searches, Notes' New and heading
+        // menus): "Action is missing".
         // SwiftUI builds these pop-ups itself and exposes no seam to add an accessibility action to them.
         Exemption(reason: "SwiftUI Picker/Menu pop-up; SwiftUI owns its actions") {
             $0.audit == .action && ($0.type == .popUpButton || $0.type == .menuButton)
@@ -182,7 +185,7 @@ final class AccessibilityAudit {
         let screenshot = XCUIScreen.main.screenshot()
         let pixels = ScreenPixels(screenshot)
 
-        var outside = 0, repeated = 0, offWindow = 0, notReproduced = 0
+        var outside = 0, repeated = 0, offWindow = 0, notReproduced = 0, covered = 0
         var unexpected: [AuditFinding] = []
         var knownHere: [String: [AuditFinding]] = [:]
         for var f in found {
@@ -198,6 +201,11 @@ final class AccessibilityAudit {
             guard reported.insert(f.key).inserted else { repeated += 1; continue }
             if f.audit == .contrast, f.type != nil, let ratio = pixels?.contrast(under: f.frame) {
                 f.measured = ratio
+                if ratio < 1.1 {
+                    covered += 1
+                    print("[a11y-audit] \(screen): contrast not measurable, nothing drawn under the frame \(f)")
+                    continue
+                }
                 if ratio >= (f.frame.height >= 24 ? 3 : 4.5) {
                     notReproduced += 1
                     print("[a11y-audit] \(screen): contrast not reproduced from the screenshot \(f)")
@@ -215,11 +223,12 @@ final class AccessibilityAudit {
                 print("[a11y-audit] \(screen): ISSUE \(f)\n    \(f.detailed)")
             }
         }
-        let new = found.count - outside - repeated - offWindow - notReproduced
+        let new = found.count - outside - repeated - offWindow - notReproduced - covered
         print("[a11y-audit] \(screen): \(new) new issue(s), \(unexpected.count) unexpected"
               + knownHere.keys.sorted().map { ", \(knownHere[$0]!.count) from \($0)" }.joined()
               + " (\(repeated) seen on an earlier screen, \(outside) outside this window, "
-              + "\(offWindow) contrast off the visible window, \(notReproduced) contrast not reproduced)")
+              + "\(offWindow) contrast off the visible window, \(notReproduced) contrast not reproduced, "
+              + "\(covered) contrast covered)")
 
         if new > 0 || notReproduced > 0 {
             let shot = XCTAttachment(screenshot: screenshot)

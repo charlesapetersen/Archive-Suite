@@ -11590,3 +11590,15 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Owner, 2026-10-16: find collections digitised below the folder, one file per document, as page streams with known boundaries; report a short list that passes, or none.
   Result: `execution-plans/benchmark-corpus/00-plan.md` Part 3. No modern office folder digitised whole at document level with a permissive licence and no gaps was found. Passes, each with a caveat: CIA CREST (real box/folder/document order on typed records, but gaps), the LoC Jefferson and Lincoln Papers (whole series item by item, enclosures separate, but date order and 18th-19th c.), TNA CAB 129 (complete and OGL, but printed papers, too easy). Two box-sized test sets are possible (CREST + Lincoln); filed `W43.seg-corpus-build` gated on `W43.seg-corpus-build-owner-ok`, cap $3. $0 spent; nothing downloaded; loc.gov HTML, NARA catalogue and cia.gov pages refused, so some verdicts are inferred.
   <!-- /W43.seg-corpus-plan -->
+- [x] **W40.e3 — accessibility audit of every main screen [S-M]** · §W40 verification phase · SHIPPED 2026-10-16 (this commit; checkpoints cff687db, c0198030)
+  `packages/UITestSupport/Runner/AccessibilityAudit.swift` runs Xcode's `performAccessibilityAudit(for: .all)` per
+  window in light and dark (`<App>UITests/AccessibilityAuditUITests`: Reader navigation window, preview sheet,
+  viewer, Settings; Notes note window, Extracts window, Settings; Processor Process Files, Settings). It keeps only
+  the audited window's own issues, reports each once per sweep, measures every contrast issue from the screenshot
+  (Xcode's verdicts failed text measuring 7–21:1) and fails only below WCAG AA, and carries filed findings as strict
+  `KnownIssue`s. Notes could not be audited at first: its contrast audit never finishes while `EditorTextView`'s two
+  1×1 DEBUG probes are in the tree (bisected in the VM), so the audit launches with `-ANUITestNoEditorProbes`.
+  Final VM run: 6 tests, 0 failures. Filed: `W40.fix-reader-a11y-labels` (S3), `W40.fix-reader-a11y-contrast` (S4),
+  `W40.fix-notes-a11y-labels` (S3), `W40.fix-notes-a11y-contrast` (S4), `W40.fix-processor-a11y-labels` (S3),
+  `W40.fix-processor-a11y-contrast` (S3, text at 1.9–2.3:1). Evidence `verification/evidence/core/W40.e3-accessibility-audit.md`.
+  <!-- /W40.e3 -->

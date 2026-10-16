@@ -3,7 +3,8 @@ import XCTest
 /// W40.e3 — Xcode's accessibility audit (`packages/UITestSupport/Runner/AccessibilityAudit.swift`) over the
 /// Processor's main screens: the default Process Files window and the Settings window. One test per appearance,
 /// because contrast differs and the appearance is a launch argument. Scratch IN/OUT only, as in
-/// `ProcessorUITests`; nothing here processes a file.
+/// `ProcessorUITests`; nothing here processes a file. Findings and their triage:
+/// `verification/evidence/core/W40.e3-accessibility-audit.md`.
 @MainActor
 final class AccessibilityAuditUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -48,7 +49,7 @@ final class AccessibilityAuditUITests: XCTestCase {
             print("PROCESSOR_UI_NO_WINDOW")   // the gate's VM/keychain-launch marker (see ProcessorUITests)
             XCTFail("the Process Files window should appear within 10 seconds"); return
         }
-        let sweep = AccessibilityAudit(app, appearance: appearance, in: self)
+        let sweep = AccessibilityAudit(app, appearance: appearance, in: self, known: Self.known)
         LayoutGuard.waitUntilSettled(main)
         sweep.audit(main, screen: "process files")
 
@@ -59,4 +60,28 @@ final class AccessibilityAuditUITests: XCTestCase {
         sweep.audit(settings, screen: "settings")
         sweep.finish()
     }
+
+    // Filed 2026-10-16 from the first VM runs; each fix's session deletes its entry (the audit fails once it
+    // stops reproducing).
+    static let known: [AccessibilityAudit.KnownIssue] = [
+        AccessibilityAudit.KnownIssue(tag: "W40.fix-processor-a11y-labels") { f in
+            switch f.audit {
+            case .sufficientElementDescription:
+                return f.identifier == "questionmark.circle"                     // the (?) help buttons
+                    || f.identifier == "ap.ocr.dropZone" && f.type == .image      // the drop zone's picture
+                    || f.type == .textField && f.identifier.isEmpty              // Settings' Google client ID,
+                        && f.compact.contains("not human-readable")             // named by its value
+            case .elementDetection:
+                return f.identifier == "ap.ocr.dropZone" && f.type == .image
+            default:
+                return false
+            }
+        },
+        // Measured 1.87–2.26:1 for the explanation lines and the drop zone's hint, 3.95:1 for its title.
+        AccessibilityAudit.KnownIssue(tag: "W40.fix-processor-a11y-contrast") { f in
+            guard f.audit == .contrast, f.type == .staticText else { return false }
+            return ["ap.ocr.reOCRExplanation", "ap.ocr.dropZone"].contains(f.identifier)
+                || f.label.hasPrefix("Sign in with the same Google account")
+        },
+    ]
 }

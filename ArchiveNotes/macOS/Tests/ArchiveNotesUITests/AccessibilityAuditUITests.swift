@@ -3,7 +3,8 @@ import XCTest
 /// W40.e3 — Xcode's accessibility audit (`packages/UITestSupport/Runner/AccessibilityAudit.swift`) over Notes'
 /// main screens: the note window with a note open in the editor and inspector, the Extracts window with an extract
 /// open, and Settings. One test per appearance, because contrast differs and the appearance is a launch argument.
-/// Read-only: nothing here edits the fixture.
+/// Read-only: nothing here edits the fixture. Findings and their triage:
+/// `verification/evidence/core/W40.e3-accessibility-audit.md`.
 final class AccessibilityAuditUITests: NotesFixtureUITestCase {
 
     private var dark = false
@@ -25,7 +26,7 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
 
     private func auditMainScreens(appearance: String) {
         continueAfterFailure = true   // an issue on one screen must not hide the next screen's
-        let sweep = AccessibilityAudit(app, appearance: appearance, in: self, exempt: [harness])
+        let sweep = AccessibilityAudit(app, appearance: appearance, in: self, known: Self.known, exempt: [harness])
         open(Self.idPlain, in: mainWindow)
         LayoutGuard.waitUntilSettled(mainWindow)
         sweep.audit(mainWindow, screen: "note window")
@@ -64,4 +65,28 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 15), "the seeded row \(id) should be listed")
         title.click()
     }
+
+    // Filed 2026-10-16 from the first VM runs; each fix's session deletes its entry (the audit fails once it
+    // stops reproducing).
+    @MainActor static let known: [AccessibilityAudit.KnownIssue] = [
+        AccessibilityAudit.KnownIssue(tag: "W40.fix-notes-a11y-labels") { f in
+            switch f.audit {
+            case .sufficientElementDescription:
+                return f.identifier.hasPrefix("an.divider.")              // the two pane dividers
+                    || ["an.filter.search", "an.filter.tagInput", "an.filter.dateFrom", "an.filter.dateTo",
+                        "an.list.table", "an.detail.authors", "an.detail.date.year"].contains(f.identifier)
+                    || (f.identifier.hasPrefix("an.cell.instances.") && f.label.isEmpty)   // a row with none
+                    || (f.identifier == "an.detail.header" && f.type == .image)          // the extract's quote mark
+            default:
+                return false
+            }
+        },
+        // Measured failures are all light-mode secondary text: 3.95–4.21:1, and the date range's "–" 3.23:1.
+        AccessibilityAudit.KnownIssue(tag: "W40.fix-notes-a11y-contrast", appearances: ["light"]) { f in
+            guard f.audit == .contrast, f.type == .staticText else { return false }
+            return ["an.sidebar.", "an.filter.count", "an.cell.instances.", "an.detail."]
+                .contains { f.identifier.hasPrefix($0) }
+                || f.label == "–" || f.label.hasSuffix(" note") || f.label.hasSuffix(" notes")
+        },
+    ]
 }

@@ -213,7 +213,8 @@ where it can.
   `tart_crash_mark`/`tart_crash_harvest` in both VM entry points; `ops/verify/leaks-harvest.sh`. Evidence
   `verification/evidence/core/W40.e2-crash-leak-harvest.md`; 18 Notes test leaks found and fixed, 0 of ours left.)*
 - **`W40.e3` — accessibility audit [S-M].** `performAccessibilityAudit` on each main screen in each UI suite;
-  findings are `S2`–`S4`.
+  findings are `S2`–`S4`. *(SHIPPED 2026-10-16: `AccessibilityAuditUITests` in all three UI suites, evidence
+  `verification/evidence/core/W40.e3-accessibility-audit.md`; six `W40.fix-*-a11y-*` items filed, labels and contrast.)*
 - **`W40.e4` — never-executed code [M].** `xccov` over unit, UI and journey runs. List functions no run reached;
   each goes to its ledger as a question (dead, unreachable, or untested).
 - **`W40.e5` — dead-code scan [S-M].** Periphery per app. Each hit is deleted (library code with no promise), or
