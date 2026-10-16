@@ -19,8 +19,8 @@ import Darwin   // getpwuid / getuid — the rehearsal store lives in the REAL h
 ///     VISUAL_REVIEW=1 ONLY_TESTING=ArchiveNotesUITests/VisualReviewUITests ops/gui/vm-gui-runner.sh notes xcuitest
 ///
 /// **What it writes.** Two extra notes into the scratch fixture (a note with 30 file chips and one with a long
-/// title), which the next test's pristine restore removes; an empty store and a junk index in the runner's own
-/// temporary directory, removed afterwards. Every sheet and alert is dismissed with Cancel or Escape, so no
+/// title), which the next test's pristine restore removes; an empty store in the runner's own temporary directory
+/// (removed afterwards) and a junk index inside the fixture. Every sheet and alert is dismissed with Cancel or Escape, so no
 /// folder, template or note is created, renamed or deleted.
 ///
 /// Shots are cropped to the app's windows and popovers (plus a margin; menus and the open panel keep the whole
@@ -424,19 +424,19 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         try FileManager.default.createDirectory(at: empty.appendingPathComponent("items"), withIntermediateDirectories: true)
         let marker = #"{"guid":"\#(UUID().uuidString.lowercased())","name":"AN-Visual-Empty","kind":"notes","createdAt":"2026-10-16T00:00:00Z"}"#
         try Data(marker.utf8).write(to: empty.appendingPathComponent(".archive-suite-root.json"))
-        let junk = base.appendingPathComponent("AN-Visual-JunkIndex-\(UUID().uuidString).sqlite3")
-        try Data(repeating: 0x5A, count: 1024).write(to: junk)
-        addTeardownBlock {
-            try? FileManager.default.removeItem(at: empty)
-            try? FileManager.default.removeItem(at: junk)
-        }
+        addTeardownBlock { try? FileManager.default.removeItem(at: empty) }
         for size in WindowSize.allCases {
             relaunch(store: empty.path, dark: dark, readyRow: nil)
             resizeMainWindow(to: size.main)
             pause(2)
             shoot("empty-library-\(size.rawValue)")
         }
-        // The search-index failure banner over the fixture (the corrupt-index test's junk file, made here).
+        // The search-index failure banner over the fixture. The app honours `-ANUITestIndexPath` only at the
+        // generated fixture's own `notes-index-v1.sqlite3` (NotesModel.indexDatabaseURL), so the corrupt-index
+        // test's 1 KiB junk goes there; the next test's pristine restore removes it.
+        try requireCanonicalScratchFixtureForIndexTests()
+        let junk = URL(fileURLWithPath: Self.canonicalFixturePath).appendingPathComponent("notes-index-v1.sqlite3")
+        try Data(repeating: 0x5A, count: 1024).write(to: junk)
         relaunch(store: Self.fixturePath, dark: dark, readyRow: nil, extra: ["-ANUITestIndexPath", junk.path])
         resizeMainWindow(to: WindowSize.typical.main)
         pause(3)

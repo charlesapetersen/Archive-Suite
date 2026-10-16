@@ -11518,3 +11518,23 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 - [x] **W41.app-seg-default — preselect "Gemini only" when a Gemini key is set [XS · <1 session]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (lane: processor) (uses: build). From W41.report §3. `SegmentationApproach.defaultApproach` is `.manual`. Gemini 3.8 Flash only was the best measured approach (88.8% unchecked, 24 checks per 100 pages, 100% after checking, 0 unflagged errors on the locked boxes, $3.61 per 1,000 pages; `options.md`). With a Gemini key and no saved choice, preselect it; without one, manual stays. A saved choice is never overridden.
   SHIPPED 2026-10-16: `SegmentationApproach.preferredDefault`/`preselect` save `gemini` when no approach is saved and a Gemini key is set; `SegmentationRoutes.currentPreselecting()` runs it wherever Settings, Process Files and the chooser's key wizard read the keys (never from a view body; the run-time refusal fallback keeps the side-effect-free `current()`). Without a Gemini key nothing is saved, so manual stays; a saved choice, manual or an unknown value included, is never overridden. Self-test: `SegmentationChooserTestDriver` §6 on a scratch defaults domain (`scripts/test-segmentation-chooser.sh`). $0.
   <!-- /W41.app-seg-default -->
+- [x] **W40.e11 — Notes screen-by-screen visual review in the VM [S-M]** · §W40 — verification phase · SHIPPED 2026-10-16
+  (lane: notes) (uses: vm). Owner-requested 2026-10-11. `VisualReviewUITests` in `ArchiveNotesUITests` (opt-in:
+  `VISUAL_REVIEW=1 ONLY_TESTING=ArchiveNotesUITests/VisualReviewUITests ops/gui/vm-gui-runner.sh notes xcuitest`;
+  for Notes the runner writes the flag inside the fixture and its pristine copy, because the UI-test runner is
+  sandboxed to the fixture, and builds the W40.c1 rehearsal store in the guest) tours every Notes window, pane
+  state, sheet, alert, popover, menu and empty state in light and dark, at minimum and typical size, on open and
+  when idle: on the fixture plus a seeded 30-chip note and a 200-character title, on the 400-item rehearsal store,
+  on an empty store and with a junk index. 312 shots, 6 tests green in the VM (run 3, 2,327 s), plus run 4 for the
+  empty states after the junk index was moved to where the app reads it. Every shot was looked at; verdicts and
+  reproductions in `verification/evidence/notes/visual-2026-10-16.md` (full sets in the primary checkout's
+  gitignored `old/W40.e11-visual-2026-10-16/`). Filed: `W40.fix-notes-stale-body-on-switch` (S2, Tier-2: a large
+  note's header over the previous note's live body), `-list-overrun`, `-chip-inline-layout`,
+  `-preview-popover-text`, `-editor-squeezed` (S3, all five blocking `W40.g2`), `-index-failure-empty` (S3) and
+  `-visual-polish` (S4); `W40.fix-notes-chips-overdrawn` reproduced in the VM (on open, gone by idle) and its
+  entry points at the shots. Lessons: Notes row ids are `uuidString`, upper-case; identifier lookups need
+  `.firstMatch` (`an.sidebar.allNotes` matches twice, and a failed click ends the test); the chip's Reveal and
+  Preview are TextKit attachment subviews XCUITest cannot hit, so the strip's seam opens the popover;
+  `-ANUITestIndexPath` is honoured only at the fixture's own `notes-index-v1.sqlite3`. Repeat after a fix batch
+  and before `W40.h3`.
+  <!-- /W40.e11 -->
