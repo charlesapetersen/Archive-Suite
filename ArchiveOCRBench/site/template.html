@@ -227,7 +227,7 @@ function render() {
             return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
             r.panel === 'farmshare' ? '$0 · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos' : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
             r.pair ? 'run ' + OWN[r.panel] + '; hosted as ' + byId[r.pair].num + ', NES ' + o.c.scores[r.pair][0].toFixed(2)
-              : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
+              : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
           x: { type: 'logarithmic', min: o.seg ? 0.35 : 0.14, max: o.seg ? 40 : 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
             grid: { color: grid }, border: { color: grid },

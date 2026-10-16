@@ -2,7 +2,7 @@
 """Build ArchiveOCRBench's data file and chart page from the bench's committed results.
 
 Reads, in ../ArchiveProcessor/segbench-results/, the W41 OCR panel's reports and per-attribute CSVs, the
-routes run on our own hardware (ocr-mac-local.md and its groups CSV; farmshare/truth/<run>/summary.json and
+routes run on our own hardware (ocr-mac-local.md, ocr-mac-local-hw.md and their groups CSV; farmshare/truth/<run>/summary.json and
 pages.csv), the segmentation reports (options.md, cheap-models.md), plus the hand-entered figures in data/inputs.json and
 the Vision OCR lab's handwriting figures in data/vision-ocr-handwriting.json, and writes:
 
@@ -92,11 +92,13 @@ def agreement_pages():
 
 
 def mac_route(spec, kinds):
-    """The Mac-local route: scores from its groups CSV, speed and memory from its report's table."""
+    """A Mac-local route: scores from the groups CSV, speed and memory from its report's table (ocr-mac-local.md unless
+    the route names its own report and speed heading, as the W41.mac-local-hw models do in ocr-mac-local-hw.md)."""
     with MAC_CSV.open(newline="") as f:
         rows = {(r["attribute"], r["value"]): r for r in csv.DictReader(f) if r["model"] == spec["key"]}
     sc = lambda r: [round(100 * float(r["nes"]), 2), int(r["ok"]), int(r["n"])]
-    speed = {c[0]: c for c in table_after(MAC_MD.read_text(), "## Speed and memory")}
+    md = RESULTS / spec.get("report", MAC_MD.name)
+    speed = {c[0]: c for c in table_after(md.read_text(), spec.get("speed", "## Speed and memory"))}
     page_s = float(speed["seconds a page (prompt + generation)"][1])
     peak = speed["MLX peak memory, GB"]
     return ({"overall": sc(rows[("all", "accuracy-96")]), **{k: sc(rows[("kind", k)]) for k in kinds}},
