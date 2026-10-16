@@ -79,7 +79,7 @@ struct SegmentationChooserView: View {
         .sheet(isPresented: Binding(get: { !wizardSpecs.isEmpty }, set: { if !$0 { wizardSpecs = [] } })) {
             ProviderKeyWizard(specs: wizardSpecs) {
                 wizardSpecs = []
-                routes = SegmentationRoutes.current()
+                routes = SegmentationRoutes.currentPreselecting()
             }
         }
     }

@@ -19,7 +19,8 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
 
     var id: String { rawValue }
 
-    /// Off until the user picks otherwise: an approach that spends money or plan usage is never the default.
+    /// What a missing or unknown stored value reads as. Manual, because nothing proposes boundaries without a
+    /// key or plan; `preselect` saves Gemini over it once a Gemini key is known to be set.
     static let defaultApproach: SegmentationApproach = .manual
 
     var proposesBoundaries: Bool { self != .manual }
@@ -28,6 +29,24 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
     static func stored(_ defaults: UserDefaults = .standard) -> SegmentationApproach {
         defaults.string(forKey: DefaultsKeys.segmentationApproach)
             .flatMap(SegmentationApproach.init(rawValue:)) ?? defaultApproach
+    }
+
+    /// The approach to start a user on who has saved no choice (W41.app-seg-default). Gemini 3.8 Flash only
+    /// was the best measured approach (W41.report §3: 88.8% of pages right unchecked, 24 checks per 100 pages,
+    /// none wrong after checking, $3.61 per 1,000 pages), so it is the start whenever its key is set.
+    static func preferredDefault(_ routes: SegmentationRoutes) -> SegmentationApproach {
+        routes.hasGeminiKey ? .gemini : defaultApproach
+    }
+
+    /// Saves `preferredDefault` when no choice is saved yet. A saved choice, manual included, is never
+    /// overridden. Returns whether it saved.
+    @discardableResult
+    static func preselect(_ routes: SegmentationRoutes, defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: DefaultsKeys.segmentationApproach) == nil else { return false }
+        let start = preferredDefault(routes)
+        guard start != defaultApproach else { return false }
+        defaults.set(start.rawValue, forKey: DefaultsKeys.segmentationApproach)
+        return true
     }
 }
 

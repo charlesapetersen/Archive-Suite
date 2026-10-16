@@ -254,7 +254,7 @@ struct SettingsView: View {
         openaiKey = KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? ""
         openrouterKey = KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? ""
         gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
-        segmentationRoutes = SegmentationRoutes.current()
+        segmentationRoutes = SegmentationRoutes.currentPreselecting()
     }
 
     // MARK: Fixed cost pane (stays put while the form scrolls)

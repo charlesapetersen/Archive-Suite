@@ -278,7 +278,7 @@ struct OCRView: View {
         .onAppear {
             reloadAPIKey()
             // Not before the Keychain explainer: each read can prompt, and the sheet says to click Always Allow.
-            if keychainExplained { segmentationRoutes = SegmentationRoutes.current() }
+            if keychainExplained { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
             processor.checkForPendingBatch()
             if !keychainExplained {
                 showKeychainSheet = true
@@ -335,10 +335,10 @@ struct OCRView: View {
             processor.stagedCaptureFiles = []
         }
         .onChange(of: keychainExplained) { _, explained in
-            if explained { segmentationRoutes = SegmentationRoutes.current() }
+            if explained { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
-            segmentationRoutes = SegmentationRoutes.current()
+            segmentationRoutes = SegmentationRoutes.currentPreselecting()
             reloadAPIKey()
         }
         .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }

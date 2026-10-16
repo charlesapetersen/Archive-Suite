@@ -16,6 +16,8 @@ import SwiftUI
 ///   4. An approach that cannot run says why: the file's reason when unmeasured, the missing key or `claude`
 ///      otherwise, with the keys the wizard should offer. Manual always runs, at no cost.
 ///   5. Render guard: each row card draws non-blank pixels offscreen.
+///   6. With nothing saved, a Gemini key preselects Gemini only and no Gemini key saves nothing; a saved choice,
+///      even manual or an unknown value, is never overridden (W41.app-seg-default).
 @MainActor
 enum SegmentationChooserTestDriver {
     private static var didRun = false
@@ -240,6 +242,31 @@ enum SegmentationChooserTestDriver {
             let ink = renderedInk(SegmentationRowCard(row: r, scaleCaption: "per 1,000 pages"), saveAs: name)
             check("5 renders \(r.approach.rawValue)\(r.canRun ? "" : " (unavailable)") (\(ink) dark px)", ink > 300)
         }
+
+        // 6. The preselected approach (W41.app-seg-default), on a scratch defaults domain.
+        let suite = "SegmentationChooserTestDriver.preselect.\(ProcessInfo.processInfo.processIdentifier)"
+        guard let d = UserDefaults(suiteName: suite) else {
+            check("6 scratch defaults", false)
+            return
+        }
+        defer { d.removePersistentDomain(forName: suite) }
+        let key = DefaultsKeys.segmentationApproach
+        let gemOnly = SegmentationRoutes(hasGeminiKey: true)
+        let noGemini = SegmentationRoutes(hasAnthropicKey: true, hasOpenAIKey: true, hasOpenRouterKey: true,
+                                          hasClaudeCLI: true)
+        check("6 no Gemini key, nothing saved: saves nothing",
+              !SegmentationApproach.preselect(noGemini, defaults: d) && d.object(forKey: key) == nil)
+        eq("6 no Gemini key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
+        check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
+        eq("6 Gemini key, nothing saved: gemini", SegmentationApproach.stored(d), .gemini)
+        for saved in [SegmentationApproach.manual, .claude, .glm] {
+            d.set(saved.rawValue, forKey: key)
+            check("6 saved \(saved.rawValue) not overridden", !SegmentationApproach.preselect(all, defaults: d)
+                  && SegmentationApproach.stored(d) == saved)
+        }
+        d.set("per-page", forKey: key)   // an unknown saved value is still the user's, read as manual
+        check("6 unknown saved value not overridden", !SegmentationApproach.preselect(gemOnly, defaults: d)
+              && d.string(forKey: key) == "per-page")
     }
 
     /// Dark pixels in the card drawn offscreen on white at the Process Files panel's width. Blank → 0.

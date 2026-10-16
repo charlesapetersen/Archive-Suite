@@ -52,6 +52,14 @@ struct SegmentationRoutes: Equatable, Sendable {
             planCalibration: PlanCalibrationStore.load(defaults))
     }
 
+    /// `current()` for the views that show the chooser: once the keys are read, an unsaved approach is
+    /// preselected from them (`SegmentationApproach.preselect`, W41.app-seg-default). Never from a view body.
+    static func currentPreselecting(_ defaults: UserDefaults = .standard) -> SegmentationRoutes {
+        let routes = current(defaults)
+        SegmentationApproach.preselect(routes, defaults: defaults)
+        return routes
+    }
+
     func hasKey(_ p: WindowProvider) -> Bool {
         switch p {
         case .anthropic: return hasAnthropicKey

@@ -503,7 +503,8 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                Self-test: `SegmentationReviewTestDriver`, `scripts/test-segmentation-review.sh`;
                                VM UITest `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone`.
   SegmentationApproach.swift   `SegmentationApproach` (manual/claude/gemini/openai/mix, `DefaultsKeys.segmentationApproach`,
-                               default manual); `SegmentationOptions` decodes the bundled `segbench-results/options.json`
+                               default manual; with nothing saved, a Gemini key preselects `gemini`, W41.app-seg-default);
+                               `SegmentationOptions` decodes the bundled `segbench-results/options.json`
                                (window shape, rule, level, voters, figures); `WindowVoter.catalog` + prompt-id check.
   WindowSegmenter.swift        Port of the bench: 7/3 windows, reply parser, per-voter combine, min/mean rules, the
                                concurrent runner (retry once; gaps no answer covered → flagged at 0; usage limit →
