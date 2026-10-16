@@ -11253,3 +11253,22 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   temperature 0 vary by a few points between runs. Row and note in `segbench-results/local-models-Deaver.md`; the
   run's summary (no text) in `segbench-results/farmshare/seg/qwen3.5-27b/`. No money.
   <!-- /W41.farmshare-seg-run -->
+- [x] **W41.bench-difficulty — page difficulty, failures apart from accuracy, and a routing rule, in ArchiveOCRBench [M · ~1-2 sessions]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light). SHIPPED 2026-10-15.
+  Owner's ask (2026-10-15): rank routes on the pages they answered, apart from failures, with difficulty in the picture, and
+  simulate cheap-first cascades; end goal a choice procedure, side goal a picture of capability. No calls, no money.
+  `scripts/segbench/ocr_pages_export.py` writes `segbench-results/ocr-pages.csv` (29 routes x 96 pages, no text; each
+  route's mean and answered count match the bench exactly) and `ocr-pages-agree.csv` (NES between 12 cheap readers'
+  texts). `ArchiveOCRBench/difficulty.py` (called by `build.py`, which writes `difficulty.md` and the page's part 5):
+  NES at average difficulty from a route + page fit on answered readings (answered-only accuracy flatters Gemma 4
+  26B-A4B by +1.18 and Qwen3.5 27B by +0.81; top three Gemini 3.1 Pro 96.84, Claude Sonnet 5.5 96.59, Gemini 3.8 Flash
+  96.46); leave-one-out page difficulty (easy third 99.5 mean NES, hard third 82.7; no handwritten page is easy, but 10
+  of 32 hard pages are typewritten); failures correlate only 0.29 with difficulty, so most are format/limit/refusal
+  failures; 18,214 simulated cascades with a 200-split half-sample check: escalating on failure beat one route by 0.8-2.8
+  NES on unseen pages at every budget to $5 per 1,000 (at $1: 94.00 vs 91.25), the disagreement check and a hard-kind
+  label gained nothing consistent over it, and at $25 Claude Sonnet 5.5 alone (95.58 unseen) beat every cascade family.
+  Flags for answered-but-wrong pages: disagreement AUC 0.89-0.97, length against Apple Vision 0.78-0.89, own kind label
+  0.57-0.70; no route reports a confidence. Filed W41.app-ocr-cascade (the proposed rule, blocked on W41.app-openrouter)
+  and W41.bench-vision-kind (Vision OCR's page sorter as a model-independent kind). The page was checked by running its
+  script under Node stubs (seven charts built, every callback exercised); no browser render was possible unattended,
+  and the published copy of the page is now behind.
+  <!-- /W41.bench-difficulty -->

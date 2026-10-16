@@ -1,6 +1,6 @@
 # ArchiveOCRBench
 
-What the bench has measured, as one page you can read and share. It has four parts:
+What the bench has measured, as one page you can read and share. It has five parts:
 
 1. **OCR.** The W41 OCR panel: twenty-five hosted routes read the same 96 adjudicated truth pages, and each is
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
@@ -17,6 +17,10 @@ What the bench has measured, as one page you can read and share. It has four par
    scored as part 1 scores them, with photos an hour in place of price (FarmShare costs nothing); NewsBench's
    newspaper pages read whole and through a layout detector, scored by NewsBench; and a 2,000-page run on the real
    corpus. Read from `ArchiveProcessor/segbench-results/farmshare/` (`build.py` → `farmshare()`).
+5. **Difficulty and cascades.** Part 1's routes ranked on the pages they answered, apart from their failures, with a
+   page-difficulty measure that never reuses the route being judged; where failures fall; cheap-first cascades
+   simulated from the measured readings, with a split-half check on choosing them; and the signals that flag an
+   answered page that is wrong (W41.bench-difficulty). The full report is `difficulty.md`.
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet
@@ -29,6 +33,8 @@ built are in [`POTENTIAL_FEATURES.md`](POTENTIAL_FEATURES.md).
 | `build.py` | Builds the two outputs below from the panel's committed results. `--check` fails if they are stale. |
 | `data/inputs.json` | The figures the panel reports do not hold, each with its source: route display names, the estimated API price for Claude Sonnet 5.5, which routes have a batch price, and the names and machines of the routes on our own hardware (`own_hardware`). |
 | `data/vision-ocr-handwriting.json` | The Vision OCR lab's handwriting figures, entered by hand from its repository with the file and commit they came from. |
+| `difficulty.py` | Part 5's analysis, called by `build.py`: rankings, difficulty, cascades, flags. Standard library only; `test_difficulty.py` checks its statistics. |
+| `difficulty.md` | Built. Part 5 as a readable report, every table included. |
 | `data/panel-data.json` | Built. Every OCR route's score, answered pages and price for the four charts; every segmentation approach's test-box figures; the handwriting readers. |
 | `site/template.html` | The chart page, with a `__DATA__` placeholder. |
 | `site/index.html` | Built. The page itself: open it in a browser, or publish it. |
@@ -55,6 +61,10 @@ record:
   `ocr_panel.py`), and `build.py` stops if that average stops matching `summary.json`. GPU-hours per 100,000
   photos come from its photos an hour. The newspaper results in `farmshare/news/` wait for a newspaper chart
   (`POTENTIAL_FEATURES.md`).
+- `ocr-pages.csv` and `ocr-pages-agree.csv`: every route's score on every one of the 96 pages (kind, the kind the
+  route said, answered, NES, measured cost, word counts), and the NES between two cheap readers' texts on the same
+  page. `scripts/segbench/ocr_pages_export.py` writes them from the panels' private caches; rerun it when a route is
+  added or rerun, then `build.py`. Part 5 reads only these, and FarmShare's `bulk/summary.json` for its failures by kind.
 - `ocr-panel-cloud-pilot.md`: the three-page pilot that came before the full cloud run.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.

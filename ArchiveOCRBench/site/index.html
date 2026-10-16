@@ -5,8 +5,10 @@
 <style>
 /* Layout: one reading column. Part 1, four OCR chart panels sharing one numbered route key; part 2, segmentation
    (one chart and its table); part 3, the Vision OCR lab's on-device handwriting readers (a table); part 4, the
-   same truth pages and NewsBench read on Stanford's FarmShare GPUs (two tables). */
+   same truth pages and NewsBench read on Stanford's FarmShare GPUs (two tables); part 5, page difficulty and
+   cascades (a rankings table, the difficulty curves, the cascade frontier, the flag signals). */
 :root {
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
   --bg: #fbfbfa; --panel: #ffffff; --fg: #1b1d22; --fg-2: #4d525c; --muted: #8a8f99;
   --rule: #e3e4e8; --grid: #ececef; --accent: #2457c5; --other: #8f939c;
   --display: "Newsreader", Georgia, "Times New Roman", serif;
@@ -15,10 +17,12 @@
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #15171b; --panel: #1c1f24; --fg: #eceef2; --fg-2: #b9bec8; --muted: #8a909b;
-  --rule: #2c3038; --grid: #262a31; --accent: #6f9bff; --other: #7c818b; color-scheme: dark } }
+  --rule: #2c3038; --grid: #262a31; --accent: #6f9bff; --other: #7c818b; color-scheme: dark;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181 } }
 :root[data-theme="dark"] {
   --bg: #15171b; --panel: #1c1f24; --fg: #eceef2; --fg-2: #b9bec8; --muted: #8a909b;
-  --rule: #2c3038; --grid: #262a31; --accent: #6f9bff; --other: #7c818b; color-scheme: dark }
+  --rule: #2c3038; --grid: #262a31; --accent: #6f9bff; --other: #7c818b; color-scheme: dark;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181 }
 body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--body);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 56px; }
 main { max-width: 980px; margin: 0 auto; display: grid; gap: 28px; }
@@ -35,6 +39,7 @@ p { margin: 0; max-width: 68ch; color: var(--fg-2); }
 .hollow { width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--other); display: inline-block; }
 .diamond { width: 8px; height: 8px; background: var(--other); transform: rotate(45deg); display: inline-block; }
 .square { width: 9px; height: 9px; background: var(--other); display: inline-block; }
+.ln { width: 18px; height: 0; border-top: 2px solid; display: inline-block; }
 .dots { width: 18px; border-top: 2px dotted var(--other); display: inline-block; }
 section.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 20px 20px 16px; display: grid; gap: 12px; min-width: 0; }
 .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
@@ -64,7 +69,7 @@ footer p { font-size: 13px; }
   <header class="lede">
     <div class="eyebrow">Archive Suite · what the bench has measured</div>
     <h1>Archive OCR bench</h1>
-    <p>Four parts: the W41 OCR panel (<span id="nroutes"></span> routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), the on-device handwriting readers the Vision OCR lab measured, and open-weight models run on Stanford's FarmShare GPUs. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
+    <p>Five parts: the W41 OCR panel (<span id="nroutes"></span> routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), the on-device handwriting readers the Vision OCR lab measured, open-weight models run on Stanford's FarmShare GPUs, and the panel's pages ranked by difficulty, with cheap-first cascades simulated from the measured readings. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
   </header>
 
   <header class="part" id="ocr">
@@ -130,6 +135,37 @@ footer p { font-size: 13px; }
     <div class="head"><h2>Newspapers: NewsBench's 15 scored broadsheet pages</h2><span class="meta">NewsBench score.py · overall = 1 − CER</span></div>
     <div class="tbl"><table><thead><tr><th>Reader</th><th>How the page is read</th><th>Overall</th><th>Broadsheet</th><th>Page</th><th>Pages answered</th><th>Pages an hour per GPU</th></tr></thead><tbody id="fs-news-rows"></tbody></table></div>
     <p class="note">Full Library of Congress newspaper pages, scored by NewsBench's own scorer, not NES, so these do not compare with the tables above. "Regions" means newspaper-ocr's layout detector cut the page first and each region was read alone. Reference rows are NewsBench's published results, made elsewhere. Source: <code>ArchiveProcessor/segbench-results/farmshare/news/</code>.</p>
+  </section>
+
+  <header class="part" id="difficulty">
+    <div class="eyebrow">Part 5 · Page difficulty and cascades · the same 96 pages</div>
+    <h2>Accuracy on the pages answered, and what to do with the rest</h2>
+    <p>A page that fails is not inaccurate text: it goes on to another model. So here accuracy on the pages a route answered and its failures are counted apart, with page difficulty in the picture, and cascades send each page to a cheap reader first and on to a stronger one when it fails or looks wrong. Every figure is from the panel's measured readings; no new calls were made. The full report, with every table, is <code>ArchiveOCRBench/difficulty.md</code>.</p>
+  </header>
+  <section class="panel" id="dif-rank">
+    <div class="head"><h2>Two rankings</h2><span class="meta">by NES at average difficulty</span></div>
+    <p class="note">"NES at average difficulty" fits route ability plus page easiness to every answered reading, so a route that failed hard pages is not credited for skipping them. "Page mix" is how much easier than average the pages it answered were; it is what answered-only accuracy flatters.</p>
+    <div class="tbl"><table><thead><tr><th>#</th><th>Route</th><th>Answered</th><th>NES on answered</th><th>At average difficulty</th><th>Page mix</th><th>Failed</th><th>Strict NES</th><th>Per 1,000</th></tr></thead><tbody id="dif-rank-rows"></tbody></table></div>
+  </section>
+  <section class="panel" id="dif-curves">
+    <div class="head"><h2>Difficulty curves</h2><span class="meta">pages in six bins of 16, easiest to hardest</span></div>
+    <p class="note" id="dif-curves-note"></p>
+    <div class="legend" id="dif-curves-legend"></div>
+    <div class="plot"><canvas role="img" aria-label="NES on answered pages for five routes across six page-difficulty bins"></canvas></div>
+    <details><summary>Show the numbers</summary><div class="tbl"><table><thead id="dif-curves-head"></thead><tbody id="dif-curves-rows"></tbody></table></div></details>
+  </section>
+  <section class="panel" id="dif-frontier">
+    <div class="head"><h2>Cascades: accuracy against price</h2><span class="meta" id="dif-frontier-meta"></span></div>
+    <p class="note" id="dif-frontier-note"></p>
+    <div class="legend" id="dif-frontier-legend"></div>
+    <div class="plot"><canvas role="img" aria-label="Best cascades in each family: NES against dollars per 1,000 pages, with single routes for comparison"></canvas></div>
+    <details><summary>Show the numbers: the best at each budget, and chosen on half the pages</summary><div class="tbl"><table><thead><tr><th>Budget</th><th>Family</th><th>Best on all pages</th><th>NES</th><th>Per 1,000</th><th>Chosen on half → other half</th></tr></thead><tbody id="dif-budget-rows"></tbody></table></div></details>
+  </section>
+  <section class="panel" id="dif-flags">
+    <div class="head"><h2>What flags an answered page that is wrong</h2><span class="meta" id="dif-flags-meta"></span></div>
+    <p class="note">A cascade sees a failure but not a poor reading. AUC is how well a signal ranks a reader's poor readings above its good ones: 0.5 is chance, 1 is perfect. Length compares the reader's word count with Apple Vision's (free, on the device); disagreement compares its text with a second cheap reader's; kind is the reader's own handwritten-or-mixed label. No route reports a confidence.</p>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>Poor readings</th><th>Kind label</th><th>Length</th><th>Disagreement</th><th>Against</th></tr></thead><tbody id="dif-flags-rows"></tbody></table></div>
+    <p class="note" id="dif-rule"></p>
   </section>
 
   <footer>
@@ -301,8 +337,74 @@ document.getElementById('fs-news-rows').innerHTML = FS.news.map(r => '<tr><td>' 
   FS.news_reference.map(r => '<tr><td>' + r.label + '</td><td>reference</td><td>' + r.overall.toFixed(3) + '</td><td>' + r.broadsheet.toFixed(3) +
   '</td><td>' + r.page.toFixed(3) + '</td><td>—</td><td>—</td></tr>').join('');
 
+
+// Part 5: difficulty and cascades.
+const DF = DATA.difficulty;
+const f2 = v => v === null || v === undefined ? '—' : v.toFixed(2);
+const sgn = v => (v > 0 ? '+' : '') + v.toFixed(2);
+document.getElementById('dif-rank-rows').innerHTML = DF.routes.slice().sort((a, b) => b.adjusted - a.adjusted).map((r, i) =>
+  '<tr><td>' + (i + 1) + '</td><td>' + r.name + '</td><td>' + r.answered + '/' + DF.pages + '</td><td>' + f2(r.answered_nes) + '</td><td>' + f2(r.adjusted) +
+  '</td><td>' + sgn(r.page_mix) + '</td><td>' + r.failed + '</td><td>' + f2(r.strict) + '</td><td>' + (r.app ? money(r.price) : '$0') + '</td></tr>').join('');
+const CURVE = ['claude-sonnet5.5', 'gemini3.8-flash', 'qwen3.8-flash', 'qwen3.5-9b-mlx4', 'apple-vision'];
+const routeName = Object.fromEntries(DF.routes.map(r => [r.id, r.name]));
+const binLabel = DF.curves.bins.map((b, i) => (i === 0 ? 'easiest' : i === 5 ? 'hardest' : 'bin ' + (i + 1)) + ' · ' + (100 - b.difficulty).toFixed(1));
+document.getElementById('dif-curves-note').textContent = 'Each line is one route\'s NES on the pages it answered in each bin; the bins are set by every route\'s mean NES on the page (shown under each bin). The hardest sixth holds ' +
+  DF.curves.bins[5].kinds.handwritten + ' of the ' + DF.curves.bins.reduce((a, b) => a + b.kinds.handwritten, 0) + ' handwritten pages and ' + DF.curves.bins[5].route_failures + ' of the ' + DF.curves.bins.reduce((a, b) => a + b.route_failures, 0) + ' failures across all routes.';
+document.getElementById('dif-curves-legend').innerHTML = CURVE.map((id, i) => '<span><i class="ln" style="border-color:var(--s' + (i + 1) + ')"></i>' + routeName[id] + '</span>').join('');
+document.getElementById('dif-curves-head').innerHTML = '<tr><th>Route</th><th></th>' + binLabel.map(l => '<th>' + l + '</th>').join('') + '</tr>';
+document.getElementById('dif-curves-rows').innerHTML = CURVE.map(id => '<tr><td>' + routeName[id] + '</td><td></td>' + DF.curves.routes[id].map(c => '<td>' + f2(c.nes) + (c.failed ? ' (' + c.failed + ' failed)' : '') + '</td>').join('') + '</tr>').join('');
+const FAM = { fail: ['Escalate on failure', 's1'], disagree: ['On failure or two cheap readers disagreeing', 's2'], 'fail+kind': ['On failure or a handwritten/mixed label', 's3'] };
+const FAMN = { single: 'one route', ...Object.fromEntries(Object.entries(FAM).map(([k, v]) => [k, v[0].toLowerCase()])) };
+const CFREE = 0.01;
+const cx = v => Math.max(v, CFREE);
+document.getElementById('dif-frontier-meta').textContent = DF.cascades.n.toLocaleString() + ' candidates · standard prices';
+document.getElementById('dif-frontier-legend').innerHTML = Object.values(FAM).map(([l, c]) => '<span><i class="sw" style="background:var(--' + c + ')"></i>' + l + '</span>').join('') +
+  '<span><i class="sw" style="background:var(--other)"></i>One route alone (best value)</span>';
+const bud = Object.fromEntries(DF.cascades.budgets.map(b => [b.budget, b.families]));
+document.getElementById('dif-frontier-note').textContent = 'Each line joins the cascades in one family that no cheaper one in that family beats. Chosen on all 96 pages, these flatter themselves, so the table below also chooses each family on a random half and scores it on the other half: at $1 per 1,000 pages, escalating on failure gives ' +
+  f2(bud[1].fail.split_out) + ' on unseen pages against ' + f2(bud[1].single.split_out) + ' for one route chosen the same way; at $25 one strong route alone gives ' + f2(bud[25].single.split_out) + '. Free here means on our hardware: the Mac routes take about 40 seconds a page.';
+document.getElementById('dif-budget-rows').innerHTML = DF.cascades.budgets.flatMap(b => Object.entries(b.families).map(([f, v]) =>
+  '<tr><td>' + (b.budget ? '$' + b.budget : 'free') + '</td><td>' + FAMN[f] + '</td><td style="white-space:normal;text-align:left">' + v.best.label + '</td><td>' + f2(v.best.nes) + '</td><td>' + money(v.best.usd) + '</td><td>' + f2(v.split_in) + ' → ' + f2(v.split_out) + '</td></tr>')).join('');
+document.getElementById('dif-flags-meta').textContent = 'poor reading = answered, under ' + DF.wrong_bar.toFixed(0) + ' NES';
+document.getElementById('dif-flags-rows').innerHTML = DF.flags.map(f => { const s = f.signals, d = Object.entries(s).find(([k]) => k.startsWith('disagrees'));
+  const a = k => s[k] ? s[k].auc.toFixed(2) : '—';
+  return '<tr><td>' + f.name + '</td><td>' + f.wrong + ' of ' + f.answered + '</td><td>' + a('said handwritten or mixed') + '</td><td>' + a("length against Apple Vision's") + '</td><td>' + (d ? d[1].auc.toFixed(2) : '—') + '</td><td>' + (d ? d[0].replace('disagrees with ', '') : '') + '</td></tr>'; }).join('');
+document.getElementById('dif-rule').textContent = 'A proposed rule for the app, not built (W41.app-ocr-cascade): read every page with a cheap reader first; send a failed page to a stronger route; optionally send pages where two cheap readers disagree too, which catches most poor readings but did not gain consistently on unseen pages; and where accuracy matters more than price, one strong reader alone is still best. Limits: 96 pages from one corpus, and truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash.';
+const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
+let curveChart, frontChart;
+function renderDifficulty() {
+  const grid = css('--grid'), mut = css('--muted'), sec = css('--fg-2'), surf = css('--panel'), ink = css('--fg');
+  if (curveChart) curveChart.destroy();
+  if (frontChart) frontChart.destroy();
+  const endLabels = (getLabel) => ({ id: 'endlbl', afterDatasetsDraw(ch) { const g = ch.ctx; g.save(); g.font = '11px ' + css('--mono'); g.fillStyle = sec; g.textBaseline = 'middle';
+    const used = []; ch.data.datasets.forEach((ds, i) => { const t = getLabel(ds); if (!t) return; const m = ch.getDatasetMeta(i); const pt = m.data[m.data.length - 1]; if (!pt) return;
+      let y = pt.y; while (used.some(u => Math.abs(u - y) < 12)) y += 12; used.push(y); g.fillText(t, pt.x + 8, y); }); g.restore(); } });
+  curveChart = new Chart(curveCanvas, { type: 'line',
+    data: { labels: binLabel, datasets: CURVE.map((id, i) => ({ label: routeName[id], data: DF.curves.routes[id].map(c => c.nes), borderColor: css('--s' + (i + 1)),
+      backgroundColor: css('--s' + (i + 1)), borderWidth: 2, pointRadius: 4, pointBorderColor: surf, pointBorderWidth: 2, pointHoverRadius: 6, tension: 0 })) },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 150 } }, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => i.dataset.label + ': ' + f2(i.raw) + (DF.curves.routes[CURVE[i.datasetIndex]][i.dataIndex].failed ? ' (' + DF.curves.routes[CURVE[i.datasetIndex]][i.dataIndex].failed + ' failed)' : '') } } },
+      scales: { x: { title: { display: true, text: 'Page difficulty bin · mean NES of all routes', color: sec }, grid: { color: grid }, ticks: { color: mut } },
+        y: { title: { display: true, text: 'NES on answered pages %', color: sec }, grid: { color: grid }, border: { display: false }, ticks: { color: mut } } } },
+    plugins: [endLabels(ds => ds.label)] });
+  const fam = DF.cascades.family_frontiers;
+  const sets = Object.entries(FAM).map(([k, [l, c]]) => ({ label: l, data: fam[k].map(p => ({ x: cx(p.usd), y: p.nes, p })), showLine: true, stepped: false,
+    borderColor: css('--' + c), backgroundColor: css('--' + c), borderWidth: 2, pointRadius: 4, pointBorderColor: surf, pointBorderWidth: 1.5, pointHoverRadius: 7 }));
+  sets.push({ label: 'One route alone', data: fam.single.map(p => ({ x: cx(p.usd), y: p.nes, p })), showLine: true, borderColor: css('--other'), backgroundColor: css('--other'),
+    borderDash: [4, 3], borderWidth: 1.5, pointRadius: 4, pointBorderColor: surf, pointBorderWidth: 1.5, pointHoverRadius: 7 });
+  frontChart = new Chart(frontCanvas, { type: 'scatter', data: { datasets: sets },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 18, top: 6 } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => i[0].raw.p.label,
+        label: i => ['NES ' + f2(i.raw.p.nes) + ' · ' + (i.raw.p.usd ? money(i.raw.p.usd) + ' per 1,000 pages' : 'free, on our hardware'), i.raw.p.family === 'single' ? 'one route' : i.raw.p.escalated + ' of 96 pages sent on'] } } },
+      scales: { x: { type: 'logarithmic', min: CFREE * 0.8, max: 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec }, grid: { color: grid }, border: { color: grid },
+          afterBuildTicks: a => { a.ticks = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30].map(v => ({ value: v })); },
+          ticks: { color: mut, autoSkip: false, callback: v => v === CFREE ? 'free' : '$' + v } },
+        y: { min: 91, max: 97.5, title: { display: true, text: 'NES %, failures as 0', color: sec }, grid: { color: grid }, border: { display: false }, ticks: { color: mut, stepSize: 1 } } } } });
+}
+
 Chart.defaults.font.family = css('--body');
-render();
-try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render); } catch (e) {}
-new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+const renderAll = () => { render(); renderDifficulty(); };
+renderAll();
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll); } catch (e) {}
+new MutationObserver(renderAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 </script>
