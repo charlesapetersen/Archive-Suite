@@ -38,6 +38,7 @@ OPTIONS_MD = RESULTS / "options.md"
 CHEAP_MD = RESULTS / "cheap-models.md"
 INPUTS = HERE / "data" / "inputs.json"
 HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
+KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
@@ -303,7 +304,8 @@ def main():
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
                               [r["id"] for r in routes if r["panel"] != "farmshare"])
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting(),
-             "farmshare": farmshare(), "difficulty": diff}
+             "farmshare": farmshare(), "difficulty": diff,
+             "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 
