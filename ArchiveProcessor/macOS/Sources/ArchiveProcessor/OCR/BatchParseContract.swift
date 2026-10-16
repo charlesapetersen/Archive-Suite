@@ -429,9 +429,14 @@ enum BatchParseContract {
               && recitation.errorMessage?.contains("Recitation") == true)
 
         let otherFinish = GeminiBatchClient.parseSingleResponse(
+            ["candidates": [["finishReason": "SAFETY", "content": ["parts": [["text": "kept page"]]]]]])
+        check("gemini: a non-RECITATION, non-MAX_TOKENS finish reason keeps whatever text was returned",
+              otherFinish.text == "kept page" && otherFinish.errorMessage == nil)
+        // W41.app-ocr-cascade: a reply cut off at the token limit is not a transcription, so its text is not kept.
+        let cutFinish = GeminiBatchClient.parseSingleResponse(
             ["candidates": [["finishReason": "MAX_TOKENS", "content": ["parts": [["text": "truncated page"]]]]]])
-        check("gemini: a non-RECITATION finish reason keeps whatever text was returned",
-              otherFinish.text == "truncated page" && otherFinish.errorMessage == nil)
+        check("gemini: a MAX_TOKENS finish fails the page as cut off (`length`) instead of keeping the cut text",
+              cutFinish.text == nil && cutFinish.errorCode == OCRFailureCode.cutOff)
 
         check("gemini: a response with no candidates fails the page explicitly",
               GeminiBatchClient.parseSingleResponse(["candidates": []]).errorMessage == "No candidates in response")

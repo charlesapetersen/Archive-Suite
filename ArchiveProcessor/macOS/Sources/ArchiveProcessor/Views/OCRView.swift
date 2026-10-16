@@ -67,6 +67,8 @@ struct OCRView: View {
     // Apple Vision is the no-key, on-device backend selected in Settings.
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision: Bool = false
     @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment: Bool = false
+    @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
+    @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
 
     /// The model for the current provider, read live from the shared store so a change made in the
     /// Settings window updates this window's cost estimate — and the model a run launches with —
@@ -680,6 +682,17 @@ struct OCRView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                     .accessibilityIdentifier("ap.ocr.secondReaderCost")
+                            }
+                            let cascade = OCRCascade(routeID: ocrCascadeRoute, onDisagreement: ocrCascadeOnDisagreement)
+                            if !useGateway && !useLocalAgent && !preOCRedInput,
+                               cascade.applies(to: effectiveModel.provider, model: effectiveModel),
+                               let target = cascade.escalationModel,
+                               let page = cascade.pageCost(imageScale: imageScale / 100.0) {
+                                // W41.app-ocr-cascade — escalated pages are read again, outside the totals above.
+                                Text("Pages \(effectiveModel.displayName) fails\(cascade.onDisagreement ? ", or whose word count disagrees with Apple Vision's," : "") are read again by \(target.provider.rawValue) · \(target.displayName): about \(CostEstimate.money(page)) a page. Not in the totals.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("ap.ocr.cascadeCost")
                             }
                             Text(useGateway ? "Estimates based on user-provided pricing. Actual gateway costs may differ." : "Estimates calibrated from actual API usage with high-resolution archival photos. Actual costs may vary with image resolution.")
                                 .font(.caption2)

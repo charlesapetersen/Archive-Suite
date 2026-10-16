@@ -70,13 +70,15 @@ struct AnthropicClient {
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let contentArray = json["content"] as? [[String: Any]] else {
-            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: nil)
+            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: OCRFailureCode.unparsable)
         }
 
         let rawText = contentArray
             .filter { ($0["type"] as? String) == "text" }
             .compactMap { $0["text"] as? String }
             .joined(separator: "\n")
+        // W41.app-ocr-cascade: a reply cut off at the token limit is not a transcription.
+        if (json["stop_reason"] as? String) == "max_tokens" { return OCRResult.cutOff }
 
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(rawText))

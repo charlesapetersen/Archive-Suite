@@ -11395,3 +11395,23 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   OCR read, not changed (its sorter built at ff798aa for the new pages, f8f97d2 for the panel's). No money; no
   download (both Qwens were already in the lab's cache).
   <!-- /W41.bench-kind-classifier -->
+- [x] **W41.app-ocr-cascade — a cheap-first OCR cascade in the Processor: escalate failures, optionally disagreements [M · Tier-2]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) — SHIPPED 2026-10-16
+  Proposed by W41.bench-difficulty (`ArchiveOCRBench/difficulty.md` §4-5). `OCR/OCRCascade.swift`, off by default:
+  Settings → **Escalate failed pages to** picks a built-in model of any keyed provider; on the direct-provider path a
+  page the run's model fails on (cut off at the token limit `length`, `unparsable`, 500 / `api_error`, a Gemini
+  refusal) is read again by it. Never escalated: transport errors, timeouts, 429/503/529, key/quota/request errors,
+  the gateway, the Local Agent, Apple Vision as first reader, the Tools diagnostics. The kept route is recorded per
+  page in `OCRResult.secondReader` (trigger, first code, first reader, cost), named in the PDF header and counted in
+  the run history. A failed escalation fails the page as `CascadeExhausted`, never auto-retried; a Gemini refusal
+  goes on to the refusal readers without the cascade's route. Opt-in: escalate when the word count differs from
+  Apple Vision's by more than 1.5x (a failed one keeps the first reading). A per-run breaker lets 20 escalations go,
+  then at most a quarter of the run's distinct pages. Frozen in the run, resume and paid-batch snapshots. Every
+  client now fails a reply cut off at the token limit as `length` rather than saving the cut text (sync and batch).
+  Tier-2: adversarial review in two sessions; the second (opus) found no high issue and four lows, handled here:
+  the breaker counted retry attempts as pages (now distinct pages), a cascade record missing a key failed the batch
+  journal's decode (now tolerant), an OpenAI-compatible reply cut off before any content was labelled `unparsable`
+  (now `length`), and the Gemini cut-off → refusal-reader path with the cascade off, kept as intended and documented
+  in KNOWN_ISSUES with the other limits. Contract `scripts/test-ocr-cascade.sh` 56/56 (key-free, no network, no
+  spend); `test-ocr-refusal` 44, `test-openrouter` 138, `test-batch-resume` 393 all pass. No money; no migration
+  written, since there is nothing to migrate.
+  <!-- /W41.app-ocr-cascade -->

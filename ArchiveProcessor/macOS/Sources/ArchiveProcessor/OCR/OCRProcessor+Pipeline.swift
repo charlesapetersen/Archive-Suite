@@ -294,7 +294,8 @@ extension OCRProcessor {
             visionTextModel: runConfig?.visionTextLLM?.model,
             visionTextThinkingLevel: runConfig?.visionTextLLM?.thinkingLevel,
             gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults(),
-            segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored()
+            segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored(),
+            cascade: runConfig?.cascade ?? OCRCascade.fromDefaults()
         )
     }
 
@@ -332,6 +333,7 @@ extension OCRProcessor {
             runConfig.exportedImageMB = runtime.exportedImageMB
             runConfig.textColumns = runtime.textColumns
             runConfig.visionSettings = runtime.visionSettings
+            runConfig.cascade = runtime.cascade ?? .off
             runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
             if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
                 runConfig.visionTextLLM = LLMTextConfiguration(
@@ -374,6 +376,8 @@ extension OCRProcessor {
         // The batch journal records no Segmentation approach, so a resumed batch never runs the window
         // segmenter on whatever Settings holds now (W36.seg-opt-review): it segments as Manual does.
         runConfig.segmentationApproach = .manual
+        // The cascade the batch was submitted with (W41.app-ocr-cascade); a journal without one escalates nothing.
+        runConfig.cascade = pending.cascade ?? .off
         if let exportOriginals = pending.exportOriginals {
             runConfig.outputImageFile = exportOriginals
         }
@@ -2155,7 +2159,7 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil,
@@ -2194,7 +2198,7 @@ extension OCRProcessor {
                                 gatewayConfig: gateway, localAgent: localAgent,
                                 rotationMode: ocrRun.rotationMode,
                                 standardImageMB: ocrRun.standardImageMB,
-                                visionSettings: ocrRun.visionSettings
+                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                             )
                             let result = await Self.applyingVisionTextClassification(
                                 to: ocrResult, previousText: nil,
@@ -2232,7 +2236,7 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                 )
 
                 if Self.isTimeoutError(result) {
@@ -2246,7 +2250,7 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                     )
                 }
 
@@ -3376,7 +3380,7 @@ extension OCRProcessor {
             previousText: nil, previousImageURL: nil, gatewayConfig: effectiveRunConfig.gateway,
             localAgent: effectiveRunConfig.localAgent, rotationMode: ocrRun.rotationMode,
             standardImageMB: ocrRun.standardImageMB,
-            visionSettings: ocrRun.visionSettings)
+            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,

@@ -228,6 +228,7 @@ extension OCRProcessor {
         config.exportedImageMB = runtime.exportedImageMB
         config.textColumns = runtime.textColumns
         config.visionSettings = runtime.visionSettings
+        config.cascade = runtime.cascade ?? .off
         if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
             config.visionTextLLM = LLMTextConfiguration(
                 provider: provider, model: model,

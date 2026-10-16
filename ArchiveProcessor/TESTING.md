@@ -315,6 +315,13 @@ existing scratch, key-free, no-network execution remains unchanged.
   no route, no auto-retry of an exhausted refusal, Tools diagnostics opting out, the batch parser's codes; and
   (W41.app-ocr-default-fu1) refused batch pages read once at collection, 3.8 Flash's thinking tokens in the
   estimate, second-reader pages and cost in the run history and summary. No API key, network, corpus, or spend.
+- **`test-ocr-cascade.sh`** — W41.app-ocr-cascade: the cheap-first cascade through the real `performOCRCall` over an
+  injected transport (`OCRCASCADE_TEST`): which failures escalate (cut off, unparsable, 500) and which never spend a
+  second call (key errors, rate limits, overload, timeouts, transport, success), the `secondReader` record, cost and
+  PDF header, fail-loud when the escalation route fails or has no key, no escalation off the direct route (gateway,
+  Apple Vision, Tools), Gemini refusals falling through to the refusal readers without the cascade's route, Gemini
+  as the escalation route, the opt-in Vision word-count check, a Stop, every client's `length`/`unparsable` codes
+  (sync and batch), and the run snapshot. No API key, network, corpus, or spend; not in the health gate.
 - **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests, **and** (W16.bat1) the three paid
   batch clients' provider **response-shape contract** — every status/result body shape Anthropic, Gemini and
   Mistral are accepted in, from literal fixtures through the pure parse seams in `BatchOCR.swift`

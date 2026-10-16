@@ -411,6 +411,9 @@ class OCRProcessor: ObservableObject {
         /// Version 1 turns the old submit-once manifest into a durable paid-batch journal. Nil denotes a
         /// legacy manifest, whose comma-separated `batchId` remains readable exactly as before.
         var lifecycleVersion: Int?
+        /// The run's OCR cascade (W41.app-ocr-cascade), so a resumed batch escalates to the route it was
+        /// submitted with, never to whatever Settings hold now. Nil reads as off.
+        var cascade: OCRCascade? = nil
         /// Ordered server-side job IDs acknowledged so far. Gemini can create several paid jobs for one
         /// local run; each ID is appended and atomically saved immediately after its create response.
         var submittedChunkIds: [String]
@@ -498,6 +501,7 @@ class OCRProcessor: ObservableObject {
             completedOutputPaths = try c.decodeIfPresent([String: String].self, forKey: .completedOutputPaths)
             lifecycleFingerprint = try c.decodeIfPresent(String.self, forKey: .lifecycleFingerprint)
             mixedPDFOutcomes = try c.decodeIfPresent([MixedPDFOutcome].self, forKey: .mixedPDFOutcomes)
+            cascade = try c.decodeIfPresent(OCRCascade.self, forKey: .cascade)
         }
 
         static func parseChunkIDs(_ value: String) -> [String] {
@@ -587,6 +591,10 @@ class OCRProcessor: ObservableObject {
         /// Who proposes this run's boundaries (W36.seg-opt-review), so a resumed run keeps its approach. Nil
         /// reads as `manual`.
         var segmentationApproach: SegmentationApproach? = nil
+
+        /// The run's OCR cascade (W41.app-ocr-cascade), so a resumed run escalates to the route it began with.
+        /// Nil reads as off.
+        var cascade: OCRCascade? = nil
     }
 
     struct PendingRun: Codable {

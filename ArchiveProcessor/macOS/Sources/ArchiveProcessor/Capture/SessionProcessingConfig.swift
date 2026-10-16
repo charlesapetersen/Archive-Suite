@@ -39,6 +39,9 @@ struct SessionProcessingConfig: Sendable {
     /// Snapshot of the Apple Vision controls. Vision has no API key or request body, but its local
     /// recognition options must remain stable across an interrupted run just like PDF sizing does.
     var visionSettings: VisionOCRSettings = .default
+    /// The cheap-first OCR cascade (W41.app-ocr-cascade): where a page the run's model fails goes. Frozen with the
+    /// run so a settings change mid-run cannot send later pages to a different, dearer route.
+    var cascade: OCRCascade = .off
     /// Optional direct LLM used only after Apple Vision has produced text. The image OCR provider
     /// remains `.appleVision`; this value is deliberately never handed to `performOCRCall`.
     var visionTextLLM: LLMTextConfiguration? = nil
@@ -312,6 +315,7 @@ struct SessionProcessingConfig: Sendable {
             textColumns: sizing.textColumns,
             localAgent: useAppleVision ? nil : LocalAgentConfig.fromDefaults(d),
             visionSettings: VisionOCRSettings.fromDefaults(d),
+            cascade: OCRCascade.fromDefaults(d),
             visionTextLLM: visionTextLLM,
             segmentationApproach: SegmentationApproach.stored(d)
         )

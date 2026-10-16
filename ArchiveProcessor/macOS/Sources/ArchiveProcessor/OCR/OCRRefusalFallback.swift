@@ -9,8 +9,10 @@ import Foundation
 /// `OCRResult.secondReader`, which the run's `PendingRun.completedResults` persists. When no second route exists
 /// or every one fails, the page FAILS with a message naming the refusal — never an empty success.
 ///
-/// Called only from the direct-Gemini branch of `OCRProcessor.performOCRCall`; the gateway and Local Agent
-/// backends are the user's explicit single route and are never second-guessed.
+/// Called only through `OCRCascade.resolve` (W41.app-ocr-cascade), on the direct-provider path of
+/// `OCRProcessor.performOCRCall` and the batch collection: after the cascade's own route when one is set, and
+/// otherwise alone. The gateway and Local Agent backends are the user's explicit single route and are never
+/// second-guessed.
 enum OCRRefusalFallback {
     /// One route a refused page can be sent to.
     struct Route: Sendable {
@@ -43,6 +45,9 @@ enum OCRRefusalFallback {
     static func isRefusal(_ result: OCRResult) -> Bool {
         guard result.text == nil, let code = result.errorCode, !code.isEmpty else { return false }
         if OCRProcessor.isTimeoutError(result) { return false }
+        // A reply Gemini sent that held no answer was a plain failure before it had a code (W41.app-ocr-cascade);
+        // it stays one here, so it buys no second read unless the user set up a cascade.
+        if code == OCRFailureCode.unparsable { return false }
         if code.allSatisfy(\.isNumber) { return code == "500" }
         return true
     }
@@ -101,10 +106,19 @@ enum OCRRefusalFallback {
     /// marked with `secondReader`. Otherwise a failure (`exhaustedCode`) naming Gemini's reason and every route's.
     static func readRefusedPage(
         _ refused: OCRResult, imageURL: URL, previousText: String?, previousImageURL: URL?,
-        customPrompt: String?, imageScale: Double
+        customPrompt: String?, imageScale: Double, excluding: LLMModel? = nil, failedBefore: String? = nil
     ) async -> OCRResult {
         let why = refused.errorMessage ?? "Gemini returned no text (\(refused.errorCode ?? "?"))."
-        let routes = availableRoutes()
+        // `excluding`: the cascade's route, which has already failed this page (W41.app-ocr-cascade).
+        let routes = availableRoutes().filter { route in
+            guard let excluding, route.localAgent == nil else { return true }
+            return !(route.provider == excluding.provider && route.model.id == excluding.id)
+        }
+        if routes.isEmpty, let failedBefore {
+            // The cascade's route was the only one, and it failed: say so, not "no second reader is set up".
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: "\(why) Second readers failed too — \(failedBefore)", errorCode: exhaustedCode)
+        }
         guard !routes.isEmpty else {
             NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent) (\(refused.errorCode ?? "?")); no second reader")
             return OCRResult(text: nil, classification: nil,
@@ -112,7 +126,7 @@ enum OCRRefusalFallback {
                                  + "OpenAI or Mistral key, or install claude, to read pages Gemini refuses.",
                              errorCode: exhaustedCode)
         }
-        var reasons: [String] = []
+        var reasons: [String] = failedBefore.map { [$0] } ?? []
         for route in routes {
             // Stopped: spend nothing more. The caller sees the exhausted code and, in a batch, does not persist it.
             if Task.isCancelled { reasons.append("stopped before \(route.label)"); break }
@@ -129,7 +143,7 @@ enum OCRRefusalFallback {
                 let cost = route.localAgent == nil
                     ? CostEstimator.secondReaderPageCost(model: route.model, imageScale: imageScale) : 0
                 let reader = SecondReader(provider: route.provenanceProvider, model: route.provenanceModel,
-                                          geminiCode: refused.errorCode ?? "?", estimatedCost: cost)
+                                          firstCode: refused.errorCode ?? "?", estimatedCost: cost)
                 NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(reader.summary)")
                 return OCRResult(text: result.text, classification: result.classification,
                                  rotationDegrees: result.rotationDegrees, errorMessage: nil, errorCode: nil,
@@ -143,21 +157,8 @@ enum OCRRefusalFallback {
                          errorCode: exhaustedCode)
     }
 
-    /// A Gemini BATCH page as collected (W41.app-ocr-default-fu1): a refusal goes to `readRefusedPage`, anything
-    /// else is returned untouched. `enabled` is false off the direct-Gemini route (gateway, Local Agent, other
-    /// providers' batches). Batch pages carry no previous text; `previousImageURL` is set only when the batch
-    /// itself sent one.
-    static func readIfRefused(
-        _ result: OCRResult, enabled: Bool, imageURL: URL, previousImageURL: URL?,
-        customPrompt: String?, imageScale: Double
-    ) async -> OCRResult {
-        guard enabled, isRefusal(result) else { return result }
-        return await readRefusedPage(result, imageURL: imageURL, previousText: nil,
-                                     previousImageURL: previousImageURL, customPrompt: customPrompt,
-                                     imageScale: imageScale)
-    }
-
-    private static func read(
+    /// One route's reading of the page. Also the cascade's escalation read (`OCRCascade`), which may be Gemini.
+    static func read(
         _ route: Route, imageURL: URL, previousText: String?, previousImageURL: URL?,
         customPrompt: String?, imageScale: Double
     ) async throws -> OCRResult {
@@ -182,8 +183,14 @@ enum OCRRefusalFallback {
         case .mistral:
             return try await MistralClient(apiKey: route.apiKey, model: route.model).ocr(
                 imageURL: imageURL, previousText: previousText, imageScale: imageScale)
-        case .gemini, .appleVision:
-            // Never a second reader: Gemini is the refuser, and Vision's text is not a transcription.
+        case .gemini:
+            // Never a refusal route (`availableRoutes` builds none: Gemini is the refuser), but a cascade may
+            // escalate a cheaper reader's failure to it.
+            return try await GeminiClient(apiKey: route.apiKey, model: route.model, thinkingLevel: nil).ocr(
+                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+                customPrompt: customPrompt, imageScale: imageScale)
+        case .appleVision:
+            // Never a second reader: Vision's text is not a transcription the panel scored as one.
             return OCRResult(text: nil, classification: nil, errorMessage: "not a second reader", errorCode: nil)
         }
     }

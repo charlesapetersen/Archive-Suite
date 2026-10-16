@@ -2,6 +2,22 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W41.app-ocr-cascade, 2026-10-16): what the cheap-first cascade does not yet cover
+
+`OCRCascade` (off by default) re-reads a failed page with the user's escalation model. What it leaves open, from its
+Tier-2 review: an **Anthropic batch** item that errors carries no code, so it is not escalated (a Gemini batch 500
+is); the recorded escalation cost uses the per-file dimension scale on the synchronous path but the slider fraction
+on the batch path and in the pre-run line (the refusal readers already did the same); a **Stop during an
+escalation read** on the synchronous path leaves the page `CascadeExhausted` (only batch collection refuses to keep
+that verdict), so it needs the operator's Retry; a **disagreement** escalation that fails keeps the first reading
+and its spend is not added to the run's history; the breaker (`OCRCascade.Breaker`: the first 20 escalations, then
+at most a quarter of the run's pages) counts afresh after a resume. Since this item every client fails a reply cut
+off at the token limit (`length`) instead of saving the cut text; on OpenAI reasoning models a high Thinking level
+spends the 8,192-token budget on reasoning too, so a dense page there can now fail where it used to keep partial text. A **Gemini** page
+cut off at the limit counts as a refusal, so with the refusal readers on it buys one of their second reads even with
+the cascade off (it used to save the looping text); those reads are not bounded by the cascade's breaker and the
+pre-run line does not count them.
+
 ## ⚠️ LIMITATION (W41.app-ocr-default, 2026-10-15): Gemini refuses some printed text; a second reader covers it
 
 Every Gemini model ends some reprinted published pages with no text (in the W41 panel, the same two printed 1900-1949 pages on every

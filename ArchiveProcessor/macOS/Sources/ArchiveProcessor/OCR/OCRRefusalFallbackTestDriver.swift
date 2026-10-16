@@ -102,7 +102,7 @@ enum OCRRefusalFallbackTestDriver {
         func ocr() async -> OCRResult {
             await OCRProcessor.performOCRCall(
                 imageURL: image, provider: .gemini, model: gemini[0], thinkingLevel: .low, apiKey: "test-gemini",
-                previousText: nil, previousImageURL: nil, rotationMode: .off, standardImageMB: 4)
+                previousText: nil, previousImageURL: nil, rotationMode: .off, standardImageMB: 4, cascade: .off)
         }
 
         let recitation = #"{"candidates":[{"finishReason":"RECITATION"}]}"#
@@ -121,7 +121,7 @@ enum OCRRefusalFallbackTestDriver {
               calls.first?.contains("generativelanguage") == true && calls.contains { $0.contains("anthropic") })
         check("the result names its second reader and Gemini's reason",
               r.secondReader?.provider == "Anthropic" && r.secondReader?.model == LLMModel.anthropicModels[0].displayName
-              && r.secondReader?.geminiCode == "Recitation")
+              && r.secondReader?.firstCode == "Recitation")
         // W41.app-ocr-default-fu1 — the page carries what the keyed reader spent, for the run summary.
         let claudePage = CostEstimator.secondReaderPageCost(model: LLMModel.anthropicModels[0], imageScale: 1)
         check("a keyed second read carries its estimated cost", claudePage > 0
@@ -263,17 +263,19 @@ enum OCRRefusalFallbackTestDriver {
         useRoutes([claude])
         await script.set(gemini: (200, geminiText), anthropic: (200, claudeText))
         func collect(_ page: OCRResult, enabled: Bool = true) async -> OCRResult {
-            await OCRRefusalFallback.readIfRefused(page, enabled: enabled, imageURL: image, previousImageURL: nil,
-                                                   customPrompt: nil, imageScale: 1)
+            // The batch collection's call (`processBatchResults`), with the cascade off.
+            await OCRCascade.resolve(page, cascade: .off, provider: .gemini, model: gemini[0], refusalFallback: enabled,
+                                     imageURL: image, previousText: nil, previousImageURL: nil, customPrompt: nil,
+                                     imageScale: 1, visionSettings: .default)
         }
         r = await collect(batchOther)
         calls = await script.calls()
         check("a batch page refused with OTHER is read by the second reader, marked, with one call",
-              r.text?.contains("CLAUDE-TEXT") == true && r.secondReader?.geminiCode == "OTHER"
+              r.text?.contains("CLAUDE-TEXT") == true && r.secondReader?.firstCode == "OTHER"
               && calls.filter { $0.contains("anthropic") }.count == 1 && !calls.contains { $0.contains("generativelanguage") })
         let batchRecitation = GeminiBatchClient.parseSingleResponse(["candidates": [["finishReason": "RECITATION"]]])
         r = await collect(batchRecitation)
-        check("a batch RECITATION page is read by the second reader", r.secondReader?.geminiCode == "Recitation")
+        check("a batch RECITATION page is read by the second reader", r.secondReader?.firstCode == "Recitation")
         await script.set(gemini: (200, geminiText), anthropic: (200, claudeText))
         let batchOK = OCRResult(text: "BATCH-TEXT", classification: nil, errorMessage: nil, errorCode: nil)
         r = await collect(batchOK)
@@ -315,8 +317,8 @@ enum OCRRefusalFallbackTestDriver {
             model: flash, visionTextProvider: nil, visionTextModel: nil, batchMode: true, enableTagging: false,
             enableCollectionSegmentation: false, preOCRedInput: false, reOCRMultiPagePDF: false, mixedReOCR: false,
             sendPreviousImage: false, contextCharCount: 0, imageScale: 1, rotationMode: .off, fileCount: 3)
-        let readers = [SecondReader(provider: "Anthropic", model: "m", geminiCode: "OTHER", estimatedCost: 0.01),
-                       SecondReader(provider: "claude", model: "m", geminiCode: "OTHER", estimatedCost: 0)]
+        let readers = [SecondReader(provider: "Anthropic", model: "m", firstCode: "OTHER", estimatedCost: 0.01),
+                       SecondReader(provider: "claude", model: "m", firstCode: "OTHER", estimatedCost: 0)]
         let recorded = snapshot.makeRun(succeeded: 3, secondReaders: readers)
         check("the run's history counts the second-read pages and adds their cost",
               recorded.secondReaderPages == 2 && abs(recorded.cost - (snapshot.estimatedCost + 0.01)) < 1e-12)

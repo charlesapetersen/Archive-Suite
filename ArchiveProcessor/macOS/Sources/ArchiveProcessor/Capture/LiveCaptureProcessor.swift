@@ -975,7 +975,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 imageScale: config.imageScale, gateway: config.gateway,
                 localAgent: config.localAgent,
                 rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
-                visionSettings: config.visionSettings,
+                visionSettings: config.visionSettings, cascade: config.cascade,
                 visionTextLLM: config.visionTextLLM)
         }
 
@@ -1542,7 +1542,7 @@ final class LiveCaptureProcessor: ObservableObject {
         imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
         apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?,
         localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double,
-        visionSettings: VisionOCRSettings, visionTextLLM: LLMTextConfiguration?
+        visionSettings: VisionOCRSettings, cascade: OCRCascade, visionTextLLM: LLMTextConfiguration?
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
             let ocrResult = await OCRProcessor.performOCRCall(
@@ -1550,7 +1550,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 apiKey: apiKey, previousText: nil, previousImageURL: nil,
                 customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
                 localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
-                visionSettings: visionSettings)
+                visionSettings: visionSettings, cascade: cascade)
             return await OCRProcessor.applyingVisionTextClassification(
                 to: ocrResult, previousText: nil, customPrompt: customPrompt,
                 configuration: provider == .appleVision ? visionTextLLM : nil)

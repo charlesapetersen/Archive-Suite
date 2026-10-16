@@ -54,7 +54,7 @@ struct GeminiClient {
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: nil)
+            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: OCRFailureCode.unparsable)
         }
 
         if let promptFeedback = json["promptFeedback"] as? [String: Any],
@@ -64,7 +64,7 @@ struct GeminiClient {
 
         guard let candidates = json["candidates"] as? [[String: Any]],
               let first = candidates.first else {
-            return OCRResult(text: nil, classification: nil, errorMessage: "No candidates in response", errorCode: nil)
+            return OCRResult(text: nil, classification: nil, errorMessage: "No candidates in response", errorCode: OCRFailureCode.unparsable)
         }
 
         // Surface any non-STOP finish reason with its actual code — not just RECITATION. MAX_TOKENS,
@@ -80,7 +80,7 @@ struct GeminiClient {
             if let fr = finishReason, fr != "STOP" {
                 return OCRResult(text: nil, classification: nil, errorMessage: "Gemini stopped without returning text (\(fr)).", errorCode: fr)
             }
-            return OCRResult(text: nil, classification: nil, errorMessage: "No content parts in response", errorCode: nil)
+            return OCRResult(text: nil, classification: nil, errorMessage: "No content parts in response", errorCode: OCRFailureCode.unparsable)
         }
 
         let rawText = respParts.compactMap { $0["text"] as? String }.joined(separator: "\n")
@@ -89,6 +89,9 @@ struct GeminiClient {
         if rawText.isEmpty, let fr = finishReason, fr != "STOP" {
             return OCRResult(text: nil, classification: nil, errorMessage: "Gemini returned no text (\(fr)).", errorCode: fr)
         }
+        // W41.app-ocr-cascade: a reply cut off at the token limit is not a transcription (it is almost always a
+        // reply repeating itself), so it fails the page rather than saving the cut text as the page's reading.
+        if finishReason == "MAX_TOKENS" { return OCRResult.cutOff }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(rawText)
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(rawText))
     }

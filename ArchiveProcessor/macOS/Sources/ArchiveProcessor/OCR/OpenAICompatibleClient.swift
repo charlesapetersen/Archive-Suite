@@ -73,18 +73,24 @@ struct OpenAICompatibleClient {
                                  errorMessage: (error["message"] as? String) ?? "Provider error",
                                  errorCode: Self.openRouterRetryCode(code))
             }
-            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: nil)
+            // A reply cut at the token limit before any content (`content: null`) is a cut-off, not unparsable.
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let choices = json["choices"] as? [[String: Any]],
+               choices.first?["finish_reason"] as? String == "length" {
+                return OCRResult.cutOff
+            }
+            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: OCRFailureCode.unparsable)
         }
 
-        // OpenRouter reports a provider failure mid-stream as finish_reason "error", and a reply cut at the token
-        // limit as "length": neither is a transcription (W41.app-openrouter review). The failure is 503, which
+        // OpenRouter reports a provider failure mid-stream as finish_reason "error", and every OpenAI-compatible
+        // endpoint reports a reply cut at the token limit as "length": neither is a transcription (W41.app-openrouter
+        // review; the cut reply on every route since W41.app-ocr-cascade). The failure is 503, which
         // `isRetryableError` retries; a cut reply is not retried, since the same budget would cut it again.
-        if openRouterRoute != nil, let finish = choices.first?["finish_reason"] as? String,
-           finish == "error" || finish == "length" {
-            return OCRResult(text: nil, classification: nil,
-                             errorMessage: finish == "error" ? "The provider failed while answering"
-                                 : "The reply was cut off at the token limit",
-                             errorCode: finish == "error" ? "503" : "length")
+        let finish = choices.first?["finish_reason"] as? String
+        if finish == "length" { return OCRResult.cutOff }
+        if openRouterRoute != nil, finish == "error" {
+            return OCRResult(text: nil, classification: nil, errorMessage: "The provider failed while answering",
+                             errorCode: "503")
         }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(content)
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(content))

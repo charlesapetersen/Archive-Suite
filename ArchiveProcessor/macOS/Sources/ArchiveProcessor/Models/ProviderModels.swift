@@ -536,6 +536,11 @@ struct OCRResult: Codable {
         self.ocrEnclosure = ocrEnclosure ?? self.enclosure
     }
 
+    /// A reply cut off at the token limit (W41.app-ocr-cascade): every client fails the page with this, never the
+    /// cut text. Not auto-retried (the same budget would cut it again); the cascade escalates it.
+    static let cutOff = OCRResult(text: nil, classification: nil, errorMessage: "The reply was cut off at the token limit",
+                                  errorCode: OCRFailureCode.cutOff)
+
     /// A copy of this result with a new classification and/or rotation, **preserving** `text`,
     /// `errorMessage`, and `errorCode`. The review / retry / rotation flows re-derive only the
     /// classification or the rotation; routing them through one initializer stops each from re-typing
@@ -554,18 +559,41 @@ struct OCRResult: Codable {
     }
 }
 
-/// W41.app-ocr-default — who read a page Gemini refused, and why. `provider`/`model` fill the PDF page-2 header's
-/// provenance positions in place of the run's Gemini model, so the header names the model that wrote the text
-/// without changing the header's shape (`SPEC/tag-format.md`).
+/// W41.app-ocr-default — who read a page the run's own model did not, and why: a page Gemini refused
+/// (`OCRRefusalFallback`), or one the cascade escalated (W41.app-ocr-cascade, `OCRCascade`). `provider`/`model` fill
+/// the PDF page-2 header's provenance positions in place of the run's model, so the header names the model that
+/// wrote the text without changing the header's shape (`SPEC/tag-format.md`).
 struct SecondReader: Codable, Equatable {
+    /// Why the run's own reading was not kept.
+    enum Trigger: String, Codable {
+        /// Gemini refused the page (a finish or block reason, or its bare 500).
+        case refusal
+        /// The first reader failed: cut off at the token limit, an unparsable reply, a server error.
+        case failure
+        /// The first reader's word count and Apple Vision's disagreed (`OCRCascade.disagreementRatio`).
+        case disagreement
+    }
+
     let provider: String
     let model: String
-    /// Gemini's code for the refusal (`Recitation`, `OTHER`, `500`, …).
-    let geminiCode: String
+    /// The first reader's failure code (`Recitation`, `OTHER`, `500`, `length`, …), or for a disagreement the
+    /// two word counts.
+    let firstCode: String
     /// USD, `CostEstimator.secondReaderPageCost` for the route that read the page (0 for claude by plan).
     var estimatedCost: Double? = nil
+    /// nil on a refusal second read (`OCRRefusalFallback`), which predates the cascade and is always Gemini's.
+    var trigger: Trigger? = nil
+    /// The first reader, `"<provider> · <model>"`; nil = the run's Gemini model (a refusal second read).
+    var firstReader: String? = nil
 
-    var summary: String { "\(provider) · \(model), after Gemini returned no text (\(geminiCode))" }
+    var summary: String {
+        let first = firstReader ?? "Gemini"
+        switch trigger ?? .refusal {
+        case .refusal: return "\(provider) · \(model), after \(first) returned no text (\(firstCode))"
+        case .failure: return "\(provider) · \(model), after \(first) failed (\(firstCode))"
+        case .disagreement: return "\(provider) · \(model), after \(first)'s reading disagreed with Apple Vision's (\(firstCode))"
+        }
+    }
 }
 
 // MARK: - Live Processing Mode

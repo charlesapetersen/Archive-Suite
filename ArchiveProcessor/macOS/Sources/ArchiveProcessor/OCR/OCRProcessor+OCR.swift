@@ -32,13 +32,14 @@ extension OCRProcessor {
     /// call sites. `nonisolated` so the detached OCR workers can resolve it without hopping actors.
     nonisolated static func ocrCallValues(
         for runConfig: SessionProcessingConfig?
-    ) -> (rotationMode: RotationMode, standardImageMB: Double, visionSettings: VisionOCRSettings) {
+    ) -> (rotationMode: RotationMode, standardImageMB: Double, visionSettings: VisionOCRSettings, cascade: OCRCascade) {
         guard let runConfig else {
             return (SessionProcessingConfig.defaultRotationMode(),
                     SessionProcessingConfig.runSizing().standardImageMB,
-                    VisionOCRSettings.fromDefaults())
+                    VisionOCRSettings.fromDefaults(),
+                    OCRCascade.fromDefaults())
         }
-        return (runConfig.rotationMode, runConfig.standardImageMB, runConfig.visionSettings)
+        return (runConfig.rotationMode, runConfig.standardImageMB, runConfig.visionSettings, runConfig.cascade)
     }
 
     /// Convert any PDF files in the input list to temporary JPEG images.
@@ -396,7 +397,7 @@ extension OCRProcessor {
                         customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                     )
                     }
                     if activePendingMixedPDF != nil &&
@@ -733,7 +734,7 @@ extension OCRProcessor {
         let immutableFingerprint = Self.runFingerprint(
             files: originalFiles, outputDirectory: outputDirectory, taggingMode: taggingMode,
             enableTagging: enableTagging, batchMode: true, preserveInputOrder: true)
-        let initialPendingBatch = PendingBatch(
+        var initialPendingBatch = PendingBatch(
             batchId: "", provider: provider, model: model,
             thinkingLevel: thinkingLevel, fileURLs: originalFiles,
             outputDirectory: outputDirectory, enableTagging: enableTagging,
@@ -751,6 +752,7 @@ extension OCRProcessor {
             submissionComplete: false, completedResults: [:], completedOutputPaths: [:],
             mixedPDFOutcomes: mixedPDFOutcomes
         )
+        initialPendingBatch.cascade = Self.ocrCallValues(for: runConfig).cascade
         guard let persistedInitialBatch = Self.savePendingBatch(initialPendingBatch) else {
             statusMessage = "Could not create a safe paid-batch journal. No batch requests were sent."
             batchPollInterrupted = true
@@ -1220,7 +1222,8 @@ extension OCRProcessor {
         // M4 perf fix: detect rotation concurrently (bounded) instead of serially.
         // handleOCRResult runs back on MainActor (serialized) for state updates;
         // its PDF gen is off-MainActor via M3.
-        let rotationMode = Self.ocrCallValues(for: runConfig).rotationMode
+        let ocrRun = Self.ocrCallValues(for: runConfig)
+        let rotationMode = ocrRun.rotationMode
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let maxConcurrent = max(1, ProcessInfo.processInfo.activeProcessorCount - 2)
@@ -1228,7 +1231,11 @@ extension OCRProcessor {
         // synchronous path does in `performOCRCall`. The request matches the batch's own: its prompt, its
         // previous-image setting, and the live size fraction a batch resume also uses. A page already in
         // `completedResults` was filtered out above, so a re-fetched chunk never buys a second read twice.
-        let secondReaderFallback = model.provider == .gemini && gateway == nil && localAgent == nil
+        // W41.app-ocr-cascade: a page the batch's model failed (or disagrees with Vision on) is escalated the same
+        // way here, once. Off the direct route (gateway, Local Agent) neither runs.
+        let direct = gateway == nil && localAgent == nil
+        let secondReaderFallback = model.provider == .gemini && direct
+        let batchCascade = direct ? ocrRun.cascade : .off
         let fallbackPrompt = activePendingBatch?.customPrompt
         let fallbackPreviousImage = activePendingBatch?.sendPreviousImage ?? false
         let fallbackScale = Self.liveImageScaleFraction()
@@ -1239,17 +1246,20 @@ extension OCRProcessor {
             func addNext() -> Bool {
                 guard let entry = iter.next() else { return false }
                 group.addTask {
-                    let read = await OCRRefusalFallback.readIfRefused(
-                        entry.result, enabled: secondReaderFallback, imageURL: entry.url,
+                    let read = await OCRCascade.resolve(
+                        entry.result, cascade: batchCascade, provider: model.provider, model: model,
+                        refusalFallback: secondReaderFallback, imageURL: entry.url, previousText: nil,
                         previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
-                        customPrompt: fallbackPrompt, imageScale: fallbackScale)
+                        customPrompt: fallbackPrompt, imageScale: fallbackScale,
+                        visionSettings: ocrRun.visionSettings)
                     let correction = await Self.detectRotation(
                         imageURL: entry.url, provider: model.provider, apiKey: apiKey,
                         mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
                     )
                     // A Stop cancels the routes mid-read, so "every second reader failed" is not true: never
                     // persist that verdict; the kept journal brings the page back on resume.
-                    let abandoned = Task.isCancelled && read.errorCode == OCRRefusalFallback.exhaustedCode
+                    let abandoned = Task.isCancelled && (read.errorCode == OCRRefusalFallback.exhaustedCode
+                        || read.errorCode == OCRCascade.exhaustedCode)
                     return (entry.index, entry.url, entry.jobID,
                             Self.mergeRotation(into: read, correction: correction), abandoned)
                 }
@@ -1369,7 +1379,7 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
             )
 
             // If timed out, retry once without context
@@ -1388,7 +1398,7 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                 )
             }
 
@@ -1455,7 +1465,7 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                     )
                     let result = await Self.applyingVisionTextClassification(
                         to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1495,7 +1505,7 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1665,7 +1675,9 @@ extension OCRProcessor {
     }
     nonisolated static func isTimeoutError(_ result: OCRResult) -> Bool {
         // A refused page whose second readers failed: re-running would buy the refusal and every reader again.
-        if result.errorCode == OCRRefusalFallback.exhaustedCode { return false }
+        if result.errorCode == OCRRefusalFallback.exhaustedCode || result.errorCode == OCRCascade.exhaustedCode {
+            return false
+        }
         if result.errorMessage?.lowercased().contains("timed out") == true
             || result.errorCode?.lowercased().contains("timeout") == true { return true }
         // Providers also surface timeouts as HTTP 408 (Request Timeout) / 504 (Gateway Timeout)
@@ -1693,6 +1705,7 @@ extension OCRProcessor {
         rotationMode: RotationMode,
         standardImageMB: Double,
         visionSettings: VisionOCRSettings = .default,
+        cascade: OCRCascade,
         refusalFallback: Bool = true
     ) async -> OCRResult {
         // Start rotation detection concurrently with the network OCR call. Both are async, so
@@ -1727,13 +1740,7 @@ extension OCRProcessor {
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 case .gemini:
                     let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    let geminiResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-                    // W41.app-ocr-default: a page Gemini refuses goes to a second reader, never an empty success.
-                    networkResult = refusalFallback && OCRRefusalFallback.isRefusal(geminiResult)
-                        ? await OCRRefusalFallback.readRefusedPage(
-                            geminiResult, imageURL: imageURL, previousText: previousText,
-                            previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-                        : geminiResult
+                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
                 case .mistral:
                     let client = MistralClient(apiKey: apiKey, model: model)
                     networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: scale)
@@ -1754,9 +1761,19 @@ extension OCRProcessor {
             return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: nil)
         }
 
+        // W41.app-ocr-default: a page Gemini refuses goes to a second reader, never an empty success. W41.app-ocr-
+        // cascade: a page the run's own model fails (or, opted in, disagrees with Vision on) goes to the user's
+        // escalation route. Direct providers only: the gateway and the Local Agent are the user's single route.
+        let resolved = localAgent == nil && gatewayConfig == nil
+            ? await OCRCascade.resolve(
+                networkResult, cascade: cascade, provider: provider, model: model, refusalFallback: refusalFallback,
+                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+                customPrompt: customPrompt, imageScale: scale, visionSettings: visionSettings)
+            : networkResult
+
         // Override rotation with the detected correction when OCR produced text and a
         // correction was found; otherwise keep the LLM prompt's parsed rotation.
-        return mergeRotation(into: networkResult, correction: await rotationCorrection)
+        return mergeRotation(into: resolved, correction: await rotationCorrection)
     }
     /// Detect the clockwise correction for an image per the run's rotation mode, with LLM
     /// modes falling back to local Vision when unavailable. Runs off the main actor.
@@ -1795,7 +1812,8 @@ extension OCRProcessor {
     }
     private func isRetryableError(_ result: OCRResult?) -> Bool {
         guard let result = result, result.text == nil,
-              result.errorCode != OCRRefusalFallback.exhaustedCode else { return false }
+              result.errorCode != OCRRefusalFallback.exhaustedCode,
+              result.errorCode != OCRCascade.exhaustedCode else { return false }
         let code = result.errorCode ?? ""
         let msg = (result.errorMessage ?? "").lowercased()
         return code == "503" || code == "429" || code == "529"
@@ -1846,7 +1864,7 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade
             )
 
             // W16.bat11 — there is deliberately NO `jobs[index]` read here.
@@ -1890,6 +1908,7 @@ extension OCRProcessor {
             rotationMode: rotationMode,
             standardImageMB: standardImageMB,
             visionSettings: visionSettings,
+            cascade: .off,   // a diagnostic measures the chosen model, as below
             refusalFallback: false   // a diagnostic measures the chosen model; never report a second reader's text as its
         )
     }

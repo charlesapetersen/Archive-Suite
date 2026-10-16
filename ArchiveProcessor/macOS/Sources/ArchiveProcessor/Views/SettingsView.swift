@@ -57,6 +57,8 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.visionFastRecognition) private var visionFastRecognition: Bool = false
     @AppStorage(DefaultsKeys.visionMinimumConfidence) private var visionMinimumConfidence: Double = 0
     @AppStorage(DefaultsKeys.visionCustomVocabulary) private var visionCustomVocabulary: String = ""
+    @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
+    @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
 
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
@@ -501,8 +503,54 @@ struct SettingsView: View {
                         }
                     }
                 }
+                cascadeControls
                 Button("Manage custom models…") { showManageModels = true }
             }
+        }
+    }
+
+    /// W41.app-ocr-cascade — where a page the run's model fails goes (`OCRCascade`). Off by default.
+    @ViewBuilder private var cascadeControls: some View {
+        Picker(selection: $ocrCascadeRoute) {
+            Text("Off").tag("")
+            // Keyed by route ID: a model ID alone is not unique across providers.
+            ForEach(OCRCascade.candidates.map { (OCRCascade.routeID(for: $0), $0) }, id: \.0) { routeID, m in
+                Text("\(m.provider.rawValue) · \(m.displayName)").tag(routeID)
+            }
+        } label: {
+            HStack {
+                Text("Escalate failed pages to")
+                HelpButton(text: "Read every page with the model above, and send a page it fails on (a refusal, a reply cut off at the token limit, an unparsable reply, a server error) to this stronger model. On the bench's 96 pages this beat one model alone at every budget up to $5 per 1,000 pages, and few pages fail, so the stronger model reads few. Where accuracy matters more than price, one strong model alone is still best. Each page records which model's text was kept. Uses that provider's API key.")
+            }
+        }
+        .accessibilityIdentifier("ap.settings.cascadeRoute")
+        if let target = OCRCascade(routeID: ocrCascadeRoute).escalationModel {
+            if OCRCascade.routeID(for: target) == OCRCascade.routeID(for: selectedModel) {
+                Text("That is the model above, so nothing is escalated.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if storedKey(for: target.provider).isEmpty {
+                Text("No \(target.provider.rawValue) key is saved: escalated pages will fail until one is.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            Toggle(isOn: $ocrCascadeOnDisagreement) {
+                HStack {
+                    Text("Also escalate pages whose word count disagrees with Apple Vision's")
+                    HelpButton(text: "Experimental. Apple Vision also reads each page on this Mac (free, about a second), and a page whose word count differs from it by more than half again is sent on too. It finds many poor readings, but on the bench's pages its gain over escalating failures alone was not consistent, and it escalates about one page in ten.")
+                }
+            }
+            .accessibilityIdentifier("ap.settings.cascadeDisagreement")
+        }
+    }
+
+    /// The key field's current value for a provider (loaded from the Keychain once, with the fields above).
+    private func storedKey(for provider: LLMProvider) -> String {
+        switch provider {
+        case .anthropic: return anthropicKey
+        case .gemini: return geminiKey
+        case .mistral: return mistralKey
+        case .openai: return openaiKey
+        case .openrouter: return openrouterKey
+        case .appleVision: return ""
         }
     }
 

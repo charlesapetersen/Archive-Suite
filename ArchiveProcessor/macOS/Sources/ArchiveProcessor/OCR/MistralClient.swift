@@ -39,7 +39,7 @@ struct MistralClient {
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: nil)
+            return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: OCRFailureCode.unparsable)
         }
 
         var ocrText: String? = nil
