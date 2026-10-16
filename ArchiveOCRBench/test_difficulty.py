@@ -26,6 +26,16 @@ def test_two_way_does_not_credit_skipping_hard_pages():
     assert answered_b > answered_a
 
 
+def test_vision_verdict_needs_a_gain_at_every_paid_budget():
+    def d(gains):
+        fams = lambda g: {"fail": {"split_out": 90.0}, "fail+vision": {"split_out": 90.0 + g}}  # noqa: E731
+        return {"vision_kind": {"panel": {}},
+                "cascades": {"budgets": [{"budget": b, "families": fams(g)} for b, g in zip((0, 0.5, 1, 2, 5, 25), gains)]}}
+    assert D.vision_verdict(d([0, 1, 1, 1, 1, -5])) == "gain"      # free and $25 do not count
+    assert D.vision_verdict(d([0, 1, -0.3, 1, 1, 0])) == "none"    # one paid budget that loses is enough
+    assert D.vision_verdict({"vision_kind": None}) == "unmeasured"
+
+
 if __name__ == "__main__":
     for name, f in list(globals().items()):
         if name.startswith("test_"):

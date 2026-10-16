@@ -10,6 +10,10 @@ and writes, in segbench-results/:
   ocr-pages-agree.csv  NES between two cheap readers' texts on the same page, for every pair of the cheap readers
                        (free, or $1 or less per 1,000 pages), the disagreement a cascade could see without truth
 
+and, when vision_kind/run.sh has been run into the cache's vision-kind/ (W41.bench-vision-kind), each page's Vision
+OCR page kind in ocr-pages.csv's vision_kind column, and farmshare/bulk/vision-kind.csv for the bulk pages: one row
+per page, the kind and the signals it was judged by, under the bulk run's own neutral page names.
+
 No text, file names or corpus paths leave the cache: page ids are the panel's private keys. ArchiveOCRBench's
 difficulty.py reads these two files; nothing here needs the network or money.
 """
@@ -32,7 +36,23 @@ CHEAP = ('apple-vision', *MAC, 'qwen3.5-9b', 'mistral-small-24b', 'gemma4-31b', 
          'qwen3.8-flash', 'qwen3.5-35b-a3b', 'qwen3-vl-30b-a3b')
 PAGES_CSV = P.RESULTS / 'ocr-pages.csv'
 AGREE_CSV = P.RESULTS / 'ocr-pages-agree.csv'
-FIELDS = ['route', 'page', 'kind', 'said_kind', 'ok', 'nes', 'cost', 'words', 'hyp_words', 'completion_tokens', 'finish']
+FIELDS = ['route', 'page', 'kind', 'said_kind', 'vision_kind', 'ok', 'nes', 'cost', 'words', 'hyp_words',
+          'completion_tokens', 'finish']
+# W41.bench-vision-kind: vision_kind/run.sh's output for the panel's originals and the bulk pilot's 2,000 pages.
+VISION_KIND = CACHES / 'vision-kind'
+BULK_KIND_CSV = P.RESULTS / 'farmshare' / 'bulk' / 'vision-kind.csv'
+BULK_KIND_FIELDS = ['page', 'vision_kind', 'paste_up', 'photo', 'camera', 'hand', 'lines', 'wide_w']
+
+
+def vision_kinds(*names):
+    """page -> the row vision-page-kind printed for it, from the named TSVs in the cache; unread pages are left out."""
+    out = {}
+    for n in names:
+        f = VISION_KIND / n
+        if f.exists():
+            with f.open(newline='') as fh:
+                out.update({r['id']: r for r in csv.DictReader(fh, delimiter='\t') if r['vision_kind'] != 'unread'})
+    return out
 
 
 def load(f):
@@ -68,6 +88,7 @@ def main():
             if r['scale'] == 'original':
                 panel[(r['key'], r['page'])] = r
 
+    vk = vision_kinds('panel.tsv')
     rows, texts = [], {}
     for route in routes:
         if route in FARMSHARE:
@@ -93,7 +114,8 @@ def main():
                     raise SystemExit(f'{route} {p}: scores.json and the reading disagree on whether it answered')
             if route not in FARMSHARE:
                 row['said_kind'] = (parsed or {}).get('kind') or ''
-            rows.append({'route': route, 'page': p, 'kind': truth_kind[p], **row,
+            rows.append({'route': route, 'page': p, 'kind': truth_kind[p],
+                         'vision_kind': vk.get(p, {}).get('vision_kind', ''), **row,
                          'nes': round(float(row['nes']), 6)})
             if route in CHEAP and parsed:
                 texts[(route, p)] = parsed['text']
@@ -105,8 +127,13 @@ def main():
             if (a, p) in texts and (b, p) in texts:
                 agree.append({'a': a, 'b': b, 'page': p, 'nes': round(S.score(texts[(a, p)], texts[(b, p)])['nes'], 4)})
     S.write_csv(AGREE_CSV, agree, ['a', 'b', 'page', 'nes'])
-    print(f'{PAGES_CSV.name}: {len(rows)} rows ({len(routes)} routes x {len(pages)} pages); '
-          f'{AGREE_CSV.name}: {len(agree)} pairs of readings')
+    bulk = vision_kinds(*(f'bulk-{i}.tsv' for i in range(4)))
+    if bulk:
+        S.write_csv(BULK_KIND_CSV, [{'page': p, **{k: bulk[p][k] for k in BULK_KIND_FIELDS[1:]}} for p in sorted(bulk)],
+                    BULK_KIND_FIELDS)
+    print(f'{PAGES_CSV.name}: {len(rows)} rows ({len(routes)} routes x {len(pages)} pages, '
+          f'{sum(p in vk for p in pages)} with a Vision kind); {AGREE_CSV.name}: {len(agree)} pairs of readings; '
+          f'{BULK_KIND_CSV.name}: {len(bulk)} bulk pages')
 
 
 if __name__ == '__main__':

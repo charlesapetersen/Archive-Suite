@@ -5899,6 +5899,7 @@
   },
   "bulk_failures": {
    "unparsed (length)": 13
-  }
+  },
+  "vision_kind": null
  }
 }

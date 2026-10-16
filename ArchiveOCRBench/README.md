@@ -20,7 +20,10 @@ What the bench has measured, as one page you can read and share. It has five par
 5. **Difficulty and cascades.** Part 1's routes ranked on the pages they answered, apart from their failures, with a
    page-difficulty measure that never reuses the route being judged; where failures fall; cheap-first cascades
    simulated from the measured readings, with a split-half check on choosing them; and the signals that flag an
-   answered page that is wrong (W41.bench-difficulty). The full report is `difficulty.md`.
+   answered page that is wrong (W41.bench-difficulty). With it, the Vision OCR lab's page sorter (newspaper,
+   photograph, handwriting, other, from Apple Vision's reading; no model, no paid call) on the panel's pages and the
+   bulk pilot's, as a label that does not depend on the route being judged and as a routing rule
+   (W41.bench-vision-kind). The full report is `difficulty.md`.
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet
@@ -62,9 +65,13 @@ record:
   photos come from its photos an hour. The newspaper results in `farmshare/news/` wait for a newspaper chart
   (`POTENTIAL_FEATURES.md`).
 - `ocr-pages.csv` and `ocr-pages-agree.csv`: every route's score on every one of the 96 pages (kind, the kind the
-  route said, answered, NES, measured cost, word counts), and the NES between two cheap readers' texts on the same
-  page. `scripts/segbench/ocr_pages_export.py` writes them from the panels' private caches; rerun it when a route is
-  added or rerun, then `build.py`. Part 5 reads only these, and FarmShare's `bulk/summary.json` for its failures by kind.
+  route said, Vision OCR's page kind, answered, NES, measured cost, word counts), and the NES between two cheap
+  readers' texts on the same page. `scripts/segbench/ocr_pages_export.py` writes them from the panels' private
+  caches; rerun it when a route is added or rerun, then `build.py`. Part 5 reads only these, and FarmShare's
+  `bulk/summary.json`, `bulk/pages.csv` and `bulk/vision-kind.csv` for the bulk pages' failures and kinds.
+- The Vision kind comes from `scripts/segbench/vision_kind/run.sh`, which builds a small tool against a vision-ocr
+  checkout's `Sources/` (read only; the commit is printed) and writes into the private cache's `vision-kind/`;
+  then rerun `ocr_pages_export.py`. The bulk pages' images are the bulk pilot's 2,400 px renders, kept on the Mac.
 - `ocr-panel-cloud-pilot.md`: the three-page pilot that came before the full cloud run.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.

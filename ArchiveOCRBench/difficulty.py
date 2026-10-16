@@ -18,6 +18,9 @@ RESULTS = Path(__file__).resolve().parent.parent / "ArchiveProcessor" / "segbenc
 PAGES_CSV = RESULTS / "ocr-pages.csv"
 AGREE_CSV = RESULTS / "ocr-pages-agree.csv"
 BULK = RESULTS / "farmshare" / "bulk" / "summary.json"
+BULK_PAGES = RESULTS / "farmshare" / "bulk" / "pages.csv"
+BULK_VISION = RESULTS / "farmshare" / "bulk" / "vision-kind.csv"   # W41.bench-vision-kind
+VISION_KINDS = ("newspaper", "photograph", "handwriting", "other")
 
 WRONG = 0.90            # an answered page below this NES counts as a poor reading (answered but wrong)
 TIERS = ("easy", "middle", "hard")
@@ -87,10 +90,12 @@ def analyse(prices, names, app_routes):
     routes = list(dict.fromkeys(r["route"] for r in rows))
     pages = sorted({r["page"] for r in rows})
     nes, ok, kind, said, cost, words, hyp = (defaultdict(dict) for _ in range(7))
+    vkind = {}  # Vision OCR's page kind (W41.bench-vision-kind), the same for every route; "" where not measured
     for r in rows:
         x, p = r["route"], r["page"]
         nes[x][p], ok[x][p] = float(r["nes"]), r["ok"] == "True"
         kind[p], said[x][p], words[p], hyp[x][p] = r["kind"], r["said_kind"], int(r["words"]), int(r["hyp_words"])
+        vkind[p] = r.get("vision_kind") or ""
         cost[x][p] = float(r["cost"])
     # Each page's price: the route's bench price shared out by its measured per-page cost where it has one, so a
     # cascade that escalates long pages pays for long pages; a route with no per-page record pays its average.
@@ -151,11 +156,15 @@ def analyse(prices, names, app_routes):
     # trigger fires. Its NES on a page is the last stage it reached (0 if that stage failed too).
     cheap = [x for x in app_routes if prices[x] <= CHEAP_PRICE]
 
-    def run(stages, trigger):
+    def run(stages, trigger, skip=None):
+        """skip(i, x, p): send the page past stage i unread and unpaid (a routing rule that needs no reading)."""
         out_n, out_c, out_esc, out_f = [], [], 0, 0
         for p in pages:
             c, got = 0.0, None
             for i, x in enumerate(stages):
+                if skip and i < len(stages) - 1 and skip(i, x, p):
+                    out_esc += i == 0
+                    continue
                 c += cost[x][p]
                 if i == len(stages) - 1 or not trigger(i, x, p):
                     got = nes[x][p] if ok[x][p] else 0.0
@@ -167,8 +176,8 @@ def analyse(prices, names, app_routes):
 
     cands = []
 
-    def add(label, stages, trigger, kind_="fail", extra_cost=None):
-        n_, c_, esc, failed = run(stages, trigger)
+    def add(label, stages, trigger, kind_="fail", extra_cost=None, skip=None):
+        n_, c_, esc, failed = run(stages, trigger, skip)
         if extra_cost:
             c_ = [c + extra_cost[p] for c, p in zip(c_, pages)]
         cands.append({"label": label, "stages": stages, "trigger": kind_, "nes_pages": n_, "cost_pages": c_,
@@ -183,6 +192,10 @@ def analyse(prices, names, app_routes):
             if any(said[a].values()):
                 add(f"{names[a]} → {names[b]} (and its handwritten or mixed pages)", [a, b],
                     lambda i, x, p: not ok[x][p] or said[x][p] in FLAG_KINDS, "fail+kind")
+            # Vision's page sorter routes before any reading: its handwriting pages go straight to b, unpaid at a.
+            if all(vkind.values()):
+                add(f"{names[a]} → {names[b]} (Vision's handwriting pages straight to {names[b]})", [a, b], fail,
+                    "fail+vision", skip=lambda i, x, p: vkind[p] == "handwriting")
     for a, b in itertools.permutations(cheap, 2):
         for c in app_routes:
             if c not in (a, b):
@@ -259,6 +272,8 @@ def analyse(prices, names, app_routes):
         sig = {}
         if any(said[x].values()):
             sig["said handwritten or mixed"] = {p: float(said[x][p] in FLAG_KINDS) for p in ans}
+        if all(vkind.values()):
+            sig["Vision: handwriting"] = {p: float(vkind[p] == "handwriting") for p in ans}
         if x != vision:
             sig["length against Apple Vision's"] = {p: abs(math.log((hyp[x][p] + 1) / (hyp[vision][p] + 1))) for p in ans}
         partners = []
@@ -279,6 +294,7 @@ def analyse(prices, names, app_routes):
                       "signals": out})
 
     bulk = json.loads(BULK.read_text()) if BULK.exists() else None
+    vision_kind = vision_kinds(pages, kind, vkind, all_diff, fails_on, tier_all, said, routes) if all(vkind.values()) else None
     hardest = sorted(pages, key=lambda p: -all_diff[p])[:10]
     return {
         "pages": len(pages), "routes_n": len(routes), "wrong_bar": r2(WRONG), "mu": r2(mu),
@@ -297,7 +313,54 @@ def analyse(prices, names, app_routes):
         "bulk": {k: bulk["by_kind"][k] for k in bulk["by_kind"]} if bulk else None,
         "bulk_total": {"pages": bulk["pages"], "failed": bulk["failed"]} if bulk else None,
         "bulk_failures": bulk["failures"] if bulk else None,
+        "vision_kind": vision_kind,
     }
+
+
+def vision_kinds(pages, kind, vkind, all_diff, fails_on, tier_all, said, routes):
+    """W41.bench-vision-kind: Vision OCR's page kind against the truth's kind and the models' labels, on the panel's
+    pages, and against the bulk model's label and its failures on the 2,000 bulk pages."""
+    present = [k for k in VISION_KINDS if any(vkind[p] == k for p in pages)]
+    truth_kinds = sorted(set(kind.values()))
+    panel = {v: {"n": sum(vkind[p] == v for p in pages),
+                 "truth": {k: sum(vkind[p] == v and kind[p] == k for p in pages) for k in truth_kinds},
+                 "tiers": {t: sum(vkind[p] == v and tier_all[p] == t for p in pages) for t in TIERS},
+                 "mean_nes": r2(1 - mean(all_diff[p] for p in pages if vkind[p] == v)),
+                 "route_failures": sum(fails_on[p] for p in pages if vkind[p] == v)} for v in present}
+    hand = [p for p in pages if kind[p] == "handwritten"]
+    called = [p for p in pages if vkind[p] == "handwriting"]
+    # The models' own labels on the same pages, for comparison: how often each says handwritten on a handwritten page.
+    said_hand = [r for r in routes if any(said[r].values())]
+    model_recall = {r: sum(said[r][p] == "handwritten" for p in hand) for r in said_hand}
+    model_prec = {r: (sum(kind[p] == "handwritten" for p in pages if said[r][p] == "handwritten"),
+                      sum(said[r][p] == "handwritten" for p in pages)) for r in said_hand}
+    out = {"panel": panel, "present": present, "truth_kinds": truth_kinds,
+           "hand": {"truth": len(hand), "called": len(called), "both": sum(kind[p] == "handwritten" for p in called),
+                    "called_kinds": {k: sum(kind[p] == k for p in called) for k in truth_kinds}},
+           "model_hand": {"routes": len(said_hand),
+                          "recall": [min(model_recall.values()), max(model_recall.values())] if said_hand else None,
+                          "precision": [min(a / b for a, b in model_prec.values() if b),
+                                        max(a / b for a, b in model_prec.values() if b)] if said_hand else None}}
+    if BULK_VISION.exists() and BULK_PAGES.exists():
+        with BULK_VISION.open(newline="") as f:
+            bv = {r["page"]: r for r in csv.DictReader(f)}
+        with BULK_PAGES.open(newline="") as f:
+            bp = {r["page"]: r for r in csv.DictReader(f)}
+        both = sorted(set(bv) & set(bp))
+        labels = sorted({bp[p]["kind"] for p in both if bp[p]["kind"]})
+        failed = lambda p: bp[p]["status"] != "ok"  # noqa: E731
+        out["bulk"] = {
+            "pages": len(both), "unread": len(set(bp) - set(bv)),
+            "by_kind": {v: {"pages": sum(bv[p]["vision_kind"] == v for p in both),
+                            "failed": sum(bv[p]["vision_kind"] == v and failed(p) for p in both),
+                            "labels": {k: sum(bv[p]["vision_kind"] == v and bp[p]["kind"] == k for p in both)
+                                       for k in labels},
+                            "unlabelled": sum(bv[p]["vision_kind"] == v and not bp[p]["kind"] for p in both)}
+                        for v in VISION_KINDS if any(bv[p]["vision_kind"] == v for p in both)},
+            "labels": labels,
+            "hand_signal": sum(bv[p]["hand"] == "1" for p in both),
+            "photo_signal": sum(bv[p]["photo"] == "1" for p in both)}
+    return out
 
 
 def slim(c):
@@ -307,7 +370,8 @@ def slim(c):
 
 
 FAMILY = {"single": "one route", "fail": "escalate on failure", "fail+kind": "on failure or a handwritten/mixed label",
-          "disagree": "on failure or two cheap readers disagreeing"}
+          "disagree": "on failure or two cheap readers disagreeing",
+          "fail+vision": "on failure, Vision's handwriting pages sent straight on"}
 
 
 def f2(x, signed=False):
@@ -316,6 +380,93 @@ def f2(x, signed=False):
 
 def money(x):
     return "free" if x == 0 else f"${x:.2f}"
+
+
+def vision_verdict(d):
+    """Whether routing Vision's handwriting pages straight to the stronger route held up on unseen pages."""
+    v = d.get("vision_kind")
+    if not v:
+        return "unmeasured"
+    out = {b["budget"]: b["families"] for b in d["cascades"]["budgets"]}
+    gains = [out[b]["fail+vision"]["split_out"] - out[b]["fail"]["split_out"]
+             for b in out if 0 < b <= 5 and "fail+vision" in out[b] and "fail" in out[b]]
+    return "gain" if gains and min(gains) > 0.25 else "none"
+
+
+VISION_RULE = {
+    "unmeasured": "A page sorter that does not depend on the model being judged (the Vision OCR lab's `pageKind`) "
+                  "could route handwriting before any paid call; it has not been run on these pages.",
+    "gain": "5. Before step 1, send the pages Vision OCR's page sorter calls handwriting straight to the stronger "
+            "route: it needs no model and no paid call, and on unseen pages it added to escalation on failure at "
+            "every paid budget up to $5 (part 6).",
+    "none": "Vision OCR's page sorter (part 6) is not part of the rule: sending its handwriting pages straight to the "
+            "stronger route made no reliable difference on unseen pages, so it stays a free label rather than a "
+            "routing step.",
+}
+
+
+def vision_report(d):
+    """Part 6: Vision OCR's page kind, a label that does not depend on the model being judged."""
+    v = d.get("vision_kind")
+    if not v:
+        return []
+    P, tk = v["panel"], v["truth_kinds"]
+    L = ["## 6. Vision OCR's page kind, a label no model gives", "",
+         "The Vision OCR lab's page sorter (`Recogniser.pageKind` in its `Sources/Recogniser.swift`) calls a page "
+         "newspaper, photograph, handwriting or other from Apple Vision's reading of it: the number and width of its "
+         "lines, the colour and lighting of the paper, and the shape of the ink along each line. It runs on the Mac, "
+         "with no model and no paid call, so it can route a page before anything reads it, and it does not depend on "
+         "the route being judged. Run with `scripts/segbench/vision_kind/run.sh` on the panel's originals and the "
+         "bulk pilot's pages, as the app judges a page (the differences are in that tool's header); a newspaper or "
+         "handwritten page outranks a photograph, so a photographed letter in a hand is handwriting.", "",
+         f"On the {d['pages']} accuracy pages, against the truth's kind:", "",
+         "| Vision's kind | pages | " + " | ".join(tk) + " | easy | middle | hard | mean NES of all routes | route failures |",
+         "|---|---:|" + "---:|" * len(tk) + "---:|---:|---:|---:|---:|"]
+    for k in v["present"]:
+        r = P[k]
+        L.append(f"| {k} | {r['n']} | " + " | ".join(str(r["truth"][t]) for t in tk) + " | "
+                 + " | ".join(str(r["tiers"][t]) for t in TIERS) + f" | {f2(r['mean_nes'])} | {r['route_failures']} |")
+    h, mh = v["hand"], v["model_hand"]
+    L += ["", f"It calls {h['called']} pages handwriting, {h['both']} of them handwritten in the truth "
+          f"({', '.join(f'{n} {k}' for k, n in h['called_kinds'].items() if n and k != 'handwritten') or 'no others'}), "
+          f"and finds {h['both']} of the truth's {h['truth']} handwritten pages. "
+          + (f"The models' own labels, for comparison: the {mh['routes']} routes that label a page say handwritten on "
+             f"{mh['recall'][0]} to {mh['recall'][1]} of those {h['truth']} pages, and are right {100 * mh['precision'][0]:.0f}% "
+             f"to {100 * mh['precision'][1]:.0f}% of the times they say it. " if mh["recall"] else "")
+          + "Most of the panel's pages are photographs of paper, so *photograph* is the sorter's call for nearly "
+          "every typed or printed page; it separates handwriting and newspapers from the rest and says nothing about "
+          "typewritten against printed.", ""]
+    out = {b["budget"]: b["families"] for b in d["cascades"]["budgets"]}
+    paid = [b for b in out if 0 < b <= 5 and "fail+vision" in out[b]]
+    vis = [s for f in d["flags"] for k, s in f["signals"].items() if k == "Vision: handwriting"]
+    if vis:
+        L += [f"**As a flag for a poor reading** (part 5), Vision's handwriting call has AUC {min(s['auc'] for s in vis):.2f} "
+              f"to {max(s['auc'] for s in vis):.2f} across the cheap readers, against {min(s['auc'] for f in d['flags'] for k, s in f['signals'].items() if k.startswith('said')):.2f} "
+              f"to {max(s['auc'] for f in d['flags'] for k, s in f['signals'].items() if k.startswith('said')):.2f} for the readers' own labels. "
+              "Poor readings are spread over typed and printed pages too, so no kind label can find most of them.", ""]
+    if paid:
+        L += ["**As a routing rule** (part 4's cascades, with a fifth family): the pages Vision calls handwriting go "
+              "straight to the second route, unread and unpaid by the first, and the first route's failures follow "
+              "them. Chosen on half the pages and scored on the other half, against escalation on failure alone: "
+              + ", ".join(f"{out[b]['fail+vision']['split_out'] - out[b]['fail']['split_out']:+.2f} at ${b}" for b in paid)
+              + f" NES. The best such cascade on all pages at $1 per 1,000: {out[1]['fail+vision']['best']['label']}, "
+              f"{f2(out[1]['fail+vision']['best']['nes'])} NES for {money(out[1]['fail+vision']['best']['usd'])}.", ""]
+    b = v.get("bulk")
+    if b:
+        labels = b["labels"]
+        L += ["### On the real corpus", "",
+              f"FarmShare's bulk pilot pages ({b['pages']:,} random corpus pages; the model's kind label is Qwen3.6 "
+              "27B's own, and a failure is a reply that ran to the token cap). There is no truth here, so this says "
+              "how the two labels relate and where failures fall, not which label is right.", "",
+              "| Vision's kind | pages | " + " | ".join(f"model said {k}" for k in labels) + " | failed | failure rate |",
+              "|---|---:|" + "---:|" * len(labels) + "---:|---:|"]
+        for k, r in b["by_kind"].items():
+            L.append(f"| {k} | {r['pages']:,} | " + " | ".join(f"{r['labels'][x]:,}" for x in labels)
+                     + f" | {r['failed']} | {100 * r['failed'] / r['pages']:.1f}% |")
+        L += ["", f"{b['photo_signal']:,} of the {b['pages']:,} pages read as photographs by their light and colour, and "
+              f"{b['hand_signal']:,} have a hand's ink."
+              + (f" {b['unread']:,} pages Vision could not read are left out." if b["unread"] else ""), ""]
+    return L
 
 
 def report(d):
@@ -434,23 +585,27 @@ def report(d):
     for x in d["cascades"]["frontier"]:
         L.append(f"| {x['label']} | {f2(x['nes'])} | {money(x['usd'])} | {x['escalated']} | {x['failed']} |")
     L += ["", "## 5. What flags an answered page that is wrong", "",
-          "A cascade sees a failure; it does not see a poor reading. For each cheap first reader, how well three "
+          "A cascade sees a failure; it does not see a poor reading. For each cheap first reader, how well its "
           f"signals pick out its answered pages under {d['wrong_bar']:.0f} NES: AUC (0.5 is chance, 1 is perfect) "
           "and how many of the poor readings fall in the fifth of its pages the signal ranks most suspect. "
           "**Length** compares its word count with Apple Vision's on the same page (free, on the device). "
           "**Disagreement** is one minus the NES between its text and a second cheap reader's; the partner shown is "
-          "the best of the cheap readers, itself chosen on these pages. **Kind** is its own label. No route reports "
+          "the best of the cheap readers, itself chosen on these pages. **Kind** is its own label, and **Vision** "
+          "is whether Vision OCR's page sorter calls the page handwriting (part 6), the same for every reader. No route reports "
           "a confidence: the panel's prompt asks for none and the APIs used return no token probabilities, so that "
           "signal was not available.", "",
-          "| reader | answered | poor readings | kind label: AUC, caught | length: AUC, caught | disagreement: partner, AUC, caught |",
-          "|---|---:|---:|---|---|---|"]
+          "| reader | answered | poor readings | kind label: AUC, caught | Vision: handwriting: AUC, caught | "
+          "length: AUC, caught | disagreement: partner, AUC, caught |",
+          "|---|---:|---:|---|---|---|---|"]
     for f in d["flags"]:
         s = f["signals"]
         kind_ = s.get("said handwritten or mixed")
         length = s.get("length against Apple Vision's")
+        vis = s.get("Vision: handwriting")
         dis = next(((k, v) for k, v in s.items() if k.startswith("disagrees")), None)
         L.append(f"| {f['name']} | {f['answered']} | {f['wrong']} | "
                  + (f"{kind_['auc']:.2f}, {kind_['caught_at_20']}" if kind_ else "–") + " | "
+                 + (f"{vis['auc']:.2f}, {vis['caught_at_20']}" if vis else "–") + " | "
                  + (f"{length['auc']:.2f}, {length['caught_at_20']}" if length else "–") + " | "
                  + (f"{dis[0].removeprefix('disagrees with ')}, {dis[1]['auc']:.2f}, {dis[1]['caught_at_20']}" if dis else "–") + " |")
     rng_ = lambda key: [v["auc"] for f in d["flags"] for k, v in f["signals"].items() if k.startswith(key)]
@@ -472,6 +627,7 @@ def report(d):
         worst = max(v["failed"] / v["pages"] for v in d["bulk"].values())
         L += ["", f"No kind fails more than {100 * worst:.1f}% of its pages, so on the real corpus escalation on failure "
               f"is cheap: the dearer route would see about one page in {round(bt['pages'] / bt['failed'])}.", ""]
+    L += vision_report(d)
     L += ["## A proposed routing rule (a proposal, filed as W41.app-ocr-cascade; not built)", "",
           "1. Read every page with a cheap reader first.",
           "2. Send a failed page to a stronger route. This is the measured, robust gain (part 4), and on the real "
@@ -481,9 +637,7 @@ def report(d):
           "at the second reader's cost plus the pages escalated; on these pages its gain over step 2 alone was not "
           "consistent (part 4), so it wants a larger test before it is the default.",
           "4. Where accuracy matters more than price, one strong reader alone is still the best single choice.", "",
-          "A page sorter that does not depend on the model being judged (the Vision OCR lab's `pageKind`, from Apple "
-          "Vision's line shape and ink) could route handwriting before any paid call. It needs the lab's code and an "
-          "hour or two of Mac time, so it is not measured here (filed as W41.bench-vision-kind).", "",
+          VISION_RULE.get(vision_verdict(d), ""), "",
           "## Limits", "",
           f"{d['pages']} pages from one corpus; truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash before it was "
           "adjudicated, so it may lean toward those families. Difficulty is measured by the same routes that are "

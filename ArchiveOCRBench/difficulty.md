@@ -195,22 +195,22 @@ What holds up on pages the choice did not see:
 
 ## 5. What flags an answered page that is wrong
 
-A cascade sees a failure; it does not see a poor reading. For each cheap first reader, how well three signals pick out its answered pages under 90 NES: AUC (0.5 is chance, 1 is perfect) and how many of the poor readings fall in the fifth of its pages the signal ranks most suspect. **Length** compares its word count with Apple Vision's on the same page (free, on the device). **Disagreement** is one minus the NES between its text and a second cheap reader's; the partner shown is the best of the cheap readers, itself chosen on these pages. **Kind** is its own label. No route reports a confidence: the panel's prompt asks for none and the APIs used return no token probabilities, so that signal was not available.
+A cascade sees a failure; it does not see a poor reading. For each cheap first reader, how well its signals pick out its answered pages under 90 NES: AUC (0.5 is chance, 1 is perfect) and how many of the poor readings fall in the fifth of its pages the signal ranks most suspect. **Length** compares its word count with Apple Vision's on the same page (free, on the device). **Disagreement** is one minus the NES between its text and a second cheap reader's; the partner shown is the best of the cheap readers, itself chosen on these pages. **Kind** is its own label, and **Vision** is whether Vision OCR's page sorter calls the page handwriting (part 6), the same for every reader. No route reports a confidence: the panel's prompt asks for none and the APIs used return no token probabilities, so that signal was not available.
 
-| reader | answered | poor readings | kind label: AUC, caught | length: AUC, caught | disagreement: partner, AUC, caught |
-|---|---:|---:|---|---|---|
-| Qwen3.8 Flash | 93 | 12 | 0.66, 6 | 0.87, 9 | Qwen3.6 35B-A3B, 0.91, 10 |
-| Qwen3.6 35B-A3B | 96 | 17 | 0.63, 7 | 0.85, 11 | LightOnOCR-3-4B 8-bit (Mac), 0.89, 12 |
-| Qwen3.5 35B-A3B | 94 | 19 | 0.64, 8 | 0.89, 14 | LightOnOCR-3-4B 8-bit (Mac), 0.91, 13 |
-| Gemma 4 31B | 93 | 21 | 0.57, 6 | 0.89, 14 | Qwen3.6 35B-A3B, 0.95, 14 |
-| Qwen3-VL 30B-A3B | 94 | 25 | 0.68, 12 | 0.87, 16 | Apple Vision, 0.95, 15 |
-| Qwen3.5 9B | 92 | 20 | 0.66, 9 | 0.79, 13 | Qwen3.6 35B-A3B, 0.92, 15 |
-| Mistral Small 24B | 94 | 24 | 0.67, 11 | 0.89, 15 | Qwen3.6 35B-A3B, 0.94, 17 |
-| Gemma 4 26B-A4B | 86 | 23 | 0.70, 11 | 0.85, 14 | Qwen3.6 35B-A3B, 0.97, 17 |
-| Apple Vision | 96 | 41 | – | – | Qwen3.6 35B-A3B, 0.97, 19 |
-| Qwen3-VL 8B 4-bit (Mac) | 92 | 21 | 0.65, 9 | 0.82, 14 | Qwen3.6 35B-A3B, 0.96, 17 |
-| LightOnOCR-3-4B 8-bit (Mac) | 96 | 27 | – | 0.78, 14 | Qwen3.6 35B-A3B, 0.95, 16 |
-| Qwen3.5-9B 4-bit (Mac) | 95 | 19 | 0.70, 10 | 0.85, 14 | Qwen3.6 35B-A3B, 0.92, 15 |
+| reader | answered | poor readings | kind label: AUC, caught | Vision: handwriting: AUC, caught | length: AUC, caught | disagreement: partner, AUC, caught |
+|---|---:|---:|---|---|---|---|
+| Qwen3.8 Flash | 93 | 12 | 0.66, 6 | – | 0.87, 9 | Qwen3.6 35B-A3B, 0.91, 10 |
+| Qwen3.6 35B-A3B | 96 | 17 | 0.63, 7 | – | 0.85, 11 | LightOnOCR-3-4B 8-bit (Mac), 0.89, 12 |
+| Qwen3.5 35B-A3B | 94 | 19 | 0.64, 8 | – | 0.89, 14 | LightOnOCR-3-4B 8-bit (Mac), 0.91, 13 |
+| Gemma 4 31B | 93 | 21 | 0.57, 6 | – | 0.89, 14 | Qwen3.6 35B-A3B, 0.95, 14 |
+| Qwen3-VL 30B-A3B | 94 | 25 | 0.68, 12 | – | 0.87, 16 | Apple Vision, 0.95, 15 |
+| Qwen3.5 9B | 92 | 20 | 0.66, 9 | – | 0.79, 13 | Qwen3.6 35B-A3B, 0.92, 15 |
+| Mistral Small 24B | 94 | 24 | 0.67, 11 | – | 0.89, 15 | Qwen3.6 35B-A3B, 0.94, 17 |
+| Gemma 4 26B-A4B | 86 | 23 | 0.70, 11 | – | 0.85, 14 | Qwen3.6 35B-A3B, 0.97, 17 |
+| Apple Vision | 96 | 41 | – | – | – | Qwen3.6 35B-A3B, 0.97, 19 |
+| Qwen3-VL 8B 4-bit (Mac) | 92 | 21 | 0.65, 9 | – | 0.82, 14 | Qwen3.6 35B-A3B, 0.96, 17 |
+| LightOnOCR-3-4B 8-bit (Mac) | 96 | 27 | – | – | 0.78, 14 | Qwen3.6 35B-A3B, 0.95, 16 |
+| Qwen3.5-9B 4-bit (Mac) | 95 | 19 | 0.70, 10 | – | 0.85, 14 | Qwen3.6 35B-A3B, 0.92, 15 |
 
 Disagreement between two cheap readers is the strong signal (AUC 0.89 to 0.97), and length against Apple Vision's reading is a free second (0.78 to 0.89). The model's own kind label is weak (0.57 to 0.70): the models often label a page differently from the truth (the panel's `kind_correct`), and poor readings are spread over printed and typewritten pages as well as handwritten ones.
 
@@ -234,7 +234,7 @@ No kind fails more than 1.2% of its pages, so on the real corpus escalation on f
 3. Optionally, read the page with a second cheap reader (or compare the word count with Apple Vision's, which is free) and send pages where they disagree to the stronger route. It catches most poor readings, at the second reader's cost plus the pages escalated; on these pages its gain over step 2 alone was not consistent (part 4), so it wants a larger test before it is the default.
 4. Where accuracy matters more than price, one strong reader alone is still the best single choice.
 
-A page sorter that does not depend on the model being judged (the Vision OCR lab's `pageKind`, from Apple Vision's line shape and ink) could route handwriting before any paid call. It needs the lab's code and an hour or two of Mac time, so it is not measured here (filed as W41.bench-vision-kind).
+A page sorter that does not depend on the model being judged (the Vision OCR lab's `pageKind`) could route handwriting before any paid call; it has not been run on these pages.
 
 ## Limits
 

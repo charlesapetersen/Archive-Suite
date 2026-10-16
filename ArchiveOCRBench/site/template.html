@@ -163,9 +163,16 @@ footer p { font-size: 13px; }
   </section>
   <section class="panel" id="dif-flags">
     <div class="head"><h2>What flags an answered page that is wrong</h2><span class="meta" id="dif-flags-meta"></span></div>
-    <p class="note">A cascade sees a failure but not a poor reading. AUC is how well a signal ranks a reader's poor readings above its good ones: 0.5 is chance, 1 is perfect. Length compares the reader's word count with Apple Vision's (free, on the device); disagreement compares its text with a second cheap reader's; kind is the reader's own handwritten-or-mixed label. No route reports a confidence.</p>
-    <div class="tbl"><table><thead><tr><th>Reader</th><th>Poor readings</th><th>Kind label</th><th>Length</th><th>Disagreement</th><th>Against</th></tr></thead><tbody id="dif-flags-rows"></tbody></table></div>
+    <p class="note">A cascade sees a failure but not a poor reading. AUC is how well a signal ranks a reader's poor readings above its good ones: 0.5 is chance, 1 is perfect. Length compares the reader's word count with Apple Vision's (free, on the device); disagreement compares its text with a second cheap reader's; kind is the reader's own handwritten-or-mixed label; Vision is whether Vision OCR's page sorter calls the page handwriting, the same for every reader. No route reports a confidence.</p>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>Poor readings</th><th>Kind label</th><th>Vision</th><th>Length</th><th>Disagreement</th><th>Against</th></tr></thead><tbody id="dif-flags-rows"></tbody></table></div>
     <p class="note" id="dif-rule"></p>
+  </section>
+  <section class="panel" id="dif-vision">
+    <div class="head"><h2>Vision OCR's page kind, a label no model gives</h2><span class="meta">free, on the Mac, before any reading</span></div>
+    <p class="note">The Vision OCR lab's page sorter calls a page newspaper, photograph, handwriting or other from Apple Vision's reading of it: its lines' number and width, the paper's light and colour, and the shape of the ink. It needs no model and no paid call, and it does not depend on the route being judged. On the panel's accuracy pages, against the truth's kind, with the mean NES of all routes:</p>
+    <div class="tbl"><table><thead id="dif-vision-head"></thead><tbody id="dif-vision-rows"></tbody></table></div>
+    <p class="note" id="dif-vision-bulk-note"></p>
+    <div class="tbl"><table><thead id="dif-vision-bulk-head"></thead><tbody id="dif-vision-bulk-rows"></tbody></table></div>
   </section>
 
   <footer>
@@ -353,7 +360,8 @@ document.getElementById('dif-curves-note').textContent = 'Each line is one route
 document.getElementById('dif-curves-legend').innerHTML = CURVE.map((id, i) => '<span><i class="ln" style="border-color:var(--s' + (i + 1) + ')"></i>' + routeName[id] + '</span>').join('');
 document.getElementById('dif-curves-head').innerHTML = '<tr><th>Route</th><th></th>' + binLabel.map(l => '<th>' + l + '</th>').join('') + '</tr>';
 document.getElementById('dif-curves-rows').innerHTML = CURVE.map(id => '<tr><td>' + routeName[id] + '</td><td></td>' + DF.curves.routes[id].map(c => '<td>' + f2(c.nes) + (c.failed ? ' (' + c.failed + ' failed)' : '') + '</td>').join('') + '</tr>').join('');
-const FAM = { fail: ['Escalate on failure', 's1'], disagree: ['On failure or two cheap readers disagreeing', 's2'], 'fail+kind': ['On failure or a handwritten/mixed label', 's3'] };
+const FAM = { fail: ['Escalate on failure', 's1'], disagree: ['On failure or two cheap readers disagreeing', 's2'], 'fail+kind': ['On failure or a handwritten/mixed label', 's3'],
+  ...(DF.cascades.family_frontiers['fail+vision'] ? { 'fail+vision': ["On failure, Vision's handwriting pages sent straight on", 's4'] } : {}) };
 const FAMN = { single: 'one route', ...Object.fromEntries(Object.entries(FAM).map(([k, v]) => [k, v[0].toLowerCase()])) };
 const CFREE = 0.01;
 const cx = v => Math.max(v, CFREE);
@@ -368,8 +376,20 @@ document.getElementById('dif-budget-rows').innerHTML = DF.cascades.budgets.flatM
 document.getElementById('dif-flags-meta').textContent = 'poor reading = answered, under ' + DF.wrong_bar.toFixed(0) + ' NES';
 document.getElementById('dif-flags-rows').innerHTML = DF.flags.map(f => { const s = f.signals, d = Object.entries(s).find(([k]) => k.startsWith('disagrees'));
   const a = k => s[k] ? s[k].auc.toFixed(2) : '—';
-  return '<tr><td>' + f.name + '</td><td>' + f.wrong + ' of ' + f.answered + '</td><td>' + a('said handwritten or mixed') + '</td><td>' + a("length against Apple Vision's") + '</td><td>' + (d ? d[1].auc.toFixed(2) : '—') + '</td><td>' + (d ? d[0].replace('disagrees with ', '') : '') + '</td></tr>'; }).join('');
+  return '<tr><td>' + f.name + '</td><td>' + f.wrong + ' of ' + f.answered + '</td><td>' + a('said handwritten or mixed') + '</td><td>' + a('Vision: handwriting') + '</td><td>' + a("length against Apple Vision's") + '</td><td>' + (d ? d[1].auc.toFixed(2) : '—') + '</td><td>' + (d ? d[0].replace('disagrees with ', '') : '') + '</td></tr>'; }).join('');
 document.getElementById('dif-rule').textContent = 'A proposed rule for the app, not built (W41.app-ocr-cascade): read every page with a cheap reader first; send a failed page to a stronger route; optionally send pages where two cheap readers disagree too, which catches most poor readings but did not gain consistently on unseen pages; and where accuracy matters more than price, one strong reader alone is still best. Limits: 96 pages from one corpus, and truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash.';
+const VK = DF.vision_kind;
+if (VK) {
+  document.getElementById('dif-vision-head').innerHTML = '<tr><th>Vision\'s kind</th><th>Pages</th>' + VK.truth_kinds.map(k => '<th>' + k + '</th>').join('') + '<th>Mean NES</th><th>Route failures</th></tr>';
+  document.getElementById('dif-vision-rows').innerHTML = VK.present.map(k => { const r = VK.panel[k];
+    return '<tr><td>' + k + '</td><td>' + r.n + '</td>' + VK.truth_kinds.map(t => '<td>' + r.truth[t] + '</td>').join('') + '<td>' + f2(r.mean_nes) + '</td><td>' + r.route_failures + '</td></tr>'; }).join('');
+  const B = VK.bulk;
+  if (B) {
+    document.getElementById('dif-vision-bulk-note').textContent = 'On FarmShare\'s bulk pilot (' + B.pages.toLocaleString() + ' random corpus pages, no truth), against Qwen3.6 27B\'s own label and its failures:';
+    document.getElementById('dif-vision-bulk-head').innerHTML = '<tr><th>Vision\'s kind</th><th>Pages</th>' + B.labels.map(k => '<th>Said ' + k + '</th>').join('') + '<th>Failed</th></tr>';
+    document.getElementById('dif-vision-bulk-rows').innerHTML = Object.entries(B.by_kind).map(([k, r]) => '<tr><td>' + k + '</td><td>' + r.pages.toLocaleString() + '</td>' + B.labels.map(l => '<td>' + r.labels[l].toLocaleString() + '</td>').join('') + '<td>' + r.failed + '</td></tr>').join('');
+  }
+} else document.getElementById('dif-vision').hidden = true;
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;
 function renderDifficulty() {
