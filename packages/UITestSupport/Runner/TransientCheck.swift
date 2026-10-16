@@ -39,12 +39,14 @@ enum TransientCheck {
         var samples = 0
         var walkMaxMs = 0
         var plants = 0
+        var changing = ""
+        var header = ""
         var findings: [(transition: Int, line: String)] = []
 
         init?(_ text: String) {
             var lines = text.split(separator: "\n").map(String.init)
             guard !lines.isEmpty else { return nil }
-            let header = lines.removeFirst()
+            header = lines.removeFirst()
             var fields: [String: Int] = [:]
             for pair in header.split(separator: " ") {
                 let kv = pair.split(separator: "=")
@@ -56,6 +58,7 @@ enum TransientCheck {
             samples = fields["samples"] ?? 0
             walkMaxMs = fields["walkMaxMs"] ?? 0
             plants = fields["plants"] ?? 0
+            changing = header.components(separatedBy: "changing=").dropFirst().first ?? ""
             findings = lines.compactMap { line in
                 guard line.hasPrefix("#"), let space = line.firstIndex(of: " "),
                       let n = Int(line[line.index(after: line.startIndex)..<space]) else { return nil }
@@ -105,8 +108,16 @@ enum TransientCheck {
             if let r = waitIdle(app, timeout: 5), r.transitions > before.transitions { after = r; break }
         }
         guard let after else {
-            XCTFail("transient: \(name): no watched section changed — the action did nothing on screen, or the "
-                    + "watched sections are not the ones it changes", file: file, line: line)
+            let now = read(app)
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "transient — \(name) — never settled"
+            shot.lifetime = .keepAlways
+            test.add(shot)
+            let why = now.map { $0.changing.isEmpty
+                ? "no watched section changed — the action did nothing on screen, or the watched sections are not "
+                    + "the ones it changes"
+                : "the screen never settled; still changing: \($0.changing)" } ?? "the report is gone"
+            XCTFail("transient: \(name): \(why) [\(now?.header ?? "")]", file: file, line: line)
             return []
         }
         let lines = after.findings.filter { $0.transition > before.transitions }.map(\.line)

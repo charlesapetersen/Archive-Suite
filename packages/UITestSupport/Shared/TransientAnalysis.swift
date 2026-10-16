@@ -83,8 +83,11 @@ enum TransientAnalysis {
                 for c in 0..<4 {
                     let values = states.map { $0.entries[j].coordinates[c] }
                     if let problem = geometryProblem(values) {
+                        let odd = states.first { !(min(values[0], values[last])...max(values[0], values[last]))
+                            .contains($0.entries[j].coordinates[c]) } ?? states[1]
                         note(.geometry, "\(old.entries[j].name) \(["x", "y", "width", "height"][c]) "
-                             + "\(values.map(String.init).joined(separator: "→")): \(problem)")
+                             + "\(values.map(String.init).joined(separator: "→")): \(problem) "
+                             + "(frame \(frame(odd.entries[j])) against \(frame(new.entries[j])) settled)")
                         break outer
                     }
                 }
@@ -122,6 +125,8 @@ enum TransientAnalysis {
         return "\(s.entries.count) elements (\(old.entries.count) before, \(new.entries.count) after)"
             + (extra.map { ", showing \(quote($0))" } ?? "")
     }
+
+    private static func frame(_ e: TransientEntry) -> String { "\(e.x),\(e.y) \(e.w)×\(e.h)" }
 
     static func quote(_ text: String) -> String {
         let flat = text.replacingOccurrences(of: "\n", with: "⏎")

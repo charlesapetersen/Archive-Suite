@@ -9,7 +9,8 @@
 //
 // WHAT IT SAMPLES. The app's own accessibility tree, walked in-process: every element whose identifier starts
 // with a watched prefix, and every element inside one, as (role, identifier, displayed text, frame). That reaches
-// SwiftUI and AppKit alike. The pseudo-prefix `@sheets` watches every element of every sheet. Consecutive identical samples collapse; when no watched section has changed for
+// SwiftUI and AppKit alike. An item `!<prefix>` excludes matching elements and everything inside them (a UITest
+// harness strip that reports internals, not display). The pseudo-prefix `@sheets` watches every element of every sheet. Consecutive identical samples collapse; when no watched section has changed for
 // `settleInterval`, the states since the last settle are one transition, judged by `TransientAnalysis`.
 //
 // HOW THE TEST READS IT. A small borderless panel, "Transient Recorder", holding one text element
@@ -44,21 +45,25 @@ final class TransientRecorder {
 
     static func startIfRequested(arguments: [String] = ProcessInfo.processInfo.arguments) {
         guard let i = arguments.firstIndex(of: argument), i + 1 < arguments.count else { return }
-        let prefixes = arguments[i + 1].split(separator: ",").map(String.init).filter { !$0.isEmpty }
+        let items = arguments[i + 1].split(separator: ",").map(String.init).filter { !$0.isEmpty }
+        let prefixes = items.filter { !$0.hasPrefix("!") }
+        let excluded = items.filter { $0.hasPrefix("!") }.map { String($0.dropFirst()) }
         guard !prefixes.isEmpty, shared == nil else { return }
         var plant = false
         if let p = arguments.firstIndex(of: plantArgument), p + 1 < arguments.count { plant = arguments[p + 1] == "blink" }
-        let recorder = TransientRecorder(prefixes: prefixes, plantBlink: plant)
+        let recorder = TransientRecorder(prefixes: prefixes, excluded: excluded, plantBlink: plant)
         shared = recorder
         recorder.install()
     }
 
     private let prefixes: [String]
+    private let excluded: [String]
     private let plantBlink: Bool
     private var observer: CFRunLoopObserver?
     private var current: [String: TransientSectionState] = [:]
     private var segment: [String: [TransientSectionState]] = [:]
     private var changedSinceSettle = false
+    private var changing: Set<String> = []
     private var settleTimer: Timer?
     private var transitions = 0
     private var findings: [String] = []
@@ -72,8 +77,9 @@ final class TransientRecorder {
     private var published = ""
     private var sampling = false
 
-    private init(prefixes: [String], plantBlink: Bool) {
+    private init(prefixes: [String], excluded: [String], plantBlink: Bool) {
         self.prefixes = prefixes
+        self.excluded = excluded
         self.plantBlink = plantBlink
     }
 
@@ -106,6 +112,7 @@ final class TransientRecorder {
             states.append(state)
             if states.count > Self.maxStatesPerSection { states.remove(at: 1) }
             segment[prefix] = states
+            changing.insert(prefix)
             changed = true
         }
         guard changed else { return }
@@ -123,6 +130,7 @@ final class TransientRecorder {
     private func settle() {
         guard changedSinceSettle else { return }
         changedSinceSettle = false
+        changing = []
         plantedThisTransition = false
         transitions += 1
         for prefix in prefixes {
@@ -153,6 +161,7 @@ final class TransientRecorder {
         guard budget > 0, depth < 80 else { return }
         budget -= 1
         let identifier = element.accessibilityIdentifier() ?? ""
+        if !identifier.isEmpty, excluded.contains(where: { identifier.hasPrefix($0) }) { return }
         let section = section ?? prefixes.first { !identifier.isEmpty && identifier.hasPrefix($0) }
         if let section {
             let frame = element.accessibilityFrame()
@@ -162,7 +171,13 @@ final class TransientRecorder {
                                        w: Int(frame.width.rounded()), h: Int(frame.height.rounded()))
             out[section, default: TransientSectionState()].entries.append(entry)
         }
-        for child in element.accessibilityChildren() ?? [] {
+        // A table's or outline's rows are its `accessibilityRows`, which its children need not include (measured:
+        // a Notes folder switch changed only the list's rows, and a children-only walk saw no change at all).
+        var children = (element.accessibilityChildren() ?? []).map { $0 as AnyObject }
+        for row in element.accessibilityRows() ?? [] where !children.contains(where: { $0 === row as AnyObject }) {
+            children.append(row as AnyObject)
+        }
+        for child in children {
             guard let child = child as? NSAccessibilityProtocol else { continue }
             walk(child, section: section, origin: origin, depth: depth + 1, into: &out, budget: &budget)
         }
@@ -178,6 +193,10 @@ final class TransientRecorder {
         case let n as NSNumber: parts.append(n.stringValue)
         default: break
         }
+        // A selection highlight or a greyed-out control is displayed state too: a row deselected and selected
+        // again, or a toolbar button that flashes disabled, is a flicker.
+        if element.isAccessibilitySelected() { parts.append("⟨selected⟩") }
+        if !element.isAccessibilityEnabled() { parts.append("⟨disabled⟩") }
         return parts.joined(separator: " | ")
     }
 
@@ -223,7 +242,7 @@ final class TransientRecorder {
 
     private func publish(idle: Bool) {
         let header = "transitions=\(transitions) idle=\(idle ? 1 : 0) samples=\(samples) "
-            + "walkMaxMs=\(Int(walkMaxMs.rounded())) plants=\(plants)"
+            + "walkMaxMs=\(Int(walkMaxMs.rounded())) plants=\(plants) changing=\(changing.sorted().joined(separator: ","))"
         let text = ([header] + findings.suffix(200)).joined(separator: "\n")
         guard text != published, let field else { return }
         published = text

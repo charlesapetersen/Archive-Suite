@@ -10,7 +10,8 @@ final class TransientStateUITests: NotesFixtureUITestCase {
     /// The panes the transitions below change: the inspector (and its Locations block), the editor, the list,
     /// the sidebar and the filter bar, plus every sheet.
     static let sections = ["an.detail", "an.locations", "an.zotero", "an.editor", "an.list", "an.sidebar",
-                           "an.filter", TransientCheck.sheets]
+                           "an.filter", TransientCheck.sheets,
+                           "!an.editor.test."]   // the UITest button strip, which reports internals
 
     private var plant = false
     override var extraLaunchArguments: [String] {
