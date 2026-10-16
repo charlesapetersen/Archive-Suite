@@ -1,4 +1,4 @@
-"""W41.mac-local-measure report on synthetic scratch readings; no corpus, model or network.
+"""W41.mac-local-measure and W41.mac-local-hw reports on synthetic scratch readings; no corpus, model or network.
 Needs the scorer's packages: uv run --with rapidfuzz --with 'sacrebleu==2.5.1' python -m unittest test_ocr_mac_local
 """
 import json
@@ -23,7 +23,7 @@ class MacLocal(unittest.TestCase):
         rows = [{'page': p, 'kind': 'typewritten'} for p in pages]
         self.patches = [patch.object(P, 'CACHE', root / 'cache'), patch.object(P, 'TRUTH', root / 'truth'),
                         patch.object(P, 'RESULTS', root / 'out'), patch.object(M, 'OUT', root / 'cache/local/k'),
-                        patch.object(M, 'REPORT', root / 'out/r.md'), patch.object(M, 'GROUPS', root / 'out/ocr-mac-local-groups.csv'), patch.object(P, 'rows', return_value=rows),
+                        patch.object(M, 'REPORT', root / 'out/r.md'), patch.object(M, 'HW_REPORT', root / 'out/hw.md'), patch.object(M, 'GROUPS', root / 'out/ocr-mac-local-groups.csv'), patch.object(P, 'rows', return_value=rows),
                         patch.object(P, 'manifest', return_value={'jobs': jobs}),
                         patch.dict('os.environ', {'OCRLAB': str(root / 'lab')})]
         for p in self.patches:
@@ -74,6 +74,38 @@ class MacLocal(unittest.TestCase):
         out = (self.root / 'out/r.md').read_text()
         self.assertIn('Incomplete: 1 of 2 accuracy pages', out)
         self.assertIn('+0.00 points** over 1 pages', out)
+
+    def test_handwriting_models_join_the_groups_csv(self):
+        for p in ('p001', 'p002', 'p086'):
+            self.reading('hosted', p, 'the quick brown fox')
+        self.reading('local', 'p001', 'the quick brown fox')
+        lighton = M.out_dir('lightonocr-3-4b-mlx8')
+        P.save(lighton / 'p001-original.json', {'meta': {'wall_s': 18, 'first_token_s': 3, 'prompt_tokens': 3086,
+               'completion_tokens': 300, 'gen_tps': 30, 'mlx_peak_gb': 6.4, 'load_s': 2, 'status': 'ok', 'finish': 'stop'},
+               'parsed': M.parse(M.HW['lightonocr-3-4b-mlx8'], 'the quick brown fox\n')})
+        qwen = M.out_dir('qwen3.5-9b-mlx4')
+        P.save(qwen / 'p002-original.json', {'meta': {'wall_s': 30, 'first_token_s': 5, 'prompt_tokens': 4000,
+               'completion_tokens': 400, 'gen_tps': 20, 'mlx_peak_gb': 8.7, 'load_s': 3, 'status': 'ok', 'finish': 'stop'},
+               'parsed': {'kind': 'typewritten', 'table': False, 'text': 'the quick brown'}})
+        P.save(P.CACHE / 'responses' / 'qwen3.5-9b' / 'p002-original.json',
+               {'meta': {}, 'parsed': {'kind': 'typewritten', 'table': False, 'text': 'the quick brown fox'}})
+        M.report()
+        out = (self.root / 'out/hw.md').read_text()
+        self.assertIn('**Incomplete: 1 of 2 accuracy pages read.**', out)
+        self.assertIn('| Mac MLX (lightonocr-3-4b-mlx8) | 1/1 | 100.00 |', out)
+        self.assertIn('| hosted bf16 (qwen3.5-9b) | 1/1 | 100.00 |', out)
+        self.assertIn('4-bit-on-a-Mac penalty', out)
+        self.assertNotIn('quick brown', out)
+        groups = (self.root / 'out/ocr-mac-local-groups.csv').read_text()
+        self.assertIn('lightonocr-3-4b-mlx8,all,accuracy-96,1,1,1.0,', groups)
+        self.assertIn('qwen3.5-9b-mlx4,kind,typewritten,1,1,', groups)
+        self.assertIn('qwen3-vl-8b-mlx4,all,accuracy-96,1,1,1.0,', groups)
+
+    def test_plain_reply_is_scored_whole(self):
+        spec = M.HW['lightonocr-3-4b-mlx8']
+        self.assertEqual(M.parse(spec, '  KIND: x\nsome text\n')['text'], 'KIND: x\nsome text')
+        self.assertIsNone(M.parse(spec, '   '))
+        self.assertIsNone(M.parse(M.HW['qwen3.5-9b-mlx4'], 'no header at all'))
 
 
 if __name__ == '__main__':
