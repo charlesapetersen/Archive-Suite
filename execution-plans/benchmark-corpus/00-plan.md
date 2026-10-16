@@ -173,6 +173,23 @@ collection, so that no one hand or printer dominates it.
 | OmniDocBench | research only, not commercial (V, HF card) · yes · **no** | block-level text, tables and reading order; page text rebuilt (V) | its own headline metric is normalised edit distance | 1,651 pages, v1.6, EN/ZH (V) | github.com/opendatalab/OmniDocBench |
 | MTHv2 | non-commercial research only (V) · yes · **no** | page images + line text in reading order (V) | txt + coordinates | 3,199 pages, Buddhist Tripitaka prints (V) | github.com/HCIILAB/MTHv2_Datasets_Release |
 
+**Licence check, 2026-10-16 (corpus-build session 1, WebFetch; §7 step 2).** V is read on the page.
+- **TAPUS** (github.com/HTR-United/tapuscorpus): text and images CC BY 4.0, source works out of copyright (V);
+  about 150 image + PAGE pairs in 9 sub-corpora. Taken for L3's French typescripts.
+- **DAHN** (github.com/HTR-United/dahncorpus): text CC BY 4.0, but the images stay with the Archives
+  départementales de la Sarthe and are only linked over IIIF (V). **Dropped**; TAPUS fills its L3 slot.
+- **Europeana Newspapers, SBB** (Zenodo 2583866): CC0 (V); 50 pages, `gt_page.zip` + `img_full.zip`, 32 MB. Taken
+  for L9. The PRImA ENP main set's licence page could not be read: unconfirmed.
+- **HTR-United printed Devanagari** (heiDATA doi:10.11588/data/EGOKEI): CC BY 4.0 in the catalogue (V); 4,333 lines
+  of Naval Kishore Press letterpress, 1880-1953, JPG + ALTO. heiDATA refused the fetch, so whether whole pages are
+  included is unknown. If lines only, N6 needs another source.
+- **NorHand v3** (Zenodo 10255840): CC BY 4.0, **page-level** (11,287 full pages with PageXML), 11.7 GB (V).
+  Norwegian letters and diaries: a second source for L1 or L5, and a fallback if loc.gov stays closed.
+- **Princeton Geniza** (Zenodo 15839056): CC BY-NC; document-level text, images only as IIIF links (V). Not
+  page-aligned, so not taken for N4.
+- **Smithsonian Transcription Center**: every si.edu page returned 403, and no statement that transcriptions are
+  CC0 was found. Unconfirmed; if the fetch session cannot confirm it, L4 is filled from other sources (§7 step 2).
+
 #### 2.2 Considered and not taken
 
 - **GT4HistOCR** (CC BY): line crops only, and pages cannot be rebuilt from the set itself. It is also widely used
