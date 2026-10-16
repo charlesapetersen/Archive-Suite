@@ -21,7 +21,7 @@
 #                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test),
 #                READER_JOURNEY=rehearsal (W40.d8 triage journey on the real-corpus sample).
 #                NOTES_JOURNEY=integrations (W40.d10: Notes with the real Zotero and Reader in the VM).
-#                VISUAL_REVIEW=1 (W40.e10 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
+#                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
@@ -346,11 +346,22 @@ run_xcuitest() {
   # file exists beside the app's fixture, because it is minutes long and writes hundreds of shots. Set or
   # clear it on every run so a previous VISUAL_REVIEW=1 run cannot leave it switched on.
   local vflag; vflag="$(dirname "$GUEST_FIXTURE")/.visual-review"
+  # W40.e11: Notes' UITest runner is sandboxed to its fixture, and each test restores the fixture from its
+  # pristine copy, so for Notes the flag also goes inside both.
+  local vflags="\"$vflag\""
+  [ "$APP" = notes ] && vflags="$vflags \"$GUEST_FIXTURE/.visual-review\" \"$GUEST_FIXTURE.pristine/.visual-review\""
   if [ "${VISUAL_REVIEW:-0}" = "1" ]; then
-    tart exec "$VM" bash -lc "mkdir -p \"$(dirname "$vflag")\" && touch \"$vflag\"" >/dev/null 2>&1 \
+    tart exec "$VM" bash -lc "mkdir -p \"$(dirname "$vflag")\" && touch $vflags" >/dev/null 2>&1 \
       || die "could not set the visual-review flag in the guest"
+    # Notes' volume pass opens the W40.c1 rehearsal store (400 items, many chips, odd titles), built in the
+    # guest's own cache by its generator, which refuses a destination outside that cache.
+    if [ "$APP" = notes ]; then
+      log "building the Notes rehearsal store in the VM for the visual review…"
+      tart exec "$VM" bash -lc "python3 '$GUEST_REPO/ArchiveNotes/scripts/make-notes-rehearsal.py'" \
+        > "$APP_ART/rehearsal-store.log" 2>&1 || die "the rehearsal store build failed (log: $APP_ART/rehearsal-store.log)"
+    fi
   else
-    tart exec "$VM" bash -lc "rm -f \"$vflag\"" >/dev/null 2>&1 || true
+    tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
   fi
   log "building + running $ONLY_TESTING for $APP in the VM…"
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
@@ -370,7 +381,7 @@ run_xcuitest() {
   " 2>&1 | tee "$APP_ART/xcuitest.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
   log "XCUITest log: $APP_ART/xcuitest.log"
   # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
-  tart exec "$VM" bash -lc "rm -f \"$vflag\"" >/dev/null 2>&1 || true
+  tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
   collect_shots
   collect_xcresult
   collect_crashes
