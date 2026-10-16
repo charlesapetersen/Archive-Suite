@@ -11194,3 +11194,14 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   FarmShare: `build.py` averages `pages.csv` over the 96 accuracy pages per kind (agreement letters read from `ocr_panel.py`) and stops if that stops matching `summary.json`. Route 2, □, priced $0, 95.25 overall, 1,055 photos an hour, 95 GPU-hours per 100,000 photos on one L40S. The bf16-KV (94.97, 111 GPU-h) and fp8-at-load dyn (93.17, 154 GPU-h) runs appear in the tables only. On every chart the FarmShare route is now the free end of the best-value line. Each own-hardware route is listed in the tables directly under its hosted pair, and the key says "(hosted: N)". The NewsBench score waits for a newspaper chart (POTENTIAL_FEATURES.md).
   Names and machines are in `inputs.json` → `own_hardware`; the template, README and page text were updated (route count, legend, tooltips, the costs and limits notes). `--check` passes. Rendered headless at 1100 px and in a true 390 px iframe and looked at. No money. The published copy of the page is now behind.
   <!-- /W41.bench-catchup -->
+- [x] **W25.retry-backend-fu1 — `scripts/test-retry-backend.sh` hangs on main [XS-S · <1 session]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (lane: processor) (uses: build). Found 2026-10-15 by W41.app-ocr-default: the driver times out at 120 s with 0 checks and an empty app log, on pristine `da2252ee` as well as on the change. Likely cause, unverified: `RetryBackendTestDriver` installs `NetworkSession.testTransport`, but `activeTestTransport` only honours it under `BATCHRESUME_TEST=1` or `VISIONHYBRID_TEST=1`, and the script sets neither, so its retries may go to the wire. Find the cause, make it pass, and add the script to whatever gate should have caught this.
+  SHIPPED 2026-10-15. Cause confirmed: the driver (W25.retry-backend, 2026-09-05) predates W16.bat7-fu's env gate on
+  `NetworkSession.activeTestTransport`, which never listed `RETRY_BACKEND_TEST`, so the installed stub was ignored
+  and the direct retry went to the wire with a fake key and waited out its timeouts. A `sample` of the hung app
+  showed an idle main thread. Fix: `RetryBackendTestDriver.envKey` added to the gate, the same way the W41
+  refusal driver's is; the driver now FAILS at once if the seam is inactive after the stub is installed, so a
+  repeat can never reach the wire or hang. It also logs each check (`RETRY PASS:`), so a timeout reports
+  progress. Gate: new free `processor-retry-backend` step on the gate-DD binary (the script takes
+  `ARCHIVEPROC_TEST_BINARY` like test-recovery.sh). Verified: 7/7 ALL PASS in 3 s (was a 120 s timeout); with
+  the flag removed again the driver reports `FAIL: the injected transport is not active` and exits. No money.
+  <!-- /W25.retry-backend-fu1 -->

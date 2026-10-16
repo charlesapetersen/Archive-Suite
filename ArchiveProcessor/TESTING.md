@@ -288,8 +288,10 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-retry-backend.sh`** — retry backend-lock contract: the real Process Files retry seam runs against
   an injected no-network HTTP transport and committed fake Local Agent CLI. It proves direct, gateway-only,
   and Local Agent retries keep the immutable run snapshot despite contradictory mutable Settings, and checks
-  the generated PDF provenance too. No API key, network, corpus, or spend. ⚠️ Hangs on main as of
-  2026-10-15 (`W25.retry-backend-fu1`).
+  the generated PDF provenance too. No API key, network, corpus, or spend. Its `RETRY_BACKEND_TEST` flag is
+  one of those `NetworkSession.activeTestTransport` honours; without it the stub went unused and the direct
+  retry waited on the wire (`W25.retry-backend-fu1`), so the driver now fails at once if the seam is
+  inactive. A free gate step (`processor-retry-backend`) runs it on the gate-DD binary.
 - **`test-ocr-refusal.sh`** — W41.app-ocr-default: the default Gemini model and its prices, and the second
   reader for pages Gemini refuses, through the real `performOCRCall` over an injected transport: refusal codes
   that reach the second route and those that never do, the `secondReader` record and PDF header, fail-loud with

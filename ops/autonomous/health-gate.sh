@@ -349,6 +349,10 @@ step processor-launch bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$
 # W28.cert-fu3 (heavy block: test-recovery.sh takes the heavy lock as a whole-script entry): prove the launch gate itself runs a binary that aborts before main and reports a failing
 # launch, rather than merely checking that the command text still mentions `test-recovery.sh`.
 step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-launch-gate.sh"
+# W25.retry-backend-fu1: the retry backend-lock contract on the same gate artifact; $0, no key, no network
+# (its driver stops before any retry if the injected transport is not active). It hung unnoticed on main
+# for weeks because no gate ran it.
+step processor-retry-backend bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-retry-backend.sh'
 # Opt-in paid OCR smoke. PREREQ before enabling this in an unattended run: the Gemini key must be readable
 # WITHOUT a prompt — test-smoke.sh reads it via `security find-generic-password`, so run the WS12 keychain
 # fix (ops/autonomous/fix-keychain-access.sh) first, else this either prompts (→ the daemon's GATE_MAXRUN

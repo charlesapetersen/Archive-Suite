@@ -12,9 +12,12 @@ import PDFKit
 @MainActor
 enum RetryBackendTestDriver {
     private static var didRun = false
+    /// Also one of the flags `NetworkSession.activeTestTransport` honours: without it the stub below is
+    /// installed but never used, and the direct retry goes to the wire (W25.retry-backend-fu1).
+    nonisolated static let envKey = "RETRY_BACKEND_TEST"
 
     static func runIfRequested() {
-        guard !didRun, ProcessInfo.processInfo.environment["RETRY_BACKEND_TEST"] == "1" else { return }
+        guard !didRun, ProcessInfo.processInfo.environment[envKey] == "1" else { return }
         didRun = true
         Task { await run() }
     }
@@ -37,6 +40,7 @@ enum RetryBackendTestDriver {
         var results: [String] = []
         func check(_ name: String, _ condition: Bool) {
             results.append("\(condition ? "PASS" : "FAIL"): \(name)")
+            NSLog("RETRY %@: %@", condition ? "PASS" : "FAIL", name)   // progress for test-report-wait.sh
         }
 
         guard let image = makeJPEG(at: root.appendingPathComponent("retry.jpg")) else {
@@ -66,6 +70,12 @@ enum RetryBackendTestDriver {
             return (Data(body.utf8), response)
         }
         defer { NetworkSession.testTransport = nil }
+        // Stop before any retry if the seam ignored the stub: the direct retry would otherwise go to the wire
+        // and wait out its network timeouts, which is how this contract hung silently (W25.retry-backend-fu1).
+        guard NetworkSession.testTransportIsActive else {
+            finish(results + ["FAIL: the injected transport is not active under \(envKey)=1"])
+            return
+        }
 
         let model = LLMProvider.gemini.models[0]
         let staleGateway = GatewayConfig(baseURL: "https://retry-gateway.invalid/v1", modelID: "stale-model",
