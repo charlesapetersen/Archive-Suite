@@ -4,7 +4,11 @@
 #   fetch.sh URL DEST       download URL to DEST (a path relative to the cache folder)
 #   fetch.sh --head URL     print the response headers only
 #   fetch.sh --stdout URL   print the body (for API JSON; capped at 20 MB)
+#   fetch.sh --range A-B URL  print bytes A..B (under 200 MB), for reading members of a remote zip
+#   fetch.sh --stream URL   print the whole body, uncapped (pipe a tarball through tar; never to disk)
 #
+# The disk had 24 GB free on 2026-10-16, so multi-GB archives are read member by member through
+# --range (remote_zip.py), never downloaded whole.
 # The owner allowed the corpus fetch to these hosts only (2026-10-16 walkthrough, gate
 # W43.corpus-build-net-owner-ok, option (a)). The script refuses any other host, on the first
 # URL and on every redirect (curl's redirects are followed one at a time here, so a redirect to
@@ -60,8 +64,22 @@ case "${1:-}" in
     final="$(resolve "$2")"
     curl -sS --fail --max-time 300 --max-redirs 0 --max-filesize 20000000 "$final"
     ;;
+  --range)
+    [ $# -eq 3 ] || die "usage: fetch.sh --range START-END URL"
+    [[ "$2" =~ ^[0-9]+-[0-9]+$ ]] || die "bad range: $2"
+    a="${2%-*}"; b="${2#*-}"
+    [ "$b" -ge "$a" ] && [ $((b - a)) -lt 200000000 ] || die "range must be under 200 MB: $2"
+    final="$(resolve "$3")"
+    curl -sS --fail --retry 3 --max-time 1800 --max-redirs 0 -r "$2" "$final"
+    ;;
+  --stream)
+    # Uncapped body to stdout, for piping a .tbz/.tgz through tar to keep a few members.
+    [ $# -eq 2 ] || die "usage: fetch.sh --stream URL"
+    final="$(resolve "$2")"
+    curl -sS --fail --max-time 7200 --max-redirs 0 "$final"
+    ;;
   ""|-h|--help)
-    sed -n '2,13p' "$0"; exit 0 ;;
+    sed -n '2,/^set -e/p' "$0" | grep '^#'; exit 0 ;;
   *)
     [ $# -eq 2 ] || die "usage: fetch.sh URL DEST"
     url="$1"; dest="$2"
