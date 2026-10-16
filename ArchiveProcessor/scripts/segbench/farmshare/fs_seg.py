@@ -44,7 +44,7 @@ import method_local as L  # noqa: E402
 from fs_ocr import atomic_write, env_info, DEAD_SERVER  # noqa: E402
 
 # The teacher by default; FS_SEG_KEY names a student or a baseline (method_openrouter.FARMSHARE), in pack and run.
-KEY = os.environ.get("FS_SEG_KEY", "fs-qwen3.5-27b")
+KEY = os.environ.get("FS_SEG_KEY", "fs-qwen3.5-27b")  # gitleaks:allow (a model key name, not a secret)
 
 
 def cmd_pack(a):
