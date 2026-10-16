@@ -2,7 +2,7 @@
 """W43.corpus-build — draw, check and freeze the broader truth set (plan §7 steps 4-5).
 
   sample.py list                 # every source's candidates -> CACHE/candidates.jsonl, counts by stratum
-  sample.py draw                 # seeded draw per stratum, quarter cap per collection; fetch the drawn pages
+  sample.py draw [STRATUM ...]   # seeded draw per stratum, quarter cap per collection; fetch the drawn pages
   sample.py sanity               # Apple Vision reads the drawn Latin/Cyrillic/Arabic pages; flags low scorers
   sample.py drop KEY REASON      # drop a drawn page (wrong or misplaced truth); the next draw replaces it
   sample.py freeze               # write the committed manifest; no model call may come before its commit
@@ -111,14 +111,20 @@ def drops() -> dict[str, str]:
     return {d['key']: d['reason'] for d in C.read_jsonl(DROPS)} if DROPS.exists() else {}
 
 
-def cmd_draw():
+def cmd_draw(strata: list[str]):
+    """Draw the named strata (all when none are named). Rows already drawn for other strata are kept as they
+    are, so a stratum whose sources arrive later (W43.corpus-build-more) joins without moving the others."""
     mods, rows = modules(), C.read_jsonl(CANDIDATES)
     dropped = drops()
     by = collections.defaultdict(list)
     for r in rows:
         by[r['stratum']].append(r)
-    out = []
-    for s in sorted(TARGET):
+    strata = strata or sorted(TARGET)
+    unknown = set(strata) - set(TARGET)
+    if unknown:
+        raise SystemExit(f'unknown strata: {sorted(unknown)}')
+    out = [r for r in C.read_jsonl(DRAW) if r['stratum'] not in strata] if DRAW.exists() else []
+    for s in sorted(strata):
         while True:
             chosen = choose(order(by[s], s), TARGET[s], set(dropped))
             failed = False
@@ -146,7 +152,7 @@ def cmd_draw():
         out += chosen
         over = sum(r['over_cap'] for r in chosen)
         print(f'{s}: {len(chosen)}/{TARGET[s]}' + (f' ({over} over the quarter cap)' if over else ''))
-    C.write_jsonl(DRAW, out)
+    C.write_jsonl(DRAW, sorted(out, key=lambda r: (r['stratum'], r['source'], r['page_id'])))
 
 
 def _append_drop(key: str, reason: str):
@@ -215,6 +221,8 @@ def main():
         if len(a.args) != 2:
             raise SystemExit('usage: sample.py drop KEY REASON')
         cmd_drop(*a.args)
+    elif a.command == 'draw':
+        cmd_draw(a.args)
     else:
         {'list': cmd_list, 'draw': cmd_draw, 'sanity': cmd_sanity, 'freeze': cmd_freeze}[a.command]()
 

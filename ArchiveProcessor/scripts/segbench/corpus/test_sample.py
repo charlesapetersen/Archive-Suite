@@ -39,6 +39,33 @@ class Draw(unittest.TestCase):
         self.assertEqual(len(second), 80)
         self.assertEqual(len(set(keys(first)) & set(keys(second))), 79)
 
+    def test_drawing_one_stratum_keeps_the_others(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        import common as C
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            cands = [{**r, 'stratum': s, **{f: '' for f in ('licence', 'item_url', 'convention', 'contamination',
+                                                              'script', 'era', 'kind')},
+                      'publish_image': False, 'fetch': {}}
+                     for s in ('L5', 'L6') for r in pool({'a': 30, 'b': 30, 'c': 30, 'd': 30})]
+            C.write_jsonl(d / 'cands.jsonl', cands)
+            img = d / 'img.jpg'
+            img.write_bytes(b'x')
+            fake = mock.Mock()
+            fake.materialise = lambda c: (img, f'text of {c.page_id}')
+            with mock.patch.multiple(S, CANDIDATES=d / 'cands.jsonl', DRAW=d / 'draw.jsonl',
+                                     DROPS=d / 'drops.jsonl', TRUTH=d / 'truth'), \
+                    mock.patch.object(S, 'modules', lambda: {'src': fake}):
+                S.cmd_draw(['L5'])
+                l5 = C.read_jsonl(d / 'draw.jsonl')
+                S.cmd_draw(['L6'])
+                both = C.read_jsonl(d / 'draw.jsonl')
+        self.assertEqual({r['stratum'] for r in l5}, {'L5'})
+        self.assertEqual([r for r in both if r['stratum'] == 'L5'], l5)
+        self.assertEqual(sum(r['stratum'] == 'L6' for r in both), 80)
+
 
 if __name__ == '__main__':
     unittest.main()
