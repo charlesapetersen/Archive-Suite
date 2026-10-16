@@ -296,8 +296,22 @@ QOS, GPUs, `--time`, and the number of bulk shards.
 - **Ending a job:** each job stops sending pages 15 minutes before its wall limit. It then queues its own shard
   again, up to 30 times.
 - **Done pages** (their `.txt` exists) are never read twice.
-- **Failures** go to `failed-<shard>.jsonl`: a reply cut off or unparseable, a request the server refused, or an
-  image Pillow cannot open. They never stop the run. Running `submit.sh` again retries them.
+- **The loop guard** (W41.farmshare-loop-guard, on by default; `--no-guard` is the panel's plain request). The reply
+  is streamed and stopped once it repeats itself: a span of up to 1,000 characters, repeated 6 times over at least
+  1,200 (whitespace ignored). Closing the stream makes vLLM abort the request, so the GPU slot is freed in seconds
+  instead of the 7 to 29 minutes a runaway held in the first bulk run. The cap is 6,144 tokens (answered pages there:
+  median 408, longest 5,766). A stopped or capped page is read once more at 8,192 with `repetition_penalty` 1.05,
+  still at temperature 0; its `_meta` records `attempts`, the first attempt and the retry's settings.
+  `fs_ocr.py guard-check DIR...` replays the detector over saved replies (a truth run's `replies/`, the panel cache)
+  and exits 1 if it would have stopped an answered page: on the 2,803 cached answered replies and 99 truths it fires
+  on none, and it catches 71 of the 72 runaways.
+- **Failures** go to `failed-<shard>.jsonl`, one line per failed read: a reply cut off or unparseable, a loop, a
+  request the server refused, or an image Pillow cannot open. They never stop the run.
+- **Escalation:** a page that failed for good (after the retry) is also listed in `escalate-<shard>.jsonl`, one JSON
+  object a line: `image` (as in `failed-`), `reason` (`loop`, `cap` or `error`), `status`, `finish`, `attempts`,
+  `model`, `error`, `t`. No transcript text. This is the list W41.app-farmshare-import and W41.app-ocr-cascade read to
+  send the page to a stronger reader. A rerun skips listed pages; `--retry-escalated` reads them again. A page that
+  got no answer at all is not listed: it is still to do, and `submit.sh` again reads it.
 - `--out` must be outside `--in`. The input is only ever read.
 
 ## General models on the layout regions (`news-layout`)
@@ -321,7 +335,7 @@ requests, because the library leaves a failed region blank. Per detector it writ
 | file | what |
 |---|---|
 | `fs_seg.py` | segmentation: `pack` (Mac), `run` (node), `import` (Mac), the seg-large request against the local server |
-| `fs_ocr.py` | `pack` (Mac), `truth`, `news`, `bulk`. Imports the panel's `PROMPT`, image cap and `max_tokens`, so a FarmShare row is the panel's measurement at FarmShare's precision. `--layout` reads with `news_layout.py` instead |
+| `fs_ocr.py` | `pack` (Mac), `truth`, `news`, `bulk`, `guard-check`. Imports the panel's `PROMPT`, image cap and `max_tokens`, so a FarmShare row is the panel's measurement at FarmShare's precision. `--layout` reads with `news_layout.py` instead |
 | `news_layout.py` | the layout-first reader: `newspaper-ocr`'s DocLayout-YOLO + GLM-OCR pipeline against the local vLLM server |
 | `limits.py` | reads the cluster's limits and writes `limits.env` |
 | `models.sh` | presets: Hugging Face repo, GPUs, download size, vLLM flags |
@@ -329,4 +343,4 @@ requests, because the library leaves a failed region blank. Per detector it writ
 | `fs_news_layout.py`, `setup-layout.sh` | `news-layout`: newspaper-ocr's regions read by a general served model, for comparison with `news_layout.py`; its own venv |
 | `bulk_summary.py` | a bulk run's summary for the repo, by page and by the model's kind label, with no transcript text |
 | `estimate.py` | the estimate table above |
-| `test_farmshare.py` | 25 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring), segmentation's windows (the request, the retry, failed and refused windows, resume), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |
+| `test_farmshare.py` | 30 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring, the loop guard against a server that loops: stop, retry, escalation, guard-check), segmentation's windows (the request, the retry, failed and refused windows, resume), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |

@@ -89,8 +89,13 @@ class Limits(unittest.TestCase):
             L.choose(L.gpu_partitions('normal*|(null)|1:00:00|2\n'), {}, set())
 
 
+LOOP_LINE = 'the same line again, and again\n'
+
+
 class Fake(http.server.BaseHTTPRequestHandler):
-    """Answers like vLLM's /v1/chat/completions. The reply text is chosen by the image bytes."""
+    """Answers like vLLM's /v1/chat/completions, whole or streamed. The reply is chosen by the image's colour: black
+    reads, red runs to the cap every time, yellow is a long page that fits only the panel's 8,192, blue loops until it
+    is asked with a repetition penalty, green loops whatever it is asked."""
     seen = []
 
     def log_message(self, *a):
@@ -102,15 +107,32 @@ class Fake(http.server.BaseHTTPRequestHandler):
         import base64
         img = base64.b64decode(b['messages'][0]['content'][0]['image_url']['url'].split(',', 1)[1])
         from PIL import Image
-        colour = Image.open(io.BytesIO(img)).getpixel((0, 0))
-        if colour[0] > 200:      # red: a reply cut off at max_tokens
-            content, finish = 'KIND: printed\nTABLE: no\nTEXT:\nhalf a pa', 'length'
+        r, g, bl = Image.open(io.BytesIO(img)).getpixel((0, 0))[:3]
+        head = 'KIND: printed\nTABLE: no\nTEXT:\n'
+        if r > 200 and g > 200:  # yellow
+            content, finish = (head + 'a long page', 'stop') if b['max_tokens'] >= 8192 else (head + 'a long pa', 'length')
+        elif r > 200:            # red: a reply cut off at max_tokens
+            content, finish = head + 'half a pa', 'length'
+        elif g > 200 or (bl > 200 and 'repetition_penalty' not in b):
+            content, finish = head + LOOP_LINE * 2000, 'length'
         else:
-            content, finish = 'KIND: printed\nTABLE: no\nTEXT:\nThe quick brown fox', 'stop'
-        out = json.dumps({'choices': [{'message': {'content': content}, 'finish_reason': finish}],
-                          'usage': {'prompt_tokens': 4873, 'completion_tokens': 9}}).encode()
-        self.send_response(200); self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', str(len(out))); self.end_headers(); self.wfile.write(out)
+            content, finish = head + 'The quick brown fox', 'stop'
+        if not b.get('stream'):
+            out = json.dumps({'choices': [{'message': {'content': content}, 'finish_reason': finish}],
+                              'usage': {'prompt_tokens': 4873, 'completion_tokens': 9}}).encode()
+            self.send_response(200); self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(out))); self.end_headers(); self.wfile.write(out)
+            return
+        self.send_response(200); self.send_header('Content-Type', 'text/event-stream'); self.end_headers()
+        pieces = [content[k:k + 8] for k in range(0, len(content), 8)]
+        try:
+            for k, piece in enumerate(pieces):
+                c = {'delta': {'content': piece}, 'finish_reason': finish if k == len(pieces) - 1 else None}
+                self.wfile.write(b'data: ' + json.dumps({'choices': [c]}).encode() + b'\n\n')
+            self.wfile.write(b'data: ' + json.dumps({'choices': [], 'usage': {'prompt_tokens': 4873,
+                             'completion_tokens': len(pieces)}}).encode() + b'\n\ndata: [DONE]\n\n')
+        except (BrokenPipeError, ConnectionResetError):  # the client stopped reading: vLLM aborts the request here
+            pass
 
 
 class Driver(unittest.TestCase):
@@ -165,13 +187,86 @@ class Driver(unittest.TestCase):
         self.assertTrue((out / 'box1/b.png.txt').exists())
         self.assertFalse((out / 'c.jpg.txt').exists())      # cut off at max_tokens: a failure, not text
         fails = [json.loads(x) for x in (out / 'failed-0.jsonl').read_text().splitlines()]
-        self.assertEqual([f['image'] for f in fails], ['c.jpg'])
+        self.assertEqual([(f['image'], f['attempts']) for f in fails], [('c.jpg', 2)])
         self.assertEqual(json.loads((out / '_meta/box1/a.jpg.json').read_text())['kind'], 'printed')
         self.assertEqual(list(out.rglob('*.tmp*')), [])
         n = len(Fake.seen)
-        r = self.bulk()                                      # rerun: only the failed page is asked again
-        self.assertEqual(len(Fake.seen) - n, 1, r.stdout)
-        self.assertIn('2 already done, 1 to read', r.stdout)
+        r = self.bulk()                                      # rerun: the escalated page is not asked again
+        self.assertEqual(len(Fake.seen) - n, 0, r.stdout)
+        self.assertIn('3 already done or escalated, 0 to read', r.stdout)
+        r = self.bulk('--retry-escalated')                   # unless asked: read, and retried, once more
+        self.assertEqual(len(Fake.seen) - n, 2, r.stdout)
+
+    def test_bulk_request_streams_at_the_lower_cap(self):
+        self.mk('a.jpg', (0, 0, 0))
+        self.assertEqual(self.bulk().returncode, 0)
+        b = Fake.seen[0]
+        self.assertEqual((b['temperature'], b['max_tokens'], b['stream']), (0, F.BULK_MAX_TOKENS, True))
+        self.assertNotIn('repetition_penalty', b)
+        self.assertEqual((self.tmp / 'out/a.jpg.txt').read_text(), 'The quick brown fox')
+        side = json.loads((self.tmp / 'out/_meta/a.jpg.json').read_text())
+        self.assertEqual((side['status'], side['completion_tokens']), ('ok', 7))  # usage from the stream's last event
+        self.bulk('--no-guard', '--retry-escalated')         # nothing left; --no-guard is the panel's request
+        self.mk('b.jpg', (0, 0, 0)); self.bulk('--no-guard')
+        self.assertEqual((Fake.seen[-1]['max_tokens'], Fake.seen[-1].get('stream')), (8192, None))
+
+    def test_guard_stops_a_loop_retries_once_and_escalates_what_still_fails(self):
+        self.mk('loop-then-reads.jpg', (0, 0, 255)); self.mk('loops.jpg', (0, 255, 0))
+        self.mk('long.jpg', (255, 255, 0)); self.mk('capped.jpg', (255, 0, 0)); self.mk('fine.jpg', (0, 0, 0))
+        r = self.bulk()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = self.tmp / 'out'
+        self.assertEqual((out / 'loop-then-reads.jpg.txt').read_text(), 'The quick brown fox')
+        self.assertEqual((out / 'long.jpg.txt').read_text(), 'a long page')   # the retry's 8,192 fits it
+        side = json.loads((out / '_meta/loop-then-reads.jpg.json').read_text())
+        self.assertEqual((side['attempts'], side['first']['status'], side['retry']),
+                         (2, 'loop', {'repetition_penalty': 1.05, 'max_tokens': 8192}))
+        self.assertEqual(side['first']['loop_period'], len(LOOP_LINE))
+        self.assertEqual(json.loads((out / '_meta/long.jpg.json').read_text())['first']['finish'], 'length')
+        self.assertNotIn('attempts', json.loads((out / '_meta/fine.jpg.json').read_text()))
+        esc = {e['image']: e for e in map(json.loads, (out / 'escalate-0.jsonl').read_text().splitlines())}
+        self.assertEqual({k: (e['reason'], e['attempts']) for k, e in esc.items()},
+                         {'loops.jpg': ('loop', 2), 'capped.jpg': ('cap', 2)})
+        self.assertEqual(esc['loops.jpg']['model'], 'm')
+        fails = {f['image']: f for f in map(json.loads, (out / 'failed-0.jsonl').read_text().splitlines())}
+        self.assertLess(fails['loops.jpg']['chars'], 3000)   # stopped early, not at the reply's 62,000 characters
+        retried = [b for b in Fake.seen if 'repetition_penalty' in b]
+        self.assertEqual(len(retried), 4)                    # one retry each for the two loops, the long and the capped
+        log = self.tmp / 'shard.out'; log.write_text(r.stdout)
+        r = subprocess.run([sys.executable, str(HERE / 'bulk_summary.py'), str(out), '1', 'm', str(log)],
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        s = json.loads((out / 'summary.json').read_text())
+        self.assertEqual((s['pages'], s['ok'], s['retried'], s['recovered_by_retry'], s['escalated']),
+                         (5, 3, 4, 2, {'loop': 1, 'cap': 1}))
+
+    def test_loop_period_finds_loops_and_leaves_repetitive_pages(self):
+        self.assertEqual(F.loop_period('KIND: printed\n' + 'abc def\n' * 300), len('abc def '))
+        self.assertEqual(F.loop_period('x\n' + 'one line\n  wrapped  differently\n' * 100), len('one line wrapped differently '))
+        self.assertIsNone(F.loop_period('abc def\n' * 100))        # 800 characters: under LOOP_MIN_CHARS
+        self.assertIsNone(F.loop_period(' '.join(str(k) + '.' for k in range(1000, 1600))))  # counting: the cap's job
+        self.assertIsNone(F.loop_period('The quick brown fox jumps. ' * 5 + 'over the lazy dog ' * 30))
+        self.assertEqual([F.failure_reason(m) for m in ({'status': 'ok'}, {'status': 'error'}, {'status': 'loop'},
+                          {'status': 'unparsed', 'finish': 'length'}, {'status': 'unparsed', 'finish': 'stop'},
+                          {'status': 'rejected'}, {'status': 'unreadable'})],
+                         [None, None, 'loop', 'cap', 'error', 'error', 'error'])
+
+    def test_guard_check_replays_saved_replies(self):
+        d = self.tmp / 'runs/replies'
+        F.atomic_write(d / 'p1.json', json.dumps({'reply': {'raw': 'KIND: printed\nTEXT:\nfine'}, 'meta': {'finish': 'stop'}}).encode())
+        F.atomic_write(d / 'p2.json', json.dumps({'reply': {'raw': LOOP_LINE * 500}, 'meta': {'finish': 'length'}}).encode())
+        F.atomic_write(self.tmp / 'runs/x.raw.json', json.dumps({'choices': [{'message': {'content': 'x ' * 9},
+                                                                              'finish_reason': 'length'}]}).encode())
+        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'guard-check', str(self.tmp / 'runs')],
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        j = json.loads(r.stdout)
+        self.assertEqual((j['answered'], j['answered_fired'], j['capped'], j['capped_caught']), (1, 0, 2, 1))
+        self.assertNotIn('again', r.stdout)                  # names and counts only, never the text
+        F.atomic_write(d / 'p3.json', json.dumps({'reply': {'raw': LOOP_LINE * 500}, 'meta': {'finish': 'stop'}}).encode())
+        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'guard-check', str(self.tmp / 'runs')],
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1)                    # a fire on an answered reply fails the check
 
     def test_bulk_shards_partition_the_input(self):
         for k in range(5):

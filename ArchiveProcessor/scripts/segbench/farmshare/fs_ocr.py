@@ -12,8 +12,14 @@ API or the network beyond that server. The prompt, image cap and max_tokens are 
 FarmShare score is the same measurement as the OpenRouter rows, at FarmShare's precision.
 
 Bulk is resumable: a page whose <image name>.txt exists is skipped, every file is written to a temporary name and
-renamed, and a page that fails is logged to failed-<shard>.jsonl (not retried in the same run; a rerun retries it).
-A page the server never answered counts as still to do, and eight such in a row stop the run with exit 75.
+renamed, and every failed read is logged to failed-<shard>.jsonl. A page the server never answered counts as still
+to do, and eight such in a row stop the run with exit 75.
+
+The loop guard (W41.farmshare-loop-guard; on in bulk, --guard for truth/news): the reply is streamed and stopped
+once it repeats itself (loop_period), a stopped or capped page is read once more with a repetition penalty at the
+panel's full cap, and a page that still fails goes to escalate-<shard>.jsonl with its reason (loop, cap, error).
+A rerun skips escalated pages unless --retry-escalated. `fs_ocr.py guard-check DIR...` replays the detector over
+saved replies, to show it fires on no answered page.
 """
 from __future__ import annotations
 import argparse
@@ -40,6 +46,39 @@ IMAGES = {'.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp'}
 STRATA = ('page', 'kind', 'table_form', 'handwritten', 'clippings', 'tables')  # no identity columns leave the Mac
 NEWS_SIDE = 3584      # broadsheets are 2453-5975 px wide; 2400 loses small type
 NEWS_MAX_TOKENS = 16384  # NewsBench gold runs to 5,464 words a page
+# The 2,000-page bulk run's answered pages: median 408 tokens, 99.9% under 3,556, longest 5,766. Its 13 failures all
+# ran to 8,192. A capped page is retried at the panel's 8,192, so a long page this cuts short is not lost.
+BULK_MAX_TOKENS = 6144
+
+# A reply is looping when its whitespace-normalised tail is one span of up to LOOP_MAX_PERIOD characters repeated
+# LOOP_MIN_REPEATS times, covering LOOP_MIN_CHARS. Replayed with guard-check on 2026-10-15 over the cached panel and
+# Mac-local replies (25 models) and the 99 truth texts: none of the 2,803 answered replies (231 of them Qwen3.6 27B's)
+# or truths fires at these values or at 800/5, three do at 600/4; 71 of the 72 replies cut off at the cap fire, at a
+# median 8.6% of their length. The miss counts upward (1428. 1429. ...): the cap catches that kind.
+LOOP_MIN_CHARS, LOOP_MIN_REPEATS, LOOP_MAX_PERIOD = 1200, 6, 1000
+LOOP_CHECK_EVERY = 256       # characters of new text between checks
+RETRY = {'repetition_penalty': 1.05}  # vLLM sampling extra; temperature stays 0, so the retry is reproducible
+
+
+def loop_period(text: str):
+    """The repeating span's length if the reply ends in a loop, else None."""
+    t = ' '.join(text[-(LOOP_MAX_PERIOD * (LOOP_MIN_REPEATS + 1) + 1000):].split())
+    for p in range(1, LOOP_MAX_PERIOD + 1):
+        s = max(LOOP_MIN_CHARS - p, (LOOP_MIN_REPEATS - 1) * p)
+        if s + p > len(t):
+            break
+        if t[-s:] == t[-s - p:-p]:
+            return p
+    return None
+
+
+def failure_reason(meta):
+    """Why a page failed, for the escalation list: 'loop', 'cap' or 'error'; None if answered or never answered."""
+    if meta['status'] in ('ok', 'error'):   # 'error' got no answer: still to do, not a page to escalate
+        return None
+    if meta['status'] == 'loop':
+        return 'loop'
+    return 'cap' if meta.get('finish') == 'length' else 'error'
 
 
 def atomic_write(path: Path, data: bytes):
@@ -61,33 +100,88 @@ def jpeg(src: Path, side: int) -> bytes:
 
 
 class Server:
-    def __init__(self, url, model, max_tokens, thinking_off):
+    """guard: stream the reply and stop it when it loops, then read a stopped or capped page once more with RETRY
+    at retry_max_tokens. Without it a read is the panel's single request, unchanged."""
+    def __init__(self, url, model, max_tokens, thinking_off, guard=False, retry_max_tokens=None):
         self.url, self.model, self.max_tokens, self.thinking_off = url.rstrip('/'), model, max_tokens, thinking_off
+        self.guard, self.retry_max_tokens = guard, retry_max_tokens or max(max_tokens, P.MAX_TOKENS)
 
     def read(self, image: bytes, timeout=1800):
-        b = {'model': self.model, 'temperature': 0, 'max_tokens': self.max_tokens, 'messages': [{'role': 'user', 'content': [
-            {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(image).decode()}},
-            {'type': 'text', 'text': P.PROMPT}]}]}
+        t0 = time.time()
+        reply, meta = self.read_once(image, timeout)
+        if not self.guard or failure_reason(meta) not in ('loop', 'cap'):
+            return reply, meta
+        first = {k: meta.get(k) for k in ('status', 'finish', 'completion_tokens', 'wall_s', 'loop_period')}
+        reply, meta = self.read_once(image, max(60, timeout - (time.time() - t0)), retry=True)
+        meta.update(attempts=2, first=first, retry=dict(RETRY, max_tokens=self.retry_max_tokens),
+                    wall_total_s=round(time.time() - t0, 3))
+        return reply, meta
+
+    def read_once(self, image: bytes, timeout=1800, retry=False):
+        b = {'model': self.model, 'temperature': 0, 'max_tokens': self.retry_max_tokens if retry else self.max_tokens,
+             'messages': [{'role': 'user', 'content': [
+                 {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(image).decode()}},
+                 {'type': 'text', 'text': P.PROMPT}]}]}
         if self.thinking_off:  # the panel ran reasoning off; Qwen3.5/3.6 chat templates honour this switch
             b['chat_template_kwargs'] = {'enable_thinking': False}
+        if retry:
+            b.update(RETRY)
+        if self.guard:
+            b.update(stream=True, stream_options={'include_usage': True})
         req = urllib.request.Request(self.url + '/v1/chat/completions', json.dumps(b).encode(),
                                      {'Content-Type': 'application/json'})
         t0 = time.time()
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
-                j = json.loads(r.read())
+                raw, finish, u, period = self.stream(r, t0, timeout) if self.guard else self.whole(r)
         except urllib.error.HTTPError as e:  # the server answered and refused this page (e.g. 400): the page failed
             return None, {'status': 'rejected', 'error': f'{e.code} {e.read()[:300]!r}', 'wall_s': time.time() - t0}
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:  # no answer: transient, not the page
-            return None, {'status': 'error', 'error': repr(e)[:300], 'wall_s': time.time() - t0}
-        c = j['choices'][0]; u = j.get('usage') or {}
-        raw = (c.get('message') or {}).get('content') or ''
-        meta = {'finish': c.get('finish_reason'), 'prompt_tokens': u.get('prompt_tokens'),
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, IndexError) as e:
+            return None, {'status': 'error', 'error': repr(e)[:300], 'wall_s': time.time() - t0}  # no answer: transient
+        meta = {'finish': finish, 'prompt_tokens': u.get('prompt_tokens'),
                 'completion_tokens': u.get('completion_tokens'), 'wall_s': round(time.time() - t0, 3)}
+        if period:
+            meta.update(status='loop', loop_period=period, chars=len(raw))
+            return {'raw': raw, 'parsed': None}, meta
         # As the panel: a reply cut off at max_tokens is a failure, not a short transcript.
         parsed = T.parse_draft(raw) if meta['finish'] == 'stop' else None
         meta['status'] = 'ok' if parsed else 'unparsed'
         return {'raw': raw, 'parsed': parsed}, meta
+
+    @staticmethod
+    def whole(r):
+        j = json.loads(r.read())
+        c = j['choices'][0]
+        return (c.get('message') or {}).get('content') or '', c.get('finish_reason'), j.get('usage') or {}, None
+
+    @staticmethod
+    def stream(r, t0, timeout):
+        """vLLM's server-sent events. Returns at a loop, which closes the connection, and vLLM aborts the request."""
+        parts, n, checked, finish, usage = [], 0, 0, None, {}
+        for line in r:
+            if not line.startswith(b'data:'):
+                continue
+            data = line[5:].strip()
+            if data == b'[DONE]':
+                break
+            j = json.loads(data)
+            usage = j.get('usage') or usage
+            for c in j.get('choices') or []:
+                piece = (c.get('delta') or {}).get('content') or ''
+                parts.append(piece); n += len(piece)
+                finish = c.get('finish_reason') or finish
+            if n - checked >= LOOP_CHECK_EVERY:
+                checked = n
+                text = ''.join(parts); parts[:] = [text]
+                period = loop_period(text)
+                if period:
+                    return text, 'loop', usage, period
+            if time.time() - t0 > timeout:
+                raise TimeoutError(f'stream ran past {timeout:.0f} s')
+        else:
+            if finish is None:  # the connection ended without a finish: not an answer
+                raise ValueError('stream ended early')
+        return ''.join(parts), finish, usage, None
 
 
 DEAD_SERVER = 8  # this many 'error' replies in a row: the server is gone, stop instead of failing every page
@@ -195,7 +289,7 @@ def server_from(a, max_tokens):
     if a.layout:
         import news_layout as NL  # needs setup.sh --layout
         return NL.LayoutReader(NL.build_pipeline(a.url, model)), NL.open_rgb
-    return Server(a.url, model, max_tokens, not a.thinking_on), None
+    return Server(a.url, model, max_tokens, not a.thinking_on, guard=a.guard), None
 
 
 def cmd_truth(a):
@@ -269,10 +363,12 @@ def cmd_bulk(a):
     mine = [p for p in files if int(hashlib.sha1(p.relative_to(src).as_posix().encode()).hexdigest(), 16) % n == i]
     # The image's own name plus .txt (a.jpg -> a.jpg.txt), so a.jpg and a.tif never share an output.
     target = lambda p: out / (p.relative_to(src).as_posix() + '.txt')  # noqa: E731
-    todo = [p for p in mine if not target(p).exists()]
-    print(f'{len(files)} images, shard {i}/{n}: {len(mine)}, {len(mine) - len(todo)} already done, {len(todo)} to read',
-          flush=True)
-    server, load = server_from(a, a.max_tokens or P.MAX_TOKENS)
+    escalated = set() if a.retry_escalated else {json.loads(x)['image'] for f in sorted(out.glob('escalate-*.jsonl'))
+                                                  for x in f.read_text().splitlines() if x.strip()}
+    todo = [p for p in mine if not target(p).exists() and p.relative_to(src).as_posix() not in escalated]
+    print(f'{len(files)} images, shard {i}/{n}: {len(mine)}, {len(mine) - len(todo)} already done or escalated, '
+          f'{len(todo)} to read', flush=True)
+    server, load = server_from(a, a.max_tokens or (BULK_MAX_TOKENS if a.guard and not a.layout else P.MAX_TOKENS))
     load = load or (lambda p: jpeg(p, a.side or P.SIDE))
     log_lock = threading.Lock()
     done = [0]
@@ -288,6 +384,13 @@ def cmd_bulk(a):
             else:
                 with (out / f'failed-{i}.jsonl').open('a') as f:
                     f.write(json.dumps({'image': key, **meta, 'raw': (reply or {}).get('raw', '')[:500]}) + '\n')
+                reason = failure_reason(meta)
+                if reason:  # the form W41.app-farmshare-import / W41.app-ocr-cascade read: no transcript text
+                    with (out / f'escalate-{i}.jsonl').open('a') as f:
+                        f.write(json.dumps({'image': key, 'reason': reason, 'status': meta['status'],
+                                            'finish': meta.get('finish'), 'attempts': meta.get('attempts', 1),
+                                            'model': getattr(server, 'model', None), 'error': meta.get('error'),
+                                            't': round(time.time())}) + '\n')
             if done[0] % 100 == 0:
                 print(f'{done[0]}/{len(todo)}', flush=True)
 
@@ -303,6 +406,47 @@ def cmd_bulk(a):
     sys.exit(0 if t['left'] == 0 else 75)  # 75 (EX_TEMPFAIL): deadline or dead server, resubmit to continue
 
 
+def saved_replies(d: Path):
+    """(name, finish, text) for every reply under d: this kit's replies/*.json, the panel's *.raw.json (OpenRouter
+    bodies) and the Mac-local runs' *.raw.json (text, with the finish in the sibling .json)."""
+    for f in sorted(d.rglob('*.json')):
+        if f.name.endswith('.raw.json'):
+            j = json.loads(f.read_text())
+            if 'choices' in j:
+                c = j['choices'][0]
+                yield f, c.get('finish_reason'), (c.get('message') or {}).get('content') or ''
+            elif 'text' in j:
+                side = f.with_name(f.name[:-len('.raw.json')] + '.json')
+                fin = json.loads(side.read_text())['meta'].get('finish') if side.exists() else None
+                yield f, fin, j['text']
+        elif f.parent.name == 'replies':
+            j = json.loads(f.read_text())
+            yield f, (j.get('meta') or {}).get('finish'), (j.get('reply') or {}).get('raw') or ''
+
+
+def cmd_guard_check(a):
+    """Replay the loop detector, as the stream would see it, over saved replies: a fire on an answered reply would
+    have stopped a page that today scores; a fire on a capped one is a page the guard frees early. Prints counts and
+    names, never text."""
+    answered = capped = 0; fired, caught, missed = [], [], []
+    for d in a.dirs:
+        for f, finish, text in saved_replies(Path(d)):
+            at = next((k for k in range(LOOP_CHECK_EVERY, len(text) + LOOP_CHECK_EVERY, LOOP_CHECK_EVERY)
+                       if loop_period(text[:k])), None)
+            if finish == 'stop':
+                answered += 1
+                if at:
+                    fired.append(str(f))
+            elif finish == 'length':
+                capped += 1
+                (caught if at else missed).append((str(f), at and round(min(at, len(text)) / max(len(text), 1), 3)))
+    used = sorted(x for _, x in caught)
+    print(json.dumps({'answered': answered, 'answered_fired': len(fired), 'capped': capped, 'capped_caught': len(caught),
+                      'median_share_read_before_stop': used[len(used) // 2] if used else None,
+                      'fired_on_answered': fired, 'missed': [m for m, _ in missed]}, indent=1))
+    sys.exit(1 if fired else 0)
+
+
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest='cmd', required=True)
     p = sub.add_parser('pack'); p.add_argument('--out', required=True)
@@ -314,7 +458,10 @@ def main():
                        'with --layout, whose regions are what fill the server: news_layout.REGION_WORKERS)')
         p.add_argument('--gpus', type=int, default=int(os.environ.get('FS_GPUS', 1)), help='for pages/hour/GPU')
         p.add_argument('--thinking-on', action='store_true', help='leave the chat template thinking switch alone')
-        p.add_argument('--max-tokens', type=int)
+        p.add_argument('--max-tokens', type=int, help=f'reply cap (bulk: {BULK_MAX_TOKENS} with the guard, else '
+                       f'{P.MAX_TOKENS}; news: {NEWS_MAX_TOKENS}; truth: {P.MAX_TOKENS})')
+        p.add_argument('--guard', action=argparse.BooleanOptionalAction, default=None,
+                       help='stop a looping reply, retry a stopped or capped page once (default: on in bulk only)')
         p.add_argument('--layout', action='store_true', default=os.environ.get('FS_LAYOUT') == '1',
                        help='layout-first: DocLayout-YOLO + GLM-OCR per region (default from $FS_LAYOUT=1)')
         p.add_argument('--out', required=True)
@@ -328,10 +475,14 @@ def main():
             p.add_argument('--in', dest='inp', required=True)
             p.add_argument('--shard', default='0/1'); p.add_argument('--deadline', type=float)
             p.add_argument('--side', type=int)
+            p.add_argument('--retry-escalated', action='store_true', help='read pages in escalate-*.jsonl again')
+    p = sub.add_parser('guard-check'); p.add_argument('dirs', nargs='+')
     a = ap.parse_args()
-    if a.cmd != 'pack' and a.concurrency is None:
+    if a.cmd not in ('pack', 'guard-check') and a.guard is None:
+        a.guard = a.cmd == 'bulk' and not a.layout
+    if a.cmd not in ('pack', 'guard-check') and a.concurrency is None:
         a.concurrency = int(os.environ.get('FS_CONCURRENCY') or (4 if a.layout else 32))
-    {'pack': cmd_pack, 'truth': cmd_truth, 'news': cmd_news, 'bulk': cmd_bulk}[a.cmd](a)
+    {'pack': cmd_pack, 'truth': cmd_truth, 'news': cmd_news, 'bulk': cmd_bulk, 'guard-check': cmd_guard_check}[a.cmd](a)
 
 
 if __name__ == '__main__':
