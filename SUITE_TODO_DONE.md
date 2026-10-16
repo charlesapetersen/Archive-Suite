@@ -11479,3 +11479,13 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   ALL PASS on the final code; test-ocr-refusal, test-ocr-page-guidance ALL PASS and test-batch-resume 393 PASS at checkpoint 2. Clean build, no new warnings. No money;
   no migration, as there is nothing to migrate.
   <!-- /W41.app-page-kind -->
+- [x] **W41.farmshare-loop-guard — the FarmShare kit stops a reply that repeats itself, retries once, and records the page for escalation [S · ~1 session]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light). SHIPPED 2026-10-16 (this commit; the code is 4920df65).
+  Built by engine session archive-suite-77 (4920df65: streamed stop at a span repeated 6 times over 1,200 characters,
+  the 6,144 bulk cap, one retry at 8,192 with repetition_penalty 1.05, `escalate-<shard>.jsonl` with the reason,
+  `guard-check`; truth and news unchanged unless `--guard`). An interactive session had built a second version in
+  parallel (streaming in every mode, presence_penalty 1.5, escalation in failed-*.jsonl); it kept 4920df65 and dropped
+  its own. Checked on FarmShare: `guard-check` fires on none of 525 answered truth and newspaper replies and catches 7
+  of 8 capped ones; the detector fires on none of the bulk pilot's 1,987 answered pages. The 13 failed pilot pages
+  read again with the guard (job 1850822, 2.5 minutes): 5 answered (2 first time, 3 on the retry), 8 looped twice and
+  were escalated, none capped. README updated. No money.
+  <!-- /W41.farmshare-loop-guard -->

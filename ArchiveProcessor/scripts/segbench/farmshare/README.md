@@ -308,7 +308,13 @@ QOS, GPUs, `--time`, and the number of bulk shards.
   still at temperature 0; its `_meta` records `attempts`, the first attempt and the retry's settings.
   `fs_ocr.py guard-check DIR...` replays the detector over saved replies (a truth run's `replies/`, the panel cache)
   and exits 1 if it would have stopped an answered page: on the 2,803 cached answered replies and 99 truths it fires
-  on none, and it catches 71 of the 72 runaways.
+  on none, and it catches 71 of the 72 runaways. On FarmShare's own replies (2026-10-16) it fired on none of 525
+  answered truth and newspaper replies or the 1,987 answered pages of the 2,000-page bulk pilot, and caught 7 of the 8
+  capped replies.
+- **The pilot's 13 failed pages, read again with the guard** (2026-10-16, one L40S, 2.5 minutes for all 13): 5
+  answered (2 at the first attempt, 3 on the retry) and 8 looped on both attempts and were escalated; none ran to a
+  cap. Before the guard each of the 13 ran to 8,192 tokens. So the pilot's 99.35% answered becomes 99.6%, and the
+  last 0.4% is sent on to a stronger reader rather than held for minutes.
 - **Failures** go to `failed-<shard>.jsonl`, one line per failed read: a reply cut off or unparseable, a loop, a
   request the server refused, or an image Pillow cannot open. They never stop the run.
 - **Escalation:** a page that failed for good (after the retry) is also listed in `escalate-<shard>.jsonl`, one JSON
