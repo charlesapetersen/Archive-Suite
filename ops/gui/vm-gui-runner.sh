@@ -21,6 +21,7 @@
 #                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test),
 #                READER_JOURNEY=rehearsal (W40.d8 triage journey on the real-corpus sample).
 #                NOTES_JOURNEY=integrations (W40.d10: Notes with the real Zotero and Reader in the VM).
+#                VISUAL_REVIEW=1 (W40.e10 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
@@ -341,6 +342,16 @@ run_xcuitest() {
     *) die "could not prepare the VM's $APP DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed}." ;;
   esac
   tart_crash_mark "$VM"
+  # W40.e10: the screen-by-screen visual review tour (`VisualReviewUITests`) runs only while this flag
+  # file exists beside the app's fixture, because it is minutes long and writes hundreds of shots. Set or
+  # clear it on every run so a previous VISUAL_REVIEW=1 run cannot leave it switched on.
+  local vflag; vflag="$(dirname "$GUEST_FIXTURE")/.visual-review"
+  if [ "${VISUAL_REVIEW:-0}" = "1" ]; then
+    tart exec "$VM" bash -lc "mkdir -p \"$(dirname "$vflag")\" && touch \"$vflag\"" >/dev/null 2>&1 \
+      || die "could not set the visual-review flag in the guest"
+  else
+    tart exec "$VM" bash -lc "rm -f \"$vflag\"" >/dev/null 2>&1 || true
+  fi
   log "building + running $ONLY_TESTING for $APP in the VM…"
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
   # before executing a single test. Remove it first.
@@ -358,6 +369,8 @@ run_xcuitest() {
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " 2>&1 | tee "$APP_ART/xcuitest.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
   log "XCUITest log: $APP_ART/xcuitest.log"
+  # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
+  tart exec "$VM" bash -lc "rm -f \"$vflag\"" >/dev/null 2>&1 || true
   collect_shots
   collect_xcresult
   collect_crashes
