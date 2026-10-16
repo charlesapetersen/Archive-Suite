@@ -266,7 +266,7 @@ def cmd_pack(a):
 
 
 def score_pages(pages, replies):
-    import ocr_panel_score as S  # needs rapidfuzz + sacrebleu==2.5.1 (setup.sh installs them)
+    import ocr_panel_score as S  # needs rapidfuzz, regex + sacrebleu==2.5.1 (setup.sh installs them)
     rr = []
     for page, truth, strata in pages:
         reply, meta = replies.get(page, (None, {'status': 'missing'}))

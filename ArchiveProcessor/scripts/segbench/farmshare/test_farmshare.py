@@ -325,7 +325,7 @@ class Driver(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('outside --in', r.stderr)
 
-    @unittest.skipUnless(SCORING, 'needs rapidfuzz + sacrebleu (ocr-panel-requirements.txt)')
+    @unittest.skipUnless(SCORING, 'needs rapidfuzz, regex + sacrebleu (ocr-panel-requirements.txt)')
     def test_truth_mode_scores_a_synthetic_pack(self):
         import hashlib
         pack = self.tmp / 'pack'

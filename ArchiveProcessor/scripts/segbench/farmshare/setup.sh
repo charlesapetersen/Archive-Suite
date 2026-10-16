@@ -60,5 +60,5 @@ HF_HOME=$ROOT/hf
 FS_PY=$ROOT/venv/bin/python
 FS_VLLM=$ROOT/venv/bin/vllm
 EOF
-"$ROOT/venv/bin/python" -c 'import vllm, sacrebleu, rapidfuzz, PIL; print("vllm", vllm.__version__)'
+"$ROOT/venv/bin/python" -c 'import vllm, sacrebleu, rapidfuzz, regex, PIL; print("vllm", vllm.__version__)'
 echo "ready: $(cat fs.env | tr '\n' ' ')"

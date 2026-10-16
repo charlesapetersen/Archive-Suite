@@ -171,6 +171,55 @@ class Scores(unittest.TestCase):
         self.assertEqual(normal('“Text” | word'), '"Text" word')
         self.assertNotEqual(normal('state-of-the-art'), normal('state of the art'))
 
+    def test_graphemes_count_a_letter_and_its_marks_once(self):
+        from ocr_panel_score import nes
+        # Decomposed Hebrew with points: one wrong point is one edit in four clusters, not one in eight code points.
+        self.assertAlmostEqual(nes('שָׁלוֹם', 'שָׂלוֹם'), 1 - 1/4)
+        self.assertEqual(nes('abc', 'abd'), 1 - 1/3)
+
+    def test_bidi_controls_are_not_edits(self):
+        from ocr_panel_score import score
+        self.assertEqual(score('مرحبا بكم', '‏مرحبا‎ بكم⁩')['nes'], 1)
+
+    def test_long_s_strict_and_mapped(self):
+        from ocr_panel_score import score
+        self.assertEqual(score('Gefchichte ſein', 'Gefchichte sein')['nes'], 1)  # S0 folds long s, as NFKC did
+        r = score('Geſchichte', 'Geschichte', stratum='L8')
+        self.assertLess(r['nes'], 1)
+        self.assertEqual(r['nes_mapped'], 1)
+        self.assertEqual(score('uiuere ꝑ ꝯtra', 'vivere p contra', stratum='L7')['nes_mapped'], 1)
+        self.assertEqual(score('dñs', 'dns', stratum='L5')['nes_mapped'], 1)
+
+    def test_diacritics_kept_and_reported_apart(self):
+        from ocr_panel_score import score, tokens
+        r = score('कमल', 'कमला', stratum='N6')
+        self.assertIn('nes_no_marks', r)
+        self.assertEqual(tokens('שָׁלוֹם'), ['שָׁלוֹם'])  # points stay in the word
+        self.assertEqual(score('שָׁלוֹם', 'שלום', stratum='N4')['nes_no_marks'], 1)
+
+    def test_cjk_words_and_whitespace_free_score(self):
+        from ocr_panel_score import score, tokens
+        self.assertEqual(tokens('中文 text'), ['中', '文', 'text'])
+        r = score('中华人民共和国', '中华 人民 共和国', stratum='N5')
+        self.assertLess(r['nes'], 1)
+        self.assertEqual(r['nes_no_space'], 1)
+
+    def test_hyphen_joining_is_per_stratum(self):
+        from ocr_panel_score import score
+        self.assertLess(score('remem-\nber', 'remember')['nes'], 1)
+        self.assertEqual(score('remem-\nber', 'remember', stratum='L1')['nes'], 1)
+        self.assertEqual(score('remember', 'remem- \n ber', stratum='L1')['nes'], 1)
+
+    def test_paired_and_failure_figures(self):
+        from ocr_panel_score import paired, aggregate
+        same = paired([.5, .6, .7] * 10, [.5, .6, .7] * 10, rounds=500)
+        self.assertEqual(same['delta'], 0); self.assertEqual(same['p'], 1)
+        far = paired([.9] * 30, [.1] * 30, rounds=500)
+        self.assertLess(far['p'], .01); self.assertAlmostEqual(far['lo'], .8)
+        a = aggregate([{'ok': True, 'nes': .8, 'chrf': 0, 'words': 1, 'missed': 0, 'added': 0},
+                       {'ok': False, 'nes': 0., 'chrf': 0, 'words': 1, 'missed': 1, 'added': 0}])
+        self.assertEqual((a['failed'], a['nes_answered'], a['nes']), (.5, .8, .4))
+
     def test_group_labels_are_truth_and_overlapping(self):
         from ocr_panel_score import group_values
         r = {'collection':'a', 'source':'original', 'date_bin':'undated', 'kind':'typewritten',

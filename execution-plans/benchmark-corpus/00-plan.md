@@ -158,7 +158,7 @@ collection, so that no one hand or printer dominates it.
 | Smithsonian Transcription Center | volunteers keep no IP (V); transcription CC0 **not verified**; images CC0 where Open Access flags them (I) | yes, per page on the site (V); no bulk dump found | "type what you see"; `[[??]]`, `[[strikethrough]]…`, `[[right margin]]…`, pipe tables, ditto marks expanded; three-stage QA (V) | large; export by project or EDAN | transcription.si.edu |
 | VOC/WIC/notarial (Dutch) | CC BY 4.0 (V) | full JPG + PAGE + txt (V) | PAGE-XML; diplomatic (I) | ~6,000 GT scans (V) | HTR-United catalogue |
 | HTR-United: Königsfelden, Late Medieval Castilian, iForal | CC BY / BY-SA (V) | pages with PAGE/ALTO line coordinates; page text rebuilt in line order (V/I) | CREMMA-style diplomatic, abbreviations **not** expanded (V) | 60k / 28k lines; iForal size not read | htr-united.github.io (catalogue YAML) |
-| READ ICDAR 2017; Konzilsprotokolle | CC BY (V) | full pages, PAGE lines (V) | PAGE-XML | Test 65+57 pages; 8,770 lines (V) | zenodo.org/records/835489, /215383 |
+| READ ICDAR 2017; Konzilsprotokolle | CC BY (V; 835489 re-read 2026-10-16: CC-BY-4.0, Test-A 71 MB, Test-B1 71 MB, Test-B2 48 MB) | full pages, PAGE lines (V) | PAGE-XML | Test 65+57 pages; 8,770 lines (V) | zenodo.org/records/835489, /215383 |
 | German Kurrent 19th c. | images CC0, DTA text CC BY 4.0, editorial CC BY-NC-SA (V) | full pages + PAGE (V) | OCR-D level 2 (V) | 9,317 lines, 1806-1894 (V) | zenodo.org/records/17252677 |
 | Bentham R0 (HTRtS 2014) | CC BY 4.0 (V) | full pages + PAGE (V) | PAGE-XML | ~430 pages (I) | zenodo.org/records/44519 |
 | OCR-D `gt_structure_text` | CC BY-SA 4.0 (V) | page images with region and line TextEquiv (V) | PAGE-XML; long s and ligatures depend on OCR-D GT level (level page not fetched) | 217 pages, 6,609 lines; de/la/fr/en/he (V) | github.com/OCR-D/gt_structure_text |
@@ -166,7 +166,7 @@ collection, so that no one hand or printer dominates it.
 | NewsBench (nealcaren) | MIT code; images and text are By the People public domain (V) | yes, full-page `.txt` (V) | gold from By the People | 19 pages, 15 scored (V) | github.com/nealcaren/newsbench |
 | Europeana Newspapers / ENP | per record (not checked) | PAGE-XML (V) | — | 50 (SBB, Zenodo 2583866) / 500+ (V) | cneud.github.io/ocr-gt |
 | TAPUS, DAHN (French typescripts) | not checked | page sets (from the ocr-gt list) | — | not checked | cneud.github.io/ocr-gt |
-| Muharaf (public part) | CC BY-NC-SA 4.0 (from search results; confirm) | page images + polygons + page-level text (V) | PAGE-XML, JSON; expert transcribers | 1,216 public pages (V) | zenodo.org/records/11492215 |
+| Muharaf (public part) | CC BY-NC-SA **2.0** (V, Zenodo record metadata, 2026-10-16) | page images + polygons + page-level text (V) | PAGE-XML, JSON; expert transcribers | 1,216 public pages (V) | zenodo.org/records/11492215 |
 | Digital Peter | MIT (V, HF card) | 662 full pages; lines named doc_page_line, so pages rebuild (V) | jpg + txt + COCO | 662 pages, 9,694 lines (V) | huggingface.co/datasets/ai-forever/Peter |
 | EPARCHOS | CC BY 4.0 (V) | 120 pages, PageXML lines (V) | PAGE-XML | 120 pages (V) | zenodo.org/records/4095301 |
 | BiblIA | CC BY-NC-SA 4.0 (V) | 202 page images (70 by IIIF link only) + ALTO lines (V) | ALTO 4.2 | 202 pages (V) | zenodo.org/records/5167263 |

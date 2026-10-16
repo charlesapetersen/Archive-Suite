@@ -1,15 +1,17 @@
 #!/usr/local/bin/python3
 """Aggregate W41 OCR panel scores. No network; raw text and page-level scores stay outside git.
-Requires rapidfuzz and sacrebleu==2.5.1 (see ocr-panel-requirements.txt).
+Requires rapidfuzz, regex and sacrebleu==2.5.1 (see ocr-panel-requirements.txt).
 """
 from __future__ import annotations
 import collections
 import csv
 import json
+import random
 import re
 import unicodedata
 from pathlib import Path
 
+import regex
 from rapidfuzz.distance import Levenshtein
 from sacrebleu.metrics import CHRF
 import ocr_panel as P
@@ -32,26 +34,88 @@ HF = {
 }
 
 
-def normal(text):
+# W43.corpus-build. Unicode is NFC; the compatibility folds NFKC used to make silently are applied per character,
+# except the characters a stratum's strict score keeps. On the owner's 96 (S0) nothing is kept, so S0 scores as
+# before; the old and new scorers' S0 figures are compared in the commit that made this change.
+LONG_S_AND_LIGATURES = frozenset('ſﬀﬁﬂﬃﬄﬅﬆ')
+# Historical letter forms a mapped score folds. Strict scores keep every one of them as written.
+HISTORICAL_MAP = {'ſ': 's', 'ꝛ': 'r', 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st',
+                  'æ': 'ae', 'Æ': 'Ae', 'œ': 'oe', 'Œ': 'Oe', 'v': 'u', 'V': 'U', 'j': 'i', 'J': 'I', 'ꝰ': 'us',
+                  'ꝯ': 'con', 'ꝑ': 'p', 'ꝓ': 'p', 'ꝗ': 'q', 'ꝙ': 'q', '⁊': '&'}
+# Combining abbreviation marks (macron, tilde, overline, the superscript letters) a mapped score drops.
+ABBREVIATION_MARKS = re.compile('[̃̄̅̾ͣ-ͯᷓ-ᷴ]')
+BIDI_CONTROLS = re.compile('[‎‏‪-‮⁦-⁩]')
+GRAPHEME = regex.compile(r'\X')
+CJK = re.compile('[⺀-鿿가-힯豈-﫿\U00020000-\U0003134f]')
+
+# One entry per stratum of execution-plans/benchmark-corpus/00-plan.md. keep: characters the strict score keeps
+# distinct; mapped: also report a score after HISTORICAL_MAP; hyphens: join a line-end '-' with the next line in
+# truth and reading (By the People's convention); diacritics: also report a score without combining marks;
+# nospace: also report a character score with all whitespace removed (the CER convention, for CJK).
+STRATA = {
+    'S0': {}, 'L1': {'hyphens': True}, 'L2': {'hyphens': True, 'keep': LONG_S_AND_LIGATURES, 'mapped': True},
+    'L3': {'hyphens': True}, 'L4': {},
+    **{s: {'keep': LONG_S_AND_LIGATURES, 'mapped': True} for s in ('L5', 'L6', 'L7', 'L8')}, 'L9': {},
+    'N1': {'diacritics': True}, 'N2': {}, 'N3': {'diacritics': True}, 'N4': {'diacritics': True},
+    'N5': {'nospace': True}, 'N6': {'diacritics': True},
+}
+
+
+def compat_fold(text, keep=frozenset()):
+    """NFC, then NFKC's compatibility folds character by character, except the characters in keep."""
+    text = unicodedata.normalize('NFC', text)
+    if not keep:
+        return unicodedata.normalize('NFKC', text)
+    return unicodedata.normalize('NFC', ''.join(c if c in keep else unicodedata.normalize('NFKC', c) for c in text))
+
+
+def normal(text, keep=frozenset(), hyphens=False):
     """Truth stores words only. Preserve case/spelling; unify Unicode typography/table separators.
 
     Star, bullet, and a *standalone* dash at the start of a line all count as a bullet.
     A prose dash, hyphenation and punctuation otherwise remain; no spelling corrections.
+    Bidi control marks are dropped: truth is in logical order and is never reordered.
     """
-    text = unicodedata.normalize('NFKC', text).translate(str.maketrans(
+    text = BIDI_CONTROLS.sub('', compat_fold(text, keep)).translate(str.maketrans(
         {'‘': "'", '’': "'", '“': '"', '”': '"', '–': '-', '—': '-', '−': '-', '|': ' ', '•': '*'}))
+    if hyphens:
+        text = re.sub(r'(\w)-[ \t]*\n[ \t]*(?=\w)', r'\1', text)
     text = re.sub(r'(?m)^\s*-\s+(?=\S)', '* ', text)
     return ' '.join(text.split())
 
 
 def tokens(text):
-    return [t for w in text.split() if (t := ''.join(c for c in w.lower() if c.isalnum()))]
+    """Lower-cased words of letters, digits and combining marks; CJK characters count one word each."""
+    words = CJK.sub(lambda m: f' {m.group()} ', text).split()
+    # lower() turns a capital dotted İ into i + U+0307; that dot is an artefact of lower-casing, not a mark.
+    return [t for w in words if (t := ''.join(c for c in w.lower().replace('i̇', 'i')
+                                              if c.isalnum() or unicodedata.category(c) in ('Mn', 'Mc')))]
 
 
-def score(truth, hyp):
-    truth, hyp = normal(truth), normal(hyp)
+def nes(truth, hyp):
+    """1 - Levenshtein / max(length), both counted in grapheme clusters, so a base letter and its marks are one."""
+    a, b = GRAPHEME.findall(truth), GRAPHEME.findall(hyp)
+    if len(a) == len(truth) and len(b) == len(hyp):
+        a, b = truth, hyp  # one code point per cluster: the same distance, and much faster on strings
+    n = max(len(a), len(b))
+    return 1 - Levenshtein.distance(a, b) / n if n else 1.
+
+
+def historical(text):
+    return ABBREVIATION_MARKS.sub('', unicodedata.normalize('NFD', text.translate(str.maketrans(HISTORICAL_MAP))))
+
+
+def no_marks(text):
+    return unicodedata.normalize('NFC', ''.join(
+        c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn'))
+
+
+def score(truth, hyp, stratum='S0'):
+    opt = STRATA[stratum]
+    raw_truth, raw_hyp = truth, hyp
+    truth = normal(truth, opt.get('keep', frozenset()), opt.get('hyphens', False))
+    hyp = normal(hyp, opt.get('keep', frozenset()), opt.get('hyphens', False))
     n = max(len(truth), len(hyp))
-    nes = 1 - Levenshtein.distance(truth, hyp) / n if n else 1.
     chrf = CHRF2.sentence_score(hyp, [truth]).score / 100 if n else 1.
     # Like Vision OCR's contested text, the literal marker isn't a scored word.
     # No word-span labels exist here; substantive handwriting remains scored (and separately grouped).
@@ -60,14 +124,38 @@ def score(truth, hyp):
     a, b = collections.Counter(tokens(known)), collections.Counter(tokens(reading))
     nwords, nhyp = sum(a.values()), sum(b.values())
     matched = sum((a & b).values())
-    return {'nes': nes, 'chrf': chrf, 'words': nwords, 'hyp_words': nhyp,
-            'missed': nwords - matched, 'added': nhyp - matched,
-            'illegible': len(re.findall(r'\[illegible\]', truth, flags=re.I))}
+    out = {'nes': nes(truth, hyp), 'chrf': chrf, 'words': nwords, 'hyp_words': nhyp,
+           'missed': nwords - matched, 'added': nhyp - matched,
+           'illegible': len(re.findall(r'\[illegible\]', truth, flags=re.I))}
+    if opt.get('mapped'):
+        h = lambda t: normal(historical(compat_fold(t)), hyphens=opt.get('hyphens', False))
+        out['nes_mapped'] = nes(h(raw_truth), h(raw_hyp))
+    if opt.get('diacritics'):
+        out['nes_no_marks'] = nes(no_marks(truth), no_marks(hyp))
+    if opt.get('nospace'):
+        out['nes_no_space'] = nes(''.join(truth.split()), ''.join(hyp.split()))
+    return out
+
+
+def paired(a, b, rounds=10000, seed=0):
+    """Mean difference of two routes' per-page scores on the same pages, a two-sided paired permutation p (random
+    sign flips) and a 95% bootstrap interval. Per-page differences are heavy-tailed, so no t-test (plan §4)."""
+    d = [x - y for x, y in zip(a, b, strict=True)]
+    if not d:
+        return {'n': 0, 'delta': 0., 'p': 1., 'lo': 0., 'hi': 0.}
+    rng = random.Random(seed); n = len(d); delta = sum(d) / n
+    extreme = sum(abs(sum(x if rng.random() < .5 else -x for x in d)) >= abs(sum(d)) - 1e-12 for _ in range(rounds))
+    boots = sorted(sum(rng.choice(d) for _ in range(n)) / n for _ in range(rounds))
+    return {'n': n, 'delta': delta, 'p': (extreme + 1) / (rounds + 1),
+            'lo': boots[int(.025 * rounds)], 'hi': boots[int(.975 * rounds) - 1]}
 
 
 def aggregate(rr):
-    n = len(rr); words = sum(r['words'] for r in rr)
-    return {'n': n, 'ok': sum(r['ok'] for r in rr),
+    n = len(rr); words = sum(r['words'] for r in rr); answered = [r for r in rr if r['ok']]
+    return {'n': n, 'ok': len(answered),
+            'failed': 1 - len(answered) / n if n else 0,
+            # Plan §4: failures are their own figure, and NES over the answered pages halves the paired SD.
+            'nes_answered': sum(r['nes'] for r in answered) / len(answered) if answered else 0,
             'nes': sum(r['nes'] for r in rr) / n if n else 0,
             'chrf': sum(r['chrf'] for r in rr) / n if n else 0,
             'miss': sum(r['missed'] for r in rr) / words if words else 0,
@@ -76,7 +164,7 @@ def aggregate(rr):
 
 
 def group_values(r, cal):
-    groups = {'collection': r['collection'], 'source': r['source'], 'date_bin': r['date_bin'],
+    groups = {'stratum': r.get('stratum') or 'S0', 'collection': r['collection'], 'source': r['source'], 'date_bin': r['date_bin'],
               'kind': r['kind'], 'table_form': r['table_form'] or 'no', 'camera': r['camera'] or '(no EXIF)',
               'year_taken': r['year_taken'], 'ladder_member': r['ladder'] or 'no'}
     for field in ('handwritten', 'clippings', 'tables'):
