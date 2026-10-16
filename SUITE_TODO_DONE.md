@@ -11455,3 +11455,27 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   toolbar `Menu` is not a button; a row scrolled off screen makes `clickRow` tap the menu bar; cropping by
   querying every menu's frame costs a second per menu. Repeat after a fix batch and before `W40.h3`.
   <!-- /W40.e10 -->
+- [x] **W41.app-page-kind — the Processor tells each page's kind and preselects its reader from the model guide [M · Tier-2]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · SHIPPED 2026-10-16
+  (lane: processor) (uses: build) (blocked-on: W41.bench-kind-classifier). Owner, 2026-10-15. Run W41.bench-kind-classifier's recommended classifier on each page before OCR, show the kind per page, and preselect the reader W41.app-ocr-hierarchy's guide names for that kind among the models the user has keys or a local route for; the user can override per page or per batch, and a page whose kind is uncertain keeps the user's chosen default. Record per page the kind, how sure, and which reader was used. Works with W41.app-ocr-cascade (escalation on failure) once that lands, not instead of it. Tier-2: it changes which paid route reads a page, so the cost estimate must follow the per-page choice. Tests on scratch copies; no money.
+  **Shipped 2026-10-16.** Settings → "Choose each page's reader by its kind" (off by default). `OCR/PageKindClassifier.swift`
+  ports the bench's `kind-signals.swift` measurements (Vision text lines, ink periodicity, tables, feature print pinned to
+  revision 2) and applies `segbench-results/kind-classifier-model.json`, bundled from the bench; on the bench's 184
+  labelled pages the app calls the bench model's kind on all 184 (largest probability difference 0.0000, parity check in
+  the test script when the private cache is present). `OCR/PageKindRouting.swift`: the first `OCRPageGuidance` pick for
+  the kind among built-in models of keyed providers; under 0.8 confidence (a choice, not measured), no kind, or no
+  runnable pick → the run's model (printed → Qwen3.6 27B, since Claude Sonnet 5.5 is not in the app yet). The file list
+  (`Views/OCRView+PageKind.swift`) classifies dropped photos on this Mac, shows kind/confidence/reader per row with a menu
+  (by kind, the run's model — follows a later model change — or any keyed model), a batch menu and a caption; the
+  estimate adds each routed page's price less the run model's, with the run's context and previous image. Frozen at
+  Start into `SessionProcessingConfig.pageReaders` and both resume records (plain and mixed PDF); `performOCRCall` reads
+  a planned page with its model on the direct, non-batch path (not gateway/Local Agent/Apple Vision/pre-OCRed; the run's
+  Thinking level when the model supports one; a missing key at read time keeps the run's model as `no_pick`), passes it
+  on to the cascade, and records `OCRResult.pageReader` (kind, confidence, reason, reader, prices), which names the reader
+  in the PDF header and adds the price difference and a count to the run history. Tier-2 review (opus) found a dropped
+  plan on mixed-PDF resume, a driver call log never reset, estimate missing context tokens, a stuck "run's model"
+  choice, routed pages ignoring Thinking, a page on the run's own model counted as rerouted, and a rebuild site
+  dropping the record; all fixed here, plus a vacuous render check (a Menu draws as a placeholder offscreen). Open
+  limits in `ArchiveProcessor/KNOWN_ISSUES.md`. `scripts/test-ocr-page-kind.sh` ALL PASS (49 checks); test-ocr-cascade
+  ALL PASS on the final code; test-ocr-refusal, test-ocr-page-guidance ALL PASS and test-batch-resume 393 PASS at checkpoint 2. Clean build, no new warnings. No money;
+  no migration, as there is nothing to migrate.
+  <!-- /W41.app-page-kind -->
