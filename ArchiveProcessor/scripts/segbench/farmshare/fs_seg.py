@@ -2,6 +2,8 @@
 """W41.farmshare-seg. Segmentation's windows (method_openrouter's seg-large request) against FarmShare's vLLM server.
 
   fs_seg.py pack   --out /tmp/fs-segpack [--box Deaver]     # on the Mac: every window's exact request, for scp
+  fs_seg.py pack   --out DIR --final                        # all five boxes, once, for the frozen teacher
+  python method_openrouter.py report-teacher                # its five-box score, as report-five scores
   fs_seg.py run    --pack DIR --out DIR --label L           # on a GPU node (job.sbatch, mode seg): send, check, time
   fs_seg.py import --run DIR                                # on the Mac: answers into the cache; then
   python method_openrouter.py report Deaver                 # the FarmShare row beside the OpenRouter ones
@@ -49,19 +51,27 @@ def cmd_pack(a):
     out = Path(a.out)
     if out.exists():
         raise SystemExit(f"{out} exists; pick a new path")
-    W.refuse_test([a.box])
-    col = data.load(a.box, with_exif=False)
+    boxes = a.box or ["Deaver"]
+    if a.final:  # W41.seg-27b-test: the one test-box run, all five boxes, only for the committed frozen teacher
+        if R.teacher() != KEY:
+            raise SystemExit(f"the frozen teacher is {R.teacher()}, not {KEY}")
+        boxes = list(R.FIVE)
+    else:
+        W.refuse_test(boxes)
     windows, pages = [], set()
-    for lo, hi in W.windows(len(col.pages)):
-        prompt, thumbs, nums = L.request(col, lo, hi)
-        for n, t in zip(nums, thumbs):
-            if n not in pages:
-                atomic_write(out / "images" / a.box / f"{n}.jpg", R.image_jpeg(t, R.side_of(KEY)))
-                pages.add(n)
-        windows.append({"box": a.box, "window": nums, "cache_key": R.cache_key(KEY, prompt, thumbs), "prompt": prompt})
+    for box in boxes:
+        col = data.load(box, with_exif=False)
+        for lo, hi in W.windows(len(col.pages)):
+            prompt, thumbs, nums = L.request(col, lo, hi)
+            for n, t in zip(nums, thumbs):
+                if (box, n) not in pages:
+                    atomic_write(out / "images" / box / f"{n}.jpg", R.image_jpeg(t, R.side_of(KEY)))
+                    pages.add((box, n))
+            windows.append({"box": box, "window": nums, "cache_key": R.cache_key(KEY, prompt, thumbs),
+                            "prompt": prompt})
     atomic_write(out / "windows.jsonl", "".join(json.dumps(w) + "\n" for w in windows).encode())
     atomic_write(out / "pack.json", json.dumps({"key": KEY, "model": R.entry(KEY)[0], "side": R.side_of(KEY),
-        "max_tokens": R.MAX_TOKENS, "prompt_version": R.PROMPT_VERSION, "box": a.box, "pages": len(pages),
+        "max_tokens": R.MAX_TOKENS, "prompt_version": R.PROMPT_VERSION, "boxes": boxes, "pages": len(pages),
         "windows": len(windows), "made": time.strftime("%Y-%m-%dT%H:%M:%S")}, indent=1).encode())
     print(f"{len(windows)} windows, {len(pages)} pages -> {out}  "
           f"(copy with: scp -r {out} <sunet>@login.farmshare.stanford.edu:)")
@@ -154,7 +164,7 @@ def cmd_run(a):
     wall = time.time() - t0
     final = [r for r in results if r["status"] in ("ok", R.FAILED)]
     pages = sum(len(r["window"]) for r in final) * meta["pages"] / max(1, sum(len(w["window"]) for w in windows))
-    summary = {"label": a.label, "box": meta["box"], "windows": len(windows), "sent": len(results),
+    summary = {"label": a.label, "boxes": meta.get("boxes") or [meta.get("box")], "windows": len(windows), "sent": len(results),
                "ok": sum(r["status"] == "ok" for r in final), "failed": sum(r["status"] == R.FAILED for r in final),
                "rejected": [r["window"] for r in results if r["status"] == "rejected"],
                "left": len(todo) - len(final), "wall_s": round(wall, 1), "concurrency": a.concurrency,
@@ -205,7 +215,9 @@ def cmd_import(a):
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("pack"); p.add_argument("--out", required=True); p.add_argument("--box", default="Deaver")
+    p = sub.add_parser("pack"); p.add_argument("--out", required=True); p.add_argument("--box", action="append", help="a development box (repeatable; default Deaver)")
+    p.add_argument("--final", action="store_true", help="W41.seg-27b-test: all five boxes, test boxes included, "
+                   "for the frozen teacher only (method_openrouter.py freeze-teacher, committed)")
     p = sub.add_parser("run")
     p.add_argument("--pack", required=True); p.add_argument("--out", required=True); p.add_argument("--label", required=True)
     p.add_argument("--url", default=os.environ.get("FS_URL", "http://127.0.0.1:8000"))

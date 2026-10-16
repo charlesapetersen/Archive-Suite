@@ -407,6 +407,37 @@ def freeze_cheap(keys) -> None:
     print(f"wrote {CHEAP_FROZEN}")
 
 
+# W41.seg-27b-test: the FarmShare teacher, frozen the same way before its one test-box run (fs_seg.py pack --final).
+TEACHER_FROZEN = RESULTS / "seg-teacher.json"
+
+
+def freeze_teacher(key) -> None:
+    if key not in FARMSHARE:
+        raise SystemExit(f"not a FarmShare key: {key}")
+    if TEACHER_FROZEN.exists():
+        raise SystemExit(f"{TEACHER_FROZEN.name} exists; the freeze is written once")
+    TEACHER_FROZEN.write_text(json.dumps({"teacher": key, "level": LEVEL, "chosen_on": "Deaver",
+                                          "frozen": time.strftime("%Y-%m-%d %H:%M"),
+                                          "rule": "the open-weight model that cleans the corpus labels for the Mac "
+                                                  "segmenter (SUITE_TODO W41.seg-27b-test); fixed on Deaver, "
+                                                  "where it scored 96.5% of pages in the exact document"},
+                                         indent=1) + "\n")
+    print(f"wrote {TEACHER_FROZEN}")
+
+
+def teacher() -> str:
+    """The frozen teacher's key, only once its freeze is committed unchanged (git), as the test boxes require."""
+    if not TEACHER_FROZEN.exists():
+        raise SystemExit("no freeze: run `freeze-teacher <key>` and commit seg-teacher.json first")
+    rel = TEACHER_FROZEN.relative_to(data.HERE.parent.parent.parent)
+    root = data.HERE.parent.parent.parent
+    tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch", str(rel)], capture_output=True)
+    clean = subprocess.run(["git", "-C", str(root), "diff", "--quiet", "HEAD", "--", str(rel)])
+    if tracked.returncode or clean.returncode:
+        raise SystemExit(f"{rel} is not committed as it stands; commit the freeze before any test-box call")
+    return json.loads(TEACHER_FROZEN.read_text())["teacher"]
+
+
 def five_jobs(key):
     jw = judge(key)
     return [(c, a, b) for n in FIVE for c in [data.load(n, with_exif=False)] for a, b in W.windows(len(c.pages))
@@ -446,11 +477,12 @@ def collected_everywhere(key) -> bool:
     return not five_jobs(key)
 
 
-def report_five() -> str:
-    keys = [k for k in finalists() if collected_everywhere(k)]
+def report_five(wanted=None) -> str:
+    wanted = finalists() if wanted is None else wanted
+    keys = [k for k in wanted if collected_everywhere(k)]
     codes = ["G"] + [f"X:{k}" for k in keys]
     E, boxes = five_box(codes)
-    label = {"G": "Gemini 3.8 Flash (low), the bar", **{f"X:{k}": CHEAP[k][1] for k in keys}}
+    label = {"G": "Gemini 3.8 Flash (low), the bar", **{f"X:{k}": entry(k)[1] for k in keys}}
     lines = ["| model | boxes | pages | no checking | flagged | per 100 pages | after checking | unflagged errors "
              "| reaches 99% |", "|---|---|---:|---:|---:|---:|---:|---:|---|"]
     for c in codes:
@@ -469,10 +501,10 @@ def report_five() -> str:
     for k in keys:
         recs = [r for r in records(k) if r["collection"] in FIVE]
         paid = sum(r.get("cost") or 0 for r in recs)
-        b = CHEAP[k][5]
+        b = CHEAP[k][5] if k in CHEAP else None
         bk = (f"${1000 * sum((r.get('prompt_tokens') or 0) * b[0] + (r.get('gen_tokens') or 0) * b[1] for r in recs) / 1e6 / pages:.2f}"
               if b else "none offered")
-        cost.append(f"| {CHEAP[k][1]} | {pages} | {len(recs)} | ${paid:.3f} | ${1000 * paid / pages:.2f} | {bk} |")
+        cost.append(f"| {entry(k)[1]} | {pages} | {len(recs)} | ${paid:.3f} | ${1000 * paid / pages:.2f} | {bk} |")
     # The fixed 0.85 is Claude's fitted level; models whose confidences run higher flag little at it. So, as
     # options.py fitted each approach: the level held out per development box (fitted on the other two), and
     # for the test boxes the level fitted on all three, at the item's 99% and at options.py's 98% bar.
@@ -494,7 +526,7 @@ def report_five() -> str:
                            f"| {100 * E.pe(t['rev']):.1f}% | {100 * t['flagged'] / t['pages']:.1f} | {t['acc_err']} |")
     finally:
         E.BAR = bar0
-    waiting = [CHEAP[k][1] for k in finalists() if k not in keys]
+    waiting = [entry(k)[1] for k in wanted if k not in keys]
     note = [f"", f"Not yet run on all five boxes: {', '.join(waiting)}."] if waiting else []
     return "\n".join(lines + fit + cost + note)
 
@@ -614,6 +646,10 @@ def main(argv) -> int:
         print(f"glm: level {e['level']:.3f}, test {100 * t['pages_exact_no_review']:.1f}% no checking, "
               f"{t['flagged_per_100_pages']:.1f} per 100 pages, {100 * t['pages_exact_after_review']:.1f}% after, "
               f"{t['unflagged_errors']} unflagged, ${e['cost']['total']['list_usd_per_1000_pages']:.2f} per 1,000")
+    elif len(argv) == 2 and argv[0] == "freeze-teacher":
+        freeze_teacher(argv[1])
+    elif argv and argv[0] == "report-teacher":
+        print(report_five([teacher()]))
     elif argv and argv[0] == "report-cheap":
         for name in argv[1:] or ["Deaver"]:
             W.refuse_test([name])

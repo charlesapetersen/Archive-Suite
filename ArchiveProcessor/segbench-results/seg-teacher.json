@@ -1,0 +1,7 @@
+{
+ "teacher": "fs-qwen3.5-27b",
+ "level": 0.85,
+ "chosen_on": "Deaver",
+ "frozen": "2026-10-15 23:05",
+ "rule": "the open-weight model that cleans the corpus labels for the Mac segmenter (SUITE_TODO W41.seg-27b-test); fixed on Deaver, where it scored 96.5% of pages in the exact document"
+}
