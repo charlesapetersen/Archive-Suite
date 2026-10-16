@@ -498,7 +498,7 @@ def cmd_pack(a):
     for f in folders:  # contiguous by cumulative pages, so parts come out about even
         part[f] = min(a.parts - 1, int(acc // per)); acc += pages_of[f]
     os.makedirs(os.path.join(out, "images"), exist_ok=True)
-    recs, n_img = [], 0
+    recs, todo = [], {}
     for w in wins:
         nums = [p["n"] for p in w["pages"]]
         prompt = window_prompt(nums, [page_text_of(p["pdf"]) for p in w["pages"]])
@@ -510,11 +510,16 @@ def cmd_pack(a):
         if part[w["folder_id"]] != a.part:
             continue
         for p in w["pages"]:
-            dst = os.path.join(out, "images", w["folder_id"], f"{p['n']}.jpg")
-            if not os.path.exists(dst):
-                S.atomic_write(__import__("pathlib").Path(dst),
-                               R.image_jpeg(os.path.join(JPEGS, p["jpeg"]), R.side_of(S.KEY)))
-                n_img += 1
+            todo[os.path.join(out, "images", w["folder_id"], f"{p['n']}.jpg")] = os.path.join(JPEGS, p["jpeg"])
+    todo = {d: src for d, src in todo.items() if not os.path.exists(d)}
+
+    def image(item):
+        S.atomic_write(__import__("pathlib").Path(item[0]), R.image_jpeg(item[1], R.side_of(S.KEY)))
+    with cf.ThreadPoolExecutor(8) as ex:
+        for k, _ in enumerate(ex.map(image, todo.items()), 1):
+            if k % 2000 == 0:
+                print(f"images {k}/{len(todo)}", flush=True)
+    n_img = len(todo)
     S.atomic_write(__import__("pathlib").Path(out) / "windows.jsonl",
                    "".join(json.dumps(r) + "\n" for r in recs).encode())
     S.atomic_write(__import__("pathlib").Path(out) / "pack.json", json.dumps({
@@ -526,6 +531,22 @@ def cmd_pack(a):
 
 
 KEEP_AGREE = 0.5   # a tag label is kept when the teacher's P(new) is on the same side of this
+# The owner's reading (2026-10-16): a tag change almost always marks a real start, but he sometimes kept separate
+# documents on nearby dates with similar content under one tag set. So under "start-trust" a tag start stands unless
+# the teacher is sure it is a continuation, and a tag continuation becomes a start where the teacher is sure of one.
+SURE = 0.85
+
+
+def rule_label(tag, p, rule):
+    """The gap's label under a rule ("new", "cont"), or None where the rule drops it."""
+    if rule == "agree":
+        return tag if (p >= KEEP_AGREE) == (tag == "new") else None
+    if tag == "new":
+        return None if p <= 1 - SURE else "new"
+    return "new" if p >= SURE else ("cont" if p < KEEP_AGREE else None)
+
+
+RULES = ("agree", "start-trust")
 
 
 def gap_labels(run):
@@ -558,7 +579,8 @@ def gap_labels(run):
             p = sum(votes[k]) / len(votes[k])
             out[k] = {"folder_id": fid, "n": left["n"], "left": left["pdf"], "right": right["pdf"], "split": w["split"],
                       "tag": tag, "p_new": round(p, 4), "n_judged": len(votes[k]),
-                      "keep": (p >= KEEP_AGREE) == (tag == "new")}
+                      "keep": (p >= KEEP_AGREE) == (tag == "new"),
+                      **{f"label_{r}": rule_label(tag, p, r) for r in RULES}}
     return out
 
 
@@ -570,6 +592,8 @@ def cmd_clean(a):
             f.write(json.dumps(v, ensure_ascii=False) + "\n")
     os.replace(path + ".tmp", path)
     c = collections.Counter((v["split"], v["tag"], v["keep"]) for v in g.values())
+    by_rule = {r: dict(collections.Counter(f"{v['split']} {v['tag']} -> {v[f'label_{r}'] or 'dropped'}"
+                                           for v in g.values())) for r in RULES}
     # The owner-checked noise sample (corpus_survey pack, W36.seg-corpus-noise): how many of its wrong tag labels
     # the teacher's agreement removes, and how many right ones it throws away.
     key = json.load(open(os.path.join(CS.CACHE, "pack", "key.json")))
@@ -582,14 +606,76 @@ def cmd_clean(a):
         if v is None or a_ not in ("new", "same"):
             probe["not in the run or unsure"] += 1
             continue
-        right = a_ == k["implied"]
-        probe[f"{k['implied']} tag {'right' if right else 'wrong'}, {'kept' if v['keep'] else 'dropped'}"] += 1
+        truth = "new" if a_ == "new" else "cont"
+        probe[f"tags: {'right' if truth == v['tag'] else 'wrong'}"] += 1
+        for r in RULES:
+            got = v[f"label_{r}"]
+            probe[f"{r}: {'dropped' if got is None else 'right' if got == truth else 'wrong'}"] += 1
     summary = {"gaps": len(g), "by_split_tag_keep": {f"{s} {t} {'kept' if k else 'dropped'}": n
                                                       for (s, t, k), n in sorted(c.items())},
-               "owner_sample": dict(sorted(probe.items())), "keep_rule": f"teacher P(new) on the tag's side of {KEEP_AGREE}"}
+               "by_rule": {r: dict(sorted(v.items())) for r, v in by_rule.items()},
+               "owner_sample": dict(sorted(probe.items())), "keep_rule": f"teacher P(new) on the tag's side of {KEEP_AGREE}",
+               "start_trust_sure": SURE}
     with open(os.path.join(CACHE, "labels-summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
     print(json.dumps(summary, indent=1))
+
+
+def cmd_subpack(a):
+    """W41.seg-finetune: the held-out windows of a pack (corpus_pairs pack), for another key (a student or a
+    baseline), images linked, not copied. Runs where the pack is (FarmShare); needs no corpus."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "farmshare"))
+    import method_openrouter as R
+    split = {(w["folder_id"], tuple(p["n"] for p in w["pages"])): w["split"]
+             for w in map(json.loads, open(a.windows, encoding="utf-8"))}
+    os.makedirs(a.out)
+    rows = [l for l in open(os.path.join(a.pack, "windows.jsonl"), encoding="utf-8")
+            if split[(json.loads(l)["box"], tuple(json.loads(l)["window"]))] == a.split]
+    with open(os.path.join(a.out, "windows.jsonl"), "w", encoding="utf-8") as f:
+        f.writelines(rows)
+    meta = json.load(open(os.path.join(a.pack, "pack.json")))
+    meta.update(key=a.key, model=R.entry(a.key)[0], windows=len(rows), split=a.split, made=time.strftime("%Y-%m-%dT%H:%M:%S"))
+    json.dump(meta, open(os.path.join(a.out, "pack.json"), "w"), indent=1)
+    os.symlink(os.path.abspath(os.path.join(a.pack, "images")), os.path.join(a.out, "images"))
+    print(f"{len(rows)} {a.split} windows for {a.key} -> {a.out}")
+
+
+def cmd_score(a):
+    """A run's per-gap calls (method_window.combine's mean over the windows covering a gap) against the held-out
+    gaps the teacher and the tags agree on (labels.jsonl, `keep`), and against every held-out tag label."""
+    import method_window as W
+    lab = {(g["folder_id"], g["n"]): g for g in map(json.loads, open(os.path.join(CACHE, "labels.jsonl")))}
+    votes, failed, n = collections.defaultdict(list), 0, 0
+    for line in open(os.path.join(a.run, "answers.jsonl"), encoding="utf-8"):
+        try:
+            r = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        n += 1
+        try:
+            j = W.parse_answer(r["result"], r["window"]) if r.get("status") == "ok" else None
+        except Exception:
+            j = None
+        if j is None:
+            failed += 1
+            continue
+        for x, bd in j["boundaries"].items():
+            votes[(r["collection"], x)].append(bd["confidence"] if bd["decision"] == "new" else 1 - bd["confidence"])
+    out = {"windows": n, "failed": failed}
+    for name, keep in (("agreed", lambda g: g["keep"]), ("all tags", lambda g: True)):
+        c = collections.Counter()
+        for k, v in votes.items():
+            g = lab.get(k)
+            if g is None or g["split"] != "holdout" or not keep(g):
+                continue
+            said = "new" if sum(v) / len(v) >= 0.5 else "cont"
+            c["gaps"] += 1
+            c["right"] += said == g["tag"]
+            c["false splits"] += said == "new" and g["tag"] == "cont"
+            c["false merges"] += said == "cont" and g["tag"] == "new"
+        out[name] = {**c, "accuracy": round(c["right"] / max(1, c["gaps"]), 4)}
+    print(json.dumps(out, indent=1))
+    return out
 
 
 def main():
@@ -598,11 +684,17 @@ def main():
     for c in ("pair", "check", "windows"):
         sub.add_parser(c)
     p = sub.add_parser("clean"); p.add_argument("--run", required=True, help="runs/seg/<label>, brought back")
+    p = sub.add_parser("subpack")
+    for k in ("pack", "windows", "key", "out"):
+        p.add_argument("--" + k, required=True)
+    p.add_argument("--split", default="holdout")
+    p = sub.add_parser("score"); p.add_argument("--run", required=True)
     p = sub.add_parser("pack")
     p.add_argument("--out", required=True); p.add_argument("--part", type=int, default=0)
     p.add_argument("--parts", type=int, default=1)
     a = ap.parse_args()
-    {"pair": cmd_pair, "check": cmd_check, "windows": cmd_windows, "pack": cmd_pack, "clean": cmd_clean}[a.cmd](a)
+    {"pair": cmd_pair, "check": cmd_check, "windows": cmd_windows, "pack": cmd_pack, "clean": cmd_clean, "subpack": cmd_subpack,
+     "score": cmd_score}[a.cmd](a)
 
 
 if __name__ == "__main__":

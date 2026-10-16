@@ -107,6 +107,13 @@ FAILED = L.FAILED
 # key: (served model name, label, where, precision, parameters, local 4-bit GB)
 FARMSHARE = {
     "fs-qwen3.5-27b": ("Qwen/Qwen3.5-27B-FP8", "Qwen3.5 27B", "FarmShare L40S vLLM", "fp8", "27B dense", 17),
+    # W41.seg-finetune: the students, served by name (models.sh seg-student), and their untrained bases as baselines
+    "fs-qwen3.5-4b": ("Qwen/Qwen3.5-4B", "Qwen3.5 4B, untrained", "FarmShare L40S vLLM", "bf16", "4B dense", 3),
+    "fs-qwen3.5-2b": ("Qwen/Qwen3.5-2B", "Qwen3.5 2B, untrained", "FarmShare L40S vLLM", "bf16", "2B dense", 1.5),
+    "fs-seg-4b-pilot": ("seg-4b-pilot", "Qwen3.5 4B, fine-tuned on a quarter of the corpus (pilot)",
+                        "FarmShare L40S vLLM", "bf16", "4B dense", 3),
+    "fs-seg-4b": ("seg-4b", "Qwen3.5 4B, fine-tuned", "FarmShare L40S vLLM", "bf16", "4B dense", 3),
+    "fs-seg-2b": ("seg-2b", "Qwen3.5 2B, fine-tuned", "FarmShare L40S vLLM", "bf16", "2B dense", 1.5),
 }
 
 

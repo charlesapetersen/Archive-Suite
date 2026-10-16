@@ -43,7 +43,7 @@ label="${FS_PRESET_NAME}-${SLURM_JOB_ID:-local}"
 case "$FS_MODE" in
   truth) "$FS_PY" fs_ocr.py truth --pack "$FS_PACK" --out "$FS_ROOT/runs/truth" --label "$label" --warmup ;;
   # One folder per preset, not per job: a resubmission after exit 75 sends only the windows still unanswered.
-  seg)   "$FS_PY" fs_seg.py run --pack "$FS_PACK" --out "$FS_ROOT/runs/seg" --label "$FS_PRESET_NAME" --warmup ;;
+  seg)   "$FS_PY" fs_seg.py run --pack "$FS_PACK" --out "$FS_ROOT/runs/seg" --label "${FS_LABEL:-$FS_PRESET_NAME}" --warmup ;;
   news)  "$FS_PY" fs_ocr.py news --newsbench "$FS_ROOT/newsbench" --out "$FS_ROOT/runs/news" --label "$label" ;;
   news-layout)  # a general model (served here) reading newspaper-ocr's regions, in its own venv (fs_news_layout.py)
     "$FS_ROOT/npo-venv/bin/python" fs_news_layout.py --newsbench "$FS_ROOT/newsbench" --out "$FS_ROOT/runs/news-layout" \

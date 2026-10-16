@@ -43,7 +43,8 @@ import method_window as W  # noqa: E402
 import method_local as L  # noqa: E402
 from fs_ocr import atomic_write, env_info, DEAD_SERVER  # noqa: E402
 
-KEY = "fs-qwen3.5-27b"
+# The teacher by default; FS_SEG_KEY names a student or a baseline (method_openrouter.FARMSHARE), in pack and run.
+KEY = os.environ.get("FS_SEG_KEY", "fs-qwen3.5-27b")
 
 
 def cmd_pack(a):
@@ -130,7 +131,7 @@ def answer_lines(path):
 def cmd_run(a):
     pack, out = Path(a.pack), Path(a.out) / a.label
     meta = json.loads((pack / "pack.json").read_text())
-    model = a.model or os.environ.get("FS_MODEL")
+    model = a.model or os.environ.get("FS_SERVED") or os.environ.get("FS_MODEL")
     if meta["key"] != KEY or model != meta["model"]:
         raise SystemExit(f"the pack is for {meta['model']} ({meta['key']}); the server is serving {model}")
     windows = [json.loads(l) for l in (pack / "windows.jsonl").read_text().splitlines()]

@@ -8,7 +8,7 @@
 preset() {
   FS_PRESET="$1"
   local len="${FS_MAX_LEN:-16384}" FS_EXTRA="" kv="${FS_KV_DTYPE:-fp8}" util="${FS_GPU_UTIL:-0.92}" seqs="${FS_MAX_SEQS:-32}"
-  FS_LAYOUT=0 FS_DET_REPO="" FS_DET_FILE=""
+  FS_LAYOUT=0 FS_DET_REPO="" FS_DET_FILE="" FS_SERVED=""
   case "$1" in
     qwen3.6-27b)       # first choice. Panel 94.28 (Chutes fp8). Official block-FP8 checkpoint.
       FS_MODEL=Qwen/Qwen3.6-27B-FP8; FS_GPUS=1; FS_DISK_GB=31 ;;
@@ -34,7 +34,12 @@ preset() {
       FS_DET_REPO=juliozhao/DocLayout-YOLO-DocStructBench-imgsz1280-2501   # newspaper-ocr 0.11.0's default variant
       FS_DET_FILE=doclayout_yolo_docstructbench_imgsz1280_2501.pt
       [ "${FS_GLM_MTP:-1}" = 0 ] || FS_EXTRA='--speculative-config {"method":"mtp","num_speculative_tokens":1}' ;;
-    *) echo "unknown preset '$1' (qwen3.6-27b qwen3.8-27b qwen3.6-27b-dyn qwen3.6-35b-a3b qwen3-vl-8b qwen3.5-27b qwen3.5-122b-a10b glm-ocr)" >&2
+    qwen3.5-4b|qwen3.5-2b)  # W41.seg-finetune: the students' untrained bases, the baselines (bf16)
+      FS_MODEL="Qwen/Qwen3.5-$(echo "${1#qwen3.5-}" | tr b B)"; FS_GPUS=1; FS_DISK_GB=10 ;;
+    seg-student)       # W41.seg-finetune: a merged student (train.sbatch), served under FS_STUDENT_NAME
+      FS_MODEL="${FS_STUDENT:?FS_STUDENT=<a merged model directory>}"; FS_SERVED="${FS_STUDENT_NAME:?FS_STUDENT_NAME=<served name>}"
+      FS_EXTRA="--served-model-name $FS_SERVED"; FS_GPUS=1; FS_DISK_GB=10 ;;
+    *) echo "unknown preset '$1' (qwen3.6-27b qwen3.8-27b qwen3.6-27b-dyn qwen3.6-35b-a3b qwen3-vl-8b qwen3.5-27b qwen3.5-122b-a10b glm-ocr qwen3.5-4b qwen3.5-2b seg-student)" >&2
        return 2 ;;
   esac
   # max-model-len must hold the prompt (~4,900 tokens) plus max_tokens (8192), or vLLM refuses every page.
@@ -44,5 +49,5 @@ preset() {
   if [ "$len" -lt 13312 ]; then echo "FS_MAX_LEN=$len is below prompt + max_tokens (13312)" >&2; return 2; fi
   FS_VLLM_ARGS="--tensor-parallel-size $FS_GPUS --max-model-len $len --kv-cache-dtype $kv \
 --gpu-memory-utilization $util --max-num-seqs $seqs --limit-mm-per-prompt {\"image\":${FS_MM_IMAGES:-1}} ${FS_EXTRA:-}"
-  export FS_PRESET FS_MODEL FS_GPUS FS_DISK_GB FS_VLLM_ARGS FS_LAYOUT FS_DET_REPO FS_DET_FILE
+  export FS_SERVED FS_PRESET FS_MODEL FS_GPUS FS_DISK_GB FS_VLLM_ARGS FS_LAYOUT FS_DET_REPO FS_DET_FILE
 }
