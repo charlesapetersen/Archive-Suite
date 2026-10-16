@@ -61,7 +61,8 @@ def candidates() -> list[common.Candidate]:
     for coll, stem, img, xml in list_pages(z.names()):
         licence, era = COLLECTIONS.get(coll, ('CC-BY-NC-SA-4.0', ''))
         out.append(common.Candidate(
-            source=SOURCE, collection=coll, page_id=f'{coll}/{stem}', stratum=STRATUM, licence=licence,
+            # the low-box-quality folder is the same Senatsprotokolle volumes: one collection for the quarter cap
+            source=SOURCE, collection=coll.removesuffix('_LowBoundingBoxQuality'), page_id=f'{coll}/{stem}', stratum=STRATUM, licence=licence,
             item_url=RECORD, convention='PAGE lines, OCR-D level 2 diplomatic (long s, abbreviations kept)',
             contamination=CONTAMINATION, publish_image=True, script='Latn', era=era, kind='handwritten',
             fetch={'zip': ZIP_URL, 'image': img, 'xml': xml}))
