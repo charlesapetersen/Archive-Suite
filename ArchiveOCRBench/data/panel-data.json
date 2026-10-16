@@ -1314,5 +1314,4591 @@
    },
    "note": "Model: qwen3.6-27b, fp8 KV cache, one L40S per shard, 32 requests in flight per server. wall_s per page is with 32 in flight, so it ranks pages but is not a page time. Kind is the model's own label (90% right on the truth set)."
   }
+ },
+ "difficulty": {
+  "pages": 96,
+  "routes_n": 29,
+  "wrong_bar": 90.0,
+  "mu": 93.32,
+  "routes": [
+   {
+    "id": "gemini3.1-pro",
+    "name": "Gemini 3.1 Pro",
+    "price": 21.92,
+    "app": true,
+    "strict": 94.85,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 96.86,
+    "adjusted": 96.84,
+    "page_mix": 0.14,
+    "wrong": 10,
+    "fail_pctile": 71,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "printed": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.78,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 99.3,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 91.41,
+      "failed": 1,
+      "n": 32,
+      "wrong": 10
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 94.06,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 82.3,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 96.07,
+      "failed": 2,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 98.75,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gemini3.8-flash",
+    "name": "Gemini 3.8 Flash",
+    "price": 3.22,
+    "app": true,
+    "strict": 94.47,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 96.48,
+    "adjusted": 96.46,
+    "page_mix": 0.14,
+    "wrong": 6,
+    "fail_pctile": 71,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "printed": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.89,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 99.41,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 90.01,
+      "failed": 1,
+      "n": 32,
+      "wrong": 6
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 95.97,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 77.06,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 93.92,
+      "failed": 2,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 98.74,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "claude-sonnet5.5",
+    "name": "Claude Sonnet 5.5",
+    "price": 11.5,
+    "app": true,
+    "strict": 96.47,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 96.47,
+    "adjusted": 96.59,
+    "page_mix": 0.0,
+    "wrong": 8,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.84,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 99.12,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 90.46,
+      "failed": 0,
+      "n": 32,
+      "wrong": 8
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 92.43,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 78.1,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 96.31,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 98.59,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-27b",
+    "name": "Qwen3.5 27B",
+    "price": 1.8,
+    "app": true,
+    "strict": 81.8,
+    "answered": 82,
+    "failed": 14,
+    "answered_nes": 95.76,
+    "adjusted": 95.08,
+    "page_mix": 0.81,
+    "wrong": 10,
+    "fail_pctile": 59,
+    "fail_hard": 6,
+    "fail_kinds": {
+     "handwritten": 4,
+     "printed": 4,
+     "typewritten": 6
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.87,
+      "failed": 4,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.62,
+      "failed": 4,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 88.27,
+      "failed": 6,
+      "n": 32,
+      "wrong": 10
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 92.18,
+      "failed": 4,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 69.16,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 95.7,
+      "failed": 4,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 97.99,
+      "failed": 6,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gemini3.5-flash",
+    "name": "Gemini 3.5 Flash",
+    "price": 6.23,
+    "app": true,
+    "strict": 93.48,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 95.47,
+    "adjusted": 95.45,
+    "page_mix": 0.14,
+    "wrong": 7,
+    "fail_pctile": 71,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "printed": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.85,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.56,
+      "failed": 1,
+      "n": 32,
+      "wrong": 1
+     },
+     "hard": {
+      "answered_nes": 87.85,
+      "failed": 1,
+      "n": 32,
+      "wrong": 6
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 92.93,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 76.05,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 94.96,
+      "failed": 2,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 97.32,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.6-27b",
+    "name": "Qwen3.6 27B",
+    "price": 1.94,
+    "app": true,
+    "strict": 94.28,
+    "answered": 95,
+    "failed": 1,
+    "answered_nes": 95.27,
+    "adjusted": 95.33,
+    "page_mix": 0.06,
+    "wrong": 13,
+    "fail_pctile": 82,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "typewritten": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.83,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.11,
+      "failed": 0,
+      "n": 32,
+      "wrong": 1
+     },
+     "hard": {
+      "answered_nes": 87.63,
+      "failed": 1,
+      "n": 32,
+      "wrong": 12
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 92.15,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 72.0,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 94.82,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 97.5,
+      "failed": 1,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.6-27b-farmshare",
+    "name": "Qwen3.6 27B fp8 (FarmShare)",
+    "price": 0.0,
+    "app": false,
+    "strict": 95.25,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 95.25,
+    "adjusted": 95.37,
+    "page_mix": 0.0,
+    "wrong": 14,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.83,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.46,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 87.47,
+      "failed": 0,
+      "n": 32,
+      "wrong": 14
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 92.8,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 70.32,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 94.93,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 97.22,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gemini3.5-flash-lite",
+    "name": "Gemini 3.5 Flash Lite",
+    "price": 1.57,
+    "app": true,
+    "strict": 93.13,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 95.11,
+    "adjusted": 95.09,
+    "page_mix": 0.14,
+    "wrong": 12,
+    "fail_pctile": 71,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "printed": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.54,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.99,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 87.65,
+      "failed": 1,
+      "n": 32,
+      "wrong": 12
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 91.98,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 64.35,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 94.69,
+      "failed": 2,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 97.56,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.8-flash",
+    "name": "Qwen3.8 Flash",
+    "price": 0.6,
+    "app": true,
+    "strict": 91.88,
+    "answered": 93,
+    "failed": 3,
+    "answered_nes": 94.84,
+    "adjusted": 95.12,
+    "page_mix": -0.16,
+    "wrong": 12,
+    "fail_pctile": 38,
+    "fail_hard": 0,
+    "fail_kinds": {
+     "printed": 1,
+     "typewritten": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.66,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.23,
+      "failed": 2,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 86.99,
+      "failed": 0,
+      "n": 32,
+      "wrong": 12
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 91.03,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 68.47,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 94.65,
+      "failed": 1,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 97.31,
+      "failed": 2,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gemini3.1-flash-lite",
+    "name": "Gemini 3.1 Flash Lite",
+    "price": 1.17,
+    "app": true,
+    "strict": 91.61,
+    "answered": 93,
+    "failed": 3,
+    "answered_nes": 94.57,
+    "adjusted": 94.54,
+    "page_mix": 0.14,
+    "wrong": 12,
+    "fail_pctile": 72,
+    "fail_hard": 2,
+    "fail_kinds": {
+     "handwritten": 1,
+     "printed": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.66,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.71,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 84.85,
+      "failed": 2,
+      "n": 32,
+      "wrong": 12
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 92.42,
+      "failed": 1,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 78.78,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 93.53,
+      "failed": 2,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 96.38,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gpt5.4-mini",
+    "name": "GPT-5.4 Mini",
+    "price": 5.55,
+    "app": true,
+    "strict": 93.55,
+    "answered": 95,
+    "failed": 1,
+    "answered_nes": 94.53,
+    "adjusted": 94.72,
+    "page_mix": -0.07,
+    "wrong": 17,
+    "fail_pctile": 20,
+    "fail_hard": 0,
+    "fail_kinds": {
+     "typewritten": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.72,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.71,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 85.33,
+      "failed": 0,
+      "n": 32,
+      "wrong": 17
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 89.48,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 80.33,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 93.32,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 97.46,
+      "failed": 1,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-397b",
+    "name": "Qwen3.5 397B",
+    "price": 2.02,
+    "app": true,
+    "strict": 93.98,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 93.98,
+    "adjusted": 94.1,
+    "page_mix": 0.0,
+    "wrong": 16,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.81,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.85,
+      "failed": 0,
+      "n": 32,
+      "wrong": 1
+     },
+     "hard": {
+      "answered_nes": 84.29,
+      "failed": 0,
+      "n": 32,
+      "wrong": 15
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 90.57,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 69.99,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 93.72,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 96.18,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3-vl-235b",
+    "name": "Qwen3-VL 235B",
+    "price": 1.22,
+    "app": true,
+    "strict": 93.95,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 93.95,
+    "adjusted": 94.07,
+    "page_mix": 0.0,
+    "wrong": 16,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.8,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.33,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 83.71,
+      "failed": 0,
+      "n": 32,
+      "wrong": 16
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 91.38,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 70.81,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 93.25,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 96.09,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3-vl-8b",
+    "name": "Qwen3-VL 8B",
+    "price": 1.49,
+    "app": true,
+    "strict": 91.81,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 93.76,
+    "adjusted": 93.59,
+    "page_mix": 0.29,
+    "wrong": 20,
+    "fail_pctile": 91,
+    "fail_hard": 2,
+    "fail_kinds": {
+     "handwritten": 1,
+     "printed": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.76,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 96.73,
+      "failed": 0,
+      "n": 32,
+      "wrong": 2
+     },
+     "hard": {
+      "answered_nes": 84.2,
+      "failed": 2,
+      "n": 32,
+      "wrong": 18
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 90.49,
+      "failed": 1,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 62.08,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 94.61,
+      "failed": 1,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.56,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3-vl-8b-mlx4",
+    "name": "Qwen3-VL 8B 4-bit (Mac)",
+    "price": 0.0,
+    "app": true,
+    "strict": 89.66,
+    "answered": 92,
+    "failed": 4,
+    "answered_nes": 93.56,
+    "adjusted": 93.4,
+    "page_mix": 0.28,
+    "wrong": 21,
+    "fail_pctile": 74,
+    "fail_hard": 3,
+    "fail_kinds": {
+     "mixed": 1,
+     "printed": 1,
+     "typewritten": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.55,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.01,
+      "failed": 1,
+      "n": 32,
+      "wrong": 3
+     },
+     "hard": {
+      "answered_nes": 83.25,
+      "failed": 3,
+      "n": 32,
+      "wrong": 18
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 89.16,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 33.68,
+      "failed": 1,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 95.09,
+      "failed": 1,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.4,
+      "failed": 2,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gemma4-31b",
+    "name": "Gemma 4 31B",
+    "price": 0.38,
+    "app": true,
+    "strict": 90.55,
+    "answered": 93,
+    "failed": 3,
+    "answered_nes": 93.47,
+    "adjusted": 92.86,
+    "page_mix": 0.72,
+    "wrong": 21,
+    "fail_pctile": 91,
+    "fail_hard": 3,
+    "fail_kinds": {
+     "printed": 2,
+     "typewritten": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 98.76,
+      "failed": 0,
+      "n": 32,
+      "wrong": 1
+     },
+     "middle": {
+      "answered_nes": 95.79,
+      "failed": 0,
+      "n": 32,
+      "wrong": 5
+     },
+     "hard": {
+      "answered_nes": 85.07,
+      "failed": 3,
+      "n": 32,
+      "wrong": 15
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 90.84,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 84.93,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 89.7,
+      "failed": 2,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 96.67,
+      "failed": 1,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-9b",
+    "name": "Qwen3.5 9B",
+    "price": 0.25,
+    "app": true,
+    "strict": 89.43,
+    "answered": 92,
+    "failed": 4,
+    "answered_nes": 93.32,
+    "adjusted": 93.61,
+    "page_mix": -0.18,
+    "wrong": 20,
+    "fail_pctile": 48,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "printed": 1,
+     "typewritten": 3
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.34,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 96.14,
+      "failed": 2,
+      "n": 32,
+      "wrong": 2
+     },
+     "hard": {
+      "answered_nes": 84.56,
+      "failed": 1,
+      "n": 32,
+      "wrong": 18
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 90.92,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 69.42,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 92.97,
+      "failed": 1,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.35,
+      "failed": 3,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "mistral-large4",
+    "name": "Mistral Large 4",
+    "price": 2.69,
+    "app": true,
+    "strict": 93.15,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 93.15,
+    "adjusted": 93.27,
+    "page_mix": 0.0,
+    "wrong": 19,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.7,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.01,
+      "failed": 0,
+      "n": 32,
+      "wrong": 1
+     },
+     "hard": {
+      "answered_nes": 82.73,
+      "failed": 0,
+      "n": 32,
+      "wrong": 18
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 92.03,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 53.86,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 92.46,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.46,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gpt5.6-luna",
+    "name": "GPT-5.6 Luna",
+    "price": 1.41,
+    "app": true,
+    "strict": 92.13,
+    "answered": 95,
+    "failed": 1,
+    "answered_nes": 93.1,
+    "adjusted": 93.29,
+    "page_mix": -0.07,
+    "wrong": 19,
+    "fail_pctile": 20,
+    "fail_hard": 0,
+    "fail_kinds": {
+     "typewritten": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.63,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.85,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 82.03,
+      "failed": 0,
+      "n": 32,
+      "wrong": 19
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 85.44,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 67.73,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 92.61,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 96.92,
+      "failed": 1,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.6-35b-a3b",
+    "name": "Qwen3.6 35B-A3B",
+    "price": 0.6,
+    "app": true,
+    "strict": 93.02,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 93.02,
+    "adjusted": 93.14,
+    "page_mix": 0.0,
+    "wrong": 17,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.81,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.59,
+      "failed": 0,
+      "n": 32,
+      "wrong": 1
+     },
+     "hard": {
+      "answered_nes": 81.67,
+      "failed": 0,
+      "n": 32,
+      "wrong": 16
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 88.82,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 69.5,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 92.34,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.69,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "mistral-ocr-4-1",
+    "name": "Mistral OCR 4.1",
+    "price": 4.0,
+    "app": true,
+    "strict": 92.91,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 92.91,
+    "adjusted": 93.03,
+    "page_mix": 0.0,
+    "wrong": 17,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.42,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.81,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 81.51,
+      "failed": 0,
+      "n": 32,
+      "wrong": 17
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 89.01,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 74.51,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 91.49,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.7,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-9b-mlx4",
+    "name": "Qwen3.5-9B 4-bit (Mac)",
+    "price": 0.0,
+    "app": true,
+    "strict": 91.91,
+    "answered": 95,
+    "failed": 1,
+    "answered_nes": 92.88,
+    "adjusted": 93.04,
+    "page_mix": -0.05,
+    "wrong": 19,
+    "fail_pctile": 49,
+    "fail_hard": 0,
+    "fail_kinds": {
+     "typewritten": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.56,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.14,
+      "failed": 1,
+      "n": 32,
+      "wrong": 0
+     },
+     "hard": {
+      "answered_nes": 81.09,
+      "failed": 0,
+      "n": 32,
+      "wrong": 19
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 87.92,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 76.22,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 92.78,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.23,
+      "failed": 1,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-35b-a3b",
+    "name": "Qwen3.5 35B-A3B",
+    "price": 0.83,
+    "app": true,
+    "strict": 90.83,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 92.76,
+    "adjusted": 92.81,
+    "page_mix": 0.07,
+    "wrong": 19,
+    "fail_pctile": 64,
+    "fail_hard": 1,
+    "fail_kinds": {
+     "typewritten": 2
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.79,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 98.11,
+      "failed": 1,
+      "n": 32,
+      "wrong": 1
+     },
+     "hard": {
+      "answered_nes": 80.15,
+      "failed": 1,
+      "n": 32,
+      "wrong": 18
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 88.31,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 71.75,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 91.09,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 96.1,
+      "failed": 2,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "gemma4-26b-a4b",
+    "name": "Gemma 4 26B-A4B",
+    "price": 0.41,
+    "app": true,
+    "strict": 82.73,
+    "answered": 86,
+    "failed": 10,
+    "answered_nes": 92.35,
+    "adjusted": 91.29,
+    "page_mix": 1.18,
+    "wrong": 23,
+    "fail_pctile": 70,
+    "fail_hard": 5,
+    "fail_kinds": {
+     "mixed": 1,
+     "printed": 6,
+     "typewritten": 3
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 98.51,
+      "failed": 1,
+      "n": 32,
+      "wrong": 1
+     },
+     "middle": {
+      "answered_nes": 96.79,
+      "failed": 4,
+      "n": 32,
+      "wrong": 1
+     },
+     "hard": {
+      "answered_nes": 80.67,
+      "failed": 5,
+      "n": 32,
+      "wrong": 21
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 86.6,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 67.02,
+      "failed": 1,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 91.11,
+      "failed": 6,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.42,
+      "failed": 3,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "qwen3-vl-30b-a3b",
+    "name": "Qwen3-VL 30B-A3B",
+    "price": 0.98,
+    "app": true,
+    "strict": 89.82,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 91.73,
+    "adjusted": 91.8,
+    "page_mix": 0.05,
+    "wrong": 25,
+    "fail_pctile": 75,
+    "fail_hard": 2,
+    "fail_kinds": {
+     "handwritten": 1,
+     "printed": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.58,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 97.2,
+      "failed": 0,
+      "n": 32,
+      "wrong": 2
+     },
+     "hard": {
+      "answered_nes": 77.53,
+      "failed": 2,
+      "n": 32,
+      "wrong": 23
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 82.75,
+      "failed": 1,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 67.28,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 91.43,
+      "failed": 1,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.56,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "mistral-small-24b",
+    "name": "Mistral Small 24B",
+    "price": 0.32,
+    "app": true,
+    "strict": 89.34,
+    "answered": 94,
+    "failed": 2,
+    "answered_nes": 91.24,
+    "adjusted": 91.03,
+    "page_mix": 0.34,
+    "wrong": 24,
+    "fail_pctile": 93,
+    "fail_hard": 2,
+    "fail_kinds": {
+     "handwritten": 1,
+     "typewritten": 1
+    },
+    "by_tier": {
+     "easy": {
+      "answered_nes": 99.28,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 96.92,
+      "failed": 0,
+      "n": 32,
+      "wrong": 3
+     },
+     "hard": {
+      "answered_nes": 76.62,
+      "failed": 2,
+      "n": 32,
+      "wrong": 21
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 85.16,
+      "failed": 1,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 60.86,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 89.33,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 95.44,
+      "failed": 1,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "mistral-medium3.5",
+    "name": "Mistral Medium 3.5",
+    "price": 7.29,
+    "app": true,
+    "strict": 90.65,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 90.65,
+    "adjusted": 90.77,
+    "page_mix": 0.0,
+    "wrong": 29,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 98.8,
+      "failed": 0,
+      "n": 32,
+      "wrong": 0
+     },
+     "middle": {
+      "answered_nes": 96.05,
+      "failed": 0,
+      "n": 32,
+      "wrong": 4
+     },
+     "hard": {
+      "answered_nes": 77.1,
+      "failed": 0,
+      "n": 32,
+      "wrong": 25
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 85.04,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 72.56,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 87.98,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 94.67,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "lightonocr-3-4b-mlx8",
+    "name": "LightOnOCR-3-4B 8-bit (Mac)",
+    "price": 0.0,
+    "app": true,
+    "strict": 89.13,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 89.13,
+    "adjusted": 89.25,
+    "page_mix": 0.0,
+    "wrong": 27,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 96.21,
+      "failed": 0,
+      "n": 32,
+      "wrong": 4
+     },
+     "middle": {
+      "answered_nes": 95.04,
+      "failed": 0,
+      "n": 32,
+      "wrong": 4
+     },
+     "hard": {
+      "answered_nes": 76.14,
+      "failed": 0,
+      "n": 32,
+      "wrong": 19
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 89.67,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 58.72,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 87.98,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 90.81,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   },
+   {
+    "id": "apple-vision",
+    "name": "Apple Vision",
+    "price": 0.0,
+    "app": true,
+    "strict": 81.34,
+    "answered": 96,
+    "failed": 0,
+    "answered_nes": 81.34,
+    "adjusted": 81.45,
+    "page_mix": 0.0,
+    "wrong": 41,
+    "fail_pctile": null,
+    "fail_hard": 0,
+    "fail_kinds": {},
+    "by_tier": {
+     "easy": {
+      "answered_nes": 95.27,
+      "failed": 0,
+      "n": 32,
+      "wrong": 2
+     },
+     "middle": {
+      "answered_nes": 86.61,
+      "failed": 0,
+      "n": 32,
+      "wrong": 11
+     },
+     "hard": {
+      "answered_nes": 62.13,
+      "failed": 0,
+      "n": 32,
+      "wrong": 28
+     }
+    },
+    "by_kind": {
+     "handwritten": {
+      "answered_nes": 57.87,
+      "failed": 0,
+      "n": 16
+     },
+     "mixed": {
+      "answered_nes": 73.2,
+      "failed": 0,
+      "n": 2
+     },
+     "printed": {
+      "answered_nes": 76.43,
+      "failed": 0,
+      "n": 28
+     },
+     "typewritten": {
+      "answered_nes": 91.92,
+      "failed": 0,
+      "n": 50
+     }
+    }
+   }
+  ],
+  "difficulty": {
+   "tier_kinds": {
+    "easy": {
+     "handwritten": 0,
+     "mixed": 0,
+     "printed": 8,
+     "typewritten": 24
+    },
+    "middle": {
+     "handwritten": 5,
+     "mixed": 0,
+     "printed": 11,
+     "typewritten": 16
+    },
+    "hard": {
+     "handwritten": 11,
+     "mixed": 2,
+     "printed": 9,
+     "typewritten": 10
+    }
+   },
+   "tier_mean": {
+    "easy": 99.5,
+    "middle": 97.34,
+    "hard": 82.74
+   },
+   "hardest": [
+    {
+     "kind": "typewritten",
+     "mean_nes": 47.5,
+     "failed_by": 3
+    },
+    {
+     "kind": "mixed",
+     "mean_nes": 47.65,
+     "failed_by": 1
+    },
+    {
+     "kind": "printed",
+     "mean_nes": 55.93,
+     "failed_by": 1
+    },
+    {
+     "kind": "printed",
+     "mean_nes": 72.28,
+     "failed_by": 0
+    },
+    {
+     "kind": "handwritten",
+     "mean_nes": 73.53,
+     "failed_by": 1
+    },
+    {
+     "kind": "printed",
+     "mean_nes": 74.86,
+     "failed_by": 9
+    },
+    {
+     "kind": "handwritten",
+     "mean_nes": 75.76,
+     "failed_by": 0
+    },
+    {
+     "kind": "printed",
+     "mean_nes": 77.01,
+     "failed_by": 0
+    },
+    {
+     "kind": "typewritten",
+     "mean_nes": 80.36,
+     "failed_by": 1
+    },
+    {
+     "kind": "typewritten",
+     "mean_nes": 81.54,
+     "failed_by": 2
+    }
+   ],
+   "fail_corr": 0.29
+  },
+  "curves": {
+   "bins": [
+    {
+     "n": 16,
+     "difficulty": 0.24,
+     "kinds": {
+      "handwritten": 0,
+      "mixed": 0,
+      "printed": 4,
+      "typewritten": 12
+     },
+     "route_failures": 3
+    },
+    {
+     "n": 16,
+     "difficulty": 0.76,
+     "kinds": {
+      "handwritten": 0,
+      "mixed": 0,
+      "printed": 4,
+      "typewritten": 12
+     },
+     "route_failures": 6
+    },
+    {
+     "n": 16,
+     "difficulty": 1.73,
+     "kinds": {
+      "handwritten": 1,
+      "mixed": 0,
+      "printed": 3,
+      "typewritten": 12
+     },
+     "route_failures": 11
+    },
+    {
+     "n": 16,
+     "difficulty": 3.59,
+     "kinds": {
+      "handwritten": 4,
+      "mixed": 0,
+      "printed": 8,
+      "typewritten": 4
+     },
+     "route_failures": 9
+    },
+    {
+     "n": 16,
+     "difficulty": 9.04,
+     "kinds": {
+      "handwritten": 6,
+      "mixed": 1,
+      "printed": 2,
+      "typewritten": 7
+     },
+     "route_failures": 11
+    },
+    {
+     "n": 16,
+     "difficulty": 25.48,
+     "kinds": {
+      "handwritten": 5,
+      "mixed": 1,
+      "printed": 7,
+      "typewritten": 3
+     },
+     "route_failures": 21
+    }
+   ],
+   "routes": {
+    "claude-sonnet5.5": [
+     {
+      "nes": 99.96,
+      "failed": 0
+     },
+     {
+      "nes": 99.73,
+      "failed": 0
+     },
+     {
+      "nes": 99.61,
+      "failed": 0
+     },
+     {
+      "nes": 98.77,
+      "failed": 0
+     },
+     {
+      "nes": 94.79,
+      "failed": 0
+     },
+     {
+      "nes": 85.97,
+      "failed": 0
+     }
+    ],
+    "gemini3.1-pro": [
+     {
+      "nes": 99.96,
+      "failed": 0
+     },
+     {
+      "nes": 99.61,
+      "failed": 0
+     },
+     {
+      "nes": 99.64,
+      "failed": 1
+     },
+     {
+      "nes": 98.98,
+      "failed": 0
+     },
+     {
+      "nes": 95.45,
+      "failed": 0
+     },
+     {
+      "nes": 87.1,
+      "failed": 1
+     }
+    ],
+    "gemini3.8-flash": [
+     {
+      "nes": 99.95,
+      "failed": 0
+     },
+     {
+      "nes": 99.83,
+      "failed": 0
+     },
+     {
+      "nes": 99.53,
+      "failed": 1
+     },
+     {
+      "nes": 99.3,
+      "failed": 0
+     },
+     {
+      "nes": 97.14,
+      "failed": 0
+     },
+     {
+      "nes": 82.41,
+      "failed": 1
+     }
+    ],
+    "qwen3.5-397b": [
+     {
+      "nes": 99.94,
+      "failed": 0
+     },
+     {
+      "nes": 99.68,
+      "failed": 0
+     },
+     {
+      "nes": 98.65,
+      "failed": 0
+     },
+     {
+      "nes": 97.04,
+      "failed": 0
+     },
+     {
+      "nes": 94.15,
+      "failed": 0
+     },
+     {
+      "nes": 74.42,
+      "failed": 0
+     }
+    ],
+    "qwen3-vl-235b": [
+     {
+      "nes": 99.85,
+      "failed": 0
+     },
+     {
+      "nes": 99.75,
+      "failed": 0
+     },
+     {
+      "nes": 98.37,
+      "failed": 0
+     },
+     {
+      "nes": 98.3,
+      "failed": 0
+     },
+     {
+      "nes": 93.68,
+      "failed": 0
+     },
+     {
+      "nes": 73.74,
+      "failed": 0
+     }
+    ],
+    "qwen3.8-flash": [
+     {
+      "nes": 99.86,
+      "failed": 1
+     },
+     {
+      "nes": 99.48,
+      "failed": 0
+     },
+     {
+      "nes": 98.83,
+      "failed": 1
+     },
+     {
+      "nes": 97.64,
+      "failed": 1
+     },
+     {
+      "nes": 94.38,
+      "failed": 0
+     },
+     {
+      "nes": 79.6,
+      "failed": 0
+     }
+    ],
+    "gpt5.4-mini": [
+     {
+      "nes": 99.83,
+      "failed": 0
+     },
+     {
+      "nes": 99.61,
+      "failed": 1
+     },
+     {
+      "nes": 98.99,
+      "failed": 0
+     },
+     {
+      "nes": 98.44,
+      "failed": 0
+     },
+     {
+      "nes": 94.02,
+      "failed": 0
+     },
+     {
+      "nes": 76.63,
+      "failed": 0
+     }
+    ],
+    "gemini3.5-flash": [
+     {
+      "nes": 99.95,
+      "failed": 0
+     },
+     {
+      "nes": 99.75,
+      "failed": 0
+     },
+     {
+      "nes": 99.49,
+      "failed": 1
+     },
+     {
+      "nes": 97.7,
+      "failed": 0
+     },
+     {
+      "nes": 96.37,
+      "failed": 0
+     },
+     {
+      "nes": 78.76,
+      "failed": 1
+     }
+    ],
+    "mistral-large4": [
+     {
+      "nes": 99.75,
+      "failed": 0
+     },
+     {
+      "nes": 99.64,
+      "failed": 0
+     },
+     {
+      "nes": 98.87,
+      "failed": 0
+     },
+     {
+      "nes": 95.16,
+      "failed": 0
+     },
+     {
+      "nes": 88.67,
+      "failed": 0
+     },
+     {
+      "nes": 76.8,
+      "failed": 0
+     }
+    ],
+    "gemini3.5-flash-lite": [
+     {
+      "nes": 99.93,
+      "failed": 0
+     },
+     {
+      "nes": 99.15,
+      "failed": 0
+     },
+     {
+      "nes": 98.73,
+      "failed": 1
+     },
+     {
+      "nes": 97.62,
+      "failed": 0
+     },
+     {
+      "nes": 94.3,
+      "failed": 0
+     },
+     {
+      "nes": 80.22,
+      "failed": 1
+     }
+    ],
+    "mistral-ocr-4-1": [
+     {
+      "nes": 99.73,
+      "failed": 0
+     },
+     {
+      "nes": 99.1,
+      "failed": 0
+     },
+     {
+      "nes": 98.18,
+      "failed": 0
+     },
+     {
+      "nes": 97.45,
+      "failed": 0
+     },
+     {
+      "nes": 92.81,
+      "failed": 0
+     },
+     {
+      "nes": 70.21,
+      "failed": 0
+     }
+    ],
+    "gpt5.6-luna": [
+     {
+      "nes": 99.83,
+      "failed": 0
+     },
+     {
+      "nes": 99.43,
+      "failed": 1
+     },
+     {
+      "nes": 98.42,
+      "failed": 0
+     },
+     {
+      "nes": 97.28,
+      "failed": 0
+     },
+     {
+      "nes": 91.14,
+      "failed": 0
+     },
+     {
+      "nes": 72.93,
+      "failed": 0
+     }
+    ],
+    "mistral-medium3.5": [
+     {
+      "nes": 99.5,
+      "failed": 0
+     },
+     {
+      "nes": 98.67,
+      "failed": 0
+     },
+     {
+      "nes": 97.07,
+      "failed": 0
+     },
+     {
+      "nes": 95.84,
+      "failed": 0
+     },
+     {
+      "nes": 86.75,
+      "failed": 0
+     },
+     {
+      "nes": 66.08,
+      "failed": 0
+     }
+    ],
+    "qwen3.6-27b": [
+     {
+      "nes": 99.93,
+      "failed": 0
+     },
+     {
+      "nes": 99.73,
+      "failed": 0
+     },
+     {
+      "nes": 98.93,
+      "failed": 0
+     },
+     {
+      "nes": 97.29,
+      "failed": 0
+     },
+     {
+      "nes": 95.89,
+      "failed": 1
+     },
+     {
+      "nes": 79.89,
+      "failed": 0
+     }
+    ],
+    "qwen3.6-35b-a3b": [
+     {
+      "nes": 99.94,
+      "failed": 0
+     },
+     {
+      "nes": 99.68,
+      "failed": 0
+     },
+     {
+      "nes": 98.66,
+      "failed": 0
+     },
+     {
+      "nes": 98.01,
+      "failed": 0
+     },
+     {
+      "nes": 91.88,
+      "failed": 0
+     },
+     {
+      "nes": 69.98,
+      "failed": 0
+     }
+    ],
+    "qwen3-vl-8b": [
+     {
+      "nes": 99.84,
+      "failed": 0
+     },
+     {
+      "nes": 99.68,
+      "failed": 0
+     },
+     {
+      "nes": 96.43,
+      "failed": 0
+     },
+     {
+      "nes": 97.21,
+      "failed": 0
+     },
+     {
+      "nes": 91.78,
+      "failed": 0
+     },
+     {
+      "nes": 75.33,
+      "failed": 2
+     }
+    ],
+    "gemini3.1-flash-lite": [
+     {
+      "nes": 99.63,
+      "failed": 0
+     },
+     {
+      "nes": 99.69,
+      "failed": 0
+     },
+     {
+      "nes": 99.38,
+      "failed": 1
+     },
+     {
+      "nes": 98.09,
+      "failed": 0
+     },
+     {
+      "nes": 94.08,
+      "failed": 1
+     },
+     {
+      "nes": 75.61,
+      "failed": 1
+     }
+    ],
+    "qwen3.5-35b-a3b": [
+     {
+      "nes": 99.92,
+      "failed": 0
+     },
+     {
+      "nes": 99.65,
+      "failed": 0
+     },
+     {
+      "nes": 98.96,
+      "failed": 1
+     },
+     {
+      "nes": 97.95,
+      "failed": 0
+     },
+     {
+      "nes": 92.49,
+      "failed": 0
+     },
+     {
+      "nes": 66.31,
+      "failed": 1
+     }
+    ],
+    "gemma4-31b": [
+     {
+      "nes": 99.74,
+      "failed": 0
+     },
+     {
+      "nes": 98.19,
+      "failed": 0
+     },
+     {
+      "nes": 98.24,
+      "failed": 0
+     },
+     {
+      "nes": 93.72,
+      "failed": 0
+     },
+     {
+      "nes": 91.08,
+      "failed": 1
+     },
+     {
+      "nes": 77.71,
+      "failed": 2
+     }
+    ],
+    "qwen3-vl-30b-a3b": [
+     {
+      "nes": 99.89,
+      "failed": 0
+     },
+     {
+      "nes": 99.26,
+      "failed": 0
+     },
+     {
+      "nes": 98.42,
+      "failed": 0
+     },
+     {
+      "nes": 95.98,
+      "failed": 0
+     },
+     {
+      "nes": 88.04,
+      "failed": 2
+     },
+     {
+      "nes": 68.33,
+      "failed": 0
+     }
+    ],
+    "qwen3.5-9b": [
+     {
+      "nes": 99.71,
+      "failed": 0
+     },
+     {
+      "nes": 98.94,
+      "failed": 1
+     },
+     {
+      "nes": 98.51,
+      "failed": 1
+     },
+     {
+      "nes": 93.77,
+      "failed": 1
+     },
+     {
+      "nes": 92.55,
+      "failed": 1
+     },
+     {
+      "nes": 77.07,
+      "failed": 0
+     }
+    ],
+    "mistral-small-24b": [
+     {
+      "nes": 99.33,
+      "failed": 0
+     },
+     {
+      "nes": 99.23,
+      "failed": 0
+     },
+     {
+      "nes": 97.81,
+      "failed": 0
+     },
+     {
+      "nes": 96.03,
+      "failed": 0
+     },
+     {
+      "nes": 85.14,
+      "failed": 0
+     },
+     {
+      "nes": 66.88,
+      "failed": 2
+     }
+    ],
+    "gemma4-26b-a4b": [
+     {
+      "nes": 99.36,
+      "failed": 0
+     },
+     {
+      "nes": 98.27,
+      "failed": 1
+     },
+     {
+      "nes": 97.29,
+      "failed": 1
+     },
+     {
+      "nes": 96.01,
+      "failed": 3
+     },
+     {
+      "nes": 85.39,
+      "failed": 1
+     },
+     {
+      "nes": 74.15,
+      "failed": 4
+     }
+    ],
+    "qwen3.5-27b": [
+     {
+      "nes": 99.94,
+      "failed": 2
+     },
+     {
+      "nes": 99.8,
+      "failed": 2
+     },
+     {
+      "nes": 99.14,
+      "failed": 0
+     },
+     {
+      "nes": 97.94,
+      "failed": 4
+     },
+     {
+      "nes": 94.38,
+      "failed": 3
+     },
+     {
+      "nes": 82.16,
+      "failed": 3
+     }
+    ],
+    "apple-vision": [
+     {
+      "nes": 98.58,
+      "failed": 0
+     },
+     {
+      "nes": 96.42,
+      "failed": 0
+     },
+     {
+      "nes": 96.54,
+      "failed": 0
+     },
+     {
+      "nes": 75.64,
+      "failed": 0
+     },
+     {
+      "nes": 66.83,
+      "failed": 0
+     },
+     {
+      "nes": 54.01,
+      "failed": 0
+     }
+    ],
+    "qwen3-vl-8b-mlx4": [
+     {
+      "nes": 99.86,
+      "failed": 0
+     },
+     {
+      "nes": 99.24,
+      "failed": 0
+     },
+     {
+      "nes": 98.05,
+      "failed": 1
+     },
+     {
+      "nes": 96.32,
+      "failed": 0
+     },
+     {
+      "nes": 90.97,
+      "failed": 1
+     },
+     {
+      "nes": 74.65,
+      "failed": 2
+     }
+    ],
+    "lightonocr-3-4b-mlx8": [
+     {
+      "nes": 99.6,
+      "failed": 0
+     },
+     {
+      "nes": 97.71,
+      "failed": 0
+     },
+     {
+      "nes": 91.9,
+      "failed": 0
+     },
+     {
+      "nes": 96.75,
+      "failed": 0
+     },
+     {
+      "nes": 79.01,
+      "failed": 0
+     },
+     {
+      "nes": 69.79,
+      "failed": 0
+     }
+    ],
+    "qwen3.5-9b-mlx4": [
+     {
+      "nes": 99.87,
+      "failed": 0
+     },
+     {
+      "nes": 99.26,
+      "failed": 0
+     },
+     {
+      "nes": 98.51,
+      "failed": 1
+     },
+     {
+      "nes": 97.79,
+      "failed": 0
+     },
+     {
+      "nes": 90.23,
+      "failed": 0
+     },
+     {
+      "nes": 71.95,
+      "failed": 0
+     }
+    ],
+    "qwen3.6-27b-farmshare": [
+     {
+      "nes": 99.93,
+      "failed": 0
+     },
+     {
+      "nes": 99.73,
+      "failed": 0
+     },
+     {
+      "nes": 99.14,
+      "failed": 0
+     },
+     {
+      "nes": 97.78,
+      "failed": 0
+     },
+     {
+      "nes": 95.31,
+      "failed": 0
+     },
+     {
+      "nes": 79.63,
+      "failed": 0
+     }
+    ]
+   }
+  },
+  "cascades": {
+   "n": 18214,
+   "frontier": [
+    {
+     "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5-9B 4-bit (Mac)",
+     "stages": [
+      "qwen3-vl-8b-mlx4",
+      "qwen3.5-9b-mlx4"
+     ],
+     "trigger": "fail",
+     "nes": 93.42,
+     "family": "fail",
+     "usd": 0.0,
+     "escalated": 4,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.80 \u2192 Qwen3.5 9B",
+     "stages": [
+      "qwen3.5-9b-mlx4",
+      "qwen3.5-9b"
+     ],
+     "trigger": "disagree@0.80",
+     "nes": 93.72,
+     "family": "disagree",
+     "usd": 0.02,
+     "escalated": 10,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.85 \u2192 Qwen3.5 9B",
+     "stages": [
+      "qwen3.5-9b-mlx4",
+      "qwen3.5-9b"
+     ],
+     "trigger": "disagree@0.85",
+     "nes": 94.21,
+     "family": "disagree",
+     "usd": 0.02,
+     "escalated": 13,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.5-9B 4-bit (Mac), checked against Apple Vision at 0.80 \u2192 Qwen3.5 9B",
+     "stages": [
+      "qwen3.5-9b-mlx4",
+      "qwen3.5-9b"
+     ],
+     "trigger": "disagree@0.80",
+     "nes": 94.33,
+     "family": "disagree",
+     "usd": 0.07,
+     "escalated": 33,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3-VL 8B 4-bit (Mac), checked against LightOnOCR-3-4B 8-bit (Mac) at 0.85 \u2192 Qwen3.8 Flash",
+     "stages": [
+      "qwen3-vl-8b-mlx4",
+      "qwen3.8-flash"
+     ],
+     "trigger": "disagree@0.85",
+     "nes": 94.68,
+     "family": "disagree",
+     "usd": 0.11,
+     "escalated": 19,
+     "failed": 0
+    },
+    {
+     "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.90 \u2192 Qwen3.8 Flash",
+     "stages": [
+      "lightonocr-3-4b-mlx8",
+      "qwen3.8-flash"
+     ],
+     "trigger": "disagree@0.90",
+     "nes": 94.9,
+     "family": "disagree",
+     "usd": 0.16,
+     "escalated": 29,
+     "failed": 0
+    },
+    {
+     "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3.5 9B at 0.90 \u2192 Qwen3.8 Flash",
+     "stages": [
+      "lightonocr-3-4b-mlx8",
+      "qwen3.8-flash"
+     ],
+     "trigger": "disagree@0.90",
+     "nes": 94.97,
+     "family": "disagree",
+     "usd": 0.44,
+     "escalated": 32,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 LightOnOCR-3-4B 8-bit (Mac)",
+     "stages": [
+      "qwen3.8-flash",
+      "qwen3.5-9b-mlx4",
+      "lightonocr-3-4b-mlx8"
+     ],
+     "trigger": "fail",
+     "nes": 94.99,
+     "family": "fail",
+     "usd": 0.6,
+     "escalated": 3,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Gemma 4 26B-A4B",
+     "stages": [
+      "qwen3.8-flash",
+      "qwen3.5-9b-mlx4",
+      "gemma4-26b-a4b"
+     ],
+     "trigger": "fail",
+     "nes": 95.0,
+     "family": "fail",
+     "usd": 0.6,
+     "escalated": 3,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Qwen3.6 35B-A3B",
+     "stages": [
+      "qwen3.8-flash",
+      "qwen3.5-9b-mlx4",
+      "qwen3.6-35b-a3b"
+     ],
+     "trigger": "fail",
+     "nes": 95.0,
+     "family": "fail",
+     "usd": 0.61,
+     "escalated": 3,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Gemini 3.1 Flash Lite",
+     "stages": [
+      "qwen3.8-flash",
+      "qwen3.5-9b-mlx4",
+      "gemini3.1-flash-lite"
+     ],
+     "trigger": "fail",
+     "nes": 95.0,
+     "family": "fail",
+     "usd": 0.61,
+     "escalated": 3,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash \u2192 Gemini 3.1 Flash Lite",
+     "stages": [
+      "qwen3.8-flash",
+      "gemini3.1-flash-lite"
+     ],
+     "trigger": "fail",
+     "nes": 95.0,
+     "family": "fail",
+     "usd": 0.64,
+     "escalated": 3,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.6 35B-A3B, checked against Qwen3-VL 8B 4-bit (Mac) at 0.80 \u2192 Qwen3.8 Flash",
+     "stages": [
+      "qwen3.6-35b-a3b",
+      "qwen3.8-flash"
+     ],
+     "trigger": "disagree@0.80",
+     "nes": 95.42,
+     "family": "disagree",
+     "usd": 0.67,
+     "escalated": 11,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 \u2192 Qwen3.8 Flash",
+     "stages": [
+      "qwen3.6-35b-a3b",
+      "qwen3.8-flash"
+     ],
+     "trigger": "disagree@0.90",
+     "nes": 95.43,
+     "family": "disagree",
+     "usd": 0.95,
+     "escalated": 16,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3.8 Flash at 0.90 \u2192 Gemini 3.8 Flash",
+     "stages": [
+      "qwen3.5-9b-mlx4",
+      "gemini3.8-flash"
+     ],
+     "trigger": "disagree@0.90",
+     "nes": 95.51,
+     "family": "disagree",
+     "usd": 1.19,
+     "escalated": 21,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.80 \u2192 Gemini 3.8 Flash",
+     "stages": [
+      "qwen3.6-35b-a3b",
+      "gemini3.8-flash"
+     ],
+     "trigger": "disagree@0.80",
+     "nes": 95.62,
+     "family": "disagree",
+     "usd": 1.22,
+     "escalated": 12,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 \u2192 Gemini 3.8 Flash",
+     "stages": [
+      "qwen3.6-35b-a3b",
+      "gemini3.8-flash"
+     ],
+     "trigger": "disagree@0.90",
+     "nes": 95.98,
+     "family": "disagree",
+     "usd": 1.33,
+     "escalated": 16,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.8 Flash, checked against Qwen3.5 9B at 0.85 \u2192 Gemini 3.8 Flash",
+     "stages": [
+      "qwen3.8-flash",
+      "gemini3.8-flash"
+     ],
+     "trigger": "disagree@0.85",
+     "nes": 96.13,
+     "family": "disagree",
+     "usd": 1.39,
+     "escalated": 16,
+     "failed": 0
+    },
+    {
+     "label": "Gemini 3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac)",
+     "stages": [
+      "gemini3.8-flash",
+      "qwen3.5-9b-mlx4"
+     ],
+     "trigger": "fail",
+     "nes": 96.38,
+     "family": "fail",
+     "usd": 3.22,
+     "escalated": 2,
+     "failed": 0
+    },
+    {
+     "label": "Gemini 3.8 Flash \u2192 Qwen3.5 35B-A3B",
+     "stages": [
+      "gemini3.8-flash",
+      "qwen3.5-35b-a3b"
+     ],
+     "trigger": "fail",
+     "nes": 96.39,
+     "family": "fail",
+     "usd": 3.24,
+     "escalated": 2,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 \u2192 Claude Sonnet 5.5",
+     "stages": [
+      "qwen3.6-35b-a3b",
+      "claude-sonnet5.5"
+     ],
+     "trigger": "disagree@0.90",
+     "nes": 96.42,
+     "family": "disagree",
+     "usd": 4.48,
+     "escalated": 29,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 \u2192 Claude Sonnet 5.5",
+     "stages": [
+      "qwen3.5-35b-a3b",
+      "claude-sonnet5.5"
+     ],
+     "trigger": "disagree@0.95",
+     "nes": 96.52,
+     "family": "disagree",
+     "usd": 5.64,
+     "escalated": 37,
+     "failed": 0
+    },
+    {
+     "label": "Gemini 3.1 Pro \u2192 Qwen3.5-9B 4-bit (Mac)",
+     "stages": [
+      "gemini3.1-pro",
+      "qwen3.5-9b-mlx4"
+     ],
+     "trigger": "fail",
+     "nes": 96.76,
+     "family": "fail",
+     "usd": 21.92,
+     "escalated": 2,
+     "failed": 0
+    },
+    {
+     "label": "Gemini 3.1 Pro \u2192 Qwen3.5 35B-A3B",
+     "stages": [
+      "gemini3.1-pro",
+      "qwen3.5-35b-a3b"
+     ],
+     "trigger": "fail",
+     "nes": 96.77,
+     "family": "fail",
+     "usd": 21.94,
+     "escalated": 2,
+     "failed": 0
+    }
+   ],
+   "singles": [
+    {
+     "label": "Qwen3.5-9B 4-bit (Mac)",
+     "stages": [
+      "qwen3.5-9b-mlx4"
+     ],
+     "trigger": "single",
+     "nes": 91.91,
+     "family": "single",
+     "usd": 0.0,
+     "escalated": 0,
+     "failed": 1
+    },
+    {
+     "label": "Qwen3.6 35B-A3B",
+     "stages": [
+      "qwen3.6-35b-a3b"
+     ],
+     "trigger": "single",
+     "nes": 93.02,
+     "family": "single",
+     "usd": 0.6,
+     "escalated": 0,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3-VL 235B",
+     "stages": [
+      "qwen3-vl-235b"
+     ],
+     "trigger": "single",
+     "nes": 93.95,
+     "family": "single",
+     "usd": 1.22,
+     "escalated": 0,
+     "failed": 0
+    },
+    {
+     "label": "Qwen3.6 27B",
+     "stages": [
+      "qwen3.6-27b"
+     ],
+     "trigger": "single",
+     "nes": 94.28,
+     "family": "single",
+     "usd": 1.94,
+     "escalated": 0,
+     "failed": 1
+    },
+    {
+     "label": "Gemini 3.8 Flash",
+     "stages": [
+      "gemini3.8-flash"
+     ],
+     "trigger": "single",
+     "nes": 94.47,
+     "family": "single",
+     "usd": 3.22,
+     "escalated": 0,
+     "failed": 2
+    },
+    {
+     "label": "Claude Sonnet 5.5",
+     "stages": [
+      "claude-sonnet5.5"
+     ],
+     "trigger": "single",
+     "nes": 96.47,
+     "family": "single",
+     "usd": 11.5,
+     "escalated": 0,
+     "failed": 0
+    }
+   ],
+   "budgets": [
+    {
+     "budget": 0,
+     "families": {
+      "single": {
+       "best": {
+        "label": "Qwen3.5-9B 4-bit (Mac)",
+        "stages": [
+         "qwen3.5-9b-mlx4"
+        ],
+        "trigger": "single",
+        "nes": 91.91,
+        "family": "single",
+        "usd": 0.0,
+        "escalated": 0,
+        "failed": 1
+       },
+       "split_in": 91.95,
+       "split_out": 91.87
+      },
+      "fail": {
+       "best": {
+        "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5-9B 4-bit (Mac)",
+        "stages": [
+         "qwen3-vl-8b-mlx4",
+         "qwen3.5-9b-mlx4"
+        ],
+        "trigger": "fail",
+        "nes": 93.42,
+        "family": "fail",
+        "usd": 0.0,
+        "escalated": 4,
+        "failed": 0
+       },
+       "split_in": 93.53,
+       "split_out": 92.65
+      },
+      "fail+kind": {
+       "best": {
+        "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 LightOnOCR-3-4B 8-bit (Mac) (and its handwritten or mixed pages)",
+        "stages": [
+         "qwen3-vl-8b-mlx4",
+         "lightonocr-3-4b-mlx8"
+        ],
+        "trigger": "fail+kind",
+        "nes": 93.23,
+        "family": "fail+kind",
+        "usd": 0.0,
+        "escalated": 22,
+        "failed": 0
+       },
+       "split_in": 93.5,
+       "split_out": 92.27
+      },
+      "disagree": {
+       "best": {
+        "label": "Qwen3-VL 8B 4-bit (Mac), checked against Apple Vision at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
+        "stages": [
+         "qwen3-vl-8b-mlx4",
+         "qwen3.5-9b-mlx4"
+        ],
+        "trigger": "disagree@0.90",
+        "nes": 93.26,
+        "family": "disagree",
+        "usd": 0.0,
+        "escalated": 44,
+        "failed": 0
+       },
+       "split_in": 93.6,
+       "split_out": 91.63
+      }
+     }
+    },
+    {
+     "budget": 0.5,
+     "families": {
+      "single": {
+       "best": {
+        "label": "Qwen3.5-9B 4-bit (Mac)",
+        "stages": [
+         "qwen3.5-9b-mlx4"
+        ],
+        "trigger": "single",
+        "nes": 91.91,
+        "family": "single",
+        "usd": 0.0,
+        "escalated": 0,
+        "failed": 1
+       },
+       "split_in": 92.25,
+       "split_out": 90.84
+      },
+      "fail": {
+       "best": {
+        "label": "Qwen3.5 9B \u2192 Gemini 3.8 Flash",
+        "stages": [
+         "qwen3.5-9b",
+         "gemini3.8-flash"
+        ],
+        "trigger": "fail",
+        "nes": 93.58,
+        "family": "fail",
+        "usd": 0.41,
+        "escalated": 4,
+        "failed": 0
+       },
+       "split_in": 94.2,
+       "split_out": 92.12
+      },
+      "fail+kind": {
+       "best": {
+        "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.6 27B (and its handwritten or mixed pages)",
+        "stages": [
+         "qwen3-vl-8b-mlx4",
+         "qwen3.6-27b"
+        ],
+        "trigger": "fail+kind",
+        "nes": 94.14,
+        "family": "fail+kind",
+        "usd": 0.39,
+        "escalated": 22,
+        "failed": 0
+       },
+       "split_in": 94.48,
+       "split_out": 92.57
+      },
+      "disagree": {
+       "best": {
+        "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3.5 9B at 0.90 \u2192 Qwen3.8 Flash",
+        "stages": [
+         "lightonocr-3-4b-mlx8",
+         "qwen3.8-flash"
+        ],
+        "trigger": "disagree@0.90",
+        "nes": 94.97,
+        "family": "disagree",
+        "usd": 0.44,
+        "escalated": 32,
+        "failed": 0
+       },
+       "split_in": 95.58,
+       "split_out": 92.59
+      }
+     }
+    },
+    {
+     "budget": 1,
+     "families": {
+      "single": {
+       "best": {
+        "label": "Qwen3.6 35B-A3B",
+        "stages": [
+         "qwen3.6-35b-a3b"
+        ],
+        "trigger": "single",
+        "nes": 93.02,
+        "family": "single",
+        "usd": 0.6,
+        "escalated": 0,
+        "failed": 0
+       },
+       "split_in": 93.55,
+       "split_out": 91.25
+      },
+      "fail": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Gemini 3.1 Flash Lite",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.1-flash-lite"
+        ],
+        "trigger": "fail",
+        "nes": 95.0,
+        "family": "fail",
+        "usd": 0.64,
+        "escalated": 3,
+        "failed": 0
+       },
+       "split_in": 95.06,
+       "split_out": 94.0
+      },
+      "fail+kind": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Gemini 3.5 Flash Lite (and its handwritten or mixed pages)",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.5-flash-lite"
+        ],
+        "trigger": "fail+kind",
+        "nes": 95.05,
+        "family": "fail+kind",
+        "usd": 0.86,
+        "escalated": 23,
+        "failed": 0
+       },
+       "split_in": 95.43,
+       "split_out": 93.45
+      },
+      "disagree": {
+       "best": {
+        "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 \u2192 Qwen3.8 Flash",
+        "stages": [
+         "qwen3.6-35b-a3b",
+         "qwen3.8-flash"
+        ],
+        "trigger": "disagree@0.90",
+        "nes": 95.43,
+        "family": "disagree",
+        "usd": 0.95,
+        "escalated": 16,
+        "failed": 0
+       },
+       "split_in": 96.2,
+       "split_out": 93.41
+      }
+     }
+    },
+    {
+     "budget": 2,
+     "families": {
+      "single": {
+       "best": {
+        "label": "Qwen3.6 27B",
+        "stages": [
+         "qwen3.6-27b"
+        ],
+        "trigger": "single",
+        "nes": 94.28,
+        "family": "single",
+        "usd": 1.94,
+        "escalated": 0,
+        "failed": 1
+       },
+       "split_in": 94.84,
+       "split_out": 92.55
+      },
+      "fail": {
+       "best": {
+        "label": "Qwen3.6 27B \u2192 Gemini 3.8 Flash",
+        "stages": [
+         "qwen3.6-27b",
+         "gemini3.8-flash"
+        ],
+        "trigger": "fail",
+        "nes": 95.29,
+        "family": "fail",
+        "usd": 1.97,
+        "escalated": 1,
+        "failed": 0
+       },
+       "split_in": 95.66,
+       "split_out": 93.65
+      },
+      "fail+kind": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Gemini 3.8 Flash (and its handwritten or mixed pages)",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.8-flash"
+        ],
+        "trigger": "fail+kind",
+        "nes": 95.28,
+        "family": "fail+kind",
+        "usd": 1.44,
+        "escalated": 23,
+        "failed": 0
+       },
+       "split_in": 95.77,
+       "split_out": 93.83
+      },
+      "disagree": {
+       "best": {
+        "label": "Qwen3.8 Flash, checked against Qwen3.5 9B at 0.85 \u2192 Gemini 3.8 Flash",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.8-flash"
+        ],
+        "trigger": "disagree@0.85",
+        "nes": 96.13,
+        "family": "disagree",
+        "usd": 1.39,
+        "escalated": 16,
+        "failed": 0
+       },
+       "split_in": 96.64,
+       "split_out": 94.22
+      }
+     }
+    },
+    {
+     "budget": 5,
+     "families": {
+      "single": {
+       "best": {
+        "label": "Gemini 3.8 Flash",
+        "stages": [
+         "gemini3.8-flash"
+        ],
+        "trigger": "single",
+        "nes": 94.47,
+        "family": "single",
+        "usd": 3.22,
+        "escalated": 0,
+        "failed": 2
+       },
+       "split_in": 95.34,
+       "split_out": 92.81
+      },
+      "fail": {
+       "best": {
+        "label": "Gemini 3.8 Flash \u2192 Qwen3.5 35B-A3B",
+        "stages": [
+         "gemini3.8-flash",
+         "qwen3.5-35b-a3b"
+        ],
+        "trigger": "fail",
+        "nes": 96.39,
+        "family": "fail",
+        "usd": 3.24,
+        "escalated": 2,
+        "failed": 0
+       },
+       "split_in": 96.58,
+       "split_out": 94.87
+      },
+      "fail+kind": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Claude Sonnet 5.5 (and its handwritten or mixed pages)",
+        "stages": [
+         "qwen3.8-flash",
+         "claude-sonnet5.5"
+        ],
+        "trigger": "fail+kind",
+        "nes": 95.49,
+        "family": "fail+kind",
+        "usd": 3.36,
+        "escalated": 23,
+        "failed": 0
+       },
+       "split_in": 95.92,
+       "split_out": 94.02
+      },
+      "disagree": {
+       "best": {
+        "label": "Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 \u2192 Claude Sonnet 5.5",
+        "stages": [
+         "qwen3.6-35b-a3b",
+         "claude-sonnet5.5"
+        ],
+        "trigger": "disagree@0.90",
+        "nes": 96.42,
+        "family": "disagree",
+        "usd": 4.48,
+        "escalated": 29,
+        "failed": 0
+       },
+       "split_in": 96.84,
+       "split_out": 94.47
+      }
+     }
+    },
+    {
+     "budget": 25,
+     "families": {
+      "single": {
+       "best": {
+        "label": "Claude Sonnet 5.5",
+        "stages": [
+         "claude-sonnet5.5"
+        ],
+        "trigger": "single",
+        "nes": 96.47,
+        "family": "single",
+        "usd": 11.5,
+        "escalated": 0,
+        "failed": 0
+       },
+       "split_in": 96.57,
+       "split_out": 95.58
+      },
+      "fail": {
+       "best": {
+        "label": "Gemini 3.1 Pro \u2192 Qwen3.5 35B-A3B",
+        "stages": [
+         "gemini3.1-pro",
+         "qwen3.5-35b-a3b"
+        ],
+        "trigger": "fail",
+        "nes": 96.77,
+        "family": "fail",
+        "usd": 21.94,
+        "escalated": 2,
+        "failed": 0
+       },
+       "split_in": 96.99,
+       "split_out": 95.31
+      },
+      "fail+kind": {
+       "best": {
+        "label": "Qwen3.8 Flash \u2192 Gemini 3.1 Pro (and its handwritten or mixed pages)",
+        "stages": [
+         "qwen3.8-flash",
+         "gemini3.1-pro"
+        ],
+        "trigger": "fail+kind",
+        "nes": 95.72,
+        "family": "fail+kind",
+        "usd": 5.33,
+        "escalated": 23,
+        "failed": 0
+       },
+       "split_in": 95.99,
+       "split_out": 94.28
+      },
+      "disagree": {
+       "best": {
+        "label": "Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 \u2192 Claude Sonnet 5.5",
+        "stages": [
+         "qwen3.5-35b-a3b",
+         "claude-sonnet5.5"
+        ],
+        "trigger": "disagree@0.95",
+        "nes": 96.52,
+        "family": "disagree",
+        "usd": 5.64,
+        "escalated": 37,
+        "failed": 0
+       },
+       "split_in": 96.9,
+       "split_out": 94.66
+      }
+     }
+    }
+   ],
+   "family_frontiers": {
+    "single": [
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "single",
+      "nes": 91.91,
+      "family": "single",
+      "usd": 0.0,
+      "escalated": 0,
+      "failed": 1
+     },
+     {
+      "label": "Qwen3.6 35B-A3B",
+      "stages": [
+       "qwen3.6-35b-a3b"
+      ],
+      "trigger": "single",
+      "nes": 93.02,
+      "family": "single",
+      "usd": 0.6,
+      "escalated": 0,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 235B",
+      "stages": [
+       "qwen3-vl-235b"
+      ],
+      "trigger": "single",
+      "nes": 93.95,
+      "family": "single",
+      "usd": 1.22,
+      "escalated": 0,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 27B",
+      "stages": [
+       "qwen3.6-27b"
+      ],
+      "trigger": "single",
+      "nes": 94.28,
+      "family": "single",
+      "usd": 1.94,
+      "escalated": 0,
+      "failed": 1
+     },
+     {
+      "label": "Gemini 3.8 Flash",
+      "stages": [
+       "gemini3.8-flash"
+      ],
+      "trigger": "single",
+      "nes": 94.47,
+      "family": "single",
+      "usd": 3.22,
+      "escalated": 0,
+      "failed": 2
+     },
+     {
+      "label": "Claude Sonnet 5.5",
+      "stages": [
+       "claude-sonnet5.5"
+      ],
+      "trigger": "single",
+      "nes": 96.47,
+      "family": "single",
+      "usd": 11.5,
+      "escalated": 0,
+      "failed": 0
+     }
+    ],
+    "fail": [
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "fail",
+      "nes": 93.42,
+      "family": "fail",
+      "usd": 0.0,
+      "escalated": 4,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.8 Flash",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.8-flash"
+      ],
+      "trigger": "fail",
+      "nes": 93.55,
+      "family": "fail",
+      "usd": 0.03,
+      "escalated": 4,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5 9B \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "qwen3.5-9b",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "fail",
+      "nes": 93.56,
+      "family": "fail",
+      "usd": 0.25,
+      "escalated": 4,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5 9B \u2192 Gemini 3.8 Flash",
+      "stages": [
+       "qwen3.5-9b",
+       "gemini3.8-flash"
+      ],
+      "trigger": "fail",
+      "nes": 93.58,
+      "family": "fail",
+      "usd": 0.41,
+      "escalated": 4,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 LightOnOCR-3-4B 8-bit (Mac)",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.5-9b-mlx4",
+       "lightonocr-3-4b-mlx8"
+      ],
+      "trigger": "fail",
+      "nes": 94.99,
+      "family": "fail",
+      "usd": 0.6,
+      "escalated": 3,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Gemma 4 26B-A4B",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.5-9b-mlx4",
+       "gemma4-26b-a4b"
+      ],
+      "trigger": "fail",
+      "nes": 95.0,
+      "family": "fail",
+      "usd": 0.6,
+      "escalated": 3,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Qwen3.6 35B-A3B",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.5-9b-mlx4",
+       "qwen3.6-35b-a3b"
+      ],
+      "trigger": "fail",
+      "nes": 95.0,
+      "family": "fail",
+      "usd": 0.61,
+      "escalated": 3,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac) \u2192 Gemini 3.1 Flash Lite",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.5-9b-mlx4",
+       "gemini3.1-flash-lite"
+      ],
+      "trigger": "fail",
+      "nes": 95.0,
+      "family": "fail",
+      "usd": 0.61,
+      "escalated": 3,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Gemini 3.1 Flash Lite",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.1-flash-lite"
+      ],
+      "trigger": "fail",
+      "nes": 95.0,
+      "family": "fail",
+      "usd": 0.64,
+      "escalated": 3,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Gemini 3.1 Pro",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.1-pro"
+      ],
+      "trigger": "fail",
+      "nes": 95.0,
+      "family": "fail",
+      "usd": 1.21,
+      "escalated": 3,
+      "failed": 0
+     },
+     {
+      "label": "Gemini 3.5 Flash Lite \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "gemini3.5-flash-lite",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "fail",
+      "nes": 95.04,
+      "family": "fail",
+      "usd": 1.57,
+      "escalated": 2,
+      "failed": 0
+     },
+     {
+      "label": "Gemini 3.5 Flash Lite \u2192 Qwen3.5 35B-A3B",
+      "stages": [
+       "gemini3.5-flash-lite",
+       "qwen3.5-35b-a3b"
+      ],
+      "trigger": "fail",
+      "nes": 95.05,
+      "family": "fail",
+      "usd": 1.59,
+      "escalated": 2,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 27B \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "qwen3.6-27b",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "fail",
+      "nes": 95.25,
+      "family": "fail",
+      "usd": 1.94,
+      "escalated": 1,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 27B \u2192 Gemini 3.1 Flash Lite",
+      "stages": [
+       "qwen3.6-27b",
+       "gemini3.1-flash-lite"
+      ],
+      "trigger": "fail",
+      "nes": 95.29,
+      "family": "fail",
+      "usd": 1.95,
+      "escalated": 1,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 27B \u2192 Gemini 3.5 Flash Lite",
+      "stages": [
+       "qwen3.6-27b",
+       "gemini3.5-flash-lite"
+      ],
+      "trigger": "fail",
+      "nes": 95.29,
+      "family": "fail",
+      "usd": 1.96,
+      "escalated": 1,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 27B \u2192 Gemini 3.8 Flash",
+      "stages": [
+       "qwen3.6-27b",
+       "gemini3.8-flash"
+      ],
+      "trigger": "fail",
+      "nes": 95.29,
+      "family": "fail",
+      "usd": 1.97,
+      "escalated": 1,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5 27B \u2192 Gemini 3.5 Flash Lite",
+      "stages": [
+       "qwen3.5-27b",
+       "gemini3.5-flash-lite"
+      ],
+      "trigger": "fail",
+      "nes": 95.42,
+      "family": "fail",
+      "usd": 2.03,
+      "escalated": 14,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5 27B \u2192 Gemini 3.8 Flash",
+      "stages": [
+       "qwen3.5-27b",
+       "gemini3.8-flash"
+      ],
+      "trigger": "fail",
+      "nes": 95.7,
+      "family": "fail",
+      "usd": 2.28,
+      "escalated": 14,
+      "failed": 0
+     },
+     {
+      "label": "Gemini 3.8 Flash \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "gemini3.8-flash",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "fail",
+      "nes": 96.38,
+      "family": "fail",
+      "usd": 3.22,
+      "escalated": 2,
+      "failed": 0
+     },
+     {
+      "label": "Gemini 3.8 Flash \u2192 Qwen3.5 35B-A3B",
+      "stages": [
+       "gemini3.8-flash",
+       "qwen3.5-35b-a3b"
+      ],
+      "trigger": "fail",
+      "nes": 96.39,
+      "family": "fail",
+      "usd": 3.24,
+      "escalated": 2,
+      "failed": 0
+     },
+     {
+      "label": "Claude Sonnet 5.5 \u2192 Gemini 3.1 Pro",
+      "stages": [
+       "claude-sonnet5.5",
+       "gemini3.1-pro"
+      ],
+      "trigger": "fail",
+      "nes": 96.47,
+      "family": "fail",
+      "usd": 11.5,
+      "escalated": 0,
+      "failed": 0
+     },
+     {
+      "label": "Gemini 3.1 Pro \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "gemini3.1-pro",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "fail",
+      "nes": 96.76,
+      "family": "fail",
+      "usd": 21.92,
+      "escalated": 2,
+      "failed": 0
+     },
+     {
+      "label": "Gemini 3.1 Pro \u2192 Qwen3.5 35B-A3B",
+      "stages": [
+       "gemini3.1-pro",
+       "qwen3.5-35b-a3b"
+      ],
+      "trigger": "fail",
+      "nes": 96.77,
+      "family": "fail",
+      "usd": 21.94,
+      "escalated": 2,
+      "failed": 0
+     }
+    ],
+    "fail+kind": [
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 LightOnOCR-3-4B 8-bit (Mac) (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "lightonocr-3-4b-mlx8"
+      ],
+      "trigger": "fail+kind",
+      "nes": 93.23,
+      "family": "fail+kind",
+      "usd": 0.0,
+      "escalated": 22,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac) \u2192 Qwen3.5 9B (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "qwen3.5-9b"
+      ],
+      "trigger": "fail+kind",
+      "nes": 93.28,
+      "family": "fail+kind",
+      "usd": 0.04,
+      "escalated": 20,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac) \u2192 Gemma 4 31B (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "gemma4-31b"
+      ],
+      "trigger": "fail+kind",
+      "nes": 93.63,
+      "family": "fail+kind",
+      "usd": 0.04,
+      "escalated": 20,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5 9B (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.5-9b"
+      ],
+      "trigger": "fail+kind",
+      "nes": 93.73,
+      "family": "fail+kind",
+      "usd": 0.04,
+      "escalated": 22,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.5 397B (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.5-397b"
+      ],
+      "trigger": "fail+kind",
+      "nes": 93.79,
+      "family": "fail+kind",
+      "usd": 0.33,
+      "escalated": 22,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac) \u2192 Qwen3.6 27B (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.6-27b"
+      ],
+      "trigger": "fail+kind",
+      "nes": 94.14,
+      "family": "fail+kind",
+      "usd": 0.39,
+      "escalated": 22,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Qwen3.5 9B (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.8-flash",
+       "qwen3.5-9b"
+      ],
+      "trigger": "fail+kind",
+      "nes": 94.23,
+      "family": "fail+kind",
+      "usd": 0.64,
+      "escalated": 23,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac) \u2192 Gemini 3.8 Flash (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "gemini3.8-flash"
+      ],
+      "trigger": "fail+kind",
+      "nes": 94.3,
+      "family": "fail+kind",
+      "usd": 0.76,
+      "escalated": 20,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Gemini 3.5 Flash Lite (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.5-flash-lite"
+      ],
+      "trigger": "fail+kind",
+      "nes": 95.05,
+      "family": "fail+kind",
+      "usd": 0.86,
+      "escalated": 23,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Gemini 3.8 Flash (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.8-flash"
+      ],
+      "trigger": "fail+kind",
+      "nes": 95.28,
+      "family": "fail+kind",
+      "usd": 1.44,
+      "escalated": 23,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Claude Sonnet 5.5 (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.8-flash",
+       "claude-sonnet5.5"
+      ],
+      "trigger": "fail+kind",
+      "nes": 95.49,
+      "family": "fail+kind",
+      "usd": 3.36,
+      "escalated": 23,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash \u2192 Gemini 3.1 Pro (and its handwritten or mixed pages)",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.1-pro"
+      ],
+      "trigger": "fail+kind",
+      "nes": 95.72,
+      "family": "fail+kind",
+      "usd": 5.33,
+      "escalated": 23,
+      "failed": 0
+     }
+    ],
+    "disagree": [
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac), checked against Apple Vision at 0.90 \u2192 Qwen3.5-9B 4-bit (Mac)",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.5-9b-mlx4"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 93.26,
+      "family": "disagree",
+      "usd": 0.0,
+      "escalated": 44,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.80 \u2192 Qwen3.5 9B",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "qwen3.5-9b"
+      ],
+      "trigger": "disagree@0.80",
+      "nes": 93.72,
+      "family": "disagree",
+      "usd": 0.02,
+      "escalated": 10,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.85 \u2192 Qwen3.5 9B",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "qwen3.5-9b"
+      ],
+      "trigger": "disagree@0.85",
+      "nes": 94.21,
+      "family": "disagree",
+      "usd": 0.02,
+      "escalated": 13,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac), checked against Apple Vision at 0.80 \u2192 Qwen3.5 9B",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "qwen3.5-9b"
+      ],
+      "trigger": "disagree@0.80",
+      "nes": 94.33,
+      "family": "disagree",
+      "usd": 0.07,
+      "escalated": 33,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3-VL 8B 4-bit (Mac), checked against LightOnOCR-3-4B 8-bit (Mac) at 0.85 \u2192 Qwen3.8 Flash",
+      "stages": [
+       "qwen3-vl-8b-mlx4",
+       "qwen3.8-flash"
+      ],
+      "trigger": "disagree@0.85",
+      "nes": 94.68,
+      "family": "disagree",
+      "usd": 0.11,
+      "escalated": 19,
+      "failed": 0
+     },
+     {
+      "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3-VL 8B 4-bit (Mac) at 0.90 \u2192 Qwen3.8 Flash",
+      "stages": [
+       "lightonocr-3-4b-mlx8",
+       "qwen3.8-flash"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 94.9,
+      "family": "disagree",
+      "usd": 0.16,
+      "escalated": 29,
+      "failed": 0
+     },
+     {
+      "label": "LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3.5 9B at 0.90 \u2192 Qwen3.8 Flash",
+      "stages": [
+       "lightonocr-3-4b-mlx8",
+       "qwen3.8-flash"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 94.97,
+      "family": "disagree",
+      "usd": 0.44,
+      "escalated": 32,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 35B-A3B, checked against Qwen3-VL 8B 4-bit (Mac) at 0.80 \u2192 Qwen3.8 Flash",
+      "stages": [
+       "qwen3.6-35b-a3b",
+       "qwen3.8-flash"
+      ],
+      "trigger": "disagree@0.80",
+      "nes": 95.42,
+      "family": "disagree",
+      "usd": 0.67,
+      "escalated": 11,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 \u2192 Qwen3.8 Flash",
+      "stages": [
+       "qwen3.6-35b-a3b",
+       "qwen3.8-flash"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 95.43,
+      "family": "disagree",
+      "usd": 0.95,
+      "escalated": 16,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3.8 Flash at 0.90 \u2192 Gemini 3.8 Flash",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "gemini3.8-flash"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 95.51,
+      "family": "disagree",
+      "usd": 1.19,
+      "escalated": 21,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.80 \u2192 Gemini 3.8 Flash",
+      "stages": [
+       "qwen3.6-35b-a3b",
+       "gemini3.8-flash"
+      ],
+      "trigger": "disagree@0.80",
+      "nes": 95.62,
+      "family": "disagree",
+      "usd": 1.22,
+      "escalated": 12,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 \u2192 Gemini 3.8 Flash",
+      "stages": [
+       "qwen3.6-35b-a3b",
+       "gemini3.8-flash"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 95.98,
+      "family": "disagree",
+      "usd": 1.33,
+      "escalated": 16,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash, checked against Qwen3.5 9B at 0.85 \u2192 Gemini 3.8 Flash",
+      "stages": [
+       "qwen3.8-flash",
+       "gemini3.8-flash"
+      ],
+      "trigger": "disagree@0.85",
+      "nes": 96.13,
+      "family": "disagree",
+      "usd": 1.39,
+      "escalated": 16,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash, checked against Mistral Small 24B at 0.85 \u2192 Claude Sonnet 5.5",
+      "stages": [
+       "qwen3.8-flash",
+       "claude-sonnet5.5"
+      ],
+      "trigger": "disagree@0.85",
+      "nes": 96.17,
+      "family": "disagree",
+      "usd": 3.32,
+      "escalated": 20,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5-9B 4-bit (Mac), checked against Gemma 4 31B at 0.90 \u2192 Claude Sonnet 5.5",
+      "stages": [
+       "qwen3.5-9b-mlx4",
+       "claude-sonnet5.5"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 96.21,
+      "family": "disagree",
+      "usd": 3.73,
+      "escalated": 28,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.8 Flash, checked against Mistral Small 24B at 0.90 \u2192 Claude Sonnet 5.5",
+      "stages": [
+       "qwen3.8-flash",
+       "claude-sonnet5.5"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 96.33,
+      "family": "disagree",
+      "usd": 3.91,
+      "escalated": 25,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 \u2192 Claude Sonnet 5.5",
+      "stages": [
+       "qwen3.6-35b-a3b",
+       "claude-sonnet5.5"
+      ],
+      "trigger": "disagree@0.90",
+      "nes": 96.42,
+      "family": "disagree",
+      "usd": 4.48,
+      "escalated": 29,
+      "failed": 0
+     },
+     {
+      "label": "Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 \u2192 Claude Sonnet 5.5",
+      "stages": [
+       "qwen3.5-35b-a3b",
+       "claude-sonnet5.5"
+      ],
+      "trigger": "disagree@0.95",
+      "nes": 96.52,
+      "family": "disagree",
+      "usd": 5.64,
+      "escalated": 37,
+      "failed": 0
+     }
+    ]
+   }
+  },
+  "flags": [
+   {
+    "id": "qwen3.8-flash",
+    "name": "Qwen3.8 Flash",
+    "answered": 93,
+    "wrong": 12,
+    "wrong_kinds": {
+     "handwritten": 5,
+     "mixed": 1,
+     "printed": 4,
+     "typewritten": 2
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.664,
+      "caught_at_20": 6
+     },
+     "length against Apple Vision's": {
+      "auc": 0.87,
+      "caught_at_20": 9
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.913,
+      "caught_at_20": 10
+     }
+    }
+   },
+   {
+    "id": "qwen3.6-35b-a3b",
+    "name": "Qwen3.6 35B-A3B",
+    "answered": 96,
+    "wrong": 17,
+    "wrong_kinds": {
+     "handwritten": 4,
+     "mixed": 1,
+     "printed": 6,
+     "typewritten": 6
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.628,
+      "caught_at_20": 7
+     },
+     "length against Apple Vision's": {
+      "auc": 0.854,
+      "caught_at_20": 11
+     },
+     "disagrees with LightOnOCR-3-4B 8-bit (Mac)": {
+      "auc": 0.89,
+      "caught_at_20": 12
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-35b-a3b",
+    "name": "Qwen3.5 35B-A3B",
+    "answered": 94,
+    "wrong": 19,
+    "wrong_kinds": {
+     "handwritten": 7,
+     "mixed": 1,
+     "printed": 7,
+     "typewritten": 4
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.637,
+      "caught_at_20": 8
+     },
+     "length against Apple Vision's": {
+      "auc": 0.885,
+      "caught_at_20": 14
+     },
+     "disagrees with LightOnOCR-3-4B 8-bit (Mac)": {
+      "auc": 0.907,
+      "caught_at_20": 13
+     }
+    }
+   },
+   {
+    "id": "gemma4-31b",
+    "name": "Gemma 4 31B",
+    "answered": 93,
+    "wrong": 21,
+    "wrong_kinds": {
+     "handwritten": 6,
+     "mixed": 1,
+     "printed": 8,
+     "typewritten": 6
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.575,
+      "caught_at_20": 6
+     },
+     "length against Apple Vision's": {
+      "auc": 0.886,
+      "caught_at_20": 14
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.946,
+      "caught_at_20": 14
+     }
+    }
+   },
+   {
+    "id": "qwen3-vl-30b-a3b",
+    "name": "Qwen3-VL 30B-A3B",
+    "answered": 94,
+    "wrong": 25,
+    "wrong_kinds": {
+     "handwritten": 10,
+     "mixed": 1,
+     "printed": 8,
+     "typewritten": 6
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.675,
+      "caught_at_20": 12
+     },
+     "length against Apple Vision's": {
+      "auc": 0.873,
+      "caught_at_20": 16
+     },
+     "disagrees with Apple Vision": {
+      "auc": 0.948,
+      "caught_at_20": 15
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-9b",
+    "name": "Qwen3.5 9B",
+    "answered": 92,
+    "wrong": 20,
+    "wrong_kinds": {
+     "handwritten": 7,
+     "mixed": 1,
+     "printed": 6,
+     "typewritten": 6
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.656,
+      "caught_at_20": 9
+     },
+     "length against Apple Vision's": {
+      "auc": 0.794,
+      "caught_at_20": 13
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.924,
+      "caught_at_20": 15
+     }
+    }
+   },
+   {
+    "id": "mistral-small-24b",
+    "name": "Mistral Small 24B",
+    "answered": 94,
+    "wrong": 24,
+    "wrong_kinds": {
+     "handwritten": 8,
+     "mixed": 2,
+     "printed": 9,
+     "typewritten": 5
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.672,
+      "caught_at_20": 11
+     },
+     "length against Apple Vision's": {
+      "auc": 0.893,
+      "caught_at_20": 15
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.939,
+      "caught_at_20": 17
+     }
+    }
+   },
+   {
+    "id": "gemma4-26b-a4b",
+    "name": "Gemma 4 26B-A4B",
+    "answered": 86,
+    "wrong": 23,
+    "wrong_kinds": {
+     "handwritten": 9,
+     "mixed": 1,
+     "printed": 5,
+     "typewritten": 8
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.703,
+      "caught_at_20": 11
+     },
+     "length against Apple Vision's": {
+      "auc": 0.854,
+      "caught_at_20": 14
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.975,
+      "caught_at_20": 17
+     }
+    }
+   },
+   {
+    "id": "apple-vision",
+    "name": "Apple Vision",
+    "answered": 96,
+    "wrong": 41,
+    "wrong_kinds": {
+     "handwritten": 16,
+     "mixed": 2,
+     "printed": 13,
+     "typewritten": 10
+    },
+    "signals": {
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.973,
+      "caught_at_20": 19
+     }
+    }
+   },
+   {
+    "id": "qwen3-vl-8b-mlx4",
+    "name": "Qwen3-VL 8B 4-bit (Mac)",
+    "answered": 92,
+    "wrong": 21,
+    "wrong_kinds": {
+     "handwritten": 8,
+     "mixed": 1,
+     "printed": 5,
+     "typewritten": 7
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.651,
+      "caught_at_20": 9
+     },
+     "length against Apple Vision's": {
+      "auc": 0.825,
+      "caught_at_20": 14
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.956,
+      "caught_at_20": 17
+     }
+    }
+   },
+   {
+    "id": "lightonocr-3-4b-mlx8",
+    "name": "LightOnOCR-3-4B 8-bit (Mac)",
+    "answered": 96,
+    "wrong": 27,
+    "wrong_kinds": {
+     "handwritten": 7,
+     "mixed": 2,
+     "printed": 9,
+     "typewritten": 9
+    },
+    "signals": {
+     "length against Apple Vision's": {
+      "auc": 0.777,
+      "caught_at_20": 14
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.948,
+      "caught_at_20": 16
+     }
+    }
+   },
+   {
+    "id": "qwen3.5-9b-mlx4",
+    "name": "Qwen3.5-9B 4-bit (Mac)",
+    "answered": 95,
+    "wrong": 19,
+    "wrong_kinds": {
+     "handwritten": 8,
+     "mixed": 1,
+     "printed": 5,
+     "typewritten": 5
+    },
+    "signals": {
+     "said handwritten or mixed": {
+      "auc": 0.704,
+      "caught_at_20": 10
+     },
+     "length against Apple Vision's": {
+      "auc": 0.848,
+      "caught_at_20": 14
+     },
+     "disagrees with Qwen3.6 35B-A3B": {
+      "auc": 0.92,
+      "caught_at_20": 15
+     }
+    }
+   }
+  ],
+  "bulk": {
+   "typewritten": {
+    "pages": 1202,
+    "failed": 5,
+    "tables": 79,
+    "mean_tokens_out": 473
+   },
+   "printed": {
+    "pages": 487,
+    "failed": 5,
+    "tables": 16,
+    "mean_tokens_out": 792
+   },
+   "mixed": {
+    "pages": 167,
+    "failed": 2,
+    "tables": 10,
+    "mean_tokens_out": 409
+   },
+   "handwritten": {
+    "pages": 144,
+    "failed": 1,
+    "tables": 2,
+    "mean_tokens_out": 223
+   }
+  },
+  "bulk_total": {
+   "pages": 2000,
+   "failed": 13
+  },
+  "bulk_failures": {
+   "unparsed (length)": 13
+  }
  }
 }

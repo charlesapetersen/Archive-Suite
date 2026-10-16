@@ -4,11 +4,13 @@
 Reads, in ../ArchiveProcessor/segbench-results/, the W41 OCR panel's reports and per-attribute CSVs, the
 routes run on our own hardware (ocr-mac-local.md, ocr-mac-local-hw.md and their groups CSV; farmshare/truth/<run>/summary.json and
 pages.csv), the segmentation reports (options.md, cheap-models.md), plus the hand-entered figures in data/inputs.json and
-the Vision OCR lab's handwriting figures in data/vision-ocr-handwriting.json, and writes:
+the Vision OCR lab's handwriting figures in data/vision-ocr-handwriting.json, and the per-page tables
+(ocr-pages.csv, ocr-pages-agree.csv) that difficulty.py turns into page difficulty and cascades, and writes:
 
   data/panel-data.json   every OCR route's score per chart, its answered pages and its price; every
                          segmentation approach's test-box figures; the handwriting readers
   site/index.html        the chart page (site/template.html with the data filled in)
+  difficulty.md          page difficulty, failures apart from accuracy, cascades (W41.bench-difficulty)
 
 Run from anywhere:  python3 ArchiveOCRBench/build.py
 Add --check to fail instead of writing when either output is out of date.
@@ -19,6 +21,8 @@ import re
 import sys
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
+
+import difficulty
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parent / "ArchiveProcessor" / "segbench-results"
@@ -37,6 +41,7 @@ HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
+OUT_DIFFICULTY = HERE / "difficulty.md"
 
 
 def table_after(md, heading, nth=0):
@@ -285,10 +290,12 @@ def main():
                 or any(e["scores"][c["key"]][2] != c["n"] for e in extra):
             sys.exit(f"a FarmShare run's {c['key']} page count differs from the panel's {c['n']}")
 
+    diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
+                              [r["id"] for r in routes if r["panel"] != "farmshare"])
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting(),
-             "farmshare": farmshare()}
+             "farmshare": farmshare(), "difficulty": diff}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
-    outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page}
+    outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 
     stale = [p for p, text in outputs.items() if not p.exists() or p.read_text() != text]
     if check:
@@ -298,9 +305,9 @@ def main():
         return
     for p, text in outputs.items():
         p.write_text(text)
-    print(f"wrote {OUT_DATA.relative_to(HERE)} and {OUT_PAGE.relative_to(HERE)}: "
+    print(f"wrote {OUT_DATA.relative_to(HERE)}, {OUT_PAGE.relative_to(HERE)} and {OUT_DIFFICULTY.name}: "
           f"{len(routes)} routes, {len(charts)} charts, {len(built['segmentation'])} segmentation approaches, "
-          f"{len(built['handwriting']['readers'])} handwriting readers")
+          f"{len(built['handwriting']['readers'])} handwriting readers, {diff['cascades']['n']:,} cascades")
 
 
 if __name__ == "__main__":
