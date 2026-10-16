@@ -320,3 +320,23 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-14 W40.d8 — raised.
+
+### S-016 · Clicking a column header in the Notes list may not sort it
+
+- **Raised:** 2026-10-16 · W40.e5 · Periphery reported the sort callback unused; confirmed by reading the code.
+- **Suspected behaviour:** `tableView(_:sortDescriptorsDidChange:)` is an `NSTableViewDataSource` callback, but
+  Notes implements it on `Coordinator` (`ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift:389`),
+  which is only the table's delegate, and the method is not `@objc`. The data source is
+  `NotesTableDataSource` (`:522`, a `NSTableViewDiffableDataSource`), which does not implement or forward it. The
+  columns do set `sortDescriptorPrototype` (`:101`), so a header click moves the sort arrow while the model's
+  order stays as it was. Reader had the same defect and fixed it with `SortableDiffableDataSource`
+  (`ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift:581-591`). Secondary sort, from the
+  header menu, is a separate path and is not affected.
+- **Where:** `Views/NotesTableView.swift:389-396`; ledger `N-09` (whose *Reached by* names this callback).
+- **Would confirm it:** on the VM with the rehearsal store, click the Title header and read the row order; or a
+  unit test that sets `tableView.sortDescriptors` on the live table and checks `NotesNavigationModel`'s sort.
+  Confirmed if the order does not change.
+- **Would clear it:** the rows reorder by title.
+- **Status:** `open`
+- **History:**
+  - 2026-10-16 W40.e5 — raised.

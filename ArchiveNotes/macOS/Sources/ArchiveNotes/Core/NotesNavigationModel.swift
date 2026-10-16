@@ -551,7 +551,6 @@ final class NotesNavigationModel: ObservableObject {
     }
 
     private struct RecomputeResult: Sendable {
-        let orderedIDs: [UUID]
         let orderedSummaries: [ItemSummary]
         let visibleIDs: Set<UUID>
         let instanceCounts: [UUID: Int]
@@ -623,7 +622,7 @@ final class NotesNavigationModel: ObservableObject {
         }
         let orderedIDs = ordered.map(\.id)
         guard !cancellation.isCancelled else { return nil }
-        return RecomputeResult(orderedIDs: orderedIDs, orderedSummaries: ordered,
+        return RecomputeResult(orderedSummaries: ordered,
                               visibleIDs: Set(orderedIDs), instanceCounts: counts)
     }
 

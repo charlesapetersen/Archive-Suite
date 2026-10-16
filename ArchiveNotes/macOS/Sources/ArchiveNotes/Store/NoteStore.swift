@@ -63,9 +63,6 @@ actor NoteStore {
     private static let facetProjectionStateName = ".archivenotes-finder-facets.json"
 
     enum StoreError: Error, Sendable {
-        case rootUnavailable
-        case corruptRootMarker
-        case titleCollision(URL)
         case writeFailed(String)
         case notFound(UUID)
         case readFailed(String)

@@ -112,8 +112,8 @@ struct NotesTableView: NSViewRepresentable {
         coordinator.tableView = tableView
         coordinator.displayedByID = Dictionary(uniqueKeysWithValues: model.displayed.map { ($0.id, $0) })
 
-        let dataSource = NotesTableDataSource(tableView: tableView) { tv, column, row, itemID in
-            coordinator.makeCell(tableView: tv, column: column, row: row, itemID: itemID)
+        let dataSource = NotesTableDataSource(tableView: tableView) { tv, column, _, itemID in
+            coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
         }
         coordinator.dataSource = dataSource
         tableView.delegate = coordinator
@@ -223,7 +223,7 @@ struct NotesTableView: NSViewRepresentable {
 
         // MARK: Cell factory
 
-        func makeCell(tableView: NSTableView, column: NSTableColumn, row: Int, itemID: UUID) -> NSView {
+        func makeCell(tableView: NSTableView, column: NSTableColumn, itemID: UUID) -> NSView {
             let colID = column.identifier.rawValue
             let item = displayedByID[itemID]
 

@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import ArchiveCore
 
 @main
 struct ArchiveNotesApp: App {

@@ -60,10 +60,6 @@ struct Item: Sendable, Equatable, Identifiable {
     var sortsBySentWith: Bool { ownSortDate == nil && sentWith != nil }
 
     /// Each role's sort key, for a date filter that matches either date (`DateRangeFilter`).
-    var dateKeysByRole: [DateRole: Int] {
-        Self.dateKeysByRole(own: ownSortDate, sentWith: sentWith)
-    }
-
     static func dateKeysByRole(own: Int?, sentWith: ArchiveDate?) -> [DateRole: Int] {
         var keys: [DateRole: Int] = [:]
         if let own { keys[.own] = own }

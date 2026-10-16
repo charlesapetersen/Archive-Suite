@@ -47,15 +47,6 @@ struct NotesLayoutSettings: Equatable, Sendable {
     static var treeWidthRange: ClosedRange<CGFloat> { CGFloat(treeWidthMin)...CGFloat(treeWidthMax) }
     static var detailWidthRange: ClosedRange<CGFloat> { CGFloat(detailWidthMin)...CGFloat(detailWidthMax) }
 
-    init(windowSize: CGSize?, treeWidth: Double, detailWidth: Double,
-         showTree: Bool, hiddenColumns: Set<String>) {
-        self.windowSize = windowSize
-        self.treeWidth = treeWidth
-        self.detailWidth = detailWidth
-        self.showTree = showTree
-        self.hiddenColumns = hiddenColumns
-    }
-
     /// Read + validate from a defaults store (point-of-use).
     init(reading d: UserDefaults) {
         let w = d.double(forKey: NotesLayoutSettingsKey.windowW)
@@ -104,7 +95,6 @@ enum NotesAppSettings {
 
     /// Item-list columns the user has hidden (W6-S3 consumes this; the key lives here so the layout
     /// key set is centralized). Mirrors Reader's `AppSettings.hiddenColumns`.
-    static var hiddenColumns: Set<String> { current.hiddenColumns }
     static func setHiddenColumns(_ hidden: Set<String>, into store: UserDefaults = .standard) {
         store.set(Array(hidden).sorted(), forKey: NotesLayoutSettingsKey.hiddenColumns)
     }

@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 import Combine
-import ArchiveCore
 
 /// Center pane of the 3-pane shell: hosts the Markdown editor with formatting toolbar, bound to the
 /// currently-selected item's body (W7-S1a). Loading + autosaving the selected note's Markdown via the

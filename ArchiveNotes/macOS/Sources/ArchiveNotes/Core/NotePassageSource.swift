@@ -1,5 +1,4 @@
 import AppKit
-import ArchiveCore
 
 // W7-S2 (b) — the READ side of Extracts: turn a live note-editor selection into the ordinal
 // "source blocks" the snapshot builder anchors to.

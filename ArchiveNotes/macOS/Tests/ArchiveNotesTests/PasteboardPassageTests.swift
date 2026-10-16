@@ -1,7 +1,6 @@
 import XCTest
 import AppKit
 @testable import ArchiveNotes
-import ArchiveCore
 
 /// W7-S2 — the `com.archivenotes.passage` pasteboard codec (copy-in-Notes → paste-into-Extract, §5),
 /// plus the payload → passage-blocks bridge and the extract-references-notes-only coercion the paste

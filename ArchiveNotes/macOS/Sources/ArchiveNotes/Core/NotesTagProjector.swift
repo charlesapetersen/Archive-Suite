@@ -46,9 +46,7 @@ enum NotesTagProjector {
     private static let retiredTokens: Set<String> = ["ArchiveSuite"]
 
     enum ProjectError: Error, Sendable {
-        case unreadable(String)
         case verificationFailed(String)
-        case coordinationFailed(String)
         case outsideItemDir(String)
     }
 
@@ -70,8 +68,8 @@ enum NotesTagProjector {
     /// - Returns: The managed set actually present after the write (persist as next call's
     ///   `previouslyManaged`).
     ///
-    /// - Throws: `ProjectError` on read failure, verification failure, coordination failure, or
-    ///   if the URL escapes the item directory.
+    /// - Throws: `ProjectError` on verification failure or if the URL escapes the item directory;
+    ///   a read or coordination failure propagates `CoordinatedTagWriter`'s own error.
     static func project(
         _ desired: Set<String>,
         previouslyManaged: Set<String>,

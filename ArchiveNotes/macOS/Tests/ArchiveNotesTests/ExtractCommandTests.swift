@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 import AppKit
-import ArchiveCore
 @testable import ArchiveNotes
 
 // W7-S2 (c) — the model-level Create / Append-Extract actions the Extract-menu commands drive. Runs

@@ -67,10 +67,4 @@ enum ZoteroSettingsStore {
     private static var d: UserDefaults { .standard }
 
     static var current: ZoteroSettings { ZoteroSettings(reading: d) }
-
-    static func setEnabled(_ v: Bool) { d.set(v, forKey: ZoteroSettingsKey.enabled) }
-    static func setClipboardDetect(_ v: Bool) { d.set(v, forKey: ZoteroSettingsKey.clipboardDetect) }
-    static func setHost(_ v: String) { d.set(v, forKey: ZoteroSettingsKey.host) }
-    static func setPort(_ v: Int) { d.set(v, forKey: ZoteroSettingsKey.port) }
-    static func setStyleID(_ v: String) { d.set(v, forKey: ZoteroSettingsKey.styleID) }
 }

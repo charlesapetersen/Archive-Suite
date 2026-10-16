@@ -11,7 +11,6 @@
 
 import Testing
 import AppKit
-import ArchiveCore
 @testable import ArchiveNotes
 
 @Suite("Test-host window suppression — the unit suite draws nothing")

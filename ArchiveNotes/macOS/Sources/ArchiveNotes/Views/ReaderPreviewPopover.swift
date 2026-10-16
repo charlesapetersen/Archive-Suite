@@ -410,10 +410,6 @@ final class SourceBlockPreviewState: ObservableObject {
         preview.show(for: anchor, relativeTo: view)
     }
 
-    func dismiss() {
-        preview.dismiss()
-    }
-
     /// Best-effort image for a pasted page link whose Reader payload had no embedded thumbnail.
     /// Failure stays text-only; a paste never waits for a user grant or an archive-wide search.
     func thumbnail(for anchor: SourceAnchor) async -> Data? {

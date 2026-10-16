@@ -1,5 +1,4 @@
 import SwiftUI
-import ArchiveCore
 import UniformTypeIdentifiers
 
 /// The Notes browser's left pane — the **mutable, id-keyed virtual folder tree** (06-viewers §2,

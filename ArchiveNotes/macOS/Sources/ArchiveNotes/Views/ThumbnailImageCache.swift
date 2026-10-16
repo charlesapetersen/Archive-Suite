@@ -4,8 +4,6 @@ import AppKit
 /// NSCache auto-evicts under memory pressure; countLimit/totalCostLimit bound the hot set.
 @MainActor
 final class ThumbnailImageCache {
-    static let shared = ThumbnailImageCache()
-
     private let cache = NSCache<NSString, NSImage>()
 
     init(countLimit: Int = 300, costLimitMB: Int = 64) {

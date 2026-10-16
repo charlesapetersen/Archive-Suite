@@ -1,5 +1,4 @@
 import AppKit
-import ArchiveCore
 
 // W7-S3 — jump-to-source resolution + provenance-chip labeling for extract note-passage blocks.
 //

@@ -1,5 +1,4 @@
 import Foundation
-import ArchiveCore
 
 /// A snapshot block plus the inline-image bytes it references.
 ///

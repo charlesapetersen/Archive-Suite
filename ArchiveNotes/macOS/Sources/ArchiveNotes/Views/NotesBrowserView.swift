@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import ArchiveCore
 
 /// The reusable 3-pane browsing shell (folder tree │ item list │ detail), instantiated as the
 /// Notes window and the Extracts window (06-viewers §1, W6-S1). W6-S2 swapped in the folder tree;
@@ -14,8 +13,6 @@ import ArchiveCore
 /// Persistence (W6-S1): panel widths + tree-visibility survive relaunch via `@AppStorage`; window size
 /// via `NotesAppSettings`; hidden item-list columns via `NotesAppSettings.hiddenColumns` (W6-S3).
 struct NotesBrowserView: View {
-    let kind: ItemKindShell
-
     /// The shared UI façade (folder tree + scope + item source), passed from the app.
     @ObservedObject private var model: NotesModel
     /// Per-window item-list state (kind filter, sort, selection, displayed list).
@@ -31,7 +28,6 @@ struct NotesBrowserView: View {
     @EnvironmentObject private var flushRegistry: EditorFlushRegistry
 
     init(kind: ItemKindShell, model: NotesModel) {
-        self.kind = kind
         self._model = ObservedObject(wrappedValue: model)
         // `.standard` ⟹ this window's kind featuring is remembered across launches (W7-S4).
         self._nav = StateObject(wrappedValue: NotesNavigationModel(model: model, defaultKind: kind,

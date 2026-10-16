@@ -338,6 +338,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-10-12 W40.b2 — row written, `unproven`.
 - **Notes:** a non-empty search swaps the sort to relevance and swaps it back on clear
   (`Core/NotesNavigationModel.swift:474-477`). The promise draft records no W9.e2 result.
+  2026-10-16 `W40.e5`: Periphery reports `sortDescriptorsDidChange` unused, and the code reads that way (it sits
+  on the delegate, not the data source), so the header-click path above may be dead: suspect `S-016`.
 
 ### N-10 · Empty-list guidance
 
