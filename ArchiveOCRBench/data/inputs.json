@@ -52,5 +52,16 @@
       "mistral-ocr-4-1": 0.5
     }
   },
+  "own_hardware": {
+    "source": "Routes run on our own hardware, not a paid endpoint, so they cost no money. Scores, speed and memory are read from segbench-results; only names and machines are entered here. Mac: ocr-mac-local.md (W41.mac-local-measure), mlx-community/Qwen3-VL-8B-Instruct-4bit through mlx-vlm. FarmShare: farmshare/truth/ (cbd0e68c), Qwen/Qwen3.6-27B-FP8 on vLLM 0.31.0, one L40S per run (scripts/segbench/farmshare/README.md); its cost is GPU time on Stanford's cluster.",
+    "routes": {
+      "qwen3-vl-8b-mlx4": {"name": "Qwen3-VL 8B 4-bit (Mac)", "where": "mac", "key": "qwen3-vl-8b-mlx4", "pair": "qwen3-vl-8b", "machine": "Apple M3 Pro, 18 GB"},
+      "qwen3.6-27b-farmshare": {"name": "Qwen3.6 27B fp8 (FarmShare)", "where": "farmshare", "run": "qwen3.6-27b-1849739", "pair": "qwen3.6-27b", "machine": "one NVIDIA L40S, Stanford FarmShare"}
+    },
+    "table_only": [
+      {"name": "Qwen3.6 27B fp8, bf16 KV cache (FarmShare)", "run": "qwen3.6-27b-1849744", "machine": "one NVIDIA L40S, Stanford FarmShare"},
+      {"name": "Qwen3.6 27B, fp8 at load (FarmShare)", "run": "qwen3.6-27b-dyn-1849745", "machine": "one NVIDIA L40S, Stanford FarmShare"}
+    ]
+  },
   "kinds": ["typewritten", "printed", "handwritten"]
 }

@@ -167,6 +167,100 @@
    "panel": "local",
    "std": 0.0,
    "batch": null
+  },
+  {
+   "id": "qwen3-vl-8b-mlx4",
+   "name": "Qwen3-VL 8B 4-bit (Mac)",
+   "panel": "mac",
+   "pair": "qwen3-vl-8b",
+   "std": 0.0,
+   "batch": null,
+   "machine": "Apple M3 Pro, 18 GB",
+   "hw": {
+    "seconds": 40.8,
+    "peak_gb": 6.91,
+    "peak_max_gb": 7.64
+   }
+  },
+  {
+   "id": "qwen3.6-27b-farmshare",
+   "name": "Qwen3.6 27B fp8 (FarmShare)",
+   "panel": "farmshare",
+   "pair": "qwen3.6-27b",
+   "std": 0.0,
+   "batch": null,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 1054.7,
+    "gpus": 1,
+    "gpu_hours_per_100k": 94.8136910969944
+   }
+  }
+ ],
+ "table_only": [
+  {
+   "name": "Qwen3.6 27B fp8, bf16 KV cache (FarmShare)",
+   "panel": "farmshare",
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 903.0,
+    "gpus": 1,
+    "gpu_hours_per_100k": 110.74197120708749
+   },
+   "scores": {
+    "overall": [
+     94.97,
+     96,
+     96
+    ],
+    "typewritten": [
+     97.22,
+     50,
+     50
+    ],
+    "printed": [
+     94.97,
+     28,
+     28
+    ],
+    "handwritten": [
+     90.94,
+     16,
+     16
+    ]
+   }
+  },
+  {
+   "name": "Qwen3.6 27B, fp8 at load (FarmShare)",
+   "panel": "farmshare",
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 649.2,
+    "gpus": 1,
+    "gpu_hours_per_100k": 154.03573629081947
+   },
+   "scores": {
+    "overall": [
+     93.17,
+     94,
+     96
+    ],
+    "typewritten": [
+     96.98,
+     50,
+     50
+    ],
+    "printed": [
+     95.13,
+     28,
+     28
+    ],
+    "handwritten": [
+     79.01,
+     14,
+     16
+    ]
+   }
   }
  ],
  "charts": [
@@ -293,6 +387,16 @@
     ],
     "apple-vision": [
      81.34,
+     96,
+     96
+    ],
+    "qwen3-vl-8b-mlx4": [
+     89.66,
+     92,
+     96
+    ],
+    "qwen3.6-27b-farmshare": [
+     95.25,
      96,
      96
     ]
@@ -423,6 +527,16 @@
      91.92,
      50,
      50
+    ],
+    "qwen3-vl-8b-mlx4": [
+     91.59,
+     48,
+     50
+    ],
+    "qwen3.6-27b-farmshare": [
+     97.22,
+     50,
+     50
     ]
    }
   },
@@ -551,6 +665,16 @@
      76.43,
      28,
      28
+    ],
+    "qwen3-vl-8b-mlx4": [
+     91.69,
+     27,
+     28
+    ],
+    "qwen3.6-27b-farmshare": [
+     94.93,
+     28,
+     28
     ]
    }
   },
@@ -677,6 +801,16 @@
     ],
     "apple-vision": [
      57.87,
+     16,
+     16
+    ],
+    "qwen3-vl-8b-mlx4": [
+     89.16,
+     16,
+     16
+    ],
+    "qwen3.6-27b-farmshare": [
+     92.8,
      16,
      16
     ]

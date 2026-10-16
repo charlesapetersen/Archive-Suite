@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build ArchiveOCRBench's data file and chart page from the bench's committed results.
 
-Reads, in ../ArchiveProcessor/segbench-results/, the W41 OCR panel's reports and per-attribute CSVs and the
-segmentation reports (options.md, cheap-models.md), plus the hand-entered figures in data/inputs.json and
+Reads, in ../ArchiveProcessor/segbench-results/, the W41 OCR panel's reports and per-attribute CSVs, the
+routes run on our own hardware (ocr-mac-local.md and its groups CSV; farmshare/truth/<run>/summary.json and
+pages.csv), the segmentation reports (options.md, cheap-models.md), plus the hand-entered figures in data/inputs.json and
 the Vision OCR lab's handwriting figures in data/vision-ocr-handwriting.json, and writes:
 
   data/panel-data.json   every OCR route's score per chart, its answered pages and its price; every
@@ -25,6 +26,10 @@ CLOUD_MD = RESULTS / "ocr-panel-cloud.md"
 LOCAL_MD = RESULTS / "ocr-panel-local.md"
 CLOUD_CSV = RESULTS / "ocr-panel-cloud-groups.csv"
 LOCAL_CSV = RESULTS / "ocr-panel-local-groups.csv"
+MAC_MD = RESULTS / "ocr-mac-local.md"
+MAC_CSV = RESULTS / "ocr-mac-local-groups.csv"
+FARMSHARE = RESULTS / "farmshare" / "truth"
+PANEL_PY = HERE.parent / "ArchiveProcessor" / "scripts" / "segbench" / "ocr_panel.py"
 OPTIONS_MD = RESULTS / "options.md"
 CHEAP_MD = RESULTS / "cheap-models.md"
 INPUTS = HERE / "data" / "inputs.json"
@@ -78,6 +83,44 @@ def money_cells(cell):
 
 def pct(cell):
     return None if cell in ("—", "") else float(cell.rstrip("%"))
+
+
+def agreement_pages():
+    """The three agreement-only letters the panel leaves out of its 96 accuracy pages, read from ocr_panel.py."""
+    m = re.search(r"^AGREEMENT = \{([^}]*)\}", PANEL_PY.read_text(), re.M)
+    return set(re.findall(r"'(p\d+)'", m.group(1)))
+
+
+def mac_route(spec, kinds):
+    """The Mac-local route: scores from its groups CSV, speed and memory from its report's table."""
+    with MAC_CSV.open(newline="") as f:
+        rows = {(r["attribute"], r["value"]): r for r in csv.DictReader(f) if r["model"] == spec["key"]}
+    sc = lambda r: [round(100 * float(r["nes"]), 2), int(r["ok"]), int(r["n"])]
+    speed = {c[0]: c for c in table_after(MAC_MD.read_text(), "## Speed and memory")}
+    page_s = float(speed["seconds a page (prompt + generation)"][1])
+    peak = speed["MLX peak memory, GB"]
+    return ({"overall": sc(rows[("all", "accuracy-96")]), **{k: sc(rows[("kind", k)]) for k in kinds}},
+            {"seconds": page_s, "peak_gb": float(peak[1]), "peak_max_gb": float(peak[3])})
+
+
+def farmshare_run(run, kinds):
+    """One FarmShare run: per-kind scores from pages.csv over the 96 accuracy pages, checked against summary.json."""
+    d = FARMSHARE / run
+    summary = json.loads((d / "summary.json").read_text())
+    agree = agreement_pages()
+    with (d / "pages.csv").open(newline="") as f:
+        pages = [r for r in csv.DictReader(f) if r["page"] not in agree]
+    acc = summary["accuracy_96"]
+
+    def sc(rr):
+        return [round(100 * sum(float(r["nes"]) for r in rr) / len(rr), 2), sum(r["ok"] == "True" for r in rr), len(rr)]
+    overall = sc(pages)
+    if overall[1:] != [acc["ok"], acc["n"]] or abs(overall[0] - round(100 * acc["nes"], 2)) > 1e-9:
+        sys.exit(f"{run}: pages.csv over the 96 accuracy pages gives {overall}, summary.json says {acc}")
+    tp = summary["throughput"]
+    return ({"overall": overall, **{k: sc([r for r in pages if r["kind"] == k]) for k in kinds}},
+            {"photos_per_hour": tp["pages_per_hour_per_gpu"], "gpus": tp["gpus"],
+             "gpu_hours_per_100k": 100000 / tp["pages_per_hour_per_gpu"]})
 
 
 def segmentation():
@@ -162,7 +205,27 @@ def main():
         charts.append({"key": kind, "title": kind.capitalize(), "n": first[2], "words": first[3],
                        "scores": {rid: list(d[rid][:3]) for rid in names}})
 
-    built = {"routes": routes, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting()}
+    # Routes on our own hardware: free in money, so drawn in the free column with their own marker.
+    own = inputs["own_hardware"]
+    extra = []
+    for rid, spec in own["routes"].items():
+        if spec["where"] == "mac":
+            scores, hw = mac_route(spec, inputs["kinds"])
+        else:
+            scores, hw = farmshare_run(spec["run"], inputs["kinds"])
+        routes.append({"id": rid, "name": spec["name"], "panel": spec["where"], "pair": spec["pair"],
+                       "std": 0.0, "batch": None, "machine": spec["machine"], "hw": hw})
+        for c in charts:
+            c["scores"][rid] = scores[c["key"]]
+    for spec in own["table_only"]:
+        scores, hw = farmshare_run(spec["run"], inputs["kinds"])
+        extra.append({"name": spec["name"], "panel": "farmshare", "machine": spec["machine"], "hw": hw, "scores": scores})
+    for c in charts:
+        if any(c["scores"][r["id"]][2] != c["n"] for r in routes if r["panel"] == "farmshare") \
+                or any(e["scores"][c["key"]][2] != c["n"] for e in extra):
+            sys.exit(f"a FarmShare run's {c['key']} page count differs from the panel's {c['n']}")
+
+    built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page}
 
