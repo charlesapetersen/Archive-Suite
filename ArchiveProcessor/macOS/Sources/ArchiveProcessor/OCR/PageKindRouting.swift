@@ -71,7 +71,8 @@ enum PageKindRouting {
 
     /// The reader `performOCRCall` uses for one planned page, and what the page's record says. A routed page whose
     /// model is no longer built in, or whose provider has no key now, keeps the run's model and records `.noPick`. A
-    /// routed model reads at its own default thinking (nil): the run's level was chosen for the run's model.
+    /// routed model reads at the run's Thinking level when it supports one, else its default. Prices count the
+    /// context and previous image the page is actually sent with (Tier-2 review).
     struct Reader {
         let provider: LLMProvider
         let model: LLMModel
@@ -81,18 +82,23 @@ enum PageKindRouting {
     }
 
     static func reader(_ entry: PageReaderPlan.Entry, provider: LLMProvider, model: LLMModel, apiKey: String,
-                       thinkingLevel: ThinkingLevel?, imageScale: Double) -> Reader {
+                       thinkingLevel: ThinkingLevel?, imageScale: Double, sendPreviousImage: Bool = false,
+                       contextCharCount: Int = 0) -> Reader {
+        func price(_ m: LLMModel) -> Double {
+            pagePrice(m, imageScale: imageScale, sendPreviousImage: sendPreviousImage, contextCharCount: contextCharCount)
+        }
         func record(_ reason: Reason, _ p: LLMProvider, _ m: LLMModel, cost: Double? = nil) -> PageReaderRecord {
             PageReaderRecord(kind: entry.kind?.kind, confidence: entry.kind?.confidence, reason: reason,
                              provider: p.rawValue, model: m.displayName, estimatedCost: cost,
-                             replacedCost: cost == nil ? nil
-                                : CostEstimator.secondReaderPageCost(model: model, imageScale: imageScale))
+                             replacedCost: cost == nil ? nil : price(model))
         }
         let c = entry.choice
         let differs = c.provider != provider || c.modelID != model.id
         guard c.reason == .kind || c.reason == .override, differs else {
+            // A choice that is the run's own model is not a reroute, whatever chose it.
+            let reason: Reason = c.reason == .kind || c.reason == .override ? .same : c.reason
             return Reader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
-                          record: record(c.reason, provider, model))
+                          record: record(reason, provider, model))
         }
         guard let target = Self.model(Candidate(provider: c.provider, modelID: c.modelID)),
               let key = c.provider == provider && !apiKey.isEmpty ? apiKey : runKey(for: c.provider), !key.isEmpty
@@ -100,9 +106,15 @@ enum PageKindRouting {
             return Reader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
                           record: record(.noPick, provider, model))
         }
-        return Reader(provider: target.provider, model: target, apiKey: key, thinkingLevel: nil,
-                      record: record(c.reason, target.provider, target,
-                                     cost: CostEstimator.secondReaderPageCost(model: target, imageScale: imageScale)))
+        return Reader(provider: target.provider, model: target, apiKey: key,
+                      thinkingLevel: target.supportsThinking ? thinkingLevel : nil,
+                      record: record(c.reason, target.provider, target, cost: price(target)))
+    }
+
+    /// One page's OCR price on a model, with the context and previous image it is sent with.
+    static func pagePrice(_ m: LLMModel, imageScale: Double, sendPreviousImage: Bool, contextCharCount: Int) -> Double {
+        CostEstimator.estimate(fileCount: 1, model: m, enableTagging: false, sendPreviousImage: sendPreviousImage,
+                               contextCharCount: contextCharCount, imageScale: imageScale).ocrCost
     }
 
     /// A provider's key at read time; the cascade's test seam replaces the Keychain in the headless tests.
@@ -151,18 +163,22 @@ struct PageReaderPlan: Codable, Equatable, Sendable {
     func entry(for url: URL) -> Entry? { pages[Self.key(url)] }
 
     /// What the plan adds to the run model's OCR estimate: for each page read by another model, that model's page
-    /// price less the run model's (`CostEstimator.secondReaderPageCost`, the same rate the cascade line uses).
+    /// price less the run model's, each with the run's context and previous image (`PageKindRouting.pagePrice`).
     /// Negative when the guide sends pages to a cheaper model.
-    func ocrCostDelta(runModel: LLMModel, imageScale: Double) -> Double {
-        let base = CostEstimator.secondReaderPageCost(model: runModel, imageScale: imageScale)
+    func ocrCostDelta(runModel: LLMModel, imageScale: Double, sendPreviousImage: Bool = false,
+                      contextCharCount: Int = 0) -> Double {
+        func price(_ m: LLMModel) -> Double {
+            PageKindRouting.pagePrice(m, imageScale: imageScale, sendPreviousImage: sendPreviousImage,
+                                      contextCharCount: contextCharCount)
+        }
+        let base = price(runModel)
         var prices: [PageKindRouting.Candidate: Double] = [:]
         var delta = 0.0
         for entry in pages.values where entry.choice.modelID != runModel.id || entry.choice.provider != runModel.provider {
             let c = PageKindRouting.Candidate(provider: entry.choice.provider, modelID: entry.choice.modelID)
-            guard let price = prices[c] ?? PageKindRouting.model(c).map({
-                CostEstimator.secondReaderPageCost(model: $0, imageScale: imageScale) }) else { continue }
-            prices[c] = price
-            delta += price - base
+            guard let p = prices[c] ?? PageKindRouting.model(c).map(price) else { continue }
+            prices[c] = p
+            delta += p - base
         }
         return delta
     }
@@ -192,6 +208,7 @@ struct PageReaderRecord: Codable, Equatable, Sendable {
     var estimatedCost: Double? = nil
     var replacedCost: Double? = nil
 
-    /// True when the page was read by a model other than the run's (the guide's pick or the user's choice).
-    var isRouted: Bool { reason == .kind || reason == .override }
+    /// True when the page was read by a model other than the run's (the guide's pick or the user's choice): only
+    /// then is a price recorded.
+    var isRouted: Bool { (reason == .kind || reason == .override) && estimatedCost != nil }
 }

@@ -74,6 +74,7 @@ struct ContentView: View {
             OCRCascadeTestDriver.runIfRequested()            // $0 W41 cheap-first OCR cascade, no wire
             OpenRouterTestDriver.runIfRequested()             // $0 W41 OpenRouter request pinning, no wire
             OCRPageGuidanceTestDriver.runIfRequested()       // $0 W41 picker note: which model reads which pages
+            OCRPageKindTestDriver.runIfRequested()           // $0 W41 page kind → its reader, no wire
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage

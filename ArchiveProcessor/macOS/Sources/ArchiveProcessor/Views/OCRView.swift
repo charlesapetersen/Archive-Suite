@@ -69,6 +69,9 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment: Bool = false
     @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
+    @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
+    /// W41.app-page-kind — each dropped image's kind and the reader it chose.
+    @StateObject private var pageKinds = PageKindStore()
 
     /// The model for the current provider, read live from the shared store so a change made in the
     /// Settings window updates this window's cost estimate — and the model a run launches with —
@@ -155,6 +158,18 @@ struct OCRView: View {
     private var effectiveModel: LLMModel {
         useAppleVision ? LLMModel.appleVisionModels[0] : (currentGatewayConfig?.asLLMModel() ?? selectedModel)
     }
+    /// W41.app-page-kind applies to a direct API model reading pages one by one: not a paid batch (one model), the
+    /// gateway or the Local Agent (the user's single route), Apple Vision (free; the guide never sends a page to it,
+    /// and moving its pages to a paid model is not what choosing it asks for), or pre-OCRed input.
+    private var pageKindsActive: Bool {
+        ocrPageKindRouting && !useGateway && !useLocalAgent && !useAppleVision && !batchMode && !preOCRedInput
+    }
+    private var pageKindRunDefault: PageKindRouting.Candidate {
+        .init(provider: effectiveModel.provider, modelID: effectiveModel.id)
+    }
+    private var pageReaderPlan: PageReaderPlan {
+        pageKindsActive ? pageKinds.plan(droppedFiles, guidance: .bundled, runDefault: pageKindRunDefault) : .empty
+    }
     private var visionWorkflowIsSupported: Bool {
         !useAppleVision || visionUseLLMJudgment || ((taggingMode == .none || taggingMode == .copySource)
             && !enableCollectionSegmentation)
@@ -176,6 +191,10 @@ struct OCRView: View {
     private var costEstimate: CostEstimate? {
         guard imageFileCount > 0 else { return nil }
         let model = useAppleVision && visionUseLLMJudgment ? selectedModel : effectiveModel
+        let readersDelta = pageKindsActive
+            ? pageReaderPlan.ocrCostDelta(runModel: effectiveModel, imageScale: imageScale / 100.0,
+                                          sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
+                                          contextCharCount: Int(contextCharCount)) : 0
         return CostEstimator.estimate(
             fileCount: imageFileCount,
             model: model,
@@ -189,7 +208,7 @@ struct OCRView: View {
             useGateway: useGateway || useAppleVision,
             imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil,
             visionTextOnly: useAppleVision && visionUseLLMJudgment
-        )
+        ).addingOCR(readersDelta)
     }
 
     /// Direct per-page calls for the dropped multi-page PDFs, priced with the model that OCRs them.
@@ -281,6 +300,10 @@ struct OCRView: View {
             droppedHasMultiPagePDF = !pageCounts.isEmpty
             droppedPDFFileCount = pageCounts.count
             droppedPDFPageCount = pageCounts.reduce(0, +)
+            if pageKindsActive { pageKinds.update(files) }
+        }
+        .onChange(of: pageKindsActive) { _, active in
+            if active { pageKinds.update(droppedFiles) }
         }
         .onChange(of: processor.stagedCaptureFiles) { _, staged in
             guard !staged.isEmpty else { return }
@@ -683,6 +706,10 @@ struct OCRView: View {
                                     .foregroundStyle(.secondary)
                                     .accessibilityIdentifier("ap.ocr.secondReaderCost")
                             }
+                            if pageKindsActive && !droppedFiles.isEmpty {
+                                PageKindBatchControl(store: pageKinds, plan: pageReaderPlan,
+                                                     runDefault: pageKindRunDefault, runModel: effectiveModel)
+                            }
                             let cascade = OCRCascade(routeID: ocrCascadeRoute, onDisagreement: ocrCascadeOnDisagreement)
                             if !useGateway && !useLocalAgent && !preOCRedInput,
                                cascade.applies(to: effectiveModel.provider, model: effectiveModel),
@@ -902,6 +929,15 @@ struct OCRView: View {
         return processor.jobs.firstIndex { $0.sourceURL == droppedFiles[rowIndex] }
     }
 
+    /// W41.app-page-kind — the row's kind and reader, with its menu; nothing when kind routing is off.
+    @ViewBuilder private func pageKindLine(_ url: URL) -> some View {
+        if pageKindsActive {
+            PageKindRowLine(store: pageKinds, url: url, guidance: .bundled, runDefault: pageKindRunDefault,
+                            runModel: effectiveModel)
+                .padding(.trailing, 8)
+        }
+    }
+
     private var fileList: some View {
         let jobsBySource = Dictionary(processor.jobs.map { ($0.sourceURL, $0) }, uniquingKeysWith: { _, last in last })
         return ZStack {
@@ -920,6 +956,7 @@ struct OCRView: View {
                             isExpanded: expandedFileID == itemID,
                             presetClassification: capturePreGroupedClassification(at: index)
                         )
+                        .overlay(alignment: .bottomTrailing) { pageKindLine(url) }
                         .contentShape(Rectangle())
                         .id(index)
                         .onTapGesture(count: 2) {
@@ -1281,6 +1318,7 @@ struct OCRView: View {
             processor.exportOriginals = outputImageFile
         }
         processor.mergeDocuments = mergeDocuments
+        processor.pageReaders = pageReaderPlan   // W41.app-page-kind; the run ignores it where it does not apply
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }

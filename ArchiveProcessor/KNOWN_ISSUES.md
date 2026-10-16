@@ -2,6 +2,23 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
+
+Settings → **Choose each page's reader by its kind** (off by default; `PageKindRouting`) classifies dropped photos
+before a run and preselects the guide's pick. Open: the **0.8 confidence floor is a choice, not a measurement** — the
+bench's probabilities come from weights fitted on the pages they were scored on, so there is no held-out calibration
+yet; **PDFs are not classified** (their pages become images only during the run) and keep the run's model, as does
+a page **Rotate-and-rerun** re-reads (its temporary image is not in the plan); it applies only to a direct, non-batch
+run, never a paid batch, the gateway, the Local Agent or **Apple Vision**; a routed page that its reader **refuses or
+fails** can buy a second read (the refusal readers, the cascade), and the pre-run second-reader and cascade lines are
+still worded for the run's model only; the guide's forms/printed pick **Qwen3.6 27B** was measured on the bench's
+local run, while the app reads it on OpenRouter's pinned provider; there is **no
+low-resolution kind** (the bench found no signal that catches it), so the guide's low-resolution pick is never
+chosen; classification needs **macOS 26** (Vision's document request and feature-print revision) and keeps the run's
+model elsewhere; the weights come from 144 pages of one corpus, so refit as labelled pages grow
+(`segbench-results/kind-classifier.md` §6). The classifier's inputs are measured exactly as the bench's
+`kind-signals.swift` measures them — change the two together.
+
 ## ⚠️ LIMITATION (W41.app-ocr-cascade, 2026-10-16): what the cheap-first cascade does not yet cover
 
 `OCRCascade` (off by default) re-reads a failed page with the user's escalation model. What it leaves open, from its

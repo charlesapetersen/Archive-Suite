@@ -134,7 +134,7 @@ enum NetworkSession {
     /// The W41 refusal-fallback contract (`OCRRefusalFallbackTestDriver.envKey`) and the W25 retry-backend
     /// contract (`RetryBackendTestDriver.envKey`) have their own flags for the same reason, as does the W41
     /// OpenRouter request contract (`OpenRouterTestDriver.envKey`) and the W41 cascade contract
-    /// (`OCRCascadeTestDriver.envKey`).
+    /// (`OCRCascadeTestDriver.envKey`) and the W41 page-kind contract (`OCRPageKindTestDriver.envKey`).
     nonisolated static func visionHybridTestTransportIsEnabled(flag: String?) -> Bool { flag == "1" }
 
     /// The stand-in transport for THIS process, or nil when the wire is what a request takes. Resolved in
@@ -157,7 +157,9 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OpenRouterTestDriver.envKey])
                || testTransportIsEnabled(
-                flag: ProcessInfo.processInfo.environment[OCRCascadeTestDriver.envKey]))
+                flag: ProcessInfo.processInfo.environment[OCRCascadeTestDriver.envKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[OCRPageKindTestDriver.envKey]))
         else { return nil }
         return stub
     }

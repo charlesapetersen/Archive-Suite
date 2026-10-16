@@ -188,6 +188,7 @@ enum PageKindClassifier {
         }
 
         let fp = VNGenerateImageFeaturePrintRequest()
+        fp.revision = VNGenerateImageFeaturePrintRequestRevision2   // the bench's (macOS 26's default); pinned
         do { try handler.perform([fp]) } catch { return nil }
         guard let o = fp.results?.first, o.elementType == .float else { return nil }
         s.print = o.data.withUnsafeBytes { Array($0.bindMemory(to: Float.self).prefix(o.elementCount)) }

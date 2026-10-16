@@ -48,6 +48,8 @@ enum DefaultsKeys {
     // W41.app-ocr-cascade (`OCRCascade`)
     static let ocrCascadeRoute = "ocrCascadeRoute"                 // "<provider>|<model id>"; empty = off
     static let ocrCascadeOnDisagreement = "ocrCascadeOnDisagreement"
+    // W41.app-page-kind (`PageKindRouting`): tell each page's kind and preselect its reader; off by default
+    static let ocrPageKindRouting = "ocrPageKindRouting"
 
     // Input & processing
     static let batchMode = "batchMode"

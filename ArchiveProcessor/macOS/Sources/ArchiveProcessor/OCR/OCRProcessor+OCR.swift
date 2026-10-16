@@ -1663,7 +1663,7 @@ extension OCRProcessor {
                     rotationDegrees: result.rotationDegrees,
                     errorMessage: "OCR succeeded but the output PDF could not be written. Check that the "
                                 + "output folder exists and is writable, and that there is free disk space.",
-                    errorCode: "pdf_write_failed")
+                    errorCode: "pdf_write_failed", secondReader: result.secondReader, pageReader: result.pageReader)
                 jobs[index].status = .failed
             }
             let name = sourceURL.lastPathComponent
@@ -1732,7 +1732,8 @@ extension OCRProcessor {
         let routed = localAgent == nil && gatewayConfig == nil
             ? readers.entry(for: imageURL).map {
                 PageKindRouting.reader($0, provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
-                                       imageScale: imageScale) }
+                                       imageScale: imageScale, sendPreviousImage: previousImageURL != nil,
+                                       contextCharCount: previousText?.count ?? 0) }
             : nil
         let provider = routed?.provider ?? provider
         let model = routed?.model ?? model

@@ -2677,6 +2677,10 @@ extension OCRProcessor {
         localAgent: LocalAgentConfig? = nil,
         resumingMixedPDF: PendingMixedPDF? = nil
     ) async {
+        // W41.app-page-kind: taken and cleared before any early return, so a start that is refused cannot leave its
+        // plan for a later run whose caller set none.
+        let plannedReaders = pageReaders
+        pageReaders = .empty
         guard !files.isEmpty else { return }
         // Never overwrite recovery state from a different interrupted run. The UI surfaces explicit
         // Resume/Dismiss controls, but keep the invariant here as well for shortcuts and programmatic
@@ -2807,8 +2811,9 @@ extension OCRProcessor {
         runConfig.outputImageFile = exportOriginals
         runConfig.localAgent = localAgent
         // W41.app-page-kind: per-page readers apply to a direct, non-batch run only (a paid batch is one model).
-        runConfig.pageReaders = batchMode || gatewayConfig != nil || localAgent != nil ? .empty : pageReaders
-        pageReaders = .empty
+        runConfig.pageReaders = batchMode || gatewayConfig != nil || localAgent != nil || provider == .appleVision
+            || preOCRedInput
+            ? .empty : plannedReaders
         if let resumingMixedPDF {
             applyMixedPDFRuntimeConfig(resumingMixedPDF.runtimeConfig, to: &runConfig, apiKey: apiKey)
             activePendingMixedPDF = resumingMixedPDF

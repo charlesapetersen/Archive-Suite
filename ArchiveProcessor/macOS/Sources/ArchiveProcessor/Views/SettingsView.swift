@@ -59,6 +59,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.visionCustomVocabulary) private var visionCustomVocabulary: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
+    @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
 
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
@@ -504,6 +505,7 @@ struct SettingsView: View {
                     }
                 }
                 cascadeControls
+                pageKindControls
                 Button("Manage custom models…") { showManageModels = true }
             }
         }
@@ -540,6 +542,17 @@ struct SettingsView: View {
             }
             .accessibilityIdentifier("ap.settings.cascadeDisagreement")
         }
+    }
+
+    /// W41.app-page-kind — tell each page's kind on this Mac and preselect its reader from the guide above. Off by default.
+    @ViewBuilder private var pageKindControls: some View {
+        Toggle(isOn: $ocrPageKindRouting) {
+            HStack {
+                Text("Choose each page's reader by its kind")
+                HelpButton(text: "Before a run, this Mac tells each dropped photo's kind (handwritten, typewritten, printed, or a form or table) with Apple Vision, free, in about half a second a page, and the file list preselects the first model in the guide above for that kind that you have a key for. A page whose kind it is not sure of, or whose pick you have no key for, keeps the model above. You can change the reader for one page, or for the whole batch, in the file list, and the cost estimate follows. On the bench's pages it told the kind right on 139 of 144, and read 1 NES point below choosing by the true kinds. Each page records its kind and the model that read it. Not for batch runs, the gateway, the Local Agent or Apple Vision, and PDFs keep the model above. Needs macOS 26.")
+            }
+        }
+        .accessibilityIdentifier("ap.settings.pageKindRouting")
     }
 
     /// The key field's current value for a provider (loaded from the Keychain once, with the fields above).
