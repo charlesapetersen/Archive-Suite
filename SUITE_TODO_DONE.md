@@ -11320,3 +11320,20 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   W41.bench-kind-classifier, which starts from this: 14/16 here against the lab's 18/19 in HW-DETECT-2026-10-15.tsv.
   No money.
   <!-- /W41.bench-vision-kind -->
+- [x] **W41.seg-corpus-pairs — training windows from the tagged corpus, JPEGs paired to PDFs [M · ~1 session]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: machine) (blocked-on: W41.seg-27b-test). SHIPPED 2026-10-15 (this commit).
+  `scripts/segbench/corpus_pairs.py` (read only on both trees; cache `~/Library/Caches/ArchiveSuiteRehearsal/corpus-pairs/`),
+  results `segbench-results/corpus-pairs.md`, tests `test_corpus_pairs.py` (7, the pairing rule mutation-checked four
+  ways). Pairing by the owner's rule (same numbers, nearly the same name, any order): mirrored path, unique stem, then
+  the set of 3+ digit numbers plus a name-word Jaccard of 0.5, then the folder path for ties. 90.4% of the 102,478 PDFs
+  pair (July audit 90.6%), 95.9% in the per-document folders. A first version took the last digit run as the photo
+  number, which for `01100 — Noyce 1490` is the collection number, and tied 5,400 Noyce pages; the set of numbers fixed
+  it. Checked by image (100 a method: the JPEG must be nearer the PDF page than its four folder neighbours, 16x16
+  difference hash at four quarter turns, because the PDFs were turned upright and the JPEGs were not): mirrored 96,
+  stem 96, number 95, folder 100; mirrored pairs are right by construction, so 4% is the check's own error. Windows:
+  117 per-document folders (3 excluded as copies of development or test boxes, Harvard's Office of the Dean papers
+  among them because the Dean box's source folder is not recorded), 13,984 training and 2,459 held-out seven-page
+  windows, 22 of 114 collections held out whole, 30% of training windows marked to go with no page text; ABBYY text
+  read for all 50,996 pages. App-style OCR text for a share of windows was not made (it needs OCR of the pages). The
+  same file carries `pack` (the label-clean pack, in parts, because the Mac had 15 GB free) and `clean` (the
+  teacher's agreement with the tags, scored on the owner's 80 checked gaps), both for W41.seg-label-clean.
+  <!-- /W41.seg-corpus-pairs -->
