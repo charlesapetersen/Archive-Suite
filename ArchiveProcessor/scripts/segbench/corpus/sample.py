@@ -131,13 +131,14 @@ def cmd_draw(strata: list[str]):
             for r in chosen:
                 k = r['source'] + ':' + r['page_id']
                 truth_path = TRUTH / (safe(k) + '.txt')
+                # A fetch that fails stops the draw rather than dropping the page: on a slow or throttled link the
+                # failures are the large images, so dropping them would bias the sample. Rerun; pages are cached.
                 try:
                     img, text = mods[r['source']].materialise(C.Candidate(**{f: r[f] for f in C.Candidate.__dataclass_fields__}))
-                except Exception as e:   # a page that cannot be fetched is dropped with the error, then replaced
-                    dropped[k] = f'materialise failed: {type(e).__name__}: {e}'[:300]
-                    _append_drop(k, dropped[k])
-                    failed = True
-                    break
+                except Exception as e:
+                    C.write_jsonl(DRAW, sorted(out, key=lambda r: (r['stratum'], r['source'], r['page_id'])))
+                    raise SystemExit(f'{k}: fetch failed ({type(e).__name__}: {e}); rerun `sample.py draw` '
+                                     f'to continue, or `sample.py drop` it if it can never be fetched')
                 if not text.strip():
                     dropped[k] = 'empty truth'
                     _append_drop(k, dropped[k])
@@ -162,8 +163,8 @@ def _append_drop(key: str, reason: str):
 
 
 def cmd_drop(key: str, reason: str):
-    if key not in {r['source'] + ':' + r['page_id'] for r in C.read_jsonl(DRAW)}:
-        raise SystemExit(f'{key} is not in the draw')
+    if key not in {r['source'] + ':' + r['page_id'] for r in C.read_jsonl(CANDIDATES)}:
+        raise SystemExit(f'{key} is not a candidate')
     _append_drop(key, reason)
     print(f'dropped {key}; run `sample.py draw` to replace it')
 
