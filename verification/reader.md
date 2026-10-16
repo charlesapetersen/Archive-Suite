@@ -439,7 +439,12 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Notes:**
   - The undo stack is memory-only (R-46).
   - `undoLast` drops a file whose undo fails (`try?`, `:1108`), and its count reports only the files it undid.
-    That is `W40.f1`'s to demonstrate.
+    Demonstrated 2026-10-16 by `W40.f1` ([`evidence/reader/W40.f1-undo.md`](evidence/reader/W40.f1-undo.md)):
+    `W40.fix-reader-undo-partial` (S3).
+  - `W40.f1` also found that undo re-tags a file swapped under its path: the §6 identity check compares a
+    `URL`'s cached `fileResourceIdentifier` with itself. `W40.fix-identity-url-cache` (S1). The row stays
+    `works` for what it promises (the inverse delta, one step per batch); the §6 refusal is R-45's safety
+    promise, and the S1 is recorded there too.
   - `S-001`: ⌘Z may fire Undo Tag Change while a text field has focus.
 
 ### R-22 · Tag editor sheet
@@ -930,7 +935,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-tag-quarantine` (S3).
+  - 2026-10-16 W40.f1 — still `broken`, a second defect: undo re-tags a file swapped under its path, because the
+    §6 check reads `fileResourceIdentifier` through a reused `URL`'s cache and compares it with itself
+    (`UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath`,
+    [`evidence/reader/W40.f1-undo.md`](evidence/reader/W40.f1-undo.md)). `W40.fix-identity-url-cache` (S1).
 - **Notes:**
+  - The writer-level identity tests above pass only because each hands the writer a new `URL`; the app passes
+    the same `ArchiveFile.url` to the capture and the write (`W40.fix-identity-url-cache`).
   - The identity is captured when an edit starts (`ArchiveFile.liveIdentity()`), not at discovery. It guards
     the moment between the start of an edit and its write, not a file moved since the list was built.
   - A write that fails its re-read check has already written. It throws without rolling back, which is what §9
@@ -954,9 +965,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Status:** `unreachable`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unreachable` (a promise with no implementation).
-- **Notes:** `unreachable` is used because there is no path to it, and this time no code either. The decision,
-  build it or withdraw the promise, belongs to `W40.f1`, which demonstrates the memory-only undo first.
-  `W40.b5` leaves §12 in place until then, marked as unimplemented.
+  - 2026-10-16 W40.f1 — memory-only undo demonstrated (`UndoDurabilityTests.testTheUndoHistoryDoesNotSurviveARelaunch`,
+    [`evidence/reader/W40.f1-undo.md`](evidence/reader/W40.f1-undo.md)); still `unreachable`. Build or withdraw
+    is the owner's call, asked in the Daemon Report; the work it decides is `W40.audit-ledger`.
+- **Notes:** `unreachable` is used because there is no path to it, and this time no code either.
+  `W40.b5` leaves §12 in place until the owner rules, marked as unimplemented.
 
 ### R-47 · Two same-facet date tags are flagged as ambiguous
 

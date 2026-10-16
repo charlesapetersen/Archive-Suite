@@ -11602,3 +11602,15 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `W40.fix-notes-a11y-labels` (S3), `W40.fix-notes-a11y-contrast` (S4), `W40.fix-processor-a11y-labels` (S3),
   `W40.fix-processor-a11y-contrast` (S3, text at 1.9–2.3:1). Evidence `verification/evidence/core/W40.e3-accessibility-audit.md`.
   <!-- /W40.e3 -->
+- [x] **W40.f1 — Reader undo durability and the missing audit ledger [S]** · §W40 verification phase · SHIPPED 2026-10-16 (this commit)
+  `ArchiveReaderTests/UndoDurabilityTests` drives `NavigationModel.mark` → `undoLast` on scratch roots. Both
+  suspicions demonstrated: undo is memory-only (a second model on the same root and defaults has nothing to undo
+  and no record of the change; the §12 audit ledger does not exist), and a partly failed undo drops the failed file
+  (`try?`) and reports `Undid 1 change.` with no word about it, against Safety §11 → `W40.fix-reader-undo-partial`
+  (S3). Found on the way, S1: undo re-tags a file swapped under its path, because `FileIdentity.capture` reads
+  `fileResourceIdentifier` through a reused `URL`'s resource-value cache, so the §6 check compares the cache with
+  itself (measured: a fresh `URL` sees the swap, the reused one does not) → `W40.fix-identity-url-cache` (S1, top
+  of TIER 7). Each defect is held by a strict `XCTExpectFailure` naming its fix. Build or withdraw the §12 ledger
+  is the owner's call (Daemon Report, gate `W40.audit-ledger-owner-ok`) → `W40.audit-ledger`. Ledger rows R-21,
+  R-45, R-46 updated. Evidence `verification/evidence/reader/W40.f1-undo.md`.
+  <!-- /W40.f1 -->
