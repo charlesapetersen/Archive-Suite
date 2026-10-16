@@ -11557,3 +11557,16 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   batch-resume, processing-history, retry-backend all pass; farmshare kit 31 (10 skip). No money; no migration, as
   there is nothing to migrate.
   <!-- /W41.app-farmshare-import -->
+- [x] **W40.e1 — Thread and Address Sanitizer runs [M]** · §W40 verification phase · SHIPPED 2026-10-16 (this commit; checkpoint `ea893bff`)
+  `ops/verify/sanitizer-runs.sh <tsan|asan> [core|reader|notes|processor]`: Core by `swift test --sanitize`, the
+  Reader and Notes app-hosted unit bundles by `xcodebuild test -enable{Thread,Address}Sanitizer YES` (own DerivedData
+  per sanitizer), and 27 headless Processor drivers on a TSan build with `TSAN_OPTIONS=log_path` so a report survives
+  the driver's deleted `mktemp` log. Results: 0 reports in all seven runs (Core 264+110 tests, Reader 431, Notes
+  219+984, both sanitizers; Processor drivers TSan, all exit 0). A planted race and a planted heap overflow were
+  reported and failed the run in Core, Reader and Notes, and a planted race in `ManifestPersistenceTestDriver` was
+  caught through `log_path`. Finding, fixed: the Processor did not compile under TSan. `finalizeSegment`'s
+  `Task.detached` captured the `var texts` itself (region-isolation error, which only the TSan build raises); fixed
+  with a `[texts]` capture list. Same value at runtime, since the only mutation comes before the closure. Plain build
+  has no new warnings; five capture drivers pass on it. Not covered: UI/VM lanes, Processor ASan, the four key or
+  paid drivers; not in the gate (about 25 minutes). Evidence `verification/evidence/core/W40.e1-sanitizers.md`.
+  <!-- /W40.e1 -->

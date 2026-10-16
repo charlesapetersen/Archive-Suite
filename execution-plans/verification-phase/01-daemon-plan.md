@@ -206,6 +206,8 @@ where it can.
 
 - **`W40.e1` — sanitizers [M].** Thread Sanitizer and Address Sanitizer configurations (separate runs) for
   ArchiveCore and the Reader and Notes unit suites; Processor drivers under TSan. Triage every report under rule 5.
+  *(SHIPPED 2026-10-16: `ops/verify/sanitizer-runs.sh`, evidence `verification/evidence/core/W40.e1-sanitizers.md`;
+  0 reports anywhere, planted mutants seen in every suite; one fix, the Processor did not compile under TSan.)*
 - **`W40.e2` — crash, hang and leak harvest [S-M].** After each VM run, copy new `.ips` files out of the guest's
   `DiagnosticReports` and fail the run on any new one; `leaks --atExit` on the unit suites. *(SHIPPED 2026-10-15:
   `tart_crash_mark`/`tart_crash_harvest` in both VM entry points; `ops/verify/leaks-harvest.sh`. Evidence

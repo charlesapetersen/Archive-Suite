@@ -1172,7 +1172,9 @@ final class LiveCaptureProcessor: ObservableObject {
         // session's `_processed/`. (The write is the last unavoidable-before-check step; see the guard below.)
         guard clearGeneration == startedGeneration else { return }
 
-        var outcome = await Task.detached(priority: .userInitiated) { () -> StagedSegment in
+        // `[texts]`: capture the array by value. `texts` is a `var`, and capturing the variable itself shares its
+        // box with this actor; a TSan build rejects that as a data-race risk (W40.e1).
+        var outcome = await Task.detached(priority: .userInitiated) { [texts] () -> StagedSegment in
             Self.writeSegmentFiles(groupId: groupId, type: gType, collectionKey: collectionKey, order: gOrder,
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                    gatewayName: gatewayName, localAgentDisplayName: localAgentDisplayName,
