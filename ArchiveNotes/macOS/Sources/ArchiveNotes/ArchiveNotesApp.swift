@@ -23,6 +23,7 @@ struct ArchiveNotesApp: App {
             ArchiveTestHost.suppressWindowsIfUnitTestHost()
 #if DEBUG
             UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
+            TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
 #endif
         }
     }

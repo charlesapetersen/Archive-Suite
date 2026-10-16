@@ -29,7 +29,8 @@ targets:
     platform: macOS
     sources:
       - Sources/ArchiveNotes
-      - path: ../../packages/UITestSupport/App   # W40.e9 DEBUG appearance seam for the layout guard
+      - path: ../../packages/UITestSupport/App   # W40.e9 appearance seam, W40.e13 transient recorder (DEBUG)
+      - path: ../../packages/UITestSupport/Shared   # W40.e13 transient analysis, also in the UI suite
     dependencies:
       - package: ArchiveCore
         product: ArchiveCore
@@ -70,6 +71,7 @@ targets:
     sources:
       - Tests/ArchiveNotesUITests
       - path: ../../packages/UITestSupport/Runner   # W40.e9 layout guard, shared by every UI suite
+      - path: ../../packages/UITestSupport/Shared   # W40.e13 transient analysis, shared with the app
     dependencies:
       - target: ArchiveNotes
     settings:

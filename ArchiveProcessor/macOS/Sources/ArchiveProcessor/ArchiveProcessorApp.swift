@@ -7,7 +7,10 @@ struct ArchiveProcessorApp: App {
         // This happens before any view reads @AppStorage. The UI suite supplies disposable paths and
         // ARCHIVEPROC_HEADLESS=1, so it never opens a Keychain item or a remembered real folder.
         ProcessorUITestConfiguration.installScratchDefaults()
-        MainActor.assumeIsolated { UITestAppearance.applyIfRequested() }   // layout guard light/dark (W40.e9)
+        MainActor.assumeIsolated {
+            UITestAppearance.applyIfRequested()   // layout guard light/dark (W40.e9)
+            TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
+        }
 #endif
         OCRProcessor.requestNotificationPermission()
         // One-time: adopt the new default rotation mode (llmSingle — overlaps OCR, ~same accuracy)

@@ -33,7 +33,8 @@ targets:
     platform: macOS
     sources:
       - Sources/ArchiveProcessor
-      - path: ../../packages/UITestSupport/App   # W40.e9 DEBUG appearance seam for the layout guard
+      - path: ../../packages/UITestSupport/App   # W40.e9 appearance seam, W40.e13 transient recorder (DEBUG)
+      - path: ../../packages/UITestSupport/Shared   # W40.e13 transient analysis, also in the UI suite
       # The segmentation figures, bundled straight from the bench's file (no copy), so a bench re-run reaches the
       # app on its next build (W36.seg-opt-engine). Loaded as Bundle.main "options.json".
       - path: ../segbench-results/options.json
@@ -77,6 +78,7 @@ targets:
     sources:
       - Tests/ArchiveProcessorUITests
       - path: ../../packages/UITestSupport/Runner   # W40.e9 layout guard, shared by every UI suite
+      - path: ../../packages/UITestSupport/Shared   # W40.e13 transient analysis, shared with the app
     dependencies:
       - target: ArchiveProcessor
     settings:
