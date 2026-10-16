@@ -89,5 +89,23 @@ class Fetch(unittest.TestCase):
         self.assertEqual(self.run_fetch('--range', '0-300000000', 'https://zenodo.org/x').returncode, 2)
 
 
+class Chunks(unittest.TestCase):
+    def test_big_range_is_read_in_retried_chunks(self):
+        from unittest import mock
+        data = bytes(range(256)) * 100
+        calls, fail_once = [], {10}
+
+        def once(url, a, b):
+            calls.append((a, b))
+            if a in fail_once:
+                fail_once.discard(a)
+                raise IOError('closed early')
+            return data[a:b + 1]
+        with mock.patch.object(C, '_range_once', once), mock.patch.object(C, 'CHUNK', 7):
+            got = C.get_range('u', 3, 24, sleep=lambda s: None)
+        self.assertEqual(got, data[3:25])
+        self.assertEqual(calls, [(3, 9), (10, 16), (10, 16), (17, 23), (24, 24)])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -32,12 +32,35 @@ def get(url: str) -> bytes:
     return subprocess.run([str(FETCH), '--stdout', url], check=True, capture_output=True).stdout
 
 
-def get_range(url: str, start: int, end: int) -> bytes:
-    """Bytes start..end inclusive."""
+def _range_once(url: str, start: int, end: int) -> bytes:
     out = subprocess.run([str(FETCH), '--range', f'{start}-{end}', url], check=True, capture_output=True).stdout
     if len(out) != end - start + 1:
         raise IOError(f'range {start}-{end} of {url}: got {len(out)} bytes (server ignored the range?)')
     return out
+
+
+# Zenodo closed range transfers after about three minutes on 2026-10-16 (6 MB of a 19 MB member at ~36 KB/s),
+# so a large member never arrived in one request. Big ranges are read in chunks, each retried on its own.
+CHUNK = 4 << 20
+CHUNK_TRIES = 5
+
+
+def get_range(url: str, start: int, end: int, sleep=None) -> bytes:
+    """Bytes start..end inclusive."""
+    import time
+    sleep = sleep or time.sleep
+    parts = []
+    for a in range(start, end + 1, CHUNK):
+        b = min(end, a + CHUNK - 1)
+        for i in range(CHUNK_TRIES):
+            try:
+                parts.append(_range_once(url, a, b))
+                break
+            except (subprocess.CalledProcessError, IOError):
+                if i == CHUNK_TRIES - 1:
+                    raise
+                sleep(min(60, 5 * 2 ** i))
+    return b''.join(parts)
 
 
 def size_of(url: str) -> int:
