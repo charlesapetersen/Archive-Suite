@@ -11438,3 +11438,20 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Residuals recorded in `ArchiveNotes/KNOWN_ISSUES.md` (retained draft not shown on reopening the note; trashed-note retained draft
   blocks quit until Quit; slow-path copies linger). Templates' seam cannot report a refusal → `W40.fix-notes-failed-save-close-fu1`.
   <!-- /W40.fix-notes-failed-save-close -->
+- [x] **W40.e10 — Reader screen-by-screen visual review in the VM [S-M]** · §W40 — verification phase · SHIPPED 2026-10-16
+  (lane: reader) (uses: vm). Owner-requested 2026-10-11. `VisualReviewUITests` (opt-in: `VISUAL_REVIEW=1
+  ONLY_TESTING=ArchiveReaderUITests/VisualReviewUITests ops/gui/vm-gui-runner.sh reader xcuitest`; the runner sets
+  and clears a guest flag file so the tour never rides along in the gate) tours every Reader screen, sheet,
+  popover, menu and empty state in light and dark, at minimum and typical size, on open and when idle, on the
+  fixture, a 301-file volume corpus and two empty roots: 286 shots, 6 tests green in the VM (run 4, 1,812 s).
+  Every shot was looked at; the verdicts and reproductions are in
+  `verification/evidence/reader/visual-2026-10-16.md` (full sets in the primary checkout's gitignored
+  `old/W40.e10-visual-2026-10-16/`). Filed: `W40.fix-reader-long-name-overrun`, `-doc-find-focus`,
+  `-tag-editor-chips`, `-tagcloud-width`, `-phantom-selection` (Tier-2: a selection-wide action may act on
+  files the list does not show), `-selected-row-contrast` (all S3, all blocking `W40.g1-refresh`) and
+  `-visual-polish` (S4); a new symptom added to `W40.fix-reader-narrow-window`. Built from the draft saved by
+  worktree cleanup (`wt/w40e10-20261011-110919-96829`). Lessons: `-AppleInterfaceStyle Dark` leaves the app
+  light (use `LayoutGuard.darkModeArguments`); `app.buttons["Cancel"]` matches the Touch Bar copy; a SwiftUI
+  toolbar `Menu` is not a button; a row scrolled off screen makes `clickRow` tap the menu bar; cropping by
+  querying every menu's frame costs a second per menu. Repeat after a fix batch and before `W40.h3`.
+  <!-- /W40.e10 -->
