@@ -25,19 +25,32 @@ enum OCRRefusalFallbackTestDriver {
         var gemini: (Int, String) = (200, "")
         var anthropic: (Int, String) = (200, "")
         var openai: (Int, String) = (200, "")
+        var openrouter: (Int, String) = (200, "")
         var hosts: [String] = []
-        func set(gemini: (Int, String), anthropic: (Int, String) = (200, ""), openai: (Int, String) = (200, "")) {
-            self.gemini = gemini; self.anthropic = anthropic; self.openai = openai; hosts = []
+        var openRouterBody: [String: Any]?
+        func set(gemini: (Int, String), anthropic: (Int, String) = (200, ""), openai: (Int, String) = (200, ""),
+                 openrouter: (Int, String) = (200, "")) {
+            self.gemini = gemini; self.anthropic = anthropic; self.openai = openai; self.openrouter = openrouter
+            hosts = []; openRouterBody = nil
         }
         func answer(_ request: URLRequest) -> (Int, String) {
             let host = request.url?.host ?? ""
             hosts.append(host)
             if host.contains("generativelanguage") { return gemini }
             if host.contains("anthropic") { return anthropic }
+            if host.contains("openrouter") {
+                openRouterBody = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                return openrouter
+            }
             if host.contains("openai") { return openai }
             return (404, "{}")
         }
         func calls() -> [String] { hosts }
+        /// The last OpenRouter request's `model`, `provider.order` and `reasoning.enabled`.
+        func openRouterPin() -> (String?, [String]?, Bool?) {
+            (openRouterBody?["model"] as? String, (openRouterBody?["provider"] as? [String: Any])?["order"] as? [String],
+             (openRouterBody?["reasoning"] as? [String: Any])?["enabled"] as? Bool)
+        }
     }
 
     static func run() async {
@@ -80,6 +93,9 @@ enum OCRRefusalFallbackTestDriver {
                                               apiKey: "test-anthropic", localAgent: nil)
         let gpt = OCRRefusalFallback.Route(provider: .openai, model: LLMModel.openaiModels[0],
                                            apiKey: "test-openai", localAgent: nil)
+        let qwenModel = OCRRefusalFallback.keyedModels[1]
+        let qwen = OCRRefusalFallback.Route(provider: .openrouter, model: qwenModel, apiKey: "test-openrouter",
+                                            localAgent: nil)
         func useRoutes(_ routes: [OCRRefusalFallback.Route]) {
             OCRRefusalFallback.routesOverride = { routes }
         }
@@ -147,6 +163,50 @@ enum OCRRefusalFallbackTestDriver {
         check("when Claude fails, the next route (OpenAI) reads the page",
               r.text?.contains("GPT-TEXT") == true && r.secondReader?.provider == "OpenAI"
               && r.secondReader?.model == LLMModel.openaiModels[0].displayName)
+
+        // 3b. W41.app-openrouter-fu1 — Qwen3.6 27B on OpenRouter is the route after Claude, before OpenAI and Mistral.
+        let keyed = OCRRefusalFallback.keyedModels
+        check("the keyed second readers run Claude, Qwen3.6 27B, GPT-5.4 mini, Mistral OCR",
+              keyed.map(\.provider) == [.anthropic, .openrouter, .openai, .mistral]
+              && keyed[1].id == "qwen/qwen3.6-27b" && keyed[2].id == "gpt-5.4-mini")
+        let qwenText = #"{"choices":[{"finish_reason":"stop","message":{"content":"[document_start]\nQWEN-TEXT"}}]}"#
+        useRoutes([claude, qwen, gpt])
+        await script.set(gemini: (200, recitation), anthropic: (401, #"{"error":{"message":"bad key"}}"#),
+                         openai: (200, gptText), openrouter: (200, qwenText))
+        r = await ocr()
+        calls = await script.calls()
+        let pin = await script.openRouterPin()
+        check("when Claude fails, Qwen3.6 27B on OpenRouter reads the page and OpenAI is never called",
+              r.text?.contains("QWEN-TEXT") == true && r.secondReader?.provider == "OpenRouter"
+              && r.secondReader?.model == qwenModel.displayName && !calls.contains { $0.contains("openai") })
+        check("the OpenRouter second read is pinned as the panel ran it: chutes fp8, reasoning off",
+              pin.0 == "qwen/qwen3.6-27b" && pin.1 == ["chutes/fp8"] && pin.2 == false)
+        let qwenPage = CostEstimator.secondReaderPageCost(model: qwenModel, imageScale: 1)
+        check("the OpenRouter second read carries its estimated cost, inside the pre-run range",
+              qwenPage > 0 && r.secondReader?.estimatedCost.map { abs($0 - qwenPage) < 1e-12 } == true
+              && OCRRefusalFallback.pageCostRange(imageScale: 1).contains(qwenPage))
+        _ = try? PDFGenerator().generate(imageURL: image, result: r, model: gemini[0], outputURL: pdfURL)
+        let qwenHeader = PDFDocument(url: pdfURL)?.page(at: 1)?.string ?? ""
+        check("the PDF header credits OpenRouter's Qwen3.6 27B, not Gemini",
+              qwenHeader.contains("OpenRouter \u{00B7} \(qwenModel.displayName)") && !qwenHeader.contains(gemini[0].displayName))
+        // OpenRouter's provider failure (a 200 with an in-body error) is not text: the next route reads the page.
+        await script.set(gemini: (200, recitation), anthropic: (401, #"{"error":{"message":"bad key"}}"#),
+                         openai: (200, gptText), openrouter: (200, #"{"error":{"code":502,"message":"upstream down"}}"#))
+        r = await ocr()
+        check("when OpenRouter's provider fails, OpenAI reads the page",
+              r.text?.contains("GPT-TEXT") == true && r.secondReader?.provider == "OpenAI")
+        let notCatalogued = OCRRefusalFallback.Route(
+            provider: .openrouter, model: LLMModel(id: "x/unpinned", displayName: "Unpinned", provider: .openrouter,
+                                                   supportsThinking: false, returnsMd: false, inputCostPer1M: 0,
+                                                   outputCostPer1M: 0, batchDiscount: 1),
+            apiKey: "test-openrouter", localAgent: nil)
+        useRoutes([notCatalogued, gpt])
+        await script.set(gemini: (200, recitation), openai: (200, gptText), openrouter: (200, qwenText))
+        r = await ocr()
+        calls = await script.calls()
+        check("an OpenRouter model with no pinned route is never called unpinned; the next route reads",
+              r.text?.contains("GPT-TEXT") == true && !calls.contains { $0.contains("openrouter") })
+        useRoutes([claude, gpt])
 
         // 4. Never a silent failure: every route fails, or there is none.
         await script.set(gemini: (200, recitation), anthropic: (401, #"{"error":{"message":"bad key"}}"#),

@@ -5,7 +5,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 ## ⚠️ LIMITATION (W41.app-ocr-default, 2026-10-15): Gemini refuses some printed text; a second reader covers it
 
 Every Gemini model ends some reprinted published pages with no text (in the W41 panel, the same two printed 1900-1949 pages on every
-Gemini route). `OCRRefusalFallback` reads such a page with the user's Claude (plan or key), OpenAI or Mistral route, on the
+Gemini route). `OCRRefusalFallback` reads such a page with the user's Claude (plan or key), OpenRouter (Qwen3.6 27B, W41.app-openrouter-fu1), OpenAI or Mistral route, on the
 synchronous path and as Gemini batch results are collected (W41.app-ocr-default-fu1), and records it in `OCRResult.secondReader` and
 the PDF header. The run summary and history count those pages and add their estimated cost; the pre-run pane gives only a per-page
 price range, because how many pages Gemini will refuse is not known in advance. With no second route the page fails, saying how to

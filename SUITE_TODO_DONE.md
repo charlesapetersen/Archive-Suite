@@ -11337,3 +11337,15 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   same file carries `pack` (the label-clean pack, in parts, because the Mac had 15 GB free) and `clean` (the
   teacher's agreement with the tags, scored on the owner's 80 checked gaps), both for W41.seg-label-clean.
   <!-- /W41.seg-corpus-pairs -->
+- [x] **W41.app-openrouter-fu1 — Qwen3.6 27B on OpenRouter as a second reader for pages Gemini refuses [XS · Tier-2]** · §transcription and segmentation bake-off on OpenRouter — SHIPPED 2026-10-15.
+  An OpenRouter key now adds Qwen3.6 27B (second only to Claude on printed pages, 94.8 NES in `ocr-page-guidance.json`)
+  to `OCRRefusalFallback.availableRoutes`, after Claude and before GPT-5.4 mini and Mistral OCR. It is read through
+  `OpenAICompatibleClient.pinnedOpenRouter` (chutes fp8, reasoning off, fallbacks off, max_price at the catalog price),
+  and its cost is in `keyedModels`, so it is in `pageCostRange` too (about $0.0027 a page at the 3,700-token OpenRouter
+  image estimate, which is on the high side). The PDF header credits "OpenRouter · Qwen3.6 27B (chutes fp8)" through
+  `SecondReader`. `test-ocr-refusal.sh` gained 7 checks, 44/44 pass: the route order, Qwen reading after Claude fails
+  without OpenAI being called, the request's pin, its cost, the header, an in-body provider error falling through to
+  OpenAI, and an uncatalogued OpenRouter model never being called. `test-openrouter.sh` still passes. The Tier-2 review
+  (opus) found no HIGH or MED issues; its LOWs (the recorded cost leaves out a previous image, which was already true
+  of every route; the range check holds by construction) were left as they are. Cost $0, with no live call made.
+  <!-- /W41.app-openrouter-fu1 -->

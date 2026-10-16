@@ -31,6 +31,9 @@ enum OCRRefusalFallback {
     /// reader again. The operator's explicit per-item Retry still can.
     static let exhaustedCode = "GeminiRefused"
 
+    /// The OpenRouter model that reads a refused page: Qwen3.6 27B, second on printed pages, which Gemini refuses.
+    static let openRouterReaderID = "qwen/qwen3.6-27b"
+
     /// Test seam: replaces the Keychain/CLI lookup (headless tests have no Keychain). nil in production.
     nonisolated(unsafe) static var routesOverride: (@Sendable () -> [Route])?
 
@@ -45,7 +48,9 @@ enum OCRRefusalFallback {
     }
 
     /// The routes the user has, best first by the W41 panel: Claude (by plan or key, per the user's
-    /// `ClaudeRoute`), then an OpenAI key (GPT-5.4 mini, 93.55 NES), then a Mistral key (Mistral OCR, 92.91).
+    /// `ClaudeRoute`), then an OpenRouter key (Qwen3.6 27B, second only to Claude on printed pages, 94.8 —
+    /// `ocr-page-guidance.json`; W41.app-openrouter-fu1), then an OpenAI key (GPT-5.4 mini, 93.55 NES), then a
+    /// Mistral key (Mistral OCR, 92.91).
     /// Reads the Keychain, so it runs only once a page has actually been refused.
     static func availableRoutes(_ defaults: UserDefaults = .standard) -> [Route] {
         if let routesOverride { return routesOverride() }
@@ -63,18 +68,23 @@ enum OCRRefusalFallback {
         if !available.claudeByPlan, !anthropicKey.isEmpty {
             routes.append(Route(provider: .anthropic, model: claudeModel, apiKey: anthropicKey, localAgent: nil))
         }
+        if let key = KeychainHelper.load(account: LLMProvider.openrouter.rawValue), !key.isEmpty {
+            routes.append(Route(provider: .openrouter, model: keyedModels[1], apiKey: key, localAgent: nil))
+        }
         if let key = KeychainHelper.load(account: LLMProvider.openai.rawValue), !key.isEmpty {
-            routes.append(Route(provider: .openai, model: keyedModels[1], apiKey: key, localAgent: nil))
+            routes.append(Route(provider: .openai, model: keyedModels[2], apiKey: key, localAgent: nil))
         }
         if let key = KeychainHelper.load(account: LLMProvider.mistral.rawValue), !key.isEmpty {
-            routes.append(Route(provider: .mistral, model: keyedModels[2], apiKey: key, localAgent: nil))
+            routes.append(Route(provider: .mistral, model: keyedModels[3], apiKey: key, localAgent: nil))
         }
         return routes
     }
 
-    /// The model each keyed route uses, in `availableRoutes` order: Claude, GPT-5.4 mini, Mistral OCR.
+    /// The model each keyed route uses, in `availableRoutes` order: Claude, Qwen3.6 27B, GPT-5.4 mini, Mistral OCR.
+    /// Qwen3.6 27B goes through its pinned OpenRouter route (chutes fp8, reasoning off), the one the panel scored.
     static var keyedModels: [LLMModel] {
         [LLMModel.anthropicModels[0],
+         OpenRouterRoute.forModel(openRouterReaderID)?.model ?? LLMModel.openrouterModels[0],
          LLMModel.openaiModels.first { $0.id == "gpt-5.4-mini" } ?? LLMModel.openaiModels[0],
          LLMModel.mistralModels[0]]
     }
@@ -98,8 +108,8 @@ enum OCRRefusalFallback {
         guard !routes.isEmpty else {
             NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent) (\(refused.errorCode ?? "?")); no second reader")
             return OCRResult(text: nil, classification: nil,
-                             errorMessage: "\(why) No second reader is set up: add an Anthropic, OpenAI or "
-                                 + "Mistral key, or install claude, to read pages Gemini refuses.",
+                             errorMessage: "\(why) No second reader is set up: add an Anthropic, OpenRouter, "
+                                 + "OpenAI or Mistral key, or install claude, to read pages Gemini refuses.",
                              errorCode: exhaustedCode)
         }
         var reasons: [String] = []
@@ -165,12 +175,15 @@ enum OCRRefusalFallback {
             return try await OpenAICompatibleClient.openAI(model: route.model, apiKey: route.apiKey, thinkingLevel: nil).ocr(
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
                 customPrompt: customPrompt, imageScale: imageScale)
+        case .openrouter:
+            return try await OpenAICompatibleClient.pinnedOpenRouter(model: route.model, apiKey: route.apiKey).ocr(
+                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+                customPrompt: customPrompt, imageScale: imageScale)
         case .mistral:
             return try await MistralClient(apiKey: route.apiKey, model: route.model).ocr(
                 imageURL: imageURL, previousText: previousText, imageScale: imageScale)
-        case .gemini, .appleVision, .openrouter:
-            // Never a second reader: Gemini is the refuser, and Vision's text is not a transcription. OpenRouter
-            // is not one yet (W41.app-openrouter-fu1 would add Qwen3.6 27B, second on printed pages).
+        case .gemini, .appleVision:
+            // Never a second reader: Gemini is the refuser, and Vision's text is not a transcription.
             return OCRResult(text: nil, classification: nil, errorMessage: "not a second reader", errorCode: nil)
         }
     }
