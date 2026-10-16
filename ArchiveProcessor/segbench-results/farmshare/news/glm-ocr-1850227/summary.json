@@ -1,0 +1,37 @@
+{
+ "label": "glm-ocr-1850227",
+ "layout": true,
+ "side": null,
+ "env": {
+  "SLURM_JOB_ID": "1850227",
+  "SLURM_JOB_PARTITION": "gpu",
+  "SLURM_JOB_QOS": "gpu",
+  "SLURMD_NODENAME": "oat-06",
+  "CUDA_VISIBLE_DEVICES": "0",
+  "FS_MODEL": "zai-org/GLM-OCR",
+  "FS_PRESET": "glm-ocr",
+  "FS_VLLM_ARGS": "--tensor-parallel-size 1 --max-model-len 16384 --kv-cache-dtype auto --gpu-memory-utilization 0.80 --max-num-seqs 64 --limit-mm-per-prompt {\"image\":1} --speculative-config {\"method\":\"mtp\",\"num_speculative_tokens\":1}",
+  "vllm": "0.31.0",
+  "newspaper-ocr": "0.11.0",
+  "doclayout-yolo": "0.0.4"
+ },
+ "throughput": {
+  "pages": 19,
+  "ok": 19,
+  "wall_s": 62.9,
+  "gpus": 1,
+  "pages_per_hour_per_gpu": 1087.3,
+  "mean_prompt_tokens": 0.0,
+  "mean_completion_tokens": 0.0
+ },
+ "scored_15_panel_normalisation": {
+  "n": 15,
+  "ok": 15,
+  "nes": 0.9619911394741809,
+  "chrf": 0.976608979771074,
+  "miss": 0.020894742733480094,
+  "add": 0.015391216745643818,
+  "cost": 0,
+  "words": 53602
+ }
+}

@@ -11235,3 +11235,21 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   their own `report`/`speed` heading; build.py reads them); part 3 kept, its note links the handwritten chart. Tests:
   `test_ocr_mac_local.py` 5 synthetic checks. No money; no download; no page text in the public files.
   <!-- /W41.mac-local-hw -->
+- [x] **W41.farmshare-news-layout-run — run the layout-first route on FarmShare — OWNER** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light) (blocked-on: W41.farmshare-news-layout, W41.farmshare-news-layout-run-owner-ok). SHIPPED 2026-10-15.
+  Run by an interactive session over the owner's shared SSH connection (owner: "continue with all farmshare work").
+  `setup.sh --layout` added newspaper-ocr 0.11.0 and doclayout-yolo 0.0.4 to the vLLM venv with no conflict;
+  `download.sh glm-ocr`; `submit.sh news glm-ocr` (job 1850227, one L40S, 2 min 46 s). vLLM 0.31.0 served GLM-OCR
+  with MTP (GlmOcrMTPModel) at 80% of the card and the detector fit beside it. All 19 pages and all 1,018 region
+  requests answered, 1,087 pages an hour. NewsBench's own score.py on its 15 scored pages: 0.969 overall, 0.975
+  broadsheet, 0.965 page, against the reference row glm-ocr-doclayout's 0.970 and Qwen3.6 27B whole page's 0.967 at
+  65 pages an hour. Results: `segbench-results/farmshare/news/glm-ocr-1850227/`, `news/newsbench-score.txt`. No money.
+  <!-- /W41.farmshare-news-layout-run -->
+- [x] **W41.farmshare-seg-run — run segmentation's Deaver windows on FarmShare — OWNER** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light) (blocked-on: W41.farmshare-seg, W41.farmshare-seg-run-owner-ok). SHIPPED 2026-10-15.
+  Run by an interactive session over the owner's shared SSH connection. `fs_seg.py pack` on the Mac (51 windows, 149
+  pages, 34 MB), `submit.sh seg qwen3.5-27b` (job 1850228, one L40S): 51/51 windows answered, 307 s, 1,749 pages an
+  hour; `fs_seg.py import` and `method_openrouter.py report Deaver`: 96.5% of pages in the exact document, 0 false
+  splits, 2 false merges, against OpenRouter's 95.0% (0 splits, 3 merges) for the same model at fp8. An earlier run the
+  same day through a since-replaced route (32,768 tokens, eight images) gave 93.6%, so the same windows at
+  temperature 0 vary by a few points between runs. Row and note in `segbench-results/local-models-Deaver.md`; the
+  run's summary (no text) in `segbench-results/farmshare/seg/qwen3.5-27b/`. No money.
+  <!-- /W41.farmshare-seg-run -->

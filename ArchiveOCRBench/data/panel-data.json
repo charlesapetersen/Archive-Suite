@@ -1142,6 +1142,16 @@
   ],
   "news": [
    {
+    "label": "glm-ocr-1850227",
+    "how": "DocLayout-YOLO 1280 regions, the kit's glm-ocr route",
+    "per_hour": 1087.3,
+    "answered": "19/19",
+    "name": "GLM-OCR",
+    "overall": 0.969,
+    "broadsheet": 0.975,
+    "page": 0.965
+   },
+   {
     "label": "qwen3.6-27b-1849746",
     "how": "whole page",
     "per_hour": 65.2,
@@ -1153,7 +1163,7 @@
    },
    {
     "label": "qwen3.6-27b-1850148-doclayout_yolo",
-    "how": "DocLayout-YOLO regions",
+    "how": "DocLayout-YOLO regions (fs_news_layout.py)",
     "per_hour": 58.0,
     "answered": "19/19",
     "name": "Qwen3.6 27B",
@@ -1163,7 +1173,7 @@
    },
    {
     "label": "glm-ocr-1849949-doclayout_yolo",
-    "how": "DocLayout-YOLO regions",
+    "how": "DocLayout-YOLO regions (fs_news_layout.py)",
     "per_hour": 483.8,
     "answered": "19/19",
     "name": "GLM-OCR",
@@ -1173,7 +1183,7 @@
    },
    {
     "label": "glm-ocr-1849949-paddlex",
-    "how": "PP-DocLayout regions",
+    "how": "PP-DocLayout regions (fs_news_layout.py)",
     "per_hour": 478.3,
     "answered": "19/19",
     "name": "GLM-OCR",
@@ -1183,7 +1193,7 @@
    },
    {
     "label": "qwen3.6-27b-1850112-paddlex",
-    "how": "PP-DocLayout regions",
+    "how": "PP-DocLayout regions (fs_news_layout.py)",
     "per_hour": 64.6,
     "answered": "19/19",
     "name": "Qwen3.6 27B",

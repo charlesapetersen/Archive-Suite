@@ -40,12 +40,16 @@ run, no transcript text).
   19 pages ran to the 16,384-token cap (neither is among the 15 scored), and a page takes about 55 seconds:
   65 newspaper pages an hour per GPU. Full table: `segbench-results/farmshare/news/newsbench-score.txt`.
 - **Newspapers, layout first** (`news-layout`, below): Qwen3.6 27B on DocLayout-YOLO regions 0.965 (0.980 / 0.954),
-  so cutting the page first changes little for it, at 58 pages an hour. GLM-OCR (0.9B) on the same regions 0.959,
-  exactly NewsBench's own `ll-doclayout-glm`, at **484 pages an hour**: 8 times faster for 0.6 points. PP-DocLayout
+  so cutting the page first changes little for it, at 58 pages an hour. GLM-OCR (0.9B) through this runner 0.959
+  (NewsBench's `ll-doclayout-glm`, with the library's default detector checkpoint) at 484 pages an hour; through the
+  kit's glm-ocr route, with the 1280 checkpoint the reference used, 0.969 (above). PP-DocLayout
   regions are worse for both (0.936 Qwen, 0.938 GLM-OCR). Qwen3.8 27B whole page 0.893 (0.827 broadsheet), with 4 of
   19 pages at the token cap.
-- **Segmentation** (`seg`, Qwen3.5 27B on the Deaver box): run with `fs_seg.py` below; its row is in
-  `segbench-results/local-models-Deaver.md` beside OpenRouter's 95.0%.
+- **Newspapers, the kit's glm-ocr route** (`news glm-ocr`, below): **0.969**, the reference row's 0.970 reproduced,
+  at 1,087 pages an hour, 17 times Qwen whole page for slightly more. This is the newspaper reader to use.
+- **Segmentation** (`seg`, Qwen3.5 27B on the Deaver box, `fs_seg.py` below): 96.5% of pages in the exact document
+  against OpenRouter's 95.0%; an earlier run the same day through a since-replaced route gave 93.6%, so runs of the
+  same model at temperature 0 differ by a few points. `segbench-results/local-models-Deaver.md`.
 
 What it took to get there, all fixed in this folder: `limits.py` paired the `normal` partition with the `gpu` QOS,
 which `normal` refuses; `download.sh` passed three patterns to one `--exclude`, which `hf` 1.x reads as file
@@ -149,12 +153,16 @@ paragraphs are what the run measured and the layout route that was built after i
 layout-first rows (0.970) and well above every whole-page model in the lab's table. Measured layout-first on FarmShare
 the same day (`news-layout`): Qwen3.6 27B on DocLayout-YOLO regions 0.965, GLM-OCR 0.959 (the reference's own
 `ll-doclayout-glm` figure, reproduced), both PP-DocLayout rows about 0.937. So for Qwen the layout pass adds nothing
-here; its case is GLM-OCR's speed, 484 pages an hour against Qwen's 58-65, and a page can no longer run one reply
-into the output cap. NewsBench's 0.970 rows used settings beyond the library defaults run here.
+here. Its case is GLM-OCR: the kit's glm-ocr route (DocLayout-YOLO's 1280 checkpoint, a page's regions at once)
+reproduced the reference's 0.970 as 0.969 at 1,087 pages an hour, against Qwen whole page's 0.967 at 65, and no
+page can run one reply into the output cap. The runner's lower 0.959 came from the library's default checkpoint.
 
 ### The layout-first route (`glm-ocr` preset, W41.farmshare-news-layout)
 
-Built 2026-10-15; **not yet run on FarmShare** (that needs the owner's login, `W41.farmshare-news-layout-run`).
+Built 2026-10-15 and run on FarmShare the same evening (`W41.farmshare-news-layout-run`): **0.969 overall on
+NewsBench's 15 scored pages (0.975 broadsheet, 0.965 page), against the reference row's 0.970**, all 19 pages and all
+1,018 region requests answered, at **1,087 pages an hour** on one L40S (job 1850227). vLLM 0.31.0 served GLM-OCR with
+MTP (`GlmOcrMTPModel`), and the detector fit in the 20% the preset leaves.
 `news_layout.py` runs the pipeline behind NewsBench's 0.970 row (`glm-ocr-doclayout`): the
 [`newspaper-ocr`](https://github.com/nealcaren/newspaper-ocr) library, version 0.11.0, with its defaults,
 DocLayout-YOLO (the 1280 DocStructBench checkpoint) finding the regions and GLM-OCR (0.9B) reading each one, in the
@@ -184,12 +192,13 @@ bash submit.sh bulk glm-ocr --in DIR --out DIR
 
 `setup.sh --layout` pins every package already in the venv at its installed version, so it adds the library around
 vLLM or stops with a conflict; it never changes what the measured runs used. If it stops, the fix is a separate
-venv for the reader (vLLM is only reached over HTTP), not loosening the pins. Untried on the cluster, and so open:
-whether vLLM 0.31.0 serves GLM-OCR with MTP, and whether the detector fits in the 20% of the card the preset leaves.
+venv for the reader (vLLM is only reached over HTTP), not loosening the pins. On the cluster it added the library
+without a conflict (newspaper-ocr 0.11.0, doclayout-yolo 0.0.4).
 
 ## Segmentation (`seg` mode, W41.farmshare-seg)
 
-Built 2026-10-15; **not yet run on FarmShare** (`W41.farmshare-seg-run`, the owner's login). It measures
+Built 2026-10-15 and run on FarmShare the same evening (`W41.farmshare-seg-run`, job 1850228): 51/51 windows, 307 s,
+**96.5% of pages in the exact document (0 false splits, 2 false merges)** against OpenRouter's 95.0%. It measures
 segmentation's best open model, Qwen3.5 27B at fp8 (`Qwen/Qwen3.5-27B-FP8`, preset `qwen3.5-27b`), on Deaver's 51
 windows, the request W41.seg-large sent through OpenRouter unchanged: method_window_cues's codex prompt, seven pages a
 window at 1024 px, temperature 0, thinking off (vLLM takes it as the chat template's `enable_thinking`), one retry

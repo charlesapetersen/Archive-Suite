@@ -194,12 +194,13 @@ def farmshare():
     news = []
     for f in sorted((FARMSHARE_ROOT / "news").glob("*/summary.json")):
         s = json.loads(f.read_text())
-        news.append({"label": s["label"], "how": "whole page", "per_hour": s["throughput"]["pages_per_hour_per_gpu"],
+        how = "DocLayout-YOLO 1280 regions, the kit's glm-ocr route" if s.get("layout") else "whole page"
+        news.append({"label": s["label"], "how": how, "per_hour": s["throughput"]["pages_per_hour_per_gpu"],
                      "answered": f"{s['throughput']['ok']}/{s['throughput']['pages']}"})
     for f in sorted((FARMSHARE_ROOT / "news-layout").glob("*/timing.json")):
         s = json.loads(f.read_text())
         news.append({"label": s["label"], "how": {"doclayout_yolo": "DocLayout-YOLO regions",
-                                                   "paddlex": "PP-DocLayout regions"}[s["detector"]],
+                                                   "paddlex": "PP-DocLayout regions"}[s["detector"]] + " (fs_news_layout.py)",
                      "per_hour": s["pages_per_hour_per_gpu"], "answered": f"{s['ok']}/{s['pages']}"})
     for r in news:
         preset = re.sub(r"-\d+(-(doclayout_yolo|paddlex))?$", "", r["label"])
