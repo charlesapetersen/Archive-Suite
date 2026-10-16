@@ -8,7 +8,8 @@ transcription.si.edu were denied or returned 403, so every format and convention
 README, dataset card or paper. **Corpus-build's first step is to open one page from each chosen source and confirm
 it** (§7).
 
-Part 1 is for the owner. Part 2 is the detail behind it.
+Part 1 is for the owner. Part 2 is the detail behind it. Part 3 (`W43.seg-corpus-plan`) is a separate question:
+public collections digitised one file per document, as segmentation truth.
 
 ---
 
@@ -413,3 +414,130 @@ No. There is nothing built to look at. Corpus-build will choose the pages, and t
 figures, so a review now would be repeated. The owner's only input now is the decision in Part 1, which is a gate,
 not a review session. Corpus-build judges again before offering a sample for the owner to look at, if it wants
 one. It needs no owner adjudication as planned.
+
+---
+
+## Part 3 — segmentation truth from collections split item by item (W43.seg-corpus-plan)
+
+Owner request, 2026-10-16: find public collections digitised below the folder, one file per document, so that
+putting the items back in order gives a page stream with known boundaries. Written 2026-10-16 by an unattended
+session from three research passes (US federal and Library of Congress; university and IIIF repositories; European
+archives). No paid calls, nothing downloaded. "Opened" below means a session fetched the record, manifest or API
+response itself; "inferred" means it rests on documentation or search results. The loc.gov HTML pages, NARA's
+catalogue, cia.gov item pages, the Edison Papers and CERN refused or rendered nothing, so those verdicts are partly
+inferred.
+
+### The answer in brief
+
+**No collection was found where a modern office folder was digitised whole and every document in it given its own
+record, with a permissive licence and no gaps.** What exists is close in three different ways, and none is the
+owner's kind of box:
+
+- **CIA CREST** is the only one in real box-and-folder order on 20th-century typed office records. Its numbers have
+  gaps, so a folder can be used only if its sequence is complete.
+- **The Library of Congress Jefferson and Lincoln Papers** are digitised whole, item by item, with enclosures as
+  their own items, which is the suite's rule 1. But the order is the collection's date order, not anyone's folders,
+  and the material is 18th- and 19th-century manuscript.
+- **UK Cabinet memoranda (CAB 129)** are digitised whole, numbered in order within each volume, under the Open
+  Government Licence. But they are printed papers bound in number order: no carbons, envelopes, enclosures or
+  fragments, so the hard cases never arise.
+
+Together these can give **two or more test boxes the size of the locked ones** (Stanton 250 pages, RG 165 113):
+one CREST box of modern typescript, and one Lincoln or Jefferson box that tests the enclosure rule. They would
+show whether a route generalises beyond the owner's two boxes. They would not replace a real box, because each
+is easier than one in its own way (§3.3).
+
+### 3.1 Collections that pass
+
+| | CIA CREST (FOIA reading room) | LoC Thomas Jefferson Papers, Series 1 | LoC Abraham Lincoln Papers, Series 1-3 | TNA CAB 129 Cabinet memoranda |
+|---|---|---|---|---|
+| material | 1940s-1990s typed memos, routing slips, notes, clippings | 1760s-1820s letters, mostly manuscript | 1830s-1860s letters, mostly manuscript | 1945-1997 duplicated memoranda |
+| original order | document number encodes job, box, folder and a document sequence, e.g. `CIA-RDP96-00788R` + box `0017` + folder `0021` + doc `0001-0086` (inferred from the numbers; the CREST manual did not open) | each item is a run of microfilm frames, `mtj1.024_1085_1086` then `_1087`, `_1088` (opened): physical film order, which is the collection's date order | item IDs follow date order (inferred; IDs have unexplained gaps) | item number within its piece, CAB 129/84/1 … /43, annexes as /1A (opened) |
+| every page, or a selection | not complete: gaps in the sequence (withheld or missing from the mirror), and one known document lacks a page | whole series filmed and digitised; blank backs may not have been filmed | whole of Series 1-3 (about 20,000 documents, 62,000 images); most of Series 4 left out | whole volumes, except closed or retained papers |
+| one document = the suite's rules? | split finely: routing slips and handwritten notes get their own number; attachment handling unknown | close: "enclosures following covering letter", each its own item with its own author and date (opened) | close: an enclosure is its own item, an envelope is the last image of its letter's item (opened); some enclosures folded into the letter | one memorandum is one item; annexes sometimes separate, which the suite's rule 2 would join |
+| licence | US government work, public domain | images marked for noncommercial and research use; the manuscripts are public domain | public domain | Crown copyright, Open Government Licence (not checked on a page) |
+| size | about 930,000 documents, 12 million pages; folders of 70+ documents | about 27,000 documents, 83,000 images | about 20,000 documents | about 240 volumes of 40-60 memoranda |
+| format | one bitonal PDF per document; archive.org mirrors and lists a folder by ID prefix | JSON API, JPEG per frame about 1529×1916, from microfilm | JSON API, IIIF manifest per item, colour JP2 about 4900×6100 from the originals | Discovery JSON API; PDF per memorandum and per volume (inferred, not opened) |
+
+Example URLs: CREST `https://www.cia.gov/readingroom/docs/CIA-RDP96-00788R001700210025-5.pdf` and
+`https://archive.org/advancedsearch.php?q=identifier%3Acia-readingroom-document-cia-rdp96-00788r00170021*&fl[]=identifier&rows=100&output=json`;
+Jefferson `https://www.loc.gov/item/mtjbib010666/?fo=json`; Lincoln `https://www.loc.gov/item/mal0440500/manifest.json`;
+CAB 129 `https://discovery.nationalarchives.gov.uk/API/records/v1/details/D7658256`.
+
+### 3.2 Near passes, and what was rejected
+
+Near passes (item level, but something about them fails the test):
+- **Boston Public Library Anti-Slavery Collection (Garrison papers, MS A.1.2), Digital Commonwealth.** Each letter
+  is its own record, ordered by volume and page ("v.41, p.53A"); "no known copyright restrictions"; IIIF per item.
+  But these are letters mounted in bound volumes, and whether a volume is complete is unproven.
+- **Theodore Roosevelt Center** (the LoC Roosevelt Papers microfilm). One record per document; image paths look
+  like reel and frame, which would give film order (inferred from one record). No IIIF or API, and cataloguing is
+  unfinished.
+- **Cambridge Digital Library, Darwin-Hooker letters (MS DAR 100 on).** IIIF ranges, one per letter, in folio
+  order. But the images are licensed for research only, and every range is a letter, so enclosures were not tested.
+- **State Library of NSW, Banks Papers.** Numbered documents in arranged order, enclosures separate; arranged by
+  correspondent; licence not shown.
+- **LoC Washington and Madison Papers.** Item level in film order, but enclosures are mostly inside the covering
+  letter's item.
+- **OpenPSS-LONG** (van Heusden, Kamps and Marx, TPDL 2024). 110 hand-labelled streams, 89,491 pages, median 217
+  pages and 55 documents per stream, which is box-sized. Dutch FOIA releases of 2020-2022, so modern and redacted,
+  not archival. Woo documents are CC BY by Dutch law; the repository states no licence, and the SURFdrive share
+  opened without a file list.
+- **Edison Papers** (selected items, about 30% of some folders), **Churchill Archive** (paid, only partly at
+  document level), **Einstein Archives** and **Adams Papers** (selected, or re-sorted by correspondent).
+
+Rejected as folder- or file-level, with no document boundaries: NARA's presidential libraries (Truman's President's
+Secretary's Files, FDR, Eisenhower, JFK, Ford, Reagan), most new LoC Manuscript Division digitisation, the Wellcome
+Collection (opened: a "1 file" record with no ranges), the Smithsonian Archives of American Art, the Rockefeller
+Archive Center, Calisphere's JARDA records, CONTENTdm generally (children are pages, not letters), the League of
+Nations' LONTAD (file-level by design, opened), the Historical Archives of the EU, Bundesarchiv invenio, the
+Nationaal Archief, UN ARMS and the Australian NAA. Also rejected: the Wilson Center Digital Archive and the State
+Department FOIA room (hand-picked items with no folder context), Founders Online and FRUS (text only), Arolsen
+(one record per card or image), the German Archive22k streams (private), and TABME++ and Tobacco800 (§8).
+
+Not assessed: NARA's catalogue at item level (the API needed a key), CERN (bot check), and METS logical-structure
+maps in library digitisation (Staatsbibliothek Berlin, e-manuscripta), which can mark letters inside a box in
+physical order. That last one is the most promising lead left.
+
+### 3.3 Why each is easier than a real box
+
+- **CREST:** bitonal scans, so no phone-photo problems. Gaps in a folder remove pages, so only gap-free folders
+  can be used. Its "document" is finer than the suite's (a routing slip is its own document; the suite might call
+  it part of the memo), so its truth needs one check against the ten rules before use.
+- **Jefferson and Lincoln:** date order puts related letters next to each other in a way a real folder may not,
+  and it removes the cases a real box has between documents (stray carbons, undated scraps filed out of order).
+  Jefferson is low-resolution microfilm; Lincoln is good colour.
+- **CAB 129:** each memorandum opens with a printed heading and number, so boundaries are nearly trivial. It is a
+  sanity check, not a test.
+
+None was photographed by phone, which is the owner's input. Segmentation reads page text and layout, not the
+image's grain, so this matters less than it would for OCR, and contamination matters less for the same reason:
+knowing the text does not tell a model where a document ends.
+
+### 3.4 Recommendation
+
+**Worth a small build: two public boxes, filed as `W43.seg-corpus-build`, gated on the owner.**
+
+1. One CREST box of 110-250 pages: a folder (or two adjacent folders of one box) whose document sequence has no
+   gaps, checked through archive.org's listing. Convert each PDF to page images in folder order; a document's first
+   page is New, the rest Cont. Then check the archive's splits against the ten rules on every page and record where
+   they differ (routing slips, attachments), as the Stanton and RG 165 truth was checked.
+2. One Lincoln Papers box of about 250 pages: a run of consecutive items, using the IIIF manifests. Enclosures stay
+   their own documents and envelopes stay with their letters, which matches rules 1 and 6. Check enclosures
+   folded into a letter's item and split them.
+3. Score the shipped approaches on both with the bench's existing scorer, beside the two locked boxes, and report
+   them separately in ArchiveOCRBench, labelled as public and easier.
+
+CAB 129 is left out (too easy), and OpenPSS-LONG stays the fallback if CREST turns out to have no gap-free
+folder of the right size.
+
+**Cost.** Pages: about 500. Gemini 3.1 Flash-Lite at about $1.20 per 1,000 pages and Gemini 3.8 Flash at about $4
+come to about $0.60 and $2 (from `segmentation/01-results.md`); Claude is run on the subscription, which is not
+money. Cap for the item: **$3**, within the standing limit. Downloads: about 0.5-1 GB, from archive.org, cia.gov,
+loc.gov and tile.loc.gov. These hosts are blocked in unattended sessions for the same reason as
+`W43.corpus-build-net-owner-ok`, so the build waits on that answer as well. Sessions: about two.
+
+**The owner's decision** (`W43.seg-corpus-build-owner-ok`): build the two public boxes as above, or not now. Not
+building leaves segmentation scored only on the owner's two boxes, which is what the bench does today.
+
+**Is an owner review timely?** No. Nothing is built, and the decision is a gate, not a review session.

@@ -11586,3 +11586,7 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Notes 219+984, 27 Processor drivers, Debug and Release builds of all three apps, no new warnings. Evidence
   `verification/evidence/core/W40.e5-dead-code.md`.
   <!-- /W40.e5 -->
+- [x] **W43.seg-corpus-plan — public collections already split into one file per document, as segmentation truth** · §a broader benchmark corpus and the pre-release model sweep — SHIPPED 2026-10-16
+  Owner, 2026-10-16: find collections digitised below the folder, one file per document, as page streams with known boundaries; report a short list that passes, or none.
+  Result: `execution-plans/benchmark-corpus/00-plan.md` Part 3. No modern office folder digitised whole at document level with a permissive licence and no gaps was found. Passes, each with a caveat: CIA CREST (real box/folder/document order on typed records, but gaps), the LoC Jefferson and Lincoln Papers (whole series item by item, enclosures separate, but date order and 18th-19th c.), TNA CAB 129 (complete and OGL, but printed papers, too easy). Two box-sized test sets are possible (CREST + Lincoln); filed `W43.seg-corpus-build` gated on `W43.seg-corpus-build-owner-ok`, cap $3. $0 spent; nothing downloaded; loc.gov HTML, NARA catalogue and cia.gov pages refused, so some verdicts are inferred.
+  <!-- /W43.seg-corpus-plan -->
