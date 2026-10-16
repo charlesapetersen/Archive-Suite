@@ -62,6 +62,18 @@ models' training data. Every report gives three figures: S0 alone, the low-conta
 high-contamination public strata. A model that is much better on the high strata than on the low strata of the same
 kind is reciting text it has seen, not reading the page. S0 stays the unpublished reference.
 
+**The owner's question, 2026-10-16 (interactive session, after this plan was written).** The owner asked whether
+any public source can be uncontaminated, since every proposed stratum already has a published transcription. This
+plan's "low-contamination" strata are a guess, not a measurement. Its only clean stratum is S0, and §4 shows that
+96 pages cannot separate close routes. A model can memorise a transcription, but it cannot memorise a page that has
+never been transcribed. So public images with no published transcription are clean, even when the images have been
+online for years. The Library of Congress, NARA and the Internet Archive hold many such pages. The cost is that we
+make the truth ourselves, as the 96 were made: two models draft and a person adjudicates. That took the owner about
+89 minutes per 100 pages (an estimate in `ocr-truth.md`, not measured). Several hundred clean pages would be needed
+to rank close routes. Scripts the owner does not read would need another adjudicator, or would get weaker truth.
+This changes the claim above that no adjudication is needed. The decision below should settle it before
+corpus-build starts.
+
 **Cost.** These are measured costs per page, not the brief's 2,500/500 tokens a page, which was never measured
 (§5). Gemini 3.8 Flash costs about $0.0035 a page and Qwen3-VL 235B about $0.0012. Other-script pages get 50%
 headroom for denser output. Only new pages are counted, because the 96 are already scored on both routes. Apple
@@ -90,6 +102,10 @@ and corpus-build will change the material. Corpus-build judges that again when i
    N5's research-only sources would publish scores only.
 4. Optional: ask socOCRbench's author to share the set or run our candidates. The plan does not depend on it,
    and nothing has been sent.
+5. Clean pages (added 2026-10-16, from the owner's question above): whether to add strata of public images with
+   no published transcription, adjudicated as the 96 were, and rest the recommendations on them and S0, with the
+   transcribed public strata as a contamination check. The figures to decide on are how many pages, which kinds
+   and scripts, and the owner's adjudication time. If yes, corpus-build first prices that time on a small sample.
 
 ---
 
