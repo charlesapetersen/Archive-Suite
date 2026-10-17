@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """W41.seg-finetune. LoRA-train a small Qwen3.5 vision model to answer the bench's segmentation windows.
 
-  train_seg.py data  --pack DIR --answers FILE --labels FILE --out DIR   # Mac or node: the training set
+  train_seg.py data  --pack DIR --answers FILE --labels FILE --windows FILE --out DIR [--rule agree|start-trust]
+                                                                        # Mac or node: the training set
   train_seg.py train --data DIR --model Qwen/Qwen3.5-4B --out DIR [--epochs 1] [--max-windows N]
   train_seg.py merge --adapter DIR --out DIR                            # base + LoRA -> one model vLLM can serve
 
@@ -36,7 +37,8 @@ def cmd_data(a):
     keep = {}
     for line in Path(a.labels).read_text().splitlines():
         g = json.loads(line)
-        keep[(g["folder_id"], g["n"])] = g["keep"]
+        # A gap is trained on when the rule labels it (corpus_pairs.py clean); `agree` is the same as its `keep`.
+        keep[(g["folder_id"], g["n"])] = g["label_" + a.rule] is not None
     rows, why = [], {"not ok": 0, "held out": 0, "a gap disagrees": 0, "a gap unlabelled": 0}
     for line in Path(a.answers).read_text().splitlines():
         try:
@@ -60,7 +62,7 @@ def cmd_data(a):
     random.Random(SEED).shuffle(rows)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     (out / "train.jsonl").write_text("".join(json.dumps(x) + "\n" for x in rows))
-    summary = {"windows": len(rows), "no_text": sum(x["text"] == "none" for x in rows), "dropped": why,
+    summary = {"rule": a.rule, "windows": len(rows), "no_text": sum(x["text"] == "none" for x in rows), "dropped": why,
                "images": str(pack / "images")}
     (out / "data.json").write_text(json.dumps(summary, indent=1))
     print(json.dumps(summary, indent=1))
@@ -174,6 +176,7 @@ def main():
     p = sub.add_parser("data")
     for k in ("pack", "answers", "labels", "windows", "out"):
         p.add_argument("--" + k, required=True)
+    p.add_argument("--rule", choices=("agree", "start-trust"), default="agree")
     p = sub.add_parser("train")
     p.add_argument("--data", required=True); p.add_argument("--model", required=True); p.add_argument("--out", required=True)
     p.add_argument("--images"); p.add_argument("--epochs", type=float, default=1.0)

@@ -331,6 +331,49 @@ QOS, GPUs, `--time`, and the number of bulk shards.
   got no answer at all is not listed: it is still to do, and `submit.sh` again reads it.
 - `--out` must be outside `--in`. The input is only ever read.
 
+## Fine-tuning the segmenters (W41.seg-finetune, a session the owner logs in for)
+
+The training set is the label-clean pack already on FarmShare (W41.seg-label-clean's `corpus_pairs.py pack`, all
+parts rsync'd into one folder, called `<pack>` below), with the teacher's replies as targets. The Mac keeps the
+three files `data` reads besides the pack, about 52 MB together, and no page images:
+
+```bash
+# on the Mac
+C=~/Library/Caches/ArchiveSuiteRehearsal/corpus-pairs
+scp "$HOME/Library/Application Support/ArchiveSuiteRehearsal/label-clean/clean-all/answers.jsonl" \
+    $C/labels.jsonl $C/windows.jsonl <sunet>@login.farmshare.stanford.edu:fs-train-in/
+# on FarmShare, in this folder (git pull first)
+sbatch --partition=normal --cpus-per-task=4 --mem=16G --time=90 --output=$FS_ROOT/logs/setup-train-%j.out setup-train.sh
+V=$FS_ROOT/train-venv/bin/python; I=~/fs-train-in
+$V train_seg.py data --pack <pack> --answers $I/answers.jsonl --labels $I/labels.jsonl --windows $I/windows.jsonl \
+   --out $FS_ROOT/train/data-agree --rule agree        # 5,885 windows; --rule start-trust gives 11,094
+for m in 4B 2B; do sbatch --partition=gpu --qos=gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=480 \
+   --job-name=seg-train --output=$FS_ROOT/logs/%x-%j.out \
+   --export=ALL,TRAIN_DATA=$FS_ROOT/train/data-agree,TRAIN_MODEL=Qwen/Qwen3.5-$m,TRAIN_OUT=$FS_ROOT/train/seg-${m,,} \
+   train.sbatch; done
+```
+
+- **The rule.** `agree` trains only on windows whose every gap the teacher and the tags agree on; `start-trust` also
+  keeps tag continuations the teacher calls starts. Which one is cleaner is W41.seg-label-clean-fu1's owner check;
+  until it is answered, train on `agree` (1.8% noise on the 2026-10-08 sample against start-trust's 5.0%). The
+  counts above were measured on the Mac from the same answers on 2026-10-17.
+- **A pilot first** if the step time is unknown: `TRAIN_ARGS="--max-windows 1500"` and `TRAIN_OUT=.../seg-4b-pilot`,
+  scored as `fs-seg-4b-pilot`. `train-log.jsonl` in the output folder gives the loss and seconds per step; `--save-every
+  50` keeps adapters along the way, so a run that hits its wall time still leaves one to merge.
+- **Scoring a student.** Serve the merged model by name and run the same windows the baselines ran:
+  ```bash
+  python3 ../corpus_pairs.py subpack --pack <pack> --windows $I/windows.jsonl --key fs-seg-4b --out ~/fs-hold-4b
+  FS_STUDENT=$FS_ROOT/train/seg-4b/merged FS_STUDENT_NAME=seg-4b FS_SEG_KEY=fs-seg-4b \
+    bash submit.sh seg seg-student --pack ~/fs-hold-4b                     # the held-out collections
+  # the development boxes: on the Mac, FS_SEG_KEY=fs-seg-4b python farmshare/fs_seg.py pack --out /tmp/fs-dev-4b \
+  #   --box Dean --box Deaver --box Herrnstein; scp it up and submit it the same way
+  ```
+  Bring back `runs/seg/<label>/answers.jsonl`; on the Mac `corpus_pairs.py score --run <dir>` scores the held-out
+  gaps and `fs_seg.py import` plus `method_openrouter.py report <box>` the development boxes, beside the untrained
+  baselines (4B: Dean 67.9%, Deaver 56.0%, Herrnstein 76.2%, held-out agreed gaps 75.5%). The locked test boxes are
+  scored once, at the end, as `options.md` does; `fs_seg.py pack --final` refuses every key but the frozen teacher
+  today, so letting a chosen student through is still to write.
+
 ## General models on the layout regions (`news-layout`)
 
 The comparison beside the `glm-ocr` route above: any model vLLM serves, reading newspaper-ocr's regions through the
