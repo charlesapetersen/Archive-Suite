@@ -75,3 +75,17 @@ class Truth(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OpenModels(unittest.TestCase):
+    def test_reasoning_is_stripped_as_the_local_route_strips_it(self):
+        import date_tagging as D
+        self.assertEqual(D.strip_reasoning('<think>the year is 1968</think>\n{"year": "1968"}'), '{"year": "1968"}')
+        self.assertEqual(D.strip_reasoning('a</think>{"year": "1970"}'), '{"year": "1970"}')   # opening tag cut off
+        self.assertEqual(D.strip_reasoning('<think>never closed, all 512 tokens'), '<think>never closed, all 512 tokens')
+        self.assertEqual(D.strip_reasoning('{"year": "1971"}'), '{"year": "1971"}')
+
+    def test_an_unfinished_thought_is_an_unusable_reply(self):
+        import date_tagging as D
+        resp = {"candidates": [{"content": {"parts": [{"text": D.strip_reasoning("<think>the letter is dated")}]}}]}
+        self.assertEqual(D.app_parse(resp), (None, None, True, False))   # no year, Date Uncertain, as the app writes

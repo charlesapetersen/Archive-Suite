@@ -195,6 +195,12 @@ footer p { font-size: 13px; }
     <p class="note">Segmentation only proposes boundaries; the tagging call dates each document afterwards, with the prompt <code>TagGenerator.generateTags</code> sends (year always, month only if the document states it, <code>date_uncertain</code> when the year is not in the document itself). Documents are runs of pages with one identity tag set, kept only where the label-clean teacher and the tags agree on every gap around them, sampled across collections; the corpus copies of the test and development boxes are left out. The text sent is ABBYY's layer, not the app's own OCR. A month the reply gives where the owner tagged none is not always invented: most of those months are named in the text, so the owner left them untagged. Full tables: <code>ArchiveProcessor/segbench-results/date-tagging.md</code>.</p>
   </section>
 
+  <section class="panel" id="date-open" hidden>
+    <div class="head"><h2>Open-weight models on FarmShare</h2><span class="meta">the same documents and prompt, as the app's local route sends it</span></div>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Year exact</th><th>Year printed in the text</th><th>Year not in the text</th><th>Owner's month</th><th>Unusable replies</th></tr></thead><tbody id="date-open-rows"></tbody></table></div>
+    <p class="note">Sent as the local route sends a text call: one message, 512 tokens, temperature 0, no reasoning switch. Qwen3.5 and Qwen3.6 think by default, so sent that way they spend all 512 tokens thinking and answer nothing: in the app every document would get no year and Date Uncertain (KNOWN_ISSUES: the local route sends no reasoning switch; filed as W41.app-local-models-fu2). "Thinking off" rows switch it off. Every model reads a printed year about as well as Gemini; the gap is the year that is not in the text, estimated from context. No money.</p>
+  </section>
+
   <header class="part" id="public">
     <div class="eyebrow">Part 7 · Public truth sets · not the owner's archive</div>
     <h2>Reference routes on the public strata</h2>
@@ -488,6 +494,17 @@ if (DT) {
     row('… and the year is not in the text', U.owner_certain_not_in_text),
     row('Date Uncertain where the owner tagged it too', U.owner_uncertain),
     row('Certain and wrong, where the owner was certain', U.certain_and_wrong)].join('');
+  const OM = DT.open_models || {};
+  const NAMES = { 'qwen3.6-27b': 'Qwen3.6 27B', 'qwen3.6-35b-a3b': 'Qwen3.6 35B-A3B', 'qwen3-vl-8b': 'Qwen3-VL 8B',
+    'qwen3.5-4b': 'Qwen3.5 4B' };
+  const name = k => (NAMES[k.replace(/-nothink$/, '')] || k) + (k.endsWith('-nothink') ? ', thinking off' : (k === 'qwen3-vl-8b' ? '' : ', as the app sends it'));
+  const keys = Object.keys(OM).sort();
+  if (keys.length) {
+    const orow = (label, m) => '<tr><td>' + label + '</td><td>' + sh(m.year.all.exact) + '</td><td>' + sh(m.year['in text'].exact) +
+      '</td><td>' + sh(m.year['not in text'].exact) + '</td><td>' + sh(m.month.owner) + '</td><td>' + m.parse_failures + ' of ' + m.documents + '</td></tr>';
+    document.getElementById('date-open-rows').innerHTML = [orow(DT.model + ' (the app\'s default)', DT), ...keys.map(k => orow(name(k), OM[k]))].join('');
+    document.getElementById('date-open').hidden = false;
+  }
 }
 
 // Part 7: the public strata.

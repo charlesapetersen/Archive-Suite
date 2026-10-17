@@ -44,6 +44,8 @@ case "$FS_MODE" in
   truth) "$FS_PY" fs_ocr.py truth --pack "$FS_PACK" --out "$FS_ROOT/runs/truth" --label "$label" --warmup ;;
   # One folder per preset, not per job: a resubmission after exit 75 sends only the windows still unanswered.
   seg)   "$FS_PY" fs_seg.py run --pack "$FS_PACK" --out "$FS_ROOT/runs/seg" --label "${FS_LABEL:-$FS_PRESET_NAME}" --warmup ;;
+  # Text prompts as the app's local route sends them (fs_text.py; the dating benchmark). FS_TEXT_ARGS: --thinking-off.
+  text)  "$FS_PY" fs_text.py --pack "$FS_PACK" --out "$FS_ROOT/runs/text" --label "${FS_LABEL:-$label}" ${FS_TEXT_ARGS:-} ;;
   news)  "$FS_PY" fs_ocr.py news --newsbench "$FS_ROOT/newsbench" --out "$FS_ROOT/runs/news" --label "$label" ;;
   news-layout)  # a general model (served here) reading newspaper-ocr's regions, in its own venv (fs_news_layout.py)
     "$FS_ROOT/npo-venv/bin/python" fs_news_layout.py --newsbench "$FS_ROOT/newsbench" --out "$FS_ROOT/runs/news-layout" \
@@ -67,5 +69,5 @@ case "$FS_MODE" in
       exit 0
     fi
     exit $rc ;;
-  *) echo "FS_MODE must be truth, seg, news, news-layout or bulk"; exit 2 ;;
+  *) echo "FS_MODE must be truth, seg, text, news, news-layout or bulk"; exit 2 ;;
 esac

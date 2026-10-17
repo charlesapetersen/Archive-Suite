@@ -13,7 +13,7 @@ FS_DIR="$(pwd)"
 [ -f limits.env ] && [ -f fs.env ] || { echo "run setup.sh first"; exit 1; }
 source limits.env; source fs.env; source models.sh
 
-FS_MODE="${1:?mode: truth|seg|news|news-layout|bulk}"; FS_PRESET_NAME="${2:?preset (see models.sh)}"; shift 2
+FS_MODE="${1:?mode: truth|seg|text|news|news-layout|bulk}"; FS_PRESET_NAME="${2:?preset (see models.sh)}"; shift 2
 hours="" dry="" FS_PACK="" FS_IN="" FS_OUT="" FS_SHARDS=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -47,6 +47,8 @@ case "$FS_MODE" in
          served="${FS_SERVED:-$FS_MODEL}"   # a student is served under its own name (models.sh seg-student)
          [ "$want_model" = "$served" ] || { echo "the pack is for $want_model; preset $FS_PRESET_NAME serves $served"; exit 2; }
          default_min=60 ;;
+  text)  [ -n "$FS_PACK" ] || { echo "text needs --pack (requests.jsonl: date_tagging.py export)"; exit 2; }
+         default_min=60 ;;
   news|news-layout)
          if [ "$FS_MODE" = news-layout ] && [ ! -x "$FS_ROOT/npo-venv/bin/python" ]; then
            echo "news-layout needs its newspaper-ocr venv: bash setup-layout.sh"; exit 2
@@ -62,7 +64,7 @@ case "$FS_MODE" in
          cap=$(( FS_MAXGPU_PU / FS_GPUS )); [ "$FS_MAXJOBS_PU" -lt "$cap" ] && cap="$FS_MAXJOBS_PU"
          [ "$FS_MAXSUBMIT_PU" -lt "$cap" ] && cap="$FS_MAXSUBMIT_PU"
          FS_SHARDS="${FS_SHARDS:-$cap}" ;;
-  *) echo "mode must be truth, seg, news, news-layout or bulk"; exit 2 ;;
+  *) echo "mode must be truth, seg, text, news, news-layout or bulk"; exit 2 ;;
 esac
 want=$(awk -v h="${hours:-0}" 'BEGIN { printf "%d", h * 60 }'); [ "$want" -gt 0 ] || want="$default_min"
 FS_WALL_MIN=$(( want < FS_MAXWALL_MIN ? want : FS_MAXWALL_MIN ))

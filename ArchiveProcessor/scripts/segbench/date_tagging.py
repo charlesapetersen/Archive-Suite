@@ -9,6 +9,14 @@ own year, month and Date Uncertain tags.
     python3 date_tagging.py sample           # documents -> cache sample.jsonl (no model call)
     python3 date_tagging.py run [--limit N]  # each sampled document through the app's prompt (paid, capped)
     python3 date_tagging.py score            # cache answers -> segbench-results/date-tagging.md (numbers only)
+    python3 date_tagging.py export --out DIR # the sampled prompts as requests.jsonl, for FarmShare's fs_text.py
+    python3 date_tagging.py import --answers FILE --label L   # fs_text.py's answers, as the local route reads them
+    python3 date_tagging.py score --label L  # an open model's figures, beside Gemini's, in date-tagging.md
+
+OPEN MODELS (2026-10-17). The same prompts through FarmShare's vLLM (farmshare/fs_text.py), sent as the app's local
+route sends a text call: one user message, 512 tokens, temperature 0, no reasoning switch; the reply's reasoning
+stripped as LocalModelRoute.strippingReasoning strips it, then parsed as TagGenerator parses it. A label ending
+"-nothink" was sent with thinking switched off, which the app does not do.
 
 DOCUMENTS. A document is a run of page photos with one identity tag set (corpus_pairs.folder_pages' rule: New,
 then Cont), from the folders corpus_pairs windowed (its EXCLUDE already sets aside the corpus copies of the
@@ -241,9 +249,55 @@ def body_of(prompt):
     return {"contents": [{"parts": [{"text": prompt}]}]}
 
 
-def answer_path(prompt):
+def answer_path(prompt, label=None):
+    """Gemini's answers by the request's hash; an open model's (label) by the prompt's id."""
+    if label:
+        return os.path.join(CACHE, "answers-" + label, prompt_id(prompt) + ".json")
     h = hashlib.sha256(json.dumps([MODEL, body_of(prompt)], sort_keys=True).encode()).hexdigest()
     return os.path.join(CACHE, "answers", h + ".json")
+
+
+def prompt_id(prompt):
+    return hashlib.sha256(prompt.encode()).hexdigest()[:24]
+
+
+def strip_reasoning(s):
+    """LocalModelRoute.strippingReasoning: every closed <think> block, then text up to a stray </think>."""
+    while "<think>" in s and "</think>" in s[s.index("<think>"):]:
+        i = s.index("<think>"); j = s.index("</think>", i) + len("</think>")
+        s = s[:i] + s[j:]
+    if "<think>" not in s and "</think>" in s:
+        s = s[s.index("</think>") + len("</think>"):]
+    return s.strip()
+
+
+def cmd_export(a):
+    docs = [json.loads(l) for l in open(os.path.join(CACHE, "sample.jsonl"), encoding="utf-8")]
+    os.makedirs(a.out, exist_ok=True)
+    with open(os.path.join(a.out, "requests.jsonl"), "w", encoding="utf-8") as f:
+        for d in docs:
+            f.write(json.dumps({"id": prompt_id(d["prompt"]), "prompt": d["prompt"]}, ensure_ascii=False) + "\n")
+    print(f"{len(docs)} prompts -> {a.out}/requests.jsonl")
+
+
+def cmd_import(a):
+    """fs_text.py's answers, stored in Gemini's reply shape so app_parse reads them unchanged."""
+    d = os.path.join(CACHE, "answers-" + a.label)
+    os.makedirs(d, exist_ok=True)
+    n = 0
+    for line in open(a.answers, encoding="utf-8"):
+        r = json.loads(line)
+        if "raw" not in r:
+            continue
+        u = r.get("usage") or {}
+        with open(os.path.join(d, r["id"] + ".json"), "w") as fh:
+            json.dump({"candidates": [{"content": {"parts": [{"text": strip_reasoning(r["raw"])}]},
+                                       "finishReason": r.get("finish")}],
+                       "usageMetadata": {"promptTokenCount": u.get("prompt_tokens", 0),
+                                         "candidatesTokenCount": u.get("completion_tokens", 0)},
+                       "finish": r.get("finish"), "raw_chars": len(r["raw"])}, fh)
+        n += 1
+    print(f"{n} answers -> {d}")
 
 
 def cost(u):
@@ -379,6 +433,37 @@ def pct(a, b):
     return f"{100 * a / b:.1f}% ({a}/{b})" if b else "–"
 
 
+def metrics(rows, usd, model):
+    """The figures ArchiveOCRBench reads, for one model's rows."""
+    n = len(rows)
+    yr = [r for r in rows if r["class"] != "decade"]
+    dec = [r for r in rows if r["class"] == "decade"]
+    ym = [r for r in rows if r["class"] == "year+month"]
+    dated = [r for r in rows if r["class"] in ("year+month", "year")]
+    du_rows = [r for r in rows if r["class"] == "year+DU"]
+    def frac(rs, f):
+        return [sum(1 for r in rs if f(r)), len(rs)]
+    within1 = lambda r: r["y"] is not None and abs(r["y"] - r["truth"]["year"]) <= 1
+    out = {"model": model, "documents": n, "usd": round(usd, 2), "usd_per_1000": round(1000 * usd / n, 2) if n else None,
+           "year": {cls: {"exact": frac(rs, lambda r: r["y"] == r["truth"]["year"]), "within1": frac(rs, within1)}
+                    for cls, rs in [(c, [r for r in yr if r["class"] == c]) for c in ("year+month", "year", "year+DU")]
+                    + [("in text", [r for r in yr if r["year_in_text"]]), ("not in text", [r for r in yr if not r["year_in_text"]]),
+                       ("all", yr)]},
+           "decade": frac(dec, lambda r: r["y"] is not None and r["truth"]["decade"] <= r["y"] < r["truth"]["decade"] + 10),
+           "month": {"owner": frac(ym, lambda r: r["m"] == r["truth"]["month"]),
+                     "other": frac(ym, lambda r: r["m"] is not None and r["m"] != r["truth"]["month"]),
+                     "none": frac(ym, lambda r: r["m"] is None),
+                     "untagged_given": frac([r for r in rows if r["class"] == "year"], lambda r: r["m"] is not None),
+                     "untagged_given_named": sum(r["m_named"] for r in rows if r["class"] == "year" and r["m"] is not None)},
+           "uncertain": {"owner_certain": frac(dated, lambda r: r["du_pred"]),
+                         "owner_certain_in_text": frac([r for r in dated if r["year_in_text"]], lambda r: r["du_pred"]),
+                         "owner_certain_not_in_text": frac([r for r in dated if not r["year_in_text"]], lambda r: r["du_pred"]),
+                         "owner_uncertain": frac(du_rows, lambda r: r["du_pred"]),
+                         "certain_and_wrong": frac(dated, lambda r: not r["du_pred"] and r["y"] != r["truth"]["year"])},
+           "parse_failures": sum(not r["parsed"] for r in rows)}
+    return out
+
+
 def cmd_score(a):
     docs = [json.loads(l) for l in open(os.path.join(CACHE, "sample.jsonl"), encoding="utf-8")]
     summary = json.load(open(os.path.join(CACHE, "sample-summary.json")))
@@ -386,12 +471,12 @@ def cmd_score(a):
     usd = 0.0
     tokens = collections.Counter()
     for d in docs:
-        p = answer_path(d["prompt"])
+        p = answer_path(d["prompt"], a.label)
         if not os.path.exists(p):
             continue
         resp = json.load(open(p))
         u = resp.get("usageMetadata") or {}
-        usd += cost(u)
+        usd += cost(u) if not a.label else 0.0
         tokens["in"] += u.get("promptTokenCount", 0)
         tokens["out"] += u.get("candidatesTokenCount", 0)
         tokens["thought"] += u.get("thoughtsTokenCount", 0)
@@ -402,6 +487,8 @@ def cmd_score(a):
                      "m_named": isinstance(month, int) and month_named(t, month),
                      "owner_m_named": bool(d["truth"].get("month")) and month_named(t, d["truth"]["month"])})
     n = len(rows)
+    if a.label:
+        return score_open(a.label, rows)
     L = ["# Date tagging, scored against the owner's Finder tags (W41.date-tag-measure)", "",
          f"Generated by `scripts/segbench/date_tagging.py score`. The app's default tagging call, "
          f"`TagGenerator.generateTags` (the automatic mode), with its prompt verbatim and its default model "
@@ -507,30 +594,55 @@ def cmd_score(a):
     with open(RESULTS, "w", encoding="utf-8") as fh:
         fh.write("\n".join(L))
 
-    def frac(rs, f):
-        return [sum(1 for r in rs if f(r)), len(rs)]
-    within1 = lambda r: r["y"] is not None and abs(r["y"] - r["truth"]["year"]) <= 1
-    out = {"model": MODEL, "documents": n, "usd": round(usd, 2), "usd_per_1000": round(1000 * usd / n, 2) if n else None,
-           "year": {cls: {"exact": frac(rs, lambda r: r["y"] == r["truth"]["year"]), "within1": frac(rs, within1)}
-                    for cls, rs in [(c, [r for r in yr if r["class"] == c]) for c in ("year+month", "year", "year+DU")]
-                    + [("in text", [r for r in yr if r["year_in_text"]]), ("not in text", [r for r in yr if not r["year_in_text"]]),
-                       ("all", yr)]},
-           "decade": frac(dec, lambda r: r["y"] is not None and r["truth"]["decade"] <= r["y"] < r["truth"]["decade"] + 10),
-           "month": {"owner": frac(ym, lambda r: r["m"] == r["truth"]["month"]),
-                     "other": frac(ym, lambda r: r["m"] is not None and r["m"] != r["truth"]["month"]),
-                     "none": frac(ym, lambda r: r["m"] is None),
-                     "untagged_given": frac([r for r in rows if r["class"] == "year"], lambda r: r["m"] is not None),
-                     "untagged_given_named": sum(r["m_named"] for r in rows if r["class"] == "year" and r["m"] is not None)},
-           "uncertain": {"owner_certain": frac(dated, lambda r: r["du_pred"]),
-                         "owner_certain_in_text": frac([r for r in dated if r["year_in_text"]], lambda r: r["du_pred"]),
-                         "owner_certain_not_in_text": frac([r for r in dated if not r["year_in_text"]], lambda r: r["du_pred"]),
-                         "owner_uncertain": frac(du_rows, lambda r: r["du_pred"]),
-                         "certain_and_wrong": frac(dated, lambda r: not r["du_pred"] and r["y"] != r["truth"]["year"])},
-           "parse_failures": sum(not r["parsed"] for r in rows)}
+    out = metrics(rows, usd, MODEL)
+    old = json.load(open(RESULTS_JSON)) if os.path.exists(RESULTS_JSON) else {}
+    if old.get("open_models"):
+        out["open_models"] = old["open_models"]
     with open(RESULTS_JSON, "w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=1)
         fh.write("\n")
     print("\n".join(L))
+
+
+OPEN_HEAD = "\n## Open-weight models on FarmShare\n"
+
+
+def score_open(label, rows):
+    j = json.load(open(RESULTS_JSON))
+    m = metrics(rows, 0.0, label)
+    m["finish_length"] = sum(1 for r in rows if (json.load(open(answer_path(r["prompt"], label))).get("finish") == "length"))
+    j.setdefault("open_models", {})[label] = m
+    with open(RESULTS_JSON, "w", encoding="utf-8") as fh:
+        json.dump(j, fh, indent=1)
+        fh.write("\n")
+    write_open_section(j)
+    print(json.dumps(m, indent=1))
+
+
+def write_open_section(j):
+    """The open models beside Gemini, rewritten in place at the end of date-tagging.md."""
+    with open(RESULTS, encoding="utf-8") as fh:
+        text = fh.read().split(OPEN_HEAD)[0].rstrip("\n") + "\n"
+
+    def f(x):
+        return f"{100 * x[0] / x[1]:.1f}%" if x[1] else "–"
+    L = [OPEN_HEAD.strip(), "",
+         "The same 300 prompts, sent as the app's local route sends a text call (`farmshare/fs_text.py`: one user "
+         "message, 512 tokens, temperature 0, no reasoning switch, reasoning text stripped), to vLLM on one L40S, "
+         "parsed and scored as above. `-nothink` rows were sent with thinking switched off, which the app does not "
+         "do (`KNOWN_ISSUES.md`: the local route sends no reasoning switch). No money.", "",
+         "| model | year exact | within 1 | year, in text | year, not in text | owner's month | no month | "
+         "Date Uncertain agrees | unparsed | ran to 512 tokens |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    rows = [(j.get("model", MODEL) + " (the app's default)", j)] + sorted(j.get("open_models", {}).items())
+    for name, m in rows:
+        y = m["year"]; u = m["uncertain"]
+        agree = [u["owner_certain"][1] - u["owner_certain"][0] + u["owner_uncertain"][0],
+                 u["owner_certain"][1] + u["owner_uncertain"][1]]
+        L.append(f"| {name} | {f(y['all']['exact'])} | {f(y['all']['within1'])} | {f(y['in text']['exact'])} | "
+                 f"{f(y['not in text']['exact'])} | {f(m['month']['owner'])} | {f(m['month']['none'])} | {f(agree)} | "
+                 f"{m['parse_failures']} | {m.get('finish_length', '–')} |")
+    with open(RESULTS, "w", encoding="utf-8") as fh:
+        fh.write(text + "\n".join(L) + "\n")
 
 
 def main():
@@ -540,9 +652,11 @@ def main():
     p = sub.add_parser("run")
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--spread", action="store_true", help="with --limit, take documents spread across the sample")
-    sub.add_parser("score")
+    p = sub.add_parser("score"); p.add_argument("--label")
+    p = sub.add_parser("export"); p.add_argument("--out", required=True)
+    p = sub.add_parser("import"); p.add_argument("--answers", required=True); p.add_argument("--label", required=True)
     a = ap.parse_args()
-    {"sample": cmd_sample, "run": cmd_run, "score": cmd_score}[a.cmd](a)
+    {"sample": cmd_sample, "run": cmd_run, "score": cmd_score, "export": cmd_export, "import": cmd_import}[a.cmd](a)
 
 
 if __name__ == "__main__":

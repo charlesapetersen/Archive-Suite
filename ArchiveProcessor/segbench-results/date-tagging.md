@@ -85,3 +85,17 @@ The prompt asks for `date_uncertain` when the year cannot be determined from the
 ## Cost
 
 300 calls, 464,888 input tokens, 39,819 answer tokens, 192,439 thinking tokens: $1.22 at $0.75/$3.75 per million (thinking billed as output), $4.07 per 1,000 documents.
+## Open-weight models on FarmShare
+
+The same 300 prompts, sent as the app's local route sends a text call (`farmshare/fs_text.py`: one user message, 512 tokens, temperature 0, no reasoning switch, reasoning text stripped), to vLLM on one L40S, parsed and scored as above. `-nothink` rows were sent with thinking switched off, which the app does not do (`KNOWN_ISSUES.md`: the local route sends no reasoning switch). No money.
+
+| model | year exact | within 1 | year, in text | year, not in text | owner's month | no month | Date Uncertain agrees | unparsed | ran to 512 tokens |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| gemini-3.8-flash (the app's default) | 79.6% | 95.2% | 97.5% | 63.4% | 75.0% | 22.5% | 72.4% | 0 | – |
+| qwen3-vl-8b | 62.8% | 70.4% | 94.1% | 34.4% | 43.3% | 55.0% | 80.0% | 0 | 0 |
+| qwen3.5-4b | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 20.0% | 300 | 300 |
+| qwen3.5-4b-nothink | 63.2% | 78.0% | 95.8% | 33.6% | 5.8% | 92.5% | 78.0% | 0 | 0 |
+| qwen3.6-27b | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 20.0% | 300 | 300 |
+| qwen3.6-27b-nothink | 68.4% | 83.2% | 97.5% | 42.0% | 72.5% | 23.3% | 72.0% | 0 | 0 |
+| qwen3.6-35b-a3b | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 100.0% | 20.0% | 300 | 300 |
+| qwen3.6-35b-a3b-nothink | 65.2% | 82.0% | 96.6% | 36.6% | 73.3% | 20.8% | 71.6% | 0 | 0 |

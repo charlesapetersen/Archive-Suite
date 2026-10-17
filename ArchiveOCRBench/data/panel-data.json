@@ -6755,7 +6755,814 @@
     200
    ]
   },
-  "parse_failures": 0
+  "parse_failures": 0,
+  "open_models": {
+   "qwen3.6-27b": {
+    "model": "qwen3.6-27b",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       0,
+       120
+      ],
+      "within1": [
+       0,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       0,
+       80
+      ],
+      "within1": [
+       0,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       0,
+       50
+      ],
+      "within1": [
+       0,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       0,
+       119
+      ],
+      "within1": [
+       0,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       0,
+       131
+      ],
+      "within1": [
+       0,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       0,
+       250
+      ],
+      "within1": [
+       0,
+       250
+      ]
+     }
+    },
+    "decade": [
+     0,
+     50
+    ],
+    "month": {
+     "owner": [
+      0,
+      120
+     ],
+     "other": [
+      0,
+      120
+     ],
+     "none": [
+      120,
+      120
+     ],
+     "untagged_given": [
+      0,
+      80
+     ],
+     "untagged_given_named": 0
+    },
+    "uncertain": {
+     "owner_certain": [
+      200,
+      200
+     ],
+     "owner_certain_in_text": [
+      114,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      86,
+      86
+     ],
+     "owner_uncertain": [
+      50,
+      50
+     ],
+     "certain_and_wrong": [
+      0,
+      200
+     ]
+    },
+    "parse_failures": 300,
+    "finish_length": 300
+   },
+   "qwen3.6-27b-nothink": {
+    "model": "qwen3.6-27b-nothink",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       99,
+       120
+      ],
+      "within1": [
+       110,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       54,
+       80
+      ],
+      "within1": [
+       67,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       18,
+       50
+      ],
+      "within1": [
+       31,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       116,
+       119
+      ],
+      "within1": [
+       118,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       55,
+       131
+      ],
+      "within1": [
+       90,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       171,
+       250
+      ],
+      "within1": [
+       208,
+       250
+      ]
+     }
+    },
+    "decade": [
+     29,
+     50
+    ],
+    "month": {
+     "owner": [
+      87,
+      120
+     ],
+     "other": [
+      5,
+      120
+     ],
+     "none": [
+      28,
+      120
+     ],
+     "untagged_given": [
+      38,
+      80
+     ],
+     "untagged_given_named": 28
+    },
+    "uncertain": {
+     "owner_certain": [
+      52,
+      200
+     ],
+     "owner_certain_in_text": [
+      1,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      51,
+      86
+     ],
+     "owner_uncertain": [
+      32,
+      50
+     ],
+     "certain_and_wrong": [
+      19,
+      200
+     ]
+    },
+    "parse_failures": 0,
+    "finish_length": 0
+   },
+   "qwen3.6-35b-a3b": {
+    "model": "qwen3.6-35b-a3b",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       0,
+       120
+      ],
+      "within1": [
+       0,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       0,
+       80
+      ],
+      "within1": [
+       0,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       0,
+       50
+      ],
+      "within1": [
+       0,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       0,
+       119
+      ],
+      "within1": [
+       0,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       0,
+       131
+      ],
+      "within1": [
+       0,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       0,
+       250
+      ],
+      "within1": [
+       0,
+       250
+      ]
+     }
+    },
+    "decade": [
+     0,
+     50
+    ],
+    "month": {
+     "owner": [
+      0,
+      120
+     ],
+     "other": [
+      0,
+      120
+     ],
+     "none": [
+      120,
+      120
+     ],
+     "untagged_given": [
+      0,
+      80
+     ],
+     "untagged_given_named": 0
+    },
+    "uncertain": {
+     "owner_certain": [
+      200,
+      200
+     ],
+     "owner_certain_in_text": [
+      114,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      86,
+      86
+     ],
+     "owner_uncertain": [
+      50,
+      50
+     ],
+     "certain_and_wrong": [
+      0,
+      200
+     ]
+    },
+    "parse_failures": 300,
+    "finish_length": 300
+   },
+   "qwen3.6-35b-a3b-nothink": {
+    "model": "qwen3.6-35b-a3b-nothink",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       97,
+       120
+      ],
+      "within1": [
+       108,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       50,
+       80
+      ],
+      "within1": [
+       64,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       16,
+       50
+      ],
+      "within1": [
+       33,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       115,
+       119
+      ],
+      "within1": [
+       118,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       48,
+       131
+      ],
+      "within1": [
+       87,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       163,
+       250
+      ],
+      "within1": [
+       205,
+       250
+      ]
+     }
+    },
+    "decade": [
+     27,
+     50
+    ],
+    "month": {
+     "owner": [
+      88,
+      120
+     ],
+     "other": [
+      7,
+      120
+     ],
+     "none": [
+      25,
+      120
+     ],
+     "untagged_given": [
+      38,
+      80
+     ],
+     "untagged_given_named": 28
+    },
+    "uncertain": {
+     "owner_certain": [
+      60,
+      200
+     ],
+     "owner_certain_in_text": [
+      5,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      55,
+      86
+     ],
+     "owner_uncertain": [
+      39,
+      50
+     ],
+     "certain_and_wrong": [
+      14,
+      200
+     ]
+    },
+    "parse_failures": 0,
+    "finish_length": 0
+   },
+   "qwen3-vl-8b": {
+    "model": "qwen3-vl-8b",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       96,
+       120
+      ],
+      "within1": [
+       100,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       49,
+       80
+      ],
+      "within1": [
+       58,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       12,
+       50
+      ],
+      "within1": [
+       18,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       112,
+       119
+      ],
+      "within1": [
+       115,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       45,
+       131
+      ],
+      "within1": [
+       61,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       157,
+       250
+      ],
+      "within1": [
+       176,
+       250
+      ]
+     }
+    },
+    "decade": [
+     23,
+     50
+    ],
+    "month": {
+     "owner": [
+      52,
+      120
+     ],
+     "other": [
+      2,
+      120
+     ],
+     "none": [
+      66,
+      120
+     ],
+     "untagged_given": [
+      17,
+      80
+     ],
+     "untagged_given_named": 15
+    },
+    "uncertain": {
+     "owner_certain": [
+      2,
+      200
+     ],
+     "owner_certain_in_text": [
+      0,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      2,
+      86
+     ],
+     "owner_uncertain": [
+      2,
+      50
+     ],
+     "certain_and_wrong": [
+      54,
+      200
+     ]
+    },
+    "parse_failures": 0,
+    "finish_length": 0
+   },
+   "qwen3.5-4b": {
+    "model": "qwen3.5-4b",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       0,
+       120
+      ],
+      "within1": [
+       0,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       0,
+       80
+      ],
+      "within1": [
+       0,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       0,
+       50
+      ],
+      "within1": [
+       0,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       0,
+       119
+      ],
+      "within1": [
+       0,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       0,
+       131
+      ],
+      "within1": [
+       0,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       0,
+       250
+      ],
+      "within1": [
+       0,
+       250
+      ]
+     }
+    },
+    "decade": [
+     0,
+     50
+    ],
+    "month": {
+     "owner": [
+      0,
+      120
+     ],
+     "other": [
+      0,
+      120
+     ],
+     "none": [
+      120,
+      120
+     ],
+     "untagged_given": [
+      0,
+      80
+     ],
+     "untagged_given_named": 0
+    },
+    "uncertain": {
+     "owner_certain": [
+      200,
+      200
+     ],
+     "owner_certain_in_text": [
+      114,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      86,
+      86
+     ],
+     "owner_uncertain": [
+      50,
+      50
+     ],
+     "certain_and_wrong": [
+      0,
+      200
+     ]
+    },
+    "parse_failures": 300,
+    "finish_length": 300
+   },
+   "qwen3.5-4b-nothink": {
+    "model": "qwen3.5-4b-nothink",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       94,
+       120
+      ],
+      "within1": [
+       101,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       49,
+       80
+      ],
+      "within1": [
+       65,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       15,
+       50
+      ],
+      "within1": [
+       29,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       114,
+       119
+      ],
+      "within1": [
+       119,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       44,
+       131
+      ],
+      "within1": [
+       76,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       158,
+       250
+      ],
+      "within1": [
+       195,
+       250
+      ]
+     }
+    },
+    "decade": [
+     24,
+     50
+    ],
+    "month": {
+     "owner": [
+      7,
+      120
+     ],
+     "other": [
+      2,
+      120
+     ],
+     "none": [
+      111,
+      120
+     ],
+     "untagged_given": [
+      1,
+      80
+     ],
+     "untagged_given_named": 1
+    },
+    "uncertain": {
+     "owner_certain": [
+      28,
+      200
+     ],
+     "owner_certain_in_text": [
+      2,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      26,
+      86
+     ],
+     "owner_uncertain": [
+      23,
+      50
+     ],
+     "certain_and_wrong": [
+      37,
+      200
+     ]
+    },
+    "parse_failures": 0,
+    "finish_length": 0
+   }
+  }
  },
  "public": {
   "rows": [
