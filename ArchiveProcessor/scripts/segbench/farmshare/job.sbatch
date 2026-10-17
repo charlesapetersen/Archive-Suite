@@ -58,7 +58,7 @@ case "$FS_MODE" in
     deadline=$(( start + FS_WALL_MIN * 60 - 900 ))
     shard="${SLURM_ARRAY_TASK_ID:-0}/$FS_SHARDS"
     set +e
-    "$FS_PY" fs_ocr.py bulk --in "$FS_IN" --out "$FS_OUT" --shard "$shard" --deadline "$deadline"
+    "$FS_PY" fs_ocr.py bulk --in "$FS_IN" --out "$FS_OUT" --shard "$shard" --deadline "$deadline" ${FS_BULK_ARGS:-}
     rc=$?
     set -e
     if [ $rc -eq 75 ] && [ "${FS_CHAIN:-0}" -lt "${FS_CHAIN_MAX:-30}" ]; then

@@ -44,7 +44,8 @@ case "$FS_MODE" in
          default_min=120 ;;
   seg)   [ -n "$FS_PACK" ] || { echo "seg needs --pack (made on the Mac by fs_seg.py pack)"; exit 2; }
          want_model="$("$FS_PY" -c 'import json, sys; print(json.load(open(sys.argv[1]))["model"])' "$FS_PACK/pack.json")"
-         [ "$want_model" = "$FS_MODEL" ] || { echo "the pack is for $want_model; preset $FS_PRESET_NAME serves $FS_MODEL"; exit 2; }
+         served="${FS_SERVED:-$FS_MODEL}"   # a student is served under its own name (models.sh seg-student)
+         [ "$want_model" = "$served" ] || { echo "the pack is for $want_model; preset $FS_PRESET_NAME serves $served"; exit 2; }
          default_min=60 ;;
   news|news-layout)
          if [ "$FS_MODE" = news-layout ] && [ ! -x "$FS_ROOT/npo-venv/bin/python" ]; then

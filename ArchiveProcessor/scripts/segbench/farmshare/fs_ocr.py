@@ -395,7 +395,10 @@ def cmd_bulk(a):
                                                **meta, 'sha256': digest, **run}).encode())
             else:
                 with (out / f'failed-{i}.jsonl').open('a') as f:
-                    f.write(json.dumps({'image': key, **meta, 'raw': (reply or {}).get('raw', '')[:500]}) + '\n')
+                    # FS_KEEP_RAW=1 keeps the whole reply (it stays on FarmShare scratch): for replaying a stop rule
+                    # over real runaways (W41.app-local-models' guards, 2026-10-16). Otherwise 500 characters.
+                    keep = None if os.environ.get('FS_KEEP_RAW') == '1' else 500
+                    f.write(json.dumps({'image': key, **meta, 'raw': (reply or {}).get('raw', '')[:keep]}) + '\n')
                 reason = failure_reason(meta)
                 if reason:  # the form W41.app-farmshare-import / W41.app-ocr-cascade read: no transcript text
                     with (out / f'escalate-{i}.jsonl').open('a') as f:

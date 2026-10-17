@@ -85,6 +85,18 @@ def encode(processor, row, images_dir):
     return enc
 
 
+def reply_loss(model, enc):
+    """Cross-entropy over the reply's tokens only. The model is asked for logits at the last k positions
+    (`logits_to_keep`): full-vocabulary logits for a whole window (about 12,000 tokens x 248,000) are a 10 GB
+    allocation that ran an L40S out of memory on the first window (2026-10-16)."""
+    import torch.nn.functional as F
+    labels = enc["labels"]
+    k = int((labels[0] != -100).sum()) + 1
+    logits = model(**{key: v for key, v in enc.items() if key != "labels"}, logits_to_keep=k).logits
+    # position t predicts token t+1: the k kept positions predict the last k-1 tokens, which are the reply's
+    return F.cross_entropy(logits[0, :-1].float(), labels[0, -(k - 1):], ignore_index=-100)
+
+
 def cmd_train(a):
     import torch
     from transformers import AutoModelForImageTextToText, AutoProcessor
@@ -123,7 +135,7 @@ def cmd_train(a):
             enc = {key: v.to(dev) for key, v in encode(processor, rows[i], images).items()}
             if enc["input_ids"].shape[1] > a.max_len:
                 continue
-            loss = model(**enc).loss / a.accum
+            loss = reply_loss(model, enc) / a.accum
             loss.backward()
             run_loss += loss.item() * a.accum; run_n += 1; seen += 1
             if seen % a.accum == 0:
