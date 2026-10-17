@@ -11764,3 +11764,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   - Caveats: a stratum's score is comparable across routes, not across strata or with the 96 (each source keeps its own conventions). N4 understates every route (main text only, no vowel points in the truth; use its no-marks score).
   - Not done here, for `W43.sweep`: `ocr_pages_export.py` and `difficulty.py` by stratum (three routes are too few for difficulty or cascades); `routes-pages.csv` is the per-page table they will read.
   <!-- /W43.corpus-build -->
+- [x] **W40.fix-notes-editor-frame-jump — on some note changes the editor's text view is laid out at 0×0, off the window, for one pass [S-M · S4]** · §W40 — verification phase (lane: notes) (uses: build,vm). Found by the `W40.e13` recorder (first runs 2026-10-16; 3 of 5 VM runs on 2026-10-17, gate-fix): whenever the shown note changes (next/previous note, a switch to the empty Inbox folder), `an.editor.text` goes from x 761 (343×109) to frame -429,-324 0×0 for one committed pass and back. A user may see the editor blank for a frame; it may be what the owner saw as the jitter in `W40.fix-notes-inspector-jitter` (unchecked). Reproduce with `ONLY_TESTING=ArchiveNotesUITests/TransientStateUITests ops/gui/vm-gui-runner.sh notes xcuitest`. Fix so the text view keeps its frame through a note change, then delete `editorJump` from Notes' `TransientStateUITests` (an intermittent `KnownIssue` until then). SHIPPED 2026-10-17.
+  **What it was: the accessibility tree, not the screen.** A DEBUG probe in the VM (six runs, 2026-10-17) tagged the
+  windowless text view: it was the NEW editor (`.id(bodyEditor.loadedID)` rebuilds it per note), made outside the
+  recorder's walk, listed by SwiftUI's accessibility tree one pass before its host was in the window — so its frame
+  read 0×0 at the screen origin (-429,-324 against the window). In that same pass the OLD text view was still in the
+  window at 360×125, alpha 1.0. Nothing blanked on screen, so no app change; the editor's per-note rebuild stays (it
+  guards retired write-backs, W9.cand2).
+  **Fix (recorder, all three apps):** `packages/UITestSupport/App/TransientRecorder.swift` drops a sample in which a
+  watched element is an `NSView` with no window (at most 3 passes in a row, so a view that never joins a window
+  cannot silence it), counts it as `ahead=N`, and `TransientCheck` prints it. `editorJump` deleted from Notes'
+  `TransientStateUITests`.
+  **Verified:** Notes `TransientStateUITests` ×8 in the VM, 16/16 passed, no editor finding (2–3 samples skipped
+  per note change); the planted flicker still caught on all 8. Reader and Processor build; Reader's
+  `TransientStateUITests` 2/2 in the VM (nothing skipped there). `W40.fix-notes-chip-first-draw-blank` is a separate cause (noted in its entry).
+  <!-- /W40.fix-notes-editor-frame-jump -->
