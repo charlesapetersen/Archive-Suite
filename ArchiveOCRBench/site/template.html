@@ -69,7 +69,7 @@ footer p { font-size: 13px; }
   <header class="lede">
     <div class="eyebrow">Archive Suite · what the bench has measured</div>
     <h1>Archive OCR bench</h1>
-    <p>Five parts: the W41 OCR panel (<span id="nroutes"></span> routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), the on-device handwriting readers the Vision OCR lab measured, open-weight models run on Stanford's FarmShare GPUs, and the panel's pages ranked by difficulty, with cheap-first cascades simulated from the measured readings. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
+    <p>Six parts: the W41 OCR panel (<span id="nroutes"></span> routes reading the same 96 truth pages), segmentation (how well each approach splits a box of photographs into documents), the on-device handwriting readers the Vision OCR lab measured, open-weight models run on Stanford's FarmShare GPUs, the panel's pages ranked by difficulty, with cheap-first cascades simulated from the measured readings, and how well the tagger dates a document. The page is rebuilt from the bench's result files whenever a measured result lands.</p>
   </header>
 
   <header class="part" id="ocr">
@@ -182,6 +182,17 @@ footer p { font-size: 13px; }
     <p class="note">Routed by the model guide's first pick for the kind each classifier says, on the 96 accuracy pages; lost is the mean NES below routing by the true kind:</p>
     <div class="tbl"><table><thead><tr><th>Classifier</th><th>Routed as labelled</th><th>Mean NES</th><th>Lost</th></tr></thead><tbody id="kind-clf-route"></tbody></table></div>
     <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
+  </section>
+
+  <header class="part" id="dating">
+    <div class="eyebrow">Part 6 · Dating documents · the owner's own tags as the answer</div>
+    <h2>The year and month the tagger gives a document</h2>
+    <p id="date-lede"></p>
+  </header>
+  <section class="panel" id="date-table">
+    <div class="head"><h2>Against the owner's tags</h2><span class="meta" id="date-meta"></span></div>
+    <div class="tbl"><table><thead><tr><th>What is scored</th><th>Documents</th><th>Right</th><th>Share</th></tr></thead><tbody id="date-rows"></tbody></table></div>
+    <p class="note">Segmentation only proposes boundaries; the tagging call dates each document afterwards, with the prompt <code>TagGenerator.generateTags</code> sends (year always, month only if the document states it, <code>date_uncertain</code> when the year is not in the document itself). Documents are runs of pages with one identity tag set, kept only where the label-clean teacher and the tags agree on every gap around them, sampled across collections; the corpus copies of the test and development boxes are left out. The text sent is ABBYY's layer, not the app's own OCR. A month the reply gives where the owner tagged none is not always invented: most of those months are named in the text, so the owner left them untagged. Full tables: <code>ArchiveProcessor/segbench-results/date-tagging.md</code>.</p>
   </section>
 
   <footer>
@@ -437,6 +448,34 @@ function renderDifficulty() {
           afterBuildTicks: a => { a.ticks = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30].map(v => ({ value: v })); },
           ticks: { color: mut, autoSkip: false, callback: v => v === CFREE ? 'free' : '$' + v } },
         y: { min: 91, max: 97.5, title: { display: true, text: 'NES %, failures as 0', color: sec }, grid: { color: grid }, border: { display: false }, ticks: { color: mut, stepSize: 1 } } } } });
+}
+
+// Part 6: dating.
+const DT = DATA.dating;
+if (DT) {
+  const sh = ([a, b]) => b ? (100 * a / b).toFixed(1) + '%' : '–';
+  const row = (label, f) => '<tr><td>' + label + '</td><td>' + f[1] + '</td><td>' + f[0] + '</td><td>' + sh(f) + '</td></tr>';
+  document.getElementById('date-lede').textContent = 'The app\'s default tagging model, ' + DT.model + ', on ' + DT.documents +
+    ' whole corpus documents, scored against the year, month and Date Uncertain tags the owner gave them by hand. The run cost $' + DT.usd.toFixed(2) + ' ($' + DT.usd_per_1000.toFixed(2) + ' per 1,000 documents).';
+  document.getElementById('date-meta').textContent = DT.documents + ' documents · ' + DT.parse_failures + ' unusable replies';
+  const Y = DT.year, M = DT.month, U = DT.uncertain;
+  document.getElementById('date-rows').innerHTML = [
+    row('Year exact, every year-tagged document', Y.all.exact),
+    row('Year within one', Y.all.within1),
+    row('Year exact, the year is printed in the text', Y['in text'].exact),
+    row('Year exact, the year is not in the text', Y['not in text'].exact),
+    row('Year exact, owner tagged a month too', Y['year+month'].exact),
+    row('Year exact, owner tagged Date Uncertain', Y['year+DU'].exact),
+    row('Year in the owner\'s decade, decade-tagged documents', DT.decade),
+    row('Month: the owner\'s month', M.owner),
+    row('Month: another month', M.other),
+    row('Month: none, where the owner tagged one', M.none),
+    row('Month given where the owner tagged none (year-only documents)', M.untagged_given),
+    row('Date Uncertain where the owner was certain', U.owner_certain),
+    row('… and the year is in the text', U.owner_certain_in_text),
+    row('… and the year is not in the text', U.owner_certain_not_in_text),
+    row('Date Uncertain where the owner tagged it too', U.owner_uncertain),
+    row('Certain and wrong, where the owner was certain', U.certain_and_wrong)].join('');
 }
 
 Chart.defaults.font.family = css('--body');

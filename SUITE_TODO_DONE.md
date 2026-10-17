@@ -11614,3 +11614,21 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   is the owner's call (Daemon Report, gate `W40.audit-ledger-owner-ok`) → `W40.audit-ledger`. Ledger rows R-21,
   R-45, R-46 updated. Evidence `verification/evidence/reader/W40.f1-undo.md`.
   <!-- /W40.f1 -->
+- [x] **W41.date-tag-measure — how well the tagger dates a document, scored against the owner's Finder tags [S]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · SHIPPED 2026-10-17 (this commit)
+  `ArchiveProcessor/scripts/segbench/date_tagging.py` (sample, run, score) sends whole corpus documents through
+  `TagGenerator.generateTags`' prompt, verbatim (`test_date_tagging.py` compares it with the Swift, mutation-checked),
+  to the default model Gemini 3.8 Flash with no generationConfig, as `LLMTextClient.callGemini` sends it, with the
+  app's neighbour context (three segments, 300 characters each). 300 documents (120 year+month, 80 year only, 50
+  year with Date Uncertain, 50 decade-only), round-robin over up to 90 collections, from the 5,730 documents whose
+  every bounding gap the label-clean teacher and the tags agree on; the Stanton, RG 165 and development-box copies
+  are left out by corpus_pairs. Results, numbers only: `segbench-results/date-tagging.md` and `.json`; ArchiveOCRBench
+  part 6. Year exact 79.6% (95.2% within one): 97.5% where the owner's year is printed in the text, 63.4% where it
+  is not; 39 of the 51 wrong years are one year off. Month: the owner's month 75%, another month 2.5%, none 22.5%,
+  and in none of those 27 is the owner's month named in the text, so the model left out no month the text names.
+  On year-only documents the reply gives a month 42.5% of the time, 26 of 34 named in the text (months the owner
+  left untagged). Date Uncertain: written on 31.5% of documents the owner dated with certainty, nearly all where the
+  year is not in the text (69.8% against 2.6%), which is what the prompt asks for and not the owner's own test; 88%
+  where the owner tagged it too; certain and wrong 2.5%. No unusable reply. Cost $1.22 of real API money (estimated
+  $1.75 from a six-document pilot), $4.07 per 1,000 documents. Nothing found clearly broken, so nothing filed.
+  `generateDateOnly` (the auto-date mode) was not run. The text sent is ABBYY's, not the app's own OCR.
+  <!-- /W41.date-tag-measure -->

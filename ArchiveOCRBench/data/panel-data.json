@@ -6642,5 +6642,119 @@
    }
   ],
   "oracle_nes": 97.26
+ },
+ "dating": {
+  "model": "gemini-3.8-flash",
+  "documents": 300,
+  "usd": 1.22,
+  "usd_per_1000": 4.07,
+  "year": {
+   "year+month": {
+    "exact": [
+     112,
+     120
+    ],
+    "within1": [
+     119,
+     120
+    ]
+   },
+   "year": {
+    "exact": [
+     63,
+     80
+    ],
+    "within1": [
+     76,
+     80
+    ]
+   },
+   "year+DU": {
+    "exact": [
+     24,
+     50
+    ],
+    "within1": [
+     43,
+     50
+    ]
+   },
+   "in text": {
+    "exact": [
+     116,
+     119
+    ],
+    "within1": [
+     118,
+     119
+    ]
+   },
+   "not in text": {
+    "exact": [
+     83,
+     131
+    ],
+    "within1": [
+     120,
+     131
+    ]
+   },
+   "all": {
+    "exact": [
+     199,
+     250
+    ],
+    "within1": [
+     238,
+     250
+    ]
+   }
+  },
+  "decade": [
+   34,
+   50
+  ],
+  "month": {
+   "owner": [
+    90,
+    120
+   ],
+   "other": [
+    3,
+    120
+   ],
+   "none": [
+    27,
+    120
+   ],
+   "untagged_given": [
+    34,
+    80
+   ],
+   "untagged_given_named": 26
+  },
+  "uncertain": {
+   "owner_certain": [
+    63,
+    200
+   ],
+   "owner_certain_in_text": [
+    3,
+    114
+   ],
+   "owner_certain_not_in_text": [
+    60,
+    86
+   ],
+   "owner_uncertain": [
+    44,
+    50
+   ],
+   "certain_and_wrong": [
+    5,
+    200
+   ]
+  },
+  "parse_failures": 0
  }
 }

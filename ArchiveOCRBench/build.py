@@ -3,7 +3,7 @@
 
 Reads, in ../ArchiveProcessor/segbench-results/, the W41 OCR panel's reports and per-attribute CSVs, the
 routes run on our own hardware (ocr-mac-local.md, ocr-mac-local-hw.md and their groups CSV; farmshare/truth/<run>/summary.json and
-pages.csv), the segmentation reports (options.md, cheap-models.md), plus the hand-entered figures in data/inputs.json and
+pages.csv), the segmentation reports (options.md, cheap-models.md), the date-tagging score (date-tagging.json), plus the hand-entered figures in data/inputs.json and
 the Vision OCR lab's handwriting figures in data/vision-ocr-handwriting.json, and the per-page tables
 (ocr-pages.csv, ocr-pages-agree.csv) that difficulty.py turns into page difficulty and cascades, and writes:
 
@@ -40,6 +40,7 @@ TEACHER_MD = RESULTS / "seg-teacher.md"  # W41.seg-27b-test: the FarmShare teach
 INPUTS = HERE / "data" / "inputs.json"
 HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
+DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
@@ -318,7 +319,8 @@ def main():
                               [r["id"] for r in routes if r["panel"] != "farmshare"])
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting(),
              "farmshare": farmshare(), "difficulty": diff,
-             "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None}
+             "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
+             "dating": json.loads(DATING.read_text()) if DATING.exists() else None}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

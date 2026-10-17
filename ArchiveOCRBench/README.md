@@ -1,6 +1,6 @@
 # ArchiveOCRBench
 
-What the bench has measured, as one page you can read and share. It has five parts:
+What the bench has measured, as one page you can read and share. It has six parts:
 
 1. **OCR.** The W41 OCR panel: twenty-five hosted routes read the same 96 adjudicated truth pages, and each is
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
@@ -27,6 +27,10 @@ What the bench has measured, as one page you can read and share. It has five par
    (hand, forms and tables, low resolution) measured on 184 labelled page images, with the reading accuracy a wrong
    kind costs under the model guide, read from `ArchiveProcessor/segbench-results/kind-classifier.json`
    (W41.bench-kind-classifier; the full report is `kind-classifier.md` there).
+6. **Dating.** How well the tagging call dates a document: the app's `generateTags` prompt and default model on 300
+   whole corpus documents, scored against the owner's own year, month and Date Uncertain tags. Read from
+   `ArchiveProcessor/segbench-results/date-tagging.json` (W41.date-tag-measure; the full tables are
+   `date-tagging.md` there).
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet
