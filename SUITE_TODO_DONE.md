@@ -11652,3 +11652,26 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   `scripts/test-local-models.sh` ALL PASS (22 new checks); cascade, OpenRouter, page-kind, network-session,
   retry-backend and refusal contracts ALL PASS. No money.
   <!-- /W41.app-local-models-fu1 -->
+- [x] **W40.e13 — catch transient states between two settled screens, all three apps [M]** · §W40 (lane: reader,notes,processor) (uses: build,vm). Owner-requested 2026-10-11 after a Notes inspector flicker too fast to screenshot. ✅ SHIPPED 2026-10-17 — checkpoints `b721510b`, `4bf82cd0`, gate-fix `6372da10`/`5f0dc29f`/`bdc8b0a9`, `50b95fdc` → this commit.
+  1. **The recorder (the test).** `packages/UITestSupport/App/TransientRecorder.swift` (DEBUG, in-app) samples the
+     watched sections' accessibility subtrees after every committed run-loop pass; `Shared/TransientAnalysis.swift`
+     judges each transition (a value that appears and is replaced, a geometry that turns back, an element removed and
+     re-added); `Runner/TransientCheck.swift` drives one transition at a time and reads the report through a panel's
+     text element (the runner is sandboxed). Each line `@N changed=… sizes=…` names the sections that moved. Every
+     app's `TransientStateUITests` runs its common transitions and a planted blink, which must be reported. The walk
+     reads SwiftUI's undeclared nodes and AppKit's legacy `NSTableRow` (gate-fix). Reader's folder switch is covered
+     via a `Box 2/` PDF in the GUI fixture, outside its pinned 12-file count.
+  2. **Screen video (the confirmation).** `TRANSIENT_VIDEO=1` on `vm-gui-runner.sh` records the guest with in-guest
+     `screencapture -v`; `ops/gui/transient-frames.py` finds regions that change and return within 250 ms and names
+     the transition (`transient-mark:` lines, the movie's `creation_time`, ±0.5 s). Measured: works under
+     `--no-graphics`, variable frame rate up to 60 fps (median gap 16.7 ms Reader/Processor, 33.3 ms Notes). Each
+     app's planted blink is caught on video too. `ops/gui/README.md` §"Screen video".
+  Results (VM, 2026-10-17): Reader 3/3, Notes 2/2 twice, Processor 3/3; no unfiled recorder finding. Filed during the
+  item: `W40.fix-notes-editor-frame-jump`, `W40.fix-split-animation-wobble` (intermittent `KnownIssue`s). **The video
+  reproduced the owner's Notes flicker, which the recorder passes:** on a note change the inspector shows the new
+  note while the editor shows the previous body for 100–133 ms, and "No note selected" sits over the previous body
+  on a switch to an empty folder (2 of 2 runs); written into `W40.fix-notes-inspector-jitter` with frames.
+  Evidence: `verification/evidence/notes/W40.e13-transient-video.md`. Still open, for whoever sees it next: Notes'
+  "switch folder (Ideas)" once (1 of 4 runs, before gate-fix) reported no change; the `@N` lines now say which
+  sections moved.
+  <!-- /W40.e13 -->

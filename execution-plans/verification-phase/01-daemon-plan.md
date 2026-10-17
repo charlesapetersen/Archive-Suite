@@ -250,22 +250,8 @@ where it can.
   `verification/evidence/<app>/visual-<date>.md`. Each defect is filed as a `W40.fix-*` with its screenshot as the
   reproduction (rule 5), and each class of defect the guard in `W40.e9` could catch is added to it. Repeat after a
   fix batch and before `W40.h3`.
-- **`W40.e13` — transient states [M].** Owner-requested 2026-10-11: in Notes the inspector flickers for a
-  few milliseconds on every note change, too fast for a person to screenshot and far too fast for an XCUITest
-  query, which takes tens of milliseconds and only ever sees a settled screen. Two instruments, both run on the
-  common transitions in each app (select the next item in a list, switch folder or filter, open and close a
-  sheet, toggle a pane):
-  1. **A layout recorder (the test).** A DEBUG-only seam that, from the moment of the transition until the app is
-     idle, logs every frame and every displayed string of the screen's main sections on each layout pass. The UI
-     test drives the transition and fails if any section passes through a state that is neither the old settled
-     state nor the new one: a value that appears and is replaced, a height that changes and changes back, a view
-     that is removed and re-added. Show it failing once on a planted flicker before trusting its passes.
-  2. **Screen video in the VM (the confirmation).** Record the guest screen at its full frame rate across the
-     transition and compare consecutive frames; a region that changes and then returns to an earlier frame is a
-     flicker. Use this to confirm what the recorder reports and to catch drawing glitches it cannot see (a layer
-     painted out of place). Check first that recording works in the headless guest and at what frame rate, and
-     write that down before relying on it.
-  Findings are `W40.fix-*` at `S3`–`S4`, with the log or frames as the reproduction.
+- **`W40.e13` — transient states [M].** Shipped 2026-10-17 (`SUITE_TODO_DONE.md`): an accessibility-tree
+  recorder per app (`TransientStateUITests`) and a screen-video scan in the VM (`ops/gui/README.md` §"Screen video").
 
 ## F — specific suspicions to settle
 

@@ -81,6 +81,20 @@ once like any other. Other processes' reports and `.diag` resource reports are c
 Helpers: `tart_crash_mark` / `tart_crash_harvest` in `tart-lib.sh`; real-guest proof: `vm-crash-harvest-probe.sh`.
 Leaks are not a VM job: `ops/verify/leaks-harvest.sh` runs the unit suites under `leaks` on the host.
 
+**Screen video** (W40.e13, measured 2026-10-17). `TRANSIENT_VIDEO=1` records the guest's display with in-guest
+`screencapture -v` across the xcuitest lane (the app is built first, so the movie holds only the tests), and
+`ops/gui/transient-frames.py vm-artifacts/<app>` scans it for flickers: a region that changes and returns within
+250 ms, named by the `transient-mark:` transition it followed (`TransientCheck` prints one per action). It is the
+confirmation for the accessibility-tree transient recorder: it sees what was drawn, so it catches an
+inconsistency *between* sections that the recorder judges one at a time. Measured: it works under `--no-graphics`
+(the agent's Screen Recording grant); variable frame rate, a frame per change, up to 60 fps (Reader median frame gap
+16.7 ms, Notes 33.3 ms); ~35–40 MB per 2–3 minute suite. The movie carries no start time and its file appears only
+when it is finished, so findings are placed by its whole-second `creation_time` (±0.5 s; transitions are seconds
+apart). The planted blink is the largest finding in Reader and Notes (900–1,200 blocks, 100–180 ms). Expect noise
+the script cannot tell from a defect: a sheet's crossfade and a sidebar's slide return to earlier pixels too, and
+the Dock and the recorder's report panel (bottom 120 px, skipped by default) change constantly. Read the frames
+(`--frames N` writes before/during/after PNGs) before filing anything.
+
 **Reader's committed snapshot reference** is also guest-rendered. `SnapshotTests` is included in the default
 Reader VM selector and compares there; it intentionally skips on the host because the two renderers differ.
 For an intended visual change only, temporarily set its `recordMode` to `.all` and run the Reader VM lane.
@@ -133,7 +147,9 @@ display** until a viewer attaches (in-VM `screencapture` → "could not create i
 `cliclick` needs Accessibility TCC that's awkward to grant. So the sighted lane boots with
 `--vnc-experimental` (a virtual display served over a local VNC port) and uses `vncdotool` from the host to
 grab that framebuffer **and** inject clicks/keys — **VNC-injected input bypasses guest TCC entirely.** It
-parses tart's one-shot `vnc://:PASS@127.0.0.1:PORT` from the launch log.
+parses tart's one-shot `vnc://:PASS@127.0.0.1:PORT` from the launch log. (In-guest `screencapture -v` does record
+a `--no-graphics` guest since the agent's Screen Recording grant — "Screen video", above; the sighted lane still
+uses VNC for input.)
 
 ⚠️ **`--vnc-experimental` is not silent, and the boot mode is therefore PER LANE.** `tart run --help`: it uses
 "Virtualization.Framework's VNC server **instead of** the built-in UI" — and tart then opens macOS
@@ -161,7 +177,7 @@ Reader on `AR-GUI-Fixture` (11 documents, tags, parsed dates, OCR-fail badges).
 
 **GUI fixture:** fixtured Reader UITests need `ArchiveReader/scripts/make-gui-fixture.sh` (a tagged scratch
 corpus at `~/Library/Application Support/ArchiveReader/AR-GUI-Fixture`). Its default generates 10 small,
-text-bearing PDFs, so it works from a bare worktree mount; `AR_FIXTURE_SRC` is only an explicit optional
+text-bearing PDFs (plus one in `Box 2/`, outside the pinned top-level count, so the sidebar has a folder), so it works from a bare worktree mount; `AR_FIXTURE_SRC` is only an explicit optional
 read-only sample override, and `AR_FIXTURE_DST` builds somewhere throwaway. Since `W26.scripts` (2026-08-07)
 it neither `mdimport`s nor waits on `mdfind`: it reads the tags back off disk and **exits non-zero** if the
 fixture is wrong. That matters most here — the guest boots with a cold Spotlight index, so the old poll could

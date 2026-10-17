@@ -10,7 +10,7 @@ to what it was within a short time — the A→B→A of a flicker.
     ops/gui/transient-frames.py <artifact dir>      # e.g. ~/.tart-mirror/vm-artifacts/notes
     ops/gui/transient-frames.py <dir> --max-ms 250 --tile 16 --frames 12
 
-Reads <dir>/transient.mov, <dir>/transient.start (the guest's epoch when recording began) and the
+Reads <dir>/transient.mov (its creation_time places it on the guest's clock) and the
 `transient-mark: <epoch> <name>` lines TransientCheck prints into <dir>/xcuitest.log, so each finding is named
 by the transition it followed. Writes <dir>/transient-frames.txt and, for the first --frames findings, the frame
 before, during and after each one as PNGs in <dir>/transient-frames/.
@@ -41,18 +41,25 @@ import sys
 def probe(mov):
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-         "stream=width,height,avg_frame_rate,r_frame_rate:frame=best_effort_timestamp_time",
+         "stream=width,height,avg_frame_rate,r_frame_rate:format_tags=creation_time"
+         ":frame=best_effort_timestamp_time",
          "-of", "json", mov], check=True, capture_output=True, text=True).stdout
     data = json.loads(out)
     stream = data["streams"][0]
     times = [float(f["best_effort_timestamp_time"]) for f in data["frames"]
              if f.get("best_effort_timestamp_time") not in (None, "N/A")]
-    return stream, times
+    created = (data.get("format", {}).get("tags", {}) or {}).get("creation_time")
+    if created:
+        import datetime
+        created = datetime.datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp()
+    return stream, times, created
 
 
 def frames(mov, gw, gh):
     proc = subprocess.Popen(
-        ["ffmpeg", "-v", "error", "-i", mov, "-fps_mode", "passthrough",
+        # -v fatal: screencapture repeats a timestamp now and then, and the rawvideo muxer logs each one as an
+        # error while still writing the frame (decoded and probed counts match; checked below).
+        ["ffmpeg", "-v", "fatal", "-i", mov, "-fps_mode", "passthrough",
          "-vf", f"scale={gw}:{gh}:flags=area,format=gray", "-f", "rawvideo", "-"],
         stdout=subprocess.PIPE)
     size = gw * gh
@@ -91,11 +98,18 @@ def main():
     mov = os.path.join(args.dir, "transient.mov")
     if not os.path.exists(mov):
         sys.exit(f"no {mov} — run vm-gui-runner.sh with TRANSIENT_VIDEO=1 first")
-    start = None
+    stream, times, created = probe(mov)
+    # Where the movie starts on the guest's clock. screencapture writes no start time of its own, and the file
+    # appears only once it is being finished, so the creation_time tag is all there is: whole seconds,
+    # truncated, so the first frame is within [created, created + 1). The middle of that second puts each
+    # finding within half a second, which is enough when the transitions are seconds apart. A
+    # transient.start file beside the movie (one epoch) overrides it, for a recording made some other way.
+    start, start_note = None, ""
     start_file = os.path.join(args.dir, "transient.start")
     if os.path.exists(start_file):
         start = float(open(start_file).read().strip())
-    stream, times = probe(mov)
+    elif created is not None:
+        start, start_note = created + 0.5, " (aligned on the movie's creation_time, ±0.5 s)"
     w, h = int(stream["width"]), int(stream["height"])
     gw, gh = max(1, w // args.tile), max(1, h // args.tile)
     duration = times[-1] - times[0] if len(times) > 1 else 0.0
@@ -145,6 +159,8 @@ def main():
                 base[k] = v
         prev = cur
 
+    if count != len(times):
+        print(f"warning: decoded {count} frames but the stream lists {len(times)}; times may be off", file=sys.stderr)
     tmarks = marks(os.path.join(args.dir, "xcuitest.log"))
     mark_times = [m[0] for m in tmarks]
 
@@ -168,7 +184,8 @@ def main():
              f"stream frame rate: avg {stream.get('avg_frame_rate')}, r {stream.get('r_frame_rate')}",
              f"settings: tile {args.tile}px, diff {args.diff}, same {args.same}, max {args.max_ms:.0f} ms, "
              f"bottom {args.ignore_bottom}px skipped",
-             f"transitions marked: {len(tmarks)}{'' if start is not None else ' (no transient.start: times are video-relative)'}",
+             f"transitions marked: {len(tmarks)}{'' if start is not None else ' (no transient.start: times are video-relative)'}"
+             f"{start_note}",
              f"findings: {len(findings)} ({sum(1 for f in findings if not f['sweep'])} not part of a sweep)", ""]
     big = sorted((f for f in findings if not f["sweep"]), key=lambda f: -f["blocks"])[:5]
     if big:

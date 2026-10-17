@@ -333,9 +333,9 @@ assert_accessibility() {
 # of the guest's display can. `screencapture -v` runs in the guest under the agent's Screen Recording grant
 # (vm-seed-accessibility-guest.sh). It is a separate `tart exec` kept in the host's background, because a child
 # left behind by a finished `tart exec` session is not guaranteed to live; SIGINT makes it finalize the movie.
-# The app is built first so the movie holds the tests rather than minutes of compiling. The guest's epoch at
-# the start goes beside the movie: TransientCheck prints each transition's epoch (`transient-mark:`), and
-# ops/gui/transient-frames.py lines the two up. Frame rate and what it can see: ops/gui/README.md §"Screen video".
+# The app is built first so the movie holds the tests rather than minutes of compiling. TransientCheck prints
+# each transition's guest epoch (`transient-mark:`), and ops/gui/transient-frames.py lines them up with the
+# movie's own creation_time. Frame rate and what it can see: ops/gui/README.md §"Screen video".
 TRANSIENT_VIDEO="${TRANSIENT_VIDEO:-0}"
 VIDEO_PID=""
 video_start() {
@@ -344,11 +344,9 @@ video_start() {
   tart exec "$VM" bash -lc "xcodebuild build-for-testing -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
     -destination 'platform=macOS' -derivedDataPath '$GUEST_DD' CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" \
     > "$APP_ART/video-build.log" 2>&1 || warn "build-for-testing failed before the recording (log: $APP_ART/video-build.log)"
-  tart exec "$VM" bash -lc "pkill -x screencapture; rm -f /tmp/transient.mov" >/dev/null 2>&1 || true
-  tart exec "$VM" bash -lc "python3 -c 'import time; print(repr(time.time()))' > /tmp/transient.start
-    exec screencapture -v -x /tmp/transient.mov" > "$APP_ART/video-capture.log" 2>&1 &
+  tart exec "$VM" bash -lc "pkill -x screencapture; rm -f /tmp/transient.mov /tmp/transient.start" >/dev/null 2>&1 || true
+  tart exec "$VM" bash -lc "exec screencapture -v -x /tmp/transient.mov" > "$APP_ART/video-capture.log" 2>&1 &
   VIDEO_PID=$!
-  sleep 3
   if kill -0 "$VIDEO_PID" 2>/dev/null; then log "screen recording started in the guest"
   else warn "screencapture exited at once — no video this run: $(tr '\n' ' ' < "$APP_ART/video-capture.log")"; VIDEO_PID=""; fi
 }
@@ -358,8 +356,9 @@ video_stop() {
   local i; for i in $(seq 1 60); do kill -0 "$VIDEO_PID" 2>/dev/null || break; sleep 1; done
   kill "$VIDEO_PID" 2>/dev/null || true
   VIDEO_PID=""
-  rm -f "$APP_ART/transient.mov" "$APP_ART/transient.start"
-  if tart exec "$VM" bash -lc "cp /tmp/transient.mov /tmp/transient.start '/Volumes/My Shared Files/out/$APP/'" >/dev/null 2>&1; then
+  rm -f "$APP_ART/transient.mov" "$APP_ART/transient.start" "$APP_ART/transient-frames.txt"
+  rm -rf "$APP_ART/transient-frames"
+  if tart exec "$VM" bash -lc "cp /tmp/transient.mov '/Volumes/My Shared Files/out/$APP/'" >/dev/null 2>&1; then
     log "screen video: $APP_ART/transient.mov — scan it: ops/gui/transient-frames.py $APP_ART"
   else
     warn "the guest's screen video could not be collected (log: $APP_ART/video-capture.log)"
