@@ -6,6 +6,7 @@
   routes.py collect            # every page, both paid routes, under CAP (all attempts count)
   routes.py vision             # Apple Vision on the Latin-script pages (the app's settings, en-US)
   routes.py reconcile          # bound uncertain charges by the key's UTC-day billing (the panel's rule)
+  routes.py reask              # after reconcile: ask again the calls this runner's interruption cut off
   routes.py report             # scores by stratum -> segbench-results/bench-corpus/routes.*
 
 The paid calls go through ocr_panel.collect with ocr_cloud's pinned endpoints, bodies and reservations, so this
@@ -39,7 +40,10 @@ RESULTS = HERE.parents[2] / 'segbench-results' / 'bench-corpus'
 MANIFEST = RESULTS / 'manifest.jsonl'
 INDEX = C.FROZEN / 'index.jsonl'
 ROUTES = {k: OC.MODELS[k] for k in ('gemini3.8-flash', 'qwen3-vl-235b')}
-CAP = 2.60     # of the $5.10: 440 pages at the plan's $0.0047 a page is $2.07, plus other-script headroom
+# Of the $5.10. The 30-page probe (2026-10-17) measured $0.00334 a page for Gemini and $0.00217 for Qwen: about
+# $2.49 for the 440 pages. The cap check also counts the reservations in flight (about $0.06 a call), so $2.60
+# would stop the run near 85%; $2.90 leaves W43.corpus-build-more $2.20 of the item's cap.
+CAP = 2.90
 PROBE = 30
 VISION_SCRIPTS = {'Latn'}
 
@@ -94,7 +98,7 @@ def prepare():
             dest.write_bytes(b)
         jobs.append({'page': jid, 'scale': 'original', 'id': jid, 'sha256': P.digest(b),
                      'width': im.width, 'height': im.height, 'stratum': r['stratum'], 'script': r['script']})
-    m = {'jobs': run_order(jobs), 'prompt': P.PROMPT, 'models': ROUTES, 'max_tokens': P.MAX_TOKENS, 'cap': CAP,
+    m = {'jobs': run_order(jobs), 'prompt': P.PROMPT, 'models': ROUTES, 'max_tokens': P.MAX_TOKENS,
          'manifest_sha256': C.sha256(MANIFEST)}
     dest = RUN / 'manifest.json'
     if dest.exists() and json.loads(dest.read_text()) != json.loads(json.dumps(m)):
@@ -106,7 +110,7 @@ def prepare():
 def manifest(limit=None):
     m = json.loads((RUN / 'manifest.json').read_text())
     if (m['prompt'] != P.PROMPT or m['models'] != json.loads(json.dumps(ROUTES)) or m['max_tokens'] != P.MAX_TOKENS
-            or m['cap'] != CAP or m['manifest_sha256'] != C.sha256(MANIFEST)):
+            or m['manifest_sha256'] != C.sha256(MANIFEST)):
         raise SystemExit('run configuration changed')
     if len(P.PROMPT.encode()) + 1024 + 4784 >= OC.INPUT_BOUND:
         raise SystemExit('prompt/envelope no longer fits the documented input bound')
@@ -119,25 +123,40 @@ def configure(limit=None):
     P.body, P.endpoint, P.reservation = OC.body, OC.endpoint, OC.reservation
     P.manifest = lambda: manifest(limit)
     P.estimate = lambda: estimate()
-    os.environ.setdefault('OCR_PANEL_CONCURRENCY', '4')
+    os.environ.setdefault('OCR_PANEL_CONCURRENCY', '4')   # fewer reservations held against the cap
 
 
 def estimate():
     n = len(manifest()['jobs']); total = 0
     print(f'ITEM SPENT ${P.spent():.6f} of the ${CAP:.2f} run cap')
     for k in ROUTES:
-        calls = [r for r in P.records() if r['key'] == k and r['status'] in ('ok', 'failed')]
+        # A call bounded by reconcile is booked at a ceiling, not measured; it would inflate the average.
+        calls = [r for r in P.records() if r['key'] == k and r['status'] in ('ok', 'failed')
+                 and not r.get('cost_upper_bound')]
         if not calls:
             continue
-        per = collections.defaultdict(list)
-        for r in calls:
-            per[r['page'].split('__')[0]].append(r)
         avg = sum(r['cost'] for r in calls) / len(calls); total += avg * n
         toks = [r for r in calls if r.get('prompt_tokens')]
         print(f'{k}: n={len(calls)}, ${avg:.6f}/page, prompt {sum(r["prompt_tokens"] for r in toks) / max(1, len(toks)):.0f} '
               f'completion {sum(r["completion_tokens"] or 0 for r in toks) / max(1, len(toks)):.0f} tokens; '
               f'projected {n} pages ${avg * n:.3f}')
     print(f'projection, both routes, all {n} pages: ${total:.3f}')
+
+
+def reask():
+    """Calls cut off by an interruption of this runner (finish 'interrupted', bounded and booked by reconcile)
+    are a fact about the session, not the route: left as failures they would count against the route's score.
+    Their cached reply is set aside (kept, renamed) so collect asks again; the ledger keeps the booked cost, so
+    the cap still counts it. Only interrupted calls: a route's own failure is never re-asked."""
+    n = 0
+    for f in sorted((RUN / 'responses').glob('*/*.json')):
+        if f.name.endswith(('.raw.json', '.interrupted.json')):
+            continue
+        meta = json.loads(f.read_text()).get('meta') or {}
+        if meta.get('finish') == 'interrupted':
+            f.rename(f.with_name(f.name[:-5] + '.interrupted.json')); n += 1
+            print(f"re-ask {meta['key']} {meta['job']} (booked ${meta['cost']:.6f})")
+    print(f'{n} interrupted calls set aside for collect')
 
 
 def vision():
@@ -210,7 +229,7 @@ def report():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=['prepare', 'probe', 'collect', 'vision', 'reconcile', 'report'])
+    ap.add_argument('command', choices=['prepare', 'probe', 'collect', 'vision', 'reconcile', 'reask', 'report'])
     a = ap.parse_args()
     if a.command == 'prepare':
         return prepare()
@@ -218,7 +237,7 @@ def main():
     if a.command in ('probe', 'collect'):
         P.collect()
     else:
-        {'vision': vision, 'reconcile': P.reconcile, 'report': report}[a.command]()
+        {'vision': vision, 'reconcile': P.reconcile, 'reask': reask, 'report': report}[a.command]()
 
 
 if __name__ == '__main__':
