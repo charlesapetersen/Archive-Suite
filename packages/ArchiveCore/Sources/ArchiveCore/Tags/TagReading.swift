@@ -137,7 +137,15 @@ public enum TagReading {
     /// transform computed from stale tags and a write that clobbers whatever changed them (measured,
     /// W40.fix-identity-url-cache).
     public static func read(_ url: URL) -> TagReadResult {
-        let url = url.uncached
+        readTrustingURL(url.uncached)
+    }
+
+    /// `read`, through the URL exactly as handed in. ONLY for a caller that built the `URL` itself in the
+    /// same breath (the corpus walker, whose enumerator vends a new URL per file and which already
+    /// rebuilds one byte-exactly in `inspect`): there the rebuild buys nothing and costs a second
+    /// attribute fetch per file, about 7 µs, or 0.7 s over a 102k-file scan. Anything that holds a `URL`
+    /// across time — a row, a stored reference, an undo entry — calls `read`.
+    static func readTrustingURL(_ url: URL) -> TagReadResult {
         do {
             let values = try url.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey])
             if let names = values.tagNames {

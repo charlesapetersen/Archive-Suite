@@ -1,7 +1,7 @@
 import Foundation
 
 extension URL {
-    /// The same file path as a NEW `URL`, with no resource-value cache behind it.
+    /// The same file as a NEW `URL`, with no resource-value cache behind it.
     ///
     /// `URL.resourceValues(forKeys:)` answers from a cache on the backing `NSURL`, and every copy of a
     /// Swift `URL` value shares that one object. Measured on this machine (W40.fix-identity-url-cache,
@@ -13,12 +13,23 @@ extension URL {
     /// run-loop turn, and never on a background thread, which is why the defect showed in an undo made
     /// in the same turn as the edit and would show in any writer off the main thread.
     ///
-    /// Every read that must see the disk as it is NOW (`FileIdentity.capture`, `TagReading.read`, and
-    /// through it the writer's §2 pre-read and §8 re-read) goes through this. It costs about 1.5 µs
-    /// (no `stat`: the directory flag is carried over rather than probed). Non-file URLs are returned
-    /// as they are.
+    /// Writes are affected as well: `setResourceValue` on an `NSURL` that holds cached Finder info
+    /// rebuilds the 32-byte Finder-info block from the CACHE, so a tag or label write through a reused
+    /// `URL` silently reverts a hidden flag (measured), a hide-extension bit or a custom icon set by
+    /// someone else since the cache was filled. A write through a fresh `URL` leaves them alone.
+    ///
+    /// Every read that must see the disk as it is NOW (`FileIdentity.capture`, `TagReading.read`) and
+    /// every write in `CoordinatedTagWriter.write` goes through this. Built from the file-system
+    /// representation, as `CorpusWalker.inspect` does, never from `path`: `URL(fileURLWithPath:)` would
+    /// normalise composed Unicode and so could name a different entry on a byte-exact volume, and an
+    /// empty `path` (an undecodable escape) would silently become the working directory. A URL with no
+    /// representation, an empty path, or a non-file scheme is returned as it is. Building the URL costs
+    /// about 1.5 µs; the read behind it is then a real attribute fetch rather than a cache hit.
     var uncached: URL {
-        guard isFileURL else { return self }
-        return URL(fileURLWithPath: path, isDirectory: hasDirectoryPath)
+        guard isFileURL, !path.isEmpty else { return self }
+        return withUnsafeFileSystemRepresentation { raw in
+            guard let raw else { return self }
+            return URL(fileURLWithFileSystemRepresentation: raw, isDirectory: hasDirectoryPath, relativeTo: nil)
+        }
     }
 }

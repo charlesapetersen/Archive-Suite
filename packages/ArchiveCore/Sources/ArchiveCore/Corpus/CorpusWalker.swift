@@ -419,7 +419,7 @@ public enum CorpusWalker {
                     return .unreadable(CorpusReadFailure(url: url, reason: error.localizedDescription))
                 }
 
-                switch TagReading.read(url) {
+                switch TagReading.readTrustingURL(url) {   // `url` was built in this iteration; see readTrustingURL
                 case let .failure(reason):
                     if FileStat.isMissing(url) { return .vanished }
                     return .unreadable(CorpusReadFailure(url: url, reason: reason))
@@ -559,7 +559,7 @@ public enum CorpusWalker {
                     continue
                 }
 
-                switch TagReading.read(url) {
+                switch TagReading.readTrustingURL(url) {   // `url` was built in this iteration; see readTrustingURL
                 case let .failure(why):
                     // The case `W26.deny` exists to make honest. The code being replaced wrote
                     // `else { continue }` here, which lost the file with no error and no count.

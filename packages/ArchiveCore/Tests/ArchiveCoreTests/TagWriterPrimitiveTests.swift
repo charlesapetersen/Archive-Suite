@@ -24,11 +24,18 @@ final class TagWriterPrimitiveTests: XCTestCase {
         return url
     }
 
+    /// Read-back helpers go through a NEW `URL`: a reused one answers from its resource-value cache and
+    /// would never see a write made through another object (W40.fix-identity-url-cache).
     private func readTags(_ url: URL) throws -> [String] {
-        (try url.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
+        (try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
     }
     private func readLabel(_ url: URL) throws -> Int? {
-        try url.resourceValues(forKeys: [.labelNumberKey]).labelNumber
+        try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.labelNumberKey]).labelNumber
+    }
+    /// Fill `url`'s own resource-value cache with its tags, label and identity, as a discovery enumerator
+    /// or an earlier read would have; the cache-sensitivity tests start from this state.
+    private func prime(_ url: URL) throws {
+        _ = try url.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey, .fileResourceIdentifierKey])
     }
 
     // MARK: §3 Trustworthy-read guard — unreadable file ABORTS
@@ -231,7 +238,7 @@ final class TagWriterPrimitiveTests: XCTestCase {
     func testReplacedFileAbortsThroughTheSameURLItWasCapturedThrough() throws {
         let url = try makeFile("id-swap-same-url.pdf", tags: ["Unread"])
         let identity = try XCTUnwrap(FileIdentity.capture(url))
-        XCTAssertEqual(try readTags(url), ["Unread"], "prime the URL's tag cache too, as discovery does")
+        try prime(url)   // the tag cache too, as a discovery enumerator's URL arrives
 
         try FileManager.default.removeItem(at: url)
         let replacement = URL(fileURLWithPath: url.path)
@@ -255,7 +262,7 @@ final class TagWriterPrimitiveTests: XCTestCase {
     /// made since (here "Keep", added by another writer through a fresh URL).
     func testWriteReadsTheDiskNotTheCallersURLCache() throws {
         let url = try makeFile("stale-before.pdf", tags: ["Unread"])
-        XCTAssertEqual(try readTags(url), ["Unread"], "prime the cache on `url`")
+        try prime(url)
         try (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(["Unread", "Keep"], forKey: .tagNamesKey)
 
         var seen: [String] = []
@@ -267,6 +274,44 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertTrue(multisetEqual(r.before, ["Unread", "Keep"]))
         XCTAssertTrue(multisetEqual(try readTags(URL(fileURLWithPath: url.path)), ["Keep", "Read"]),
                       "the concurrent addition survived the write")
+    }
+
+    /// A write through a `URL` holding cached Finder info rebuilds the Finder-info block from the CACHE, so
+    /// it reverts a hidden flag another writer set since (measured; the Reader's rows carry the enumerator's
+    /// URLs, which arrive with Finder info cached). The writer must leave such bits alone: Tier-2 review of
+    /// this item.
+    func testWriteThroughACachedURLKeepsAnExternalHiddenFlag() throws {
+        let url = try makeFile("hidden-kept.pdf", tags: ["Unread"])
+        try prime(url)   // the label lives in Finder info, so this caches the Finder-info block
+        let fresh = URL(fileURLWithPath: url.path)
+        try (fresh as NSURL).setResourceValue(true, forKey: .isHiddenKey)
+        XCTAssertEqual(try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.isHiddenKey]).isHidden, true,
+                       "precondition: the hidden flag is set on disk")
+
+        let r = try CoordinatedTagWriter.write(url) { current, label in (current + ["Read"], 6) }
+        XCTAssertFalse(r.isNoOp)
+        XCTAssertEqual(try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.isHiddenKey]).isHidden, true,
+                       "a tag + label write must not write cached Finder info back over the hidden flag")
+        XCTAssertTrue(multisetEqual(try readTags(URL(fileURLWithPath: url.path)), ["Unread", "Read"]))
+        XCTAssertEqual(try readLabel(URL(fileURLWithPath: url.path)), 6)
+    }
+
+    /// `URL.uncached` names the same bytes, and never falls back to the working directory.
+    func testUncachedURLKeepsTheNameBytesAndRefusesAnEmptyPath() throws {
+        let composed = tempDir.appendingPathComponent("caf\u{E9}-\u{65}\u{301}.pdf")   // NFC é and NFD é side by side
+        try Data("x".utf8).write(to: composed)
+        var original: [CChar] = [], rebuilt: [CChar] = []
+        composed.withUnsafeFileSystemRepresentation { p in original = Array(UnsafeBufferPointer(start: p, count: strlen(p!))) }
+        composed.uncached.withUnsafeFileSystemRepresentation { p in rebuilt = Array(UnsafeBufferPointer(start: p, count: strlen(p!))) }
+        XCTAssertEqual(original, rebuilt, "the file-system representation is carried over byte for byte")
+        XCTAssertFalse((composed.uncached as NSURL) === (composed as NSURL), "and it is a new object")
+        XCTAssertTrue(FileIdentity.capture(composed.uncached)!.matches(FileIdentity.capture(composed)!))
+
+        let undecodable = try XCTUnwrap(URL(string: "file:///tmp/%FF"))
+        XCTAssertEqual(undecodable.path, "", "precondition: Foundation decodes this to an empty path")
+        XCTAssertEqual(undecodable.uncached, undecodable, "an empty path is returned as it is, never the working directory")
+        let web = try XCTUnwrap(URL(string: "https://example.org/a.pdf"))
+        XCTAssertEqual(web.uncached, web)
     }
 
     /// `TagReading.read` itself, the primitive every read in the suite goes through: a reused `URL` must

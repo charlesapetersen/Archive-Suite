@@ -242,13 +242,26 @@ public enum CoordinatedTagWriter {
         var coordError: NSError?
         NSFileCoordinator().coordinate(writingItemAt: url, options: .contentIndependentMetadataOnly, error: &coordError) { writeURL in
             do {
+                // Everything below reads and writes through a NEW URL for the resolved path, never through
+                // `writeURL` itself: the coordinator hands this block the caller's own `NSURL` object, whose
+                // resource-value cache would answer the reads, and whose cached Finder info a
+                // `setResourceValue` would write back over whatever changed on disk since (measured: a tag
+                // write through a cached URL reverted a hidden flag set by another writer). The path is the
+                // coordinator's, so a relocation by a file presenter is still honoured
+                // (W40.fix-identity-url-cache).
+                let target = writeURL.uncached
+                // And whatever the handed-in URL had cached is stale once this block ends (we wrote, or
+                // the disk had moved on from it), so drop it: a caller reading `resourceValues` through
+                // its own URL afterwards sees the disk. The cache is documented thread-safe.
+                defer { (writeURL as NSURL).removeAllCachedResourceValues() }
+
                 // §6 write-target identity re-verification. If the caller captured the file's identity
                 // at discovery/selection, re-read the resolved URL's identity NOW (inside coordination,
                 // just before writing) and ABORT on mismatch — the file at this path was moved/replaced,
                 // so writing here would tag a DIFFERENT file. Pure read (fileResourceIdentifier), never
                 // documentIdentifier. This runs BEFORE the fresh tag read so nothing is written on abort.
                 if let expectedIdentity {
-                    guard let current = FileIdentity.capture(writeURL) else {
+                    guard let current = FileIdentity.capture(target) else {
                         throw TagWriteError.identityMismatch("write target has no resolvable identity (moved or deleted since discovery)")
                     }
                     guard current.matches(expectedIdentity) else {
@@ -266,7 +279,7 @@ public enum CoordinatedTagWriter {
                 // read again.
                 let before: [String]
                 let beforeLabel: Int?
-                switch TagReading.read(writeURL) {
+                switch TagReading.read(target) {
                 case let .success(names, label):
                     before = names
                     beforeLabel = label
@@ -282,19 +295,19 @@ public enum CoordinatedTagWriter {
                 }
 
                 // Write the tag array. Write the label ONLY when we intend to change it (§7).
-                try (writeURL as NSURL).setResourceValue(intendedTags, forKey: .tagNamesKey)
+                try (target as NSURL).setResourceValue(intendedTags, forKey: .tagNamesKey)
                 if normalizedLabel(intendedLabel) != normalizedLabel(beforeLabel) {
-                    try (writeURL as NSURL).setResourceValue(intendedLabel ?? 0, forKey: .labelNumberKey)
+                    try (target as NSURL).setResourceValue(intendedLabel ?? 0, forKey: .labelNumberKey)
                 }
 
                 // §8 verify by re-read.
-                var (after, afterLabel) = try readPair(writeURL)
+                var (after, afterLabel) = try readPair(target)
 
                 // §7 label-drift defense: if we did NOT intend a color change but the label drifted
                 // (e.g. from rewriting the tag array), restore the original label.
                 if normalizedLabel(intendedLabel) == normalizedLabel(beforeLabel), normalizedLabel(afterLabel) != normalizedLabel(beforeLabel) {
-                    try (writeURL as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)
-                    (after, afterLabel) = try readPair(writeURL)
+                    try (target as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)
+                    (after, afterLabel) = try readPair(target)
                 }
 
                 guard multisetEqual(after, intendedTags) else {
