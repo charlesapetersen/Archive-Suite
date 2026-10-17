@@ -7,6 +7,7 @@
   sample.py sanity               # Apple Vision reads the drawn Latin/Cyrillic/Arabic pages; flags low scorers
   sample.py drop KEY REASON      # drop a drawn page (wrong or misplaced truth); the next draw replaces it
   sample.py freeze               # write the committed manifest; no model call may come before its commit
+  sample.py keep                 # copy the frozen pages and truth to FROZEN, each checked against the manifest
 
 The draw is a pure function of the candidates, SEED and the drops file: each stratum's candidates are sorted by
 key and shuffled with Random(f'{SEED}:{stratum}'), then taken in that order while no collection has more than a
@@ -14,7 +15,8 @@ quarter of the stratum's target. If the cap leaves the stratum short, a second p
 and marks those pages `over_cap`, so a thin stratum is visible rather than quietly capped. Drops are recorded
 with their reason and replaced from further down the same order: the sample is not quietly made easy.
 
-Images and truth stay in CACHE (third-party material; the owner publishes scores only). The repo gets the
+Images and truth stay outside the repo (third-party material; the owner publishes scores only): fetched into
+CACHE, and the frozen sample kept in FROZEN, under Application Support, because macOS may purge Caches. The repo gets the
 manifest: source, item URL, licence, checksums, stratum, convention, contamination and the publish flag.
 """
 from __future__ import annotations
@@ -245,9 +247,38 @@ def cmd_freeze():
     print(f'{len(rows)} pages frozen in {RESULTS / "manifest.jsonl"}')
 
 
+def cmd_keep():
+    """Copy every frozen page's image and truth to FROZEN/<stratum>/ and check each copy's checksum against the
+    committed manifest. FROZEN/index.jsonl maps each page to its kept files. Idempotent; a kept file whose bytes
+    differ from the manifest stops it, and nothing is overwritten."""
+    import shutil
+    draw = {r['source'] + ':' + r['page_id']: r for r in C.read_jsonl(DRAW)}
+    index = []
+    for m in C.read_jsonl(RESULTS / 'manifest.jsonl'):
+        k = m['source'] + ':' + m['page_id']
+        d = draw[k]
+        out = {}
+        for what, src, want in (('image', Path(d['image']), m['image_sha256']),
+                                ('truth', Path(d['truth']), m['truth_sha256'])):
+            dest = C.FROZEN / m['stratum'] / (safe(k) + ('.txt' if what == 'truth' else src.suffix.lower()))
+            if not dest.exists():
+                if C.sha256(src) != want:
+                    raise SystemExit(f'{k}: cached {what} differs from the manifest; not kept')
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                tmp = dest.with_name(dest.name + '.part')
+                shutil.copyfile(src, tmp)
+                tmp.replace(dest)
+            if C.sha256(dest) != want:
+                raise SystemExit(f'{k}: kept {what} {dest} differs from the manifest')
+            out[what] = str(dest.relative_to(C.FROZEN))
+        index.append({'key': k, 'stratum': m['stratum'], **out})
+    C.write_jsonl(C.FROZEN / 'index.jsonl', index)
+    print(f'{len(index)} pages kept in {C.FROZEN}, every checksum matching the manifest')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=['list', 'prefetch', 'draw', 'sanity', 'drop', 'freeze'])
+    ap.add_argument('command', choices=['list', 'prefetch', 'draw', 'sanity', 'drop', 'freeze', 'keep'])
     ap.add_argument('args', nargs='*')
     a = ap.parse_args()
     if a.command == 'drop':
@@ -257,7 +288,7 @@ def main():
     elif a.command in ('draw', 'prefetch'):
         {'draw': cmd_draw, 'prefetch': cmd_prefetch}[a.command](a.args)
     else:
-        {'list': cmd_list, 'draw': cmd_draw, 'sanity': cmd_sanity, 'freeze': cmd_freeze}[a.command]()
+        {'list': cmd_list, 'sanity': cmd_sanity, 'freeze': cmd_freeze, 'keep': cmd_keep}[a.command]()
 
 
 if __name__ == '__main__':

@@ -12,17 +12,17 @@ import routes as R
 class Frozen(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-        self.saved = (R.MANIFEST, R.DRAW)
-        R.MANIFEST, R.DRAW = self.tmp / 'manifest.jsonl', self.tmp / 'draw.jsonl'
+        self.saved = (R.MANIFEST, R.INDEX, C.FROZEN)
+        R.MANIFEST, R.INDEX, C.FROZEN = self.tmp / 'manifest.jsonl', self.tmp / 'index.jsonl', self.tmp
         img, truth = self.tmp / 'p.jpg', self.tmp / 'p.txt'
         img.write_bytes(b'image'); truth.write_text('truth')
         row = {'source': 's', 'page_id': 'a/b', 'stratum': 'L5', 'script': 'Latn'}
-        C.write_jsonl(R.DRAW, [{**row, 'image': str(img), 'truth': str(truth)}])
+        C.write_jsonl(R.INDEX, [{'key': 's:a/b', 'stratum': 'L5', 'image': 'p.jpg', 'truth': 'p.txt'}])
         C.write_jsonl(R.MANIFEST, [{**row, 'image_sha256': C.sha256(img), 'truth_sha256': C.sha256(truth)}])
         self.img, self.truth = img, truth
 
     def tearDown(self):
-        R.MANIFEST, R.DRAW = self.saved
+        R.MANIFEST, R.INDEX, C.FROZEN = self.saved
 
     def test_frozen_page_joins_its_paths(self):
         [r] = R.frozen()
@@ -34,8 +34,8 @@ class Frozen(unittest.TestCase):
         with self.assertRaises(SystemExit):
             R.frozen()
 
-    def test_page_missing_from_draw_is_refused(self):
-        C.write_jsonl(R.DRAW, [])
+    def test_page_not_kept_is_refused(self):
+        C.write_jsonl(R.INDEX, [])
         with self.assertRaises(SystemExit):
             R.frozen()
 

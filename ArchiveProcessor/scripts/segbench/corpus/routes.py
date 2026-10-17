@@ -37,7 +37,7 @@ import ocr_panel as P        # noqa: E402
 RUN = C.CACHE / 'routes'
 RESULTS = HERE.parents[2] / 'segbench-results' / 'bench-corpus'
 MANIFEST = RESULTS / 'manifest.jsonl'
-DRAW = C.CACHE / 'sample' / 'draw.jsonl'
+INDEX = C.FROZEN / 'index.jsonl'
 ROUTES = {k: OC.MODELS[k] for k in ('gemini3.8-flash', 'qwen3-vl-235b')}
 CAP = 2.60     # of the $5.10: 440 pages at the plan's $0.0047 a page is $2.07, plus other-script headroom
 PROBE = 30
@@ -53,14 +53,15 @@ def job_id(r):
 
 
 def frozen():
-    """The committed manifest joined to the cache's draw (which holds the image and truth paths). Every
-    checksum must match: a page whose bytes moved since the freeze is not the frozen page."""
-    draw = {key(r): r for r in C.read_jsonl(DRAW)}
+    """The committed manifest joined to the kept copies (sample.py keep; FROZEN/index.jsonl). Every checksum must
+    match: a page whose bytes moved since the freeze is not the frozen page."""
+    kept = {r['key']: {'image': str(C.FROZEN / r['image']), 'truth': str(C.FROZEN / r['truth'])}
+            for r in C.read_jsonl(INDEX)}
     rows = []
     for m in C.read_jsonl(MANIFEST):
-        d = draw.get(key(m))
+        d = kept.get(key(m))
         if d is None:
-            raise SystemExit(f'{key(m)}: frozen but not in the draw')
+            raise SystemExit(f'{key(m)}: frozen but not kept (run sample.py keep)')
         if C.sha256(Path(d['image'])) != m['image_sha256'] or C.sha256(Path(d['truth'])) != m['truth_sha256']:
             raise SystemExit(f'{key(m)}: image or truth differs from the frozen checksum')
         rows.append({**m, 'image': d['image'], 'truth': d['truth']})

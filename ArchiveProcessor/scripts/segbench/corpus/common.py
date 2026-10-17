@@ -24,6 +24,9 @@ HERE = Path(__file__).resolve().parent
 FETCH = HERE / 'fetch.sh'
 CACHE = Path(os.environ.get('BENCH_CORPUS_CACHE',
                             Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/bench-corpus'))
+# The frozen pages and truth, kept (owner, 2026-10-16 23:40): not in Caches, which macOS may purge.
+FROZEN = Path(os.environ.get('BENCH_CORPUS_FROZEN',
+                             Path.home() / 'Library/Application Support/ArchiveSuiteRehearsal/bench-corpus-frozen'))
 
 
 # --- network, through fetch.sh only ---------------------------------------------------------------
