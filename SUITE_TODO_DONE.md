@@ -11675,3 +11675,13 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   "switch folder (Ideas)" once (1 of 4 runs, before gate-fix) reported no change; the `@N` lines now say which
   sections moved.
   <!-- /W40.e13 -->
+- [x] **W40.f2 — the Reader's undisclosed root-marker write [S]** · §W40 verification phase · SHIPPED 2026-10-17 (this commit)
+  `ArchiveReaderTests/RootMarkerDisclosureTests` drives the real adoption paths (`RootFolderStore.setRoot` and the
+  relaunch re-resolve) on scratch roots with throwaway defaults. Demonstrated: choosing a folder, with no link copied
+  and no tag edited, writes `.archive-suite-root.json` (under 512 bytes) into it and changes the root's mtime, the
+  archive's PDF bytes and tags untouched; a relaunch does not rewrite it; a removed marker is re-minted on the next
+  launch with a new GUID and no word, orphaning earlier links; a read-only folder still opens and reads, so the file
+  serves durable links only. The Core Directive does not mention it. Keep and disclose, defer to the first link copy,
+  or keep it out of the archive is the owner's call (Daemon Report, gate `W40.root-marker-owner-ok`) →
+  `W40.root-marker`. Ledger note under R-45 updated. Evidence `verification/evidence/reader/W40.f2-root-marker.md`.
+  <!-- /W40.f2 -->

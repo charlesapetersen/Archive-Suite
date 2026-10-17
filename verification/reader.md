@@ -947,7 +947,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - A write that fails its re-read check has already written. It throws without rolling back, which is what §9
     asks ("no blind rollback").
   - The Reader also creates `.archive-suite-root.json` in the granted root (`RootMarkerState.swift:77`). That is
-    a new file in the archive, outside the "only Finder tags" promise, and `W40.f2` owns the decision.
+    a new file in the archive, outside the "only Finder tags" promise. `W40.f2` demonstrated it on scratch
+    ([`evidence/reader/W40.f2-root-marker.md`](evidence/reader/W40.f2-root-marker.md)): written when a folder is
+    chosen, once, and silently re-minted with a new GUID if removed. The owner decides under `W40.root-marker`.
 
 ### R-46 · Append-only audit ledger of every change
 
