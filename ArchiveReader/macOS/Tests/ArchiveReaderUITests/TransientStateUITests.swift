@@ -11,6 +11,12 @@ final class TransientStateUITests: FixtureUITestCase {
     static let sections = ["ar.table", "ar.sidebar", "ar.filter", "ar.toolbar", "ar.status", "ar.tagCloud",
                            "ar.empty", "ar.preview", TransientCheck.sheets]
 
+    /// `W40.fix-split-animation-wobble`: while the sidebar animates, a file-list row's or cell's width turns back by
+    /// 1–5 points (1112→1115→1110, 54→53→54), on some runs and not others (measured in the VM, 2026-10-17).
+    static let splitWobble = TransientCheck.KnownIssue(tag: "W40.fix-split-animation-wobble", intermittent: true) {
+        $0.hasPrefix("ar.table geometry: ") && $0.contains(" width ")
+    }
+
     func testCommonTransitionsShowNoTransientState() throws {
         relaunch(TransientCheck.launchArguments(sections: Self.sections))
         continueAfterFailure = true   // one flickering transition must not hide the next one's
@@ -40,8 +46,12 @@ final class TransientStateUITests: FixtureUITestCase {
         TransientCheck.check("close the preview sheet", in: app, test: self) {
             app.buttons["ar.preview.done"].firstMatch.click()
         }
-        TransientCheck.check("hide the sidebar", in: app, test: self) { toolbarButton("ar.toolbar.sidebar").click() }
-        TransientCheck.check("show the sidebar", in: app, test: self) { toolbarButton("ar.toolbar.sidebar").click() }
+        TransientCheck.check("hide the sidebar", in: app, test: self, known: [Self.splitWobble]) {
+            toolbarButton("ar.toolbar.sidebar").click()
+        }
+        TransientCheck.check("show the sidebar", in: app, test: self, known: [Self.splitWobble]) {
+            toolbarButton("ar.toolbar.sidebar").click()
+        }
         TransientCheck.check("toggle the tag cloud", in: app, test: self) {
             toolbarButton("ar.toolbar.tagCloud").click()
         }

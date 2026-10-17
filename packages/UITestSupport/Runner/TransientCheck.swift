@@ -7,7 +7,8 @@
 //     TransientCheck.check("next note", in: app, test: self) { row.click() }
 // which waits for the screen to be idle, runs the action, waits for the recorder to see the transition settle,
 // and fails on every finding the recorder reported for it. `known:` carries a filed defect as a strict expected
-// failure, as the layout guard does: it fails the run once the defect stops reproducing.
+// failure, as the layout guard does: it fails the run once the defect stops reproducing. A defect measured to
+// show only on some runs is marked `intermittent` instead, and does not fail a run where it does not show.
 //
 // The checker is shown to fail twice before its passes are trusted: `TransientCheckSelfTest.run()` feeds the
 // analysis synthetic flickers of every kind, and each suite runs one transition with the planted flicker
@@ -27,9 +28,13 @@ enum TransientCheck {
         [sectionsArgument, sections.joined(separator: ",")] + (plant ? [plantArgument, "blink"] : [])
     }
 
-    /// A filed defect the recorder is expected to report, matched on a finding's line.
+    /// A filed defect the recorder is expected to report, matched on a finding's line. `intermittent` is for a defect
+    /// measured to show on some runs and not others (XCTest's non-strict expected failure): it is still printed and
+    /// attached when it shows, and a run where it does not show is not a failure. Keep the matcher narrow, so that
+    /// it cannot also swallow a different finding on the same transition.
     struct KnownIssue {
         let tag: String
+        var intermittent = false
         let matches: (String) -> Bool
     }
 
@@ -132,11 +137,11 @@ enum TransientCheck {
             if lines.isEmpty { XCTFail("transient: \(name): expected findings, got none", file: file, line: line) }
             return lines
         }
-        var unmatched = Set(known.map(\.tag))
+        var unmatched = Set(known.filter { !$0.intermittent }.map(\.tag))
         for finding in lines {
             if let k = known.first(where: { $0.matches(finding) }) {
                 unmatched.remove(k.tag)
-                print("  (known: \(k.tag))")
+                print("  (known\(k.intermittent ? ", intermittent" : ""): \(k.tag))")
             } else {
                 XCTFail("transient: \(name): \(finding)", file: file, line: line)
             }

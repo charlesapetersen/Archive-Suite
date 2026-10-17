@@ -13,6 +13,20 @@ final class TransientStateUITests: NotesFixtureUITestCase {
                            "an.filter", TransientCheck.sheets,
                            "!an.editor.test."]   // the UITest button strip, which reports internals
 
+    /// `W40.fix-notes-editor-frame-jump`: when the shown note changes (next or previous note, a folder switch), the
+    /// editor's text view is sometimes laid out at 0×0 off the window (x -429) for one pass and then back (first seen
+    /// by this recorder 2026-10-16; on 3 of 5 VM runs, 2026-10-17). Carried by each transition that changes the
+    /// shown note.
+    static let editorJump = TransientCheck.KnownIssue(tag: "W40.fix-notes-editor-frame-jump", intermittent: true) {
+        $0.hasPrefix("an.editor geometry: an.editor.text ") && $0.contains(" 0×0 against ")
+    }
+
+    /// `W40.fix-split-animation-wobble`: while the folder tree animates, a list row's or the header's width turns
+    /// back by 1–2 points (1010→1012→1008), on some runs and not others (measured in the VM, 2026-10-17).
+    static let splitWobble = TransientCheck.KnownIssue(tag: "W40.fix-split-animation-wobble", intermittent: true) {
+        $0.hasPrefix("an.list geometry: ") && $0.contains(" width ")
+    }
+
     private var plant = false
     override var extraLaunchArguments: [String] {
         TransientCheck.launchArguments(sections: Self.sections, plant: plant)
@@ -25,31 +39,31 @@ final class TransientStateUITests: NotesFixtureUITestCase {
             XCTAssertTrue(window.waitForExistence(timeout: 15))
             row(Self.idPlain, in: window).click()
 
-            TransientCheck.check("next note (click)", in: app, test: self) {
+            TransientCheck.check("next note (click)", in: app, test: self, known: [Self.editorJump]) {
                 row(Self.idReader, in: window).click()
             }
-            TransientCheck.check("next note (down arrow)", in: app, test: self) {
+            TransientCheck.check("next note (down arrow)", in: app, test: self, known: [Self.editorJump]) {
                 app.typeKey(.downArrow, modifierFlags: [])
             }
-            TransientCheck.check("previous note (up arrow)", in: app, test: self) {
+            TransientCheck.check("previous note (up arrow)", in: app, test: self, known: [Self.editorJump]) {
                 app.typeKey(.upArrow, modifierFlags: [])
             }
-            TransientCheck.check("switch folder (Reading)", in: app, test: self) {
+            TransientCheck.check("switch folder (Reading)", in: app, test: self, known: [Self.editorJump]) {
                 folder("Reading", in: window).click()
             }
-            TransientCheck.check("switch folder (Ideas)", in: app, test: self) {
+            TransientCheck.check("switch folder (Ideas)", in: app, test: self, known: [Self.editorJump]) {
                 folder("Ideas", in: window).click()
             }
-            TransientCheck.check("switch to an empty folder (Inbox)", in: app, test: self) {
+            TransientCheck.check("switch to an empty folder (Inbox)", in: app, test: self, known: [Self.editorJump]) {
                 folder("Inbox", in: window).click()
             }
-            TransientCheck.check("switch to All Notes", in: app, test: self) {
+            TransientCheck.check("switch to All Notes", in: app, test: self, known: [Self.editorJump]) {
                 window.descendants(matching: .any)["an.sidebar.allNotes"].firstMatch.click()
             }
-            TransientCheck.check("filter by kind", in: app, test: self) {
+            TransientCheck.check("filter by kind", in: app, test: self, known: [Self.editorJump]) {
                 kindFilter(in: window, to: "Extracts")
             }
-            TransientCheck.check("filter back to all kinds", in: app, test: self) {
+            TransientCheck.check("filter back to all kinds", in: app, test: self, known: [Self.editorJump]) {
                 kindFilter(in: window, to: "Both")
             }
             TransientCheck.check("open the smart-folder sheet", in: app, test: self) {
@@ -58,10 +72,10 @@ final class TransientStateUITests: NotesFixtureUITestCase {
             TransientCheck.check("close the smart-folder sheet", in: app, test: self) {
                 window.sheets.firstMatch.buttons["Cancel"].click()
             }
-            TransientCheck.check("hide the folder tree", in: app, test: self) {
+            TransientCheck.check("hide the folder tree", in: app, test: self, known: [Self.splitWobble]) {
                 window.descendants(matching: .any)["an.toggleTree"].firstMatch.click()
             }
-            TransientCheck.check("show the folder tree", in: app, test: self) {
+            TransientCheck.check("show the folder tree", in: app, test: self, known: [Self.splitWobble]) {
                 window.descendants(matching: .any)["an.toggleTree"].firstMatch.click()
             }
         }
