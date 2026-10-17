@@ -24,14 +24,9 @@ final class TransientStateUITests: FixtureUITestCase {
         TransientCheck.check("previous file (up arrow)", in: app, test: self) {
             app.typeKey(.upArrow, modifierFlags: [])
         }
-        TransientCheck.check("switch folder (a subfolder)", in: app, test: self) {
-            let folder = app.descendants(matching: .any).matching(identifier: "ar.sidebar.folder").firstMatch
-            XCTAssertTrue(folder.waitForExistence(timeout: 10), "the fixture's subfolder should be listed")
-            folder.click()
-        }
-        TransientCheck.check("switch to All Files", in: app, test: self) {
-            app.descendants(matching: .any)["ar.sidebar.allFiles"].firstMatch.click()
-        }
+        // No folder switch: the sidebar's folders come from the rows' paths, and the GUI fixture's only subfolder
+        // (`Archival Photos JPEGS`) holds a JPEG that is not a row, so it lists none (measured in the VM, 2026-10-17).
+        // Covering it needs a fixture subfolder with a PDF in it; see execution-plans/items/W40.e13.md.
         TransientCheck.check("filter to Q3", in: app, test: self) {
             app.descendants(matching: .any)["ar.filter.quality.Q3"].firstMatch.click()
         }

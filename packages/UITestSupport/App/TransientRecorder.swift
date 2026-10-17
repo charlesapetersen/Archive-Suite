@@ -153,88 +153,151 @@ final class TransientRecorder {
         let windows = NSApp.windows.filter { $0.isVisible && $0 !== panel }.sorted { $0.windowNumber < $1.windowNumber }
         for window in windows {
             let section = window.isSheet && prefixes.contains(Self.sheetsSection) ? Self.sheetsSection : nil
-            walk(window, section: section, origin: window.frame.origin, depth: 0, into: &out, budget: &budget)
+            guard let node = AXNode(window) else { continue }
+            walk(node, section: section, origin: window.frame.origin, depth: 0, into: &out, budget: &budget)
         }
         return out
     }
 
-    private func walk(_ element: NSAccessibilityProtocol, section: String?, origin: CGPoint, depth: Int,
+    private func walk(_ element: AXNode, section: String?, origin: CGPoint, depth: Int,
                       into out: inout [String: TransientSectionState], budget: inout Int) {
         guard budget > 0, depth < 80 else { return }
         budget -= 1
-        let identifier = element.accessibilityIdentifier() ?? ""
+        let identifier = element.identifier
         if !identifier.isEmpty, excluded.contains(where: { identifier.hasPrefix($0) }) { return }
         // An open menu is AppKit's menu tracking, not the app's display: while a pop-up button's menu is open its
         // items are the button's children, and their highlight follows the pointer (measured 2026-10-17: picking a
         // Processor segmentation option reported every item the pointer crossed as a transient value).
-        if element.accessibilityRole() == .menu { return }
+        let role = element.role
+        if role == NSAccessibility.Role.menu.rawValue { return }
         let section = section ?? prefixes.first { !identifier.isEmpty && identifier.hasPrefix($0) }
         if let section {
-            let frame = element.accessibilityFrame()
-            let entry = TransientEntry(role: element.accessibilityRole()?.rawValue ?? "", identifier: identifier,
-                                       text: Self.text(of: element),
+            let frame = element.frame
+            let entry = TransientEntry(role: role, identifier: identifier, text: element.text,
                                        x: Int((frame.minX - origin.x).rounded()), y: Int((frame.minY - origin.y).rounded()),
                                        w: Int(frame.width.rounded()), h: Int(frame.height.rounded()))
             out[section, default: TransientSectionState()].entries.append(entry)
         }
         // A table's or outline's rows are its `accessibilityRows`, which its children need not include (measured:
         // a Notes folder switch changed only the list's rows, and a children-only walk saw no change at all).
-        var children = (element.accessibilityChildren() ?? []).map { $0 as AnyObject }
-        let rows = Self.answers(element, "accessibilityRows") ? element.accessibilityRows() ?? [] : []
-        for row in rows where !children.contains(where: { $0 === row as AnyObject }) {
-            children.append(row as AnyObject)
+        var children = element.children
+        for row in element.rows where !children.contains(where: { $0 === row }) {
+            children.append(row)
         }
         for child in children {
-            guard let child = Self.element(child) else { continue }
+            guard let child = AXNode(child) else { continue }
             walk(child, section: section, origin: origin, depth: depth + 1, into: &out, budget: &budget)
         }
     }
 
-    /// The messages the walk needs every element to answer; the rest are asked only of an element that answers
-    /// them (`answers`).
-    private static let requiredSelectors = ["accessibilityIdentifier", "accessibilityFrame", "accessibilityRole",
-                                            "accessibilityChildren"].map(NSSelectorFromString)
+    /// One element as the walk reads it. The accessibility server reads an element by message, whatever it declares,
+    /// and the walk has to as well, because an app's tree mixes three kinds (all measured in the VM, 2026-10-17):
+    /// - AppKit views and windows, which declare `NSAccessibilityProtocol`;
+    /// - SwiftUI's elements (`SwiftUI.AccessibilityNode`), which answer that protocol's messages without declaring
+    ///   it, so `as? NSAccessibilityProtocol` fails on them. A walk that relied on the cast dropped every child of a
+    ///   SwiftUI scroll view and stopped at 16 elements; the Processor's panels, all inside one, were never sampled;
+    /// - AppKit's older elements, such as `NSTableRow` (a view-based table's rows), which answer only the legacy
+    ///   `accessibilityAttributeValue:`. The Reader's file list returned 20 of them, and without them a selection
+    ///   change showed nothing.
+    /// The first two are read through the protocol (the second by `unsafeBitCast`, sound because an `@objc`
+    /// protocol's existential is the bare object reference and every call is an Objective-C message), each optional
+    /// message checked before it is sent; the third through its attributes, asking only those it lists.
+    private struct AXNode {
+        let object: NSObject
+        private let modern: NSAccessibilityProtocol?
+        private let attributes: Set<String>
 
-    private static func answers(_ element: NSAccessibilityProtocol, _ selector: String) -> Bool {
-        (element as AnyObject).responds(to: NSSelectorFromString(selector))
-    }
+        private static let required = ["accessibilityIdentifier", "accessibilityFrame", "accessibilityRole",
+                                       "accessibilityChildren"].map(NSSelectorFromString)
+        private static let attributeValue = NSSelectorFromString("accessibilityAttributeValue:")
+        private static let attributeNames = NSSelectorFromString("accessibilityAttributeNames")
 
-    /// A child as an element the walk can read, or nil if it does not answer the accessibility messages.
-    ///
-    /// SwiftUI's in-process elements (`SwiftUI.AccessibilityNode`) answer them but do not declare
-    /// `NSAccessibilityProtocol`, so `as? NSAccessibilityProtocol` fails on them. Measured in the VM on 2026-10-17:
-    /// every child of a SwiftUI scroll view was dropped that way, the walk stopped at 16 elements, and the
-    /// Processor's panels, which all sit in one, were never sampled; each transition there failed as "no watched
-    /// section changed". The accessibility server reads elements by message, not by declared protocol, so the walk
-    /// does too: an object that answers the required messages is read through the protocol, and every optional
-    /// message is checked with `answers` before it is sent. That is sound because an `@objc` protocol's existential
-    /// is the bare object reference and each call is an Objective-C message.
-    private static func element(_ child: AnyObject) -> NSAccessibilityProtocol? {
-        if let element = child as? NSAccessibilityProtocol { return element }
-        guard requiredSelectors.allSatisfy({ child.responds(to: $0) }) else { return nil }
-        return unsafeBitCast(child, to: NSAccessibilityProtocol.self)
-    }
+        init?(_ any: Any) {
+            guard let object = any as? NSObject else { return nil }
+            self.object = object
+            if let element = object as? NSAccessibilityProtocol {
+                modern = element
+                attributes = []
+            } else if Self.required.allSatisfy({ object.responds(to: $0) }) {
+                modern = unsafeBitCast(object, to: NSAccessibilityProtocol.self)
+                attributes = []
+            } else if object.responds(to: Self.attributeValue), object.responds(to: Self.attributeNames) {
+                modern = nil
+                attributes = Set(object.perform(Self.attributeNames)?.takeUnretainedValue() as? [String] ?? [])
+            } else {
+                return nil
+            }
+        }
 
-    private static func text(of element: NSAccessibilityProtocol) -> String {
-        var parts: [String] = []
-        if answers(element, "accessibilityTitle"), let title = element.accessibilityTitle(), !title.isEmpty {
-            parts.append(title)
+        private func answers(_ selector: String) -> Bool { object.responds(to: NSSelectorFromString(selector)) }
+
+        private func attribute(_ name: NSAccessibility.Attribute) -> Any? {
+            guard attributes.contains(name.rawValue) else { return nil }
+            return object.perform(Self.attributeValue, with: name.rawValue)?.takeUnretainedValue()
         }
-        if answers(element, "accessibilityLabel"), let label = element.accessibilityLabel(), !label.isEmpty,
-           !parts.contains(label) {
-            parts.append(label)
+
+        var identifier: String {
+            if let modern { return modern.accessibilityIdentifier() ?? "" }
+            return attribute(.identifier) as? String ?? ""
         }
-        switch answers(element, "accessibilityValue") ? element.accessibilityValue() : nil {
-        case let s as String where !s.isEmpty && !parts.contains(s): parts.append(s)
-        case let a as NSAttributedString where a.length > 0: parts.append(a.string)
-        case let n as NSNumber: parts.append(n.stringValue)
-        default: break
+
+        var role: String {
+            if let modern { return modern.accessibilityRole()?.rawValue ?? "" }
+            return attribute(.role) as? String ?? ""
         }
-        // A selection highlight or a greyed-out control is displayed state too: a row deselected and selected
-        // again, or a toolbar button that flashes disabled, is a flicker.
-        if answers(element, "isAccessibilitySelected"), element.isAccessibilitySelected() { parts.append("⟨selected⟩") }
-        if answers(element, "isAccessibilityEnabled"), !element.isAccessibilityEnabled() { parts.append("⟨disabled⟩") }
-        return parts.joined(separator: " | ")
+
+        var frame: CGRect {
+            if let modern { return modern.accessibilityFrame() }
+            let origin = (attribute(.position) as? NSValue)?.pointValue ?? .zero
+            let size = (attribute(.size) as? NSValue)?.sizeValue ?? .zero
+            return CGRect(origin: origin, size: size)
+        }
+
+        var children: [AnyObject] {
+            if let modern { return (modern.accessibilityChildren() ?? []).map { $0 as AnyObject } }
+            return (attribute(.children) as? [Any] ?? []).map { $0 as AnyObject }
+        }
+
+        var rows: [AnyObject] {
+            if let modern {
+                guard answers("accessibilityRows") else { return [] }
+                return (modern.accessibilityRows() ?? []).map { $0 as AnyObject }
+            }
+            return (attribute(.rows) as? [Any] ?? []).map { $0 as AnyObject }
+        }
+
+        /// Title, label and value, plus a selection highlight or a greyed-out control, which are displayed state too:
+        /// a row deselected and selected again, or a toolbar button that flashes disabled, is a flicker.
+        var text: String {
+            let title, label: String?
+            let value: Any?
+            let selected, enabled: Bool
+            if let modern {
+                title = answers("accessibilityTitle") ? modern.accessibilityTitle() : nil
+                label = answers("accessibilityLabel") ? modern.accessibilityLabel() : nil
+                value = answers("accessibilityValue") ? modern.accessibilityValue() : nil
+                selected = answers("isAccessibilitySelected") && modern.isAccessibilitySelected()
+                enabled = !answers("isAccessibilityEnabled") || modern.isAccessibilityEnabled()
+            } else {
+                title = attribute(.title) as? String
+                label = attribute(.description) as? String
+                value = attribute(.value)
+                selected = (attribute(.selected) as? NSNumber)?.boolValue ?? false
+                enabled = (attribute(.enabled) as? NSNumber)?.boolValue ?? true
+            }
+            var parts: [String] = []
+            if let title, !title.isEmpty { parts.append(title) }
+            if let label, !label.isEmpty, !parts.contains(label) { parts.append(label) }
+            switch value {
+            case let s as String where !s.isEmpty && !parts.contains(s): parts.append(s)
+            case let a as NSAttributedString where a.length > 0: parts.append(a.string)
+            case let n as NSNumber: parts.append(n.stringValue)
+            default: break
+            }
+            if selected { parts.append("⟨selected⟩") }
+            if !enabled { parts.append("⟨disabled⟩") }
+            return parts.joined(separator: " | ")
+        }
     }
 
     // MARK: - the planted flicker
