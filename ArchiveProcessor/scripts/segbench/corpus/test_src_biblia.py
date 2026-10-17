@@ -33,6 +33,15 @@ class Truth(unittest.TestCase):
     def test_blocks_lines_points_kept(self):
         self.assertEqual(s.truth(ALTO), 'בְּרֵאשִׁית ברא אלהים\nאת השמים ואת\n\nל׳ זעירא')
 
+    def test_columns_read_right_to_left(self):
+        # The left column listed first, as most drawn BiblIA files do; the right one is read first.
+        two = ('<alto xmlns="http://www.loc.gov/standards/alto/ns-v4#"><Layout><Page><PrintSpace>'
+               '<TextBlock ID="L" HPOS="470" WIDTH="1281"><TextLine><String CONTENT="שני"/></TextLine></TextBlock>'
+               '<TextBlock ID="R" HPOS="1828" WIDTH="1301"><TextLine><String CONTENT="ראשון"/></TextLine></TextBlock>'
+               '</PrintSpace></Page></Layout></alto>').encode()
+        self.assertEqual(s.truth(two), 'ראשון\n\nשני')
+        self.assertEqual(common.alto_text(two), 'שני\n\nראשון')   # file order unless asked
+
     def test_clean_line(self):
         self.assertEqual(s.clean_line("ואת הקרב ואת [הכר']"), 'ואת הקרב ואת')     # line-end filler
         self.assertEqual(s.clean_line('ויחבר את חמש היר[י]עת'), 'ויחבר את חמש היריעת')   # added letter

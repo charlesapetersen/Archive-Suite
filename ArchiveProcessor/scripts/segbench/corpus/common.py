@@ -222,13 +222,18 @@ def page_xml_text(data: bytes) -> str:
     return '\n\n'.join(out).strip()
 
 
-def alto_text(data: bytes) -> str:
-    """ALTO page text: TextLine by TextLine, String CONTENT joined by spaces (HYP keeps its hyphen)."""
+def alto_text(data: bytes, rtl: bool = False) -> str:
+    """ALTO page text: TextLine by TextLine, String CONTENT joined by spaces (HYP keeps its hyphen).
+
+    Blocks come in file order, unless `rtl`: then by their right edge, rightmost first, for a right-to-left script
+    whose file order is not its reading order (BiblIA, where 29 of the 40 drawn pages listed a column before the
+    one to its right)."""
     root = ET.fromstring(data)
     blocks = []
-    for blk in root.iter():
-        if _local(blk.tag) != 'TextBlock':
-            continue
+    tbs = [b for b in root.iter() if _local(b.tag) == 'TextBlock']
+    if rtl:
+        tbs.sort(key=lambda b: -(float(b.get('HPOS', 0)) + float(b.get('WIDTH', 0))))
+    for blk in tbs:
         lines = []
         for ln in blk.iter():
             if _local(ln.tag) != 'TextLine':

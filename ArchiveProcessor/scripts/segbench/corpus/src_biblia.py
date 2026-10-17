@@ -59,9 +59,10 @@ def clean_line(line: str) -> str:
 
 def truth(xml_bytes: bytes) -> str:
     """Page text, ALTO block by block, each line through clean_line(). Vowel points and cantillation marks,
-    where a transcriber kept them (one page of 132), stay."""
+    where a transcriber kept them (one page of 132), stay. Blocks (the page's columns) are read right to left:
+    the files list them in no fixed order (found by hand in the 2026-10-17 sanity pass: Deut. 3:28 before 3:23)."""
     blocks = []
-    for blk in common.alto_text(xml_bytes).split('\n\n'):
+    for blk in common.alto_text(xml_bytes, rtl=True).split('\n\n'):
         lines = [t for t in (clean_line(ln) for ln in blk.split('\n')) if t]
         if lines:
             blocks.append('\n'.join(lines))
