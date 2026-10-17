@@ -144,18 +144,23 @@ def estimate():
 
 
 def reask():
-    """Calls cut off by an interruption of this runner (finish 'interrupted', bounded and booked by reconcile)
-    are a fact about the session, not the route: left as failures they would count against the route's score.
-    Their cached reply is set aside (kept, renamed) so collect asks again; the ledger keeps the booked cost, so
-    the cap still counts it. Only interrupted calls: a route's own failure is never re-asked."""
+    """Calls cut off by an interruption of this runner (bounded and booked by reconcile) are a fact about the
+    session, not the route: left as failures they would count against the route's score. A page and route whose
+    every ledger record is such a bounded call has its cached reply set aside (kept, renamed) so collect asks
+    again; the ledger keeps the booked cost, so the cap still counts it. The ledger decides, not the reply file:
+    reconcile rewrites a bounded call's reply file with its bounded record even after a re-ask has answered
+    (found 2026-10-17, when four answered re-asks were set aside again). A route's own failure is never re-asked."""
+    measured, bounded = set(), {}
+    for r in P.records():
+        (bounded.__setitem__((r['key'], r['job']), r) if r.get('cost_upper_bound')
+         else measured.add((r['key'], r['job'])))
     n = 0
-    for f in sorted((RUN / 'responses').glob('*/*.json')):
-        if f.name.endswith(('.raw.json', '.interrupted.json')):
+    for (k, job), r in sorted(bounded.items()):
+        f = RUN / 'responses' / k / (job + '.json')
+        if (k, job) in measured or not f.exists():
             continue
-        meta = json.loads(f.read_text()).get('meta') or {}
-        if meta.get('finish') == 'interrupted':
-            f.rename(f.with_name(f.name[:-5] + '.interrupted.json')); n += 1
-            print(f"re-ask {meta['key']} {meta['job']} (booked ${meta['cost']:.6f})")
+        f.rename(f.with_name(job + '.interrupted.json')); n += 1
+        print(f"re-ask {k} {job} (booked ${r['cost']:.6f})")
     print(f'{n} interrupted calls set aside for collect')
 
 
