@@ -47,6 +47,8 @@ enum TransientCheck {
         var changing = ""
         var header = ""
         var findings: [(transition: Int, line: String)] = []
+        /// Per transition: which sections changed, and how many elements each section held once settled.
+        var changes: [(transition: Int, line: String)] = []
 
         init?(_ text: String) {
             var lines = text.split(separator: "\n").map(String.init)
@@ -64,11 +66,13 @@ enum TransientCheck {
             walkMaxMs = fields["walkMaxMs"] ?? 0
             plants = fields["plants"] ?? 0
             changing = header.components(separatedBy: "changing=").dropFirst().first ?? ""
-            findings = lines.compactMap { line in
-                guard line.hasPrefix("#"), let space = line.firstIndex(of: " "),
+            func numbered(_ mark: Character) -> [(Int, String)] { lines.compactMap { line in
+                guard line.first == mark, let space = line.firstIndex(of: " "),
                       let n = Int(line[line.index(after: line.startIndex)..<space]) else { return nil }
                 return (n, String(line[line.index(after: space)...]))
-            }
+            } }
+            findings = numbered("#")
+            changes = numbered("@")
         }
     }
 
@@ -106,6 +110,8 @@ enum TransientCheck {
                     + "(is the app launched with TransientCheck.launchArguments?)", file: file, line: line)
             return []
         }
+        // The guest's epoch at the action, for lining a screen video up with the transitions (transient-frames.py).
+        print("transient-mark: \(String(format: "%.3f", Date().timeIntervalSince1970)) \(name)")
         action()
         let deadline = Date().addingTimeInterval(30)
         var after: Report?
@@ -126,9 +132,10 @@ enum TransientCheck {
             return []
         }
         let lines = after.findings.filter { $0.transition > before.transitions }.map(\.line)
+        let changes = after.changes.filter { $0.transition > before.transitions }.map(\.line)
         let summary = "transient: \(name): \(after.transitions - before.transitions) transition(s), "
             + "\(lines.count) finding(s), \(after.samples - before.samples) samples, walk ≤ \(after.walkMaxMs) ms"
-        print(([summary] + lines.map { "  " + $0 }).joined(separator: "\n"))
+        print(([summary] + changes.map { "  · " + $0 } + lines.map { "  " + $0 }).joined(separator: "\n"))
         let attachment = XCTAttachment(string: ([summary] + lines).joined(separator: "\n"))
         attachment.name = "transient — \(name)"
         attachment.lifetime = .keepAlways
@@ -191,5 +198,8 @@ enum TransientCheckSelfTest {
         XCTAssertEqual(r?.findings.first?.transition, 2, file: file, line: line)
         XCTAssertEqual(r?.findings.first?.line, "x value: y", file: file, line: line)
         XCTAssertEqual(r?.plants, 1, file: file, line: line)
+        let c = TransientCheck.Report("transitions=1 idle=1 samples=2 walkMaxMs=1 plants=0\n@1 changed=x sizes=x:2")
+        XCTAssertEqual(c?.changes.first?.line, "changed=x sizes=x:2", file: file, line: line)
+        XCTAssertEqual(c?.findings.count, 0, "a per-transition line is not a finding", file: file, line: line)
     }
 }

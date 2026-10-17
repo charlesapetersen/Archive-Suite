@@ -122,6 +122,10 @@ n_jpeg=$(find "$GDST/Archival Photos JPEGS" -maxdepth 1 -type f -name '*.jpg' 2>
 if [ "$n_jpeg" -eq 1 ]; then ok "the JPEG partner folder holds its one JPEG (W24.jpeg1)"
 else bad "expected 1 JPEG in 'Archival Photos JPEGS', got $n_jpeg"; fi
 
+n_sub=$(find "$GDST/Box 2" -maxdepth 1 -type f -name '*.pdf' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$n_sub" -eq 1 ]; then ok "the 'Box 2' subfolder holds its one PDF (W40.e13 — a sidebar folder to switch to)"
+else bad "expected 1 PDF in 'Box 2', got $n_sub"; fi
+
 if [ -f "$GDST/.archive-suite-root.json" ]; then ok "root marker written (W23.m4 — durable links)"
 else bad "root marker .archive-suite-root.json missing"; fi
 

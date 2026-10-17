@@ -3,7 +3,8 @@
 #
 # Generates text-bearing PDFs, then applies a deliberate VARIETY of Finder tags via
 # the `tag` CLI so that XCUITests can assert against known tag state. Also generates
-# one image-only (no text layer) PDF and one non-PDF image for format-degrade tests.
+# one image-only (no text layer) PDF and one non-PDF image for format-degrade tests, and
+# one PDF in a subfolder (`Box 2/`) so the sidebar has a folder to switch to.
 # A deliberately supplied sample directory may replace the generated PDFs, but the
 # default never needs a corpus outside this worktree.
 #
@@ -241,6 +242,16 @@ set_tags "IMG_NOTEXT — Fixture.pdf" "1990,OCR Failed,Unread"
 # Non-PDF image: Folder marker (Purple) + Read (viewer degrade test)
 set_tags "IMG_PHOTO — Fixture.jpg" "Folder,Purple,Read"
 
+# --- one PDF in a subfolder (W40.e13) ---
+# The sidebar's folder tree is built from the listed files' paths, and the JPEG partner folder holds no PDF,
+# so without this the tree has no folder and no UITest can switch folder. It sits OUTSIDE the top-level
+# count verified below (12 files, 11 with a read state), which other UITests and test-fixture-scripts.sh pin;
+# a name and tags no other test filters on keep their counts as they were.
+SUBDIR="$DST/Box 2"
+mkdir -p "$SUBDIR"
+write_text_pdf "$SUBDIR/00011 IMG — Box Two.pdf" "Reader synthetic fixture page 11"
+set_tags "Box 2/00011 IMG — Box Two.pdf" "1977,Subfolder Fixture,Read"
+
 # --- set color labels for Box (Red=6) and Folder (Purple=3) ---
 # The `tag` CLI writes color-name tokens; macOS resolves Red→labelNumber 6,
 # Purple→labelNumber 3 automatically when the color name is in the tag array.
@@ -323,6 +334,11 @@ if [ "$total" -ne "$EXPECTED_TOTAL" ] || [ "$tagged" -ne "$EXPECTED_TAGGED" ] ||
   echo "error: fixture is wrong — $total files (want $EXPECTED_TOTAL), $tagged carry Read/Unread on disk (want $EXPECTED_TAGGED) in $DST${problems}" >&2
   exit 1
 fi
+sub_tags=$("$TAG" -lN "$SUBDIR/00011 IMG — Box Two.pdf" 2>/dev/null || true)
+case ",$sub_tags," in
+  *,Read,*) : ;;
+  *) echo "error: fixture is wrong — the subfolder PDF in $SUBDIR is missing or untagged (tags: $sub_tags)" >&2; exit 1 ;;
+esac
 echo "GUI fixture ready: $total files ($tagged tagged Read/Unread, verified on disk) in $DST" >&2
 
 # Emit the fixture path on stdout (for -ARUITestRootPath)

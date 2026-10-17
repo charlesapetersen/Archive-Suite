@@ -22,6 +22,7 @@
 #                READER_JOURNEY=rehearsal (W40.d8 triage journey on the real-corpus sample).
 #                NOTES_JOURNEY=integrations (W40.d10: Notes with the real Zotero and Reader in the VM).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
+#                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
@@ -327,6 +328,44 @@ assert_accessibility() {
   printf '%s\n' "$out" | sed 's/^/  /'
 }
 
+# --- TRANSIENT_VIDEO=1: record the guest's screen across the run (W40.e13, the confirmation instrument) ------
+# The transient recorder reads the accessibility tree, so it cannot see a layer painted out of place; a video
+# of the guest's display can. `screencapture -v` runs in the guest under the agent's Screen Recording grant
+# (vm-seed-accessibility-guest.sh). It is a separate `tart exec` kept in the host's background, because a child
+# left behind by a finished `tart exec` session is not guaranteed to live; SIGINT makes it finalize the movie.
+# The app is built first so the movie holds the tests rather than minutes of compiling. The guest's epoch at
+# the start goes beside the movie: TransientCheck prints each transition's epoch (`transient-mark:`), and
+# ops/gui/transient-frames.py lines the two up. Frame rate and what it can see: ops/gui/README.md §"Screen video".
+TRANSIENT_VIDEO="${TRANSIENT_VIDEO:-0}"
+VIDEO_PID=""
+video_start() {
+  [ "$TRANSIENT_VIDEO" = 1 ] || return 0
+  log "TRANSIENT_VIDEO=1: building first, so the recording holds only the tests…"
+  tart exec "$VM" bash -lc "xcodebuild build-for-testing -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
+    -destination 'platform=macOS' -derivedDataPath '$GUEST_DD' CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" \
+    > "$APP_ART/video-build.log" 2>&1 || warn "build-for-testing failed before the recording (log: $APP_ART/video-build.log)"
+  tart exec "$VM" bash -lc "pkill -x screencapture; rm -f /tmp/transient.mov" >/dev/null 2>&1 || true
+  tart exec "$VM" bash -lc "python3 -c 'import time; print(repr(time.time()))' > /tmp/transient.start
+    exec screencapture -v -x /tmp/transient.mov" > "$APP_ART/video-capture.log" 2>&1 &
+  VIDEO_PID=$!
+  sleep 3
+  if kill -0 "$VIDEO_PID" 2>/dev/null; then log "screen recording started in the guest"
+  else warn "screencapture exited at once — no video this run: $(tr '\n' ' ' < "$APP_ART/video-capture.log")"; VIDEO_PID=""; fi
+}
+video_stop() {
+  [ -n "$VIDEO_PID" ] || return 0
+  tart exec "$VM" bash -lc "pkill -INT -x screencapture" >/dev/null 2>&1 || true
+  local i; for i in $(seq 1 60); do kill -0 "$VIDEO_PID" 2>/dev/null || break; sleep 1; done
+  kill "$VIDEO_PID" 2>/dev/null || true
+  VIDEO_PID=""
+  rm -f "$APP_ART/transient.mov" "$APP_ART/transient.start"
+  if tart exec "$VM" bash -lc "cp /tmp/transient.mov /tmp/transient.start '/Volumes/My Shared Files/out/$APP/'" >/dev/null 2>&1; then
+    log "screen video: $APP_ART/transient.mov — scan it: ops/gui/transient-frames.py $APP_ART"
+  else
+    warn "the guest's screen video could not be collected (log: $APP_ART/video-capture.log)"
+  fi
+}
+
 # --- LANE: XCUITest (accessibility) ---
 run_xcuitest() {
   assert_accessibility
@@ -364,6 +403,7 @@ run_xcuitest() {
     tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
   fi
   log "building + running $ONLY_TESTING for $APP in the VM…"
+  video_start
   # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
   # before executing a single test. Remove it first.
   # CODE_SIGN_IDENTITY=- : the guest has no keychain, so it cannot use the host's "Archive Suite Dev"
@@ -380,6 +420,7 @@ run_xcuitest() {
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " 2>&1 | tee "$APP_ART/xcuitest.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
   log "XCUITest log: $APP_ART/xcuitest.log"
+  video_stop
   # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
   tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
   collect_shots

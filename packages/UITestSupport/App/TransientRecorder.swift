@@ -17,7 +17,8 @@
 //
 // HOW THE TEST READS IT. A small borderless panel, "Transient Recorder", holding one text element
 // (`ui.transient.report`) whose value is a header line — `transitions=N idle=0|1 samples=S walkMaxMs=M plants=P` —
-// followed by one line per finding, `#<transition> <section> <kind>: <detail>`. The UI-test runner is sandboxed and
+// followed by one line per transition, `@<transition> changed=<sections> sizes=<section>:<elements>,…`, and one
+// line per finding, `#<transition> <section> <kind>: <detail>`. The UI-test runner is sandboxed and
 // cannot read a file the app writes, which is why the report goes through the accessibility tree.
 //
 // LIMITS. A state that is committed and replaced inside one run-loop pass (an explicit `CATransaction.flush`) is not
@@ -132,9 +133,10 @@ final class TransientRecorder {
     private func settle() {
         guard changedSinceSettle else { return }
         changedSinceSettle = false
-        changing = []
         plantedThisTransition = false
         transitions += 1
+        findings.append("@\(transitions) changed=\(changing.sorted().joined(separator: ",")) sizes="
+                        + prefixes.map { "\($0):\(current[$0]?.entries.count ?? 0)" }.joined(separator: ","))
         for prefix in prefixes {
             let states = segment[prefix] ?? []
             for finding in TransientAnalysis.findings(section: prefix, states: states) {
@@ -142,6 +144,7 @@ final class TransientRecorder {
             }
             segment[prefix] = current[prefix].map { [$0] } ?? []
         }
+        changing = []
         publish(idle: true)
     }
 
