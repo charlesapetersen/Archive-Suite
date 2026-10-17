@@ -88,6 +88,30 @@ class Clean(unittest.TestCase):
                          [("cont", True), ("new", True), ("cont", False)])  # gap 3: tags say cont, teacher new
 
 
+class OwnerCheck(unittest.TestCase):
+    def gap(self, tag, p):
+        return {"tag": tag, **{f"label_{r}": P.rule_label(tag, p, r) for r in P.RULES}}
+
+    def test_strata_follow_how_start_trust_kept_the_label(self):
+        self.assertEqual([P.check_stratum(self.gap(t, p)) for t, p in
+                          (("new", 0.9), ("new", 0.3), ("new", 0.1), ("cont", 0.9), ("cont", 0.7), ("cont", 0.2))],
+                         ["A", "B", None, "C", None, "D"])
+
+    def test_noise_is_weighted_by_stratum_population_and_agree_skips_its_drops(self):
+        cases = [{"id": i, "stratum": s, **self.gap(t, p)} for i, s, t, p in
+                 (("a1", "A", "new", 0.9), ("a2", "A", "new", 0.9), ("c1", "C", "cont", 0.9),
+                  ("c2", "C", "cont", 0.9), ("d1", "D", "cont", 0.1), ("d2", "D", "cont", 0.1))]
+        key = {"population": {"A": 100, "C": 100, "D": 200}, "cases": cases}
+        # A: both right. C (start-trust says new): one wrong, one unsure. D: one wrong of two.
+        answers = {"a1": "new", "a2": "new", "c1": "same", "c2": "unsure", "d1": "same", "d2": "new", "x9": "new"}
+        per, noise = P.check_noise(key, answers)
+        self.assertEqual(per["start-trust"], {"A": [2, 0, 0], "C": [0, 1, 1], "D": [1, 1, 0]})
+        self.assertNotIn("C", per["agree"])                          # agree drops C's labels
+        self.assertAlmostEqual(noise["agree"][0], (100 * 0 + 200 * 0.5) / 300)
+        self.assertAlmostEqual(noise["start-trust"][0], (100 * 0 + 100 * 1 + 200 * 0.5) / 400)
+        self.assertEqual([noise[r][1] for r in ("agree", "start-trust")], [4, 5])
+
+
 class ImageCheck(unittest.TestCase):
     def test_a_quarter_turned_original_is_nearest_its_page(self):
         from PIL import Image, ImageDraw

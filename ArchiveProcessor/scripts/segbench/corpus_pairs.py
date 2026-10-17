@@ -12,6 +12,8 @@ reading a PDF or JPEG and writing only into the cache. Nothing in either tree is
     python3 corpus_pairs.py check      # a sample of each method's pairs (and every tie) compared by image
     python3 corpus_pairs.py windows    # per-document folders -> pages, labels, text, windows, split (cache)
     python3 corpus_pairs.py clean --run DIR   # W41.seg-label-clean: the teacher's answers -> cleaned labels
+    python3 corpus_pairs.py checkpack         # a fresh blind pack of kept labels for the owner (cache checkpack/)
+    python3 corpus_pairs.py checkscore FILE   # the owner's answers to it -> each rule's noise among kept labels
     python3 corpus_pairs.py pack --out DIR --part K --parts N   # W41.seg-label-clean: fs_seg.py's pack format,
                                        # every window with ABBYY text, images for part K's folders only (the
                                        # Mac's disk holds one part at a time; rsync each into one pack on FarmShare)
@@ -621,6 +623,107 @@ def cmd_clean(a):
     print(json.dumps(summary, indent=1))
 
 
+CHECK_DIR = os.path.join(CACHE, "checkpack")
+# The fresh owner check of the cleaned labels: every label start-trust keeps, in four strata by how it was kept
+# (start-trust's kept set holds agree's, with the same labels). Agree keeps A and D; start-trust keeps all four.
+CHECK_N = {"A": 25, "B": 5, "C": 25, "D": 25}
+
+
+def check_stratum(g):
+    """A labels.jsonl gap's stratum: A tag start the teacher agrees with, B tag start start-trust keeps though the
+    teacher leans continuation, C tag continuation start-trust turns into a start, D agreed continuation."""
+    lab = g["label_start-trust"]
+    if lab is None:
+        return None
+    if g["tag"] == "new":
+        return "A" if g["label_agree"] == "new" else "B"
+    return "D" if lab == "cont" else "C"
+
+
+def cmd_checkpack(a):
+    """A blind pack of kept labels for the owner to judge, drawn fresh: no gap from the 2026-10-08 sample. Writes
+    the pack (JPEG thumbnails, read from the JPEG tree by sips) and its key into the cache, outside git."""
+    lab = [json.loads(l) for l in open(os.path.join(CACHE, "labels.jsonl"), encoding="utf-8")]
+    jpeg = {p["pdf"]: p["jpeg"] for w in map(json.loads, open(os.path.join(CACHE, "windows.jsonl"), encoding="utf-8"))
+            for p in w["pages"]}
+    old = {(os.path.join(k["folder"], k["left"]), os.path.join(k["folder"], k["right"]))
+           for k in json.load(open(os.path.join(CS.CACHE, "pack", "key.json")))}
+    by = collections.defaultdict(list)
+    for g in lab:
+        s = check_stratum(g)
+        if s and (g["left"], g["right"]) not in old and g["left"] in jpeg and g["right"] in jpeg:
+            by[s].append(g)
+    rng = random.Random(SEED + 1)
+    cases = [(s, g) for s in sorted(CHECK_N)
+             for g in rng.sample(sorted(by[s], key=lambda g: (g["left"], g["right"])), CHECK_N[s])]
+    rng.shuffle(cases)
+    thumbs = os.path.join(CHECK_DIR, "thumbs")
+    os.makedirs(thumbs, exist_ok=True)
+    key, rows = [], []
+    for i, (s, g) in enumerate(cases, 1):
+        cid = f"k{i:02d}"
+        key.append({"id": cid, "stratum": s, "left": g["left"], "right": g["right"], "tag": g["tag"],
+                    "p_new": g["p_new"], "label_agree": g["label_agree"], "label_start-trust": g["label_start-trust"]})
+        imgs = []
+        for side, pdf in (("l", g["left"]), ("r", g["right"])):
+            dst = os.path.join(thumbs, f"{cid}{side}.jpg")
+            if not os.path.exists(dst):
+                subprocess.run(["/usr/bin/sips", "-s", "format", "jpeg", "-Z", "900", os.path.join(JPEGS, jpeg[pdf]),
+                                "--out", dst], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            imgs.append(f"thumbs/{cid}{side}.jpg")
+        rows.append((cid, os.path.dirname(g["right"]), os.path.basename(g["left"]), os.path.basename(g["right"]), imgs))
+    pop = {s: len(v) for s, v in sorted(by.items())}
+    with open(os.path.join(CHECK_DIR, "key.json"), "w") as f:
+        json.dump({"population": pop, "cases": key}, f, indent=1)
+    page_path = os.path.join(CHECK_DIR, "index.html")
+    CS.write_pack_html(rows, page_path)
+    # corpus_survey's page names its own item and stores answers under its own key; this pack is a different check.
+    with open(page_path) as f:
+        page = f.read()
+    page = (page.replace("Corpus tag noise check (W36.seg-corpus-survey)", "Cleaned label check (W41.seg-label-clean)")
+            .replace("80 neighbouring photo pairs", f"{len(rows)} neighbouring photo pairs")
+            .replace("'corpus-survey-answers'", "'label-clean-answers'"))
+    with open(page_path, "w") as f:
+        f.write(page)
+    print(f"{len(rows)} cases from strata {pop} -> {page_path} (key in key.json; not shown in the page)")
+
+
+def check_noise(key, answers):
+    """Per stratum [right, wrong, unsure] for each rule's label, and each rule's noise among the labels it keeps,
+    weighted by stratum population: {rule: (noise, judged)}. Answers: {id: new|same|unsure}."""
+    per = {r: collections.defaultdict(lambda: [0, 0, 0]) for r in RULES}
+    for k in key["cases"]:
+        ans = answers.get(k["id"])
+        if ans not in ("new", "same", "unsure"):
+            continue
+        for r in RULES:
+            lab = k[f"label_{r}"]
+            if lab is None:
+                continue
+            c = per[r][k["stratum"]]
+            if ans == "unsure":
+                c[2] += 1
+            else:
+                c[0 if (ans == "new") == (lab == "new") else 1] += 1
+    noise = {}
+    for r in RULES:
+        judged = {s: c for s, c in per[r].items() if c[0] + c[1]}
+        tot = sum(key["population"][s] for s in judged)
+        est = sum(key["population"][s] * c[1] / (c[0] + c[1]) for s, c in judged.items())
+        noise[r] = (est / tot if tot else 0.0, sum(c[0] + c[1] for c in judged.values()))
+    return {r: dict(sorted(v.items())) for r, v in per.items()}, noise
+
+
+def cmd_checkscore(a):
+    with open(os.path.join(CHECK_DIR, "key.json")) as f:
+        key = json.load(f)
+    with open(a.answers) as f:
+        answers = {k.strip(): v.strip() for k, v in (l.split(",", 1) for l in f if "," in l)}
+    per, noise = check_noise(key, answers)
+    print(json.dumps({"population": key["population"], "per_stratum": per,
+                      "noise": {r: {"weighted": round(n, 4), "judged": j} for r, (n, j) in noise.items()}}, indent=1))
+
+
 def cmd_subpack(a):
     """W41.seg-finetune: the held-out windows of a pack (corpus_pairs pack), for another key (a student or a
     baseline), images linked, not copied. Runs where the pack is (FarmShare); needs no corpus."""
@@ -689,12 +792,14 @@ def main():
         p.add_argument("--" + k, required=True)
     p.add_argument("--split", default="holdout")
     p = sub.add_parser("score"); p.add_argument("--run", required=True)
+    sub.add_parser("checkpack")
+    p = sub.add_parser("checkscore"); p.add_argument("answers")
     p = sub.add_parser("pack")
     p.add_argument("--out", required=True); p.add_argument("--part", type=int, default=0)
     p.add_argument("--parts", type=int, default=1)
     a = ap.parse_args()
     {"pair": cmd_pair, "check": cmd_check, "windows": cmd_windows, "pack": cmd_pack, "clean": cmd_clean, "subpack": cmd_subpack,
-     "score": cmd_score}[a.cmd](a)
+     "score": cmd_score, "checkpack": cmd_checkpack, "checkscore": cmd_checkscore}[a.cmd](a)
 
 
 if __name__ == "__main__":
