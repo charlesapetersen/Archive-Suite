@@ -2,6 +2,7 @@
 """W43.corpus-build — draw, check and freeze the broader truth set (plan §7 steps 4-5).
 
   sample.py list                 # every source's candidates -> CACHE/candidates.jsonl, counts by stratum
+  sample.py prefetch [STRATUM ...]  # fetch the pages the draw will take, one thread per source (cache only)
   sample.py draw [STRATUM ...]   # seeded draw per stratum, quarter cap per collection; fetch the drawn pages
   sample.py sanity               # Apple Vision reads the drawn Latin/Cyrillic/Arabic pages; flags low scorers
   sample.py drop KEY REASON      # drop a drawn page (wrong or misplaced truth); the next draw replaces it
@@ -156,6 +157,37 @@ def cmd_draw(strata: list[str]):
     C.write_jsonl(DRAW, sorted(out, key=lambda r: (r['stratum'], r['source'], r['page_id'])))
 
 
+def cmd_prefetch(strata: list[str]):
+    """Fetch the pages the draw will take, one thread per source, so a slow host does not hold up the rest.
+    Only warms the cache: `draw` still decides the sample, and a page the draw later skips costs only disk.
+    Sources run in parallel but each one serially, because a source's pages share its raw downloads."""
+    import concurrent.futures as cf
+    mods, rows, dropped = modules(), C.read_jsonl(CANDIDATES), set(drops())
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[r['stratum']].append(r)
+    per_source = collections.defaultdict(list)
+    for s in sorted(strata or TARGET):
+        for r in choose(order(by[s], s), TARGET[s], dropped):
+            per_source[r['source']].append(r)
+
+    def run(source):
+        bad = 0
+        for i, r in enumerate(per_source[source], 1):
+            try:
+                mods[source].materialise(C.Candidate(**{f: r[f] for f in C.Candidate.__dataclass_fields__}))
+            except Exception as e:
+                bad += 1
+                print(f"{source}:{r['page_id']}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            if i % 10 == 0:
+                print(f'{source}: {i}/{len(per_source[source])}', flush=True)
+        return source, len(per_source[source]), bad
+
+    with cf.ThreadPoolExecutor(max_workers=len(per_source) or 1) as ex:
+        for source, n, bad in ex.map(run, sorted(per_source)):
+            print(f'{source}: {n} pages, {bad} failed', flush=True)
+
+
 def _append_drop(key: str, reason: str):
     DROPS.parent.mkdir(parents=True, exist_ok=True)
     with DROPS.open('a') as f:
@@ -215,15 +247,15 @@ def cmd_freeze():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=['list', 'draw', 'sanity', 'drop', 'freeze'])
+    ap.add_argument('command', choices=['list', 'prefetch', 'draw', 'sanity', 'drop', 'freeze'])
     ap.add_argument('args', nargs='*')
     a = ap.parse_args()
     if a.command == 'drop':
         if len(a.args) != 2:
             raise SystemExit('usage: sample.py drop KEY REASON')
         cmd_drop(*a.args)
-    elif a.command == 'draw':
-        cmd_draw(a.args)
+    elif a.command in ('draw', 'prefetch'):
+        {'draw': cmd_draw, 'prefetch': cmd_prefetch}[a.command](a.args)
     else:
         {'list': cmd_list, 'draw': cmd_draw, 'sanity': cmd_sanity, 'freeze': cmd_freeze}[a.command]()
 
