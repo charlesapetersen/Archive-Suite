@@ -16,10 +16,18 @@
 // `settleInterval`, the states since the last settle are one transition, judged by `TransientAnalysis`.
 //
 // HOW THE TEST READS IT. A small borderless panel, "Transient Recorder", holding one text element
-// (`ui.transient.report`) whose value is a header line — `transitions=N idle=0|1 samples=S walkMaxMs=M plants=P` —
+// (`ui.transient.report`) whose value is a header line — `transitions=N idle=0|1 samples=S walkMaxMs=M plants=P ahead=A` —
 // followed by one line per transition, `@<transition> changed=<sections> sizes=<section>:<elements>,…`, and one
 // line per finding, `#<transition> <section> <kind>: <detail>`. The UI-test runner is sandboxed and
 // cannot read a file the app writes, which is why the report goes through the accessibility tree.
+//
+// A SAMPLE AHEAD OF THE SCREEN IS SKIPPED. SwiftUI can list a new view in its accessibility tree one pass before it
+// puts that view in the window. W40.fix-notes-editor-frame-jump measured it in the VM (2026-10-17): on a note change
+// the tree held the Notes editor's NEW text view, not yet in any window (so its frame read 0×0 at the screen's
+// origin), while the OLD one was still in the window at full size and fully opaque. The screen never showed a blank
+// editor. A watched element backed by an `NSView` with no window is not drawn, so a sample holding one is not a
+// state the user could see: it is dropped and counted (`ahead=N` in the header). At most `maxAheadInARow` passes in
+// a row are dropped, so a view that stays out of its window cannot silence the recorder.
 //
 // LIMITS. A state that is committed and replaced inside one run-loop pass (an explicit `CATransaction.flush`) is not
 // sampled, and walking the tree may itself make SwiftUI bring its view graph up to date. Both can only HIDE a
@@ -48,6 +56,7 @@ final class TransientRecorder {
     static let settleInterval: TimeInterval = 0.75
     private static let nodeBudget = 20_000
     private static let maxStatesPerSection = 400
+    private static let maxAheadInARow = 3
 
     private(set) static var shared: TransientRecorder?
 
@@ -85,6 +94,8 @@ final class TransientRecorder {
     private var samples = 0
     private var walkMaxMs = 0.0
     private var plants = 0
+    private var ahead = 0
+    private var aheadInARow = 0
     private var plantedThisTransition = false
     private var hiddenByPlant: NSView?
     private var panel: NSPanel?
@@ -117,8 +128,14 @@ final class TransientRecorder {
         defer { sampling = false }
         ensurePanel()
         let start = CFAbsoluteTimeGetCurrent()
-        let snapshot = takeSnapshot()
+        let (snapshot, isAhead) = takeSnapshot()
         walkMaxMs = max(walkMaxMs, (CFAbsoluteTimeGetCurrent() - start) * 1000)
+        if isAhead, aheadInARow < Self.maxAheadInARow {
+            aheadInARow += 1
+            ahead += 1
+            return
+        }
+        aheadInARow = 0
         samples += 1
         var changed = false
         for prefix in prefixes {
@@ -177,20 +194,23 @@ final class TransientRecorder {
 
     // MARK: - the walk
 
-    private func takeSnapshot() -> [String: TransientSectionState] {
+    /// The watched sections, and whether any watched element is a view not yet in a window (see the header).
+    private func takeSnapshot() -> ([String: TransientSectionState], ahead: Bool) {
         var out: [String: TransientSectionState] = [:]
+        var ahead = false
         var budget = Self.nodeBudget
         let windows = NSApp.windows.filter { $0.isVisible && $0 !== panel }.sorted { $0.windowNumber < $1.windowNumber }
         for window in windows {
             let section = window.isSheet && prefixes.contains(Self.sheetsSection) ? Self.sheetsSection : nil
             guard let node = AXNode(window) else { continue }
-            walk(node, section: section, origin: window.frame.origin, depth: 0, into: &out, budget: &budget)
+            walk(node, section: section, origin: window.frame.origin, depth: 0, into: &out, ahead: &ahead,
+                 budget: &budget)
         }
-        return out
+        return (out, ahead)
     }
 
     private func walk(_ element: AXNode, section: String?, origin: CGPoint, depth: Int,
-                      into out: inout [String: TransientSectionState], budget: inout Int) {
+                      into out: inout [String: TransientSectionState], ahead: inout Bool, budget: inout Int) {
         guard budget > 0, depth < 80 else { return }
         budget -= 1
         let identifier = element.identifier
@@ -207,6 +227,7 @@ final class TransientRecorder {
                                        x: Int((frame.minX - origin.x).rounded()), y: Int((frame.minY - origin.y).rounded()),
                                        w: Int(frame.width.rounded()), h: Int(frame.height.rounded()))
             out[section, default: TransientSectionState()].entries.append(entry)
+            if let view = element.object as? NSView, view.window == nil { ahead = true }
         }
         // A table's or outline's rows are its `accessibilityRows`, which its children need not include (measured:
         // a Notes folder switch changed only the list's rows, and a children-only walk saw no change at all).
@@ -216,7 +237,7 @@ final class TransientRecorder {
         }
         for child in children {
             guard let child = AXNode(child) else { continue }
-            walk(child, section: section, origin: origin, depth: depth + 1, into: &out, budget: &budget)
+            walk(child, section: section, origin: origin, depth: depth + 1, into: &out, ahead: &ahead, budget: &budget)
         }
     }
 
@@ -372,7 +393,7 @@ final class TransientRecorder {
 
     private func publish(idle: Bool) {
         let header = "transitions=\(transitions) idle=\(idle ? 1 : 0) samples=\(samples) "
-            + "walkMaxMs=\(Int(walkMaxMs.rounded())) plants=\(plants) changing=\(changing.sorted().joined(separator: ","))"
+            + "walkMaxMs=\(Int(walkMaxMs.rounded())) plants=\(plants) ahead=\(ahead) changing=\(changing.sorted().joined(separator: ","))"
         let text = ([header] + findings.suffix(200)).joined(separator: "\n")
         guard text != published, let field else { return }
         published = text

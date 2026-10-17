@@ -48,6 +48,7 @@ enum TransientCheck {
         var samples = 0
         var walkMaxMs = 0
         var plants = 0
+        var ahead = 0
         var changing = ""
         var header = ""
         var findings: [(transition: Int, line: String)] = []
@@ -69,6 +70,7 @@ enum TransientCheck {
             samples = fields["samples"] ?? 0
             walkMaxMs = fields["walkMaxMs"] ?? 0
             plants = fields["plants"] ?? 0
+            ahead = fields["ahead"] ?? 0
             changing = header.components(separatedBy: "changing=").dropFirst().first ?? ""
             func numbered(_ mark: Character) -> [(Int, String)] { lines.compactMap { line in
                 guard line.first == mark, let space = line.firstIndex(of: " "),
@@ -139,6 +141,7 @@ enum TransientCheck {
         let changes = after.changes.filter { $0.transition > before.transitions }.map(\.line)
         let summary = "transient: \(name): \(after.transitions - before.transitions) transition(s), "
             + "\(lines.count) finding(s), \(after.samples - before.samples) samples, walk ≤ \(after.walkMaxMs) ms"
+            + (after.ahead > before.ahead ? ", \(after.ahead - before.ahead) ahead of the screen (skipped)" : "")
         print(([summary] + changes.map { "  · " + $0 } + lines.map { "  " + $0 }).joined(separator: "\n"))
         let attachment = XCTAttachment(string: ([summary] + lines).joined(separator: "\n"))
         attachment.name = "transient — \(name)"
