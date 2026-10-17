@@ -24,7 +24,7 @@ struct LocalModelSettingsView: View {
         Toggle(isOn: $gatewayLocalModel) {
             HStack {
                 Text("A model on this Mac")
-                HelpButton(text: "The gateway is an open-weight model served on this Mac by LM Studio, Ollama or mlx-vlm. Pages are read one at a time with no key and no charge. A reply is capped at \(LocalModelRoute.maxTokens) tokens and one that repeats itself is stopped: on our Mac 3 of 99 pages looped, 7 minutes each. Such a page fails, and goes to a cloud escalation model only if you allow it below.")
+                HelpButton(text: "The gateway is an open-weight model served on this Mac by LM Studio, Ollama or mlx-vlm. Pages are read one at a time with no key and no charge. A reply is capped at \(LocalModelRoute.maxTokens) tokens, and one that starts repeating itself is stopped as it arrives (on our Mac 3 of 99 pages looped). A looped or capped page is read once more with a repetition penalty; if that fails too, the page fails, and goes to a cloud escalation model only if you allow it below.")
             }
         }
         .accessibilityIdentifier("ap.settings.localModel")
@@ -38,6 +38,9 @@ struct LocalModelSettingsView: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("ap.settings.localModelRecommendation")
+            Text(LocalModelRoute.newspaperNote)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Picker("Server", selection: $server) {
                 ForEach(LocalModelRoute.Server.allCases) { Text($0.rawValue).tag($0) }
             }

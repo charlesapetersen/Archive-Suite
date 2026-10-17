@@ -204,6 +204,54 @@ enum NetworkSession {
         }
     }
 
+    /// Lines the no-wire seam has handed to `streamLines`' reader since the last reset, so a check can see that a
+    /// stopped stream was not read to its end. Test-only; production never reads it.
+    nonisolated(unsafe) static var testStreamLinesRead = 0
+
+    /// W41.app-local-models-fu1: a streamed (server-sent events) response read line by line, through the global
+    /// limiter. `onLine` returns false to stop: the request is cancelled at once, which closes the connection, and
+    /// the result says it was stopped. Never retried, not even on a 429 as `data(for:)` would: the request is
+    /// generation, and a local server has no rate limit to wait out. Under the no-wire seam the stub's whole body is
+    /// split into lines, empty ones dropped as `AsyncBytes.lines` drops them.
+    static func streamLines(
+        for request: URLRequest,
+        onLine: (String) -> Bool
+    ) async throws -> (response: URLResponse, stopped: Bool) {
+        try await limiter.acquire()
+        do {
+            try Task.checkCancellation()
+            var req = request
+            req.setValue("close", forHTTPHeaderField: "Connection")
+            var stopped = false
+            let response: URLResponse
+            if let stub = activeTestTransport {
+                let data: Data
+                (data, response) = try await stub(req)
+                // Split on the byte, so a CRLF stream splits too (Swift reads "\r\n" as one Character).
+                for line in data.split(separator: UInt8(ascii: "\n")) {
+                    testStreamLinesRead += 1
+                    var text = String(decoding: line, as: UTF8.self)
+                    if text.hasSuffix("\r") { text.removeLast() }
+                    if text.isEmpty { continue }
+                    if !onLine(text) { stopped = true; break }
+                }
+            } else {
+                let bytes: URLSession.AsyncBytes
+                (bytes, response) = try await shared.bytes(for: req)
+                for try await line in bytes.lines where !onLine(line) {
+                    stopped = true
+                    bytes.task.cancel()
+                    break
+                }
+            }
+            await limiter.release()
+            return (response, stopped)
+        } catch {
+            await limiter.release()
+            throw error
+        }
+    }
+
     private typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
     private typealias Sleeper = @Sendable (Double) async throws -> Void
 

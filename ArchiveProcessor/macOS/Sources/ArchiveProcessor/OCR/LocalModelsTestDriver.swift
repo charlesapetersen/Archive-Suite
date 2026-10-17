@@ -15,6 +15,8 @@ import Foundation
 ///   4. Such a page goes to the user's escalation model only when the user allowed it, recorded with the local model
 ///      as the first reader; a remote gateway's page still never escalates.
 ///   5. One page at a time, the time estimate at the model's pace, $0, and the settings round trip.
+///   6. (W41.app-local-models-fu1) The local reply is streamed and closed as soon as it loops, a looped or capped page
+///      is read once more with a repetition penalty, the reason says so, and a timeout or a good page is read once.
 @MainActor
 enum LocalModelsTestDriver {
     nonisolated static let envKey = "LOCALMODELS_TEST"
@@ -45,16 +47,27 @@ enum LocalModelsTestDriver {
         let lock = NSLock()
         var requests: [URLRequest] = []
         var answers: [String: String] = [:]
+        /// Answers given in turn before `answers`, one per request: a first and a second reading that differ. A
+        /// queued "THROW" fails that request on the wire; "STATUS 422 <body>" answers it with that status.
+        var queued: [String] = []
         var timesOut = false
         func answer(_ request: URLRequest) throws -> String {
             try lock.withLock {
                 requests.append(request)
                 if timesOut { throw URLError(.timedOut) }
+                if !queued.isEmpty {
+                    let next = queued.removeFirst()
+                    if next == "THROW" { throw URLError(.cannotConnectToHost) }
+                    return next
+                }
                 let host = request.url?.host ?? ""
                 return answers.first { host.contains($0.key) }?.value ?? "{}"
             }
         }
-        func reset(_ answers: [String: String]) { lock.withLock { self.answers = answers; requests = [] } }
+        func reset(_ answers: [String: String], queued: [String] = []) {
+            lock.withLock { self.answers = answers; self.queued = queued; requests = [] }
+            NetworkSession.testStreamLinesRead = 0
+        }
         var hosts: [String] { lock.withLock { requests.map { $0.url?.host ?? "" } } }
     }
 
@@ -67,8 +80,13 @@ enum LocalModelsTestDriver {
         check("0 seam dormant before install", !NetworkSession.testTransportIsActive)
         let wire = Wire()
         NetworkSession.testTransport = { request in
-            let body = try wire.answer(request)
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            var body = try wire.answer(request)
+            var status = 200
+            if body.hasPrefix("STATUS "), let code = Int(body.dropFirst(7).prefix(3)) {
+                status = code
+                body = String(body.dropFirst(11))
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
             return (Data(body.utf8), response)
         }
         OCRCascade.keyOverride = { "test-\($0.rawValue)" }
@@ -178,8 +196,9 @@ enum LocalModelsTestDriver {
               p.errorCode == OCRFailureCode.cutOff && !wire.hosts.contains { $0.contains("anthropic") }, "\(wire.hosts)")
         wire.reset(["local-mac": reply(loop), "anthropic": claudeText])
         p = await ocr(local, .off)
-        check("4 cascade off: the looped page fails, with no second call",
-              p.text == nil && p.errorCode == OCRFailureCode.cutOff && wire.hosts.count == 1, "\(wire.hosts)")
+        check("4 cascade off: the looped page fails, with no call beyond its second reading",
+              p.text == nil && p.errorCode == OCRFailureCode.cutOff && wire.hosts == ["local-mac.invalid", "local-mac.invalid"],
+              "\(wire.hosts)")
         wire.reset(["local-mac": reply("[document_start]\nfine page"), "anthropic": claudeText])
         p = await ocr(local, toClaude)
         check("4 a page the local model reads is not escalated", p.text == "fine page" && wire.hosts.count == 1)
@@ -199,6 +218,128 @@ enum LocalModelsTestDriver {
         let cost = CostEstimator.estimate(fileCount: 10, model: local.asLLMModel(), enableTagging: true,
                                           sendPreviousImage: false, contextCharCount: 0, useGateway: true)
         eq("5 a local run costs nothing", cost.totalStandard, 0)
+
+        await streamChecks(wire: wire, image: image, local: local, remote: remote, reply: reply)
+    }
+
+    /// A streamed reply as a server sends it: one `data:` event per piece, the finish on the last, then `[DONE]`.
+    private static func events(_ pieces: [String], finish: String = "stop") -> String {
+        var out = pieces.enumerated().map { i, piece in
+            let choice: [String: Any] = ["index": 0, "delta": ["content": piece],
+                                         "finish_reason": i == pieces.count - 1 ? finish : NSNull()]
+            let data = try! JSONSerialization.data(withJSONObject: ["choices": [choice]])
+            return "data: " + String(data: data, encoding: .utf8)! + "\n\n"
+        }
+        out.append("data: [DONE]\n\n")
+        return out.joined()
+    }
+
+    private static func streamChecks(wire: Wire, image: URL, local: GatewayConfig, remote: GatewayConfig,
+                                     reply: (String, String) -> String) async {
+        let client = OpenAICompatibleClient.gateway(local)
+        let good = events(["[document_start]\n", "Dear Sir,\n", "the committee ", "met on Tuesday."])
+        wire.reset(["local-mac": good])
+        var r = try? await client.ocr(imageURL: image)
+        eq("6 a streamed reply is put together", r?.text, "Dear Sir,\nthe committee met on Tuesday.")
+        check("6 a good page is read once", wire.requests.count == 1)
+        if let body = wire.requests.first.flatMap(jsonBody) {
+            check("6 local: stream on, no penalty on a first reading",
+                  body["stream"] as? Bool == true && body["repetition_penalty"] == nil && body["repeat_penalty"] == nil)
+        } else { check("6 local request sent", false) }
+        wire.reset(["remote-gateway": reply("[document_start]\nok", "stop")])
+        _ = try? await OpenAICompatibleClient.gateway(remote).ocr(imageURL: image)
+        check("6 a remote gateway is not streamed", wire.requests.first.flatMap(jsonBody)?["stream"] == nil)
+
+        // A runaway: 600 pieces of one sentence (about 22,000 characters, past the cap), then text that must not be read.
+        let sentence = "the committee met again on Tuesday. "
+        let runaway = events(["[document_start]\nDear Sir,\n"] + Array(repeating: sentence, count: 600) + ["LATE-TEXT"],
+                             finish: "length")
+        let total = runaway.split(separator: "\n").count
+        wire.reset(["local-mac": runaway])
+        r = try? await client.ocr(imageURL: image)
+        let read = NetworkSession.testStreamLinesRead
+        check("6 a streamed loop fails the page as length", r?.text == nil && r?.errorCode == OCRFailureCode.cutOff,
+              String(describing: r?.errorMessage))
+        // Two readings of the same runaway: each stopped by 2,000 + 250 characters of loop, about 63 lines of 602.
+        check("6 the stream is closed once it loops, long before its end", read < total / 2, "read \(read) of 2 × \(total)")
+        check("6 a looped page is read a second time", wire.requests.count == 2, "\(wire.requests.count)")
+        if wire.requests.count == 2, let body = jsonBody(wire.requests[1]) {
+            check("6 the second reading has the repetition penalty under both names, temperature still 0",
+                  body["repetition_penalty"] as? Double == LocalModelRoute.retryRepetitionPenalty
+                  && body["repeat_penalty"] as? Double == LocalModelRoute.retryRepetitionPenalty
+                  && body["temperature"] as? Int == 0 && body["stream"] as? Bool == true)
+        }
+        check("6 the reason says it was read twice and why",
+              r?.errorMessage?.contains("read twice: the first reply repeated itself") == true,
+              String(describing: r?.errorMessage))
+
+        wire.reset([:], queued: [runaway, good])
+        r = try? await client.ocr(imageURL: image)
+        eq("6 a second reading that answers is kept", r?.text, "Dear Sir,\nthe committee met on Tuesday.")
+        check("6 and carries no failure", r?.errorCode == nil && r?.errorMessage == nil)
+
+        let capped = events(["[document_start]\n", "A long newspaper page"], finish: "length")
+        wire.reset(["local-mac": capped])
+        r = try? await client.ocr(imageURL: image)
+        check("6 a capped page is read twice and says so", wire.requests.count == 2 && r?.errorCode == OCRFailureCode.cutOff
+              && r?.errorMessage?.contains("the first reply reached the 4096-token cap") == true,
+              String(describing: r?.errorMessage))
+
+        wire.reset([:])
+        wire.timesOut = true
+        r = try? await client.ocr(imageURL: image)
+        check("6 a timed-out page is not read again", r?.errorCode == OCRFailureCode.cutOff && wire.requests.count == 1)
+        wire.timesOut = false
+
+        wire.reset(["local-mac": #"data: {"error":{"message":"model crashed"}}"# + "\n\n"])
+        r = try? await client.ocr(imageURL: image)
+        check("6 an error event fails the page, read once", r?.errorMessage == "model crashed" && r?.errorCode == "500"
+              && wire.requests.count == 1, String(describing: r?.errorMessage))
+
+        wire.reset(["local-mac": events(["<think>Let me look.</think>\n", "[document_start]\n", "Thinking aside"])])
+        r = try? await client.ocr(imageURL: image)
+        eq("6 a streamed reply's reasoning is stripped", r?.text, "Thinking aside")
+
+        wire.reset([:], queued: [runaway, #"STATUS 422 {"detail":"unknown field repeat_penalty"}"#])
+        r = try? await client.ocr(imageURL: image)
+        check("6 a second reading the server refuses keeps the first reading's code, so the page still escalates",
+              r?.errorCode == OCRFailureCode.cutOff && r?.errorMessage?.contains("read twice") == true,
+              "\(String(describing: r?.errorCode)) \(String(describing: r?.errorMessage))")
+        wire.reset([:], queued: [runaway, "THROW"])
+        r = try? await client.ocr(imageURL: image)
+        check("6 a second reading that cannot be made keeps the first failure",
+              r?.errorCode == OCRFailureCode.cutOff && r?.errorMessage?.contains("a second reading could not be made") == true,
+              String(describing: r?.errorMessage))
+
+        let unfinished = events(["[document_start]\n", "Dear Sir,\n", "the commit"]).components(separatedBy: "data: [DONE]")[0]
+            .replacingOccurrences(of: #""finish_reason":"stop""#, with: #""finish_reason":null"#)
+        wire.reset(["local-mac": unfinished])
+        r = try? await client.ocr(imageURL: image)
+        check("6 a stream that ends with no finish and no [DONE] is not a transcription",
+              r?.text == nil && r?.errorCode == OCRFailureCode.unparsable && wire.requests.count == 1,
+              "\(String(describing: r?.text)) \(String(describing: r?.errorCode))")
+
+        wire.reset(["local-mac": good.replacingOccurrences(of: "\n\n", with: "\r\n\r\n")])
+        r = try? await client.ocr(imageURL: image)
+        eq("6 a CRLF stream is read", r?.text, "Dear Sir,\nthe committee met on Tuesday.")
+
+        // A loop in a separate reasoning field (LM Studio, Ollama) is stopped too.
+        let thinking = (0..<600).map { _ -> String in
+            let data = try! JSONSerialization.data(withJSONObject: ["choices": [["index": 0,
+                "delta": ["reasoning_content": "wait, let me check the date again. "], "finish_reason": NSNull()]]])
+            return "data: " + String(data: data, encoding: .utf8)! + "\n\n"
+        }.joined() + "data: [DONE]\n\n"
+        wire.reset(["local-mac": thinking])
+        r = try? await client.ocr(imageURL: image)
+        check("6 a loop in the reasoning field stops the stream", r?.errorCode == OCRFailureCode.cutOff
+              && NetworkSession.testStreamLinesRead < 600, "\(NetworkSession.testStreamLinesRead)")
+
+        // The rule fires only on a loop: a long, varied page streamed in small pieces is read whole.
+        let prose = (1...300).map { "Line \($0) of the letter mentions item \($0 * 7 % 13). " }
+        wire.reset(["local-mac": events(["[document_start]\n"] + prose)])
+        r = try? await client.ocr(imageURL: image)
+        check("6 a long streamed page is read whole", r?.text?.hasSuffix("item \(300 * 7 % 13).") == true
+              && wire.requests.count == 1, String(describing: r?.errorMessage))
     }
 
     private static func memoryChecks() {
@@ -219,6 +360,8 @@ enum LocalModelsTestDriver {
         eq("1 the measured MLX build is the bench's", LocalModelRoute.qwen3VL8B4.modelID(for: .mlxVLM),
            "mlx-community/Qwen3-VL-8B-Instruct-4bit")
         eq("1 an unknown model is timed at the one measurement", LocalModelRoute.secondsPerPage(modelID: "x"), 41)
+        check("1 Settings warns that whole newspaper pages pass the cap",
+              LocalModelRoute.newspaperNote.contains("18 of 32") && LocalModelRoute.newspaperNote.contains("4096"))
     }
 
     private static func replyGuardChecks() {

@@ -7,12 +7,21 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 Settings → API Gateway → **A model on this Mac** (`LocalModelRoute`). Open: **only Qwen3-VL 8B at 4-bit is measured on
 a Mac** (`segbench-results/ocr-mac-local.md`); every Qwen3.6 figure shown is a hosted fp8 score or a bandwidth
 estimate, and labelled so. The **model names** filled for Ollama and LM Studio, and every Qwen3.6 MLX name, are those
-servers' usual naming, not checked against a live server; **Check server** shows the real list. The **loop stop is
-not streamed**: a looping reply runs to the 4,096-token cap before it fails (about 200 s on the 8B, against 7.3
-minutes at 8,192), and a page that legitimately needs more (FarmShare's longest, a 5,766-token newspaper) is cut and
-escalated rather than read. A model whose **reasoning is on** (a Qwen3.6 template that thinks by default) spends that
+servers' usual naming, not checked against a live server; **Check server** shows the real list. Since W41.app-local-models-fu1 the reply is **streamed and
+closed as soon as it loops** (the rule runs every 250 characters; closing the stream made mlx-vlm cancel the generation
+in 53 ms and answer the next request in 0.3 s, measured on the M3 Pro, where a reply left to run held it 158 s). That
+was measured with a Python client closing the socket, not through the app's URLSession, and not on LM Studio or Ollama.
+The rule caught 51 of 62 FarmShare runaways while streaming; the other 11 still run to the cap. A looped or capped page
+is **read once more** with `repetition_penalty`/`repeat_penalty` 1.05 at temperature 0 (FarmShare's retry, which
+answered 9 of 71); Ollama's OpenAI endpoint is believed to take neither name, so there the second reading is the same
+request and likely loops the same way. A capped page that was simply long (a newspaper read whole: 18 of 32 broadsheets
+need more than 4,096 tokens, and Settings says so) pays that second full reading too before it fails. The streamed rule
+also sees each reply's beginnings, which the 4,539-reply FarmShare check (on finished replies) did not cover: a page
+with 2,000+ characters of one exact repeat that later recovers now fails (and is read again), where before it passed. A model whose **reasoning is on** (a Qwen3.6 template that thinks by default) spends that
 budget thinking; the route strips `<think>` text but sends no switch to turn reasoning off, because the servers spell
-it differently. A slow Mac running a big pick may reach the 600 s timeout before the cap; that fails as `length` too, after up to ten minutes. The loop check needs 2,000+ characters of one 4-400-character span with three or more visible characters, so a blank form of more than about 55 identical rows is failed as a loop, and a repeated paragraph over 400 characters, or a loop with a counter in it, is left to the cap. A local server that **requires a key** gets only the stand-in `local` (a saved gateway key is never sent to it). Pages are sent at the app's 2,048 px cap, where the bench used 2,400 px (its half-resolution ladder
+it differently. A slow Mac running a big pick may reach the 600 s timeout (now the session's whole-request limit, since a streamed
+request's own timeout only covers the wait between pieces) before the cap; that fails as `length` too, after up to ten
+minutes, and is not read again. The loop check needs 2,000+ characters of one 4-400-character span with three or more visible characters, so a blank form of more than about 55 identical rows is failed as a loop, and a repeated paragraph over 400 characters, or a loop with a counter in it, is left to the cap. A local server that **requires a key** gets only the stand-in `local` (a saved gateway key is never sent to it). Pages are sent at the app's 2,048 px cap, where the bench used 2,400 px (its half-resolution ladder
 stayed within about two points). **Live Capture** does not go through `schedulingWorkerCount`, so it can have up to
 five requests waiting in the server at once, each on its 600 s timeout. Text calls (classification, tags,
 segmentation) go to the local model too, up to six at once (tagging's own concurrency), uncapped beyond their own budgets, and are not timed in the estimate. A

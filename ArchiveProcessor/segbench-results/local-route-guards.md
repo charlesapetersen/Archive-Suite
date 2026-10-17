@@ -39,3 +39,12 @@ The route does not stream today (`ArchiveProcessor/KNOWN_ISSUES.md`), so every l
 200 s on the 8B. Streamed, the same rule would stop four loops in five after about 1,200 tokens, about a minute.
 At the 8B's 3.6% that is roughly an hour saved per 1,000 pages, against about 11 hours of reading them (41 s a page
 on the M3 Pro): an estimate from the Mac's mean speed, not a Mac measurement. Filed as W41.app-local-models-fu1.
+
+## The streamed stop on the Mac (W41.app-local-models-fu1, 2026-10-17)
+
+The app now streams the local reply and closes it when the rule fires. Checked on the 18 GB M3 Pro with
+`mlx_vlm.server` 0.7.4 serving Qwen3-VL 8B 4-bit, text-only prompts, a Python client closing the socket as the app's
+URLSession cancel does (not the app itself): a reply that would run to the cap was closed after 1,503 characters;
+the server logged the generation cancelled at 465 tokens 53 ms later, and the next request answered in 0.3 s (0.2 s
+before). The same reply left to run held the server 158 s (4,096 tokens at 26 tokens a second). So a stopped stream
+frees the server at once, and the next page starts without waiting. LM Studio and Ollama were not checked.

@@ -65,21 +65,21 @@ struct OpenAICompatibleClient {
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
         applyOpenRouterRoute(&body)
 
-        let data: Data, response: URLResponse
-        do {
-            (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
-        } catch let error as URLError where localModel && error.code == .timedOut {
-            // A bigger local model can loop for longer than the timeout before reaching the cap. Same failure as a cut
-            // reply: not retried (another 10 minutes), escalated when the user allowed it.
-            return LocalModelRoute.timedOutReply
-        }
+        // A model on this Mac streams its reply, so a loop is stopped as it starts (W41.app-local-models-fu1).
+        if localModel { return try await readLocally(body) }
+
+        let (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {
             let errorMessage = Self.parseErrorResponse(data: data, statusCode: http.statusCode)
             return OCRResult(text: nil, classification: nil, errorMessage: errorMessage, errorCode: "\(http.statusCode)")
         }
+        return parseCompletion(data)
+    }
 
+    /// A whole (unstreamed) chat-completions reply as an OCR result. Also a local server's, when it ignored `stream`.
+    private func parseCompletion(_ data: Data) -> OCRResult {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let message = choices.first?["message"] as? [String: Any],
@@ -100,12 +100,15 @@ struct OpenAICompatibleClient {
             }
             return OCRResult(text: nil, classification: nil, errorMessage: "Malformed response", errorCode: OCRFailureCode.unparsable)
         }
+        return completedReply(rawContent, finish: choices.first?["finish_reason"] as? String)
+    }
 
+    /// The reply's content and finish reason, streamed or whole, as an OCR result.
+    private func completedReply(_ rawContent: String, finish: String?) -> OCRResult {
         // OpenRouter reports a provider failure mid-stream as finish_reason "error", and every OpenAI-compatible
         // endpoint reports a reply cut at the token limit as "length": neither is a transcription (W41.app-openrouter
         // review; the cut reply on every route since W41.app-ocr-cascade). The failure is 503, which
         // `isRetryableError` retries; a cut reply is not retried, since the same budget would cut it again.
-        let finish = choices.first?["finish_reason"] as? String
         if finish == "length" { return OCRResult.cutOff }
         if openRouterRoute != nil, finish == "error" {
             return OCRResult(text: nil, classification: nil, errorMessage: "The provider failed while answering",
@@ -121,6 +124,53 @@ struct OpenAICompatibleClient {
                              errorCode: OCRFailureCode.unparsable)
         }
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(content))
+    }
+
+    /// A model on this Mac (W41.app-local-models-fu1): the reply streamed and closed once it loops, and a page that
+    /// looped or reached the cap read once more, with a light repetition penalty, before it fails (and escalates, when
+    /// the user allowed it). The failure reason then says it was read twice.
+    private func readLocally(_ body: [String: Any]) async throws -> OCRResult {
+        let first = try await streamLocally(body)
+        guard LocalModelRoute.shouldReadAgain(first) else { return first }
+        var again = body
+        LocalModelRoute.applyRetryPenalty(&again)
+        do {
+            return LocalModelRoute.afterSecondReading(first: first, second: try await streamLocally(again))
+        } catch {
+            // A cancelled run stops here; any other failure leaves the first reading's, which can still escalate.
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled { throw error }
+            return LocalModelRoute.afterFailedSecondReading(first: first, error: error)
+        }
+    }
+
+    private func streamLocally(_ body: [String: Any]) async throws -> OCRResult {
+        var body = body
+        body["stream"] = true
+        let request = try makeRequest(body: body, timeoutInterval: requestTimeout)
+        var reply = LocalModelRoute.StreamedReply()
+        let response: URLResponse, stopped: Bool
+        do {
+            (response, stopped) = try await NetworkSession.streamLines(for: request) { reply.take($0) }
+        } catch let error as URLError where error.code == .timedOut {
+            // A bigger local model can run past the timeout before reaching the cap, or before its loop is long
+            // enough to see. Same failure as a cut reply: not read again (another 10 minutes), escalated when allowed.
+            return LocalModelRoute.timedOutReply
+        }
+        guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
+        if http.statusCode != 200 {
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: Self.parseErrorResponse(data: reply.rawBody, statusCode: http.statusCode),
+                             errorCode: "\(http.statusCode)")
+        }
+        // `take` stops the stream only when the reply loops.
+        if stopped { return LocalModelRoute.loopedReply }
+        // A server that ignored `stream` sent the whole reply as one JSON body.
+        if !reply.sawEvents { return parseCompletion(reply.rawBody) }
+        if let error = reply.error {
+            return OCRResult(text: nil, classification: nil, errorMessage: error, errorCode: "500")
+        }
+        if !reply.isComplete { return LocalModelRoute.endedEarlyReply }
+        return completedReply(reply.content, finish: reply.finish)
     }
 
     func textCompletion(prompt: String, maxTokens: Int = 512) async throws -> String {
@@ -157,6 +207,10 @@ struct OpenAICompatibleClient {
     }
 
     private func sendRequest(body: [String: Any], timeoutInterval: TimeInterval) async throws -> (Data, URLResponse) {
+        try await NetworkSession.data(for: makeRequest(body: body, timeoutInterval: timeoutInterval), policy: .nonIdempotent)
+    }
+
+    private func makeRequest(body: [String: Any], timeoutInterval: TimeInterval) throws -> URLRequest {
         guard let endpoint = chatEndpoint else {
             throw OCRError.networkError("Invalid gateway URL: \(baseURL)")
         }
@@ -165,7 +219,7 @@ struct OpenAICompatibleClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        return try await NetworkSession.data(for: request, policy: .nonIdempotent)
+        return request
     }
 
     static func parseErrorResponse(data: Data, statusCode: Int) -> String {

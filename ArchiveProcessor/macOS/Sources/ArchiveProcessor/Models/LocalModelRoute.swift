@@ -130,6 +130,11 @@ enum LocalModelRoute {
         return note
     }
 
+    /// Settings' warning about whole newspaper pages (W41.app-local-models-fu1): 18 of 32 answered broadsheets needed
+    /// more than the cap on FarmShare (4,341 to 7,371 tokens, `segbench-results/local-route-guards.md`).
+    static let newspaperNote = "Whole newspaper pages mostly fail here: on our measurement 18 of 32 broadsheets needed "
+        + "more than the \(maxTokens)-token cap. Leave newspapers to the escalation model, or read them in regions."
+
     // MARK: Reply guards
 
     /// Removes a reasoning block (`<think>…</think>`) a server returned inline, and a dangling close tag left when the
@@ -174,9 +179,126 @@ enum LocalModelRoute {
         errorMessage: "The local model's reply repeated itself; the page was not read",
         errorCode: OCRFailureCode.cutOff)
 
+    /// A streamed chat-completions reply as it arrives (W41.app-local-models-fu1): server-sent events, `data: {json}`
+    /// lines and a closing `data: [DONE]`, as LM Studio, Ollama and mlx-vlm send them for `stream: true`.
+    /// `isRepetitionLoop` runs on the content every `checkEvery` characters, so a loop is caught near where it starts:
+    /// replayed over 62 of Qwen3-VL 8B's FarmShare runaways at every 250 characters it fired on 51, after a median
+    /// 1,232 tokens (`segbench-results/local-route-guards.md`), where the cap reads 4,096.
+    struct StreamedReply {
+        static let checkEvery = 250
+
+        private(set) var content = ""
+        /// Reasoning a server streams in its own field (`reasoning_content`, `reasoning`), kept only to catch a loop in it.
+        private var reasoning = ""
+        private(set) var finish: String?
+        /// Whether the closing `data: [DONE]` came. With no finish reason either, the reply ended early (the server
+        /// stopped or unloaded the model) and is not a transcription.
+        private(set) var sawDone = false
+        private(set) var error: String?
+        /// Whether any `data:` line came. None means the server ignored `stream` (or failed) and sent a plain body.
+        private(set) var sawEvents = false
+        private var lines: [String] = []
+        private var length = 0
+        private var checkedAt = 0
+        private var reasoningLength = 0
+        private var reasoningCheckedAt = 0
+
+        /// Whether the reply came to an end the server reported, rather than a connection that just closed.
+        var isComplete: Bool { sawDone || finish != nil }
+
+        /// The lines that were not events, as one body: an error status's, or a whole reply from a server that
+        /// ignored `stream`.
+        var rawBody: Data { Data(lines.joined(separator: "\n").utf8) }
+
+        /// Takes one line of the response. Returns false once the content loops, the cue to close the request.
+        mutating func take(_ line: String) -> Bool {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("data:") else {
+                if !sawEvents { lines.append(line) }
+                return true
+            }
+            sawEvents = true
+            let payload = trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            if payload == "[DONE]" { sawDone = true; return true }
+            guard let json = try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any] else { return true }
+            if let failure = json["error"] as? [String: Any] {
+                error = (failure["message"] as? String) ?? "The local server failed while answering"
+            } else if let failure = json["error"] as? String {
+                error = failure
+            }
+            guard let choice = (json["choices"] as? [[String: Any]])?.first else { return true }
+            let delta = choice["delta"] as? [String: Any]
+            if let piece = delta?["content"] as? String {
+                content += piece
+                length += piece.unicodeScalars.count
+            }
+            if let piece = (delta?["reasoning_content"] ?? delta?["reasoning"]) as? String {
+                reasoning += piece
+                reasoningLength += piece.unicodeScalars.count
+            }
+            if let reason = choice["finish_reason"] as? String { finish = reason }
+            if length - checkedAt >= Self.checkEvery {
+                checkedAt = length
+                if LocalModelRoute.isRepetitionLoop(content) { return false }
+            }
+            if reasoningLength - reasoningCheckedAt >= Self.checkEvery {
+                reasoningCheckedAt = reasoningLength
+                if LocalModelRoute.isRepetitionLoop(reasoning) { return false }
+            }
+            return true
+        }
+    }
+
+    /// The penalty of the second reading, FarmShare's (`fs_ocr.py` `RETRY`), with temperature still 0.
+    static let retryRepetitionPenalty = 1.05
+
+    /// Whether a failed page is read once more (W41.app-local-models-fu1): a reply that looped or reached the cap. On
+    /// FarmShare a second reading with this penalty answered 9 of Qwen3-VL 8B's 71 looped pages. Not a timeout, which
+    /// already took up to ten minutes, and not an error.
+    static func shouldReadAgain(_ result: OCRResult) -> Bool {
+        result.errorCode == OCRFailureCode.cutOff && result.errorMessage != timedOutReply.errorMessage
+    }
+
+    /// The penalty under both names in use: mlx-vlm (and vLLM) read `repetition_penalty`, LM Studio `repeat_penalty`.
+    /// Each server ignores the other's name. Ollama's OpenAI endpoint takes neither (an unchecked reading of its
+    /// documentation), so there the second reading repeats the first request.
+    static func applyRetryPenalty(_ body: inout [String: Any]) {
+        body["repetition_penalty"] = retryRepetitionPenalty
+        body["repeat_penalty"] = retryRepetitionPenalty
+    }
+
+    /// The second reading's result: its text when it answered, else a failure with both readings in the reason. A
+    /// second reading that failed some other way (a server that refused the penalty field, or one that fell over) keeps
+    /// the first reading's code, so the page still escalates as the looped page it is and the run's retry passes, which
+    /// take 5xx codes, do not read it twice more.
+    static func afterSecondReading(first: OCRResult, second: OCRResult) -> OCRResult {
+        guard second.errorCode != nil else { return second }
+        let firstWhat = first.errorMessage == loopedReply.errorMessage
+            ? "repeated itself" : "reached the \(maxTokens)-token cap"
+        let sameKind = [OCRFailureCode.cutOff, OCRFailureCode.unparsable].contains(second.errorCode ?? "")
+        return OCRResult(
+            text: nil, classification: nil,
+            errorMessage: (second.errorMessage ?? "The page was not read")
+                + " (read twice: the first reply \(firstWhat); the second, with a repetition penalty, failed too)",
+            errorCode: sameKind ? second.errorCode : first.errorCode)
+    }
+
+    /// The first reading's failure when the second could not be made at all (the server stopped answering).
+    static func afterFailedSecondReading(first: OCRResult, error: Error) -> OCRResult {
+        OCRResult(text: nil, classification: nil,
+                  errorMessage: (first.errorMessage ?? "The page was not read")
+                    + " (a second reading could not be made: \(error.localizedDescription))",
+                  errorCode: first.errorCode)
+    }
+
+    static let endedEarlyReply = OCRResult(
+        text: nil, classification: nil,
+        errorMessage: "The local server's reply ended before it finished (was the model unloaded?)",
+        errorCode: OCRFailureCode.unparsable)
+
     static let timedOutReply = OCRResult(
         text: nil, classification: nil,
-        errorMessage: "The local model did not finish within \(Int(requestTimeout)) s (most likely a reply repeating itself)",
+        errorMessage: "The local model did not finish within \(Int(requestTimeout)) s (a slow Mac, a big model, or a loop the check did not see)",
         errorCode: OCRFailureCode.cutOff)
 
     /// Whether the address is this Mac (the presets' 127.0.0.1, `localhost`, `::1`); Settings warns otherwise, since
