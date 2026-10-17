@@ -75,7 +75,11 @@ class Fetch(unittest.TestCase):
 
     def test_refuses_other_hosts_and_bad_urls(self):
         for url in ('https://example.com/x', 'http://zenodo.org/x', 'https://zenodo.org:8443/x',
-                    'https://u@zenodo.org/x', 'https://zenodo.org.evil.com/x', 'ftp://zenodo.org/x'):
+                    'https://u@zenodo.org/x', 'https://zenodo.org.evil.com/x', 'ftp://zenodo.org/x',
+                    # the hosts W43.corpus-build-more added are exact names: no parent domain, sibling or suffix
+                    'https://hf.co/x', 'https://cdn.hf.co/x', 'https://si.edu/x', 'https://www.si.edu/x',
+                    'https://edan.si.edu.evil.com/x', 'https://x.ids.si.edu/x', 'https://uni-heidelberg.de/x',
+                    'https://xethub.hf.co/x'):
             r = self.run_fetch('--head', url)
             self.assertEqual(r.returncode, 2, url)
             self.assertIn('refused', r.stderr)

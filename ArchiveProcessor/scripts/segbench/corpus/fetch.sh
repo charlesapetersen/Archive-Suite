@@ -10,14 +10,16 @@
 # The disk had 24 GB free on 2026-10-16, so multi-GB archives are read member by member through
 # --range (remote_zip.py), never downloaded whole.
 # The owner allowed the corpus fetch to these hosts only (2026-10-16 walkthrough, gate
-# W43.corpus-build-net-owner-ok, option (a)). The script refuses any other host, on the first
+# W43.corpus-build-net-owner-ok, option (a)), and for W43.corpus-build-more added Hugging Face's two file CDNs
+# and heiDATA (gate W43.corpus-build-more-owner-ok, option (a)) and the Smithsonian's edan.si.edu and ids.si.edu
+# (owner, 2026-10-16 23:40). The script refuses any other host, on the first
 # URL and on every redirect (curl's redirects are followed one at a time here, so a redirect to
 # an unlisted host stops the fetch). It writes only under the cache folder below, never the
 # real corpus and never the repo. A typed curl is denied to every project; run this instead.
 set -euo pipefail
 
 CACHE="${BENCH_CORPUS_CACHE:-$HOME/Library/Caches/ArchiveSuiteRehearsal/bench-corpus}"
-ALLOWED="zenodo.org huggingface.co github.com raw.githubusercontent.com loc.gov crowd.loc.gov tile.loc.gov transcription.si.edu orda.shef.ac.uk"
+ALLOWED="zenodo.org huggingface.co github.com raw.githubusercontent.com loc.gov crowd.loc.gov tile.loc.gov transcription.si.edu orda.shef.ac.uk us.aws.cdn.hf.co cas-bridge.xethub.hf.co heidata.uni-heidelberg.de edan.si.edu ids.si.edu"
 MAX_REDIRECTS=10
 
 die() { echo "fetch.sh: $*" >&2; exit 2; }
