@@ -208,6 +208,78 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertNil(FileIdentity.capture(tempDir.appendingPathComponent("nope.pdf")))
     }
 
+    // MARK: W40.fix-identity-url-cache — reads see the disk, not the URL's resource-value cache
+
+    /// The mechanism behind the S1: the SAME `URL` instance, captured before and after the file at its
+    /// path is replaced. Before the fix the second capture answered from the first one's cache.
+    func testFileIdentityCaptureThroughAReusedURLSeesASwap() throws {
+        let url = try makeFile("id-reused.pdf", tags: ["Unread"])
+        let before = try XCTUnwrap(FileIdentity.capture(url))
+
+        try FileManager.default.removeItem(at: url)
+        try Data("a different document".utf8).write(to: URL(fileURLWithPath: url.path))
+
+        let fresh = try XCTUnwrap(FileIdentity.capture(URL(fileURLWithPath: url.path)))
+        XCTAssertFalse(fresh.matches(before), "precondition: a fresh URL sees the replacement")
+        let reused = try XCTUnwrap(FileIdentity.capture(url))
+        XCTAssertFalse(reused.matches(before), "the same URL instance must see the replacement too")
+    }
+
+    /// The Reader's shape of the S1, at the writer: identity captured through a `URL`, the file swapped
+    /// under its path, then a write through THAT SAME `URL` expecting the captured identity. §6 must refuse
+    /// and the replacement must be left exactly as it was written.
+    func testReplacedFileAbortsThroughTheSameURLItWasCapturedThrough() throws {
+        let url = try makeFile("id-swap-same-url.pdf", tags: ["Unread"])
+        let identity = try XCTUnwrap(FileIdentity.capture(url))
+        XCTAssertEqual(try readTags(url), ["Unread"], "prime the URL's tag cache too, as discovery does")
+
+        try FileManager.default.removeItem(at: url)
+        let replacement = URL(fileURLWithPath: url.path)
+        try Data("a different document".utf8).write(to: replacement)
+        try (replacement as NSURL).setResourceValue(["Untouched"], forKey: .tagNamesKey)
+
+        XCTAssertThrowsError(try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+            (current + ["Reviewed"], label)
+        }) { error in
+            guard case TagWriteError.identityMismatch = error else {
+                return XCTFail("expected .identityMismatch, got \(error)")
+            }
+        }
+        XCTAssertEqual(try readTags(URL(fileURLWithPath: url.path)), ["Untouched"],
+                       "§6: a file swapped under the path is never tagged")
+    }
+
+    /// §2 at the writer: the transform must receive the tags ON DISK, not the tags the caller's `URL` read
+    /// last time. The coordinator hands the block the caller's own `NSURL`, so before the fix a write
+    /// through a URL that had read its tags once computed from those stale tags and clobbered a change
+    /// made since (here "Keep", added by another writer through a fresh URL).
+    func testWriteReadsTheDiskNotTheCallersURLCache() throws {
+        let url = try makeFile("stale-before.pdf", tags: ["Unread"])
+        XCTAssertEqual(try readTags(url), ["Unread"], "prime the cache on `url`")
+        try (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(["Unread", "Keep"], forKey: .tagNamesKey)
+
+        var seen: [String] = []
+        let r = try CoordinatedTagWriter.write(url) { current, label in
+            seen = current
+            return (current.filter { $0 != "Unread" } + ["Read"], label)
+        }
+        XCTAssertTrue(multisetEqual(seen, ["Unread", "Keep"]), "the transform saw the disk, got \(seen)")
+        XCTAssertTrue(multisetEqual(r.before, ["Unread", "Keep"]))
+        XCTAssertTrue(multisetEqual(try readTags(URL(fileURLWithPath: url.path)), ["Keep", "Read"]),
+                      "the concurrent addition survived the write")
+    }
+
+    /// `TagReading.read` itself, the primitive every read in the suite goes through: a reused `URL` must
+    /// report a change made since it last read.
+    func testTagReadingReadThroughAReusedURLSeesAnExternalChange() throws {
+        let url = try makeFile("stale-read.pdf", tags: ["Unread"])
+        guard case let .success(first, _) = TagReading.read(url) else { return XCTFail("first read failed") }
+        XCTAssertEqual(first, ["Unread"])
+        try (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(["Read"], forKey: .tagNamesKey)
+        guard case let .success(second, _) = TagReading.read(url) else { return XCTFail("second read failed") }
+        XCTAssertEqual(second, ["Read"], "the same URL instance reports the tags on disk now")
+    }
+
     // MARK: §9 (W15.tu1) Occurrence-aware (multiset) inverse — never loses a duplicate
 
     /// The multiset-difference primitive underneath the occurrence-aware inverse.

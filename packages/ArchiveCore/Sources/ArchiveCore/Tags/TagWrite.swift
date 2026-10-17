@@ -10,7 +10,10 @@ import Foundation
 //
 //  Guarantees (per write()):
 //   §1 coordinated, metadata-only write (never .forReplacing).
-//   §2 fresh read INSIDE the coordinated block (no TOCTOU).
+//   §2 fresh read INSIDE the coordinated block (no TOCTOU) — and from the DISK: the coordinator
+//      hands the block the same `NSURL` object the caller passed, whose resource-value cache would
+//      otherwise answer the read, so the identity capture and both tag reads go through a new
+//      `URL` for the path (`URL.uncached`, W40.fix-identity-url-cache).
 //   §3 trustworthy-read guard — a read failure ABORTS; it is never coerced into "no tags".
 //   §5 lossless compute: the transform receives the fresh state and returns the intended state.
 //   §6 write-target identity re-verification — when the caller passes the identity captured at
@@ -132,8 +135,14 @@ public struct FileIdentity: @unchecked Sendable {
     /// Capture the identity of the file currently at `url`, or `nil` if it has none — e.g. the file
     /// does not exist, or the volume does not vend a resource identifier. A `nil` capture means the
     /// caller cannot request identity re-verification for this file (pass `nil` → no §6 check).
+    ///
+    /// Always reads the disk, never the `URL`'s resource-value cache (`URL.uncached`). Before
+    /// W40.fix-identity-url-cache this read went through the handed-in `URL`, and a reused instance
+    /// answered with the identity it had cached: the Reader hands the same `ArchiveFile.url` to the
+    /// capture at edit time and to the write, so the §6 re-check compared the cache with itself and a
+    /// file swapped under the path between an edit and its undo was re-tagged (S1).
     public static func capture(_ url: URL) -> FileIdentity? {
-        guard let token = (try? url.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier
+        guard let token = (try? url.uncached.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier
         else { return nil }
         return FileIdentity(token: token)
     }

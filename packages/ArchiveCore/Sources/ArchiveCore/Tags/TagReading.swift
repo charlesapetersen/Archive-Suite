@@ -131,7 +131,13 @@ public enum TagReading {
     ///
     /// Intentionally does NOT request `.documentIdentifierKey` — requesting it can cause the kernel to
     /// assign & persist a document identifier, which would be a mutation of a file we only meant to read.
+    ///
+    /// Reads the disk, not the `URL`'s resource-value cache (`URL.uncached`): a reused `URL` instance
+    /// would otherwise hand back the tags it read last time, which for the writer's §2 pre-read means a
+    /// transform computed from stale tags and a write that clobbers whatever changed them (measured,
+    /// W40.fix-identity-url-cache).
     public static func read(_ url: URL) -> TagReadResult {
+        let url = url.uncached
         do {
             let values = try url.resourceValues(forKeys: [.tagNamesKey, .labelNumberKey])
             if let names = values.tagNames {
