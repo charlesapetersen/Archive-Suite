@@ -11779,3 +11779,23 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   per note change); the planted flicker still caught on all 8. Reader and Processor build; Reader's
   `TransientStateUITests` 2/2 in the VM (nothing skipped there). `W40.fix-notes-chip-first-draw-blank` is a separate cause (noted in its entry).
   <!-- /W40.fix-notes-editor-frame-jump -->
+- [x] **W41.seg-finetune — fine-tune a 4B and a 2B vision model for segmentation on FarmShare — OWNER login [M · ~1-2 sessions]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: light) (blocked-on: W41.seg-label-clean). SHIPPED 2026-10-17 (this commit), in the owner's interactive FarmShare session.
+  `farmshare/train_seg.py` (LoRA rank 16 on the language model, one epoch, the teacher's reply as target; loss on the
+  reply's tokens only, after the full-vocabulary logits of a window ran an L40S out of memory), `train.sbatch`,
+  `setup-train.sh`; the engine session's `--rule` (2aaa6a89) and README procedure kept. Agreement rule. Pilot 4B on a
+  quarter of the windows (1,580, 2.25 h); full 4B and 2B on 5,885 windows (8.1 h and 4.1 h). Held-out collections,
+  agreed gaps: untrained 4B 77.0%, pilot 97.1%, full 4B 97.6%, full 2B 96.0%. Development boxes: pilot about 92.5%
+  pooled, full 4B 89.8%, 2B 90.5% (teacher 90.2%). Frozen in `seg-students.json` (f15c5dff; `fs_seg.py pack --final`
+  now takes any frozen key), then the test boxes once: 4B 79.1%, 2B 78.8% unchecked (teacher 83.0%, Gemini 88.8%);
+  confidences are no flag. App-style OCR text for the training windows was judged unneeded: the development boxes
+  carry the app's own kind of LLM OCR text and gained most. Results `segbench-results/seg-students.md`;
+  ArchiveOCRBench lists both (published copy behind). The results say the training data is one owner's archives.
+  <!-- /W41.seg-finetune -->
+- [x] **W41.seg-mac-model — the trained segmenters on the Mac, through the app's local route [M · ~1 session]** · §transcription and segmentation bake-off on OpenRouter (lane: segbench) (uses: machine) (blocked-on: W41.seg-finetune). SHIPPED 2026-10-17 (this commit).
+  Merged on FarmShare, converted with the lab's `convert-mlx.py` at 8 and 4 bits, run on the M3 Pro under
+  `run-guarded.sh` (`method_local.py` keys seg-2b, seg-2b-8bit, seg-4b, seg-4b-8bit). Development boxes, pooled:
+  2B 8-bit 90.3% (18 s a window, 4.4 GB peak, 2.5 GB), 2B 4-bit 85.6%, 4B 8-bit 88.0% (37 s, 7.3 GB), 4B 4-bit
+  86.6%. 8-bit keeps full precision's accuracy; 4-bit costs 2-5 points; the 4B buys nothing on the Mac. The owner
+  asked whether 4-bit was needed given his disk: the reason is other users' 8-16 GB of memory and speed, not disk,
+  and 8-bit proved the right build. Filed W41.app-local-seg (with an owner gate for publishing the weights).
+  <!-- /W41.seg-mac-model -->

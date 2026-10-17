@@ -45,6 +45,16 @@ MODELS = {  # key: (repo in the lab's Hugging Face cache, label)
     "qwen3.5-4b": ("lmstudio-community/Qwen3.5-4B-MLX-4bit", "Qwen3.5-4B, 4-bit"),
     "gemma4-12b": ("mlx-community/gemma-4-12B-it-4bit", "Gemma 4 12B, 4-bit"),
     "qwen3-vl-8b": ("mlx-community/Qwen3-VL-8B-Instruct-4bit", "Qwen3-VL-8B, 4-bit"),
+    # W41.seg-mac-model: the FarmShare fine-tunes (W41.seg-finetune), merged there and converted here to 4-bit MLX
+    # with the lab's convert-mlx.py; mlx_vlm loads a build from its folder.
+    "seg-4b": (str(Path("~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-4b-4bit").expanduser()),
+               "Qwen3.5-4B fine-tuned for segmentation, 4-bit"),
+    "seg-2b": (str(Path("~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-4bit").expanduser()),
+               "Qwen3.5-2B fine-tuned for segmentation, 4-bit"),
+    "seg-4b-8bit": (str(Path("~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-4b-8bit").expanduser()),
+                    "Qwen3.5-4B fine-tuned for segmentation, 8-bit"),
+    "seg-2b-8bit": (str(Path("~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-8bit").expanduser()),
+                    "Qwen3.5-2B fine-tuned for segmentation, 8-bit"),
 }
 FAILED = "failed"
 

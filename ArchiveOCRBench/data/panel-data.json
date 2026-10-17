@@ -1003,6 +1003,28 @@
    "batch": null,
    "farmshare": true,
    "source": "seg-teacher.md"
+  },
+  {
+   "name": "Qwen3.5 4B, fine-tuned (trained on the corpus; FarmShare figures)",
+   "nocheck": 79.1,
+   "after": 98.8,
+   "checks": 79.9,
+   "unflagged": 1,
+   "std": null,
+   "batch": null,
+   "farmshare": true,
+   "source": "seg-students.md"
+  },
+  {
+   "name": "Qwen3.5 2B, fine-tuned (trained on the corpus; FarmShare figures)",
+   "nocheck": 78.8,
+   "after": 97.3,
+   "checks": 78.8,
+   "unflagged": 3,
+   "std": null,
+   "batch": null,
+   "farmshare": true,
+   "source": "seg-students.md"
   }
  ],
  "handwriting": {

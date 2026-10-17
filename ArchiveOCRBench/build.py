@@ -36,6 +36,7 @@ FARMSHARE = RESULTS / "farmshare" / "truth"
 PANEL_PY = HERE.parent / "ArchiveProcessor" / "scripts" / "segbench" / "ocr_panel.py"
 OPTIONS_MD = RESULTS / "options.md"
 CHEAP_MD = RESULTS / "cheap-models.md"
+STUDENTS_MD = RESULTS / "seg-students.md"  # W41.seg-finetune: the fine-tuned 4B and 2B
 TEACHER_MD = RESULTS / "seg-teacher.md"  # W41.seg-27b-test: the FarmShare teacher, scored as cheap-models.md scores
 INPUTS = HERE / "data" / "inputs.json"
 HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
@@ -167,18 +168,22 @@ def segmentation():
             continue
         std, batch = money_cells(costs[c[0]][4] + " " + costs[c[0]][5])
         seg.append({"name": c[0], **row, "std": std, "batch": batch, "source": "cheap-models.md"})
-    if TEACHER_MD.exists():
-        for c in table_after(TEACHER_MD.read_text(), "### The level fitted per model"):
+    # Open weights on FarmShare's GPUs: no price per page, so in the table and off the price chart. The teacher
+    # (W41.seg-27b-test) and the fine-tuned Mac segmenters it taught (W41.seg-finetune), scored the same way.
+    for md, suffix in ((TEACHER_MD, " on FarmShare (the corpus teacher)"),
+                       (STUDENTS_MD, " (trained on the corpus; FarmShare figures)")):
+        if not md.exists():
+            continue
+        for c in table_after(md.read_text(), "### The level fitted per model"):
             if c[1] != "98%":
                 continue
             row = {"nocheck": pct(c[5]), "after": pct(c[6]), "checks": float(c[7]), "unflagged": int(c[8])}
             if c[0].startswith("Gemini 3.8 Flash"):
                 if any(row[k] != gemini[k] for k in row):
-                    sys.exit(f"seg-teacher.md's Gemini row at 98% no longer matches options.md: {row}")
+                    sys.exit(f"{md.name}'s Gemini row at 98% no longer matches options.md: {row}")
                 continue
-            # Open weights on FarmShare's GPUs: no price per page, so in the table and off the price chart.
-            seg.append({"name": c[0] + " on FarmShare (the corpus teacher)", **row, "std": None, "batch": None,
-                        "farmshare": True, "source": "seg-teacher.md"})
+            seg.append({"name": c[0] + suffix, **row, "std": None, "batch": None, "farmshare": True,
+                        "source": md.name})
     return seg
 
 
