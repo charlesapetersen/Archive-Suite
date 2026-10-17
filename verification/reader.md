@@ -441,10 +441,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - `undoLast` drops a file whose undo fails (`try?`, `:1108`), and its count reports only the files it undid.
     Demonstrated 2026-10-16 by `W40.f1` ([`evidence/reader/W40.f1-undo.md`](evidence/reader/W40.f1-undo.md)):
     `W40.fix-reader-undo-partial` (S3).
-  - `W40.f1` also found that undo re-tags a file swapped under its path: the §6 identity check compares a
-    `URL`'s cached `fileResourceIdentifier` with itself. `W40.fix-identity-url-cache` (S1). The row stays
-    `works` for what it promises (the inverse delta, one step per batch); the §6 refusal is R-45's safety
-    promise, and the S1 is recorded there too.
+  - `W40.f1` also found that undo re-tagged a file swapped under its path: the §6 identity check compared a
+    `URL`'s cached `fileResourceIdentifier` with itself. Fixed 2026-10-17 by `W40.fix-identity-url-cache`
+    (S1): `UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath` now passes without its expected
+    failure. The row stays `works` for what it promises (the inverse delta, one step per batch); the §6
+    refusal is R-45's safety promise, and the fix is recorded there too.
   - `S-001`: ⌘Z may fire Undo Tag Change while a text field has focus.
 
 ### R-22 · Tag editor sheet
@@ -939,9 +940,23 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     §6 check reads `fileResourceIdentifier` through a reused `URL`'s cache and compares it with itself
     (`UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath`,
     [`evidence/reader/W40.f1-undo.md`](evidence/reader/W40.f1-undo.md)). `W40.fix-identity-url-cache` (S1).
+  - 2026-10-17 W40.fix-identity-url-cache — the §6 defect fixed, builder is not verifier: `FileIdentity.capture`
+    and `TagReading.read` now read through a new `URL` for the same file, and `CoordinatedTagWriter.write` reads
+    and writes through it inside its block, so the capture, the writer's pre-read, its writes and its re-read see
+    the disk and never the caller's `URL` cache. The Tier-2 review found, and a probe confirmed, that a write
+    through a cached URL also wrote cached Finder info back over a hidden flag set since; fixed in the same
+    change. `UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath`
+    and `.testFileIdentityThroughAReusedURLSeesASwap` pass without their expected failures; six new
+    `ArchiveCoreTests/TagWriterPrimitiveTests` (`…ThroughAReusedURL…`, `testReplacedFileAbortsThroughTheSameURLItWasCapturedThrough`,
+    `testWriteReadsTheDiskNotTheCallersURLCache`, `testWriteThroughACachedURLKeepsAnExternalHiddenFlag`,
+    `testUncachedURLKeepsTheNameBytesAndRefusesAnEmptyPath`), the cache-sensitive five checked to fail on the
+    pre-fix code and pass with it. Still `broken` for the quarantine xattr (`W40.fix-reader-tag-quarantine`).
 - **Notes:**
-  - The writer-level identity tests above pass only because each hands the writer a new `URL`; the app passes
-    the same `ArchiveFile.url` to the capture and the write (`W40.fix-identity-url-cache`).
+  - The writer-level identity tests above passed only because each handed the writer a new `URL`, while the app
+    passes the same `ArchiveFile.url` to the capture and the write. Since `W40.fix-identity-url-cache` the
+    primitive reads through a new `URL` itself, and the tests named in its history line pin that. The same
+    cache also served the writer's §2 pre-read when the handed-in `URL` had read its tags before (measured:
+    the transform saw the old tags after an external change), so that write path is covered by the fix too.
   - The identity is captured when an edit starts (`ArchiveFile.liveIdentity()`), not at discovery. It guards
     the moment between the start of an edit and its write, not a file moved since the list was built.
   - A write that fails its re-read check has already written. It throws without rolling back, which is what §9

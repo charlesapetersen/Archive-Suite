@@ -562,6 +562,27 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   The group/rename path uses the identity-carrying `TagWriter.apply(_:to:[(url,identity)])` batch overload.
   A `nil` identity (file with no resolvable id) transparently skips the check for that file. Guard active
   in production; failures surface as "could not update/edit" without altering any other file.
+  **Re-opened and fixed 2026-10-17 (`W40.f1` → `W40.fix-identity-url-cache`, S1).** The check compared a
+  `URL`'s resource-value cache with itself: `FileIdentity.capture` read `fileResourceIdentifier` through the
+  `URL` it was handed, a reused `URL` answers from the cache on its backing `NSURL` (every copy shares it,
+  and `NSFileCoordinator` hands the block that same object), and the Reader passes one `ArchiveFile.url` to
+  the capture and to the write. Measured: a file deleted and replaced under its path kept the old identity
+  **and the old `tagNames`** through the reused `URL`, so the writer's §2 pre-read was stale the same way.
+  The main thread's run loop flushes the cache each turn, which is why the defect showed in an undo made in
+  the same turn as its edit (`UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath`) and would show
+  in any writer off the main thread (Notes' store). The Tier-2 review found the writes affected too, and a
+  probe confirmed it: `setResourceValue` on an `NSURL` holding cached Finder info rebuilds the 32-byte
+  Finder-info block from the **cache**, so a tag or label write through a reused `URL` (the Reader's rows carry
+  the enumerator's URLs, which arrive with Finder info cached) reverted a hidden flag another writer had set.
+  Fix in ArchiveCore: `FileIdentity.capture` and `TagReading.read` read through a new `URL` for the same
+  file-system representation (`URL.uncached`; built byte-exactly as `CorpusWalker.inspect` does, never from
+  `path`, so composed Unicode and an empty path cannot redirect it), and `CoordinatedTagWriter.write` does
+  every read and write inside its block through that URL, dropping the handed-in URL's cache on exit. The
+  rebuild costs ~1.5 µs plus a real attribute fetch (~7 µs); the walker, which builds its URL fresh per file
+  anyway, reads through `readTrustingURL` and pays neither. Pinned by `TagWriterPrimitiveTests`
+  (`…ThroughAReusedURL…`, `testWriteReadsTheDiskNotTheCallersURLCache`,
+  `testWriteThroughACachedURLKeepsAnExternalHiddenFlag`, `testUncachedURLKeepsTheNameBytesAndRefusesAnEmptyPath`)
+  and the two `UndoDurabilityTests` that failed before it.
 
 ## @Published willSet timing (fixed 2026-07-05 — GUI-caught)
 - A Combine subscription on a nested `@Published` (`library.$files`) fires in **willSet**, *before* the

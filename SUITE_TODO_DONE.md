@@ -11701,3 +11701,36 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   before landing (raw-error writes unrecorded; host UITests writing the owner's ledger); the low findings went into
   `W40.audit-ledger-undo`. `R-46` → `fixed-pending-recheck` (record half); §12 and the Implementation Map updated.
   <!-- /W40.audit-ledger -->
+- [x] **W40.fix-identity-url-cache — the §6 identity re-check did not see a file swapped under its path, so Reader undo re-tagged a different file [S · S1 · Tier-2 · shared ArchiveCore]** · §W40 verification phase · SHIPPED 2026-10-17 (this commit; checkpoints `554d2de1`, `20e8f078`)
+  Found by `W40.f1` 2026-10-16 (`UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath`, `.testFileIdentityThroughAReusedURLSeesASwap`,
+  evidence `verification/evidence/reader/W40.f1-undo.md`). **Cause, measured on scratch files:** `FileIdentity.capture` read
+  `fileResourceIdentifier` through the `URL` it was handed; a reused `URL` answers from the cache on its backing `NSURL`, which every
+  copy of the value shares, and `NSFileCoordinator` hands its block that same object (`===`). After delete-and-replace at a path the
+  reused `URL` reported the OLD identity and the OLD `tagNames`, a fresh `URL` the new ones. The Reader passes one `ArchiveFile.url`
+  to the edit-time capture and to the write, so §6 compared the cache with itself; the writer's §2 pre-read was stale the same way
+  when the handed-in `URL` had read its tags before (the transform saw the old tags after an external change). The main thread's
+  run loop flushes the cache each turn, a background thread never does, so it showed in an undo made in the same turn as its edit
+  and would show in any writer off the main thread. Discovery does not cache the identity on `ArchiveFile.url` (the walker prefetches
+  only mtime and content type), so edit-time captures were not comparing against discovery; the reuse was capture-then-write.
+  **Fix (ArchiveCore):** internal `URL.uncached` (`Tags/URL+Uncached.swift`): a new URL built from the same file-system
+  representation, as `CorpusWalker.inspect` does (never from `path`, which normalises composed Unicode and turns an empty path
+  into the working directory). `FileIdentity.capture` and `TagReading.read` go through it, and `CoordinatedTagWriter.write`
+  does every read AND write inside its block through it, dropping the handed-in URL's cache on exit. The writes matter too:
+  the Tier-2 adversarial review (opus) found, and a probe confirmed, that `setResourceValue` on an NSURL holding cached Finder
+  info rebuilds the Finder-info block from the cache, so a tag write through a cached URL reverted a hidden flag set by another
+  writer (true → false); through a fresh URL it stayed. The walker builds its per-file URL fresh in the same iteration, so it
+  reads through an internal `readTrustingURL` and does not pay the second attribute fetch (~7 µs per file, ~0.7 s per 102k scan).
+  Notes' `NoteStore` and the Processor need no change (they call `FileIdentity.capture`; `OutputFileSafety.isSameFile` builds
+  fresh URLs already).
+  **Tests:** the two `UndoDurabilityTests` expected failures removed (both pass); six new `TagWriterPrimitiveTests`
+  (`testFileIdentityCaptureThroughAReusedURLSeesASwap`, `testReplacedFileAbortsThroughTheSameURLItWasCapturedThrough`,
+  `testWriteReadsTheDiskNotTheCallersURLCache`, `testTagReadingReadThroughAReusedURLSeesAnExternalChange`,
+  `testWriteThroughACachedURLKeepsAnExternalHiddenFlag`, `testUncachedURLKeepsTheNameBytesAndRefusesAnEmptyPath`); the first
+  four run against the pre-fix sources and fail there, the hidden-flag test fails with the writes routed back through the
+  cached URL, all pass with the fix. The test file's read-back helpers now use a new URL and prime caches explicitly, because
+  a helper reading through the reused test URL saw its own stale cache once writes went through a fresh object. ArchiveCore
+  `swift test`: 269 XCTest (4 skipped) + 110 Swift Testing, 0 failures, 0 warnings. Reader unit bundle: 437 tests (3 skipped), 0 failures, no new
+  warnings. Notes unit bundle: 219 tests, 0 failures, no new warnings. Processor: build succeeded, no new warnings (no unit target).
+  Docs: Reader `CLAUDE.md` Safety §6, `KNOWN_ISSUES.md` §Deferred hardening, `verification/reader.md` R-21 and R-45 (R-45 stays
+  `broken` for the quarantine xattr, `W40.fix-reader-tag-quarantine`). Unblocks `W40.audit-ledger-undo`.
+  <!-- /W40.fix-identity-url-cache -->

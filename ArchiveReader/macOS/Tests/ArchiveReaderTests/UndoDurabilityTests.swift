@@ -15,9 +15,9 @@ import ArchiveCore
 ///    a partly failed undo reads as a complete one. §11 requires partial failures to be surfaced. That
 ///    assertion is held by `XCTExpectFailure` until `W40.fix-reader-undo-partial` lands; when it does, the
 ///    expected failure turns into an unexpected pass and this test fails until the wrapper is removed.
-/// 3. Found on the way: §6's identity re-check does not see a file swapped under its path, so undo re-tags
-///    it (`W40.fix-identity-url-cache`, S1; the last two tests). Evidence:
-///    `verification/evidence/reader/W40.f1-undo.md`.
+/// 3. Found on the way, and fixed by `W40.fix-identity-url-cache` (S1): §6's identity re-check did not see a
+///    file swapped under its path, so undo re-tagged it. The last two tests failed before that fix and pin
+///    it now. Evidence: `verification/evidence/reader/W40.f1-undo.md`.
 @MainActor
 final class UndoDurabilityTests: XCTestCase {
 
@@ -93,10 +93,11 @@ final class UndoDurabilityTests: XCTestCase {
 
     /// Found while writing the test above (it first swapped the file rather than deleting it, expecting
     /// §6 to refuse). `undoLast` re-verifies against the identity captured at the original edit, but
-    /// `FileIdentity.capture` reads `fileResourceIdentifier` through the `URL` it is handed, and a reused
+    /// `FileIdentity.capture` read `fileResourceIdentifier` through the `URL` it was handed, and a reused
     /// `URL` instance answers from its resource-value cache. The edit and the undo both pass the
-    /// `ArchiveFile`'s own `url`, so the check compares the cache with itself and a different file at
-    /// that path is re-tagged.
+    /// `ArchiveFile`'s own `url`, so the check compared the cache with itself and a different file at
+    /// that path was re-tagged. Since `W40.fix-identity-url-cache` the capture reads through a new `URL`
+    /// for the path (`URL.uncached`), so the swap is seen and the undo refuses the file.
     func testUndoRefusesAFileSwappedUnderItsPath() throws {
         let fixture = try makeRoot(files: ["a.pdf"])
         let model = fixtureNavigationModel(pinnedTo: fixture.root)
@@ -111,8 +112,6 @@ final class UndoDurabilityTests: XCTestCase {
 
         model.undoLast()
 
-        XCTExpectFailure("W40.fix-identity-url-cache (S1): FileIdentity.capture answers from a reused URL's "
-                         + "resource-value cache, so §6 does not see the swap and undo re-tags a different file")
         XCTAssertEqual(try tags(swapped), ["Read"], "§6: a file swapped under the path must not be re-tagged")
         XCTAssertEqual(model.statusMessage, "Undid 0 changes.", "…so nothing was undone")
     }
@@ -130,7 +129,6 @@ final class UndoDurabilityTests: XCTestCase {
         XCTAssertFalse(fresh.matches(before), "a fresh URL sees the replacement")
 
         let reused = try XCTUnwrap(FileIdentity.capture(url))
-        XCTExpectFailure("W40.fix-identity-url-cache (S1): a reused URL returns its cached fileResourceIdentifier")
         XCTAssertFalse(reused.matches(before), "the same URL instance must see the replacement too")
     }
 }

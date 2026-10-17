@@ -150,8 +150,12 @@ add {"1981"}`. All of the following hold for every delta.
    (guards against writing to the wrong file after a Finder move). *Mechanism (W14.2):*
    `CoordinatedTagWriter.write(_:expectedIdentity:)` + `FileIdentity` (backed by `fileResourceIdentifier`,
    `isEqual:`-compared) re-verify identity inside the coordination block and abort with `.identityMismatch`
-   on mismatch; `TagWriter.apply`/`setReadState` expose an opt-in `expecting:` param. Arming it at live
-   call sites (capture lazily at selection, never at bulk discovery) is the open follow-up W14.2-fu.
+   on mismatch; `TagWriter.apply`/`setReadState` expose an opt-in `expecting:` param, armed at every live
+   call site (captured lazily at edit time, never at bulk discovery; W14.2-fu). The capture, every tag
+   read and every write inside the coordinated block go through a new `URL` for the same file, never the
+   handed-in `URL`'s resource-value cache: a reused `URL` answers with what it read last time, a write
+   through it puts cached Finder info back on disk, and the coordinator hands the block the caller's own
+   `NSURL` (W40.fix-identity-url-cache; `KNOWN_ISSUES.md` §Deferred hardening has the measurements).
 7. **Color label:** write `.labelNumberKey` **only** when the delta explicitly changes color
    (box/folder). Otherwise never write it; read before/after and restore only on unintended drift.
 8. **Verify by re-read.** Assert the resulting tag **multiset** equals `(old − remove) ∪ add`
