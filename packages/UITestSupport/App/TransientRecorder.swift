@@ -25,6 +25,10 @@
 // sampled, and walking the tree may itself make SwiftUI bring its view graph up to date. Both can only HIDE a
 // flicker, never invent one; the screen video (`ops/gui/vm-screen-video.sh`) is the confirmation for that gap.
 //
+// `-ArchiveTransientLinks <first>+<second>,…` adds links (THE LINK RULE in `../Shared/TransientAnalysis.swift`): pairs
+// of elements, both inside watched sections, whose texts must change in the same pass. A link's finding is reported
+// under the section name `<first>+<second>`.
+//
 // `-ArchiveTransientPlant blink` plants a real flicker: on every transition after the first settle, the key
 // window's content is hidden for one pass and shown again. The UI tests use it once per app to show the recorder
 // failing before its passes are trusted.
@@ -36,6 +40,7 @@ import AppKit
 final class TransientRecorder {
     static let argument = "-ArchiveTransientSections"
     static let plantArgument = "-ArchiveTransientPlant"
+    static let linksArgument = "-ArchiveTransientLinks"
     static let reportIdentifier = "ui.transient.report"
     /// The section holding every element of every sheet, identified or not, so opening and closing one is a
     /// transition the recorder can see.
@@ -54,17 +59,24 @@ final class TransientRecorder {
         guard !prefixes.isEmpty, shared == nil else { return }
         var plant = false
         if let p = arguments.firstIndex(of: plantArgument), p + 1 < arguments.count { plant = arguments[p + 1] == "blink" }
-        let recorder = TransientRecorder(prefixes: prefixes, excluded: excluded, plantBlink: plant)
+        var links: [TransientLink] = []
+        if let l = arguments.firstIndex(of: linksArgument), l + 1 < arguments.count {
+            links = arguments[l + 1].split(separator: ",").compactMap { TransientLink(String($0)) }
+        }
+        let recorder = TransientRecorder(prefixes: prefixes, excluded: excluded, links: links, plantBlink: plant)
         shared = recorder
         recorder.install()
     }
 
     private let prefixes: [String]
     private let excluded: [String]
+    private let links: [TransientLink]
     private let plantBlink: Bool
     private var observer: CFRunLoopObserver?
     private var current: [String: TransientSectionState] = [:]
     private var segment: [String: [TransientSectionState]] = [:]
+    /// Per link, the distinct states since the last settle (the first is the settled state before).
+    private var linkSegment: [[TransientAnalysis.LinkState]] = []
     private var changedSinceSettle = false
     private var changing: Set<String> = []
     private var settleTimer: Timer?
@@ -80,9 +92,11 @@ final class TransientRecorder {
     private var published = ""
     private var sampling = false
 
-    private init(prefixes: [String], excluded: [String], plantBlink: Bool) {
+    private init(prefixes: [String], excluded: [String], links: [TransientLink], plantBlink: Bool) {
         self.prefixes = prefixes
         self.excluded = excluded
+        self.links = links
+        self.linkSegment = links.map { _ in [] }
         self.plantBlink = plantBlink
     }
 
@@ -119,6 +133,13 @@ final class TransientRecorder {
             changed = true
         }
         guard changed else { return }
+        let entries = prefixes.flatMap { snapshot[$0]?.entries ?? [] }
+        for (n, link) in links.enumerated() {
+            let key = link.key(entries)
+            if let last = linkSegment[n].last, last == key { continue }
+            linkSegment[n].append(key)
+            if linkSegment[n].count > Self.maxStatesPerSection { linkSegment[n].remove(at: 1) }
+        }
         changedSinceSettle = true
         if plantBlink, transitions > 0, !plantedThisTransition { plant() }
         settleTimer?.invalidate()
@@ -143,6 +164,12 @@ final class TransientRecorder {
                 findings.append("#\(transitions) \(finding)")
             }
             segment[prefix] = current[prefix].map { [$0] } ?? []
+        }
+        for (n, link) in links.enumerated() {
+            for finding in TransientAnalysis.linkFindings(link: link, states: linkSegment[n]) {
+                findings.append("#\(transitions) \(finding)")
+            }
+            linkSegment[n] = linkSegment[n].last.map { [$0] } ?? []
         }
         changing = []
         publish(idle: true)

@@ -15,6 +15,13 @@
 //   • structure — elements added or removed and then put back (neither the old nor the new element list).
 //
 // One finding per section per kind per transition: the first offending step, which is the reproduction.
+//
+// THE LINK RULE (W40.fix-notes-inspector-jitter). Two elements that describe one thing — the Notes inspector's
+// header and the editor's text both show the selected note — must change in the same committed pass. Each section
+// on its own can move straight from old to new and still pass the rule above while the two do it passes apart,
+// which is how the inspector showed the new note over the old body. A link watches the pair together:
+//
+//   • apart     — a state where one of the two shows its new text and the other does not yet.
 
 #if DEBUG
 import Foundation
@@ -39,11 +46,38 @@ struct TransientSectionState: Equatable, Sendable {
 }
 
 struct TransientFinding: Equatable, Sendable, CustomStringConvertible {
-    enum Kind: String, Sendable { case value, reverted, removed, geometry, structure }
+    enum Kind: String, Sendable { case value, reverted, removed, geometry, structure, apart }
     var section: String
     var kind: Kind
     var detail: String
     var description: String { "\(section) \(kind.rawValue): \(detail)" }
+}
+
+/// Two element identifiers whose texts must change together (THE LINK RULE). An element stands for itself and every
+/// element whose identifier extends it after a dot (`an.detail.header` covers `an.detail.header.date`), because a
+/// SwiftUI container's identifier lands on each of its children. Written `first+second` on the command line.
+struct TransientLink: Equatable, Sendable, CustomStringConvertible {
+    var first: String
+    var second: String
+
+    init(first: String, second: String) { self.first = first; self.second = second }
+
+    init?(_ text: String) {
+        let parts = text.split(separator: "+").map(String.init)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+        self.init(first: parts[0], second: parts[1])
+    }
+
+    var description: String { "\(first)+\(second)" }
+
+    /// The texts each identifier shows across `entries`, joined; "" where it shows nothing (absent from the screen).
+    func key(_ entries: [TransientEntry]) -> TransientAnalysis.LinkState {
+        func text(_ id: String) -> String {
+            entries.filter { $0.identifier == id || $0.identifier.hasPrefix(id + ".") }.map(\.text)
+                .joined(separator: " | ")
+        }
+        return (text(first), text(second))
+    }
 }
 
 enum TransientAnalysis {
@@ -95,6 +129,28 @@ enum TransientAnalysis {
         }
         let order: [TransientFinding.Kind] = [.removed, .value, .reverted, .structure, .geometry]
         return order.compactMap { found[$0] }
+    }
+
+    /// A link's texts at one sample: the first element's and the second's (`TransientLink.key`).
+    typealias LinkState = (first: String, second: String)
+
+    /// `states` are the DISTINCT consecutive states of one link in one transition, settled before to settled after.
+    /// Only a transition that changes both texts can hold the two apart; one that changes either alone passes.
+    static func linkFindings(link: TransientLink, states: [LinkState]) -> [TransientFinding] {
+        guard states.count > 2, let old = states.first, let new = states.last,
+              old.first != new.first, old.second != new.second else { return [] }
+        let last = states.count - 1
+        for i in 1..<last {
+            let s = states[i]
+            let firstNew = s.first == new.first, secondNew = s.second == new.second
+            guard firstNew != secondNew else { continue }
+            let (ahead, behind) = firstNew ? (link.first, link.second) : (link.second, link.first)
+            return [TransientFinding(section: link.description, kind: .apart,
+                                     detail: "step \(i) of \(last): \(ahead) showed the new "
+                                        + "\(quote(firstNew ? new.first : new.second)) while \(behind) still showed "
+                                        + "\(quote(firstNew ? s.second : s.first))")]
+        }
+        return []
     }
 
     /// nil when `values` goes from its first to its last without leaving that range and without turning back.

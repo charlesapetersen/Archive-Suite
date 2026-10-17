@@ -4,7 +4,7 @@ import XCTest
 /// The app's DEBUG recorder samples the watched sections after every committed run-loop pass; each transition here
 /// must take them from the old settled state to the new one without showing anything else on the way. This is the
 /// owner's report of the inspector flickering on every note change (`W40.fix-notes-inspector-jitter`), put where a
-/// test can see it. Read-only: nothing here edits the fixture (the smart-folder sheet is cancelled).
+/// test can see it, with a link holding the inspector's header and the editor's text to the same pass. Read-only: nothing here edits the fixture (the smart-folder sheet is cancelled).
 final class TransientStateUITests: NotesFixtureUITestCase {
 
     /// The panes the transitions below change: the inspector (and its Locations block), the editor, the list,
@@ -12,6 +12,11 @@ final class TransientStateUITests: NotesFixtureUITestCase {
     static let sections = ["an.detail", "an.locations", "an.zotero", "an.editor", "an.list", "an.sidebar",
                            "an.filter", TransientCheck.sheets,
                            "!an.editor.test."]   // the UITest button strip, which reports internals
+
+    /// The inspector's header and the editor's text both show the selected note, so a note change must change them in
+    /// the same pass (`W40.fix-notes-inspector-jitter`: the screen video showed the new header over the previous body
+    /// for 100–133 ms, which each section alone passes).
+    static let links = [TransientLink(first: "an.detail.header", second: "an.editor.text")]
 
     /// `W40.fix-notes-editor-frame-jump`: when the shown note changes (next or previous note, a folder switch), the
     /// editor's text view is sometimes laid out at 0×0 off the window (x -429) for one pass and then back (first seen
@@ -29,7 +34,7 @@ final class TransientStateUITests: NotesFixtureUITestCase {
 
     private var plant = false
     override var extraLaunchArguments: [String] {
-        TransientCheck.launchArguments(sections: Self.sections, plant: plant)
+        TransientCheck.launchArguments(sections: Self.sections, links: Self.links, plant: plant)
     }
 
     func testCommonTransitionsShowNoTransientState() throws {

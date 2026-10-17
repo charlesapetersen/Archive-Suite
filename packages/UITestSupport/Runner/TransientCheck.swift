@@ -20,12 +20,16 @@ import XCTest
 enum TransientCheck {
     static let sectionsArgument = "-ArchiveTransientSections"
     static let plantArgument = "-ArchiveTransientPlant"
+    static let linksArgument = "-ArchiveTransientLinks"
     static let reportIdentifier = "ui.transient.report"
     /// Watches every element of every sheet (`TransientRecorder.sheetsSection`).
     static let sheets = "@sheets"
 
-    static func launchArguments(sections: [String], plant: Bool = false) -> [String] {
-        [sectionsArgument, sections.joined(separator: ",")] + (plant ? [plantArgument, "blink"] : [])
+    /// `links` pairs elements whose texts must change in the same pass (`TransientLink`), each inside a section.
+    static func launchArguments(sections: [String], links: [TransientLink] = [], plant: Bool = false) -> [String] {
+        [sectionsArgument, sections.joined(separator: ",")]
+            + (links.isEmpty ? [] : [linksArgument, links.map(\.description).joined(separator: ",")])
+            + (plant ? [plantArgument, "blink"] : [])
     }
 
     /// A filed defect the recorder is expected to report, matched on a finding's line. `intermittent` is for a defect
@@ -192,6 +196,27 @@ enum TransientCheckSelfTest {
         XCTAssertEqual(kinds([a, s(e("x.title", "Moore", h: 27), e("x.date", "1968")),
                               s(e("x.title", "Moore", h: 33), e("x.date", "1968")), tall]), [],
                        "a smooth animation from one height to another is clean", file: file, line: line)
+        let link = TransientLink(first: "x.title", second: "y.body")
+        func pair(_ title: String, _ body: String) -> TransientAnalysis.LinkState { (title, body) }
+        func linkKinds(_ states: [TransientAnalysis.LinkState]) -> [TransientFinding.Kind] {
+            TransientAnalysis.linkFindings(link: link, states: states).map(\.kind)
+        }
+        XCTAssertEqual(linkKinds([pair("Moore", "old body"), pair("Intel", "new body")]), [],
+                       "both texts changing in one pass is clean", file: file, line: line)
+        XCTAssertEqual(linkKinds([pair("Moore", "old body"), pair("Intel", "old body"), pair("Intel", "new body")]),
+                       [.apart], "the header changing a pass before the body", file: file, line: line)
+        XCTAssertEqual(linkKinds([pair("Moore", "old body"), pair("Moore", "new body"), pair("Intel", "new body")]),
+                       [.apart], "the body changing a pass before the header", file: file, line: line)
+        XCTAssertEqual(linkKinds([pair("Moore", "old body"), pair("", "old body"), pair("", "")]), [.apart],
+                       "the header leaving a pass before the body empties", file: file, line: line)
+        XCTAssertEqual(linkKinds([pair("Moore", "a"), pair("Moore", "b"), pair("Moore", "c")]), [],
+                       "a link whose header does not change is left to the section rule", file: file, line: line)
+        XCTAssertEqual(TransientLink("an.detail.header+an.editor.text"),
+                       TransientLink(first: "an.detail.header", second: "an.editor.text"), file: file, line: line)
+        XCTAssertNil(TransientLink("an.detail.header"), file: file, line: line)
+        XCTAssertEqual(link.key([e("x.title", "Moore"), e("x.title.date", "1968"), e("x.titled", "no"),
+                                 e("y.body", "text")]).first, "Moore | 1968",
+                       "an identifier covers its dotted children only", file: file, line: line)
         XCTAssertNotNil(TransientCheck.Report("transitions=3 idle=1 samples=9 walkMaxMs=4 plants=0\n#2 x value: y"),
                         file: file, line: line)
         let r = TransientCheck.Report("transitions=3 idle=1 samples=9 walkMaxMs=4 plants=1\n#2 x value: y")
