@@ -1,0 +1,10 @@
+{
+ "students": [
+  "fs-seg-4b",
+  "fs-seg-2b"
+ ],
+ "level": 0.85,
+ "chosen_on": "Dean, Deaver, Herrnstein and the corpus's held-out collections",
+ "frozen": "2026-10-17 10:20",
+ "rule": "the two fine-tuned segmenters a Mac would run (SUITE_TODO W41.seg-finetune): the 4B for 16 GB, the 2B for 8 GB; trained on the cleaned corpus windows, no test-box page seen"
+}

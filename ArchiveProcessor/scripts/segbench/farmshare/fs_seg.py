@@ -54,8 +54,8 @@ def cmd_pack(a):
         raise SystemExit(f"{out} exists; pick a new path")
     boxes = a.box or ["Deaver"]
     if a.final:  # W41.seg-27b-test: the one test-box run, all five boxes, only for the committed frozen teacher
-        if R.teacher() != KEY:
-            raise SystemExit(f"the frozen teacher is {R.teacher()}, not {KEY}")
+        if KEY not in R.frozen_keys():
+            raise SystemExit(f"{KEY} is not frozen for the test boxes ({R.frozen_keys()})")
         boxes = list(R.FIVE)
     else:
         W.refuse_test(boxes)

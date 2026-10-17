@@ -432,17 +432,53 @@ def freeze_teacher(key) -> None:
     print(f"wrote {TEACHER_FROZEN}")
 
 
-def teacher() -> str:
-    """The frozen teacher's key, only once its freeze is committed unchanged (git), as the test boxes require."""
-    if not TEACHER_FROZEN.exists():
-        raise SystemExit("no freeze: run `freeze-teacher <key>` and commit seg-teacher.json first")
-    rel = TEACHER_FROZEN.relative_to(data.HERE.parent.parent.parent)
+def committed(path) -> dict:
+    """A freeze file's contents, only while it is committed unchanged (git), as the test boxes require."""
     root = data.HERE.parent.parent.parent
+    rel = path.relative_to(root)
     tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch", str(rel)], capture_output=True)
     clean = subprocess.run(["git", "-C", str(root), "diff", "--quiet", "HEAD", "--", str(rel)])
     if tracked.returncode or clean.returncode:
         raise SystemExit(f"{rel} is not committed as it stands; commit the freeze before any test-box call")
-    return json.loads(TEACHER_FROZEN.read_text())["teacher"]
+    return json.loads(path.read_text())
+
+
+def teacher() -> str:
+    """The frozen teacher's key, only once its freeze is committed unchanged."""
+    if not TEACHER_FROZEN.exists():
+        raise SystemExit("no freeze: run `freeze-teacher <key>` and commit seg-teacher.json first")
+    return committed(TEACHER_FROZEN)["teacher"]
+
+
+# W41.seg-finetune: the students, frozen on the development boxes and the held-out collections before their one
+# test-box run, as the teacher was.
+STUDENTS_FROZEN = RESULTS / "seg-students.json"
+
+
+def freeze_students(keys) -> None:
+    bad = [k for k in keys if k not in FARMSHARE]
+    if bad or not keys:
+        raise SystemExit(f"not FarmShare keys: {bad}")
+    if STUDENTS_FROZEN.exists():
+        raise SystemExit(f"{STUDENTS_FROZEN.name} exists; the freeze is written once")
+    STUDENTS_FROZEN.write_text(json.dumps({
+        "students": keys, "level": LEVEL, "chosen_on": "Dean, Deaver, Herrnstein and the corpus's held-out collections",
+        "frozen": time.strftime("%Y-%m-%d %H:%M"),
+        "rule": "the two fine-tuned segmenters a Mac would run (SUITE_TODO W41.seg-finetune): the 4B for 16 GB, the "
+                "2B for 8 GB; trained on the cleaned corpus windows, no test-box page seen"}, indent=1) + "\n")
+    print(f"wrote {STUDENTS_FROZEN}")
+
+
+def frozen_keys() -> list[str]:
+    """Every key frozen for the test boxes (the teacher and the students), each freeze committed unchanged."""
+    keys = []
+    if TEACHER_FROZEN.exists():
+        keys.append(committed(TEACHER_FROZEN)["teacher"])
+    if STUDENTS_FROZEN.exists():
+        keys += committed(STUDENTS_FROZEN)["students"]
+    if not keys:
+        raise SystemExit("no freeze: run `freeze-teacher <key>` or `freeze-students <key>...` and commit it first")
+    return keys
 
 
 def five_jobs(key):
@@ -657,6 +693,10 @@ def main(argv) -> int:
         freeze_teacher(argv[1])
     elif argv and argv[0] == "report-teacher":
         print(report_five([teacher()]))
+    elif len(argv) >= 2 and argv[0] == "freeze-students":
+        freeze_students(argv[1:])
+    elif argv and argv[0] == "report-students":
+        print(report_five(committed(STUDENTS_FROZEN)["students"]))
     elif argv and argv[0] == "report-cheap":
         for name in argv[1:] or ["Deaver"]:
             W.refuse_test([name])
