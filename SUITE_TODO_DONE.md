@@ -11734,3 +11734,21 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Docs: Reader `CLAUDE.md` Safety §6, `KNOWN_ISSUES.md` §Deferred hardening, `verification/reader.md` R-21 and R-45 (R-45 stays
   `broken` for the quarantine xattr, `W40.fix-reader-tag-quarantine`). Unblocks `W40.audit-ledger-undo`.
   <!-- /W40.fix-identity-url-cache -->
+- [x] **W40.fix-notes-inspector-jitter — the upper-right inspector jitters for a few milliseconds on every note change [S-M · S4]** · §W40 (lane: notes) (uses: build,vm) (blocked-on: W40.e13). Owner-reported 2026-10-11. ✅ SHIPPED 2026-10-17 — recorder link rule `1d8cf851` → this commit.
+  Cause: the body loads asynchronously, but the detail pane's header and inspectors followed the selection at once, so
+  the new note's header was drawn over the previous note's body for 100–200 ms (the `W40.e13` screen video). Fix: they
+  now follow `NotesNavigationModel.detailItemID` — the selection once `NoteBodyEditorModel.settledSelection` reaches it,
+  the editor's `loadedID` until then — reported synchronously through `onShownChange`, so header and body change in one
+  committed pass. A failed load or refused save settles too, so the header never stays on a note the user has left;
+  "No note selected" is hidden (opacity 0) while a switch is pending. Review found and fixed an A → B → A race: going
+  back to the loaded note returned early without retiring B's switch, so B's late load (or B's load after A's save)
+  landed over A; `loadGeneration` is now taken before the flush.
+  Test that failed before: the recorder's new LINK RULE (`TransientLink`, `TransientAnalysis.linkFindings`, kind
+  `apart`; shared `packages/UITestSupport`, additive), wired in Notes' `TransientStateUITests` as
+  `an.detail.header+an.editor.text` — 4 failures before (next note by click, down, up; switch to Inbox), 0 after, in
+  the VM. Screen video: the x≈1200 y≈704 and y≈416 findings are gone. Unit: three `NoteBodyEditorModelTests` (A → B → A
+  in load and in save, settledSelection for every outcome); Notes bundle 219 XCTest + 987 Swift Testing green.
+  Evidence: `verification/evidence/notes/W40.fix-notes-inspector-jitter.md`. Left: the new note's file chip draws blank
+  for 2–3 frames → filed `W40.fix-notes-chip-first-draw-blank`; `W40.fix-notes-stale-body-on-switch` keeps only its
+  keystroke-in-the-gap half (noted in its entry).
+  <!-- /W40.fix-notes-inspector-jitter -->

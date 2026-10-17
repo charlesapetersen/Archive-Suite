@@ -300,6 +300,83 @@ struct NoteBodyEditorModelTests {
         #expect(m.markdown == "A-body")
     }
 
+    /// W40.fix-notes-inspector-jitter: going back to the loaded note returned early without retiring the load
+    /// in flight, so B's late body landed while A was selected again.
+    @Test("A → B → A: B's late load does not land over A selected again")
+    func reselectingLoadedItemRetiresInFlightLoad() async {
+        let a = UUID(), b = UUID()
+        let rec = Recorder([a: "A-body", b: "B-body"])
+        rec.loadDelays[b] = .milliseconds(80)
+        let m = makeModel(rec)
+        await m.select(a)
+        let slowSelect = Task { await m.select(b) }
+        var spins = 0
+        while rec.loadCount < 2 && spins < 10_000 { await Task.yield(); spins += 1 }
+        #expect(rec.loadCount == 2, "B's load never started — the race was never set up")
+
+        await m.select(a)
+        await slowSelect.value
+
+        #expect(m.loadedID == a)
+        #expect(m.markdown == "A-body")
+        #expect(m.settledSelection == .init(id: a))
+    }
+
+    /// The same race with A's save still running when A is selected again (found in review): B's `select` is then
+    /// parked in its flush, not its load, and must still not load B afterwards.
+    @Test("A → B → A during A's save: B is not loaded, A's edit is saved")
+    func reselectingDuringOutgoingSaveRetiresSwitch() async {
+        let a = UUID(), b = UUID()
+        let rec = Recorder([a: "A-body", b: "B-body"])
+        let m = makeModel(rec, debounce: .seconds(60))
+        var saveStarted = false
+        m.save = { id, body in
+            saveStarted = true
+            try? await Task.sleep(for: .milliseconds(80))
+            await rec.save(id, body)
+        }
+        await m.select(a)
+        m.markdown = "A edited"
+        let switchToB = Task { await m.select(b) }
+        var spins = 0
+        while !saveStarted && spins < 10_000 { await Task.yield(); spins += 1 }
+        #expect(saveStarted, "A's save never started — the race was never set up")
+
+        await m.select(a)
+        await switchToB.value
+
+        #expect(m.loadedID == a)
+        #expect(m.markdown == "A edited")
+        #expect(rec.bodies[a] == "A edited")
+        #expect(rec.loadCount == 1, "B's body was never to be read")
+        #expect(m.settledSelection == .init(id: a))
+    }
+
+    /// W40.fix-notes-inspector-jitter: the detail pane shows the loaded note until the switch settles, so the
+    /// settled selection must be reported for every outcome but a superseded one, in the same call as the body.
+    @Test("settledSelection follows each switch, also when the load fails")
+    func settledSelectionReportsEveryOutcome() async {
+        let a = UUID(), b = UUID(), missing = UUID()
+        let rec = Recorder([a: "A-body", b: "B-body"])
+        let m = makeModel(rec)
+        var reports: [(loaded: UUID?, settled: UUID??)] = []
+        m.onShownChange = { [weak m] in reports.append((m?.loadedID, m?.settledSelection.map(\.id))) }
+        #expect(m.settledSelection == nil)
+
+        await m.select(a)
+        #expect(m.loadedID == a && m.settledSelection == .init(id: a))
+        #expect(reports.last?.loaded == a && reports.last?.settled == .some(a))
+
+        await m.select(missing)                       // the load fails: the body stays, the switch still settles
+        #expect(m.loadedID == a)
+        #expect(m.settledSelection == .init(id: missing))
+
+        await m.select(b)
+        await m.select(nil)
+        #expect(m.loadedID == nil && m.settledSelection == .init(id: nil))
+        #expect(reports.last?.loaded == nil && reports.last?.settled == .some(nil))
+    }
+
     @Test("rapid edits coalesce into a single debounced save")
     func debouncedSaveCoalesces() async {
         let a = UUID()

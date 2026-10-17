@@ -304,6 +304,7 @@ private struct ItemListPane: View {
 
 /// Right pane: a compact header, the locations inspector, and the metadata inspector (date front-matter
 /// plus the front-matter-backed Q1...Q3 mirror) for the currently-selected item, above the W3 editor.
+/// They follow `nav.detailItemID`, not the selection, so they change in the same pass as the editor's body.
 /// The header is the visible "selection → detail" signal (W6-S3). The editor is bound to the selected
 /// item's body and autosaves through `NoteStore` (W7-S1a — `NoteEditorPane` + `NoteBodyEditorModel`).
 private struct DetailPane: View {
@@ -340,13 +341,13 @@ private struct DetailPane: View {
     private var noteDetail: some View {
         VStack(spacing: 0) {
             selectedHeader
-            if let id = nav.selectedItemID {
+            if let id = nav.detailItemID {
                 Divider()
                 LocationsInspector(nav: nav, itemId: id)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
             }
-            if let summary = nav.selectedSummary {
+            if let summary = nav.detailSummary {
                 Divider()
                 // Keep the editor usable at the minimum window height, even with many references.
                 ScrollView {
@@ -361,7 +362,7 @@ private struct DetailPane: View {
     }
 
     @ViewBuilder private var selectedHeader: some View {
-        if let item = nav.selectedSummary {
+        if let item = nav.detailSummary {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Image(systemName: item.kind == .extract ? "quote.opening" : "doc.text")
@@ -389,6 +390,7 @@ private struct DetailPane: View {
             Text(nav.selection.count > 1 ? "\(nav.selection.count) items selected" : "No note selected")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+                .opacity(nav.detailSwitchPending ? 0 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)

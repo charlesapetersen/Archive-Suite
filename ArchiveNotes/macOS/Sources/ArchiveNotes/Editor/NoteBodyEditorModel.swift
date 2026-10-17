@@ -37,7 +37,14 @@ final class NoteBodyEditorModel: ObservableObject {
     /// The item whose body is currently in the editor (nil = nothing loaded / multi- or no selection).
     /// Saves and flushes target THIS id, captured at schedule time — never a newer selection. Published
     /// so the host can gate a jump-to-source scroll on "the target's body is loaded" (W7-S3).
-    @Published private(set) var loadedID: UUID?
+    @Published private(set) var loadedID: UUID? { didSet { if loadedID != oldValue { onShownChange() } } }
+
+    /// The selection the last `select` finished with: loaded, a no-op repeat, or stopped by a failed load or a
+    /// refused save (nil = no `select` has finished yet). While it differs from the current selection a switch is
+    /// still in flight, and the detail pane keeps showing `loadedID`'s note so its inspector and this body change
+    /// together (W40.fix-notes-inspector-jitter).
+    private(set) var settledSelection: SettledSelection? { didSet { if settledSelection != oldValue { onShownChange() } } }
+    struct SettledSelection: Equatable { let id: UUID? }
 
     // MARK: Injected seams (real wiring in `NoteEditorPane`; closures in tests)
 
@@ -55,6 +62,9 @@ final class NoteBodyEditorModel: ObservableObject {
     /// emergency vault at once), true when it landed (the host drops that copy). Not called for the
     /// template `save` seam, which cannot report a refusal.
     var onSaveResult: (Bool) -> Void = { _ in }
+    /// `loadedID` or `settledSelection` changed. Called synchronously, so whatever the host derives from them is
+    /// published in the same pass as the body (W40.fix-notes-inspector-jitter).
+    var onShownChange: () -> Void = {}
     @Published private(set) var externalChangeMessage: String?
     /// Recreate TextKit after a conflict reload so old undo/serialization cannot restore stale text.
     @Published private(set) var reloadGeneration = 0
@@ -92,19 +102,23 @@ final class NoteBodyEditorModel: ObservableObject {
     /// of the already-loaded id is a no-op — it must NOT reload (that would clobber in-progress typing,
     /// e.g. when a post-save `reloadItems()` re-publishes the same selection).
     func select(_ id: UUID?) async {
-        guard id != loadedID else { return }
-        flushEditor()
-        await flush()                       // persist the outgoing item (targets the OLD loadedID)
-
-        // A refused content/recovery write must not discard the outgoing draft on a switch.
-        guard !dirty else { return }
+        // Taken before the flush's await, so any later `select` retires this one — also one back to the loaded
+        // item (A → B → A) made while A's save is still running: B's load must not land over A selected again.
         loadGeneration &+= 1
         let generation = loadGeneration
-        guard let id else { setLoaded(nil, body: "") ; return }
+        guard id != loadedID else { settledSelection = SettledSelection(id: id); return }
+        flushEditor()
+        await flush()                       // persist the outgoing item (targets the OLD loadedID)
+        guard generation == loadGeneration else { return }   // a newer select() came during the flush; it settles
 
-        guard let body = await load(id) else { return }
-        guard generation == loadGeneration else { return }   // a newer select() superseded this load
-        setLoaded(id, body: body)
+        // A refused content/recovery write must not discard the outgoing draft on a switch.
+        guard !dirty else { settledSelection = SettledSelection(id: id); return }
+        guard let id else { setLoaded(nil, body: ""); settledSelection = SettledSelection(id: nil); return }
+
+        let body = await load(id)
+        guard generation == loadGeneration else { return }   // a newer select() superseded this load; it settles
+        if let body { setLoaded(id, body: body) }
+        settledSelection = SettledSelection(id: id)
     }
 
     /// Persist any pending edit for the currently-loaded item **now** (cancel the debounce and await the

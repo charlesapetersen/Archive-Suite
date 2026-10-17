@@ -116,6 +116,7 @@ struct NoteEditorPane: View {
         }
         .onAppear {
             wireBodySeams()
+            reportEditorBody()
             refreshAssetStore(for: bodyEditor.loadedID)
             syncFormattingIdentity()
             formatting.clearZoteroAutoFillReference()
@@ -177,6 +178,8 @@ struct NoteEditorPane: View {
             // (W40.fix-notes-failed-save-close), so a later quit retries it instead of losing it.
             // Pull TextKit's own pending serialize now, while the text view still exists.
             bodyEditor.flushEditor()
+            bodyEditor.onShownChange = {}
+            nav.editorBody = nil
             let registry = flushRegistry, id = paneID
             Task { await registry.paneClosed(id) }
         }
@@ -417,10 +420,20 @@ struct NoteEditorPane: View {
             model.statusMessage = "This note changed outside this editor and was reloaded."
         }
         bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
+        bodyEditor.onShownChange = { [weak nav, weak bodyEditor] in
+            guard let nav, let bodyEditor else { return }
+            nav.editorBody = .init(loadedID: bodyEditor.loadedID, settled: bodyEditor.settledSelection)
+        }
         // W7-S2: give the formatting context the shared model so Create/Append Extract can persist.
         formatting.notesModel = model
         formatting.zoteroStatus = zoteroStatus
         formatting.flushCurrentNote = { [bodyEditor] in await bodyEditor.flushPending() }
+    }
+
+    /// Tell the detail pane what this editor holds (W40.fix-notes-inspector-jitter); afterwards `onShownChange`
+    /// keeps it current, in the same call as each change.
+    private func reportEditorBody() {
+        nav.editorBody = .init(loadedID: bodyEditor.loadedID, settled: bodyEditor.settledSelection)
     }
 
     /// Ensure the item-scoped inline-image asset store exists (lazily, once the model's `NoteStore` has

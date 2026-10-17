@@ -191,6 +191,33 @@ final class NotesNavigationModel: ObservableObject {
         return model.allItems.first { $0.id == id }
     }
 
+    /// What this window's editor holds, reported by `NoteEditorPane` in the same call that changes it (nil while
+    /// no editor is mounted). See `detailItemID`.
+    @Published var editorBody: EditorBody?
+    struct EditorBody: Equatable {
+        /// The item whose body the editor shows.
+        var loadedID: UUID?
+        /// The selection the editor last finished switching to (`NoteBodyEditorModel.settledSelection`).
+        var settled: NoteBodyEditorModel.SettledSelection?
+    }
+
+    /// The item the detail pane's header and inspectors describe: the selection once the editor has settled on
+    /// it, and until then the item whose body the editor still shows. The body loads asynchronously, so showing
+    /// the selection at once drew the new note's header over the previous note's body for 100–200 ms on every
+    /// note change (W40.fix-notes-inspector-jitter). A failed load or a refused save settles too, so the header
+    /// never stays on a note the user has left. nil while no editor is mounted (nothing is shown under it).
+    var detailItemID: UUID? {
+        guard let editorBody else { return nil }
+        return editorBody.settled == .init(id: selectedItemID) ? selectedItemID : editorBody.loadedID
+    }
+    /// The editor has not yet settled on the selection: the header then keeps its place but names nothing, rather
+    /// than reading "No note selected" over a note that is about to open.
+    var detailSwitchPending: Bool { editorBody?.settled != .init(id: selectedItemID) }
+    var detailSummary: ItemSummary? {
+        guard let id = detailItemID else { return nil }
+        return model.allItems.first { $0.id == id }
+    }
+
     /// Select a single item (context-menu "Open" / double-click). Loads it into the detail pane.
     func select(_ id: UUID?) {
         selection = id.map { [$0] } ?? []
