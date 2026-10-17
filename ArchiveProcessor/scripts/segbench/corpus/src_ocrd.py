@@ -108,13 +108,14 @@ def materialise(c: common.Candidate):
     dest = common.CACHE / 'pages' / SOURCE / f"{safe}.{c.fetch['ext']}"
     t = truth(common.get(c.fetch['xml']))
     if not dest.exists():
-        data = _download(c)
-        if ghtree.is_lfs_pointer(data):
+        _download(c, dest)
+        if ghtree.is_lfs_pointer(dest.open('rb').read(1024)):
+            dest.unlink()
             raise IOError(f'{c.key}: Git LFS pointer')
-        common.cached(str(dest.relative_to(common.CACHE)), data)
     return dest, t
 
 
-def _download(c: common.Candidate) -> bytes:
-    """Whole tif (about 10 MB). `get` caps stdout at 20 MB, which covers every page here; a larger one raises."""
-    return common.get(c.fetch['image'])
+def _download(c: common.Candidate, dest) -> None:
+    """Whole tif, straight to the cache (fetch.sh writes a .part and renames it). Most are about 10 MB, but six of
+    the 80 drawn on 2026-10-17 were over the 20 MB that `get` (fetch.sh --stdout) allows, and failed every time."""
+    common.download(c.fetch['image'], str(dest.relative_to(common.CACHE)))

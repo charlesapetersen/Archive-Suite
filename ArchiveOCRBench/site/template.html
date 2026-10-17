@@ -195,6 +195,18 @@ footer p { font-size: 13px; }
     <p class="note">Segmentation only proposes boundaries; the tagging call dates each document afterwards, with the prompt <code>TagGenerator.generateTags</code> sends (year always, month only if the document states it, <code>date_uncertain</code> when the year is not in the document itself). Documents are runs of pages with one identity tag set, kept only where the label-clean teacher and the tags agree on every gap around them, sampled across collections; the corpus copies of the test and development boxes are left out. The text sent is ABBYY's layer, not the app's own OCR. A month the reply gives where the owner tagged none is not always invented: most of those months are named in the text, so the owner left them untagged. Full tables: <code>ArchiveProcessor/segbench-results/date-tagging.md</code>.</p>
   </section>
 
+  <header class="part" id="public">
+    <div class="eyebrow">Part 7 · Public truth sets · not the owner's archive</div>
+    <h2>Reference routes on the public strata</h2>
+    <p id="pub-lede"></p>
+  </header>
+  <section class="panel" id="pub-table">
+    <div class="head"><h2>By stratum</h2><span class="meta" id="pub-meta"></span></div>
+    <div class="tbl"><table><thead><tr><th>Stratum</th><th>Pages</th><th>Route</th><th>Answered</th><th>NES</th><th>NES, answered</th><th>Second score</th><th>Cost</th></tr></thead><tbody id="pub-rows"></tbody></table></div>
+    <p class="note" id="pub-pair"></p>
+    <p class="note">Pages drawn with a fixed seed from published transcriptions (no collection more than a quarter of its stratum), checked against Apple Vision's reading for wrong truth, and frozen before any model read them; the manifest is <code>ArchiveProcessor/segbench-results/bench-corpus/manifest.jsonl</code>. Same prompt, image size and scorer as the 96. Each source keeps its own transcription conventions, so a stratum's score is comparable across routes, not with the 96 or with another stratum. Second score: NES after mapping historical letter forms (long s, ligatures, abbreviation marks) for L5-L8; without diacritics for N1, N3 and N4. Apple Vision runs the app's settings (English, language correction on), so it reads only the Latin-script strata. Scores only: the page images are not published, whatever their licence allows.</p>
+  </section>
+
   <footer>
     <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B on FarmShare is priced at $0 because the cluster bills nothing; what it costs is GPU time, shown in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
     <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
@@ -476,6 +488,33 @@ if (DT) {
     row('… and the year is not in the text', U.owner_certain_not_in_text),
     row('Date Uncertain where the owner tagged it too', U.owner_uncertain),
     row('Certain and wrong, where the owner was certain', U.certain_and_wrong)].join('');
+}
+
+// Part 7: the public strata.
+const PB = DATA.public;
+const STRATUM_NAMES = { L1: 'English letters and diaries', L2: 'English manuscripts, 1700-1850', L3: 'Typescripts and telegrams',
+  L4: 'Ledgers and forms', L5: 'Dutch and Romance archival hands', L6: 'German Kurrent', L7: 'Charters before 1600',
+  L8: 'Early print, incl. Fraktur', L9: 'Newspapers', N1: 'Arabic manuscripts', N2: 'Cyrillic', N3: 'Greek minuscule',
+  N4: 'Hebrew book hands', N5: 'Chinese print', N6: 'Devanagari print' };
+if (PB) {
+  const p1 = v => v == null ? '–' : (100 * v).toFixed(1);
+  const rows = PB.rows.filter(r => r.stratum !== 'all');
+  const total = Object.values(PB.strata).reduce((a, s) => a + s.pages, 0);
+  document.getElementById('pub-lede').textContent = total + ' pages in ' + Object.keys(PB.strata).length +
+    ' strata of public transcriptions, read by two paid reference routes and Apple Vision, to check that the set separates readers and to measure the price a page. Spent $' +
+    PB.paired.spent.toFixed(2) + ' of a $' + PB.paired.cap.toFixed(2) + ' cap.';
+  document.getElementById('pub-meta').textContent = 'NES %, failures as 0';
+  document.getElementById('pub-rows').innerHTML = rows.map(r => {
+    const s = PB.strata[r.stratum];
+    const second = r.nes_mapped != null ? r.nes_mapped : r.nes_no_marks;
+    return '<tr><td>' + r.stratum + ' · ' + (STRATUM_NAMES[r.stratum] || '') + '</td><td>' + s.pages + '</td><td>' + r.route +
+      '</td><td>' + r.ok + '/' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.nes_answered) + '</td><td>' + p1(second) +
+      '</td><td>' + (r.cost ? '$' + r.cost.toFixed(3) : '–') + '</td></tr>';
+  }).join('');
+  const P2 = PB.paired, all = P2.by_stratum.all;
+  if (all) document.getElementById('pub-pair').textContent = P2.a + ' minus ' + P2.b + ', paired over all ' + all.n +
+    ' pages: ' + (100 * all.delta).toFixed(1) + ' NES points (95% interval ' + (100 * all.lo).toFixed(1) + ' to ' +
+    (100 * all.hi).toFixed(1) + ', permutation p = ' + all.p.toFixed(4) + ').';
 }
 
 Chart.defaults.font.family = css('--body');

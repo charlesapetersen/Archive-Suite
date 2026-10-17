@@ -5,6 +5,7 @@ then fails or returns an error body. Every group-A converter reads through these
 """
 from __future__ import annotations
 
+import functools
 import subprocess
 import time
 
@@ -32,8 +33,10 @@ def get_range(url: str, start: int, end: int) -> bytes:
     return retry(common.get_range, url, start, end)
 
 
+@functools.lru_cache(maxsize=None)
 def open_zip(url: str) -> common.RemoteZip:
-    """RemoteZip whose every range read retries (a 429 in the middle of the directory read included)."""
+    """RemoteZip whose every range read retries (a 429 in the middle of the directory read included). Opened once
+    per URL per process: Kurrent's central directory alone is 2.8 MB, and every page used to read it again."""
     size = retry(common.size_of, url)
     return retry(lambda: common.RemoteZip(url, size, reader=lambda a, b: get_range(url, a, b)))
 

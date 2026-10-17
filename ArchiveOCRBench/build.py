@@ -41,6 +41,7 @@ INPUTS = HERE / "data" / "inputs.json"
 HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
+PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
@@ -247,6 +248,25 @@ def farmshare():
             "bulk": json.loads(bulk_f.read_text()) if bulk_f.exists() else None}
 
 
+def public():
+    """The reference routes on the frozen public strata, by stratum: corpus/routes.py's routes.csv and the paired
+    comparison. None until the routes have run."""
+    f = PUBLIC / "routes.csv"
+    if not f.exists():
+        return None
+    num = lambda v: None if v in ("", None) else float(v)
+    with f.open(newline="") as fh:
+        rows = [{k: (v if k in ("route", "stratum") else num(v)) for k, v in r.items()} for r in csv.DictReader(fh)]
+    manifest = [json.loads(l) for l in (PUBLIC / "manifest.jsonl").read_text().splitlines()]
+    strata = {}
+    for m in manifest:
+        s = strata.setdefault(m["stratum"], {"pages": 0, "sources": set(), "script": m["script"]})
+        s["pages"] += 1
+        s["sources"].add(m["source"])
+    return {"rows": rows, "paired": json.loads((PUBLIC / "routes-paired.json").read_text()),
+            "strata": {k: {**v, "sources": sorted(v["sources"])} for k, v in sorted(strata.items())}}
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -320,7 +340,8 @@ def main():
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting(),
              "farmshare": farmshare(), "difficulty": diff,
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
-             "dating": json.loads(DATING.read_text()) if DATING.exists() else None}
+             "dating": json.loads(DATING.read_text()) if DATING.exists() else None,
+             "public": public()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

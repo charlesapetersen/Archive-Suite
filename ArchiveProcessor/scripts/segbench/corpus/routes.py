@@ -169,7 +169,7 @@ def report():
             if not attempted:
                 continue
             s = S.score(t, text or '', j['stratum'])
-            out.append({'key': k, 'stratum': j['stratum'], 'script': j['script'], 'ok': bool(text), **s,
+            out.append({'key': k, 'page': j['id'], 'stratum': j['stratum'], 'script': j['script'], 'ok': bool(text), **s,
                         'cost': meta.get('cost', 0), 'prompt_tokens': meta.get('prompt_tokens'),
                         'completion_tokens': meta.get('completion_tokens')})
     P.save(RUN / 'scores.json', out)
@@ -187,6 +187,11 @@ def report():
     fields = ['route', 'stratum', 'n', 'ok', 'failed', 'nes', 'nes_answered', 'nes_mapped', 'nes_no_marks', 'chrf',
               'miss', 'add', 'words', 'cost']
     S.write_csv(RESULTS / 'routes.csv', rows, fields)
+    # One row per route and page, for the sweep's difficulty and cascade analysis. Page ids are the public
+    # datasets' own; no text leaves the cache.
+    S.write_csv(RESULTS / 'routes-pages.csv', [{**r, 'route': r['key']} for r in out],
+                ['route', 'page', 'stratum', 'script', 'ok', 'nes', 'nes_mapped', 'nes_no_marks', 'chrf', 'words',
+                 'hyp_words', 'cost', 'completion_tokens'])
     # Separation: the two paid routes paired page by page, within each stratum and pooled.
     pairs = {}
     a_key, b_key = ROUTES
