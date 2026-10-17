@@ -209,6 +209,10 @@ depends on the apps' current settings, structure or outputs.
   piece of work (an item across all its sessions) without asking him first. Subscription usage is not money. Over
   $3, an unattended session asks in the Daemon Report and moves on. The rule's authority is `~/Claude/CLAUDE.md`,
   section "Spending money".
+- ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models on FarmShare first; paid hosted
+  bench runs wait for `W43.sweep` at the end of the queue, behind a full price estimate. A session that wants a paid
+  run and defers it adds a line to [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md)
+  in the same commit, so none is lost.
 - ~~⛔ **Money paths are unchanged.** Stranding a live paid batch costs real money regardless of whether any
   output matters (the W16 `bat3`/`bat5`/`bat2-fu2` work is framed around money, not data).~~ *(superseded
   2026-08-13, above.)*
