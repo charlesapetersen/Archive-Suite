@@ -42,8 +42,11 @@ INDEX = C.FROZEN / 'index.jsonl'
 ROUTES = {k: OC.MODELS[k] for k in ('gemini3.8-flash', 'qwen3-vl-235b')}
 # Of the $5.10. The 30-page probe (2026-10-17) measured $0.00334 a page for Gemini and $0.00217 for Qwen: about
 # $2.49 for the 440 pages. The cap check also counts the reservations in flight (about $0.06 a call), so $2.60
-# would stop the run near 85%; $2.90 leaves W43.corpus-build-more $2.20 of the item's cap.
-CAP = 2.90
+# would stop the run near 85%; $2.90 left W43.corpus-build-more $2.20 of the item's cap. The full run cost more
+# than the probe said: Gemini on the Hebrew pages about $0.010 a page (three times its average), and Qwen ran to
+# the 8,192-token limit on 82 pages (about 18%, $0.008 each). It stopped at $2.79 with 59 Gemini pages left,
+# priced at $0.23 by their strata; $3.20 finishes them and leaves W43.corpus-build-more $1.90.
+CAP = 3.20
 PROBE = 30
 VISION_SCRIPTS = {'Latn'}
 

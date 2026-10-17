@@ -1,6 +1,6 @@
 # ArchiveOCRBench
 
-What the bench has measured, as one page you can read and share. It has six parts:
+What the bench has measured, as one page you can read and share. It has seven parts:
 
 1. **OCR.** The W41 OCR panel: twenty-five hosted routes read the same 96 adjudicated truth pages, and each is
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
@@ -31,6 +31,13 @@ What the bench has measured, as one page you can read and share. It has six part
    whole corpus documents, scored against the owner's own year, month and Date Uncertain tags. Read from
    `ArchiveProcessor/segbench-results/date-tagging.json` (W41.date-tag-measure; the full tables are
    `date-tagging.md` there).
+7. **Public truth sets.** The reference routes (Gemini 3.8 Flash, Qwen3-VL 235B, and Apple Vision on the
+   Latin-script pages) on 440 pages of published transcriptions in seven strata: Dutch and Romance archival hands,
+   German Kurrent, charters before 1600, early print with Fraktur, Arabic manuscripts, Greek minuscule and Hebrew
+   book hands. Scored by stratum with the 96's prompt, image size and scorer; scores only, no page images. Read
+   from `ArchiveProcessor/segbench-results/bench-corpus/` (`routes.csv`, `routes-paired.json`, `manifest.jsonl`),
+   written by `scripts/segbench/corpus/routes.py report` (W43.corpus-build). More strata come with
+   W43.corpus-build-more.
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet
