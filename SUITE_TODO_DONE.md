@@ -11685,3 +11685,19 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   or keep it out of the archive is the owner's call (Daemon Report, gate `W40.root-marker-owner-ok`) →
   `W40.root-marker`. Ledger note under R-45 updated. Evidence `verification/evidence/reader/W40.f2-root-marker.md`.
   <!-- /W40.f2 -->
+- [x] **W40.audit-ledger — build the Reader's promised audit ledger, or withdraw the promise [S-M]** · §W40 verification phase · SHIPPED 2026-10-17 (this commit)
+  Owner, 2026-10-16 walkthrough: build it, and durable undo. This commit builds the ledger; durable undo is
+  `W40.audit-ledger-undo` (blocked-on `W40.fix-identity-url-cache`, as the gate's answer said it should be).
+  `Core/AuditLedger.swift`: one JSON line per verified, non-no-op `TagWriter` write — `{v, timestamp, op, group,
+  undoes, path, bookmark, file{device,inode}, before, after, beforeLabel, afterLabel, delta, inverse, unverified}` —
+  appended to `audit-ledger.jsonl` in the Reader's Application Support (container); a per-process temp file under
+  the unit-test host and under a UITest launch (`-ARUITestRootPath`). `TagWriter.recorded` wraps all four writes; a
+  write that failed after it may have reached disk (`.verificationFailed`, or a raw error from the label write) gets
+  an `unverified` line, the pre-write refusals get none. `NavigationModel` binds one `@TaskLocal` group per action
+  (bulk mark, edit, rename = one group, as one undo) and names the undone group in `undoes`. A torn last line is
+  skipped and costs only itself. Two exact-line allowances added to `lint-write-surface.sh` (the ledger's
+  `createFile` and `FileHandle(forWritingTo:)`). Tests: `AuditLedgerTests` (7); Reader unit bundle 437 run, 0
+  failures; write-surface lint + self-test green. Tier-2 review (opus): no serious defect; two medium gaps fixed
+  before landing (raw-error writes unrecorded; host UITests writing the owner's ledger); the low findings went into
+  `W40.audit-ledger-undo`. `R-46` → `fixed-pending-recheck` (record half); §12 and the Implementation Map updated.
+  <!-- /W40.audit-ledger -->

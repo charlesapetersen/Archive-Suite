@@ -170,6 +170,11 @@ add {"1981"}`. All of the following hold for every delta.
     after its write **verified**.
 12. **Append-only audit ledger** of `{path, bookmark, delta, before[], after[], timestamp}` for
     every change — transparency/history and inverse-delta undo source, *not* blind full-array restore.
+    *Mechanism (W40.audit-ledger):* `Core/AuditLedger.swift`, one JSON line per verified `TagWriter`
+    write in `~/Library/Containers/com.archivereader.app/Data/Library/Application Support/ArchiveReader/
+    audit-ledger.jsonl` (a per-process temp file under the unit-test host), with the file's device/inode,
+    the occurrence delta and its inverse, and a `group` per action (`undoes` on an undo). Not yet the undo
+    source — undo is still in memory and lost on quit until `W40.audit-ledger-undo`.
 13. **PDF panes are provably non-writing:** PDFViews non-editable, annotations disabled, no
     `PDFDocument.write` path exists. The write-surface lint covers *all* write spellings
     (`setResourceValue(s)`, `setxattr`, `FileManager` mutators, `PDFDocument.write`). The lint is one
@@ -358,7 +363,9 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
   TagWriter.swift             Reader's DELTA ADAPTER over `ArchiveCore.CoordinatedTagWriter` (the shared
                               write choke-point). TagDelta{add,remove,color}; apply()/setReadState()/batch;
                               trustworthy-read guard; multiset+label+bytes verify; label-only .restoreLabel
-                              inverse undo.
+                              inverse undo. Every verified write is recorded in AuditLedger.
+  AuditLedger.swift           Safety §12 append-only JSON-lines record of every tag write (container,
+                              never the archive); @TaskLocal group per action, `undoes` on undo.
   TagSimilarity.swift         Pure near-duplicate subject clustering (normalize + length-scaled
                               Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
   LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort.

@@ -4,8 +4,9 @@ import ArchiveCore
 
 /// W40.f1 — what the Reader's undo actually is, against what `CLAUDE.md` Safety Protocol §11–§12 promise.
 ///
-/// §12 promises an append-only audit ledger that is the source for undo. None exists (ledger row `R-46`):
-/// undo is `NavigationModel`'s private in-memory `undoStack`. These tests pin what that means on
+/// §12 promises an append-only audit ledger that is the source for undo. The ledger now records every write
+/// (`W40.audit-ledger`, `AuditLedgerTests`), but undo does not read it yet (`W40.audit-ledger-undo`, row
+/// `R-46`): undo is `NavigationModel`'s private in-memory `undoStack`. These tests pin what that means on
 /// scratch `mktemp` fixtures, through the same `mark` → `undoLast` path ⌘Z takes:
 ///
 /// 1. The undo history does not outlive the model. A relaunch (here, a second model on the same root and

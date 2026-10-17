@@ -21,7 +21,7 @@ enum TagWriter {
     /// write target's identity re-verified inside coordination (Safety §6); a file moved/replaced
     /// under the same path aborts with `.identityMismatch`. `nil` (default) skips the check.
     static func apply(_ delta: TagDelta, to url: URL, expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.apply, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
             var removals = delta.remove
             var additions = delta.add
             var targetLabel = label
@@ -55,7 +55,7 @@ enum TagWriter {
 
             if newTags == current && normalizedLabel(targetLabel) == normalizedLabel(label) { return nil }
             return (newTags, targetLabel)
-        }
+        } }
     }
 
     /// Undo/restore path: apply an OCCURRENCE-AWARE (multiset) inverse to one file's tags. Unlike the
@@ -77,7 +77,7 @@ enum TagWriter {
     /// token a concurrent edit re-cased.
     static func applyOccurrence(_ delta: TagOccurrenceDelta, to url: URL,
                                 expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.undo, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
             var targetLabel = label
             switch delta.color {
             case .restoreLabel(let lbl): targetLabel = lbl
@@ -102,7 +102,7 @@ enum TagWriter {
 
             if newTags == current && normalizedLabel(targetLabel) == normalizedLabel(label) { return nil }
             return (newTags, targetLabel)
-        }
+        } }
     }
 
     /// Apply the same delta to a group of files. Each file is an INDEPENDENT, idempotent unit — never
@@ -131,7 +131,7 @@ enum TagWriter {
     /// markers, Safety §10); pass `addIfMissing: true` for an explicit "mark Read" on such files.
     static func setReadState(_ target: ReadState, on url: URL, addIfMissing: Bool = false,
                              expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.readState, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
             let hasReadState = current.contains { isReadStateWord($0) }
             guard hasReadState || addIfMissing else { return nil }
             let alreadyTarget = current.contains { isSameTag($0, target.rawValue) }
@@ -141,7 +141,7 @@ enum TagWriter {
             newTags.append(target.rawValue)
             if newTags == current { return nil }
             return (newTags, label)
-        }
+        } }
     }
 
     /// Conditional corpus-wide rename. The selection that nominated `url` may have come from a
@@ -150,12 +150,32 @@ enum TagWriter {
     /// verified no-op instead of unconditionally adding `new` to the wrong selection set.
     static func renameToken(from old: String, to new: String, on url: URL,
                             expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
+        try recorded(.rename, url) { try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
             guard current.contains(where: { shouldRemoveTag($0, matching: old) }) else { return nil }
             var renamed = current.filter { !shouldRemoveTag($0, matching: old) }
             if !renamed.contains(where: { isSameTag($0, new) }) { renamed.append(new) }
             if renamed == current { return nil }
             return (renamed, label)
+        } }
+    }
+
+    /// Safety §12: every verified write that changed something gets one audit-ledger line. A write that
+    /// failed after it may have reached the disk gets a line too, marked with the error: a failed
+    /// post-write verification, or a raw Foundation error from the label write, which comes after the
+    /// tag write. `unreadable`, `identityMismatch` and `coordinationFailed` are refused before any write
+    /// and leave nothing to record.
+    private static func recorded(_ op: AuditLedger.Operation, _ url: URL,
+                                 _ write: () throws -> TagWriteResult) throws -> TagWriteResult {
+        do {
+            let result = try write()
+            AuditLedger.shared.record(op, result)
+            return result
+        } catch let error as TagWriteError {
+            if case .verificationFailed(let why) = error { AuditLedger.shared.recordUnverified(op, url, why) }
+            throw error
+        } catch {
+            AuditLedger.shared.recordUnverified(op, url, String(describing: error))
+            throw error
         }
     }
 }

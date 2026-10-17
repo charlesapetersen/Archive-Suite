@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 4` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-26, R-46, R-47). Updated by `W40.e5`, 2026-10-16.
+- **Count:** `unproven 36 · works 3 · broken 4 · unreachable 3 · fixed-pending-recheck 1` (works: R-21, R-28, R-29; broken: R-11, R-13, R-23, R-45; unreachable: R-25, R-26, R-47; fixed-pending-recheck: R-46). Updated by `W40.audit-ledger`, 2026-10-17.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -956,20 +956,24 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Promise:** every tag change is recorded in an append-only ledger of `{path, bookmark, delta, before[],
   after[], timestamp}`. The ledger is the history and the source for undo.
 - **Promised in:** `CLAUDE.md` Safety Protocol §12.
-- **Reached by:** **none found. No implementation exists.** Searched: `ledger`, `audit`, `journal`, `AuditLog`,
-  `TagJournal` and `append-only` in `ArchiveReader/macOS/Sources`, `packages/ArchiveCore/Sources` and every
-  `.swift` file in the repo. The only hits are comments ("the audited TagWriter"), Notes' and the Processor's
-  unrelated ledgers, and SQLite/FSEvents journals. Undo lives in `NavigationModel`'s private `undoStack`
-  (`Views/NavigationModel.swift:126-127`), an in-memory array that is lost on quit, has no cap, and stores no
-  timestamp or bookmark.
-- **Real-path test:** none.
+- **Reached by:** every Reader tag write. `Core/TagWriter.swift`'s `recorded(_:_:_:)` wraps each of its four
+  writes (`apply`, `applyOccurrence` = undo, `setReadState`, `renameToken`) and hands each verified, non-no-op
+  result to `Core/AuditLedger.swift`, which appends one JSON line to `audit-ledger.jsonl` in the Reader's
+  Application Support directory (container). A write that fails its post-write verification gets a line marked
+  `unverified`. `NavigationModel` binds one `group` per action (a bulk mark, edit or rename is one group, as it
+  is one undo) and names the undone group in an undo's `undoes`. **Not yet the undo source:** undo still reads
+  the in-memory `undoStack`, so it is lost on quit; reading the ledger is `W40.audit-ledger-undo`.
+- **Real-path test:** `ArchiveReaderTests/AuditLedgerTests` (7 tests, through `NavigationModel` on scratch
+  fixtures).
 - **Runtime evidence:** none.
-- **Status:** `unreachable`
+- **Status:** `fixed-pending-recheck` (the record half; the undo-source half is `W40.audit-ledger-undo`)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unreachable` (a promise with no implementation).
   - 2026-10-16 W40.f1 — memory-only undo demonstrated (`UndoDurabilityTests.testTheUndoHistoryDoesNotSurviveARelaunch`,
     [`evidence/reader/W40.f1-undo.md`](evidence/reader/W40.f1-undo.md)); still `unreachable`. Build or withdraw
     is the owner's call, asked in the Daemon Report; the work it decides is `W40.audit-ledger`.
+  - 2026-10-17 W40.audit-ledger — the ledger built (owner, 2026-10-16: build it, and durable undo);
+    `fixed-pending-recheck`. Durable undo from it waits on `W40.fix-identity-url-cache` → `W40.audit-ledger-undo`.
 - **Notes:** `unreachable` is used because there is no path to it, and this time no code either.
   `W40.b5` leaves §12 in place until the owner rules, marked as unimplemented.
 

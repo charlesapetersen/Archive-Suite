@@ -126,6 +126,14 @@ ALLOW=(
   # added in the same item's completing commit rather than left for someone to discover.
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagVocabulary.swift${SEP}try? data.write(to: fileURL, options: .atomic)"
 
+  # AuditLedger (Safety §12, W40.audit-ledger): the Reader's append-only record of its own tag writes,
+  # one JSON line per verified write. The file is `audit-ledger.jsonl` in the Reader's Application
+  # Support directory (a per-process temp file under the unit-test host); its URL comes from
+  # `FileManager.urls(for: .applicationSupportDirectory…)` and nothing else, so no scanned corpus URL
+  # can reach it. It creates that one empty file and appends to it; it never truncates or rewrites.
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}_ = fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])"
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}let handle = try FileHandle(forWritingTo: url)"
+
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`
   # deleted the call (discovery is `ArchiveCore.CorpusWalker` now, which passes an `errorHandler:`),
