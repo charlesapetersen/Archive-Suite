@@ -10,7 +10,9 @@
 // WHAT IT SAMPLES. The app's own accessibility tree, walked in-process: every element whose identifier starts
 // with a watched prefix, and every element inside one, as (role, identifier, displayed text, frame). That reaches
 // SwiftUI and AppKit alike. An item `!<prefix>` excludes matching elements and everything inside them (a UITest
-// harness strip that reports internals, not display). The pseudo-prefix `@sheets` watches every element of every sheet. Consecutive identical samples collapse; when no watched section has changed for
+// harness strip that reports internals, not display); an open menu is skipped too (AppKit draws and highlights it,
+// not the app). The pseudo-prefix `@sheets` watches every element of every sheet. Consecutive identical samples
+// collapse; when no watched section has changed for
 // `settleInterval`, the states since the last settle are one transition, judged by `TransientAnalysis`.
 //
 // HOW THE TEST READS IT. A small borderless panel, "Transient Recorder", holding one text element
@@ -162,6 +164,10 @@ final class TransientRecorder {
         budget -= 1
         let identifier = element.accessibilityIdentifier() ?? ""
         if !identifier.isEmpty, excluded.contains(where: { identifier.hasPrefix($0) }) { return }
+        // An open menu is AppKit's menu tracking, not the app's display: while a pop-up button's menu is open its
+        // items are the button's children, and their highlight follows the pointer (measured 2026-10-17: picking a
+        // Processor segmentation option reported every item the pointer crossed as a transient value).
+        if element.accessibilityRole() == .menu { return }
         let section = section ?? prefixes.first { !identifier.isEmpty && identifier.hasPrefix($0) }
         if let section {
             let frame = element.accessibilityFrame()
@@ -174,20 +180,51 @@ final class TransientRecorder {
         // A table's or outline's rows are its `accessibilityRows`, which its children need not include (measured:
         // a Notes folder switch changed only the list's rows, and a children-only walk saw no change at all).
         var children = (element.accessibilityChildren() ?? []).map { $0 as AnyObject }
-        for row in element.accessibilityRows() ?? [] where !children.contains(where: { $0 === row as AnyObject }) {
+        let rows = Self.answers(element, "accessibilityRows") ? element.accessibilityRows() ?? [] : []
+        for row in rows where !children.contains(where: { $0 === row as AnyObject }) {
             children.append(row as AnyObject)
         }
         for child in children {
-            guard let child = child as? NSAccessibilityProtocol else { continue }
+            guard let child = Self.element(child) else { continue }
             walk(child, section: section, origin: origin, depth: depth + 1, into: &out, budget: &budget)
         }
     }
 
+    /// The messages the walk needs every element to answer; the rest are asked only of an element that answers
+    /// them (`answers`).
+    private static let requiredSelectors = ["accessibilityIdentifier", "accessibilityFrame", "accessibilityRole",
+                                            "accessibilityChildren"].map(NSSelectorFromString)
+
+    private static func answers(_ element: NSAccessibilityProtocol, _ selector: String) -> Bool {
+        (element as AnyObject).responds(to: NSSelectorFromString(selector))
+    }
+
+    /// A child as an element the walk can read, or nil if it does not answer the accessibility messages.
+    ///
+    /// SwiftUI's in-process elements (`SwiftUI.AccessibilityNode`) answer them but do not declare
+    /// `NSAccessibilityProtocol`, so `as? NSAccessibilityProtocol` fails on them. Measured in the VM on 2026-10-17:
+    /// every child of a SwiftUI scroll view was dropped that way, the walk stopped at 16 elements, and the
+    /// Processor's panels, which all sit in one, were never sampled; each transition there failed as "no watched
+    /// section changed". The accessibility server reads elements by message, not by declared protocol, so the walk
+    /// does too: an object that answers the required messages is read through the protocol, and every optional
+    /// message is checked with `answers` before it is sent. That is sound because an `@objc` protocol's existential
+    /// is the bare object reference and each call is an Objective-C message.
+    private static func element(_ child: AnyObject) -> NSAccessibilityProtocol? {
+        if let element = child as? NSAccessibilityProtocol { return element }
+        guard requiredSelectors.allSatisfy({ child.responds(to: $0) }) else { return nil }
+        return unsafeBitCast(child, to: NSAccessibilityProtocol.self)
+    }
+
     private static func text(of element: NSAccessibilityProtocol) -> String {
         var parts: [String] = []
-        if let title = element.accessibilityTitle(), !title.isEmpty { parts.append(title) }
-        if let label = element.accessibilityLabel(), !label.isEmpty, !parts.contains(label) { parts.append(label) }
-        switch element.accessibilityValue() {
+        if answers(element, "accessibilityTitle"), let title = element.accessibilityTitle(), !title.isEmpty {
+            parts.append(title)
+        }
+        if answers(element, "accessibilityLabel"), let label = element.accessibilityLabel(), !label.isEmpty,
+           !parts.contains(label) {
+            parts.append(label)
+        }
+        switch answers(element, "accessibilityValue") ? element.accessibilityValue() : nil {
         case let s as String where !s.isEmpty && !parts.contains(s): parts.append(s)
         case let a as NSAttributedString where a.length > 0: parts.append(a.string)
         case let n as NSNumber: parts.append(n.stringValue)
@@ -195,8 +232,8 @@ final class TransientRecorder {
         }
         // A selection highlight or a greyed-out control is displayed state too: a row deselected and selected
         // again, or a toolbar button that flashes disabled, is a flicker.
-        if element.isAccessibilitySelected() { parts.append("⟨selected⟩") }
-        if !element.isAccessibilityEnabled() { parts.append("⟨disabled⟩") }
+        if answers(element, "isAccessibilitySelected"), element.isAccessibilitySelected() { parts.append("⟨selected⟩") }
+        if answers(element, "isAccessibilityEnabled"), !element.isAccessibilityEnabled() { parts.append("⟨disabled⟩") }
         return parts.joined(separator: " | ")
     }
 

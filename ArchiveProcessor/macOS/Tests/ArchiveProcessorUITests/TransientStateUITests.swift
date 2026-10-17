@@ -34,6 +34,7 @@ final class TransientStateUITests: XCTestCase {
 
     func testCommonTransitionsShowNoTransientState() throws {
         guard launch(plant: false) else { return }
+        startFromManualSegmentation()
         TransientCheck.check("segmentation: Gemini only", in: app, test: self) { chooseSegmentation("Gemini only") }
         TransientCheck.check("segmentation: ChatGPT only", in: app, test: self) { chooseSegmentation("ChatGPT only") }
         TransientCheck.check("segmentation: Full manual", in: app, test: self) { chooseSegmentation("Full manual") }
@@ -57,6 +58,7 @@ final class TransientStateUITests: XCTestCase {
     /// blink` the app hides its window's content for one pass during each transition, and that must be reported.
     func testRecorderCatchesAPlantedFlicker() throws {
         guard launch(plant: true) else { return }
+        startFromManualSegmentation()
         let findings = TransientCheck.check("segmentation, planted flicker", in: app, test: self,
                                             expectFindings: true) { chooseSegmentation("Gemini only") }
         XCTAssertTrue(findings.contains { $0.contains(" removed: ") },
@@ -82,6 +84,13 @@ final class TransientStateUITests: XCTestCase {
     }
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
+
+    /// The chooser's choice persists in the app's defaults from one launch to the next (another test, or this one's
+    /// last run, can leave "Gemini only" chosen, and choosing it again changes nothing). Choose Full manual first,
+    /// outside any check, so each checked choice after it is a real change.
+    private func startFromManualSegmentation() {
+        chooseSegmentation("Full manual")
+    }
 
     /// The segmentation chooser is a pop-up menu: open it and pick the item whose title starts with `label`.
     private func chooseSegmentation(_ label: String) {
