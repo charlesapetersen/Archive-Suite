@@ -12,6 +12,14 @@ checks memory, disables downloads and keeps boundary evidence. `segbench-results
 and its comparison to the bench. This is a development-folder plumbing proof; the locked-box accuracy and the
 unmeasured 8 GB Mac remain as stated in `seg-students.md`. Publishing the weights is still W41.app-local-seg-publish.
 
+## RESOLVED (W43.corpus-build-more, 2026-10-17): public corpus truth and kind checks
+
+`scripts/segbench/corpus/src_omnidoc.py::truth` now retains the visible headers, footers, page numbers and
+footnotes whose dataset reading-order field is empty. Previously they were silently omitted, penalising a
+whole-page reader. Federal Theatre playbills and advertisements are excluded from `src_btp.py`'s typescript
+pool. These sources had not yet been frozen or scored, so no published score changes. The expanded sample's
+source conventions and remaining limits are in `segbench-results/bench-corpus/README.md`.
+
 ## ⚠️ LIMITATION (W41.app-local-models, 2026-10-16): what the local open-weight model route does not yet cover
 
 Settings → API Gateway → **A model on this Mac** (`LocalModelRoute`). Open: **only Qwen3-VL 8B at 4-bit is measured on

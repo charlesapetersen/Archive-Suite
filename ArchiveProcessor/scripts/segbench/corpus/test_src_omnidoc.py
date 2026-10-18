@@ -19,6 +19,14 @@ class Truth(unittest.TestCase):
             self.assertIsNone(O.truth(page(('text_block', '0', '正文'), bad)), bad)
         self.assertIsNone(O.truth(page(('figure', None, ''))))
 
+    def test_unordered_peripheral_text_is_not_lost(self):
+        p = page(('text_block', 1, '正文'), ('page_number', None, '54'),
+                 ('header', None, '題頭'), ('footer', None, '刊名'))
+        p['layout_dets'][1]['poly'] = [0, 900, 20, 900, 20, 920, 0, 920]
+        p['layout_dets'][3]['poly'] = [0, 850, 20, 850, 20, 870, 0, 870]
+        self.assertEqual(O.truth(p), '題頭\n\n正文\n\n刊名\n\n54')
+        self.assertIsNone(O.truth(page(('text_block', 1, '正文'), ('footer', None, '$x$'))))
+
 
 if __name__ == '__main__':
     unittest.main()

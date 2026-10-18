@@ -37,7 +37,7 @@ SEED = 'W43.corpus-build/2026-10-16'
 TARGET = {**{f'L{i}': 80 for i in range(1, 10)}, **{f'N{i}': 40 for i in range(1, 7)}}
 SOURCES = ['read2017', 'kurrent', 'eparchos', 'biblia', 'muharaf', 'sbb',
            'tapus', 'ocrd', 'iforal', 'newsbench',
-           'koenigsfelden', 'castilian', 'voc', 'bentham']
+           'koenigsfelden', 'castilian', 'voc', 'bentham', 'btp', 'peter', 'omnidoc', 'devanagari']
 RESULTS = Path(__file__).resolve().parents[3] / 'segbench-results' / 'bench-corpus'
 CANDIDATES = C.CACHE / 'candidates.jsonl'
 DRAW = C.CACHE / 'sample' / 'draw.jsonl'

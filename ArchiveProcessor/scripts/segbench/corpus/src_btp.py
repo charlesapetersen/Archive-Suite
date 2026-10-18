@@ -17,7 +17,8 @@ goes: brackets and asterisks are removed, and a "?" standing alone (or as [?]) i
 Strata (the plan's table, 2026-10-16; the owner's candidate list on W43.corpus-build-more): L1 the handwritten
 letters and diaries of 1850-1950, from the suffrage papers (Stanton, Anthony, Catt), the Garfield and Patton
 diaries, Bourne, Dickinson and Blackwell; L2 the George Washington Papers, the only founding-era set; L3 the
-typed campaigns, the WWII Rumor Project, Woodrow Wilson file 89 and the Federal Theatre Project. The L1 sets mix
+typed campaigns, the WWII Rumor Project and Woodrow Wilson file 89. Federal Theatre's printed playbills and
+advertisements are excluded. The L1 sets mix
 in some typed and printed pages; a page whose volunteer tags or item title call it typed, printed or a transcript is
 left out of L1 rather than guessed at (Patton's diaries come with typed "annotated transcripts"; tags are free
 text, so this catches only the pages someone labelled). The quarter cap counts each project
@@ -49,7 +50,7 @@ DATASETS = {
     '2020446971': ('L2', 'handwritten', '1776-1798'),   # George Washington Papers
     '2022360466': ('L3', 'typed', '1942-1943'),         # WWII Rumor Project
     '2025474985': ('L3', 'typed', '1913-1921'),         # Woodrow Wilson Papers, file 89
-    '2023514920': ('L3', 'typed', '1935-1939'),         # Federal Theatre Project
+    # Federal Theatre's playbills and ads are printed matter, not L3 typescripts.
 }
 NOT_HAND = re.compile(r'\b(typed|typewrit\w*|typescripts?|transcripts?|printed|print)\b', re.I)
 

@@ -8,8 +8,9 @@ N5 is Chinese print, modern and historical: pages in simplified or traditional C
 magazines, research reports, historical documents and academic papers (slides, exam papers, textbooks and notes
 are left out). A page with a table, a displayed equation or a masked region is left out too, because its truth
 would be HTML or LaTeX, or would miss text the page shows; so is a page whose text has inline LaTeX ($ or \\).
-Figures are allowed (157 pages rather than 37); words inside a figure are not in the truth.
-Truth is every text block's `text`, in `order`, one block per paragraph. The collection for the quarter cap is
+Figures are allowed; words inside a figure are not in the truth.
+Truth is every text block's `text`, explicit body `order` preserved, unordered headers prepended and
+footnotes/footers/page numbers appended geometrically, one block per paragraph. The collection for the quarter cap is
 the data source. Licence: research use only, not commercial (the card), so scores only. Contamination 'high': a
 public OCR benchmark since 2024.
 """
@@ -40,9 +41,20 @@ def truth(page: dict) -> str | None:
         return None
     texts = [(int(b['order']), (b.get('text') or '').strip()) for b in blocks
              if b.get('order') not in (None, '', 'None') and (b.get('text') or '').strip()]
+    # OmniDocBench leaves headers, page numbers and footnotes outside its body reading order.
+    # The panel asks for everything: dropping these would penalise a correct whole-page reader.
+    def position(b):
+        poly = b.get('poly') or [0, 0]
+        return min(poly[1::2]), min(poly[::2])
+    peripheral = [b for b in blocks if b.get('order') in (None, '', 'None') and (b.get('text') or '').strip()]
+    top = [b for b in peripheral if b['category_type'] == 'header']
+    bottom = [b for b in peripheral if b['category_type'] != 'header']
+    texts = ([(-1, b['text'].strip()) for b in sorted(top, key=position)] +
+             sorted(texts, key=lambda x: x[0]) +
+             [(1000000, b['text'].strip()) for b in sorted(bottom, key=position)])
     if any('$' in t or '\\' in t for _, t in texts):
         return None
-    return '\n\n'.join(t for _, t in sorted(texts, key=lambda x: x[0])) or None
+    return '\n\n'.join(t for _, t in texts) or None
 
 
 def candidates() -> list[common.Candidate]:
