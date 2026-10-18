@@ -909,8 +909,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 
 ### R-45 · The Core Directive holds on every tag write
 
-- **Promise:** only Finder tags ever change. A file's bytes and location never do. Every write goes through
-  the one audited writer:
+- **Promise:** only Finder tags change on existing archive files; their bytes and location never do.
+  W40.root-marker names one creation exception: the first archive-link copy may create the root identity
+  file. Every tag write goes through the one audited writer:
   - It is coordinated and metadata-only.
   - It re-reads the tags first and aborts if they cannot be read, so an unreadable file is never wiped.
   - It matches tokens exactly, as whole strings.
@@ -919,7 +920,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - The PDF panes cannot edit anything.
 - **Promised in:** `CLAUDE.md` Core Directive, Safety Protocol §1–§8 and §13, §Never; `README.md` §Prime
   directive; `SPEC/tag-format.md`; `SUITE_TODO_DONE.md` `W14.2`, `W14.2-fu`, `W26.lint`.
-- **Reached by:** every Reader write (`NavigationModel.mark`, `applyEdit`, `renameTag`, `applyDelta` and
+- **Reached by:** every Reader tag write (`NavigationModel.mark`, `applyEdit`, `renameTag`, `applyDelta` and
   `undoLast`, `Views/NavigationModel.swift:1066-1320`) goes through `Core/TagWriter.swift` into
   `CoordinatedTagWriter.write` (`packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift:219`). The
   coordinated write is at `:236`, the identity check `:243-250`, the abort on an unreadable read `:262-268`,
