@@ -26,16 +26,21 @@ ASSET = re.compile(r'^NMAAHC-[\w.-]+$', re.M)
 
 
 def clean(text):
+    # Volunteer markup is sometimes triple-bracketed or nests a closing tag inside
+    # an uncertain-word tag. Resolve inner tags first, keeping the actual words.
+    text = re.sub(r'\[{3,}', '[[', text)
     # PDF line wrapping can split a [[tag]]; whitespace inside tag names is not text.
     def markup(m):
         compact = re.sub(r'\s+', '', m.group(1)).lower()
         if compact in ('illegible', '?'):
             return '[illegible]'
         if compact.startswith(('/', 'strik', 'under', 'note', 'preprinted', 'stamp', 'label', 'table', 'superscript')) or \
-                compact == 'endtable' or re.fullmatch(r'\d+column\w*', compact):
+                compact == 'endtable' or re.fullmatch(r'(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)column\w*', compact) or \
+                re.fullmatch(r'(?:left|right|top|bottom)(?:margin|page)', compact) or compact.startswith('imageof'):
             return ''
         return m.group(1)  # insertions, ditto explanations, uncertain words stay
-    text = re.sub(r'\[\[([^\]]*)\]\]', markup, text)
+    while re.search(r'\[\[([^\[\]]*)\]\]', text):
+        text = re.sub(r'\[\[([^\[\]]*)\]\]', markup, text)
     # All remaining bracket markup is editorial; keep its content (insertions, ditto, uncertain words).
     text = text.replace('[[', '').replace(']]', '').replace('^', '')
     lines = []

@@ -27,6 +27,11 @@ their truth, with the shortest truth in each stratum and one page each of N1, N3
 replaced (`drops.jsonl`). The hand check also found BiblIA's columns in the wrong order (fixed before the freeze).
 L1-L4, N2, N5, N6 and the short L2, L3 and L9 are `W43.corpus-build-more`.
 
+Pre-freeze checks for that extension (2026-10-18): Smithsonian editorial margin/table labels and malformed
+closing tags are removed while the visible words stay. Vision sanity refuses failed OCR jobs or missing output;
+an existing empty output remains a legitimate blank reading. The extension is not frozen until its visual
+kind and image/truth checks finish.
+
 ## The reference routes (2026-10-17)
 
 The 96's prompt, 2400 px inputs and scorer, through the panel's write-ahead ledger. NES %, failures scored 0;

@@ -21,6 +21,14 @@ class Pages(unittest.TestCase):
         with self.assertRaises(ValueError):
             S.pages('NMAAHC-01\nTranscription:\ntext\fNMAAHC-01\nTranscription:\nother')
 
+    def test_real_register_editorial_and_malformed_tags(self):
+        self.assertEqual(S.clean('[[left margin]]89 West[[/left margin]]'), '89 West')
+        self.assertEqual(S.clean('[[[ /\nstrikethrough]]kept'), 'kept')
+        self.assertEqual(S.clean('[[occupied by Capt Allen 13 Army Corp [[/note]]]]'),
+                         'occupied by Capt Allen 13 Army Corp')
+        self.assertEqual(S.clean('[[four columned table]]A [[Fister?]] [[/table]]'), 'A Fister?')
+        self.assertEqual(S.clean('[[image of a map depicting a River and buildings]]'), '')
+
 
 if __name__ == '__main__':
     unittest.main()

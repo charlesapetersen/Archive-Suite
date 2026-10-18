@@ -208,7 +208,11 @@ def cmd_sanity():
     jobs = C.CACHE / 'sample' / 'vision-jobs.tsv'
     jobs.write_text(''.join(f"{r['image']}\t{VISION / (safe(r['source'] + ':' + r['page_id']) + '.txt')}\n"
                             for r in rows))
-    subprocess.run([str(OCR_BIN), str(jobs)], check=False)
+    subprocess.run([str(OCR_BIN), str(jobs)], check=True)
+    missing = [r['source'] + ':' + r['page_id'] for r in rows
+               if not (VISION / (safe(r['source'] + ':' + r['page_id']) + '.txt')).is_file()]
+    if missing:
+        raise SystemExit(f'Vision sanity outputs missing: {missing[:5]}')
     # Scored with the panel's scorer, which needs regex/rapidfuzz/sacrebleu (run this under uv, as the
     # reports are: uv run --with regex --with rapidfuzz --with 'sacrebleu==2.5.1' python sample.py sanity).
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -217,7 +221,7 @@ def cmd_sanity():
     for r in rows:
         k = r['source'] + ':' + r['page_id']
         v = VISION / (safe(k) + '.txt')
-        hyp = v.read_text() if v.exists() else ''
+        hyp = v.read_text()
         by[r['stratum']].append((S.score(Path(r['truth']).read_text(), hyp, r['stratum'])['nes'], k))
     flagged = []
     for s, xs in sorted(by.items()):

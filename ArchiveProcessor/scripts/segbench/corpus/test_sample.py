@@ -12,6 +12,39 @@ def pool(spec):
 
 
 class Draw(unittest.TestCase):
+    def test_sanity_requires_success_and_every_output_but_accepts_blank_ocr(self):
+        import tempfile
+        import subprocess
+        import types
+        from pathlib import Path
+        from unittest import mock
+        import common as C
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = root / 'sample'; cache.mkdir()
+            truth = root / 'truth.txt'; truth.write_text('visible text')
+            C.write_jsonl(cache / 'draw.jsonl', [dict(source='src', page_id='a', script='Latn',
+                                                   stratum='L1', image='image.jpg', truth=str(truth))])
+            flags = cache / 'flagged.jsonl'; flags.write_text('previous review\n')
+            with mock.patch.object(C, 'CACHE', root), \
+                    mock.patch.multiple(S, DRAW=cache / 'draw.jsonl', VISION=cache / 'vision'), \
+                    mock.patch.object(S.subprocess, 'run') as run:
+                run.side_effect = subprocess.CalledProcessError(1, 'vision')
+                with self.assertRaises(subprocess.CalledProcessError):
+                    S.cmd_sanity()
+                self.assertEqual(flags.read_text(), 'previous review\n')
+                run.side_effect = None
+                with self.assertRaisesRegex(SystemExit, 'outputs missing'):
+                    S.cmd_sanity()
+                self.assertEqual(flags.read_text(), 'previous review\n')
+                S.VISION.mkdir()
+                (S.VISION / 'src__a.txt').write_text('')
+                scorer = types.SimpleNamespace(score=lambda *args: {'nes': 0})
+                with mock.patch.dict('sys.modules', ocr_panel_score=scorer):
+                    S.cmd_sanity()
+                run.assert_called_with([str(S.OCR_BIN), str(cache / 'vision-jobs.tsv')], check=True)
+                self.assertEqual(C.read_jsonl(flags), [])
+
     def test_freeze_extends_but_refuses_changed_or_missing_old_page(self):
         import tempfile
         from pathlib import Path
