@@ -2,24 +2,24 @@ import XCTest
 import ArchiveCore
 @testable import ArchiveReader
 
-/// W40.f1 — what the Reader's undo actually is, against what `CLAUDE.md` Safety Protocol §11–§12 promise.
-///
-/// §12 promises an append-only audit ledger that is the source for undo. The ledger now records every write
-/// (`W40.audit-ledger`, `AuditLedgerTests`), but undo does not read it yet (`W40.audit-ledger-undo`, row
-/// `R-46`): undo is `NavigationModel`'s private in-memory `undoStack`. These tests pin what that means on
-/// scratch `mktemp` fixtures, through the same `mark` → `undoLast` path ⌘Z takes:
-///
-/// 1. The undo history does not outlive the model. A relaunch (here, a second model on the same root and
-///    defaults domain) starts with nothing to undo and no record of the change.
-/// 2. `undoLast` drops a file whose inverse write throws (`try?`) and reports only the files it undid, so
-///    a partly failed undo reads as a complete one. §11 requires partial failures to be surfaced. That
-///    assertion is held by `XCTExpectFailure` until `W40.fix-reader-undo-partial` lands; when it does, the
-///    expected failure turns into an unexpected pass and this test fails until the wrapper is removed.
-/// 3. Found on the way, and fixed by `W40.fix-identity-url-cache` (S1): §6's identity re-check did not see a
-///    file swapped under its path, so undo re-tagged it. The last two tests failed before that fix and pin
-///    it now. Evidence: `verification/evidence/reader/W40.f1-undo.md`.
+/// Safety §9/§12 regression tests through the real mark → undoLast path, on scratch files.
+/// W40.audit-ledger-undo reverses the original memory-only assertion: history must survive relaunch.
 @MainActor
 final class UndoDurabilityTests: XCTestCase {
+
+    private var savedLedgerURL: URL!
+    private var ledgerRoot: URL!
+
+    override func setUp() async throws {
+        savedLedgerURL = AuditLedger.shared.fileURL
+        ledgerRoot = FileManager.default.temporaryDirectory.appendingPathComponent("UndoLedger-\(UUID())")
+        AuditLedger.shared.fileURL = ledgerRoot.appendingPathComponent("audit-ledger.jsonl")
+    }
+
+    override func tearDown() async throws {
+        AuditLedger.shared.fileURL = savedLedgerURL
+        try? FileManager.default.removeItem(at: ledgerRoot)
+    }
 
     private func makeRoot(files names: [String]) throws -> (root: URL, files: [URL]) {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -48,7 +48,7 @@ final class UndoDurabilityTests: XCTestCase {
         XCTAssertEqual(model.selectedFiles.count, urls.count, "precondition: the selection resolves")
     }
 
-    func testTheUndoHistoryDoesNotSurviveARelaunch() throws {
+    func testTheUndoHistorySurvivesARelaunch() throws {
         let fixture = try makeRoot(files: ["a.pdf"])
         let defaults = fixtureDefaults(pinnedTo: fixture.root)
 
@@ -60,11 +60,11 @@ final class UndoDurabilityTests: XCTestCase {
 
         // Same root, same defaults domain: everything a relaunch would read back.
         let relaunched = NavigationModel(defaults: defaults)
-        XCTAssertEqual(relaunched.undoDepth, 0,
-                       "undo is memory-only: after a relaunch the change can no longer be undone")
+        XCTAssertEqual(relaunched.undoDepth, 1)
         relaunched.undoLast()
-        XCTAssertEqual(try tags(fixture.files[0]), ["Read"], "…and ⌘Z there changes nothing on disk")
-        XCTAssertEqual(relaunched.statusMessage, "", "…nor says anything: there is no record to consult")
+        XCTAssertEqual(try tags(fixture.files[0]), ["Unread"])
+        XCTAssertEqual(relaunched.statusMessage, "Undid 1 change.")
+        XCTAssertEqual(NavigationModel(defaults: defaults).undoDepth, 0, "a consumed action never returns")
     }
 
     func testAPartlyFailedUndoIsReportedAsComplete() throws {
@@ -82,13 +82,10 @@ final class UndoDurabilityTests: XCTestCase {
 
         XCTAssertEqual(try tags(fixture.files[0]), ["Unread"], "the file that could be undone was")
         XCTAssertEqual(model.undoDepth, 0, "the failed entry is dropped, not kept for a retry")
-        XCTAssertEqual(model.statusMessage, "Undid 1 change.",
-                       "today: the count of what was undone, with no word about the file that was not")
-
-        XCTExpectFailure("W40.fix-reader-undo-partial (S3): undoLast drops a failed file silently (try?) "
-                         + "and reports only the count it undid; Safety §11 requires the failure be surfaced")
-        XCTAssertTrue(model.statusMessage.contains("could not"),
-                      "a partly failed undo must say how many files it could not undo, as `mark` does")
+        XCTAssertTrue(model.statusMessage.contains("1 could not be undone"))
+        XCTAssertTrue(model.statusMessage.contains("b.pdf"))
+        XCTAssertEqual(fixtureNavigationModel(pinnedTo: fixture.root).undoDepth, 0,
+                       "partial attempts consume the whole group, including after relaunch")
     }
 
     /// Found while writing the test above (it first swapped the file rather than deleting it, expecting
@@ -113,7 +110,7 @@ final class UndoDurabilityTests: XCTestCase {
         model.undoLast()
 
         XCTAssertEqual(try tags(swapped), ["Read"], "§6: a file swapped under the path must not be re-tagged")
-        XCTAssertEqual(model.statusMessage, "Undid 0 changes.", "…so nothing was undone")
+        XCTAssertTrue(model.statusMessage.contains("1 could not be undone"), "identity refusal is surfaced")
     }
 
     /// The mechanism under the test above, without the model: the same `URL` instance, before and after
@@ -131,4 +128,68 @@ final class UndoDurabilityTests: XCTestCase {
         let reused = try XCTUnwrap(FileIdentity.capture(url))
         XCTAssertFalse(reused.matches(before), "the same URL instance must see the replacement too")
     }
+    func testRelaunchedUndoPreservesConcurrentTagsAndBytes() throws {
+        let fixture = try makeRoot(files: ["a.pdf", "b.pdf"])
+        let defaults = fixtureDefaults(pinnedTo: fixture.root)
+        let first = NavigationModel(defaults: defaults)
+        try select(fixture.files, in: first)
+        first.mark(.read)
+        let bytes = try fixture.files.map { try Data(contentsOf: $0) }
+        // A Finder edit is outside the Reader's ledger.
+        try (URL(fileURLWithPath: fixture.files[0].path) as NSURL)
+            .setResourceValue(["Read", "Finder addition"], forKey: .tagNamesKey)
+        let relaunched = NavigationModel(defaults: defaults)
+        XCTAssertEqual(relaunched.undoDepth, 1)
+        relaunched.undoLast()
+        XCTAssertEqual(Set(try tags(fixture.files[0])), ["Unread", "Finder addition"])
+        XCTAssertEqual(try tags(fixture.files[1]), ["Unread"])
+        XCTAssertEqual(try fixture.files.map { try Data(contentsOf: $0) }, bytes)
+    }
+
+    func testRelaunchedUndoRefusesReplacementAndConsumesAllFailures() throws {
+        let fixture = try makeRoot(files: ["a.pdf"])
+        let defaults = fixtureDefaults(pinnedTo: fixture.root)
+        let first = NavigationModel(defaults: defaults)
+        try select(fixture.files, in: first)
+        first.mark(.read)
+        // Keep original inode alive so the filesystem cannot recycle it for the replacement.
+        try FileManager.default.moveItem(at: fixture.files[0], to: fixture.root.appendingPathComponent("original.pdf"))
+        try Data("replacement".utf8).write(to: fixture.files[0])
+        try (fixture.files[0] as NSURL).setResourceValue(["Read"], forKey: .tagNamesKey)
+        let relaunched = NavigationModel(defaults: defaults)
+        relaunched.undoLast()
+        XCTAssertEqual(try tags(fixture.files[0]), ["Read"])
+        XCTAssertTrue(relaunched.statusMessage.contains("1 could not be undone"))
+        XCTAssertEqual(NavigationModel(defaults: defaults).undoDepth, 0)
+    }
+
+    func testNoOpUndoIsDurablyConsumed() throws {
+        let fixture = try makeRoot(files: ["a.pdf"])
+        let defaults = fixtureDefaults(pinnedTo: fixture.root)
+        let first = NavigationModel(defaults: defaults)
+        let row = try XCTUnwrap(first.library.files.first)
+        first.applyEdit(.addSubject("Temporary"), to: row)
+        try (URL(fileURLWithPath: fixture.files[0].path) as NSURL)
+            .setResourceValue(["Unread"], forKey: .tagNamesKey)
+        NavigationModel(defaults: defaults).undoLast()
+        XCTAssertEqual(try tags(fixture.files[0]), ["Unread"])
+        XCTAssertEqual(NavigationModel(defaults: defaults).undoDepth, 0)
+    }
+
+    func testUndoRefusesToWriteWhenConsumptionCannotBeRecorded() throws {
+        let fixture = try makeRoot(files: ["a.pdf"])
+        let first = fixtureNavigationModel(pinnedTo: fixture.root)
+        try select(fixture.files, in: first)
+        first.mark(.read)
+        let ledger = AuditLedger.shared.fileURL
+        let history = try Data(contentsOf: ledger)
+        // A readable, non-writable ledger permits history reconstruction but refuses consumption.
+        try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: ledger.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ledger.path) }
+        first.undoLast()
+        XCTAssertEqual(try tags(fixture.files[0]), ["Read"])
+        XCTAssertEqual(try Data(contentsOf: ledger), history)
+        XCTAssertTrue(first.statusMessage.contains("Could not record undo safely"))
+    }
+
 }

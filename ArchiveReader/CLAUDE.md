@@ -177,8 +177,19 @@ add {"1981"}`. All of the following hold for every delta.
     *Mechanism (W40.audit-ledger):* `Core/AuditLedger.swift`, one JSON line per verified `TagWriter`
     write in `~/Library/Containers/com.archivereader.app/Data/Library/Application Support/ArchiveReader/
     audit-ledger.jsonl` (a per-process temp file under the unit-test host), with the file's device/inode,
-    the occurrence delta and its inverse, and a `group` per action (`undoes` on an undo). Not yet the undo
-    source — undo is still in memory and lost on quit until `W40.audit-ledger-undo`.
+    the occurrence delta and its inverse, and a `group` per action (`undoes` on an undo). Undo reloads the
+    latest 100 forward groups per archive (including consumed groups in the bound, so older changes
+    never resurface), skipping unsupported, undecodable and unverified lines. It checks device/inode
+    and bookmark identity, then applies the inverse occurrence delta to fresh tags. A synchronized
+    `undoAttempt` consumes the whole group BEFORE inverses: interrupted or partly failed attempts are
+    not replayed after relaunch, because occurrence additions are not idempotent. Failed files are
+    named in the status; retry is not offered. A failed marker append refuses undo without changing
+    tags. The ledger remains append-only and unbounded on disk; ordinary forward records are not
+    fsynced. Unavailable bookmarks fall back to path + device/inode; missing identity or a disagreeing
+    bookmark refuses the file. A forward recording failure warns and disables older undo until a
+    successful append persists a synchronized history barrier; even recovery during a batch warns
+    that its history is incomplete. If the process dies before storage recovers, the missing forward
+    record and barrier cannot be recovered (ordinary forward persistence remains best-effort).
 13. **PDF panes are provably non-writing:** PDFViews non-editable, annotations disabled, no
     `PDFDocument.write` path exists. The write-surface lint covers *all* write spellings
     (`setResourceValue(s)`, `setxattr`, `FileManager` mutators, `PDFDocument.write`). The lint is one
@@ -369,7 +380,8 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               trustworthy-read guard; multiset+label+bytes verify; label-only .restoreLabel
                               inverse undo. Every verified write is recorded in AuditLedger.
   AuditLedger.swift           Safety §12 append-only JSON-lines record of every tag write (container,
-                              never the archive); @TaskLocal group per action, `undoes` on undo.
+                              never the archive); @TaskLocal group per action, `undoes` on undo;
+                              reconstructs the latest 100 groups for durable inverse-delta undo.
   TagSimilarity.swift         Pure near-duplicate subject clustering (normalize + length-scaled
                               Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
   LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort.

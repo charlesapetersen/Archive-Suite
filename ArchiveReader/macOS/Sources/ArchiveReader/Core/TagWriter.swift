@@ -166,9 +166,18 @@ enum TagWriter {
     /// and leave nothing to record.
     private static func recorded(_ op: AuditLedger.Operation, _ url: URL,
                                  _ write: () throws -> TagWriteResult) throws -> TagWriteResult {
+        // Bind the persisted inode to the object present before the write. Capturing only after
+        // coordination could record a replacement's identity against the original file's inverse.
+        let number = AuditLedger.fileNumber(url)
+        let identity = FileIdentity.capture(url)
+        let stableBefore = number != nil && AuditLedger.fileNumber(url) == number
         do {
             let result = try write()
-            AuditLedger.shared.record(op, result)
+            let sameObject = identity.flatMap { original in
+                FileIdentity.capture(result.url).map { $0.matches(original) }
+            } == true
+            let recordedFile = stableBefore && sameObject && AuditLedger.fileNumber(result.url) == number ? number : nil
+            AuditLedger.shared.record(op, result, file: recordedFile)
             return result
         } catch let error as TagWriteError {
             if case .verificationFailed(let why) = error { AuditLedger.shared.recordUnverified(op, url, why) }

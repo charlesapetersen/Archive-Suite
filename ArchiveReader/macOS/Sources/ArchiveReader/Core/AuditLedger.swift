@@ -37,7 +37,7 @@ final class AuditLedger: @unchecked Sendable {
     }
 
     enum Operation: String, Codable, Sendable {
-        case apply, readState, rename, undo
+        case apply, readState, rename, undo, undoAttempt, historyBarrier
     }
 
     struct Delta: Codable, Equatable, Sendable {
@@ -75,17 +75,23 @@ final class AuditLedger: @unchecked Sendable {
     private let lock = NSLock()
     private var _fileURL: URL
     private var _lastError: String?
+    private var _hasRecordingGap = false
+    private var _recordingFailureCount: UInt64 = 0
     private static let log = Logger(subsystem: "com.archivereader.app", category: "AuditLedger")
 
     init(fileURL: URL) { _fileURL = fileURL }
 
     var fileURL: URL {
         get { lock.withLock { _fileURL } }
-        set { lock.withLock { _fileURL = newValue } }
+        set { lock.withLock { _fileURL = newValue; _hasRecordingGap = false } }
     }
 
     /// The last append failure, nil once an append succeeds.
     var lastError: String? { lock.withLock { _lastError } }
+
+    /// A successful change missing from the ledger makes older inverses unsafe to offer as “last”.
+    var hasRecordingGap: Bool { lock.withLock { _hasRecordingGap } }
+    var recordingFailureCount: UInt64 { lock.withLock { _recordingFailureCount } }
 
     /// `~/Library/Containers/com.archivereader.app/Data/Library/Application Support/ArchiveReader/
     /// audit-ledger.jsonl` in the sandboxed app. The unit-test host, and a UITest launch (which passes
@@ -106,20 +112,20 @@ final class AuditLedger: @unchecked Sendable {
     // MARK: Recording
 
     /// Append one line for a verified write. A no-op result records nothing.
-    func record(_ op: Operation, _ r: TagWriteResult) {
+    func record(_ op: Operation, _ r: TagWriteResult, file: FileNumber?) {
         guard !r.isNoOp else { return }
         let ctx = Self.context ?? Context(group: UUID(), undoes: nil)
         let entry = Entry(
             v: 1, timestamp: Date(), op: op, group: ctx.group, undoes: ctx.undoes,
             path: r.url.path,
             bookmark: try? r.url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil),
-            file: Self.fileNumber(r.url),
+            file: file,
             before: r.before, after: r.after, beforeLabel: r.beforeLabel, afterLabel: r.afterLabel,
             delta: Self.forwardDelta(r),
             inverse: Delta(add: r.occurrenceInverse.add, remove: r.occurrenceInverse.remove,
                            label: Self.label(of: r.occurrenceInverse.color)),
             unverified: nil)
-        append(entry)
+        append(entry, recordsChange: true)
     }
 
     /// Append one line for a write that failed its post-write re-read (`.verificationFailed`).
@@ -130,10 +136,11 @@ final class AuditLedger: @unchecked Sendable {
             v: 1, timestamp: Date(), op: op, group: ctx.group, undoes: ctx.undoes, path: url.path,
             bookmark: try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil),
             file: Self.fileNumber(url), before: [], after: [], beforeLabel: nil, afterLabel: nil,
-            delta: none, inverse: none, unverified: why))
+            delta: none, inverse: none, unverified: why), recordsChange: true)
     }
 
-    func append(_ entry: Entry) {
+    @discardableResult
+    func append(_ entry: Entry, synchronize: Bool = false, recordsChange: Bool = false) -> Bool {
         do {
             var line = try Self.encoder.encode(entry)
             line.append(0x0A)
@@ -145,6 +152,18 @@ final class AuditLedger: @unchecked Sendable {
                     // A new, empty ledger file in the app's own support directory — never a corpus path.
                     _ = fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
                 }
+                // Once storage recovers, persist a boundary before accepting newer actions. Never
+                // expose an older inverse across a successful but unrecorded (or uncertain) change.
+                let hadGap = _hasRecordingGap
+                if hadGap {
+                    let none = Delta(add: [], remove: [], label: nil)
+                    let barrier = Entry(v: 1, timestamp: Date(), op: .historyBarrier, group: UUID(),
+                        undoes: nil, path: "", bookmark: nil, file: nil, before: [], after: [],
+                        beforeLabel: nil, afterLabel: nil, delta: none, inverse: none, unverified: nil)
+                    var prefix = try Self.encoder.encode(barrier)
+                    prefix.append(0x0A)
+                    line.insert(contentsOf: prefix, at: 0)
+                }
                 // Append-only: seek to the end and add one line; nothing already written is touched. A
                 // crash mid-append can leave a last line with no newline; start a fresh line after it, so
                 // the torn fragment costs only itself and not the entry written next.
@@ -153,11 +172,21 @@ final class AuditLedger: @unchecked Sendable {
                 defer { try? handle.close() }
                 try handle.seekToEnd()
                 try handle.write(contentsOf: line)
+                if synchronize || hadGap { try handle.synchronize() }
+                _hasRecordingGap = false
                 _lastError = nil
             }
+            return true
         } catch {
-            lock.withLock { _lastError = String(describing: error) }
+            lock.withLock {
+                _lastError = String(describing: error)
+                if recordsChange {
+                    _hasRecordingGap = true
+                    _recordingFailureCount &+= 1
+                }
+            }
             Self.log.error("audit ledger append failed: \(String(describing: error), privacy: .public)")
+            return false
         }
     }
 
@@ -168,6 +197,80 @@ final class AuditLedger: @unchecked Sendable {
     func entries() -> [Entry] {
         guard let data = lock.withLock({ try? Data(contentsOf: _fileURL) }) else { return [] }
         return data.split(separator: 0x0A).compactMap { try? Self.decoder.decode(Entry.self, from: Data($0)) }
+    }
+
+    /// Latest 100 forward actions in this archive, including consumed actions in the bound. Counting
+    /// only pending actions would resurrect older history each time the most recent action was undone.
+    /// Undo writes are never redo candidates. The ledger itself remains append-only and is not pruned.
+    static let undoGroupLimit = 100
+
+    func undoGroups(in root: URL) -> [[Entry]] {
+        guard !hasRecordingGap else { return [] }
+        let history = entries()
+        var consumed = Set<UUID>()
+        var order: [UUID] = []
+        var groups: [UUID: [Entry]] = [:]
+        for entry in history.reversed() where entry.v == 1 && entry.unverified == nil {
+            if entry.op == .historyBarrier { break }
+            if let undone = entry.undoes { consumed.insert(undone); continue }
+            guard entry.op != .undo && entry.op != .undoAttempt,
+                  (ReaderArchiveLayout.isContained(URL(fileURLWithPath: entry.path), inRootPath: root.path)
+                    || Self.bookmarkURL(entry).map { ReaderArchiveLayout.isContained($0, inRootPath: root.path) } == true)
+            else { continue }
+            if groups[entry.group] == nil {
+                guard order.count < Self.undoGroupLimit else { break }
+                order.append(entry.group)
+                groups[entry.group] = []
+            }
+            // Already reversed: undo multiple writes to the same file in reverse write order.
+            groups[entry.group, default: []].append(entry)
+        }
+        return order.reversed().filter { !consumed.contains($0) }.compactMap { groups[$0] }
+    }
+
+    /// Consume BEFORE applying an occurrence inverse: replay can append duplicate occurrences. If the
+    /// append/sync fails, the caller must refuse to write. A crash or partial failure consumes the entire
+    /// action; retry of individual failures is intentionally not offered by this group-level format.
+    func beginUndo(_ group: UUID) -> Bool {
+        let none = Delta(add: [], remove: [], label: nil)
+        return append(Entry(v: 1, timestamp: Date(), op: .undoAttempt, group: UUID(), undoes: group,
+                            path: "", bookmark: nil, file: nil, before: [], after: [],
+                            beforeLabel: nil, afterLabel: nil, delta: none, inverse: none,
+                            unverified: nil), synchronize: true)
+    }
+
+    /// A bookmark is a locator, never authority to tag a different object. An existing recorded path
+    /// must still identify the recorded file. If it moved, a resolvable bookmark may locate it inside
+    /// the current archive; if bookmark resolution is unavailable, path + device/inode is the fallback.
+    static func undoTarget(_ entry: Entry) throws -> (url: URL, identity: FileIdentity) {
+        guard let expected = entry.file else {
+            throw TagWriteError.identityMismatch("ledger has no recorded file identity")
+        }
+        let path = URL(fileURLWithPath: entry.path)
+        let bookmarked = bookmarkURL(entry)
+        let atPath = fileNumber(path)
+        if let atPath, atPath != expected {
+            throw TagWriteError.identityMismatch("file at the recorded path has been replaced")
+        }
+        if let bookmarked, fileNumber(bookmarked) != expected {
+            throw TagWriteError.identityMismatch("bookmark disagrees with the recorded identity")
+        }
+        let target = atPath == expected ? path : (bookmarked ?? path)
+        // Capture BETWEEN two persisted-identity reads. A swap before capture fails the second stat;
+        // a swap after capture fails the shared writer's in-coordination FileIdentity check (§6).
+        guard fileNumber(target) == expected, let identity = FileIdentity.capture(target),
+              fileNumber(target) == expected else {
+            throw TagWriteError.identityMismatch("recorded file is missing or its identity changed")
+        }
+        return (target, identity)
+    }
+
+    private static func bookmarkURL(_ entry: Entry) -> URL? {
+        var stale = false
+        return entry.bookmark.flatMap {
+            try? URL(resolvingBookmarkData: $0, options: [.withoutUI, .withoutMounting],
+                     relativeTo: nil, bookmarkDataIsStale: &stale)
+        }
     }
 
     // MARK: Helpers
@@ -193,7 +296,7 @@ final class AuditLedger: @unchecked Sendable {
     }
 
     /// `stat(2)`, not `URLResourceValues`: a reused `URL` answers from its resource-value cache.
-    private static func fileNumber(_ url: URL) -> FileNumber? {
+    static func fileNumber(_ url: URL) -> FileNumber? {
         var st = stat()
         guard stat(url.path, &st) == 0 else { return nil }
         return FileNumber(device: Int64(st.st_dev), inode: UInt64(st.st_ino))

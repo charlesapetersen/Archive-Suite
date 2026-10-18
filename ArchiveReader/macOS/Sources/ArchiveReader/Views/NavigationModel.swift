@@ -119,13 +119,9 @@ final class NavigationModel: ObservableObject {
     /// archive. Weak — the context is owned by the app scene, which outlives this model.
     private weak var linkContext: ArchiveLinkContext?
 
-    /// One undoable tag write plus the `FileIdentity` captured at the edit. Undo re-verifies §6 against
-    /// this identity, so a file replaced under its path BETWEEN the edit and the undo aborts rather than
-    /// re-tagging a different file. `identity` is nil when the file had no resolvable identity at edit
-    /// time — undo then simply skips the §6 check, exactly as the forward write did. `group` is the
-    /// audit-ledger group the write was recorded under (§12), so the undo's own lines can name it.
-    private struct UndoEntry { let result: TagWriteResult; let identity: FileIdentity?; let group: UUID }
-    private var undoStack: [[UndoEntry]] = []
+    /// Ledger-derived history only; refreshed at launch, action boundaries and archive switches.
+    private var undoGroups: [[AuditLedger.Entry]] = []
+    private var seenRecordingFailures = AuditLedger.shared.recordingFailureCount
     private var cancellables = Set<AnyCancellable>()
 
     /// `excludedFolders` defaults to the process-wide singleton, which is what production wants: the
@@ -222,7 +218,10 @@ final class NavigationModel: ObservableObject {
         // reads the COMMITTED value (`@Published` emits in willSet), same reason as the library sink.
         rootStore.objectWillChange
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.publishLinkTarget() } }
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                self?.publishLinkTarget()
+                self?.refreshUndoHistory()
+            } }
             .store(in: &cancellables)
         library.$jpegPartnerIndex
             .receive(on: DispatchQueue.main)
@@ -235,6 +234,7 @@ final class NavigationModel: ObservableObject {
         if let root = rootStore.root {
             library.start(scope: root, markerGUID: rootStore.rootMarker?.guid)
         }
+        refreshUndoHistory()
     }
 
     /// Retry a root bookmark after an ejection/mount event, then apply the no-timer fallback for a
@@ -1073,7 +1073,7 @@ final class NavigationModel: ObservableObject {
             }
             return
         }
-        var batch: [UndoEntry] = []
+        var changed = 0
         var verified: [TagWriteResult] = []
         var failures = reverified.rejected
         let group = UUID()                       // §12: the whole action is one ledger group, as it is one undo
@@ -1083,40 +1083,58 @@ final class NavigationModel: ObservableObject {
                 do {
                     let r = try TagWriter.setReadState(target, on: f.url, expecting: identity)
                     verified.append(r)               // verified ground truth (incl. no-op) — safe to display
-                    if !r.isNoOp { batch.append(UndoEntry(result: r, identity: identity, group: group)) }  // real changes → undo
+                    if !r.isNoOp { changed += 1 }  // real changes → undo
                 } catch { failures += 1 }
             }
         }
         // Only verified (non-throwing) writes move a row — a failed write keeps the last-discovered value and
         // must NOT vanish from a filtered view (Safety §11). The row shows TagWriter's re-read `.after`.
         library.applyVerifiedWrites(verified)
-        if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
+        refreshUndoHistory()
         statusMessage = failures == 0
-            ? "Marked \(batch.count) \(target.rawValue)."
-            : "Marked \(batch.count); \(failures) could not update."
+            ? "Marked \(changed) \(target.rawValue)."
+            : "Marked \(changed); \(failures) could not update."
         announce(statusMessage)
     }
 
+    private func refreshUndoHistory() {
+        if let root = rootStore.root {
+            undoGroups = AuditLedger.shared.undoGroups(in: ReaderArchiveLayout(grantedRoot: root).mainRoot)
+        } else { undoGroups = [] }
+        undoDepth = undoGroups.count
+    }
+
     func undoLast() {
-        guard let batch = undoStack.popLast() else { return }
-        undoDepth = undoStack.count
+        refreshUndoHistory()
+        guard let batch = undoGroups.last, let group = batch.first?.group else { return }
+        // Reserve durably before the first inverse. An append failure must never allow a later
+        // relaunch to replay a non-idempotent occurrence addition.
+        guard AuditLedger.shared.beginUndo(group) else {
+            statusMessage = "Could not record undo safely; no files were changed."
+            announce(statusMessage)
+            return
+        }
         var verified: [TagWriteResult] = []
-        AuditLedger.withContext(group: UUID(), undoes: batch.first?.group) {
+        var failures: [String] = []
+        AuditLedger.withContext(group: UUID(), undoes: group) {
             for entry in batch {
-                // Undo = OCCURRENCE-AWARE inverse applied to a FRESH read (§9), preserving any concurrent
-                // third-party edit AND restoring a duplicated tag's exact count (W15.tu2 — the set-based
-                // `.inverse` collapses `["A","A"]`→`["A"]`; `.occurrenceInverse` + `applyOccurrence` do not).
-                // Display the inverse-apply's own verified `.after`, not the stale stored `.before`.
-                // §6: re-verify against the identity captured at the ORIGINAL edit so undo never re-tags a
-                // file swapped under this path since then (a mismatch throws → try? skips just that file).
-                guard isInsideMainArchive(entry.result.url) else { continue }
-                if let rr = try? TagWriter.applyOccurrence(entry.result.occurrenceInverse, to: entry.result.url, expecting: entry.identity) {
-                    verified.append(rr)
-                }
+                do {
+                    let target = try AuditLedger.undoTarget(entry)
+                    guard isInsideMainArchive(target.url) else {
+                        throw TagWriteError.identityMismatch("file is outside the current archive")
+                    }
+                    let inverse = TagOccurrenceDelta(add: entry.inverse.add, remove: entry.inverse.remove,
+                        color: entry.inverse.label.map { .restoreLabel($0) })
+                    verified.append(try TagWriter.applyOccurrence(inverse, to: target.url, expecting: target.identity))
+                } catch { failures.append(URL(fileURLWithPath: entry.path).lastPathComponent) }
             }
         }
         library.applyVerifiedWrites(verified)
-        statusMessage = "Undid \(verified.count) change\(verified.count == 1 ? "" : "s")."
+        refreshUndoHistory()
+        let changed = verified.filter { !$0.isNoOp }.count
+        statusMessage = "Undid \(changed) change\(changed == 1 ? "" : "s")"
+            + (failures.isEmpty ? "." : "; \(failures.count) could not be undone (\(failures.prefix(3).joined(separator: ", "))).")
+        announce(statusMessage)
     }
 
     // MARK: Keyboard triage (G4) — fast next/previous-unread navigation + mark-read-and-advance.
@@ -1200,7 +1218,7 @@ final class NavigationModel: ObservableObject {
             }
             return
         }
-        var batch: [UndoEntry] = []
+        var changed = 0
         var verified: [TagWriteResult] = []
         var failures = reverified.rejected
         let group = UUID()                       // §12: one ledger group, as it is one undo
@@ -1212,13 +1230,13 @@ final class NavigationModel: ObservableObject {
                 do {
                     let r = try TagWriter.apply(delta, to: f.url, expecting: identity)
                     verified.append(r)
-                    if !r.isNoOp { batch.append(UndoEntry(result: r, identity: identity, group: group)) }
+                    if !r.isNoOp { changed += 1 }
                 } catch { failures += 1 }
             }
         }
         library.applyVerifiedWrites(verified)   // one O(N+M) overlay pass (was per-file O(N*M))
-        if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }
-        statusMessage = "Edited \(batch.count) file\(batch.count == 1 ? "" : "s")"
+        refreshUndoHistory()
+        statusMessage = "Edited \(changed) file\(changed == 1 ? "" : "s")"
             + (failures > 0 ? "; \(failures) could not update." : ".")
         announce(statusMessage)
     }
@@ -1254,7 +1272,7 @@ final class NavigationModel: ObservableObject {
             announce(statusMessage)
             return
         }
-        var batch: [UndoEntry] = []
+        var changed = 0
         var verified: [TagWriteResult] = []
         var failures = reverified.rejected
         // Capture each affected file's identity lazily (§6), then run the conditional fresh-read rename
@@ -1263,24 +1281,24 @@ final class NavigationModel: ObservableObject {
         let items = affected.map { (url: $0.url, identity: $0.liveIdentity()) }
         let group = UUID()                                  // §12: one ledger group, as it is one undo
         AuditLedger.withContext(group: group) {
-            for (i, item) in items.enumerated() {
+            for item in items {
                 switch Result(catching: {
                     try TagWriter.renameToken(from: old, to: new, on: item.url,
                                               expecting: item.identity)
                 }) {
                 case .success(let r):
                     verified.append(r)
-                    if !r.isNoOp { batch.append(UndoEntry(result: r, identity: items[i].identity, group: group)) }
+                    if !r.isNoOp { changed += 1 }
                 case .failure:
                     failures += 1
                 }
             }
         }
         library.applyVerifiedWrites(verified)
-        if !batch.isEmpty { undoStack.append(batch); undoDepth = undoStack.count }   // ONE grouped undo
+        refreshUndoHistory()   // ONE grouped undo
         statusMessage = failures == 0
-            ? "Renamed “\(old)” → “\(new)” on \(batch.count) file\(batch.count == 1 ? "" : "s")."
-            : "Renamed \(batch.count); \(failures) could not update."
+            ? "Renamed “\(old)” → “\(new)” on \(changed) file\(changed == 1 ? "" : "s")."
+            : "Renamed \(changed); \(failures) could not update."
         announce(statusMessage)
     }
 
@@ -1312,7 +1330,7 @@ final class NavigationModel: ObservableObject {
             let r = try AuditLedger.withContext(group: group) {
                 try TagWriter.setReadState(target, on: file.url, addIfMissing: true, expecting: identity)
             }
-            reflect(r, identity: identity, group: group)
+            reflect(r)
         }
         catch { statusMessage = "Could not update \(file.name)."; announce(statusMessage) }
     }
@@ -1338,15 +1356,19 @@ final class NavigationModel: ObservableObject {
         let group = UUID()
         do {
             let r = try AuditLedger.withContext(group: group) { try TagWriter.apply(delta, to: file.url, expecting: identity) }
-            reflect(r, identity: identity, group: group)
+            reflect(r)
         }
         catch { statusMessage = "Could not edit \(file.name)."; announce(statusMessage) }
     }
 
     /// Reflect one verified inline write in the display (overlay) and push it as its own undo step.
-    private func reflect(_ r: TagWriteResult, identity: FileIdentity?, group: UUID) {
+    private func reflect(_ r: TagWriteResult) {
         library.applyVerifiedWrites([r])
-        if !r.isNoOp { undoStack.append([UndoEntry(result: r, identity: identity, group: group)]); undoDepth = undoStack.count }
+        if !r.isNoOp { refreshUndoHistory() }
+        if AuditLedger.shared.hasRecordingGap || AuditLedger.shared.recordingFailureCount != seenRecordingFailures {
+            statusMessage = "Edited a file."
+            announce(statusMessage)
+        }
     }
 
     /// Library data-quality snapshot (for the health popover).
@@ -1368,7 +1390,18 @@ final class NavigationModel: ObservableObject {
     }
 
     /// VoiceOver announcement (accessibility). Silent no-op if there is no key window.
-    private func announce(_ message: String) {
+    private func announce(_ messageToAnnounce: String) {
+        let message: String
+        if AuditLedger.shared.hasRecordingGap {
+            if !statusMessage.contains("Audit history could not be saved") {
+                statusMessage += " Audit history could not be saved; undo is unavailable."
+            }
+            message = statusMessage
+        } else if AuditLedger.shared.recordingFailureCount != seenRecordingFailures {
+            statusMessage += " Some audit history could not be saved; undo history is incomplete."
+            message = statusMessage
+        } else { message = messageToAnnounce }
+        seenRecordingFailures = AuditLedger.shared.recordingFailureCount
         guard !message.isEmpty, let window = NSApp.keyWindow ?? NSApp.mainWindow else { return }
         NSAccessibility.post(element: window, notification: .announcementRequested,
                              userInfo: [.announcement: message,

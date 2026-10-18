@@ -85,7 +85,7 @@ final class AuditLedgerTests: XCTestCase {
 
         model.undoLast()
         let entries = AuditLedger.shared.entries()
-        XCTAssertEqual(entries.count, 4, "the undo is a change too: two more lines")
+        XCTAssertEqual(entries.count, 5, "one durable attempt marker, then two verified inverse writes")
         let undo = Array(entries.suffix(2))
         XCTAssertEqual(undo.map(\.op), [.undo, .undo])
         XCTAssertEqual(Set(undo.map(\.undoes)), [forwardGroup])

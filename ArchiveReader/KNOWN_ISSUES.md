@@ -770,3 +770,21 @@ are now settled in code + tests. Kept as a short record:
 - Xcode 26.3 / Swift 6.2 toolchain; XcodeGen 2.45.2 at `/opt/homebrew/bin/xcodegen`.
 - GitHub CLI: use `/opt/homebrew/bin/gh` (bare `gh` is shadowed on this machine).
 - The corpus lives in `Test files/Brown Gemini/` (150-PDF representative sample as of 2026-07-18, slimmed from ~6,941) and is gitignored — never modify it.
+
+### W40.audit-ledger-undo — history now survives relaunch (2026-10-18)
+
+Undo reads the append-only ledger, retaining the latest 100 forward groups per archive (consumed groups
+count toward the bound). It skips unsupported/unverified/broken lines, follows matching bookmarks after
+moves, and refuses mismatched or missing recorded identity. Device/inode is checked around a fresh
+FileIdentity capture; the writer checks that identity again inside coordination. The recorded inode is
+bound to the forward write's object, rather than captured only after the write returned.
+
+A synchronized undoAttempt consumes the group before any inverse, so a crash or failed ledger append
+cannot cause a non-idempotent occurrence inverse to replay. Partial failures name files; whole-group
+consumption means interrupted/failed members are not retried. W40.fix-reader-undo-partial retains the
+retry-policy question. Forward append failure disables older undo and warns; recovery appends a
+synchronized history barrier. A failure counter keeps the warning even when another member of the
+same batch recovers storage. Process death before recovery can still lose the missing forward record
+and barrier: forward recording remains best-effort, rather than a write-ahead journal. Ledger growth remains unbounded and ordinary forward appends are not fsynced.
+Scratch regressions: UndoDurabilityTests, LedgerUndoHistoryTests; evidence in
+verification/evidence/reader/W40.audit-ledger-undo.md. R-46 stays fixed-pending-recheck.

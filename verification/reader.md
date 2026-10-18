@@ -427,8 +427,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Promised in:** `CLAUDE.md` Safety Protocol §9, §Keyboard map; `SMOKE_TEST.md` step O; `SUITE_TODO_DONE.md`
   `W15.tu2`.
 - **Reached by:** ⌘Z (`ArchiveReaderCommands.swift:112-114`, enabled only while `undoDepth > 0`) or the toolbar
-  Undo button. Both call `NavigationModel.undoLast()` (`Views/NavigationModel.swift:1096`), which pops one batch
-  and applies `TagWriter.applyOccurrence` to each entry (`:1108`).
+  Undo button. Both call `NavigationModel.undoLast()`, which reloads the ledger, durably consumes one group,
+  checks persisted identity and applies `TagWriter.applyOccurrence` to each entry.
 - **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 5a, 5b), through `undoLast`. At the writer level, `ArchiveReaderTests/TagWriterTests.testOccurrenceUndoPreservesConcurrentUnrelatedTag`
   and `.testOccurrenceInverseRestoresDuplicateTag` test the writer's inverse.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): one ⌘Z undid a three-file rename as one step, a second ⌘Z undid the three-file group edit, and the tags after the first undo equalled those before the rename. Every other file stayed byte-identical.
@@ -437,10 +437,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `works` (both runs).
 - **Notes:**
-  - The undo stack is memory-only (R-46).
-  - `undoLast` drops a file whose undo fails (`try?`, `:1108`), and its count reports only the files it undid.
-    Demonstrated 2026-10-16 by `W40.f1` ([`evidence/reader/W40.f1-undo.md`](evidence/reader/W40.f1-undo.md)):
-    `W40.fix-reader-undo-partial` (S3).
+  - W40.audit-ledger-undo restores history after relaunch (R-46), with a 100-forward-group bound.
+  - Partial failures now name the refused files. The group is durably consumed before inverse writes;
+    retry is not offered (the remaining policy question in `W40.fix-reader-undo-partial`).
   - `W40.f1` also found that undo re-tagged a file swapped under its path: the §6 identity check compared a
     `URL`'s cached `fileResourceIdentifier` with itself. Fixed 2026-10-17 by `W40.fix-identity-url-cache`
     (S1): `UndoDurabilityTests.testUndoRefusesAFileSwappedUnderItsPath` now passes without its expected
@@ -976,12 +975,14 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   result to `Core/AuditLedger.swift`, which appends one JSON line to `audit-ledger.jsonl` in the Reader's
   Application Support directory (container). A write that fails its post-write verification gets a line marked
   `unverified`. `NavigationModel` binds one `group` per action (a bulk mark, edit or rename is one group, as it
-  is one undo) and names the undone group in an undo's `undoes`. **Not yet the undo source:** undo still reads
-  the in-memory `undoStack`, so it is lost on quit; reading the ledger is `W40.audit-ledger-undo`.
+  is one undo). `NavigationModel` now reconstructs the latest 100 forward groups per archive from the
+  ledger, excluding groups named by later verified `undoes` lines. A synchronized `undoAttempt` consumes
+  an entire group before any inverse, including no-op/failed attempts, to prevent unsafe replay.
+  Bookmark/device/inode checks and the coordinated writer's fresh identity check guard each inverse.
 - **Real-path test:** `ArchiveReaderTests/AuditLedgerTests` (7 tests, through `NavigationModel` on scratch
   fixtures).
 - **Runtime evidence:** none.
-- **Status:** `fixed-pending-recheck` (the record half; the undo-source half is `W40.audit-ledger-undo`)
+- **Status:** `fixed-pending-recheck` (both recording and durable undo; builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unreachable` (a promise with no implementation).
   - 2026-10-16 W40.f1 — memory-only undo demonstrated (`UndoDurabilityTests.testTheUndoHistoryDoesNotSurviveARelaunch`,
@@ -989,8 +990,12 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     is the owner's call, asked in the Daemon Report; the work it decides is `W40.audit-ledger`.
   - 2026-10-17 W40.audit-ledger — the ledger built (owner, 2026-10-16: build it, and durable undo);
     `fixed-pending-recheck`. Durable undo from it waits on `W40.fix-identity-url-cache` → `W40.audit-ledger-undo`.
-- **Notes:** `unreachable` is used because there is no path to it, and this time no code either.
-  `W40.b5` leaves §12 in place until the owner rules, marked as unimplemented.
+  - 2026-10-18 W40.audit-ledger-undo — durable undo wired; the original relaunch assertion is reversed
+    because the owner requested undo to outlive quit. Scratch evidence and limitations:
+    [`evidence/reader/W40.audit-ledger-undo.md`](evidence/reader/W40.audit-ledger-undo.md).
+- **Notes:** the on-disk ledger remains unbounded; ordinary forward lines are not fsynced. Interrupted
+  undo attempts consume the group and cannot retry individual files. No schema migration: no production
+  app output needs migration.
 
 ### R-47 · Two same-facet date tags are flagged as ambiguous
 
