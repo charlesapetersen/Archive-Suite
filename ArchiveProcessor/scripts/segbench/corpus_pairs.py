@@ -14,7 +14,7 @@ reading a PDF or JPEG and writing only into the cache. Nothing in either tree is
     python3 corpus_pairs.py clean --run DIR   # W41.seg-label-clean: the teacher's answers -> cleaned labels
     python3 corpus_pairs.py checkpack         # a fresh blind pack of kept labels for the owner (cache checkpack/)
     python3 corpus_pairs.py checkscore FILE   # the owner's answers to it -> each rule's noise among kept labels
-    python3 corpus_pairs.py pack --out DIR --part K --parts N   # W41.seg-label-clean: fs_seg.py's pack format,
+    python3 corpus_pairs.py pack --out DIR --part K --parts N   # W41.seg-label-clean: cluster_seg.py's pack format,
                                        # every window with ABBYY text, images for part K's folders only (the
                                        # Mac's disk holds one part at a time; rsync each into one pack on FarmShare)
 
@@ -485,9 +485,9 @@ def page_text_of(pdf):
 
 
 def cmd_pack(a):
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "farmshare"))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "institutional-compute"))
     import method_openrouter as R
-    import fs_seg as S
+    import cluster_seg as S
     out = a.out
     wins = [json.loads(l) for l in open(os.path.join(CACHE, "windows.jsonl"), encoding="utf-8")]
     # Held-out windows go too: the teacher's labels make the held-out set a cleaner test of the student, and never
@@ -506,7 +506,7 @@ def cmd_pack(a):
         prompt = window_prompt(nums, [page_text_of(p["pdf"]) for p in w["pages"]])
         key = hashlib.sha256(json.dumps([w["folder_id"], nums, prompt]).encode()).hexdigest()
         # The teacher reads every window with ABBYY's text; prompt_notext is the same request with no page text, for
-        # the student's no-text share (train_seg.py data). fs_seg.py sends only "prompt".
+        # the student's no-text share (train_seg.py data). cluster_seg.py sends only "prompt".
         recs.append({"box": w["folder_id"], "window": nums, "cache_key": key, "prompt": prompt,
                      "prompt_notext": window_prompt(nums, [None] * len(nums)) if w["text"] == "none" else None})
         if part[w["folder_id"]] != a.part:
@@ -727,7 +727,7 @@ def cmd_checkscore(a):
 def cmd_subpack(a):
     """W41.seg-finetune: the held-out windows of a pack (corpus_pairs pack), for another key (a student or a
     baseline), images linked, not copied. Runs where the pack is (FarmShare); needs no corpus."""
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "farmshare"))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "institutional-compute"))
     import method_openrouter as R
     split = {(w["folder_id"], tuple(p["n"] for p in w["pages"])): w["split"]
              for w in map(json.loads, open(a.windows, encoding="utf-8"))}

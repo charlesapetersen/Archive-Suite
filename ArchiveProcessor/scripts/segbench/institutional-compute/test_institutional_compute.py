@@ -1,6 +1,6 @@
-"""W41.farmshare-plan offline tests: Slurm-limit parsing, and fs_ocr.py and fs_seg.py against a fake vLLM server on
+"""W41.farmshare-plan offline tests: Slurm-limit parsing, and cluster_ocr.py and cluster_seg.py against a fake vLLM server on
 localhost.
-No cluster, GPU, corpus or paid API. Run: python3 -m unittest test_farmshare (from this directory)."""
+No cluster, GPU, corpus or paid API. Run: python3 -m unittest test_institutional_compute (from this directory)."""
 import hashlib
 import http.server
 import io
@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
+import shlex
 import sys
 import tempfile
 import threading
@@ -16,8 +18,9 @@ import unittest
 import unittest.mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import profiles as C  # noqa: E402
 import limits as L  # noqa: E402
-import fs_ocr as F  # noqa: E402
+import cluster_ocr as F  # noqa: E402
 import estimate as E  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
@@ -50,13 +53,13 @@ class Limits(unittest.TestCase):
         q = L.qos_table(self.QOS)
         self.assertEqual(q['gpu'], {'maxwall': None, 'gpus_pu': 6, 'jobs_pu': 4, 'submit_pu': 32})
         s = L.choose(parts, q, {'normal', 'gpu', 'interactive', 'dev'})
-        self.assertEqual((s['FS_PARTITION'], s['FS_QOS'], s['FS_MAXGPU_PU'], s['FS_MAXJOBS_PU'], s['FS_MAXWALL_MIN']),
+        self.assertEqual((s['IC_PARTITION'], s['IC_QOS'], s['IC_MAXGPU_PU'], s['IC_MAXJOBS_PU'], s['IC_MAXWALL_MIN']),
                          ('gpu', 'gpu', 6, 4, 2880))
         # A user not associated with the gpu QOS falls back to what they are allowed.
         s = L.choose(parts, q, {'normal'})
-        self.assertEqual((s['FS_QOS'], s['FS_MAXGPU_PU']), ('normal', 3))
+        self.assertEqual((s['IC_QOS'], s['IC_MAXGPU_PU']), ('normal', 3))
         # Slurm would not list the user's QOS: name none rather than guess one sbatch may refuse.
-        self.assertEqual(L.choose(parts, q, set())['FS_QOS'], '')
+        self.assertEqual(L.choose(parts, q, set())['IC_QOS'], '')
 
     # What FarmShare itself reported on 2026-10-15: GPU nodes in BOTH `normal` and `gpu`, listed normal first, and
     # `normal` refusing the `gpu` QOS. The first run paired normal + gpu and sbatch said "Invalid qos specification".
@@ -76,14 +79,14 @@ class Limits(unittest.TestCase):
         self.assertEqual(allow['normal'], {'normal', 'long', 'interactive', 'dev'})
         self.assertIsNone(allow['gpu'])
         s = L.choose(parts, L.qos_table(self.CLUSTER_QOS), self.CLUSTER_ALLOWED, allow)
-        self.assertEqual((s['FS_PARTITION'], s['FS_QOS'], s['FS_MAXGPU_PU'], s['FS_MAXJOBS_PU'], s['FS_MAXWALL_MIN']),
+        self.assertEqual((s['IC_PARTITION'], s['IC_QOS'], s['IC_MAXGPU_PU'], s['IC_MAXJOBS_PU'], s['IC_MAXWALL_MIN']),
                          ('gpu', 'gpu', 4, 4, 2880))
         # Without the gpu QOS the user gets normal's one GPU, on the normal partition that allows it.
         s = L.choose(parts, L.qos_table(self.CLUSTER_QOS), self.CLUSTER_ALLOWED - {'gpu'}, allow)
-        self.assertEqual((s['FS_PARTITION'], s['FS_QOS'], s['FS_MAXGPU_PU']), ('normal', 'normal', 1))
+        self.assertEqual((s['IC_PARTITION'], s['IC_QOS'], s['IC_MAXGPU_PU']), ('normal', 'normal', 1))
         # If only `normal` had GPUs, its allow-list alone must keep the 4-GPU `gpu` QOS off it.
         s = L.choose([('normal', 4, 2880)], L.qos_table(self.CLUSTER_QOS), self.CLUSTER_ALLOWED, allow)
-        self.assertEqual((s['FS_PARTITION'], s['FS_QOS']), ('normal', 'normal'))
+        self.assertEqual((s['IC_PARTITION'], s['IC_QOS']), ('normal', 'normal'))
 
     def test_no_gpu_partition_is_an_error(self):
         with self.assertRaises(SystemExit):
@@ -157,7 +160,7 @@ class Driver(unittest.TestCase):
         Image.new('RGB', size, colour).save(path)
 
     def bulk(self, *extra):
-        cmd = [sys.executable, str(HERE / 'fs_ocr.py'), 'bulk', '--url', self.url, '--model', 'm',
+        cmd = [sys.executable, str(HERE / 'cluster_ocr.py'), 'bulk', '--cluster', 'Test Cluster', '--url', self.url, '--model', 'm',
                '--in', str(self.tmp / 'in'), '--out', str(self.tmp / 'out'), '--concurrency', '2', *extra]
         return subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
@@ -194,6 +197,7 @@ class Driver(unittest.TestCase):
         # W41.app-farmshare-import matches by the input's bytes and records the reader.
         self.assertEqual(side['sha256'], hashlib.sha256((self.tmp / 'in/box1/a.jpg').read_bytes()).hexdigest())
         self.assertEqual(side['model'], 'm')
+        self.assertEqual(side['cluster'], 'Test Cluster')
         self.assertTrue({'preset', 'vllm_args', 'job'} <= side.keys())
         self.assertEqual(list(out.rglob('*.tmp*')), [])
         n = len(Fake.seen)
@@ -202,6 +206,20 @@ class Driver(unittest.TestCase):
         self.assertIn('3 already done or escalated, 0 to read', r.stdout)
         r = self.bulk('--retry-escalated')                   # unless asked: read, and retried, once more
         self.assertEqual(len(Fake.seen) - n, 2, r.stdout)
+
+    def test_bulk_resume_refuses_other_cluster_and_missing_provenance(self):
+        self.mk('a.jpg', (0, 0, 0))
+        self.assertEqual(self.bulk().returncode, 0)
+        n = len(Fake.seen)
+        r = self.bulk('--cluster', 'Another University')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('incompatible cluster/input/model provenance', r.stderr)
+        self.assertEqual(len(Fake.seen), n)
+        side = self.tmp / 'out/_meta/a.jpg.json'
+        metadata = json.loads(side.read_text()); del metadata['cluster']; side.write_text(json.dumps(metadata))
+        r = self.bulk()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(len(Fake.seen), n)
 
     def test_bulk_request_streams_at_the_lower_cap(self):
         self.mk('a.jpg', (0, 0, 0))
@@ -263,14 +281,14 @@ class Driver(unittest.TestCase):
         F.atomic_write(d / 'p2.json', json.dumps({'reply': {'raw': LOOP_LINE * 500}, 'meta': {'finish': 'length'}}).encode())
         F.atomic_write(self.tmp / 'runs/x.raw.json', json.dumps({'choices': [{'message': {'content': 'x ' * 9},
                                                                               'finish_reason': 'length'}]}).encode())
-        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'guard-check', str(self.tmp / 'runs')],
+        r = subprocess.run([sys.executable, str(HERE / 'cluster_ocr.py'), 'guard-check', str(self.tmp / 'runs')],
                            capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
         j = json.loads(r.stdout)
         self.assertEqual((j['answered'], j['answered_fired'], j['capped'], j['capped_caught']), (1, 0, 2, 1))
         self.assertNotIn('again', r.stdout)                  # names and counts only, never the text
         F.atomic_write(d / 'p3.json', json.dumps({'reply': {'raw': LOOP_LINE * 500}, 'meta': {'finish': 'stop'}}).encode())
-        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'guard-check', str(self.tmp / 'runs')],
+        r = subprocess.run([sys.executable, str(HERE / 'cluster_ocr.py'), 'guard-check', str(self.tmp / 'runs')],
                            capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 1)                    # a fire on an answered reply fails the check
 
@@ -302,7 +320,7 @@ class Driver(unittest.TestCase):
         import socket
         with socket.socket() as sk:                          # a port nobody listens on: every read is 'error'
             sk.bind(('127.0.0.1', 0)); port = sk.getsockname()[1]
-        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'bulk', '--url', f'http://127.0.0.1:{port}',
+        r = subprocess.run([sys.executable, str(HERE / 'cluster_ocr.py'), 'bulk', '--cluster', 'Test Cluster', '--url', f'http://127.0.0.1:{port}',
                             '--model', 'm', '--in', str(self.tmp / 'in'), '--out', str(self.tmp / 'out'),
                             '--concurrency', '1'], capture_output=True, text=True, timeout=120)
         self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
@@ -319,7 +337,7 @@ class Driver(unittest.TestCase):
 
     def test_bulk_refuses_output_inside_input(self):
         self.mk('a.jpg', (0, 0, 0))
-        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'bulk', '--url', self.url, '--model', 'm',
+        r = subprocess.run([sys.executable, str(HERE / 'cluster_ocr.py'), 'bulk', '--cluster', 'Test Cluster', '--url', self.url, '--model', 'm',
                             '--in', str(self.tmp / 'in'), '--out', str(self.tmp / 'in' / 'out')],
                            capture_output=True, text=True, timeout=60)
         self.assertNotEqual(r.returncode, 0)
@@ -340,7 +358,7 @@ class Driver(unittest.TestCase):
             f'{j["page"]}\tprinted\t\t\t{"yes" if j["page"] == "p001" else ""}\t\n' for j in jobs))
         (pack / 'pack.json').write_text(json.dumps({'prompt_sha256': hashlib.sha256(F.P.PROMPT.encode()).hexdigest(),
                                                     'jobs': jobs, 'agreement': ['p086']}))
-        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'truth', '--url', self.url, '--model', 'm',
+        r = subprocess.run([sys.executable, str(HERE / 'cluster_ocr.py'), 'truth', '--url', self.url, '--model', 'm',
                             '--pack', str(pack), '--out', str(self.tmp / 'runs'), '--label', 't'],
                            capture_output=True, text=True, timeout=120, env={**os.environ})
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -357,7 +375,7 @@ class Driver(unittest.TestCase):
         (pack / 'pages.tsv').write_text('\t'.join(F.STRATA) + '\n')
         (pack / 'pack.json').write_text(json.dumps({'prompt_sha256': hashlib.sha256(F.P.PROMPT.encode()).hexdigest(),
             'jobs': [{'page': 'p001', 'sha256': '0' * 64}], 'agreement': []}))
-        r = subprocess.run([sys.executable, str(HERE / 'fs_ocr.py'), 'truth', '--url', self.url, '--model', 'm',
+        r = subprocess.run([sys.executable, str(HERE / 'cluster_ocr.py'), 'truth', '--url', self.url, '--model', 'm',
                             '--pack', str(pack), '--out', str(self.tmp / 'runs'), '--label', 't'],
                            capture_output=True, text=True, timeout=60)
         self.assertIn('differs from the frozen panel input', r.stderr)
@@ -465,7 +483,7 @@ class Layout(unittest.TestCase):
         with socket.socket() as sk:
             sk.bind(('127.0.0.1', 0)); port = sk.getsockname()[1]
         _, meta = self.reader(f'http://127.0.0.1:{port}').read(self.page([(0, 0, 0)] * 3))
-        self.assertEqual(meta['status'], 'error')              # counts toward fs_ocr's dead-server stop
+        self.assertEqual(meta['status'], 'error')              # counts toward cluster_ocr's dead-server stop
         _, meta = self.reader().read(self.page([]))
         self.assertEqual((meta['status'], meta['regions']), ('empty', 0))
         reply, meta = self.reader(fail=True).read(self.page([(0, 0, 0)]))
@@ -476,9 +494,9 @@ class Layout(unittest.TestCase):
         self.page([(0, 0, 0), (255, 0, 0), (0, 0, 255)], self.tmp / 'in/1890/p2.png')
         real = NL.build_pipeline
 
-        def bulk():
-            argv = ['fs_ocr.py', 'bulk', '--layout', '--url', self.url, '--model', 'zai-org/GLM-OCR',
-                    '--in', str(self.tmp / 'in'), '--out', str(self.tmp / 'out')]
+        def bulk(*extra):
+            argv = ['cluster_ocr.py', 'bulk', '--cluster', 'Test Cluster', '--layout', '--url', self.url, '--model', 'zai-org/GLM-OCR',
+                    '--in', str(self.tmp / 'in'), '--out', str(self.tmp / 'out'), *extra]
             with unittest.mock.patch.object(sys, 'argv', argv), \
                     unittest.mock.patch.object(NL, 'build_pipeline', lambda u, m: real(u, m, detector=ColumnDetector())):
                 with self.assertRaises(SystemExit) as e:
@@ -493,9 +511,12 @@ class Layout(unittest.TestCase):
         self.assertEqual([(f['image'], f['status']) for f in fails], [('1890/p2.png', 'partial')])
         side = json.loads((out / '_meta/1890/p1.jpg.json').read_text())
         self.assertEqual((side['kind'], side['regions']), ('newspaper', 3))
+        self.assertEqual((side['cluster'], side['model']), ('Test Cluster', 'zai-org/GLM-OCR'))
         self.assertTrue(json.loads((out / 'throughput.jsonl').read_text().splitlines()[-1])['layout'])
         n = len(FakeGlm.seen)
         self.assertEqual(bulk(), 0)
+        self.assertEqual(len(FakeGlm.seen), n)               # partial page is held for explicit escalation retry
+        self.assertEqual(bulk('--retry-escalated'), 0)
         self.assertEqual(len(FakeGlm.seen) - n, 2 + 3)          # only p2's three regions (one tried three times)
 
 
@@ -510,13 +531,160 @@ class Estimate(unittest.TestCase):
             self.assertLess(fast, slow)
 
 
+class Profiles(unittest.TestCase):
+    def test_profiles_keep_identity_scheduler_runtime_and_paths_together(self):
+        farm = C.load('farmshare'); other = C.load('example-university')
+        self.assertEqual((farm['CLUSTER_NAME'], farm['IC_GPU_MEMORY_GB']), ('FarmShare', 48))
+        self.assertEqual((other['IC_ACCOUNT'], other['IC_GPU_GRES_TYPE'], other['IC_MAXWALL_MIN']),
+                         ('humanities', 'h100', 720))
+        self.assertEqual((other['IC_GPU_MEMORY_GB'], other['IC_CUDA_MODE']), (80, 'modules'))
+        self.assertIn('cuda/13.0', other['IC_MODULES'])
+        self.assertTrue(Path(other['IC_SCRATCH']).is_absolute())
+        self.assertTrue(Path(other['IC_STORAGE']).is_absolute())
+
+    def test_rejects_other_schedulers_and_unsafe_scheduler_identifiers(self):
+        original = json.loads((HERE / 'profiles/example-university.json').read_text())
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'profile.json'
+            for field, value in [('scheduler', 'pbs'), ('name', ''), ('name', 'Cluster\nforged')]:
+                data = dict(original); data[field] = value; path.write_text(json.dumps(data))
+                with self.assertRaises(ValueError): C.load(path)
+            for modules in ('cuda/13.0', ['--force'], ['cuda/13.0;echo']):
+                data = json.loads(json.dumps(original)); data['runtime']['modules'] = modules
+                path.write_text(json.dumps(data))
+                with self.assertRaises(ValueError): C.load(path)
+            original['slurm']['account'] = 'a; touch /tmp/should-not-exist'
+            path.write_text(json.dumps(original))
+            with self.assertRaises(ValueError): C.load(path)
+
+    def test_live_caps_constrain_the_profile_without_switching_partition(self):
+        profile = C.load('farmshare')
+        result = L.constrain(profile, [('gpu', 2, 480)], L.qos_table(Limits.CLUSTER_QOS),
+                             Limits.CLUSTER_ALLOWED, {'gpu': None})
+        self.assertEqual(result['IC_GPUS_PER_NODE'], 2)
+        self.assertEqual(result['IC_MAXWALL_MIN'], 480)
+        self.assertEqual(result['IC_MAXGPU_PU'], 4)
+        with self.assertRaises(ValueError):
+            L.constrain(profile, [('normal', 4, 480)], {}, set(), {})
+        with self.assertRaises(ValueError):
+            L.constrain(profile, [('gpu', 4, 480)], L.qos_table(Limits.CLUSTER_QOS), {'normal'}, {})
+
+    def test_dry_run_both_profiles_without_setup_or_external_commands(self):
+        with tempfile.TemporaryDirectory(prefix='institutional compute ') as d:
+            kit = Path(d) / 'kit with spaces'; shutil.copytree(HERE, kit)
+            # Deliberately no setup files, GPU, modules or sbatch. A dry-run must remain purely local.
+            for name in ('compute.env', 'limits.env'):
+                path = kit / name
+                if path.exists(): path.unlink()
+            before = sorted(str(p.relative_to(kit)) for p in kit.rglob('*'))
+            for profile in ('farmshare', 'example-university'):
+                result = subprocess.run(['bash', str(kit / 'submit.sh'), '--profile', profile, 'news', 'auto',
+                                         '--hours', '30', '--dry-run'], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('sbatch', result.stdout)
+                self.assertIn('Qwen/Qwen3.6-27B-FP8', result.stdout)
+                self.assertIn('48 GB/card' if profile == 'farmshare' else '80 GB/card', result.stdout)
+                if profile == 'example-university':
+                    self.assertIn('--account=humanities', result.stdout)
+                    self.assertIn('--gres=gpu:h100:1', result.stdout)
+                    self.assertIn('--time=720', result.stdout)
+                    self.assertIn('--qos=research', result.stdout)
+            after = sorted(str(p.relative_to(kit)) for p in kit.rglob('*') if '__pycache__' not in p.parts)
+            self.assertEqual(after, [p for p in before if '__pycache__' not in Path(p).parts])
+            # Fresh 24 GB profile selects the small default. Oversized explicit presets/shards refuse.
+            data = json.loads((kit / 'profiles/example-university.json').read_text())
+            data['gpu']['memory_gb'] = 24; data['gpu']['per_node'] = 1
+            (kit / 'profiles/small.json').write_text(json.dumps(data))
+            result = subprocess.run(['bash', str(kit / 'submit.sh'), '--profile', 'small', 'news', 'auto', '--dry-run'],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('Qwen/Qwen3-VL-8B-Instruct', result.stdout)
+            result = subprocess.run(['bash', str(kit / 'submit.sh'), '--profile', 'small', 'news',
+                                     'qwen3.6-27b', '--dry-run'], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('needs 2 GPUs', result.stderr)
+
+    def test_real_submission_matches_dry_run_and_requires_unchanged_setup_profile(self):
+        with tempfile.TemporaryDirectory(prefix='cluster submit ') as d:
+            kit = Path(d) / 'kit'; shutil.copytree(HERE, kit)
+            profile = kit / 'profiles/example-university.json'
+            data = json.loads(profile.read_text())
+            data['paths'] = {'scratch': str(Path(d) / 'scratch with spaces'), 'storage': str(Path(d) / 'storage')}
+            profile.write_text(json.dumps(data))
+            config = C.load(profile)
+            config.update({'IC_PY': sys.executable, 'IC_VLLM': '/not-used-in-submit'})
+            (kit / 'compute.env').write_text(C.shell(config))
+            caps = {k: config[k] for k in ('IC_GPUS_PER_NODE', 'IC_MAXGPU_PU', 'IC_MAXJOBS_PU',
+                                         'IC_MAXSUBMIT_PU', 'IC_MAXWALL_MIN')}
+            (kit / 'limits.env').write_text(C.shell(caps))
+            fake_bin = Path(d) / 'bin'; fake_bin.mkdir()
+            executable = fake_bin / 'sbatch'
+            executable.write_text("#!/bin/bash\nprintf '%s\\0' \"$@\" > \"$IC_CAPTURE\"\n")
+            executable.chmod(0o755)
+            capture = Path(d) / 'capture'
+            env = dict(os.environ, PATH=str(fake_bin) + os.pathsep + os.environ['PATH'], IC_CAPTURE=str(capture))
+            inp = Path(d) / 'input'; inp.mkdir()
+            out = Path(d) / 'new output'
+            cmd = ['bash', str(kit / 'submit.sh'), '--profile', str(profile), 'bulk', 'auto',
+                   '--in', str(inp), '--out', str(out), '--shards', '1']
+            dry = subprocess.run(cmd + ['--dry-run'], env=env, capture_output=True, text=True)
+            self.assertEqual(dry.returncode, 0, dry.stderr)
+            self.assertFalse(out.exists()); self.assertFalse(capture.exists())
+            real = subprocess.run(cmd, env=env, capture_output=True, text=True)
+            self.assertEqual(real.returncode, 0, real.stderr)
+            argv = capture.read_bytes().decode().split('\0')[:-1]
+            self.assertEqual(argv, shlex.split(dry.stdout.splitlines()[-1])[1:])
+            overlap_cmd = cmd.copy(); overlap_cmd[overlap_cmd.index('--out') + 1] = str(inp / 'forbidden output')
+            overlap = subprocess.run(overlap_cmd, env=env, capture_output=True, text=True)
+            self.assertNotEqual(overlap.returncode, 0)
+            self.assertIn('outside --in', overlap.stderr)
+            self.assertFalse((inp / 'forbidden output').exists())
+            data['name'] = 'Renamed after submission'; profile.write_text(json.dumps(data))
+            changed = subprocess.run(cmd, env=env, capture_output=True, text=True)
+            self.assertNotEqual(changed.returncode, 0)
+            self.assertIn('profile revision', changed.stderr)
+
+    def test_layout_setup_loads_profile_modules_before_python(self):
+        with tempfile.TemporaryDirectory(prefix='cluster layout setup ') as d:
+            kit = Path(d) / 'kit'; shutil.copytree(HERE, kit)
+            root = Path(d) / 'runtime'; root.mkdir()
+            fake_bin = Path(d) / 'bin'; fake_bin.mkdir()
+            module = fake_bin / 'module'
+            module.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "$IC_MODULE_LOG"\n')
+            module.chmod(0o755)
+            python = fake_bin / 'cluster-python'
+            python.write_text('#!/bin/bash\n[ -s "$IC_MODULE_LOG" ] || exit 91\n'
+                              'if [ "$*" = "-m pip freeze" ]; then echo "vllm==0.31.0"; fi\n')
+            python.chmod(0o755)
+            (kit / 'compute.env').write_text(C.shell({'IC_ROOT': root, 'IC_PY': python,
+                                                     'IC_MODULES': 'python/3.12 cuda/13.0'}))
+            env = dict(os.environ, PATH=str(fake_bin) + os.pathsep + os.environ['PATH'],
+                       IC_MODULE_LOG=str(Path(d) / 'modules'))
+            result = subprocess.run(['bash', str(kit / 'setup.sh'), '--layout'], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(env['IC_MODULE_LOG']).read_text().splitlines(),
+                             ['load python/3.12', 'load cuda/13.0'])
+
+    def test_memory_budgets_select_power_of_two_tensor_parallel_sizes(self):
+        result = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; '
+            'for m in 24 48 80; do IC_GPU_MEMORY_GB=$m; preset auto; echo "$m|$IC_MODEL|$IC_GPUS"; '
+            'preset qwen3.5-122b-a10b; echo "$m|$IC_GPUS"; done'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            '24|Qwen/Qwen3-VL-8B-Instruct|1', '24|8',
+            '48|Qwen/Qwen3.6-27B-FP8|1', '48|4',
+            '80|Qwen/Qwen3.6-27B-FP8|1', '80|4'])
+
+
 class Shell(unittest.TestCase):
     def test_scripts_parse_and_presets_resolve(self):
-        for f in ('setup.sh', 'download.sh', 'job.sbatch', 'submit.sh', 'models.sh'):
+        for f in ('setup.sh', 'download.sh', 'job.sbatch', 'submit.sh', 'models.sh', 'runtime.sh', 'scheduler.sh',
+                  'setup-layout.sh', 'setup-train.sh', 'train.sbatch'):
             self.assertEqual(subprocess.run(['bash', '-n', str(HERE / f)]).returncode, 0, f)
-        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; preset qwen3.6-27b-dyn; echo "$FS_VLLM_ARGS"; '
-                              'preset qwen3.6-27b; echo "$FS_MODEL|$FS_VLLM_ARGS"; preset nope; '
-                              'FS_MAX_LEN=12288 preset qwen3.6-35b-a3b'],
+        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; preset qwen3.6-27b-dyn; echo "$IC_VLLM_ARGS"; '
+                              'preset qwen3.6-27b; echo "$IC_MODEL|$IC_VLLM_ARGS"; preset nope; '
+                              'IC_MAX_LEN=12288 preset qwen3.6-35b-a3b'],
                              capture_output=True, text=True)
         first, second = out.stdout.splitlines()[:2]
         self.assertIn('--quantization fp8', first)
@@ -526,8 +694,8 @@ class Shell(unittest.TestCase):
         self.assertIn('unknown preset', out.stderr)
         self.assertIn('below prompt + max_tokens', out.stderr)
         self.assertIn('--max-model-len 16384', second)
-        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; FS_MAX_LEN=32768 preset glm-ocr; '
-                              'echo "$FS_LAYOUT|$FS_DET_FILE|$FS_VLLM_ARGS"; preset qwen3.6-27b; echo "$FS_LAYOUT|$FS_DET_REPO"'],
+        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; IC_MAX_LEN=32768 preset glm-ocr; '
+                              'echo "$IC_LAYOUT|$IC_DET_FILE|$IC_VLLM_ARGS"; preset qwen3.6-27b; echo "$IC_LAYOUT|$IC_DET_REPO"'],
                              capture_output=True, text=True)
         glm, after = out.stdout.splitlines()
         self.assertTrue(glm.startswith('1|doclayout_yolo_docstructbench_imgsz1280_2501.pt|'), glm)
@@ -567,9 +735,9 @@ class FakeSeg(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(out))); self.end_headers(); self.wfile.write(out)
 
 
-@unittest.skipUnless(NUMPY, 'fs_seg imports the bench (numpy)')
+@unittest.skipUnless(NUMPY, 'cluster_seg imports the bench (numpy)')
 class Seg(unittest.TestCase):
-    """fs_seg.py run on a synthetic pack (the prompt is the window's page list, so the fake can answer it)."""
+    """cluster_seg.py run on a synthetic pack (the prompt is the window's page list, so the fake can answer it)."""
 
     @classmethod
     def setUpClass(cls):
@@ -599,7 +767,7 @@ class Seg(unittest.TestCase):
         return pack
 
     def run_seg(self, pack, model='Qwen/Qwen3.5-27B-FP8'):
-        cmd = [sys.executable, str(HERE / 'fs_seg.py'), 'run', '--pack', str(pack), '--out', str(self.tmp / 'out'),
+        cmd = [sys.executable, str(HERE / 'cluster_seg.py'), 'run', '--pack', str(pack), '--out', str(self.tmp / 'out'),
                '--label', 'L', '--url', self.url, '--model', model, '--concurrency', '2']
         return subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
@@ -646,7 +814,7 @@ class Seg(unittest.TestCase):
         self.assertFalse((self.tmp / 'out/L/answers.jsonl').exists())
 
     def test_test_boxes_need_the_committed_teacher_freeze(self):
-        import fs_seg as S
+        import cluster_seg as S
         R = S.R
         args = lambda **k: type('A', (), {'out': str(self.tmp / 'p'), 'box': None, 'final': False, **k})  # noqa: E731
         with self.assertRaisesRegex(SystemExit, 'not development'):
@@ -674,8 +842,8 @@ class Seg(unittest.TestCase):
         self.assertEqual(FakeSeg.seen, [])
 
     def test_seg_preset_takes_seven_images(self):
-        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; FS_MM_IMAGES=7 preset qwen3.5-27b; '
-                              'echo "$FS_VLLM_ARGS"; unset FS_MM_IMAGES; preset qwen3.5-27b; echo "$FS_VLLM_ARGS"'],
+        out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; IC_MM_IMAGES=7 preset qwen3.5-27b; '
+                              'echo "$IC_VLLM_ARGS"; unset IC_MM_IMAGES; preset qwen3.5-27b; echo "$IC_VLLM_ARGS"'],
                              capture_output=True, text=True)
         seg, ocr = out.stdout.splitlines()
         self.assertIn('--limit-mm-per-prompt {"image":7}', seg)
@@ -684,10 +852,10 @@ class Seg(unittest.TestCase):
 
 
 class NewsLayout(unittest.TestCase):
-    """fs_news_layout.py with a stand-in pipeline: one file per page where NewsBench's score.py looks, failures kept."""
+    """cluster_news_layout.py with a stand-in pipeline: one file per page where NewsBench's score.py looks, failures kept."""
 
     def test_writes_each_page_and_records_failures(self):
-        import fs_news_layout as N
+        import cluster_news_layout as N
 
         class Pipe:
             def ocr(self, path):

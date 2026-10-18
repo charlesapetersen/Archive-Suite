@@ -97,6 +97,9 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
   content rather than by name.
 - **Older bulk output without `_meta.cluster` does not import.** No institution is guessed. Use a new output folder
   with the neutral kit; no migration is provided because there is no kept app output.
+- **The kit supports Slurm/NVIDIA only.** Profiles describe local policy and memory; offline dry-runs do not
+  prove CUDA/model compatibility or throughput. The example university is fictional. Run the frozen truth
+  check on a new cluster before bulk processing; ask its research computing office for allocation/runtime settings.
 
 ## ⚠️ LIMITATION (W41.app-ocr-cascade, 2026-10-16): what the cheap-first cascade does not yet cover
 

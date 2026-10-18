@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""NewsBench read layout-first by a GENERAL model on a FarmShare GPU node (job.sbatch mode news-layout).
+"""NewsBench read layout-first by a GENERAL model on an institutional GPU node (job.sbatch mode news-layout).
 
 The kit's own layout-first route is news_layout.py (the glm-ocr preset: DocLayout-YOLO + GLM-OCR, NewsBench's
-reference configuration, through fs_ocr.py --layout). This runner is the comparison beside it: any model vLLM serves
+reference configuration, through cluster_ocr.py --layout). This runner is the comparison beside it: any model vLLM serves
 reading the library's regions through its OpenAI-compatible recognizer, as NewsBench's *-paddlex rows were made.
 
-  fs_news_layout.py --newsbench DIR --out DIR --label L --base-url URL --model M --reader openai|glm \
+  cluster_news_layout.py --newsbench DIR --out DIR --label L --base-url URL --model M --reader openai|glm \
       --detectors doclayout_yolo paddlex [--workers N] [--limit N]
 
 newspaper-ocr (github.com/nealcaren/newspaper-ocr) finds the page's regions with a layout detector, and each region
@@ -41,7 +41,7 @@ def build_pipeline(detector: str, reader: str, base_url: str, model: str):
     else:
         from newspaper_ocr.recognizers.openai_compat import OpenAiCompatRecognizer
         # Qwen3.5/3.6 think by default and vLLM returns the thinking in the reply, so every region's text came back
-        # wrapped in working notes (NewsBench 0.187, 2026-10-15). fs_ocr.py turns it off the same way.
+        # wrapped in working notes (NewsBench 0.187, 2026-10-15). cluster_ocr.py turns it off the same way.
         rec = OpenAiCompatRecognizer(model=model, base_url=base_url, api_key='local', timeout=600,
                                      extra_body={'chat_template_kwargs': {'enable_thinking': False}})
     return Pipeline(detector=detector, recognizer=rec)

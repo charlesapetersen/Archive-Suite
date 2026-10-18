@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""W41.farmshare-seg. Segmentation's windows (method_openrouter's seg-large request) against FarmShare's vLLM server.
+"""W41.farmshare-seg. Segmentation's windows (method_openrouter's seg-large request) against an institutional cluster's vLLM server.
 
-  fs_seg.py pack   --out /tmp/fs-segpack [--box Deaver]     # on the Mac: every window's exact request, for scp
-  fs_seg.py pack   --out DIR --final                        # all five boxes, once, for the frozen teacher
+  cluster_seg.py pack   --out /tmp/fs-segpack [--box Deaver]     # on the Mac: every window's exact request, for scp
+  cluster_seg.py pack   --out DIR --final                        # all five boxes, once, for the frozen teacher
   python method_openrouter.py report-teacher                # its five-box score, as report-five scores
-  fs_seg.py run    --pack DIR --out DIR --label L           # on a GPU node (job.sbatch, mode seg): send, check, time
-  fs_seg.py import --run DIR                                # on the Mac: answers into the cache; then
+  cluster_seg.py run    --pack DIR --out DIR --label L           # on a GPU node (job.sbatch, mode seg): send, check, time
+  cluster_seg.py import --run DIR                                # on the Mac: answers into the cache; then
   python method_openrouter.py report Deaver                 # the FarmShare row beside the OpenRouter ones
 
 Why a pack: a window's request holds seven page images made by ``sips`` from the bench's photos and each page's
@@ -41,10 +41,10 @@ sys.path.insert(0, str(HERE))
 import method_openrouter as R  # noqa: E402  (no I/O at import; the node needs numpy, which vLLM brings)
 import method_window as W  # noqa: E402
 import method_local as L  # noqa: E402
-from fs_ocr import atomic_write, env_info, DEAD_SERVER  # noqa: E402
+from cluster_ocr import atomic_write, env_info, DEAD_SERVER  # noqa: E402
 
-# The teacher by default; FS_SEG_KEY names a student or a baseline (method_openrouter.FARMSHARE), in pack and run.
-KEY = os.environ.get("FS_SEG_KEY", "fs-qwen3.5-27b")  # gitleaks:allow (a model key name, not a secret)
+# The teacher by default; IC_SEG_KEY names a student or a baseline (method_openrouter.FARMSHARE), in pack and run.
+KEY = os.environ.get("IC_SEG_KEY", "fs-qwen3.5-27b")  # gitleaks:allow (a model key name, not a secret)
 
 
 def cmd_pack(a):
@@ -75,7 +75,7 @@ def cmd_pack(a):
         "max_tokens": R.MAX_TOKENS, "prompt_version": R.PROMPT_VERSION, "boxes": boxes, "pages": len(pages),
         "windows": len(windows), "made": time.strftime("%Y-%m-%dT%H:%M:%S")}, indent=1).encode())
     print(f"{len(windows)} windows, {len(pages)} pages -> {out}  "
-          f"(copy with: scp -r {out} <sunet>@login.farmshare.stanford.edu:)")
+          f"(copy with: scp -r {out} <user>@<cluster-login>:)")
 
 
 def send(url, body, timeout=900):
@@ -131,7 +131,7 @@ def answer_lines(path):
 def cmd_run(a):
     pack, out = Path(a.pack), Path(a.out) / a.label
     meta = json.loads((pack / "pack.json").read_text())
-    model = a.model or os.environ.get("FS_SERVED") or os.environ.get("FS_MODEL")
+    model = a.model or os.environ.get("IC_SERVED") or os.environ.get("IC_MODEL")
     if meta["key"] != KEY or model != meta["model"]:
         raise SystemExit(f"the pack is for {meta['model']} ({meta['key']}); the server is serving {model}")
     windows = [json.loads(l) for l in (pack / "windows.jsonl").read_text().splitlines()]
@@ -221,10 +221,10 @@ def main():
                    "for the frozen teacher only (method_openrouter.py freeze-teacher, committed)")
     p = sub.add_parser("run")
     p.add_argument("--pack", required=True); p.add_argument("--out", required=True); p.add_argument("--label", required=True)
-    p.add_argument("--url", default=os.environ.get("FS_URL", "http://127.0.0.1:8000"))
-    p.add_argument("--model", help="served model name (default $FS_MODEL)")
-    p.add_argument("--concurrency", type=int, default=int(os.environ.get("FS_CONCURRENCY") or 16))
-    p.add_argument("--gpus", type=int, default=int(os.environ.get("FS_GPUS", 1)))
+    p.add_argument("--url", default=os.environ.get("IC_URL", "http://127.0.0.1:8000"))
+    p.add_argument("--model", help="served model name (default $IC_MODEL)")
+    p.add_argument("--concurrency", type=int, default=int(os.environ.get("IC_CONCURRENCY") or 16))
+    p.add_argument("--gpus", type=int, default=int(os.environ.get("IC_GPUS", 1)))
     p.add_argument("--warmup", action="store_true", help="one untimed window first")
     p = sub.add_parser("import"); p.add_argument("--run", required=True, help="runs/seg/<label>, brought back")
     a = ap.parse_args()

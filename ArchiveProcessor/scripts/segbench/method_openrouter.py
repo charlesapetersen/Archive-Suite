@@ -103,7 +103,7 @@ FAILED = L.FAILED
 # seg-large request otherwise unchanged: 1024 px images, temperature 0, thinking off through the chat template
 # (vLLM has no OpenRouter ``reasoning`` field), no provider, no key, no money. ``SEGBENCH_OR_API`` is where these
 # keys' requests go, and only theirs: every other key, and every other caller of ``post``, stays on OpenRouter. On
-# FarmShare the node cannot reach the Mac's thumbnails, so farmshare/fs_seg.py packs these exact requests on the
+# FarmShare the node cannot reach the Mac's thumbnails, so institutional-compute/cluster_seg.py packs these exact requests on the
 # Mac, sends them on the node and imports the answers into this key's cache and log.
 # key: (served model name, label, where, precision, parameters, local 4-bit GB)
 FARMSHARE = {
@@ -415,7 +415,7 @@ def freeze_cheap(keys) -> None:
     print(f"wrote {CHEAP_FROZEN}")
 
 
-# W41.seg-27b-test: the FarmShare teacher, frozen the same way before its one test-box run (fs_seg.py pack --final).
+# W41.seg-27b-test: the FarmShare teacher, frozen the same way before its one test-box run (cluster_seg.py pack --final).
 TEACHER_FROZEN = RESULTS / "seg-teacher.json"
 
 

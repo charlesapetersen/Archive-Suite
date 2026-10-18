@@ -1,0 +1,8 @@
+{
+  "name": "FarmShare", "scheduler": "slurm",
+  "slurm": {"partition": "gpu", "qos": "gpu", "account": "", "wall_minutes": 2880,
+    "max_gpus_per_user": 4, "max_running_jobs": 4, "max_submitted_jobs": 32},
+  "gpu": {"name": "NVIDIA L40S", "gres_type": "", "memory_gb": 48, "per_node": 4},
+  "runtime": {"modules": ["python/3.12"], "cuda_mode": "pip-toolkit", "cuda_home": ""},
+  "paths": {"scratch": "/scratch/users/$USER", "storage": "$HOME/institutional-compute-results"}
+}

@@ -16,8 +16,8 @@ target, so the student learns the whole answer: page kinds, decisions, confidenc
 sends for a page without OCR (the pack's prompt_notext), because the app's segmenter sees the app's OCR, never ABBYY's. Held-out windows are
 never trained on.
 
-The request is the one fs_seg.py sends (the pack's prompt and 1024 px images), in the base model's chat template
-with thinking off, so a trained model is scored by the same fs_seg.py run and import as the teacher.
+The request is the one cluster_seg.py sends (the pack's prompt and 1024 px images), in the base model's chat template
+with thinking off, so a trained model is scored by the same cluster_seg.py run and import as the teacher.
 """
 from __future__ import annotations
 import argparse

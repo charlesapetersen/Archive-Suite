@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read FarmShare's real limits on the cluster and write limits.env, which submit.sh fits every job to.
+"""Read Slurm's real limits on the cluster and write limits.env, which submit.sh fits every job to.
 
   limits.py [--out limits.env]
 
@@ -8,7 +8,7 @@ Asks Slurm, never the docs: `sinfo` for GPU partitions and their time limits, `s
 partition allows, then `df`/`quota` for space. The docs (docs.farmshare.stanford.edu/slurm, 2026-10-15) and the
 cluster disagree: the cluster reported the `gpu` QOS at gres/gpu=4 and 4 running jobs per user and `normal` at
 gres/gpu=1, and GPU nodes in both the `normal` and `gpu` partitions, with `normal` refusing the `gpu` QOS. That is
-why this reads Slurm. Parsing is pure functions, tested offline in test_farmshare.py.
+why this reads Slurm. Parsing is pure functions, tested offline in test_institutional_compute.py.
 """
 from __future__ import annotations
 import argparse
@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import subprocess
+from profiles import load, shell
 
 
 def run(cmd):
@@ -104,7 +105,7 @@ def choose(parts, qos, allowed, allow_qos=None):
     Ties go to more GPUs per node, a QOS named like the partition, then the longer wall time.
     `allow_qos` is partition_qos()'s map; a partition missing from it is taken to allow every QOS."""
     if not parts:
-        raise SystemExit('no partition with GPUs in sinfo; is this the FarmShare login node?')
+        raise SystemExit('no partition with GPUs in sinfo; is this a Slurm login node?')
     allow_qos = allow_qos or {}
     if not allowed:
         print('WARNING: no QOS list for this user from sacctmgr; submitting without --qos')
@@ -124,9 +125,9 @@ def choose(parts, qos, allowed, allow_qos=None):
     q = qos.get(best, {})
     walls = [w for w in (part[2], q.get('maxwall')) if w]
     gpus_pu = q.get('gpus_pu') or part[1]
-    return {'FS_PARTITION': part[0], 'FS_QOS': best or '', 'FS_GPUS_PER_NODE': part[1],
-            'FS_MAXWALL_MIN': min(walls) if walls else 1440, 'FS_MAXGPU_PU': gpus_pu,
-            'FS_MAXJOBS_PU': q.get('jobs_pu') or gpus_pu, 'FS_MAXSUBMIT_PU': q.get('submit_pu') or 32}
+    return {'IC_PARTITION': part[0], 'IC_QOS': best or '', 'IC_GPUS_PER_NODE': part[1],
+            'IC_MAXWALL_MIN': min(walls) if walls else 1440, 'IC_MAXGPU_PU': gpus_pu,
+            'IC_MAXJOBS_PU': q.get('jobs_pu') or gpus_pu, 'IC_MAXSUBMIT_PU': q.get('submit_pu') or 32}
 
 
 def scratch_dir():
@@ -137,25 +138,46 @@ def scratch_dir():
     return ''
 
 
+def constrain(profile, parts, qos, allowed, allow_qos):
+    """Validate the chosen partition/QOS and lower the profile caps using live Slurm limits; never auto-switch."""
+    matching = [p for p in parts if p[0] == profile['IC_PARTITION']]
+    if not matching:
+        raise ValueError('profile partition has no GPUs in sinfo')
+    part = matching[0]
+    name = profile['IC_QOS']
+    if name:
+        if name not in qos or name not in allowed:
+            raise ValueError('profile QOS is not listed for this user; ask research computing to verify the association')
+        allowed_here = allow_qos.get(part[0])
+        if allowed_here is not None and name not in allowed_here:
+            raise ValueError('profile QOS is not allowed on its partition')
+    q = qos.get(name, {})
+    observed = {'IC_GPUS_PER_NODE': part[1], 'IC_MAXWALL_MIN': min(w for w in
+                (part[2], q.get('maxwall'), profile['IC_MAXWALL_MIN']) if w),
+                'IC_MAXGPU_PU': q.get('gpus_pu'), 'IC_MAXJOBS_PU': q.get('jobs_pu'),
+                'IC_MAXSUBMIT_PU': q.get('submit_pu')}
+    return {k: min(profile[k], v) if v is not None else profile[k] for k, v in observed.items()}
+
+
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument('--out', default='limits.env'); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument('--out', default='limits.env'); ap.add_argument('--profile', required=True); a = ap.parse_args()
     sinfo = run(['sinfo', '-h', '-o', '%P|%G|%l|%D'])
     qos = run(['sacctmgr', '-nP', 'show', 'qos', 'format=Name,MaxWall,MaxTRESPU,MaxJobsPU,MaxSubmitPU'])
     assoc = run(['sacctmgr', '-nP', 'show', 'assoc', f"user={os.environ.get('USER', '')}", 'format=Partition,QOS'])
     parts_qos = run(['scontrol', '-o', 'show', 'partition'])
     print('--- sinfo\n' + sinfo + '--- qos\n' + qos + '--- associations\n' + assoc + '--- partitions\n' + parts_qos)
-    s = choose(gpu_partitions(sinfo), qos_table(qos), user_qos(assoc), partition_qos(parts_qos))
-    s['FS_SCRATCH'] = scratch_dir()
-    for d in (os.environ.get('HOME'), s['FS_SCRATCH']):
+    profile = load(a.profile)
+    s = constrain(profile, gpu_partitions(sinfo), qos_table(qos), user_qos(assoc), partition_qos(parts_qos))
+    for d in (os.environ.get('HOME'), profile['IC_SCRATCH']):
         if d:
             print('--- space', d, '\n' + run(['df', '-h', d]))
     if shutil.which('quota'):
         print('--- quota\n' + run(['quota', '-s']))
     with open(a.out, 'w') as f:
-        f.writelines(f'{k}={v}\n' for k, v in s.items())
+        f.write(shell(s))
     print(open(a.out).read(), end='')
-    if not s['FS_SCRATCH']:
-        print('WARNING: no writable scratch found; set FS_SCRATCH in', a.out, 'before downloading models')
+    if not profile['IC_SCRATCH']:
+        print('WARNING: no writable scratch found; set IC_SCRATCH in', a.out, 'before downloading models')
 
 
 if __name__ == '__main__':

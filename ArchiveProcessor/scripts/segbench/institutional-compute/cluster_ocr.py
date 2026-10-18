@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""W41.farmshare-plan. The W41 OCR panel's prompt against a local vLLM server, for FarmShare.
+"""W41.farmshare-plan. The W41 OCR panel's prompt against a local vLLM server, for an institutional computing cluster.
 
-  fs_ocr.py pack  --out /tmp/fs-truthpack            # on the Mac: the 99 frozen truth pages, for scp
-  fs_ocr.py truth --pack DIR --out DIR --label L     # on a GPU node: read, score as the panel does, time it
-  fs_ocr.py news  --newsbench DIR --out DIR --label L
-  fs_ocr.py bulk  --in DIR --out DIR [--shard I/N] [--deadline EPOCH]
+  cluster_ocr.py pack  --out /tmp/fs-truthpack            # on the Mac: the 99 frozen truth pages, for scp
+  cluster_ocr.py truth --pack DIR --out DIR --label L     # on a GPU node: read, score as the panel does, time it
+  cluster_ocr.py news  --newsbench DIR --out DIR --label L
+  cluster_ocr.py bulk  --in DIR --out DIR [--shard I/N] [--deadline EPOCH]
   ... --layout   (any of truth/news/bulk) layout-first instead: DocLayout-YOLO + GLM-OCR per region (news_layout.py)
 
 The server is started by job.sbatch (`vllm serve`, OpenAI-compatible, localhost only). Nothing here calls a paid
 API or the network beyond that server. The prompt, image cap and max_tokens are imported from ocr_panel.py, so a
-FarmShare score is the same measurement as the OpenRouter rows, at FarmShare's precision.
+cluster score uses the same measurement as the OpenRouter rows, at its recorded precision.
 
 Bulk is resumable: a page whose <image name>.txt exists is skipped, every file is written to a temporary name and
 renamed, and every failed read is logged to failed-<shard>.jsonl. A page the server never answered counts as still
@@ -18,7 +18,7 @@ to do, and eight such in a row stop the run with exit 75.
 The loop guard (W41.farmshare-loop-guard; on in bulk, --guard for truth/news): the reply is streamed and stopped
 once it repeats itself (loop_period), a stopped or capped page is read once more with a repetition penalty at the
 panel's full cap, and a page that still fails goes to escalate-<shard>.jsonl with its reason (loop, cap, error).
-A rerun skips escalated pages unless --retry-escalated. `fs_ocr.py guard-check DIR...` replays the detector over
+A rerun skips escalated pages unless --retry-escalated. `cluster_ocr.py guard-check DIR...` replays the detector over
 saved replies, to show it fires on no answered page.
 """
 from __future__ import annotations
@@ -228,7 +228,7 @@ def throughput(results, wall, gpus):
 
 def env_info(layout=False):
     keys = ('SLURM_JOB_ID', 'SLURM_JOB_PARTITION', 'SLURM_JOB_QOS', 'SLURMD_NODENAME', 'CUDA_VISIBLE_DEVICES',
-            'FS_MODEL', 'FS_PRESET', 'FS_VLLM_ARGS')
+            'IC_MODEL', 'IC_PRESET', 'IC_VLLM_ARGS', 'CLUSTER_NAME')
     from importlib import metadata
     try:
         vllm = metadata.version('vllm')
@@ -262,7 +262,7 @@ def cmd_pack(a):
             w.writerow([rows[j['page']][k] for k in STRATA])
     (out / 'pack.json').write_text(json.dumps({'prompt_sha256': hashlib.sha256(P.PROMPT.encode()).hexdigest(),
         'jobs': jobs, 'agreement': sorted(P.AGREEMENT), 'made': time.strftime('%Y-%m-%dT%H:%M:%S')}, indent=1))
-    print(f'{len(jobs)} pages -> {out}  (copy with: scp -r {out} <sunet>@login.farmshare.stanford.edu:)')
+    print(f'{len(jobs)} pages -> {out}  (copy with: scp -r {out} <user>@<cluster-login>:)')
 
 
 def score_pages(pages, replies):
@@ -285,7 +285,7 @@ def write_rows(path, rr):
 def server_from(a, max_tokens):
     """The reader and how it wants a page loaded: the panel's Server takes JPEG bytes, the layout pipeline a
     full-resolution image (it crops regions from the original). load(src) takes a path or the frozen bytes."""
-    model = a.model or os.environ['FS_MODEL']
+    model = a.model or os.environ['IC_MODEL']
     if a.layout:
         import news_layout as NL  # needs setup.sh --layout
         return NL.LayoutReader(NL.build_pipeline(a.url, model)), NL.open_rgb
@@ -357,14 +357,38 @@ def cmd_bulk(a):
     src, out = Path(a.inp).resolve(), Path(a.out).resolve()
     if out == src or src in out.parents or out in src.parents:
         raise SystemExit('--out must be outside --in (the input directory is never written)')
+    cluster = getattr(a, 'cluster', None) or os.environ.get('CLUSTER_NAME', '')
+    if not cluster.strip() or any(ord(c) < 32 for c in cluster):
+        raise SystemExit('bulk requires --cluster NAME or CLUSTER_NAME from the cluster profile')
+    cluster = cluster.strip()
     files = sorted(p for p in src.rglob('*') if p.suffix.lower() in IMAGES and p.is_file())
     i, n = (int(x) for x in a.shard.split('/'))
+    if n < 1 or not 0 <= i < n:
+        raise SystemExit('--shard must be I/N with 0 <= I < N')
     # By a hash of the path, not by position: a file added mid-run cannot shift others out of every shard.
     mine = [p for p in files if int(hashlib.sha1(p.relative_to(src).as_posix().encode()).hexdigest(), 16) % n == i]
     # The image's own name plus .txt (a.jpg -> a.jpg.txt), so a.jpg and a.tif never share an output.
     target = lambda p: out / (p.relative_to(src).as_posix() + '.txt')  # noqa: E731
     escalated = set() if a.retry_escalated else {json.loads(x)['image'] for f in sorted(out.glob('escalate-*.jsonl'))
-                                                  for x in f.read_text().splitlines() if x.strip()}
+                                                  for x in f.read_text().splitlines() if x.strip() and all(json.loads(x).get(k) == v for k, v in
+                                                      {'cluster': cluster, 'model': a.model or os.environ.get('IC_MODEL'),
+                                                       'preset': os.environ.get('IC_PRESET'),
+                                                       'vllm_args': os.environ.get('IC_VLLM_ARGS')}.items())}
+    # Never reuse a transcript under a different cluster label or input digest. Refuse rather than overwrite
+    # a previous run: a new cluster/model/precision needs a separate output directory.
+    for p in mine:
+        if target(p).exists():
+            try:
+                meta = json.loads((out / '_meta' / (p.relative_to(src).as_posix() + '.json')).read_text())
+                valid = (meta.get('cluster') == cluster
+                         and meta.get('sha256') == hashlib.sha256(p.read_bytes()).hexdigest()
+                         and meta.get('model') == (a.model or os.environ.get('IC_MODEL'))
+                         and meta.get('preset') == os.environ.get('IC_PRESET')
+                         and meta.get('vllm_args') == os.environ.get('IC_VLLM_ARGS'))
+            except (OSError, ValueError):
+                valid = False
+            if not valid:
+                raise SystemExit('existing text has incompatible cluster/input/model provenance; use a new --out directory')
     todo = [p for p in mine if not target(p).exists() and p.relative_to(src).as_posix() not in escalated]
     print(f'{len(files)} images, shard {i}/{n}: {len(mine)}, {len(mine) - len(todo)} already done or escalated, '
           f'{len(todo)} to read', flush=True)
@@ -374,8 +398,8 @@ def cmd_bulk(a):
     done = [0]
     # What the Processor's import (W41.app-farmshare-import) records with each page's text: who read it, at which
     # precision (the preset's checkpoint and vLLM arguments), in which Slurm job.
-    run = {'model': getattr(server, 'model', None), 'preset': os.environ.get('FS_PRESET'),
-           'vllm_args': os.environ.get('FS_VLLM_ARGS'), 'job': os.environ.get('SLURM_JOB_ID')}
+    run = {'cluster': cluster, 'model': a.model or os.environ['IC_MODEL'], 'preset': os.environ.get('IC_PRESET'),
+           'vllm_args': os.environ.get('IC_VLLM_ARGS'), 'job': os.environ.get('SLURM_JOB_ID')}
 
     def on_done(key, reply, meta):
         side = out / '_meta' / (key + '.json')
@@ -395,16 +419,16 @@ def cmd_bulk(a):
                                                **meta, 'sha256': digest, **run}).encode())
             else:
                 with (out / f'failed-{i}.jsonl').open('a') as f:
-                    # FS_KEEP_RAW=1 keeps the whole reply (it stays on FarmShare scratch): for replaying a stop rule
+                    # IC_KEEP_RAW=1 keeps the whole reply (it stays on FarmShare scratch): for replaying a stop rule
                     # over real runaways (W41.app-local-models' guards, 2026-10-16). Otherwise 500 characters.
-                    keep = None if os.environ.get('FS_KEEP_RAW') == '1' else 500
-                    f.write(json.dumps({'image': key, **meta, 'raw': (reply or {}).get('raw', '')[:keep]}) + '\n')
+                    keep = None if os.environ.get('IC_KEEP_RAW') == '1' else 500
+                    f.write(json.dumps({'image': key, **run, **meta, 'raw': (reply or {}).get('raw', '')[:keep]}) + '\n')
                 reason = failure_reason(meta)
                 if reason:  # the form W41.app-farmshare-import / W41.app-ocr-cascade read: no transcript text
                     with (out / f'escalate-{i}.jsonl').open('a') as f:
-                        f.write(json.dumps({'image': key, 'reason': reason, 'status': meta['status'],
+                        f.write(json.dumps({'image': key, **run, 'reason': reason, 'status': meta['status'],
                                             'finish': meta.get('finish'), 'attempts': meta.get('attempts', 1),
-                                            'model': getattr(server, 'model', None), 'error': meta.get('error'),
+                                            'model': a.model or os.environ['IC_MODEL'], 'error': meta.get('error'),
                                             't': round(time.time())}) + '\n')
             if done[0] % 100 == 0:
                 print(f'{done[0]}/{len(todo)}', flush=True)
@@ -467,18 +491,18 @@ def main():
     p = sub.add_parser('pack'); p.add_argument('--out', required=True)
     for name in ('truth', 'news', 'bulk'):
         p = sub.add_parser(name)
-        p.add_argument('--url', default=os.environ.get('FS_URL', 'http://127.0.0.1:8000'))
-        p.add_argument('--model', help='served model name (default $FS_MODEL)')
-        p.add_argument('--concurrency', type=int, help='pages in flight (default $FS_CONCURRENCY, else 32; 4 '
+        p.add_argument('--url', default=os.environ.get('IC_URL', 'http://127.0.0.1:8000'))
+        p.add_argument('--model', help='served model name (default $IC_MODEL)')
+        p.add_argument('--concurrency', type=int, help='pages in flight (default $IC_CONCURRENCY, else 32; 4 '
                        'with --layout, whose regions are what fill the server: news_layout.REGION_WORKERS)')
-        p.add_argument('--gpus', type=int, default=int(os.environ.get('FS_GPUS', 1)), help='for pages/hour/GPU')
+        p.add_argument('--gpus', type=int, default=int(os.environ.get('IC_GPUS', 1)), help='for pages/hour/GPU')
         p.add_argument('--thinking-on', action='store_true', help='leave the chat template thinking switch alone')
         p.add_argument('--max-tokens', type=int, help=f'reply cap (bulk: {BULK_MAX_TOKENS} with the guard, else '
                        f'{P.MAX_TOKENS}; news: {NEWS_MAX_TOKENS}; truth: {P.MAX_TOKENS})')
         p.add_argument('--guard', action=argparse.BooleanOptionalAction, default=None,
                        help='stop a looping reply, retry a stopped or capped page once (default: on in bulk only)')
-        p.add_argument('--layout', action='store_true', default=os.environ.get('FS_LAYOUT') == '1',
-                       help='layout-first: DocLayout-YOLO + GLM-OCR per region (default from $FS_LAYOUT=1)')
+        p.add_argument('--layout', action='store_true', default=os.environ.get('IC_LAYOUT') == '1',
+                       help='layout-first: DocLayout-YOLO + GLM-OCR per region (default from $IC_LAYOUT=1)')
         p.add_argument('--out', required=True)
         if name == 'truth':
             p.add_argument('--pack', required=True); p.add_argument('--label', required=True)
@@ -487,6 +511,7 @@ def main():
             p.add_argument('--newsbench', required=True); p.add_argument('--label', required=True)
             p.add_argument('--side', type=int, default=NEWS_SIDE)
         else:
+            p.add_argument('--cluster', default=os.environ.get('CLUSTER_NAME'), help='display name from profile')
             p.add_argument('--in', dest='inp', required=True)
             p.add_argument('--shard', default='0/1'); p.add_argument('--deadline', type=float)
             p.add_argument('--side', type=int)
@@ -496,7 +521,7 @@ def main():
     if a.cmd not in ('pack', 'guard-check') and a.guard is None:
         a.guard = a.cmd == 'bulk' and not a.layout
     if a.cmd not in ('pack', 'guard-check') and a.concurrency is None:
-        a.concurrency = int(os.environ.get('FS_CONCURRENCY') or (4 if a.layout else 32))
+        a.concurrency = int(os.environ.get('IC_CONCURRENCY') or (4 if a.layout else 32))
     {'pack': cmd_pack, 'truth': cmd_truth, 'news': cmd_news, 'bulk': cmd_bulk, 'guard-check': cmd_guard_check}[a.cmd](a)
 
 

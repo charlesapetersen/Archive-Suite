@@ -7,7 +7,7 @@ speed: GLM-OCR is served by vLLM on the same GPU (the library's `api` mode) inst
 page's regions are sent to the server at the same time instead of one after another. vLLM applies the checkpoint's
 own generation defaults, as transformers' generate() did in the measured run.
 
-fs_ocr.py uses LayoutReader in place of its panel Server when a mode is given --layout (the `glm-ocr` preset sets it).
+cluster_ocr.py uses LayoutReader in place of its panel Server when a mode is given --layout (the `glm-ocr` preset sets it).
 LayoutReader.read() returns the Server's (reply, meta) shape, so run_all, scoring, resume and the dead-server stop are
 the same code for both routes. Needs `bash setup.sh --layout` (newspaper-ocr and doclayout-yolo in the venv).
 """
@@ -72,10 +72,10 @@ def build_pipeline(url, model, detector=None, workers=REGION_WORKERS, timeout=RE
 
 
 class LayoutReader:
-    """fs_ocr.Server's interface over the layout pipeline. read(image) -> (reply, meta), where meta['status'] is:
+    """cluster_ocr.Server's interface over the layout pipeline. read(image) -> (reply, meta), where meta['status'] is:
     ok       every region answered (a region the library marked timeout or repetition is kept, as the measured
              run kept it; the counts are in meta['region_status'])
-    error    no region answered: the server is gone, the page is still to do (fs_ocr's dead-server rule counts these)
+    error    no region answered: the server is gone, the page is still to do (cluster_ocr's dead-server rule counts these)
     partial  some regions got no answer: not written as done, so a rerun reads the page again
     empty    no text on the page at all
     failed   the pipeline raised (the message is in meta['error'])"""

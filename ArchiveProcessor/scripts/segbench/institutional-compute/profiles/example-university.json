@@ -1,0 +1,8 @@
+{
+  "name": "Example University Research Computing", "scheduler": "slurm",
+  "slurm": {"partition": "accelerated", "qos": "research", "account": "humanities", "wall_minutes": 720,
+    "max_gpus_per_user": 2, "max_running_jobs": 1, "max_submitted_jobs": 8},
+  "gpu": {"name": "NVIDIA H100 80GB", "gres_type": "h100", "memory_gb": 80, "per_node": 2},
+  "runtime": {"modules": ["python/3.12", "cuda/13.0"], "cuda_mode": "modules", "cuda_home": "/opt/cuda/13.0"},
+  "paths": {"scratch": "/scratch/$USER", "storage": "$HOME/institutional-compute-results"}
+}

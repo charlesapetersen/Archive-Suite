@@ -9,12 +9,12 @@ own year, month and Date Uncertain tags.
     python3 date_tagging.py sample           # documents -> cache sample.jsonl (no model call)
     python3 date_tagging.py run [--limit N]  # each sampled document through the app's prompt (paid, capped)
     python3 date_tagging.py score            # cache answers -> segbench-results/date-tagging.md (numbers only)
-    python3 date_tagging.py export --out DIR # the sampled prompts as requests.jsonl, for FarmShare's fs_text.py
-    python3 date_tagging.py import --answers FILE --label L   # fs_text.py's answers, as the local route reads them
+    python3 date_tagging.py export --out DIR # the sampled prompts as requests.jsonl, for FarmShare's cluster_text.py
+    python3 date_tagging.py import --answers FILE --label L   # cluster_text.py's answers, as the local route reads them
     python3 date_tagging.py score --label L  # an open model's figures, beside Gemini's, in date-tagging.md
     python3 date_tagging.py train-data [--out DIR]   # W41.date-model's train/val sets (no model call)
 
-OPEN MODELS (2026-10-17). The same prompts through FarmShare's vLLM (farmshare/fs_text.py), sent as the app's local
+OPEN MODELS (2026-10-17). The same prompts through FarmShare's vLLM (institutional-compute/cluster_text.py), sent as the app's local
 route sends a text call: one user message, 512 tokens, temperature 0, no reasoning switch; the reply's reasoning
 stripped as LocalModelRoute.strippingReasoning strips it, then parsed as TagGenerator parses it. A label ending
 "-nothink" was sent with thinking switched off, which the app does not do.
@@ -338,7 +338,7 @@ def cmd_export(a):
 
 
 def cmd_import(a):
-    """fs_text.py's answers, stored in Gemini's reply shape so app_parse reads them unchanged."""
+    """cluster_text.py's answers, stored in Gemini's reply shape so app_parse reads them unchanged."""
     d = os.path.join(CACHE, "answers-" + a.label)
     os.makedirs(d, exist_ok=True)
     n = 0
@@ -684,7 +684,7 @@ def write_open_section(j):
     def f(x):
         return f"{100 * x[0] / x[1]:.1f}%" if x[1] else "–"
     L = [OPEN_HEAD.strip(), "",
-         "The same 300 prompts, sent as the app's local route sends a text call (`farmshare/fs_text.py`: one user "
+         "The same 300 prompts, sent as the app's local route sends a text call (`institutional-compute/cluster_text.py`: one user "
          "message, 512 tokens, temperature 0, no reasoning switch, reasoning text stripped), to vLLM on one L40S, "
          "parsed and scored as above. `-nothink` rows were sent with thinking switched off, which the app does not "
          "do (`KNOWN_ISSUES.md`: the local route sends no reasoning switch). No money.", "",

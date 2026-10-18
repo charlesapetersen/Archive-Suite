@@ -12,7 +12,7 @@ W43.seg-corpus-build, which would add it, waits on its own gates.
     python3 public_dates.py build            # -> cache public.jsonl + public-summary.json (no model call)
     python3 public_dates.py train-data       # cache train/public-{train,val}.jsonl, the test kept out
     python3 public_dates.py mix [--public-max N]   # cache train/mixed/: corpus + public rows for train_seg.py
-    python3 public_dates.py export --out DIR # the test prompts as requests.jsonl, for farmshare/fs_text.py
+    python3 public_dates.py export --out DIR # the test prompts as requests.jsonl, for institutional-compute/cluster_text.py
     python3 public_dates.py import --answers FILE --label L
     python3 public_dates.py score --label L  # year, month and day apart -> segbench-results/date-tagging-public.json
 

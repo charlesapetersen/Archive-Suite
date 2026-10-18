@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Text prompts against the FarmShare vLLM server, sent as the app's local route sends a text call
+"""Text prompts against an institutional cluster’s vLLM server, sent as the app's local route sends a text call
 (OpenAICompatibleClient.textCompletion with a local model: one user message, max_tokens, temperature 0, no reasoning
 switch). First used for the dating benchmark (date_tagging.py export / import, 2026-10-17).
 
-  fs_text.py --pack DIR --out DIR --label L [--max-tokens 512] [--thinking-off]
+  cluster_text.py --pack DIR --out DIR --label L [--max-tokens 512] [--thinking-off]
 
 The pack is requests.jsonl, one {"id", "prompt"} a line (date_tagging.py export). Each answer goes to
 answers.jsonl as {"id", "raw", "finish", "usage", "wall_s"}; the reply is kept whole (the app strips reasoning
@@ -37,8 +37,8 @@ def post(url, body, timeout=600):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pack", required=True); ap.add_argument("--out", required=True); ap.add_argument("--label", required=True)
-    ap.add_argument("--url", default=os.environ.get("FS_URL", "http://127.0.0.1:8000"))
-    ap.add_argument("--model", default=os.environ.get("FS_SERVED") or os.environ.get("FS_MODEL"))
+    ap.add_argument("--url", default=os.environ.get("IC_URL", "http://127.0.0.1:8000"))
+    ap.add_argument("--model", default=os.environ.get("IC_SERVED") or os.environ.get("IC_MODEL"))
     ap.add_argument("--max-tokens", type=int, default=512)   # TagGenerator's text call
     ap.add_argument("--thinking-off", action="store_true")
     ap.add_argument("--concurrency", type=int, default=16)
@@ -75,7 +75,7 @@ def main():
     summary = {"label": a.label, "model": a.model, "prompts": len(reqs), "sent": len(todo), "errors": len(errs),
                "first_error": errs[0]["error"] if errs else None, "max_tokens": a.max_tokens,
                "thinking_off": a.thinking_off, "wall_s": round(time.time() - t0, 1),
-               "env": {k: os.environ.get(k) for k in ("SLURM_JOB_ID", "SLURMD_NODENAME", "FS_PRESET", "FS_VLLM_ARGS")}}
+               "env": {k: os.environ.get(k) for k in ("SLURM_JOB_ID", "SLURMD_NODENAME", "IC_PRESET", "IC_VLLM_ARGS", "CLUSTER_NAME")}}
     (out / f"summary-{int(t0)}.json").write_text(json.dumps(summary, indent=1))
     print(json.dumps(summary), flush=True)
     raise SystemExit(1 if errs and len(errs) == len(todo) else 0)

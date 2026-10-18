@@ -12,7 +12,7 @@ The host is `cp1@login.farmshare.stanford.edu`; the local control socket is
 `/Users/cp1/.ssh/cm-farmshare`. Select it explicitly: this Mac has no user SSH config that selects it
 for an ordinary `ssh` or `scp`. Another session opens a separate remote shell through the authenticated
 connection; it does not inherit the owner's terminal's working directory, variables or activated venv.
-Read the kit's `farmshare/README.md` and load the existing job environment explicitly.
+Read the kit's `ArchiveProcessor/scripts/segbench/institutional-compute/README.md` and load the existing job environment explicitly.
 
 Run this bounded, read-only preflight before transferring data or submitting jobs:
 

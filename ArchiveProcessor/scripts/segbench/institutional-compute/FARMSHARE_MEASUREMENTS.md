@@ -1,3 +1,8 @@
+# FarmShare measurements and reproducible run notes
+
+These are the original measured FarmShare runs, retained with neutral kit command names.
+For cluster setup and the current profile interface, start with [README.md](README.md).
+
 # FarmShare: the open-weight candidate and a ready job (W41.farmshare-plan)
 
 Question 4 of the W41 bake-off: could Stanford's FarmShare GPUs read the whole corpus with an open-weight model,
@@ -7,14 +12,14 @@ sections after it are the plan as written before the run, with its estimates.
 
 ## Measured on FarmShare (2026-10-15)
 
-One L40S per run, vLLM 0.31.0, the 99 frozen truth pages from `fs_ocr.py pack`, scored as the panel scores.
+One L40S per run, vLLM 0.31.0, the 99 frozen truth pages from `cluster_ocr.py pack`, scored as the panel scores.
 Results: [`segbench-results/farmshare/`](../../../segbench-results/farmshare/) (`summary.json` and `pages.csv` per
 run, no transcript text).
 
 | run | NES, 96 accuracy pages | answered | NES, 13 clippings | photos an hour per GPU |
 |---|---:|---:|---:|---:|
 | **`qwen3.6-27b`, fp8 KV cache (the default)** | **95.25** | 96/96 | 93.51 | **1,055** |
-| `qwen3.6-27b`, `FS_KV_DTYPE=auto` (bf16 KV cache) | 94.97 | 96/96 | | 903 |
+| `qwen3.6-27b`, `IC_KV_DTYPE=auto` (bf16 KV cache) | 94.97 | 96/96 | | 903 |
 | `qwen3.6-27b-dyn`, fp8 KV cache | 93.17 | 94/96 | 93.60 | 649 |
 | `qwen3.6-35b-a3b`, fp8 KV cache (the speed option) | 94.51 | 96/96 | 94.08 | **3,327** |
 | `qwen3.8-27b`, fp8 KV cache (Qwen3.6 27B's successor) | 93.10 | 96/96 | 94.45 | 1,063 |
@@ -51,7 +56,7 @@ run, no transcript text).
   19 pages at the token cap.
 - **Newspapers, the kit's glm-ocr route** (`news glm-ocr`, below): **0.969**, the reference row's 0.970 reproduced,
   at 1,087 pages an hour, 17 times Qwen whole page for slightly more. This is the newspaper reader to use.
-- **Segmentation** (`seg`, Qwen3.5 27B on the Deaver box, `fs_seg.py` below): 96.5% of pages in the exact document
+- **Segmentation** (`seg`, Qwen3.5 27B on the Deaver box, `cluster_seg.py` below): 96.5% of pages in the exact document
   against OpenRouter's 95.0%; an earlier run the same day through a since-replaced route gave 93.6%, so runs of the
   same model at temperature 0 differ by a few points. `segbench-results/local-models-Deaver.md`.
 
@@ -61,9 +66,9 @@ names, so it fetched nothing; and FlashInfer compiles attention kernels at start
 nodes lack. FarmShare's `cuda/12.9.0` module is the wrong one, since vLLM's torch is built for CUDA 13, so the job
 uses the CUDA 13 toolkit in the venv (`setup.sh` pins its compiler to torch's version; `job.sbatch` sets
 `CUDA_HOME` and the link paths). Later the same day: vLLM took one image a prompt, too few for a seven-page
-segmentation window (`FS_MM_IMAGES`); newspaper-ocr's recognizer left Qwen's thinking on, so every
-region came back with working notes (`fs_news_layout.py` turns it off); DocLayout-YOLO ran its detector on the
-job's GPU beside vLLM at 92%, which ran out of memory partway and left most regions blank (`FS_GPU_UTIL`, 0.80 for
+segmentation window (`IC_MM_IMAGES`); newspaper-ocr's recognizer left Qwen's thinking on, so every
+region came back with working notes (`cluster_news_layout.py` turns it off); DocLayout-YOLO ran its detector on the
+job's GPU beside vLLM at 92%, which ran out of memory partway and left most regions blank (`IC_GPU_UTIL`, 0.80 for
 `news-layout`, and the job now prints vLLM's failed requests and fails when its engine dies); and paddlepaddle
 3.3.1 cannot run PP-DocLayout on the CPU (pinned to 3.2).
 
@@ -176,12 +181,12 @@ GLM-OCR 0.937. Two things differ from the measured run, and both are about speed
 - **GLM-OCR is served by vLLM** on the same GPU (the library's `api` mode), instead of loaded into transformers.
   NewsBench's notes give about 90 s a page that way on an L40S. vLLM applies the checkpoint's own generation
   defaults, as `generate()` did, and the preset turns on the MTP speculative decoding the vLLM recipe for GLM-OCR
-  gives (`FS_GLM_MTP=0` turns it off if it will not start).
+  gives (`IC_GLM_MTP=0` turns it off if it will not start).
 - **A page's regions go to the server at once** (about 67 a page on NewsBench), through the library's
   `recognize_regions` hook, up to 48 in flight; 4 pages are in flight, and detection takes one page at a time.
   Each region still goes through the library's own retries, code-fence strip and repetition check.
 
-The preset sets `FS_LAYOUT=1`, so every mode reads layout-first: `news` scores it on NewsBench as above,
+The preset sets `IC_LAYOUT=1`, so every mode reads layout-first: `news` scores it on NewsBench as above,
 `bulk` reads a tree of newspaper page images at full resolution (the same resume, shards, deadline and dead-server
 rules; a page where some regions got no answer is logged as `partial` and read again by the next run), and `truth`
 works too, which gives a clippings figure beside the whole-page one. Pages an hour come out of `summary.json` as
@@ -210,17 +215,17 @@ at twice the token limit. The OpenRouter run scored 95.0% of pages in the exact 
 merges), so the FarmShare row says what FarmShare's build and vLLM give against that, and how many pages an hour.
 
 A window's request needs the bench's `sips` thumbnails and its OCR text, neither of which is on the node, so
-`fs_seg.py` works in three steps:
+`cluster_seg.py` works in three steps:
 
 ```bash
 # on the Mac, in ArchiveProcessor/scripts/segbench (the bench's Python: numpy, Pillow)
-python farmshare/fs_seg.py pack --out /tmp/fs-segpack      # 51 windows, 149 page images, 34 MB
+python institutional-compute/cluster_seg.py pack --out /tmp/fs-segpack      # 51 windows, 149 page images, 34 MB
 scp -r /tmp/fs-segpack <sunet>@login.farmshare.stanford.edu:
 # on FarmShare, in this folder
 bash download.sh qwen3.5-27b                              # ~31 GB
 bash submit.sh seg qwen3.5-27b --pack ~/fs-segpack        # vLLM with 7 images a prompt, 20,480 tokens
-# back on the Mac: copy $FS_ROOT/runs/seg/qwen3.5-27b/ here, then
-python farmshare/fs_seg.py import --run qwen3.5-27b
+# back on the Mac: copy $IC_ROOT/runs/seg/qwen3.5-27b/ here, then
+python institutional-compute/cluster_seg.py import --run qwen3.5-27b
 python method_openrouter.py report Deaver                 # the FarmShare row beside the OpenRouter one
 ```
 
@@ -262,26 +267,26 @@ QOS, GPUs, `--time`, and the number of bulk shards.
 
 ## Running it (W41.farmshare-run, the owner)
 
-1. **On the Mac:** `python3 fs_ocr.py pack --out /tmp/fs-truthpack`, run from this folder. It needs Pillow. The
+1. **On the Mac:** `python3 cluster_ocr.py pack --out /tmp/fs-truthpack`, run from this folder. It needs Pillow. The
    pack holds the 99 frozen truth images, byte-identical to what OpenRouter received, plus their truth text and
    the non-identifying strata. It is 74 MB.
 2. `ssh <sunet>@login.farmshare.stanford.edu` (two-step), then
    `git clone https://github.com/charlesapetersen/Archive-Suite.git`, then
    `scp -r /tmp/fs-truthpack <sunet>@login.farmshare.stanford.edu:`.
-3. In `Archive-Suite/ArchiveProcessor/scripts/segbench/farmshare/`:
+3. In `Archive-Suite/ArchiveProcessor/scripts/segbench/institutional-compute/`:
    ```bash
    bash setup.sh                         # limits.env + venv (vLLM, scorer deps) on scratch
    bash download.sh qwen3.6-27b          # ~31 GB into $HF_HOME on scratch
    bash submit.sh truth qwen3.6-27b --pack ~/fs-truthpack
    bash submit.sh news  qwen3.6-27b      # clones NewsBench at the lab's commit, on the login node
    ```
-   Watch the job with `squeue -u $USER`. Its log is in `$FS_ROOT/logs/`.
-4. **Bring back** `$FS_ROOT/runs/{truth,news}/<label>/summary.json` and `pages.csv`. Those two hold scores,
+   Watch the job with `squeue -u $USER`. Its log is in `$IC_ROOT/logs/`.
+4. **Bring back** `$IC_ROOT/runs/{truth,news}/<label>/summary.json` and `pages.csv`. Those two hold scores,
    token counts and timings, and no transcript text. `summary.json` → `throughput.pages_per_hour_per_gpu` is the
    measured figure that replaces the estimate. Its `env` records the vLLM version, the node and the GPU.
 5. **If the FP8 checkpoint will not load on Ada** (an error about block-quantised fp8 kernels), use the
    `qwen3.6-27b-dyn` preset. It loads bf16 weights (56 GB) and quantises them to fp8 at load time. If vLLM will
-   not use an fp8 KV cache with Qwen3.5/3.6's hybrid attention, run with `FS_KV_DTYPE=auto`. Neither was needed on
+   not use an fp8 KV cache with Qwen3.5/3.6's hybrid attention, run with `IC_KV_DTYPE=auto`. Neither was needed on
    2026-10-15: the FP8 checkpoint loaded (weight-only fp8 through Marlin, since Ada has no block-fp8 kernels), and
    both measured slower than the default. A start-up failure that names `nvcc`, `libcudart.so.12`, "headers are
    incompatible" or "Unsupported .version" is the CUDA toolkit, not these; see the paragraph above the plan.
@@ -313,7 +318,7 @@ QOS, GPUs, `--time`, and the number of bulk shards.
   instead of the 7 to 29 minutes a runaway held in the first bulk run. The cap is 6,144 tokens (answered pages there:
   median 408, longest 5,766). A stopped or capped page is read once more at 8,192 with `repetition_penalty` 1.05,
   still at temperature 0; its `_meta` records `attempts`, the first attempt and the retry's settings.
-  `fs_ocr.py guard-check DIR...` replays the detector over saved replies (a truth run's `replies/`, the panel cache)
+  `cluster_ocr.py guard-check DIR...` replays the detector over saved replies (a truth run's `replies/`, the panel cache)
   and exits 1 if it would have stopped an answered page: on the 2,803 cached answered replies and 99 truths it fires
   on none, and it catches 71 of the 72 runaways. On FarmShare's own replies (2026-10-16) it fired on none of 525
   answered truth and newspaper replies or the 1,987 answered pages of the 2,000-page bulk pilot, and caught 7 of the 8
@@ -343,13 +348,13 @@ C=~/Library/Caches/ArchiveSuiteRehearsal/corpus-pairs
 scp "$HOME/Library/Application Support/ArchiveSuiteRehearsal/label-clean/clean-all/answers.jsonl" \
     $C/labels.jsonl $C/windows.jsonl <sunet>@login.farmshare.stanford.edu:fs-train-in/
 # on FarmShare, in this folder (git pull first)
-sbatch --partition=normal --cpus-per-task=4 --mem=16G --time=90 --output=$FS_ROOT/logs/setup-train-%j.out setup-train.sh
-V=$FS_ROOT/train-venv/bin/python; I=~/fs-train-in
+sbatch --partition=normal --cpus-per-task=4 --mem=16G --time=90 --output=$IC_ROOT/logs/setup-train-%j.out setup-train.sh
+V=$IC_ROOT/train-venv/bin/python; I=~/fs-train-in
 $V train_seg.py data --pack <pack> --answers $I/answers.jsonl --labels $I/labels.jsonl --windows $I/windows.jsonl \
-   --out $FS_ROOT/train/data-agree --rule agree        # 5,885 windows; --rule start-trust gives 11,094
+   --out $IC_ROOT/train/data-agree --rule agree        # 5,885 windows; --rule start-trust gives 11,094
 for m in 4B 2B; do sbatch --partition=gpu --qos=gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=480 \
-   --job-name=seg-train --output=$FS_ROOT/logs/%x-%j.out \
-   --export=ALL,TRAIN_DATA=$FS_ROOT/train/data-agree,TRAIN_MODEL=Qwen/Qwen3.5-$m,TRAIN_OUT=$FS_ROOT/train/seg-${m,,} \
+   --job-name=seg-train --output=$IC_ROOT/logs/%x-%j.out \
+   --export=ALL,TRAIN_DATA=$IC_ROOT/train/data-agree,TRAIN_MODEL=Qwen/Qwen3.5-$m,TRAIN_OUT=$IC_ROOT/train/seg-${m,,} \
    train.sbatch; done
 ```
 
@@ -363,27 +368,27 @@ for m in 4B 2B; do sbatch --partition=gpu --qos=gpu --gres=gpu:1 --cpus-per-task
 - **Scoring a student.** Serve the merged model by name and run the same windows the baselines ran:
   ```bash
   python3 ../corpus_pairs.py subpack --pack <pack> --windows $I/windows.jsonl --key fs-seg-4b --out ~/fs-hold-4b
-  FS_STUDENT=$FS_ROOT/train/seg-4b/merged FS_STUDENT_NAME=seg-4b FS_SEG_KEY=fs-seg-4b \
+  IC_STUDENT=$IC_ROOT/train/seg-4b/merged IC_STUDENT_NAME=seg-4b IC_SEG_KEY=fs-seg-4b \
     bash submit.sh seg seg-student --pack ~/fs-hold-4b                     # the held-out collections
-  # the development boxes: on the Mac, FS_SEG_KEY=fs-seg-4b python farmshare/fs_seg.py pack --out /tmp/fs-dev-4b \
+  # the development boxes: on the Mac, IC_SEG_KEY=fs-seg-4b python institutional-compute/cluster_seg.py pack --out /tmp/fs-dev-4b \
   #   --box Dean --box Deaver --box Herrnstein; scp it up and submit it the same way
   ```
   Bring back `runs/seg/<label>/answers.jsonl`; on the Mac `corpus_pairs.py score --run <dir>` scores the held-out
-  gaps and `fs_seg.py import` plus `method_openrouter.py report <box>` the development boxes, beside the untrained
+  gaps and `cluster_seg.py import` plus `method_openrouter.py report <box>` the development boxes, beside the untrained
   baselines (4B: Dean 67.9%, Deaver 56.0%, Herrnstein 76.2%, held-out agreed gaps 75.5%). The locked test boxes are
-  scored once, at the end, as `options.md` does; `fs_seg.py pack --final` refuses every key but the frozen teacher
+  scored once, at the end, as `options.md` does; `cluster_seg.py pack --final` refuses every key but the frozen teacher
   today, so letting a chosen student through is still to write.
 
 ## General models on the layout regions (`news-layout`)
 
 The comparison beside the `glm-ocr` route above: any model vLLM serves, reading newspaper-ocr's regions through the
-library's OpenAI-compatible recognizer, as NewsBench's `*-paddlex` rows were made (`fs_news_layout.py`, its own venv
+library's OpenAI-compatible recognizer, as NewsBench's `*-paddlex` rows were made (`cluster_news_layout.py`, its own venv
 from `setup-layout.sh`, paddlepaddle pinned to 3.2 because 3.3.1 fails PP-DocLayout on the CPU).
 
 ```bash
 bash setup-layout.sh                                   # once: newspaper-ocr's venv, and the detectors' weights
-FS_DETECTORS=doclayout_yolo FS_LAYOUT_WORKERS=19 bash submit.sh news-layout qwen3.6-27b
-cd $FS_ROOT/newsbench && python score.py               # every <label>-<detector> folder beside the references
+IC_DETECTORS=doclayout_yolo IC_LAYOUT_WORKERS=19 bash submit.sh news-layout qwen3.6-27b
+cd $IC_ROOT/newsbench && python score.py               # every <label>-<detector> folder beside the references
 ```
 
 It turns Qwen's thinking off, serves vLLM at 80% of the card for the detector beside it, and prints vLLM's failed
@@ -394,15 +399,15 @@ requests, because the library leaves a failed region blank. Per detector it writ
 
 | file | what |
 |---|---|
-| `fs_seg.py` | segmentation: `pack` (Mac), `run` (node), `import` (Mac), the seg-large request against the local server |
-| `fs_ocr.py` | `pack` (Mac), `truth`, `news`, `bulk`, `guard-check`. Imports the panel's `PROMPT`, image cap and `max_tokens`, so a FarmShare row is the panel's measurement at FarmShare's precision. `--layout` reads with `news_layout.py` instead |
+| `cluster_seg.py` | segmentation: `pack` (Mac), `run` (node), `import` (Mac), the seg-large request against the local server |
+| `cluster_ocr.py` | `pack` (Mac), `truth`, `news`, `bulk`, `guard-check`. Imports the panel's `PROMPT`, image cap and `max_tokens`, so a FarmShare row is the panel's measurement at FarmShare's precision. `--layout` reads with `news_layout.py` instead |
 | `news_layout.py` | the layout-first reader: `newspaper-ocr`'s DocLayout-YOLO + GLM-OCR pipeline against the local vLLM server |
 | `limits.py` | reads the cluster's limits and writes `limits.env` |
 | `models.sh` | presets: Hugging Face repo, GPUs, download size, vLLM flags |
 | `setup.sh`, `download.sh`, `submit.sh`, `job.sbatch` | environment, weights, fitted submission, and the GPU job that serves vLLM on localhost and runs one mode (`truth`, `news`, `news-layout`, `seg`, `bulk`) |
-| `fs_news_layout.py`, `setup-layout.sh` | `news-layout`: newspaper-ocr's regions read by a general served model, for comparison with `news_layout.py`; its own venv |
+| `cluster_news_layout.py`, `setup-layout.sh` | `news-layout`: newspaper-ocr's regions read by a general served model, for comparison with `news_layout.py`; its own venv |
 | `bulk_summary.py` | a bulk run's summary for the repo, by page and by the model's kind label, with no transcript text |
-| `app_loop_rule.py` | the app's local-route loop check (`LocalModelRoute.isRepetitionLoop`) ported line for line, replayed over saved replies (`segbench-results/local-route-guards.md`); `--self-test` runs the Swift driver's cases. `FS_KEEP_RAW=1` makes a bulk run keep a failed page's whole reply on scratch for it |
+| `app_loop_rule.py` | the app's local-route loop check (`LocalModelRoute.isRepetitionLoop`) ported line for line, replayed over saved replies (`segbench-results/local-route-guards.md`); `--self-test` runs the Swift driver's cases. `IC_KEEP_RAW=1` makes a bulk run keep a failed page's whole reply on scratch for it |
 | `train_seg.py`, `train.sbatch`, `setup-train.sh` | W41.seg-finetune: the training set from the cleaned windows, a LoRA run of a small Qwen3.5 on one L40S (loss on the reply's tokens only), the merge vLLM serves (`models.sh seg-student`); its own venv |
 | `estimate.py` | the estimate table above |
-| `test_farmshare.py` | 30 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring, the loop guard against a server that loops: stop, retry, escalation, guard-check), segmentation's windows (the request, the retry, failed and refused windows, resume), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |
+| `test_institutional_compute.py` | 30 offline tests: Slurm parsing, presets, the driver against a fake vLLM server (resume, shards, deadline, dead server, unreadable images, truth scoring, the loop guard against a server that loops: stop, retry, escalation, guard-check), segmentation's windows (the request, the retry, failed and refused windows, resume), and the layout route with the real library against a fake GLM-OCR server and detector (skipped where `newspaper-ocr` is not installed) |

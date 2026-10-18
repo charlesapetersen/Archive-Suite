@@ -361,7 +361,7 @@ Changes, made in corpus-build:
 7. **Strata.** `aggregate()` (line 68) is already generic. Add `stratum` to `group_values()` (line 78).
 8. **The tests decide.** S0's NES must not change under the new scorer, apart from explicit, listed folds. Every
    route uses this one `score()` (`ocr_cloud_report.py`, `ocr_cloud_full_report.py`, `ocr_mac_local.py`,
-   `farmshare/fs_ocr.py:269`, `ocr_pages_export.py:106,128`), so a change rescores everything. Corpus-build rescores
+   `institutional-compute/cluster_ocr.py:269`, `ocr_pages_export.py:106,128`), so a change rescores everything. Corpus-build rescores
    the 96 once with old and new scorers, and writes the differences into the commit.
 
 **Reporting by stratum.**

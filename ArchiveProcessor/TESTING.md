@@ -320,8 +320,12 @@ existing scratch, key-free, no-network execution remains unchanged.
   their bytes (two boxes' `001.jpg`, a renamed copy), hashless, invalid-hash, unnamed-cluster and escalated pages matching nothing, a matched page
   spending only the text-only classification call (no image, no rotation call), an unmatched one read by the run's
   model, the gateway ignoring the import, the `ImportedReading` record and precision label, both institutions' PDF headers, separator/newline sanitizing, replaced-reader metadata rejected, the
-  persisted result and the resume snapshot. `INSTITUTIONAL_COMPUTE_IMPORT_ARTIFACTS=/tmp/<scratch>` saves a rendered
+  persisted result and the resume snapshot, plus the Reader’s real parser stripping the full long header. `INSTITUTIONAL_COMPUTE_IMPORT_ARTIFACTS=/tmp/<scratch>` saves a rendered
   PDF-header PNG to inspect. No API key, network, corpus, or spend; not in the health gate.
+- **`scripts/segbench/institutional-compute/test_institutional_compute.py`** — offline synthetic-image/fake-server
+  tests for bulk/resume provenance, layout reading, segmentation, cluster profiles, memory-based presets and
+  Slurm submission. Run `python3 -m unittest test_institutional_compute` from the kit with its requirements
+  installed. Both profiles dry-run without setup, Slurm or downloads, including paths containing spaces.
 - **`test-ocr-cascade.sh`** — W41.app-ocr-cascade: the cheap-first cascade through the real `performOCRCall` over an
   injected transport (`OCRCASCADE_TEST`): which failures escalate (cut off, unparsable, 500) and which never spend a
   second call (key errors, rate limits, overload, timeouts, transport, success), the `secondReader` record, cost and
