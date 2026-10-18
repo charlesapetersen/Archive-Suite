@@ -12,6 +12,28 @@ def pool(spec):
 
 
 class Draw(unittest.TestCase):
+    def test_freeze_extends_but_refuses_changed_or_missing_old_page(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        import common as C
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            a = {f: '' for f in S.MANIFEST_FIELDS}
+            a.update(source='a', page_id='1', stratum='L5', publish_image=True)
+            b = {**a, 'source': 'b', 'stratum': 'N2'}
+            with mock.patch.multiple(S, RESULTS=root / 'results', DRAW=root / 'draw.jsonl', DROPS=root / 'drops.jsonl'):
+                C.write_jsonl(S.DRAW, [a]); S.cmd_freeze()
+                original = (S.RESULTS / 'manifest.jsonl').read_bytes()
+                C.write_jsonl(S.DRAW, [a, b]); S.cmd_freeze()
+                extended = (S.RESULTS / 'manifest.jsonl').read_bytes()
+                self.assertTrue(extended.startswith(original))
+                for changed in ([b], [{**a, 'truth_sha256': 'different'}, b]):
+                    C.write_jsonl(S.DRAW, changed)
+                    with self.assertRaises(SystemExit):
+                        S.cmd_freeze()
+                    self.assertEqual((S.RESULTS / 'manifest.jsonl').read_bytes(), extended)
+
     def test_order_is_seeded_and_input_order_free(self):
         rows = pool({'a': 30, 'b': 30})
         self.assertEqual(S.order(rows, 'L1'), S.order(list(reversed(rows)), 'L1'))

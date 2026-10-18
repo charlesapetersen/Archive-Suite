@@ -37,7 +37,7 @@ SEED = 'W43.corpus-build/2026-10-16'
 TARGET = {**{f'L{i}': 80 for i in range(1, 10)}, **{f'N{i}': 40 for i in range(1, 7)}}
 SOURCES = ['read2017', 'kurrent', 'eparchos', 'biblia', 'muharaf', 'sbb',
            'tapus', 'ocrd', 'iforal', 'newsbench',
-           'koenigsfelden', 'castilian', 'voc', 'bentham', 'btp', 'peter', 'omnidoc', 'devanagari']
+           'koenigsfelden', 'castilian', 'voc', 'bentham', 'btp', 'peter', 'omnidoc', 'devanagari', 'si']
 RESULTS = Path(__file__).resolve().parents[3] / 'segbench-results' / 'bench-corpus'
 CANDIDATES = C.CACHE / 'candidates.jsonl'
 DRAW = C.CACHE / 'sample' / 'draw.jsonl'
@@ -240,9 +240,16 @@ def cmd_freeze():
     RESULTS.mkdir(parents=True, exist_ok=True)
     # The owner's 2026-10-16 decision: scores only, no third-party page images on the published bench,
     # whatever the licence. `licence_permits_images` keeps what the licence alone would allow.
-    C.write_jsonl(RESULTS / 'manifest.jsonl',
-                  [{**{f: r[f] for f in MANIFEST_FIELDS if f != 'publish_image'},
-                    'licence_permits_images': r['publish_image'], 'publish_image': False} for r in rows])
+    frozen = [{**{f: r[f] for f in MANIFEST_FIELDS if f != 'publish_image'},
+               'licence_permits_images': r['publish_image'], 'publish_image': False} for r in rows]
+    dest = RESULTS / 'manifest.jsonl'
+    if dest.exists():
+        by_key = {r['source'] + ':' + r['page_id']: r for r in frozen}
+        for old in C.read_jsonl(dest):
+            k = old['source'] + ':' + old['page_id']
+            if by_key.get(k) != old:
+                raise SystemExit(f'{k}: already frozen; refusing to change or remove it')
+    C.write_jsonl(dest, frozen)
     C.write_jsonl(RESULTS / 'drops.jsonl', [{'key': k, 'reason': v} for k, v in sorted(drops().items())])
     print(f'{len(rows)} pages frozen in {RESULTS / "manifest.jsonl"}')
 

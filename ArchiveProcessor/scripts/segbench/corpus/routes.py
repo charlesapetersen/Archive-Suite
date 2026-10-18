@@ -35,9 +35,11 @@ import common as C          # noqa: E402
 import ocr_cloud as OC       # noqa: E402
 import ocr_panel as P        # noqa: E402
 
-RUN = C.CACHE / 'routes'
+RUN = Path(os.environ.get('BENCH_CORPUS_RUN', C.CACHE / 'routes'))
 RESULTS = HERE.parents[2] / 'segbench-results' / 'bench-corpus'
-MANIFEST = RESULTS / 'manifest.jsonl'
+# Preserve the 440-page paid run as the corpus grows. A future sweep supplies both an
+# independent run folder and the extended manifest; never reuse its ledger for new inputs.
+MANIFEST = Path(os.environ.get('BENCH_CORPUS_MANIFEST', RESULTS / 'manifest-reference-440.jsonl'))
 INDEX = C.FROZEN / 'index.jsonl'
 ROUTES = {k: OC.MODELS[k] for k in ('gemini3.8-flash', 'qwen3-vl-235b')}
 # Of the $5.10. The 30-page probe (2026-10-17) measured $0.00334 a page for Gemini and $0.00217 for Qwen: about
