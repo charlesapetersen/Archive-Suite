@@ -34,14 +34,17 @@ RUN = C.CACHE / 'specialists'
 KRAKEN = Path(os.environ.get('KRAKEN_BIN', Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/kraken-venv/bin/kraken'))
 MODELS_DIR = Path.home() / 'Library/Application Support/htrmopo'
 RTL = {'Arab', 'Hebr'}
+# The Mac-local cache ocr_mac_local.py uses (the Vision OCR lab's is at its limit).
+os.environ.setdefault('HF_HOME', str(Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/mlx-hf'))
 BATCH = 10   # pages per kraken call: one model load per batch, and an interruption loses at most a batch
 WORKERS = int(os.environ.get('SPECIALISTS_WORKERS', '4'))
 
 # DOI -> the file `kraken get` puts under MODELS_DIR/<uuid>/. `contaminated` names the test sources a model's
 # own record lists among its training data (2026-10-17, from the Zenodo records and their linked lists): TRIDIS
-# v2 names the Königsfelden Abbey corpus; the Mannheim German models' training sets include READ's
-# Konzilsprotokolle and Bozen, which READ 2017 was drawn from (`?`: not checked page by page); McCATMuS and the
-# Greek minuscule model name no source list that could be checked (`unknown`); '' = none of ours in a full list.
+# v2 names the Königsfelden Abbey corpus. The Mannheim German models list READ's Konzilsprotokolle and Bozen,
+# but every READ 2017 page here is an Alfred Escher letter (src_read2017.py), and the Kurrent set (2025) postdates
+# them. McCATMuS, the Greek minuscule model and TrOCR Kurrent ("many other smaller collections") give no list
+# that could be checked (`unknown`); '' = none of ours in a full list.
 # BiblIA's model is trained on BiblIA itself and is scored only as a labelled upper bound.
 MODELS = {
     'catmus-medieval': {'doi': '10.5281/zenodo.12743230', 'file': 'catmus-medieval.mlmodel',
@@ -51,17 +54,21 @@ MODELS = {
     'mccatmus': {'doi': '10.5281/zenodo.13788177', 'file': 'McCATMuS_nfd_nofix_V1.mlmodel',
                  'strata': ['L5', 'L6'], 'licence': 'CC-BY-4.0', 'contaminated': 'unknown'},
     'german-handwriting': {'doi': '10.5281/zenodo.7933463', 'file': 'german_handwriting.mlmodel',
-                           'strata': ['L6'], 'licence': 'CC-BY-SA-4.0', 'contaminated': 'read2017?'},
+                           'strata': ['L6'], 'licence': 'CC-BY-SA-4.0', 'contaminated': ''},
     'kurrent-v3': {'doi': '10.5281/zenodo.21747522', 'file': 'german_handwriting_kurrent_v3.mlmodel',
-                   'strata': ['L6'], 'licence': 'CC-BY-4.0', 'contaminated': 'read2017?'},
+                   'strata': ['L6'], 'licence': 'CC-BY-4.0', 'contaminated': ''},
+    # A line model on the same kraken lines, read by trocr_lines.py (transformers, MPS); 0.3B.
+    'trocr-kurrent': {'hf': 'dh-unibe/trocr-kurrent', 'strata': ['L6'], 'licence': 'MIT', 'contaminated': 'unknown'},
     'greek-minuscule': {'doi': '10.5281/zenodo.15838142', 'file': 'greek_minuscule_s9-12_NFC.mlmodel',
                         'strata': ['N3'], 'licence': 'CC-BY-SA-4.0', 'contaminated': 'unknown'},
     'biblia': {'doi': '10.5281/zenodo.5468286', 'file': 'BiblIA_01.mlmodel',
-               'strata': ['N4'], 'licence': 'CC-BY-SA-4.0', 'contaminated': 'biblia'},
+               'strata': ['N4'], 'licence': 'CC-BY-SA-4.0', 'contaminated': 'biblia', 'visual_rtl': True},
 }
 
 
 def model_path(key):
+    if 'hf' in MODELS[key]:
+        return MODELS[key]['hf']    # trocr_lines.py loads it by id, from HF_HOME's cache once fetched
     name = MODELS[key]['file']
     found = sorted(MODELS_DIR.glob('*/' + name))
     if not found:
@@ -116,8 +123,13 @@ def collect(keys):
             raise SystemExit(f'{k}: {len(missing)} pages not segmented (run segment)')
         todo = [r for r in rows if not text_path(k, r).exists()]
         text_path(k, rows[0]).parent.mkdir(parents=True, exist_ok=True)
-        for b in batches(todo):
-            kraken(['-f', 'page'], [(seg_path(r), text_path(k, r)) for r in b], 'ocr', '-m', str(m))
+        if 'hf' in MODELS[k]:
+            jobs = RUN / f'{k}-jobs.tsv'
+            jobs.write_text(''.join(f'{seg_path(r)}\t{text_path(k, r)}\n' for r in todo))
+            subprocess.run([str(KRAKEN.with_name('python')), str(HERE / 'trocr_lines.py'), m, str(jobs)], check=True)
+        else:
+            for b in batches(todo):
+                kraken(['-f', 'page'], [(seg_path(r), text_path(k, r)) for r in b], 'ocr', '-m', str(m))
         print(f'{k}: {len(todo)} pages read')
 
 
@@ -132,7 +144,10 @@ def report():
             f = text_path(k, r)
             if not f.exists():
                 continue
-            s = S.score(Path(r['truth']).read_text(), f.read_text(), r['stratum'])
+            text = f.read_text()
+            if spec.get('visual_rtl'):
+                text = logical(text)
+            s = S.score(Path(r['truth']).read_text(), text, r['stratum'])
             out.append({'route': k, 'page': R.job_id(r), 'stratum': r['stratum'], 'source': r['source'],
                         'script': r['script'], 'ok': bool(f.read_text().strip()), **s})
     rows, by = [], collections.defaultdict(list)
@@ -159,6 +174,14 @@ def report():
     for r in rows:
         print(f"{r['route']:20s} {r['stratum']} n={r['n']:3d} NES {100 * r['nes']:.1f} "
               f"vs Gemini {_pts(r['vs_gemini'])} vs Qwen {_pts(r['vs_qwen'])} {r['contaminated']}")
+
+
+def logical(text):
+    """A line written in visual order (BiblIA's 2021 model: kraken's --reorder and --base-dir change nothing on a
+    PAGE input) to logical order, reversed by grapheme cluster so a vowel point stays on its letter. Pure Hebrew
+    lines only, which is all N4's main text is; a digit run would come out reversed."""
+    import regex
+    return '\n'.join(''.join(reversed(regex.findall(r'\X', line))) for line in text.split('\n'))
 
 
 def _pts(x):

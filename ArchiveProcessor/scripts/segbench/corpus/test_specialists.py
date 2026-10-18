@@ -47,6 +47,10 @@ class Specialists(unittest.TestCase):
             SP.collect(['catmus-medieval'])
         self.assertIn('not segmented', str(e.exception))
 
+    def test_visual_order_reverses_by_grapheme(self):
+        # The point (U+05B4) stays after the letter it was stored after.
+        self.assertEqual(SP.logical('ןירסח\nםִכ'), 'חסרין\nכםִ')
+
     def test_report_pairs_against_the_general_routes(self):
         [a, b] = SP.pages(['L7'])
         for r, text in ((a, 'in nomine domini amen'), (b, '')):
