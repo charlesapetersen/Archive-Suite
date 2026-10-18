@@ -17,9 +17,14 @@ answered 9 of 71); Ollama's OpenAI endpoint is believed to take neither name, so
 request and likely loops the same way. A capped page that was simply long (a newspaper read whole: 18 of 32 broadsheets
 need more than 4,096 tokens, and Settings says so) pays that second full reading too before it fails. The streamed rule
 also sees each reply's beginnings, which the 4,539-reply FarmShare check (on finished replies) did not cover: a page
-with 2,000+ characters of one exact repeat that later recovers now fails (and is read again), where before it passed. A model whose **reasoning is on** (a Qwen3.6 template that thinks by default) spends that
-budget thinking; the route strips `<think>` text but sends no switch to turn reasoning off, because the servers spell
-it differently. A slow Mac running a big pick may reach the 600 s timeout (now the session's whole-request limit, since a streamed
+with 2,000+ characters of one exact repeat that later recovers now fails (and is read again), where before it passed. Since W41.app-local-models-fu2 every local call turns **reasoning off** under three spellings at once
+(`enable_thinking`, `chat_template_kwargs.enable_thinking`, `think`); only mlx-vlm 0.7.4 was checked live (a
+thinking-on server answered the tagging call with the switch and spent all 512 tokens thinking without it,
+`segbench-results/local-route-guards.md`). Whether **Ollama's** OpenAI endpoint reads `think`, and whether **LM Studio**
+reads either template spelling, is unchecked; a server that ignores all three still thinks, and a local text call
+whose reply holds no answer (cut, empty, or ending in `<think>`) now fails, so the tagger writes Date Uncertain and no
+year, as before, but never tags read from reasoning. A cut reply fails even when its first line was a usable
+classification. Text calls have no escalation model: their failure is final. A slow Mac running a big pick may reach the 600 s timeout (now the session's whole-request limit, since a streamed
 request's own timeout only covers the wait between pieces) before the cap; that fails as `length` too, after up to ten
 minutes, and is not read again. The loop check needs 2,000+ characters of one 4-400-character span with three or more visible characters, so a blank form of more than about 55 identical rows is failed as a loop, and a repeated paragraph over 400 characters, or a loop with a counter in it, is left to the cap. A local server that **requires a key** gets only the stand-in `local` (a saved gateway key is never sent to it). Pages are sent at the app's 2,048 px cap, where the bench used 2,400 px (its half-resolution ladder
 stayed within about two points). **Live Capture** does not go through `schedulingWorkerCount`, so it can have up to

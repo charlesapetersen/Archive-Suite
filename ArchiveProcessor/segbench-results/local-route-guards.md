@@ -48,3 +48,21 @@ URLSession cancel does (not the app itself): a reply that would run to the cap w
 the server logged the generation cancelled at 465 tokens 53 ms later, and the next request answered in 0.3 s (0.2 s
 before). The same reply left to run held the server 158 s (4,096 tokens at 26 tokens a second). So a stopped stream
 frees the server at once, and the next page starts without waiting. LM Studio and Ollama were not checked.
+
+## Reasoning switched off, on the Mac (W41.app-local-models-fu2, 2026-10-17)
+`mlx_vlm.server` 0.7.4 serving `lmstudio-community/Qwen3.5-4B-MLX-4bit` (a thinking model), a Python client sending
+the route's request shapes: the tagging-shaped call (one message, 512 tokens, temperature 0) and a streamed OCR call
+on a synthetic three-line typed page (4,096 cap), each without and with the three fields `applyReasoningOff` adds.
+
+| server | call | no switch | with the switch |
+|---|---|---|---|
+| default (thinking off) | text | answered, 2.8 s, no reasoning | answered, 1.2 s |
+| default | OCR | read, 1.9 s, no reasoning | read, 1.1 s |
+| `--enable-thinking` | text | `length` at 512 tokens, 1,720 characters of reasoning, no content | answered `{"year": "1952", …}`, 1.2 s |
+| `--enable-thinking` | OCR | read, 7.1 s, after 915 characters of reasoning | read, 1.1 s, no reasoning |
+
+So mlx-vlm 0.7.4 already thinks only when its server is started with thinking on (its template call defaults
+`enable_thinking` to false); there the unswitched tagging call fails exactly as FarmShare's vLLM did (300 of 300), and
+the request's `enable_thinking: false` overrides the server. The extra `think` and `chat_template_kwargs` fields were
+accepted (200). LM Studio, Ollama and vLLM were not run on the Mac (none is installed); their spellings come from
+their documentation and, for vLLM, FarmShare's thinking-off runs. Qwen3.6 was not run (it does not fit 18 GB).

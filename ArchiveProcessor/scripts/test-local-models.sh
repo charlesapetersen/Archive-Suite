@@ -2,7 +2,7 @@
 # Key-free ($0) self-test of the local open-weight model route (W41.app-local-models): runs LocalModelsTestDriver headless.
 # Every request goes to the app's no-wire seam (NetworkSession.testTransport); the driver checks the memory-based pick,
 # the local request (token cap, temperature 0, stand-in key, timeout), the loop and reasoning guards, escalation of a
-# looped page, one worker at a time and the $0 estimate, and (W41.app-local-models-fu1) the streamed reply, its loop stop and the second reading. No model call, no network, no Keychain read, no window, never
+# looped page, one worker at a time and the $0 estimate, and (W41.app-local-models-fu1) the streamed reply, its loop stop and the second reading, and (fu2) the reasoning-off switch and the no-answer text reply. No model call, no network, no Keychain read, no window, never
 # the corpus.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail

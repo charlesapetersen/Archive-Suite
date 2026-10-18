@@ -11799,3 +11799,18 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   asked whether 4-bit was needed given his disk: the reason is other users' 8-16 GB of memory and speed, not disk,
   and 8-bit proved the right build. Filed W41.app-local-seg (with an owner gate for publishing the weights).
   <!-- /W41.seg-mac-model -->
+- [x] **W41.app-local-models-fu2 — switch reasoning off on the local route's calls: Qwen3.5/3.6 date nothing today** · §Archive Processor — transcription and segmentation bake-off on OpenRouter · SHIPPED 2026-10-17 (this commit; checkpoint 839555d3)
+  `LocalModelRoute.applyReasoningOff` adds `enable_thinking: false` (mlx-vlm 0.7.4 reads it at the top level, checked
+  in its source), `chat_template_kwargs: {enable_thinking: false}` (vLLM, llama.cpp) and `think: false` (Ollama) to
+  every local request: the OCR call, its second reading, and the text calls (tagging, classification, segmentation).
+  No `reasoning_effort`, which vLLM validates. A local text reply that is cut at its budget, empty, or ends in an
+  unclosed `<think>` now throws (`textAnswer`), so no tag is read from reasoning; a local refusal of a text call says
+  why; an OCR reply holding an unclosed `<think>` is unparsable and escalates, never saved as the page's text. Remote
+  gateways, OpenAI and OpenRouter unchanged. Live on the Mac (mlx-vlm 0.7.4, Qwen3.5 4B 4-bit, server started with
+  thinking on): the tagging call without the switch ended `length` with 1,720 characters of reasoning and no answer,
+  FarmShare's failure; with it, the year in 1.2 s; the OCR call dropped from 7.1 s to 1.1 s. With the server's default
+  (thinking off) mlx-vlm did not think either way. LM Studio, Ollama and vLLM not installed here, so their spellings
+  are unchecked (KNOWN_ISSUES); Qwen3.6 MLX names still unchecked. Tier-2 review (opus): no high; fixed the
+  error-message and think-after-content lows. `scripts/test-local-models.sh` ALL PASS (section 7, 18 checks);
+  cascade, page-kind, refusal, OpenRouter, thinking-budget and network-session contracts pass. No money.
+  <!-- /W41.app-local-models-fu2 -->
