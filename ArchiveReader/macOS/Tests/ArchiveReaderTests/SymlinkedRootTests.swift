@@ -128,7 +128,7 @@ final class SymlinkedRootTests: XCTestCase {
         let target = try XCTUnwrap(context.target, "a root with a readable marker publishes a target")
 
         let item = await ArchiveLinkWriter.pasteboardItem(for: [file], rootPath: target.rootPath,
-                                                          marker: target.marker, thumbnailer: nil)
+                                                          marker: try XCTUnwrap(target.marker), thumbnailer: nil)
         let text = try XCTUnwrap(item.string(forType: .string))
 
         XCTAssertTrue(text.contains("Box/report.pdf") || text.contains("Box%2Freport.pdf"),

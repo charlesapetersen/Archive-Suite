@@ -183,6 +183,56 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
+    // W40.root-marker: exercise the real focused menu from both viewer scenes without an identity.
+    func testFirstPageLinkCreatesMarkerFromDocumentWindow() throws {
+        try assertFirstPageLinkCreatesMarker(openViewer: true)
+    }
+
+    func testFirstPageLinkCreatesMarkerFromPreview() throws {
+        try assertFirstPageLinkCreatesMarker(openViewer: false)
+    }
+
+    private func assertFirstPageLinkCreatesMarker(openViewer: Bool) throws {
+        // This helper checks the fixed scratch path, non-symlink root and exact generated marker.
+        // Never remove a marker from an arbitrary AR_GUI_FIXTURE_PATH override.
+        try requireGeneratedScratchFixtureForTagWrites()
+        app.terminate()
+        let marker = URL(fileURLWithPath: Self.canonicalFixturePath, isDirectory: true)
+            .appendingPathComponent(".archive-suite-root.json")
+        let original = try Data(contentsOf: marker)
+        defer {
+            app.terminate()
+            try? original.write(to: marker, options: .atomic)
+        }
+        try FileManager.default.removeItem(at: marker)
+        app.launch()
+        app.activate()
+        waitForRows(minimum: 3, timeout: 15)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), "browsing creates no identity")
+        clickRow(0)
+        if openViewer {
+            pressKey("o", modifiers: .command)
+            XCTAssertTrue(app.windows.element(boundBy: 1).waitForExistence(timeout: 5))
+        } else {
+            toolbarButton("ar.toolbar.preview").click()
+            XCTAssertTrue(app.buttons["ar.preview.done"].waitForExistence(timeout: 5))
+        }
+        // The asynchronous sibling scan publishes a context even though it has no durable marker.
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        let item = documentMenuItem("Copy Archive Link to This Page")
+        XCTAssertTrue(item.isEnabled, "first copy is reachable without an existing marker")
+        item.click()
+        let deadline = Date().addingTimeInterval(5)
+        while !FileManager.default.fileExists(atPath: marker.path), Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path), "explicit page copy creates identity")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: marker)) as? [String: Any])
+        XCTAssertNotNil(UUID(uuidString: try XCTUnwrap(json["guid"] as? String)))
+        XCTAssertFalse(app.alerts.firstMatch.exists, "a writable scratch root copies successfully")
+        captureScreenshot(openViewer ? "root-marker-document-first-copy" : "root-marker-preview-first-copy")
+    }
+
     // MARK: - Linked JPEG viewer switch (W24.jpeg1)
 
     func testJPEGImageSwitchIsAvailableAndSticky() throws {

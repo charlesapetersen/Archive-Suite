@@ -253,6 +253,8 @@ final class NavigationModel: ObservableObject {
     /// bookmark in `init`, before the subscription above existed). Called by the navigation window.
     func attach(linkContext: ArchiveLinkContext) {
         self.linkContext = linkContext
+        linkContext.prepareForCopy = { [weak self] url in self?.prepareArchiveLinkCopy(for: url) }
+        linkContext.copyFailureMessage = { [weak self] in self?.statusMessage ?? "Choose an archive folder first." }
         publishLinkTarget()
     }
 
@@ -264,7 +266,8 @@ final class NavigationModel: ObservableObject {
                             marker: rootStore.rootMarker,
                             mainRootPath: layout?.mainRoot.path,
                             jpegRootPath: layout?.jpegRoot.path,
-                            jpegPartnerIndex: library.jpegPartnerIndex)
+                            jpegPartnerIndex: library.jpegPartnerIndex,
+                            preferenceGUID: rootStore.preferenceGUID)
     }
 
     // MARK: Saved searches / scope
@@ -461,8 +464,8 @@ final class NavigationModel: ObservableObject {
         return chosen.count == 1 ? chosen.first : nil
     }
 
-    /// Whether a choice can be stored at all: it is keyed by the root marker's GUID.
-    var canChooseDisplayCalendar: Bool { rootStore.rootMarker != nil }
+    /// Whether a choice can be stored: a container-only root identity needs no archive write.
+    var canChooseDisplayCalendar: Bool { rootStore.preferenceGUID != nil }
 
     func setDisplayCalendar(_ calendar: DisplayCalendar) {
         for file in selectedFiles {
@@ -480,7 +483,7 @@ final class NavigationModel: ObservableObject {
     }
 
     private func calendarKey(for file: ArchiveFile) -> (guid: UUID, path: String)? {
-        guard let guid = rootStore.rootMarker?.guid, let root = rootStore.discoveredPathPrefix else { return nil }
+        guard let guid = rootStore.preferenceGUID, let root = rootStore.discoveredPathPrefix else { return nil }
         let prefix = root.hasSuffix("/") ? root : root + "/"
         let path = file.url.path
         guard path.hasPrefix(prefix) else { return nil }
@@ -1433,21 +1436,9 @@ final class NavigationModel: ObservableObject {
             statusMessage = "Choose an archive folder first."
             return
         }
-        // A root with no DURABLE identity would mint links that can never resolve, so refuse — and
-        // say which of the several possible reasons it is. The old message claimed no folder was
-        // open, when one was. (W23.m6)
-        guard let marker = rootStore.rootMarker else {
-            statusMessage = rootStore.markerState.degradation?.message ?? "Choose an archive folder first."
-            return
-        }
-        guard library.jpegPartnerScanStatus == .ready,
-              let jpegPartnerIndex = library.jpegPartnerIndex,
-              let root = rootStore.root else {
-            statusMessage = jpegPartnerUnavailableMessage
-            announce(statusMessage)
-            return
-        }
-        let mainRootPath = ReaderArchiveLayout(grantedRoot: root).mainRoot.path
+        guard let target = prepareArchiveLinkCopy(), let marker = target.marker,
+              let jpegPartnerIndex = library.jpegPartnerIndex else { return }
+        let mainRootPath = target.mainRootPath
         // Durable links are the primary copy result. Put them on the clipboard before optional page
         // previews render, then replace this item only if we still own the clipboard.
         let immediateItem = ArchiveLinkWriter.pasteboardItemWithoutThumbnails(
@@ -1470,6 +1461,38 @@ final class NavigationModel: ObservableObject {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.writeObjects([item])
         }
+    }
+
+    /// Shared by navigation and document/preview copies. No marker write until every read-side
+    /// prerequisite is ready. Return the committed target synchronously (Combine publishes later).
+    func prepareArchiveLinkCopy(for fileURL: URL? = nil) -> ArchiveLinkTarget? {
+        guard let root = rootStore.root, let rootPath = rootStore.discoveredPathPrefix else {
+            statusMessage = "Choose an archive folder first."
+            return nil
+        }
+        if let fileURL, !ReaderArchiveLayout.isContained(fileURL, inRootPath: rootPath) {
+            statusMessage = "This document belongs to a different archive. Reopen its archive folder to copy a link."
+            return nil
+        }
+        // Preserve the precise refusal even while the optional JPEG partner scan is pending.
+        if let reason = RootMarkerState.reading(root).degradation {
+            statusMessage = reason.message
+            return nil
+        }
+        guard library.jpegPartnerScanStatus == .ready,
+              let index = library.jpegPartnerIndex, index.isClean else {
+            statusMessage = jpegPartnerUnavailableMessage
+            announce(statusMessage)
+            return nil
+        }
+        guard let marker = rootStore.prepareMarkerForLinkCopy() else {
+            statusMessage = rootStore.markerState.degradation?.message ?? "Choose an archive folder first."
+            return nil
+        }
+        publishLinkTarget()
+        return ArchiveLinkTarget(rootPath: rootPath, marker: marker,
+                                 mainRootPath: ReaderArchiveLayout(grantedRoot: root).mainRoot.path,
+                                 preferenceGUID: rootStore.preferenceGUID)
     }
 
     private var jpegPartnerUnavailableMessage: String {

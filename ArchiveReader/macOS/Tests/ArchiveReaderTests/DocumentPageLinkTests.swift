@@ -122,7 +122,7 @@ final class DocumentPageLinkTests: XCTestCase {
         guard case .readerReveal(let guid, let rel, let page, let jpegRel) = parsed else {
             return XCTFail("expected a readerReveal link, got \(String(describing: parsed))")
         }
-        XCTAssertEqual(guid, t.marker.guid, "the link carries the root marker's GUID")
+        XCTAssertEqual(guid, t.marker?.guid, "the link carries the root marker's GUID")
         XCTAssertEqual(rel, "cite-me.pdf", "root-relative path")
         XCTAssertEqual(page, 6, "the link cites the OCR text page being read, not the scan")
         XCTAssertNil(jpegRel)
@@ -348,7 +348,7 @@ final class DocumentPageLinkTests: XCTestCase {
         context.update(rootPath: other.path, marker: otherMarker, mainRootPath: other.path,
                        jpegRootPath: otherJPEGRoot.path, jpegPartnerIndex: otherIndex)
         XCTAssertEqual(context.target?.rootPath, other.path)
-        XCTAssertEqual(context.target?.marker.guid, otherMarker.guid)
+        XCTAssertEqual(context.target?.marker?.guid, otherMarker.guid)
     }
 
     func testNavigationModelPublishesItsRootAsTheLinkTarget() throws {
@@ -366,6 +366,6 @@ final class DocumentPageLinkTests: XCTestCase {
         XCTAssertEqual(context.target?.rootPath, model.rootStore.discoveredPathPrefix,
                        "the document window's target comes from the navigation window's root store")
         XCTAssertNotNil(context.target?.rootPath)
-        XCTAssertEqual(context.target?.marker.guid, guid)
+        XCTAssertEqual(context.target?.marker?.guid, guid)
     }
 }

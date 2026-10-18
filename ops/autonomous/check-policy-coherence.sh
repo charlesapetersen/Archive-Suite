@@ -143,6 +143,16 @@ must_exist "real-corpus-still-gated" 'REAL corpus|real corpus' 5
 must_exist "tier3-release-still-gated" 'Tier-3 release|gh release' 2
 must_exist "tier2-still-mandatory" 'Tier-2' 8
 
+# W40.root-marker: the Core Directive must disclose the owner's one root-file exception.
+# Pin its presence in the authoritative guide (another file mentioning it cannot substitute).
+if grep -qF 'One named exception: the first archive-link copy' ArchiveReader/CLAUDE.md \
+   && grep -qF '`.archive-suite-root.json`' ArchiveReader/CLAUDE.md; then
+  printf '  %s reader-root-marker-disclosed\n' "$(green '✓')"
+else
+  printf '  %s reader-root-marker-disclosed — restore the first-copy exception in Reader CORE DIRECTIVE\n' "$(red '✗')"
+  fails=$((fails+1))
+fi
+
 printf '\n'
 if [ "$fails" -gt 0 ]; then
   printf '%s — %d rule(s) violated. Fix the prose, or change the rule here IN THE SAME COMMIT and say why.\n' \

@@ -191,7 +191,12 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 
 1. **Reader's Prime Directive.** Reader MUST NOT delete, move, rename, trash, re-save, or alter any
    file's **bytes or location** — ever. Finder-tag metadata (the tag-name array + the color label) is
-   the **only** thing it changes, and only via one audited choke-point, `Core/TagWriter.swift`.
+   the **only** change to existing archive files, via the audited `Core/TagWriter.swift`.
+   **Named exception (W40.root-marker):** the first archive-link copy may create
+   `.archive-suite-root.json` once at the granted root through ArchiveCore `RootMarker.ensure`;
+   it is never rewritten. Choosing/reopening, browsing, tagging and ordinary copying do not create it.
+   No existing archive file is touched. A removed marker stays absent until another archive-link copy;
+   that creates a new identity, so old links no longer resolve.
 2. **Single write choke-point.** Every Reader tag write (subject/date/priority/color, group edits,
    Read/Unread triage) routes through `TagWriter.apply` as a **delta** `{add, remove, color}` against
    a **freshly-read** array, then verifies by re-read (multiset equality + label + data-fork-hash

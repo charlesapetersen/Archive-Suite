@@ -30,12 +30,13 @@ struct DocumentWindowView: View {
         }
         .frame(minWidth: 900, minHeight: 600)
         .background(WindowAccessor { configureWindow($0) })   // DV-1: open maximized, then remember size
+        .archiveLinkCopyError(model: model)
         .navigationTitle(model.title)
         .toolbar { toolbar }
         .focusedSceneObject(model)   // so the Document menu commands act on this window
         // W23.m4: publish the link target here too, so "Copy Archive Link to This Page" is ENABLED in
         // the document window — it used to require a focused NavigationModel this scene never has.
-        .focusedSceneValue(\.archiveLinkTarget, linkContext.target)
+        .focusedSceneValue(\.archiveLinkContext, linkContext)
         .onReceive(linkContext.$target.combineLatest(linkContext.$jpegPartnerIndex)) { target, index in
             model.updateArchiveContext(target: target, index: index)
         }

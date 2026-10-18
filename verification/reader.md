@@ -857,7 +857,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
-- **Notes:** the menu is hidden on a root without a durable marker, by design (`W24.cal1-reader` review).
+- **Notes:** W40.root-marker: container-only display identity enables this menu before the first archive-link copy.
 
 ### R-43 · Showing the JPEG original
 
@@ -960,10 +960,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     the moment between the start of an edit and its write, not a file moved since the list was built.
   - A write that fails its re-read check has already written. It throws without rolling back, which is what §9
     asks ("no blind rollback").
-  - The Reader also creates `.archive-suite-root.json` in the granted root (`RootMarkerState.swift:77`). That is
-    a new file in the archive, outside the "only Finder tags" promise. `W40.f2` demonstrated it on scratch
-    ([`evidence/reader/W40.f2-root-marker.md`](evidence/reader/W40.f2-root-marker.md)): written when a folder is
-    chosen, once, and silently re-minted with a new GUID if removed. The owner decides under `W40.root-marker`.
+  - W40.root-marker (2026-10-18): the owner chose defer and disclose. Adoption now only reads;
+    `.archive-suite-root.json` is created only on explicit archive-link copy and disclosed as the Core
+    Directive's named exception. `RootMarkerDisclosureTests` checks chooser/relaunch mtime and listing,
+    navigation/page copies, unchanged PDF bytes/tags, read-only and damaged-marker refusal, root switches,
+    and marker removal. Original evidence: [`W40.f2-root-marker.md`](evidence/reader/W40.f2-root-marker.md).
 
 ### R-46 · Append-only audit ledger of every change
 

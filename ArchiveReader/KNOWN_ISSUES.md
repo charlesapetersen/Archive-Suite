@@ -788,3 +788,16 @@ same batch recovers storage. Process death before recovery can still lose the mi
 and barrier: forward recording remains best-effort, rather than a write-ahead journal. Ledger growth remains unbounded and ordinary forward appends are not fsynced.
 Scratch regressions: UndoDurabilityTests, LedgerUndoHistoryTests; evidence in
 verification/evidence/reader/W40.audit-ledger-undo.md. R-46 stays fixed-pending-recheck.
+
+
+### W40.root-marker — root identity deferred to the first archive-link copy (fixed 2026-10-18)
+
+Choosing/reopening a folder used to create `.archive-suite-root.json` without a deliberate write action,
+contradicting the Core Directive. `RootFolderStore` now only reads on adoption; navigation, viewer and
+preview archive-link commands prepare the durable identity at copy time, after checking the live root
+and partner scan. Read-only, damaged and unreadable identities refuse visibly without replacing the
+clipboard or marker. Ordinary browsing, tag edits and copying never create it. Display-calendar and
+image-source choices use a container-only identity before/after that first copy. If someone removes the
+marker, browsing does not recreate it; another explicit archive-link copy makes a new GUID, invalidating
+old links. The Core Directive and SPEC now disclose this single creation exception. Scratch regressions:
+`RootMarkerDisclosureTests`; no real corpus used.

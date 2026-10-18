@@ -12,9 +12,11 @@ documents Read as you go. The two apps ship together as **Archive Suite** (this 
 ## Prime directive — the files are irreplaceable
 
 Archival images cannot be re-shot and their tagging was extremely time-consuming. Archive Reader
-**never deletes, moves, renames, or alters any file's bytes or location.** The *only* thing it ever
-changes is a file's **macOS Finder tags** — and only as a deliberate, verified, reversible user
-action routed through a single audited writer. See [CLAUDE.md](CLAUDE.md) → Core Directive & Safety
+**never deletes, moves, renames, or alters any existing archive file's bytes or location.** It changes
+**macOS Finder tags** only as a deliberate, verified, reversible user action through a single audited
+writer. The first archive-link copy may also create one small identity file, `.archive-suite-root.json`,
+at the archive root; it is never rewritten. Choosing, reopening, browsing and tagging create no marker.
+Keep that identity file with the folder so copied archive links continue to resolve. See [CLAUDE.md](CLAUDE.md) → Core Directive & Safety
 Protocol.
 
 ## What it does

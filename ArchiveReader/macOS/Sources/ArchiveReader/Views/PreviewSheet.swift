@@ -30,6 +30,7 @@ struct PreviewSheet: View {
             content
         }
         .frame(width: 940, height: 700)
+        .archiveLinkCopyError(model: model)
         .onAppear {
             model.load(selection)
             published = model            // → the nav window publishes it to the scene while we are up
@@ -124,6 +125,20 @@ struct PreviewSheet: View {
                         .accessibilityIdentifier("ar.preview.noText")
                 }
             }
+        }
+    }
+}
+
+/// Both viewer scenes report a refused copy without changing the clipboard.
+extension View {
+    func archiveLinkCopyError(model: DocumentViewerModel) -> some View {
+        alert("Could Not Copy Archive Link", isPresented: Binding(
+            get: { model.archiveLinkError != nil },
+            set: { if !$0 { model.archiveLinkError = nil } }
+        )) {
+            Button("OK") { model.archiveLinkError = nil }
+        } message: {
+            Text(model.archiveLinkError ?? "")
         }
     }
 }

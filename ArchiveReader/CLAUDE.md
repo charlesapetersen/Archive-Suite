@@ -25,14 +25,21 @@ Archival image files are **irreplaceable** and their tagging was **extremely tim
   and read-state tags, for a single file **or a group** — but **only** as a *deliberate user
   action*, routed through one audited choke-point (`TagWriter`), applied as a precise **delta**
   (add-set / remove-set) to a **freshly-read** tag array, and **verified** afterward. Finder-tag
-  (extended-attribute) metadata is the *only* thing the app ever changes; file **bytes and file
+  (extended-attribute) metadata is the only change to existing archive files; their **bytes and
   location never change**. (Read/Unread triage is just the fast-path preset of this same editor.)
-- Everything else — discovery, filtering, viewing, copying — is strictly **read-only**.
+- **One named exception: the first archive-link copy** may create `.archive-suite-root.json`, a small
+  identity file at the granted root, so links travel with the folder. It is created once, never
+  rewritten; no existing archive file is touched. Choosing/reopening a folder, browsing, tagging,
+  and ordinary text/file-link copying create no marker. If it is removed, browsing leaves it absent;
+  another deliberate archive-link copy creates a new identity, and earlier links no longer resolve.
+  A damaged/unreadable marker is left untouched; a failed creation refuses the copy with an explanation.
+- Everything else — discovery, filtering, viewing, ordinary copying — is strictly **read-only**.
 
 This is an architectural property, not a coding-discipline hope: **all tag writes route through the
 single audited `TagWriter`** (see Safety Protocol). No other code imports a file-mutating API, and
 even `TagWriter` never calls a move / rename / delete / content-write API — only the tag-array and
-(deliberately) the color-label metadata.
+(deliberately) the color-label metadata. The root-identity exception uses ArchiveCore's coordinated
+`RootMarker.ensure`, only from `RootFolderStore.prepareMarkerForLinkCopy`.
 
 ---
 
@@ -400,7 +407,7 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               one-time default-hidden migration for the optional Provenance column.
   DisplayCalendarPreferences.swift  W24.cal1-reader: Options ▸ Dates switch (off by default), each
                               document's display calendar (UserDefaults, root GUID + relative path), and
-                              the Date column text in it. Display only: sort/filter/tags keep ISO.
+                              the Date column text in it. Display only: sort/filter/tags keep ISO; container identity works before a link copy.
 Search/                       Discovery + disposable caches (never the corpus):
   ArchiveLibrary.swift        Warm-cache publication, background revalidation, honest health/absence,
                               verified-write ordering, and FSEvents merge for one granted root.
@@ -408,7 +415,8 @@ Search/                       Discovery + disposable caches (never the corpus):
                               state, byte-exact root/path identity, verified rows + scan provenance.
   LibraryScan.swift           Dedicated-thread full and fingerprint-diff passes; real monotonic progress.
   CorpusWatcher.swift         FSEvents exact/subtree/root recovery; byte-exact coalescing + path reads.
-  RootFolderStore.swift       Security-scoped bookmark to the archive root.
+  RootFolderStore.swift       Security-scoped root bookmark; read-only adoption, identity creation only
+                              on archive-link copy; container-only display preference identity.
   ContentIndex.swift          SQLite FTS5 actor (import SQLite3) — full-text + classification; open() is
                               ALL-OR-NOTHING (setup failure ⇒ discardHandle + db = nil) (W23.m9).
   ContentIndexer.swift        Background (detached) incremental indexing; async search/classification;

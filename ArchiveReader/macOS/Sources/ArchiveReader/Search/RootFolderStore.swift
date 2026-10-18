@@ -32,6 +32,10 @@ final class RootFolderStore: ObservableObject {
     /// GUID that only exists in memory (or one we failed to read) can never reach a copied link.
     var rootMarker: RootMarker? { markerState.durableMarker }
 
+    /// Container-only identity for display preferences, never used to mint links or validate caches.
+    /// Aliases by path and, once available, durable GUID keep choices stable across first copy/moves.
+    @Published private(set) var preferenceGUID: UUID?
+
     private var accessing: URL?
     private let key = "archiveRootBookmark"
     /// Injected so the adoption path — which WRITES `archiveRootBookmark` — is testable without going
@@ -104,7 +108,6 @@ final class RootFolderStore: ObservableObject {
             accessing = target
             if let previous, previous != target { previous.stopAccessingSecurityScopedResource() }
             adopt(target)
-            loadOrEnsureMarker(at: target)
             return nil
         } catch {
             NSLog("RootFolderStore: could not bookmark \(target.path): \(error)")
@@ -117,6 +120,7 @@ final class RootFolderStore: ObservableObject {
         defaults.removeObject(forKey: key)
         root = nil
         discoveredPathPrefix = nil
+        preferenceGUID = nil
         markerState = .noRoot
     }
 
@@ -131,6 +135,7 @@ final class RootFolderStore: ObservableObject {
             stopAccessing()
             root = nil
             discoveredPathPrefix = nil
+            preferenceGUID = nil
             markerState = .noRoot
             return nil
         }
@@ -145,6 +150,7 @@ final class RootFolderStore: ObservableObject {
                 stopAccessing()
                 root = nil
                 discoveredPathPrefix = nil
+                preferenceGUID = nil
                 markerState = .noRoot
                 return nil
             }
@@ -152,7 +158,6 @@ final class RootFolderStore: ObservableObject {
             accessing = url
             previous?.stopAccessingSecurityScopedResource() // balance the old lifetime after new access is live
             adopt(url)
-            loadOrEnsureMarker(at: url)
             // Refresh a stale bookmark WHILE access is still held — never drop the scope first. (Fix)
             if stale, let fresh = try? url.bookmarkData(options: .withSecurityScope,
                                                         includingResourceValuesForKeys: nil, relativeTo: nil) {
@@ -164,6 +169,7 @@ final class RootFolderStore: ObservableObject {
             stopAccessing()
             root = nil
             discoveredPathPrefix = nil
+            preferenceGUID = nil
             markerState = .noRoot
             return nil
         }
@@ -179,6 +185,27 @@ final class RootFolderStore: ObservableObject {
     private func adopt(_ url: URL) {
         root = url
         discoveredPathPrefix = CorpusWalker.discoveredPathPrefix(for: url) ?? url.path
+        markerState = .reading(url)
+        updatePreferenceIdentity()
+    }
+
+    private func updatePreferenceIdentity(preserving markerlessIdentity: UUID? = nil) {
+        guard let url = root else { preferenceGUID = nil; return }
+        var identities = defaults.dictionary(forKey: "ar.rootPreferenceIDs") as? [String: String] ?? [:]
+        let pathKey = "path:" + Data(url.path.utf8).base64EncodedString()
+        let markerKey = rootMarker.map { "marker:" + $0.guid.uuidString }
+        // A known durable marker outranks a reused filesystem path. Its alias is recorded at the
+        // first copy, so markerless choices still survive that transition and subsequent moves.
+        let identity: UUID
+        if let marker = rootMarker, let markerKey {
+            identity = identities[markerKey].flatMap(UUID.init(uuidString:)) ?? markerlessIdentity ?? marker.guid
+        } else {
+            identity = identities[pathKey].flatMap(UUID.init(uuidString:)) ?? UUID()
+        }
+        preferenceGUID = identity
+        identities[pathKey] = identity.uuidString
+        if let markerKey { identities[markerKey] = identity.uuidString }
+        defaults.set(identities, forKey: "ar.rootPreferenceIDs")
     }
 
     private func resolveSaved() { _ = reResolveSavedRoot() }
@@ -187,12 +214,19 @@ final class RootFolderStore: ObservableObject {
         if let a = accessing { a.stopAccessingSecurityScopedResource(); accessing = nil }
     }
 
-    /// Read or create the `.archive-suite-root.json` marker at the granted root.
-    /// On failure (read-only volume, unreadable or malformed existing file) the state records *why*
-    /// and `rootMarker` stays nil — the app still reads normally, but link minting is refused and
-    /// the reason is shown when they try, rather than a link being copied that can never resolve.
-    private func loadOrEnsureMarker(at url: URL) {
-        markerState = .ensuring(url)
+    /// The only creation path, called after a deliberate archive-link copy has a usable target.
+    /// Re-read even an already-durable identity: deletion/replacement while open must not mint a
+    /// link with a GUID that exists only in memory. Existing damaged/unreadable markers stay intact.
+    @discardableResult
+    func prepareMarkerForLinkCopy() -> RootMarker? {
+        guard let root else { return nil }
+        // Preserve markerless preferences only when the identity was actually absent. A different
+        // durable archive substituted while open must retain its own preference namespace.
+        let beforeCopy = RootMarkerState.reading(root)
+        let markerlessIdentity = beforeCopy == .absent ? preferenceGUID : nil
+        markerState = .ensuring(root)
+        if rootMarker != nil { updatePreferenceIdentity(preserving: markerlessIdentity) }
+        return rootMarker
     }
 
 #if DEBUG
@@ -203,8 +237,6 @@ final class RootFolderStore: ObservableObject {
     private func adoptTestRoot(_ url: URL) {
         adopt(url)
         // `accessing` stays nil — no scope to release. No bookmark persisted.
-        // Read (but don't create) a marker if present — tests may provide one.
-        markerState = .reading(url)
     }
 #endif
 }

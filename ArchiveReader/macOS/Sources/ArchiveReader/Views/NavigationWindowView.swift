@@ -95,7 +95,7 @@ struct NavigationWindowView: View {
         .focusedSceneValue(\.openSelection) { openSelection() }
         // W23.m4 — page-link publication + the deep-link "open the viewer ON the cited page" bridge.
         // Extracted into one modifier: adding them inline blew this body's type-check budget.
-        .archivePageLinkBridge(model: model, target: linkContext.target, openWindow: openWindow)
+        .archivePageLinkBridge(model: model, context: linkContext, openWindow: openWindow)
         .onAppear { deepLinkRouter.nav = model; model.attach(linkContext: linkContext) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.applicationDidBecomeActive()
@@ -765,9 +765,9 @@ struct FlowLayout: Layout {
 ///    open, and the payload carries the 1-based PDF page the link cited.
 private extension View {
     func archivePageLinkBridge(model: NavigationModel,
-                               target: ArchiveLinkTarget?,
+                               context: ArchiveLinkContext,
                                openWindow: OpenWindowAction) -> some View {
-        focusedSceneValue(\.archiveLinkTarget, target)
+        focusedSceneValue(\.archiveLinkContext, context)
             .onChange(of: model.openViewerRequest) {
                 guard let sel = model.openViewerSelection, !sel.filePaths.isEmpty else { return }
                 openWindow(id: WindowID.document, value: sel)

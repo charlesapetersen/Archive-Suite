@@ -171,7 +171,7 @@ final class DocumentViewerModel: ObservableObject {
         guard persistsImageSource,
               let target = archiveLinkTarget,
               let relativePath = relativePDFPath(for: currentURL, rootPath: target.rootPath) else { return }
-        imageSourcePreferences.set(imageSource, rootGUID: target.marker.guid, relativePath: relativePath)
+        imageSourcePreferences.set(imageSource, rootGUID: target.preferenceGUID, relativePath: relativePath)
     }
 
     /// Bounds-checked page lookup — `pair` can outrun a freshly-loaded shorter document for one
@@ -362,25 +362,36 @@ final class DocumentViewerModel: ObservableObject {
     /// — so the *contents* of the link (in particular which page it names) are testable.
     /// `nil` when no document is loaded.
     func archivePageLink(target: ArchiveLinkTarget) async -> NSPasteboardItem? {
-        guard urls.indices.contains(index) else { return nil }
+        guard urls.indices.contains(index), let marker = target.marker else { return nil }
         return await ArchiveLinkWriter.pageLink(
             fileURL: urls[index], page: focusedPageNumber,
-            rootPath: target.rootPath, marker: target.marker, thumbnailer: thumbnailer,
+            rootPath: target.rootPath, marker: marker, thumbnailer: thumbnailer,
             mainRootPath: target.mainRootPath, jpegPartnerIndex: jpegPartnerIndex
         )
     }
 
-    /// Copy an archive link for the page on screen to the pasteboard. Takes the root + marker as an
-    /// `ArchiveLinkTarget` focused value rather than a `NavigationModel`, so the command is available in
-    /// the document window too (W23.m4 defect 1).
-    func copyArchivePageLink(target: ArchiveLinkTarget) {
+    /// Copy through the shared focused context, preparing a durable identity only on this deliberate
+    /// action. The document window and preview need no focused NavigationModel (W23.m4).
+    @Published var archiveLinkError: String?
+
+    func copyArchivePageLink(context: ArchiveLinkContext) {
         guard urls.indices.contains(index) else { return }
+        guard let target = context.prepareForCopy?(urls[index]) else {
+            archiveLinkError = context.copyFailureMessage?() ?? "Choose an archive folder first."
+            return
+        }
+        archiveLinkError = nil
+        copyArchivePageLink(target: target)
+    }
+
+    func copyArchivePageLink(target: ArchiveLinkTarget) {
+        guard urls.indices.contains(index), let marker = target.marker else { return }
         // Snapshot the page at command time. Rendering is asynchronous, but a later document/page change
         // must not silently turn the user's copied citation into whatever happens to be visible later.
         let fileURL = urls[index]
         let page = focusedPageNumber
         let immediateItem = ArchiveLinkWriter.pageLinkWithoutThumbnail(
-            fileURL: fileURL, page: page, rootPath: target.rootPath, marker: target.marker,
+            fileURL: fileURL, page: page, rootPath: target.rootPath, marker: marker,
             mainRootPath: target.mainRootPath, jpegPartnerIndex: jpegPartnerIndex
         )
         NSPasteboard.general.clearContents()
@@ -390,7 +401,7 @@ final class DocumentViewerModel: ObservableObject {
         let generation = archivePageLinkCopyGeneration
         Task {
             let item = await ArchiveLinkWriter.pageLink(
-                fileURL: fileURL, page: page, rootPath: target.rootPath, marker: target.marker,
+                fileURL: fileURL, page: page, rootPath: target.rootPath, marker: marker,
                 thumbnailer: thumbnailer, mainRootPath: target.mainRootPath,
                 jpegPartnerIndex: jpegPartnerIndex
             )
@@ -450,7 +461,7 @@ final class DocumentViewerModel: ObservableObject {
         jpegPartnerRelativePath = partnerRelativePath
         guard let relativePath = relativePDFPath(for: pdfURL, rootPath: target.rootPath) else { return }
         if persistsImageSource {
-            imageSource = imageSourcePreferences.source(rootGUID: target.marker.guid,
+            imageSource = imageSourcePreferences.source(rootGUID: target.preferenceGUID,
                                                         relativePath: relativePath)
             if imageSource == .jpeg, jpegPartnerPage == nil { imageSource = .pdf }
         }

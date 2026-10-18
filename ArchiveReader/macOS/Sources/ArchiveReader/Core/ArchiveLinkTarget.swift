@@ -4,8 +4,8 @@
 import SwiftUI
 import ArchiveCore
 
-/// Everything needed to write a durable `archivereader://reveal` link: the granted archive **root**
-/// (to make the file path root-relative) and its **marker** (whose GUID makes the link portable).
+/// The granted root and display identity, shared with every viewer before the first link copy.
+/// The optional marker becomes durable only when an explicit copy prepares the root identity.
 ///
 /// Both live on `NavigationModel.rootStore`, which only the *navigation* window owns — so before
 /// W23.m4 the "Copy Archive Link to This Page" command required a focused `NavigationModel` and was
@@ -20,9 +20,19 @@ struct ArchiveLinkTarget: Equatable, Sendable {
     /// degraded to a bare `lastPathComponent`, which resolves in no other archive. It carries no
     /// security scope and must never be opened. (`W26.symroot-fu1`.)
     let rootPath: String
-    let marker: RootMarker
+    let marker: RootMarker?
+    /// Container-only display preference ID. Never a substitute for a durable link marker.
+    let preferenceGUID: UUID
     /// The scanned MAIN subtree used to resolve a partner by the same relative path/stem context.
     let mainRootPath: String
+
+    init(rootPath: String, marker: RootMarker?, mainRootPath: String, preferenceGUID: UUID? = nil) {
+        self.rootPath = rootPath
+        self.marker = marker
+        self.mainRootPath = mainRootPath
+        // Production supplies the root store's stable container ID, including before first copy.
+        self.preferenceGUID = preferenceGUID ?? marker?.guid ?? UUID()
+    }
 }
 
 /// App-level carrier for the current `ArchiveLinkTarget`, injected into both scenes so a document
@@ -35,16 +45,20 @@ final class ArchiveLinkContext: ObservableObject {
     @Published private(set) var target: ArchiveLinkTarget?
     @Published private(set) var jpegPartnerIndex: JPEGPartnerIndex?
 
-    /// Mirror the navigation window's root store. A missing root or unreadable marker clears the
-    /// target (the command then disables) rather than leaving a stale one behind.
+    /// Live preparation, owned by NavigationModel; invoked only by the explicit copy command.
+    var prepareForCopy: ((URL) -> ArchiveLinkTarget?)?
+    var copyFailureMessage: (() -> String)?
+
+    /// Mirror the navigation root and clean partner scan. A markerless root still publishes a
+    /// target so its first copy is enabled; preparation reports damaged/unreadable identities.
     func update(rootPath: String?, marker: RootMarker?, mainRootPath: String?, jpegRootPath: String?,
-                jpegPartnerIndex: JPEGPartnerIndex?) {
+                jpegPartnerIndex: JPEGPartnerIndex?, preferenceGUID: UUID? = nil) {
         let new: ArchiveLinkTarget?
-        if let rootPath, let marker, let mainRootPath, let jpegRootPath,
+        if let rootPath, marker != nil || preferenceGUID != nil, let mainRootPath, let jpegRootPath,
            let jpegPartnerIndex, jpegPartnerIndex.isClean,
            jpegPartnerIndex.jpegRootPath == jpegRootPath {
             new = ArchiveLinkTarget(rootPath: rootPath, marker: marker,
-                                    mainRootPath: mainRootPath)
+                                    mainRootPath: mainRootPath, preferenceGUID: preferenceGUID)
         } else {
             new = nil
         }
@@ -55,10 +69,10 @@ final class ArchiveLinkContext: ObservableObject {
 
 // The focused value the menu commands read. Each window that can show a document publishes it, so
 // `ArchiveReaderCommands` never has to reach for a `NavigationModel` it may not have.
-struct ArchiveLinkTargetKey: FocusedValueKey { typealias Value = ArchiveLinkTarget }
+struct ArchiveLinkContextKey: FocusedValueKey { typealias Value = ArchiveLinkContext }
 extension FocusedValues {
-    var archiveLinkTarget: ArchiveLinkTarget? {
-        get { self[ArchiveLinkTargetKey.self] }
-        set { self[ArchiveLinkTargetKey.self] = newValue }
+    var archiveLinkContext: ArchiveLinkContext? {
+        get { self[ArchiveLinkContextKey.self] }
+        set { self[ArchiveLinkContextKey.self] = newValue }
     }
 }
