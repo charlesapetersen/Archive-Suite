@@ -65,6 +65,10 @@ class Target(unittest.TestCase):
             resp = {"candidates": [{"content": {"parts": [{"text": json.dumps({"year": "1900", "day": v})}]}}]}
             self.assertEqual(P.reply_day(resp), want, v)
 
+    def test_corpus_target_loses_only_the_day(self):
+        t = D.target_of({"year": 1972, "month": 3, "du": False})
+        self.assertEqual(json.loads(P.without_day(t)), {"year": "1972", "month": "03 March", "date_uncertain": False})
+
     def test_split_is_by_project(self):
         self.assertEqual(P.split_of("Letters to Lincoln/1864: Civil War"), P.split_of("Letters to Lincoln/1864: Civil War"))
         self.assertIn(P.split_of("x"), ("train", "val", "test"))

@@ -6,6 +6,9 @@
   train_seg.py train --data DIR --model Qwen/Qwen3.5-4B --out DIR [--epochs 1] [--max-windows N]
   train_seg.py merge --adapter DIR --out DIR                            # base + LoRA -> one model vLLM can serve
 
+TEXT ROWS (W41.date-model). A row with no `box` is a text-only request: one user message holding the prompt, no
+images, trained the same way (thinking off, loss over the reply). public_dates.py mix writes such a set.
+
 The data: a training window (corpus_pairs.py pack, split train) whose every gap the teacher (Qwen3.5 27B, frozen in
 seg-teacher.json) and the tags agree on (corpus_pairs.py clean's `keep`), with the teacher's own reply as the
 target, so the student learns the whole answer: page kinds, decisions, confidences and cues. A window marked
@@ -74,13 +77,15 @@ def load_images(images, box, nums):
 
 
 def encode(processor, row, images_dir):
-    """input_ids, attention mask, pixel inputs and labels (-100 over the request, the reply's tokens trained)."""
-    imgs = load_images(images_dir, row["box"], row["window"])
+    """input_ids, attention mask, pixel inputs and labels (-100 over the request, the reply's tokens trained).
+    A text row (no `box`) has no images."""
+    imgs = load_images(images_dir, row["box"], row["window"]) if "box" in row else []
     msgs = [{"role": "user", "content": [*({"type": "image"} for _ in imgs), {"type": "text", "text": row["prompt"]}]}]
     prompt = processor.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
     full = prompt + row["target"] + processor.tokenizer.eos_token
-    enc = processor(text=[full], images=imgs, return_tensors="pt")
-    n_prompt = processor(text=[prompt], images=imgs, return_tensors="pt")["input_ids"].shape[1]
+    extra = {"images": imgs} if imgs else {}
+    enc = processor(text=[full], return_tensors="pt", **extra)
+    n_prompt = processor(text=[prompt], return_tensors="pt", **extra)["input_ids"].shape[1]
     labels = enc["input_ids"].clone()
     labels[:, :n_prompt] = -100
     enc["labels"] = labels
@@ -108,7 +113,7 @@ def cmd_train(a):
     rows = [json.loads(l) for l in (data / "train.jsonl").read_text().splitlines()]
     if a.max_windows:
         rows = rows[:a.max_windows]
-    images = json.loads((data / "data.json").read_text())["images"] if not a.images else a.images
+    images = a.images or json.loads((data / "data.json").read_text()).get("images")
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     processor = AutoProcessor.from_pretrained(a.model)
     model = AutoModelForImageTextToText.from_pretrained(a.model, dtype=torch.bfloat16 if dev == "cuda" else torch.float32)

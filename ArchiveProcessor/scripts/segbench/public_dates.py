@@ -11,6 +11,7 @@ W43.seg-corpus-build, which would add it, waits on its own gates.
 
     python3 public_dates.py build            # -> cache public.jsonl + public-summary.json (no model call)
     python3 public_dates.py train-data       # cache train/public-{train,val}.jsonl, the test kept out
+    python3 public_dates.py mix [--public-max N]   # cache train/mixed/: corpus + public rows for train_seg.py
     python3 public_dates.py export --out DIR # the test prompts as requests.jsonl, for farmshare/fs_text.py
     python3 public_dates.py import --answers FILE --label L
     python3 public_dates.py score --label L  # year, month and day apart -> segbench-results/date-tagging-public.json
@@ -261,6 +262,35 @@ def cmd_train_data(a):
         print(split, len(rs))
 
 
+def without_day(target):
+    """A corpus target with its "day" key taken out. The owner's tags carry no day, so a corpus target's null day
+    would teach "no day" for documents that state one; with the key absent the reply's day is not trained on
+    there, and parseTagResponse reads a missing day as none."""
+    j = json.loads(target)
+    j.pop("day", None)
+    return json.dumps(j, ensure_ascii=False)
+
+
+def cmd_mix(a):
+    """train_seg.py's text set: date_tagging train-data's corpus rows (day key removed) and public rows, the public
+    ones capped at the corpus count by default so the owner's tags stay at least half of what is learned."""
+    src = os.path.join(D.CACHE, "train")
+    out = os.path.join(src, "mixed")
+    os.makedirs(out, exist_ok=True)
+    summary = {}
+    for split in ("train", "val"):
+        corpus = [json.loads(l) for l in open(os.path.join(src, f"{split}.jsonl"), encoding="utf-8")]
+        public = [json.loads(l) for l in open(os.path.join(src, f"public-{split}.jsonl"), encoding="utf-8")]
+        cap = len(corpus) if a.public_max is None else a.public_max
+        rows = [{**r, "target": without_day(r["target"]), "source": "corpus"} for r in corpus]
+        rows += [{**r, "source": "public"} for r in public[:cap]]
+        random.Random(SEED).shuffle(rows)
+        write_jsonl(os.path.join(out, f"{split}.jsonl"), rows)
+        summary[split] = {"corpus": len(corpus), "public": min(cap, len(public)), "public_available": len(public)}
+    json.dump({"rows": summary, "text_only": True}, open(os.path.join(out, "data.json"), "w"), indent=1)
+    print(json.dumps(summary, indent=1))
+
+
 def cmd_export(a):
     test = [d for d in load() if d["test"]]
     os.makedirs(a.out, exist_ok=True)
@@ -351,11 +381,12 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("build")
     p = sub.add_parser("train-data"); p.add_argument("--out")
+    p = sub.add_parser("mix"); p.add_argument("--public-max", type=int)
     p = sub.add_parser("export"); p.add_argument("--out", required=True)
     p = sub.add_parser("import"); p.add_argument("--answers", required=True); p.add_argument("--label", required=True)
     p = sub.add_parser("score"); p.add_argument("--label", required=True)
     a = ap.parse_args()
-    {"build": cmd_build, "train-data": cmd_train_data, "export": cmd_export, "import": cmd_import,
+    {"build": cmd_build, "train-data": cmd_train_data, "mix": cmd_mix, "export": cmd_export, "import": cmd_import,
      "score": cmd_score}[a.cmd](a)
 
 
