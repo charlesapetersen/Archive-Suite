@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import PDFKit
+import ArchiveCore
 
 /// Key-free, no-network contract for W41.app-institutional-compute. Builds a mixed-cluster bulk folder in the form
 /// `cluster_ocr.py bulk` writes it (`<image>.txt`, `_meta/<image>.json` with `sha256`, `model`, `preset`, `vllm_args`,
@@ -209,6 +210,9 @@ enum InstitutionalComputeImportTestDriver {
             check("a second institution's PDF names its own cluster, not FarmShare",
                   otherText.contains("Example University Atlas · Qwen3.6-27B-FP8")
                   && !otherText.contains("FarmShare"), String(otherText.prefix(200)))
+            check("the Reader's production parser strips the entire long cluster header, including the date",
+                  PDFHeaderParser.extract(otherPDF)?.strippedBody.trimmingCharacters(in: .whitespacesAndNewlines)
+                    == "BOX-TWO text from Example University", PDFHeaderParser.extract(otherPDF)?.strippedBody ?? "")
             if let path = ProcessInfo.processInfo.environment["INSTITUTIONAL_COMPUTE_IMPORT_ARTIFACTS"] {
                 let artifact = URL(fileURLWithPath: path).appendingPathComponent("cluster-header.png")
                 let image = otherPage?.thumbnail(of: NSSize(width: 900, height: 1200), for: .mediaBox)

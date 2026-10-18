@@ -262,12 +262,15 @@ struct PDFGenerator {
         let dateStr = dateFormatter.string(from: Date())
 
         var headerLine = "Extracted text."
+        var importedMetaRange: NSRange?
         if let fileName = originalFileName {
             headerLine += "\n\(fileName)"
         }
         if let imported = result.imported {
             // W41.app-institutional-compute: an institutional-computing bulk run wrote the text — name it, its model, precision and job.
-            headerLine += "\n\(imported.headerSource) \u{00B7} \(imported.headerModel) \u{00B7} \(dateStr)"
+            let metaLine = "\(imported.headerSource) \u{00B7} \(imported.headerModel) \u{00B7} \(dateStr)"
+            importedMetaRange = NSRange(location: headerLine.utf16.count + 1, length: metaLine.utf16.count)
+            headerLine += "\n\(metaLine)"
         } else if let reader = result.secondReader {
             // W41.app-ocr-default: Gemini refused this page and another model wrote the text — name that model.
             headerLine += "\n\(reader.provider) \u{00B7} \(reader.model) \u{00B7} \(dateStr)"
@@ -325,12 +328,24 @@ struct PDFGenerator {
             .paragraphStyle: bodyParaStyle
         ]
 
-        let headerString = NSAttributedString(string: headerLine, attributes: headerAttr)
+        let headerString = NSMutableAttributedString(string: headerLine, attributes: headerAttr)
         let bodyString = NSAttributedString(string: bodyText, attributes: bodyAttr)
 
         let pageWidth: CGFloat = 612
         let margin: CGFloat = 54
         let fullTextWidth = pageWidth - 2 * margin
+        // Institutional names plus precision/job details can wrap the processing date onto a new line.
+        // The shared Reader parser then mistakes that continuation for body text. Keep this contract line
+        // together by fitting its font to the available width; retain the full cluster/model provenance.
+        if let range = importedMetaRange {
+            let meta = headerString.attributedSubstring(from: range)
+            let width = CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(meta), nil, nil, nil))
+            if width > fullTextWidth {
+                headerString.addAttribute(.font,
+                    value: NSFont.systemFont(ofSize: headerFont.pointSize * fullTextWidth / width * 0.98, weight: .semibold),
+                    range: range)
+            }
+        }
         let cols = SessionProcessingConfig.clampTextColumns(textColumns)
 
         // --- Measure the header (always single-column, full width) ---
