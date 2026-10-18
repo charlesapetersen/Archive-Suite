@@ -67,3 +67,6 @@ reads only the Latin strata, and reads old hands poorly.
 
 Files: `manifest.jsonl` (the frozen pages), `drops.jsonl`, `routes.csv` (by route and stratum),
 `routes-pages.csv` (by route and page, public page ids, no text), `routes-paired.json`.
+
+Script specialists (W43.script-specialists): open line models built for these hands, read on the Mac with
+kraken, in [`specialists.md`](specialists.md) (`specialists.csv`, `specialists-pages.csv`).

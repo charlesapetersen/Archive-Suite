@@ -5,8 +5,11 @@
 
 TrOCR reads one cropped line per call (its card: a whole page is not an input it has), so the page is cut on
 the baselines specialists.py segment cached, with kraken's own polygon extraction, and the lines are written in
-the segmentation's order, one per line. A page whose output exists is skipped. Greedy decoding, batches of 16.
+the segmentation's order, one per line. A line kraken's polygon extraction refuses (no boundary, a baseline
+under 5 px) is skipped, as kraken's recogniser skips it. A page whose output exists is skipped. Greedy decoding, batches of 16.
 """
+import dataclasses
+import math
 import sys
 from pathlib import Path
 
@@ -18,6 +21,10 @@ from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 BATCH = 16
 
 
+def usable(baseline):
+    return len(baseline) >= 2 and sum(math.dist(a, b) for a, b in zip(baseline, baseline[1:])) >= 5
+
+
 def main(model_dir, jobs):
     device = 'mps' if torch.backends.mps.is_available() else 'cpu'
     proc = TrOCRProcessor.from_pretrained(model_dir)
@@ -27,6 +34,9 @@ def main(model_dir, jobs):
         if out.exists():
             continue
         seg = xml.XMLPage(seg_xml).to_container()
+        # extract_polygons raises on a line with no boundary or a baseline under 5 px, ending the whole page;
+        # kraken's own recogniser skips such a line, so this does too.
+        seg = dataclasses.replace(seg, lines=[ln for ln in seg.lines if ln.boundary is not None and usable(ln.baseline)])
         with Image.open(seg.imagename) as im:
             crops = [c.convert('RGB') for c, _ in segmentation.extract_polygons(im, seg)]
         lines = []

@@ -279,8 +279,15 @@ def public():
         s = strata.setdefault(m["stratum"], {"pages": 0, "sources": set(), "script": m["script"]})
         s["pages"] += 1
         s["sources"].add(m["source"])
+    spec = PUBLIC / "specialists.csv"   # W43.script-specialists: corpus/specialists.py report
+    specialists = None
+    if spec.exists():
+        with spec.open(newline="") as fh:
+            specialists = [{k: (v if k in ("route", "stratum", "contaminated") else num(v)) for k, v in r.items()}
+                           for r in csv.DictReader(fh)]
     return {"rows": rows, "paired": json.loads((PUBLIC / "routes-paired.json").read_text()),
-            "strata": {k: {**v, "sources": sorted(v["sources"])} for k, v in sorted(strata.items())}}
+            "strata": {k: {**v, "sources": sorted(v["sources"])} for k, v in sorted(strata.items())},
+            "specialists": specialists}
 
 
 def main():

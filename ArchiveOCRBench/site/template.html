@@ -213,6 +213,12 @@ footer p { font-size: 13px; }
     <p class="note">Pages drawn with a fixed seed from published transcriptions (no collection more than a quarter of its stratum), checked against Apple Vision's reading for wrong truth, and frozen before any model read them; the manifest is <code>ArchiveProcessor/segbench-results/bench-corpus/manifest.jsonl</code>. Same prompt, image size and scorer as the 96. Each source keeps its own transcription conventions, so a stratum's score is comparable across routes, not with the 96 or with another stratum. Second score: NES after mapping historical letter forms (long s, ligatures, abbreviation marks) for L5-L8; without diacritics for N1, N3 and N4. Apple Vision runs the app's settings (English, language correction on), so it reads only the Latin-script strata. N4 understates every route twice over: its truth is the main text only, while the prompt asks for everything on the sheet, so a reader that also transcribes the masorah in the margins loses points; and all but one of BiblIA's 132 pages are transcribed without vowel points, which Gemini writes, so for N4 the second score, without marks, is the fairer figure. Gemini's failures were provider errors (HTTP 500 mid-reply, not billed); Qwen's were replies that ran to the 8,192-token limit, mostly repeating a line. Scores only: the page images are not published, whatever their licence allows.</p>
   </section>
 
+  <section class="panel" id="pub-spec" hidden>
+    <div class="head"><h2>Models built for the script</h2><span class="meta">NES %, failures as 0; paired differences in NES points</span></div>
+    <div class="tbl"><table><thead><tr><th>Stratum</th><th>Model</th><th>Trained on a test source</th><th>Answered</th><th>NES</th><th>Second score</th><th>chrF</th><th>Minus Gemini (95%)</th><th>Minus Qwen (95%)</th></tr></thead><tbody id="pub-spec-rows"></tbody></table></div>
+    <p class="note">Open line recognisers for the hardest strata (W43.script-specialists), read on our Mac with kraken: its default blla segmenter cuts each page into lines once, and every model reads the same lines, so a model's score includes the segmenter's reading order. That costs a line model against a whole-page reader, which chrF, nearly blind to order, shows. "Unknown" means the model's record gives no training list to check against our sources; a named source means the model was trained on that test source, so its score is an upper bound, not a specialist's. BiblIA's model writes lines in visual order and is reversed to logical order before scoring. Same pages and scorer as the table above; no money. The page-level models (Qari-OCR for Arabic, CHURRO-3B, the Bern Qwen Kurrent models) need FarmShare and are not yet run; the survey is <code>ArchiveProcessor/segbench-results/bench-corpus/specialists.md</code>.</p>
+  </section>
+
   <footer>
     <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B on FarmShare is priced at $0 because the cluster bills nothing; what it costs is GPU time, shown in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
     <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
@@ -532,6 +538,18 @@ if (PB) {
   if (all) document.getElementById('pub-pair').textContent = P2.a + ' minus ' + P2.b + ', paired over all ' + all.n +
     ' pages: ' + (100 * all.delta).toFixed(1) + ' NES points (95% interval ' + (100 * all.lo).toFixed(1) + ' to ' +
     (100 * all.hi).toFixed(1) + ', permutation p = ' + all.p.toFixed(4) + ').';
+  if (PB.specialists && PB.specialists.length) {
+    const d = (v, lo, hi) => v == null ? '–' : (100 * v >= 0 ? '+' : '') + (100 * v).toFixed(1) + ' (' + (100 * lo).toFixed(1) + ' to ' + (100 * hi).toFixed(1) + ')';
+    const sr = PB.specialists.slice().sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);
+    document.getElementById('pub-spec-rows').innerHTML = sr.map(r => {
+      const second = r.nes_mapped != null ? r.nes_mapped : r.nes_no_marks;
+      return '<tr><td>' + r.stratum + ' · ' + (STRATUM_NAMES[r.stratum] || '') + '</td><td>' + r.route + '</td><td>' +
+        (r.contaminated || 'none listed') + '</td><td>' + r.ok + '/' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(second) +
+        '</td><td>' + p1(r.chrf) + '</td><td>' + d(r.vs_gemini, r.vs_gemini_lo, r.vs_gemini_hi) + '</td><td>' +
+        d(r.vs_qwen, r.vs_qwen_lo, r.vs_qwen_hi) + '</td></tr>';
+    }).join('');
+    document.getElementById('pub-spec').hidden = false;
+  }
 }
 
 Chart.defaults.font.family = css('--body');
