@@ -73,6 +73,22 @@ class Truth(unittest.TestCase):
         self.assertEqual(D.truth_of(["taxes"])[0], "undated")
 
 
+class TrainingTarget(unittest.TestCase):
+    """W41.date-model's target is a reply the app's parser reads back as the owner's date."""
+    def resp(self, text):
+        return {"candidates": [{"content": {"parts": [{"text": text}]}}]}
+
+    def test_round_trips_through_app_parse(self):
+        for tags in (["1968", "03 March"], ["1968"], ["1968", "Date Uncertain"], ["1968", "11 November", "Date Uncertain"]):
+            _, truth = D.truth_of(tags)
+            y, m, du, ok = D.app_parse(self.resp(D.target_of(truth)))
+            self.assertEqual((y, m, du, ok), (str(truth["year"]), truth["month"], truth["du"], True))
+
+    def test_month_is_the_apps_spelling(self):
+        self.assertIn('"month": "03 March"', D.target_of({"year": 1968, "month": 3, "du": False}))
+        self.assertIn('"month": null', D.target_of({"year": 1968, "month": None, "du": False}))
+
+
 if __name__ == "__main__":
     unittest.main()
 

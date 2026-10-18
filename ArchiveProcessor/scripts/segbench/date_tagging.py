@@ -12,6 +12,7 @@ own year, month and Date Uncertain tags.
     python3 date_tagging.py export --out DIR # the sampled prompts as requests.jsonl, for FarmShare's fs_text.py
     python3 date_tagging.py import --answers FILE --label L   # fs_text.py's answers, as the local route reads them
     python3 date_tagging.py score --label L  # an open model's figures, beside Gemini's, in date-tagging.md
+    python3 date_tagging.py train-data [--out DIR]   # W41.date-model's train/val sets (no model call)
 
 OPEN MODELS (2026-10-17). The same prompts through FarmShare's vLLM (farmshare/fs_text.py), sent as the app's local
 route sends a text call: one user message, 512 tokens, temperature 0, no reasoning switch; the reply's reasoning
@@ -172,7 +173,8 @@ def folder_documents(folder, lab):
     return segs
 
 
-def cmd_sample(a):
+def document_pool():
+    """Every agreed, dated document with text, by truth class, as the prompt the app would send; and the counts."""
     lab = {}
     for line in open(os.path.join(CP.CACHE, "labels.jsonl"), encoding="utf-8"):
         g = json.loads(line)
@@ -206,6 +208,12 @@ def cmd_sample(a):
                               "collection": CP.collection_of(f), "pages": len(s["pages"]), "truth": truth,
                               "year_in_text": bool(year_s) and year_s in texts[k][:3000],
                               "prompt": build_prompt(texts[k], context), "n_near": len(near)})
+    counts["folders"] = len(folders)
+    return pool, counts
+
+
+def cmd_sample(a):
+    pool, counts = document_pool()
     rng = random.Random(SEED)
     sample = []
     for cls, want in PER_CLASS.items():
@@ -229,9 +237,53 @@ def cmd_sample(a):
         for d in sample:
             fh.write(json.dumps(d, ensure_ascii=False) + "\n")
     os.replace(os.path.join(CACHE, "sample.jsonl.tmp"), os.path.join(CACHE, "sample.jsonl"))
-    counts["folders"] = len(folders)
     json.dump(dict(sorted(counts.items())), open(os.path.join(CACHE, "sample-summary.json"), "w"), indent=1)
     print(json.dumps(dict(sorted(counts.items())), indent=1))
+
+
+def target_of(truth):
+    """The reply a dating model is trained to give (W41.date-model): the app's JSON with the owner's year, month and
+    Date Uncertain, and nothing else. Subjects and the other fields are omitted (parseTagResponse reads a missing
+    key as none); day is null because the owner's tags carry no day."""
+    m = truth["month"]
+    return json.dumps({"year": str(truth["year"]), "month": f"{m:02d} {MONTH_NAMES[m - 1]}" if m else None,
+                       "day": None, "date_uncertain": truth["du"]}, ensure_ascii=False)
+
+
+def cmd_train_data(a):
+    """W41.date-model's training set: every pooled document with a year, less the 300 sampled (the test), split into
+    corpus_pairs' held-out collections (val) and the rest (train). Decade documents have no year to train to."""
+    pool, _ = document_pool()
+    test = {json.loads(l)["id"] for l in open(os.path.join(CACHE, "sample.jsonl"), encoding="utf-8")}
+    held = set(json.load(open(os.path.join(CP.CACHE, "holdout.json"))))
+    test_prompts = {d["prompt"] for ds in pool.values() for d in ds if d["id"] in test}
+    rows = {"train": [], "val": []}
+    why = collections.Counter()
+    for cls in ("year+month", "year", "year+DU", "decade"):
+        for d in pool[cls]:
+            if d["id"] in test:
+                why["test"] += 1; continue
+            if cls == "decade":
+                why["decade"] += 1; continue
+            if d["prompt"] in test_prompts:
+                why["same prompt as a test document"] += 1; continue
+            split = "val" if d["collection"] in held else "train"
+            rows[split].append({"id": d["id"], "collection": d["collection"], "class": cls,
+                                "year_in_text": d["year_in_text"], "prompt": d["prompt"], "target": target_of(d["truth"])})
+    out = a.out or os.path.join(CACHE, "train")
+    os.makedirs(out, exist_ok=True)
+    for split, rs in rows.items():
+        random.Random(SEED).shuffle(rs)
+        with open(os.path.join(out, split + ".jsonl"), "w", encoding="utf-8") as fh:
+            fh.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rs)
+    summary = {"dropped": dict(why),
+               **{split: {"documents": len(rs), "collections": len({r["collection"] for r in rs}),
+                          "classes": dict(collections.Counter(r["class"] for r in rs)),
+                          "year_not_in_text": sum(not r["year_in_text"] for r in rs)} for split, rs in rows.items()},
+               "test_in_held_collections": sum(d["collection"] in held for ds in pool.values() for d in ds
+                                               if d["id"] in test)}
+    json.dump(summary, open(os.path.join(out, "data.json"), "w"), indent=1)
+    print(json.dumps(summary, indent=1))
 
 
 # --- the model ---------------------------------------------------------------------------------
@@ -649,6 +701,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sample")
+    p = sub.add_parser("train-data"); p.add_argument("--out")
     p = sub.add_parser("run")
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--spread", action="store_true", help="with --limit, take documents spread across the sample")
@@ -656,7 +709,7 @@ def main():
     p = sub.add_parser("export"); p.add_argument("--out", required=True)
     p = sub.add_parser("import"); p.add_argument("--answers", required=True); p.add_argument("--label", required=True)
     a = ap.parse_args()
-    {"sample": cmd_sample, "run": cmd_run, "score": cmd_score, "export": cmd_export, "import": cmd_import}[a.cmd](a)
+    {"sample": cmd_sample, "train-data": cmd_train_data, "run": cmd_run, "score": cmd_score, "export": cmd_export, "import": cmd_import}[a.cmd](a)
 
 
 if __name__ == "__main__":
