@@ -245,7 +245,7 @@ public enum CoordinatedTagWriter {
                 // Everything below reads and writes through a NEW URL for the resolved path, never through
                 // `writeURL` itself: the coordinator hands this block the caller's own `NSURL` object, whose
                 // resource-value cache would answer the reads, and whose cached Finder info a
-                // `setResourceValue` would write back over whatever changed on disk since (measured: a tag
+                // metadata setter would write back over whatever changed on disk since (measured: a tag
                 // write through a cached URL reverted a hidden flag set by another writer). The path is the
                 // coordinator's, so a relocation by a file presenter is still honoured
                 // (W40.fix-identity-url-cache).

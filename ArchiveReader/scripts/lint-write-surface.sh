@@ -104,10 +104,12 @@ SEP=$'\x1f'   # unit separator — cannot occur in Swift source, so a code line 
 # rule<SEP>path<SEP>exact source line (whitespace-trimmed). Every entry is an audited write.
 ALLOW=(
   # The audited Finder-tag write choke-point: CoordinatedTagWriter's coordinated, metadata-only
-  # write, plus its label restore on unintended drift.
-  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (writeURL as NSURL).setResourceValue(intendedTags, forKey: .tagNamesKey)"
-  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (writeURL as NSURL).setResourceValue(intendedLabel ?? 0, forKey: .labelNumberKey)"
-  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (writeURL as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)"
+  # write, plus its label restore on unintended drift. Re-audited for gate-fix (2026-10-17):
+  # W40.fix-identity-url-cache (20e8f078) derives `target` from `writeURL.uncached` INSIDE the
+  # metadata-only coordination block; identity/read guards and post-write verification still apply.
+  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (target as NSURL).setResourceValue(intendedTags, forKey: .tagNamesKey)"
+  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (target as NSURL).setResourceValue(intendedLabel ?? 0, forKey: .labelNumberKey)"
+  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (target as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)"
 
   # RootMarker: creates the archive root's identity file (a NEW sidecar, under NSFileCoordinator,
   # adopting a racing winner rather than overwriting it). It never writes an existing corpus file.

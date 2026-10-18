@@ -2,6 +2,18 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (gate-fix, 2026-10-17) — write-surface lint allowances lagged the fresh-URL writer
+
+`W40.fix-identity-url-cache` (`20e8f078`) moved the three audited tag/label setters from the
+coordinator's cached `writeURL` to `target = writeURL.uncached`, but left the lint's exact-line
+allowances stale. Re-audited all three: they remain inside metadata-only coordination, after the
+identity/trustworthy-read guards, with label-drift restoration and post-write verification. The lint
+now pins those exact `target` lines. Two comments name the metadata setter descriptively to avoid
+tripping the deliberately broad API-name scan; no scan, scope, or safety check changed.
+
+Verified both failing gate steps repeatedly, including all 22 scratch-tree mutation/control checks
+in `test-lint-write-surface.sh`. Only allowance data and prose changed; app behavior is unchanged.
+
 ## ⚠️ LIMITATION (W37.dual-date, 2026-10-06) — the year filter does not say which date matched
 
 The Sort & Filter year range matches a file's own date OR its `Sent With` date (each value meeting both

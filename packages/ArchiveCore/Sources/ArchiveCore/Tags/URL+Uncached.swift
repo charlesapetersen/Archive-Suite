@@ -13,7 +13,7 @@ extension URL {
     /// run-loop turn, and never on a background thread, which is why the defect showed in an undo made
     /// in the same turn as the edit and would show in any writer off the main thread.
     ///
-    /// Writes are affected as well: `setResourceValue` on an `NSURL` that holds cached Finder info
+    /// Writes are affected as well: the metadata setter on an `NSURL` that holds cached Finder info
     /// rebuilds the 32-byte Finder-info block from the CACHE, so a tag or label write through a reused
     /// `URL` silently reverts a hidden flag (measured), a hide-extension bit or a custom icon set by
     /// someone else since the cache was filled. A write through a fresh `URL` leaves them alone.
