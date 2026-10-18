@@ -12,7 +12,8 @@ import Foundation
 ///      the cheap-first cascade escalates;
 ///   2. a repetition check (`isRepetitionLoop`) on a reply that ended by itself but looped;
 ///   3. one page at a time (one model, one GPU), with a timeout long enough for a slow Mac;
-///   4. no API key, temperature 0, and reasoning text (`<think>…</think>`) stripped.
+///   4. no API key, temperature 0, reasoning switched off (`applyReasoningOff`) and any reasoning text
+///      (`<think>…</think>`) that comes anyway stripped.
 /// The app's own reply format already keeps the text when the header tag is missing or unknown
 /// (`OCRPrompt.parseResponse`), which is the lenient parser the measurement asked for.
 enum LocalModelRoute {
@@ -134,6 +135,37 @@ enum LocalModelRoute {
     /// more than the cap on FarmShare (4,341 to 7,371 tokens, `segbench-results/local-route-guards.md`).
     static let newspaperNote = "Whole newspaper pages mostly fail here: on our measurement 18 of 32 broadsheets needed "
         + "more than the \(maxTokens)-token cap. Leave newspapers to the escalation model, or read them in regions."
+
+    // MARK: Reasoning off
+
+    /// Turns a thinking model's reasoning off, under every spelling the presets' servers read (W41.app-local-models-fu2).
+    /// On FarmShare, Qwen3.5 4B and Qwen3.6 27B and 35B-A3B spent the tagging call's 512 tokens thinking on 300 of 300
+    /// documents and dated none; with reasoning off they dated a printed year at 95.8-97.5% (Gemini 97.5%;
+    /// `segbench-results/date-tagging.md`). Qwen3-VL 8B does not think, and its template ignores the switch.
+    ///   - `enable_thinking`: mlx-vlm (0.7.4's request schema reads it at the top level, checked in its source).
+    ///   - `chat_template_kwargs.enable_thinking`: vLLM and llama.cpp's server pass it to the chat template.
+    ///   - `think`: Ollama's own field; whether its OpenAI endpoint reads it is unchecked.
+    /// Each server ignores the names it does not know (mlx-vlm's schema allows extra fields, vLLM warns and drops them,
+    /// Ollama's JSON decoding skips them). No `reasoning_effort`: vLLM has validated it against low, medium and high,
+    /// so "none" could fail every call there. A server that ignores all three still thinks, and a reply with no answer then
+    /// fails (`textAnswer`, and OCR's own check) rather than being read as one.
+    static func applyReasoningOff(_ body: inout [String: Any]) {
+        body["enable_thinking"] = false
+        body["chat_template_kwargs"] = ["enable_thinking": false]
+        body["think"] = false
+    }
+
+    /// A text call's answer (classification, tags, segmentation), or nil when the reply holds none: cut at its token
+    /// budget, empty, or ending in reasoning (an unclosed `<think>`, which `strippingReasoning` keeps). The caller
+    /// throws, so the tagger records its failure instead of parsing the model's thinking as tags. A cut reply is no
+    /// answer even when it began one: a cut JSON object never parsed, and a cut collection name is worse than none.
+    static func textAnswer(_ content: String?, finish: String?) -> String? {
+        guard finish != "length", let content else { return nil }
+        let answer = strippingReasoning(content)
+        return answer.isEmpty || answer.contains("<think>") ? nil : answer
+    }
+
+    static let noTextAnswer = "The local model's reply held no answer (all reasoning, or cut at its token budget)"
 
     // MARK: Reply guards
 

@@ -17,6 +17,8 @@ import Foundation
 ///   5. One page at a time, the time estimate at the model's pace, $0, and the settings round trip.
 ///   6. (W41.app-local-models-fu1) The local reply is streamed and closed as soon as it loops, a looped or capped page
 ///      is read once more with a repetition penalty, the reason says so, and a timeout or a good page is read once.
+///   7. (W41.app-local-models-fu2) Every local call, OCR and text, turns reasoning off under the servers' three
+///      spellings; a text reply with no answer (cut, empty or all reasoning) throws; a remote gateway is unchanged.
 @MainActor
 enum LocalModelsTestDriver {
     nonisolated static let envKey = "LOCALMODELS_TEST"
@@ -220,6 +222,90 @@ enum LocalModelsTestDriver {
         eq("5 a local run costs nothing", cost.totalStandard, 0)
 
         await streamChecks(wire: wire, image: image, local: local, remote: remote, reply: reply)
+        await reasoningOffChecks(wire: wire, image: image, local: local, remote: remote, reply: reply)
+    }
+
+    /// Whether a request body turns reasoning off under all three spellings.
+    private static func asksNoReasoning(_ body: [String: Any]?) -> Bool {
+        body?["enable_thinking"] as? Bool == false && body?["think"] as? Bool == false
+            && (body?["chat_template_kwargs"] as? [String: Any])?["enable_thinking"] as? Bool == false
+            && body?["reasoning_effort"] == nil
+    }
+
+    private static func reasoningOffChecks(wire: Wire, image: URL, local: GatewayConfig, remote: GatewayConfig,
+                                           reply: (String, String) -> String) async {
+        let client = OpenAICompatibleClient.gateway(local)
+        wire.reset(["local-mac": events(["[document_start]\n", "Hello"])])
+        _ = try? await client.ocr(imageURL: image)
+        check("7 a local OCR call turns reasoning off (all three spellings, no reasoning_effort)",
+              asksNoReasoning(wire.requests.first.flatMap(jsonBody)))
+        let runaway = events(["[document_start]\n"] + Array(repeating: "the committee met again on Tuesday. ", count: 600),
+                             finish: "length")
+        wire.reset(["local-mac": runaway])
+        _ = try? await client.ocr(imageURL: image)
+        check("7 the second reading keeps reasoning off", wire.requests.count == 2
+              && asksNoReasoning(wire.requests.last.flatMap(jsonBody)))
+        wire.reset(["local-mac": reply(#"{"year":"1952"}"#, "stop")])
+        let tags = try? await client.textCompletion(prompt: "tags")
+        eq("7 a local text call's answer is returned", tags, #"{"year":"1952"}"#)
+        check("7 a local text call turns reasoning off", asksNoReasoning(wire.requests.first.flatMap(jsonBody)))
+        wire.reset(["remote-gateway": reply("[document_start]\nok", "stop")])
+        _ = try? await OpenAICompatibleClient.gateway(remote).ocr(imageURL: image)
+        _ = try? await OpenAICompatibleClient.gateway(remote).textCompletion(prompt: "tags")
+        check("7 a remote gateway's requests carry no reasoning switch", wire.requests.count == 2
+              && wire.requests.allSatisfy { r in
+                  let b = jsonBody(r)
+                  return b?["enable_thinking"] == nil && b?["think"] == nil && b?["chat_template_kwargs"] == nil
+              })
+
+        // The FarmShare failure: every reply spent the 512 tokens thinking. None is read as tags.
+        func textFails(_ name: String, _ body: String) async {
+            wire.reset(["local-mac": body])
+            do {
+                let got = try await client.textCompletion(prompt: "tags")
+                check(name, false, "returned \(got.prefix(60))")
+            } catch {
+                check(name, "\(error)".contains("no answer"), "\(error)")
+            }
+        }
+        await textFails("7 a text reply cut while thinking fails", reply("<think>The year might be 1952, or", "length"))
+        await textFails("7 a text reply cut after an answer began fails", reply(#"{"year":"19"#, "length"))
+        await textFails("7 a text reply that is an unclosed think block fails", reply("<think>I am not sure.", "stop"))
+        await textFails("7 a text reply that is only a closed think block fails", reply("<think>Hmm.</think>\n", "stop"))
+        await textFails("7 an empty text reply fails", reply("", "stop"))
+        let nullContent = try! JSONSerialization.data(withJSONObject: ["choices": [["finish_reason": "length",
+            "message": ["content": NSNull(), "reasoning_content": "Let me think about the date."]]]])
+        await textFails("7 a text reply with its reasoning in a field and no content fails",
+                        String(data: nullContent, encoding: .utf8)!)
+        await textFails("7 a text reply that ends in an unclosed think block fails",
+                        reply(#"{"year":"1952"}"# + "\n<think>But maybe", "stop"))
+        wire.reset(["local-mac": reply("The year is 1952, I think.</think>\n" + #"{"year":"1952"}"#, "stop")])
+        let opened = try? await client.textCompletion(prompt: "tags")
+        eq("7 a text reply whose block the template opened keeps the answer", opened, #"{"year":"1952"}"#)
+        wire.reset(["local-mac": #"STATUS 422 {"detail":"unknown field think"}"#])
+        do {
+            _ = try await client.textCompletion(prompt: "tags")
+            check("7 a local server's refusal of a text call throws", false)
+        } catch {
+            check("7 a local server's refusal of a text call says why", "\(error)".contains("unknown field think"), "\(error)")
+        }
+        wire.reset(["remote-gateway": reply("", "stop")])
+        let remoteEmpty = try? await OpenAICompatibleClient.gateway(remote).textCompletion(prompt: "tags")
+        eq("7 a remote gateway's empty text reply is unchanged", remoteEmpty, "")
+
+        wire.reset(["local-mac": events(["<think>", "The page shows a letter dated"])])
+        var r = try? await client.ocr(imageURL: image)
+        check("7 an OCR reply that is an unclosed think block is unparsable, not the page's text",
+              r?.text == nil && r?.errorCode == OCRFailureCode.unparsable,
+              "\(String(describing: r?.text)) \(String(describing: r?.errorCode))")
+        wire.reset(["local-mac": events(["[document_start]\n", "Dear Sir,\n", "<think>Is that a 7 or a 1?"])])
+        r = try? await client.ocr(imageURL: image)
+        check("7 an OCR reply that ends in an unclosed think block is unparsable",
+              r?.text == nil && r?.errorCode == OCRFailureCode.unparsable, String(describing: r?.text))
+        wire.reset(["local-mac": reply("<think>The page shows", "stop")])
+        r = try? await client.ocr(imageURL: image)
+        check("7 an unstreamed OCR reply (stream ignored) that is all thinking is unparsable",
+              r?.text == nil && r?.errorCode == OCRFailureCode.unparsable, String(describing: r?.text))
     }
 
     /// A streamed reply as a server sends it: one `data:` event per piece, the finish on the last, then `[DONE]`.

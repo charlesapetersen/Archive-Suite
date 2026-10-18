@@ -61,7 +61,10 @@ struct OpenAICompatibleClient {
             "messages": [["role": "user", "content": contentParts]]
         ]
         body[maxTokensParam] = localModel ? LocalModelRoute.maxTokens : 8192
-        if localModel { body["temperature"] = 0 }
+        if localModel {
+            body["temperature"] = 0
+            LocalModelRoute.applyReasoningOff(&body)
+        }
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
         applyOpenRouterRoute(&body)
 
@@ -118,8 +121,9 @@ struct OpenAICompatibleClient {
         // A local model that looped but stopped by itself (W41.mac-local-measure) is a failed page like a cut one.
         if localModel, LocalModelRoute.isRepetitionLoop(content) { return LocalModelRoute.loopedReply }
         let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(content)
-        // A local reply that was all reasoning (`<think>` only) answered nothing: unparsable, so it can escalate.
-        if localModel, ocrText == nil {
+        // A local reply that was all reasoning (`<think>` only, closed or not) answered nothing: unparsable, so it can
+        // escalate. An unclosed block survives the strip, and the lenient parser would keep it as the page's text.
+        if localModel, ocrText == nil || content.contains("<think>") {
             return OCRResult(text: nil, classification: nil, errorMessage: "The local model's reply held no transcription",
                              errorCode: OCRFailureCode.unparsable)
         }
@@ -179,11 +183,30 @@ struct OpenAICompatibleClient {
             "messages": [["role": "user", "content": prompt]]
         ]
         body[maxTokensParam] = maxTokens
-        if localModel { body["temperature"] = 0 }
+        if localModel {
+            body["temperature"] = 0
+            LocalModelRoute.applyReasoningOff(&body)
+        }
         if let reasoningEffort { body["reasoning_effort"] = reasoningEffort }
         applyOpenRouterRoute(&body)
 
         let (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
+
+        // A local model's reply with no answer (reasoning it was not switched out of, or cut at the budget) is a
+        // failure, never tags or a classification read from its thinking (W41.app-local-models-fu2). A refusal says
+        // why (a server that rejected a request field, say), as the OCR stream does.
+        if localModel, let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
+            throw OCRError.networkError(Self.parseErrorResponse(data: data, statusCode: status))
+        }
+        if localModel, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let choice = (json["choices"] as? [[String: Any]])?.first {
+            let message = choice["message"] as? [String: Any]
+            guard let answer = LocalModelRoute.textAnswer(message?["content"] as? String,
+                                                          finish: choice["finish_reason"] as? String) else {
+                throw OCRError.networkError(LocalModelRoute.noTextAnswer)
+            }
+            return answer
+        }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
@@ -203,7 +226,7 @@ struct OpenAICompatibleClient {
             throw OCRError.networkError("OpenRouter returned no answer")
         }
 
-        return localModel ? LocalModelRoute.strippingReasoning(content) : content
+        return content
     }
 
     private func sendRequest(body: [String: Any], timeoutInterval: TimeInterval) async throws -> (Data, URLResponse) {
