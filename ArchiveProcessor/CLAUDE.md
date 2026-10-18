@@ -515,6 +515,10 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
   WindowPrompts.swift          Prompts w1/g1, verbatim from the bench (the test compares the rendering byte for byte).
   WindowTransports.swift       API (Anthropic/Gemini/OpenAI, injectable HTTP seam), `claude -p` (temp dir of page
                                files), and per-provider routing.
+  LocalSegmenter.swift         The `local` approach (W41.app-local-seg): the corpus-trained Qwen3.5 2B through mlx-vlm
+                               on this Mac, no key; `LocalWindowTransport` (1,024 px, thinking off, one server check
+                               before the first window, one window at a time), the chooser's Mac and memory notes.
+                               Its options.json row: `method_openrouter.py option-local-seg`.
   SegmentationEngineTestDriver.swift   $0 headless self-test (`SEGMENTATION_ENGINE_TEST=1`,
                                `scripts/test-segmentation-engine.sh`): reproduces the bench's verdict on every gap
                                of a recorded box (`scripts/segbench/engine-fixture-deaver.json`, from

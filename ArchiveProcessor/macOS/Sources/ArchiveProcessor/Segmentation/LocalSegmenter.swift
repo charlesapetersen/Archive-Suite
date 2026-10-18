@@ -22,8 +22,25 @@ enum LocalSegmenter {
     /// The bench's token budget for a window (`method_local.MAX_TOKENS` 1,500, then twice that on its retry): the
     /// fine-tuned 2B wrote a mean of about 380 tokens a window on FarmShare. 3,000 holds the retry's budget at once.
     static let maxTokens = 3000
-    /// A window took 18 s on the M3 Pro; the first one also loads (or downloads) the model.
+    /// A window took 18 s on the M3 Pro; ten minutes is room for a slow Mac, never a stopped server (below).
     static let timeout: TimeInterval = LocalModelRoute.requestTimeout
+    /// The warm-up call loads the model before the first window, and on the first run mlx-vlm downloads it (about
+    /// 2.5 GB) inside that call, sending nothing meanwhile: an hour is about 6 Mbit/s.
+    static let warmUpTimeout: TimeInterval = 3600
+    /// Windows that fail in a row before the run stops: the engine retries each window once, so this is two windows
+    /// that failed twice. The run then says why instead of finishing with every gap flagged at confidence 0.
+    static let maxFailuresInARow = 4
+
+    /// The local route's own session. Not `NetworkSession.shared`: that one waits for connectivity, so a stopped or
+    /// crashed server would hold each window to its timeout (and the engine's retry to another); here a refused
+    /// connection fails at once and the run stops with how to start the server.
+    static let session: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
+        c.waitsForConnectivity = false
+        c.timeoutIntervalForRequest = timeout
+        c.timeoutIntervalForResource = warmUpTimeout
+        return URLSession(configuration: c)
+    }()
 
     static func baseURL(_ defaults: UserDefaults = .standard) -> String {
         let s = (defaults.string(forKey: DefaultsKeys.localSegmenterBaseURL) ?? "").trimmingCharacters(in: .whitespaces)
@@ -49,8 +66,8 @@ enum LocalSegmenter {
                        + "\(SegmentationRow.twoSignificant(mac.downloadGB)) GB download.")
         }
         out.append(memoryNote(memoryGB: memoryGB))
-        out.append("Trained on one owner's archives: on boxes it never saw it was about ten points behind the best "
-                   + "cloud model, and its doubts are no guide, so skim every boundary it proposes.")
+        out.append("Trained on one owner's archives: on boxes it never saw it was about ten points behind Gemini 3.8 "
+                   + "Flash and further behind ChatGPT, and its doubts are no guide, so skim every boundary it proposes.")
         return out
     }
 
@@ -72,26 +89,90 @@ enum LocalSegmenter {
 /// route sent it (`method_openrouter.py` `request_body` for a FarmShare key, which the model was trained on): the
 /// images alone in page order, then the prompt; temperature 0; thinking off. No key: the bearer is the local route's
 /// placeholder.
+///
+/// Before the first window it asks whether a server answers (`probe`, five seconds) and then loads the model with a
+/// one-token call (`warmUp`, which also covers the first run's download), so a missing server or a model that cannot
+/// load stops the run with a reason instead of failing every window. A server that stops mid-run fails at once (its
+/// own session does not wait for connectivity) and stops the run too, as do `maxFailuresInARow` failures in a row.
 struct LocalWindowTransport: WindowTransport {
     let baseURL: String
     let modelID: String
-    var http: APIWindowTransport.HTTP = { try await NetworkSession.data(for: $0, policy: .nonIdempotent) }
-    /// Whether a server answers at all, asked once before the first window: the network session waits for
-    /// connectivity, so a stopped server would otherwise hold every window to its timeout.
+    var http: APIWindowTransport.HTTP = { try await LocalSegmenter.session.data(for: $0) }
     var probe: @Sendable (String) async throws -> [String] = { try await LocalModelRoute.listModels(baseURL: $0) }
-    private let checked = ServerCheck()
+    private let state = LocalRunState()
 
     func send(_ r: WindowRequest) async throws -> String {
-        try await checked.once {
+        let (baseURL, modelID, http, probe) = (self.baseURL, self.modelID, self.http, self.probe)
+        try await state.prepareOnce {
             do { _ = try await probe(baseURL) } catch {
                 throw WindowTransportError.fatal("No server answers at \(baseURL). \(LocalSegmenter.startHint)")
             }
+            try await Self.warmUp(baseURL: baseURL, modelID: modelID, http: http)
         }
-        let (data, response) = try await http(try Self.request(r, baseURL: baseURL, modelID: modelID))
+        do {
+            let text = try await answer(r, http: http)
+            await state.succeeded()
+            return text
+        } catch WindowTransportError.failed(let message) {
+            if await state.failed() >= LocalSegmenter.maxFailuresInARow {
+                throw WindowTransportError.fatal("The model on this Mac failed \(LocalSegmenter.maxFailuresInARow) "
+                    + "windows in a row; the last: \(message)")
+            }
+            throw WindowTransportError.failed(message)
+        }
+    }
+
+    private func answer(_ r: WindowRequest, http: APIWindowTransport.HTTP) async throws -> String {
+        let (data, response) = try await Self.call(try Self.request(r, baseURL: baseURL, modelID: modelID),
+                                                   baseURL: baseURL, http: http)
         guard let status = (response as? HTTPURLResponse)?.statusCode else {
             throw WindowTransportError.failed("no HTTP response")
         }
         return try Self.replyText(data: data, status: status)
+    }
+
+    /// Sends one request. A refused or dropped connection means the server is gone: the run stops (a timeout is this
+    /// window's failure, since a slow window on a busy Mac is not a stopped server).
+    static func call(_ request: URLRequest, baseURL: String, http: APIWindowTransport.HTTP) async throws
+        -> (Data, URLResponse) {
+        do { return try await http(request) } catch let e as URLError {
+            switch e.code {
+            case .timedOut: throw WindowTransportError.failed("the local model did not answer in time")
+            case .cancelled: throw CancellationError()
+            default:
+                throw WindowTransportError.fatal("The server at \(baseURL) stopped answering (\(e.localizedDescription)). "
+                    + LocalSegmenter.startHint)
+            }
+        }
+    }
+
+    /// Loads the model with a one-token text call, downloading it first if the server has not yet. A failure stops the
+    /// run with the server's reason: most often the repository is not published or the Model setting is wrong.
+    static func warmUp(baseURL: String, modelID: String, http: APIWindowTransport.HTTP) async throws {
+        let base = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
+        guard let url = URL(string: "\(base)/chat/completions") else {
+            throw WindowTransportError.fatal("Invalid server address: \(baseURL)")
+        }
+        var body: [String: Any] = ["model": modelID, "max_tokens": 1, "temperature": 0,
+                                   "messages": [["role": "user", "content": "Reply OK."]]]
+        LocalModelRoute.applyReasoningOff(&body)
+        var request = URLRequest(url: url, timeoutInterval: LocalSegmenter.warmUpTimeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(LocalModelRoute.placeholderKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response): (Data, URLResponse)
+        do { (data, response) = try await call(request, baseURL: baseURL, http: http) } catch WindowTransportError.failed {
+            throw WindowTransportError.fatal("The server did not load \(modelID) within an hour.")
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else {
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let message = (json?["error"] as? [String: Any])?["message"] as? String ?? json?["error"] as? String
+                ?? json?["detail"] as? String ?? String(decoding: data.prefix(300), as: UTF8.self)
+            throw WindowTransportError.fatal("The server could not load \(modelID) (\(status)): \(message). Check the "
+                + "Model setting: a Hugging Face repository the server can download, or a folder on this Mac.")
+        }
     }
 
     static func request(_ r: WindowRequest, baseURL: String, modelID: String) throws -> URLRequest {
@@ -139,14 +220,23 @@ struct LocalWindowTransport: WindowTransport {
     }
 }
 
-/// Runs a check once per transport; later windows reuse its outcome, a failure included.
-private actor ServerCheck {
-    private var outcome: Result<Void, Error>?
+/// One run's state: the server check and warm-up, made once (later windows reuse its outcome, a failure included),
+/// and the failures in a row.
+private actor LocalRunState {
+    private var prepared: Result<Void, Error>?
+    private var failuresInARow = 0
 
-    func once(_ check: @Sendable () async throws -> Void) async throws {
-        if outcome == nil {
-            do { try await check(); outcome = .success(()) } catch { outcome = .failure(error) }
+    func prepareOnce(_ prepare: @Sendable () async throws -> Void) async throws {
+        if prepared == nil {
+            do { try await prepare(); prepared = .success(()) } catch { prepared = .failure(error) }
         }
-        try outcome?.get()
+        try prepared?.get()
+    }
+
+    func succeeded() { failuresInARow = 0 }
+
+    func failed() -> Int {
+        failuresInARow += 1
+        return failuresInARow
     }
 }

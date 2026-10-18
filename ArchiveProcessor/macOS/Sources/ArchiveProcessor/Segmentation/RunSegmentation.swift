@@ -225,7 +225,8 @@ enum WindowStageTransport {
                 return .failure(Missing(description: p == .anthropic
                     ? "Claude needs an Anthropic API key or a signed-in claude."
                     : p == .gemini ? "Gemini needs an API key."
-                    : p == .openrouter ? "GLM-5.3 Flash needs an OpenRouter API key."                    : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
+                    : p == .openrouter ? "GLM-5.3 Flash needs an OpenRouter API key."
+                    : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
             }
         }
         return .success(RoutingWindowTransport(routes: routes))

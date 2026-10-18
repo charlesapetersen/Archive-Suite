@@ -341,7 +341,7 @@ const SEG = DATA.segmentation.slice().sort((a, b) => (b.nocheck ?? -1) - (a.noch
 SEG.forEach((a, i) => { a.num = i + 1; a.id = 'seg' + i; });
 const pct1 = v => v === null ? '—' : v.toFixed(1) + '%';
 const segP = [];
-SEG.filter(a => a.nocheck !== null && !a.farmshare).forEach(a => {
+SEG.filter(a => a.nocheck !== null && !a.farmshare && !a.mac).forEach(a => {
   const s = [a.nocheck];
   segP.push({ x: a.std, y: a.nocheck, r: a, b: false, s });
   if (a.batch) segP.push({ x: a.batch, y: a.nocheck, r: a, b: true, s });
@@ -351,7 +351,7 @@ const segTop = SEG.filter(a => a.nocheck === SEG[0].nocheck).map(a => a.name);
 document.getElementById('seg-note').textContent = 'Highest: ' + segTop.join(' and ') + (segTop.length > 1 ? ', tied' : '') + ' at ' + SEG[0].nocheck.toFixed(1) + '%. Best-value points: ' +
   segP.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '. ' + (f => f ? 'With checking, ' + f.name + ' reaches 100% with the fewest checks (' + f.checks.toFixed(1) + ' per 100 pages).' : '')(SEG.filter(a => a.nocheck !== null && a.after === 100).sort((a, b) => a.checks - b.checks)[0]);
 document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + '</td><td>' + a.checks.toFixed(1) +
-  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? 'FarmShare GPUs' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
+  '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? 'FarmShare GPUs' : a.mac ? 'free, on your Mac' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
 charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
 
 // Part 3: handwriting.

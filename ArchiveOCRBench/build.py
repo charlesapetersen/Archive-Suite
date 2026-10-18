@@ -141,9 +141,15 @@ def segmentation():
     seg = []
     for c in table_after(OPTIONS_MD.read_text(), "## The five figures"):
         std, batch = money_cells(c[5])
-        seg.append({"name": c[0], "nocheck": pct(c[1]), "checks": float(c[2]), "after": pct(c[3]),
-                    "unflagged": int(re.search(r"\((\d+)\)", c[4]).group(1)), "std": std, "batch": batch,
-                    "source": "options.md"})
+        row = {"name": c[0], "nocheck": pct(c[1]), "checks": float(c[2]), "after": pct(c[3]),
+               "unflagged": int(re.search(r"\((\d+)\)", c[4]).group(1)), "std": std, "batch": batch,
+               "source": "options.md"}
+        # The corpus-trained 2B the app runs on the user's Mac (W41.app-local-seg): free, so in the table and off the
+        # price chart, as the FarmShare rows are.
+        if "on this Mac" in c[0]:
+            row.update(name=c[0] + " (scored at full precision on FarmShare)", std=None, batch=None, mac=True)
+        seg.append(row)
+    shipped_mac = next((a for a in seg if a.get("mac")), None)
     cheap = CHEAP_MD.read_text()
     costs = {c[0]: c for c in table_after(cheap, "### The level fitted per model", 1)}
     gemini = next(a for a in seg if a["name"] == "Gemini only")
@@ -181,6 +187,11 @@ def segmentation():
             if c[0].startswith("Gemini 3.8 Flash"):
                 if any(row[k] != gemini[k] for k in row):
                     sys.exit(f"{md.name}'s Gemini row at 98% no longer matches options.md: {row}")
+                continue
+            # The 2B the app offers is options.md's on-this-Mac approach: shown once, from there, and the two agree.
+            if md == STUDENTS_MD and shipped_mac and c[0] == "Qwen3.5 2B, fine-tuned":
+                if any(row[k] != shipped_mac[k] for k in row):
+                    sys.exit(f"{md.name}'s 2B row at 98% no longer matches options.md: {row}")
                 continue
             seg.append({"name": c[0] + suffix, **row, "std": None, "batch": None, "farmshare": True,
                         "source": md.name})

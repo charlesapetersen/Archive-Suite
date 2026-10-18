@@ -13,6 +13,10 @@
 #                                      OpenRouter GLM-5.3 Flash approach, ~$0.03 for the folder; W41.app-openrouter)
 #                                      [--box Herrnstein --from 19 --to 39]
 #
+#   scripts/test-segmentation-proof.sh --runs local:mac   the corpus-trained 2B on this Mac (W41.app-local-seg): no
+#                                      money, so no --paid. Start mlx-vlm first (mlx_vlm.server --port 8080); the
+#                                      app's defaults, or SEGMENTATION_PROOF_LOCAL_URL / _MODEL (a local path works).
+#
 # No ChatGPT run: since W36.seg-opt-openai the mix is Claude + ChatGPT, and the driver has no OpenAI route (an
 # OpenAI API key is not to be used; the subscription route is W36.seg-opt-siwc), so openai and mix are refused.
 #
@@ -87,7 +91,7 @@ for r in runs.split(","):
 print(f"Estimated total: ${total:.2f}")
 PY
 
-if [ "$paid" != 1 ]; then
+if [ "$paid" != 1 ] && [ "$runs" != "local:mac" ]; then
     echo "Not run: pass --paid to spend it."
     exit 2
 fi

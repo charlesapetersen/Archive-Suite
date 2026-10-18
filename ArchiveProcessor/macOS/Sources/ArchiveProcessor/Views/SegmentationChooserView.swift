@@ -130,15 +130,17 @@ struct LocalSegmenterControls: View {
 
     private func check() {
         checking = true
-        let url = baseURL.isEmpty ? LocalSegmenter.defaultBaseURL : baseURL
-        let model = modelID.isEmpty ? LocalSegmenter.defaultModelID : modelID
+        // What a run would use: the same trimming and defaults.
+        let url = LocalSegmenter.baseURL(), model = LocalSegmenter.modelID()
         Task {
             let text: String
             do {
                 let models = try await LocalModelRoute.listModels(baseURL: url)
-                // mlx-vlm downloads a model it does not list yet on its first request, so an unlisted one is no fault.
+                // mlx-vlm downloads a model it does not list yet on its first request, so an unlisted one is no fault
+                // yet; the run loads it before the first window and stops with the server's reason if it cannot.
                 text = models.contains(model) ? "The server answers and has \(model). Ready."
-                    : "The server answers. It will download \(model) on the first run if it has not already."
+                    : "The server answers but does not list \(model). A run first tries to load it (downloading about "
+                        + "2.5 GB if needed) and stops with the reason if it cannot."
             } catch {
                 text = "No server answers at \(url): \(error.localizedDescription)"
             }

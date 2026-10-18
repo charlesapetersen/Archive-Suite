@@ -459,6 +459,57 @@ enum SegmentationEngineTestDriver {
             let p = res?.proposals ?? []
             check("local: a run through the seam reads the answer and flags at the file's level",
                   p.count == 2 && p[0].decision == .new && !p[0].flagged && p[1].decision == .continue && p[1].flagged)
+
+            // Runs that must stop with a reason rather than finish with every gap at confidence 0. Ten pages are two
+            // windows, so four failures in a row are both windows failing twice.
+            let ten = (0..<10).map { _ in PageInput(jpeg: Data([1]), text: "") }
+            func stops(_ http: @escaping APIWindowTransport.HTTP) async -> (message: String, calls: Int) {
+                let calls = Counter()
+                var t = LocalWindowTransport(baseURL: "http://127.0.0.1:9999/v1", modelID: "me/seg")
+                t.probe = { _ in [] }
+                t.http = { req in
+                    calls.lock.withLock { calls.n += 1 }
+                    return try await http(req)
+                }
+                var s = WindowSegmenter.instant(t)
+                s.maxConcurrent = 1
+                do { _ = try await s.segment(pages: ten, photoKinds: Array(repeating: nil, count: 10), approach: spec) }
+                catch WindowSegmenterError.fatal(let m, _) { return (m, calls.lock.withLock { calls.n }) } catch {}
+                return ("did not stop", calls.lock.withLock { calls.n })
+            }
+            let isWarmUp: @Sendable (URLRequest) -> Bool = { req in
+                let b = req.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+                return b?["max_tokens"] as? Int == 1
+            }
+            let unloadable = await stops { _ in
+                Self.localReply(404, ["error": ["message": "Repository not found"]])
+            }
+            check("local: a model the server cannot load stops the run at the warm-up, naming it and the reason",
+                  unloadable.message.contains("me/seg") && unloadable.message.contains("Repository not found")
+                  && unloadable.calls == 1)
+            let warmCalls = Counter()
+            let died = await stops { req in
+                if isWarmUp(req) {
+                    warmCalls.lock.withLock { warmCalls.n += 1 }
+                    return Self.localReply(200, Self.localChat("OK"))
+                }
+                throw URLError(.cannotConnectToHost)
+            }
+            check("local: a server that stops mid-run stops the run at the first window, with how to start it",
+                  died.message.contains("stopped answering") && died.message.contains("mlx_vlm.server")
+                  && died.calls == 2 && warmCalls.n == 1)
+            let failing = await stops { req in
+                isWarmUp(req) ? Self.localReply(200, Self.localChat("OK")) : Self.localReply(500, ["detail": "boom"])
+            }
+            check("local: \(LocalSegmenter.maxFailuresInARow) failures in a row stop the run with the last reason",
+                  failing.message.contains("\(LocalSegmenter.maxFailuresInARow) windows in a row")
+                  && failing.message.contains("boom") && failing.calls == 1 + LocalSegmenter.maxFailuresInARow)
+            let slow = await stops { req in
+                if isWarmUp(req) { return Self.localReply(200, Self.localChat("OK")) }
+                throw URLError(.timedOut)
+            }
+            check("local: a slow window is this window's failure, not a stopped server",
+                  slow.message.contains("windows in a row") && slow.message.contains("did not answer in time"))
         }
         return out
     }
