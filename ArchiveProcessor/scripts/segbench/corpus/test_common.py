@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Tests for common.py on hand-made fixtures (no network). python3 test_common.py"""
 import io
+import os
+from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 import zipfile
 
@@ -79,7 +82,8 @@ class Fetch(unittest.TestCase):
                     # the hosts W43.corpus-build-more added are exact names: no parent domain, sibling or suffix
                     'https://hf.co/x', 'https://cdn.hf.co/x', 'https://si.edu/x', 'https://www.si.edu/x',
                     'https://edan.si.edu.evil.com/x', 'https://x.ids.si.edu/x', 'https://uni-heidelberg.de/x',
-                    'https://xethub.hf.co/x'):
+                    'https://xethub.hf.co/x', 'https://archive.org.evil.com/x',
+                    'https://x.archive.org/x', 'https://cia.gov.evil.com/x', 'https://www.cia.gov/x'):
             r = self.run_fetch('--head', url)
             self.assertEqual(r.returncode, 2, url)
             self.assertIn('refused', r.stderr)
@@ -91,6 +95,27 @@ class Fetch(unittest.TestCase):
 
     def test_refuses_big_range(self):
         self.assertEqual(self.run_fetch('--range', '0-300000000', 'https://zenodo.org/x').returncode, 2)
+
+    def test_segmentation_hosts_and_redirect_refusal(self):
+        # Stub the wire, not check_host: an allowed first hop must not permit another host.
+        with tempfile.TemporaryDirectory() as d:
+            stub = Path(d) / 'curl'
+            stub.write_text('#!/bin/bash\nif [[ " $* " == *" %{redirect_url} "* ]]; then\n'
+                            '  printf "%s" "${FETCH_TEST_REDIRECT:-}"\nelse\n  echo reached\nfi\n')
+            stub.chmod(0o755)
+            env = {**os.environ, 'PATH': d + os.pathsep + os.environ['PATH'],
+                   'FETCH_TEST_REDIRECT': ''}
+            for host in ('archive.org', 'cia.gov'):
+                r = subprocess.run([str(C.FETCH), '--stdout', f'https://{host}/x'],
+                                   env=env, capture_output=True, text=True)
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, 'reached'), r.stderr)
+            for host in ('example.com', 'ia800000.us.archive.org', 'www.cia.gov'):
+                env['FETCH_TEST_REDIRECT'] = f'https://{host}/x'
+                r = subprocess.run([str(C.FETCH), '--stdout', 'https://archive.org/x'],
+                                   env=env, capture_output=True, text=True)
+                self.assertEqual(r.returncode, 2)
+                self.assertIn('refused host', r.stderr)
+                self.assertNotIn('reached', r.stdout)
 
 
 class Chunks(unittest.TestCase):
