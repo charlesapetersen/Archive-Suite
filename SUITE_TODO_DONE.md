@@ -11835,3 +11835,17 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   publish.sh`; no HF login on this Mac) and W41.app-local-seg-proof (a live run through a real mlx-vlm server, which
   the heavy lock and a memory-guard kill stopped today). No money.
   <!-- /W41.app-local-seg -->
+
+- [x] **W41.app-local-seg-proof — the app's local segmenter end to end on the real 8-bit build [S · ~0.3 session]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter · SHIPPED 2026-10-17 (this commit)
+  (lane: processor) (uses: build). From W41.app-local-seg: every part is covered by the engine and chooser self-tests through the HTTP seam, but no run has yet gone through a real mlx-vlm server. Run `scripts/test-segmentation-proof.sh --runs local:mac` with `SEGMENTATION_PROOF_LOCAL_URL`/`_MODEL` pointed at a guarded `mlx_vlm.server` serving `~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-8bit`, and compare with the bench (Herrnstein 19-39). On 2026-10-17 two things stopped it: the proof script takes the Mac-wide heavy lock, which the guarded server (`run-guarded.sh`) already held, so it waited; and the guard then killed the idle server on swap growth from other work. Start the server and the app under ONE lock holder (a small wrapper run by `run-guarded.sh`, or the proof script starting the server itself), at a quiet time. No money.
+  COMPLETE: real mlx-vlm 0.7.4 serving the corpus-trained 8-bit 2B, through the app stage on scratch Herrnstein 19-39.
+  All 8 expected windows answered; 16/21 pages exact unchecked, 16/20 gaps flagged, 2 changed, 21/21 after review,
+  no unflagged error. Python bench recombination matches every proposed/final boundary, flag confidence and score;
+  the cached full-box subset also agrees (its different edge windows and numbering are disclosed). No locked-box rerun.
+  One-lock guarded runner added, downloads off, 12 GiB footprint/RSS cap and 2 GiB swap-growth cap. Proof coverage now
+  records each parsed window, catching a failure hidden by overlapping answers. Python owns/reaps all app/server
+  groups rather than signalling a stale Bash pid; scratch lifecycle tests cover cleanup/crash and nested shutdown.
+  Debug build succeeds with no new warnings; engine and chooser ALL PASS; independent adversarial review completed.
+  Evidence and reproduction: ArchiveProcessor/segbench-results/proof.md, local-seg-proof.json and local-seg-proof-runtime.json.
+  No money, host GUI or real-corpus writes. Publishing remains the separate owner-action item.
+  <!-- /W41.app-local-seg-proof -->

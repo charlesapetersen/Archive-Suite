@@ -2,6 +2,16 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+
+## ✅ VERIFIED (W41.app-local-seg-proof, 2026-10-17): the local 8-bit segmenter reaches the app's review stage
+
+The real corpus-trained Qwen3.5 2B at 8 bits now runs through mlx-vlm and the Processor's own window stage,
+flagged review and skim on scratch copies of Herrnstein 19-39. Reproduce with
+`scripts/test-local-segmentation-proof.sh` after a Debug build: it owns the server and app under one heavy lock,
+checks memory, disables downloads and keeps boundary evidence. `segbench-results/proof.md` records the result
+and its comparison to the bench. This is a development-folder plumbing proof; the locked-box accuracy and the
+unmeasured 8 GB Mac remain as stated in `seg-students.md`. Publishing the weights is still W41.app-local-seg-publish.
+
 ## ⚠️ LIMITATION (W41.app-local-models, 2026-10-16): what the local open-weight model route does not yet cover
 
 Settings → API Gateway → **A model on this Mac** (`LocalModelRoute`). Open: **only Qwen3-VL 8B at 4-bit is measured on

@@ -12,7 +12,7 @@ import Foundation
 /// driver plays a careful user: confirms the folder photo, answers every flagged gap from the folder's truth
 /// (Keep when the proposal is right, else Split or Join), accepts the skim unchanged, and scores the result.
 ///
-/// What has to be true, per run: the stage ends `.done`; every window got an answer (no gap at confidence 0); the
+/// What has to be true, per run: the stage ends `.done`; every expected voter/window got a parsed answer; the
 /// tokens went to the route's own transport (API tokens metered on the key routes, plan meter readings on the
 /// plan route, none crossing over); and every answered gap landed in the jobs. The figures (pages in an exactly
 /// right document before and after the review, flagged and unflagged-wrong gaps) are reported, not asserted: one
@@ -90,6 +90,15 @@ enum SegmentationProofDriver {
 
         var snapshot: [String: (input: Int, output: Int, calls: Int)] { lock.withLock { tokens } }
 
+        private var answers: [WindowKey: WindowAnswer] = [:]
+        func addAnswer(_ request: WindowRequest, _ answer: WindowAnswer) {
+            guard let first = request.pageNumbers.first, let last = request.pageNumbers.last else { return }
+            lock.withLock {
+                answers[WindowKey(voter: request.voter.name, pages: 0, start: first - 1, end: last)] = answer
+            }
+        }
+        var answeredWindows: [WindowKey: WindowAnswer] { lock.withLock { answers } }
+
         private var served: Set<String> = []
         func addProvider(_ p: String) { _ = lock.withLock { served.insert(p) } }
         /// The OpenRouter providers that answered, as OpenRouter named them (`Z.AI`).
@@ -122,6 +131,18 @@ enum SegmentationProofDriver {
                 }
                 return (data, response)
             }
+        }
+    }
+
+    /// Records only successfully parsed window replies, so an overlapping answer cannot hide a failed window.
+    struct RecordingTransport: WindowTransport {
+        let base: any WindowTransport
+        let meter: Meter
+        func send(_ request: WindowRequest) async throws -> String {
+            let text = try await base.send(request)
+            let answer = try WindowAnswerParser.parse(text, pageNumbers: request.pageNumbers)
+            meter.addAnswer(request, answer)
+            return text
         }
     }
 
@@ -199,10 +220,11 @@ enum SegmentationProofDriver {
         p.windowTransportFactory = { spec, gate in
             gateBox.value = gate
             let env = ProcessInfo.processInfo.environment
-            return WindowStageTransport.make(spec, keys: keys, claudeBinary: planBinary, route: route, gate: gate,
+            let base = WindowStageTransport.make(spec, keys: keys, claudeBinary: planBinary, route: route, gate: gate,
                                              http: meter.http,
                                              local: (env["SEGMENTATION_PROOF_LOCAL_URL"] ?? LocalSegmenter.defaultBaseURL,
                                                      env["SEGMENTATION_PROOF_LOCAL_MODEL"] ?? LocalSegmenter.defaultModelID))
+            return base.map { RecordingTransport(base: $0, meter: meter) }
         }
 
         let started = Date()
@@ -253,7 +275,13 @@ enum SegmentationProofDriver {
         let unflaggedWrong = (0..<gaps).filter { !flaggedIDs.contains($0) && before[$0] != truth[$0] }.count
         let noAnswer = flagged.filter { $0.confidence <= 0 }.count
         let changed = flagged.filter { $0.answer != .keep }.count
-        check("\(name) every window answered", noAnswer == 0, "\(noAnswer) gaps had no answer")
+        let windows = WindowLayout.windows(pageCount: labels.count, pages: spec.windowPages, stride: spec.windowStride)
+        let expected = Set(spec.voters.flatMap { voter in
+            windows.map { WindowKey(voter: voter.name, pages: 0, start: $0.lowerBound, end: $0.upperBound) }
+        })
+        let answered = meter.answeredWindows
+        check("\(name) every window answered", Set(answered.keys) == expected && noAnswer == 0,
+              "\(answered.count)/\(expected.count) parsed windows; \(noAnswer) gaps had no answer")
         check("\(name) every answered gap landed in the jobs",
               flagged.allSatisfy { final[$0.id] == truth[$0.id] })
         check("\(name) the folder photo stays a label", p.jobs[0].classification == .folderLabel || labels[0] != "Folder")
@@ -285,6 +313,17 @@ enum SegmentationProofDriver {
         var result: [String: Any] = [
             "run": name, "approach": approach.rawValue, "route": route.rawValue, "folder": manifest.folder,
             "pages": labels.count, "gaps": gaps, "seconds": seconds,
+            "expected_windows": expected.count, "answered_windows": answered.count,
+            "boundaries_before_review": before, "boundaries_after_review": final, "truth": truth,
+            // No page text, image bytes or free-form cues in the retained proof.
+            "windows": answered.keys.sorted { ($0.voter, $0.start) < ($1.voter, $1.start) }.map { key in
+                ["voter": key.voter, "start": key.start, "end": key.end,
+                 "boundaries": answered[key]!.votes.sorted { $0.key < $1.key }.map { gap, vote in
+                     ["page": gap, "decision": vote.decision.rawValue, "confidence": vote.confidence] as [String: Any]
+                 }] as [String: Any]
+            },
+            "flagged_gaps": flagged.map { ["gap": $0.id, "confidence": $0.confidence,
+                                           "proposal": $0.proposal.rawValue] as [String: Any] },
             "flagged": flagged.count, "changed_by_review": changed, "unflagged_wrong": unflaggedWrong,
             "pages_exact_no_review": exactPages(predicted: before, truth: truth),
             "pages_exact_after_review": exactPages(predicted: final, truth: truth),

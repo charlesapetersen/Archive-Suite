@@ -1,0 +1,433 @@
+[
+  {
+    "answered_windows": 8,
+    "api_tokens": {
+      "local": {
+        "calls": 9,
+        "input": 73049,
+        "output": 2522
+      }
+    },
+    "approach": "local",
+    "boundaries_after_review": [
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ],
+    "boundaries_before_review": [
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ],
+    "changed_by_review": 2,
+    "count_line": "16 boundaries checked, 2 changed",
+    "expected_windows": 8,
+    "flagged": 16,
+    "flagged_gaps": [
+      {
+        "confidence": 0.975,
+        "gap": 1,
+        "proposal": "continue"
+      },
+      {
+        "confidence": 0.97,
+        "gap": 3,
+        "proposal": "continue"
+      },
+      {
+        "confidence": 0.97,
+        "gap": 4,
+        "proposal": "continue"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 5,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 6,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 7,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 8,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.5,
+        "gap": 10,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 12,
+        "proposal": "continue"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 13,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 14,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.97,
+        "gap": 15,
+        "proposal": "continue"
+      },
+      {
+        "confidence": 0.99,
+        "gap": 16,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.99,
+        "gap": 17,
+        "proposal": "continue"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 18,
+        "proposal": "new"
+      },
+      {
+        "confidence": 0.995,
+        "gap": 19,
+        "proposal": "continue"
+      }
+    ],
+    "folder": "Herrnstein 19-39",
+    "gaps": 20,
+    "pages": 21,
+    "pages_exact_after_review": 21,
+    "pages_exact_no_review": 16,
+    "plan_checks_asked": 0,
+    "route": "apiKey",
+    "run": "local:mac",
+    "seconds": 124,
+    "truth": [
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ],
+    "unflagged_wrong": 0,
+    "windows": [
+      {
+        "boundaries": [
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 1
+          },
+          {
+            "confidence": 1,
+            "decision": "continue",
+            "page": 2
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 3
+          }
+        ],
+        "end": 4,
+        "start": 0,
+        "voter": "window-local-seg-2b"
+      },
+      {
+        "boundaries": [
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 1
+          },
+          {
+            "confidence": 0.95,
+            "decision": "continue",
+            "page": 2
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 3
+          },
+          {
+            "confidence": 0.95,
+            "decision": "continue",
+            "page": 4
+          },
+          {
+            "confidence": 0.95,
+            "decision": "continue",
+            "page": 5
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 6
+          }
+        ],
+        "end": 7,
+        "start": 0,
+        "voter": "window-local-seg-2b"
+      },
+      {
+        "boundaries": [
+          {
+            "confidence": 0.99,
+            "decision": "continue",
+            "page": 4
+          },
+          {
+            "confidence": 0.99,
+            "decision": "continue",
+            "page": 5
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 6
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 7
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 8
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 9
+          }
+        ],
+        "end": 10,
+        "start": 3,
+        "voter": "window-local-seg-2b"
+      },
+      {
+        "boundaries": [
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 7
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 8
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 9
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 10
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 11
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 12
+          }
+        ],
+        "end": 13,
+        "start": 6,
+        "voter": "window-local-seg-2b"
+      },
+      {
+        "boundaries": [
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 10
+          },
+          {
+            "confidence": 1,
+            "decision": "continue",
+            "page": 11
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 12
+          },
+          {
+            "confidence": 1,
+            "decision": "continue",
+            "page": 13
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 14
+          },
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 15
+          }
+        ],
+        "end": 16,
+        "start": 9,
+        "voter": "window-local-seg-2b"
+      },
+      {
+        "boundaries": [
+          {
+            "confidence": 0.99,
+            "decision": "continue",
+            "page": 13
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 14
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 15
+          },
+          {
+            "confidence": 0.99,
+            "decision": "continue",
+            "page": 16
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 17
+          },
+          {
+            "confidence": 0.99,
+            "decision": "continue",
+            "page": 18
+          }
+        ],
+        "end": 19,
+        "start": 12,
+        "voter": "window-local-seg-2b"
+      },
+      {
+        "boundaries": [
+          {
+            "confidence": 0.95,
+            "decision": "continue",
+            "page": 16
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 17
+          },
+          {
+            "confidence": 0.99,
+            "decision": "continue",
+            "page": 18
+          },
+          {
+            "confidence": 0.99,
+            "decision": "new",
+            "page": 19
+          },
+          {
+            "confidence": 0.99,
+            "decision": "continue",
+            "page": 20
+          }
+        ],
+        "end": 21,
+        "start": 15,
+        "voter": "window-local-seg-2b"
+      },
+      {
+        "boundaries": [
+          {
+            "confidence": 1,
+            "decision": "new",
+            "page": 19
+          },
+          {
+            "confidence": 1,
+            "decision": "continue",
+            "page": 20
+          }
+        ],
+        "end": 21,
+        "start": 18,
+        "voter": "window-local-seg-2b"
+      }
+    ]
+  }
+]

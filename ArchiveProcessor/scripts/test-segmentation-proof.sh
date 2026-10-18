@@ -16,6 +16,7 @@
 #   scripts/test-segmentation-proof.sh --runs local:mac   the corpus-trained 2B on this Mac (W41.app-local-seg): no
 #                                      money, so no --paid. Start mlx-vlm first (mlx_vlm.server --port 8080); the
 #                                      app's defaults, or SEGMENTATION_PROOF_LOCAL_URL / _MODEL (a local path works).
+#                                      Guarded one-lock runner: scripts/test-local-segmentation-proof.sh.
 #
 # No ChatGPT run: since W36.seg-opt-openai the mix is Claude + ChatGPT, and the driver has no OpenAI route (an
 # OpenAI API key is not to be used; the subscription route is W36.seg-opt-siwc), so openai and mix are refused.
@@ -51,7 +52,7 @@ if [ ! -x "$bin" ]; then
 fi
 
 work=$(mktemp -d)
-trap 'kill "${pid:-}" 2>/dev/null || true; rm -rf "$work"' EXIT
+trap 'rm -rf "$work"' EXIT
 
 # The folder: its pages copied out, their cached Apple Vision text, and the truth labels.
 /usr/bin/python3 - "$box" "$from" "$to" "$work" "$runs" <<'PY'
@@ -109,20 +110,9 @@ ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     SEGMENTATION_PROOF_OUT="$report" SEGMENTATION_PROOF_JSON="$json" \
     SEGMENTATION_PROOF_ANTHROPIC_KEY="$anthropic_key" SEGMENTATION_PROOF_GEMINI_KEY="$gemini_key" \
     SEGMENTATION_PROOF_OPENROUTER_KEY="$openrouter_key" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
+    /usr/bin/python3 "$PWD/scripts/segbench/local_segmentation_proof.py" \
+        --app "$bin" --report "$report" --app-log "$log"
 unset anthropic_key gemini_key openrouter_key
-
-# Each run is a few minutes; the plan route's windows are the slowest (seven Read turns each).
-for _ in $(seq 1 3600); do
-    [ -f "$report" ] && break
-    sleep 1
-done
-if [ ! -f "$report" ]; then
-    echo "Segmentation proof timed out." >&2
-    tail -40 "$log" >&2
-    exit 1
-fi
 
 cat "$report"
 [ -f "$json" ] && cat "$json"

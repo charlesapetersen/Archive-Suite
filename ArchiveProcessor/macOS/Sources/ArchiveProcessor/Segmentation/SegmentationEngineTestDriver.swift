@@ -256,6 +256,16 @@ enum SegmentationEngineTestDriver {
             check("a window that fails once is retried and the result is unchanged",
                   once.calls[k5] == 2 && r1?.proposals == clean?.proposals && r1?.failed.isEmpty == true)
 
+            var oneMissing = replies
+            oneMissing[k5] = "not json"
+            let proofMeter = SegmentationProofDriver.Meter()
+            let recorded = SegmentationProofDriver.RecordingTransport(base: FakeTransport(replies: oneMissing), meter: proofMeter)
+            let masked = try? await WindowSegmenter.instant(recorded).segment(pages: pages, photoKinds: photo, approach: spec)
+            check("proof: overlapping answers cannot hide a failed window",
+                  masked?.failed.count == 1 && masked?.proposals.allSatisfy { $0.confidence > 0 } == true
+                  && proofMeter.answeredWindows.count == ws.count - 1
+                  && proofMeter.answeredWindows.keys.allSatisfy { $0.start != w5.start || $0.end != w5.end })
+
             // Every gap is judged by two windows, so two overlapping windows must fail to leave a gap unanswered.
             let k6 = FakeTransport.key(vname, ws[6].start, ws[6].end)
             var garbled = replies
