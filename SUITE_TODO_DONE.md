@@ -11849,3 +11849,19 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   Evidence and reproduction: ArchiveProcessor/segbench-results/proof.md, local-seg-proof.json and local-seg-proof-runtime.json.
   No money, host GUI or real-corpus writes. Publishing remains the separate owner-action item.
   <!-- /W41.app-local-seg-proof -->
+
+- [x] **W40.audit-ledger-undo — durable undo from the Reader's audit ledger [S-M · Tier-2]** · §W40 verification phase · SHIPPED 2026-10-18 (this commit; checkpoint e4fe101c)
+  Original scope: (lane: reader) (uses: build) (blocked-on: W40.fix-identity-url-cache). The second half of `W40.audit-ledger` (owner, 2026-10-16 walkthrough: build the ledger, and durable undo). The ledger now records every verified Reader tag write (`Core/AuditLedger.swift`, `ArchiveReaderTests/AuditLedgerTests`); undo still reads `NavigationModel`'s in-memory `undoStack`, so a relaunch forgets it. Make undo read the ledger: on launch, rebuild the undo history from the ledger's groups not yet named by a later `undoes` line, skipping `unverified` lines and any line that does not decode; undo applies each line's `inverse` as an occurrence delta to a FRESH read (§9) and re-checks identity first (§6: the line's device/inode and bookmark against the file at the path, a mismatch refuses that file and says so). Waits for `W40.fix-identity-url-cache` because the identity re-check is what it leans on. Decide and state a bound (how far back undo reaches after a relaunch). Also from the Tier-2 review of the ledger (2026-10-17), low: each line costs a `bookmarkData`, `stat` and two open/close pairs on the main actor, so measure a few-thousand-file rename and batch a group's lines into one write if it shows; the file grows without bound (a bookmark is ~1 KB per line); a non-security-scoped bookmark may not resolve after a relaunch in the sandbox (path + inode are the fallback); no fsync. Ship the test that failed before it: `UndoDurabilityTests.testTheUndoHistoryDoesNotSurviveARelaunch` turned into the opposite assertion (undo outlives a relaunch). Builder is not verifier: `R-46` to `fixed-pending-recheck` for the undo half.
+  Shipped: ledger-derived latest 100 forward groups per archive; inverse occurrence deltas against fresh tags,
+  bookmark/device/inode and in-coordination identity checks; synchronized pre-inverse consumption, including
+  interrupted/no-op/failed attempts. Failures name refused files. Forward recording failures warn and block
+  older undo; synchronized recovery barriers prevent crossing gaps, including after reopening. Ledger growth
+  and best-effort forward persistence remain documented limits; no migration because no production output
+  exists. Scratch tests cover relaunch, grouping, identity refusal, duplicate counts/label, bytes, concurrent
+  edits, bounds, interruption and recording failure/recovery. 3,000-file rename 6.525s; appends 0.247s (3.8%),
+  history load 0.284s, so group append batching was not warranted. Tier-2 adversarial review resolved two
+  recording-gap findings. Final Reader smoke: 460 tests pass, no new compiler warnings;
+  focused off-screen VM Undo interaction passes (1 test), screenshot inspected.
+  R-46 fixed-pending-recheck; builder is not verifier. Evidence:
+  verification/evidence/reader/W40.audit-ledger-undo.md.
+  <!-- /W40.audit-ledger-undo -->

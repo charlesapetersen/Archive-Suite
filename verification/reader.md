@@ -979,9 +979,12 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   ledger, excluding groups named by later verified `undoes` lines. A synchronized `undoAttempt` consumes
   an entire group before any inverse, including no-op/failed attempts, to prevent unsafe replay.
   Bookmark/device/inode checks and the coordinated writer's fresh identity check guard each inverse.
-- **Real-path test:** `ArchiveReaderTests/AuditLedgerTests` (7 tests, through `NavigationModel` on scratch
-  fixtures).
-- **Runtime evidence:** none.
+- **Real-path test:** `ArchiveReaderTests/AuditLedgerTests` (7), `UndoDurabilityTests` (8),
+  `LedgerUndoHistoryTests` (10), plus the off-screen VM's
+  `NavigationUITests.testLedgerUndoShowsVerifiedResultOnScratchFixture`.
+- **Runtime evidence:** builder scratch tests and VM check, 2026-10-18:
+  [`evidence/reader/W40.audit-ledger-undo.md`](evidence/reader/W40.audit-ledger-undo.md).
+  Independent promise recheck remains pending.
 - **Status:** `fixed-pending-recheck` (both recording and durable undo; builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unreachable` (a promise with no implementation).

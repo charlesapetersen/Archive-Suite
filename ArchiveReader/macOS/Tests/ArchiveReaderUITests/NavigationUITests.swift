@@ -345,6 +345,32 @@ final class NavigationUITests: FixtureUITestCase {
         captureScreenshot("w21-vmgui-e-matched-identity-writes")
     }
 
+    /// W40.audit-ledger-undo: the toolbar reads the ledger-backed history and reports the verified
+    /// inverse. Relaunch, recovery and identity refusal are exercised more deeply by scratch unit tests.
+    func testLedgerUndoShowsVerifiedResultOnScratchFixture() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        let name = "00002 IMG — Brown.pdf"
+        let path = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(name).path
+        let beforeTags = try XCTUnwrap(URL(fileURLWithPath: path).resourceValues(forKeys: [.tagNamesKey]).tagNames)
+        let beforeBytes = try Data(contentsOf: URL(fileURLWithPath: path))
+        typeInField("ar.filter.name", text: "00002")
+        XCTAssertTrue(waitForRowCount(1))
+        clickRow(0)
+        XCTAssertTrue(waitForTags(on: name, containing: ["Unread"]))
+        toolbarButton("ar.toolbar.markRead").click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Read"], excluding: ["Unread"]))
+        let undo = toolbarButton("ar.toolbar.undo")
+        XCTAssertTrue(undo.isEnabled)
+        undo.click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Unread"], excluding: ["Read"]))
+        XCTAssertTrue(app.staticTexts["Undid 1 change."].waitForExistence(timeout: 5))
+        let afterTags = try XCTUnwrap(URL(fileURLWithPath: path).resourceValues(forKeys: [.tagNamesKey]).tagNames)
+        XCTAssertEqual(beforeTags.sorted(), afterTags.sorted())
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), beforeBytes)
+        XCTAssertFalse(undo.isEnabled, "inverse records cannot become redo candidates")
+        captureScreenshot("w40-audit-ledger-undo-verified")
+    }
+
     private func waitForTags(on filename: String,
                              containing required: [String],
                              excluding forbidden: [String] = [],
