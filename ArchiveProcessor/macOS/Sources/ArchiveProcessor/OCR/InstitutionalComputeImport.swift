@@ -1,27 +1,28 @@
 import CryptoKit
 import Foundation
 
-/// W41.app-farmshare-import — take in the text a FarmShare bulk run already read (`scripts/segbench/farmshare/README.md`
-/// §Bulk), so a page FarmShare answered is not bought again from the run's model.
+/// W41.app-institutional-compute — take in the text an institutional-computing bulk run already read (`scripts/segbench/institutional-compute/README.md`
+/// §Bulk), so a page the cluster answered is not bought again from the run's model.
 ///
 /// A bulk run's output folder holds `<image>.txt` per answered page and `_meta/<image>.json` beside it; since this
-/// item the kit writes the input image's SHA-256 into each `_meta`, with the model, its preset and vLLM arguments
+/// item the kit writes the cluster's display name (`cluster`) into each `_meta`, with the input image's SHA-256,
+/// the model, its preset and vLLM arguments
 /// (the precision) and the Slurm job. A page is matched by the SHA-256 of the file the run is about to read, never
-/// by its name: the bulk tree's paths are FarmShare's, two boxes reuse names like `001.jpg`, and a name match could
+/// by its name: the bulk tree's paths are the cluster's, two boxes reuse names like `001.jpg`, and a name match could
 /// put one photo's text under another. A `_meta` without a hash (a run from before this kit change, or the
 /// pilot's neutral-named renders, which are not the corpus files' bytes anyway) matches nothing.
 ///
-/// What a match gives the page: FarmShare's text, its reader in the PDF header's provider/model positions
-/// (`FarmShare · <model> (<precision>, job <id>)`, `SPEC/tag-format.md`), rotation 0 (FarmShare read the file as
+/// What a match gives the page: the cluster's text, its reader in the PDF header's provider/model positions
+/// (`<cluster> · <model> (<precision>, job <id>)`, `SPEC/tag-format.md`), rotation 0 (the cluster read the file as
 /// stored, and asking the run's provider for the rotation would be a paid call), and — because the panel prompt
-/// FarmShare reads with returns no document-start/continuation label — a text-only classification by the run's own
+/// the cluster reads with returns no document-start/continuation label — a text-only classification by the run's own
 /// model, as the Apple Vision hybrid does. A page with no match (escalated, failed, never read, or not in the
 /// folder) is read by the run's model as usual: the run's cost estimate already counts every page, so falling
 /// through never spends more than the estimate said.
 ///
-/// Read only: nothing here writes into the FarmShare folder or the input images. Applies where the page readers
+/// Read only: nothing here writes into the cluster folder or the input images. Applies where the page readers
 /// do (a direct-provider, non-batch Process Files run); frozen with the run, and a resumed run reloads the folder.
-struct FarmShareImport: Sendable {
+struct InstitutionalComputeImport: Sendable {
     struct Page: Sendable, Equatable {
         /// The page's `<image>.txt`.
         let text: URL
@@ -34,7 +35,7 @@ struct FarmShareImport: Sendable {
     let folder: URL
     /// By the input image's SHA-256 (lowercase hex).
     let pages: [String: Page]
-    /// `_meta` files that matched nothing because they carry no hash or their `.txt` is missing.
+    /// `_meta` files that matched nothing because their provenance is incomplete or their `.txt` is missing.
     let unmatchable: Int
 
     var count: Int { pages.count }
@@ -44,7 +45,7 @@ struct FarmShareImport: Sendable {
         var errorDescription: String? {
             switch self {
             case .notABulkRun(let url):
-                return "\(url.lastPathComponent) has no _meta folder, so it is not the output of a FarmShare bulk run."
+                return "\(url.lastPathComponent) has no _meta folder, so it is not the output of an institutional-computing bulk run."
             }
         }
     }
@@ -52,7 +53,7 @@ struct FarmShareImport: Sendable {
     /// Reads every `_meta/**/*.json` under `folder`. Thousands of small files: call it off the main actor. Two `_meta`
     /// with one hash (the same image twice, or a folder mixing runs) are the same image, so either text is right; the
     /// later one walked names the reader.
-    static func load(folder: URL) throws -> FarmShareImport {
+    static func load(folder: URL) throws -> InstitutionalComputeImport {
         let fm = FileManager.default
         let meta = folder.appendingPathComponent("_meta", isDirectory: true)
         var isDir: ObjCBool = false
@@ -74,36 +75,42 @@ struct FarmShareImport: Sendable {
             var parts = rel
             parts[parts.count - 1] = String(parts[parts.count - 1].dropLast(".json".count)) + ".txt"
             let text = parts.reduce(folder) { $0.appendingPathComponent($1) }
-            guard let sha = (object["sha256"] as? String)?.lowercased(), sha.count == 64,
-                  let model = object["model"] as? String, !model.isEmpty,
+            guard let record = Self.record(object),
                   fm.fileExists(atPath: text.path) else {
                 unmatchable += 1
                 continue
             }
-            let reading = ImportedReading(
-                source: ImportedReading.farmShare, model: model, preset: object["preset"] as? String,
-                precision: ImportedReading.precision(model: model, vllmArgs: object["vllm_args"] as? String),
-                job: object["job"] as? String, kind: object["kind"] as? String)
-            pages[sha] = Page(text: text, meta: url, reading: reading)
+            pages[record.sha] = Page(text: text, meta: url, reading: record.reading)
         }
-        return FarmShareImport(folder: folder, pages: pages, unmatchable: unmatchable)
+        return InstitutionalComputeImport(folder: folder, pages: pages, unmatchable: unmatchable)
     }
 
-    /// The page's FarmShare reading, or nil to read it with the run's model: no match, or its text is gone or
-    /// empty. Hashes the image (one read of the file).
+    /// The page's cluster reading, or nil to read it with the run's model: no match, changed provenance, or its
+    /// text is gone or empty. Hashes the image (one read of the file).
     func result(for imageURL: URL) -> OCRResult? {
         guard !pages.isEmpty, let sha = Self.sha256(of: imageURL), let page = pages[sha],
-              Self.recordedHash(page.meta) == sha,
+              let data = try? Data(contentsOf: page.meta),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let record = Self.record(object), record.sha == sha, record.reading == page.reading,
               let text = try? String(contentsOf: page.text, encoding: .utf8),
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return OCRResult(text: text, classification: nil, rotationDegrees: 0, errorMessage: nil, errorCode: nil,
                          imported: page.reading)
     }
 
-    private static func recordedHash(_ meta: URL) -> String? {
-        guard let data = try? Data(contentsOf: meta),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return (object["sha256"] as? String)?.lowercased()
+    /// No implicit Stanford label: the kit must name the cluster that actually read this page. No migration is
+    /// needed (no app output has been kept). A folder from the older kit must be read again before importing.
+    private static func record(_ object: [String: Any]) -> (sha: String, reading: ImportedReading)? {
+        guard let sha = (object["sha256"] as? String)?.lowercased(), sha.count == 64,
+              sha.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+              let cluster = object["cluster"] as? String,
+              !ImportedReading.headerComponent(cluster).isEmpty,
+              let model = object["model"] as? String,
+              !ImportedReading.headerComponent(model).isEmpty else { return nil }
+        return (sha, ImportedReading(
+            source: cluster, model: model, preset: object["preset"] as? String,
+            precision: ImportedReading.precision(model: model, vllmArgs: object["vllm_args"] as? String),
+            job: object["job"] as? String, kind: object["kind"] as? String))
     }
 
     static func sha256(of url: URL) -> String? {
@@ -122,11 +129,10 @@ struct FarmShareImport: Sendable {
     }
 }
 
-/// Who read a page whose text came in from outside the run (W41.app-farmshare-import). `source`/`headerModel` fill
+/// Who read a page whose text came in from outside the run (W41.app-institutional-compute). `source`/`headerModel` fill
 /// the PDF page-2 header's provider/model positions, as `SecondReader` does, without changing the header's shape.
 struct ImportedReading: Codable, Equatable, Sendable {
-    static let farmShare = "FarmShare"
-
+    /// The human-readable cluster name from this page's `_meta.cluster`.
     let source: String
     /// The served model, as vLLM named it (the Hugging Face repo, e.g. `Qwen/Qwen3.6-27B-FP8`).
     let model: String
@@ -139,14 +145,23 @@ struct ImportedReading: Codable, Equatable, Sendable {
     /// The model's own page-kind label (`typewritten`, `printed`, `mixed`, `handwritten`).
     let kind: String?
 
+    var headerSource: String { Self.headerComponent(source) }
+
+    /// Both free-form header positions must remain on one line and cannot introduce the contract's separator.
+    static func headerComponent(_ value: String) -> String {
+        value.components(separatedBy: .controlCharacters).joined(separator: " ")
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            .split(separator: "\u{00B7}").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
     /// The model position: `Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739)`. Never contains the
     /// header's ` · ` separator.
     var headerModel: String {
         let name = model.split(separator: "/").last.map(String.init) ?? model
         let details = [precision, job.map { "job \($0)" }].compactMap { $0 }
         let line = details.isEmpty ? name : "\(name) (\(details.joined(separator: ", ")))"
-        return line.replacingOccurrences(of: " \u{00B7} ", with: ", ")
-            .components(separatedBy: .newlines).joined(separator: " ")
+        return Self.headerComponent(line)
     }
 
     /// `Qwen/Qwen3.6-27B-FP8` + `--kv-cache-dtype fp8` → `FP8 weights, fp8 KV cache`; bf16 weights quantised by
@@ -172,7 +187,7 @@ struct ImportedReading: Codable, Equatable, Sendable {
 extension OCRProcessor {
     /// A resumed run's import, read again from its folder. A folder that is gone or no longer a bulk run gives nil:
     /// its pages are then read by the run's model, which the run's estimate already counted.
-    nonisolated static func reloadFarmShareImport(_ path: String) -> FarmShareImport? {
-        try? FarmShareImport.load(folder: URL(fileURLWithPath: path, isDirectory: true))
+    nonisolated static func reloadInstitutionalComputeImport(_ path: String) -> InstitutionalComputeImport? {
+        try? InstitutionalComputeImport.load(folder: URL(fileURLWithPath: path, isDirectory: true))
     }
 }

@@ -315,12 +315,13 @@ existing scratch, key-free, no-network execution remains unchanged.
   no route, no auto-retry of an exhausted refusal, Tools diagnostics opting out, the batch parser's codes; and
   (W41.app-ocr-default-fu1) refused batch pages read once at collection, 3.8 Flash's thinking tokens in the
   estimate, second-reader pages and cost in the run history and summary. No API key, network, corpus, or spend.
-- **`test-farmshare-import.sh`** — W41.app-farmshare-import: a FarmShare bulk folder written as `fs_ocr.py bulk`
-  writes it, through the real `performOCRCall` over an injected transport (`FARMSHARE_IMPORT_TEST`): pages matched by
-  their bytes (two boxes' `001.jpg`, a renamed copy), hashless and escalated pages matching nothing, a matched page
+- **`test-institutional-compute-import.sh`** — W41.app-institutional-compute: a mixed-cluster bulk folder written as `cluster_ocr.py bulk`
+  writes it, through the real `performOCRCall` over an injected transport (`INSTITUTIONAL_COMPUTE_IMPORT_TEST`): pages matched by
+  their bytes (two boxes' `001.jpg`, a renamed copy), hashless, invalid-hash, unnamed-cluster and escalated pages matching nothing, a matched page
   spending only the text-only classification call (no image, no rotation call), an unmatched one read by the run's
-  model, the gateway ignoring the import, the `ImportedReading` record and precision label, the PDF header, the
-  persisted result and the resume snapshot. No API key, network, corpus, or spend; not in the health gate.
+  model, the gateway ignoring the import, the `ImportedReading` record and precision label, both institutions' PDF headers, separator/newline sanitizing, replaced-reader metadata rejected, the
+  persisted result and the resume snapshot. `INSTITUTIONAL_COMPUTE_IMPORT_ARTIFACTS=/tmp/<scratch>` saves a rendered
+  PDF-header PNG to inspect. No API key, network, corpus, or spend; not in the health gate.
 - **`test-ocr-cascade.sh`** — W41.app-ocr-cascade: the cheap-first cascade through the real `performOCRCall` over an
   injected transport (`OCRCASCADE_TEST`): which failures escalate (cut off, unparsable, 500) and which never spend a
   second call (key errors, rate limits, overload, timeouts, transport, success), the `secondReader` record, cost and

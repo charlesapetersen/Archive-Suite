@@ -37,7 +37,7 @@ extension OCRProcessor {
     nonisolated static func ocrCallValues(
         for runConfig: SessionProcessingConfig?
     ) -> (rotationMode: RotationMode, standardImageMB: Double, visionSettings: VisionOCRSettings, cascade: OCRCascade,
-          readers: PageReaderPlan, imported: FarmShareImport?) {
+          readers: PageReaderPlan, imported: InstitutionalComputeImport?) {
         guard let runConfig else {
             return (SessionProcessingConfig.defaultRotationMode(),
                     SessionProcessingConfig.runSizing().standardImageMB,
@@ -45,7 +45,7 @@ extension OCRProcessor {
                     OCRCascade.fromDefaults(), .empty, nil)
         }
         return (runConfig.rotationMode, runConfig.standardImageMB, runConfig.visionSettings, runConfig.cascade,
-                runConfig.pageReaders, runConfig.farmShareImport)
+                runConfig.pageReaders, runConfig.institutionalComputeImport)
     }
 
     /// Convert any PDF files in the input list to temporary JPEG images.
@@ -1714,9 +1714,9 @@ extension OCRProcessor {
         cascade: OCRCascade,
         refusalFallback: Bool = true,
         readers: PageReaderPlan = .empty,
-        imported: FarmShareImport? = nil
+        imported: InstitutionalComputeImport? = nil
     ) async -> OCRResult {
-        // W41.app-farmshare-import: a page a FarmShare bulk run already read is not bought again. Before the rotation
+        // W41.app-institutional-compute: a page an institutional-computing bulk run already read is not bought again. Before the rotation
         // task, which would be a paid call too. Direct providers only, as for the page readers (the run start clears
         // the import elsewhere); its classification comes from the run's model on the text alone.
         if let imported, localAgent == nil, gatewayConfig == nil, provider != .appleVision,

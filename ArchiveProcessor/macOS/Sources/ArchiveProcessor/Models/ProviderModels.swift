@@ -522,8 +522,8 @@ struct OCRResult: Codable {
     /// W41.app-page-kind — the page's kind and the reader its kind chose (`PageReaderPlan`). `nil` = the page was
     /// not classified; set by `performOCRCall` on every page the run's plan names, routed or not.
     var pageReader: PageReaderRecord?
-    /// W41.app-farmshare-import — set when the text came in from a FarmShare bulk run instead of the run's model
-    /// (`FarmShareImport`). `nil` = read in this run.
+    /// W41.app-institutional-compute — set when the text came in from an institutional-computing bulk run instead of the run's model
+    /// (`InstitutionalComputeImport`). `nil` = read in this run.
     let imported: ImportedReading?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,

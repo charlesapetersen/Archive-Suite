@@ -155,14 +155,17 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
 <body text…>                   ← or "No text returned by model." (+ error) on OCR failure
 ```
 
-- `<Provider>` is `model.provider.rawValue` (`Anthropic`/`Google Gemini`/`Mistral`/`OpenAI`/`Apple Vision`/`OpenRouter`; an OpenRouter model's
-  name carries its pinned provider and precision, e.g. `Qwen3-VL 235B (deepinfra fp8)`),
-  a custom gateway display name, `FarmShare` for text taken in from a FarmShare bulk run (W41.app-farmshare-import;
-  its model position reads like `Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739)`),
-  **or** `Local CLI Agent (<tool>)` for a subscription-authenticated CLI —
-  treat as free-form. A Local Agent's model position is its explicit CLI override or `CLI default`, never
-  the selected direct-provider fallback. For example, the on-device backend writes
+- `<Provider>` is `model.provider.rawValue` (`Anthropic`/`Google Gemini`/`Mistral`/`OpenAI`/`Apple Vision`/`OpenRouter`),
+  a custom gateway display name, an imported institutional cluster's name, **or** `Local CLI Agent (<tool>)` for a
+  subscription-authenticated CLI. Treat this position as free-form. An OpenRouter model's name carries its pinned
+  provider and precision, e.g. `Qwen3-VL 235B (deepinfra fp8)`. A Local Agent's model position is its explicit CLI
+  override or `CLI default`, never the selected direct-provider fallback. The on-device backend writes
   `Apple Vision · macOS Vision` in the header's provider/model positions.
+  Imported text (W41.app-institutional-compute) uses the per-page `_meta.cluster` name; for example,
+  `FarmShare · Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739)`, or another institution's cluster.
+  Imported cluster and model labels are flattened to one line; middle-dot tokens are replaced by commas so they
+  cannot introduce the header's separators. Missing/blank cluster provenance is not imported. Matching is by the
+  input image's SHA-256, never its name.
 - **Classification — verified values (exact strings):** `Document Start`, `Continuation`, `Box`,
   `Folder`. (These are `DocumentClassification.displayName`; the enum's Codable rawValues
   `document_start`/`document_continuation`/`box_label`/`folder_label` appear only in JSON sidecars,

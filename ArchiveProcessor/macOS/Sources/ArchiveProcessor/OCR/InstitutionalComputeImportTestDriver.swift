@@ -2,18 +2,18 @@ import AppKit
 import Foundation
 import PDFKit
 
-/// Key-free, no-network contract for W41.app-farmshare-import. Builds a FarmShare bulk folder in the form
-/// `fs_ocr.py bulk` writes it (`<image>.txt`, `_meta/<image>.json` with `sha256`, `model`, `preset`, `vllm_args`,
-/// `job`) in a temporary directory, then drives the REAL `OCRProcessor.performOCRCall` through the injected HTTP
+/// Key-free, no-network contract for W41.app-institutional-compute. Builds a mixed-cluster bulk folder in the form
+/// `cluster_ocr.py bulk` writes it (`<image>.txt`, `_meta/<image>.json` with `sha256`, `model`, `preset`, `vllm_args`,
+/// `job`, `cluster`) in a temporary directory, then drives the REAL `OCRProcessor.performOCRCall` through the injected HTTP
 /// transport: a matched page takes FarmShare's text and spends only the text-only classification call, an unmatched
 /// one is read by the run's model, a page is matched by its bytes and never by a name two boxes share, and the
 /// gateway ignores the import. Also the PDF header, the precision label and the resume snapshot. Every file is
 /// scratch; nothing outside the temporary directory is read or written.
 ///
-/// Run via `scripts/test-farmshare-import.sh`.
+/// Run via `scripts/test-institutional-compute-import.sh`.
 @MainActor
-enum FarmShareImportTestDriver {
-    nonisolated static let envKey = "FARMSHARE_IMPORT_TEST"
+enum InstitutionalComputeImportTestDriver {
+    nonisolated static let envKey = "INSTITUTIONAL_COMPUTE_IMPORT_TEST"
     private static var didRun = false
 
     static func runIfRequested() {
@@ -35,7 +35,7 @@ enum FarmShareImportTestDriver {
 
     static func run() async {
         let fm = FileManager.default
-        let root = fm.temporaryDirectory.appendingPathComponent("APFarmShareImport-\(UUID().uuidString)", isDirectory: true)
+        let root = fm.temporaryDirectory.appendingPathComponent("APInstitutionalComputeImport-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: root) }
         var results: [String] = []
         func check(_ name: String, _ condition: Bool, _ detail: String = "") {
@@ -53,36 +53,43 @@ enum FarmShareImportTestDriver {
             finish(["FAIL: fixture JPEGs could not be created"])
             return
         }
-        let sha = { (url: URL) in FarmShareImport.sha256(of: url) ?? "" }
+        let sha = { (url: URL) in InstitutionalComputeImport.sha256(of: url) ?? "" }
         let args = "--tensor-parallel-size 1 --max-model-len 16384 --kv-cache-dtype fp8 --gpu-memory-utilization 0.92"
         // FarmShare's tree mirrors its own --in, so its names need not be the Mac's: box2's page sits under b/.
         write(bulk, "box1/001.jpg", text: "BOX-ONE text from FarmShare",
               meta: ["kind": "typewritten", "table": false, "sha256": sha(box1), "model": "Qwen/Qwen3.6-27B-FP8",
-                     "preset": "qwen3.6-27b", "vllm_args": args, "job": "1849739", "status": "ok"])
-        write(bulk, "b/001.jpg", text: "BOX-TWO text from FarmShare",
+                     "cluster": "FarmShare", "preset": "qwen3.6-27b", "vllm_args": args, "job": "1849739", "status": "ok"])
+        write(bulk, "b/001.jpg", text: "BOX-TWO text from Example University",
               meta: ["kind": "handwritten", "table": false, "sha256": sha(box2), "model": "Qwen/Qwen3.6-27B-FP8",
-                     "preset": "qwen3.6-27b", "vllm_args": args, "job": "1849740", "status": "ok"])
+                     "cluster": "Example University Atlas", "preset": "qwen3.6-27b", "vllm_args": args, "job": "1849740", "status": "ok"])
         // A page from before the kit recorded hashes: matches nothing, even though its name is box3's.
         write(bulk, "box3/009.jpg", text: "OLD text", meta: ["kind": "printed", "table": false, "status": "ok"])
         try? Data(#"{"image": "box1/002.jpg", "reason": "loop", "status": "failed"}"#.utf8 + [10])
             .write(to: bulk.appendingPathComponent("escalate-0.jsonl"))
 
+        // Neither a missing cluster nor an empty one invents a FarmShare attribution. Invalid SHA-256 is rejected.
+        write(bulk, "old/009.jpg", text: "NO CLUSTER", meta: ["sha256": sha(unread), "model": "m"])
+        write(bulk, "empty/009.jpg", text: "EMPTY CLUSTER",
+              meta: ["sha256": sha(unread), "model": "m", "cluster": " \n\t"])
+        write(bulk, "bad-hash/009.jpg", text: "BAD HASH",
+              meta: ["sha256": String(repeating: "z", count: 64), "model": "m", "cluster": "Atlas"])
+
         // 1. Loading.
-        var loaded: FarmShareImport?
-        do { loaded = try FarmShareImport.load(folder: bulk) } catch { check("the bulk folder loads", false, "\(error)") }
-        check("two pages carry a hash; the one without is counted, not matched",
-              loaded?.count == 2 && loaded?.unmatchable == 1, "\(loaded?.count ?? -1) / \(loaded?.unmatchable ?? -1)")
+        var loaded: InstitutionalComputeImport?
+        do { loaded = try InstitutionalComputeImport.load(folder: bulk) } catch { check("the bulk folder loads", false, "\(error)") }
+        check("only complete cluster records match; incomplete or invalid provenance is counted",
+              loaded?.count == 2 && loaded?.unmatchable == 4, "\(loaded?.count ?? -1) / \(loaded?.unmatchable ?? -1)")
         var notBulk = false
-        do { _ = try FarmShareImport.load(folder: input) } catch FarmShareImport.LoadError.notABulkRun { notBulk = true } catch {}
+        do { _ = try InstitutionalComputeImport.load(folder: input) } catch InstitutionalComputeImport.LoadError.notABulkRun { notBulk = true } catch {}
         check("a folder without _meta is refused as not a bulk run", notBulk)
         guard let imported = loaded else { finish(results); return }
 
         // 2. Matching is by bytes.
         check("box1's page takes box1's text", imported.result(for: box1)?.text == "BOX-ONE text from FarmShare")
         check("box2/001.jpg takes box2's text, not box1's (same name, other bytes)",
-              imported.result(for: box2)?.text == "BOX-TWO text from FarmShare")
+              imported.result(for: box2)?.text == "BOX-TWO text from Example University")
         check("a copy under another name still matches by its bytes",
-              imported.result(for: renamed)?.text == "BOX-TWO text from FarmShare")
+              imported.result(for: renamed)?.text == "BOX-TWO text from Example University")
         check("an escalated page and an unread one (hashless meta of the same name) match nothing",
               imported.result(for: escalated) == nil && imported.result(for: unread) == nil)
         let reading = imported.result(for: box1)?.imported
@@ -101,6 +108,11 @@ enum FarmShareImportTestDriver {
                 == "fp8 weights (quantised at load), fp8 KV cache"
               && ImportedReading(source: "FarmShare", model: "m\nx", preset: nil, precision: nil, job: "1\n2",
                                  kind: nil).headerModel == "m x (job 1 2)")
+        check("cluster names cannot add a PDF header field or line",
+              ImportedReading(source: "Example · University\nAtlas\tCluster", model: "m", preset: nil,
+                              precision: nil, job: nil, kind: nil).headerSource == "Example, University Atlas Cluster")
+        check("adjacent middle dots cannot leave an overlapping header separator",
+              ImportedReading.headerComponent("Atlas · · Cluster") == "Atlas, Cluster")
         try? fm.removeItem(at: bulk.appendingPathComponent("box1/001.jpg.txt"))
         check("a text file gone since loading matches nothing (the run's model reads the page)",
               imported.result(for: box1) == nil)
@@ -111,6 +123,12 @@ enum FarmShareImportTestDriver {
         write(bulk, "box1/001.jpg", text: "SOMEONE ELSE's text",
               meta: ["sha256": String(repeating: "0", count: 64), "model": "m"])
         check("a _meta that no longer records the page's hash gives no match", imported.result(for: box1) == nil)
+        write(bulk, "box1/001.jpg", text: "BOX-ONE text from FarmShare", meta: nil)
+        try? saved?.write(to: box1Meta)
+        write(bulk, "box1/001.jpg", text: "REPLACED RUN",
+              meta: ["sha256": sha(box1), "cluster": "Another Cluster", "model": "m", "job": "new"])
+        check("a replaced folder with the same image but a different cluster or model is not misattributed",
+              imported.result(for: box1) == nil)
         write(bulk, "box1/001.jpg", text: "BOX-ONE text from FarmShare", meta: nil)
         try? saved?.write(to: box1Meta)
 
@@ -140,8 +158,9 @@ enum FarmShareImportTestDriver {
         await script.set((200, #"{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"[document_start]\nMODEL-TEXT"}]}}]}"#))
         var r = await ocr(box2)
         var calls = await script.calls()
-        check("a matched page keeps FarmShare's text and its reader",
-              r.text == "BOX-TWO text from FarmShare" && r.imported?.job == "1849740" && r.errorCode == nil)
+        check("a matched page keeps the other institution's text and its reader",
+              r.text == "BOX-TWO text from Example University" && r.imported?.job == "1849740"
+              && r.imported?.source == "Example University Atlas" && r.errorCode == nil)
         check("a matched page spends one text-only call (its classification), with no image and no rotation call",
               calls.count == 1 && !calls[0].contains("inline_data") && !calls[0].contains("inlineData"),
               "\(calls.count) calls")
@@ -149,8 +168,8 @@ enum FarmShareImportTestDriver {
               r.classification == .documentStart && r.rotationDegrees == 0)
         await script.set((500, #"{"error":{"message":"down"}}"#))
         r = await ocr(box2)
-        check("a failed classification call still keeps FarmShare's text, unclassified",
-              r.text == "BOX-TWO text from FarmShare" && r.classification == nil && r.errorMessage == nil)
+        check("a failed classification call still keeps the cluster's text, unclassified",
+              r.text == "BOX-TWO text from Example University" && r.classification == nil && r.errorMessage == nil)
         await script.set((200, #"{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"[document_start]\nMODEL-TEXT"}]}}]}"#))
         r = await ocr(escalated, rotation: .off)
         calls = await script.calls()
@@ -181,6 +200,26 @@ enum FarmShareImportTestDriver {
         check("the PDF header names FarmShare, its model, precision and job in the provider/model positions",
               page2.contains("FarmShare \u{00B7} Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739) \u{00B7} ")
               && page2.contains("BOX-ONE text from FarmShare"), String(page2.prefix(200)))
+        if let other = imported.result(for: box2) {
+            let otherPDF = root.appendingPathComponent("out/other.pdf")
+            _ = try? PDFGenerator().generate(imageURL: box2, result: other, model: flash, outputURL: otherPDF,
+                                             originalFileName: "001.jpg")
+            let otherPage = PDFDocument(url: otherPDF)?.page(at: 1)
+            let otherText = otherPage?.string ?? ""
+            check("a second institution's PDF names its own cluster, not FarmShare",
+                  otherText.contains("Example University Atlas · Qwen3.6-27B-FP8")
+                  && !otherText.contains("FarmShare"), String(otherText.prefix(200)))
+            if let path = ProcessInfo.processInfo.environment["INSTITUTIONAL_COMPUTE_IMPORT_ARTIFACTS"] {
+                let artifact = URL(fileURLWithPath: path).appendingPathComponent("cluster-header.png")
+                let image = otherPage?.thumbnail(of: NSSize(width: 900, height: 1200), for: .mediaBox)
+                let png = image?.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0) }?
+                    .representation(using: .png, properties: [:])
+                try? fm.createDirectory(at: artifact.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? png?.write(to: artifact)
+                check("the cluster PDF header renders to pixels", png != nil && fm.fileExists(atPath: artifact.path))
+                NSLog("ARTIFACT cluster-header: %@", artifact.path)
+            }
+        } else { check("the second institution still matches", false) }
         if let data = try? JSONEncoder().encode(matched),
            let back = try? JSONDecoder().decode(OCRResult.self, from: data) {
             check("a persisted result keeps the reading", back.imported == matched.imported)
@@ -193,21 +232,21 @@ enum FarmShareImportTestDriver {
 
         // 5. The resume snapshot.
         let processor = OCRProcessor()
-        let suite = "APFarmShareImport-\(UUID().uuidString)"
+        let suite = "APInstitutionalComputeImport-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite) ?? .standard
         defer { defaults.removePersistentDomain(forName: suite) }
         var config = SessionProcessingConfig.fromProcessFilesRunStart(defaults)
-        config.farmShareImport = imported
+        config.institutionalComputeImport = imported
         let runtime = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil, runConfig: config)
         let back = (try? JSONEncoder().encode(runtime)).flatMap {
             try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
-        check("the run snapshot records the folder", back?.farmShareFolder == bulk.path)
+        check("the run snapshot records the folder", back?.institutionalComputeFolder == bulk.path)
         check("a resumed run reloads the folder",
-              back?.farmShareFolder.flatMap { OCRProcessor.reloadFarmShareImport($0) }?.count == 2)
+              back?.institutionalComputeFolder.flatMap { OCRProcessor.reloadInstitutionalComputeImport($0) }?.count == 2)
         check("a folder gone since gives no import (its pages go to the run's model)",
-              OCRProcessor.reloadFarmShareImport(root.appendingPathComponent("gone").path) == nil)
+              OCRProcessor.reloadInstitutionalComputeImport(root.appendingPathComponent("gone").path) == nil)
         check("a run without an import records none and its call values carry none",
-              processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil).farmShareFolder == nil
+              processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil).institutionalComputeFolder == nil
               && OCRProcessor.ocrCallValues(for: nil).imported == nil
               && OCRProcessor.ocrCallValues(for: config).imported?.count == 2)
 
@@ -245,8 +284,8 @@ enum FarmShareImportTestDriver {
     private static func finish(_ results: [String]) {
         let passed = !results.contains { $0.hasPrefix("FAIL") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
-        let output = ProcessInfo.processInfo.environment["FARMSHARE_IMPORT_TEST_OUT"].map { URL(fileURLWithPath: $0) }
-            ?? FileManager.default.temporaryDirectory.appendingPathComponent("archiveprocessor-farmshare-import.txt")
+        let output = ProcessInfo.processInfo.environment["INSTITUTIONAL_COMPUTE_IMPORT_TEST_OUT"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.temporaryDirectory.appendingPathComponent("archiveprocessor-institutional-compute-import.txt")
         try? Data(report.utf8).write(to: output, options: .atomic)
         NSLog("%@", report)
         exit(passed ? 0 : 1)

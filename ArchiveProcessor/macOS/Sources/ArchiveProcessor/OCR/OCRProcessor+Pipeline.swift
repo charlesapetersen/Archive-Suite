@@ -297,7 +297,7 @@ extension OCRProcessor {
             segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored(),
             cascade: runConfig?.cascade ?? OCRCascade.fromDefaults(),
             pageReaders: runConfig.map { $0.pageReaders.isEmpty ? nil : $0.pageReaders } ?? nil,
-            farmShareFolder: runConfig?.farmShareImport?.folder.path
+            institutionalComputeFolder: runConfig?.institutionalComputeImport?.folder.path
         )
     }
 
@@ -335,7 +335,7 @@ extension OCRProcessor {
             runConfig.visionSettings = runtime.visionSettings
             runConfig.cascade = runtime.cascade ?? .off
             runConfig.pageReaders = runtime.pageReaders ?? .empty
-            runConfig.farmShareImport = runtime.farmShareFolder.flatMap { Self.reloadFarmShareImport($0) }
+            runConfig.institutionalComputeImport = runtime.institutionalComputeFolder.flatMap { Self.reloadInstitutionalComputeImport($0) }
             runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
             if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
                 runConfig.visionTextLLM = LLMTextConfiguration(
@@ -2643,8 +2643,8 @@ extension OCRProcessor {
         // plan for a later run whose caller set none.
         let plannedReaders = pageReaders
         pageReaders = .empty
-        let plannedImport = farmShareImport
-        farmShareImport = nil
+        let plannedImport = institutionalComputeImport
+        institutionalComputeImport = nil
         guard !files.isEmpty else { return }
         // Never overwrite recovery state from a different interrupted run. The UI surfaces explicit
         // Resume/Dismiss controls, but keep the invariant here as well for shortcuts and programmatic
@@ -2776,8 +2776,8 @@ extension OCRProcessor {
         runConfig.pageReaders = batchMode || gatewayConfig != nil || localAgent != nil || provider == .appleVision
             || preOCRedInput
             ? .empty : plannedReaders
-        // W41.app-farmshare-import: where the page readers apply, and for the same reason (a paid batch is one model).
-        runConfig.farmShareImport = batchMode || gatewayConfig != nil || localAgent != nil || provider == .appleVision
+        // W41.app-institutional-compute: where the page readers apply, and for the same reason (a paid batch is one model).
+        runConfig.institutionalComputeImport = batchMode || gatewayConfig != nil || localAgent != nil || provider == .appleVision
             || preOCRedInput
             ? nil : plannedImport
         if let resumingMixedPDF {
@@ -3359,8 +3359,8 @@ extension OCRProcessor {
             previousText: nil, previousImageURL: nil, gatewayConfig: effectiveRunConfig.gateway,
             localAgent: effectiveRunConfig.localAgent, rotationMode: ocrRun.rotationMode,
             standardImageMB: ocrRun.standardImageMB,
-            // W41.app-farmshare-import: no import here. A Retry (or Rotate & re-run) is the user asking for a fresh
-            // read, and an imported page matches its FarmShare text again by its bytes (Tier-2 review).
+            // W41.app-institutional-compute: no import here. A Retry (or Rotate & re-run) is the user asking for a fresh
+            // read, and an imported page matches its institutional-computing text again by its bytes (Tier-2 review).
             visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: nil)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,

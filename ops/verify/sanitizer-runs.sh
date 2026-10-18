@@ -36,7 +36,7 @@ OUT="${SAN_OUT:-/tmp/sanitizer-runs}/$san"
 mkdir -p "$OUT"
 REPORT_RE='WARNING: ThreadSanitizer|ERROR: AddressSanitizer|SUMMARY: (Thread|Address|UndefinedBehavior)Sanitizer'
 
-DEFAULT_DRIVERS="test-batch-resume.sh test-collection-organize.sh test-dual-date.sh test-farmshare-import.sh
+DEFAULT_DRIVERS="test-batch-resume.sh test-collection-organize.sh test-dual-date.sh test-institutional-compute-import.sh
 test-filerelay.sh test-incremental-skip.sh test-local-models.sh test-localagent.sh test-manifest-persistence.sh
 test-merge-safety.sh test-multipage-reocr.sh test-network-session.sh test-ocr-cascade.sh test-ocr-page-guidance.sh
 test-ocr-page-kind.sh test-ocr-refusal.sh test-processfiles-tagwarn.sh test-processing-history.sh test-recovery.sh
