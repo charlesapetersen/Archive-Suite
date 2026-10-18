@@ -236,8 +236,42 @@ enum SegmentationChooserTestDriver {
         check("1 two scheduled price changes are refused",
               twoChanges != nil && (try? SegmentationOptions.decode(twoChanges!)) == nil)
 
+        // 7. The corpus-trained 2B on this Mac (W41.app-local-seg): runs with nothing, costs nothing, says so, and says
+        // what this Mac's memory means for it and where it learned.
+        let local = row(.local, 1000, SegmentationRoutes(memoryGB: 18))
+        let localFig = options.approach(.local)?.figures?.test
+        eq("7 local runs with no key or claude", local.unavailableReason, nil)
+        eq("7 local offers no key", local.missingKeys, [])
+        eq("7 local no checking is the file's", local.rightWithNoChecking,
+           localFig?.pagesExactNoReview.map { "about \(SegmentationRow.percent($0)) of pages" })
+        eq("7 local no checking", local.rightWithNoChecking, "about 79% of pages")
+        eq("7 local after checking", local.rightAfterChecking, "about 97% of pages")
+        eq("7 local cost", local.costLines, ["none: it runs on this Mac"])
+        eq("7 local adds no dollars", local.apiDollars, 0)
+        eq("7 local cost pane", local.costSummary, CostEstimate.money(0))
+        check("7 local notes: the Mac figures, recommended at 18 GB, trained on one owner's archives",
+              local.notes.count == 3 && local.notes[0].contains("4.4 GB") && local.notes[0].contains("6 s a page")
+              && local.notes[1].contains("recommended") && local.notes[2].contains("one owner's archives"),
+              "\(local.notes)")
+        check("7 local at 8 GB: unmeasured, not recommended",
+              row(.local, 1000, SegmentationRoutes(memoryGB: 8)).notes[1].contains("not been measured"))
+        check("7 local at 64 GB: ample", row(.local, 1000, SegmentationRoutes(memoryGB: 64)).notes[1].contains("ample"))
+        eq("7 other rows carry no notes", row(.gemini, 1000).notes, [])
+        let pricedLocal = mutateBundled { approaches in
+            guard let i = approaches.firstIndex(where: { $0["id"] as? String == "local" }),
+                  var cost = approaches[i]["cost"] as? [String: Any],
+                  var per = cost["per_model"] as? [String: Any], var l = per["L"] as? [String: Any],
+                  var total = cost["total"] as? [String: Any] else { return false }
+            l["list_usd_per_1000_pages"] = 1.0; total["list_usd_per_1000_pages"] = 1.0
+            per["L"] = l; cost["per_model"] = per; cost["total"] = total; approaches[i]["cost"] = cost
+            return true
+        }
+        check("7 a price on the model on this Mac is a problem",
+              pricedLocal?.problems().contains("local: local model L has a price") == true,
+              "\(pricedLocal?.problems() ?? ["could not rebuild the file"])")
+
         // 5. Render guard.
-        for r in [claude, gemini, mix, manual, openai, noClaude, claudePlan] {
+        for r in [claude, gemini, mix, manual, openai, noClaude, claudePlan, local] {
             let name = "\(r.approach.rawValue)\(r.canRun ? "" : "-unavailable")"
             let ink = renderedInk(SegmentationRowCard(row: r, scaleCaption: "per 1,000 pages"), saveAs: name)
             check("5 renders \(r.approach.rawValue)\(r.canRun ? "" : " (unavailable)") (\(ink) dark px)", ink > 300)

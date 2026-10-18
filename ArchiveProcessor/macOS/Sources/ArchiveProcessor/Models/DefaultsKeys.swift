@@ -90,6 +90,10 @@ enum DefaultsKeys {
     static let chatGPTPlanWelcomeShown = "chatGPTPlanWelcomeShown"
     /// `PlanCalibrationStore` JSON: the plan meter's points per notional dollar, measured on this account.
     static let segmentationPlanCalibration = "segmentationPlanCalibration"
+    /// The `local` approach's server and model (W41.app-local-seg): an mlx-vlm server on this Mac, and the repository
+    /// it loads the corpus-trained 2B from. Absent ⇒ `LocalSegmenter.defaultBaseURL` / `defaultModelID`.
+    static let localSegmenterBaseURL = "localSegmenterBaseURL"
+    static let localSegmenterModelID = "localSegmenterModelID"
     static let enableCollectionSegmentation = "enableCollectionSegmentation"
     static let confirmCollectionIDs = "confirmCollectionIDs"
     static let reviewDocumentSegmentation = "reviewDocumentSegmentation"

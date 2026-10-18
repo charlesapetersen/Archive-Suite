@@ -573,6 +573,108 @@
     }
    },
    "note": "W41.seg-cheap (cheap-models.md): the budget option for a user who checks everything flagged; Gemini 3.8 Flash stays the better approach. Measured through method_openrouter.py, scored here by `option-glm`."
+  },
+  {
+   "id": "local",
+   "label": "Corpus-trained Qwen3.5 2B on this Mac (no key)",
+   "available": true,
+   "voters": [
+    "window-local-seg-2b (Qwen3.5 2B fine-tuned on the owner's corpus, 8-bit MLX on this Mac, thinking off, prompt c1)"
+   ],
+   "rule": "min",
+   "level": 0.995,
+   "flag_rule": "flag a gap whose confidence is at or below the level",
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 286,
+     "pages_exact_no_review": 0.7878787878787878,
+     "flagged_per_100_pages": 78.78787878787878,
+     "pages_exact_after_review": 0.9727272727272728,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 4.132231404958677
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 213,
+      "pages_exact_no_review": 0.7325102880658436,
+      "flagged_per_100_pages": 85.2,
+      "pages_exact_after_review": 0.9629629629629629,
+      "unflagged_errors": 3,
+      "unflagged_errors_per_500_pages": 6.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 73,
+      "pages_exact_no_review": 0.9425287356321839,
+      "flagged_per_100_pages": 64.60176991150442,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 404,
+     "pages_exact_no_review": 0.9054054054054054,
+     "flagged_per_100_pages": 73.32123411978222,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
+    }
+   },
+   "tokens_per_1000_pages": {
+    "L": {
+     "model": "seg-qwen3.5-2b-8bit",
+     "provider": "this Mac (mlx-vlm)",
+     "precision": "8-bit MLX (scored at bf16)",
+     "reasoning": "off",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 914,
+     "calls": 310,
+     "input_per_1000_pages": 3314966.0831509847,
+     "output_per_1000_pages": 129974.83588621444,
+     "spent_usd": 0,
+     "how": "the usage vLLM returned on every logged FarmShare call of the bf16 model"
+    }
+   },
+   "cost": {
+    "per_model": {
+     "L": {
+      "list_usd_per_1000_pages": 0.0,
+      "batch_usd_per_1000_pages": null,
+      "price_source": "runs on this Mac; no provider is paid"
+     }
+    },
+    "total": {
+     "list_usd_per_1000_pages": 0.0,
+     "batch_usd_per_1000_pages": null
+    }
+   },
+   "mac": {
+    "build": "8-bit MLX (9.6 bits a weight)",
+    "download_gb": 2.5,
+    "peak_memory_gb": 4.4,
+    "seconds_per_window": 18,
+    "seconds_per_page": 6,
+    "measured_on": "18 GB M3 Pro",
+    "thumbnail_long_edge_px": 1024,
+    "dev_pooled_pages_exact_no_review": 0.903,
+    "dev_pooled_bf16": 0.905,
+    "source": "seg-students.md \u00a7On the Mac (W41.seg-mac-model)"
+   },
+   "note": "W41.seg-finetune and W41.seg-mac-model (seg-students.md): trained on one owner's archives (no test-box page seen); its confidences make no useful flag, so the review asks about most gaps. A no-key, no-cost first draft whose boundaries the user skims. Scored here by `option-local-seg`."
   }
  ],
  "openai_measured": {
@@ -584,5 +686,10 @@
   "date": "2026-10-14",
   "item": "W41.seg-cheap-more",
   "added": "W41.app-openrouter"
+ },
+ "local_measured": {
+  "date": "2026-10-17",
+  "item": "W41.seg-finetune",
+  "added": "W41.app-local-seg"
  }
 }

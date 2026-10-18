@@ -10,6 +10,7 @@ W41.seg-cheap: the cheap cloud models over the same windows (the ``CHEAP`` set, 
     python method_openrouter.py collect-five <model> --final   # those calls (dev boxes, then the test boxes)
     python method_openrouter.py report-five                    # each finalist on all five boxes, flagged at <= 0.85
     python method_openrouter.py option-glm                     # GLM-5.3 Flash as an approach in options.json
+    python method_openrouter.py option-local-seg               # the corpus-trained 2B as the `local` approach
     SEGBENCH_OR_API=http://127.0.0.1:8000/v1 python method_openrouter.py collect fs-qwen3.5-27b   # a local server
 
 Owner, 2026-10-11 (SUITE_TODO W41): do the models a 64 GB Mac could hold segment any better than the 4B-12B
@@ -639,6 +640,69 @@ def option_glm() -> dict:
     return entry
 
 
+# W41.app-local-seg: the corpus-trained 2B as the `local` approach. Scored as `option-glm` scores GLM: the level fitted
+# on the development boxes at options.json's bar, the test boxes scored at it, from the full-precision FarmShare run
+# (`fs-seg-2b`; the test boxes were scored once, there). The Mac's 8-bit build matched it on the development boxes
+# (90.3% against 90.5%, seg-students.md §On the Mac). No money: the cost is zero, with the tokens the run logged.
+LOCAL_SEG_KEY = "fs-seg-2b"
+LOCAL_SEG_CODE = "L"
+LOCAL_SEG_VOTER = ("window-local-seg-2b (Qwen3.5 2B fine-tuned on the owner's corpus, 8-bit MLX on this Mac, "
+                   "thinking off, prompt c1)")
+# The voter's model id in WindowVoter.catalog (SegmentationApproach.swift). It names the build, not where it is
+# downloaded from: the app sends the repository the user's setting names (LocalSegmenter.modelID).
+LOCAL_SEG_MODEL = "seg-qwen3.5-2b-8bit"
+
+
+def option_local_seg() -> dict:
+    import options as O
+    E, boxes = five_box([f"X:{LOCAL_SEG_KEY}"])
+    code = (f"X:{LOCAL_SEG_KEY}",)
+    dev = {n: boxes[n] for n in data.DEV}
+    out = json.loads(O.OUT_JSON.read_text())
+    bar0 = E.BAR
+    try:
+        E.BAR = out["bar_after_review"]
+        v = E.fit_level(list(dev.values()), code)
+        if v is None or not 0 < v < 1:
+            raise SystemExit(f"no usable level for the 2B at the {out['bar_after_review']} bar: {v}")
+        lo = E.loco(dev, code)["pooled"]
+        per = [E.evaluate(boxes[n], code, v) | {"name": n} for n in data.TEST]
+    finally:
+        E.BAR = bar0
+    p = E.pooled(per)
+    recs = [r for r in records(LOCAL_SEG_KEY) if r["collection"] in FIVE]
+    pages = sum(boxes[n].pages for n in FIVE)
+    tin = 1000 * sum(r.get("prompt_tokens") or 0 for r in recs) / pages
+    tout = 1000 * sum(r.get("gen_tokens") or 0 for r in recs) / pages
+    entry = {
+        "id": "local", "label": "Corpus-trained Qwen3.5 2B on this Mac (no key)", "available": True,
+        "voters": [LOCAL_SEG_VOTER],
+        "rule": "min", "level": v, "flag_rule": "flag a gap whose confidence is at or below the level",
+        "figures": {"test": O.figures(p), "test_by_box": {r["name"]: O.figures(r) for r in per},
+                    "dev_held_out": O.figures(lo)},
+        "tokens_per_1000_pages": {LOCAL_SEG_CODE: {
+            "model": LOCAL_SEG_MODEL, "provider": "this Mac (mlx-vlm)", "precision": "8-bit MLX (scored at bf16)",
+            "reasoning": "off", "boxes": sorted(FIVE), "pages": pages, "calls": len(recs),
+            "input_per_1000_pages": tin, "output_per_1000_pages": tout, "spent_usd": 0,
+            "how": "the usage vLLM returned on every logged FarmShare call of the bf16 model"}},
+        "cost": {"per_model": {LOCAL_SEG_CODE: {"list_usd_per_1000_pages": 0.0, "batch_usd_per_1000_pages": None,
+                                                "price_source": "runs on this Mac; no provider is paid"}},
+                 "total": {"list_usd_per_1000_pages": 0.0, "batch_usd_per_1000_pages": None}},
+        "mac": {"build": "8-bit MLX (9.6 bits a weight)", "download_gb": 2.5, "peak_memory_gb": 4.4,
+                "seconds_per_window": 18, "seconds_per_page": 6, "measured_on": "18 GB M3 Pro",
+                "thumbnail_long_edge_px": 1024,
+                "dev_pooled_pages_exact_no_review": 0.903, "dev_pooled_bf16": 0.905,
+                "source": "seg-students.md §On the Mac (W41.seg-mac-model)"},
+        "note": "W41.seg-finetune and W41.seg-mac-model (seg-students.md): trained on one owner's archives (no test-box "
+                "page seen); its confidences make no useful flag, so the review asks about most gaps. A no-key, "
+                "no-cost first draft whose boundaries the user skims. Scored here by `option-local-seg`."}
+    out["approaches"] = [a for a in out["approaches"] if a["id"] != "local"] + [entry]
+    out["local_measured"] = {"date": "2026-10-17", "item": "W41.seg-finetune", "added": "W41.app-local-seg"}
+    O.OUT_JSON.write_text(json.dumps(out, indent=1) + "\n")
+    O.OUT_MD.write_text(O.render(out))
+    return entry
+
+
 def cheap_rows(name) -> list[str]:
     """One row per cheap model: score, cost paid, and cost per 1,000 pages at the standard and batch prices."""
     col = data.load(name)
@@ -689,6 +753,12 @@ def main(argv) -> int:
         print(f"glm: level {e['level']:.3f}, test {100 * t['pages_exact_no_review']:.1f}% no checking, "
               f"{t['flagged_per_100_pages']:.1f} per 100 pages, {100 * t['pages_exact_after_review']:.1f}% after, "
               f"{t['unflagged_errors']} unflagged, ${e['cost']['total']['list_usd_per_1000_pages']:.2f} per 1,000")
+    elif argv and argv[0] == "option-local-seg":
+        e = option_local_seg()
+        t = e["figures"]["test"]
+        print(f"local: level {e['level']:.3f}, test {100 * t['pages_exact_no_review']:.1f}% no checking, "
+              f"{t['flagged_per_100_pages']:.1f} per 100 pages, {100 * t['pages_exact_after_review']:.1f}% after, "
+              f"{t['unflagged_errors']} unflagged")
     elif len(argv) == 2 and argv[0] == "freeze-teacher":
         freeze_teacher(argv[1])
     elif argv and argv[0] == "report-teacher":

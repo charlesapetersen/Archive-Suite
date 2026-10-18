@@ -166,7 +166,9 @@ extension OCRProcessor {
         }
 
         do {
-            let result = try await WindowSegmenter(transport: transport)
+            // A model on this Mac reads one window at a time (one model, one GPU), as the local OCR route reads pages.
+            let onThisMac = spec.voters.allSatisfy { $0.provider == .local }
+            let result = try await WindowSegmenter(transport: transport, maxConcurrent: onThisMac ? 1 : 3)
                 .segment(pages: loaded.compactMap { $0 }, photoKinds: pages.photoKinds, approach: spec,
                          answered: prior)
             persistWindowSegmentationProgress(windows: result.answered)

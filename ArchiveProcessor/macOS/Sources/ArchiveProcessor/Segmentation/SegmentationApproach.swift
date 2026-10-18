@@ -16,6 +16,7 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
     case openai   // an OpenAI model over the same windows; offered only once options.json measures it
     case mix      // the window voters combined by the rule options.json names
     case glm      // GLM-5.3 Flash through OpenRouter, the budget approach (W41.app-openrouter)
+    case local    // the corpus-trained Qwen3.5 2B on this Mac through mlx-vlm, no key (W41.app-local-seg)
 
     var id: String { rawValue }
 
@@ -199,10 +200,27 @@ struct SegmentationOptions: Decodable, Sendable {
         let figures: FigureSets?
         let cost: Cost?
         let tokensPer1000Pages: [String: Tokens]?
+        /// A model run on the user's Mac: what it measured there (W41.app-local-seg).
+        let mac: Mac?
 
         enum CodingKeys: String, CodingKey {
-            case id, label, available, voters, rule, level, reason, figures, cost
+            case id, label, available, voters, rule, level, reason, figures, cost, mac
             case tokensPer1000Pages = "tokens_per_1000_pages"
+        }
+    }
+
+    /// `seg-students.md` §On the Mac, as `method_openrouter.py option-local-seg` copies it.
+    struct Mac: Decodable, Sendable {
+        let downloadGB: Double
+        let peakMemoryGB: Double
+        let secondsPerPage: Double
+        let measuredOn: String
+
+        enum CodingKeys: String, CodingKey {
+            case downloadGB = "download_gb"
+            case peakMemoryGB = "peak_memory_gb"
+            case secondsPerPage = "seconds_per_page"
+            case measuredOn = "measured_on"
         }
     }
 
@@ -275,11 +293,21 @@ struct SegmentationOptions: Decodable, Sendable {
             if WindowCombineRule(rawValue: a.rule ?? "") == nil { out.append("\(a.id): rule \(a.rule ?? "nil")") }
             let voters = a.voters ?? []
             if voters.isEmpty { out.append("\(a.id): no voters") }
+            var edges = Set<Int?>()
             for v in voters {
                 switch WindowVoter.resolve(v) {
-                case .success: break
+                case .success(let voter): edges.insert(voter.thumbnailLongEdgePx)
                 case .failure(let e): out.append("\(a.id): \(e.description)")
                 }
+            }
+            if edges.count > 1 { out.append("\(a.id): its voters were measured at different image sizes") }
+            // A model on the user's Mac costs nothing, and the chooser says so instead of pricing it.
+            for (key, cost) in a.cost?.perModel ?? [:] {
+                let provider = WindowVoter.catalog.first { $0.modelID == a.tokensPer1000Pages?[key]?.model }?.provider
+                if provider == .local, cost.listUSDPer1000Pages != 0 {
+                    out.append("\(a.id): local model \(key) has a price")
+                }
+                if provider == .local, a.mac == nil { out.append("\(a.id): local model \(key) has no mac figures") }
             }
         }
         for c in SegmentationApproach.allCases where approach(c) == nil {
@@ -304,9 +332,11 @@ struct SegmentationOptions: Decodable, Sendable {
             }
         }
         guard !voters.isEmpty else { throw SegmentationOptionsError.incomplete(a.rawValue) }
+        // One image size a run: `problems()` refuses an approach whose voters were measured at different sizes.
+        guard Set(voters.map(\.thumbnailLongEdgePx)).count == 1 else { throw SegmentationOptionsError.incomplete(a.rawValue) }
         return ApproachSpec(voters: voters, rule: rule, level: level,
                             windowPages: window.pages, windowStride: window.stride,
-                            thumbnailLongEdgePx: window.thumbnailLongEdgePx,
+                            thumbnailLongEdgePx: voters[0].thumbnailLongEdgePx ?? window.thumbnailLongEdgePx,
                             ocrTextChars: window.ocrTextCharsPerPage)
     }
 }
@@ -357,14 +387,17 @@ struct ApproachSpec: Sendable {
 /// The provider a voter's model is reached through.
 enum WindowProvider: String, Sendable {
     case anthropic, gemini, openai, openrouter
+    /// A server on this Mac (`LocalSegmenter`): no key, no money.
+    case local
 
-    /// The Keychain account holding this provider's key (the OCR providers' accounts).
-    var keychainAccount: LLMProvider {
+    /// The Keychain account holding this provider's key (the OCR providers' accounts); nil for one that needs none.
+    var keychainAccount: LLMProvider? {
         switch self {
         case .anthropic: return .anthropic
         case .gemini: return .gemini
         case .openai: return .openai
         case .openrouter: return .openrouter
+        case .local: return nil
         }
     }
 }
@@ -381,6 +414,9 @@ struct WindowVoter: Sendable, Equatable {
     /// `reasoning_effort` (Codex's `model_reasoning_effort` in the bench).
     let thinkingLevel: String?
     let prompt: WindowPromptID
+    /// The page images' long edge when it is not the file's window figure: the local 2B was trained and measured on
+    /// 1,024 px pages (`method_local.MAX_SIDE`), the cloud voters on 1,600.
+    var thumbnailLongEdgePx: Int? = nil
 
     /// The voters the app can run. A voter in options.json that is not here (or whose prompt id differs)
     /// fails validation, so a bench change cannot silently run against the wrong prompt.
@@ -397,6 +433,11 @@ struct WindowVoter: Sendable, Equatable {
         // `method_local.request` builds it, pinned to z-ai fp8 at reasoning minimal (`OpenRouterRoute`).
         WindowVoter(name: "window-openrouter-glm-5.3-flash", provider: .openrouter, modelID: "z-ai/glm-5.3-flash",
                     thinkingLevel: "minimal", prompt: .c1),
+        // W41.seg-finetune's Qwen3.5 2B, trained on c1 requests as `method_local.request` builds them (the images
+        // alone, 1,024 px, thinking off) and run so on the Mac (W41.seg-mac-model). The model id names the build;
+        // the request sends the repository the user's setting names (`LocalSegmenter.modelID`).
+        WindowVoter(name: "window-local-seg-2b", provider: .local, modelID: LocalSegmenter.buildID,
+                    thinkingLevel: nil, prompt: .c1, thumbnailLongEdgePx: 1024),
     ]
 
     struct ResolveError: Error, CustomStringConvertible {

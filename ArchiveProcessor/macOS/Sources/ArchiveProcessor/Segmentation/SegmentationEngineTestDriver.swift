@@ -307,6 +307,11 @@ enum SegmentationEngineTestDriver {
             }
         }
 
+        // 10. The corpus-trained 2B on this Mac (W41.app-local-seg).
+        if let options {
+            for (name, ok) in await localChecks(options: options) { check(name, ok) }
+        }
+
         // Fatal: the run stops at once and no window is retried.
         if let options, let spec = try? options.spec(for: .claude) {
             final class Refusing: WindowTransport, @unchecked Sendable {
@@ -353,6 +358,119 @@ enum SegmentationEngineTestDriver {
         check("page and photo counts must match", mismatchRefused)
 
         finish(results)
+    }
+
+    /// The `local` approach: its spec, the request the model was trained on, the reply guards, the keyless route, and
+    /// a stopped server stopping the run at once rather than holding every window to its timeout.
+    private static func localChecks(options: SegmentationOptions) async -> [(String, Bool)] {
+        var out: [(String, Bool)] = []
+        func check(_ name: String, _ ok: Bool) { out.append((name, ok)) }
+
+        let spec = try? options.spec(for: .local)
+        let voter = spec?.voters.first
+        check("local: one voter, window-local-seg-2b on this Mac, prompt c1, 1,024 px pages, level from the file",
+              spec?.voters.count == 1 && voter?.name == "window-local-seg-2b" && voter?.provider == .local
+              && voter?.prompt == .c1 && spec?.thumbnailLongEdgePx == 1024
+              && spec?.level == options.approach(.local)?.level)
+        check("local: no other approach changes image size",
+              SegmentationApproach.allCases.filter { $0 != .local && $0.proposesBoundaries }
+                .allSatisfy { (try? options.spec(for: $0))?.thumbnailLongEdgePx == options.window.thumbnailLongEdgePx })
+        check("local: costs nothing and carries its Mac figures",
+              options.approach(.local)?.cost?.total.listUSDPer1000Pages == 0
+              && options.approach(.local)?.mac?.peakMemoryGB == 4.4)
+        guard let voter else { return out }
+
+        // The request: the images alone in page order, then the prompt (no "Page n:" lines, as trained); temperature
+        // 0; thinking off under every spelling; the placeholder bearer, never a key; the user's model and server.
+        let r = WindowRequest(voter: voter, prompt: "PROMPT", images: [Data([1]), Data([2]), Data([3])],
+                              pageNumbers: [4, 5, 6])
+        if let q = try? LocalWindowTransport.request(r, baseURL: "http://127.0.0.1:9999/v1/", modelID: "me/seg") {
+            let b = (q.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let content = ((b["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
+            check("local request: the user's server and model, chat completions",
+                  q.url?.absoluteString == "http://127.0.0.1:9999/v1/chat/completions" && b["model"] as? String == "me/seg")
+            check("local request: three images then the prompt, no page labels",
+                  content.count == 4 && content.prefix(3).allSatisfy { $0["type"] as? String == "image_url" }
+                  && content.last?["text"] as? String == "PROMPT")
+            check("local request: temperature 0, thinking off, the bench's budget",
+                  (b["temperature"] as? NSNumber)?.intValue == 0 && b["enable_thinking"] as? Bool == false
+                  && (b["chat_template_kwargs"] as? [String: Any])?["enable_thinking"] as? Bool == false
+                  && b["max_tokens"] as? Int == LocalSegmenter.maxTokens)
+            check("local request: the placeholder bearer only",
+                  q.value(forHTTPHeaderField: "Authorization") == "Bearer \(LocalModelRoute.placeholderKey)")
+        } else {
+            check("local request builds", false)
+        }
+
+        // Replies.
+        func text(_ status: Int, _ obj: Any) -> Result<String, Error> {
+            let (d, _) = Self.localReply(status, obj)
+            return Result { try LocalWindowTransport.replyText(data: d, status: status) }
+        }
+        func isFatal(_ r: Result<String, Error>) -> Bool {
+            if case .failure(WindowTransportError.fatal) = r { return true } else { return false }
+        }
+        func isFailed(_ r: Result<String, Error>) -> Bool {
+            if case .failure(WindowTransportError.failed) = r { return true } else { return false }
+        }
+        check("local reply: the answer is read", (try? text(200, Self.localChat(#"{"pages":[]}"#)).get()) == #"{"pages":[]}"#)
+        check("local reply: a reasoning block is stripped",
+              (try? text(200, Self.localChat("<think>hm</think>\n{\"pages\":[]}")).get()) == #"{"pages":[]}"#)
+        check("local reply: cut at the budget is this window's failure", isFailed(text(200, Self.localChat("{\"pa", finish: "length"))))
+        check("local reply: all reasoning is this window's failure", isFailed(text(200, Self.localChat("<think>still going"))))
+        check("local reply: an unknown model (404) stops the run", isFatal(text(404, ["error": "model not found"])))
+        check("local reply: a server error is this window's failure", isFailed(text(500, ["detail": "boom"])))
+
+        // The route: no key needed, and the user's server and model reach the transport.
+        if let spec {
+            switch WindowStageTransport.make(spec, keys: [:], claudeBinary: nil,
+                                             local: ("http://127.0.0.1:9999/v1", "me/seg")) {
+            case .success(let t):
+                let local = (t as? RoutingWindowTransport)?.routes[.local] as? LocalWindowTransport
+                check("local: routed with no key, to the user's server and model",
+                      local?.baseURL == "http://127.0.0.1:9999/v1" && local?.modelID == "me/seg")
+            case .failure(let m):
+                check("local: routed with no key (\(m.description))", false)
+            }
+
+            // A stopped server: the run stops after the one check, with how to start it; no window is sent.
+            final class Counter: @unchecked Sendable { let lock = NSLock(); var n = 0 }
+            let sent = Counter(), probed = Counter()
+            var down = LocalWindowTransport(baseURL: "http://127.0.0.1:9999/v1", modelID: "me/seg")
+            down.http = { req in sent.lock.withLock { sent.n += 1 }; return Self.localReply(200, Self.localChat("{}")) }
+            down.probe = { _ in probed.lock.withLock { probed.n += 1 }; throw URLError(.cannotConnectToHost) }
+            let six = (0..<6).map { _ in PageInput(jpeg: Data([1]), text: "") }
+            var seg = WindowSegmenter.instant(down)
+            seg.maxConcurrent = 1
+            var message = ""
+            do { _ = try await seg.segment(pages: six, photoKinds: Array(repeating: nil, count: 6), approach: spec) }
+            catch WindowSegmenterError.fatal(let m, _) { message = m } catch {}
+            check("local: a stopped server stops the run once, with how to start it, and sends no window",
+                  message.contains("mlx_vlm.server") && sent.n == 0 && probed.n == 1)
+
+            // A run through the HTTP seam: one three-page window, its answer judged at the file's level.
+            var up = LocalWindowTransport(baseURL: "http://127.0.0.1:9999/v1", modelID: "me/seg")
+            up.probe = { _ in [] }
+            let answer = #"{"pages":[{"page":1,"kind":"document"},{"page":2,"kind":"document"},{"page":3,"kind":"document"}],"boundaries":[{"between":[1,2],"decision":"new","cue":"letterhead","confidence":0.999},{"between":[2,3],"decision":"continue","cue":"same letter","confidence":0.9}]}"#
+            up.http = { _ in Self.localReply(200, Self.localChat(answer)) }
+            let three = (0..<3).map { _ in PageInput(jpeg: Data([1]), text: "") }
+            let res = try? await WindowSegmenter.instant(up).segment(pages: three, photoKinds: [nil, nil, nil],
+                                                                       approach: spec)
+            let p = res?.proposals ?? []
+            check("local: a run through the seam reads the answer and flags at the file's level",
+                  p.count == 2 && p[0].decision == .new && !p[0].flagged && p[1].decision == .continue && p[1].flagged)
+        }
+        return out
+    }
+
+    nonisolated private static func localReply(_ status: Int, _ obj: Any) -> (Data, URLResponse) {
+        ((try? JSONSerialization.data(withJSONObject: obj)) ?? Data(),
+         HTTPURLResponse(url: URL(string: "http://127.0.0.1:8080/v1/chat/completions")!, statusCode: status,
+                         httpVersion: nil, headerFields: nil)!)
+    }
+
+    nonisolated private static func localChat(_ content: String, finish: String = "stop") -> [String: Any] {
+        ["choices": [["message": ["content": content], "finish_reason": finish]]]
     }
 
     private static func transportChecks(options: SegmentationOptions, fx: Fixture, replies: [String: String],

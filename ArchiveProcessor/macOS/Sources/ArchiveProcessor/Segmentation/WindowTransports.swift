@@ -109,6 +109,9 @@ struct APIWindowTransport: WindowTransport {
                                     "provider": OpenAICompatibleClient.openRouterProviderField(route)]
             if let t = r.voter.thinkingLevel { o["reasoning"] = ["effort": t, "exclude": true] }
             body = o
+        case .local:
+            // `WindowStageTransport.make` routes the model on this Mac to `LocalWindowTransport`, never here.
+            throw WindowTransportError.fatal("the model on this Mac has no API-key route")
         }
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "POST"
@@ -187,7 +190,7 @@ struct APIWindowTransport: WindowTransport {
             }
             text = ((c["content"] as? [String: Any])?["parts"] as? [[String: Any]] ?? [])
                 .filter { ($0["thought"] as? Bool) != true }.compactMap { $0["text"] as? String }.joined()
-        case .openai:
+        case .openai, .local:
             text = (((json["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any])?["content"] as? String) ?? ""
         case .openrouter:
             // A provider's failure comes back as a 200 with an `error` object; it is one window's failure.

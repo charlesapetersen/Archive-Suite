@@ -108,6 +108,10 @@ enum SegmentationProofDriver {
                     let u = obj?["usageMetadata"] as? [String: Any]
                     add("gemini", input: int(u?["promptTokenCount"]),
                         output: int(u?["candidatesTokenCount"]) + int(u?["thoughtsTokenCount"]))
+                case let h where LocalModelRoute.isLoopback("http://\(h)/"):
+                    // W41.app-local-seg: the model on this Mac (mlx-vlm reports usage as OpenAI does).
+                    let u = obj?["usage"] as? [String: Any]
+                    add("local", input: int(u?["prompt_tokens"]), output: int(u?["completion_tokens"]))
                 case "openrouter.ai":
                     // W41.app-openrouter: the GLM approach. Which provider answered is checked per run.
                     let u = obj?["usage"] as? [String: Any]
@@ -194,8 +198,11 @@ enum SegmentationProofDriver {
         p.pendingRunSaveOverride = { _ in }
         p.windowTransportFactory = { spec, gate in
             gateBox.value = gate
+            let env = ProcessInfo.processInfo.environment
             return WindowStageTransport.make(spec, keys: keys, claudeBinary: planBinary, route: route, gate: gate,
-                                             http: meter.http)
+                                             http: meter.http,
+                                             local: (env["SEGMENTATION_PROOF_LOCAL_URL"] ?? LocalSegmenter.defaultBaseURL,
+                                                     env["SEGMENTATION_PROOF_LOCAL_MODEL"] ?? LocalSegmenter.defaultModelID))
         }
 
         let started = Date()
@@ -264,6 +271,10 @@ enum SegmentationProofDriver {
         }
         if providers.contains(.gemini) {
             check("\(name) Gemini went by key", (tokens["gemini"]?.calls ?? 0) > 0)
+        }
+        if providers.contains(.local) {
+            check("\(name) the 2B answered on this Mac", (tokens["local"]?.calls ?? 0) > 0 && tokens.count == 1,
+                  tokens.keys.sorted().joined(separator: ", "))
         }
         if providers.contains(.openrouter) {
             check("\(name) GLM went by the OpenRouter key", (tokens["openrouter"]?.calls ?? 0) > 0)

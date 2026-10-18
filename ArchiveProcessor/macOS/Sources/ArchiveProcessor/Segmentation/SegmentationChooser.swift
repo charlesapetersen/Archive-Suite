@@ -22,6 +22,8 @@ struct SegmentationRoutes: Equatable, Sendable {
     var chatGPTRoute: ChatGPTRoute = .apiKey
     /// The plan's share, measured on this account by earlier runs.
     var planCalibration = PlanCalibrationStore()
+    /// This Mac's memory, which decides whether the model on this Mac is recommended (W41.app-local-seg).
+    var memoryGB: Double = LocalModelRoute.thisMacMemoryGB
 
     static let none = SegmentationRoutes()
 
@@ -66,12 +68,14 @@ struct SegmentationRoutes: Equatable, Sendable {
         case .gemini: return hasGeminiKey
         case .openai: return hasOpenAIKey
         case .openrouter: return hasOpenRouterKey
+        case .local: return false   // needs none
         }
     }
 
-    /// A voter can run by API key, Claude through the user's own `claude`, ChatGPT through the user's ChatGPT plan.
+    /// A voter can run by API key, Claude through the user's own `claude`, ChatGPT through the user's ChatGPT plan,
+    /// and the model on this Mac always (whether its server answers is asked when the run starts).
     func canRun(_ p: WindowProvider) -> Bool {
-        hasKey(p) || (p == .anthropic && hasClaudeCLI) || (p == .openai && hasChatGPTPlan)
+        p == .local || hasKey(p) || (p == .anthropic && hasClaudeCLI) || (p == .openai && hasChatGPTPlan)
     }
 }
 
@@ -100,6 +104,9 @@ struct SegmentationRow: Equatable, Sendable {
     let unavailableReason: String?
     /// The providers whose key would make it runnable (offered through the key wizard).
     let missingKeys: [WindowProvider]
+    /// What else the user should read before choosing it: for the model on this Mac, its Mac figures, whether this
+    /// Mac's memory suits it, and where it learned.
+    var notes: [String] = []
 
     var canRun: Bool { unavailableReason == nil }
 
@@ -162,7 +169,8 @@ struct SegmentationRow: Equatable, Sendable {
             unshownErrors: unshown, costLines: lines, priceNotes: notes,
             // An approach that cannot run adds nothing to a run's total; its row still shows what it would cost.
             apiDollars: reason == nil ? dollars : nil, footnote: footnote,
-            unavailableReason: reason, missingKeys: missingKeys)
+            unavailableReason: reason, missingKeys: missingKeys,
+            notes: providers.contains(.local) ? LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac) : [])
     }
 
     static func all(options: SegmentationOptions, pageCount: Int, routes: SegmentationRoutes,
@@ -200,11 +208,17 @@ struct SegmentationRow: Equatable, Sendable {
         var notes: [String] = []
         var planNotional = 0.0, anyPlan = false
         var chatGPTTokens = 0.0, chatGPTNotional = 0.0, anyChatGPTPlan = false
+        var anyLocal = false
         for (key, cost) in models {
             let tokens = entry.tokensPer1000Pages?[key]
             // problems() refuses a model outside the catalog, so this never skips in a shipped file.
             guard let provider = WindowVoter.catalog.first(where: { $0.modelID == tokens?.model })?.provider
             else { continue }
+            // problems() refuses a price on a model on this Mac: it is never priced, only said to be free.
+            if provider == .local {
+                anyLocal = true
+                continue
+            }
             if provider == .anthropic, routes.claudeByPlan,
                let notional = tokens?.subscriptionRouteNotionalUSDPer1000Pages {
                 anyPlan = true
@@ -233,6 +247,7 @@ struct SegmentationRow: Equatable, Sendable {
             }
         }
         var lines: [String] = []
+        if anyLocal { lines.append("none: it runs on this Mac") }
         if anyAPI { lines.append("about \(dollars(apiList)) by API key at list price") }
         if anyPlan {
             if let share = routes.planCalibration.estimate(notionalUSD: planNotional),
@@ -248,7 +263,7 @@ struct SegmentationRow: Equatable, Sendable {
             lines.append("ChatGPT plan: \(tokenText)roughly \(dollars(chatGPTNotional)) "
                          + "of API calls at list price (approximate). Using ChatGPT plan")
         }
-        return (lines, notes, anyAPI ? apiList : nil)
+        return (lines, notes, anyAPI ? apiList : anyLocal && !anyPlan && !anyChatGPTPlan ? 0 : nil)
     }
 
     // MARK: Formatting
@@ -301,6 +316,7 @@ struct SegmentationRow: Equatable, Sendable {
         case .gemini: return "Gemini"
         case .openai: return "ChatGPT"
         case .openrouter: return "GLM-5.3 Flash"
+        case .local: return "The model on this Mac"
         }
     }
 
@@ -310,6 +326,7 @@ struct SegmentationRow: Equatable, Sendable {
         case .gemini: return "a Gemini API key"
         case .openai: return "an OpenAI API key, or Sign in with ChatGPT"
         case .openrouter: return "an OpenRouter API key"
+        case .local: return "mlx-vlm running on this Mac"
         }
     }
 

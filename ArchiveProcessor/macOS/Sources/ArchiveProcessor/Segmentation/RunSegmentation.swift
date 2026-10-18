@@ -189,12 +189,23 @@ enum WindowStageTransport {
     /// signed-in account, or nil.
     static func make(_ spec: ApproachSpec, keys: [WindowProvider: String], claudeBinary: String?,
                      route: ClaudeRoute = .apiKey, chatGPT: ChatGPTAuth? = nil, chatGPTRoute: ChatGPTRoute = .apiKey,
-                     gate: PlanRunGate? = nil, http: APIWindowTransport.HTTP? = nil)
+                     gate: PlanRunGate? = nil, http: APIWindowTransport.HTTP? = nil,
+                     local: (baseURL: String, modelID: String) = (LocalSegmenter.defaultBaseURL,
+                                                                  LocalSegmenter.defaultModelID),
+                     localProbe: (@Sendable (String) async throws -> [String])? = nil)
         -> Result<any WindowTransport, Missing> {
         var routes: [WindowProvider: any WindowTransport] = [:]
         var api = APIWindowTransport(keys: keys.filter { !$0.value.isEmpty })
         if let http { api.http = http }
         for p in Set(spec.voters.map(\.provider)) {
+            // The model on this Mac needs no key; whether its server answers is asked before the first window.
+            if p == .local {
+                var t = LocalWindowTransport(baseURL: local.baseURL, modelID: local.modelID)
+                if let http { t.http = http }
+                if let localProbe { t.probe = localProbe }
+                routes[p] = t
+                continue
+            }
             let noKey = (keys[p] ?? "").isEmpty
             let claudeByPlan = p == .anthropic && claudeBinary != nil && (route == .plan || noKey)
             let chatGPTByPlan = p == .openai && chatGPT != nil && (chatGPTRoute == .plan || noKey)
@@ -214,8 +225,7 @@ enum WindowStageTransport {
                 return .failure(Missing(description: p == .anthropic
                     ? "Claude needs an Anthropic API key or a signed-in claude."
                     : p == .gemini ? "Gemini needs an API key."
-                    : p == .openrouter ? "GLM-5.3 Flash needs an OpenRouter API key."
-                    : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
+                    : p == .openrouter ? "GLM-5.3 Flash needs an OpenRouter API key."                    : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
             }
         }
         return .success(RoutingWindowTransport(routes: routes))
@@ -226,7 +236,8 @@ enum WindowStageTransport {
         -> Result<any WindowTransport, Missing> {
         var keys: [WindowProvider: String] = [:]
         for p in Set(spec.voters.map(\.provider)) {
-            keys[p] = KeychainHelper.load(account: p.keychainAccount.rawValue) ?? ""
+            guard let account = p.keychainAccount else { continue }
+            keys[p] = KeychainHelper.load(account: account.rawValue) ?? ""
         }
         let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
         let override = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""
@@ -234,6 +245,7 @@ enum WindowStageTransport {
                     claudeBinary: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override),
                     route: ClaudeRoute.stored(defaults),
                     chatGPT: ChatGPTAuth.shared.isSignedIn ? ChatGPTAuth.shared : nil,
-                    chatGPTRoute: ChatGPTRoute.stored(defaults), gate: gate)
+                    chatGPTRoute: ChatGPTRoute.stored(defaults), gate: gate,
+                    local: (LocalSegmenter.baseURL(defaults), LocalSegmenter.modelID(defaults)))
     }
 }

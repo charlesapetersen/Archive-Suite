@@ -67,9 +67,13 @@ struct SegmentationChooserView: View {
                 ChatGPTPlanControls(routes: $routes)
             }
 
+            if SegmentationRow.providers(approach, options: options).contains(.local) {
+                LocalSegmenterControls()
+            }
+
             if let row = rows.first(where: { $0.approach == approach }) {
                 SegmentationRowCard(row: row, scaleCaption: scaleCaption) {
-                    wizardSpecs = row.missingKeys.map(Self.keySpec)
+                    wizardSpecs = row.missingKeys.compactMap(Self.keySpec)
                 }
             } else {
                 Text("The segmentation figures are missing from this build; only Full manual is offered.")
@@ -84,12 +88,61 @@ struct SegmentationChooserView: View {
         }
     }
 
-    static func keySpec(_ p: WindowProvider) -> ProviderKeySpec {
+    static func keySpec(_ p: WindowProvider) -> ProviderKeySpec? {
         switch p {
         case .anthropic: return .anthropic
         case .gemini: return .gemini
         case .openai: return .openai
         case .openrouter: return .openrouter
+        case .local: return nil
+        }
+    }
+}
+
+/// The `local` approach's server and model (W41.app-local-seg), with a check that the server answers.
+struct LocalSegmenterControls: View {
+    @AppStorage(DefaultsKeys.localSegmenterBaseURL) private var baseURL = LocalSegmenter.defaultBaseURL
+    @AppStorage(DefaultsKeys.localSegmenterModelID) private var modelID = LocalSegmenter.defaultModelID
+    @State private var checkResult: String?
+    @State private var checking = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField("Server", text: $baseURL, prompt: Text(LocalSegmenter.defaultBaseURL))
+                .textFieldStyle(.roundedBorder).controlSize(.small)
+                .accessibilityIdentifier("ap.segmentation.local.server")
+            TextField("Model", text: $modelID, prompt: Text(LocalSegmenter.defaultModelID))
+                .textFieldStyle(.roundedBorder).controlSize(.small)
+                .accessibilityIdentifier("ap.segmentation.local.model")
+            HStack {
+                Button(checking ? "Checking…" : "Check server") { check() }
+                    .controlSize(.small).disabled(checking)
+                    .accessibilityIdentifier("ap.segmentation.local.check")
+                if let checkResult {
+                    Text(checkResult).font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Text(LocalSegmenter.startHint).font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func check() {
+        checking = true
+        let url = baseURL.isEmpty ? LocalSegmenter.defaultBaseURL : baseURL
+        let model = modelID.isEmpty ? LocalSegmenter.defaultModelID : modelID
+        Task {
+            let text: String
+            do {
+                let models = try await LocalModelRoute.listModels(baseURL: url)
+                // mlx-vlm downloads a model it does not list yet on its first request, so an unlisted one is no fault.
+                text = models.contains(model) ? "The server answers and has \(model). Ready."
+                    : "The server answers. It will download \(model) on the first run if it has not already."
+            } catch {
+                text = "No server answers at \(url): \(error.localizedDescription)"
+            }
+            await MainActor.run { checkResult = text; checking = false }
         }
     }
 }
@@ -122,6 +175,10 @@ struct SegmentationRowCard: View {
                     }
                     ForEach(row.priceNotes, id: \.self) { note in
                         Text(note).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    ForEach(row.notes, id: \.self) { note in
+                        Text(note).font(.caption2).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .opacity(row.canRun ? 1 : 0.5)

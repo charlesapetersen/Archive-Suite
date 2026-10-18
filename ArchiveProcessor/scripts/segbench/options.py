@@ -779,10 +779,12 @@ def render(out: dict) -> str:
             seen.setdefault(code, (u, ap["cost"]["per_model"][code]))
     for code, (u, k) in seen.items():
         effort = u.get("thinking") or u.get("reasoning")
+        # A model run on the user's own Mac (W41.app-local-seg) has no price to show, only its source.
+        price = (f"{k['prices_usd_per_mtok']['in']}, {k['prices_usd_per_mtok']['out']} ({k['price_read']})"
+                 if "prices_usd_per_mtok" in k else k.get("price_source", "none"))
         L.append(f"| {u['model']}{'/' + effort if effort else ''} | {', '.join(u['boxes'])} | "
                  f"{u['calls']} | {_k(u['input_per_1000_pages'])} | {_k(u['output_per_1000_pages'])} | "
-                 f"{_money(k['list_usd_per_1000_pages'])} | {_money(k['batch_usd_per_1000_pages'])} | "
-                 f"{k['prices_usd_per_mtok']['in']}, {k['prices_usd_per_mtok']['out']} ({k['price_read']}) |")
+                 f"{_money(k['list_usd_per_1000_pages'])} | {_money(k['batch_usd_per_1000_pages'])} | {price} |")
     g = seen.get("G", (None, {}))[1].get("after_2026_12_31")
     if g:
         L += ["", f"Gemini 3.8 Flash is at its introductory price to 31 Dec 2026; at the later $1.50 / $7.50 the "
