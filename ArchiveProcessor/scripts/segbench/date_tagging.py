@@ -203,11 +203,13 @@ def document_pool():
             near = segs[max(0, k - 3):k] + segs[k + 1:k + 4]
             near_texts = (texts[max(0, k - 3):k] + texts[k + 1:k + 4])[:3]
             context = "\n---\n".join(t[:300] for t in near_texts)
+            context_ids = [hashlib.sha1(n["pages"][0].encode()).hexdigest()[:16] for n in near[:3]]
             year_s = str(truth.get("year", ""))
             pool[cls].append({"id": hashlib.sha1(s["pages"][0].encode()).hexdigest()[:16], "class": cls,
                               "collection": CP.collection_of(f), "pages": len(s["pages"]), "truth": truth,
                               "year_in_text": bool(year_s) and year_s in texts[k][:3000],
-                              "prompt": build_prompt(texts[k], context), "n_near": len(near)})
+                              "prompt": build_prompt(texts[k], context), "n_near": len(near),
+                              "context_ids": context_ids})
     counts["folders"] = len(folders)
     return pool, counts
 
@@ -235,7 +237,7 @@ def cmd_sample(a):
     os.makedirs(CACHE, exist_ok=True)
     with open(os.path.join(CACHE, "sample.jsonl.tmp"), "w", encoding="utf-8") as fh:
         for d in sample:
-            fh.write(json.dumps(d, ensure_ascii=False) + "\n")
+            fh.write(json.dumps({k: v for k, v in d.items() if k != "context_ids"}, ensure_ascii=False) + "\n")
     os.replace(os.path.join(CACHE, "sample.jsonl.tmp"), os.path.join(CACHE, "sample.jsonl"))
     json.dump(dict(sorted(counts.items())), open(os.path.join(CACHE, "sample-summary.json"), "w"), indent=1)
     print(json.dumps(dict(sorted(counts.items())), indent=1))
@@ -252,7 +254,8 @@ def target_of(truth):
 
 def cmd_train_data(a):
     """W41.date-model's training set: every pooled document with a year, less the 300 sampled (the test), split into
-    corpus_pairs' held-out collections (val) and the rest (train). Decade documents have no year to train to."""
+    corpus_pairs' held-out collections (val) and the rest (train). Decade documents have no year to train to. A
+    document whose context snippets include a test document is dropped too, so no test text is trained on."""
     pool, _ = document_pool()
     test = {json.loads(l)["id"] for l in open(os.path.join(CACHE, "sample.jsonl"), encoding="utf-8")}
     held = set(json.load(open(os.path.join(CP.CACHE, "holdout.json"))))
@@ -267,6 +270,8 @@ def cmd_train_data(a):
                 why["decade"] += 1; continue
             if d["prompt"] in test_prompts:
                 why["same prompt as a test document"] += 1; continue
+            if test & set(d["context_ids"]):
+                why["a test document in its context"] += 1; continue
             split = "val" if d["collection"] in held else "train"
             rows[split].append({"id": d["id"], "collection": d["collection"], "class": cls,
                                 "year_in_text": d["year_in_text"], "prompt": d["prompt"], "target": target_of(d["truth"])})
