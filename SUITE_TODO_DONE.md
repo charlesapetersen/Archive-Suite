@@ -11814,3 +11814,24 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   error-message and think-after-content lows. `scripts/test-local-models.sh` ALL PASS (section 7, 18 checks);
   cascade, page-kind, refusal, OpenRouter, thinking-budget and network-session contracts pass. No money.
   <!-- /W41.app-local-models-fu2 -->
+- [x] **W41.app-local-seg — offer the fine-tuned 2B as the local route's segmenter, by memory size [M · ~1-2 sessions · Tier-2]** · §Archive Processor — transcription and segmentation bake-off on OpenRouter (owner, 2026-10-11) · SHIPPED 2026-10-17
+  (lane: processor) (uses: build) (blocked-on: W41.app-local-seg-owner-ok).
+  Gate W41.app-local-seg-owner-ok answered 2026-10-17: publish the weights. Shipped as a new segmentation approach,
+  `local` (`Segmentation/LocalSegmenter.swift`): the 8-bit 2B through mlx-vlm on this Mac, no key, no money. Its
+  options.json row comes from `method_openrouter.py option-local-seg`, scored as `option-glm` scores GLM: level 0.995
+  fitted on the development boxes at the 0.98 bar; test boxes (full precision, FarmShare) 78.8% unchecked, 78.8 checks
+  per 100 pages, 97.3% after checking, 3 unflagged, matching seg-students.md; plus the Mac block (4.4 GB peak, 2.5 GB,
+  6 s a page). The voter sends c1 at 1,024 px, images then the prompt, temperature 0, thinking off (as trained and
+  measured), one window at a time. The chooser runs it with nothing, prices it at none, and shows the Mac figures, a
+  memory note (recommended under 32 GB; 8 GB unmeasured, not recommended) and that it was trained on one owner's
+  archives. Server and model fields with Check server. Runs never fail silently: a probe and a one-token warm-up
+  (an hour, covering the first download) before the first window, its own URLSession (no waiting for connectivity),
+  a refused connection fatal, and four failed or unparsable windows in a row stop the run with the reason.
+  Tier-2 review (opus, two passes): HIGH mid-run server death hanging the run and HIGH unloadable model finishing
+  as all-flagged, both fixed; then MEDIUM idle-connection drops and unparsable replies, LOW cancel message, fixed.
+  Engine self-test ALL PASS (23 local checks), chooser ALL PASS (13 + render guard), review/plan/ChatGPT/OpenRouter/
+  local-model self-tests pass. ArchiveOCRBench shows the 2B once, free, off the price chart (published copy behind).
+  Not done here, filed: W41.app-local-seg-publish (the owner uploads with `scripts/segbench/publish-seg-model/
+  publish.sh`; no HF login on this Mac) and W41.app-local-seg-proof (a live run through a real mlx-vlm server, which
+  the heavy lock and a memory-guard kill stopped today). No money.
+  <!-- /W41.app-local-seg -->

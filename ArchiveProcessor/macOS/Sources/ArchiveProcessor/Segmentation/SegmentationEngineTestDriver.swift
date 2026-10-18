@@ -510,6 +510,18 @@ enum SegmentationEngineTestDriver {
             }
             check("local: a slow window is this window's failure, not a stopped server",
                   slow.message.contains("windows in a row") && slow.message.contains("did not answer in time"))
+            let dropped = await stops { req in
+                if isWarmUp(req) { return Self.localReply(200, Self.localChat("OK")) }
+                throw URLError(.networkConnectionLost)
+            }
+            check("local: a dropped connection is this window's failure, retried, not a stopped server",
+                  dropped.message.contains("windows in a row")
+                  && dropped.calls == 1 + LocalSegmenter.maxFailuresInARow)
+            let prose = await stops { req in
+                Self.localReply(200, Self.localChat(isWarmUp(req) ? "OK" : "These pages look like one letter."))
+            }
+            check("local: replies that never parse stop the run too",
+                  prose.message.contains("windows in a row") && prose.message.contains("did not parse"))
         }
         return out
     }

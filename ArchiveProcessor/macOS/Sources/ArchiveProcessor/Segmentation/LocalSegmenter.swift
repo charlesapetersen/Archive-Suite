@@ -104,7 +104,11 @@ struct LocalWindowTransport: WindowTransport {
     func send(_ r: WindowRequest) async throws -> String {
         let (baseURL, modelID, http, probe) = (self.baseURL, self.modelID, self.http, self.probe)
         try await state.prepareOnce {
-            do { _ = try await probe(baseURL) } catch {
+            do { _ = try await probe(baseURL) } catch let e as URLError where e.code == .cancelled {
+                throw CancellationError()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
                 throw WindowTransportError.fatal("No server answers at \(baseURL). \(LocalSegmenter.startHint)")
             }
             try await Self.warmUp(baseURL: baseURL, modelID: modelID, http: http)
@@ -128,20 +132,28 @@ struct LocalWindowTransport: WindowTransport {
         guard let status = (response as? HTTPURLResponse)?.statusCode else {
             throw WindowTransportError.failed("no HTTP response")
         }
-        return try Self.replyText(data: data, status: status)
+        let text = try Self.replyText(data: data, status: status)
+        // A reply that does not parse is the engine's failure too; counted here, a model that loads but never answers
+        // in the format (the Model setting naming a base Qwen, say) stops the run instead of flagging every gap at 0.
+        do { _ = try WindowAnswerParser.parse(text, pageNumbers: r.pageNumbers) } catch {
+            throw WindowTransportError.failed("local: the reply did not parse (\(error))")
+        }
+        return text
     }
 
-    /// Sends one request. A refused or dropped connection means the server is gone: the run stops (a timeout is this
-    /// window's failure, since a slow window on a busy Mac is not a stopped server).
+    /// Sends one request. A refused connection means the server is gone: the run stops. A timeout or a dropped
+    /// connection is this window's failure (a slow window on a busy Mac is not a stopped server); if the server has
+    /// gone, the retry is refused and stops the run then.
     static func call(_ request: URLRequest, baseURL: String, http: APIWindowTransport.HTTP) async throws
         -> (Data, URLResponse) {
         do { return try await http(request) } catch let e as URLError {
             switch e.code {
             case .timedOut: throw WindowTransportError.failed("the local model did not answer in time")
             case .cancelled: throw CancellationError()
-            default:
+            case .cannotConnectToHost, .cannotFindHost, .notConnectedToInternet, .badURL, .unsupportedURL:
                 throw WindowTransportError.fatal("The server at \(baseURL) stopped answering (\(e.localizedDescription)). "
                     + LocalSegmenter.startHint)
+            default: throw WindowTransportError.failed("local: \(e.localizedDescription)")
             }
         }
     }
@@ -160,10 +172,12 @@ struct LocalWindowTransport: WindowTransport {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(LocalModelRoute.placeholderKey)", forHTTPHeaderField: "Authorization")
+        // As `NetworkSession` does: a fresh connection each time, never an idle one the server has already closed.
+        request.setValue("close", forHTTPHeaderField: "Connection")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response): (Data, URLResponse)
-        do { (data, response) = try await call(request, baseURL: baseURL, http: http) } catch WindowTransportError.failed {
-            throw WindowTransportError.fatal("The server did not load \(modelID) within an hour.")
+        do { (data, response) = try await call(request, baseURL: baseURL, http: http) } catch WindowTransportError.failed(let why) {
+            throw WindowTransportError.fatal("The server did not load \(modelID): \(why).")
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {
@@ -191,6 +205,8 @@ struct LocalWindowTransport: WindowTransport {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(LocalModelRoute.placeholderKey)", forHTTPHeaderField: "Authorization")
+        // As `NetworkSession` does: a fresh connection each time, never an idle one the server has already closed.
+        request.setValue("close", forHTTPHeaderField: "Connection")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request
     }
