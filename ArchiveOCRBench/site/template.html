@@ -206,11 +206,15 @@ footer p { font-size: 13px; }
     <h2>Reference routes on the public strata</h2>
     <p id="pub-lede"></p>
   </header>
+  <section class="panel" id="pub-inventory">
+    <div class="head"><h2>Frozen corpus</h2><span class="meta">Hosted readings on added pages deferred to the pre-release sweep</span></div>
+    <div class="tbl"><table><thead><tr><th>Stratum</th><th>Frozen pages</th><th>Reference routes measured</th><th>Awaiting hosted readings</th><th>Sources</th></tr></thead><tbody id="pub-inventory-rows"></tbody></table></div>
+  </section>
   <section class="panel" id="pub-table">
     <div class="head"><h2>By stratum</h2><span class="meta" id="pub-meta"></span></div>
     <div class="tbl"><table><thead><tr><th>Stratum</th><th>Pages</th><th>Route</th><th>Answered</th><th>NES</th><th>NES, answered</th><th>Second score</th><th>Cost</th></tr></thead><tbody id="pub-rows"></tbody></table></div>
     <p class="note" id="pub-pair"></p>
-    <p class="note">Pages drawn with a fixed seed from published transcriptions (no collection more than a quarter of its stratum), checked against Apple Vision's reading for wrong truth, and frozen before any model read them; the manifest is <code>ArchiveProcessor/segbench-results/bench-corpus/manifest.jsonl</code>. Same prompt, image size and scorer as the 96. Each source keeps its own transcription conventions, so a stratum's score is comparable across routes, not with the 96 or with another stratum. Second score: NES after mapping historical letter forms (long s, ligatures, abbreviation marks) for L5-L8; without diacritics for N1, N3 and N4. Apple Vision runs the app's settings (English, language correction on), so it reads only the Latin-script strata. N4 understates every route twice over: its truth is the main text only, while the prompt asks for everything on the sheet, so a reader that also transcribes the masorah in the margins loses points; and all but one of BiblIA's 132 pages are transcribed without vowel points, which Gemini writes, so for N4 the second score, without marks, is the fairer figure. Gemini's failures were provider errors (HTTP 500 mid-reply, not billed); Qwen's were replies that ran to the 8,192-token limit, mostly repeating a line. Scores only: the page images are not published, whatever their licence allows.</p>
+    <p class="note">Pages drawn with a fixed seed from published transcriptions (a quarter cap per collection, with thin-stratum exceptions marked in the manifest), checked against Apple Vision's reading for wrong truth, and frozen before any hosted model read them; the manifest is <code>ArchiveProcessor/segbench-results/bench-corpus/manifest.jsonl</code>. Same prompt, image size and scorer as the 96. Each source keeps its own transcription conventions, so a stratum's score is comparable across routes, not with the 96 or with another stratum. Second score: NES after mapping historical letter forms (long s, ligatures, abbreviation marks) for L5-L8; without diacritics for N1, N3 and N4. Apple Vision runs the app's settings (English, language correction on), so it reads only the Latin-script strata. N4 understates every route twice over: its truth is the main text only, while the prompt asks for everything on the sheet, so a reader that also transcribes the masorah in the margins loses points; and all but one of BiblIA's 132 pages are transcribed without vowel points, which Gemini writes, so for N4 the second score, without marks, is the fairer figure. Gemini's failures were provider errors (HTTP 500 mid-reply, not billed); Qwen's were replies that ran to the 8,192-token limit, mostly repeating a line. Scores only: the page images are not published, whatever their licence allows.</p>
   </section>
 
   <section class="panel" id="pub-spec" hidden>
@@ -523,9 +527,14 @@ if (PB) {
   const p1 = v => v == null ? '–' : (100 * v).toFixed(1);
   const rows = PB.rows.filter(r => r.stratum !== 'all').sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);
   const total = Object.values(PB.strata).reduce((a, s) => a + s.pages, 0);
+  const measured = Object.values(PB.strata).reduce((a, s) => a + s.reference_pages, 0);
   document.getElementById('pub-lede').textContent = total + ' pages in ' + Object.keys(PB.strata).length +
-    ' strata of public transcriptions, read by two paid reference routes and Apple Vision, to check that the set separates readers and to measure the price a page. The run cost $' +
+    ' strata of public transcriptions. Two paid reference routes have read the original ' + measured +
+    ' pages; the remaining ' + (total - measured) + ' are frozen with hosted readings deferred to the pre-release sweep. Apple Vision supplies a free sanity check on the Latin-script pages. The original run cost $' +
     PB.paired.spent.toFixed(2) + ' as booked, an upper bound: seven calls cut off mid-run are booked at a ceiling.';
+  document.getElementById('pub-inventory-rows').innerHTML = Object.entries(PB.strata).map(([id, s]) =>
+    '<tr><td>' + id + ' · ' + STRATUM_NAMES[id] + '</td><td>' + s.pages + '</td><td>' + s.reference_pages +
+    '</td><td>' + (s.pages - s.reference_pages) + '</td><td>' + s.sources.join(', ') + '</td></tr>').join('');
   document.getElementById('pub-meta').textContent = 'NES %, failures as 0';
   document.getElementById('pub-rows').innerHTML = rows.map(r => {
     const s = PB.strata[r.stratum];

@@ -8,7 +8,7 @@ N5 is Chinese print, modern and historical: pages in simplified or traditional C
 magazines, research reports, historical documents and academic papers (slides, exam papers, textbooks and notes
 are left out). A page with a table, a displayed equation or a masked region is left out too, because its truth
 would be HTML or LaTeX, or would miss text the page shows; so is a page whose text has inline LaTeX ($ or \\).
-Figures are allowed; words inside a figure are not in the truth.
+Figures are allowed, but the visual sanity check drops pages whose figure lettering is missing from truth.
 Truth is every text block's `text`, explicit body `order` preserved, unordered headers prepended and
 footnotes/footers/page numbers appended geometrically, one block per paragraph. The collection for the quarter cap is
 the data source. Licence: research use only, not commercial (the card), so scores only. Contamination 'high': a
@@ -54,7 +54,8 @@ def truth(page: dict) -> str | None:
              [(1000000, b['text'].strip()) for b in sorted(bottom, key=position)])
     if any('$' in t or '\\' in t for _, t in texts):
         return None
-    return '\n\n'.join(t for _, t in texts) or None
+    # The annotations encode heading depth with Markdown, absent from the scan.
+    return re.sub(r'(?m)^#{1,6}[ \t]+', '', '\n\n'.join(t for _, t in texts)) or None
 
 
 def candidates() -> list[common.Candidate]:

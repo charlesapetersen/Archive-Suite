@@ -36,8 +36,10 @@ What the bench has measured, as one page you can read and share. It has seven pa
    German Kurrent, charters before 1600, early print with Fraktur, Arabic manuscripts, Greek minuscule and Hebrew
    book hands. Scored by stratum with the 96's prompt, image size and scorer; scores only, no page images. Read
    from `ArchiveProcessor/segbench-results/bench-corpus/` (`routes.csv`, `routes-paired.json`, `manifest.jsonl`),
-   written by `scripts/segbench/corpus/routes.py report` (W43.corpus-build). More strata come with
-   W43.corpus-build-more. Below it, the open models built for the hardest scripts (`specialists.csv`, written by
+   written by `scripts/segbench/corpus/routes.py report` (W43.corpus-build). The frozen inventory now has
+   **895 pages in fifteen strata**, adding English handwriting, typescripts, registers, newspapers, Cyrillic,
+   Chinese and Devanagari (W43.corpus-build-more). The **455 added pages have no hosted reference scores**;
+   those readings are deferred to W43.sweep. Part 7 shows the inventory separately from the original results. Below it, the open models built for the hardest scripts (`specialists.csv`, written by
    `corpus/specialists.py report`, W43.script-specialists).
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same

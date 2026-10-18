@@ -1,19 +1,23 @@
-"""W43.corpus-build — `sbb`: Historical Newspapers Ground Truth, Berlin State Library (Zenodo 2583866, CC0). L9.
+"""SBB newspaper annotations (Zenodo 2583866, CC0): excluded from OCR truth after visual audit.
+
+The record calls these OCR/OLR ground truth, but gt_page.zip's TextEquiv has systematic wrong words in
+readable scan text (00675574, 00675515, 00675581, 00675590) and FineReader Engine 10 provenance.
+It is not reliable whole-page transcription truth. Keep the parser for inspecting that finding, but
+contribute NO candidates, rather than removing just low-scoring pages. W43.corpus-build-more, 2026-10-18.
 
 50 newspaper pages from the Europeana Newspapers project: gt_page.zip (PAGE 2010-03-19, pc-<id>.xml) and
 img_full.zip (<id>.tif, full-resolution scans), both small and read from CACHE/raw/sbb/ (downloaded whole if
 missing). ocr_full.zip / ocr_bin.zip (FineReader output) and img_bin.zip are not used.
 
-Surprises:
+Parser observations (not evidence of corrected transcription):
 - The text is region-level: each TextRegion has one TextEquiv whose Unicode holds the region's lines separated
   by '\\n'; there are no TextLines. The ReadingOrder is an UnorderedGroup of OrderedGroups (and nested
   UnorderedGroups of plain RegionRefs, which common.page_xml_text does not rank). So truth() walks the
   ReadingOrder itself: groups in the order they are written, an OrderedGroup's members by index; the few
   regions no group names (usually a page number) go last, in document order.
-- The transcription keeps the print's own characters: long s, MUFI private-use ligatures (U+F502 'ch',
-  U+F4F9 'll', U+EEC4 'ck', ...), '⸗' as the Fraktur hyphen. U+FFFD stands for a glyph the keyers could not
-  read. All are kept. Pages where U+FFFD is more than 1% of the text are dropped as partial (6 pages: whole
-  columns keyed as '�'), and so are pages with a TableRegion, whose table text was not keyed (3 pages).
+- The text includes long s, MUFI private-use ligatures (U+F502 'ch', U+F4F9 'll', U+EEC4 'ck', ...), '⸗'
+  and U+FFFD. The initial parser rejected pages with more than 1% U+FFFD (6 pages) or a TableRegion (3 pages).
+  That was insufficient: readable words in the remaining 41 are also mistranscribed.
 - Neither the file names (a running image number) nor the PAGE metadata name the newspaper or its date; the
   title appears only on pages that carry the masthead. So era is the year most often named in the page's own
   text (inferred, 1799-1940 across the set, wider than L9's 1850-1920), and collection is that year's decade.
@@ -84,7 +88,7 @@ def parse(xml_bytes: bytes) -> tuple[str, bool]:
 
 
 def truth(xml_bytes: bytes) -> str:
-    """Page text, regions in ReadingOrder; the keyers' characters (MUFI PUA, U+FFFD, ſ, ⸗) kept as written."""
+    """Supplied text, regions in ReadingOrder; characters (MUFI PUA, U+FFFD, ſ, ⸗) kept as written."""
     return parse(xml_bytes)[0]
 
 
@@ -122,17 +126,7 @@ def _zip(name: str) -> Path:
 
 
 def candidates() -> list[common.Candidate]:
-    with zipfile.ZipFile(_zip(GT_ZIP)) as gt, zipfile.ZipFile(_zip(IMG_ZIP)) as im:
-        pages = list_pages(gt, im.namelist())
-    out = []
-    for pid, xml, img, year in pages:
-        out.append(common.Candidate(
-            source=SOURCE, collection=f'{year[:3]}0s' if year else 'undated', page_id=pid, stratum='L9',
-            licence='CC0-1.0', item_url=RECORD,
-            convention='PAGE regions (no lines), keyed diplomatic: long s, MUFI ligatures, U+FFFD for illegible',
-            contamination='low', publish_image=True, script='Latn', era=year, kind='newspaper',
-            fetch={'gt_zip': GT_ZIP, 'xml': xml, 'img_zip': IMG_ZIP, 'image': img}))
-    return out
+    return []  # Source-wide truth-quality exclusion, not a score-based page filter.
 
 
 def materialise(c: common.Candidate) -> tuple[Path, str]:

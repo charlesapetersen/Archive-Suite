@@ -1,4 +1,4 @@
-# The broader OCR truth set — reachable strata (W43.corpus-build)
+# The broader OCR truth set (W43.corpus-build, W43.corpus-build-more)
 
 Plan: `execution-plans/benchmark-corpus/00-plan.md` (Part 1 is the owner's decision of 2026-10-16). Code:
 `ArchiveProcessor/scripts/segbench/corpus/` (`sample.py` draws, checks, freezes and keeps; `routes.py` runs and
@@ -6,31 +6,72 @@ scores the reference routes). Scores only: no page image or text is published, w
 
 ## What is frozen
 
-440 pages in the seven strata every allowed host reaches, drawn with a fixed seed (`SEED` in `sample.py`), no
-collection more than a quarter of its stratum unless the stratum has too few (`over_cap`, 37 pages), and frozen in
-`manifest.jsonl` before any paid model read them (2026-10-17). The kept copies, checked against the manifest's
-checksums, are in `~/Library/Application Support/ArchiveSuiteRehearsal/bench-corpus-frozen/` (2.0 GB; whether
-CrashPlan backs that folder up has not been checked).
+895 pages in all fifteen strata, drawn with the original fixed seed (`SEED` in `sample.py`), with a quarter cap
+per collection unless a thin stratum requires an exception (`over_cap`). The original 440 pages were frozen on
+2026-10-17; the 455-page extension is frozen on 2026-10-18, before any paid reading. Every field of the original
+440 manifest rows is unchanged. The kept copies, checked against the manifest's checksums, are in
+`~/Library/Application Support/ArchiveSuiteRehearsal/bench-corpus-frozen/`; whether CrashPlan backs that folder
+up has not been checked. Images and truth are kept privately; this repository publishes provenance and scores only.
 
 | stratum | pages | sources |
 |---|---:|---|
+| L1 English handwritten letters and diaries | 80 | Library of Congress By the People |
+| L2 English manuscripts, 1700-1850 | 80 | By the People Washington Papers 60, Bentham 20 |
+| L3 typescripts and telegrams | 80 | By the People 78, TAPUS French typescripts 2 |
+| L4 ledgers, forms and tables | 80 | Smithsonian Freedmen's Bureau, four register projects |
 | L5 Dutch and Romance archival hands | 80 | HTR-United Castilian 51, iForal 26, VOC 3 |
 | L6 German Kurrent | 80 | 19th-c. Kurrent (Zenodo 17252677) 60, READ 2017 20 |
 | L7 charters before 1600 | 80 | Königsfelden |
 | L8 early print, incl. Fraktur | 80 | OCR-D `gt_structure_text` |
+| L9 newspapers | 15 | NewsBench |
 | N1 Arabic manuscripts | 40 | Muharaf, public part |
+| N2 Cyrillic | 40 | Digital Peter, full handwritten pages |
 | N3 Greek minuscule | 40 | EPARCHOS (30 over the quarter cap: one collection dominates) |
 | N4 Hebrew book hands | 40 | BiblIA |
+| N5 Chinese print | 40 | OmniDocBench, simplified and traditional Chinese |
+| N6 Devanagari print | 40 | heiDATA Naval Kishore Press, full-page ALTO/PAGE pairs |
 
-Sanity pass: Apple Vision read the 320 Latin pages; the 46 under half their stratum's median were opened against
+Original 440-page sanity pass: Apple Vision read the 320 Latin pages; the 46 under half their stratum's median were opened against
 their truth, with the shortest truth in each stratum and one page each of N1, N3 and N4. Two were dropped and
 replaced (`drops.jsonl`). The hand check also found BiblIA's columns in the wrong order (fixed before the freeze).
-L1-L4, N2, N5, N6 and the short L2, L3 and L9 are `W43.corpus-build-more`.
+The extension adds L1-L4, L9, N2, N5 and N6. L9 is short by 65: BLN600 remains behind Sheffield's bot challenge, and SBB was excluded as a whole after the image/truth audit below.
+MTHv2 remains unavailable on the allowed hosts, so N5 has no historical MTHv2 component. PHaEDRA's old export
+has no verified full-resolution image mapping on the allowed hosts, so L4 uses the four Freedmen's Bureau
+registers only. No substitute source was added.
 
-Pre-freeze checks for that extension (2026-10-18): Smithsonian editorial margin/table labels and malformed
+Checks for the extension (2026-10-18): Smithsonian editorial margin/table labels and malformed
 closing tags are removed while the visible words stay. Vision sanity refuses failed OCR jobs or missing output;
-an existing empty output remains a legitimate blank reading. The extension is not frozen until its visual
-kind and image/truth checks finish.
+an existing empty output remains a legitimate blank reading. By the People kind exclusions and OmniDocBench figure-text omissions
+are recorded in `drops.jsonl` and replaced further down the same seeded order; pages are never dropped merely
+because Vision reads them poorly. OmniDocBench's invisible Markdown heading markers are removed. Its photo
+figures may remain where they omit no visible lettering.
+
+The final extension sanity pass read **655 Latin pages** in all (320 original plus 335 added). The 26
+flags in the added strata were visually compared with their truth and retained: difficult hands, layout
+and genuine historical endorsements, rather than mismatched transcription. Non-Latin pairs were checked
+visually, and N5 figure-bearing pages and their replacements were checked for omitted text. The provenance
+record is `sanity-review.json`; there are 133 recorded exclusions and 42 quarter-cap exceptions overall.
+
+**SBB source exclusion.** The [Zenodo record](https://zenodo.org/records/2583866) calls `gt_page.zip` OCR/OLR
+ground truth, distinct from `ocr_full.zip`. Visual comparison nevertheless found systematic incorrect words
+in legible scan text (00675574, 00675515, 00675581 and 00675590); the PAGE metadata names FineReader Engine 10.
+That is evidence that its text is unreliable for this whole-page OCR comparison, regardless of its intended
+use. All 41 initially eligible SBB pages are excluded, including those Vision read well. `src_sbb.candidates`
+contributes no pages; the parser remains for reproducing the finding. This corrects the initial assumption
+that its text was a keyed transcription. No SBB page was frozen or scored by a hosted route.
+
+## Added pages and deferred readings
+
+The original reference run remains bound to `manifest-reference-440.jsonl`, an exact snapshot, rather than
+silently reusing its ledger with a larger input set. The table below still reports **only those 440 pages**.
+The **455 added pages have no hosted reference scores**: the owner's 2026-10-17 paid-run hold defers both
+routes to W43.sweep. The register is `execution-plans/paid-runs-deferred.md`. At the original run's measured
+$0.0066 per page for both routes, the extension alone is about **$3.00**, an estimate, not a new charge.
+Zero dollars were spent adding the extension; the earlier $3.06 booking and $2.04 remaining cap are unchanged.
+
+To run an extension later, set **both** `BENCH_CORPUS_RUN` (a new run directory) and `BENCH_CORPUS_MANIFEST`
+(the extended manifest). `routes.py` refuses setting only one. Keep the original paid run and its readings
+separate. W43.sweep prices all deferred runs and obtains the owner's approval first.
 
 ## The reference routes (2026-10-17)
 

@@ -20,6 +20,14 @@ whole-page reader. Federal Theatre playbills and advertisements are excluded fro
 pool. These sources had not yet been frozen or scored, so no published score changes. The expanded sample's
 source conventions and remaining limits are in `segbench-results/bench-corpus/README.md`.
 
+2026-10-18 pre-freeze audit: `src_si.clean` removes editorial margin labels and malformed nested closing tags;
+`src_omnidoc.truth` removes annotation-generated Markdown heading markers. Pages whose figure lettering is
+missing from OmniDocBench truth are explicitly dropped with reasons. `sample.cmd_sanity` now refuses a failed
+Vision helper or a missing output instead of scoring missing files as blank OCR (an entirely failed stratum
+previously had median zero and no flags). Offline regression cases cover all three defects. The SBB newspaper source is excluded as a whole: its supplied text has systematic incorrect words in
+legible scan text, despite the ground-truth label (details in the bench README). No hosted reading
+of these added pages has run, and the original 440 frozen pages and their scores stay unchanged.
+
 ## ⚠️ LIMITATION (W41.app-local-models, 2026-10-16): what the local open-weight model route does not yet cover
 
 Settings → API Gateway → **A model on this Mac** (`LocalModelRoute`). Open: **only Qwen3-VL 8B at 4-bit is measured on

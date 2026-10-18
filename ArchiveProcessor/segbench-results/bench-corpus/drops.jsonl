@@ -1,15 +1,35 @@
+{"key": "btp:afc1945001_ms01006-32", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms01007-13", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms02014-44", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms03052-32", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms06093-25", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08115-56", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08116a-44", "reason": "Visual stratum check: handwritten matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms08118-35", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08118-43", "reason": "Visual stratum check: handwritten matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08119-149", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms08119-169", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08119-31", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms08121-48", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms08121-99", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms08123-74", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09124-107", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms09124-39", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09125-4", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09125-49", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09127-36", "reason": "Visual stratum check: handwritten matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09129-14", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09130-46", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09130-70", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09131-121", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms09131-132", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09132-37", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms10135-42", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms10136-14", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms10137-112", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms10141-29", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:afc1945001_ms10141-5", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mgw440576-7", "reason": "Visual kind check: empty verso with page number and modern library seal only, no manuscript text"}
 {"key": "btp:mss1288000059-1", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
 {"key": "btp:mss1288000220-16", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
 {"key": "btp:mss1288000569-1", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
@@ -17,6 +37,7 @@
 {"key": "btp:mss1288000650-23", "reason": "Visual stratum check: typed/printed matter, not L1 handwriting"}
 {"key": "btp:mss1288000666-60", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
 {"key": "btp:mss1288000952-108", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288000952-184", "reason": "Visual stratum check: typed/printed matter, not L1 handwriting"}
 {"key": "btp:mss1288001261-15", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
 {"key": "btp:mss1288001790-7", "reason": "L1 era check: letter dated 1846, before the 1850-1950 stratum"}
 {"key": "btp:mss1288002011-9", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
@@ -28,20 +49,85 @@
 {"key": "btp:mss154040390-29", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
 {"key": "btp:mss154040424-40", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
 {"key": "btp:mss4602900303-144", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900303-366", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900303-425", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900303-434", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900303-507", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900303-619", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900303-771", "reason": "Visual stratum check: receipt-stamp verso with reversed bleedthrough only, no typescript body"}
 {"key": "btp:mss4602900304-1133", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900304-262", "reason": "Visual stratum check: receipt-stamp verso with reversed bleedthrough only, no typescript body"}
 {"key": "btp:mss4602900304-427", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900304-780", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900304-869", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900305-1030", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900305-194", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900305-259", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900305-683", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900306-1143", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900306-423", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900306-507", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900306-617", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900307-380", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900307-48", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900307-543", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "btp:mss4602900307-81", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "koenigsfelden:U-17_0910_s11", "reason": "truth is only the dorsal note \"56 dorf\"; the photograph also shows a dozen lines of another leaf, so what a reader should transcribe is ambiguous (sanity pass 2026-10-17, opened by hand)"}
 {"key": "kurrent:MariaTheresia/MariaTheresia_1824_page3", "reason": "truth covers only the first five lines; the inverted lines at the foot of the page are not transcribed (sanity pass 2026-10-17, opened by hand)"}
+{"key": "omnidoc:docstructbench_dianzishu_zhongwenzaixian-o.O-61562126.pdf_80", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:docstructbench_dianzishu_zhongwenzaixian-o.O-61569294.pdf_128", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:docstructbench_dianzishu_zhongwenzaixian-o.O-63687685.pdf_106", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:docstructbench_dianzishu_zhongwenzaixian-o.O-63688445.pdf_489", "reason": "Visual truth check: chart or illustration lettering absent from whole-page truth"}
+{"key": "omnidoc:newspaper_4b4ad1f6cba28a4844d7ffa9306223a4_1", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:newspaper_6fa919bfb48695bc785d9f326e3cdd36_1", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:page-15cc8cbe-9ce3-4ad8-8737-9159b061ca95", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:page-56023e3d-ae9b-486d-b7bb-419624d18356", "reason": "Visual truth check: chart or illustration lettering absent from whole-page truth"}
+{"key": "omnidoc:yanbaor2_0a47b1d6b03103a249101f13e89f2226a273a75378d8110d46eb42c1cfa65ffd.pdf_10", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:yanbaor2_782b0e71579c32d2a6c6c04494d8193c775e8c865b80b7252008ef661dae96b9.pdf_15", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:yanbaor2_8072f7ea9b3083ff5e8f9bfbba591771e61115039c96fda1c8ea391a7570f098.pdf_5", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:yanbaor2_b5cf8249bdf8eebf7625f4b0e39ad38d684d7797ac7bf1617452cd0565ca28a2.pdf_29", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:yanbaor2_bfe5f11c4ad2e94d966ef6801dc992816f42c9150e2be42b008c95f59713e901.pdf_139", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "omnidoc:yanbaor2_yanbaoPPT_467", "reason": "Visual truth check: chart or illustration lettering absent from whole-page truth"}
+{"key": "omnidoc:yanbaor2_yanbaoPPT_6148", "reason": "Visual truth check: visible chart, figure or scene lettering absent from whole-page truth"}
+{"key": "sbb:00675515", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675527", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675532", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675541", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675547", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675549", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675555", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675562", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675569", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675574", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675581", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675590", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675598", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675604", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675624", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675631", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675639", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675644", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675647", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675654", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675669", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675684", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675685", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675688", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675689", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675690", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675691", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675693", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675698", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675710", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675715", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675721", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675725", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675728", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675743", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675754", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675755", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675757", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675771", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675788", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "sbb:00675790", "reason": "Source-wide truth audit: SBB supplied region text has systematic OCR errors in legible scan words; not reliable whole-page transcription truth"}
+{"key": "si:NMAAHC-007630087_00340", "reason": "Visual kind check: printed order pasted inside volume cover, no register or table entries"}

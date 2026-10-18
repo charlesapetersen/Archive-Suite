@@ -1,0 +1,228 @@
+{
+  "date": "2026-10-18",
+  "seed": "W43.corpus-build/2026-10-16",
+  "frozen_pages": 895,
+  "original_reference_pages": 440,
+  "added_pages": 455,
+  "paid_calls": 0,
+  "over_cap_pages": 42,
+  "recorded_exclusions": 133,
+  "vision": {
+    "settings": "Apple Vision accurate, en-US, language correction on; Latin script only",
+    "pages": 655,
+    "flag_rule": "NES below half its stratum median",
+    "added_stratum_flags": [
+      {
+        "key": "btp:mss1288001809-8",
+        "median": 0.464,
+        "nes": 0.0,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss219560002-754",
+        "median": 0.464,
+        "nes": 0.038,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss1288000521-8",
+        "median": 0.464,
+        "nes": 0.074,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss219560001-1012",
+        "median": 0.464,
+        "nes": 0.106,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss184240341-70",
+        "median": 0.464,
+        "nes": 0.12,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss35634010-18",
+        "median": 0.464,
+        "nes": 0.15,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss184240252-5",
+        "median": 0.464,
+        "nes": 0.162,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss1288001804-4",
+        "median": 0.464,
+        "nes": 0.162,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss184240130-26",
+        "median": 0.464,
+        "nes": 0.184,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss154040426-56",
+        "median": 0.464,
+        "nes": 0.188,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss35634011-110",
+        "median": 0.464,
+        "nes": 0.208,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mss35634009-124",
+        "median": 0.464,
+        "nes": 0.228,
+        "stratum": "L1",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw438888-4",
+        "median": 0.327,
+        "nes": 0.014,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw500029-68",
+        "median": 0.327,
+        "nes": 0.067,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw432848-6",
+        "median": 0.327,
+        "nes": 0.072,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw500029-350",
+        "median": 0.327,
+        "nes": 0.077,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw439794-4",
+        "median": 0.327,
+        "nes": 0.098,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw6a00007-30",
+        "median": 0.327,
+        "nes": 0.114,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw500029-277",
+        "median": 0.327,
+        "nes": 0.125,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw500029-161",
+        "median": 0.327,
+        "nes": 0.144,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:mgw6a00008-7",
+        "median": 0.327,
+        "nes": 0.148,
+        "stratum": "L2",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "btp:afc1945001_ms03034-49",
+        "median": 0.942,
+        "nes": 0.413,
+        "stratum": "L3",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "si:NMAAHC-007630087_00353",
+        "median": 0.279,
+        "nes": 0.078,
+        "stratum": "L4",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "si:NMAAHC-007630087_00434",
+        "median": 0.279,
+        "nes": 0.112,
+        "stratum": "L4",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "si:NMAAHC-007630087_00438",
+        "median": 0.279,
+        "nes": 0.135,
+        "stratum": "L4",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      },
+      {
+        "key": "newsbench:mss3413201315-4",
+        "median": 0.286,
+        "nes": 0.054,
+        "stratum": "L9",
+        "decision": "keep: image and truth compared; difficult handwriting, layout or sparse historical writing, not mismatched truth"
+      }
+    ]
+  },
+  "visual_review": {
+    "L1": "All 80 chosen pages kind-checked, replacements checked; genuine historical endorsements retained",
+    "L2": "All 80 kind-checked, blank modern-seal verso replaced and replacement checked",
+    "L3": "All 80 kind-checked including replacements; receipt-stamp-only versos excluded",
+    "L4": "All 80 kind-checked; pasted printed notice replaced and replacement checked",
+    "N2_pair": "peter:4_23",
+    "N5": "All figure-bearing chosen pages and replacements compared with annotation truth; omitted visible lettering excluded, photos/nontext figures retained",
+    "N6_pair": "devanagari:paramananda1924/001"
+  },
+  "source_exclusion": {
+    "sbb": {
+      "scope": "all 41 initially eligible pages",
+      "reason": "Systematic wrong words in legible scan text; source-wide exclusion avoids conditioning on model scores",
+      "visual_evidence_page_ids": [
+        "00675574",
+        "00675515",
+        "00675581",
+        "00675590"
+      ],
+      "record": "https://zenodo.org/records/2583866"
+    }
+  },
+  "limits": [
+    "L9 has 15 pages; BLN600 inaccessible, SBB excluded",
+    "MTHv2 not reachable on allowed hosts",
+    "PHaEDRA has no verified full-resolution image mapping on allowed hosts",
+    "No hosted reference scores for the 455 added pages; deferred to W43.sweep",
+    "CrashPlan coverage of the permanent folder not checked"
+  ]
+}

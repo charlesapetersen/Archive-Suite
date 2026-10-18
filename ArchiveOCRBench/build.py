@@ -274,10 +274,13 @@ def public():
     with f.open(newline="") as fh:
         rows = [{k: (v if k in ("route", "stratum") else num(v)) for k, v in r.items()} for r in csv.DictReader(fh)]
     manifest = [json.loads(l) for l in (PUBLIC / "manifest.jsonl").read_text().splitlines()]
+    reference = [json.loads(l) for l in (PUBLIC / "manifest-reference-440.jsonl").read_text().splitlines()]
+    reference_keys = {(m["source"], m["page_id"]) for m in reference}
     strata = {}
     for m in manifest:
-        s = strata.setdefault(m["stratum"], {"pages": 0, "sources": set(), "script": m["script"]})
+        s = strata.setdefault(m["stratum"], {"pages": 0, "reference_pages": 0, "sources": set(), "script": m["script"]})
         s["pages"] += 1
+        s["reference_pages"] += (m["source"], m["page_id"]) in reference_keys
         s["sources"].add(m["source"])
     spec = PUBLIC / "specialists.csv"   # W43.script-specialists: corpus/specialists.py report
     specialists = None

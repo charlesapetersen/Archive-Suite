@@ -7990,8 +7990,43 @@
    "cap": 3.2
   },
   "strata": {
+   "L1": {
+    "pages": 80,
+    "reference_pages": 0,
+    "sources": [
+     "btp"
+    ],
+    "script": "Latn"
+   },
+   "L2": {
+    "pages": 80,
+    "reference_pages": 0,
+    "sources": [
+     "bentham",
+     "btp"
+    ],
+    "script": "Latn"
+   },
+   "L3": {
+    "pages": 80,
+    "reference_pages": 0,
+    "sources": [
+     "btp",
+     "tapus"
+    ],
+    "script": "Latn"
+   },
+   "L4": {
+    "pages": 80,
+    "reference_pages": 0,
+    "sources": [
+     "si"
+    ],
+    "script": "Latn"
+   },
    "L5": {
     "pages": 80,
+    "reference_pages": 80,
     "sources": [
      "castilian",
      "iforal",
@@ -8001,6 +8036,7 @@
    },
    "L6": {
     "pages": 80,
+    "reference_pages": 80,
     "sources": [
      "kurrent",
      "read2017"
@@ -8009,6 +8045,7 @@
    },
    "L7": {
     "pages": 80,
+    "reference_pages": 80,
     "sources": [
      "koenigsfelden"
     ],
@@ -8016,20 +8053,39 @@
    },
    "L8": {
     "pages": 80,
+    "reference_pages": 80,
     "sources": [
      "ocrd"
     ],
     "script": "Latn"
    },
+   "L9": {
+    "pages": 15,
+    "reference_pages": 0,
+    "sources": [
+     "newsbench"
+    ],
+    "script": "Latn"
+   },
    "N1": {
     "pages": 40,
+    "reference_pages": 40,
     "sources": [
      "muharaf"
     ],
     "script": "Arab"
    },
+   "N2": {
+    "pages": 40,
+    "reference_pages": 0,
+    "sources": [
+     "peter"
+    ],
+    "script": "Cyrl"
+   },
    "N3": {
     "pages": 40,
+    "reference_pages": 40,
     "sources": [
      "eparchos"
     ],
@@ -8037,10 +8093,27 @@
    },
    "N4": {
     "pages": 40,
+    "reference_pages": 40,
     "sources": [
      "biblia"
     ],
     "script": "Hebr"
+   },
+   "N5": {
+    "pages": 40,
+    "reference_pages": 0,
+    "sources": [
+     "omnidoc"
+    ],
+    "script": "Hans"
+   },
+   "N6": {
+    "pages": 40,
+    "reference_pages": 0,
+    "sources": [
+     "devanagari"
+    ],
+    "script": "Deva"
    }
   },
   "specialists": [

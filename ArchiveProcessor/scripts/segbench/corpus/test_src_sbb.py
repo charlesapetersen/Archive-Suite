@@ -31,6 +31,11 @@ XML = page(BODY, ORDER)
 
 
 class T(unittest.TestCase):
+    def test_layout_source_cannot_enter_whole_page_ocr_truth(self):
+        from unittest import mock
+        with mock.patch.object(s, '_zip', side_effect=AssertionError('excluded source should not fetch')):
+            self.assertEqual(s.candidates(), [])
+
     def test_truth_follows_reading_order_and_keeps_characters(self):
         self.assertEqual(s.truth(XML), 'Der Anzeiger.\n\nNr. 15, 1866.\n\n'
                          'Berlin, 3. April 1867. Die Verand-\nlung iſt geſloſſen, 1867.\n\n'

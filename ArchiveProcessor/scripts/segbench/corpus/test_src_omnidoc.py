@@ -27,6 +27,10 @@ class Truth(unittest.TestCase):
         self.assertEqual(O.truth(p), '題頭\n\n正文\n\n刊名\n\n54')
         self.assertIsNone(O.truth(page(('text_block', 1, '正文'), ('footer', None, '$x$'))))
 
+    def test_annotation_heading_markup_is_not_visible_text(self):
+        p = page(('title', 0, '# 三只母鸡'), ('text_block', 1, '## 一、基本案情\n### （一）定性判断。\n编号#38'))
+        self.assertEqual(O.truth(p), '三只母鸡\n\n一、基本案情\n（一）定性判断。\n编号#38')
+
 
 if __name__ == '__main__':
     unittest.main()
