@@ -1,2 +1,47 @@
+{"key": "btp:afc1945001_ms03052-32", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms06093-25", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08118-35", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08119-169", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08121-48", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08121-99", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms08123-74", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09124-39", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms09131-132", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms10136-14", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms10141-29", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:afc1945001_ms10141-5", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss1288000059-1", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288000220-16", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288000569-1", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288000630-3", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288000650-23", "reason": "Visual stratum check: typed/printed matter, not L1 handwriting"}
+{"key": "btp:mss1288000666-60", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288000952-108", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288001261-15", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288001790-7", "reason": "L1 era check: letter dated 1846, before the 1850-1950 stratum"}
+{"key": "btp:mss1288002011-9", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288002036-12", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288002067-53", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss1288002083-57", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss154040277-37", "reason": "Visual stratum check: typed/printed matter, not L1 handwriting"}
+{"key": "btp:mss154040368-20", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss154040390-29", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss154040424-40", "reason": "Visual kind check: printed/typed matter or archival folder cover, not an L1 handwritten letter/diary"}
+{"key": "btp:mss4602900303-144", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900303-434", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900303-507", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900303-619", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900304-1133", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900304-427", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900304-780", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900305-1030", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900305-194", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900305-683", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900306-1143", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900306-507", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900306-617", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900307-380", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900307-48", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
+{"key": "btp:mss4602900307-81", "reason": "Visual stratum check: handwritten/printed matter, not an L3 typescript"}
 {"key": "koenigsfelden:U-17_0910_s11", "reason": "truth is only the dorsal note \"56 dorf\"; the photograph also shows a dozen lines of another leaf, so what a reader should transcribe is ambiguous (sanity pass 2026-10-17, opened by hand)"}
 {"key": "kurrent:MariaTheresia/MariaTheresia_1824_page3", "reason": "truth covers only the first five lines; the inverted lines at the foot of the page are not transcribed (sanity pass 2026-10-17, opened by hand)"}
