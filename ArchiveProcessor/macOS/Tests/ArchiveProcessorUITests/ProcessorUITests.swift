@@ -77,6 +77,21 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-multipage-auto-reocr")
     }
 
+    func testInstitutionalComputingImportOffersNeutralFolderChooser() throws {
+        relaunch(extra: ["-APUITestSyntheticMultiPagePDF"])
+        let choose = element("ap.ocr.institutionalComputeChoose")
+        XCTAssertTrue(choose.waitForExistence(timeout: 10), "a direct run with inputs offers the cluster import")
+        XCTAssertEqual(choose.label, "Use institutional computing text…")
+        attachScreenshot("processor-institutional-computing-import")
+        choose.click()
+        let confirm = app.buttons["Use Cluster Folder"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the import must open the folder chooser")
+        attachScreenshot("processor-institutional-computing-folder")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5), "Escape dismisses the folder chooser")
+        XCTAssertTrue(choose.exists, "cancelling leaves the next run without an import")
+    }
+
     /// W36.seg-opt-review: one flagged pass, page n beside page n+1. Done waits for every gap's answer, an
     /// answer moves to the next gap, and the answers come back in order. Synthetic pages, no run behind it.
     func testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone() throws {
