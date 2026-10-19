@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-19",
+  "item": "W43.ppocrv6-farmshare",
+  "provenance": "owner-authorized interactive Codex; daemon stopped",
+  "phase": "submitted_preparation_running",
+  "jobs": {
+    "setup": {
+      "job": 1858052,
+      "args": [
+        "--partition=normal",
+        "--cpus-per-task=8",
+        "--mem=48G",
+        "--time=02:00:00"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/ppocrv6-20261019/recovery/ppocrv6_setup.sh",
+        "/scratch/users/cp1/fs-ocr/ppocrv6-20261019"
+      ]
+    },
+    "ppocrv6-medium-native": {
+      "job": 1858053,
+      "args": [
+        "--partition=gpu",
+        "--nodes=1",
+        "--gres=gpu:1",
+        "--cpus-per-task=8",
+        "--mem=48G",
+        "--time=12:00:00",
+        "--dependency=afterany:1858052:1857671"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/ppocrv6-20261019/recovery/ppocrv6_job.sh",
+        "/scratch/users/cp1/fs-ocr/ppocrv6-20261019"
+      ]
+    }
+  },
+  "remote_root": "/scratch/users/cp1/fs-ocr/ppocrv6-20261019",
+  "local_root": "/Users/cp1/Claude/Long term storage/FarmShare-ppocrv6-20261019",
+  "pages": 895,
+  "pilot_pages": 3,
+  "models": {
+    "det": "PaddlePaddle/PP-OCRv6_medium_det_safetensors@4236c2b61741a259c091fd879dcc4edc339e916c",
+    "rec": "PaddlePaddle/PP-OCRv6_medium_rec_safetensors@024cad6a831de75c2c3c26e711ba8c4a82ccd24b"
+  },
+  "checks": [
+    "Python AST syntax",
+    "bash -n both job scripts",
+    "895 unique frozen manifest page IDs",
+    "existing SSH socket rice-04",
+    "scheduler accepted both jobs",
+    "bounded collector waiting, exec session61339",
+    "Functional synthetic transport guard: 895 calls includes pilot; second pass makes zero new calls; changed image bytes refused"
+  ],
+  "not_yet_verified": [
+    "CPU synthetic smoke",
+    "GPU three-page compatibility pilot",
+    "895-page result validity and scores"
+  ],
+  "real_money_spent_usd": 0
+}

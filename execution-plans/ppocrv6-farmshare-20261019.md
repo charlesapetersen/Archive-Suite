@@ -1,0 +1,60 @@
+# Stock PP-OCRv6 FarmShare checkpoint — 2026-10-19
+
+W43.ppocrv6-farmshare. Owner explicitly asked to queue the stock Paddle pipeline. The prior
+Kraken-adapted recognizer and current PaddleOCR-VL1.5 are different routes and are not this measurement.
+
+## Submitted work — collect, never duplicate
+
+- CPU preparation **1858052**: normal partition,8CPU/48GB/2h, isolated package overlay and pinned downloads,
+  model load plus a synthetic white-image API smoke. No benchmark page read on the login/CPU node.
+- Native OCR **1858053**: one L40S GPU,8CPU/48GB/12h, afterany1858052 AND1857671 (Inkling).
+  A failed preparation exits before benchmark inference. Three L1/L4/L8 pilots must produce schema-valid,
+  nonempty text before full895 starts. The full pass reuses these three readings,895 total.
+- First submission attempt was explicitly rejected by sbatch because `bash` was supplied as the script.
+  No job existed; checked unique names and absence of jobs.json before correcting the script argument.
+  Remote submission marker retained as submission-script-argument-rejected; no inference was repeated.
+
+L=`/Users/cp1/Claude/Long term storage/FarmShare-ppocrv6-20261019`
+S=`/scratch/users/cp1/fs-ocr/ppocrv6-20261019`
+Read L/jobs.json, collection-status.json and S/logs before any recovery. Durable scripts live at L/S recovery,
+not in a temporary worktree. The caffeinate collector polls180s for at most48h, retrieves terminal model
+outputs (including failed partials) to L/outputs and logs to L/remote-logs, then exits. It never submits,
+retries inference, starts the daemon or authenticates. If SSH breaks it saves needs_inspection and stops;
+check PID/marker before restarting only the collector. Keep the owner's existing SSH master and held channel.
+
+## Pinned configuration and provenance
+
+[Detector](https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det_safetensors), revision
+4236c2b61741a259c091fd879dcc4edc339e916c.
+[Recognizer](https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_safetensors), revision
+024cad6a831de75c2c3c26e711ba8c4a82ccd24b. Both Apache2.0; public, no remote code, <=2GB each enforced.
+PaddleOCR3.7.0, PaddleX3.7.2 and Transformers5.20.2 pinned in S/venv, with explicitly pinned Torch2.13.0,
+torchvision0.28.0/numpy2.3.5 installed there. --system-site-packages exposes the OS packages only;
+the existing vLLM environment is not inherited or mutated. Transformers5.17 in the shared environment
+lacks this architecture; it is not changed. Resolved package list retained outside Git.
+
+The native PaddleOCR general pipeline uses transformers engine with document orientation/unwarping and
+line orientation disabled, as in the official detector card's Python pipeline. Explicit native defaults:
+detector limit64/min, max_side_limit4000 from pinned package, threshold0.3/box0.6/unclip1.5;
+recognition batch6/score threshold0.0. Same frozen JPEG2400px/JPEG90 bytes as other runs, with per-image
+SHA checks. Internal native preprocessing differs from VLMs and must be labelled. No autoregressive cap
+or prompt; join native rec_texts with newlines, preserve the native JSON including geometry/confidence,
+and do not invent layout ordering. This is not a controlled prompt-equivalent VLM panel row.
+
+CPU smoke checks model loading and schema on a synthetic blank only; GPU three-page gate checks compatibility,
+not transcription quality. Blanks/errors are retained as failures, never silently retried. Per-page records
+bind image SHA plus model/config/code contract. Contract excludes manifest length to permit reuse when pages
+are later added; this submitted batch itself refuses anything other than the frozen895 and matching pilot3.
+A later expansion needs an explicitly reviewed manifest-size allowance, not rereading cached unchanged pages.
+Pilot failure prevents full inference. Timeout/partial output is checkpointed, never presented as complete.
+HF offline flags on GPU prevent floating downloads. Source/weight/config hashes and package versions retained.
+
+## Resume and finish
+
+Inspect prepared.json and scheduler/logs; then retrieve only recorded outputs. Review sample transcription,
+page ordering/rotation/language and native resize settings before accepting scores. Score all895 raw answers
+with blanks/errors as failures, preserve stratum/source identity, publish the route separately from both
+PaddleOCR-VL1.5 and Kraken-on-Vision-crops, and keep historical440 unchanged. No automatic catalogue or
+adoption/default changes. Reconcile SUITE_TODO/DONE and primary plan; delete this plan only when reviewed
+results ship. Record interactive provenance honestly; no fabricated daemon PID, grant, usage or cost ledger.
+No hosted money spent. No corpus construction, app changes, training or private locked-test repeat.
