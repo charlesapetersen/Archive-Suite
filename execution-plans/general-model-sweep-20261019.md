@@ -86,3 +86,12 @@ Publish numeric report/ArchiveOCRBench updates after review; no automatic app de
 If timed out, retain per-page cache and checkpoint; do not silently repeat inference. Move the whole queue item
 to DONE, tick primary plan and delete this plan only after results review is complete. Agent Manager reads the
 shared trackers/plan/Git; no fabricated daemon session, grant, PID or usage ledger. No paid calls or daemon start.
+
+
+## Inkling alternative follow-up — owner19Oct
+
+The blocker above is specific to installed vLLM, not every runtime. W43.inkling-farmshare now queues an
+isolated pinned llama.cpp contributor branch with Unsloth Q4 GGUF and its vision projector. See
+`inkling-farmshare-20261019.md` for existing jobs1857675/1857671 and recovery; no shared vLLM patch or duplicate
+NVFP4 download. GPU image compatibility is unverified until the queued pilot succeeds. Keep this item's
+Ling/Nemotron jobs and collector independent.

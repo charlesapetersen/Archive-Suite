@@ -29,9 +29,13 @@ def main():
         raise ValueError('Frozen collector changed')
     contract = {'model': config['model'], 'revision': config['revision'], 'route': config['route'],
                 'prompt_sha256': hashlib.sha256((root / 'ocr/panel-prompt.txt').read_bytes()).hexdigest(),
-                'collector_sha256': LEGACY_SHA, 'vllm': importlib.metadata.version('vllm'),
+                'collector_sha256': LEGACY_SHA,
+                'vllm': importlib.metadata.version('vllm') if config.get('runtime', 'vllm') == 'vllm' else None,
                 'server_args': os.environ['FS_VLLM_ARGS'], 'max_tokens': 8192,
                 'temperature': 0, 'thinking': False, 'concurrency': concurrency}
+    if config.get('runtime') != 'vllm' and config.get('runtime') is not None:
+        contract.update(runtime=config['runtime'], runtime_revision=config['runtime_revision'],
+                        binary_sha256=config['binary_sha256'])
     binding = root / 'cache-contract.json'
     if binding.exists() and json.loads(binding.read_text()) != contract:
         raise ValueError('Different OCR settings; use a separate experiment')
