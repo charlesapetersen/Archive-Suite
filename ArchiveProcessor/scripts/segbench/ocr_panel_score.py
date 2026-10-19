@@ -204,7 +204,7 @@ def all_scores():
 def write_csv(path, rr, fields):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('w') as f:
-        writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
+        writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore', lineterminator='\n')
         writer.writeheader(); writer.writerows(rr)
 
 

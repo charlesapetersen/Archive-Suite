@@ -1113,6 +1113,18 @@
  "farmshare": {
   "truth": [
    {
+    "label": "qwen3.5-27b",
+    "name": "Qwen3.5 27B",
+    "kv": "bf16",
+    "gpus": 1,
+    "nes": 95.33,
+    "ok": 96,
+    "n": 96,
+    "clippings": 93.6,
+    "per_hour": 1025.6,
+    "gpu_hours_100k": 98
+   },
+   {
     "label": "qwen3.6-27b-1849739",
     "name": "Qwen3.6 27B",
     "kv": "fp8",
@@ -1183,6 +1195,18 @@
     "clippings": 94.45,
     "per_hour": 1063.2,
     "gpu_hours_100k": 94
+   },
+   {
+    "label": "churro-1855420",
+    "name": "CHURRO-3B (bf16, official XML prompt)",
+    "kv": "bf16",
+    "gpus": 1,
+    "nes": 89.09,
+    "ok": 94,
+    "n": 96,
+    "clippings": 92.78,
+    "per_hour": 1251.0,
+    "gpu_hours_100k": 80
    }
   ],
   "news": [
@@ -7583,6 +7607,456 @@
     },
     "parse_failures": 0,
     "finish_length": 0
+   },
+   "fs-date-2b-nothink": {
+    "model": "fs-date-2b-nothink",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       98,
+       120
+      ],
+      "within1": [
+       108,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       51,
+       80
+      ],
+      "within1": [
+       67,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       18,
+       50
+      ],
+      "within1": [
+       34,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       113,
+       119
+      ],
+      "within1": [
+       118,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       54,
+       131
+      ],
+      "within1": [
+       91,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       167,
+       250
+      ],
+      "within1": [
+       209,
+       250
+      ]
+     }
+    },
+    "decade": [
+     29,
+     50
+    ],
+    "month": {
+     "owner": [
+      76,
+      120
+     ],
+     "other": [
+      22,
+      120
+     ],
+     "none": [
+      22,
+      120
+     ],
+     "untagged_given": [
+      49,
+      80
+     ],
+     "untagged_given_named": 23
+    },
+    "uncertain": {
+     "owner_certain": [
+      0,
+      200
+     ],
+     "owner_certain_in_text": [
+      0,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      0,
+      86
+     ],
+     "owner_uncertain": [
+      0,
+      50
+     ],
+     "certain_and_wrong": [
+      51,
+      200
+     ]
+    },
+    "parse_failures": 0,
+    "finish_length": 0
+   },
+   "fs-date-4b-nothink": {
+    "model": "fs-date-4b-nothink",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       97,
+       120
+      ],
+      "within1": [
+       107,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       52,
+       80
+      ],
+      "within1": [
+       68,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       17,
+       50
+      ],
+      "within1": [
+       32,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       113,
+       119
+      ],
+      "within1": [
+       118,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       53,
+       131
+      ],
+      "within1": [
+       89,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       166,
+       250
+      ],
+      "within1": [
+       207,
+       250
+      ]
+     }
+    },
+    "decade": [
+     31,
+     50
+    ],
+    "month": {
+     "owner": [
+      84,
+      120
+     ],
+     "other": [
+      21,
+      120
+     ],
+     "none": [
+      15,
+      120
+     ],
+     "untagged_given": [
+      46,
+      80
+     ],
+     "untagged_given_named": 23
+    },
+    "uncertain": {
+     "owner_certain": [
+      0,
+      200
+     ],
+     "owner_certain_in_text": [
+      0,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      0,
+      86
+     ],
+     "owner_uncertain": [
+      0,
+      50
+     ],
+     "certain_and_wrong": [
+      51,
+      200
+     ]
+    },
+    "parse_failures": 0,
+    "finish_length": 0
+   }
+  }
+ },
+ "dating_public": {
+  "models": {
+   "fs-date-2b-nothink": {
+    "documents": 300,
+    "year": {
+     "exact": [
+      285,
+      300
+     ],
+     "within1": [
+      292,
+      300
+     ],
+     "in text": [
+      246,
+      257
+     ],
+     "not in text": [
+      39,
+      43
+     ]
+    },
+    "month": {
+     "exact": [
+      224,
+      240
+     ],
+     "none": [
+      3,
+      240
+     ],
+     "given_where_source_has_none": [
+      41,
+      60
+     ]
+    },
+    "day": {
+     "exact": [
+      139,
+      150
+     ],
+     "full_date": [
+      136,
+      150
+     ],
+     "none": [
+      2,
+      150
+     ],
+     "given_where_source_has_none": [
+      96,
+      150
+     ]
+    },
+    "parse_failures": 0
+   },
+   "fs-date-4b-nothink": {
+    "documents": 300,
+    "year": {
+     "exact": [
+      291,
+      300
+     ],
+     "within1": [
+      293,
+      300
+     ],
+     "in text": [
+      252,
+      257
+     ],
+     "not in text": [
+      39,
+      43
+     ]
+    },
+    "month": {
+     "exact": [
+      224,
+      240
+     ],
+     "none": [
+      3,
+      240
+     ],
+     "given_where_source_has_none": [
+      41,
+      60
+     ]
+    },
+    "day": {
+     "exact": [
+      138,
+      150
+     ],
+     "full_date": [
+      135,
+      150
+     ],
+     "none": [
+      2,
+      150
+     ],
+     "given_where_source_has_none": [
+      90,
+      150
+     ]
+    },
+    "parse_failures": 0
+   },
+   "fs-base-2b-nothink": {
+    "documents": 300,
+    "year": {
+     "exact": [
+      281,
+      300
+     ],
+     "within1": [
+      291,
+      300
+     ],
+     "in text": [
+      245,
+      257
+     ],
+     "not in text": [
+      36,
+      43
+     ]
+    },
+    "month": {
+     "exact": [
+      200,
+      240
+     ],
+     "none": [
+      10,
+      240
+     ],
+     "given_where_source_has_none": [
+      51,
+      60
+     ]
+    },
+    "day": {
+     "exact": [
+      80,
+      150
+     ],
+     "full_date": [
+      74,
+      150
+     ],
+     "none": [
+      4,
+      150
+     ],
+     "given_where_source_has_none": [
+      135,
+      150
+     ]
+    },
+    "parse_failures": 0
+   },
+   "fs-base-4b-nothink": {
+    "documents": 300,
+    "year": {
+     "exact": [
+      285,
+      300
+     ],
+     "within1": [
+      289,
+      300
+     ],
+     "in text": [
+      248,
+      257
+     ],
+     "not in text": [
+      37,
+      43
+     ]
+    },
+    "month": {
+     "exact": [
+      31,
+      240
+     ],
+     "none": [
+      206,
+      240
+     ],
+     "given_where_source_has_none": [
+      12,
+      60
+     ]
+    },
+    "day": {
+     "exact": [
+      107,
+      150
+     ],
+     "full_date": [
+      13,
+      150
+     ],
+     "none": [
+      34,
+      150
+     ],
+     "given_where_source_has_none": [
+      61,
+      150
+     ]
+    },
+    "parse_failures": 0
    }
   }
  },
@@ -7925,6 +8399,388 @@
     "cost": 1.06970044
    }
   ],
+  "farmshare": [
+   {
+    "route": "fs-churro",
+    "stratum": "L5",
+    "n": 80.0,
+    "ok": 73.0,
+    "failed": 0.08750000000000002,
+    "nes": 0.6278413846563573,
+    "nes_answered": 0.6880453530480628,
+    "chrf": 0.5689492391662043
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "L6",
+    "n": 80.0,
+    "ok": 77.0,
+    "failed": 0.03749999999999998,
+    "nes": 0.6944883869123762,
+    "nes_answered": 0.7215463760128584,
+    "chrf": 0.6004649429185306
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "L7",
+    "n": 80.0,
+    "ok": 69.0,
+    "failed": 0.13749999999999996,
+    "nes": 0.538536531821044,
+    "nes_answered": 0.6243901818215002,
+    "chrf": 0.42026405916644965
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "L8",
+    "n": 80.0,
+    "ok": 79.0,
+    "failed": 0.012499999999999956,
+    "nes": 0.9261449665606675,
+    "nes_answered": 0.9378683205677645,
+    "chrf": 0.92424107531381
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "N1",
+    "n": 40.0,
+    "ok": 33.0,
+    "failed": 0.17500000000000004,
+    "nes": 0.6918946871980394,
+    "nes_answered": 0.8386602269067144,
+    "chrf": 0.6261978737376857
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "N3",
+    "n": 40.0,
+    "ok": 40.0,
+    "failed": 0.0,
+    "nes": 0.8470323850589752,
+    "nes_answered": 0.8470323850589752,
+    "chrf": 0.712616212740829
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "N4",
+    "n": 40.0,
+    "ok": 32.0,
+    "failed": 0.19999999999999996,
+    "nes": 0.5787792983725526,
+    "nes_answered": 0.7234741229656907,
+    "chrf": 0.6024917935709769
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "all",
+    "n": 440.0,
+    "ok": 403.0,
+    "failed": 0.0840909090909091,
+    "nes": 0.699248082775496,
+    "nes_answered": 0.7634470382660502,
+    "chrf": 0.6335585921072255
+   },
+   {
+    "route": "fs-fanar",
+    "stratum": "N1",
+    "n": 40.0,
+    "ok": 32.0,
+    "failed": 0.19999999999999996,
+    "nes": 0.3571337215076755,
+    "nes_answered": 0.44641715188459435,
+    "chrf": 0.24043552609486274
+   },
+   {
+    "route": "fs-fanar",
+    "stratum": "all",
+    "n": 40.0,
+    "ok": 32.0,
+    "failed": 0.19999999999999996,
+    "nes": 0.3571337215076755,
+    "nes_answered": 0.44641715188459435,
+    "chrf": 0.24043552609486274
+   },
+   {
+    "route": "fs-german-xix",
+    "stratum": "L6",
+    "n": 80.0,
+    "ok": 77.0,
+    "failed": 0.03749999999999998,
+    "nes": 0.6951272000693931,
+    "nes_answered": 0.7222100779941747,
+    "chrf": 0.5873264391007094
+   },
+   {
+    "route": "fs-german-xix",
+    "stratum": "all",
+    "n": 80.0,
+    "ok": 77.0,
+    "failed": 0.03749999999999998,
+    "nes": 0.6951272000693931,
+    "nes_answered": 0.7222100779941747,
+    "chrf": 0.5873264391007094
+   },
+   {
+    "route": "fs-qari",
+    "stratum": "N1",
+    "n": 40.0,
+    "ok": 17.0,
+    "failed": 0.575,
+    "nes": 0.08580130543117359,
+    "nes_answered": 0.20188542454393787,
+    "chrf": 0.05878971730981465
+   },
+   {
+    "route": "fs-qari",
+    "stratum": "all",
+    "n": 40.0,
+    "ok": 17.0,
+    "failed": 0.575,
+    "nes": 0.08580130543117359,
+    "nes_answered": 0.20188542454393787,
+    "chrf": 0.05878971730981465
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "L5",
+    "n": 80.0,
+    "ok": 64.0,
+    "failed": 0.19999999999999996,
+    "nes": 0.5393647515639224,
+    "nes_answered": 0.6742059394549029,
+    "chrf": 0.4836530088156736
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "L6",
+    "n": 80.0,
+    "ok": 59.0,
+    "failed": 0.26249999999999996,
+    "nes": 0.3973868740963518,
+    "nes_answered": 0.5388296597916634,
+    "chrf": 0.3302453981346291
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "L7",
+    "n": 80.0,
+    "ok": 57.0,
+    "failed": 0.2875,
+    "nes": 0.3188926791492003,
+    "nes_answered": 0.4475686724901057,
+    "chrf": 0.2702217937735002
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "L8",
+    "n": 80.0,
+    "ok": 79.0,
+    "failed": 0.012499999999999956,
+    "nes": 0.8732160192517606,
+    "nes_answered": 0.8842693865840613,
+    "chrf": 0.7727045297103883
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "N1",
+    "n": 40.0,
+    "ok": 33.0,
+    "failed": 0.17500000000000004,
+    "nes": 0.4782983761507415,
+    "nes_answered": 0.5797556074554443,
+    "chrf": 0.3314695140561335
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "N3",
+    "n": 40.0,
+    "ok": 30.0,
+    "failed": 0.25,
+    "nes": 0.37303700493619657,
+    "nes_answered": 0.49738267324826213,
+    "chrf": 0.23120955613278887
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "N4",
+    "n": 40.0,
+    "ok": 23.0,
+    "failed": 0.42500000000000004,
+    "nes": 0.3690839690776039,
+    "nes_answered": 0.6418851636132242,
+    "chrf": 0.31247951285533343
+   },
+   {
+    "route": "qwen3.5-27b",
+    "stratum": "all",
+    "n": 440.0,
+    "ok": 345.0,
+    "failed": 0.21590909090909094,
+    "nes": 0.49801272711700106,
+    "nes_answered": 0.6351466664680594,
+    "chrf": 0.4171643676284217
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "L5",
+    "n": 80.0,
+    "ok": 62.0,
+    "failed": 0.22499999999999998,
+    "nes": 0.504927140239783,
+    "nes_answered": 0.6515188906319781,
+    "chrf": 0.4511244225416447
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "L6",
+    "n": 80.0,
+    "ok": 71.0,
+    "failed": 0.11250000000000004,
+    "nes": 0.46251544597824934,
+    "nes_answered": 0.5211441644825344,
+    "chrf": 0.3838302139350072
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "L7",
+    "n": 80.0,
+    "ok": 67.0,
+    "failed": 0.16249999999999998,
+    "nes": 0.34058521831986005,
+    "nes_answered": 0.40666891739684785,
+    "chrf": 0.2965832390611987
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "L8",
+    "n": 80.0,
+    "ok": 79.0,
+    "failed": 0.012499999999999956,
+    "nes": 0.8618991398193524,
+    "nes_answered": 0.8728092555132683,
+    "chrf": 0.7650386679607198
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "N1",
+    "n": 40.0,
+    "ok": 31.0,
+    "failed": 0.22499999999999998,
+    "nes": 0.4362850343719131,
+    "nes_answered": 0.5629484314476298,
+    "chrf": 0.3073516326878213
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "N3",
+    "n": 40.0,
+    "ok": 35.0,
+    "failed": 0.125,
+    "nes": 0.4142772406114025,
+    "nes_answered": 0.47345970355588857,
+    "chrf": 0.2515691370497174
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "N4",
+    "n": 40.0,
+    "ok": 27.0,
+    "failed": 0.32499999999999996,
+    "nes": 0.4580640193095073,
+    "nes_answered": 0.6786133619400109,
+    "chrf": 0.3574401677750522
+   },
+   {
+    "route": "qwen3.6-27b",
+    "stratum": "all",
+    "n": 440.0,
+    "ok": 372.0,
+    "failed": 0.15454545454545454,
+    "nes": 0.5134981984552102,
+    "nes_answered": 0.6073634605384207,
+    "chrf": 0.4281376385917938
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "L5",
+    "n": 80.0,
+    "ok": 64.0,
+    "failed": 0.19999999999999996,
+    "nes": 0.5032860228297966,
+    "nes_answered": 0.6291075285372458,
+    "chrf": 0.4466484767756188
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "L6",
+    "n": 80.0,
+    "ok": 71.0,
+    "failed": 0.11250000000000004,
+    "nes": 0.4624106107217808,
+    "nes_answered": 0.5210260402498939,
+    "chrf": 0.3918175810642323
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "L7",
+    "n": 80.0,
+    "ok": 68.0,
+    "failed": 0.15000000000000002,
+    "nes": 0.39048079693511106,
+    "nes_answered": 0.45938917286483655,
+    "chrf": 0.3020185075662752
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "L8",
+    "n": 80.0,
+    "ok": 80.0,
+    "failed": 0.0,
+    "nes": 0.8773634003415454,
+    "nes_answered": 0.8773634003415454,
+    "chrf": 0.7719730358483795
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "N1",
+    "n": 40.0,
+    "ok": 36.0,
+    "failed": 0.09999999999999998,
+    "nes": 0.5395721819712839,
+    "nes_answered": 0.5995246466347599,
+    "chrf": 0.3886615767294702
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "N3",
+    "n": 40.0,
+    "ok": 35.0,
+    "failed": 0.125,
+    "nes": 0.39456712786466375,
+    "nes_answered": 0.45093386041675854,
+    "chrf": 0.26230768328291915
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "N4",
+    "n": 40.0,
+    "ok": 26.0,
+    "failed": 0.35,
+    "nes": 0.36650872401985113,
+    "nes_answered": 0.5638595754151555,
+    "chrf": 0.35132463673891057
+   },
+   {
+    "route": "qwen3.6-35b-a3b",
+    "stratum": "all",
+    "n": 440.0,
+    "ok": 380.0,
+    "failed": 0.13636363636363635,
+    "nes": 0.524339063228388,
+    "nes_answered": 0.6071294416328702,
+    "chrf": 0.43883719084184647
+   }
+  ],
   "paired": {
    "a": "gemini3.8-flash",
    "b": "qwen3-vl-235b",
@@ -8173,6 +9029,196 @@
     "vs_qwen": -0.03807228233178357,
     "vs_qwen_lo": -0.08186308457332678,
     "vs_qwen_hi": 0.004061714223321378
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "L5",
+    "contaminated": "iforal,castilian,voc",
+    "n": 80.0,
+    "ok": 73.0,
+    "failed": 0.08750000000000002,
+    "nes": 0.6278413846563573,
+    "nes_answered": 0.6880453530480628,
+    "nes_mapped": 0.6622232318450498,
+    "nes_no_marks": null,
+    "chrf": 0.5689492391662043,
+    "vs_gemini": -0.0038674789399668215,
+    "vs_gemini_lo": -0.03426261692910822,
+    "vs_gemini_hi": 0.029120215157301545,
+    "vs_qwen": 0.0869208245022149,
+    "vs_qwen_lo": 0.04968186097901224,
+    "vs_qwen_hi": 0.12919129151164283
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "L6",
+    "contaminated": "",
+    "n": 80.0,
+    "ok": 77.0,
+    "failed": 0.03749999999999998,
+    "nes": 0.6944883869123762,
+    "nes_answered": 0.7215463760128584,
+    "nes_mapped": 0.7019631789208118,
+    "nes_no_marks": null,
+    "chrf": 0.6004649429185306,
+    "vs_gemini": -0.03422377082198602,
+    "vs_gemini_lo": -0.11123228815483147,
+    "vs_gemini_hi": 0.04970293938178377,
+    "vs_qwen": 0.21732140121438664,
+    "vs_qwen_lo": 0.1615141012987916,
+    "vs_qwen_hi": 0.2709257328627539
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "L7",
+    "contaminated": "koenigsfelden",
+    "n": 80.0,
+    "ok": 69.0,
+    "failed": 0.13749999999999996,
+    "nes": 0.538536531821044,
+    "nes_answered": 0.6243901818215002,
+    "nes_mapped": 0.5514453979418483,
+    "nes_no_marks": null,
+    "chrf": 0.42026405916644965,
+    "vs_gemini": -0.04099421924830577,
+    "vs_gemini_lo": -0.09078493263894541,
+    "vs_gemini_hi": 0.0055701016106426485,
+    "vs_qwen": 0.11324579472011198,
+    "vs_qwen_lo": 0.06663926972016385,
+    "vs_qwen_hi": 0.15972708772759425
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "L8",
+    "contaminated": "ocrd",
+    "n": 80.0,
+    "ok": 79.0,
+    "failed": 0.012499999999999956,
+    "nes": 0.9261449665606675,
+    "nes_answered": 0.9378683205677645,
+    "nes_mapped": 0.9293140047474419,
+    "nes_no_marks": null,
+    "chrf": 0.92424107531381,
+    "vs_gemini": 0.048357240910163954,
+    "vs_gemini_lo": 0.010918342705384469,
+    "vs_gemini_hi": 0.08660778994188108,
+    "vs_qwen": 0.05916148587302128,
+    "vs_qwen_lo": 0.02399673727690737,
+    "vs_qwen_hi": 0.0951170945926949
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "N1",
+    "contaminated": "",
+    "n": 40.0,
+    "ok": 33.0,
+    "failed": 0.17500000000000004,
+    "nes": 0.6918946871980394,
+    "nes_answered": 0.8386602269067144,
+    "nes_mapped": null,
+    "nes_no_marks": 0.7012858756907462,
+    "chrf": 0.6261978737376857,
+    "vs_gemini": -0.05467008898984793,
+    "vs_gemini_lo": -0.14788307004411066,
+    "vs_gemini_hi": 0.03882125741505467,
+    "vs_qwen": 0.24359806232687772,
+    "vs_qwen_lo": 0.17182306185886081,
+    "vs_qwen_hi": 0.3193439549671467
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "N3",
+    "contaminated": "",
+    "n": 40.0,
+    "ok": 40.0,
+    "failed": 0.0,
+    "nes": 0.8470323850589752,
+    "nes_answered": 0.8470323850589752,
+    "nes_mapped": null,
+    "nes_no_marks": 0.8729575249226655,
+    "chrf": 0.712616212740829,
+    "vs_gemini": -0.04082591634270085,
+    "vs_gemini_lo": -0.07277818227193322,
+    "vs_gemini_hi": 0.010149181723872965,
+    "vs_qwen": 0.3681402005952802,
+    "vs_qwen_lo": 0.3326236479144832,
+    "vs_qwen_hi": 0.41231392072309153
+   },
+   {
+    "route": "fs-churro",
+    "stratum": "N4",
+    "contaminated": "",
+    "n": 40.0,
+    "ok": 32.0,
+    "failed": 0.19999999999999996,
+    "nes": 0.5787792983725526,
+    "nes_answered": 0.7234741229656907,
+    "nes_mapped": null,
+    "nes_no_marks": 0.5788385975597635,
+    "chrf": 0.6024917935709769,
+    "vs_gemini": 0.11733720547760398,
+    "vs_gemini_lo": -0.012177198771412795,
+    "vs_gemini_hi": 0.23832251112307906,
+    "vs_qwen": 0.4556098315746332,
+    "vs_qwen_lo": 0.31668174510053754,
+    "vs_qwen_hi": 0.5884491322989509
+   },
+   {
+    "route": "fs-fanar",
+    "stratum": "N1",
+    "contaminated": "unknown",
+    "n": 40.0,
+    "ok": 32.0,
+    "failed": 0.19999999999999996,
+    "nes": 0.3571337215076755,
+    "nes_answered": 0.44641715188459435,
+    "nes_mapped": null,
+    "nes_no_marks": 0.37036317180784845,
+    "chrf": 0.24043552609486274,
+    "vs_gemini": -0.38943105468021183,
+    "vs_gemini_lo": -0.48584628466271473,
+    "vs_gemini_hi": -0.2944996602396944,
+    "vs_qwen": -0.09116290336348616,
+    "vs_qwen_lo": -0.1765515032096931,
+    "vs_qwen_hi": -0.0034893907193650183
+   },
+   {
+    "route": "fs-german-xix",
+    "stratum": "L6",
+    "contaminated": "unknown; possible Hufeland overlap",
+    "n": 80.0,
+    "ok": 77.0,
+    "failed": 0.03749999999999998,
+    "nes": 0.6951272000693931,
+    "nes_answered": 0.7222100779941747,
+    "nes_mapped": 0.7030823499967347,
+    "nes_no_marks": null,
+    "chrf": 0.5873264391007094,
+    "vs_gemini": -0.033584957664969106,
+    "vs_gemini_lo": -0.1117586183014089,
+    "vs_gemini_hi": 0.051901385413542646,
+    "vs_qwen": 0.21796021437140353,
+    "vs_qwen_lo": 0.16901625922075525,
+    "vs_qwen_hi": 0.26381949590147735
+   },
+   {
+    "route": "fs-qari",
+    "stratum": "N1",
+    "contaminated": "",
+    "n": 40.0,
+    "ok": 17.0,
+    "failed": 0.575,
+    "nes": 0.08580130543117359,
+    "nes_answered": 0.20188542454393787,
+    "nes_mapped": null,
+    "nes_no_marks": 0.08755268187547366,
+    "chrf": 0.05878971730981465,
+    "vs_gemini": -0.6607634707567137,
+    "vs_gemini_lo": -0.7560545252305335,
+    "vs_gemini_hi": -0.5649088278223711,
+    "vs_qwen": -0.3624953194399881,
+    "vs_qwen_lo": -0.4571346993704982,
+    "vs_qwen_hi": -0.26605033998149197
    },
    {
     "route": "german-handwriting",

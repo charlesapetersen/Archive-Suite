@@ -76,7 +76,7 @@ By source, NES (Gemini's on the same pages in brackets): L5 Castilian 77.2 CATMu
 with (BiblIA ships its own); a model trained on another segmenter's lines is disadvantaged here. BiblIA_01 writes
 lines in visual order, reversed to logical by grapheme before scoring. No model was tuned on these pages.
 
-## The candidates (survey, 2026-10-17)
+## The candidates (survey before the FarmShare measurements, 2026-10-17)
 
 From the models' own Zenodo and Hugging Face records. **Contamination** is the main finding: three of the newest
 broad historical models were trained on our test sources. Kiessling's kraken **PP-OCRv6** (Zenodo 21788410) and
@@ -102,3 +102,49 @@ credits). No hosted specialist was found for Arabic, Greek or Hebrew manuscripts
 **Coordination with W43.sweep and W43.sweep-farmshare:** those run general models. The models here are the
 script-specific ones, so none is in both. CHURRO-3B is a general historical model and belongs to whichever runs
 first on FarmShare, with the contamination labels above.
+
+
+## FarmShare measurements (2026-10-18)
+
+All four GPU candidates have now run; the shared login was renewed and reused, not reauthenticated by a worker.
+Pinned model/base revisions, crop preparation, exact prompts and job IDs are in
+`execution-plans/farmshare-interactive-20261018.md`. `corpus/farmshare_results.py` imports raw outputs;
+`specialists.csv` and `specialists-pages.csv` now include them beside the eight Mac models.
+
+| stratum | model | answered | NES | minus Gemini (95%) | known source overlap |
+|---|---|---:|---:|---|---|
+| L5 | fs-churro | 73/80 | 62.8 | -0.4 (-3.4 to 2.9) | iforal,castilian,voc |
+| L6 | fs-churro | 77/80 | 69.4 | -3.4 (-11.1 to 5.0) | none listed |
+| L7 | fs-churro | 69/80 | 53.9 | -4.1 (-9.1 to 0.6) | koenigsfelden |
+| L8 | fs-churro | 79/80 | 92.6 | +4.8 (1.1 to 8.7) | ocrd |
+| N1 | fs-churro | 33/40 | 69.2 | -5.5 (-14.8 to 3.9) | none listed |
+| N3 | fs-churro | 40/40 | 84.7 | -4.1 (-7.3 to 1.0) | none listed |
+| N4 | fs-churro | 32/40 | 57.9 | +11.7 (-1.2 to 23.8) | none listed |
+| N1 | fs-fanar | 32/40 | 35.7 | -38.9 (-48.6 to -29.4) | unknown |
+| L6 | fs-german-xix | 77/80 | 69.5 | -3.4 (-11.2 to 5.2) | unknown; possible Hufeland overlap |
+| N1 | fs-qari | 17/40 | 8.6 | -66.1 (-75.6 to -56.5) | none listed |
+
+CHURRO uses its official historical-document XML system prompt, with Page Header/Body/Footer text extracted
+as the reference implementation does; descriptive metadata, deletions, gaps and illegible tags are excluded.
+Qari uses its card's `Free OCR.` instruction. Fanar uses an Arabic transcription-only request. The Bern
+adapter reads the same kraken lines, capped at its 262,144-pixel training area, with its exact training instruction.
+No prompt or model was tuned against these scores. Raw text remains outside the repository.
+
+All page-level requests cap at 8,192 tokens; 37 CHURRO, 23 Qari and eight Fanar public-page replies cap and
+score zero. The German model caps three of 2,656 lines: their three pages fail as a whole (77/80 answered).
+The job exit code only says collection finished; it does not turn those failures into successful pages.
+
+**Reading.** CHURRO is a useful general historical reference: 69.9 NES over all 440 pages (403 answered),
+against the general Qwen models' 49.8–52.4. On Hebrew it is 11.7 points above Gemini in the mean, but the
+paired interval includes zero (-1.2 to 23.8), so this is not a demonstrated win. Its early-print advantage
+is significant on this sample (+4.8, 1.1 to 8.7), but the model was trained on OCR-D, one of this stratum's
+sources: it is an upper bound. The same caveat applies to its L5 and L7 rows. It does not beat the existing
+Mannheim model on German handwriting (69.4 vs 72.6), and the Bern Qwen adapter does not either (69.5).
+Bern's training list includes a Hufeland project; overlap with this bench's Hufeland source has not been
+resolved, so the row is labelled unknown/possible overlap. Its licence is unstated: scoring only.
+
+Qari and Fanar do not supply the missing Arabic-manuscript specialist in these conditions: Qari's answered
+pages often return descriptions rather than faithful transcription, and most of its pages cap; Fanar is
+35.7 NES. CHURRO is the strongest measured free page model there (69.2 vs Gemini 74.7), but its paired
+interval against Gemini also includes zero. Hosted specialists remain listed for the deferred paid sweep;
+none was called. No weights were published, no app default changed and no money was spent.

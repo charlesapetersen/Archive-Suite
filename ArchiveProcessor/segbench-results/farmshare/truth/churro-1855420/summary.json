@@ -1,0 +1,66 @@
+{
+ "label": "churro-1855420",
+ "env": {
+  "model": "stanford-oval/churro-3B",
+  "precision": "bf16",
+  "SLURM_JOB_ID": "1855420",
+  "note": "official XML prompt, 8192 token cap; caps count as failures",
+  "FS_PRESET": "CHURRO-3B (bf16, official XML prompt)",
+  "FS_VLLM_ARGS": "--kv-cache-dtype auto --max-num-seqs 16"
+ },
+ "accuracy_96": {
+  "n": 96,
+  "ok": 94,
+  "failed": 0.02083333333333337,
+  "nes_answered": 0.9098699109168192,
+  "nes": 0.8909142877727189,
+  "chrf": 0.9194728511087286,
+  "miss": 0.051061560510615604,
+  "add": 0.026797320267973202,
+  "cost": 0,
+  "words": 30003
+ },
+ "all_99": {
+  "n": 99,
+  "ok": 96,
+  "failed": 0.030303030303030276,
+  "nes_answered": 0.9050387419385887,
+  "nes": 0.8776133255162073,
+  "chrf": 0.9029217995299036,
+  "miss": 0.061052013313319844,
+  "add": 0.02940024799321282,
+  "cost": 0,
+  "words": 30646
+ },
+ "throughput": {
+  "pages": 99,
+  "ok": 96,
+  "wall_s": 284.9,
+  "gpus": 1,
+  "pages_per_hour_per_gpu": 1251.0
+ },
+ "clippings": {
+  "n": 13,
+  "ok": 13,
+  "failed": 0.0,
+  "nes_answered": 0.927769392584608,
+  "nes": 0.927769392584608,
+  "chrf": 0.9518530228564311,
+  "miss": 0.015630196208846026,
+  "add": 0.02926504822081809,
+  "cost": 0,
+  "words": 6014
+ },
+ "agreement_3": {
+  "n": 3,
+  "ok": 2,
+  "failed": 0.33333333333333337,
+  "nes_answered": 0.6779737999617518,
+  "nes": 0.4519825333078345,
+  "chrf": 0.3732881490075087,
+  "miss": 0.5272161741835147,
+  "add": 0.15085536547433903,
+  "cost": 0,
+  "words": 643
+ }
+}

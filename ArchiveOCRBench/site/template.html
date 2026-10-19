@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Archive OCR Bench</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -122,14 +123,14 @@ footer p { font-size: 13px; }
   </section>
 
   <header class="part" id="farmshare">
-    <div class="eyebrow">Part 4 · Open-weight models on FarmShare · one L40S each</div>
+    <div class="eyebrow">Part 4 · Open-weight models on FarmShare · L40S GPUs</div>
     <h2>The same pages on Stanford's GPUs</h2>
     <p id="fs-lede"></p>
   </header>
   <section class="panel" id="fs-truth">
     <div class="head"><h2>Archive photos: the 96 truth pages</h2><span class="meta">vLLM 0.31 · no money spent</span></div>
     <div class="tbl"><table><thead><tr><th>Model</th><th>KV cache</th><th>NES %</th><th>Answered</th><th>Clippings NES %</th><th>Photos an hour per GPU</th><th>GPU-hours per 100,000 photos</th></tr></thead><tbody id="fs-truth-rows"></tbody></table></div>
-    <p class="note">Scored exactly as part 1 scores the panel: the frozen panel images, its prompt and its NES. FarmShare costs nothing, so speed stands where price stands in part 1; your account may run 4 GPUs at once. Source: <code>ArchiveProcessor/segbench-results/farmshare/truth/</code>.</p>
+    <p class="note">The frozen panel images and the same NES scorer as part 1. Qwen models use the panel prompt; CHURRO uses its own XML transcription prompt. Differences below a point are noise on this small set. FarmShare costs nothing, so speed stands where price stands in part 1; your account may run 4 GPUs at once. Source: <code>ArchiveProcessor/segbench-results/farmshare/truth/</code>.</p>
   </section>
   <section class="panel" id="fs-news">
     <div class="head"><h2>Newspapers: NewsBench's 15 scored broadsheet pages</h2><span class="meta">NewsBench score.py · overall = 1 − CER</span></div>
@@ -201,6 +202,12 @@ footer p { font-size: 13px; }
     <p class="note">Sent as the local route sends a text call: one message, 512 tokens, temperature 0, no reasoning switch. Qwen3.5 and Qwen3.6 think by default, so sent that way they spend all 512 tokens thinking and answer nothing: in the app every document would get no year and Date Uncertain (KNOWN_ISSUES: the local route sends no reasoning switch; filed as W41.app-local-models-fu2). "Thinking off" rows switch it off. Every model reads a printed year about as well as Gemini; the gap is the year that is not in the text, estimated from context. No money.</p>
   </section>
 
+  <section class="panel" id="date-public" hidden>
+    <div class="head"><h2>Dates on public documents</h2><span class="meta">300 held-out documents · catalogue dates</span></div>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Year (300)</th><th>Month (240)</th><th>Day (150)</th><th>Full date (150)</th></tr></thead><tbody id="date-public-rows"></tbody></table></div>
+    <p class="note">Fine-tuned on a mix of the owner's documents and dated public transcriptions. Entire public projects are held out; months and days are scored only where the catalogue supplies them. A reply giving a day absent from the catalogue is recorded separately: the catalogue's precision does not prove that the document itself lacks a day. Thinking off, no paid model calls. The corpus-trained models remain below Gemini on the owner's inferred years and never mark Date Uncertain in this test; they are experimental, not a replacement for the app's default.</p>
+  </section>
+
   <header class="part" id="public">
     <div class="eyebrow">Part 7 · Public truth sets · not the owner's archive</div>
     <h2>Reference routes on the public strata</h2>
@@ -220,7 +227,7 @@ footer p { font-size: 13px; }
   <section class="panel" id="pub-spec" hidden>
     <div class="head"><h2>Models built for the script</h2><span class="meta">NES %, failures as 0; paired differences in NES points</span></div>
     <div class="tbl"><table><thead><tr><th>Stratum</th><th>Model</th><th>Trained on a test source</th><th>Answered</th><th>NES</th><th>Second score</th><th>chrF</th><th>Minus Gemini (95%)</th><th>Minus Qwen (95%)</th></tr></thead><tbody id="pub-spec-rows"></tbody></table></div>
-    <p class="note">Open line recognisers for the hardest strata (W43.script-specialists), read on our Mac with kraken: its default blla segmenter cuts each page into lines once, and every model reads the same lines, so a model's score includes the segmenter's reading order. That costs a line model against a whole-page reader, which chrF, nearly blind to order, shows. "Unknown" means the model's record gives no training list to check against our sources; a named source means the model was trained on that test source, so its score is an upper bound, not a specialist's. BiblIA's model writes lines in visual order and is reversed to logical order before scoring. Same pages and scorer as the table above; no money. The page-level models (Qari-OCR for Arabic, CHURRO-3B, the Bern Qwen Kurrent models) need FarmShare and are not yet run; the survey is <code>ArchiveProcessor/segbench-results/bench-corpus/specialists.md</code>.</p>
+    <p class="note">Open line recognisers for the hardest strata (W43.script-specialists), read on our Mac with kraken: its default blla segmenter cuts each page into lines once, and every model reads the same lines, so a model's score includes the segmenter's reading order. That costs a line model against a whole-page reader, which chrF, nearly blind to order, shows. "Unknown" means the model's record gives no training list to check against our sources; a named source means the model was trained on that test source, so its score is an upper bound, not a specialist's. BiblIA's model writes lines in visual order and is reversed to logical order before scoring. Same pages and scorer as the table above; no money. FarmShare now supplies CHURRO-3B (its own XML prompt), Qari and Fanar on Arabic pages, and the Bern Qwen model on the same German line crops. Capped or malformed replies count as failures; any missing or capped German line fails its page. CHURRO has known source overlap on L5, L7 and L8. The German adapter has an unstated licence and possible Hufeland overlap, so it is scored only; the survey is <code>ArchiveProcessor/segbench-results/bench-corpus/specialists.md</code>.</p>
   </section>
 
   <footer>
@@ -381,9 +388,9 @@ document.getElementById('hw-source').innerHTML = 'Source: <a href="' + HW.source
 const FS = DATA.farmshare;
 const n0 = v => Math.round(v).toLocaleString();
 const best = FS.truth[0];
-document.getElementById('fs-lede').textContent = 'Open-weight models served on one FarmShare L40S each. The best, ' + best.name + ', scored ' +
+document.getElementById('fs-lede').textContent = 'Open-weight models on FarmShare L40S GPUs. The highest score on these 96 pages, ' + best.name + ', scored ' +
   best.nes.toFixed(2) + ' NES with every page answered, at ' + n0(best.per_hour) + ' photos an hour, which is about ' + n0(best.gpu_hours_100k) +
-  ' GPU-hours for 100,000 photos.' + (FS.bulk ? ' On ' + FS.bulk.pages.toLocaleString() + ' real corpus pages across ' + FS.bulk.gpus + ' GPUs it read ' +
+  ' GPU-hours for 100,000 photos. Sub-point score differences are not a ranking.' + (FS.bulk ? ' The separate Qwen3.6 27B pilot on ' + FS.bulk.pages.toLocaleString() + ' real corpus pages across ' + FS.bulk.gpus + ' GPUs read ' +
   n0(FS.bulk.per_hour_total) + ' pages an hour in all, with ' + FS.bulk.failed + ' failed.' : '');
 document.getElementById('fs-truth-rows').innerHTML = FS.truth.map(r => '<tr><td>' + r.name + '</td><td>' + r.kv + '</td><td>' + r.nes.toFixed(2) +
   '</td><td>' + r.ok + '/' + r.n + '</td><td>' + r.clippings.toFixed(2) + '</td><td>' + n0(r.per_hour) + '</td><td>' + n0(r.gpu_hours_100k) + '</td></tr>').join('');
@@ -506,7 +513,7 @@ if (DT) {
     row('Certain and wrong, where the owner was certain', U.certain_and_wrong)].join('');
   const OM = DT.open_models || {};
   const NAMES = { 'qwen3.6-27b': 'Qwen3.6 27B', 'qwen3.6-35b-a3b': 'Qwen3.6 35B-A3B', 'qwen3-vl-8b': 'Qwen3-VL 8B',
-    'qwen3.5-4b': 'Qwen3.5 4B' };
+    'qwen3.5-4b': 'Qwen3.5 4B', 'fs-date-2b': 'Dating fine-tune 2B', 'fs-date-4b': 'Dating fine-tune 4B', 'fs-base-2b': 'Untrained 2B', 'fs-base-4b': 'Untrained 4B' };
   const name = k => (NAMES[k.replace(/-nothink$/, '')] || k) + (k.endsWith('-nothink') ? ', thinking off' : (k === 'qwen3-vl-8b' ? '' : ', as the app sends it'));
   const keys = Object.keys(OM).sort();
   if (keys.length) {
@@ -517,6 +524,17 @@ if (DT) {
   }
 }
 
+const DP = DATA.dating_public;
+if (DP && DP.models) {
+  const pct = ([a, b]) => b ? (100 * a / b).toFixed(1) + '%' : '–';
+  const names = { 'fs-date-2b-nothink': 'Dating fine-tune 2B', 'fs-date-4b-nothink': 'Dating fine-tune 4B',
+    'fs-base-2b-nothink': 'Untrained 2B', 'fs-base-4b-nothink': 'Untrained 4B' };
+  document.getElementById('date-public-rows').innerHTML = Object.entries(DP.models).map(([k, r]) =>
+    '<tr><td>' + (names[k] || k) + '</td><td>' + pct(r.year.exact) + '</td><td>' + pct(r.month.exact) +
+    '</td><td>' + pct(r.day.exact) + '</td><td>' + pct(r.day.full_date) + '</td></tr>').join('');
+  document.getElementById('date-public').hidden = false;
+}
+
 // Part 7: the public strata.
 const PB = DATA.public;
 const STRATUM_NAMES = { L1: 'English letters and diaries', L2: 'English manuscripts, 1700-1850', L3: 'Typescripts and telegrams',
@@ -525,11 +543,11 @@ const STRATUM_NAMES = { L1: 'English letters and diaries', L2: 'English manuscri
   N4: 'Hebrew book hands', N5: 'Chinese print', N6: 'Devanagari print' };
 if (PB) {
   const p1 = v => v == null ? '–' : (100 * v).toFixed(1);
-  const rows = PB.rows.filter(r => r.stratum !== 'all').sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);
+  const rows = [...PB.rows, ...(PB.farmshare || []).filter(r => r.route.startsWith('qwen'))].filter(r => r.stratum !== 'all').sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);
   const total = Object.values(PB.strata).reduce((a, s) => a + s.pages, 0);
   const measured = Object.values(PB.strata).reduce((a, s) => a + s.reference_pages, 0);
   document.getElementById('pub-lede').textContent = total + ' pages in ' + Object.keys(PB.strata).length +
-    ' strata of public transcriptions. Two paid reference routes have read the original ' + measured +
+    ' strata of public transcriptions. Two paid reference routes and three FarmShare Qwen models have read the original ' + measured +
     ' pages; the remaining ' + (total - measured) + ' are frozen with hosted readings deferred to the pre-release sweep. Apple Vision supplies a free sanity check on the Latin-script pages. The original run cost $' +
     PB.paired.spent.toFixed(2) + ' as booked, an upper bound: seven calls cut off mid-run are booked at a ceiling.';
   document.getElementById('pub-inventory-rows').innerHTML = Object.entries(PB.strata).map(([id, s]) =>

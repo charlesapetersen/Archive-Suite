@@ -1,0 +1,220 @@
+{
+ "models": {
+  "fs-date-2b-nothink": {
+   "documents": 300,
+   "year": {
+    "exact": [
+     285,
+     300
+    ],
+    "within1": [
+     292,
+     300
+    ],
+    "in text": [
+     246,
+     257
+    ],
+    "not in text": [
+     39,
+     43
+    ]
+   },
+   "month": {
+    "exact": [
+     224,
+     240
+    ],
+    "none": [
+     3,
+     240
+    ],
+    "given_where_source_has_none": [
+     41,
+     60
+    ]
+   },
+   "day": {
+    "exact": [
+     139,
+     150
+    ],
+    "full_date": [
+     136,
+     150
+    ],
+    "none": [
+     2,
+     150
+    ],
+    "given_where_source_has_none": [
+     96,
+     150
+    ]
+   },
+   "parse_failures": 0
+  },
+  "fs-date-4b-nothink": {
+   "documents": 300,
+   "year": {
+    "exact": [
+     291,
+     300
+    ],
+    "within1": [
+     293,
+     300
+    ],
+    "in text": [
+     252,
+     257
+    ],
+    "not in text": [
+     39,
+     43
+    ]
+   },
+   "month": {
+    "exact": [
+     224,
+     240
+    ],
+    "none": [
+     3,
+     240
+    ],
+    "given_where_source_has_none": [
+     41,
+     60
+    ]
+   },
+   "day": {
+    "exact": [
+     138,
+     150
+    ],
+    "full_date": [
+     135,
+     150
+    ],
+    "none": [
+     2,
+     150
+    ],
+    "given_where_source_has_none": [
+     90,
+     150
+    ]
+   },
+   "parse_failures": 0
+  },
+  "fs-base-2b-nothink": {
+   "documents": 300,
+   "year": {
+    "exact": [
+     281,
+     300
+    ],
+    "within1": [
+     291,
+     300
+    ],
+    "in text": [
+     245,
+     257
+    ],
+    "not in text": [
+     36,
+     43
+    ]
+   },
+   "month": {
+    "exact": [
+     200,
+     240
+    ],
+    "none": [
+     10,
+     240
+    ],
+    "given_where_source_has_none": [
+     51,
+     60
+    ]
+   },
+   "day": {
+    "exact": [
+     80,
+     150
+    ],
+    "full_date": [
+     74,
+     150
+    ],
+    "none": [
+     4,
+     150
+    ],
+    "given_where_source_has_none": [
+     135,
+     150
+    ]
+   },
+   "parse_failures": 0
+  },
+  "fs-base-4b-nothink": {
+   "documents": 300,
+   "year": {
+    "exact": [
+     285,
+     300
+    ],
+    "within1": [
+     289,
+     300
+    ],
+    "in text": [
+     248,
+     257
+    ],
+    "not in text": [
+     37,
+     43
+    ]
+   },
+   "month": {
+    "exact": [
+     31,
+     240
+    ],
+    "none": [
+     206,
+     240
+    ],
+    "given_where_source_has_none": [
+     12,
+     60
+    ]
+   },
+   "day": {
+    "exact": [
+     107,
+     150
+    ],
+    "full_date": [
+     13,
+     150
+    ],
+    "none": [
+     34,
+     150
+    ],
+    "given_where_source_has_none": [
+     61,
+     150
+    ]
+   },
+   "parse_failures": 0
+  }
+ }
+}

@@ -42,6 +42,7 @@ INPUTS = HERE / "data" / "inputs.json"
 HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
+DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
@@ -207,7 +208,7 @@ def handwriting():
 
 
 FARMSHARE_ROOT = RESULTS / "farmshare"
-PRESET_NAMES = {"qwen3.6-27b": "Qwen3.6 27B", "qwen3.6-27b-dyn": "Qwen3.6 27B, fp8 at load time",
+PRESET_NAMES = {"qwen3.5-27b": "Qwen3.5 27B", "qwen3.6-27b": "Qwen3.6 27B", "qwen3.6-27b-dyn": "Qwen3.6 27B, fp8 at load time",
                 "qwen3.6-35b-a3b": "Qwen3.6 35B-A3B", "qwen3.8-27b": "Qwen3.8 27B", "glm-ocr": "GLM-OCR",
                 "qwen3.5-122b-a10b": "Qwen3.5 122B-A10B"}
 
@@ -288,7 +289,14 @@ def public():
         with spec.open(newline="") as fh:
             specialists = [{k: (v if k in ("route", "stratum", "contaminated") else num(v)) for k, v in r.items()}
                            for r in csv.DictReader(fh)]
-    return {"rows": rows, "paired": json.loads((PUBLIC / "routes-paired.json").read_text()),
+    fs = PUBLIC / "farmshare.csv"
+    farmshare_rows = []
+    if fs.exists():
+        with fs.open(newline="") as fh:
+            farmshare_rows = [{k: (v if k in ("route", "stratum") else num(v)) for k, v in r.items()}
+                              for r in csv.DictReader(fh)]
+    return {"rows": rows, "farmshare": farmshare_rows,
+            "paired": json.loads((PUBLIC / "routes-paired.json").read_text()),
             "strata": {k: {**v, "sources": sorted(v["sources"])} for k, v in sorted(strata.items())},
             "specialists": specialists}
 
@@ -367,6 +375,7 @@ def main():
              "farmshare": farmshare(), "difficulty": diff,
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "dating": json.loads(DATING.read_text()) if DATING.exists() else None,
+             "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,
              "public": public()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}

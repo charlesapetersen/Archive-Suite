@@ -63,6 +63,13 @@ MODELS = {
                         'strata': ['N3'], 'licence': 'CC-BY-SA-4.0', 'contaminated': 'unknown'},
     'biblia': {'doi': '10.5281/zenodo.5468286', 'file': 'BiblIA_01.mlmodel',
                'strata': ['N4'], 'licence': 'CC-BY-SA-4.0', 'contaminated': 'biblia', 'visual_rtl': True},
+    'fs-churro': {'runner': 'farmshare', 'strata': ['L5', 'L6', 'L7', 'L8', 'N1', 'N3', 'N4'],
+                  'licence': 'Qwen research', 'contaminated': '',
+                  'contaminated_by_stratum': {'L5': 'iforal,castilian,voc', 'L7': 'koenigsfelden', 'L8': 'ocrd'}},
+    'fs-qari': {'runner': 'farmshare', 'strata': ['N1'], 'licence': 'Apache-2.0', 'contaminated': ''},
+    'fs-german-xix': {'runner': 'farmshare', 'strata': ['L6'], 'licence': 'not stated; scoring only',
+                      'contaminated': 'unknown; possible Hufeland overlap'},
+    'fs-fanar': {'runner': 'farmshare', 'strata': ['N1'], 'licence': 'Apache-2.0', 'contaminated': 'unknown'},
 }
 
 
@@ -116,6 +123,9 @@ def segment(strata):
 
 def collect(keys):
     for k in keys:
+        if MODELS[k].get('runner') == 'farmshare':
+            print(f'{k}: import completed cluster outputs with farmshare_results.py; no local model call')
+            continue
         m = model_path(k)
         rows = pages(MODELS[k]['strata'])
         missing = [r for r in rows if not seg_path(r).exists()]
@@ -158,7 +168,8 @@ def report():
         for e in ('nes_mapped', 'nes_no_marks'):
             xs = [r[e] for r in rr if e in r]
             a[e] = sum(xs) / len(xs) if xs and len(xs) == len(rr) else None
-        row = {'route': k, 'stratum': s, 'contaminated': MODELS[k]['contaminated'], **a}
+        contamination = MODELS[k].get('contaminated_by_stratum', {}).get(s, MODELS[k]['contaminated'])
+        row = {'route': k, 'stratum': s, 'contaminated': contamination, **a}
         # Paired against each general route on the same pages: specialist minus general, NES points.
         for g, short in (('gemini3.8-flash', 'gemini'), ('qwen3-vl-235b', 'qwen')):
             p = S.paired([r['nes'] for r in rr], [general[g].get(r['page'], 0.0) for r in rr], rounds=2000)

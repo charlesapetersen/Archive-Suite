@@ -148,3 +148,53 @@ training/validation/test exact prompts are disjoint. These checks do not replace
    that source-preparation work remains separate from these submitted GPU jobs.
 6. These four queue items remain **open** until their measurement/reporting work is done. No completion gate,
    paid-run approval, corpus access expansion, weights publication or release was inferred from this session.
+
+
+## Autonomous continuation — 2026-10-18 evening
+
+Owner explicitly asked this chat to continue **all FarmShare work autonomously until done**. All ten
+initial jobs completed with exit zero. Results were retrieved to
+`/Users/cp1/Claude/Long term storage/FarmShare-20261018` (raw text stays there, outside git).
+The parser/line-order/cap tests plus existing specialist tests pass (9 total). Numbers are now generated
+in the worktree's public benchmark CSVs, date JSONs and the new interpretation reports. No item is
+marked complete yet: commit/report/queue reconciliation and the remaining model checks are still due.
+
+Dating: 2B 167/250 owner years, 76/120 months; 4B 166/250 years, 84/120 months. Public test: 2B 285/300
+years, 224/240 months, 139/150 days (136/150 full date); 4B 291/300, 224/240, 138/150 (135/150 full date).
+Neither emits Date Uncertain for the 50 owner-uncertain documents, and both are below Gemini on inferred
+years. Fixed 2B single-task reference selected for the combined-model comparison (smaller; year essentially
+tied, 2B public full date slightly ahead). No further test-guided tuning.
+
+W41.seg-date-model job **1856294** is now training on one L40S in oat-03, after that single-task benchmark
+review. Its already-staged 13,313 rows are unchanged. The dated recipe/reference is frozen; Mac measurement
+continues independently while the several-hour mixed vision/text training runs. On success, existing
+combined-job.sh merges it and evaluates the two date packs. It still needs development and held-out
+segmentation runs, one frozen locked-test pass, 8-bit Mac conversion/measurement and the <=1-point decision.
+Do not resubmit this job blindly. `/scratch/users/cp1/fs-ocr/interactive-20261018/combined-job.id` records it.
+
+The 2B merged weights transferred to durable storage. Verified SHA-256:
+`d39e6350ecee1a14e7629621f7da188dbfb5ba450de61a0efd20be45a45e001d`.
+8-bit MLX conversion passed under the original memory guard (7s, 9.625 effective bits/weight, peak footprint
+4.7GB). Build: `Long term storage/FarmShare-20261018/date-2b-8bit`. The full 600-prompt Mac run is active
+through `institutional-compute/mlx_text.py`, under the same guard/lock; raw outputs go to `mlx-results`, label
+`mlx-date-2b-8bit-nothink`. At the last snapshot 80/300 corpus prompts were complete, peak MLX 3.784GB.
+The earlier conversion precheck refused for low reclaimable memory; no thresholds were weakened.
+
+OCR: CHURRO public NES 69.9; owner96 NES 89.09 (94/96). Qwen3.6 27B public 51.3, Qwen3.5 27B 49.8,
+35B-A3B 52.4. Qwen3.5 owner96 95.33 is only .08 above existing Qwen3.6's 95.25, not a ranking.
+All specialist candidates are scored, with caps as failures, contamination labels and uncertainty intervals.
+The newer Intel W4A16 Qwen3.8 Flash Next index actually totals 278.35GB; official FP8 185.50GB. Both are
+infeasible at the kit's serving headroom on this node; no giant download was made. The registry does support
+its Qwen4Exp architecture, so do not claim the registry was the blocker.
+
+ArchiveOCRBench was updated with public date scores, the three public Qwen rows, all new specialists and
+owner96 timings. Browser verification shows 4 public date rows, 39 general OCR rows, 21 specialist rows,
+no console errors and a readable screenshot. Added UTF-8 metadata to fix the visible mojibake. Build/check
+pass. The generated site is local, not published. The benchmark's dynamic prose now attributes the existing
+bulk pilot to Qwen3.6 instead of to whichever tiny-score leader appears first.
+
+Remaining independent work: finish/report the Mac dating run; ship specialist/sweep measurements and
+reconcile their queue items; continue mixed-model training/evaluation; inspect W43.seg-corpus-build's now
+approved host expansion and complete public-box inputs before any FarmShare runs there. Paid hosted calls,
+real-corpus writes and model publication remain outside this continuation. Keep login gates held until the
+interactive work is actually handed back, per the owner walkthrough.
