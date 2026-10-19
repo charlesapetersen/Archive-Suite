@@ -329,3 +329,17 @@ report them separately as public/easier, rebuild/visually check bench, then reco
 Keep paid work deferred. If a stage failed, inspect its saved logs; never silently repeat a locked test or
 retrain. W41.seg-date-model and W43.seg-corpus-build stay open until review. Preserve this clean worktree
 while the one-shot pipelines reference it; remove it only after those stages and result handoff finish.
+
+
+## Final completion — 2026-10-19
+
+All overnight compute completed successfully. Mac finished 23:51 Pacific18Oct; locked GPU1857097 and
+public1857094/95/96 finished just after midnight19Oct; all outputs retrieved. Full health gate GREEN,
+4089s. Final exact-count review:15/16 joint decision fields pass; Mac full-date135/150 vs137/150 loses
+1.333points, so retain separate models. Single GPU locked test272/330 vs260/330, no repeated inference.
+Public scores/report complete for CPU and FarmShare, all six runs zero failures. Hosted references remain
+deferred to W43.sweep; no further input construction or paid calls. Both scoped items reconciled in the
+trackers. No other ready GPU item found; model publication remains owner-only. Existing SSH master and
+keepalive left open. Raw data/models/scripts remain in durable Long term storage. Only our worktree is
+unlocked/removed after final commit; other dirty worktrees remain untouched. Recovery record archived
+under verification/evidence/segbench/ because this execution plan has finished.

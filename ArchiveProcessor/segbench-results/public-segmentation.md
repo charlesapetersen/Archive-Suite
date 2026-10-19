@@ -82,3 +82,32 @@ image hash, audit and order against the committed freeze. `ocr` uses the existin
 existing window combiner and document scorer. Public caches are separate from the owner's bench.
 The free floors are always retained; no paid collector is provided. Integrity tests reject missing
 middle/tail pages, duplicates, reordering, unaudited labels, changed images and paths outside the cache.
+
+## Free comparisons completed 2026-10-19
+
+All six FarmShare runs completed with no missing, rejected, or failed windows: 44 per CREST run and 88 per
+Lincoln run. Requests use the unchanged seven-page image+Apple Vision prompt, window combiner and document
+scorer, with models predicting photo kinds themselves. No public truth selected a model or rule setting.
+The fitted rule baseline is fixed from 551 owner-development pages; no public labels or OCR entered fitting.
+
+| approach | CREST exact document pages (128) | Lincoln exact document pages (261) |
+|---|---:|---:|
+|Every page starts a document|9/128 (7.03%)|19/261 (7.28%)|
+|Whole box is one document|0/128 (0.00%)|0/261 (0.00%)|
+|Rule sketch + Apple Vision|9/128 (7.03%)|19/261 (7.28%)|
+|Rules fitted on owner dev + Apple Vision|15/128 (11.72%)|44/261 (16.86%)|
+|Qwen3.5 27B teacher, FarmShare|122/128 (95.31%)|103/261 (39.46%)|
+|Trained Qwen3.5 2B, FarmShare|117/128 (91.41%)|91/261 (34.87%)|
+|Trained Qwen3.5 4B, FarmShare|126/128 (98.44%)|122/261 (46.74%)|
+
+CREST is easier for these models than the owner's locked boxes; **Lincoln is harder**, despite the requested
+public/easier section label. Public provenance does not guarantee ease. Lincoln's long manuscripts and
+separate enclosed items make whole-document accuracy demanding; one wrong split can spoil a long document.
+The frozen primary truth is unchanged, including the explicitly ambiguous isolated wrappers 77/231. These
+are agent-audited references, not a second owner adjudication. No claim of unseen/pretraining-clean data.
+Per-model false splits/merges, boundary F1, and all additive counts are in the two `*-scores.json` files.
+
+FarmShare job IDs: teacher 1857094, 2B 1857095, 4B 1857096. Raw answers, summaries, timing and original images
+remain outside git. Only metadata/truth/numeric scores are published. Hosted reference routes remain in
+W43.sweep's deferred-run register; no paid call or subscription-agent call was made. Source construction
+and the available free CPU/FarmShare comparisons are finished; no more corpus work is needed for these boxes.

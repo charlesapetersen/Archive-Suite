@@ -113,11 +113,18 @@ footer p { font-size: 13px; }
     <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Qwen3.5 27B on FarmShare is the open-weight model that cleans the corpus labels a small Mac model will be trained on; it runs on Stanford's GPUs, so it has no price per page and is not on the chart, and its confidences are too even to flag on, so reaching 98% means checking every gap, as Full manual does. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. The fine-tuned Qwen3.5 4B and 2B are small models trained on the owner's corpus with that teacher's cleaned labels, so they can run on an 8 or 16 GB Mac; these are their FarmShare figures at full precision, and the Mac's own 4-bit and 8-bit figures are in <code>seg-students.md</code>. Sources: <code>options.md</code>, <code>cheap-models.md</code>, <code>seg-teacher.md</code> and <code>seg-students.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
   </section>
 
+  <section class="panel" id="joint-model" hidden>
+    <div class="head"><h2>One model for segmentation and dating?</h2><span class="meta">fixed recipe · GPU and Mac comparison</span></div>
+    <p class="note" id="joint-model-result"></p>
+    <div class="tbl"><table><thead><tr><th>Measure</th><th>Separate models</th><th>Combined model</th><th>Loss in points</th></tr></thead><tbody id="joint-model-rows"></tbody></table></div>
+    <p class="note">The limit was fixed before results: lose at most one percentage point on every decision field. The combined recipe was frozen before its single locked-test run; no test-guided tuning or repeat inference. GPU segmentation uses the reference's oracle photo labels; Mac development uses each model's own predictions. Fifteen of sixteen fields pass; the Mac full-date result differs by only two documents and is not a statistical superiority claim. Source: <code>seg-date-model.md</code> and <code>seg-date-model-final.json</code>. App defaults remain unchanged.</p>
+  </section>
+
   <section class="panel" id="public-segmentation" hidden>
     <div class="head"><h2>Public and easier: document boundaries</h2><span class="meta">separate reference sets · no checking</span></div>
     <p class="note">CIA CREST and the Lincoln Papers preserve every supplied page of the selected consecutive source items. Archive splits were checked page by page against the same ten document rules before model collection. Scores use the existing document scorer and are reported separately from the owner's locked boxes. These are public source collections, potentially familiar to pretrained models; they do not establish performance on unseen private archives.</p>
     <div class="tbl"><table><thead><tr><th>Box</th><th>Pages / documents</th><th>Approach</th><th>Pages in exact document</th><th>False splits</th><th>False merges</th><th>Boundary F1</th></tr></thead><tbody id="public-seg-rows"></tbody></table></div>
-    <p class="note">All model requests include Apple Vision text and images. The fitted rule baseline uses only the owner's development boxes; public truth never selects its settings. CREST has a known marker for two withheld physical pages, which were not supplied. Lincoln uses consecutive catalogue positions rather than a proven gap-free physical arrangement; two isolated wrappers have explicitly ambiguous boundaries. Images remain local. Sources: <code>public-segmentation.md</code> and its frozen manifests and score files. Paid reference routes remain deferred.</p>
+    <p class="note">All model requests include Apple Vision text and images. The fitted rule baseline uses only the owner's development boxes; public truth never selects its settings. CREST has a known marker for two withheld physical pages, which were not supplied. Lincoln uses consecutive catalogue positions rather than a proven gap-free physical arrangement; two isolated wrappers have explicitly ambiguous boundaries. The Lincoln box is harder for these models despite this section label. Images remain local. Sources: <code>public-segmentation.md</code> and its frozen manifests and score files. Paid reference routes remain deferred.</p>
   </section>
 
   <header class="part" id="handwriting">
@@ -393,6 +400,19 @@ document.getElementById('public-seg-rows').innerHTML = publicSeg.flatMap(b => Ob
     pct1(r.metrics.boundary_f1 === null ? null : 100 * r.metrics.boundary_f1) + '</td></tr>')).join('');
 document.getElementById('public-segmentation').hidden = !publicSeg.length;
 
+const jointModel = DATA.seg_date;
+if (jointModel) {
+  const scorePair = ([n, d]) => (100 * n / d).toFixed(2) + '% (' + n + '/' + d + ')';
+  document.getElementById('joint-model-result').textContent = jointModel.passes_all ?
+    'Every fixed comparison meets the one-point limit.' :
+    'Retain the separate models under the agreed rule. The combined model improves locked-test segmentation, but misses the Mac public full-date limit: 135/150 versus 137/150, a 1.33-point loss.';
+  document.getElementById('joint-model-rows').innerHTML = jointModel.acceptance
+    .filter(r => r.measure.includes('document pages') || !r.passes)
+    .map(r => '<tr><td>' + r.measure + '</td><td>' + scorePair(r.reference) + '</td><td>' + scorePair(r.joint) +
+      '</td><td>' + r.loss_points.toFixed(2) + '</td></tr>').join('');
+  document.getElementById('joint-model').hidden = false;
+}
+
 // Part 3: handwriting.
 const HW = DATA.handwriting;
 document.getElementById('hw-lede').textContent = 'Readers that run on the Mac, measured on the Vision OCR lab\'s ' + HW.pages + ' handwritten truth pages (' +
@@ -535,7 +555,7 @@ if (DT) {
     row('Certain and wrong, where the owner was certain', U.certain_and_wrong)].join('');
   const OM = DT.open_models || {};
   const NAMES = { 'qwen3.6-27b': 'Qwen3.6 27B', 'qwen3.6-35b-a3b': 'Qwen3.6 35B-A3B', 'qwen3-vl-8b': 'Qwen3-VL 8B',
-    'qwen3.5-4b': 'Qwen3.5 4B', 'fs-date-2b': 'Dating fine-tune 2B', 'fs-date-4b': 'Dating fine-tune 4B', 'fs-base-2b': 'Untrained 2B', 'fs-base-4b': 'Untrained 4B', 'mlx-date-2b-8bit': 'Dating fine-tune 2B, Mac 8-bit' };
+    'qwen3.5-4b': 'Qwen3.5 4B', 'fs-date-2b': 'Dating fine-tune 2B', 'fs-date-4b': 'Dating fine-tune 4B', 'fs-base-2b': 'Untrained 2B', 'fs-base-4b': 'Untrained 4B', 'mlx-date-2b-8bit': 'Dating fine-tune 2B, Mac 8-bit', 'fs-seg-date-2b': 'Combined segmentation + dating 2B', 'mlx-seg-date-2b-8bit': 'Combined segmentation + dating 2B, Mac 8-bit' };
   const name = k => (NAMES[k.replace(/-nothink$/, '')] || k) + (k.endsWith('-nothink') ? ', thinking off' : (k === 'qwen3-vl-8b' ? '' : ', as the app sends it'));
   const keys = Object.keys(OM).sort();
   if (keys.length) {
@@ -550,7 +570,7 @@ const DP = DATA.dating_public;
 if (DP && DP.models) {
   const pct = ([a, b]) => b ? (100 * a / b).toFixed(1) + '%' : '–';
   const names = { 'fs-date-2b-nothink': 'Dating fine-tune 2B', 'fs-date-4b-nothink': 'Dating fine-tune 4B',
-    'fs-base-2b-nothink': 'Untrained 2B', 'fs-base-4b-nothink': 'Untrained 4B', 'mlx-date-2b-8bit-nothink': 'Dating fine-tune 2B, Mac 8-bit' };
+    'fs-base-2b-nothink': 'Untrained 2B', 'fs-base-4b-nothink': 'Untrained 4B', 'mlx-date-2b-8bit-nothink': 'Dating fine-tune 2B, Mac 8-bit', 'fs-seg-date-2b-nothink': 'Combined segmentation + dating 2B', 'mlx-seg-date-2b-8bit-nothink': 'Combined segmentation + dating 2B, Mac 8-bit' };
   document.getElementById('date-public-rows').innerHTML = Object.entries(DP.models).map(([k, r]) =>
     '<tr><td>' + (names[k] || k) + '</td><td>' + pct(r.year.exact) + '</td><td>' + pct(r.month.exact) +
     '</td><td>' + pct(r.day.exact) + '</td><td>' + pct(r.day.full_date) + '</td></tr>').join('');

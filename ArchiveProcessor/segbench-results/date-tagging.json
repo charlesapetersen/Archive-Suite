@@ -1376,6 +1376,121 @@
    },
    "parse_failures": 0,
    "finish_length": 0
+  },
+  "mlx-seg-date-2b-8bit-nothink": {
+   "model": "mlx-seg-date-2b-8bit-nothink",
+   "documents": 300,
+   "usd": 0.0,
+   "usd_per_1000": 0.0,
+   "year": {
+    "year+month": {
+     "exact": [
+      98,
+      120
+     ],
+     "within1": [
+      108,
+      120
+     ]
+    },
+    "year": {
+     "exact": [
+      53,
+      80
+     ],
+     "within1": [
+      67,
+      80
+     ]
+    },
+    "year+DU": {
+     "exact": [
+      17,
+      50
+     ],
+     "within1": [
+      34,
+      50
+     ]
+    },
+    "in text": {
+     "exact": [
+      114,
+      119
+     ],
+     "within1": [
+      119,
+      119
+     ]
+    },
+    "not in text": {
+     "exact": [
+      54,
+      131
+     ],
+     "within1": [
+      90,
+      131
+     ]
+    },
+    "all": {
+     "exact": [
+      168,
+      250
+     ],
+     "within1": [
+      209,
+      250
+     ]
+    }
+   },
+   "decade": [
+    28,
+    50
+   ],
+   "month": {
+    "owner": [
+     77,
+     120
+    ],
+    "other": [
+     18,
+     120
+    ],
+    "none": [
+     25,
+     120
+    ],
+    "untagged_given": [
+     46,
+     80
+    ],
+    "untagged_given_named": 23
+   },
+   "uncertain": {
+    "owner_certain": [
+     0,
+     200
+    ],
+    "owner_certain_in_text": [
+     0,
+     114
+    ],
+    "owner_certain_not_in_text": [
+     0,
+     86
+    ],
+    "owner_uncertain": [
+     0,
+     50
+    ],
+    "certain_and_wrong": [
+     49,
+     200
+    ]
+   },
+   "parse_failures": 0,
+   "finish_length": 0
   }
  }
 }

@@ -394,6 +394,8 @@ def main():
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "dating": json.loads(DATING.read_text()) if DATING.exists() else None,
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,
+             "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
+                         if (RESULTS / "seg-date-model-final.json").exists() else None,
              "public": public()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}

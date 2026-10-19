@@ -1,0 +1,752 @@
+{
+  "locked_gpu": {
+    "boxes": {
+      "Stanton": {
+        "counts": {
+          "pages": 250,
+          "doc_pages": 243,
+          "pages_exact": 190,
+          "docs": 112,
+          "docs_exact": 95,
+          "folders": 5,
+          "folders_perfect": 0,
+          "gaps": 238,
+          "truth_bounds": 107,
+          "tp": 105,
+          "false_splits": 21,
+          "false_merges": 2,
+          "edits": 23,
+          "photos": 7,
+          "photos_exact": 7,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0,
+          "pk_windows": 249,
+          "pk_errors": 23,
+          "wd_errors": 23,
+          "collections": [
+            "Stanton"
+          ]
+        },
+        "metrics": {
+          "collections": "Stanton",
+          "pages": 250,
+          "doc_pages": 243,
+          "docs": 112,
+          "pages_in_exact_doc": 0.7818930041152263,
+          "docs_exact": 0.8482142857142857,
+          "folders": 5,
+          "folders_perfect": 0.0,
+          "false_splits": 21,
+          "false_merges": 2,
+          "boundary_precision": 0.8333333333333334,
+          "boundary_recall": 0.9813084112149533,
+          "boundary_f1": 0.9012875536480688,
+          "pk": 0.09236947791164658,
+          "windowdiff": 0.09236947791164658,
+          "edits_per_100_pages": 9.2,
+          "photos": 7,
+          "photo_accuracy": 1.0,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0
+        }
+      },
+      "RG165": {
+        "counts": {
+          "pages": 113,
+          "doc_pages": 87,
+          "pages_exact": 82,
+          "docs": 33,
+          "docs_exact": 30,
+          "folders": 10,
+          "folders_perfect": 8,
+          "gaps": 77,
+          "truth_bounds": 23,
+          "tp": 22,
+          "false_splits": 1,
+          "false_merges": 1,
+          "edits": 2,
+          "photos": 26,
+          "photos_exact": 26,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0,
+          "pk_windows": 112,
+          "pk_errors": 2,
+          "wd_errors": 2,
+          "collections": [
+            "RG165"
+          ]
+        },
+        "metrics": {
+          "collections": "RG165",
+          "pages": 113,
+          "doc_pages": 87,
+          "docs": 33,
+          "pages_in_exact_doc": 0.9425287356321839,
+          "docs_exact": 0.9090909090909091,
+          "folders": 10,
+          "folders_perfect": 0.8,
+          "false_splits": 1,
+          "false_merges": 1,
+          "boundary_precision": 0.9565217391304348,
+          "boundary_recall": 0.9565217391304348,
+          "boundary_f1": 0.9565217391304348,
+          "pk": 0.017857142857142856,
+          "windowdiff": 0.017857142857142856,
+          "edits_per_100_pages": 1.7699115044247788,
+          "photos": 26,
+          "photo_accuracy": 1.0,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0
+        }
+      }
+    },
+    "pooled_counts": {
+      "pages": 363,
+      "doc_pages": 330,
+      "pages_exact": 272,
+      "docs": 145,
+      "docs_exact": 125,
+      "folders": 15,
+      "folders_perfect": 8,
+      "gaps": 315,
+      "truth_bounds": 130,
+      "tp": 127,
+      "false_splits": 22,
+      "false_merges": 3,
+      "edits": 25,
+      "photos": 33,
+      "photos_exact": 33,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0,
+      "pk_windows": 361,
+      "pk_errors": 25,
+      "wd_errors": 25,
+      "collections": [
+        "Stanton",
+        "RG165"
+      ]
+    },
+    "pooled_metrics": {
+      "collections": "Stanton+RG165",
+      "pages": 363,
+      "doc_pages": 330,
+      "docs": 145,
+      "pages_in_exact_doc": 0.8242424242424242,
+      "docs_exact": 0.8620689655172413,
+      "folders": 15,
+      "folders_perfect": 0.5333333333333333,
+      "false_splits": 22,
+      "false_merges": 3,
+      "boundary_precision": 0.8523489932885906,
+      "boundary_recall": 0.9769230769230769,
+      "boundary_f1": 0.9103942652329748,
+      "pk": 0.06925207756232687,
+      "windowdiff": 0.06925207756232687,
+      "edits_per_100_pages": 6.887052341597796,
+      "photos": 33,
+      "photo_accuracy": 1.0,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0
+    },
+    "truth_photos": true
+  },
+  "development_mac": {
+    "boxes": {
+      "Dean": {
+        "counts": {
+          "pages": 202,
+          "doc_pages": 196,
+          "pages_exact": 179,
+          "docs": 121,
+          "docs_exact": 109,
+          "folders": 5,
+          "folders_perfect": 1,
+          "gaps": 191,
+          "truth_bounds": 116,
+          "tp": 110,
+          "false_splits": 1,
+          "false_merges": 6,
+          "edits": 7,
+          "photos": 6,
+          "photos_exact": 6,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0,
+          "pk_windows": 201,
+          "pk_errors": 7,
+          "wd_errors": 7,
+          "collections": [
+            "Dean"
+          ]
+        },
+        "metrics": {
+          "collections": "Dean",
+          "pages": 202,
+          "doc_pages": 196,
+          "docs": 121,
+          "pages_in_exact_doc": 0.9132653061224489,
+          "docs_exact": 0.9008264462809917,
+          "folders": 5,
+          "folders_perfect": 0.2,
+          "false_splits": 1,
+          "false_merges": 6,
+          "boundary_precision": 0.990990990990991,
+          "boundary_recall": 0.9482758620689655,
+          "boundary_f1": 0.9691629955947136,
+          "pk": 0.03482587064676617,
+          "windowdiff": 0.03482587064676617,
+          "edits_per_100_pages": 3.4653465346534653,
+          "photos": 6,
+          "photo_accuracy": 1.0,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0
+        }
+      },
+      "Deaver": {
+        "counts": {
+          "pages": 149,
+          "doc_pages": 141,
+          "pages_exact": 123,
+          "docs": 89,
+          "docs_exact": 81,
+          "folders": 5,
+          "folders_perfect": 2,
+          "gaps": 136,
+          "truth_bounds": 84,
+          "tp": 81,
+          "false_splits": 2,
+          "false_merges": 3,
+          "edits": 5,
+          "photos": 8,
+          "photos_exact": 8,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0,
+          "pk_windows": 148,
+          "pk_errors": 5,
+          "wd_errors": 5,
+          "collections": [
+            "Deaver"
+          ]
+        },
+        "metrics": {
+          "collections": "Deaver",
+          "pages": 149,
+          "doc_pages": 141,
+          "docs": 89,
+          "pages_in_exact_doc": 0.8723404255319149,
+          "docs_exact": 0.9101123595505618,
+          "folders": 5,
+          "folders_perfect": 0.4,
+          "false_splits": 2,
+          "false_merges": 3,
+          "boundary_precision": 0.9759036144578314,
+          "boundary_recall": 0.9642857142857143,
+          "boundary_f1": 0.970059880239521,
+          "pk": 0.033783783783783786,
+          "windowdiff": 0.033783783783783786,
+          "edits_per_100_pages": 3.3557046979865772,
+          "photos": 8,
+          "photo_accuracy": 1.0,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0
+        }
+      },
+      "Herrnstein": {
+        "counts": {
+          "pages": 200,
+          "doc_pages": 181,
+          "pages_exact": 161,
+          "docs": 108,
+          "docs_exact": 100,
+          "folders": 14,
+          "folders_perfect": 9,
+          "gaps": 167,
+          "truth_bounds": 94,
+          "tp": 91,
+          "false_splits": 4,
+          "false_merges": 3,
+          "edits": 7,
+          "photos": 19,
+          "photos_exact": 19,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0,
+          "pk_windows": 199,
+          "pk_errors": 7,
+          "wd_errors": 7,
+          "collections": [
+            "Herrnstein"
+          ]
+        },
+        "metrics": {
+          "collections": "Herrnstein",
+          "pages": 200,
+          "doc_pages": 181,
+          "docs": 108,
+          "pages_in_exact_doc": 0.8895027624309392,
+          "docs_exact": 0.9259259259259259,
+          "folders": 14,
+          "folders_perfect": 0.6428571428571429,
+          "false_splits": 4,
+          "false_merges": 3,
+          "boundary_precision": 0.9578947368421052,
+          "boundary_recall": 0.9680851063829787,
+          "boundary_f1": 0.962962962962963,
+          "pk": 0.035175879396984924,
+          "windowdiff": 0.035175879396984924,
+          "edits_per_100_pages": 3.5,
+          "photos": 19,
+          "photo_accuracy": 1.0,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0
+        }
+      }
+    },
+    "pooled_counts": {
+      "pages": 551,
+      "doc_pages": 518,
+      "pages_exact": 463,
+      "docs": 318,
+      "docs_exact": 290,
+      "folders": 24,
+      "folders_perfect": 12,
+      "gaps": 494,
+      "truth_bounds": 294,
+      "tp": 282,
+      "false_splits": 7,
+      "false_merges": 12,
+      "edits": 19,
+      "photos": 33,
+      "photos_exact": 33,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0,
+      "pk_windows": 548,
+      "pk_errors": 19,
+      "wd_errors": 19,
+      "collections": [
+        "Dean",
+        "Deaver",
+        "Herrnstein"
+      ]
+    },
+    "pooled_metrics": {
+      "collections": "Dean+Deaver+Herrnstein",
+      "pages": 551,
+      "doc_pages": 518,
+      "docs": 318,
+      "pages_in_exact_doc": 0.8938223938223938,
+      "docs_exact": 0.9119496855345912,
+      "folders": 24,
+      "folders_perfect": 0.5,
+      "false_splits": 7,
+      "false_merges": 12,
+      "boundary_precision": 0.9757785467128027,
+      "boundary_recall": 0.9591836734693877,
+      "boundary_f1": 0.967409948542024,
+      "pk": 0.03467153284671533,
+      "windowdiff": 0.03467153284671533,
+      "edits_per_100_pages": 3.4482758620689653,
+      "photos": 33,
+      "photo_accuracy": 1.0,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0
+    },
+    "truth_photos": false
+  },
+  "acceptance": [
+    {
+      "measure": "GPU development exact document pages",
+      "reference": [
+        469,
+        518
+      ],
+      "joint": [
+        467,
+        518
+      ],
+      "loss_points": 0.3861003861003861,
+      "passes": true
+    },
+    {
+      "measure": "GPU held-out agreed gaps",
+      "reference": [
+        5443,
+        5668
+      ],
+      "joint": [
+        5412,
+        5668
+      ],
+      "loss_points": 0.5469301340860974,
+      "passes": true
+    },
+    {
+      "measure": "GPU locked-test exact document pages",
+      "reference": [
+        260,
+        330
+      ],
+      "joint": [
+        272,
+        330
+      ],
+      "loss_points": -3.6363636363636362,
+      "passes": true
+    },
+    {
+      "measure": "Mac development exact document pages",
+      "reference": [
+        468,
+        518
+      ],
+      "joint": [
+        463,
+        518
+      ],
+      "loss_points": 0.9652509652509652,
+      "passes": true
+    },
+    {
+      "measure": "gpu owner year",
+      "reference": [
+        167,
+        250
+      ],
+      "joint": [
+        168,
+        250
+      ],
+      "loss_points": -0.4,
+      "passes": true
+    },
+    {
+      "measure": "gpu owner month",
+      "reference": [
+        76,
+        120
+      ],
+      "joint": [
+        77,
+        120
+      ],
+      "loss_points": -0.8333333333333334,
+      "passes": true
+    },
+    {
+      "measure": "gpu public year",
+      "reference": [
+        285,
+        300
+      ],
+      "joint": [
+        290,
+        300
+      ],
+      "loss_points": -1.6666666666666667,
+      "passes": true
+    },
+    {
+      "measure": "gpu public month",
+      "reference": [
+        224,
+        240
+      ],
+      "joint": [
+        227,
+        240
+      ],
+      "loss_points": -1.25,
+      "passes": true
+    },
+    {
+      "measure": "gpu public day",
+      "reference": [
+        139,
+        150
+      ],
+      "joint": [
+        138,
+        150
+      ],
+      "loss_points": 0.6666666666666666,
+      "passes": true
+    },
+    {
+      "measure": "gpu public full date",
+      "reference": [
+        136,
+        150
+      ],
+      "joint": [
+        135,
+        150
+      ],
+      "loss_points": 0.6666666666666666,
+      "passes": true
+    },
+    {
+      "measure": "mac owner year",
+      "reference": [
+        164,
+        250
+      ],
+      "joint": [
+        168,
+        250
+      ],
+      "loss_points": -1.6,
+      "passes": true
+    },
+    {
+      "measure": "mac owner month",
+      "reference": [
+        78,
+        120
+      ],
+      "joint": [
+        77,
+        120
+      ],
+      "loss_points": 0.8333333333333334,
+      "passes": true
+    },
+    {
+      "measure": "mac public year",
+      "reference": [
+        284,
+        300
+      ],
+      "joint": [
+        290,
+        300
+      ],
+      "loss_points": -2.0,
+      "passes": true
+    },
+    {
+      "measure": "mac public month",
+      "reference": [
+        224,
+        240
+      ],
+      "joint": [
+        227,
+        240
+      ],
+      "loss_points": -1.25,
+      "passes": true
+    },
+    {
+      "measure": "mac public day",
+      "reference": [
+        140,
+        150
+      ],
+      "joint": [
+        139,
+        150
+      ],
+      "loss_points": 0.6666666666666666,
+      "passes": true
+    },
+    {
+      "measure": "mac public full date",
+      "reference": [
+        137,
+        150
+      ],
+      "joint": [
+        135,
+        150
+      ],
+      "loss_points": 1.3333333333333333,
+      "passes": false
+    }
+  ],
+  "passes_all": false,
+  "policy": "Frozen maximum absolute loss1percentage point, exact fractions; no post-test tuning or repeat locked inference. Original single-task freezes unchanged.",
+  "raw_root": "Long term storage/FarmShare-20261018",
+  "dating_mac": {
+    "owner": {
+      "model": "mlx-seg-date-2b-8bit-nothink",
+      "documents": 300,
+      "usd": 0.0,
+      "usd_per_1000": 0.0,
+      "year": {
+        "year+month": {
+          "exact": [
+            98,
+            120
+          ],
+          "within1": [
+            108,
+            120
+          ]
+        },
+        "year": {
+          "exact": [
+            53,
+            80
+          ],
+          "within1": [
+            67,
+            80
+          ]
+        },
+        "year+DU": {
+          "exact": [
+            17,
+            50
+          ],
+          "within1": [
+            34,
+            50
+          ]
+        },
+        "in text": {
+          "exact": [
+            114,
+            119
+          ],
+          "within1": [
+            119,
+            119
+          ]
+        },
+        "not in text": {
+          "exact": [
+            54,
+            131
+          ],
+          "within1": [
+            90,
+            131
+          ]
+        },
+        "all": {
+          "exact": [
+            168,
+            250
+          ],
+          "within1": [
+            209,
+            250
+          ]
+        }
+      },
+      "decade": [
+        28,
+        50
+      ],
+      "month": {
+        "owner": [
+          77,
+          120
+        ],
+        "other": [
+          18,
+          120
+        ],
+        "none": [
+          25,
+          120
+        ],
+        "untagged_given": [
+          46,
+          80
+        ],
+        "untagged_given_named": 23
+      },
+      "uncertain": {
+        "owner_certain": [
+          0,
+          200
+        ],
+        "owner_certain_in_text": [
+          0,
+          114
+        ],
+        "owner_certain_not_in_text": [
+          0,
+          86
+        ],
+        "owner_uncertain": [
+          0,
+          50
+        ],
+        "certain_and_wrong": [
+          49,
+          200
+        ]
+      },
+      "parse_failures": 0,
+      "finish_length": 0
+    },
+    "public": {
+      "documents": 300,
+      "year": {
+        "exact": [
+          290,
+          300
+        ],
+        "within1": [
+          292,
+          300
+        ],
+        "in text": [
+          251,
+          257
+        ],
+        "not in text": [
+          39,
+          43
+        ]
+      },
+      "month": {
+        "exact": [
+          227,
+          240
+        ],
+        "none": [
+          4,
+          240
+        ],
+        "given_where_source_has_none": [
+          38,
+          60
+        ]
+      },
+      "day": {
+        "exact": [
+          139,
+          150
+        ],
+        "full_date": [
+          135,
+          150
+        ],
+        "none": [
+          2,
+          150
+        ],
+        "given_where_source_has_none": [
+          87,
+          150
+        ]
+      },
+      "parse_failures": 0
+    }
+  }
+}
