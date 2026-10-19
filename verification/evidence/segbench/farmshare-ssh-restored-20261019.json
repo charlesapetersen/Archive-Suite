@@ -1,0 +1,73 @@
+{
+  "utc": "2026-10-19T15:53:53.042336+00:00",
+  "ssh_host": "rice-02",
+  "inkling_build": "100% built llama-server; pinned download active",
+  "inkling_jobs": {
+    "setup": {
+      "job": 1857687,
+      "args": [
+        "--partition=normal",
+        "--cpus-per-task=8",
+        "--mem=64G",
+        "--time=02:00:00"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/inkling-20261019/recovery/inkling-gguf-setup.sh",
+        "/scratch/users/cp1/fs-ocr/inkling-20261019"
+      ],
+      "previous_job": 1857670,
+      "previous_reason": "Final CPU link needed driver-stub SONAME and build-only rpath-link; resume compiled objects, no inference ran",
+      "previous_jobs": [
+        1857670,
+        1857673,
+        1857674,
+        1857675
+      ]
+    },
+    "inkling-small-gguf-q4": {
+      "job": 1857671,
+      "args": [
+        "--partition=gpu",
+        "--nodes=1",
+        "--gres=gpu:4",
+        "--cpus-per-task=16",
+        "--mem=220G",
+        "--time=12:00:00",
+        "--dependency=afterany:1857687:1857668"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/inkling-20261019/recovery/inkling-gguf-job.sh",
+        "/scratch/users/cp1/fs-ocr/inkling-20261019"
+      ]
+    }
+  },
+  "collectors": {
+    "FarmShare-20261019": {
+      "phase": "waiting",
+      "utc": "2026-10-19T15:43:02.487781+00:00",
+      "collected": [
+        "joint-public",
+        "ocr-qwen3.6-35b-a3b",
+        "ocr-qwen3.6-27b"
+      ]
+    },
+    "FarmShare-open-sweep-20261019": {
+      "phase": "needs_inspection",
+      "utc": "2026-10-19T15:46:27.694307+00:00",
+      "retrieved": [],
+      "error": "Command '['/opt/homebrew/bin/gtimeout', '--foreground', '-k', '3', '15', '/usr/bin/ssh', '-S', '/Users/cp1/.ssh/cm-farmshare', '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'ProxyCommand=false', 'cp1@login.farmshare.stanford.edu', 'sacct -n -X -P -j 1857614,1857607,1857608,1857609,1857610,1857611,1857612 --format=JobIDRaw,State,ExitCode']' timed out after 20 seconds"
+    },
+    "FarmShare-general-sweep-20261019": {
+      "phase": "needs_inspection",
+      "utc": "2026-10-19T15:46:16.452520+00:00",
+      "retrieved": [],
+      "error": "Command '['/opt/homebrew/bin/gtimeout', '--foreground', '-k', '3', '15', '/usr/bin/ssh', '-S', '/Users/cp1/.ssh/cm-farmshare', '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'ProxyCommand=false', 'cp1@login.farmshare.stanford.edu', 'sacct -n -X -P -j 1857666,1857667,1857668 --format=JobIDRaw,State,ExitCode']' timed out after 20 seconds"
+    },
+    "FarmShare-inkling-20261019": {
+      "phase": "needs_inspection",
+      "utc": "2026-10-19T15:46:21.509976+00:00",
+      "retrieved": [],
+      "error": "Command '['/opt/homebrew/bin/gtimeout', '--foreground', '-k', '3', '15', '/usr/bin/ssh', '-S', '/Users/cp1/.ssh/cm-farmshare', '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'ProxyCommand=false', 'cp1@login.farmshare.stanford.edu', 'sacct -n -X -P -j 1857687,1857671 --format=JobIDRaw,State,ExitCode']' timed out after 20 seconds"
+    }
+  }
+}

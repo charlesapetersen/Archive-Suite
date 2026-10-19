@@ -92,6 +92,8 @@ shared trackers/plan/Git; no fabricated daemon session, grant, PID or usage ledg
 
 The blocker above is specific to installed vLLM, not every runtime. W43.inkling-farmshare now queues an
 isolated pinned llama.cpp contributor branch with Unsloth Q4 GGUF and its vision projector. See
-`inkling-farmshare-20261019.md` for existing jobs1857675/1857671 and recovery; no shared vLLM patch or duplicate
+`inkling-farmshare-20261019.md` for existing jobs1857687/1857671 and recovery; no shared vLLM patch or duplicate
 NVFP4 download. GPU image compatibility is unverified until the queued pilot succeeds. Keep this item's
 Ling/Nemotron jobs and collector independent.
+
+SSH restored19Oct: preparation1857666 completed0, both Ling/Nemotron pinned roots ready; their GPU jobs remain dependency-pending. Collector restarted with archived old marker/status; current log collection-restored.log.

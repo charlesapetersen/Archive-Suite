@@ -22,7 +22,7 @@
   },
   "jobs": {
     "setup": {
-      "job": 1857675,
+      "job": 1857687,
       "args": [
         "--partition=normal",
         "--cpus-per-task=8",
@@ -34,11 +34,12 @@
         "/scratch/users/cp1/fs-ocr/inkling-20261019"
       ],
       "previous_job": 1857670,
-      "previous_reason": "CPU CMake needed versioned CUDA library paths plus official build-only driver stub; no inference ran",
+      "previous_reason": "Final CPU link needed driver-stub SONAME and build-only rpath-link; resume compiled objects, no inference ran",
       "previous_jobs": [
         1857670,
         1857673,
-        1857674
+        1857674,
+        1857675
       ]
     },
     "inkling-small-gguf-q4": {
@@ -50,7 +51,7 @@
         "--cpus-per-task=16",
         "--mem=220G",
         "--time=12:00:00",
-        "--dependency=afterany:1857675:1857668"
+        "--dependency=afterany:1857687:1857668"
       ],
       "command": [
         "/scratch/users/cp1/fs-ocr/inkling-20261019/recovery/inkling-gguf-job.sh",
@@ -89,5 +90,5 @@
   "weight_and_projector_bytes": 162676291520,
   "sdk_archive_sha256": "25b8071951baba827be1580b841d363464f6ee6c39f48d33a81646f90cc95ed1",
   "sdk_url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cudart/linux-x86_64/cuda_cudart-linux-x86_64-13.0.96-archive.tar.xz",
-  "checkpoint_state": "1857675 compiling CUDA objects;1857671 pending dependencies; GPU image pilot unverified"
+  "checkpoint_state": "SSH restored;1857687 linked executable successfully100%, downloading GGUF;1857671 same pending GPU job; image pilot unverified"
 }

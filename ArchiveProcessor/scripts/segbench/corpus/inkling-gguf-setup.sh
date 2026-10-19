@@ -15,6 +15,7 @@ printf '%s  %s\n' '25b8071951baba827be1580b841d363464f6ee6c39f48d33a81646f90cc95
 mkdir -p "$ROOT/cuda-stub"
 tar -xJf "$ROOT/recovery/cuda-cudart.tar.xz" -C "$ROOT/cuda-stub" --strip-components=3 \
   cuda_cudart-linux-x86_64-13.0.96-archive/lib/stubs/libcuda.so
+ln -sfn libcuda.so "$ROOT/cuda-stub/libcuda.so.1"
 REVISION=$("$FS_PY" -c 'import json,sys;print(json.load(open(sys.argv[1]))["runtime_revision"])' "$ROOT/candidate.json")
 if [ ! -e "$ROOT/src" ]; then
   git init "$ROOT/src"
@@ -29,6 +30,7 @@ cmake -S "$ROOT/src" -B "$ROOT/build" -DCMAKE_BUILD_TYPE=Release \
   -DCUDA_CUDART="$CUDA/lib/libcudart.so.13" -DCUDA_cudart_LIBRARY="$CUDA/lib/libcudart.so.13" \
   -DCUDA_cublas_LIBRARY="$CUDA/lib/libcublas.so.13" -DCUDA_cublasLt_LIBRARY="$CUDA/lib/libcublasLt.so.13" \
   -DCUDA_cuda_driver_LIBRARY="$ROOT/cuda-stub/libcuda.so" -DCMAKE_SKIP_RPATH=ON \
+  -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link,$ROOT/cuda-stub" \
   -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF
 cmake --build "$ROOT/build" --target llama-server -j "${SLURM_CPUS_PER_TASK:-8}"
 "$FS_PY" - "$ROOT" <<'PY'

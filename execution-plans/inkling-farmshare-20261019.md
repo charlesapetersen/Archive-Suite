@@ -7,16 +7,16 @@ not a claim that image inference already works on FarmShare. Existing shared env
 
 ## Submitted work — never duplicate
 
-- **1857675**:8CPU/64GB/2h CPU build then pinned download. At checkpoint CUDA objects were compiling (13%).
-- **1857671**:one node/4 L40S/16CPU/220GB/12h, afterany1857675 AND1857668 (Nemotron, last general-model job).
+- **1857687**:8CPU/64GB/2h incremental link then pinned download. Build reached100% successfully; GGUF files now downloading.
+- **1857671**:one node/4 L40S/16CPU/220GB/12h, afterany1857687 AND1857668 (Nemotron, last general-model job).
   This is the same GPU ID from initial submission; only failed CPU build dependencies were corrected.
 - Prior CPU-only1857670/1857673/1857674 failed in CMake configuration, before model downloads or inference.
   Their logs remain. Versioned pip CUDA runtime/static paths and a missing CPU-node driver development stub
-  were fixed. No GPU inference was duplicated. Do not resubmit because one old setup receipt says FAILED.
+  were fixed. Job1857675 later failed only at final executable linking; the SDK stub SONAME symlink and build-only -rpath-link now resolve that dependency. Incremental1857687 reuses compiled objects and has linked successfully. No GPU inference was duplicated. Do not resubmit because one old setup receipt says FAILED.
 
 L=`/Users/cp1/Claude/Long term storage/FarmShare-inkling-20261019`
 S=`/scratch/users/cp1/fs-ocr/inkling-20261019`
-Read L/jobs.json and collection-status.json, then scheduler and S/logs. Final collector log collection-final.log;
+Read L/jobs.json and collection-status.json, then scheduler and S/logs. Restored collector log collection-restored.log;
 prior collector status/markers remain archived after reloading the corrected setup ID. A48h non-LLM caffeinate
 collector polls180s, retrieves the terminal GPU model root (success or failed partials) to L/outputs and all logs
 to L/remote-logs, and exits. It never submits/retries inference/authenticates/starts a daemon. SSH master retained.
@@ -54,10 +54,25 @@ open_sweep_run.py; durable deployed copies at L/S recovery, no temporary-worktre
 ## Resume and finish
 
 Do not start another collector until checking existing marker/PID/status. If build fails, inspect the current
-1857675 log; a GPU skip from missing prepared.json preserves the chain. No additional setup or inference retry
+1857687 log; a GPU skip from missing prepared.json preserves the chain. No additional setup or inference retry
 is silently authorized by collection. On pass, review real image transcription/prompt/thinking behavior before
 accepting scores; nonempty pilot output is a compatibility gate, not a quality judgment. Score saved895 raw
 answers, failures as failures, separately from historical440 and other precision/runtime routes. Update numeric
 report/ArchiveOCRBench after review; no automatic catalogue/default/adoption change. Reconcile shared TODO/DONE
 and primary plan, delete this plan only when reviewed results are shipped. Manager reads trackers/Git/plan;
 interactive provenance retained, no fabricated daemon engine ledger, grants or usage. No hosted money spent.
+
+
+## SSH restored —19Oct recovery
+
+Owner reopened the login; preflight reached rice-02 as cp1. All four stopped task-owned collectors were checked
+not running, old markers/status/access blocker archived under each L/ssh-recovery-<UTC>, and collectors restarted.
+The original extension collector retains previously validated collected IDs; the three sweep collectors had
+retrieved nothing before the outage. Current logs collection-restored.log. The restored collector uses the
+current jobs.json with setup1857687/GPU1857671. SSH timeout now includes a3s forced cleanup after the15s bound;
+no auth fallback or automatic reconnect. The old owner-login blocker is resolved, not a reason to resubmit jobs.
+
+Two original OCR extensions completed0 (Qwen3.6 27B and35B-A3B); Qwen3.5 27B still running at recovery.
+Ling/Nemotron preparation1857666 completed0, both pinned model roots ready. Existing inference IDs/dependency
+chain retained; no repeated model calls. Inkling CUDA final linking completed100%; model download remains active.
+The real image pilot and895-page result review remain pending. Continue from recorded jobs and raw caches only.

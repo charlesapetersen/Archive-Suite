@@ -32,7 +32,7 @@ def main():
     try:
         for _ in range(960):  # 48 hours; no model/API/daemon usage
             cmd = 'sacct -n -X -P -j ' + ','.join(str(j['job']) for j in jobs.values()) + ' --format=JobIDRaw,State,ExitCode'
-            raw = subprocess.run(['/opt/homebrew/bin/gtimeout', '--foreground', '15', *ssh, cmd],
+            raw = subprocess.run(['/opt/homebrew/bin/gtimeout', '--foreground', '-k', '3', '15', *ssh, cmd],
                                  text=True, capture_output=True, check=True, timeout=20).stdout
             states = {a[0]: a[1:3] for line in raw.splitlines() if (a := line.split('|'))}
             state['states'] = states
