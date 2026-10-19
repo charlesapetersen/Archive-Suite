@@ -1,0 +1,72 @@
+{
+  "origin": "interactive Codex; not a daemon-launched session",
+  "prior_completion_commit": "1aebdf9e",
+  "prior_completed_items": [
+    "W41.date-model",
+    "W41.seg-date-model",
+    "W43.script-specialists",
+    "W43.sweep-farmshare",
+    "W43.seg-corpus-build"
+  ],
+  "prior_manager_completed_hook": 670,
+  "manager_readiness": "precheck/pregate/queue/fingerprint/completed/holds/status passed; shared trackers and commit history are the authoritative accounting, no fake engine ledger",
+  "jobs": {
+    "joint-public": {
+      "job": 1857598,
+      "kind": "segmentation",
+      "labels": [
+        "public-crest-fs-seg-date-2b",
+        "public-lincoln-fs-seg-date-2b"
+      ]
+    },
+    "ocr-qwen3.6-27b": {
+      "job": 1857599,
+      "kind": "ocr",
+      "label": "qwen3.6-27b",
+      "expected": 895,
+      "reused": 440,
+      "new": 455
+    },
+    "ocr-qwen3.5-27b": {
+      "job": 1857600,
+      "kind": "ocr",
+      "label": "qwen3.5-27b",
+      "expected": 895,
+      "reused": 440,
+      "new": 455
+    },
+    "ocr-qwen3.6-35b-a3b": {
+      "job": 1857601,
+      "kind": "ocr",
+      "label": "qwen3.6-35b-a3b",
+      "expected": 895,
+      "reused": 440,
+      "new": 455
+    }
+  },
+  "pack": {
+    "pages": 895,
+    "old_pages": 440,
+    "new_pages": 455,
+    "manifest_sha256": "27673d67e648a1864f16515ed6d73bf9a0b35a4895e8821455ea36c17f4236eb",
+    "base_sha256": "2ac7d7c97c10019a0a169dd48df32b0b5b100de452c35a2f9c7a46a7e47d0c20",
+    "legacy_inputs_sha256": "f6380113ab32c2b05e4adf74f230855bea45a87a4650784dec23fe9587c755e3",
+    "prompt_sha256": "2ab7ab039a6e42db6734ad7c7e5a168a60856d3bfb27e02f6c2bef08137aee8d",
+    "legacy_collector_sha256": "fe5679d9913fdc92008ad6d409c05c7b400239dd1913eeb4639dde2f3e29576b",
+    "side": 2400,
+    "max_tokens": 8192
+  },
+  "model_revisions": {
+    "qwen3.6-27b": "e89b16ebf1988b3d6befa7de50abc2d76f26eb09",
+    "qwen3.5-27b": "97f5941bf617e31c5e237364a8602ce3f03a551a",
+    "qwen3.6-35b-a3b": "95a723d08a9490559dae23d0cff1d9466213d989"
+  },
+  "validation": {
+    "cache_importer_tests": 9,
+    "original_440_score_rows_exactly_reproduced": 24,
+    "reused_page_count_preflight_per_model": 440,
+    "only_new_page_count_per_model": 455
+  },
+  "raw_location": "Long term storage/FarmShare-20261019",
+  "inference_protocol_changes": false
+}

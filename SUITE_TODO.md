@@ -833,7 +833,6 @@ the owner's decision, then a build only if the result is usable. The Processor l
 (`W40.b3`, `W40.d1`-`d4`) wait on `W36.seg-decision`; `W40.a1` no longer does (2026-10-07). Items marked
 OWNER sit in the plan's HOLD QUEUE.
 
-- [x] **`W36.seg-decision` — owner decides: usable or not, and what to build — OWNER.** ✅ ANSWERED 2026-10-11: build segmentation as a choice of approach (full manual, Claude, Gemini, ChatGPT if possible, a mix), each shown with rough accuracy, checking and cost figures, cost both in dollars by API key and as a share of the user's own subscription windows, generalized beyond the owner's plan. The on-device fine-tune is filed in `FUTURE_FEATURES.md`. Plan: `execution-plans/segmentation/04-options-build.md`.
 
 The build, from `04-options-build.md` Part 2, has shipped: every `W36.seg-opt-*` item is in `SUITE_TODO_DONE.md`.
 
@@ -1244,3 +1243,10 @@ Design-level ideas the owner wants recorded but explicitly de-prioritised. An au
   headless JVM coverage of the logic — which is what `./gradlew --offline testDebugUnitTest` already gives —
   state plainly in the commit that the pixels are unverified, and do NOT open a new Daemon Report entry
   about the missing lane.** One line in the Session Log is enough. Revisit only if the owner asks.
+
+
+## FarmShare extensions — owner, 2026-10-19
+
+- [ ] **W43.farmshare-ocr-more — extend the cached open-model OCR readings to all 895 frozen pages [S · ~0.5 session]** (lane: segbench) (uses: light). Owner19Oct: run only if expansion does not require re-OCRing unchanged pages. Reuse the440 saved readings per Qwen model and read only455 added pages, unchanged prompt/images/settings. Three existing cached Qwen presets; no paid call or source construction. Jobs submitted interactively: **resume/retrieve the recorded jobs, never submit duplicates**. Settings contracts refuse changed model revisions, prompts or existing image bytes; record reuse receipts and preserve original raw outputs. Collect/score/report the expanded set separately from the original440, update ArchiveOCRBench, then reconcile trackers. Notes: `execution-plans/farmshare-extensions-20261019.md` and durable `Long term storage/FarmShare-20261019`.
+
+- [ ] **W43.seg-date-public — test the frozen combined model on both public segmentation boxes [S · ~0.2 session]** (lane: segbench) (uses: light). Owner19Oct: queue the combined model on frozen CREST128/Lincoln261 pages, same prompts/scorer beside the three completed public model rows. Use existing combined weights; no retraining, no private locked-test repeat and no revised adoption decision. **Resume/retrieve the already-submitted recorded job, never submit a duplicate.** Report numeric scores, refresh benchmark and reconcile trackers. Notes: `execution-plans/farmshare-extensions-20261019.md` and durable `Long term storage/FarmShare-20261019`.

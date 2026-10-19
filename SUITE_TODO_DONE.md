@@ -11917,3 +11917,8 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
 
   **SHIPPED 2026-10-19 (this commit).** Completed both frozen audited input boxes (CREST128pages/31documents; Lincoln261/81) and available free CPU/Apple Vision +FarmShare teacher/2B/4B comparisons, six successful runs with no failed/missing windows. CREST exact-document pages95.31/91.41/98.44%; Lincoln39.46/34.87/46.74%, reported separately; Lincoln is harder despite public/easier grouping. Numeric scores and source limitations in ArchiveProcessor/segbench-results/public-segmentation.md and ArchiveOCRBench. Hosted Gemini and planned Claude subscription references remain explicitly deferred in execution-plans/paid-runs-deferred.md under W43.sweep; no paid/subscription call, no further source construction.
   <!-- /W43.seg-corpus-build -->
+
+
+- [x] **W36.seg-decision — owner decides: usable or not, and what to build — OWNER.** ✅ ANSWERED 2026-10-11: build segmentation as a choice of approach (full manual, Claude, Gemini, ChatGPT if possible, a mix), each shown with rough accuracy, checking and cost figures, cost both in dollars by API key and as a share of the user's own subscription windows, generalized beyond the owner's plan. The on-device fine-tune is filed in `FUTURE_FEATURES.md`. Plan: `execution-plans/segmentation/04-options-build.md`.
+  Tracker reconciliation2026-10-19: preserve the already-answered2026-10-11 owner decision here, rather than leaving a ticked stub in the OPEN tracker. No new decision or behavior change.
+  <!-- /W36.seg-decision -->
