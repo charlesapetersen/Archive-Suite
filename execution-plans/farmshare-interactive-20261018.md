@@ -235,3 +235,32 @@ existing `/home/users/cp1/fs-holdout-fs-seg-2b` has 2459 held-out windows and ca
 separate run (its corpus-pairs keys are model-independent; do not import it into five-box caches).
 Full repository health gate due at 34 commits since last green; started in primary with unattended/lock
 protections. It remains running. Public + collector regressions: 45 tests pass, 4 platform skips.
+
+### Automatic continuations prepared (same interactive task)
+
+Joint development + held-out GPU evaluation **1856499** depends on afterok:1856294. Isolated current kit
+snapshot at `R/seg-eval`, unchanged 187-window dev pack and byte-identical 2459-window held-out requests;
+only model/output namespace differs. `R/serve-seg.sh` is a separate copy (original serve.sh hash preserved),
+with current IC aliases and slash-safe log naming. `R/run-seg-eval.sh`, `joint-seg-eval-job.sh` and `.id`
+record recovery. No locked test submitted. CIA's three 44-window packs staged at `R/public-packs`.
+
+Unrounded single-task references and the <=1-point decision fields are frozen before joint results in
+`segbench-results/seg-date-comparison-plan.json`. GPU dev pages-in-exact-doc 90.5405%; Mac 90.3475%.
+Public dates are checked separately by year/month/day/full date; owner year/month retained. No new
+recipe selection against the joint test outputs. Both original freezes remain unchanged.
+
+A one-time local continuation is running from Long term storage `FarmShare-20261018/joint-mac-watch.py`,
+not a scheduled automation. Tool session 8892. It waits for 1856294 success (no auth retry on SSH failure),
+checks 8 GiB free, transfers the merged model, verifies remote/local SHA-256, then performs 8-bit conversion
+and all 600 date +187 development-window Mac tests under the unchanged machine-wide guard. No Mac locked
+or held-out call. Code snapshot `joint-mac-code`, exact text packs `date-packs`; status `joint-mac-status.json`,
+logs `joint-mac-{watch,transfer,convert,measure}.log`, outputs `mlx-results` and the new benchmark cache key
+`window-local-seg-date-2b-8bit`. At most 12 natural resource retries; no lowered threshold. Inspect rather
+than overwrite a partial quantized build. A `joint-mac-stop` marker stops its waiting phase if needed.
+
+LoC image downloads repeatedly closed HTTP/2 streams (curl 92). The host-limited helper now selects HTTP/1.1
+only for tile.loc.gov, retaining TLS, host and redirect checks. Ten wire/refusal tests pass. Downloads are
+continuing; occasional closed transfers still receive only the existing bounded retry. Lincoln audit
+progress is saved independently in `public-segmentation/lincoln-audit.json` outside git (last reviewed 192).
+No public model scores yet. Existing free rule baseline is fitting on **owner dev boxes only**, queued behind
+the repository's VM health check; its parameters will be committed before public scoring.

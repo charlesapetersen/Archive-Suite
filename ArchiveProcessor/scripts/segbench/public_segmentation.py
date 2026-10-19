@@ -5,7 +5,8 @@ Use --root for the local source cache. Committed manifests freeze every supplied
 its image hash, audit and label before OCR/model collection. No paid collection command exists.
   public_segmentation.py --root DIR --box crest verify|ocr|score
   public_segmentation.py --root DIR --box crest pack --key fs-seg-2b --out DIR
-Cluster answers use institutional-compute/cluster_seg.py run/import unchanged.
+Cluster answers use institutional-compute/cluster_seg.py run/import unchanged. For import, set
+SEGBENCH_CACHE=<root>/cache explicitly, so the owner's benchmark cache/logs are not replaced.
 """
 from __future__ import annotations
 
@@ -112,12 +113,25 @@ def score(col, manifest, key):
     if all(data.ocr_cache_path(col.name, p.n).exists() for p in col.pages):
         methods.append(RuleCuesSketch())
     predictions = {m.name: m.predict(col) for m in methods}
+    fitted = MANIFESTS / "rule-cues-frozen.json"
+    if fitted.exists():
+        import method_openrouter as R
+        import rules
+        from methods import from_labels
+        fit = R.committed(fitted)
+        if any(not data.ocr_cache_path(col.name, p.n).exists() for p in col.pages):
+            raise ValueError("fitted rules require complete public OCR")
+        params = rules.Params(**{**fit["params"], "rules": tuple(fit["params"]["rules"])})
+        features = rules._features(col, params.top_lines, params.end_lines, params.blank_chars)
+        labels, _ = rules.predict_labels(features, params)
+        predictions["rule-cues"] = from_labels(labels, cue="fitted on owner development boxes only")
     if key:
         import method_window as W
         import method_openrouter as R
         predictions[key] = W.assemble(col, W.combine(col, R.judge(key)), False)
     result = {"box": col.name, "public": True, "pages": len(col.pages),
-              "documents": Counter(col.labels)["New"], "models": {}}
+              "documents": Counter(col.labels)["New"], "models": {},
+              "truth_sha256": hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()}
     for name, pred in predictions.items():
         check_prediction(pred)
         counts = score_labels(col.labels, pred.labels)
@@ -125,6 +139,8 @@ def score(col, manifest, key):
     path = MANIFESTS / f"{col.name.lower()}-scores.json"
     if path.exists():
         previous = json.loads(path.read_text())
+        if previous.get("truth_sha256") != result["truth_sha256"]:
+            raise ValueError("previous scores use different truth; preserve and resolve them explicitly")
         previous["models"].update(result["models"])
         result = previous
     path.write_text(json.dumps(result, indent=2) + "\n")

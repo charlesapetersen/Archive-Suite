@@ -27,6 +27,16 @@ MAX_REDIRECTS=10
 
 die() { echo "fetch.sh: $*" >&2; exit 2; }
 
+# LoC's image server intermittently truncates HTTP/2 streams (curl 92). Use the standard
+# HTTP/1.1 transport there; TLS verification, host checks and redirect refusal stay in force.
+wire() {
+  local url="${!#}"
+  case "$url" in
+    https://tile.loc.gov/*) curl --http1.1 "$@" ;;
+    *) curl "$@" ;;
+  esac
+}
+
 host_of() {
   local u="$1"
   case "$u" in https://*) ;; *) return 1 ;; esac
@@ -54,10 +64,10 @@ resolve() {
   local url="$1" i loc
   for ((i = 0; i <= MAX_REDIRECTS; i++)); do
     check_host "$url"
-    loc="$(curl -sS -o /dev/null -I -w '%{redirect_url}' --max-time 60 "$url")" || die "HEAD failed: $url"
+    loc="$(wire -sS -o /dev/null -I -w '%{redirect_url}' --max-time 60 "$url")" || die "HEAD failed: $url"
     if [ -z "$loc" ]; then
       # Some servers refuse HEAD; a ranged GET answers the same question.
-      loc="$(curl -sS -o /dev/null -r 0-0 -w '%{redirect_url}' --max-time 60 "$url")" || die "GET failed: $url"
+      loc="$(wire -sS -o /dev/null -r 0-0 -w '%{redirect_url}' --max-time 60 "$url")" || die "GET failed: $url"
     fi
     [ -z "$loc" ] && { printf '%s' "$url"; return 0; }
     url="$loc"
@@ -69,12 +79,12 @@ case "${1:-}" in
   --head)
     [ $# -eq 2 ] || die "usage: fetch.sh --head URL"
     final="$(resolve "$2")"
-    curl -sS -I --max-time 60 --max-redirs 0 "$final"
+    wire -sS -I --max-time 60 --max-redirs 0 "$final"
     ;;
   --stdout)
     [ $# -eq 2 ] || die "usage: fetch.sh --stdout URL"
     final="$(resolve "$2")"
-    curl -sS --fail --max-time 300 --max-redirs 0 --max-filesize 20000000 "$final"
+    wire -sS --fail --max-time 300 --max-redirs 0 --max-filesize 20000000 "$final"
     ;;
   --range)
     [ $# -eq 3 ] || die "usage: fetch.sh --range START-END URL"
@@ -82,13 +92,13 @@ case "${1:-}" in
     a="${2%-*}"; b="${2#*-}"
     [ "$b" -ge "$a" ] && [ $((b - a)) -lt 200000000 ] || die "range must be under 200 MB: $2"
     final="$(resolve "$3")"
-    curl -sS --fail --retry 3 --max-time 1800 --max-redirs 0 -r "$2" "$final"
+    wire -sS --fail --retry 3 --max-time 1800 --max-redirs 0 -r "$2" "$final"
     ;;
   --stream)
     # Uncapped body to stdout, for piping a .tbz/.tgz through tar to keep a few members.
     [ $# -eq 2 ] || die "usage: fetch.sh --stream URL"
     final="$(resolve "$2")"
-    curl -sS --fail --max-time 7200 --max-redirs 0 "$final"
+    wire -sS --fail --max-time 7200 --max-redirs 0 "$final"
     ;;
   ""|-h|--help)
     sed -n '2,/^set -e/p' "$0" | grep '^#'; exit 0 ;;
@@ -99,7 +109,7 @@ case "${1:-}" in
     out="$CACHE/$dest"
     mkdir -p "$(dirname "$out")"
     final="$(resolve "$url")"
-    curl -sS --fail --retry 3 --max-time 3600 --max-redirs 0 -o "$out.part" "$final"
+    wire -sS --fail --retry 3 --max-time 3600 --max-redirs 0 -o "$out.part" "$final"
     mv "$out.part" "$out"
     echo "$out"
     ;;

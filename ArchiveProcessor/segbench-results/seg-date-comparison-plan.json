@@ -1,0 +1,787 @@
+{
+  "purpose": "Fixed before joint development/held-out/date outputs; no test-guided training change",
+  "joint_job": 1856294,
+  "reference_gpu": "fs-seg-2b / fs-date-2b-nothink",
+  "reference_mac": "seg-2b-8bit / mlx-date-2b-8bit-nothink",
+  "acceptance": {
+    "max_absolute_loss": 0.01,
+    "segmentation": [
+      "development pooled pages in exact document",
+      "held-out agreed-gap accuracy",
+      "locked-test pooled pages in exact document, once after committed choice freeze"
+    ],
+    "dating": [
+      "owner year exact",
+      "owner month exact",
+      "public year exact",
+      "public month exact",
+      "public day exact",
+      "public full-date exact"
+    ],
+    "mac": "Repeat owner/public dating and development segmentation against their single-task 8-bit references; report all fields. No default/publication change implied."
+  },
+  "segmentation_reference": {
+    "gpu": {
+      "truth_photos": true,
+      "boxes": {
+        "Dean": {
+          "counts": {
+            "pages": 202,
+            "doc_pages": 196,
+            "pages_exact": 184,
+            "docs": 121,
+            "docs_exact": 113,
+            "folders": 5,
+            "folders_perfect": 2,
+            "gaps": 191,
+            "truth_bounds": 116,
+            "tp": 112,
+            "false_splits": 1,
+            "false_merges": 4,
+            "edits": 5,
+            "photos": 6,
+            "photos_exact": 6,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0,
+            "pk_windows": 201,
+            "pk_errors": 5,
+            "wd_errors": 5,
+            "collections": [
+              "Dean"
+            ]
+          },
+          "metrics": {
+            "collections": "Dean",
+            "pages": 202,
+            "doc_pages": 196,
+            "docs": 121,
+            "pages_in_exact_doc": 0.9387755102040817,
+            "docs_exact": 0.9338842975206612,
+            "folders": 5,
+            "folders_perfect": 0.4,
+            "false_splits": 1,
+            "false_merges": 4,
+            "boundary_precision": 0.9911504424778761,
+            "boundary_recall": 0.9655172413793104,
+            "boundary_f1": 0.9781659388646289,
+            "pk": 0.024875621890547265,
+            "windowdiff": 0.024875621890547265,
+            "edits_per_100_pages": 2.4752475247524752,
+            "photos": 6,
+            "photo_accuracy": 1.0,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0
+          }
+        },
+        "Deaver": {
+          "counts": {
+            "pages": 149,
+            "doc_pages": 141,
+            "pages_exact": 125,
+            "docs": 89,
+            "docs_exact": 79,
+            "folders": 5,
+            "folders_perfect": 2,
+            "gaps": 136,
+            "truth_bounds": 84,
+            "tp": 81,
+            "false_splits": 4,
+            "false_merges": 3,
+            "edits": 7,
+            "photos": 8,
+            "photos_exact": 8,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0,
+            "pk_windows": 148,
+            "pk_errors": 7,
+            "wd_errors": 7,
+            "collections": [
+              "Deaver"
+            ]
+          },
+          "metrics": {
+            "collections": "Deaver",
+            "pages": 149,
+            "doc_pages": 141,
+            "docs": 89,
+            "pages_in_exact_doc": 0.8865248226950354,
+            "docs_exact": 0.8876404494382022,
+            "folders": 5,
+            "folders_perfect": 0.4,
+            "false_splits": 4,
+            "false_merges": 3,
+            "boundary_precision": 0.9529411764705882,
+            "boundary_recall": 0.9642857142857143,
+            "boundary_f1": 0.9585798816568047,
+            "pk": 0.0472972972972973,
+            "windowdiff": 0.0472972972972973,
+            "edits_per_100_pages": 4.697986577181208,
+            "photos": 8,
+            "photo_accuracy": 1.0,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0
+          }
+        },
+        "Herrnstein": {
+          "counts": {
+            "pages": 200,
+            "doc_pages": 181,
+            "pages_exact": 160,
+            "docs": 108,
+            "docs_exact": 100,
+            "folders": 14,
+            "folders_perfect": 10,
+            "gaps": 167,
+            "truth_bounds": 94,
+            "tp": 91,
+            "false_splits": 2,
+            "false_merges": 3,
+            "edits": 5,
+            "photos": 19,
+            "photos_exact": 19,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0,
+            "pk_windows": 199,
+            "pk_errors": 5,
+            "wd_errors": 5,
+            "collections": [
+              "Herrnstein"
+            ]
+          },
+          "metrics": {
+            "collections": "Herrnstein",
+            "pages": 200,
+            "doc_pages": 181,
+            "docs": 108,
+            "pages_in_exact_doc": 0.8839779005524862,
+            "docs_exact": 0.9259259259259259,
+            "folders": 14,
+            "folders_perfect": 0.7142857142857143,
+            "false_splits": 2,
+            "false_merges": 3,
+            "boundary_precision": 0.978494623655914,
+            "boundary_recall": 0.9680851063829787,
+            "boundary_f1": 0.9732620320855615,
+            "pk": 0.02512562814070352,
+            "windowdiff": 0.02512562814070352,
+            "edits_per_100_pages": 2.5,
+            "photos": 19,
+            "photo_accuracy": 1.0,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0
+          }
+        }
+      },
+      "pooled_counts": {
+        "pages": 551,
+        "doc_pages": 518,
+        "pages_exact": 469,
+        "docs": 318,
+        "docs_exact": 292,
+        "folders": 24,
+        "folders_perfect": 14,
+        "gaps": 494,
+        "truth_bounds": 294,
+        "tp": 284,
+        "false_splits": 7,
+        "false_merges": 10,
+        "edits": 17,
+        "photos": 33,
+        "photos_exact": 33,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "pk_windows": 548,
+        "pk_errors": 17,
+        "wd_errors": 17,
+        "collections": [
+          "Dean",
+          "Deaver",
+          "Herrnstein"
+        ]
+      },
+      "pooled_metrics": {
+        "collections": "Dean+Deaver+Herrnstein",
+        "pages": 551,
+        "doc_pages": 518,
+        "docs": 318,
+        "pages_in_exact_doc": 0.9054054054054054,
+        "docs_exact": 0.9182389937106918,
+        "folders": 24,
+        "folders_perfect": 0.5833333333333334,
+        "false_splits": 7,
+        "false_merges": 10,
+        "boundary_precision": 0.9759450171821306,
+        "boundary_recall": 0.9659863945578231,
+        "boundary_f1": 0.9709401709401709,
+        "pk": 0.03102189781021898,
+        "windowdiff": 0.03102189781021898,
+        "edits_per_100_pages": 3.0852994555353903,
+        "photos": 33,
+        "photo_accuracy": 1.0,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0
+      }
+    },
+    "mac": {
+      "truth_photos": false,
+      "boxes": {
+        "Dean": {
+          "counts": {
+            "pages": 202,
+            "doc_pages": 196,
+            "pages_exact": 181,
+            "docs": 121,
+            "docs_exact": 111,
+            "folders": 5,
+            "folders_perfect": 1,
+            "gaps": 191,
+            "truth_bounds": 116,
+            "tp": 111,
+            "false_splits": 1,
+            "false_merges": 5,
+            "edits": 6,
+            "photos": 6,
+            "photos_exact": 6,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0,
+            "pk_windows": 201,
+            "pk_errors": 6,
+            "wd_errors": 6,
+            "collections": [
+              "Dean"
+            ]
+          },
+          "metrics": {
+            "collections": "Dean",
+            "pages": 202,
+            "doc_pages": 196,
+            "docs": 121,
+            "pages_in_exact_doc": 0.923469387755102,
+            "docs_exact": 0.9173553719008265,
+            "folders": 5,
+            "folders_perfect": 0.2,
+            "false_splits": 1,
+            "false_merges": 5,
+            "boundary_precision": 0.9910714285714286,
+            "boundary_recall": 0.9568965517241379,
+            "boundary_f1": 0.9736842105263158,
+            "pk": 0.029850746268656716,
+            "windowdiff": 0.029850746268656716,
+            "edits_per_100_pages": 2.9702970297029703,
+            "photos": 6,
+            "photo_accuracy": 1.0,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0
+          }
+        },
+        "Deaver": {
+          "counts": {
+            "pages": 149,
+            "doc_pages": 141,
+            "pages_exact": 127,
+            "docs": 89,
+            "docs_exact": 80,
+            "folders": 5,
+            "folders_perfect": 2,
+            "gaps": 136,
+            "truth_bounds": 84,
+            "tp": 81,
+            "false_splits": 3,
+            "false_merges": 3,
+            "edits": 6,
+            "photos": 8,
+            "photos_exact": 8,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0,
+            "pk_windows": 148,
+            "pk_errors": 6,
+            "wd_errors": 6,
+            "collections": [
+              "Deaver"
+            ]
+          },
+          "metrics": {
+            "collections": "Deaver",
+            "pages": 149,
+            "doc_pages": 141,
+            "docs": 89,
+            "pages_in_exact_doc": 0.900709219858156,
+            "docs_exact": 0.898876404494382,
+            "folders": 5,
+            "folders_perfect": 0.4,
+            "false_splits": 3,
+            "false_merges": 3,
+            "boundary_precision": 0.9642857142857143,
+            "boundary_recall": 0.9642857142857143,
+            "boundary_f1": 0.9642857142857143,
+            "pk": 0.04054054054054054,
+            "windowdiff": 0.04054054054054054,
+            "edits_per_100_pages": 4.026845637583893,
+            "photos": 8,
+            "photo_accuracy": 1.0,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0
+          }
+        },
+        "Herrnstein": {
+          "counts": {
+            "pages": 200,
+            "doc_pages": 181,
+            "pages_exact": 160,
+            "docs": 108,
+            "docs_exact": 100,
+            "folders": 14,
+            "folders_perfect": 10,
+            "gaps": 167,
+            "truth_bounds": 94,
+            "tp": 91,
+            "false_splits": 2,
+            "false_merges": 3,
+            "edits": 5,
+            "photos": 19,
+            "photos_exact": 19,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0,
+            "pk_windows": 199,
+            "pk_errors": 5,
+            "wd_errors": 5,
+            "collections": [
+              "Herrnstein"
+            ]
+          },
+          "metrics": {
+            "collections": "Herrnstein",
+            "pages": 200,
+            "doc_pages": 181,
+            "docs": 108,
+            "pages_in_exact_doc": 0.8839779005524862,
+            "docs_exact": 0.9259259259259259,
+            "folders": 14,
+            "folders_perfect": 0.7142857142857143,
+            "false_splits": 2,
+            "false_merges": 3,
+            "boundary_precision": 0.978494623655914,
+            "boundary_recall": 0.9680851063829787,
+            "boundary_f1": 0.9732620320855615,
+            "pk": 0.02512562814070352,
+            "windowdiff": 0.02512562814070352,
+            "edits_per_100_pages": 2.5,
+            "photos": 19,
+            "photo_accuracy": 1.0,
+            "photo_type_swaps": 0,
+            "photos_missed": 0,
+            "false_photos": 0
+          }
+        }
+      },
+      "pooled_counts": {
+        "pages": 551,
+        "doc_pages": 518,
+        "pages_exact": 468,
+        "docs": 318,
+        "docs_exact": 291,
+        "folders": 24,
+        "folders_perfect": 13,
+        "gaps": 494,
+        "truth_bounds": 294,
+        "tp": 283,
+        "false_splits": 6,
+        "false_merges": 11,
+        "edits": 17,
+        "photos": 33,
+        "photos_exact": 33,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "pk_windows": 548,
+        "pk_errors": 17,
+        "wd_errors": 17,
+        "collections": [
+          "Dean",
+          "Deaver",
+          "Herrnstein"
+        ]
+      },
+      "pooled_metrics": {
+        "collections": "Dean+Deaver+Herrnstein",
+        "pages": 551,
+        "doc_pages": 518,
+        "docs": 318,
+        "pages_in_exact_doc": 0.9034749034749034,
+        "docs_exact": 0.9150943396226415,
+        "folders": 24,
+        "folders_perfect": 0.5416666666666666,
+        "false_splits": 6,
+        "false_merges": 11,
+        "boundary_precision": 0.9792387543252595,
+        "boundary_recall": 0.9625850340136054,
+        "boundary_f1": 0.9708404802744426,
+        "pk": 0.03102189781021898,
+        "windowdiff": 0.03102189781021898,
+        "edits_per_100_pages": 3.0852994555353903,
+        "photos": 33,
+        "photo_accuracy": 1.0,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0
+      }
+    }
+  },
+  "dating_reference": {
+    "gpu": {
+      "owner": {
+        "model": "fs-date-2b-nothink",
+        "documents": 300,
+        "usd": 0.0,
+        "usd_per_1000": 0.0,
+        "year": {
+          "year+month": {
+            "exact": [
+              98,
+              120
+            ],
+            "within1": [
+              108,
+              120
+            ]
+          },
+          "year": {
+            "exact": [
+              51,
+              80
+            ],
+            "within1": [
+              67,
+              80
+            ]
+          },
+          "year+DU": {
+            "exact": [
+              18,
+              50
+            ],
+            "within1": [
+              34,
+              50
+            ]
+          },
+          "in text": {
+            "exact": [
+              113,
+              119
+            ],
+            "within1": [
+              118,
+              119
+            ]
+          },
+          "not in text": {
+            "exact": [
+              54,
+              131
+            ],
+            "within1": [
+              91,
+              131
+            ]
+          },
+          "all": {
+            "exact": [
+              167,
+              250
+            ],
+            "within1": [
+              209,
+              250
+            ]
+          }
+        },
+        "decade": [
+          29,
+          50
+        ],
+        "month": {
+          "owner": [
+            76,
+            120
+          ],
+          "other": [
+            22,
+            120
+          ],
+          "none": [
+            22,
+            120
+          ],
+          "untagged_given": [
+            49,
+            80
+          ],
+          "untagged_given_named": 23
+        },
+        "uncertain": {
+          "owner_certain": [
+            0,
+            200
+          ],
+          "owner_certain_in_text": [
+            0,
+            114
+          ],
+          "owner_certain_not_in_text": [
+            0,
+            86
+          ],
+          "owner_uncertain": [
+            0,
+            50
+          ],
+          "certain_and_wrong": [
+            51,
+            200
+          ]
+        },
+        "parse_failures": 0,
+        "finish_length": 0
+      },
+      "public": {
+        "documents": 300,
+        "year": {
+          "exact": [
+            285,
+            300
+          ],
+          "within1": [
+            292,
+            300
+          ],
+          "in text": [
+            246,
+            257
+          ],
+          "not in text": [
+            39,
+            43
+          ]
+        },
+        "month": {
+          "exact": [
+            224,
+            240
+          ],
+          "none": [
+            3,
+            240
+          ],
+          "given_where_source_has_none": [
+            41,
+            60
+          ]
+        },
+        "day": {
+          "exact": [
+            139,
+            150
+          ],
+          "full_date": [
+            136,
+            150
+          ],
+          "none": [
+            2,
+            150
+          ],
+          "given_where_source_has_none": [
+            96,
+            150
+          ]
+        },
+        "parse_failures": 0
+      }
+    },
+    "mac": {
+      "owner": {
+        "model": "mlx-date-2b-8bit-nothink",
+        "documents": 300,
+        "usd": 0.0,
+        "usd_per_1000": 0.0,
+        "year": {
+          "year+month": {
+            "exact": [
+              99,
+              120
+            ],
+            "within1": [
+              108,
+              120
+            ]
+          },
+          "year": {
+            "exact": [
+              48,
+              80
+            ],
+            "within1": [
+              66,
+              80
+            ]
+          },
+          "year+DU": {
+            "exact": [
+              17,
+              50
+            ],
+            "within1": [
+              34,
+              50
+            ]
+          },
+          "in text": {
+            "exact": [
+              113,
+              119
+            ],
+            "within1": [
+              118,
+              119
+            ]
+          },
+          "not in text": {
+            "exact": [
+              51,
+              131
+            ],
+            "within1": [
+              90,
+              131
+            ]
+          },
+          "all": {
+            "exact": [
+              164,
+              250
+            ],
+            "within1": [
+              208,
+              250
+            ]
+          }
+        },
+        "decade": [
+          28,
+          50
+        ],
+        "month": {
+          "owner": [
+            78,
+            120
+          ],
+          "other": [
+            19,
+            120
+          ],
+          "none": [
+            23,
+            120
+          ],
+          "untagged_given": [
+            47,
+            80
+          ],
+          "untagged_given_named": 23
+        },
+        "uncertain": {
+          "owner_certain": [
+            0,
+            200
+          ],
+          "owner_certain_in_text": [
+            0,
+            114
+          ],
+          "owner_certain_not_in_text": [
+            0,
+            86
+          ],
+          "owner_uncertain": [
+            0,
+            50
+          ],
+          "certain_and_wrong": [
+            53,
+            200
+          ]
+        },
+        "parse_failures": 0,
+        "finish_length": 0
+      },
+      "public": {
+        "documents": 300,
+        "year": {
+          "exact": [
+            284,
+            300
+          ],
+          "within1": [
+            292,
+            300
+          ],
+          "in text": [
+            245,
+            257
+          ],
+          "not in text": [
+            39,
+            43
+          ]
+        },
+        "month": {
+          "exact": [
+            224,
+            240
+          ],
+          "none": [
+            3,
+            240
+          ],
+          "given_where_source_has_none": [
+            41,
+            60
+          ]
+        },
+        "day": {
+          "exact": [
+            140,
+            150
+          ],
+          "full_date": [
+            137,
+            150
+          ],
+          "none": [
+            2,
+            150
+          ],
+          "given_where_source_has_none": [
+            96,
+            150
+          ]
+        },
+        "parse_failures": 0
+      }
+    }
+  }
+}

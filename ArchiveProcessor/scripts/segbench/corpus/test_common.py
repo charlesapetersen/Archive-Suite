@@ -100,6 +100,23 @@ class Fetch(unittest.TestCase):
     def test_refuses_big_range(self):
         self.assertEqual(self.run_fetch('--range', '0-300000000', 'https://zenodo.org/x').returncode, 2)
 
+    def test_loc_image_transport_preserves_host_refusal(self):
+        with tempfile.TemporaryDirectory() as d:
+            stub, log = Path(d) / 'curl', Path(d) / 'wire.log'
+            stub.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "$FETCH_TEST_LOG"\n'
+                            '[[ " $* " == *" %{redirect_url} "* ]] || echo image\n')
+            stub.chmod(0o755)
+            env = {**os.environ, 'PATH': d + os.pathsep + os.environ['PATH'], 'FETCH_TEST_LOG': str(log)}
+            r = subprocess.run([str(C.FETCH), '--stdout', 'https://tile.loc.gov/image.jpg'],
+                               env=env, capture_output=True, text=True)
+            self.assertEqual((r.returncode, r.stdout.strip()), (0, 'image'), r.stderr)
+            self.assertTrue(all('--http1.1' in line for line in log.read_text().splitlines()))
+            before = log.read_bytes()
+            r = subprocess.run([str(C.FETCH), '--stdout', 'https://tile.loc.gov.evil.com/image.jpg'],
+                               env=env, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 2)
+            self.assertEqual(log.read_bytes(), before)
+
     def test_segmentation_hosts_and_redirect_refusal(self):
         # Stub the wire, not check_host: an allowed first hop must not permit another host.
         with tempfile.TemporaryDirectory() as d:
