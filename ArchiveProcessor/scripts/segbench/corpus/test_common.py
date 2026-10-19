@@ -83,7 +83,11 @@ class Fetch(unittest.TestCase):
                     'https://hf.co/x', 'https://cdn.hf.co/x', 'https://si.edu/x', 'https://www.si.edu/x',
                     'https://edan.si.edu.evil.com/x', 'https://x.ids.si.edu/x', 'https://uni-heidelberg.de/x',
                     'https://xethub.hf.co/x', 'https://archive.org.evil.com/x',
-                    'https://x.archive.org/x', 'https://cia.gov.evil.com/x', 'https://www.cia.gov/x'):
+                    'https://x.archive.org/x', 'https://cia.gov.evil.com/x',
+                    'https://evilarchive.org/0/items/id/file.pdf',
+                    'https://x.archive.org.evil.com/0/items/id/file.pdf',
+                    'https://bad..archive.org/0/items/id/file.pdf',
+                    'https://-bad.archive.org/0/items/id/file.pdf'):
             r = self.run_fetch('--head', url)
             self.assertEqual(r.returncode, 2, url)
             self.assertIn('refused', r.stderr)
@@ -101,21 +105,27 @@ class Fetch(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             stub = Path(d) / 'curl'
             stub.write_text('#!/bin/bash\nif [[ " $* " == *" %{redirect_url} "* ]]; then\n'
-                            '  printf "%s" "${FETCH_TEST_REDIRECT:-}"\nelse\n  echo reached\nfi\n')
+                            '  if [ "${@: -1}" = "https://archive.org/x" ]; then\n'
+                            '    printf "%s" "${FETCH_TEST_REDIRECT:-}"\n  fi\nelse\n  echo reached\nfi\n')
             stub.chmod(0o755)
             env = {**os.environ, 'PATH': d + os.pathsep + os.environ['PATH'],
                    'FETCH_TEST_REDIRECT': ''}
-            for host in ('archive.org', 'cia.gov'):
+            for host in ('archive.org', 'cia.gov', 'www.cia.gov'):
                 r = subprocess.run([str(C.FETCH), '--stdout', f'https://{host}/x'],
                                    env=env, capture_output=True, text=True)
                 self.assertEqual((r.returncode, r.stdout.strip()), (0, 'reached'), r.stderr)
-            for host in ('example.com', 'ia800000.us.archive.org', 'www.cia.gov'):
+            for host in ('example.com', 'ia800000.us.archive.org', 'archive.org.evil.com'):
                 env['FETCH_TEST_REDIRECT'] = f'https://{host}/x'
                 r = subprocess.run([str(C.FETCH), '--stdout', 'https://archive.org/x'],
                                    env=env, capture_output=True, text=True)
                 self.assertEqual(r.returncode, 2)
                 self.assertIn('refused host', r.stderr)
                 self.assertNotIn('reached', r.stdout)
+            for host in ('dn721803.ca.archive.org', 'ia800000.us.archive.org'):
+                env['FETCH_TEST_REDIRECT'] = f'https://{host}/0/items/id/file.pdf'
+                r = subprocess.run([str(C.FETCH), '--stdout', 'https://archive.org/x'],
+                                   env=env, capture_output=True, text=True)
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, 'reached'), r.stderr)
 
 
 class Chunks(unittest.TestCase):

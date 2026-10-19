@@ -13,14 +13,16 @@
 # W43.corpus-build-net-owner-ok, option (a)), and for W43.corpus-build-more added Hugging Face's two file CDNs
 # and heiDATA (gate W43.corpus-build-more-owner-ok, option (a)) and the Smithsonian's edan.si.edu and ids.si.edu
 # (owner, 2026-10-16 23:40). W43.seg-corpus-build adds only archive.org and cia.gov
-# (owner, 2026-10-16 afternoon walkthrough). The script refuses any other host, on the first
+# (owner, 2026-10-16 afternoon walkthrough). The 2026-10-18 owner walkthrough additionally allows
+# www.cia.gov and checked Archive.org file-delivery subdomains (numeric /items/ file paths only).
+# The script refuses any other host, on the first
 # URL and on every redirect (curl's redirects are followed one at a time here, so a redirect to
 # an unlisted host stops the fetch). It writes only under the cache folder below, never the
 # real corpus and never the repo. A typed curl is denied to every project; run this instead.
 set -euo pipefail
 
 CACHE="${BENCH_CORPUS_CACHE:-$HOME/Library/Caches/ArchiveSuiteRehearsal/bench-corpus}"
-ALLOWED="zenodo.org huggingface.co github.com raw.githubusercontent.com loc.gov crowd.loc.gov tile.loc.gov transcription.si.edu orda.shef.ac.uk us.aws.cdn.hf.co cas-bridge.xethub.hf.co heidata.uni-heidelberg.de edan.si.edu ids.si.edu archive.org cia.gov"
+ALLOWED="zenodo.org huggingface.co github.com raw.githubusercontent.com loc.gov crowd.loc.gov tile.loc.gov transcription.si.edu orda.shef.ac.uk us.aws.cdn.hf.co cas-bridge.xethub.hf.co heidata.uni-heidelberg.de edan.si.edu ids.si.edu archive.org cia.gov www.cia.gov"
 MAX_REDIRECTS=10
 
 die() { echo "fetch.sh: $*" >&2; exit 2; }
@@ -34,9 +36,16 @@ host_of() {
 }
 
 check_host() {
-  local h
+  local h path
   h="$(host_of "$1")" || die "refused (https only, no port or userinfo): $1"
   for a in $ALLOWED; do [ "$h" = "$a" ] && return 0; done
+  path="${1#https://}"; path="/${path#*/}"
+  # A dotted suffix boundary, valid DNS labels and the delivery path all have to match.
+  # Neither archive.org.evil.com nor an arbitrary API on x.archive.org is covered.
+  if [[ "$h" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+archive\.org$ ]] &&
+     [[ "$path" =~ ^/[0-9]+/items/[^/]+/[^/] ]]; then
+    return 0
+  fi
   die "refused host '$h' (allowed: $ALLOWED)"
 }
 
