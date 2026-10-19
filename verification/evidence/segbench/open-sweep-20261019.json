@@ -1,0 +1,249 @@
+{
+  "utc": "2026-10-19T14:42:59.565068+00:00",
+  "candidates": [
+    {
+      "key": "glm-ocr",
+      "model": "zai-org/GLM-OCR",
+      "route": "native-text",
+      "prompt": "Text Recognition:",
+      "card": "https://huggingface.co/zai-org/GLM-OCR",
+      "state": "ready",
+      "job": "1857614",
+      "revision": "2e85a62840ccac27daa451df36c736c4636b8628",
+      "license": "mit",
+      "weight_bytes": 2650579464,
+      "architectures": [
+        "GlmOcrForConditionalGeneration"
+      ],
+      "snapshot": "/scratch/users/cp1/fs-ocr/hf/hub/models--zai-org--GLM-OCR/snapshots/2e85a62840ccac27daa451df36c736c4636b8628"
+    },
+    {
+      "key": "qwen3-vl-8b",
+      "model": "Qwen/Qwen3-VL-8B-Instruct",
+      "route": "panel",
+      "prompt": null,
+      "card": "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct",
+      "state": "ready",
+      "job": "1857614",
+      "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+      "license": "apache-2.0",
+      "weight_bytes": 17534339512,
+      "architectures": [
+        "Qwen3VLForConditionalGeneration"
+      ],
+      "snapshot": "/scratch/users/cp1/fs-ocr/hf/hub/models--Qwen--Qwen3-VL-8B-Instruct/snapshots/0c351dd01ed87e9c1b53cbc748cba10e6187ff3b"
+    },
+    {
+      "key": "lightonocr3-08b",
+      "model": "lightonai/LightOnOCR-3-0.8B",
+      "route": "native-image-only",
+      "prompt": "",
+      "card": "https://huggingface.co/lightonai/LightOnOCR-3-0.8B",
+      "state": "ready",
+      "job": "1857614",
+      "revision": "36d8636925327c671bd8e479c517a004f7566bd9",
+      "license": "apache-2.0",
+      "weight_bytes": 1706030528,
+      "architectures": [
+        "Qwen3_5ForConditionalGeneration"
+      ],
+      "snapshot": "/scratch/users/cp1/fs-ocr/hf/hub/models--lightonai--LightOnOCR-3-0.8B/snapshots/36d8636925327c671bd8e479c517a004f7566bd9"
+    },
+    {
+      "key": "lightonocr3-4b",
+      "model": "lightonai/LightOnOCR-3-4B",
+      "route": "native-image-only",
+      "prompt": "",
+      "card": "https://huggingface.co/lightonai/LightOnOCR-3-4B",
+      "state": "ready",
+      "job": "1857614",
+      "revision": "b71010f095dc3735de7ee6b9969bff8f8f50b39a",
+      "license": "apache-2.0",
+      "weight_bytes": 9078620536,
+      "architectures": [
+        "Qwen3_5ForConditionalGeneration"
+      ],
+      "snapshot": "/scratch/users/cp1/fs-ocr/hf/hub/models--lightonai--LightOnOCR-3-4B/snapshots/b71010f095dc3735de7ee6b9969bff8f8f50b39a"
+    },
+    {
+      "key": "paddleocr-vl15",
+      "model": "PaddlePaddle/PaddleOCR-VL-1.5",
+      "route": "native-ocr",
+      "prompt": "OCR:",
+      "card": "https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.5",
+      "state": "ready",
+      "job": "1857614",
+      "revision": "2a4195faa5e7914c12f2fc601d72c81caf8d2da5",
+      "license": "apache-2.0",
+      "weight_bytes": 1917255968,
+      "architectures": [
+        "PaddleOCRVLForConditionalGeneration"
+      ],
+      "snapshot": "/scratch/users/cp1/fs-ocr/hf/hub/models--PaddlePaddle--PaddleOCR-VL-1.5/snapshots/2a4195faa5e7914c12f2fc601d72c81caf8d2da5"
+    },
+    {
+      "key": "qwen35-4b",
+      "model": "Qwen/Qwen3.5-4B",
+      "route": "panel",
+      "prompt": null,
+      "card": "https://huggingface.co/Qwen/Qwen3.5-4B",
+      "state": "ready",
+      "job": "1857614",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "license": "apache-2.0",
+      "weight_bytes": 9319828096,
+      "architectures": [
+        "Qwen3_5ForConditionalGeneration"
+      ],
+      "snapshot": "/scratch/users/cp1/fs-ocr/hf/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
+    }
+  ],
+  "jobs": {
+    "setup": {
+      "job": 1857614,
+      "args": [
+        "--partition=normal",
+        "--cpus-per-task=8",
+        "--mem=48G",
+        "--time=02:00:00"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019/setup-job.sh",
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019"
+      ],
+      "previous_job": 1857606,
+      "previous_reason": "ModelCardData is not dict-convertible; fixed before any GPU work"
+    },
+    "glm-ocr": {
+      "job": 1857607,
+      "args": [
+        "--partition=gpu",
+        "--gres=gpu:1",
+        "--cpus-per-task=8",
+        "--mem=64G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857614:1857599:1857600:1857601"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019/recovery/open-sweep-job.sh",
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019",
+        "glm-ocr"
+      ]
+    },
+    "qwen3-vl-8b": {
+      "job": 1857608,
+      "args": [
+        "--partition=gpu",
+        "--gres=gpu:1",
+        "--cpus-per-task=8",
+        "--mem=64G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857607"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019/recovery/open-sweep-job.sh",
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019",
+        "qwen3-vl-8b"
+      ]
+    },
+    "lightonocr3-08b": {
+      "job": 1857609,
+      "args": [
+        "--partition=gpu",
+        "--gres=gpu:1",
+        "--cpus-per-task=8",
+        "--mem=64G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857608"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019/recovery/open-sweep-job.sh",
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019",
+        "lightonocr3-08b"
+      ]
+    },
+    "lightonocr3-4b": {
+      "job": 1857610,
+      "args": [
+        "--partition=gpu",
+        "--gres=gpu:1",
+        "--cpus-per-task=8",
+        "--mem=64G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857609"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019/recovery/open-sweep-job.sh",
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019",
+        "lightonocr3-4b"
+      ]
+    },
+    "paddleocr-vl15": {
+      "job": 1857611,
+      "args": [
+        "--partition=gpu",
+        "--gres=gpu:1",
+        "--cpus-per-task=8",
+        "--mem=64G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857610"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019/recovery/open-sweep-job.sh",
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019",
+        "paddleocr-vl15"
+      ]
+    },
+    "qwen35-4b": {
+      "job": 1857612,
+      "args": [
+        "--partition=gpu",
+        "--gres=gpu:1",
+        "--cpus-per-task=8",
+        "--mem=64G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857611"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019/recovery/open-sweep-job.sh",
+        "/scratch/users/cp1/fs-ocr/open-sweep-20261019",
+        "qwen35-4b"
+      ]
+    }
+  },
+  "input": {
+    "pages": 895,
+    "pilot": [
+      {
+        "id": "btp__mss11049004-95",
+        "image": "/scratch/users/cp1/fs-ocr/interactive-20261019/ocr/images/btp__mss11049004-95.jpg",
+        "sha256": "b12c93eb095538a3bc8facd691bf6560867635fb6efeb139f9f677431f1468e5",
+        "stratum": "L1",
+        "source": "btp"
+      },
+      {
+        "id": "si__NMAAHC-007630087_00342",
+        "image": "/scratch/users/cp1/fs-ocr/interactive-20261019/ocr/images/si__NMAAHC-007630087_00342.jpg",
+        "sha256": "7e0781509472bd1b10bf7740e56a68e427646e36ebc49da96bd791707e456f3c",
+        "stratum": "L4",
+        "source": "si"
+      },
+      {
+        "id": "ocrd__aepinus_bekentnis_1548_aepinus_bekentnis_1548_0007",
+        "image": "/scratch/users/cp1/fs-ocr/interactive-20261018/ocr/images/ocrd__aepinus_bekentnis_1548_aepinus_bekentnis_1548_0007.jpg",
+        "sha256": "5d7640df6f668891a6b69f568845337bf7fd10b5906607590dcb3c2ef5f9141a",
+        "stratum": "L8",
+        "source": "ocrd"
+      }
+    ],
+    "manifest_sha256": "9b47b831f8b95814616ccb1397b957fb67822374d9c25718214a1d0bade4224e",
+    "unchanged_images": true
+  },
+  "hashes": {
+    "recovery/ocr_run.py": "fe5679d9913fdc92008ad6d409c05c7b400239dd1913eeb4639dde2f3e29576b",
+    "recovery/open-sweep-job.sh": "30e693e7a9e89b5beb157132663797b862e251294cbd02a54e9aeb047d2a147b",
+    "recovery/open_sweep_run.py": "c0bfc4426dec8327e70b66f6c1c0135559de6135bc955a341e05f5bbcb71494f",
+    "recovery/open_sweep_setup.py": "5c6b18dedf453402e8552434fe54cc52243c42c9988e73652fd478633f65e8d3"
+  },
+  "scheduler": "1857607|PENDING|0:0\n1857608|PENDING|0:0\n1857609|PENDING|0:0\n1857610|PENDING|0:0\n1857611|PENDING|0:0\n1857612|PENDING|0:0\n1857614|COMPLETED|0:0\n"
+}
