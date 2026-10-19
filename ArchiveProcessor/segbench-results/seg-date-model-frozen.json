@@ -1,0 +1,190 @@
+{
+  "students": [
+    "fs-seg-date-2b"
+  ],
+  "level": 0.85,
+  "frozen_utc": "2026-10-19T05:57:19.659878+00:00",
+  "chosen_on": "Unchanged Dean/Deaver/Herrnstein development, complete held-out collections and GPU dating outputs; no joint locked-test output yet",
+  "rule": "One fixed mixed 2B recipe/reference from seg-date-comparison-plan.json; no tuning or variant selection against tests. One locked pass follows this committed freeze. Final acceptance also awaits the Mac comparisons.",
+  "train_job": 1856294,
+  "eval_job": 1856499,
+  "merged_safetensors_sha256": "57137dd743b2d63d4417f1a3d7e0008c353ec774ade784e4ed43e33ef73a8643",
+  "pretest_review": {
+    "dev_reference": 0.9054054054054054,
+    "dev_joint": 0.9015444015444015,
+    "holdout_reference_counts": {
+      "right": 5443,
+      "gaps": 5668,
+      "false_splits": 167,
+      "false_merges": 58
+    },
+    "holdout_joint": {
+      "gaps": 5668,
+      "right": 5412,
+      "false splits": 191,
+      "false merges": 65,
+      "accuracy": 0.954834156669019
+    },
+    "failed_windows": 3,
+    "failure_policy": "Each failed window votes 0.5 on every gap, unchanged ML.neutral semantics; never drop its gaps or silently retry.",
+    "gpu_dating": "All six exact-count decision fields satisfy maximum absolute loss .01; see date-tagging.json/date-tagging-public.json label fs-seg-date-2b-nothink"
+  },
+  "locked_reference": {
+    "key": "fs-seg-2b",
+    "truth_photos": true,
+    "boxes": {
+      "Stanton": {
+        "counts": {
+          "pages": 250,
+          "doc_pages": 243,
+          "pages_exact": 178,
+          "docs": 112,
+          "docs_exact": 90,
+          "folders": 5,
+          "folders_perfect": 0,
+          "gaps": 238,
+          "truth_bounds": 107,
+          "tp": 103,
+          "false_splits": 23,
+          "false_merges": 4,
+          "edits": 27,
+          "photos": 7,
+          "photos_exact": 7,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0,
+          "pk_windows": 249,
+          "pk_errors": 27,
+          "wd_errors": 27,
+          "collections": [
+            "Stanton"
+          ]
+        },
+        "metrics": {
+          "collections": "Stanton",
+          "pages": 250,
+          "doc_pages": 243,
+          "docs": 112,
+          "pages_in_exact_doc": 0.7325102880658436,
+          "docs_exact": 0.8035714285714286,
+          "folders": 5,
+          "folders_perfect": 0.0,
+          "false_splits": 23,
+          "false_merges": 4,
+          "boundary_precision": 0.8174603174603174,
+          "boundary_recall": 0.9626168224299065,
+          "boundary_f1": 0.8841201716738197,
+          "pk": 0.10843373493975904,
+          "windowdiff": 0.10843373493975904,
+          "edits_per_100_pages": 10.8,
+          "photos": 7,
+          "photo_accuracy": 1.0,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0
+        }
+      },
+      "RG165": {
+        "counts": {
+          "pages": 113,
+          "doc_pages": 87,
+          "pages_exact": 82,
+          "docs": 33,
+          "docs_exact": 30,
+          "folders": 10,
+          "folders_perfect": 8,
+          "gaps": 77,
+          "truth_bounds": 23,
+          "tp": 22,
+          "false_splits": 1,
+          "false_merges": 1,
+          "edits": 2,
+          "photos": 26,
+          "photos_exact": 26,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0,
+          "pk_windows": 112,
+          "pk_errors": 2,
+          "wd_errors": 2,
+          "collections": [
+            "RG165"
+          ]
+        },
+        "metrics": {
+          "collections": "RG165",
+          "pages": 113,
+          "doc_pages": 87,
+          "docs": 33,
+          "pages_in_exact_doc": 0.9425287356321839,
+          "docs_exact": 0.9090909090909091,
+          "folders": 10,
+          "folders_perfect": 0.8,
+          "false_splits": 1,
+          "false_merges": 1,
+          "boundary_precision": 0.9565217391304348,
+          "boundary_recall": 0.9565217391304348,
+          "boundary_f1": 0.9565217391304348,
+          "pk": 0.017857142857142856,
+          "windowdiff": 0.017857142857142856,
+          "edits_per_100_pages": 1.7699115044247788,
+          "photos": 26,
+          "photo_accuracy": 1.0,
+          "photo_type_swaps": 0,
+          "photos_missed": 0,
+          "false_photos": 0
+        }
+      }
+    },
+    "pooled_counts": {
+      "pages": 363,
+      "doc_pages": 330,
+      "pages_exact": 260,
+      "docs": 145,
+      "docs_exact": 120,
+      "folders": 15,
+      "folders_perfect": 8,
+      "gaps": 315,
+      "truth_bounds": 130,
+      "tp": 125,
+      "false_splits": 24,
+      "false_merges": 5,
+      "edits": 29,
+      "photos": 33,
+      "photos_exact": 33,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0,
+      "pk_windows": 361,
+      "pk_errors": 29,
+      "wd_errors": 29,
+      "collections": [
+        "Stanton",
+        "RG165"
+      ]
+    },
+    "pooled_metrics": {
+      "collections": "Stanton+RG165",
+      "pages": 363,
+      "doc_pages": 330,
+      "docs": 145,
+      "pages_in_exact_doc": 0.7878787878787878,
+      "docs_exact": 0.8275862068965517,
+      "folders": 15,
+      "folders_perfect": 0.5333333333333333,
+      "false_splits": 24,
+      "false_merges": 5,
+      "boundary_precision": 0.8389261744966443,
+      "boundary_recall": 0.9615384615384616,
+      "boundary_f1": 0.896057347670251,
+      "pk": 0.08033240997229917,
+      "windowdiff": 0.08033240997229917,
+      "edits_per_100_pages": 7.988980716253444,
+      "photos": 33,
+      "photo_accuracy": 1.0,
+      "photo_type_swaps": 0,
+      "photos_missed": 0,
+      "false_photos": 0
+    }
+  }
+}

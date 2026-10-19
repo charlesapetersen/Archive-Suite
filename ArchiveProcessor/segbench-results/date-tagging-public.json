@@ -269,6 +269,60 @@
     ]
    },
    "parse_failures": 0
+  },
+  "fs-seg-date-2b-nothink": {
+   "documents": 300,
+   "year": {
+    "exact": [
+     290,
+     300
+    ],
+    "within1": [
+     292,
+     300
+    ],
+    "in text": [
+     251,
+     257
+    ],
+    "not in text": [
+     39,
+     43
+    ]
+   },
+   "month": {
+    "exact": [
+     227,
+     240
+    ],
+    "none": [
+     4,
+     240
+    ],
+    "given_where_source_has_none": [
+     38,
+     60
+    ]
+   },
+   "day": {
+    "exact": [
+     138,
+     150
+    ],
+    "full_date": [
+     135,
+     150
+    ],
+    "none": [
+     3,
+     150
+    ],
+    "given_where_source_has_none": [
+     87,
+     150
+    ]
+   },
+   "parse_failures": 0
   }
  }
 }

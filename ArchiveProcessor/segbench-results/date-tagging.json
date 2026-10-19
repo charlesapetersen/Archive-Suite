@@ -1261,6 +1261,121 @@
    },
    "parse_failures": 0,
    "finish_length": 0
+  },
+  "fs-seg-date-2b-nothink": {
+   "model": "fs-seg-date-2b-nothink",
+   "documents": 300,
+   "usd": 0.0,
+   "usd_per_1000": 0.0,
+   "year": {
+    "year+month": {
+     "exact": [
+      98,
+      120
+     ],
+     "within1": [
+      108,
+      120
+     ]
+    },
+    "year": {
+     "exact": [
+      53,
+      80
+     ],
+     "within1": [
+      68,
+      80
+     ]
+    },
+    "year+DU": {
+     "exact": [
+      17,
+      50
+     ],
+     "within1": [
+      35,
+      50
+     ]
+    },
+    "in text": {
+     "exact": [
+      114,
+      119
+     ],
+     "within1": [
+      119,
+      119
+     ]
+    },
+    "not in text": {
+     "exact": [
+      54,
+      131
+     ],
+     "within1": [
+      92,
+      131
+     ]
+    },
+    "all": {
+     "exact": [
+      168,
+      250
+     ],
+     "within1": [
+      211,
+      250
+     ]
+    }
+   },
+   "decade": [
+    28,
+    50
+   ],
+   "month": {
+    "owner": [
+     77,
+     120
+    ],
+    "other": [
+     17,
+     120
+    ],
+    "none": [
+     26,
+     120
+    ],
+    "untagged_given": [
+     45,
+     80
+    ],
+    "untagged_given_named": 22
+   },
+   "uncertain": {
+    "owner_certain": [
+     0,
+     200
+    ],
+    "owner_certain_in_text": [
+     0,
+     114
+    ],
+    "owner_certain_not_in_text": [
+     0,
+     86
+    ],
+    "owner_uncertain": [
+     0,
+     50
+    ],
+    "certain_and_wrong": [
+     49,
+     200
+    ]
+   },
+   "parse_failures": 0,
+   "finish_length": 0
   }
  }
 }

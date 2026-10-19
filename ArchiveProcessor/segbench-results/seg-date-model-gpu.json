@@ -1,0 +1,249 @@
+{
+  "dev": {
+    "Dean": {
+      "counts": {
+        "pages": 202,
+        "doc_pages": 196,
+        "pages_exact": 182,
+        "docs": 121,
+        "docs_exact": 111,
+        "folders": 5,
+        "folders_perfect": 2,
+        "gaps": 191,
+        "truth_bounds": 116,
+        "tp": 111,
+        "false_splits": 1,
+        "false_merges": 5,
+        "edits": 6,
+        "photos": 6,
+        "photos_exact": 6,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "pk_windows": 201,
+        "pk_errors": 6,
+        "wd_errors": 6,
+        "collections": [
+          "Dean"
+        ]
+      },
+      "metrics": {
+        "collections": "Dean",
+        "pages": 202,
+        "doc_pages": 196,
+        "docs": 121,
+        "pages_in_exact_doc": 0.9285714285714286,
+        "docs_exact": 0.9173553719008265,
+        "folders": 5,
+        "folders_perfect": 0.4,
+        "false_splits": 1,
+        "false_merges": 5,
+        "boundary_precision": 0.9910714285714286,
+        "boundary_recall": 0.9568965517241379,
+        "boundary_f1": 0.9736842105263158,
+        "pk": 0.029850746268656716,
+        "windowdiff": 0.029850746268656716,
+        "edits_per_100_pages": 2.9702970297029703,
+        "photos": 6,
+        "photo_accuracy": 1.0,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0
+      }
+    },
+    "Deaver": {
+      "counts": {
+        "pages": 149,
+        "doc_pages": 141,
+        "pages_exact": 123,
+        "docs": 89,
+        "docs_exact": 81,
+        "folders": 5,
+        "folders_perfect": 2,
+        "gaps": 136,
+        "truth_bounds": 84,
+        "tp": 81,
+        "false_splits": 2,
+        "false_merges": 3,
+        "edits": 5,
+        "photos": 8,
+        "photos_exact": 8,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "pk_windows": 148,
+        "pk_errors": 5,
+        "wd_errors": 5,
+        "collections": [
+          "Deaver"
+        ]
+      },
+      "metrics": {
+        "collections": "Deaver",
+        "pages": 149,
+        "doc_pages": 141,
+        "docs": 89,
+        "pages_in_exact_doc": 0.8723404255319149,
+        "docs_exact": 0.9101123595505618,
+        "folders": 5,
+        "folders_perfect": 0.4,
+        "false_splits": 2,
+        "false_merges": 3,
+        "boundary_precision": 0.9759036144578314,
+        "boundary_recall": 0.9642857142857143,
+        "boundary_f1": 0.970059880239521,
+        "pk": 0.033783783783783786,
+        "windowdiff": 0.033783783783783786,
+        "edits_per_100_pages": 3.3557046979865772,
+        "photos": 8,
+        "photo_accuracy": 1.0,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0
+      }
+    },
+    "Herrnstein": {
+      "counts": {
+        "pages": 200,
+        "doc_pages": 181,
+        "pages_exact": 162,
+        "docs": 108,
+        "docs_exact": 101,
+        "folders": 14,
+        "folders_perfect": 10,
+        "gaps": 167,
+        "truth_bounds": 94,
+        "tp": 91,
+        "false_splits": 4,
+        "false_merges": 3,
+        "edits": 7,
+        "photos": 19,
+        "photos_exact": 19,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "pk_windows": 199,
+        "pk_errors": 7,
+        "wd_errors": 7,
+        "collections": [
+          "Herrnstein"
+        ]
+      },
+      "metrics": {
+        "collections": "Herrnstein",
+        "pages": 200,
+        "doc_pages": 181,
+        "docs": 108,
+        "pages_in_exact_doc": 0.8950276243093923,
+        "docs_exact": 0.9351851851851852,
+        "folders": 14,
+        "folders_perfect": 0.7142857142857143,
+        "false_splits": 4,
+        "false_merges": 3,
+        "boundary_precision": 0.9578947368421052,
+        "boundary_recall": 0.9680851063829787,
+        "boundary_f1": 0.962962962962963,
+        "pk": 0.035175879396984924,
+        "windowdiff": 0.035175879396984924,
+        "edits_per_100_pages": 3.5,
+        "photos": 19,
+        "photo_accuracy": 1.0,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0
+      }
+    },
+    "pooled": {
+      "counts": {
+        "pages": 551,
+        "doc_pages": 518,
+        "pages_exact": 467,
+        "docs": 318,
+        "docs_exact": 293,
+        "folders": 24,
+        "folders_perfect": 14,
+        "gaps": 494,
+        "truth_bounds": 294,
+        "tp": 283,
+        "false_splits": 7,
+        "false_merges": 11,
+        "edits": 18,
+        "photos": 33,
+        "photos_exact": 33,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0,
+        "pk_windows": 548,
+        "pk_errors": 18,
+        "wd_errors": 18,
+        "collections": [
+          "Dean",
+          "Deaver",
+          "Herrnstein"
+        ]
+      },
+      "metrics": {
+        "collections": "Dean+Deaver+Herrnstein",
+        "pages": 551,
+        "doc_pages": 518,
+        "docs": 318,
+        "pages_in_exact_doc": 0.9015444015444015,
+        "docs_exact": 0.9213836477987422,
+        "folders": 24,
+        "folders_perfect": 0.5833333333333334,
+        "false_splits": 7,
+        "false_merges": 11,
+        "boundary_precision": 0.9758620689655172,
+        "boundary_recall": 0.9625850340136054,
+        "boundary_f1": 0.9691780821917808,
+        "pk": 0.032846715328467155,
+        "windowdiff": 0.032846715328467155,
+        "edits_per_100_pages": 3.266787658802178,
+        "photos": 33,
+        "photo_accuracy": 1.0,
+        "photo_type_swaps": 0,
+        "photos_missed": 0,
+        "false_photos": 0
+      }
+    }
+  },
+  "holdout": {
+    "windows": 2459,
+    "failed": 3,
+    "failed_window_policy": "Each failed window votes 0.5 on every gap, unchanged ML.neutral semantics; never drop its gaps or silently retry.",
+    "agreed": {
+      "gaps": 5668,
+      "right": 5412,
+      "false splits": 191,
+      "false merges": 65,
+      "accuracy": 0.954834156669019
+    },
+    "all tags": {
+      "gaps": 7277,
+      "right": 5848,
+      "false splits": 1205,
+      "false merges": 224,
+      "accuracy": 0.8036278686271815
+    },
+    "diagnostic_original_scorer_omitting_failed_votes": {
+      "windows": 2459,
+      "failed": 3,
+      "agreed": {
+        "gaps": 5668,
+        "right": 5412,
+        "false splits": 191,
+        "false merges": 65,
+        "accuracy": 0.9548
+      },
+      "all tags": {
+        "gaps": 7277,
+        "right": 5848,
+        "false splits": 1205,
+        "false merges": 224,
+        "accuracy": 0.8036
+      }
+    }
+  },
+  "dev_truth_photos": true,
+  "source": "Unchanged existing W.combine/assemble + score_labels and corpus_pairs.cmd_score; complete unique terminal windows required; failed held-out windows vote neutral, not omitted; no private cache import of holdout"
+}
