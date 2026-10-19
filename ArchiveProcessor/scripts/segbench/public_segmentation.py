@@ -108,7 +108,9 @@ def score(col, manifest, key):
     from dataclasses import asdict
     from methods import AllNew, NoBoundaries, RuleCuesSketch
     from score import score_labels, derived, check_prediction
-    methods = [AllNew(), NoBoundaries(), RuleCuesSketch()]
+    methods = [AllNew(), NoBoundaries()]
+    if all(data.ocr_cache_path(col.name, p.n).exists() for p in col.pages):
+        methods.append(RuleCuesSketch())
     predictions = {m.name: m.predict(col) for m in methods}
     if key:
         import method_window as W

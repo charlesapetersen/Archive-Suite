@@ -115,6 +115,7 @@ FARMSHARE = {
                         "FarmShare L40S vLLM", "bf16", "4B dense", 3),
     "fs-seg-4b": ("seg-4b", "Qwen3.5 4B, fine-tuned", "FarmShare L40S vLLM", "bf16", "4B dense", 3),
     "fs-seg-2b": ("seg-2b", "Qwen3.5 2B, fine-tuned", "FarmShare L40S vLLM", "bf16", "2B dense", 1.5),
+    "fs-seg-date-2b": ("seg-date-2b", "Qwen3.5 2B, segmentation + dating", "FarmShare L40S vLLM", "bf16", "2B dense", 1.5),
 }
 
 
@@ -477,6 +478,9 @@ def frozen_keys() -> list[str]:
         keys.append(committed(TEACHER_FROZEN)["teacher"])
     if STUDENTS_FROZEN.exists():
         keys += committed(STUDENTS_FROZEN)["students"]
+    joint = RESULTS / "seg-date-model-frozen.json"
+    if joint.exists():
+        keys += committed(joint)["students"]
     if not keys:
         raise SystemExit("no freeze: run `freeze-teacher <key>` or `freeze-students <key>...` and commit it first")
     return keys

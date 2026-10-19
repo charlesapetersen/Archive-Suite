@@ -55,6 +55,8 @@ MODELS = {  # key: (repo in the lab's Hugging Face cache, label)
                     "Qwen3.5-4B fine-tuned for segmentation, 8-bit"),
     "seg-2b-8bit": (str(Path("~/.local/share/visionocr-ocrlab/mlx/seg-qwen3.5-2b-8bit").expanduser()),
                     "Qwen3.5-2B fine-tuned for segmentation, 8-bit"),
+    "seg-date-2b-8bit": ("/Users/cp1/Claude/Long term storage/FarmShare-20261018/seg-date-2b-8bit",
+                         "Qwen3.5-2B segmentation + dating, 8-bit (experimental)"),
 }
 FAILED = "failed"
 

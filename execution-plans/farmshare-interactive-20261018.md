@@ -209,3 +209,29 @@ peak MLX 3.784GB. Guard wall 836s, peak footprint 4549MB, peak RSS 2248MB, max p
 `FarmShare-20261018/mlx-results`. Numeric results imported through the existing date scorers.
 W41.date-model is complete once this report/benchmark checkpoint ships; no model publication or default
 change. The combined model's 1856294 remains active and owns the remaining FarmShare comparison.
+
+## Public sources and combined-model evaluation preparation
+
+CIA checkpoint 918df0bf: 22 supplied PDFs /128 pages, every PDF MD5 and Scandata count verified. All pages
+visually checked, nine enclosure/article starts added (31 documents); original archive labels retained.
+Page 94 explicitly marks two withheld physical pages. Metadata/truth/image hashes frozen in
+`segbench-results/public-segmentation/crest.json`; images remain in Long term storage. Public loader refuses
+missing/reordered/duplicated/unaudited pages, escaping paths and changed images; six tests pass. Apple Vision
+read all 128 pages under unchanged memory guard in 69s, peak footprint 508MB, no failures. Free floors and
+rule sketch scored with existing scorer. No paid call. Three free cluster packs are being prepared.
+
+Lincoln: browser export of full Shelf Order catalogue page 1 (150/20,207 records), then **positions 2–73**,
+72 consecutive manuscript items /261 complete supplied canvases. Stop rule is near 250 pages at an item
+boundary: final item has 22 canvases. All manifests saved and counts checked. No completed-transcription
+filter, skipped item, synthetic image, or inferred end-of-item. Raw catalogue/manifests in public source
+cache; `download-lincoln.py` retrieves every canvas at 2000px ceiling through the approved fetch helper,
+1s pacing and bounded retries, verifies decoding/aspect ratio and records SHA-256. Labels not frozen yet.
+IIIF sizing follows https://iiif.io/api/image/2.1/#size (`full/!2000,2000/0/default.jpg`).
+
+Combined model registered only as experimental benchmark keys `fs-seg-date-2b` / `seg-date-2b-8bit`.
+A separate `seg-date-model-frozen.json`, committed after development/held-out review, is required before
+any locked-test pack. Existing teacher/student freezes untouched. Preparing unchanged 187-window dev pack;
+existing `/home/users/cp1/fs-holdout-fs-seg-2b` has 2459 held-out windows and can be copied/relabelled to a
+separate run (its corpus-pairs keys are model-independent; do not import it into five-box caches).
+Full repository health gate due at 34 commits since last green; started in primary with unattended/lock
+protections. It remains running. Public + collector regressions: 45 tests pass, 4 platform skips.
