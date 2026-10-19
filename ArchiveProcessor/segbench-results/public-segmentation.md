@@ -1,66 +1,71 @@
-# Public segmentation boxes — access audit, 2026-10-18
+# Public segmentation boxes — W43.seg-corpus-build
 
-W43.seg-corpus-build, baseline `98d4a83e`. **Neither box is built or frozen. There are no scores.**
-No image fetch succeeded, no model was called, no money was spent. The later hold on paid hosted
-benchmarking supersedes the original Gemini run grant; those routes remain in W43.sweep's register.
+CIA input frozen on 2026-10-18; Lincoln inventory in progress. No model scores yet. These public boxes
+are reported separately from the owner's locked boxes and are expected to be easier. Paid hosted runs
+remain deferred to W43.sweep, under the owner's 2026-10-17 instruction.
 
-## CIA CREST
+The 2026-10-18 walkthrough approved `www.cia.gov` and checked Archive.org file-delivery subdomains.
+The host-limited fetch helper now covers precisely that grant; nine refusal/redirect tests pass.
+Original source files and page images stay outside git, under
+`Long term storage/FarmShare-20261018/public-segmentation`. Only metadata, labels and scores are tracked.
 
-Through the owner-approved host-limited `corpus/fetch.sh`, this [archive.org query](https://archive.org/advancedsearch.php?q=identifier%3Acia-readingroom-document-cia-rdp96-00788r0017*&fl%5B%5D=identifier&fl%5B%5D=title&rows=5000&output=json)
-returned 282 of 282 records. Saved response: 51,181 bytes, SHA-256
-`3243cf94977348f783f6bc4022105f1a1c21cf7d0a3393e21964ea10a68accb2`.
-Group identifiers by box/folder after `cia-rdp96-00788r`, then read the next four digits as document
-number. There are 37 folders; 27 contain exactly `1..max(document number)`, without duplicates.
-This proves only a contiguous retrieved prefix, not absence of withheld tail documents/unfilmed sides.
+## CIA CREST: 128 supplied pages, 31 audited documents
 
-The plan's example folder `00170021` has 70 documents numbered 1–86, missing
-15, 18, 19, 20, 22, 28, 70, 72, 73, 74, 76, 77, 78, 80, 81 and 84. **Reject it.**
-Candidate gap-free folder `00170027` has 22 documents numbered 1–22. Page counts have not been checked,
-so it is not yet selected. Other gap-free folders are listed in the continuation instructions by method,
-not treated as approved boxes.
+The [Archive.org box-0017 inventory](https://archive.org/advancedsearch.php?q=identifier%3Acia-readingroom-document-cia-rdp96-00788r0017*&fl%5B%5D=identifier&fl%5B%5D=title&rows=5000&output=json)
+returned all 282 records (SHA-256 `3243cf94977348f783f6bc4022105f1a1c21cf7d0a3393e21964ea10a68accb2`).
+Folder **00170027** contains exactly documents **1–22**. All 22 original PDFs match their Archive.org MD5;
+all PDF page counts match the complete Scandata records, totaling **128 pages**, about 8.83 MB of PDFs.
+The plan's example folder 00170021 was rejected because it has sixteen missing document numbers.
 
-The [first candidate item's metadata](https://archive.org/metadata/cia-readingroom-document-cia-rdp96-00788r001700270001-5)
-reports *Orientation briefing — High Performance Task Force members*, 1983-01-26. Its original PDF is
-`cia-rdp96-00788r001700270001-5.pdf`, 458,724 bytes, MD5 `074aa9f6715a13079155116042ca0db0`.
-Original-PDF HEAD probes through the helper stopped with these refusals:
+A contiguous available prefix does not prove that no tail documents or unfilmed sides were withheld.
+**Stream page 94 explicitly says the next two pages are exempt.** They are absent from the delivered PDF;
+no images or labels were invented for them. This is a complete copy of the supplied digital folder,
+with a known hole in the underlying physical record. This limitation matters to interpretation.
 
-| requested URL | redirect host refused |
+[crest.json](public-segmentation/crest.json) freezes source checksums, supplied page order, image SHA-256,
+archive labels and an audit note on every page. Poppler rendered all pages at a 2,000-pixel ceiling, JPEG
+quality 90. Every page was visually reviewed in sixteen contact sheets; handwritten decision pages 42,
+46, 110 and 111 were also enlarged. No model output informed this truth.
+
+The archive's 22 PDF starts are retained. Nine internal starts were added under the owner-approved
+[document rules](../../execution-plans/segmentation/02-truth-check.md):
+
+| stream page | reason |
 |---|---|
-| `https://archive.org/download/cia-readingroom-document-cia-rdp96-00788r001700270001-5/cia-rdp96-00788r001700270001-5.pdf` | `dn721803.ca.archive.org` |
-| `https://cia.gov/readingroom/docs/CIA-RDP96-00788R001700270001-5.pdf` | `www.cia.gov` |
+| 2 | complete enclosed briefing script after its covering memorandum |
+| 13 | separately authored Monroe Systems RE/TBI Discovery Program handout |
+| 35 | separately titled and bylined *Altered States of Consciousness* magazine article; not a whole magazine |
+| 42 | handwritten SA legal/operations notes with their own topic heading |
+| 48 | typed briefing-script fragment after handwritten meeting notes |
+| 52 | separately titled Secretary of the Army briefing after its signed covering memorandum |
+| 65, 108 | separately titled briefing questions/answers, each retained with its own following page |
+| 110 | handwritten SA Brief notes with their own date and heading |
 
-The owner explicitly said to add `archive.org` and `cia.gov`, **no other host**. Exact names were added;
-subdomains were not inferred to be covered. The fetch helper correctly refuses both redirects.
-CREST includes third-party reports and clippings, so do not assert all contents are US-government
-public domain. Keep images/PDFs local and publish metadata/truth/scores only under the owner's
-scores-only decision. Separate PDFs still need page-by-page reconciliation with the document rules.
+Unheaded approval jottings (46), the briefing's seal illustration (88), the exemption marker (94), and
+undated cue/timing jottings (111) remain continuations. Separately preserved briefing copies each start
+anew, under rule 4. Ambiguous rule interpretations are explicitly listed in the manifest; this is an
+agent audit, not a second owner adjudication. CREST also includes third-party material: no blanket
+US-government public-domain claim is made and no image redistribution is included.
 
-## Lincoln Papers
+## Lincoln Papers: full catalogue and complete manifests
 
-`fetch.sh --stdout https://loc.gov/item/mal0440500/manifest.json` returns HTTP 403; no manifest was saved.
-The web read of the www.loc.gov manifest also failed. The collection-about page returned 403 as well.
+The browser successfully reached the full catalogue after its automatic verification, sorted it by
+Shelf Order, and saved the first **150 of 20,207** records. Starting at catalogue position 2 (the first
+manuscript after a printed envelope), complete consecutive item manifests are being exported. The catalogue
+order is preserved exactly even where numeric item identifiers are not increasing. The run will stop at
+an item boundary near 250 supplied canvases, before any model call or page-label audit based on output.
 
-Independently streamed the existing public export
-`~/Library/Caches/ArchiveSuiteRehearsal/bench-corpus/raw/btp/2026395156_csv.zip`, member
-`btp_comprehensive_2026-08-28.csv`, without changing it. Its Lincoln subset has **28,816 assets in
-10,061 items**, all from `lincoln_2025-12-01.csv`, all `AssetStatus=completed`. Campaigns are *Letters
-to Lincoln* (28,313 assets) and *Down to Raisins: The Remaining Letters to Lincoln* (503).
-The CSV starts mal0043300, mal0043800, mal0043600: row order is not collection order.
-Contiguous asset suffixes `1..max` within included items do not establish that final pages are present.
-The export cannot stand in for a full catalogue sequence or complete IIIF manifests.
+The earlier By the People CSV contains only completed transcriptions (28,816 Lincoln assets in 10,061
+items), so it cannot establish complete item or page order. It is not used to select or truncate this box.
+Manifest export is still underway; this box is not frozen and has no scores. Browser connection failures
+are retried in bounded attempts; no catalogue item is skipped after a failed manifest request.
 
-Example mal0043300 has two included assets, for the printed Kansas–Nebraska Bill (1854); its image URL is
-`https://tile.loc.gov/image-services/iiif/service:mss:mal:004:0043300:001/full/pct:100/0/default.jpg`.
-Reachable image URLs alone cannot establish which images/items are missing. Do not infer missing
-pages from URL patterns or silently construct a completed-transcriptions-only box.
+## Reproduce and score
 
-## What unblocks the build
-
-Gate **W43.seg-corpus-fetch-owner-ok** asks whether the owner permits `www.cia.gov` and Archive.org's
-file-delivery subdomains (a checked `.archive.org` suffix, never `archive.org.evil.com`), or will supply
-the original files. Lincoln additionally needs a complete catalogue run and its IIIF manifests exported
-through the owner's browser, or another approved reachable official inventory. Host expansion alone
-does not resolve loc.gov's HTTP 403. No access control or host refusal was worked around.
-
-After access: measure page counts, select complete consecutive runs, audit every page against the rules,
-freeze, then score free routes; paid Gemini calls wait for W43.sweep. The build stays open meanwhile.
+`public_segmentation.py --root <local source cache> --box crest verify` checks every supplied source page,
+image hash, audit and order against the committed freeze. `ocr` uses the existing Apple Vision helper;
+`pack --key fs-seg-2b --out <new directory>` makes the unchanged segmentation requests for the cluster.
+`institutional-compute/cluster_seg.py run/import` remains the collector; `score --key <key>` uses the
+existing window combiner and document scorer. Public caches are separate from the owner's bench.
+The free floors are always retained; no paid collector is provided. Integrity tests reject missing
+middle/tail pages, duplicates, reordering, unaudited labels, changed images and paths outside the cache.
