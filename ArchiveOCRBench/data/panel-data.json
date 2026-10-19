@@ -7837,6 +7837,121 @@
     },
     "parse_failures": 0,
     "finish_length": 0
+   },
+   "mlx-date-2b-8bit-nothink": {
+    "model": "mlx-date-2b-8bit-nothink",
+    "documents": 300,
+    "usd": 0.0,
+    "usd_per_1000": 0.0,
+    "year": {
+     "year+month": {
+      "exact": [
+       99,
+       120
+      ],
+      "within1": [
+       108,
+       120
+      ]
+     },
+     "year": {
+      "exact": [
+       48,
+       80
+      ],
+      "within1": [
+       66,
+       80
+      ]
+     },
+     "year+DU": {
+      "exact": [
+       17,
+       50
+      ],
+      "within1": [
+       34,
+       50
+      ]
+     },
+     "in text": {
+      "exact": [
+       113,
+       119
+      ],
+      "within1": [
+       118,
+       119
+      ]
+     },
+     "not in text": {
+      "exact": [
+       51,
+       131
+      ],
+      "within1": [
+       90,
+       131
+      ]
+     },
+     "all": {
+      "exact": [
+       164,
+       250
+      ],
+      "within1": [
+       208,
+       250
+      ]
+     }
+    },
+    "decade": [
+     28,
+     50
+    ],
+    "month": {
+     "owner": [
+      78,
+      120
+     ],
+     "other": [
+      19,
+      120
+     ],
+     "none": [
+      23,
+      120
+     ],
+     "untagged_given": [
+      47,
+      80
+     ],
+     "untagged_given_named": 23
+    },
+    "uncertain": {
+     "owner_certain": [
+      0,
+      200
+     ],
+     "owner_certain_in_text": [
+      0,
+      114
+     ],
+     "owner_certain_not_in_text": [
+      0,
+      86
+     ],
+     "owner_uncertain": [
+      0,
+      50
+     ],
+     "certain_and_wrong": [
+      53,
+      200
+     ]
+    },
+    "parse_failures": 0,
+    "finish_length": 0
    }
   }
  },
@@ -8053,6 +8168,60 @@
      ],
      "given_where_source_has_none": [
       61,
+      150
+     ]
+    },
+    "parse_failures": 0
+   },
+   "mlx-date-2b-8bit-nothink": {
+    "documents": 300,
+    "year": {
+     "exact": [
+      284,
+      300
+     ],
+     "within1": [
+      292,
+      300
+     ],
+     "in text": [
+      245,
+      257
+     ],
+     "not in text": [
+      39,
+      43
+     ]
+    },
+    "month": {
+     "exact": [
+      224,
+      240
+     ],
+     "none": [
+      3,
+      240
+     ],
+     "given_where_source_has_none": [
+      41,
+      60
+     ]
+    },
+    "day": {
+     "exact": [
+      140,
+      150
+     ],
+     "full_date": [
+      137,
+      150
+     ],
+     "none": [
+      2,
+      150
+     ],
+     "given_where_source_has_none": [
+      96,
       150
      ]
     },

@@ -14,6 +14,7 @@ per model/bench are present, parseable and below the output cap. No paid Gemini 
 | model | corpus year (250) | corpus month (120) | public year (300) | public month (240) | public day (150) | full public date (150) |
 |---|---:|---:|---:|---:|---:|---:|
 | trained 2B | 66.8% | 63.3% | 95.0% | 93.3% | 92.7% | 90.7% |
+| trained 2B, Mac 8-bit | 65.6% | 65.0% | 94.7% | 93.3% | 93.3% | 91.3% |
 | trained 4B | 66.4% | 70.0% | 97.0% | 93.3% | 92.0% | 90.0% |
 | untrained 2B | not rerun | not rerun | 93.7% | 83.3% | 53.3% | 49.3% |
 | untrained 4B | existing baseline | existing baseline | 95.0% | 12.9% | 71.3% | 8.7% |
@@ -35,7 +36,14 @@ The automatic app call already requests and writes the day, so that requested ap
 
 GPU jobs 1855406 (2B, 35m01 including pilot/merge/tests/base public comparison) and 1855407 (4B, 1h05m28)
 completed with exit zero. Full 2B training took 1,624 seconds. The 8-bit MLX conversion passed under the
-unchanged memory guard in 7 seconds (9.625 effective bits/weight); its Mac measurement is in progress.
+unchanged memory guard in 7 seconds (9.625 effective bits/weight). The 2.683 GB MLX build completed all
+600 test prompts: 416.69 seconds for the corpus and 414.71 seconds for the public set, about 1.39 seconds
+per document, with 1.29 seconds to load. Peak MLX memory was 3.784 GB; the guard recorded a 4.549 GB peak
+footprint without terminating the run. All responses parsed and none hit the token cap. Compared with
+the GPU 2B, quantization loses three owner years (1.2 percentage points) and one public year (0.3 points);
+it gains one public day. These small differences do not establish an improvement. Its inferred-year
+accuracy is 51/131 (38.9%), and it still identifies none of the 50 owner-uncertain documents.
+The Mac test used the same frozen prompts, thinking off, temperature zero and 512 output tokens.
 
 Source numbers: `date-tagging.json` / `date-tagging-public.json`. Full setup, model revisions, source decisions
 and raw-output locations: `execution-plans/farmshare-interactive-20261018.md`. Training outputs and raw test

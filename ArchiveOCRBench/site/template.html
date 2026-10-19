@@ -513,7 +513,7 @@ if (DT) {
     row('Certain and wrong, where the owner was certain', U.certain_and_wrong)].join('');
   const OM = DT.open_models || {};
   const NAMES = { 'qwen3.6-27b': 'Qwen3.6 27B', 'qwen3.6-35b-a3b': 'Qwen3.6 35B-A3B', 'qwen3-vl-8b': 'Qwen3-VL 8B',
-    'qwen3.5-4b': 'Qwen3.5 4B', 'fs-date-2b': 'Dating fine-tune 2B', 'fs-date-4b': 'Dating fine-tune 4B', 'fs-base-2b': 'Untrained 2B', 'fs-base-4b': 'Untrained 4B' };
+    'qwen3.5-4b': 'Qwen3.5 4B', 'fs-date-2b': 'Dating fine-tune 2B', 'fs-date-4b': 'Dating fine-tune 4B', 'fs-base-2b': 'Untrained 2B', 'fs-base-4b': 'Untrained 4B', 'mlx-date-2b-8bit': 'Dating fine-tune 2B, Mac 8-bit' };
   const name = k => (NAMES[k.replace(/-nothink$/, '')] || k) + (k.endsWith('-nothink') ? ', thinking off' : (k === 'qwen3-vl-8b' ? '' : ', as the app sends it'));
   const keys = Object.keys(OM).sort();
   if (keys.length) {
@@ -528,7 +528,7 @@ const DP = DATA.dating_public;
 if (DP && DP.models) {
   const pct = ([a, b]) => b ? (100 * a / b).toFixed(1) + '%' : '–';
   const names = { 'fs-date-2b-nothink': 'Dating fine-tune 2B', 'fs-date-4b-nothink': 'Dating fine-tune 4B',
-    'fs-base-2b-nothink': 'Untrained 2B', 'fs-base-4b-nothink': 'Untrained 4B' };
+    'fs-base-2b-nothink': 'Untrained 2B', 'fs-base-4b-nothink': 'Untrained 4B', 'mlx-date-2b-8bit-nothink': 'Dating fine-tune 2B, Mac 8-bit' };
   document.getElementById('date-public-rows').innerHTML = Object.entries(DP.models).map(([k, r]) =>
     '<tr><td>' + (names[k] || k) + '</td><td>' + pct(r.year.exact) + '</td><td>' + pct(r.month.exact) +
     '</td><td>' + pct(r.day.exact) + '</td><td>' + pct(r.day.full_date) + '</td></tr>').join('');

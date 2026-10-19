@@ -198,3 +198,14 @@ reconcile their queue items; continue mixed-model training/evaluation; inspect W
 approved host expansion and complete public-box inputs before any FarmShare runs there. Paid hosted calls,
 real-corpus writes and model publication remain outside this continuation. Keep login gates held until the
 interactive work is actually handed back, per the owner walkthrough.
+
+## Completed Mac dating measurement
+
+The guarded 600-prompt MLX run completed with exit zero. Corpus: years 164/250, months 78/120,
+inferred years 51/131, decades 28/50, Date Uncertain 0/50. Public: years 284/300, months 224/240,
+days 140/150, full dates 137/150. All 600 parse, no caps. Load 1.29s; corpus 416.69s, public 414.71s;
+peak MLX 3.784GB. Guard wall 836s, peak footprint 4549MB, peak RSS 2248MB, max pressure 2, swap growth
+-104MB. Model bytes 2,682,994,616. Raw outputs and run settings remain under Long term storage's
+`FarmShare-20261018/mlx-results`. Numeric results imported through the existing date scorers.
+W41.date-model is complete once this report/benchmark checkpoint ships; no model publication or default
+change. The combined model's 1856294 remains active and owns the remaining FarmShare comparison.
