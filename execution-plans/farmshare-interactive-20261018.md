@@ -264,3 +264,13 @@ continuing; occasional closed transfers still receive only the existing bounded 
 progress is saved independently in `public-segmentation/lincoln-audit.json` outside git (last reviewed 192).
 No public model scores yet. Existing free rule baseline is fitting on **owner dev boxes only**, queued behind
 the repository's VM health check; its parameters will be committed before public scoring.
+
+### Lincoln truth freeze
+
+All 261 supplied canvases downloaded and verified. Every image visually reviewed before model outputs;
+72 consecutive catalogue items become 81 documents under the same ten rules. Nine internal starts include
+enclosed publications, another letter, and two isolated wrappers (77/231), explicitly marked ambiguous.
+The final 22-canvas item is one continuous Lincoln-to-Corning manuscript with inserted numbered sheets.
+`public-segmentation/lincoln.json` freezes source order, manifest/image hashes, every audited boundary and
+limitations. Consecutive catalogue positions do not prove physical gap-free archival arrangement; 2000px
+IIIF renderings include all supplied canvases, not full-resolution masters. No paid/public model call yet.
