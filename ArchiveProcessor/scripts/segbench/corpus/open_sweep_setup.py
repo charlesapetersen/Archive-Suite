@@ -30,7 +30,7 @@ def main():
         record = {**candidate, 'state': 'preparing', 'job': os.environ.get('SLURM_JOB_ID')}
         save(dest, record)
         try:
-            info = api.model_info(candidate['model'], files_metadata=True)
+            info = api.model_info(candidate['model'], revision=candidate.get('revision'), files_metadata=True)
             if info.gated or info.private:
                 raise ValueError('Gated/private model excluded')
             record['revision'] = info.sha
@@ -40,8 +40,9 @@ def main():
             if not weights or any(f.size is None for f in weights):
                 raise ValueError('No safetensor weights with known size')
             record['weight_bytes'] = sum(f.size for f in weights)
-            if record['weight_bytes'] > 25_000_000_000:
-                raise ValueError('Exceeds bounded 25GB weight limit')
+            limit = candidate.get('weight_limit_bytes', 25_000_000_000)
+            if not 0 < limit <= 175_000_000_000 or record['weight_bytes'] > limit:
+                raise ValueError('Exceeds candidate weight limit (absolute ceiling175GB)')
             config = json.loads(Path(hf_hub_download(candidate['model'], 'config.json', revision=info.sha)).read_text())
             record['architectures'] = config.get('architectures', [])
             if not set(record['architectures']) & supported:

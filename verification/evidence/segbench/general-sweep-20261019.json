@@ -1,0 +1,583 @@
+{
+  "checked_on": "2026-10-19",
+  "vllm": "0.31.0",
+  "torch": "2.13.0",
+  "runtime_audit_job": 1857615,
+  "audit": [
+    {
+      "model": "zai-org/GLM-5.3-Flash",
+      "revision": "46a050bec13002ad29ee795c16e61cf4fa3c4a9c",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "mit",
+      "weight_bytes": 328337455672,
+      "weight_files": 62,
+      "architectures": [
+        "Glm5NextForConditionalGeneration"
+      ],
+      "model_type": "glm5_next",
+      "quant_method": "fp8",
+      "text_heads": {
+        "hidden_size": 4096,
+        "intermediate_size": 12288,
+        "moe_intermediate_size": 2048,
+        "num_attention_heads": 64,
+        "num_hidden_layers": 45,
+        "num_key_value_heads": 64
+      },
+      "config_keys": [
+        "architectures",
+        "text_config",
+        "vision_config",
+        "image_token_id",
+        "video_token_id",
+        "image_start_token_id",
+        "image_end_token_id",
+        "video_start_token_id",
+        "video_end_token_id",
+        "tie_word_embeddings",
+        "model_type",
+        "transformers_version",
+        "quantization_config"
+      ],
+      "registered": true
+    },
+    {
+      "model": "inclusionAI/Ling-3.0-flash-VL-fp8",
+      "revision": "6f040eebd79d756ab4f6ef69a86d194a569198e0",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "mit",
+      "weight_bytes": 126191392504,
+      "weight_files": 64,
+      "architectures": [
+        "BailingMoeV3VLForConditionalGeneration"
+      ],
+      "model_type": "bailing_moe_v3_vl",
+      "quant_method": "fp8",
+      "text_heads": {
+        "num_hidden_layers": 42,
+        "hidden_size": 2560,
+        "intermediate_size": 6144,
+        "moe_intermediate_size": 768,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 32
+      },
+      "config_keys": [
+        "model_type",
+        "architectures",
+        "auto_map",
+        "torch_dtype",
+        "transformers_version",
+        "tie_word_embeddings",
+        "norm_query_embeds",
+        "image_token_id",
+        "video_token_id",
+        "vision_start_token_id",
+        "vision_end_token_id",
+        "mrope_section",
+        "text_config",
+        "vision_config",
+        "quantization_config"
+      ],
+      "registered": true
+    },
+    {
+      "model": "inclusionAI/Ling-3.0-flash-VL-int4",
+      "revision": "94759a4b454498d91144582e26c1341ba1acb5d4",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "mit",
+      "weight_bytes": 76076767672,
+      "weight_files": 64,
+      "architectures": [
+        "BailingMoeV3VLForConditionalGeneration"
+      ],
+      "model_type": "bailing_moe_v3_vl",
+      "quant_method": "compressed-tensors",
+      "text_heads": {
+        "num_hidden_layers": 42,
+        "hidden_size": 2560,
+        "intermediate_size": 6144,
+        "moe_intermediate_size": 768,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 32
+      },
+      "config_keys": [
+        "model_type",
+        "architectures",
+        "auto_map",
+        "torch_dtype",
+        "transformers_version",
+        "tie_word_embeddings",
+        "norm_query_embeds",
+        "image_token_id",
+        "video_token_id",
+        "vision_start_token_id",
+        "vision_end_token_id",
+        "mrope_section",
+        "text_config",
+        "vision_config",
+        "quantization_config"
+      ],
+      "registered": true
+    },
+    {
+      "model": "XiaomiMiMo/MiMo-V2.6-Flash",
+      "error": "Command '['/usr/bin/curl', '-fsSL', '--max-time', '25', 'https://huggingface.co/api/models/XiaomiMiMo/MiMo-V2.6-Flash?blobs=true']' returned non-zero exit status 56.",
+      "architectures": [],
+      "model_type": null,
+      "quant_method": null,
+      "text_heads": {},
+      "config_keys": [],
+      "registered": false
+    },
+    {
+      "model": "XiaomiMiMo/MiMo-V2.6-Pro",
+      "error": "Command '['/usr/bin/curl', '-fsSL', '--max-time', '25', 'https://huggingface.co/api/models/XiaomiMiMo/MiMo-V2.6-Pro?blobs=true']' returned non-zero exit status 56.",
+      "architectures": [],
+      "model_type": null,
+      "quant_method": null,
+      "text_heads": {},
+      "config_keys": [],
+      "registered": false
+    },
+    {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "revision": "314113f8a7dadb388215396ba5fbee2c610a04d6",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "mit",
+      "weight_bytes": 510296708312,
+      "weight_files": 48,
+      "architectures": [
+        "DeepseekV41ForCausalLM"
+      ],
+      "model_type": "deepseek_v41",
+      "quant_method": "fp8",
+      "text_heads": {
+        "hidden_size": 5120,
+        "moe_intermediate_size": 2304,
+        "num_hidden_layers": 40,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 1
+      },
+      "config_keys": [
+        "architectures",
+        "model_type",
+        "dtype",
+        "transformers_version",
+        "bos_token_id",
+        "eos_token_id",
+        "pad_token_id",
+        "image_token_id",
+        "quantization_config",
+        "text_config",
+        "vision_config"
+      ],
+      "registered": true
+    },
+    {
+      "model": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+      "revision": "1f8953f7f0935358e3605150d22bc15df062061c",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "other",
+      "weight_bytes": 248913061416,
+      "weight_files": 64,
+      "architectures": [
+        "NemotronH_Omni_Reasoning_V3"
+      ],
+      "model_type": "nemotron_h_omni",
+      "quant_method": null,
+      "text_heads": {},
+      "config_keys": [
+        "architectures",
+        "auto_map",
+        "downsample_ratio",
+        "dtype",
+        "eos_token_id",
+        "force_image_size",
+        "image_tag_type",
+        "img_context_token",
+        "img_context_token_id",
+        "llm_config",
+        "model_type",
+        "norm_mean",
+        "norm_std",
+        "patch_size",
+        "processor_class",
+        "projector_hidden_size",
+        "ps_version",
+        "sound_config",
+        "sound_context_token",
+        "sound_context_token_id",
+        "template",
+        "tie_word_embeddings",
+        "transformers_version",
+        "use_thumbnail",
+        "video_context_token",
+        "video_context_token_id",
+        "video_pruning_rate",
+        "video_temporal_patch_size",
+        "vision_config",
+        "vit_hidden_size"
+      ],
+      "registered": true
+    },
+    {
+      "model": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4",
+      "revision": "59b8721646c38111a242da18218859fb2b454322",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "other",
+      "weight_bytes": 75010188240,
+      "weight_files": 88,
+      "architectures": [
+        "NemotronH_Omni_Reasoning_V3"
+      ],
+      "model_type": "nemotron_h_omni",
+      "quant_method": "modelopt_mixed",
+      "text_heads": {},
+      "config_keys": [
+        "architectures",
+        "auto_map",
+        "downsample_ratio",
+        "dtype",
+        "eos_token_id",
+        "force_image_size",
+        "image_tag_type",
+        "img_context_token",
+        "img_context_token_id",
+        "llm_config",
+        "model_type",
+        "norm_mean",
+        "norm_std",
+        "patch_size",
+        "processor_class",
+        "projector_hidden_size",
+        "ps_version",
+        "sound_config",
+        "sound_context_token",
+        "sound_context_token_id",
+        "template",
+        "tie_word_embeddings",
+        "transformers_version",
+        "use_thumbnail",
+        "video_context_token",
+        "video_context_token_id",
+        "video_pruning_rate",
+        "video_temporal_patch_size",
+        "vision_config",
+        "vit_hidden_size",
+        "quantization_config"
+      ],
+      "registered": true
+    },
+    {
+      "model": "MiniMaxAI/MiniMax-M3",
+      "revision": "f0e1c1e04d40177e4673a22097036854f536e9c0",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "other",
+      "weight_bytes": 854176398808,
+      "weight_files": 59,
+      "architectures": [
+        "MiniMaxM3SparseForConditionalGeneration"
+      ],
+      "model_type": "minimax_m3_vl",
+      "quant_method": null,
+      "text_heads": {
+        "hidden_size": 6144,
+        "intermediate_size": 3072,
+        "num_hidden_layers": 60,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 4
+      },
+      "config_keys": [
+        "architectures",
+        "auto_map",
+        "model_type",
+        "text_config",
+        "vision_config",
+        "img_token_compression_config",
+        "image_grid_pinpoints",
+        "image_seq_length",
+        "image_token_index",
+        "video_token_index",
+        "multimodal_projector_bias",
+        "num_reward_heads",
+        "process_image_mode",
+        "projector_hidden_act",
+        "vision_feature_layer",
+        "vision_feature_select_strategy",
+        "torch_dtype",
+        "transformers_version",
+        "projector_hidden_size"
+      ],
+      "registered": true
+    },
+    {
+      "model": "thinkingmachines/Inkling-Small",
+      "revision": "8cc5877b44d343f88b92086aa1fb72897950f06a",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "apache-2.0",
+      "weight_bytes": 531913022276,
+      "weight_files": 33,
+      "architectures": [
+        "InklingForConditionalGeneration"
+      ],
+      "model_type": "inkling_mm_model",
+      "quant_method": null,
+      "text_heads": {
+        "hidden_size": 4096,
+        "num_hidden_layers": 42,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 8,
+        "intermediate_size": 2048
+      },
+      "config_keys": [
+        "architectures",
+        "model_type",
+        "eos_token_id",
+        "text_config",
+        "audio_config",
+        "vision_config",
+        "mtp_config"
+      ],
+      "registered": true
+    },
+    {
+      "model": "thinkingmachines/Inkling-Small-NVFP4",
+      "revision": "b6a99534467840620d411e4cd4ad5819b2610d9c",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "apache-2.0",
+      "weight_bytes": 170733233632,
+      "weight_files": 10,
+      "architectures": [
+        "InklingForConditionalGeneration"
+      ],
+      "model_type": "inkling_mm_model",
+      "quant_method": null,
+      "text_heads": {
+        "hidden_size": 4096,
+        "num_hidden_layers": 42,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 8,
+        "intermediate_size": 2048
+      },
+      "config_keys": [
+        "architectures",
+        "model_type",
+        "eos_token_id",
+        "text_config",
+        "audio_config",
+        "vision_config",
+        "mtp_config"
+      ],
+      "registered": true
+    },
+    {
+      "model": "RedHatAI/GLM-5.3-Flash-NVFP4",
+      "revision": "18d55bfd5a2194887738da73753975c9d3842f46",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "mit",
+      "weight_bytes": 197843812476,
+      "weight_files": 11,
+      "architectures": [
+        "Glm5NextForConditionalGeneration"
+      ],
+      "model_type": "glm5_next"
+    },
+    {
+      "model": "nvidia/MiniMax-M3-NVFP4",
+      "revision": "901464083161bf8612a29ff7ad29914cd4ab4a85",
+      "gated": false,
+      "pipeline": "text-generation",
+      "license": "other",
+      "weight_bytes": 250103762320,
+      "weight_files": 88,
+      "architectures": [
+        "MiniMaxM3SparseForConditionalGeneration"
+      ],
+      "model_type": "minimax_m3_vl"
+    },
+    {
+      "model": "XiaomiMiMo/MiMo-V2.6-Flash-RL",
+      "revision": "dcd3fd83fb181622fbc606fbb1709901982a62c2",
+      "gated": false,
+      "pipeline": "text-generation",
+      "license": "mit",
+      "weight_bytes": 177741244728,
+      "weight_files": 67,
+      "architectures": [
+        "MiMoV2ForCausalLM"
+      ],
+      "model_type": "mimo_v2"
+    },
+    {
+      "model": "XiaomiMiMo/MiMo-V2.6-Pro-RL",
+      "revision": "b61f21852680ee02a29e946e18cf8697f4844061",
+      "gated": false,
+      "pipeline": "text-generation",
+      "license": "mit",
+      "weight_bytes": 573457361664,
+      "weight_files": 132,
+      "architectures": [
+        "MiMoV2ForCausalLM"
+      ],
+      "model_type": "mimo_v2"
+    },
+    {
+      "model": "XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B",
+      "revision": "2367e865d009c13ac81713a2878291d33ab28177",
+      "gated": false,
+      "pipeline": "image-text-to-text",
+      "license": "mit",
+      "weight_bytes": 18819720848,
+      "weight_files": 4,
+      "architectures": [
+        "Qwen3_5ForConditionalGeneration"
+      ],
+      "model_type": "qwen3_5"
+    }
+  ],
+  "selected": [
+    {
+      "key": "ling3-flash-vl-fp8",
+      "model": "inclusionAI/Ling-3.0-flash-VL-fp8",
+      "revision": "6f040eebd79d756ab4f6ef69a86d194a569198e0",
+      "route": "panel",
+      "prompt": null,
+      "card": "https://huggingface.co/inclusionAI/Ling-3.0-flash-VL-fp8",
+      "gpus": 4,
+      "concurrency": 4,
+      "weight_limit_bytes": 135000000000,
+      "server_args": [
+        "--tensor-parallel-size",
+        "4",
+        "--max-model-len",
+        "16384",
+        "--kv-cache-dtype",
+        "auto",
+        "--gpu-memory-utilization",
+        "0.90",
+        "--max-num-seqs",
+        "4",
+        "--disable-custom-all-reduce",
+        "--enforce-eager",
+        "--trust-remote-code",
+        "--enable-expert-parallel"
+      ]
+    },
+    {
+      "key": "nemotron35-super-vl-nvfp4",
+      "model": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4",
+      "revision": "59b8721646c38111a242da18218859fb2b454322",
+      "route": "panel",
+      "prompt": null,
+      "card": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4",
+      "gpus": 2,
+      "concurrency": 4,
+      "weight_limit_bytes": 80000000000,
+      "server_args": [
+        "--tensor-parallel-size",
+        "2",
+        "--max-model-len",
+        "16384",
+        "--kv-cache-dtype",
+        "auto",
+        "--gpu-memory-utilization",
+        "0.90",
+        "--max-num-seqs",
+        "4",
+        "--disable-custom-all-reduce",
+        "--enforce-eager",
+        "--trust-remote-code",
+        "--mamba-ssm-cache-dtype",
+        "float16"
+      ]
+    }
+  ],
+  "jobs": {
+    "setup": {
+      "job": 1857666,
+      "args": [
+        "--partition=normal",
+        "--cpus-per-task=8",
+        "--mem=48G",
+        "--time=02:00:00"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/general-sweep-20261019/setup-job.sh",
+        "/scratch/users/cp1/fs-ocr/general-sweep-20261019"
+      ]
+    },
+    "ling3-flash-vl-fp8": {
+      "job": 1857667,
+      "args": [
+        "--partition=gpu",
+        "--nodes=1",
+        "--gres=gpu:4",
+        "--cpus-per-task=16",
+        "--mem=220G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857666:1857612"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/general-sweep-20261019/recovery/open-sweep-multi-job.sh",
+        "/scratch/users/cp1/fs-ocr/general-sweep-20261019",
+        "ling3-flash-vl-fp8"
+      ]
+    },
+    "nemotron35-super-vl-nvfp4": {
+      "job": 1857668,
+      "args": [
+        "--partition=gpu",
+        "--nodes=1",
+        "--gres=gpu:2",
+        "--cpus-per-task=8",
+        "--mem=128G",
+        "--time=04:00:00",
+        "--dependency=afterany:1857667"
+      ],
+      "command": [
+        "/scratch/users/cp1/fs-ocr/general-sweep-20261019/recovery/open-sweep-multi-job.sh",
+        "/scratch/users/cp1/fs-ocr/general-sweep-20261019",
+        "nemotron35-super-vl-nvfp4"
+      ]
+    }
+  },
+  "input": {
+    "pages": 895,
+    "pilot": [
+      {
+        "id": "btp__mss11049004-95",
+        "image": "/scratch/users/cp1/fs-ocr/interactive-20261019/ocr/images/btp__mss11049004-95.jpg",
+        "sha256": "b12c93eb095538a3bc8facd691bf6560867635fb6efeb139f9f677431f1468e5",
+        "stratum": "L1",
+        "source": "btp"
+      },
+      {
+        "id": "si__NMAAHC-007630087_00342",
+        "image": "/scratch/users/cp1/fs-ocr/interactive-20261019/ocr/images/si__NMAAHC-007630087_00342.jpg",
+        "sha256": "7e0781509472bd1b10bf7740e56a68e427646e36ebc49da96bd791707e456f3c",
+        "stratum": "L4",
+        "source": "si"
+      },
+      {
+        "id": "ocrd__aepinus_bekentnis_1548_aepinus_bekentnis_1548_0007",
+        "image": "/scratch/users/cp1/fs-ocr/interactive-20261018/ocr/images/ocrd__aepinus_bekentnis_1548_aepinus_bekentnis_1548_0007.jpg",
+        "sha256": "5d7640df6f668891a6b69f568845337bf7fd10b5906607590dcb3c2ef5f9141a",
+        "stratum": "L8",
+        "source": "ocrd"
+      }
+    ],
+    "manifest_sha256": "9b47b831f8b95814616ccb1397b957fb67822374d9c25718214a1d0bade4224e",
+    "unchanged_images": true
+  },
+  "inkling_blocker": "9e2ad4a9736f2a35e82edb01b377ee666459fb4f6a291bb9d739df577e6994af  /scratch/users/cp1/fs-ocr/venv/lib/python3.12/site-packages/vllm/models/inkling/nvidia/ops/fa4_rel_attention.py\n827fc6a2d4ef8d1cc3ac991d33cab5cbe5a66ec7a82c9636ebf64b61ad780773  /scratch/users/cp1/fs-ocr/venv/lib/python3.12/site-packages/vllm/vllm_flash_attn/cute/interface.py\n            )\n        )\n\n    if softcap is not None:\n        assert score_mod is None, \"softcap and score_mod cannot be used together\"\n        score_mod = utils.create_softcap_scoremod(softcap)\n    elif score_mod is not None:\n        if arch // 10 == 8:\n            raise NotImplementedError(\"Custom user-provided score_mod is not supported on SM8x architectures.\")\n        \n    # hash score and mask mods for compile cache\n    score_mod_hash = utils.hash_callable(score_mod) if score_mod is not None else False\n    mask_mod_hash = utils.hash_callable(mask_mod) if mask_mod is not None else False\n            flash_attn_varlen_func = tml_flash_attn_varlen_func\n            bias_kwargs: dict[str, Any] = {\"rel_bias\": rel_logits}\n        else:\n            from vllm.vllm_flash_attn.cute import (\n                flash_attn_varlen_func as cute_flash_attn_varlen_func,\n            )\n\n            flash_attn_varlen_func = cute_flash_attn_varlen_func\n            bias_kwargs = {\n                \"score_mod\": _get_score_mod(rel_extent),\n                \"aux_tensors\": [rel_logits],\n            }\n\n        ret = flash_attn_varlen_func(\n            q=q,\n            k=key_cache,\n"
+}

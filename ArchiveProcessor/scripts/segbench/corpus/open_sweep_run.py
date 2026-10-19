@@ -22,6 +22,7 @@ def main():
     parent = root.parent
     config = json.loads((root / 'prepared.json').read_text())
     label = config['key']
+    concurrency = config.get('concurrency', 8)
     os.environ['FS_MODEL'] = config['model']
     collector = root / 'ocr/ocr_run.py'
     if hashlib.sha256(collector.read_bytes()).hexdigest() != LEGACY_SHA:
@@ -30,7 +31,7 @@ def main():
                 'prompt_sha256': hashlib.sha256((root / 'ocr/panel-prompt.txt').read_bytes()).hexdigest(),
                 'collector_sha256': LEGACY_SHA, 'vllm': importlib.metadata.version('vllm'),
                 'server_args': os.environ['FS_VLLM_ARGS'], 'max_tokens': 8192,
-                'temperature': 0, 'thinking': False, 'concurrency': 8}
+                'temperature': 0, 'thinking': False, 'concurrency': concurrency}
     binding = root / 'cache-contract.json'
     if binding.exists() and json.loads(binding.read_text()) != contract:
         raise ValueError('Different OCR settings; use a separate experiment')
@@ -40,7 +41,7 @@ def main():
     out = root / 'results/ocr' / label
     def collect(manifest):
         subprocess.run([sys.executable, str(collector), '--manifest', str(manifest),
-                        '--label', label, '--mode', 'panel', '--concurrency', '8'], check=True)
+                        '--label', label, '--mode', 'panel', '--concurrency', str(concurrency)], check=True)
     try:
         collect(parent / 'pilot3.jsonl')
         rows = [json.loads(x) for x in (parent / 'pilot3.jsonl').read_text().splitlines()]
