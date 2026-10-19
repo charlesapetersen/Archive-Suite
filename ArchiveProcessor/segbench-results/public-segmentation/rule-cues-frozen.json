@@ -1,0 +1,81 @@
+{
+  "fit_on": "Owner development boxes only; no public labels/images/text used for fitting",
+  "sources": [
+    {
+      "box": "Dean",
+      "pages": 202,
+      "truth_sha256": "32aefe3e9a52c5a4034cc2966c42e7b09ed95a2e37244c257a5d07d95e2a9202",
+      "ocr_sha256": "620eeba3b2decefb5f4aa6ca6ffaf7aa4717ad4b6bdc33c1c74faf89da27125a"
+    },
+    {
+      "box": "Deaver",
+      "pages": 149,
+      "truth_sha256": "783bb56a68993f77376ddbb87c1020082b486b2f08605e7207e9ac7aa73bb183",
+      "ocr_sha256": "93a1a43ad4c30f34ac79ff23574a58f6c1a4c34bd2d2583e43667a0a648615d3"
+    },
+    {
+      "box": "Herrnstein",
+      "pages": 200,
+      "truth_sha256": "6701a68ffae2e3e8657b9a656f3cde73cecf59f999c86b38f7f02f6147d2fc6f",
+      "ocr_sha256": "274829d9d9088644752dbd4857ba8c7325f7803c3a388797b6e16f727dbba309"
+    }
+  ],
+  "rule_code_sha256": "e0da5e74f9acb44b04dadc130be97dd613406b71d45ab33a823d9a89bab166ca",
+  "params": {
+    "top_lines": 3,
+    "end_lines": 3,
+    "blank_chars": 0,
+    "default": "New",
+    "rules": [
+      "blank",
+      "page-one",
+      "page-number",
+      "bare-number",
+      "jump-from",
+      "opening",
+      "date-line",
+      "prev-jump",
+      "prev-closing",
+      "flows-on"
+    ]
+  },
+  "stats": {
+    "date-line": [
+      78,
+      71
+    ],
+    "prev-closing": [
+      60,
+      58
+    ],
+    "page-number": [
+      78,
+      70
+    ],
+    "default": [
+      170,
+      127
+    ],
+    "opening": [
+      12,
+      12
+    ],
+    "bare-number": [
+      37,
+      33
+    ],
+    "flows-on": [
+      41,
+      28
+    ],
+    "jump-from": [
+      14,
+      14
+    ],
+    "prev-jump": [
+      4,
+      3
+    ]
+  },
+  "wall_s": 24.8
+}
