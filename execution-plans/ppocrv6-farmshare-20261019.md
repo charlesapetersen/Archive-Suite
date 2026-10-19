@@ -58,3 +58,10 @@ PaddleOCR-VL1.5 and Kraken-on-Vision-crops, and keep historical440 unchanged. No
 adoption/default changes. Reconcile SUITE_TODO/DONE and primary plan; delete this plan only when reviewed
 results ship. Record interactive provenance honestly; no fabricated daemon PID, grant, usage or cost ledger.
 No hosted money spent. No corpus construction, app changes, training or private locked-test repeat.
+
+## Check-in — 2026-10-19 22:37 UTC
+
+Preparation1858052 completed0 in4m46s; prepared.json is ready, pinned models loaded and the synthetic
+white-page API smoke passed. GPU1858053 remains pending after Inkling1857671. No benchmark page has
+yet been read by this route. Preparation receipt, pipeline.yaml and smoke JSON copied to
+L/preparation-check. Original collectors and SSH held channel remain healthy; no new submissions.

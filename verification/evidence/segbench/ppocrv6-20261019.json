@@ -2,7 +2,7 @@
   "date": "2026-10-19",
   "item": "W43.ppocrv6-farmshare",
   "provenance": "owner-authorized interactive Codex; daemon stopped",
-  "phase": "submitted_preparation_running",
+  "phase": "preparation_passed_gpu_pending",
   "jobs": {
     "setup": {
       "job": 1858052,
@@ -49,10 +49,10 @@
     "existing SSH socket rice-04",
     "scheduler accepted both jobs",
     "bounded collector waiting, exec session61339",
-    "Functional synthetic transport guard: 895 calls includes pilot; second pass makes zero new calls; changed image bytes refused"
+    "Functional synthetic transport guard: 895 calls includes pilot; second pass makes zero new calls; changed image bytes refused",
+    "CPU1858052 COMPLETED0 in00:04:46; prepared.json ready; pinned model load and synthetic API smoke passed"
   ],
   "not_yet_verified": [
-    "CPU synthetic smoke",
     "GPU three-page compatibility pilot",
     "895-page result validity and scores"
   ],

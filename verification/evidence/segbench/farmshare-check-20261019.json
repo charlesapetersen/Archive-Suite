@@ -1,0 +1,77 @@
+{
+  "checked_utc": "2026-10-19T22:38:09.829020+00:00",
+  "ssh": "healthy rice-04; owner master and held channel retained",
+  "completed_prior_work": {
+    "combined_public_segmentation": 1857598,
+    "qwen_extensions": [
+      1857599,
+      1857600,
+      1857601
+    ]
+  },
+  "completed_open_models": {
+    "glm-ocr": {
+      "job": 1857607,
+      "ok": 680,
+      "cap": 215
+    },
+    "qwen3-vl-8b": {
+      "job": 1857608,
+      "ok": 659,
+      "cap": 236
+    },
+    "lightonocr3-08b": {
+      "job": 1857609,
+      "ok": 750,
+      "cap": 145
+    },
+    "lightonocr3-4b": {
+      "job": 1857610,
+      "ok": 819,
+      "cap": 76
+    },
+    "paddleocr-vl15": {
+      "job": 1857611,
+      "ok": 545,
+      "cap": 350
+    }
+  },
+  "running": {
+    "qwen35-4b": {
+      "job": 1857612,
+      "terminal": 767,
+      "expected": 895,
+      "ok": 558,
+      "cap": 209
+    }
+  },
+  "pending_sequential": [
+    {
+      "model": "ling3-flash-vl-fp8",
+      "job": 1857667
+    },
+    {
+      "model": "nemotron35-super-vl-nvfp4",
+      "job": 1857668
+    },
+    {
+      "model": "inkling-small-gguf-q4",
+      "job": 1857671
+    },
+    {
+      "model": "ppocrv6-medium-native",
+      "job": 1858053
+    }
+  ],
+  "preparation_completed": [
+    1857666,
+    1857687,
+    1858052
+  ],
+  "collection": "Five completed added open models retrieved locally; collectors waiting, no inference resubmissions. Partial running counts are an instantaneous snapshot.",
+  "quality": "ok denotes nonempty uncapped transport output, not transcription accuracy; caps remain failures, protocol review/scoring pending",
+  "sweep_source_added": "https://aistudio.baidu.com/paddleocr/benchmark#leaderboard",
+  "source_inspection": "URL opened; dynamically rendered table unavailable in text retrieval. Added as discovery source without asserting rankings.",
+  "new_submissions": 0,
+  "hosted_spend_usd": 0
+}
