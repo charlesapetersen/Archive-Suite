@@ -288,3 +288,44 @@ at75858e61 before public scoring; 551 owner-dev pages only, no public tuning. No
 The full health gate ended 37passed/1failed: the pre-existing hermetic W40.root-marker proof was not wired
 into the gate. Add its actual step (no exclusion/weakening); direct proof4/4 and gate-report38/38 pass.
 App/GUI checks passed. Full gate must rerun after this small wiring fix; last-green marker not advanced yet.
+
+### Overnight pipeline checkpoint (recovery without another planning session)
+
+Latest owner instruction: ration Codex's remaining18% weekly allowance; prioritize ready compute, stop
+corpus expansion, wrap up/checkpoint partial items. No new source acquisition remains. All source inputs,
+truth audits and recipes are committed. Pipeline scripts and raw data are durable under:
+`/Users/cp1/Claude/Long term storage/FarmShare-20261018` (abbreviated L below).
+
+- GPU training1856294 and dev/holdout1856499 completed0. Reviewed joint dev467/518 vs469/518; agreed
+  holdout5412/5668 vs5443/5668. Three failed windows vote0.5, never excluded. GPU dating all six fields
+  within1point. Full numeric evidence/report and choice freeze committed before one locked pass.
+- `L/joint-mac-watch.py` is measuring600dates (finished) and187dev windows (~an hour) with the guarded
+  8-bit build. Status `joint-mac-status.json`, logs `joint-mac-{watch,convert,measure}.log`.
+- `L/joint-locked-pipeline.py` queues guarded310-window/914-page packing after Mac, then submits exactly
+  one joint-five job, records `joint-locked-job.id`, waits/retrieves to `L/results/seg/joint-five`.
+  Status `joint-locked-status.json`; any existing job id refuses resubmission. Frozen single-task exact
+  test reference260/330 is in `seg-date-model-frozen.json`. Original student/teacher freezes unchanged.
+- `L/recovery/public-pack-all.sh` is queued under the same unchanged guard: three ready Lincoln packs,
+  then both public CPU baselines. Live waiting process reads its identical copy under private/tmp.
+- `L/public-pipeline.py` waits for those packs/baselines, stages them, submits teacher/2B/4B once each,
+  records `public-pipeline-jobs.json`, retrieves all six runs, then `public-import-score.py` validates
+  every expected key, imports into isolated public cache and scores. Status `public-pipeline-status.json`.
+  **New numbers are staged in L/public-numeric-results, not uncommitted worktree files.** The unchanged
+  scorer now supports `score --out-dir` for this purpose. No paid calls or source rebuilding.
+- Full required health gate reruns after actual root-marker proof wiring (direct proof4/4 and report38/38
+  green); stdout `~/.local/state/archive-autonomous/last-gate.log`; last-green moves only on success.
+- Bounded12-hour `L/keep-ssh-open.py` under caffeinate prevents idle sleep and sends a tiny command through
+  the existing owner master every4minutes. No fresh login, socket deletion, master replacement or shell
+  closure. Status `ssh-keepalive-status.json`. Stop marker `L/ssh-keepalive-stop` stops only this helper.
+
+Continuation after the compute completes: inspect four status files/health log first, not new model calls.
+Score the600 Mac outputs from `L/mlx-results/{corpus,public}/mlx-seg-date-2b-8bit-nothink` using the existing
+D/P scorers; compare Mac dev with own-photo labels against the committed90.34749% baseline. Score the one
+joint-five run with unchanged W.combine/assemble+score_labels (oracle photos for GPU), against260/330;
+use neutral votes for failures, preserve every expected window. Apply the existing <=1point rule to every
+GPU/Mac decision field, write final recommendation, update bench in the same results commit. For public
+boxes review `L/public-numeric-results/*-scores.json`, copy only numeric outputs into tracked result paths,
+report them separately as public/easier, rebuild/visually check bench, then reconcile W43.seg-corpus-build.
+Keep paid work deferred. If a stage failed, inspect its saved logs; never silently repeat a locked test or
+retrain. W41.seg-date-model and W43.seg-corpus-build stay open until review. Preserve this clean worktree
+while the one-shot pipelines reference it; remove it only after those stages and result handoff finish.

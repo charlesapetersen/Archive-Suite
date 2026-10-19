@@ -5,6 +5,7 @@ Use --root for the local source cache. Committed manifests freeze every supplied
 its image hash, audit and label before OCR/model collection. No paid collection command exists.
   public_segmentation.py --root DIR --box crest verify|ocr|score
   public_segmentation.py --root DIR --box crest pack --key fs-seg-2b --out DIR
+  public_segmentation.py --root DIR --box crest score --out-dir STAGED_NUMBERS
 Cluster answers use institutional-compute/cluster_seg.py run/import unchanged. For import, set
 SEGBENCH_CACHE=<root>/cache explicitly, so the owner's benchmark cache/logs are not replaced.
 """
@@ -105,7 +106,7 @@ def pack(col, manifest, key, out):
     print(json.dumps(meta, indent=2))
 
 
-def score(col, manifest, key):
+def score(col, manifest, key, output_dir=None):
     from dataclasses import asdict
     from methods import AllNew, NoBoundaries, RuleCuesSketch
     from score import score_labels, derived, check_prediction
@@ -136,7 +137,9 @@ def score(col, manifest, key):
         check_prediction(pred)
         counts = score_labels(col.labels, pred.labels)
         result["models"][name] = {"counts": asdict(counts), "metrics": derived(counts)}
-    path = MANIFESTS / f"{col.name.lower()}-scores.json"
+    destination = Path(output_dir) if output_dir is not None else MANIFESTS
+    destination.mkdir(parents=True, exist_ok=True)
+    path = destination / f"{col.name.lower()}-scores.json"
     if path.exists():
         previous = json.loads(path.read_text())
         if previous.get("truth_sha256") != result["truth_sha256"]:
@@ -158,6 +161,8 @@ def main():
             p.add_argument("--key", required=cmd == "pack")
         if cmd == "pack":
             p.add_argument("--out", type=Path, required=True)
+        if cmd == "score":
+            p.add_argument("--out-dir", type=Path, help="Stage numeric outputs outside git for later review")
     a = ap.parse_args()
     data.CACHE_DIR = a.root / "cache"
     col, manifest = load(a.box, a.root)
@@ -168,7 +173,7 @@ def main():
     elif a.command == "pack":
         pack(col, manifest, a.key, a.out)
     elif a.command == "score":
-        score(col, manifest, a.key)
+        score(col, manifest, a.key, a.out_dir)
 
 
 if __name__ == "__main__":
