@@ -199,6 +199,24 @@ def segmentation():
     return seg
 
 
+def public_segmentation():
+    """Separate public/easier boxes; their labels and scores never enter owner-box fitting."""
+    root = RESULTS / "public-segmentation"
+    boxes = []
+    for name in ("crest", "lincoln"):
+        path = root / f"{name}-scores.json"
+        if not path.exists():
+            continue
+        truth = json.loads((root / f"{name}.json").read_text())
+        result = json.loads(path.read_text())
+        import hashlib
+        digest = hashlib.sha256(json.dumps(truth, sort_keys=True).encode()).hexdigest()
+        if result["truth_sha256"] != digest or result["pages"] != len(truth["pages"]):
+            sys.exit(f"{path.name}: scores do not match the frozen public truth")
+        boxes.append(result)
+    return boxes
+
+
 def handwriting():
     hw = json.loads(HANDWRITING.read_text())
     bar = hw["bar"]
@@ -372,7 +390,7 @@ def main():
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},
                               [r["id"] for r in routes if r["panel"] != "farmshare"])
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(), "handwriting": handwriting(),
-             "farmshare": farmshare(), "difficulty": diff,
+             "farmshare": farmshare(), "difficulty": diff, "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "dating": json.loads(DATING.read_text()) if DATING.exists() else None,
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,

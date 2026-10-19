@@ -307,6 +307,8 @@ step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
 step harness-lifecycle-proof python3 "$ROOT/ops/autonomous/tests/prove-harness-lifecycle.py"
 step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"
+# W40.root-marker's hermetic disclosure proof must run with the rest of the watched harnesses.
+step root-marker-policy-proof bash "$ROOT/ops/autonomous/tests/prove-root-marker-policy.sh"
 
 # ── HEAVY STEPS, after every light one (efficiency plan round 2, 2026-10-07) ─────────────────────────────
 # Everything above is hermetic and lock-free, so it runs first and a RED there lands in the first minutes

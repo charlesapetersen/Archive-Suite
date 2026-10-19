@@ -47,18 +47,31 @@ anew, under rule 4. Ambiguous rule interpretations are explicitly listed in the 
 agent audit, not a second owner adjudication. CREST also includes third-party material: no blanket
 US-government public-domain claim is made and no image redistribution is included.
 
-## Lincoln Papers: full catalogue and complete manifests
+## Lincoln Papers: 261 supplied pages, 81 audited documents
 
-The browser successfully reached the full catalogue after its automatic verification, sorted it by
-Shelf Order, and saved the first **150 of 20,207** records. Starting at catalogue position 2 (the first
-manuscript after a printed envelope), complete consecutive item manifests are being exported. The catalogue
-order is preserved exactly even where numeric item identifiers are not increasing. The run will stop at
-an item boundary near 250 supplied canvases, before any model call or page-label audit based on output.
+The [full Library of Congress catalogue](https://www.loc.gov/collections/abraham-lincoln-papers/?sb=shelf-id&c=150)
+was sorted by Shelf Order. The saved first page contains 150 of 20,207 records. Catalogue positions **2–73**
+are 72 consecutive manuscript items, with every one of their **261 canvases** included. Selection starts
+after the first printed Stern envelope and stops near 250 pages at a whole-item boundary: the final
+Lincoln-to-Corning manuscript has 22 canvases. The returned catalogue order is preserved even when numeric
+identifiers decrease. This proves consecutive catalogue positions, **not** gap-free physical archival order.
+The completed-transcription By the People export was not used to select or truncate the box.
 
-The earlier By the People CSV contains only completed transcriptions (28,816 Lincoln assets in 10,061
-items), so it cannot establish complete item or page order. It is not used to select or truncate this box.
-Manifest export is still underway; this box is not frozen and has no scores. Browser connection failures
-are retried in bounded attempts; no catalogue item is skipped after a failed manifest request.
+All 72 official IIIF manifests are saved and checksummed. Each supplied canvas was downloaded through the
+host-limited helper as a 2,000-pixel-ceiling IIIF rendering, then checked for decoding, aspect ratio and
+SHA-256. These are all supplied canvases, rather than full-resolution masters. Temporary network failures
+received bounded retries; no selected item or canvas was skipped.
+
+[lincoln.json](public-segmentation/lincoln.json) freezes every source page, original item boundary and
+page-by-page audit before model collection. The 72 catalogue starts are retained. Nine internal starts
+make **81 documents**: an Evening Edition clipping (76), Martial and Civil Law order/article (102),
+Missionaries resolutions (123), a separate editorial (124), a fresh Milroy-to-Usher letter (139), certified
+Grand State Council resolution (223), Rights of the Press proceedings (230), and isolated wrappers (77/231).
+The two wrappers follow an intervening enclosed publication rather than their covering letter: in a
+contiguous stream they are retained as separate fragments. This is an explicitly ambiguous rule-6
+interpretation, not a second owner adjudication. The manifest records the other retained continuations,
+including envelopes adjacent to their letters, quoted communications beginning within a physical page,
+and complete pamphlets under rule 10. All 261 images were visually reviewed in 66 contact sheets.
 
 ## Reproduce and score
 

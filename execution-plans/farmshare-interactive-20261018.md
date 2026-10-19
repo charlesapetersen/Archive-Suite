@@ -274,3 +274,17 @@ The final 22-canvas item is one continuous Lincoln-to-Corning manuscript with in
 `public-segmentation/lincoln.json` freezes source order, manifest/image hashes, every audited boundary and
 limitations. Consecutive catalogue positions do not prove physical gap-free archival arrangement; 2000px
 IIIF renderings include all supplied canvases, not full-resolution masters. No paid/public model call yet.
+
+## Usage-conserving overnight continuation (owner, 2026-10-18 evening)
+
+Owner reports 18% weekly Codex remaining: prioritize ready long-compute pipelines, no further corpus
+expansion, checkpoint anything requiring more construction. Preserve the owner's SSH master/socket.
+Combined training 1856294 completed exit 0 in 4h37m; both 300-prompt GPU date packs completed with no
+transport errors. Joint GPU dev is complete; held-out evaluation 1856499 is nearly complete. The existing
+Mac continuation transferred/checksummed/quantized and is measuring 600 dates +187 dev windows under the
+unchanged guard. Lincoln OCR finished all261, skipped0/failed0, 70s, peak362MB. Fitted rule baseline froze
+at75858e61 before public scoring; 551 owner-dev pages only, no public tuning. No further source building.
+
+The full health gate ended 37passed/1failed: the pre-existing hermetic W40.root-marker proof was not wired
+into the gate. Add its actual step (no exclusion/weakening); direct proof4/4 and gate-report38/38 pass.
+App/GUI checks passed. Full gate must rerun after this small wiring fix; last-green marker not advanced yet.

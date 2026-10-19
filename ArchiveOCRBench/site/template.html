@@ -55,6 +55,8 @@ table { border-collapse: collapse; font-variant-numeric: tabular-nums; min-width
 th, td { text-align: right; padding: 4px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
 th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
 th { font-weight: 600; color: var(--fg); }
+#public-segmentation th { white-space: normal; }
+#public-segmentation td:nth-child(3) { white-space: normal; text-align: left; min-width: 170px; max-width: 260px; }
 .key { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 3px 18px; font-size: 13px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
 .key b { display: inline-block; min-width: 24px; font: 12px var(--mono); color: var(--muted); font-weight: 400; }
 .key .front { color: var(--fg); }
@@ -109,6 +111,13 @@ footer p { font-size: 13px; }
     <div class="head"><h2>With checking</h2><span class="meta">each approach at its flag level frozen for the 98% bar</span></div>
     <div class="tbl"><table><thead><tr><th>#</th><th>Approach</th><th>No checking</th><th>Checks per 100 pages</th><th>Right after checking</th><th>Unflagged errors</th><th>Per 1,000</th><th>Batch</th></tr></thead><tbody id="seg-rows"></tbody></table></div>
     <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Qwen3.5 27B on FarmShare is the open-weight model that cleans the corpus labels a small Mac model will be trained on; it runs on Stanford's GPUs, so it has no price per page and is not on the chart, and its confidences are too even to flag on, so reaching 98% means checking every gap, as Full manual does. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. The fine-tuned Qwen3.5 4B and 2B are small models trained on the owner's corpus with that teacher's cleaned labels, so they can run on an 8 or 16 GB Mac; these are their FarmShare figures at full precision, and the Mac's own 4-bit and 8-bit figures are in <code>seg-students.md</code>. Sources: <code>options.md</code>, <code>cheap-models.md</code>, <code>seg-teacher.md</code> and <code>seg-students.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
+  </section>
+
+  <section class="panel" id="public-segmentation" hidden>
+    <div class="head"><h2>Public and easier: document boundaries</h2><span class="meta">separate reference sets · no checking</span></div>
+    <p class="note">CIA CREST and the Lincoln Papers preserve every supplied page of the selected consecutive source items. Archive splits were checked page by page against the same ten document rules before model collection. Scores use the existing document scorer and are reported separately from the owner's locked boxes. These are public source collections, potentially familiar to pretrained models; they do not establish performance on unseen private archives.</p>
+    <div class="tbl"><table><thead><tr><th>Box</th><th>Pages / documents</th><th>Approach</th><th>Pages in exact document</th><th>False splits</th><th>False merges</th><th>Boundary F1</th></tr></thead><tbody id="public-seg-rows"></tbody></table></div>
+    <p class="note">All model requests include Apple Vision text and images. The fitted rule baseline uses only the owner's development boxes; public truth never selects its settings. CREST has a known marker for two withheld physical pages, which were not supplied. Lincoln uses consecutive catalogue positions rather than a proven gap-free physical arrangement; two isolated wrappers have explicitly ambiguous boundaries. Images remain local. Sources: <code>public-segmentation.md</code> and its frozen manifests and score files. Paid reference routes remain deferred.</p>
   </section>
 
   <header class="part" id="handwriting">
@@ -370,6 +379,19 @@ document.getElementById('seg-note').textContent = 'Highest: ' + segTop.join(' an
 document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + '</td><td>' + a.checks.toFixed(1) +
   '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? 'FarmShare GPUs' : a.mac ? 'free, on your Mac' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
 charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
+
+const publicSeg = DATA.public_segmentation || [];
+const publicSegNames = {'all-new': 'Every page starts a document', 'no-boundaries': 'Whole box is one document',
+  'rule-cues-sketch': 'Rule sketch + Apple Vision', 'rule-cues': 'Rules fitted on owner development boxes + Apple Vision',
+  'fs-qwen3.5-27b': 'Qwen3.5 27B teacher · FarmShare', 'fs-seg-2b': 'Trained Qwen3.5 2B · FarmShare',
+  'fs-seg-4b': 'Trained Qwen3.5 4B · FarmShare'};
+document.getElementById('public-seg-rows').innerHTML = publicSeg.flatMap(b => Object.entries(b.models)
+  .sort((a, c) => c[1].metrics.pages_in_exact_doc - a[1].metrics.pages_in_exact_doc)
+  .map(([k, r]) => '<tr><td>' + b.box + '</td><td>' + b.pages + ' / ' + b.documents + '</td><td>' + (publicSegNames[k] || k) +
+    '</td><td>' + pct1(100 * r.metrics.pages_in_exact_doc) + ' (' + r.counts.pages_exact + '/' + r.counts.doc_pages +
+    ')</td><td>' + r.counts.false_splits + '</td><td>' + r.counts.false_merges + '</td><td>' +
+    pct1(r.metrics.boundary_f1 === null ? null : 100 * r.metrics.boundary_f1) + '</td></tr>')).join('');
+document.getElementById('public-segmentation').hidden = !publicSeg.length;
 
 // Part 3: handwriting.
 const HW = DATA.handwriting;

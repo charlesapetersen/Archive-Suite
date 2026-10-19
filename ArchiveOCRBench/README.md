@@ -46,6 +46,10 @@ It is kept current: a change that commits a measured OCR or segmentation result 
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet
 built are in [`POTENTIAL_FEATURES.md`](POTENTIAL_FEATURES.md).
 
+Part 2 also reports the public/easier CREST and Lincoln segmentation boxes separately, from their frozen
+`public-segmentation/*-scores.json` files. Every supplied page was audited before collection; source gaps
+and ambiguous wrappers are disclosed beside the figures. Paid reference calls remain deferred.
+
 ## What is here
 
 | Path | What it is |
