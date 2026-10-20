@@ -97,3 +97,20 @@ NVFP4 download. GPU image compatibility is unverified until the queued pilot suc
 Ling/Nemotron jobs and collector independent.
 
 SSH restored19Oct: preparation1857666 completed0, both Ling/Nemotron pinned roots ready; their GPU jobs remain dependency-pending. Collector restarted with archived old marker/status; current log collection-restored.log.
+
+## Reruns — 2026-10-20 (owner-directed; supersede 1857667 and 1857668)
+
+Both original jobs ended in TIME LIMIT (4 h) with partial caches. The collector reuses finished `<id>.json`
+readings and files failed pages separately as `<id>.error.json`, and the settings contract was unchanged, so both
+were resubmitted by hand with the same script and resources and only a longer limit. **Collect these job IDs, not
+the old ones.**
+
+- **Ling3 Flash VL FP8: 1860274.** 4 GPUs, 6 h. First run left 466 pages cached (421 ok, 44 cap). Rerun read the
+  remaining 430 in 3 h 45 min, exit 0, no errors. `status.json`: `completed_raw`, **816 ok, 79 cap** of 895.
+- **Nemotron 3.5 Super VL NVFP4: 1860275.** 2 GPUs, 7 h. First run left about 438 clean pages (369 ok, 69 cap).
+  The 241 `error` files it also wrote were all produced after the server shut down at the 04:08:46 cancellation
+  (`cannot schedule new futures after shutdown`): a time-limit artefact, not a model fault; the collector retries
+  them automatically. Rerun was RUNNING at 14:54 on 20 Oct, 457 pages to read, expected about 4 h. Final counts
+  not yet known.
+
+Caps are terminal benchmark failures in this collector and were not rerun.

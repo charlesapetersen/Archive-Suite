@@ -65,3 +65,17 @@ Preparation1858052 completed0 in4m46s; prepared.json is ready, pinned models loa
 white-page API smoke passed. GPU1858053 remains pending after Inkling1857671. No benchmark page has
 yet been read by this route. Preparation receipt, pipeline.yaml and smoke JSON copied to
 L/preparation-check. Original collectors and SSH held channel remain healthy; no new submissions.
+
+## Rerun — 2026-10-20 (owner-directed; supersedes 1858053)
+
+**Collect job 1860044, not 1858053.** 1858053 failed after 8 s at 06:02 on 20 Oct: `read_rows` in
+`recovery/ppocrv6_run.py` rejected 42 of the 895 page IDs as unsafe (41 contain parentheses, e.g.
+`eparchos__6791_(11)`; one has accented letters, `tapus__AN-96AP_1-dossier_1-pièces_…`). No page was read.
+The ID is only ever used as the file name `<id>.json`, so the allowed set was widened from `[A-Za-z0-9_.-]` to
+`[\w.()-]` (line 106; slashes and spaces still rejected). All 895 IDs pass. Original kept beside it as
+`ppocrv6_run.py.orig-1858053`. The run contract file had not been written, so the runner hash did not conflict.
+
+Resubmitted by hand as **1860044**: same resources (1 GPU, 8 CPU, 48 GB, 12 h), no dependency (setup 1858052 and
+Inkling no longer gate it). Result: COMPLETED in 5 min 26 s, 895 raw readings in `ppocrv6-medium-native/raw`;
+893 log lines `ok`, one page `blank` (`btp__afc1945001_ms04062-29`). Not yet reviewed or scored. Log:
+`ppocrv6-20261019/logs/pp6-19-ppocrv6-medium-native-1860044.log`.
