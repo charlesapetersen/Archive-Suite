@@ -114,3 +114,25 @@ the old ones.**
   not yet known.
 
 Caps are terminal benchmark failures in this collector and were not rerun.
+
+### Checking Nemotron 1860275 — for whoever picks up W43.general-sweep-farmshare (added 2026-10-20)
+
+`W43.general-sweep-farmshare` is the queue item that closes this sweep. Do not tick it while Nemotron's job is
+unfinished, and do not score a partial cache.
+
+1. Needs the owner's open FarmShare SSH master (`~/.ssh/cm-farmshare`, Duo). Test it with
+   `ssh -o ControlPath=~/.ssh/cm-farmshare -O check cp1@login.farmshare.stanford.edu`. If it is absent, do not try
+   to reconnect: leave the item open and put the question to the owner in the Daemon Report.
+2. Read the job: `sacct -j 1860275 -X -n -o JobID,State,Elapsed,End`. Jobs run on the cluster whatever the link
+   does; read scratch with a timeout, as `tail`/`wc` there can hang.
+3. **If it is still RUNNING:** leave the item open and move on. Its limit is 7 h from 13:54 on 20 Oct, so it
+   ends by about 21:00 that day at the latest.
+4. **If it is COMPLETED:** `nemotron35-super-vl-nvfp4/status.json` should read `completed_raw` with counts. Check
+   that no `<id>.error.json` is left, then record the counts in this file and go on to review and scoring.
+5. **If it is TIMEOUT or FAILED:** expect this. At 1 h 33 min it had read 80 of its 457 remaining pages, a rate
+   that needs about 8 h against a 7 h limit. Finished readings are cached, so nothing is lost. Count the clean
+   `<id>.json` files, record the count here, and put the question to the owner in the Daemon Report: a third
+   submission with a longer limit is the likely answer, but the tracker says never to resubmit inference
+   automatically, so it is the owner's call.
+6. Ling3 (1860274) is already complete: 816 ok, 79 cap, no errors. Inkling is parked. Neither needs more FarmShare
+   time.
