@@ -16,11 +16,6 @@ final class LayoutGuardUITests: FixtureUITestCase {
         sweepMainScreens(appearance: "dark")
     }
 
-    /// The preview sheet is 940×700 over a 900×612 window, so it overhangs it on every side (VM, 2026-10-11).
-    private let oversizeSheet = LayoutGuard.KnownIssue(tag: "W40.fix-reader-preview-sheet-oversize") {
-        $0.kind == .window && $0.type == .sheet
-    }
-
     /// A PDF page's text (PDFKit's `document` group) is laid out by the page and scaled by the zoom: the
     /// viewer's extracted-text page at fit-width zoom reports 10-pt-tall lines. It is content, not app layout.
     private func isPDFPage(_ node: LayoutNode) -> Bool {
@@ -48,7 +43,7 @@ final class LayoutGuardUITests: FixtureUITestCase {
         let open = app.buttons["ar.preview.open"]
         XCTAssertTrue(open.waitForExistence(timeout: 5), "the preview sheet should open")
         LayoutGuard.sweep(main, screen: "preview sheet, \(appearance)", in: self, resize: false,
-                          known: [oversizeSheet], ignore: isPDFPage)
+                          ignore: isPDFPage)
 
         open.click()
         let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch

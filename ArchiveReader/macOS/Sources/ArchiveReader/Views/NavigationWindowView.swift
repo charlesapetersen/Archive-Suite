@@ -22,6 +22,8 @@ struct NavigationWindowView: View {
     @State private var tagFilterFocusToken = 0       // C5: ⌘L focuses the tag filter
     /// The preview sheet's viewer model while that sheet is up — see `publishedPreviewViewer`.
     @State private var previewViewer: DocumentViewerModel?
+    /// The window's content size, so the preview sheet can be sized to fit inside it (W40.fix-reader-preview-sheet-oversize).
+    @State private var contentSize: CGSize = .zero
 
     var body: some View {
         HStack(spacing: 0) {
@@ -47,6 +49,7 @@ struct NavigationWindowView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 560)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
         .animation(.easeInOut(duration: 0.2), value: showingSidebar)
         .animation(.easeInOut(duration: 0.2), value: showingTagCloud)
         .toolbar { toolbarContent }
@@ -84,7 +87,8 @@ struct NavigationWindowView: View {
         .onChange(of: model.focusSearchRequest) { searchFocused = true }              // C5 ⌥⌘F
         .onChange(of: model.focusTagFilterRequest) { tagFilterFocusToken &+= 1 }       // C5 ⌘L
         .sheet(isPresented: $model.showingPreview) {
-            PreviewSheet(selection: model.documentSelection(), nav: model, published: $previewViewer) {
+            PreviewSheet(selection: model.documentSelection(), nav: model, published: $previewViewer,
+                         size: PreviewSheet.fittedSize(in: contentSize)) {
                 model.showingPreview = false
                 openSelection()   // "Open" → jump to the full document window
             }

@@ -14,7 +14,20 @@ struct PreviewSheet: View {
     /// outlives the sheet and can actively withdraw it. That is the nav window; this binding is how it
     /// learns which model to publish.
     @Binding var published: DocumentViewerModel?
+    /// The sheet's size, from `fittedSize(in:)` over the presenting window's content size.
+    var size: CGSize
     var onOpenFull: () -> Void
+
+    /// The preferred size, shrunk to leave a margin inside the window the sheet hangs from, so it never
+    /// overhangs it (W40.fix-reader-preview-sheet-oversize: 940×700 over a 900×612 window). A zero size means
+    /// the window has not been measured yet; the preferred size stands until it is.
+    static let preferredSize = CGSize(width: 940, height: 700)
+    static let windowMargin: CGFloat = 40
+    static func fittedSize(in window: CGSize) -> CGSize {
+        guard window.width > 0, window.height > 0 else { return preferredSize }
+        return CGSize(width: max(1, min(preferredSize.width, window.width - windowMargin)),
+                      height: max(1, min(preferredSize.height, window.height - windowMargin)))
+    }
 
     @Environment(\.dismiss) private var dismiss
     /// `supportsFind: false` — this sheet renders no find bar (the app's only one is in
@@ -29,7 +42,7 @@ struct PreviewSheet: View {
             Divider()
             content
         }
-        .frame(width: 940, height: 700)
+        .frame(width: size.width, height: size.height)
         .archiveLinkCopyError(model: model)
         .onAppear {
             model.load(selection)
