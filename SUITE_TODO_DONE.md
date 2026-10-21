@@ -12516,3 +12516,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
     caption headers (neighbour 1 on p019/p081, 2 on p076/p085) and counted letterheads as mixed.
   - Not on ArchiveOCRBench: no route or figure was measured, only ocr-pages.csv re-read by tag, which no chart takes.
   <!-- /W46.fix-capture-tags -->
+- [x] **W40.e12 — Processor screen-by-screen visual review in the VM [S-M]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) · SHIPPED 2026-10-21 (this commit; checkpoint `3dc96214`)
+  - `ArchiveProcessorUITests/VisualReviewUITests` tours the three modes, Settings in each OCR backend, the Tools sheets,
+    the key and Local Agent wizards and the DEBUG seams (two-page PDF, flagged review, finishing scrim, emptied pane,
+    plus the new DEBUG-only `-APUITestSyntheticVolume`: 60 dropped pages, eight with long archival names), light and
+    dark, minimum and typical size, on open and idle. Opt-in via `VISUAL_REVIEW=1` (guest `~/.visual-review`).
+  - VM run: `Executed 6 tests, with 0 failures` in 2772 s, "missing: none", 270 shots (kept in the primary checkout's
+    gitignored `old/W40.e12-visual-2026-10-21/run1/`). Verdict per screen and the defect JPEGs:
+    `verification/evidence/processor/visual-2026-10-21.md`. Open and idle were identical everywhere.
+  - Filed (S3): `W40.fix-processor-dark-disabled-buttons`, `-start-why`, `-live-emptied-mixed`, `-flagged-page-edges`,
+    `-settings-fields`, `-settings-backend-mismatch` (these six now block `W40.g3`: each sits in a task the owner's
+    session would do), `-compare-count` (Tools only, not in the session); S4 bundle `-visual-polish`.
+  - Not reached by design: the run-time review sheets (segment review, collection confirm, manual tagging, finalize),
+    which `W40.d2` drives. The flagged-review window ignored the tour's resize (opens filling the screen). None of the
+    defect classes is one `W40.e9`'s frame-based layout guard can see, so nothing was added to it.
+  <!-- /W40.e12 -->
