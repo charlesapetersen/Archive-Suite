@@ -119,9 +119,7 @@ dependencies {
 
 // W40.e8 — goldens live in the source tree so they are committed; record with -Proborazzi.test.record=true.
 roborazzi {
+    // A failed comparison writes <name>_actual.png and <name>_compare.png beside the goldens (1.32 has no separate
+    // compare dir); src/test/screenshots/.gitignore keeps them out of git.
     outputDir.set(file("src/test/screenshots"))
-    // A failed comparison's actual and diff images go under build/, never next to the goldens.
-    compare {
-        outputDir.set(layout.buildDirectory.dir("outputs/roborazzi"))
-    }
 }
