@@ -12151,3 +12151,30 @@ Plan: `~/Claude/Agent Manager/EFFICIENCY-PLAN.md` (rounds 1 and 2, the Archive S
   <!-- /W46.fix-seg-scorers -->
 - [x] **W40.fix-reader-filter-focus — the Reader's filter bar rebuilt its text fields when Save/Clear appeared, taking the keyboard from the field being typed in [S · S3]** · §W40 (lane: reader) (uses: build). Found 2026-10-21 in the W40.fix-reader-narrow-window draft stranded by a usage cut (`suite-wt-20261020-174345-21130`), whose `FilterBarLayout` avoided `ViewThatFits` for this reason; the shipped narrow-window fix (08d4c781, 10e4db2d) used `ViewThatFits`. Checked off screen in an interactive session: the same field before and after Save/Clear appear was a new NSTextField at 300 and 420 pt and the same at 600 pt, and it lost first responder; a plain HStack and `FilterBarLayout` kept both. SHIPPED 2026-10-21: `filterBar` is a `FilterBarLayout` (a `Layout` that moves a control that does not fit to the next row; Save/Clear sit at their row's right edge through `.filterBarTrailing()`), each control group wrapping whole as the rows did. The draft's row-math tests and an identity test (`FilterBarLayoutTests`, 7 tests, green on the host unit bundle); the identity test checks the layout, not that `filterBar` uses it. `LayoutGuardUITests` in the VM: 2 tests, 0 failures (the narrow-window sweep).
   <!-- /W40.fix-reader-filter-focus -->
+- [x] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** · §W21 — GUI lane generalization · SHIPPED 2026-08-01
+  `de43be3` (the lane) + this commit (the checks). **12/12 → 15/15 in the VM**, `notes` out of
+  `AUTONOMOUS_GUI_VM_WARN_APPS` (now empty by default, so a Notes UITest failure REDs the gate again).
+  The 4/12 was **one geometry cause wearing four costumes**, not four bugs, and neither half of it was what
+  the leads guessed — measured with a throwaway diagnostic test that dumped the a11y tree with frames:
+  `tart run --no-graphics` attaches no display, so the guest ran **1024×768** (while `tart get` said
+  1920x1200 all along), and `NotesBrowserView` declared `.frame(minWidth: 900)` against panes needing
+  ~1084 pt — a frame minimum below the content's own minimum does not shrink the content, so SwiftUI
+  centred 1084 in 900 and cut ~92 pt off EACH side. The four failing controls were simply the right-most
+  ones (rawToggle, locations.remove, and the strip's reveal/zoteroOpen; select/pasteImage/jump to their
+  left always passed). Fixes: drop the false `minWidth` (a real app bug — a user could drag the window to
+  900 pt and lose those controls) + `tart_ensure_display` raising the guest to 1920×1200 from
+  `ops/gui/tart-lib.sh`, loudly, so both entry points get it. Window is now 1121 pt.
+  **Backlog drained — 3 of the 4 owner-eye checks are now automated** (`ArchiveNotesUITests`, VM log
+  `~/.tart-mirror/vm-artifacts-wt/xcuitest-notes.log`, 15/15): **G12** = W14.4 (d) per-window Sources
+  column (same cell id asserted present in the Extracts window and absent in the Note window, so the
+  negative can't pass on a typo); **G13** = W14.3 live copy→paste, asserting the imported file is
+  **byte-identical** to the source note's asset, not merely referenced; **G14** = W14.4 (b) raise+focus
+  for BOTH triggers (⌘⌥E → Extracts window, then Jump-to-Source → back to the Note window), via a new
+  DEBUG `an.status.keyWindow` probe — XCUITest exposes no `isKeyWindow` on a window element, so without it
+  the check could only assert the selection half. New DEBUG seams: `an.editor.test.copyPassage` /
+  `.pastePassage` (⌘C/⌘V route to the first responder, which XCUITest can't reliably make the styled text
+  view), and the control strip now wraps to two rows so a tenth control can't push the last one
+  off-window again. **W14.4 (c) is now deterministically covered by `W21.vmgui-c-fu`.**
+  <!-- /W21.vmgui-c -->
+- [x] **G5 — cheap Tier-1 smoke gate shipped (2026-07-07).** · §Excluded (not "now") New Suite-root `./test-smoke.sh processor|reader|all` (mirrors `launch.sh`) → `ArchiveReader/test-smoke.sh` (build + full unit suite, **135 tests, free**) + `ArchiveProcessor/test-smoke.sh` (headless **2-image** OCR via `ProcessFilesTestDriver`, `gemini-2.5-flash-lite`, ~a few cents, `mktemp` scratch-isolated, key never printed). Distinct from the cost-heavy `scripts/test-smoke.sh` (raw per-provider calls) + `scripts/test-tier2.sh` (multi-case pipeline) above. Both verified PASS. ✅
+  <!-- /G5 -->

@@ -655,121 +655,8 @@ Shared-contract (Tier-2) — SPEC first, then the shared parser, then each app +
 add a second control alongside.**
 
 ## W21 — GUI lane generalization + small hygiene (owner-reviewed 2026-07-28)
-From the 2026-07-28 Daemon Report walkthrough. The headless VM lane is now shared by Reader and Notes:
-`W21.vmgui-a` shipped one per-app configuration table for both entry points, `W21.vmgui-b` made its fixtures
-corpus-free, and `W21.vmgui-c` made the Notes suite green. The remaining GUI gap was **Processor**, which had no
-test target and carried the Keychain risk described below. Completing the lane drained that backlog off-screen
-while retaining the existing Reader and Notes behavior rather than reintroducing Reader-only assumptions.
-
-**W21.vmgui is complete — see [`SUITE_TODO_DONE.md`](SUITE_TODO_DONE.md) for its 2026-08-27 completion
-record.** Reader, Notes, and Processor use the shared per-app table with corpus-free scratch fixtures and
-launch safeguards; the gate rotates one route per run.
-  - [x] **W21.vmgui-c — Notes lane green in the VM, then drain the Notes GUI backlog [M].** DONE 2026-08-01
-    `de43be3` (the lane) + this commit (the checks). **12/12 → 15/15 in the VM**, `notes` out of
-    `AUTONOMOUS_GUI_VM_WARN_APPS` (now empty by default, so a Notes UITest failure REDs the gate again).
-    The 4/12 was **one geometry cause wearing four costumes**, not four bugs, and neither half of it was what
-    the leads guessed — measured with a throwaway diagnostic test that dumped the a11y tree with frames:
-    `tart run --no-graphics` attaches no display, so the guest ran **1024×768** (while `tart get` said
-    1920x1200 all along), and `NotesBrowserView` declared `.frame(minWidth: 900)` against panes needing
-    ~1084 pt — a frame minimum below the content's own minimum does not shrink the content, so SwiftUI
-    centred 1084 in 900 and cut ~92 pt off EACH side. The four failing controls were simply the right-most
-    ones (rawToggle, locations.remove, and the strip's reveal/zoteroOpen; select/pasteImage/jump to their
-    left always passed). Fixes: drop the false `minWidth` (a real app bug — a user could drag the window to
-    900 pt and lose those controls) + `tart_ensure_display` raising the guest to 1920×1200 from
-    `ops/gui/tart-lib.sh`, loudly, so both entry points get it. Window is now 1121 pt.
-    **Backlog drained — 3 of the 4 owner-eye checks are now automated** (`ArchiveNotesUITests`, VM log
-    `~/.tart-mirror/vm-artifacts-wt/xcuitest-notes.log`, 15/15): **G12** = W14.4 (d) per-window Sources
-    column (same cell id asserted present in the Extracts window and absent in the Note window, so the
-    negative can't pass on a typo); **G13** = W14.3 live copy→paste, asserting the imported file is
-    **byte-identical** to the source note's asset, not merely referenced; **G14** = W14.4 (b) raise+focus
-    for BOTH triggers (⌘⌥E → Extracts window, then Jump-to-Source → back to the Note window), via a new
-    DEBUG `an.status.keyWindow` probe — XCUITest exposes no `isKeyWindow` on a window element, so without it
-    the check could only assert the selection half. New DEBUG seams: `an.editor.test.copyPassage` /
-    `.pastePassage` (⌘C/⌘V route to the first responder, which XCUITest can't reliably make the styled text
-    view), and the control strip now wraps to two rows so a tenth control can't push the last one
-    off-window again. **W14.4 (c) is now deterministically covered by `W21.vmgui-c-fu`.**
-  - [x] **W21.vmgui-d — Processor lane from zero, then drain the Processor GUI backlog [L]** (blocked-on:
-    W21.vmgui-c). Processor previously had **no test target of any kind**, **no `schemes:` block** (it relied on
-    Xcode autocreation), **zero `accessibilityIdentifier`s** in `Sources/` (vs 4 files Reader / 11 Notes), and no
-    UITest launch-arg override. This item creates all four: (1) an `ArchiveProcessorUITests` target
-    (`bundle.ui-testing`, `TEST_TARGET_NAME: ArchiveProcessor`, `CODE_SIGN_IDENTITY: "-"`,
-    `CODE_SIGNING_REQUIRED: NO`, **`ENABLE_HARDENED_RUNTIME: NO`** — the W7.1 finding: an ad-hoc-signed runner
-    can't load the xctest plugin under hardened runtime, and `settings.base` sets it YES); (2) an explicit
-    `schemes:` block mirroring Notes with the UITest target `[test]`-only, so `-scheme ArchiveProcessor … build`
-    keeps working for `launch.sh`, `test-smoke.sh` and `scripts/e2e-phone-mac.sh`; (3) `accessibilityIdentifier`s
-    on exactly the surfaces under check (Settings provider rows + "Set up (guided)…", `ProviderKeyWizard`, the
-    drop zone + Tagging panel in `OCRView`); (4) a scratch launch config (guest `mktemp` IN/OUT) — Processor is
-    **not sandboxed**, so no temporary-exception entitlement is needed.
-    **DONE 2026-08-27, this commit:** scratch-only Processor VM suite **4/4**, existing Reader **29/29**, and
-    Notes **21/21** all passed; the sighted Processor capture is
-    `~/.tart-mirror/vm-artifacts/processor/sighted.png`, its XCUITest evidence is
-    `~/.tart-mirror/vm-artifacts/processor/xcuitest.log` and `processor/shots/`. The fixture never mounts a
-    corpus or writes a key. **Keychain posture — why the VM is the right place, and how to keep it that way.** The host prompt comes from
-    `ContentView.maybePresentKeyOnboarding` (5 eager `KeychainHelper.load`s on first launch) plus
-    `SettingsView.loadKeys()` (5 more on appear): the host keychain *has* those items, and an ad-hoc rebuild
-    changes the code identity so their ACL no longer matches → macOS prompts. **The VM is a different machine
-    whose login keychain holds no ArchiveProcessor items at all, so `SecItemCopyMatching` returns
-    `errSecItemNotFound`, which does not prompt (there is no ACL to fail).** The lane's job is to preserve that:
-    **never seed API keys into the guest keychain, never run `ensure-signing.sh` in the guest** (ad-hoc is correct
-    there), never point the guest at the host keychain. Belt-and-braces: set `ARCHIVEPROC_HEADLESS=1` in the
-    UITest `launchEnvironment` so `KeychainHelper.load/save` early-return and **zero** Keychain calls happen.
-    *Caveat that shapes the check:* that same flag suppresses the wizard's auto-present, so the key-wizard visual
-    must be reached explicitly via Settings → "Set up (guided)…" (or a dedicated `-APUITestShowKeyWizard` arg),
-    not the no-key first-launch path. **Gate safety:** a Processor launch yielding no window within N s must SKIP
-    (fail-open) **and** save a VNC capture, so an unexpected keychain/unlock panel is diagnosable instead of an
-    invisible 20-minute hang. **Then discharge ALL THREE $0 Processor visuals** (owner-confirmed 2026-07-29 —
-    the third was under-scoped when this item was written and is the same class as the other two, so it drains
-    here too, not by hand):
-    1. **Anthropic key-wizard** — Settings ▸ "Set up (guided)…" lists **Anthropic first**: console sign-in
-       button, `sk-ant-` field, no-free-tier cost/privacy notes.
-    2. **Multi-page-PDF auto re-OCR** — the "Re-OCR multi-page PDF" toggle is GONE; drop zone reads "Drop images
-       or PDFs here"; after dropping a multi-page PDF the **Tagging** panel greys out with the re-OCR note.
-    3. **Local CLI Agent wizard + cost panes** (W13.cli-2/cli-3) — Settings ▸ Provider & Model ▸ "Local CLI
-       Agent" ▸ "Set up (guided)…": Claude/Gemini segmented steps render and Install/Docs links resolve; with
-       Local Agent active BOTH the SettingsView pinned pane and the OCRView Files-tab card read "Included in
-       your subscription — usage limits apply" (+ pacing note) instead of a dollar figure; the 3-way backend
-       picker shows Local-Agent controls only in that mode and switching clears the other backend. This needs
-       **no key and no CLI login** — it is pure rendering, so `ARCHIVEPROC_HEADLESS=1` is fine and the
-       `cliNotLoggedIn` state is an acceptable (indeed expected) thing to see in the guest.
-    Every discharged check must cite the VNC PNG / xcuitest log it was verified from, and flip its line in the
-    plan's "Outstanding owner checks" block in the SAME commit.
-    ⚠️ The **live-key** halves stay keyed/owner and do NOT drain here: the multi-page-PDF *live run*, the OpenAI
-    rotation *smoke*, Local Agent *live OCR*, `test-localagent.sh`, and the W14.5 legacy-manifest E2E all spend
-    against the owner's real accounts or need a signed-in host CLI.
-  **Acceptance criteria (all must hold):**
-  1. `vm-gui-runner.sh reader xcuitest` is still **15/15** (regression baseline), `notes` matches its host
-     baseline (G0–G11 + Smoke, 13/13 recorded 2026-07-15) **with no `XCTSkip`**, and `processor` runs its new
-     UITests green plus produces a sighted VNC capture.
-  2. Every app-specific string (project · spec · scheme · only-testing · DerivedData · app bundle · pkill name ·
-     fixture path · launch arg · artifact prefix) comes from **one** per-app table per script — no `ArchiveReader`
-     literal survives outside that table in either `vm-gui-runner.sh` or `gui-vm-gate.sh`.
-  3. The health-gate step stays **fail-open**: missing VM / boot failure / timeout / missing target → SKIP
-     (exit 0); RED only on a reproducible `** TEST FAILED **` after retry-once. Proven by a new
-     `ops/autonomous/tests/prove-gui-vm.sh` (fake `tart` on PATH, full matrix), in the style of
-     `prove-housekeeping.sh` — the existing gate has no prove harness.
-  4. The gate runs **one app per invocation, round-robin via a state file** (the `next-review-unit.sh` cadence
-     pattern). 3 apps × `AUTONOMOUS_GUI_VM_MAXRUN` (1200 s) = 60 min > the daemon's whole-gate `GATE_MAXRUN`
-     (3000 s / 50 min), so an all-three run would false-park on timeout — round-robin (or a raised cap) is
-     required, not optional.
-  5. No corpus dependency: with `Test files/` and `ArchiveProcessor/Test Files/` absent (the normal worktree
-     case) both fixtures still build inside the VM; nothing under `~/Desktop/Google Drive` is mounted or read.
-  6. File safety: Notes touches only `AN-GUI-Fixture` (scratch guard armed), Reader only `AR-GUI-Fixture`,
-     Processor only a guest `mktemp` IN/OUT; no API key is ever written to the guest keychain.
-  7. Artifacts land per app under `~/.tart-mirror/vm-artifacts/<app>/` (xcuitest log · `.xcresult` · sighted
-     PNGs), and every drained backlog item cites the PNG/log it was verified from.
-  8. Guest housekeeping: three DerivedData trees (`/Users/admin/dd-{reader,processor,notes}`) are pruned/reused
-     so the guest disk (≈33 GB free on the 120 GB image) can't fill; a full guest disk SKIPs, never REDs.
-  9. Docs move in the same commits: `ops/gui/README.md` §3 (three apps, per-app fixtures, the round-robin rule),
-     root `CLAUDE.md` loop step 2, `AGENTS.md` → *GUI verification*, and the per-app `CLAUDE.md`
-     visual-verification sections; each drained item's checkbox flipped in the **same commit** as its verification.
-
-  **Verification gate.** Two halves: (i) `gui-vm-gate.sh` + the round-robin state file are **daemon infra →
-  Tier-2** — adversarial review + prove-the-mechanism (`prove-gui-vm.sh`) **before** it goes live, per the
-  autonomous-setup change discipline; (ii) `ArchiveProcessor/macOS/project.yml` + the a11y-ID edits are **Tier-1
-  but cross-cutting** — `project.yml` is a documented SHARED HOTSPOT, so build all three app schemes clean with
-  **no new warnings**, keep `swift test` in `packages/ArchiveCore` green, and re-confirm `-scheme ArchiveProcessor
-  … build` still resolves for `launch.sh` / `test-smoke.sh` / `e2e-phone-mac.sh` now the scheme is explicit.
-  | files: ops/gui/vm-gui-runner.sh, ops/autonomous/gui-vm-gate.sh, ops/autonomous/tests/prove-gui-vm.sh (new), ops/gui/README.md, ArchiveReader/scripts/make-gui-fixture.sh, ArchiveNotes/scripts/make-notes-fixture.sh, ArchiveProcessor/macOS/project.yml, ArchiveProcessor/macOS/Tests/ArchiveProcessorUITests/ (new) | L | med | none
+**Complete.** W21.vmgui-a…d (one per-app VM table, corpus-free fixtures, Notes and Processor lanes; the gate
+rotates one app per run) are in [`SUITE_TODO_DONE.md`](SUITE_TODO_DONE.md).
 
 ## Archive Notes — DEVONthink import (owner, 2026-07-17)
 
@@ -1218,7 +1105,6 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 - Processor Tier-1 `test-smoke.sh` / Tier-2 `test-tier2.sh` (real OCR → keys + API cost); Reader cloud-drive support; Reader creation-date-mirror (would write metadata onto the real corpus).
 - ~~Processor App-Store / Play submission (Phase 4)~~ — **DROPPED (owner 2026-07-16: "we're not doing this any
   time soon").** Off the list entirely; don't re-surface it as an owner action item.
-  - [x] **G5 — cheap Tier-1 smoke gate shipped (2026-07-07).** New Suite-root `./test-smoke.sh processor|reader|all` (mirrors `launch.sh`) → `ArchiveReader/test-smoke.sh` (build + full unit suite, **135 tests, free**) + `ArchiveProcessor/test-smoke.sh` (headless **2-image** OCR via `ProcessFilesTestDriver`, `gemini-2.5-flash-lite`, ~a few cents, `mktemp` scratch-isolated, key never printed). Distinct from the cost-heavy `scripts/test-smoke.sh` (raw per-provider calls) + `scripts/test-tier2.sh` (multi-case pipeline) above. Both verified PASS. ✅
 
 ## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
 Lean-review re-pass of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/` (18 commits since the
