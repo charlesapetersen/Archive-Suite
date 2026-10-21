@@ -1,0 +1,22 @@
+{
+ "_source": "Hand-entered from the FarmShare receipts outside git, 2026-10-20. Scores are not here: they are ArchiveProcessor/segbench-results/bench-corpus/open-sweep-20261019.{csv,json}, written by corpus/farmshare_expanded_report.py. Per model: L = ~/Claude/Long term storage/FarmShare-open-sweep-20261019; model, revision, route and prompt from L/outputs/<key>/prepared.json and status.json; dtype from the vLLM log L/outputs/<key>/logs/vllm-<job>.log; collector seconds are the pilot plus full-run wall_s lines in L/remote-logs/<job>-<key>.out; server minutes are the first to the last timestamp in the vLLM log (model load included). Qwen 27B/35B rows: ~/Claude/Long term storage/FarmShare-20261019/receipts/<model>.json; their 895 readings ran in two jobs (440 on 2026-10-18, 455 in the 2026-10-19 extension), so no single wall time is given.",
+ "status": "Review baseline for the processing review (execution-plans/processing-review/00-plan.md, Phase 0). Nothing adopted; no catalogue or default changed.",
+ "hardware": "One NVIDIA L40S (48 GB) per model, vLLM 0.31.0, context 16384, 16 sequences, 8 concurrent requests, temperature 0, thinking off, 8192 output tokens, 2400 px JPEG 90 inputs identical to the Qwen runs (image SHA-256 checked page by page).",
+ "routes": {
+  "glm-ocr": {"model": "zai-org/GLM-OCR", "revision": "2e85a62840ccac27daa451df36c736c4636b8628", "route": "native", "prompt": "Text Recognition:", "dtype": "bf16", "job": 1857607, "collector_s": 2390.76, "server_min": 40.7, "license": "mit"},
+  "qwen3-vl-8b": {"model": "Qwen/Qwen3-VL-8B-Instruct", "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b", "route": "panel", "prompt": "the panel prompt", "dtype": "bf16", "job": 1857608, "collector_s": 10727.46, "server_min": 180.4, "license": "apache-2.0"},
+  "lightonocr3-0.8b": {"model": "lightonai/LightOnOCR-3-0.8B", "revision": "36d8636925327c671bd8e479c517a004f7566bd9", "route": "native", "prompt": "image only", "dtype": "bf16", "job": 1857609, "collector_s": 1052.57, "server_min": 19.7, "license": "apache-2.0"},
+  "lightonocr3-4b": {"model": "lightonai/LightOnOCR-3-4B", "revision": "b71010f095dc3735de7ee6b9969bff8f8f50b39a", "route": "native", "prompt": "image only", "dtype": "bf16", "job": 1857610, "collector_s": 2598.53, "server_min": 45.9, "license": "apache-2.0"},
+  "paddleocr-vl1.5": {"model": "PaddlePaddle/PaddleOCR-VL-1.5", "revision": "2a4195faa5e7914c12f2fc601d72c81caf8d2da5", "route": "native", "prompt": "OCR:", "dtype": "bf16", "job": 1857611, "collector_s": 1134.7, "server_min": 20.1, "license": "apache-2.0"},
+  "qwen3.5-4b": {"model": "Qwen/Qwen3.5-4B", "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a", "route": "panel", "prompt": "the panel prompt", "dtype": "bf16", "job": 1857612, "collector_s": 5507.28, "server_min": 92.7, "license": "apache-2.0"},
+  "qwen3.6-27b": {"model": "Qwen/Qwen3.6-27B-FP8", "revision": "e89b16ebf1988b3d6befa7de50abc2d76f26eb09", "route": "panel", "prompt": "the panel prompt", "dtype": "fp8", "job": 1857599, "collector_s": null, "server_min": null, "comparison": true},
+  "qwen3.5-27b": {"model": "Qwen/Qwen3.5-27B-FP8", "route": "panel", "prompt": "the panel prompt", "dtype": "fp8", "job": 1857600, "collector_s": null, "server_min": null, "comparison": true},
+  "qwen3.6-35b-a3b": {"model": "Qwen/Qwen3.6-35B-A3B-FP8", "route": "panel", "prompt": "the panel prompt", "dtype": "fp8", "job": 1857601, "collector_s": null, "server_min": null, "comparison": true}
+ },
+ "not_scored": [
+  {"route": "Ling 3 Flash VL FP8", "job": 1860274, "state": "Completed on FarmShare (816 ok, 79 cap of 895, per execution-plans/general-model-sweep-20261019.md); outputs still on the cluster, not retrieved before the SSH login lapsed."},
+  {"route": "Nemotron 3.5 Super VL NVFP4", "job": 1860275, "state": "Rerun was running on 2026-10-20; final state unknown. Partial cache on the cluster, not retrieved. A partial cache is not scored (plan rule)."},
+  {"route": "PP-OCRv6 medium, stock pipeline", "job": 1860044, "state": "Completed on FarmShare (895 raw readings, one blank); outputs still on the cluster, not retrieved."},
+  {"route": "Inkling Small Q4 GGUF", "job": 1860045, "state": "Parked by the owner: three-page pilot 2 ok, 1 cap; no full run, no score."}
+ ]
+}

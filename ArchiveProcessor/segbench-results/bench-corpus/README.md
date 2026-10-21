@@ -116,3 +116,7 @@ Files: `manifest.jsonl` (the frozen pages), `drops.jsonl`, `routes.csv` (by rout
 
 Script specialists (W43.script-specialists): open line models built for these hands, read on the Mac with
 kraken, in [`specialists.md`](specialists.md) (`specialists.csv`, `specialists-pages.csv`).
+
+Open-model FarmShare sweep (2026-10-19 runs, scored 2026-10-20, a review baseline): GLM-OCR, LightOnOCR-3 0.8B and
+4B, PaddleOCR-VL 1.5, Qwen3-VL 8B and Qwen3.5 4B on all 895 pages, beside the Qwen 27B/35B FarmShare rows, in
+[`open-sweep-20261019.md`](open-sweep-20261019.md) (`open-sweep-20261019.csv`, `-pages.csv`, `.json`).

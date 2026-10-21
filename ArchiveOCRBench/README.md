@@ -39,7 +39,9 @@ What the bench has measured, as one page you can read and share. It has seven pa
    written by `scripts/segbench/corpus/routes.py report` (W43.corpus-build). The frozen inventory now has
    **895 pages in fifteen strata**, adding English handwriting, typescripts, registers, newspapers, Cyrillic,
    Chinese and Devanagari (W43.corpus-build-more). The **455 added pages have no hosted reference scores**;
-   those readings are deferred to W43.sweep. Part 7 shows the inventory separately from the original results. Below it, the open models built for the hardest scripts (`specialists.csv`, written by
+   those readings are deferred to W43.sweep. Part 7 shows the inventory separately from the original results. Below it, the open-weight models read on FarmShare on all 895 pages, native-prompt and panel-prompt routes
+   labelled apart, a review baseline (`open-sweep-20261019.csv`, written by `corpus/farmshare_expanded_report.py`;
+   receipts in `data/open-sweep-20261019.json`), and the open models built for the hardest scripts (`specialists.csv`, written by
    `corpus/specialists.py report`, W43.script-specialists).
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same

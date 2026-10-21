@@ -240,6 +240,13 @@ footer p { font-size: 13px; }
     <p class="note">Pages drawn with a fixed seed from published transcriptions (a quarter cap per collection, with thin-stratum exceptions marked in the manifest), checked against Apple Vision's reading for wrong truth, and frozen before any hosted model read them; the manifest is <code>ArchiveProcessor/segbench-results/bench-corpus/manifest.jsonl</code>. Same prompt, image size and scorer as the 96. Each source keeps its own transcription conventions, so a stratum's score is comparable across routes, not with the 96 or with another stratum. Second score: NES after mapping historical letter forms (long s, ligatures, abbreviation marks) for L5-L8; without diacritics for N1, N3 and N4. Apple Vision runs the app's settings (English, language correction on), so it reads only the Latin-script strata. N4 understates every route twice over: its truth is the main text only, while the prompt asks for everything on the sheet, so a reader that also transcribes the masorah in the margins loses points; and all but one of BiblIA's 132 pages are transcribed without vowel points, which Gemini writes, so for N4 the second score, without marks, is the fairer figure. Gemini's failures were provider errors (HTTP 500 mid-reply, not billed); Qwen's were replies that ran to the 8,192-token limit, mostly repeating a line. Scores only: the page images are not published, whatever their licence allows.</p>
   </section>
 
+  <section class="panel" id="pub-open" hidden>
+    <div class="head"><h2>Open models on all 895 pages</h2><span class="meta">FarmShare, one L40S each · a review baseline, nothing adopted</span></div>
+    <div class="tbl"><table><thead><tr><th>Model</th><th>Route</th><th>Precision</th><th>Answered / 895</th><th>NES</th><th>NES, answered</th><th>chrF2</th><th>Words missed</th><th>Words added</th><th>NES, original 440</th><th>GPU minutes</th></tr></thead><tbody id="pub-open-rows"></tbody></table></div>
+    <div class="tbl"><table><thead><tr id="pub-open-strata-head"></tr></thead><tbody id="pub-open-strata"></tbody></table></div>
+    <p class="note" id="pub-open-note"></p>
+  </section>
+
   <section class="panel" id="pub-spec" hidden>
     <div class="head"><h2>Models built for the script</h2><span class="meta">NES %, failures as 0; paired differences in NES points</span></div>
     <div class="tbl"><table><thead><tr><th>Stratum</th><th>Model</th><th>Trained on a test source</th><th>Answered</th><th>NES</th><th>Second score</th><th>chrF</th><th>Minus Gemini (95%)</th><th>Minus Qwen (95%)</th></tr></thead><tbody id="pub-spec-rows"></tbody></table></div>
@@ -607,8 +614,28 @@ if (PB) {
   if (all) document.getElementById('pub-pair').textContent = P2.a + ' minus ' + P2.b + ', paired over all ' + all.n +
     ' pages: ' + (100 * all.delta).toFixed(1) + ' NES points (95% interval ' + (100 * all.lo).toFixed(1) + ' to ' +
     (100 * all.hi).toFixed(1) + ', permutation p = ' + all.p.toFixed(4) + ').';
+  const OS = PB.open_sweep;
+  if (OS) {
+    const all = OS.rows.filter(r => r.stratum === 'all');
+    const at = (route, subset) => all.find(r => r.route === route && r.subset === subset) || {};
+    const order = [...new Set(all.map(r => r.route))].sort((a, b) => at(b, 'full895').nes - at(a, 'full895').nes);
+    document.getElementById('pub-open-rows').innerHTML = order.map(k => {
+      const r = at(k, 'full895'), m = OS.routes[k];
+      return '<tr><td>' + k + (m.comparison ? ' (comparison)' : '') + '</td><td>' + (m.route === 'native' ? 'native: ' + m.prompt : 'panel prompt') +
+        '</td><td>' + m.dtype + '</td><td>' + r.ok + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.nes_answered) + '</td><td>' + p1(r.chrf) +
+        '</td><td>' + p1(r.miss) + '</td><td>' + p1(r.add) + '</td><td>' + p1(at(k, 'original440').nes) + '</td><td>' +
+        (m.server_min == null ? '–' : m.server_min.toFixed(0)) + '</td></tr>';
+    }).join('');
+    const strata = [...new Set(OS.rows.map(r => r.stratum))].filter(s => s !== 'all').sort();
+    document.getElementById('pub-open-strata-head').innerHTML = '<th>Stratum (NES %, failures as 0)</th>' + order.map(k => '<th>' + k + '</th>').join('');
+    document.getElementById('pub-open-strata').innerHTML = strata.map(s => '<tr><td>' + s + ' · ' + (STRATUM_NAMES[s] || '') + '</td>' +
+      order.map(k => { const r = OS.rows.find(x => x.route === k && x.subset === 'full895' && x.stratum === s); return '<td>' + p1(r.nes) + '</td>'; }).join('') + '</tr>').join('');
+    document.getElementById('pub-open-note').textContent = OS.status + ' ' + OS.hardware + ' Native routes use the model card\'s own prompt and are scored as written, as Mistral OCR\'s Markdown is; panel rows use the 96\'s prompt. A reply that ran to the 8,192-token limit counts as a failure scoring 0; nearly all of them were repetition loops. Word rates pool words, and every Chinese character counts as one, so the Chinese and newspaper pages dominate them. GPU minutes are the vLLM server\'s span, model load included; the Qwen comparison rows ran in two jobs and have no single figure. Not scored: ' +
+      OS.not_scored.map(n => n.route + ' (' + n.state + ')').join(' ');
+    document.getElementById('pub-open').hidden = false;
+  }
   if (PB.specialists && PB.specialists.length) {
-    const d = (v, lo, hi) => v == null ? '–' : (100 * v >= 0 ? '+' : '') + (100 * v).toFixed(1) + ' (' + (100 * lo).toFixed(1) + ' to ' + (100 * hi).toFixed(1) + ')';
+    const d =(v, lo, hi) => v == null ? '–' : (100 * v >= 0 ? '+' : '') + (100 * v).toFixed(1) + ' (' + (100 * lo).toFixed(1) + ' to ' + (100 * hi).toFixed(1) + ')';
     const sr = PB.specialists.slice().sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);
     document.getElementById('pub-spec-rows').innerHTML = sr.map(r => {
       const second = r.nes_mapped != null ? r.nes_mapped : r.nes_no_marks;

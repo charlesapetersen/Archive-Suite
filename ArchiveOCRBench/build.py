@@ -44,6 +44,7 @@ KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier:
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
 DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
+OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
@@ -344,7 +345,25 @@ def public():
     return {"rows": rows, "farmshare": farmshare_rows,
             "paired": json.loads((PUBLIC / "routes-paired.json").read_text()),
             "strata": {k: {**v, "sources": sorted(v["sources"])} for k, v in sorted(strata.items())},
-            "specialists": specialists}
+            "specialists": specialists, "open_sweep": open_sweep(num)}
+
+
+def open_sweep(num):
+    """The FarmShare open-model sweep on all 895 frozen pages (corpus/farmshare_expanded_report.py --name
+    open-sweep-20261019), with its receipts from data/open-sweep-20261019.json. A review baseline, nothing adopted."""
+    f = PUBLIC / "open-sweep-20261019.csv"
+    if not f.exists():
+        return None
+    with f.open(newline="") as fh:
+        rows = [{k: (v if k in ("route", "mode", "subset", "stratum") else num(v)) for k, v in r.items()}
+                for r in csv.DictReader(fh)]
+    meta = json.loads((PUBLIC / "open-sweep-20261019.json").read_text())
+    receipts = json.loads(OPEN_SWEEP.read_text())
+    if set(receipts["routes"]) != {r["route"] for r in rows}:
+        sys.exit("open-sweep receipts and scores name different routes")
+    return {"rows": rows, "coverage": meta["coverage"], "manifest_sha256": meta["manifest_sha256"],
+            "routes": receipts["routes"], "not_scored": receipts["not_scored"], "status": receipts["status"],
+            "hardware": receipts["hardware"]}
 
 
 def main():

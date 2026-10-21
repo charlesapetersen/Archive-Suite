@@ -11,9 +11,13 @@ Read `00-plan.md`, then this table. Take the first phase step not done. Strand n
 
 - [x] 2026-10-20 — every processing item behind `W46.review-done`; Processor UI items freed from `W42.int-done`.
   Plan backup: `.maintenance/AUTONOMOUS_PLAN.md.pre-regate-20261020T*`.
-- [ ] Score the collected FarmShare open-model outputs. Started 2026-10-20 by a subagent in its own worktree.
-- [ ] Check whether Nemotron job 1860275 is still on FarmShare. Blocked 2026-10-20 20:35: the cm-farmshare
-  socket refused the bounded preflight ("Connection closed"). Only the owner can renew the login and Duo.
+- [x] 2026-10-20 — scored the collected FarmShare open-model outputs: six models from the open sweep, Ling 3
+  Flash VL (1860274), stock PP-OCRv6 (1860044) and the three Qwen 27B/35B comparison rows, all 895 pages:
+  `ArchiveProcessor/segbench-results/bench-corpus/open-sweep-20261019.md`; ArchiveOCRBench Part 7. A review
+  baseline; nothing adopted.
+- [ ] Nemotron job 1860275: still RUNNING at 20:55 on 2026-10-20, ending at its 7 h limit. When it ends, count the
+  clean readings (`execution-plans/general-model-sweep-20261019.md`, "Checking Nemotron"). A partial cache is not
+  scored; a third submission is the owner's call.
 - [ ] Add a Sherlock profile to `scripts/segbench/institutional-compute/` once the account exists (strand J
   gathers its partitions, GPU types and limits first).
 
