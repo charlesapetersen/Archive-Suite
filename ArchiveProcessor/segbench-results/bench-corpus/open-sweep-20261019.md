@@ -1,21 +1,22 @@
-# Open-model FarmShare sweep on the 895 public pages (2026-10-19 runs, scored 2026-10-20)
+# Open-model FarmShare sweep on the 895 public pages (2026-10-19/20 runs, scored 2026-10-20)
 
 **A review baseline, nothing adopted.** This is Phase 0 of the processing review
 (`execution-plans/processing-review/00-plan.md`). It scores readings already collected from FarmShare. No model
 was called, no money was spent, and no catalogue entry, default or recommendation changes because of it.
 
-Protocol: `execution-plans/open-model-sweep-20261019.md`. Scorer: `corpus/farmshare_expanded_report.py`, the
-script that scored the Qwen 27B/35B extension, given `--route` arguments for the new models. Metric: the panel's
-NES, chrF2 and pooled word miss/add rates from `ocr_panel_score.py`, unchanged. Files: `open-sweep-20261019.csv`
-(route × subset × stratum), `open-sweep-20261019-pages.csv` (route × page, public page ids, no text),
-`open-sweep-20261019.json` (overall rows, coverage, manifest checksums). Receipts:
-`ArchiveOCRBench/data/open-sweep-20261019.json`.
+Protocols: `execution-plans/open-model-sweep-20261019.md`, `general-model-sweep-20261019.md` (Ling 3 Flash VL) and
+`ppocrv6-farmshare-20261019.md` (PP-OCRv6). Scorer: `corpus/farmshare_expanded_report.py`, the script that scored
+the Qwen 27B/35B extension, given `--route` arguments for the new models. Metric: the panel's NES, chrF2 and pooled
+word miss/add rates from `ocr_panel_score.py`, unchanged. Files: `open-sweep-20261019.csv` (route × subset ×
+stratum), `open-sweep-20261019-pages.csv` (route × page, public page ids, no text), `open-sweep-20261019.json`
+(overall rows, coverage, manifest checksums). Receipts: `ArchiveOCRBench/data/open-sweep-20261019.json`.
 
 Reproduce (raw readings live outside git, in `~/Claude/Long term storage/`):
 
 ```
 cd ArchiveProcessor/scripts/segbench/corpus
 O=".../FarmShare-open-sweep-20261019/outputs"; Q=".../FarmShare-20261019/results/ocr"; RC=".../FarmShare-20261019/recovery"
+G=".../FarmShare-general-sweep-20261019/outputs"; PP=".../FarmShare-ppocrv6-20261019/outputs"
 uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy python farmshare_expanded_report.py \
   --manifest "$RC/manifest-895.jsonl" --base "$RC/manifest-440.jsonl" --name open-sweep-20261019 \
   --out ../../../segbench-results/bench-corpus \
@@ -23,24 +24,41 @@ uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with 
   --route "lightonocr3-0.8b=$O/lightonocr3-08b/results/ocr/lightonocr3-08b:native" \
   --route "paddleocr-vl1.5=$O/paddleocr-vl15/results/ocr/paddleocr-vl15:native" \
   --route "qwen3-vl-8b=$O/qwen3-vl-8b/results/ocr/qwen3-vl-8b:panel" --route "qwen3.5-4b=$O/qwen35-4b/results/ocr/qwen35-4b:panel" \
+  --route "ling3-flash-vl-fp8=$G/ling3-flash-vl-fp8/results/ocr/ling3-flash-vl-fp8:panel" \
+  --route "ppocrv6-medium=$PP/ppocrv6-medium-native/raw:pipeline" \
   --route "qwen3.6-27b=$Q/qwen3.6-27b:panel" --route "qwen3.5-27b=$Q/qwen3.5-27b:panel" --route "qwen3.6-35b-a3b=$Q/qwen3.6-35b-a3b:panel"
 ```
 
 ## What was run
 
-Six models, one NVIDIA L40S each, vLLM 0.31.0, the checkpoint's own bf16 weights, context 16,384, temperature 0,
-thinking off, 8,192 output tokens, eight requests at a time. Every page went in as the same 2400 px JPEG 90 the
-Qwen 27B/35B runs read; the image SHA-256 in every reading matches the Qwen3.6 27B reading of the same page, for all
-895 pages and all eight other routes. The manifests are the unchanged `FarmShare-20261019/recovery/manifest-895.jsonl`
-and `manifest-440.jsonl`, byte-identical to this folder's `manifest.jsonl` and `manifest-reference-440.jsonl`, and
-`routes.frozen()` checked every source image and truth file against them.
+Six models on one NVIDIA L40S each, vLLM 0.31.0, the checkpoint's own bf16 weights, context 16,384, temperature 0,
+thinking off, 8,192 output tokens, eight requests at a time: GLM-OCR, LightOnOCR-3 0.8B and 4B, PaddleOCR-VL 1.5,
+Qwen3-VL 8B and Qwen3.5 4B.
 
-Two kinds of route, kept apart in every table:
+Ling 3 Flash VL, the publisher's fp8 checkpoint, ran on **four** L40S on one node (tensor parallel 4 with expert
+parallel, eager execution, four requests at a time), otherwise with the same decoding. It ran in two jobs on one
+cache contract: 1857667 reached its 4-hour limit with 466 pages cached, and the rerun 1860274 read the other 430
+(`status.json`: completed_raw, 816 answered, 79 caps).
 
-- **Panel**: the 96's prompt (KIND, TABLE, TEXT), parsed as the panel parses it. Qwen3-VL 8B, Qwen3.5 4B, and the
-  three comparison rows.
+Stock PP-OCRv6 medium (job 1860044) is not a VLM and not served by vLLM: the PaddleOCR 3.7.0 detector and
+recogniser pipeline on one L40S, document orientation, unwarping and line orientation off, no prompt and no token
+cap. Its reading is the recognised lines joined by newlines in the pipeline's own order.
+
+Every page went in as the same 2400 px JPEG 90 the Qwen 27B/35B runs read; the image SHA-256 in every reading
+matches the Qwen3.6 27B reading of the same page, for all 895 pages and all ten other routes. The manifests are the
+unchanged `FarmShare-20261019/recovery/manifest-895.jsonl` and `manifest-440.jsonl`, byte-identical to this
+folder's `manifest.jsonl` and `manifest-reference-440.jsonl`, and `routes.frozen()` checked every source image and
+truth file against them.
+
+Three kinds of route, kept apart in every table:
+
+- **Panel**: the 96's prompt (KIND, TABLE, TEXT), parsed as the panel parses it. Qwen3-VL 8B, Qwen3.5 4B, Ling 3
+  Flash VL, and the three comparison rows.
 - **Native**: the prompt the model card gives, scored as the model writes it. GLM-OCR (`Text Recognition:`),
   PaddleOCR-VL 1.5 (`OCR:`), LightOnOCR-3 0.8B and 4B (the image alone, no text).
+- **Pipeline**: PP-OCRv6, line detection then recognition. It is not a prompt-equivalent VLM row and is a
+  different route from PaddleOCR-VL 1.5. Its records carry status ok and no finish reason (there is no decoder), so
+  the scorer's `pipeline` mode accepts a stopped-or-not reading with status ok; blanks score 0.
 
 The comparison rows are Qwen3.6 27B, Qwen3.5 27B and Qwen3.6 35B-A3B, fp8, the same prompt, settings and images,
 read in two jobs (440 pages on 2026-10-18, 455 more in the 2026-10-19 extension). Rescored here with the same
@@ -66,11 +84,13 @@ what its NES there (62.4) suggests; that was not investigated.
 | qwen3.6-27b (comparison) | panel | 798/895 | 63.3 | 71.0 | 58.3 | 32.7 | 19.2 |
 | lightonocr3-4b | native | 810/895 | 62.9 | 69.5 | 58.2 | 35.4 | 21.5 |
 | qwen3.5-27b (comparison) | panel | 764/895 | 62.2 | 72.8 | 57.8 | 31.6 | 17.0 |
+| ling3-flash-vl-fp8 (4 GPUs) | panel | 814/895 | 60.2 | 66.2 | 55.6 | 31.6 | 22.2 |
 | lightonocr3-0.8b | native | 750/895 | 56.7 | 67.6 | 52.4 | 43.1 | 20.9 |
 | qwen3-vl-8b | panel | 659/895 | 53.3 | 72.3 | 49.6 | 42.5 | 14.7 |
 | qwen3.5-4b | panel | 648/895 | 51.0 | 70.5 | 47.2 | 46.7 | 14.7 |
 | glm-ocr | native | 680/895 | 48.6 | 64.0 | 42.8 | 71.4 | 13.1 |
 | paddleocr-vl1.5 | native | 545/895 | 38.9 | 63.8 | 33.5 | 83.6 | 14.1 |
+| ppocrv6-medium | pipeline | 893/895 | 38.7 | 38.8 | 35.7 | 39.2 | 25.2 |
 
 ### The original 440 pages (the historical comparison)
 
@@ -80,10 +100,12 @@ what its NES there (62.4) suggests; that was not investigated.
 | qwen3.6-35b-a3b (comparison) | panel | 380/440 | 52.4 | 60.7 | 43.9 | 61.1 | 47.4 |
 | qwen3.6-27b (comparison) | panel | 372/440 | 51.3 | 60.7 | 42.8 | 62.0 | 46.7 |
 | qwen3.5-27b (comparison) | panel | 345/440 | 49.8 | 63.5 | 41.7 | 61.4 | 40.7 |
+| ling3-flash-vl-fp8 (4 GPUs) | panel | 376/440 | 48.0 | 56.1 | 39.2 | 65.5 | 51.7 |
 | lightonocr3-0.8b | native | 338/440 | 45.5 | 59.2 | 37.7 | 65.8 | 46.6 |
 | qwen3-vl-8b | panel | 256/440 | 37.7 | 64.7 | 30.6 | 72.3 | 30.7 |
 | glm-ocr | native | 282/440 | 33.8 | 52.7 | 26.9 | 77.2 | 29.1 |
 | qwen3.5-4b | panel | 239/440 | 33.7 | 62.0 | 27.2 | 74.4 | 27.9 |
+| ppocrv6-medium | pipeline | 440/440 | 30.4 | 30.4 | 25.3 | 84.3 | 50.5 |
 | paddleocr-vl1.5 | native | 213/440 | 24.5 | 50.6 | 18.2 | 87.2 | 26.5 |
 
 The hosted reference routes read only these 440 pages (`routes.csv`, 2026-10-17): Gemini 3.8 Flash 70.3 NES
@@ -96,75 +118,81 @@ The hosted reference routes read only these 440 pages (`routes.csv`, 2026-10-17)
 | qwen3.6-35b-a3b (comparison) | panel | 438/455 | 75.0 | 77.9 | 75.2 | 16.9 | 5.5 |
 | qwen3.6-27b (comparison) | panel | 426/455 | 74.8 | 79.9 | 73.2 | 18.0 | 5.4 |
 | qwen3.5-27b (comparison) | panel | 419/455 | 74.2 | 80.5 | 73.4 | 16.5 | 5.0 |
+| ling3-flash-vl-fp8 (4 GPUs) | panel | 438/455 | 72.1 | 74.9 | 71.4 | 14.6 | 7.3 |
 | lightonocr3-4b | native | 427/455 | 71.1 | 75.8 | 70.9 | 23.5 | 7.7 |
 | qwen3-vl-8b | panel | 403/455 | 68.3 | 77.2 | 67.9 | 27.4 | 6.6 |
 | qwen3.5-4b | panel | 409/455 | 67.8 | 75.4 | 66.5 | 32.7 | 8.0 |
 | lightonocr3-0.8b | native | 412/455 | 67.5 | 74.5 | 66.6 | 31.7 | 8.0 |
 | glm-ocr | native | 398/455 | 63.0 | 72.0 | 58.2 | 68.4 | 5.0 |
 | paddleocr-vl1.5 | native | 332/455 | 52.7 | 72.3 | 48.3 | 81.7 | 7.9 |
+| ppocrv6-medium | pipeline | 453/455 | 46.7 | 46.9 | 45.8 | 16.4 | 12.5 |
 
 ### NES by stratum (failures as 0)
 
-| stratum | pages | qwen3.6-35b-a3b | qwen3.6-27b | lightonocr3-4b | qwen3.5-27b | lightonocr3-0.8b | qwen3-vl-8b | qwen3.5-4b | glm-ocr | paddleocr-vl1.5 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| L1 English letters and diaries | 80 | 87.0 | 88.4 | 87.8 | 86.2 | 83.8 | 83.1 | 78.7 | 78.6 | 69.6 |
-| L2 English manuscripts, 1700-1850 | 80 | 76.4 | 73.5 | 77.4 | 73.0 | 72.4 | 65.1 | 70.8 | 72.7 | 50.4 |
-| L3 typescripts and telegrams | 80 | 95.0 | 96.0 | 93.5 | 95.8 | 90.7 | 93.6 | 93.2 | 92.0 | 92.4 |
-| L4 ledgers and forms | 80 | 67.1 | 69.3 | 55.0 | 70.0 | 52.1 | 53.4 | 61.8 | 59.7 | 28.2 |
-| L5 Dutch and Romance hands | 80 | 50.3 | 50.5 | 58.9 | 53.9 | 53.0 | 50.2 | 40.9 | 46.8 | 16.7 |
-| L6 German Kurrent | 80 | 46.2 | 46.3 | 52.5 | 39.7 | 38.9 | 20.0 | 14.6 | 23.1 | 20.3 |
-| L7 charters before 1600 | 80 | 39.0 | 34.1 | 40.2 | 31.9 | 27.2 | 32.8 | 27.5 | 25.4 | 6.7 |
-| L8 early print, incl. Fraktur | 80 | 87.7 | 86.2 | 87.8 | 87.3 | 85.5 | 85.9 | 82.3 | 88.3 | 76.3 |
-| L9 newspapers | 15 | 93.4 | 93.6 | 92.5 | 95.8 | 84.5 | 85.3 | 68.9 | 29.2 | 0.0 |
-| N1 Arabic manuscripts | 40 | 54.0 | 43.6 | 50.6 | 47.8 | 43.1 | 25.3 | 30.8 | 1.5 | 28.2 |
-| N2 Cyrillic | 40 | 21.2 | 17.1 | 8.9 | 14.8 | 4.2 | 14.4 | 6.5 | 8.2 | 3.2 |
-| N3 Greek minuscule | 40 | 39.5 | 41.4 | 44.3 | 37.3 | 25.8 | 5.9 | 6.3 | 2.4 | 1.5 |
-| N4 Hebrew book hands | 40 | 36.7 | 45.8 | 24.2 | 36.9 | 22.5 | 5.2 | 3.0 | 0.2 | 0.0 |
-| N5 Chinese print | 40 | 82.1 | 80.7 | 72.8 | 79.7 | 74.3 | 78.3 | 72.1 | 62.4 | 56.2 |
-| N6 Devanagari print | 40 | 63.6 | 63.3 | 65.4 | 63.0 | 59.3 | 62.3 | 58.1 | 28.7 | 59.3 |
+Columns: Q35A = qwen3.6-35b-a3b, Q36 = qwen3.6-27b, Q35 = qwen3.5-27b (the three comparison rows), LO4 =
+lightonocr3-4b, Ling = ling3-flash-vl-fp8, LO08 = lightonocr3-0.8b, QVL8 = qwen3-vl-8b, Q4 = qwen3.5-4b, GLM =
+glm-ocr, PVL = paddleocr-vl1.5, PP6 = ppocrv6-medium.
+
+| stratum | pages | Q35A | Q36 | LO4 | Q35 | Ling | LO08 | QVL8 | Q4 | GLM | PVL | PP6 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| L1 English letters and diaries | 80 | 87.0 | 88.4 | 87.8 | 86.2 | 83.6 | 83.8 | 83.1 | 78.7 | 78.6 | 69.6 | 46.0 |
+| L2 English manuscripts, 1700-1850 | 80 | 76.4 | 73.5 | 77.4 | 73.0 | 72.5 | 72.4 | 65.1 | 70.8 | 72.7 | 50.4 | 50.6 |
+| L3 typescripts and telegrams | 80 | 95.0 | 96.0 | 93.5 | 95.8 | 92.4 | 90.7 | 93.6 | 93.2 | 92.0 | 92.4 | 89.7 |
+| L4 ledgers and forms | 80 | 67.1 | 69.3 | 55.0 | 70.0 | 65.0 | 52.1 | 53.4 | 61.8 | 59.7 | 28.2 | 44.5 |
+| L5 Dutch and Romance hands | 80 | 50.3 | 50.5 | 58.9 | 53.9 | 52.4 | 53.0 | 50.2 | 40.9 | 46.8 | 16.7 | 29.6 |
+| L6 German Kurrent | 80 | 46.2 | 46.3 | 52.5 | 39.7 | 39.8 | 38.9 | 20.0 | 14.6 | 23.1 | 20.3 | 24.5 |
+| L7 charters before 1600 | 80 | 39.0 | 34.1 | 40.2 | 31.9 | 34.6 | 27.2 | 32.8 | 27.5 | 25.4 | 6.7 | 23.1 |
+| L8 early print, incl. Fraktur | 80 | 87.7 | 86.2 | 87.8 | 87.3 | 85.3 | 85.5 | 85.9 | 82.3 | 88.3 | 76.3 | 79.5 |
+| L9 newspapers | 15 | 93.4 | 93.6 | 92.5 | 95.8 | 90.2 | 84.5 | 85.3 | 68.9 | 29.2 | 0.0 | 23.6 |
+| N1 Arabic manuscripts | 40 | 54.0 | 43.6 | 50.6 | 47.8 | 46.6 | 43.1 | 25.3 | 30.8 | 1.5 | 28.2 | 3.9 |
+| N2 Cyrillic | 40 | 21.2 | 17.1 | 8.9 | 14.8 | 20.5 | 4.2 | 14.4 | 6.5 | 8.2 | 3.2 | 10.7 |
+| N3 Greek minuscule | 40 | 39.5 | 41.4 | 44.3 | 37.3 | 34.1 | 25.8 | 5.9 | 6.3 | 2.4 | 1.5 | 10.7 |
+| N4 Hebrew book hands | 40 | 36.7 | 45.8 | 24.2 | 36.9 | 22.5 | 22.5 | 5.2 | 3.0 | 0.2 | 0.0 | 5.9 |
+| N5 Chinese print | 40 | 82.1 | 80.7 | 72.8 | 79.7 | 82.3 | 74.3 | 78.3 | 72.1 | 62.4 | 56.2 | 42.1 |
+| N6 Devanagari print | 40 | 63.6 | 63.3 | 65.4 | 63.0 | 56.8 | 59.3 | 62.3 | 58.1 | 28.7 | 59.3 | 8.2 |
 
 ### Answered pages by stratum
 
-| stratum | pages | qwen3.6-35b-a3b | qwen3.6-27b | lightonocr3-4b | qwen3.5-27b | lightonocr3-0.8b | qwen3-vl-8b | qwen3.5-4b | glm-ocr | paddleocr-vl1.5 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| L1 | 80 | 78 | 80 | 78 | 79 | 78 | 77 | 77 | 79 | 73 |
-| L2 | 80 | 76 | 73 | 77 | 72 | 77 | 66 | 75 | 78 | 57 |
-| L3 | 80 | 79 | 80 | 80 | 80 | 80 | 79 | 79 | 80 | 80 |
-| L4 | 80 | 79 | 73 | 80 | 74 | 75 | 66 | 78 | 79 | 47 |
-| L5 | 80 | 64 | 62 | 74 | 64 | 64 | 60 | 53 | 62 | 29 |
-| L6 | 80 | 71 | 71 | 75 | 59 | 59 | 32 | 25 | 44 | 39 |
-| L7 | 80 | 68 | 67 | 72 | 57 | 67 | 52 | 51 | 69 | 33 |
-| L8 | 80 | 80 | 79 | 80 | 79 | 80 | 79 | 77 | 80 | 74 |
-| L9 | 15 | 15 | 15 | 15 | 15 | 14 | 15 | 12 | 6 | 0 |
-| N1 | 40 | 36 | 31 | 32 | 33 | 29 | 19 | 21 | 6 | 29 |
-| N2 | 40 | 33 | 28 | 20 | 21 | 12 | 24 | 14 | 22 | 10 |
-| N3 | 40 | 35 | 35 | 35 | 30 | 25 | 6 | 7 | 3 | 4 |
-| N4 | 40 | 26 | 27 | 15 | 23 | 14 | 8 | 5 | 18 | 5 |
-| N5 | 40 | 38 | 37 | 37 | 38 | 36 | 37 | 34 | 28 | 25 |
-| N6 | 40 | 40 | 40 | 40 | 40 | 40 | 39 | 40 | 26 | 40 |
+| stratum | pages | Q35A | Q36 | LO4 | Q35 | Ling | LO08 | QVL8 | Q4 | GLM | PVL | PP6 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| L1 | 80 | 78 | 80 | 78 | 79 | 80 | 78 | 77 | 77 | 79 | 73 | 79 |
+| L2 | 80 | 76 | 73 | 77 | 72 | 76 | 77 | 66 | 75 | 78 | 57 | 80 |
+| L3 | 80 | 79 | 80 | 80 | 80 | 78 | 80 | 79 | 79 | 80 | 80 | 79 |
+| L4 | 80 | 79 | 73 | 80 | 74 | 76 | 75 | 66 | 78 | 79 | 47 | 80 |
+| L5 | 80 | 64 | 62 | 74 | 64 | 69 | 64 | 60 | 53 | 62 | 29 | 80 |
+| L6 | 80 | 71 | 71 | 75 | 59 | 73 | 59 | 32 | 25 | 44 | 39 | 80 |
+| L7 | 80 | 68 | 67 | 72 | 57 | 66 | 67 | 52 | 51 | 69 | 33 | 80 |
+| L8 | 80 | 80 | 79 | 80 | 79 | 80 | 80 | 79 | 77 | 80 | 74 | 80 |
+| L9 | 15 | 15 | 15 | 15 | 15 | 15 | 14 | 15 | 12 | 6 | 0 | 15 |
+| N1 | 40 | 36 | 31 | 32 | 33 | 36 | 29 | 19 | 21 | 6 | 29 | 40 |
+| N2 | 40 | 33 | 28 | 20 | 21 | 34 | 12 | 24 | 14 | 22 | 10 | 40 |
+| N3 | 40 | 35 | 35 | 35 | 30 | 35 | 25 | 6 | 7 | 3 | 4 | 40 |
+| N4 | 40 | 26 | 27 | 15 | 23 | 17 | 14 | 8 | 5 | 18 | 5 | 40 |
+| N5 | 40 | 38 | 37 | 37 | 38 | 39 | 36 | 37 | 34 | 28 | 25 | 40 |
+| N6 | 40 | 40 | 40 | 40 | 40 | 40 | 40 | 39 | 40 | 26 | 40 | 40 |
 
 ### Second scores
 
 The stratum's second score, as `routes.csv` reports it: historical letter forms mapped (L2, L5-L8), combining
 marks removed (N1, N3, N4, N6), or whitespace removed (N5, the CER convention for Chinese).
 
-| stratum | score | qwen3.6-35b-a3b | qwen3.6-27b | lightonocr3-4b | qwen3.5-27b | lightonocr3-0.8b | qwen3-vl-8b | qwen3.5-4b | glm-ocr | paddleocr-vl1.5 |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| L2 | mapped | 76.4 | 73.6 | 77.4 | 73.0 | 72.4 | 65.1 | 70.8 | 72.7 | 50.4 |
-| L5 | mapped | 52.0 | 52.2 | 60.8 | 55.7 | 54.7 | 51.7 | 42.1 | 48.1 | 17.0 |
-| L6 | mapped | 46.7 | 46.7 | 53.0 | 40.2 | 39.2 | 20.2 | 14.7 | 23.3 | 20.4 |
-| L7 | mapped | 40.0 | 35.0 | 41.4 | 32.7 | 28.0 | 33.5 | 28.2 | 25.8 | 6.8 |
-| L8 | mapped | 90.6 | 89.1 | 90.9 | 90.2 | 88.7 | 89.1 | 85.1 | 91.0 | 77.4 |
-| N1 | no marks | 54.9 | 44.5 | 51.9 | 49.2 | 43.8 | 27.2 | 31.4 | 1.5 | 29.8 |
-| N3 | no marks | 44.4 | 48.0 | 49.8 | 41.8 | 30.2 | 7.4 | 7.6 | 3.0 | 1.7 |
-| N4 | no marks | 39.3 | 45.8 | 24.2 | 37.4 | 23.2 | 5.9 | 3.0 | 0.2 | 0.0 |
-| N5 | no spaces | 84.7 | 82.2 | 74.0 | 81.3 | 75.8 | 80.4 | 74.8 | 64.2 | 57.4 |
-| N6 | no marks | 66.2 | 66.1 | 67.8 | 66.1 | 62.6 | 64.8 | 61.2 | 30.9 | 62.5 |
+| stratum | score | Q35A | Q36 | LO4 | Q35 | Ling | LO08 | QVL8 | Q4 | GLM | PVL | PP6 |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| L2 | mapped | 76.4 | 73.6 | 77.4 | 73.0 | 72.5 | 72.4 | 65.1 | 70.8 | 72.7 | 50.4 | 50.7 |
+| L5 | mapped | 52.0 | 52.2 | 60.8 | 55.7 | 54.0 | 54.7 | 51.7 | 42.1 | 48.1 | 17.0 | 30.3 |
+| L6 | mapped | 46.7 | 46.7 | 53.0 | 40.2 | 40.2 | 39.2 | 20.2 | 14.7 | 23.3 | 20.4 | 24.6 |
+| L7 | mapped | 40.0 | 35.0 | 41.4 | 32.7 | 35.6 | 28.0 | 33.5 | 28.2 | 25.8 | 6.8 | 23.5 |
+| L8 | mapped | 90.6 | 89.1 | 90.9 | 90.2 | 88.1 | 88.7 | 89.1 | 85.1 | 91.0 | 77.4 | 80.5 |
+| N1 | no marks | 54.9 | 44.5 | 51.9 | 49.2 | 47.4 | 43.8 | 27.2 | 31.4 | 1.5 | 29.8 | 3.9 |
+| N3 | no marks | 44.4 | 48.0 | 49.8 | 41.8 | 38.8 | 30.2 | 7.4 | 7.6 | 3.0 | 1.7 | 10.7 |
+| N4 | no marks | 39.3 | 45.8 | 24.2 | 37.4 | 22.5 | 23.2 | 5.9 | 3.0 | 0.2 | 0.0 | 5.9 |
+| N5 | no spaces | 84.7 | 82.2 | 74.0 | 81.3 | 84.8 | 75.8 | 80.4 | 74.8 | 64.2 | 57.4 | 43.0 |
+| N6 | no marks | 66.2 | 66.1 | 67.8 | 66.1 | 60.1 | 62.6 | 64.8 | 61.2 | 30.9 | 62.5 | 7.6 |
 
 ## Failures, caps and missing pages
 
-Every route has a terminal reading for all 895 pages; none is missing. A reply that ran to the 8,192-token limit is
-a cap, kept as the collector saved it, not re-asked, and scored as an empty reading.
+Every route has a terminal reading for all 895 pages; none is missing. A VLM reply that ran to the 8,192-token
+limit is a cap, kept as the collector saved it, not re-asked, and scored as an empty reading.
 
 | model | caps | of which repetitive (zlib ratio < 0.12) | answered but blank | unparsable panel reply | answered |
 |---|---:|---:|---:|---:|---:|
@@ -174,22 +202,27 @@ a cap, kept as the collector saved it, not re-asked, and scored as an empty read
 | lightonocr3-4b | 76 | 75 | 9 | – | 810 |
 | paddleocr-vl1.5 | 350 | 316 | 0 | – | 545 |
 | qwen3.5-4b | 247 | 234 | 0 | 0 | 648 |
+| ling3-flash-vl-fp8 | 79 | 75 | 0 | 2 | 814 |
+| ppocrv6-medium | – (no cap) | – | 2 | – | 893 |
 | qwen3.6-27b | 97 | | | 0 | 798 |
 | qwen3.5-27b | 131 | | | 0 | 764 |
 | qwen3.6-35b-a3b | 76 | | | 1 | 818 |
 
 The repetition column is a diagnostic from the raw replies (compressed size under an eighth of the reply), not
 part of the score: almost every cap is a loop, not a dense page that needed more tokens. Caps gather in the hard
-hands and scripts (L5-L7, N1-N4) and, for PaddleOCR-VL, in all 15 newspapers and 33 ledgers. LightOnOCR-3 4B
-returned nine stopped replies with no text; they score as failures.
+hands and scripts (L5-L7, N1-N4) and, for PaddleOCR-VL, in all 15 newspapers and 33 ledgers. Ling's caps are
+fewest among the VLMs except LightOnOCR 4B and Qwen3.6 35B-A3B; 23 of its 79 are Hebrew pages. LightOnOCR-3 4B
+returned nine stopped replies with no text; PP-OCRv6 returned two blank pages (`btp__afc1945001_ms04062-29`,
+`btp__mss1288001809-8`). They score as failures.
 
 ## Native formatting
 
 The raw replies were scanned for Markdown headings, bold, tables, HTML tags, LaTeX and coordinate or box tags
-before scoring. No route emits coordinates or layout tags. GLM-OCR and PaddleOCR-VL write plain text (a handful
-of pages carry a `$...$` span or a heading). The two panel models answer in the panel format on every stopped
-reply. LightOnOCR-3 writes Markdown and HTML for structured pages: headings, bold, `<table>`/`<td>` tables, pipe
-tables and image placeholders, on 96 answered pages for the 4B and 123 for the 0.8B.
+before scoring. No VLM route emits coordinates or layout tags. GLM-OCR and PaddleOCR-VL write plain text (a
+handful of pages carry a `$...$` span or a heading). The three panel models answer in the panel format on every
+stopped reply but Ling's two and Qwen3.6 35B-A3B's one. LightOnOCR-3 writes Markdown and HTML for structured pages:
+headings, bold, `<table>`/`<td>` tables, pipe tables and image placeholders, on 96 answered pages for the 4B and
+123 for the 0.8B.
 
 No normalisation was added. The panel's `normal()` already removes table bars, and the precedent for a native
 Markdown route is Mistral OCR on the 96, scored "removes table bars but not other Markdown"
@@ -199,33 +232,52 @@ and 1.5 points on the 895-page mean. The other two native routes move by less th
 understate its reading by about a point and a half against the panel rows; a markup-aware score would be a new
 convention for every native route and is left to the review.
 
+### PP-OCRv6 sample review
+
+The PP-OCRv6 protocol asks for a look at ordering, rotation and language before its scores are accepted. One page
+of every stratum was read in the raw output, and the pages at the bottom of N5 were checked against their scores.
+
+- **Language.** The stock recogniser reads Latin and Chinese. On the other scripts it writes Latin or Chinese
+  look-alikes: Hebrew comes out as strings like `NUNUNPND`, Arabic as digits and spaces, Devanagari as stray
+  Chinese characters, Greek and Cyrillic as Latin letters. The near-zero N1, N3, N4 and N6 scores and the low N2
+  score measure that, not a scoring fault. A typescript page began with two spurious Chinese characters.
+- **Ordering.** Lines come in the detector's order, which on single-column pages is top to bottom. On multi-column
+  pages it interleaves lines across columns: the newspaper sample alternates between columns line by line, and the
+  three worst N5 pages (about 6 NES) are the OmniDocBench newspaper pages, where Qwen3.6 35B-A3B also does
+  poorly. That ordering, more than misreading, is why PP-OCRv6 scores 23.6 on L9 with every page answered. No
+  ordering was added, as the protocol requires.
+- **Rotation.** Orientation classification was off, as configured. No page in the sample came out sideways or
+  reversed.
+- **Margins.** It also reads colour charts and rulers in the photograph frame (one charter page begins
+  "Centimetres, Inches, Blue, Cyan"), as any whole-page reader does.
+
 ## GPU time
 
-One L40S per model. The collector time is the pilot and full-run wall clock from the Slurm output; the server span
-runs from the first to the last line of the vLLM log and includes loading the model.
+The collector time is the pilot and full-run wall clock from the Slurm output (for PP-OCRv6, the sum of its
+per-page times). The server span runs from the first to the last line of the vLLM log and includes loading the
+model; for PP-OCRv6 it is the job's elapsed time. GPU-hours multiply the server span by the GPUs used.
 
-| model | collector, minutes | server span, minutes | GPU-hours per 1,000 pages (collector) |
-|---|---:|---:|---:|
-| lightonocr3-0.8b | 17.5 | 19.7 | 0.33 |
-| paddleocr-vl1.5 | 18.9 | 20.1 | 0.35 |
-| glm-ocr | 39.8 | 40.7 | 0.74 |
-| lightonocr3-4b | 43.3 | 45.9 | 0.81 |
-| qwen3.5-4b | 91.8 | 92.7 | 1.71 |
-| qwen3-vl-8b | 178.8 | 180.4 | 3.33 |
+| model | GPUs | collector, minutes | server span, minutes | GPU-hours per 1,000 pages |
+|---|---:|---:|---:|---:|
+| ppocrv6-medium | 1 | 4.9 | 5.4 | 0.10 |
+| lightonocr3-0.8b | 1 | 17.5 | 19.7 | 0.37 |
+| paddleocr-vl1.5 | 1 | 18.9 | 20.1 | 0.37 |
+| glm-ocr | 1 | 39.8 | 40.7 | 0.76 |
+| lightonocr3-4b | 1 | 43.3 | 45.9 | 0.85 |
+| qwen3.5-4b | 1 | 91.8 | 92.7 | 1.73 |
+| qwen3-vl-8b | 1 | 178.8 | 180.4 | 3.36 |
+| ling3-flash-vl-fp8 | 4 | – | 464.8 (two jobs, 240.1 + 224.7) | 34.6 |
 
 Caps cost time: a capped page generates the full 8,192 tokens. Qwen3-VL 8B generated 2.34 million completion
-tokens in all, PaddleOCR-VL 3.09 million in 19 minutes. The comparison rows read their pages in two jobs and have no
-single figure here; their earlier speed figures are in `../farmshare/`.
+tokens in all, PaddleOCR-VL 3.09 million in 19 minutes, Ling 1.18 million. Ling's first job ended at its time
+limit, so its span includes requests that were cut off and read again in the rerun; it overstates the reading
+time somewhat. The comparison rows read
+their pages in two jobs and have no single figure here; their earlier speed figures are in `../farmshare/`.
 
 ## Not scored
 
-- **Ling 3 Flash VL FP8**, job 1860274: completed on FarmShare (816 answered, 79 caps, per
-  `execution-plans/general-model-sweep-20261019.md`). The readings are still on the cluster; nothing was retrieved
-  to `FarmShare-general-sweep-20261019/` before the SSH login lapsed.
-- **Nemotron 3.5 Super VL NVFP4**, job 1860275: the rerun was running on 2026-10-20 with about 457 pages left. Its
-  final state is unknown; it could not be checked because the login is down. A partial cache is not scored.
-- **Stock PP-OCRv6 medium**, job 1860044: completed (895 raw readings, one blank). Still on the cluster; not
-  retrieved.
+- **Nemotron 3.5 Super VL NVFP4**, job 1860275: the rerun was running at 20:55 on 2026-10-20 and ends at its
+  7-hour limit. A partial cache is not scored.
 - **Inkling Small, Q4 GGUF on llama.cpp**, job 1860045: parked by the owner after a three-page pilot (2 answered,
   1 cap). No score.
 
@@ -233,20 +285,30 @@ single figure here; their earlier speed figures are in `../farmshare/`.
 
 LightOnOCR-3 4B, a 4-billion-parameter OCR model reading the bare image, lands within a point of the three 27B/35B
 Qwen models on the 895 pages (62.9 against 62.2-63.9), and on the original 440 it is ahead of all three (54.3 against
-49.8-52.4), with the fewest failures of any route on those pages. Its strength is the historical Latin hands (L5,
-L6, L7) and Greek; it is weaker on ledgers, Hebrew and Cyrillic. Its Markdown costs it about a point and a half
-under this scorer, so the gap may be smaller still. It also reads about four times faster than Qwen3-VL 8B.
-Differences of a point between these four are within what one run on these pages can tell apart; no paired test was
-run.
+49.8-52.4), with the fewest failures of any VLM route on those pages. Its strength is the historical Latin hands
+(L5, L6, L7) and Greek; it is weaker on ledgers, Hebrew and Cyrillic. Its Markdown costs it about a point and a half
+under this scorer, so the gap may be smaller still. It also reads about four times faster than Qwen3-VL 8B, on one
+GPU. Differences of a point between these four are within what one run on these pages can tell apart; no paired
+test was run.
+
+Ling 3 Flash VL, a much larger model on four GPUs, comes in below all four (60.2 on the 895, 48.0 on the 440). It
+is good on the added pages (72.1, with the lowest word miss rate of any route there) and among the best on Chinese
+and Cyrillic, but weaker on the historical hands and Hebrew. At about 35 GPU-hours per 1,000 pages it costs some
+forty times LightOnOCR-3 4B's GPU time for a lower score.
 
 The small general models, Qwen3-VL 8B and Qwen3.5 4B, read well when they answer (72.3 and 70.5 on the answered
 pages, as good as the 27B models) but loop on a quarter of the pages, mostly in the hard hands and the non-Latin
 scripts, and that sets their overall scores 10-13 points below. GLM-OCR and PaddleOCR-VL loop even more, and GLM-OCR
 does not read Arabic or Hebrew at all: on Hebrew it returns only the page number. PaddleOCR-VL fails every
-newspaper. On the clean material, typescripts (L3) and early print (L8), every route scores between 76 and 96 and the
-differences are small.
+newspaper.
 
-Every open route is well below the hosted Gemini 3.8 Flash on the 440 pages (70.3); the best open figure there is
-54.3. Cyrillic (N2) is poor for every route, at most 21 NES. Repetition loops, not misreading, account for most of
-the distance between answered and overall scores for every model, which makes a loop guard or a second reading of
-capped pages the first thing the review should consider for any local route.
+Stock PP-OCRv6 answers every page but two and is by far the fastest (0.10 GPU-hours per 1,000 pages), but it reads
+only Latin and Chinese, handles handwriting poorly (46 on L1 against 70-88 for the VLMs) and scrambles multi-column
+pages. On typescripts (89.7) and early print (79.5) it is close to the VLMs. Its 38.7 overall is a different kind of
+number from the VLM rows: none of it is loops, all of it is reading and ordering.
+
+On the clean material, typescripts (L3) and early print (L8), every route scores between 76 and 96 and the
+differences are small. Every open route is well below the hosted Gemini 3.8 Flash on the 440 pages (70.3); the best
+open figure there is 54.3. Cyrillic (N2) is poor for every route, at most 21 NES. For the VLMs, repetition loops,
+not misreading, account for most of the distance between answered and overall scores, which makes a loop guard or
+a second reading of capped pages the first thing the review should consider for any local VLM route.

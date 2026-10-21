@@ -7,7 +7,9 @@
       --route glm-ocr=PATH:native --route qwen3-vl-8b=PATH:panel ...
       any saved-output folders (W43.open-sweep-more and after). MODE panel parses the panel prompt's
       KIND/TABLE/TEXT reply; native scores the model's own reply as written (normal() only, as Mistral OCR's
-      Markdown is scored). Caps, errors and missing pages score as failures (empty reading).
+      Markdown is scored); pipeline is a non-autoregressive OCR pipeline (stock PP-OCRv6), whose records carry
+      status ok and no finish reason, scored as written (its recognised lines joined in the pipeline's own
+      order). Caps, errors, blanks and missing pages score as failures (empty reading).
 """
 from pathlib import Path
 import argparse
@@ -19,15 +21,23 @@ import farmshare_results as F
 import ocr_panel_score as S
 
 SECOND = ('nes_mapped', 'nes_no_marks', 'nes_no_space')
+MODES = ('panel', 'native', 'pipeline')
+
+
+def reading(record, mode):
+    """farmshare_results.reading, plus pipeline routes: no decoder, so no finish reason to require."""
+    if mode == 'pipeline':
+        return (record.get('raw') or '').strip() if record and record.get('status') == 'ok' else ''
+    return F.reading(record, mode)
 
 
 def parse_route(spec):
     label, _, rest = spec.partition('=')
     path, _, mode = rest.rpartition(':')
-    if not path or mode not in ('panel', 'native'):
+    if not path or mode not in MODES:
         path, mode = rest, 'panel'
     if not label or not path:
-        raise SystemExit(f'--route LABEL=DIR[:panel|native], got {spec!r}')
+        raise SystemExit(f'--route LABEL=DIR[:panel|native|pipeline], got {spec!r}')
     return label, Path(path), mode
 
 
@@ -62,7 +72,7 @@ def main():
                            'status': dict(sorted(status.items()))}
         for r in truth:
             jid = R.job_id(r)
-            text = F.reading(records.get(jid), mode)
+            text = reading(records.get(jid), mode)
             row = {'route': model, 'mode': mode, 'page': jid, 'stratum': r['stratum'], 'source': r['source'],
                    'subset': old_label if jid in old else added_label,
                    'ok': bool(text), **S.score(Path(r['truth']).read_text(), text, r['stratum'])}

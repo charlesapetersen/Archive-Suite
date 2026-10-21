@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 from farmshare_expanded_report import parse_route
-from farmshare_results import reading
+from farmshare_expanded_report import reading
 
 
 class Routes(unittest.TestCase):
@@ -24,6 +24,15 @@ class Routes(unittest.TestCase):
         self.assertEqual(reading(panel, 'panel'), 'body')
         self.assertEqual(reading({'status': 'cap', 'finish': 'length', 'raw': 'loop loop'}, 'native'), '')
         self.assertEqual(reading(None, 'native'), '')
+
+    def test_pipeline_needs_no_finish_reason_but_blanks_fail(self):
+        self.assertEqual(parse_route('pp6=/x/raw:pipeline'), ('pp6', Path('/x/raw'), 'pipeline'))
+        line_rec = {'status': 'ok', 'finish': None, 'raw': 'line one\nline two\n'}
+        self.assertEqual(reading(line_rec, 'pipeline'), 'line one\nline two')
+        self.assertEqual(reading(line_rec, 'native'), '')  # the decoder rule would fail every pipeline page
+        self.assertEqual(reading({'status': 'blank', 'finish': None, 'raw': ''}, 'pipeline'), '')
+        self.assertEqual(reading({'status': 'error', 'finish': None, 'raw': 'x'}, 'pipeline'), '')
+        self.assertEqual(reading(None, 'pipeline'), '')
 
 
 if __name__ == '__main__':

@@ -621,16 +621,17 @@ if (PB) {
     const order = [...new Set(all.map(r => r.route))].sort((a, b) => at(b, 'full895').nes - at(a, 'full895').nes);
     document.getElementById('pub-open-rows').innerHTML = order.map(k => {
       const r = at(k, 'full895'), m = OS.routes[k];
-      return '<tr><td>' + k + (m.comparison ? ' (comparison)' : '') + '</td><td>' + (m.route === 'native' ? 'native: ' + m.prompt : 'panel prompt') +
+      return '<tr><td>' + k + (m.comparison ? ' (comparison)' : '') + '</td><td>' + (m.route === 'native' ? 'native: ' + m.prompt : m.route === 'pipeline' ? 'line pipeline, not a VLM' : 'panel prompt') +
+        (m.gpus > 1 ? ' · ' + m.gpus + ' GPUs' : '') +
         '</td><td>' + m.dtype + '</td><td>' + r.ok + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.nes_answered) + '</td><td>' + p1(r.chrf) +
         '</td><td>' + p1(r.miss) + '</td><td>' + p1(r.add) + '</td><td>' + p1(at(k, 'original440').nes) + '</td><td>' +
-        (m.server_min == null ? '–' : m.server_min.toFixed(0)) + '</td></tr>';
+        (m.server_min == null ? '–' : (m.server_min * (m.gpus || 1)).toFixed(0)) + '</td></tr>';
     }).join('');
     const strata = [...new Set(OS.rows.map(r => r.stratum))].filter(s => s !== 'all').sort();
     document.getElementById('pub-open-strata-head').innerHTML = '<th>Stratum (NES %, failures as 0)</th>' + order.map(k => '<th>' + k + '</th>').join('');
     document.getElementById('pub-open-strata').innerHTML = strata.map(s => '<tr><td>' + s + ' · ' + (STRATUM_NAMES[s] || '') + '</td>' +
       order.map(k => { const r = OS.rows.find(x => x.route === k && x.subset === 'full895' && x.stratum === s); return '<td>' + p1(r.nes) + '</td>'; }).join('') + '</tr>').join('');
-    document.getElementById('pub-open-note').textContent = OS.status + ' ' + OS.hardware + ' Native routes use the model card\'s own prompt and are scored as written, as Mistral OCR\'s Markdown is; panel rows use the 96\'s prompt. A reply that ran to the 8,192-token limit counts as a failure scoring 0; nearly all of them were repetition loops. Word rates pool words, and every Chinese character counts as one, so the Chinese and newspaper pages dominate them. GPU minutes are the vLLM server\'s span, model load included; the Qwen comparison rows ran in two jobs and have no single figure. Not scored: ' +
+    document.getElementById('pub-open-note').textContent = OS.status + ' ' + OS.hardware + ' Native routes use the model card\'s own prompt and are scored as written, as Mistral OCR\'s Markdown is; panel rows use the 96\'s prompt. PP-OCRv6 is the stock line detector and recogniser, not a VLM and not a prompt-equivalent row: it reads only Latin and Chinese and interleaves the lines of multi-column pages. A reply that ran to the 8,192-token limit counts as a failure scoring 0; nearly all of them were repetition loops. Word rates pool words, and every Chinese character counts as one, so the Chinese and newspaper pages dominate them. GPU minutes are the server\'s span (vLLM log, or the job for PP-OCRv6), model load included, times the GPUs used; the Qwen comparison rows ran in two jobs and have no single figure. Not scored: ' +
       OS.not_scored.map(n => n.route + ' (' + n.state + ')').join(' ');
     document.getElementById('pub-open').hidden = false;
   }
