@@ -127,6 +127,9 @@ step write-surface-lint       bash "$ROOT/ArchiveReader/scripts/lint-write-surfa
 step write-surface-lint-proof bash "$ROOT/ArchiveReader/scripts/test-lint-write-surface.sh"
 step processor-write-surface-lint       bash "$ROOT/ArchiveProcessor/scripts/lint-write-surface.sh"
 step processor-write-surface-lint-proof bash "$ROOT/ArchiveProcessor/scripts/test-lint-write-surface.sh"
+# W40.a5: every Processor test driver / headless contract is `#if DEBUG`, so none ships in Release.
+step processor-release-drivers-lint       bash "$ROOT/ArchiveProcessor/scripts/lint-release-drivers.sh"
+step processor-release-drivers-lint-proof bash "$ROOT/ArchiveProcessor/scripts/lint-release-drivers.sh" --self-test
 # PYTHONDONTWRITEBYTECODE: this one imports `finder_tags.py` from the source tree, so CPython would
 # leave a `__pycache__` dir in ArchiveProcessor/scripts on every gate run. The repo ignores that path
 # now as well, but the gate should not be dirtying the checkout it is judging in the first place.

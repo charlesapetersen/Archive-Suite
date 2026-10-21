@@ -556,6 +556,9 @@ Capture/                       Live Capture core (Tier-2):
                                (`filedGroupIds`), via the Trash. (Recovery Core Directive.)
   LiveCaptureTestDriver·ProcessFilesTestDriver·FileRelayTestDriver.swift   Headless env-gated end-to-end
                                test drivers (live-staging / Process-Files GUI / FileRelay invariants).
+                               Every `*TestDriver`/`*ProofDriver`/`*Contract` file is wrapped in `#if DEBUG`
+                               and dispatched from ContentView only in Debug (W40.a5); scripts build Debug.
+                               `scripts/lint-release-drivers.sh` (a gate step) fails a new file without it.
   LiveCaptureRecoveryTestDriver.swift   $0/no-OCR headless self-test (`LIVECAPTURE_RECOVERYTEST=1`) of the
                                data-safety invariants: confirm-before-delete + trash-not-rm.
   ProcessFilesTagWarningTestDriver.swift   $0/no-OCR headless self-test (`PROCESSFILES_TAGWARN_TEST=1`) of
