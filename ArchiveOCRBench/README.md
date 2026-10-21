@@ -6,7 +6,12 @@ What the bench has measured, as one page you can read and share. It has seven pa
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
    handwritten pages. Four more routes ran the same pages on our own hardware: Qwen3-VL 8B at 4-bit, LightOnOCR-3-4B at 8-bit and
    Qwen3.5-9B at 4-bit on the owner's Mac, drawn in the free column, and Qwen3.6 27B at fp8 on one L40S on Stanford
-   FarmShare, which is too large for the Mac and so is priced at OpenRouter's rate for the same model.
+   FarmShare, which is too large for the Mac and so is priced at OpenRouter's rate for the same model. Every other
+   FarmShare run of the 96 pages in `farmshare/truth/` is on the same four charts (added 2026-10-21): □ when
+   OpenRouter sells the model, priced at its rate for the run's tokens; ✶ when it does not (GLM-OCR, LightOnOCR-3,
+   PaddleOCR-VL 1.5, PP-OCRv6, CHURRO-3B, Qwen3.5 4B), drawn in the free column as having no hosted price, free on
+   a university cluster, with its GPU-hours in the tables. Part 5's difficulty fit, rankings and cascades still use
+   only the routes in `ocr-pages.csv`, so these runs are not in part 5.
 2. **Segmentation.** How well each approach splits a box of photographs into documents, on the two locked test
    boxes (Stanton and RG 165, 363 pages): pages in the exact document with no checking, against price; and, in a
    table, the checks per 100 pages each needs, the pages right after checking, and the errors left unflagged.
@@ -51,6 +56,21 @@ built are in [`POTENTIAL_FEATURES.md`](POTENTIAL_FEATURES.md).
 Part 2 also reports the public/easier CREST and Lincoln segmentation boxes separately, from their frozen
 `public-segmentation/*-scores.json` files. Every supplied page was audited before collection; source gaps
 and ambiguous wrappers are disclosed beside the figures. Paid reference calls remain deferred.
+
+## Completeness rule
+
+Owner, 2026-10-21: when the bench page is updated, everything measured that a chart can take goes on it. A route
+enters every chart whose metric it was measured on, on the same pages and settings that chart uses; page sets are
+never mixed (96-page figures on the 96-page charts, the 895/440/455 public figures on the public tables, the locked
+test boxes on the segmentation test chart). Hosted routes sit at their measured price and Mac routes are free. A
+FarmShare or other cluster run of a model OpenRouter sells is priced at OpenRouter's rate for its own measured
+tokens (`data/inputs.json` → `openrouter_open_weights`, or a route's own `price`, each with the date read); a run of
+a model OpenRouter does not sell is drawn in the free column with its own marker, labelled as having no hosted
+price (free on a university cluster), with its GPU-hours shown, never as a free equivalent of a hosted route. The
+page says what each marker means. Where a chart cannot take a measured route (it lacks the per-kind scores or the
+per-page answers the chart needs), the route stays off and the page or this README says which and why. New FarmShare
+truth runs are added as `own_hardware.routes` entries in `data/inputs.json`. Known gaps today: part 5 (rankings,
+difficulty curves, cascades) covers only the routes in `ocr-pages.csv`, not the 13 FarmShare runs added to part 1.
 
 ## What is here
 
@@ -133,7 +153,8 @@ Python standard library.
   OpenRouter's catalogue list rate for the same open-weight model applied to the run's own measured tokens
   (`data/inputs.json` → `openrouter_open_weights`, read 2026-10-20). That covers the FarmShare route (□) on the
   charts, part 4's Qwen tables and the 2,000-page pilot, the segmentation teacher and the dating runs. Models that
-  fit on the Mac (CHURRO-3B, GLM-OCR, the 2B and 4B fine-tunes) stay free. Claude Sonnet 5.5 ran on the subscription, so its
+  fit on the Mac (CHURRO-3B, GLM-OCR, the 2B and 4B fine-tunes) stay free, except a FarmShare run of one OpenRouter
+  sells (Qwen3-VL 8B, at $0.25/$0.75 read 2026-10-21), which the completeness rule below prices at that rate. Claude Sonnet 5.5 ran on the subscription, so its
   price is an estimate (`data/inputs.json` → `sonnet_api_estimate`).
 - **Batch points** sit at half the measured cost, for routes whose batch price is half their standard price.
   A dotted line joins the two points.

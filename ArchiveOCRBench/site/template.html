@@ -78,7 +78,7 @@ footer p { font-size: 13px; }
   <header class="part" id="ocr">
     <div class="eyebrow">Part 1 · OCR panel · 96 truth pages</div>
     <h2>OCR price and accuracy</h2>
-    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. Some routes ran on our own hardware rather than a paid endpoint. Those on the owner's Mac sit in the free column. Qwen3.6 27B at fp8 ran on one GPU of Stanford's FarmShare cluster, which bills nothing, but it is too large for the Mac, so it is priced at what OpenRouter charges for the same model, from its own measured tokens. Each is the same model as a hosted route in the local panel, and the tables list it under that route.</p>
+    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. A failed page scores 0. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. Some routes ran on our own hardware rather than a paid endpoint. Those on the owner's Mac sit in the free column. Every open-weight model read on these 96 pages on Stanford's FarmShare cluster is here too. FarmShare bills nothing, so a FarmShare run of a model OpenRouter sells (□) is priced at what OpenRouter charges for the same model, from the run's own measured tokens. A run of a model OpenRouter does not sell (✶: GLM-OCR, LightOnOCR-3, PaddleOCR-VL 1.5, PP-OCRv6, CHURRO-3B, Qwen3.5 4B) has no hosted price: it sits in the free column, just right of the Mac routes, as free on a university cluster, and its GPU-hours are in the tables. Native rows use their model card's own prompt, as in part 4. A route on our own hardware that is the same model as a hosted route is listed in the tables under that route.</p>
   </header>
 
   <div class="legend" aria-label="Chart legend">
@@ -86,7 +86,8 @@ footer p { font-size: 13px; }
     <span><i class="sw" style="background:var(--other)"></i>Cloud panel</span>
     <span><i class="tri"></i>Local panel (small models, run hosted)</span>
     <span><i class="diamond"></i>On our Mac</span>
-    <span><i class="square"></i>Stanford FarmShare GPU</span>
+    <span><i class="square"></i>Stanford FarmShare GPU, priced at OpenRouter's rate</span>
+    <span><span aria-hidden="true" style="color:var(--other)">✶</span>FarmShare, no hosted price: free on a university cluster</span>
     <span><i class="hollow"></i><i class="dots"></i>Batch price</span>
   </div>
 
@@ -267,7 +268,8 @@ const FREE = 0.17;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const money = v => v === 0 ? 'free' : '$' + v.toFixed(2);
 const OWN = { mac: 'on our Mac', farmshare: 'Stanford FarmShare' };
-const priceCell = r => money(r.std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
+const priceCell = r => r.free_cluster ? 'no hosted price (free on the cluster)' : money(r.std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
+const FREE_CLUSTER = 0.19;  // just right of the Mac routes in the free column, so the two kinds of free stay apart
 const hwText = r => r.panel === 'mac' ? r.hw.seconds.toFixed(0) + ' s a page · ' + r.hw.peak_gb.toFixed(1) + ' GB peak (' + r.hw.peak_max_gb.toFixed(1) + ' max) · ' + r.machine
   : r.panel === 'farmshare' ? Math.round(r.hw.photos_per_hour).toLocaleString() + ' photos an hour · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 · ' + r.machine : '—';
 const overallRank = DATA.charts[0].scores;
@@ -277,17 +279,18 @@ const byId = Object.fromEntries(routes.map(r => [r.id, r]));
 // Table order: by overall score, except that a route on our own hardware sits directly under the hosted route it
 // pairs with, and the FarmShare variants shown only in the tables sit under the FarmShare route.
 const tableOrder = routes.filter(r => !r.pair).flatMap(r => [r, ...routes.filter(o => o.pair === r.id).flatMap(o =>
-  [o, ...(o.panel === 'farmshare' ? DATA.table_only.map(e => ({ ...e, num: '—', extra: true })) : [])])]);
+  [o, ...DATA.table_only.filter(e => e.under === o.id).map(e => ({ ...e, num: '—', extra: true }))])]);
 document.getElementById('nroutes').textContent = routes.length;
 
 function pointsFor(chart) {
   const P = [];
   routes.forEach(r => {
     const s = chart.scores[r.id];
-    P.push({ x: r.std || FREE, y: s[0], r, b: false, s });
-    if (r.batch) P.push({ x: r.batch, y: s[0], r, b: true, s });
+    P.push({ x: r.std || (r.free_cluster ? FREE_CLUSTER : FREE), c: r.std || FREE, y: s[0], r, b: false, s });
+    if (r.batch) P.push({ x: r.batch, c: r.batch, y: s[0], r, b: true, s });
   });
-  P.forEach(p => { p.front = !P.some(q => q !== p && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y)); });
+  // Best value compares money (c), so a route free on the cluster counts as free as a Mac route does.
+  P.forEach(p => { p.front = !P.some(q => q !== p && q.c <= p.c && q.y >= p.y && (q.c < p.c || q.y > p.y)); });
   return P;
 }
 
@@ -313,7 +316,7 @@ DATA.charts.forEach((c, ci) => {
 });
 
 document.getElementById('key').innerHTML = routes.map(r =>
-  '<span class="' + (frontIds.has(r.id) ? 'front' : '') + '"><b>' + r.num + '</b>' + r.name + (r.panel === 'local' ? ' ▵' : r.panel === 'mac' ? ' ◇' : r.panel === 'farmshare' ? ' □' : '') +
+  '<span class="' + (frontIds.has(r.id) ? 'front' : '') + '"><b>' + r.num + '</b>' + r.name + (r.panel === 'local' ? ' ▵' : r.panel === 'mac' ? ' ◇' : r.panel === 'farmshare' ? (r.free_cluster ? ' ✶' : ' □') : '') +
   (r.pair ? ' (hosted: ' + byId[r.pair].num + ')' : '') + '</span>').join('');
 
 function labelPlugin(P, freeSep = true) {
@@ -334,7 +337,7 @@ function labelPlugin(P, freeSep = true) {
     beforeDatasetsDraw(ch) {
       const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, acc = css('--accent'), oth = css('--other');
       g.save(); g.strokeStyle = css('--rule'); g.lineWidth = 1; g.setLineDash([3, 3]);
-      if (freeSep) { const sx = x.getPixelForValue(0.21); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke(); }
+      if (freeSep) { const sx = x.getPixelForValue(0.215); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke(); }
       g.setLineDash([2, 4]); g.lineWidth = 2;
       P.filter(p => p.b).forEach(b => { const s = P.find(q => q.r === b.r && !q.b); g.strokeStyle = (s.front || b.front) ? acc : oth;
         g.beginPath(); g.moveTo(x.getPixelForValue(s.x), y.getPixelForValue(s.y)); g.lineTo(x.getPixelForValue(b.x), y.getPixelForValue(b.y)); g.stroke(); });
@@ -353,19 +356,20 @@ function render() {
         { data: front, showLine: true, borderColor: acc, borderWidth: 1.5, pointRadius: 0, pointHitRadius: 0, order: 3 },
         { data: o.P, order: 1, pointHoverRadius: 8,
           pointRadius: c => c.raw && c.raw.b ? 4.5 : 6,
-          pointStyle: c => !c.raw ? 'circle' : ({ local: 'triangle', mac: 'rectRot', farmshare: 'rect' })[c.raw.r.panel] || 'circle',
+          pointStyle: c => !c.raw ? 'circle' : c.raw.r.free_cluster ? 'star' : ({ local: 'triangle', mac: 'rectRot', farmshare: 'rect' })[c.raw.r.panel] || 'circle',
           backgroundColor: c => c.raw ? (c.raw.b ? surf : col(c.raw)) : oth,
-          borderColor: c => c.raw ? (c.raw.b ? col(c.raw) : surf) : surf,
-          pointBorderWidth: c => c.raw && c.raw.b ? 2 : 1.5 } ] },
+          borderColor: c => c.raw ? (c.raw.b || c.raw.r.free_cluster ? col(c.raw) : surf) : surf,
+          pointBorderWidth: c => c.raw && (c.raw.b || c.raw.r.free_cluster) ? 2 : 1.5 } ] },
       options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 18, top: 6 } },
         plugins: { legend: { display: false }, tooltip: { filter: i => i.datasetIndex === 1, callbacks: {
           title: i => i[0].raw.r.num + '. ' + i[0].raw.r.name,
           label: i => { const p = i.raw, r = p.r; if (o.seg) return [p.y.toFixed(1) + '% of pages in the exact document, no checking',
             money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' at list price' : '')), r.checks.toFixed(1) + ' checks per 100 pages to reach ' + pct1(r.after)];
             return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
-            r.panel === 'farmshare' ? money(p.x) + ' per 1,000 pages at OpenRouter\'s rate for the same model · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos on FarmShare' : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
+            r.free_cluster ? 'no hosted price: free on a university cluster · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos on FarmShare'
+              : r.panel === 'farmshare' ? money(p.x) + ' per 1,000 pages at OpenRouter\'s rate for the same model · ' + Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos on FarmShare' : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
             r.pair ? 'run ' + OWN[r.panel] + '; hosted as ' + byId[r.pair].num + ', NES ' + o.c.scores[r.pair][0].toFixed(2)
-              : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
+              : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'farmshare' ? 'run on Stanford FarmShare' : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
           x: { type: 'logarithmic', min: o.seg ? 0.35 : 0.14, max: o.seg ? 40 : 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
             grid: { color: grid }, border: { color: grid },

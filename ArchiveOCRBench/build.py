@@ -124,9 +124,10 @@ def mac_route(spec, kinds):
             {"seconds": page_s, "peak_gb": float(peak[1]), "peak_max_gb": float(peak[3])})
 
 
-def farmshare_run(run, kinds, op):
+def farmshare_run(run, kinds, op, price=None):
     """One FarmShare run: per-kind scores from pages.csv over the 96 accuracy pages, checked against summary.json, and
-    its price at OpenRouter's rate for the same model."""
+    its price at OpenRouter's rate for the same model (or the route's own entered OpenRouter price); None when
+    OpenRouter does not sell the model."""
     d = FARMSHARE / run
     summary = json.loads((d / "summary.json").read_text())
     agree = agreement_pages()
@@ -143,8 +144,16 @@ def farmshare_run(run, kinds, op):
     return ({"overall": overall, **{k: sc([r for r in pages if r["kind"] == k]) for k in kinds}},
             {"photos_per_hour": tp["pages_per_hour_per_gpu"], "gpus": tp["gpus"],
              "gpu_hours_per_100k": 100000 / tp["pages_per_hour_per_gpu"],
-             "usd_per_1000": openrouter_price(op, summary["env"]["FS_PRESET"], tp["mean_prompt_tokens"],
-                                              tp["mean_completion_tokens"])})
+             "usd_per_1000": run_price(op, summary["env"]["FS_PRESET"], tp, price)})
+
+
+def run_price(op, preset, tp, price=None):
+    """A FarmShare run's dollars per 1,000 pages at OpenRouter's rate: a route's own entered price first, else
+    openrouter_open_weights; None for a model OpenRouter does not sell."""
+    pt, ct = tp.get("mean_prompt_tokens", 0), tp.get("mean_completion_tokens", 0)
+    if price:
+        return (pt * price["in"] + ct * price["out"]) / 1e3
+    return openrouter_price(op, preset, pt, ct)
 
 
 def segmentation(op):
@@ -277,13 +286,14 @@ def newsbench_table():
     return out
 
 
-def farmshare(op):
+def farmshare(op, own_routes):
     """The FarmShare runs (W41.farmshare-run and after): one L40S each unless noted, no money spent, but priced at
     OpenRouter's rate for the same model where it is too large for the Mac. Truth runs from their summary.json;
     newspaper runs from NewsBench's own scores of what each run wrote."""
     def usd(preset, tp):
         v = openrouter_price(op, preset, tp.get("mean_prompt_tokens", 0), tp.get("mean_completion_tokens", 0))
         return None if v is None else cents(v)
+    entered = {spec["run"]: spec["price"] for spec in own_routes.values() if spec.get("price")}
     truth = []
     for f in sorted((FARMSHARE_ROOT / "truth").glob("*/summary.json")):
         s = json.loads(f.read_text())
@@ -295,7 +305,8 @@ def farmshare(op):
                       "gpus": t["gpus"], "nes": round(100 * a["nes"], 2), "ok": a["ok"], "n": a["n"],
                       "clippings": round(100 * s["clippings"]["nes"], 2), "per_hour": t["pages_per_hour_per_gpu"],
                       "gpu_hours_100k": round(100000 / t["pages_per_hour_per_gpu"]),  # already per GPU
-                      "usd_1000": usd(env["FS_PRESET"], t)})
+                      "usd_1000": cents(run_price(op, env["FS_PRESET"], t, entered[f.parent.name]))
+                                  if f.parent.name in entered else usd(env["FS_PRESET"], t)})
     truth.sort(key=lambda r: -r["nes"])
     nb = newsbench_table()
     news = []
@@ -443,18 +454,18 @@ def main():
         if spec["where"] == "mac":
             scores, hw = mac_route(spec, inputs["kinds"])
         else:
-            scores, hw = farmshare_run(spec["run"], inputs["kinds"], op)
-            if hw["usd_per_1000"] is None:
-                sys.exit(f"{rid} runs on FarmShare but has no OpenRouter price in inputs.json")
-        # Mac routes are free; a FarmShare route is too large for the Mac, so it is priced at OpenRouter's rate.
+            scores, hw = farmshare_run(spec["run"], inputs["kinds"], op, spec.get("price"))
+        # Mac routes are free; a FarmShare run of a model OpenRouter sells is priced at OpenRouter's rate; one it
+        # does not sell has no hosted price and is drawn free, marked as free on a university cluster.
+        free_cluster = spec["where"] == "farmshare" and hw["usd_per_1000"] is None
         routes.append({"id": rid, "name": spec["name"], "panel": spec["where"], "pair": spec["pair"],
-                       "std": cents(hw["usd_per_1000"]) if spec["where"] == "farmshare" else 0.0, "batch": None,
-                       "machine": spec["machine"], "hw": hw})
+                       "std": cents(hw["usd_per_1000"]) if spec["where"] == "farmshare" and not free_cluster else 0.0,
+                       "batch": None, "free_cluster": free_cluster, "machine": spec["machine"], "hw": hw})
         for c in charts:
             c["scores"][rid] = scores[c["key"]]
     for spec in own["table_only"]:
         scores, hw = farmshare_run(spec["run"], inputs["kinds"], op)
-        extra.append({"name": spec["name"], "panel": "farmshare", "std": cents(hw["usd_per_1000"]), "machine": spec["machine"],
+        extra.append({"name": spec["name"], "panel": "farmshare", "under": spec["under"], "std": cents(hw["usd_per_1000"]), "machine": spec["machine"],
                       "hw": hw, "scores": scores})
     for c in charts:
         if any(c["scores"][r["id"]][2] != c["n"] for r in routes if r["panel"] == "farmshare") \
@@ -472,7 +483,7 @@ def main():
             elif k.removesuffix("-nothink") in op["models"]:
                 sys.exit(f"dating model {k} has an OpenRouter price but no token means in inputs.json")
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(),
-             "farmshare": farmshare(op), "difficulty": diff, "public_segmentation": public_segmentation(),
+             "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "dating": dating,
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,

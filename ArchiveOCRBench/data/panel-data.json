@@ -182,6 +182,7 @@
    "pair": "qwen3-vl-8b",
    "std": 0.0,
    "batch": null,
+   "free_cluster": false,
    "machine": "Apple M3 Pro, 18 GB",
    "hw": {
     "seconds": 40.8,
@@ -196,6 +197,7 @@
    "pair": null,
    "std": 0.0,
    "batch": null,
+   "free_cluster": false,
    "machine": "Apple M3 Pro, 18 GB",
    "hw": {
     "seconds": 23.8,
@@ -210,6 +212,7 @@
    "pair": "qwen3.5-9b",
    "std": 0.0,
    "batch": null,
+   "free_cluster": false,
    "machine": "Apple M3 Pro, 18 GB",
    "hw": {
     "seconds": 37.6,
@@ -224,6 +227,7 @@
    "pair": "qwen3.6-27b",
    "std": 1.95,
    "batch": null,
+   "free_cluster": false,
    "machine": "one NVIDIA L40S, Stanford FarmShare",
    "hw": {
     "photos_per_hour": 1054.7,
@@ -231,12 +235,221 @@
     "gpu_hours_per_100k": 94.8136910969944,
     "usd_per_1000": 1.945699494949495
    }
+  },
+  {
+   "id": "qwen3.5-27b-farmshare",
+   "name": "Qwen3.5 27B (FarmShare)",
+   "panel": "farmshare",
+   "pair": "qwen3.5-27b",
+   "std": 2.1,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 1025.6,
+    "gpus": 1,
+    "gpu_hours_per_100k": 97.50390015600625,
+    "usd_per_1000": 2.104759090909091
+   }
+  },
+  {
+   "id": "qwen3.6-35b-a3b-farmshare",
+   "name": "Qwen3.6 35B-A3B (FarmShare)",
+   "panel": "farmshare",
+   "pair": "qwen3.6-35b-a3b",
+   "std": 0.87,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 3327.0,
+    "gpus": 1,
+    "gpu_hours_per_100k": 30.057108506161708,
+    "usd_per_1000": 0.8731530303030303
+   }
+  },
+  {
+   "id": "qwen3.5-122b-a10b-farmshare",
+   "name": "Qwen3.5 122B-A10B (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 2.02,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "four NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 729.4,
+    "gpus": 4,
+    "gpu_hours_per_100k": 137.09898546750753,
+    "usd_per_1000": 2.0247670707070706
+   }
+  },
+  {
+   "id": "qwen3.8-27b-farmshare",
+   "name": "Qwen3.8 27B (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.78,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 1063.2,
+    "gpus": 1,
+    "gpu_hours_per_100k": 94.05568096313017,
+    "usd_per_1000": 0.7847862626262627
+   }
+  },
+  {
+   "id": "ling3-flash-vl-farmshare",
+   "name": "Ling 3 Flash VL fp8 (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.33,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "four NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 76.6,
+    "gpus": 4,
+    "gpu_hours_per_100k": 1305.4830287206266,
+    "usd_per_1000": 0.32656484848484846
+   }
+  },
+  {
+   "id": "qwen3-vl-8b-farmshare",
+   "name": "Qwen3-VL 8B (FarmShare)",
+   "panel": "farmshare",
+   "pair": "qwen3-vl-8b",
+   "std": 1.37,
+   "batch": null,
+   "free_cluster": false,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 1105.5,
+    "gpus": 1,
+    "gpu_hours_per_100k": 90.45680687471732,
+    "usd_per_1000": 1.3686122448979592
+   }
+  },
+  {
+   "id": "qwen3.5-4b-farmshare",
+   "name": "Qwen3.5 4B (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 1936.7,
+    "gpus": 1,
+    "gpu_hours_per_100k": 51.63422316311251,
+    "usd_per_1000": null
+   }
+  },
+  {
+   "id": "glm-ocr-farmshare",
+   "name": "GLM-OCR, native prompt (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 3463.2,
+    "gpus": 1,
+    "gpu_hours_per_100k": 28.875028875028878,
+    "usd_per_1000": null
+   }
+  },
+  {
+   "id": "lightonocr3-4b-farmshare",
+   "name": "LightOnOCR-3 4B, native (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 2628.7,
+    "gpus": 1,
+    "gpu_hours_per_100k": 38.04161752957736,
+    "usd_per_1000": null
+   }
+  },
+  {
+   "id": "lightonocr3-0.8b-farmshare",
+   "name": "LightOnOCR-3 0.8B, native (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 5527.3,
+    "gpus": 1,
+    "gpu_hours_per_100k": 18.092015993342137,
+    "usd_per_1000": null
+   }
+  },
+  {
+   "id": "paddleocr-vl1.5-farmshare",
+   "name": "PaddleOCR-VL 1.5, native (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 6203.7,
+    "gpus": 1,
+    "gpu_hours_per_100k": 16.11941260860454,
+    "usd_per_1000": null
+   }
+  },
+  {
+   "id": "ppocrv6-medium-farmshare",
+   "name": "PP-OCRv6 medium, not a VLM (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 8106.9,
+    "gpus": 1,
+    "gpu_hours_per_100k": 12.335171273853138,
+    "usd_per_1000": null
+   }
+  },
+  {
+   "id": "churro-3b-farmshare",
+   "name": "CHURRO-3B, its XML prompt (FarmShare)",
+   "panel": "farmshare",
+   "pair": null,
+   "std": 0.0,
+   "batch": null,
+   "free_cluster": true,
+   "machine": "one NVIDIA L40S, Stanford FarmShare",
+   "hw": {
+    "photos_per_hour": 1251.0,
+    "gpus": 1,
+    "gpu_hours_per_100k": 79.93605115907275,
+    "usd_per_1000": null
+   }
   }
  ],
  "table_only": [
   {
    "name": "Qwen3.6 27B fp8, bf16 KV cache (FarmShare)",
    "panel": "farmshare",
+   "under": "qwen3.6-27b-farmshare",
    "std": 1.95,
    "machine": "one NVIDIA L40S, Stanford FarmShare",
    "hw": {
@@ -271,6 +484,7 @@
   {
    "name": "Qwen3.6 27B, fp8 at load (FarmShare)",
    "panel": "farmshare",
+   "under": "qwen3.6-27b-farmshare",
    "std": 1.95,
    "machine": "one NVIDIA L40S, Stanford FarmShare",
    "hw": {
@@ -454,6 +668,71 @@
      95.25,
      96,
      96
+    ],
+    "qwen3.5-27b-farmshare": [
+     95.33,
+     96,
+     96
+    ],
+    "qwen3.6-35b-a3b-farmshare": [
+     94.51,
+     96,
+     96
+    ],
+    "qwen3.5-122b-a10b-farmshare": [
+     94.63,
+     96,
+     96
+    ],
+    "qwen3.8-27b-farmshare": [
+     93.1,
+     96,
+     96
+    ],
+    "ling3-flash-vl-farmshare": [
+     93.74,
+     96,
+     96
+    ],
+    "qwen3-vl-8b-farmshare": [
+     92.52,
+     95,
+     96
+    ],
+    "qwen3.5-4b-farmshare": [
+     90.95,
+     95,
+     96
+    ],
+    "glm-ocr-farmshare": [
+     90.9,
+     95,
+     96
+    ],
+    "lightonocr3-4b-farmshare": [
+     89.38,
+     96,
+     96
+    ],
+    "lightonocr3-0.8b-farmshare": [
+     88.0,
+     96,
+     96
+    ],
+    "paddleocr-vl1.5-farmshare": [
+     83.78,
+     86,
+     96
+    ],
+    "ppocrv6-medium-farmshare": [
+     76.85,
+     96,
+     96
+    ],
+    "churro-3b-farmshare": [
+     89.09,
+     94,
+     96
     ]
    }
   },
@@ -606,6 +885,71 @@
     "qwen3.6-27b-farmshare": [
      97.22,
      50,
+     50
+    ],
+    "qwen3.5-27b-farmshare": [
+     97.61,
+     50,
+     50
+    ],
+    "qwen3.6-35b-a3b-farmshare": [
+     96.45,
+     50,
+     50
+    ],
+    "qwen3.5-122b-a10b-farmshare": [
+     96.49,
+     50,
+     50
+    ],
+    "qwen3.8-27b-farmshare": [
+     96.18,
+     50,
+     50
+    ],
+    "ling3-flash-vl-farmshare": [
+     96.8,
+     50,
+     50
+    ],
+    "qwen3-vl-8b-farmshare": [
+     95.37,
+     50,
+     50
+    ],
+    "qwen3.5-4b-farmshare": [
+     93.57,
+     49,
+     50
+    ],
+    "glm-ocr-farmshare": [
+     93.49,
+     49,
+     50
+    ],
+    "lightonocr3-4b-farmshare": [
+     91.18,
+     50,
+     50
+    ],
+    "lightonocr3-0.8b-farmshare": [
+     91.01,
+     50,
+     50
+    ],
+    "paddleocr-vl1.5-farmshare": [
+     89.0,
+     46,
+     50
+    ],
+    "ppocrv6-medium-farmshare": [
+     90.56,
+     50,
+     50
+    ],
+    "churro-3b-farmshare": [
+     90.99,
+     49,
      50
     ]
    }
@@ -760,6 +1104,71 @@
      94.93,
      28,
      28
+    ],
+    "qwen3.5-27b-farmshare": [
+     94.98,
+     28,
+     28
+    ],
+    "qwen3.6-35b-a3b-farmshare": [
+     95.26,
+     28,
+     28
+    ],
+    "qwen3.5-122b-a10b-farmshare": [
+     94.94,
+     28,
+     28
+    ],
+    "qwen3.8-27b-farmshare": [
+     90.77,
+     28,
+     28
+    ],
+    "ling3-flash-vl-farmshare": [
+     91.24,
+     28,
+     28
+    ],
+    "qwen3-vl-8b-farmshare": [
+     91.2,
+     27,
+     28
+    ],
+    "qwen3.5-4b-farmshare": [
+     90.78,
+     28,
+     28
+    ],
+    "glm-ocr-farmshare": [
+     90.24,
+     28,
+     28
+    ],
+    "lightonocr3-4b-farmshare": [
+     88.54,
+     28,
+     28
+    ],
+    "lightonocr3-0.8b-farmshare": [
+     86.01,
+     28,
+     28
+    ],
+    "paddleocr-vl1.5-farmshare": [
+     82.45,
+     25,
+     28
+    ],
+    "ppocrv6-medium-farmshare": [
+     61.44,
+     28,
+     28
+    ],
+    "churro-3b-farmshare": [
+     88.4,
+     27,
+     28
     ]
    }
   },
@@ -911,6 +1320,71 @@
     ],
     "qwen3.6-27b-farmshare": [
      92.8,
+     16,
+     16
+    ],
+    "qwen3.5-27b-farmshare": [
+     92.1,
+     16,
+     16
+    ],
+    "qwen3.6-35b-a3b-farmshare": [
+     89.84,
+     16,
+     16
+    ],
+    "qwen3.5-122b-a10b-farmshare": [
+     89.67,
+     16,
+     16
+    ],
+    "qwen3.8-27b-farmshare": [
+     90.17,
+     16,
+     16
+    ],
+    "ling3-flash-vl-farmshare": [
+     91.18,
+     16,
+     16
+    ],
+    "qwen3-vl-8b-farmshare": [
+     89.72,
+     16,
+     16
+    ],
+    "qwen3.5-4b-farmshare": [
+     85.53,
+     16,
+     16
+    ],
+    "glm-ocr-farmshare": [
+     85.61,
+     16,
+     16
+    ],
+    "lightonocr3-4b-farmshare": [
+     88.85,
+     16,
+     16
+    ],
+    "lightonocr3-0.8b-farmshare": [
+     84.78,
+     16,
+     16
+    ],
+    "paddleocr-vl1.5-farmshare": [
+     70.81,
+     13,
+     16
+    ],
+    "ppocrv6-medium-farmshare": [
+     62.79,
+     16,
+     16
+    ],
+    "churro-3b-farmshare": [
+     87.48,
      16,
      16
     ]
@@ -1232,7 +1706,7 @@
     "clippings": 93.42,
     "per_hour": 1105.5,
     "gpu_hours_100k": 90,
-    "usd_1000": null
+    "usd_1000": 1.37
    },
    {
     "label": "qwen3.5-4b-1861700",
