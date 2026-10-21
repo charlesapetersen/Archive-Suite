@@ -102,3 +102,5 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   is for segmentation and handwriting OCR, not dating truth. It serves dating only as a check on invented dates:
   W46.date-traceable runs the tagger over the 196 pages and counts years asserted without cited evidence and not
   marked Date Uncertain. No owner labelling.
+- Box (owner, 2026-10-21): Stanford retired Box in 2023, so W46.box-collect and W46.box-ok are retired; results return
+  over SSH at each submit login. Stanford Google Drive via rclone if results ever wait too long.

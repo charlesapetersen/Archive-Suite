@@ -12398,3 +12398,8 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 | Read it | `git clone --bare "$HOME/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle" /tmp/as-original` |
 
 <!-- /bundle-reference-facts -->
+- [x] **`W46.box-collect` — results leave the cluster through Stanford Box, without SSH [S-M]** · §Document processing review — W46 (lane: segbench) (uses: light) (blocked-on: W46.box-ok, W46.cluster-waves) — First test whether FarmShare compute nodes reach the internet; then rclone upload from the cluster to stanford.box.com (approved for the owner's research data), picked up on the Mac by rclone or Box Drive, as the last job of each wave's chain; no GitHub for raw text. detail: ArchiveProcessor/scripts/segbench/institutional-compute/README.md
+  RETIRED 2026-10-21 (owner): Stanford retired its Box service on 2023-02-28 (only Stanford Medicine Box
+  remains). Cluster results come back over SSH at each submit login; Stanford Google Drive through rclone is the
+  route if results ever wait too long between logins.
+  <!-- /W46.box-collect -->
