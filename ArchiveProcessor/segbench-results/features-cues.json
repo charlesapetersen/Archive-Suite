@@ -1,0 +1,486 @@
+{
+ "dev": {
+  "base+none": {
+   "pages_exact": 0.5598455598455598,
+   "false_splits": 33,
+   "false_merges": 88,
+   "kappa": 0.5131220982324671,
+   "pq": 0.7021419009370817,
+   "mndd": 161,
+   "log_loss": 0.7260138879819553,
+   "review_gaps": 280,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.7755102040816326,
+     "review": 66,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.0,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.7624309392265194,
+     "review": 78,
+     "gaps": 167
+    }
+   }
+  },
+  "base+letter": {
+   "pages_exact": 0.555984555984556,
+   "false_splits": 35,
+   "false_merges": 90,
+   "kappa": 0.49702696098395377,
+   "pq": 0.6915280168292217,
+   "mndd": 155,
+   "log_loss": 0.7278936062848624,
+   "review_gaps": 270,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.7806122448979592,
+     "review": 62,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.0,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.7458563535911602,
+     "review": 72,
+     "gaps": 167
+    }
+   }
+  },
+  "base+layout": {
+   "pages_exact": 0.5752895752895753,
+   "false_splits": 41,
+   "false_merges": 56,
+   "kappa": 0.5973615662549365,
+   "pq": 0.7225594534788234,
+   "mndd": 91,
+   "log_loss": 0.6330603563388396,
+   "review_gaps": 414,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.6836734693877551,
+     "review": 168,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.18439716312056736,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.7624309392265194,
+     "review": 110,
+     "gaps": 167
+    }
+   }
+  },
+  "base+letter+layout": {
+   "pages_exact": 0.6081081081081081,
+   "false_splits": 41,
+   "false_merges": 53,
+   "kappa": 0.6088875412708038,
+   "pq": 0.7299579075894865,
+   "mndd": 88,
+   "log_loss": 0.6639689562024935,
+   "review_gaps": 378,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.7908163265306123,
+     "review": 145,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.1773049645390071,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.7458563535911602,
+     "review": 97,
+     "gaps": 167
+    }
+   }
+  },
+  "emb+none": {
+   "pages_exact": 0.6621621621621622,
+   "false_splits": 21,
+   "false_merges": 57,
+   "kappa": 0.6815116048403094,
+   "pq": 0.7491825396825397,
+   "mndd": 83,
+   "log_loss": 0.5314900643876713,
+   "review_gaps": 277,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.8112244897959183,
+     "review": 62,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.1773049645390071,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.8784530386740331,
+     "review": 79,
+     "gaps": 167
+    }
+   }
+  },
+  "emb+letter": {
+   "pages_exact": 0.6447876447876448,
+   "false_splits": 26,
+   "false_merges": 56,
+   "kappa": 0.6636106958976914,
+   "pq": 0.7441694169416941,
+   "mndd": 85,
+   "log_loss": 0.5361027329657291,
+   "review_gaps": 273,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.7448979591836735,
+     "review": 66,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.20567375886524822,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.8784530386740331,
+     "review": 71,
+     "gaps": 167
+    }
+   }
+  },
+  "emb+layout": {
+   "pages_exact": 0.5907335907335908,
+   "false_splits": 33,
+   "false_merges": 58,
+   "kappa": 0.6252271779908294,
+   "pq": 0.7234637008103842,
+   "mndd": 82,
+   "log_loss": 0.5423973241484914,
+   "review_gaps": 397,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.6173469387755102,
+     "review": 163,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.19858156028368795,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.8674033149171271,
+     "review": 98,
+     "gaps": 167
+    }
+   }
+  },
+  "emb+letter+layout": {
+   "pages_exact": 0.581081081081081,
+   "false_splits": 38,
+   "false_merges": 55,
+   "kappa": 0.6145740700347323,
+   "pq": 0.7194862492796342,
+   "mndd": 84,
+   "log_loss": 0.5745667055553871,
+   "review_gaps": 377,
+   "doc_gaps": 494,
+   "per_box": {
+    "Dean": {
+     "pages_exact": 0.7142857142857143,
+     "review": 150,
+     "gaps": 191
+    },
+    "Deaver": {
+     "pages_exact": 0.1773049645390071,
+     "review": 136,
+     "gaps": 136
+    },
+    "Herrnstein": {
+     "pages_exact": 0.7513812154696132,
+     "review": 91,
+     "gaps": 167
+    }
+   }
+  }
+ },
+ "public": {
+  "base+none": {
+   "Lincoln": {
+    "pages_exact": 0.3371647509578544,
+    "false_splits": 23,
+    "false_merges": 16,
+    "kappa": 0.6562711864406778,
+    "pq": 0.5817238317238318,
+    "mndd": 60,
+    "log_loss": 0.45026627005942393,
+    "review_gaps": 258,
+    "doc_gaps": 260,
+    "per_box": {
+     "Lincoln": {
+      "pages_exact": 0.3371647509578544,
+      "review": 258,
+      "gaps": 260
+     }
+    }
+   },
+   "CREST": {
+    "pages_exact": 0.125,
+    "false_splits": 19,
+    "false_merges": 10,
+    "kappa": 0.42659193523275724,
+    "pq": 0.4052362440100634,
+    "mndd": 37,
+    "log_loss": 0.7777015035170736,
+    "review_gaps": 126,
+    "doc_gaps": 127,
+    "per_box": {
+     "CREST": {
+      "pages_exact": 0.125,
+      "review": 126,
+      "gaps": 127
+     }
+    }
+   }
+  },
+  "base+letter": {
+   "Lincoln": {
+    "pages_exact": 0.32567049808429116,
+    "false_splits": 21,
+    "false_merges": 17,
+    "kappa": 0.6616438356164382,
+    "pq": 0.5973878196769763,
+    "mndd": 61,
+    "log_loss": 0.45627226156826683,
+    "review_gaps": 259,
+    "doc_gaps": 260,
+    "per_box": {
+     "Lincoln": {
+      "pages_exact": 0.32567049808429116,
+      "review": 259,
+      "gaps": 260
+     }
+    }
+   },
+   "CREST": {
+    "pages_exact": 0.1171875,
+    "false_splits": 15,
+    "false_merges": 12,
+    "kappa": 0.43049327354260103,
+    "pq": 0.40219249830109555,
+    "mndd": 33,
+    "log_loss": 0.6339405457918228,
+    "review_gaps": 125,
+    "doc_gaps": 127,
+    "per_box": {
+     "CREST": {
+      "pages_exact": 0.1171875,
+      "review": 125,
+      "gaps": 127
+     }
+    }
+   }
+  },
+  "base+layout": {
+   "Lincoln": {
+    "pages_exact": 0.4099616858237548,
+    "false_splits": 11,
+    "false_merges": 19,
+    "kappa": 0.7214285714285713,
+    "pq": 0.6191393912937077,
+    "mndd": 54,
+    "log_loss": 0.41767213288562705,
+    "review_gaps": 260,
+    "doc_gaps": 260,
+    "per_box": {
+     "Lincoln": {
+      "pages_exact": 0.4099616858237548,
+      "review": 260,
+      "gaps": 260
+     }
+    }
+   },
+   "CREST": {
+    "pages_exact": 0.0859375,
+    "false_splits": 27,
+    "false_merges": 11,
+    "kappa": 0.299767846778874,
+    "pq": 0.2565359477124183,
+    "mndd": 53,
+    "log_loss": 0.7423028494535726,
+    "review_gaps": 126,
+    "doc_gaps": 127,
+    "per_box": {
+     "CREST": {
+      "pages_exact": 0.0859375,
+      "review": 126,
+      "gaps": 127
+     }
+    }
+   }
+  },
+  "base+letter+layout": {
+   "Lincoln": {
+    "pages_exact": 0.421455938697318,
+    "false_splits": 14,
+    "false_merges": 14,
+    "kappa": 0.7472222222222223,
+    "pq": 0.6504800573428025,
+    "mndd": 56,
+    "log_loss": 0.43179669746031524,
+    "review_gaps": 260,
+    "doc_gaps": 260,
+    "per_box": {
+     "Lincoln": {
+      "pages_exact": 0.421455938697318,
+      "review": 260,
+      "gaps": 260
+     }
+    }
+   },
+   "CREST": {
+    "pages_exact": 0.109375,
+    "false_splits": 23,
+    "false_merges": 10,
+    "kappa": 0.3736362277686444,
+    "pq": 0.33242864325217264,
+    "mndd": 46,
+    "log_loss": 0.6375479200431022,
+    "review_gaps": 126,
+    "doc_gaps": 127,
+    "per_box": {
+     "CREST": {
+      "pages_exact": 0.109375,
+      "review": 126,
+      "gaps": 127
+     }
+    }
+   }
+  }
+ },
+ "weights": {
+  "next_pn_top_ge2": -1.049,
+  "next_pn_top_eq1": 0.284,
+  "next_pn_any_ge2": -0.028,
+  "pn_sequence": -0.61,
+  "next_page_of_ge2": 0.0,
+  "next_page_of_eq1": 0.0,
+  "prev_page_of_last": 0.0,
+  "next_salutation": 2.166,
+  "next_memo": 0.54,
+  "next_date_top": 0.268,
+  "prev_closing": 0.198,
+  "prev_enclosure": 0.09,
+  "prev_ends_open": -0.172,
+  "next_starts_lower": -0.274,
+  "tfidf_cosine": -1.026,
+  "abs_log_len_ratio": 0.104,
+  "prev_blank": 0.0,
+  "next_blank": 0.0,
+  "log_chars_next": 0.542,
+  "paper_diff": 1.111,
+  "paper_lum_diff": -0.576,
+  "aspect_change": 0.152,
+  "orientation_change": 0.054,
+  "ink_diff": -0.372,
+  "missing_image": 0.0,
+  "g_salutation": 0.878,
+  "g_closing": 0.691,
+  "g_both": 0.22,
+  "g_running_header": -0.274,
+  "lay_next_title_top": 0.264,
+  "lay_next_doc_title": 0.299,
+  "lay_next_text_only": -0.192,
+  "lay_prev_seal": 0.055,
+  "lay_next_seal": 0.043,
+  "lay_prev_image": 0.005,
+  "lay_next_image": 0.179,
+  "lay_next_table": -0.208,
+  "lay_hist_l1": 0.067,
+  "lay_log_regions_next": -0.023,
+  "lay_region_change": 0.147
+ },
+ "fires": {
+  "g_salutation": {
+   "fires": 137,
+   "on_boundaries": 136,
+   "boundaries": 294
+  },
+  "g_closing": {
+   "fires": 132,
+   "on_boundaries": 129,
+   "boundaries": 294
+  },
+  "g_both": {
+   "fires": 95,
+   "on_boundaries": 95,
+   "boundaries": 294
+  },
+  "g_running_header": {
+   "fires": 125,
+   "on_boundaries": 66,
+   "boundaries": 294
+  },
+  "lay_next_title_top": {
+   "fires": 236,
+   "on_boundaries": 166,
+   "boundaries": 294
+  },
+  "lay_next_doc_title": {
+   "fires": 117,
+   "on_boundaries": 86,
+   "boundaries": 294
+  },
+  "lay_next_text_only": {
+   "fires": 159,
+   "on_boundaries": 68,
+   "boundaries": 294
+  },
+  "lay_prev_seal": {
+   "fires": 2,
+   "on_boundaries": 2,
+   "boundaries": 294
+  },
+  "lay_next_seal": {
+   "fires": 2,
+   "on_boundaries": 2,
+   "boundaries": 294
+  },
+  "lay_prev_image": {
+   "fires": 67,
+   "on_boundaries": 44,
+   "boundaries": 294
+  },
+  "lay_next_image": {
+   "fires": 69,
+   "on_boundaries": 40,
+   "boundaries": 294
+  },
+  "lay_next_table": {
+   "fires": 7,
+   "on_boundaries": 2,
+   "boundaries": 294
+  }
+ }
+}
