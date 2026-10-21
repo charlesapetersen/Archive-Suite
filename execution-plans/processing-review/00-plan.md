@@ -135,6 +135,13 @@ Strands:
   and as a later option.
 - H. Whole-corpus methods: collection-level context, active learning, few-shot adaptation, and training on a user's
   own photographs, including what a coding-agent kit would need and how a trained model plugs into the Processor.
+- K. Kind identification and mixed pages (owner, 2026-10-20): page kind (typed, handwritten, printed, newspaper,
+  form, clipping, table) against our page-kind classifier (139/144 right on hand) and what readers report themselves;
+  kind changes between the pages of one document (per-page routing); and kind changes within a page (a typed letter
+  with a handwritten postscript or annotations): splitting it into typed and handwritten regions, sending each to
+  the reader that suits it, and reassembling the text layer in order. The settling question is whether one strong
+  reader on the whole mixed page is already good enough, so that region routing helps only the cheaper routes.
+  Overlaps strands D (marks) and E (layout).
 - I. Model inventory: Hugging Face and GitHub, with licence, size, positions or not, languages, and whether it runs
   on a Mac (MLX or llama.cpp) at each memory size.
 - J. Compute and prices: Sherlock's partitions, GPU types, job limits, storage and model-download rules (the
