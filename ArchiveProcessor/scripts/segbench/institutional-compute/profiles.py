@@ -31,10 +31,12 @@ def load(path):
     out = {'CLUSTER_NAME': name.strip(), 'IC_PROFILE': str(p.resolve()),
            'IC_PROFILE_SHA256': hashlib.sha256(raw).hexdigest(),
            'IC_PARTITION': slurm['partition'], 'IC_QOS': slurm['qos'], 'IC_ACCOUNT': slurm['account'],
+           # Optional: where a wave's score jobs run (wave.py), with no GPU. Empty keeps waves unavailable.
+           'IC_CPU_PARTITION': slurm.get('cpu_partition', ''), 'IC_CPU_QOS': slurm.get('cpu_qos', ''),
            'IC_GPU_NAME': gpu['name'], 'IC_GPU_GRES_TYPE': gpu['gres_type'],
            'IC_CUDA_MODE': runtime['cuda_mode'], 'IC_CUDA_HOME': os.path.expandvars(runtime['cuda_home']),
            'IC_MODULES': ' '.join(runtime['modules'])}
-    for key in ('IC_PARTITION', 'IC_QOS', 'IC_ACCOUNT', 'IC_GPU_GRES_TYPE'):
+    for key in ('IC_PARTITION', 'IC_QOS', 'IC_ACCOUNT', 'IC_GPU_GRES_TYPE', 'IC_CPU_PARTITION', 'IC_CPU_QOS'):
         if not isinstance(out[key], str) or (out[key] and not re.fullmatch(r'[A-Za-z0-9_.-]+', out[key])):
             raise ValueError(f'{key}: use a scheduler identifier, not shell syntax')
     if not out['IC_PARTITION']:

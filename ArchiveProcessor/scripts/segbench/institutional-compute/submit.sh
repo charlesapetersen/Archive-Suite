@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 # Slurm submission; --dry-run is offline and never creates paths, installs models, clones data or submits work.
 # bash submit.sh [--profile NAME|FILE] truth|seg|text|news|news-layout|bulk auto [mode options] [--dry-run]
+# wave.py adds --parsable (print the job ID only), --hold (submit held) and --after ID (--dependency=afterok:ID).
 set -euo pipefail
 cd "$(dirname "$0")"
 IC_DIR="$(pwd)"
-profile=""; positional=(); IC_PACK="" IC_IN="" IC_OUT="" IC_SHARDS=""; hours="" dry=""
+profile=""; positional=(); IC_PACK="" IC_IN="" IC_OUT="" IC_SHARDS=""; hours="" dry="" after="" extra=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --profile|--pack|--in|--out|--shards|--hours)
+    --profile|--pack|--in|--out|--shards|--hours|--after)
       [ $# -ge 2 ] || { echo "$1 needs a value" >&2; exit 2; }
       case "$1" in
         --profile) profile="$2";; --pack) IC_PACK="$2";; --in) IC_IN="$2";; --out) IC_OUT="$2";;
-        --shards) IC_SHARDS="$2";; --hours) hours="$2";;
+        --shards) IC_SHARDS="$2";; --hours) hours="$2";; --after) after="$2";;
       esac; shift 2 ;;
     --dry-run) dry=1; shift;;
+    --parsable|--hold) extra+=("$1"); shift;;
     --*) echo "unknown option $1" >&2; exit 2;;
     *) positional+=("$1"); shift;;
   esac
@@ -72,9 +74,14 @@ IC_WALL_MIN=$((want < IC_MAXWALL_MIN ? want : IC_MAXWALL_MIN))
 [ "$IC_MODE" != bulk ] || [ "$IC_WALL_MIN" -gt 15 ] || { echo 'bulk wall time must exceed its 15-minute drain period' >&2; exit 2; }
 export IC_DIR IC_MODE IC_PRESET_NAME IC_WALL_MIN IC_PACK IC_IN IC_OUT IC_SHARDS IC_CHAIN=0
 slurm_args
+if [ -n "$after" ]; then
+  # A real ID, or in a dry-run the placeholder wave.py prints for a job not yet submitted.
+  [[ "$after" =~ ^[0-9]+(_[0-9]+)?$ ]] || { [ -n "$dry" ] && [[ "$after" =~ ^\<[a-z]+\>$ ]]; } || { echo "--after needs a job ID" >&2; exit 2; }
+  extra+=("--dependency=afterok:$after")
+fi
 array=(); [ "$IC_MODE" != bulk ] || array=("--array=0-$((IC_SHARDS - 1))")
 printf 'cluster=%s; %s; %s GPU(s), %s GB/card\n' "$CLUSTER_NAME" "$IC_MODEL" "$IC_GPUS" "$IC_GPU_MEMORY_GB"
-printf '%q ' sbatch --export=ALL "${SBATCH_ARGS[@]}" ${array[@]+"${array[@]}"} job.sbatch; printf '\n'
+printf '%q ' sbatch --export=ALL "${SBATCH_ARGS[@]}" ${extra[@]+"${extra[@]}"} ${array[@]+"${array[@]}"} job.sbatch; printf '\n'
 [ -z "$dry" ] || exit 0
 if [ "$IC_MODE" = news-layout ]; then
   [ -x "$IC_ROOT/npo-venv/bin/python" ] || { echo 'news-layout needs setup-layout.sh' >&2; exit 2; }
@@ -83,4 +90,4 @@ if [ "$IC_MODE" = news ] || [ "$IC_MODE" = news-layout ]; then
   [ -d "$IC_ROOT/newsbench" ] || { echo 'fetch NewsBench first (setup-layout.sh); submit never downloads data' >&2; exit 2; }
 fi
 mkdir -p "$IC_ROOT/logs"; [ "$IC_MODE" != bulk ] || mkdir -p "$IC_OUT"
-sbatch --export=ALL "${SBATCH_ARGS[@]}" ${array[@]+"${array[@]}"} job.sbatch
+sbatch --export=ALL "${SBATCH_ARGS[@]}" ${extra[@]+"${extra[@]}"} ${array[@]+"${array[@]}"} job.sbatch

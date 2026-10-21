@@ -42,12 +42,14 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=512)   # TagGenerator's text call
     ap.add_argument("--thinking-off", action="store_true")
     ap.add_argument("--concurrency", type=int, default=16)
+    ap.add_argument("--limit", type=int, default=int(os.environ.get("IC_LIMIT") or 0), help="first N prompts only (a wave pilot)")
     a = ap.parse_args()
     out = Path(a.out) / a.label
     out.mkdir(parents=True, exist_ok=True)
     answers = out / "answers.jsonl"
     done = {json.loads(l)["id"] for l in answers.read_text().splitlines() if l.strip()} if answers.exists() else set()
     reqs = [json.loads(l) for l in (Path(a.pack) / "requests.jsonl").read_text().splitlines() if l.strip()]
+    reqs = reqs[:a.limit or None]   # a wave pilot (IC_LIMIT)
     todo = [r for r in reqs if r["id"] not in done]
     print(f"{len(reqs)} prompts, {len(todo)} to send to {a.model}", flush=True)
     lock = threading.Lock()

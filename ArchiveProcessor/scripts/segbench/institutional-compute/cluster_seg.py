@@ -135,6 +135,7 @@ def cmd_run(a):
     if meta["key"] != KEY or model != meta["model"]:
         raise SystemExit(f"the pack is for {meta['model']} ({meta['key']}); the server is serving {model}")
     windows = [json.loads(l) for l in (pack / "windows.jsonl").read_text().splitlines()]
+    windows = windows[:a.limit or None]   # a wave pilot (IC_LIMIT)
     answers = out / "answers.jsonl"
     done = {r["cache_key"] for r in answer_lines(answers)} if answers.exists() else set()
     todo = [w for w in windows if w["cache_key"] not in done]
@@ -226,6 +227,7 @@ def main():
     p.add_argument("--concurrency", type=int, default=int(os.environ.get("IC_CONCURRENCY") or 16))
     p.add_argument("--gpus", type=int, default=int(os.environ.get("IC_GPUS", 1)))
     p.add_argument("--warmup", action="store_true", help="one untimed window first")
+    p.add_argument("--limit", type=int, default=int(os.environ.get("IC_LIMIT") or 0), help="first N windows only (a wave pilot)")
     p = sub.add_parser("import"); p.add_argument("--run", required=True, help="runs/seg/<label>, brought back")
     a = ap.parse_args()
     {"pack": cmd_pack, "run": cmd_run, "import": cmd_import}[a.cmd](a)

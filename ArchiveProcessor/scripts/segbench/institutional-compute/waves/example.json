@@ -1,0 +1,8 @@
+{
+  "wave": "example",
+  "jobs": [
+    {"id": "truth-auto", "mode": "truth", "preset": "auto", "pack": "$IC_ROOT/../ic-truthpack", "hours": 2},
+    {"id": "bulk-qwen36", "mode": "bulk", "preset": "qwen3.6-27b", "in": "$IC_ROOT/../pages", "shards": 2,
+     "env": {"IC_BULK_ARGS": "--retry-escalated"}}
+  ]
+}

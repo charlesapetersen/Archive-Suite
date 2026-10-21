@@ -299,7 +299,7 @@ def cmd_truth(a):
         raise SystemExit('prompt differs from the pack: this checkout is not the one the panel ran')
     with (pack / 'pages.tsv').open() as f:
         strata = {r['page']: r for r in csv.DictReader(f, delimiter='\t')}
-    jobs = meta['jobs']
+    jobs = meta['jobs'][:a.limit or None]
     for j in jobs:
         if hashlib.sha256((pack / 'images' / (j['page'] + '.jpg')).read_bytes()).hexdigest() != j['sha256']:
             raise SystemExit('pack image differs from the frozen panel input: ' + j['page'])
@@ -329,7 +329,7 @@ def cmd_truth(a):
 def cmd_news(a):
     nb, out = Path(a.newsbench), Path(a.out) / a.label
     with (nb / 'newsbench.csv').open() as f:
-        rows = list(csv.DictReader(f))
+        rows = list(csv.DictReader(f))[:a.limit or None]
     server, load = server_from(a, a.max_tokens or NEWS_MAX_TOKENS)
     load = load or (lambda p: jpeg(p, a.side))
     items = [(Path(r['image_name']).stem, (lambda n=r['image_name']: load(nb / 'images' / n))) for r in rows]
@@ -367,6 +367,7 @@ def cmd_bulk(a):
         raise SystemExit('--shard must be I/N with 0 <= I < N')
     # By a hash of the path, not by position: a file added mid-run cannot shift others out of every shard.
     mine = [p for p in files if int(hashlib.sha1(p.relative_to(src).as_posix().encode()).hexdigest(), 16) % n == i]
+    mine = mine[:a.limit or None]   # a wave pilot (IC_LIMIT): the shard's first pages, by path
     # The image's own name plus .txt (a.jpg -> a.jpg.txt), so a.jpg and a.tif never share an output.
     target = lambda p: out / (p.relative_to(src).as_posix() + '.txt')  # noqa: E731
     escalated = set() if a.retry_escalated else {json.loads(x)['image'] for f in sorted(out.glob('escalate-*.jsonl'))
@@ -504,6 +505,8 @@ def main():
         p.add_argument('--layout', action='store_true', default=os.environ.get('IC_LAYOUT') == '1',
                        help='layout-first: DocLayout-YOLO + GLM-OCR per region (default from $IC_LAYOUT=1)')
         p.add_argument('--out', required=True)
+        p.add_argument('--limit', type=int, default=int(os.environ.get('IC_LIMIT') or 0),
+                       help='only the first N items (a wave pilot; default $IC_LIMIT, 0 = all)')
         if name == 'truth':
             p.add_argument('--pack', required=True); p.add_argument('--label', required=True)
             p.add_argument('--warmup', action='store_true', help='two untimed reads first (CUDA graphs, caches)')

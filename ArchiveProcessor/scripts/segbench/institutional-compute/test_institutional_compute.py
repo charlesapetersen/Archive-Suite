@@ -680,7 +680,7 @@ class Profiles(unittest.TestCase):
 class Shell(unittest.TestCase):
     def test_scripts_parse_and_presets_resolve(self):
         for f in ('setup.sh', 'download.sh', 'job.sbatch', 'submit.sh', 'models.sh', 'runtime.sh', 'scheduler.sh',
-                  'setup-layout.sh', 'setup-train.sh', 'train.sbatch'):
+                  'setup-layout.sh', 'setup-train.sh', 'train.sbatch', 'wave.sbatch'):
             self.assertEqual(subprocess.run(['bash', '-n', str(HERE / f)]).returncode, 0, f)
         out = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; preset qwen3.6-27b-dyn; echo "$IC_VLLM_ARGS"; '
                               'preset qwen3.6-27b; echo "$IC_MODEL|$IC_VLLM_ARGS"; preset nope; '
@@ -887,6 +887,221 @@ class NewsLayout(unittest.TestCase):
             self.assertTrue(status['bad'].startswith('error: RuntimeError'))
             self.assertEqual(status['blank'], 'empty')
             self.assertNotIn('text of', json.dumps(timing))               # no transcript text in what comes back
+
+
+FAKE_SLURM = r"""#!/bin/bash
+# A pretend Slurm for the wave tests: sbatch records the job (argv, cwd, exported env) and queues it; the test runs it.
+d="$FAKE_SLURM"; tool="$(basename "$0")"
+case "$tool" in
+  sbatch)
+    script="${@: -1}"
+    if [ -n "${FAKE_FAIL:-}" ] && [ "$(basename "$script")" = "$FAKE_FAIL" ]; then echo 'sbatch: error: invalid partition' >&2; exit 1; fi
+    n=$(cat "$d/next"); echo $((n + 1)) > "$d/next"
+    printf '%s\0' "$@" > "$d/$n.argv"; pwd > "$d/$n.cwd"; env -0 > "$d/$n.env"; echo "$n" >> "$d/queue"
+    echo "$n" ;;
+  squeue)
+    ids=""; while [ $# -gt 0 ]; do [ "$1" = -j ] && ids="$2"; shift; done
+    if [ -n "$ids" ]; then tr ',' '\n' <<<"$ids" | grep -Fx -f "$d/queue" || true; else cat "$d/queue"; fi ;;
+  scontrol|scancel) echo "$*" >> "$d/$tool" ;;
+  nvidia-smi) echo 'name, memory.total [MiB], driver_version'; echo 'Fake GPU, 81920 MiB, 0' ;;
+  nvcc) echo 'Cuda compilation tools, release 13.0' ;;
+esac
+"""
+
+FAKE_VLLM = r"""#!/usr/bin/env python3
+# `vllm serve MODEL --host H --port P ...`: the tests' Fake reader, with vLLM's /health.
+import http.server, sys
+sys.path.insert(0, sys.argv[-1])
+import test_institutional_compute as T
+class H(T.Fake):
+    def do_GET(self):
+        self.send_response(200 if self.path == '/health' else 404); self.end_headers()
+port = int(sys.argv[sys.argv.index('--port') + 1])
+http.server.ThreadingHTTPServer(('127.0.0.1', port), H).serve_forever()
+"""
+
+
+class Wave(unittest.TestCase):
+    """wave.py against a pretend Slurm: the chain's submission, and its jobs run for real against the fake reader."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='ic wave '))
+        bench = self.tmp / 'segbench'; bench.mkdir()
+        for f in HERE.parent.glob('*.py'):   # cluster_ocr imports the panel from the folder above
+            (bench / f.name).symlink_to(f)
+        self.kit = bench / 'institutional-compute'
+        shutil.copytree(HERE, self.kit, ignore=shutil.ignore_patterns('__pycache__', '*.env'))
+        self.profile = self.kit / 'profiles/test.json'
+        data = json.loads((self.kit / 'profiles/example-university.json').read_text())
+        data['paths'] = {'scratch': str(self.tmp / 'scratch'), 'storage': str(self.tmp / 'storage')}
+        data['runtime'] = {'modules': [], 'cuda_mode': 'modules', 'cuda_home': ''}
+        data['slurm'].update(max_submitted_jobs=12, max_running_jobs=4, max_gpus_per_user=4)
+        self.profile.write_text(json.dumps(data))
+        cfg = C.load(self.profile)
+        self.root = Path(cfg['IC_ROOT'])
+        self.slurm = self.tmp / 'slurm'; self.slurm.mkdir(); (self.slurm / 'next').write_text('7001')
+        (self.slurm / 'queue').write_text('')
+        fake_bin = self.tmp / 'bin'; fake_bin.mkdir()
+        (fake_bin / 'fake-slurm').write_text(FAKE_SLURM)
+        for tool in ('sbatch', 'squeue', 'scontrol', 'scancel', 'nvidia-smi', 'nvcc'):
+            (fake_bin / tool).symlink_to(fake_bin / 'fake-slurm')
+        (fake_bin / 'fake-slurm').chmod(0o755)
+        vllm = fake_bin / 'vllm'; vllm.write_text(FAKE_VLLM.replace('sys.argv[-1]', repr(str(HERE)))); vllm.chmod(0o755)
+        cfg.update({'IC_PY': sys.executable, 'IC_VLLM': str(vllm), 'HF_HOME': str(self.tmp / 'hf')})
+        (self.kit / 'compute.env').write_text(C.shell(cfg))
+        (self.kit / 'limits.env').write_text(C.shell({k: cfg[k] for k in (
+            'IC_GPUS_PER_NODE', 'IC_MAXGPU_PU', 'IC_MAXJOBS_PU', 'IC_MAXSUBMIT_PU', 'IC_MAXWALL_MIN')}))
+        self.env = dict(os.environ, PATH=f'{fake_bin}{os.pathsep}{os.environ["PATH"]}', FAKE_SLURM=str(self.slurm),
+                        USER='tester')
+        for k in [k for k in self.env if k.startswith(('IC_', 'SLURM_'))]:
+            del self.env[k]
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def images(self, folder, colours):
+        from PIL import Image
+        for name, colour in colours.items():
+            (folder / name).parent.mkdir(parents=True, exist_ok=True)
+            Image.new('RGB', (600, 800), colour).save(folder / name)
+
+    def wave(self, jobs):
+        path = self.tmp / 'wave.json'; path.write_text(json.dumps({'wave': 'w1', 'jobs': jobs})); return path
+
+    def submit(self, wave, *extra, env=None):
+        return subprocess.run([sys.executable, str(self.kit / 'wave.py'), 'submit', str(wave), '--profile',
+                               str(self.profile), *extra], env=env or self.env, capture_output=True, text=True, timeout=60)
+
+    def job(self, n):
+        argv = (self.slurm / f'{n}.argv').read_bytes().decode().split('\0')[:-1]
+        env = dict(x.split('=', 1) for x in (self.slurm / f'{n}.env').read_bytes().decode().split('\0') if '=' in x)
+        return argv, env
+
+    def run_job(self, n, task=None, **override):
+        """What Slurm would do with job n: run its script with the environment sbatch exported."""
+        argv, env = self.job(n)
+        env.update(SLURM_JOB_ID=str(n), **override)
+        if task is not None:
+            env['SLURM_ARRAY_TASK_ID'] = str(task)
+        queue = [x for x in (self.slurm / 'queue').read_text().split() if x != str(n)]
+        (self.slurm / 'queue').write_text(''.join(x + '\n' for x in queue))
+        cwd = (self.slurm / f'{n}.cwd').read_text().strip()
+        return subprocess.run(['bash', str(Path(cwd) / argv[-1])], cwd=cwd, env=env, capture_output=True, text=True,
+                              timeout=120)
+
+    def test_example_wave_is_valid_and_dry_run_needs_nothing(self):
+        import wave as W
+        data = W.load_wave(HERE / 'waves/example.json', '/scratch/x/institutional-compute')
+        self.assertEqual(data['jobs'][0]['pack'], '/scratch/x/ic-truthpack')
+        for bad in ({'id': 'a', 'mode': 'news-layout', 'preset': 'auto'},
+                    {'id': 'a', 'mode': 'bulk', 'preset': 'auto', 'in': '/x', 'env': {'IC_LIMIT': '9'}},
+                    {'id': 'a', 'mode': 'bulk', 'preset': 'auto', 'in': 'relative'},
+                    {'id': 'a', 'mode': 'truth', 'preset': 'auto'},
+                    {'id': 'a b', 'mode': 'truth', 'preset': 'auto', 'pack': '/x'}):
+            with self.assertRaises(ValueError, msg=bad):
+                W.load_wave(self.wave([bad]), '/r')
+        inp = self.tmp / 'pages'; self.images(inp, {'a.png': (0, 0, 0)})
+        for f in ('compute.env', 'limits.env'):
+            (self.kit / f).unlink()
+        wave = self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp), 'shards': 2},
+                          {'id': 'later', 'mode': 'bulk', 'preset': 'auto', 'in': str(self.tmp / 'not yet')}])
+        r = self.submit(wave, '--dry-run')
+        self.assertEqual(r.returncode, 3, r.stderr)          # one job not ready
+        self.assertIn('later: not ready', r.stdout)
+        lines = {l.split(':')[0].strip(): l for l in r.stdout.splitlines() if l.startswith('  ')}
+        self.assertIn('--hold', lines['pilot']); self.assertIn('--array=0-0', lines['pilot'])
+        self.assertIn(r'--dependency=afterok:\<pilot\>', lines['full']); self.assertIn('--array=0-1', lines['full'])
+        self.assertIn('--partition=general', lines['score']); self.assertNotIn('--gres', lines['score'])
+        self.assertEqual(sorted(self.slurm.iterdir()), [self.slurm / 'next', self.slurm / 'queue'])
+        self.assertFalse(self.root.exists())
+
+    def test_chain_runs_pilot_then_full_with_a_requeued_shard_then_score(self):
+        inp = self.tmp / 'pages'
+        self.images(inp, {f'box/p{k}.png': (0, 0, 0) for k in range(6)})
+        wave = self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp), 'shards': 2,
+                           'score': ['python3', '-c', 'import json, pathlib, sys; full, res = map(pathlib.Path, sys.argv[1:]); '
+                                     '(res / "count.json").write_text(json.dumps({"txt": len(list(full.rglob("*.txt"))), '
+                                     '"dir": sys.argv[1]}))', '{full}', '{results}']}])
+        r = self.submit(wave)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        pilot, full, score = 7001, 7002, 7003
+        self.assertIn('--hold', self.job(pilot)[0])
+        self.assertIn(f'--dependency=afterok:{pilot}', self.job(full)[0])
+        self.assertIn(f'--dependency=afterany:{full}', self.job(score)[0])
+        self.assertEqual((self.slurm / 'scontrol').read_text(), f'release {pilot}\n')
+        self.assertEqual(self.job(pilot)[1]['IC_LIMIT'], '3'); self.assertEqual(self.job(full)[1]['IC_LIMIT'], '')
+        again = self.submit(wave)                             # a second submit never doubles a chain
+        self.assertIn('already submitted', again.stdout); self.assertFalse((self.slurm / f'{score + 1}.argv').exists())
+
+        jd = self.root / 'waves/w1/b'
+        r = self.run_job(pilot, 0)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('pilot gate: 3 of 3 items read', r.stdout)
+        self.assertEqual(len(list((jd / 'bulk/pilot').rglob('*.txt'))), 3)
+        self.assertTrue((jd / 'state/pilot-0').read_text().startswith('rc=0'))
+        self.assertEqual(self.run_job(full, 0).returncode, 0)
+        # Shard 1 runs out of time: it queues itself again, and the score job waits for the new job.
+        r = self.run_job(full, 1, IC_BULK_ARGS='--deadline 1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        requeued = score + 1
+        self.assertIn(f'requeued {requeued}', (jd / 'state/full-1').read_text())
+        r = self.run_job(score)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        rescore = requeued + 1
+        self.assertIn(f'--dependency=afterany:{requeued}', self.job(rescore)[0])
+        self.assertIn('--partition=general', self.job(rescore)[0])
+        self.assertFalse((self.root / 'waves/w1/results/b/status.json').exists())
+        self.assertEqual(self.run_job(requeued, 1, IC_BULK_ARGS='').returncode, 0)
+        r = self.run_job(rescore)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        res = self.root / 'waves/w1/results/b'
+        status = json.loads((res / 'status.json').read_text())
+        self.assertEqual(status['status'], 'ok', status)
+        self.assertEqual(len(list((jd / 'bulk/full').rglob('*.txt'))), 6)
+        count = json.loads((res / 'count.json').read_text())   # the job's own score command ran, on the full run
+        self.assertEqual((count['txt'], count['dir']), (6, str(jd / 'bulk/full')))
+        self.assertTrue((res / 'full/throughput.jsonl').exists())
+        self.assertEqual([p for p in res.rglob('*') if p.suffix == '.txt' or '_meta' in p.parts], [])
+        st = subprocess.run([sys.executable, str(self.kit / 'wave.py'), 'status', str(wave), '--profile', str(self.profile)],
+                            env=self.env, capture_output=True, text=True)
+        self.assertIn('b: ok', st.stdout)
+
+    def test_failed_pilot_cancels_the_chain_and_reports(self):
+        inp = self.tmp / 'pages'
+        self.images(inp, {'a.png': (0, 0, 0), 'b.png': (255, 0, 0), 'c.png': (0, 0, 0), 'd.png': (0, 0, 0)})
+        r = self.submit(self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp)}]))
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        r = self.run_job(7001, 0)                             # b.png is cut off at max_tokens: not read
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual((self.slurm / 'scancel').read_text(), '7002 7003\n')
+        status = json.loads((self.root / 'waves/w1/results/b/status.json').read_text())
+        self.assertEqual(status['status'], 'pilot-failed')
+        self.assertEqual(status['reason'], 'pilot gate: 2 of 3 items read; pilot job exit 1')
+        self.assertTrue((self.root / 'waves/w1/results/b/pilot/failed-0.jsonl').exists())
+
+    def test_full_run_failure_is_reported_by_the_score_job(self):
+        inp = self.tmp / 'pages'; self.images(inp, {'a.png': (0, 0, 0)})
+        self.submit(self.wave([{'id': 'b', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp)}]))
+        jd = self.root / 'waves/w1/b'
+        (jd / 'state/full-0').write_text('rc=1 job=7002 \n')    # the full run crashed
+        self.assertNotEqual(self.run_job(7003).returncode, 0)
+        status = json.loads((self.root / 'waves/w1/results/b/status.json').read_text())
+        self.assertEqual((status['status'], status['reason']), ('failed', 'shard 0: exit 1'))
+
+    def test_refused_score_job_leaves_nothing_queued_and_limits_hold_back_jobs(self):
+        inp = self.tmp / 'pages'; self.images(inp, {'a.png': (0, 0, 0)})
+        wave = self.wave([{'id': 'x', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp)}])
+        r = self.submit(wave, env=dict(self.env, FAKE_FAIL='wave.sbatch'))
+        self.assertEqual(r.returncode, 3)
+        self.assertIn('invalid partition', r.stderr)
+        self.assertEqual((self.slurm / 'scancel').read_text(), '7001 7002\n')
+        self.assertFalse((self.slurm / 'scontrol').exists())  # the held pilot was never released
+        self.assertFalse((self.root / 'waves/w1/x/chain.json').exists())
+        (self.slurm / 'queue').write_text(''.join(f'{k}\n' for k in range(9)))   # 9 of 12 places taken
+        wave = self.wave([{'id': 'y', 'mode': 'bulk', 'preset': 'auto', 'in': str(inp), 'shards': 2}])
+        r = self.submit(wave)
+        self.assertEqual(r.returncode, 3)
+        self.assertIn('needs 4 queue places and 3 are free', r.stdout)
 
 
 if __name__ == '__main__':
